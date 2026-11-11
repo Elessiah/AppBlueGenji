@@ -8,6 +8,7 @@ import {
   orphanStreamIds,
   pruneMatchStreams,
   staffStream,
+  unmarkUncastMatches,
   withdrawUserCasts,
   type MatchStreamRow,
 } from "@/lib/server/tournaments/match-casters";
@@ -97,6 +98,7 @@ type WorldMatch = {
   referee_user_id: number | null;
   referee_ready_at: string | null;
   live_trigger_user_id?: number | null;
+  live_trigger?: string | null;
 };
 
 const matchOf = (row: { match_id?: number }) => row.match_id ?? 42;
@@ -104,20 +106,22 @@ const flat = (sql: string) => sql.replace(/\s+/g, " ").trim();
 
 type WorldState = { streams: WorldStream[]; casters: WorldCaster[]; matches: WorldMatch[]; locked: number[][] };
 
-/** Les trois lectures de départ de `withdrawUserCasts`, et le verrou de ses matchs. */
+/** La lecture de départ de `withdrawUserCasts` (une `UNION ALL`), et le verrou de ses matchs. */
 function readWithdrawRows(state: WorldState, sql: string, params: unknown[]): unknown[] | null {
   const userId = params[0];
-  if (sql === "SELECT match_id FROM bg_match_casters WHERE user_id = ? ORDER BY match_id") {
-    return [state.casters.filter((c) => c.user_id === userId).map((c) => ({ match_id: matchOf(c) }))];
-  }
-  if (sql === "SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id") {
-    return [[...new Set(state.streams.filter((s) => s.link_user_id === userId).map(matchOf))].map((id) => ({ match_id: id }))];
-  }
-  if (sql === "SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id") {
-    return [state.matches.filter((m) => m.referee_user_id === userId).map((m) => ({ match_id: m.id }))];
-  }
-  if (sql === "SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id") {
-    return [state.matches.filter((m) => m.live_trigger_user_id === userId).map((m) => ({ match_id: m.id }))];
+  if (sql.startsWith("SELECT 'C' AS kind, c.match_id FROM bg_match_casters c JOIN bg_matches cm")) {
+    const includeCompleted = params[1] === 1;
+    const statusOf = (id: number) => state.matches.find((m) => m.id === id)?.status;
+    return [
+      [
+        ...state.casters
+          .filter((c) => c.user_id === userId && (includeCompleted || statusOf(matchOf(c)) !== "COMPLETED"))
+          .map((c) => ({ kind: "C", match_id: matchOf(c) })),
+        ...state.streams.filter((s) => s.link_user_id === userId).map((s) => ({ kind: "L", match_id: matchOf(s) })),
+        ...state.matches.filter((m) => m.referee_user_id === userId).map((m) => ({ kind: "R", match_id: m.id })),
+        ...state.matches.filter((m) => m.live_trigger_user_id === userId).map((m) => ({ kind: "T", match_id: m.id })),
+      ],
+    ];
   }
   if (sql.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
     state.locked.push(params as number[]);
@@ -148,6 +152,18 @@ function applyWithdrawWrites(state: WorldState, sql: string, params: unknown[]):
     const owned = state.matches.filter((m) => m.live_trigger_user_id === userId && ids.includes(m.id));
     for (const m of owned) m.live_trigger_user_id = null;
     return [{ affectedRows: owned.length }];
+  }
+  // Démarquage d'un match non joué resté sans stream (`unmarkUncastMatches`).
+  if (sql.startsWith("UPDATE bg_matches m SET m.live_trigger = NULL")) {
+    const unmarked = state.matches.filter(
+      (m) =>
+        params.includes(m.id) &&
+        m.status !== "COMPLETED" &&
+        (m.live_trigger ?? null) !== null &&
+        !state.streams.some((st) => matchOf(st) === m.id),
+    );
+    for (const m of unmarked) Object.assign(m, { live_trigger: null, live_trigger_user_id: null });
+    return [{ affectedRows: unmarked.length }];
   }
   if (sql.startsWith("UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE referee_user_id = ? AND id IN")) {
     const refereed = state.matches.filter((m) => m.referee_user_id === userId && ids.includes(m.id));
@@ -328,10 +344,35 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(w.sqls()).toContain("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
   });
 
-  it("withdrawUserCasts_allCastsDropped_noBattletagUpdate", async () => {
+  it("withdrawUserCasts_erasure_noBattletagUpdate", async () => {
+    // Effacement : toutes les inscriptions partent, il n'y a rien à vider.
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.sqls().some((sql) => sql.includes("cast_battletag"))).toBe(false);
+  });
+
+  it("withdrawUserCasts_anonymisationOfOpenCast_clearsBattletagWithoutStaleCount", async () => {
+    // Le match était à jouer à la lecture de départ : l'effacement du BattleTag
+    // de cast ne dépend plus d'un décompte lu avant les verrous.
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }]);
     await withdrawUserCasts(w.connection, 12, false);
-    expect(w.sqls().some((sql) => sql.includes("cast_battletag"))).toBe(false);
+    expect(w.sqls()).toContain("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
+  });
+
+  it("withdrawUserCasts_anonymisation_doesNotLockCompletedCastOnly", async () => {
+    // Un cast gardé sur un match joué n'est pas candidat : rien à verrouiller.
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.state.locked).toEqual([]);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 0, 12, 12, 12]);
+  });
+
+  it("withdrawUserCasts_startLists_readInOneStatement", async () => {
+    const w = world([], [{ user_id: 12, stream_id: 4 }]);
+    await withdrawUserCasts(w.connection, 12, true);
+    const first = w.sqls()[0];
+    for (const kind of ["'C'", "'L'", "'R'", "'T'"]) expect(first).toContain(`${kind} AS kind`);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 1, 12, 12, 12]);
   });
 
   it("effacement : le cast d'un match joué part aussi", async () => {
@@ -344,8 +385,8 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
   it("ne touche à rien pour un compte qui ne caste rien et n'a fourni aucun lien", async () => {
     const w = world([{ id: 3, live_url: "https://twitch.tv/autre", link_user_id: 9 }], [{ user_id: 9, stream_id: 3 }]);
     expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(untouched);
-    // Les quatre lectures (casts, liens, arbitrages, modes d'antenne), rien d'autre.
-    expect(w.execute).toHaveBeenCalledTimes(4);
+    // Une seule lecture (casts, liens, arbitrages, modes d'antenne), rien d'autre.
+    expect(w.execute).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -392,7 +433,8 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
     await withdrawUserCasts(w.connection, 12, true);
     expect(w.state.streams).toEqual([staff]);
     const sqls = w.execute.mock.calls.map(([sql]) => sql.replace(/\s+/g, " ").trim());
-    expect(sqls[1]).toBe("SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id");
+    // Les liens fournis se lisent par `link_user_id`, dans la lecture de départ unique.
+    expect(sqls[0]).toContain("UNION ALL SELECT 'L' AS kind, match_id FROM bg_match_streams WHERE link_user_id = ?");
     expect(sqls.some((sql) => sql.startsWith("UPDATE bg_match_streams"))).toBe(false);
   });
 
@@ -565,5 +607,71 @@ describe("lien de l'organisation — décision du 2026-11-10", () => {
     const streams = (await loadMatchStreams(fakeConnection({ execute }), [42])).get(42);
 
     expect(streams?.map((row) => row.organisation)).toEqual([true, false, false]);
+  });
+});
+
+describe("withdrawUserCasts — démarquage d'un match resté sans stream (#296)", () => {
+  const marked = (status = "READY") => ({
+    id: 42,
+    tournament_id: 2,
+    status,
+    referee_user_id: null,
+    referee_ready_at: null,
+    live_trigger: "AUTO",
+    live_trigger_user_id: 12,
+  });
+
+  function markedWorld(streams: WorldStream[], casters: WorldCaster[], status = "READY") {
+    const w = world(streams, casters);
+    w.state.matches = [marked(status)];
+    return w;
+  }
+
+  it("withdrawUserCasts_lastStreamGone_unmarksOpenMatch", async () => {
+    const w = markedWorld([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 12, stream_id: 4 }]);
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.streams).toEqual([]);
+    expect(w.state.matches[0]).toMatchObject({ live_trigger: null, live_trigger_user_id: null });
+  });
+
+  it("withdrawUserCasts_coCasterKeepsStream_matchStaysMarked", async () => {
+    const w = markedWorld(
+      [{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }],
+      [{ user_id: 12, stream_id: 4 }, { user_id: 9, stream_id: 4 }],
+    );
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.matches[0].live_trigger).toBe("AUTO");
+  });
+
+  it("withdrawUserCasts_staffLinkRemains_matchStaysMarked", async () => {
+    const w = markedWorld(
+      [{ id: 3, live_url: "https://twitch.tv/bluegenji", staff_owned: 1, link_user_id: null }],
+      [{ user_id: 12, stream_id: 3 }],
+    );
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.matches[0].live_trigger).toBe("AUTO");
+  });
+
+  it("withdrawUserCasts_completedMatch_neverUnmarked", async () => {
+    const w = markedWorld([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 12, stream_id: 4 }], "COMPLETED");
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.matches[0].live_trigger).toBe("AUTO");
+    const unmark = w.sqls().find((sql) => sql.startsWith("UPDATE bg_matches m SET m.live_trigger = NULL"));
+    expect(unmark).toContain("m.status <> 'COMPLETED'");
+    expect(unmark).toContain("NOT EXISTS (SELECT 1 FROM bg_match_streams us WHERE us.match_id = m.id)");
+  });
+});
+
+describe("unmarkUncastMatches — un seul UPDATE, rien sans match", () => {
+  it("unmarkUncastMatches_noIds_noQuery", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [{ affectedRows: 0 }]);
+    expect(await unmarkUncastMatches(fakeConnection({ execute }), [])).toBe(0);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("unmarkUncastMatches_returnsAffectedRows", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [{ affectedRows: 2 }]);
+    expect(await unmarkUncastMatches(fakeConnection({ execute }), [4, 7])).toBe(2);
+    expect(execute.mock.calls[0][1]).toEqual([4, 7]);
   });
 });

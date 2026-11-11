@@ -401,6 +401,23 @@ function readMatchRows(state: World, sql: string) {
   return [state.match ? [{ ...state.match }] : [], []];
 }
 
+/**
+ * Les deux lectures groupées de `playingUserIds` (casters devenus joueurs de
+ * l'appariement qui arrive) : `[...comptes, ...équipes]`.
+ */
+function readBatchedParty(state: World, sql: string, params: unknown[]): unknown[] | null {
+  const solo = /^SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IN \(([?, ]+)\)/.exec(sql);
+  const members = /^SELECT DISTINCT tm\.user_id FROM bg_team_members tm WHERE tm\.user_id IN \(([?, ]+)\)/.exec(sql);
+  const match = solo ?? members;
+  if (!match) return null;
+  const count = match[1].split("?").length - 1;
+  const users = params.slice(0, count).map(Number);
+  const teams = params.slice(count).map(Number);
+  const entries = solo ? state.soloEntries : state.memberships;
+  const rows = entries.filter((e) => users.includes(e.userId) && teams.includes(e.teamId)).map((e) => ({ user_id: e.userId }));
+  return [rows, []];
+}
+
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
@@ -419,6 +436,8 @@ function executeFor(state: World) {
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
+    const batchedParty = readBatchedParty(state, sql, params);
+    if (batchedParty) return batchedParty;
     if (sql.includes("solo_user_id = ?")) {
       const userId = Number(params[0]);
       const ids = params.slice(1).map(Number);
@@ -668,6 +687,39 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
 
     // Le mode reste au match, au staff : plus au nom d'un caster parti.
     expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
+  });
+
+  it("maintainMatchLaunches_casterJoinedTeam_reportsCastReleased", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    const report = { castReleased: false };
+    await maintainMatchLaunches(connectionFor(state), 7, report);
+    expect(report.castReleased).toBe(true);
+  });
+
+  it("maintainMatchLaunches_noCasterRemoved_reportStaysFalse", async () => {
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    const report = { castReleased: false };
+    await maintainMatchLaunches(connectionFor(state), 7, report);
+    expect(casterOf(state)).toBe(CASTER);
+    expect(report.castReleased).toBe(false);
+  });
+
+  it("adoptCurrentPairing_severalCasters_twoGroupedPartyReads", async () => {
+    // Deux casters, dont un seul joue l'appariement qui arrive : deux lectures en tout.
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.users[901] = ELIGIBLE_CASTER;
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: null });
+    state.issued = [];
+    await maintainMatchLaunches(connectionFor(state), 7);
+    const partyReads = state.issued.filter(
+      (sql) => sql.startsWith("SELECT solo_user_id AS user_id") || sql.startsWith("SELECT DISTINCT tm.user_id"),
+    );
+    expect(partyReads).toHaveLength(2);
+    expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([901]);
   });
 
   it("maintainMatchLaunches_releasedCasterNotOwner_keepsOwner", async () => {
@@ -1071,7 +1123,7 @@ describe("releaseMatchCast", () => {
     state.issued = [];
     await releaseMatchCast(42, CASTER, false);
     expect(state.match?.streams).toEqual([]);
-    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?");
+    expect(state.issued.some((sql) => sql.startsWith("UPDATE bg_matches m SET m.live_trigger = NULL"))).toBe(true);
   });
 
   it("releaseMatchCast_staffStreamWithLinkRemains_keepsTrigger", async () => {
@@ -1323,6 +1375,23 @@ describe("releaseIneligibleCast", () => {
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
 
     expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
+  });
+
+  it("releaseIneligibleCast_lastStreamGone_unmarksMatch", async () => {
+    // Retrait d'office du seul caster : son stream part, le match n'est plus casté (#296).
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "AUTO", streams: [{ id: 1, live_url: "https://twitch.tv/voix" }] });
+    state.issued = [];
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+    expect(state.issued.some((sql) => sql.startsWith("UPDATE bg_matches m SET m.live_trigger = NULL"))).toBe(true);
+  });
+
+  it("releaseIneligibleCast_unmarkedMatch_noUnmarkQuery", async () => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: null });
+    state.issued = [];
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+    expect(state.issued.some((sql) => sql.startsWith("UPDATE bg_matches m SET m.live_trigger = NULL"))).toBe(false);
   });
 
   it("garde un compte redevenu éligible", async () => {

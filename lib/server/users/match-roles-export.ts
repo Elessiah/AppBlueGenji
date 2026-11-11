@@ -66,11 +66,13 @@ async function tolerantRows<T extends RowDataPacket>(
  * T16) et ses arbitrages désignés (`bg_matches.referee_user_id`, avec son
  * « Prêt », registre T04) et les modes d'antenne qu'il a posés
  * (`bg_matches.live_trigger_user_id`, registre T16) — ce que le site garde avec
- * le match. Quatre lectures, chacune par l'index du compte.
+ * le match. Quatre lectures indépendantes, chacune par l'index du compte,
+ * lancées ensemble (le pool les sert en parallèle).
  */
 export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> {
   const db = await getDatabase();
-  const casts = await tolerantRows<
+  const [casts, links, refereed, triggers] = await Promise.all([
+    tolerantRows<
     RowDataPacket & {
       match_id: number;
       tournament_id: number;
@@ -92,8 +94,8 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       { expr: "c.cast_battletag", alias: "cast_battletag" },
     ],
     userId,
-  );
-  const links = await tolerantRows<
+  ),
+    tolerantRows<
     RowDataPacket & { match_id: number; tournament_id: number; live_url: string | null; created_at: Date | null }
   >(
     db,
@@ -104,19 +106,20 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       ORDER BY ${has("created_at") ? "s.created_at, " : ""}s.match_id`,
     [{ expr: "s.created_at", alias: "created_at" }],
     userId,
-  );
-  const refereed = await tolerantRows<RowDataPacket & { id: number; tournament_id: number; referee_ready_at: Date | null }>(
+  ),
+    tolerantRows<RowDataPacket & { id: number; tournament_id: number; referee_ready_at: Date | null }>(
     db,
     (columns) => `SELECT id, tournament_id, ${columns} FROM bg_matches WHERE referee_user_id = ? ORDER BY id`,
     [{ expr: "referee_ready_at", alias: "referee_ready_at" }],
     userId,
-  );
-  const triggers = await tolerantRows<RowDataPacket & { id: number; tournament_id: number; live_trigger: string | null }>(
+  ),
+    tolerantRows<RowDataPacket & { id: number; tournament_id: number; live_trigger: string | null }>(
     db,
     (columns) => `SELECT id, tournament_id, ${columns} FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`,
     [{ expr: "live_trigger", alias: "live_trigger" }],
     userId,
-  );
+  ),
+  ]);
   return {
     casts: casts.map((row) => ({
       matchId: Number(row.match_id),

@@ -148,10 +148,14 @@ La fenêtre n'envoie le mode d'antenne que si le caster en a **choisi** un autre
 un match démarqué montre « automatique » sans qu'enregistrer un BattleTag le
 marque casté.
 
-Le dernier caster qui se retire (`releaseMatchCast`) sans qu'aucun stream ne
-reste — ni celui du staff avec son lien — démarque le match (`live_trigger` et
-`live_started_at` vidés) : l'inscription l'avait marqué casté, il ne passerait
-sinon « En direct » à son lancement pour personne.
+Le dernier caster qui part sans qu'aucun stream ne reste — ni celui du staff
+avec son lien — démarque le match (`live_trigger` et `live_started_at` vidés,
+`unmarkUncastMatches`) : l'inscription l'avait marqué casté, il ne passerait
+sinon « En direct » à son lancement pour personne. La règle vaut pour **tout**
+départ d'un match non joué : retrait volontaire ou par le staff
+(`releaseMatchCast`), retrait d'office (inéligible ou devenu joueur :
+`releaseIneligibleCast`, l'entretien des lancements) et suppression du compte
+(`withdrawUserCasts`). Un match joué garde son mode.
 
 Le BattleTag de cast figure dans l'export des données du caster
 (`casts[].castBattletag`, `listOwnMatchRoles`). Il part avec l'inscription ; sur un match joué gardé à

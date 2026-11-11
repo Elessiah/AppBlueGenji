@@ -11,7 +11,7 @@
  * bandeaux, accueil) et que lisent les annonces #live : une seule définition,
  * {@link firstStreamUrlSql}.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import { staffStream } from "@/lib/shared/live-streams";
 import { verifiedBattletagSql } from "@/lib/server/battletag-origin";
@@ -373,6 +373,26 @@ async function pruneStreamsOf(connection: Executor, matchIds: readonly number[])
 }
 
 /**
+ * Démarque (`live_trigger`, son maître et l'ouverture d'antenne vidés) ceux de
+ * ces matchs, **non joués**, qui n'ont plus aucun stream — ni de caster, ni
+ * celui du staff avec son lien. L'inscription d'un caster marque le match
+ * casté (`CAST_SETTINGS.md`) : son dernier stream parti, il passerait sinon
+ * « En direct » à son lancement sans que personne ne diffuse. Une seule
+ * instruction pour tous ; l'appelant tient déjà le verrou de leurs lignes.
+ * Rend le nombre de matchs démarqués.
+ */
+export async function unmarkUncastMatches(connection: Executor, matchIds: readonly number[]): Promise<number> {
+  if (matchIds.length === 0) return 0;
+  const [result] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_matches m SET m.live_trigger = NULL, m.live_trigger_user_id = NULL, m.live_started_at = NULL
+      WHERE m.id IN (${placeholders(matchIds)}) AND m.status <> 'COMPLETED' AND m.live_trigger IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM bg_match_streams us WHERE us.match_id = m.id)`,
+    [...matchIds],
+  );
+  return Number(result?.affectedRows ?? 0);
+}
+
+/**
  * Retire un compte de tous les casts et de tous les arbitrages qui le nomment
  * encore — suppression de compte (`lib/server/users/account-erasure.ts`).
  * L'anonymisation garde son inscription de caster sur les matchs joués
@@ -407,18 +427,33 @@ export async function withdrawUserCasts(
   userId: number,
   includeCompleted: boolean,
 ): Promise<MatchWithdrawal> {
-  const matchIdsOf = async (sql: string) => {
-    const [rows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(sql, [userId]);
-    return new Set(rows.map((row) => Number(row.match_id)));
-  };
-  const casts = await matchIdsOf(`SELECT match_id FROM bg_match_casters WHERE user_id = ? ORDER BY match_id`);
-  const links = await matchIdsOf(
-    `SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id`,
+  // Les quatre listes de départ en **une** lecture (`UNION ALL`, chaque table
+  // seule par l'index du compte). Un cast sur un match joué n'en est pas
+  // quand l'anonymisation le garde : rien à y verrouiller.
+  const [startRows] = await connection.execute<(RowDataPacket & { kind: string; match_id: number })[]>(
+    `SELECT 'C' AS kind, c.match_id FROM bg_match_casters c JOIN bg_matches cm ON cm.id = c.match_id
+      WHERE c.user_id = ? AND (? = 1 OR cm.status <> 'COMPLETED')
+     UNION ALL SELECT 'L' AS kind, match_id FROM bg_match_streams WHERE link_user_id = ?
+     UNION ALL SELECT 'R' AS kind, id AS match_id FROM bg_matches WHERE referee_user_id = ?
+     UNION ALL SELECT 'T' AS kind, id AS match_id FROM bg_matches WHERE live_trigger_user_id = ?`,
+    [userId, includeCompleted ? 1 : 0, userId, userId, userId],
   );
-  const refereed = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id`);
+  const listOf = (kind: string) => new Set(startRows.filter((row) => row.kind === kind).map((row) => Number(row.match_id)));
+  const casts = listOf("C");
+  const links = listOf("L");
+  const refereed = listOf("R");
   // Tous les matchs dont il tient le mode d'antenne, quel que soit leur état :
   // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
-  const triggered = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`);
+  const triggered = listOf("T");
+  // Un cast gardé sur un match joué (anonymisation) ne garde pas son BattleTag
+  // de cast : il part avec le compte (`CAST_SETTINGS.md`). Sans condition tirée
+  // d'une lecture faite avant les verrous : un match joué entre-temps est couvert.
+  if (!includeCompleted) {
+    await connection.execute(
+      `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
+      [userId],
+    );
+  }
   const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
   if (candidates.length === 0) {
     return { matchIds: [], tournamentIds: [], liveTournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] };
@@ -439,14 +474,6 @@ export async function withdrawUserCasts(
     await connection.execute(
       `DELETE FROM bg_match_casters WHERE user_id = ? AND match_id IN (${placeholders(castsToDrop)})`,
       [userId, ...castsToDrop],
-    );
-  }
-  // Un cast gardé sur un match joué (anonymisation) ne garde pas son
-  // BattleTag de cast : il part avec le compte (`CAST_SETTINGS.md`).
-  if (casts.size > castsToDrop.length) {
-    await connection.execute(
-      `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
-      [userId],
     );
   }
   if (linksToDrop.length > 0) {
@@ -473,7 +500,11 @@ export async function withdrawUserCasts(
       [userId, ...refereesToDrop],
     );
   }
-  await pruneStreamsOf(connection, [...new Set([...castsToDrop, ...linksToDrop])].sort((a, b) => a - b));
+  const pruned = [...new Set([...castsToDrop, ...linksToDrop])].sort((a, b) => a - b);
+  await pruneStreamsOf(connection, pruned);
+  // Comme au départ volontaire (`releaseMatchCast`) : un match non joué resté
+  // sans aucun stream n'est plus casté.
+  await unmarkUncastMatches(connection, pruned);
   // Seuls les matchs réellement modifiés : un cast gardé sur un match joué
   // (anonymisation) n'en fait pas partie.
   const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop, ...triggersToDrop]);

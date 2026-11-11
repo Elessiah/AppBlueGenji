@@ -364,10 +364,14 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
   for (const tournamentId of due) {
     await connection.beginTransaction();
     try {
-      const changed = await maintainMatchLaunches(connection, tournamentId);
+      const report = { castReleased: false };
+      const changed = await maintainMatchLaunches(connection, tournamentId, report);
       await connection.commit();
       flushBotLogs(connection);
-      if (changed > 0) publishMatchUpdatedEvent(tournamentId);
+      // Un caster retiré par l'entretien emporte son lien : l'accueil et #live
+      // se relisent tout de suite, sans attendre l'expiration de leur cache.
+      if (changed > 0 && report.castReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+      else if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
       await connection.rollback().catch(() => undefined);
       discardBotLogs(connection);

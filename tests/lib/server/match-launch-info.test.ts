@@ -727,6 +727,15 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
+  it("maintainIfDue_ineligibleCasterReleasedByMaintenance_publishesLandingLive", async () => {
+    // L'entretien retire un caster devenu inéligible : son lien quitte l'accueil et #live tout de suite.
+    state.candidates = [candidate({ lobby_opened_at: null, caster_user_id: CASTER })];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    await listViewerMatchLaunches(viewer);
+    expect(state.writes.some((w) => w.includes("SET lobby_opened_at = NOW()"))).toBe(true);
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls[0]).toEqual([7, { landingLive: true }]);
+  });
+
   it("lance d'office un match dont le délai est échu", async () => {
     state.candidates = [candidate({ lobby_opened_at: new Date(Date.now() - 20 * 60_000).toISOString() })];
     await listViewerMatchLaunches(viewer);
