@@ -890,6 +890,42 @@ describe("claimMatchCast", () => {
     expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", "CASTER");
   });
 
+  it("claimMatchCast_expectedTriggerStale_registersWithoutWritingTrigger", async () => {
+    // La fenêtre montrait un match sans mode ; le staff l'a passé en manuel entre-temps.
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
+    state.match = matchState({ live_trigger: "MANUAL" });
+    state.issued = [];
+
+    const outcome = await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO", expectedTrigger: null });
+
+    expect(outcome).toEqual({ triggerSkipped: true });
+    expect(casterOf(state)).toBe(CASTER);
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchCast_expectedTriggerMatches_writesTrigger", async () => {
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
+    state.issued = [];
+
+    const outcome = await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO", expectedTrigger: null });
+
+    expect(outcome).toEqual({ triggerSkipped: false });
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?");
+  });
+
+  it("claimMatchCast_expectedTriggerStaleButSameTriggerAsRow_reportsNoSkip", async () => {
+    // Le mode demandé est déjà celui du match : rien à écrire, rien de « laissé ».
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
+    state.match = matchState({ live_trigger: "MANUAL" });
+    state.issued = [];
+
+    const outcome = await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "MANUAL", expectedTrigger: null });
+
+    expect(outcome).toEqual({ triggerSkipped: false });
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
+  });
+
   it("claimMatchCast_sameTriggerAsMatch_journalsNothing", async () => {
     state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
     state.match = matchState({ live_trigger: "MANUAL" });

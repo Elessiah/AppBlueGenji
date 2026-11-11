@@ -341,7 +341,11 @@ export async function queueDeletedMatchCasts(
   for (const ids of chunkIds(open)) {
     const placeholders = sqlPlaceholders(ids.length);
     const [casters] = await connection.execute<(RowDataPacket & { match_id: number; user_id: number })[]>(
-      `SELECT match_id, user_id FROM bg_match_casters WHERE match_id IN (${placeholders}) ORDER BY match_id, user_id`,
+      // Sous verrou, comme les marques de `noteStaffRemovals` : une inscription
+      // ou un retrait validés après l'image de la transaction, avant le verrou
+      // des manches, ne sont ni ratés ni annoncés à tort (le `DELETE` qui suit
+      // verrouille ces lignes de toute façon, par la cascade).
+      `SELECT match_id, user_id FROM bg_match_casters WHERE match_id IN (${placeholders}) ORDER BY match_id, user_id FOR UPDATE`,
       ids,
     );
     if (casters.length === 0) continue;

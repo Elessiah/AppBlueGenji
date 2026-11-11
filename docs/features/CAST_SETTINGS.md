@@ -266,7 +266,7 @@ pas hors antenne en attendant le staff ; ils changent aussi ce mode — sauf, po
 porte le vrai lien de l'organisation (`organisationModeLocked`, 403 `STAFF_STREAM_FORBIDDEN`, bouton caché). Une inscription dont le
 mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
 tel quel et la notification le dit (`triggerSkipped`,
-`cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé
+`cardActions.castingTriggerKept`, FR/EN) — de même quand le mode que la fenêtre d'inscription montrait au premier choix du caster (`expectedTrigger`, envoyé avec `trigger`) n'est plus celui du match : la valeur périmée n'écrase pas le changement du staff ni ne referme son antenne ; sans choix du caster, la fenêtre suit le mode du match. Le propriétaire est effacé
 quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
 quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou le staff `tournaments` + `live` qui le change le lui laisse

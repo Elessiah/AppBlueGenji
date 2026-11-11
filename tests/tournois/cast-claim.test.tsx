@@ -146,6 +146,25 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
     ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL" });
   });
 
+  it("castClaimBody_separateWithExpectedTrigger_sendsItWithTrigger", () => {
+    // `null` est une valeur : la fenêtre montrait un match sans mode.
+    expect(
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", expectedTrigger: null }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", expectedTrigger: null });
+  });
+
+  it("castClaimBody_lockedTrigger_omitsExpectedTrigger", () => {
+    expect(
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: undefined, expectedTrigger: "AUTO" }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null });
+  });
+
+  it("castClaimBody_join_omitsExpectedTrigger", () => {
+    expect(
+      castClaimBody({ kind: "JOIN", streamId: 4, liveUrl: null, casterPseudos: [] }, { ...input, expectedTrigger: "AUTO" }),
+    ).toEqual({ streamId: 4, battletag: null });
+  });
+
   it("castClaimBody_lockedTrigger_omitsTrigger", () => {
     // Mode posé par un autre caster : le corps ne le porte pas, rien à refuser.
     expect(castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: undefined })).toEqual({
@@ -686,6 +705,16 @@ describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
 });
 
 describe("Inscription — un mode posé entre-temps par un autre", () => {
+  it("claimDialog_untouchedTrigger_followsMatchModeAndSendsTheSeenOne", () => {
+    // Sans choix du caster, la fenêtre suit le mode du match (jamais sa valeur
+    // d'ouverture) ; le mode vu au premier choix part avec le mode choisi.
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/CastClaimDialog.tsx");
+    expect(dialog).toContain('const trigger: MatchLiveTrigger = picked?.trigger ?? match.liveTrigger ?? "AUTO";');
+    expect(dialog).toContain("seen: previous === null ? match.liveTrigger : previous.seen");
+    expect(dialog).toContain("expectedTrigger: seenTrigger,");
+    expect(dialog).not.toContain('useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO")');
+  });
+
   it("claim_triggerSkipped_saysTheModeStayed", () => {
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toContain('payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"');

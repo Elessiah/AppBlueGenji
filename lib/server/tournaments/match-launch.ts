@@ -998,23 +998,20 @@ export async function claimMatchCast(
         liveStartedAt: row.live_started_at ?? null,
         launchedAt: null,
       });
-      const trigger =
-        settings.trigger === undefined || settings.trigger === (row.live_trigger ?? null) || !castable
-          ? undefined
-          : settings.trigger;
+      const { trigger, staleSkipped } = claimTrigger(settings, row.live_trigger ?? null, castable);
       const outcome = await applyCastSettings(
         connection,
         row,
         userId,
         streamId,
         // Le lien est déjà posé avec le stream neuf (ci-dessus).
-        { ...settings, trigger, liveUrl: undefined, skipLockedTrigger: true },
+        { ...settings, trigger, expectedTrigger: undefined, liveUrl: undefined, skipLockedTrigger: true },
         access,
       );
       return {
         tournamentId: Number(row.tournament_id),
         claimed: true,
-        triggerSkipped: outcome.triggerSkipped,
+        triggerSkipped: outcome.triggerSkipped || staleSkipped,
         pairing: castPairingOf(row),
         triggerChange: outcome.triggerChange,
       };
@@ -1028,6 +1025,27 @@ export async function claimMatchCast(
   if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null, pairing });
   announceCastTrigger(matchId, triggerChange, access);
   return { triggerSkipped };
+}
+
+/**
+ * Le mode d'antenne qu'une inscription écrit : celui qu'elle envoie, s'il
+ * change celui du match (`current`) sur un match encore castable.
+ *
+ * `staleSkipped` : le mode que la fenêtre montrait (`expectedTrigger`) n'est
+ * plus celui du match — un autre l'a changé entre-temps. La valeur périmée du
+ * caster ne l'écrase pas (ni ne referme son antenne) : l'inscription se fait,
+ * le mode reste (`triggerSkipped`), comme un mode pris entre-temps.
+ */
+function claimTrigger(
+  settings: CastSettings,
+  current: MatchLiveTrigger | null,
+  castable: boolean,
+): { trigger: MatchLiveTrigger | null | undefined; staleSkipped: boolean } {
+  if (settings.trigger === undefined || settings.trigger === current || !castable) {
+    return { trigger: undefined, staleSkipped: false };
+  }
+  const stale = settings.expectedTrigger !== undefined && settings.expectedTrigger !== current;
+  return stale ? { trigger: undefined, staleSkipped: true } : { trigger: settings.trigger, staleSkipped: false };
 }
 
 /**

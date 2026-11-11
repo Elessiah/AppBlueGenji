@@ -642,6 +642,15 @@ describe("match supprimé — l'inscription part avec lui", () => {
     expect(jest.mocked(loadNotificationRecipients).mock.calls.map((call) => call[0])).toEqual([[CASTER], [901]]);
   });
 
+  it("queueDeletedMatchCasts_openMatch_readsCastersUnderLock", async () => {
+    // Une inscription validée après l'image de la transaction ne lui échappe pas.
+    const { execute, connection } = deletingConnection([]);
+
+    await queueDeletedMatchCasts(connection, [{ id: 42, status: "READY" }]);
+
+    expect(String(execute.mock.calls[0][0])).toMatch(/FROM bg_match_casters WHERE match_id IN \(\?\).*FOR UPDATE$/);
+  });
+
   it("queueDeletedMatchCasts_manyMatchesOneCasted_readsSubjectOfTheCastedOnly", async () => {
     mockMatch(null);
     const { execute, connection } = deletingConnection([{ match_id: 43, user_id: CASTER }]);
