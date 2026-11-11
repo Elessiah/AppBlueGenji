@@ -255,8 +255,8 @@ describe("Avis Battle.net en Overwatch seulement — exactitude (revue juridique
 // Revue juridique #545, cycle 5 : l'opposition nommée, et les lecteurs du tag d'un arbitre qui caste.
 describe("Opposition d'arbitre nommée (revue juridique #545, cycle 5)", () => {
   it("rgpdPages_refereeObjection_namesWhatItCoversFrAndEn", () => {
-    expect(read("app/rgpd/page.tsx").replace(/\s+/g, " ")).toContain("son opposition d&apos;arbitre (à sa présentation avant la version 7, ou à l&apos;affichage de son pseudo aux membres)");
-    expect(read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("their referee objection (to their presentation before version 7, or to the display of their username to members)");
+    expect(read("app/rgpd/page.tsx").replace(/\s+/g, " ")).toContain("son opposition d&apos;arbitre (à sa présentation avant la version 7 — avant la version 9 pour son tag Discord —, ou à l&apos;affichage de son pseudo aux membres)");
+    expect(read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("their referee objection (to their presentation before version 7 — before version 9 for their Discord tag —, or to the display of their username to members)");
   });
 
   it("privacyChanges_refereeDiscordBasis_namesObjectionWithoutClaimingCasterRuleChangedFrAndEn", () => {

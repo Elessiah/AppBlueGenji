@@ -297,10 +297,10 @@ describe("registre — cartes choisies dans le pool de la manche (T04, T05)", ()
 
   it("registerT04_dataCategories_namesPoolPicksByStaffOrTeam", () => {
     expect(activity(PROCESSING_ACTIVITIES, "T04")).toContain(
-      "cartes choisies dans le pool de la manche (par le staff ou, en autogestion, par une équipe du match)",
+      "première carte (posée par le staff, ou choisie dans le pool de la manche) et cartes choisies dans ce pool, par le staff ou, en autogestion, par une équipe du match",
     );
     expect(activity(PROCESSING_ACTIVITIES_EN, "T04")).toContain(
-      "maps picked from the round pool (by the staff or, in self-management, by a team of the match)",
+      "first map (set by the staff, or picked from the round pool) and maps picked from that pool, by the staff or, in self-management, by a team of the match",
     );
   });
 
@@ -311,10 +311,10 @@ describe("registre — cartes choisies dans le pool de la manche (T04, T05)", ()
 
   it("registerT05_staffLog_namesPoolPickAndClear", () => {
     expect(activity(PROCESSING_ACTIVITIES, "T05")).toContain(
-      "carte choisie dans le pool de la manche ou choix retiré — sans nommer l'arbitre ni le staff",
+      "carte choisie dans le pool de la manche (par le staff ou, en autogestion, par une équipe du match) ou choix retiré — sans nommer l'arbitre ni le staff",
     );
     expect(activity(PROCESSING_ACTIVITIES_EN, "T05")).toContain(
-      "map picked from the round pool or pick cleared — without naming the referee or the staff",
+      "map picked from the round pool (by the staff or, in self-management, by a team of the match) or pick cleared — without naming the referee or the staff",
     );
   });
 });
