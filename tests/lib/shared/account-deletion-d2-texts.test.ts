@@ -211,9 +211,9 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     expect(entry?.publishedAt).toBe("2026-11-11");
     expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(entry?.audience).toBeUndefined();
-    // Suivies des entrées des salons vocaux (MATCH-VOICE, puis VOICE-CLEAR-TEAM).
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(AVATAR_HASH_ID);
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(TERMS_V10_ID);
+    // Suivies des entrées des salons vocaux (MATCH-VOICE, puis VOICE-CLEAR-TEAM) et de REF-CASTER-CONTACTS.
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(AVATAR_HASH_ID);
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(TERMS_V10_ID);
   });
 
   it("privacyChange_avatarHashEntry_saysKeptFromModerationDeletionNotErasureFrAndEn", () => {
