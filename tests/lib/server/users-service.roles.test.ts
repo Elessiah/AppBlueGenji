@@ -17,14 +17,19 @@ async function mockDb(execute: SqlMock) {
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
-/** `setUserRoles` : une transaction, sur une connexion. */
-async function mockTransaction() {
+/**
+ * `setUserRoles` : la cible lue sur le pool (`targetRows`), puis une
+ * transaction, sur une connexion.
+ */
+async function mockTransaction(targetRows: object[] = [{ id: 7 }]) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   connection.commit.mockResolvedValue(undefined);
+  const poolExecute = jest.fn<SqlQuery>().mockResolvedValue([targetRows]);
+  const getConnection = jest.fn(async () => fakeConnection(connection));
   const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: async () => fakeConnection(connection) }));
-  return connection;
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: poolExecute, getConnection }));
+  return Object.assign(connection, { poolExecute, getConnection });
 }
 
 const ACTOR_ADMIN = { id: 3, is_admin: 1 };
@@ -159,6 +164,17 @@ describe("setUserRoles — failures leave nothing behind", () => {
   });
   afterEach(() => {
     resetSessionStreams();
+  });
+
+  it("setUserRoles_targetIdMatchesNoRow_throwsUserNotFoundBeforeAnyTransaction", async () => {
+    // Un identifiant au-delà du plus grand : refusé sans verrou d'intervalle.
+    const connection = await mockTransaction([]);
+
+    await expect(setUserRoles(999, ["ADMIN"], 3)).rejects.toThrow("USER_NOT_FOUND");
+
+    expect(connection.poolExecute).toHaveBeenCalledWith("SELECT id FROM bg_users WHERE id = ? LIMIT 1", [999]);
+    expect(connection.getConnection).not.toHaveBeenCalled();
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
   });
 
   it("setUserRoles_targetMissing_throwsUserNotFoundRollsBack", async () => {
@@ -309,17 +325,16 @@ describe("setOwnPlatformRoles (ADMIN-SELF-ROLES)", () => {
     expect(params).toEqual([JSON.stringify(["RECRUTEUR"]), 1]);
   });
 
-  it("setOwnPlatformRoles_success_closesOwnStreamsOnly", async () => {
+  it("setOwnPlatformRoles_success_keepsStreamsOpen", async () => {
+    // Un administrateur tient toutes les permissions : ses flux de tournoi
+    // n'ont rien à recalculer, aucun n'est fermé.
     await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]));
     const own = jest.fn();
-    const other = jest.fn();
     registerSessionStream(1, "hash-a", own);
-    registerSessionStream(2, "hash-b", other);
 
     await setOwnPlatformRoles(1, ["ADMIN"]);
 
-    expect(own).toHaveBeenCalledTimes(1);
-    expect(other).not.toHaveBeenCalled();
+    expect(own).not.toHaveBeenCalled();
   });
 });
 

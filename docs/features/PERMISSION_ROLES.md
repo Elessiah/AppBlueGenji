@@ -51,7 +51,9 @@ s'additionnent.
   `lib/server/auth.ts`) reconstitue la liste complète ; elle est exposée sur
   `AuthUser.roles` et via `GET /api/auth/me`.
 - **Attribution** : `setUserRoles(userId, roles)` remplace l'ensemble des rôles
-  d'un **autre** compte.
+  d'un **autre** compte. La cible est lue **avant** la transaction : un
+  identifiant qui ne désigne aucune ligne rend `USER_NOT_FOUND` sans verrou
+  d'intervalle en fin d'index (qui retiendrait les inscriptions).
 - **Ses propres rôles** (ADMIN-SELF-ROLES) : `setOwnPlatformRoles(adminId, roles)`
   — voir § « Un administrateur règle ses propres rôles ».
 - **Journal du staff** : tout enregistrement réussi passe par

@@ -26,6 +26,13 @@ export async function setUserRoles(
   const nonAdminRoles = sanitized.filter((role) => role !== "ADMIN");
 
   const db = await getDatabase();
+  // Cible lue **avant** la transaction, sans verrou : un identifiant qui ne
+  // désigne aucune ligne (au-delà du plus grand) poserait, sous REPEATABLE
+  // READ, un verrou d'intervalle en fin d'index qui retiendrait les
+  // inscriptions le temps de la transaction. Seules des lignes existantes se
+  // verrouillent ensuite (verrous d'enregistrement, par la clé primaire).
+  const [target] = await db.execute<RowDataPacket[]>(`SELECT id FROM bg_users WHERE id = ? LIMIT 1`, [targetUserId]);
+  if (target.length === 0) throw new Error("USER_NOT_FOUND");
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -112,10 +119,9 @@ export async function setOwnPlatformRoles(
   );
   if (result.affectedRows === 0) throw new Error("NOT_ADMIN");
 
-  // Mêmes flux à fermer que pour un autre compte : un rôle d'arbitre retiré
-  // ne doit pas survivre dans un onglet de tournoi resté ouvert.
-  closeUserStreams(adminUserId);
-
+  // Aucun flux fermé : `is_admin` n'est jamais écrit ici, et un administrateur
+  // tient toutes les permissions (`can`) — le contexte de ses flux de tournoi
+  // ne change pas ; les fermer ne ferait que les reconnecter tous.
   return sanitized;
 }
 
