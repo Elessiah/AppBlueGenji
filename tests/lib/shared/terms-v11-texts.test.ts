@@ -358,3 +358,33 @@ describe("D55 et revue standard v11", () => {
     expect(STREAM_NOTICE_LIVE_EN).toContain(`${REPORT_FORM_NAME_EN}” button, GDPR category.`);
   });
 });
+
+describe("revue sécurité v11 — textes alignés sur le code", () => {
+  const v11Fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
+  const v11En = PRIVACY_CHANGES_EN[V11_ID];
+
+  it("rgpdPages_retransmission_noAlertDeletionOnRequestFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).not.toContain("celle de ces alertes");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).not.toContain("that of these alerts");
+  });
+
+  it("rgpdPages_accountDeletionHandover_skipsPendingDeletionMembersFrAndEn", () => {
+    const fr = readSource("app/rgpd/page.tsx");
+    const en = readSource("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).toContain("un membre dont la suppression du compte est elle-même demandée n&apos;étant pas compté ; une équipe où il ne reste aucun autre");
+    expect(fr).not.toMatch(/dont il était le seul\s+joueur/);
+    expect(en).toContain("a member whose own account deletion has been requested not being counted; a team left with");
+    expect(en).not.toMatch(/only player becomes/);
+  });
+
+  it("termsV11_voiceTrace_listsRefusedHandBackAndWholeBotOutageFrAndEn", () => {
+    expect(termsFr("contacts-de-match")).toContain("des horaires (création, rendu, panne du bot ou rendu refusé) et si une panne touchait tout le bot — ni qui s'y trouve, ni combien —");
+    expect(termsEn("contacts-de-match")).toContain("times (creation, hand-back, bot outage or refused hand-back) and whether an outage hit the whole bot — neither who is in it nor how many —");
+  });
+
+  it("privacyChangeV11_refereeDiscordTag_keepsCasterExceptionFrAndEn", () => {
+    expect(v11Fr.details.join(" ")).toContain("jamais par les arbitres sans rôle sur ce match, sauf s'il caste aussi ce match (règle des casters)");
+    expect(v11En.details.join(" ")).toContain("never by referees who have no role in that match, unless they also cast that match (the casters' rule)");
+  });
+});

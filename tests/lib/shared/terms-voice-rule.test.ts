@@ -174,11 +174,11 @@ describe("conditions d'utilisation v10 — salons vocaux", () => {
   });
 
   it("termsV10_voiceParagraph_siteKeepsNoUserDataAndLegitimateInterestKeptFrAndEn", () => {
-    expect(voiceTermsFr()).toContain("que son identifiant, les numéros du match et de l'équipe et des horaires (création, rendu, panne du bot) — ni qui s'y trouve, ni combien —");
+    expect(voiceTermsFr()).toContain("que son identifiant, les numéros du match et de l'équipe des horaires (création, rendu, panne du bot ou rendu refusé) et si une panne touchait tout le bot — ni qui s'y trouve, ni combien —");
     expect(voiceTermsFr()).toContain("un vidage par l'arbitrage nomme en outre son auteur dans les journaux du serveur, sauf l'arbitre désigné du match");
     expect(voiceTermsFr()).toContain("Ces salons reposent sur l'intérêt légitime de l'association au bon déroulement des tournois.");
     expect(voiceTermsFr()).not.toContain("s'y opposer");
-    expect(voiceTermsEn()).toContain("only keeps its identifier, the match and team numbers and times (creation, hand-back, bot outage) — neither who is in it nor how many —");
+    expect(voiceTermsEn()).toContain("only keeps its identifier, the match and team numbers, times (creation, hand-back, bot outage or refused hand-back) and whether an outage hit the whole bot — neither who is in it nor how many —");
     expect(voiceTermsEn()).toContain("a clearing by the referees also names its author in the server logs, unless they are the match's assigned referee");
     expect(voiceTermsEn()).toContain("These channels rest on the association's legitimate interest in the smooth running of tournaments.");
     expect(voiceTermsEn()).not.toContain("object to it");

@@ -423,8 +423,8 @@ function RgpdFr({
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
           ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
-          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres ; une équipe dont il était le seul
-          joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
+          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres et un membre dont la suppression du compte est elle-même demandée n&apos;étant pas compté ; une équipe où il ne reste aucun autre
+          membre devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
@@ -1338,7 +1338,7 @@ function RgpdFr({
             que le salon #live existe ; à la suppression du compte d&apos;un caster, le message d&apos;une soirée encore en
             cours est remis à jour sans le lien de sa chaîne s&apos;il garde un autre lien — sinon, ou une fois la soirée
             finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut en demander la
-            suppression, comme celle de ces alertes, par le bouton « Signaler
+            suppression par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>

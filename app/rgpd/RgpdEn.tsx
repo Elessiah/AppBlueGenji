@@ -313,8 +313,8 @@ export function RgpdEn({
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
           bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
-          teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others; a team of which it was the
-          only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
+          teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others and a member whose own account deletion has been requested not being counted; a team left with
+          no other member becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
@@ -1125,7 +1125,7 @@ export function RgpdEn({
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —
             otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can
-            ask for their deletion, and for that of these alerts,
+            ask for their deletion
             through the “Report a problem” button, GDPR category.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>
