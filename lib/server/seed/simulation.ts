@@ -238,6 +238,20 @@ type EnduranceSimulationExtras = {
 const NO_ENDURANCE_EXTRAS: Readonly<EnduranceSimulationExtras> = Object.freeze({ partialMatches: 0, penalties: 0 });
 
 /**
+ * Un tournoi en cours s'arrête là : ses vagues jouées, ou — `stopAtPlayoffs` —
+ * le premier tour des play-offs posé (laissé à jouer).
+ */
+function enduranceSimulationPauses(
+  ready: readonly { round_number: unknown }[],
+  waves: number,
+  playWaves: number,
+  extras: Readonly<EnduranceSimulationExtras>,
+): boolean {
+  if (waves >= playWaves) return true;
+  return extras.stopAtPlayoffs === true && ready.some((m) => Number(m.round_number) >= PLAYOFF_ROUND_OFFSET);
+}
+
+/**
  * Simule un tournoi « BlueGenji Survie » : manches d'endurance jusqu'à la
  * bascule en play-offs, puis l'arbre final. Même schéma que la Survie —
  * initialize → generate → reconcile, puis vagues de matchs joués.
@@ -270,8 +284,7 @@ export async function generateEnduranceTournament(
     while (true) {
       const ready = readyMatches(await getMatchRows(connection, tournamentId));
       if (ready.length === 0) break;
-      if (!finish && waves >= playWaves) break;
-      if (!finish && extras.stopAtPlayoffs && ready.some((m) => Number(m.round_number) >= PLAYOFF_ROUND_OFFSET)) break;
+      if (!finish && enduranceSimulationPauses(ready, waves, playWaves, extras)) break;
 
       for (const m of ready) {
         // L'égalité ne vaut que pour la **qualification** : l'arbre final doit

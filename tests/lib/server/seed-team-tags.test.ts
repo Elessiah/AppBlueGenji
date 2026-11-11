@@ -7,7 +7,9 @@ import { fakePool, type SqlQuery } from "../../helpers/sql-double";
  * « Test - » avant la recréation (`uniq_bg_teams_tag`).
  */
 describe("releaseSeedTeamTag", () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("releaseSeedTeamTag_tagHeldByRenamedTeam_clearsItAndSaysSo", async () => {
     const log = jest.spyOn(console, "log").mockImplementation(() => undefined);
