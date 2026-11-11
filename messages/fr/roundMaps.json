@@ -93,6 +93,7 @@
       "confirm": "Appliquer à tous les tours"
     },
     "appliedAll": "Cartes appliquées à tous les tours.",
+    "roundsSkipped": "Cartes enregistrées, sauf sur {count, plural, one {# tour qui n'existe plus} other {# tours qui n'existent plus}} dans ce tournoi : recharge la page pour voir les tours actuels.",
     "copyLabel": "Copier ces cartes vers",
     "copy": "Copier",
     "copyConfirm": {

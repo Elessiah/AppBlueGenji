@@ -315,18 +315,25 @@ export function effectiveFirstMap(slots: readonly string[][], firstMap: string |
 /**
  * Valide un choix dans un pool : le créneau existe, c'est un pool, et la carte
  * en fait partie (comparée sans casse ; la forme du pool est retenue).
- * `null` / vide retire le choix, sur tout créneau existant.
+ * `null` / vide retire le choix, sur tout créneau existant — sauf, pour une
+ * équipe en autogestion (`byTeam`), sur un créneau imposé.
  *
  * @throws `INVALID_MAP_PICK`
  */
-export function validateMapPick(slots: readonly string[][], slot: unknown, raw: unknown): string | null {
+export function validateMapPick(slots: readonly string[][], slot: unknown, raw: unknown, byTeam = false): string | null {
   if (typeof slot !== "number" || !Number.isInteger(slot) || slot < 1 || slot > slots.length) {
     throw new Error("INVALID_MAP_PICK");
   }
-  // Effacer est toujours permis, même sur un créneau devenu imposé : un ancien
-  // choix ne doit pas rester coincé et revenir quand le réglage est retiré.
-  if (raw === null || raw === undefined || raw === "") return null;
   const candidates = slots[slot - 1];
+  // Effacer reste permis à l'arbitrage, même sur un créneau devenu imposé : un
+  // ancien choix ne doit pas rester coincé et revenir quand le réglage est
+  // retiré. Une équipe en autogestion (`byTeam`), elle, ne touche pas un
+  // créneau imposé : elle effacerait la première carte fixée par le staff
+  // (`first_map`), qui manquerait une fois l'imposition retirée.
+  if (raw === null || raw === undefined || raw === "") {
+    if (byTeam && candidates.length < 2) throw new Error("INVALID_MAP_PICK");
+    return null;
+  }
   if (candidates.length < 2) throw new Error("INVALID_MAP_PICK");
   const name = normalizeMapName(raw, "INVALID_MAP_PICK").toLocaleLowerCase("fr");
   const found = candidates.find((candidate) => candidate.toLocaleLowerCase("fr") === name);

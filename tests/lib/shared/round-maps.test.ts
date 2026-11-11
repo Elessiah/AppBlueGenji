@@ -125,6 +125,20 @@ describe("validateMapPick", () => {
     expect(validateMapPick(slots, 1, "")).toBeNull();
   });
 
+  it("validateMapPick_staffClearsImposedSlot_returnsNull", () => {
+    expect(validateMapPick(slots, 2, null)).toBeNull();
+  });
+
+  it("validateMapPick_teamClearsImposedSlot_throwsInvalidMapPick", () => {
+    // La première carte fixée par le staff ne s'efface pas par une équipe en autogestion.
+    expect(() => validateMapPick(slots, 2, null, true)).toThrow("INVALID_MAP_PICK");
+    expect(() => validateMapPick(slots, 2, "", true)).toThrow("INVALID_MAP_PICK");
+  });
+
+  it("validateMapPick_teamClearsPoolSlot_returnsNull", () => {
+    expect(validateMapPick(slots, 1, null, true)).toBeNull();
+  });
+
   it("refuse un créneau absent, non entier ou imposé", () => {
     expect(() => validateMapPick(slots, 0, "Ilios")).toThrow("INVALID_MAP_PICK");
     expect(() => validateMapPick(slots, 3, "Ilios")).toThrow("INVALID_MAP_PICK");

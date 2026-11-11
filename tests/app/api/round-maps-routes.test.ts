@@ -87,19 +87,29 @@ describe("PUT /api/admin/tournaments/[id]/round-maps", () => {
 
   it("pose les cartes de la manche et rend les créneaux retenus", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundsMaps).mockResolvedValue([["Ilios"]]);
+    jest.mocked(setRoundsMaps).mockResolvedValue({ slots: [["Ilios"]], skipped: 0 });
     const res = await roundMapsPut(put({ ...ROUND, slots: [[" Ilios "]] }), tournament("7"));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ slots: [["Ilios"]] });
+    await expect(res.json()).resolves.toEqual({ slots: [["Ilios"]], skipped: 0 });
     expect(setRoundsMaps).toHaveBeenCalledWith(7, [ROUND], [[" Ilios "]]);
   });
   it("PUT_roundsList_appliesSlotsToEveryRound", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundsMaps).mockResolvedValue([["Ilios"]]);
+    jest.mocked(setRoundsMaps).mockResolvedValue({ slots: [["Ilios"]], skipped: 0 });
     const rounds = [ROUND, { ...ROUND, roundNumber: 3 }];
     const res = await roundMapsPut(put({ rounds, slots: [["Ilios"]] }), tournament("7"));
     expect(res.status).toBe(200);
     expect(setRoundsMaps).toHaveBeenCalledWith(7, rounds, [["Ilios"]]);
+  });
+
+  it("PUT_roundsList_someRoundsNoLongerInTournament_answersSkippedCount", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundsMaps).mockResolvedValue({ slots: [["Ilios"]], skipped: 1 });
+
+    const res = await roundMapsPut(put({ rounds: [ROUND, { ...ROUND, phaseId: 9 }], slots: [["Ilios"]] }), tournament("7"));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ slots: [["Ilios"]], skipped: 1 });
   });
 
   it("PUT_invalidRoundsList_returns400InvalidRound", async () => {

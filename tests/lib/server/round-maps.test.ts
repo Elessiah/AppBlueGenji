@@ -276,7 +276,7 @@ describe("setRoundsMaps", () => {
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
       { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
     ]);
-    await expect(setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]])).resolves.toEqual([["Ilios"]]);
+    await expect(setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]])).resolves.toEqual({ slots: [["Ilios"]], skipped: 0 });
     expect(connection.execute.mock.calls[0][0]).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
     expect(writes(/FROM bg_tournaments/)).toHaveLength(1);
     expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([
@@ -354,6 +354,18 @@ describe("setRoundsMaps", () => {
     await setRoundsMaps(7, [{ ...ROUND, phaseId: 3 }, { ...ROUND, phaseId: 99 }], [["Ilios"]]);
 
     expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([[7, 3, "UPPER", 2, '[["Ilios"]]']]);
+  });
+
+  it("setRoundsMaps_mixedOwnAndForeignRounds_reportsSkippedCount", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] },
+      { pattern: /FROM bg_tournament_phases/, rows: [{ id: 3 }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+
+    const result = await setRoundsMaps(7, [{ ...ROUND, phaseId: 3 }, { ...ROUND, phaseId: 99 }, { ...ROUND, phaseId: 98 }], [["Ilios"]]);
+
+    expect(result).toEqual({ slots: [["Ilios"]], skipped: 2 });
   });
 
   it("setRoundsMaps_clearOrphanRound_deletesWithoutPhaseCheck", async () => {
@@ -593,6 +605,15 @@ describe("pickMatchMap", () => {
     jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM2", canDeclareReady: true });
     await pickMatchMap(42, { userId: 5, staff: false }, 1, "Ilios");
     expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true });
+  });
+
+  it("pickMatchMap_selfManagedTeamClearsImposedSlot_throwsInvalidMapPickWithoutWriting", async () => {
+    withMatch({ ...MATCH, self_managed: 1, map_picks: '{"3":"Oasis"}' });
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM2", canDeclareReady: true });
+
+    await expect(pickMatchMap(42, { userId: 5, staff: false }, 3, null)).rejects.toThrow("INVALID_MAP_PICK");
+
+    expect(writes(/UPDATE bg_matches/)).toHaveLength(0);
   });
 
   it("en autogestion, un joueur qui ne déclare pas « Prêt » est refusé", async () => {

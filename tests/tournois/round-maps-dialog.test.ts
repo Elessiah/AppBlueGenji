@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   addMapToSlot,
   blocksImplicitSubmit,
@@ -243,5 +245,26 @@ describe("journal des cartes de manche", () => {
   it("règles de ban modifiées, sans nommer personne", () => {
     expect(formatMapRulesLog({ tournament })).toContain("Règles de ban modifiées");
     expect(formatMapRulesLog({ tournament })).toContain("par le staff");
+  });
+});
+
+describe("copie vers des tours que le tournoi ne porte plus (REFEREE-LOT-1)", () => {
+  const dialog = readFileSync(
+    join(process.cwd(), "app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx"),
+    "utf8",
+  );
+  const text = (lang: string) =>
+    JSON.parse(readFileSync(join(process.cwd(), `messages/${lang}/roundMaps.json`), "utf8")) as {
+      dialog: { roundsSkipped: string };
+    };
+
+  it("RoundMapsDialog_skippedRounds_neutralToastInsteadOfFullSuccess", () => {
+    expect(dialog).toContain('if (skipped > 0) showInfo(t("dialog.roundsSkipped", { count: skipped }));');
+    expect(dialog).toContain("else showSuccess(success);");
+  });
+
+  it("RoundMapsDialog_skippedRoundsText_inFrenchAndEnglish", () => {
+    expect(text("fr").dialog.roundsSkipped).toContain("qui n'existe plus");
+    expect(text("en").dialog.roundsSkipped).toContain("that no longer exists");
   });
 });

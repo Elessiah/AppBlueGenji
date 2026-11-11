@@ -474,6 +474,13 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // portent l'instant exact de leur pose (celui d'un effacement de compte,
     // rapprochable du journal des suppressions) — ramenées au jour. Idempotent.
     `UPDATE bg_blocked_image_hashes SET created_at = DATE(created_at) WHERE created_at <> DATE(created_at)`,
+    // REFEREE-LOT-1 — un arbitre effacé avant EF-21 (#526) a laissé son « Prêt »
+    // sur le match : la clé étrangère n'a nulé que `referee_user_id`. Idempotent.
+    `UPDATE bg_matches SET referee_ready_at = NULL WHERE referee_user_id IS NULL AND referee_ready_at IS NOT NULL`,
+    // REFEREE-LOT-1 — cartes d'un tour au-delà de la borne `ROUND_NUMBER_MAX`
+    // (2000), permises avant #514 : la copie « à tous les tours » les reprenait
+    // et chaque lot était refusé (`INVALID_ROUND`), sans moyen de les retirer.
+    `DELETE FROM bg_tournament_round_maps WHERE round_number > 2000`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
