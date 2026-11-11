@@ -180,8 +180,8 @@ function fakeDb(options: {
           ];
         }
 
-        // roundHasScoreInput
-        if (q.includes("AND is_bye = 0 AND (team1_score IS NOT NULL")) {
+        // roundHasScoreInput (HAS_SCORE_INPUT_SQL partagé, relu sous verrou)
+        if (q.includes("AND round_number = ?") && q.includes("(team1_id IS NOT NULL AND team2_id IS NOT NULL")) {
           const round = Number(params[2]);
           const c = matches.filter((m) => m.round === round && !m.isBye && m.hasScoreInput).length;
           return [[{ c }], []];

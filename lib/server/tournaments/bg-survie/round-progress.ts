@@ -18,8 +18,8 @@ import { withShortLockWait } from "../lock-wait";
  * (réappariement d'une manche d'endurance périmée, verrous du retrait d'une
  * pénalité, de l'annulation d'un abandon et de la correction d'arbitrage, et
  * les bornes que l'interface reçoit pour ne pas proposer un geste que le
- * serveur refusera) ; la survie et la ronde suisse gardent encore leur copie
- * (`ERREUR.txt`). Le report en attente se lit sur ses dates, comme le verrou
+ * serveur refusera), et pour le réappariement de la survie et de la ronde
+ * suisse (`roundHasScoreInput`). Le report en attente se lit sur ses dates, comme le verrou
  * d'arbitrage (`admin.ts`). Les deux engagées en place écartent l'exemption,
  * que le moteur pose d'office (score 1-0, seconde place vide), et les matchs
  * fantômes clos sans engagé : ils ne disent pas qu'une manche est entamée,
@@ -35,17 +35,32 @@ export const HAS_SCORE_INPUT_SQL = `(team1_id IS NOT NULL AND team2_id IS NOT NU
             OR (double_forfeit = 1 AND status = 'COMPLETED') OR status = 'AWAITING_CONFIRMATION'
             OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL))`;
 
-/** Un match de la manche porte-t-il déjà une saisie ? */
+/**
+ * Un match de la manche porte-t-il déjà une saisie ? Une manche générée mais
+ * non entamée peut être réappariée sans rien détruire ; dès qu'une saisie y
+ * est portée, elle est figée. Même règle pour l'endurance, la survie et la
+ * ronde suisse (phase `phaseId`, 0 hors multi-phases).
+ *
+ * `lock` : lecture **verrouillante**, à prendre juste avant de défaire la
+ * manche. Une lecture ordinaire lit l'image de la transaction, née avant ses
+ * verrous (`syncTournamentState` en tête de report) : un « Enregistrer »
+ * commité entre-temps y est invisible, et la manche serait jugée vierge puis
+ * détruite avec la saisie. La lecture verrouillante lit la dernière version
+ * commitée (MariaDB 11.8 refuse par `ER_CHECKREAD`, rejoué). Réservée à ce
+ * dernier contrôle : posée à chaque réconciliation, elle verrouillerait toute
+ * la manche à chaque report, et deux reports concurrents s'y croiseraient.
+ */
 export async function roundHasScoreInput(
   conn: PoolConnection,
   tournamentId: number,
   round: number,
+  options: { phaseId?: number; lock?: boolean } = {},
 ): Promise<boolean> {
   const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
     `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = 0 AND round_number = ?
-       AND ${HAS_SCORE_INPUT_SQL}`,
-    [tournamentId, round],
+     WHERE tournament_id = ? AND phase_id = ? AND round_number = ?
+       AND ${HAS_SCORE_INPUT_SQL}${options.lock ? " FOR UPDATE" : ""}`,
+    [tournamentId, options.phaseId ?? 0, round],
   );
   return Number(rows[0]?.c ?? 0) > 0;
 }

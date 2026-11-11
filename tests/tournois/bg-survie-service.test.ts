@@ -790,6 +790,26 @@ describe("reconcileEndurance — réappariement après correction", () => {
     expect((rollback?.[1] as unknown[])[0]).toBe(1);
   });
 
+  // ERREUR.txt (revue perf EF-15) : la première lecture voit l'image de la
+  // transaction ; un « Enregistrer » commité depuis n'apparaît qu'à la relecture
+  // verrouillante, qui garde alors la manche.
+  it("reconcileEndurance_staleRoundButLockedRecheckFindsInput_keepsRound", async () => {
+    jest.mocked(createMatch).mockResolvedValue(77);
+    const conn = makeConn(
+      stateWithStaleRound([
+        { team1_id: 1, team2_id: 2 },
+        { team1_id: 3, team2_id: 4 },
+      ]),
+      [["FOR UPDATE", [[{ c: 1 }]]]],
+    );
+
+    await reconcileEndurance(5, conn);
+
+    const sqls = conn.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /DELETE FROM bg_matches/.test(sql))).toBe(false);
+    expect(sqls.some((sql) => /SELECT COUNT\(\*\) AS c FROM bg_matches[\s\S]*FOR UPDATE$/.test(sql))).toBe(true);
+  });
+
   it("laisse la manche en place quand ses couples sont toujours valides", async () => {
     jest.mocked(createMatch).mockResolvedValue(77);
     // 2 vs 4 puis 1 vs 3 : exactement ce que le classement rejoué produit.

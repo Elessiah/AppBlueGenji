@@ -101,7 +101,12 @@ export async function reconcileEndurance(
   // tournoi, faute d'un match sur lequel reporter un score.
   let effectiveRound = currentRound;
   if (currentRound > 0 && !(await roundHasScoreInput(conn, tournamentId, currentRound))) {
-    if (await roundPairingsAreStale(conn, tournamentId, currentRound, replayed)) {
+    // Saisie relue **sous verrou** avant de défaire : la première lecture, sur
+    // l'image de la transaction, peut ignorer un « Enregistrer » commité depuis.
+    if (
+      (await roundPairingsAreStale(conn, tournamentId, currentRound, replayed)) &&
+      !(await roundHasScoreInput(conn, tournamentId, currentRound, { lock: true }))
+    ) {
       await noteDeletedMatches(conn, "tournament_id = ? AND phase_id = 0 AND round_number = ?", [
         tournamentId,
         currentRound,

@@ -3,6 +3,7 @@ import {
   HAS_SCORE_INPUT_SQL,
   laterRoundHasScoreInput,
   laterRoundsHaveScoreInput,
+  roundHasScoreInput,
 } from "@/lib/server/tournaments/bg-survie/round-progress";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
@@ -142,5 +143,56 @@ describe("HAS_SCORE_INPUT_SQL", () => {
     ]) {
       expect(HAS_SCORE_INPUT_SQL).toContain(clause);
     }
+  });
+});
+
+// ERREUR.txt (revues #542 / EF-15) : une seule « manche entamée » pour
+// l'endurance, la survie et la ronde suisse, relue sous verrou avant de défaire.
+describe("roundHasScoreInput", () => {
+  it("roundHasScoreInput_countPositive_returnsTrue", async () => {
+    const { conn } = connectionReturning([{ c: 2 }]);
+
+    await expect(roundHasScoreInput(conn, 7, 3)).resolves.toBe(true);
+  });
+
+  it("roundHasScoreInput_countZero_returnsFalse", async () => {
+    const { conn } = connectionReturning([{ c: 0 }]);
+
+    await expect(roundHasScoreInput(conn, 7, 3)).resolves.toBe(false);
+  });
+
+  it("roundHasScoreInput_noRow_returnsFalse", async () => {
+    const { conn } = connectionReturning([]);
+
+    await expect(roundHasScoreInput(conn, 7, 3)).resolves.toBe(false);
+  });
+
+  it("roundHasScoreInput_defaultOptions_phaseZeroUnlockedSharedPredicate", async () => {
+    const { conn, execute } = connectionReturning([{ c: 0 }]);
+
+    await roundHasScoreInput(conn, 7, 3);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(flat(sql)).toContain(flat(HAS_SCORE_INPUT_SQL));
+    expect(flat(sql)).not.toContain("FOR UPDATE");
+    expect(params).toEqual([7, 0, 3]);
+  });
+
+  it("roundHasScoreInput_phaseIdGiven_scopesToPhase", async () => {
+    const { conn, execute } = connectionReturning([{ c: 0 }]);
+
+    await roundHasScoreInput(conn, 7, 3, { phaseId: 4 });
+
+    expect(execute.mock.calls[0][1]).toEqual([7, 4, 3]);
+  });
+
+  it("roundHasScoreInput_lock_endsWithForUpdateWithoutJoin", async () => {
+    const { conn, execute } = connectionReturning([{ c: 0 }]);
+
+    await roundHasScoreInput(conn, 7, 3, { lock: true });
+
+    const sql = flat(execute.mock.calls[0][0]);
+    expect(sql).toMatch(/FOR UPDATE$/);
+    expect(sql).not.toContain("JOIN");
   });
 });
