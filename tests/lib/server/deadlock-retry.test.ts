@@ -7,7 +7,9 @@ import {
   isDeadlockMessage,
   isSnapshotConflict,
   isTransactionAborted,
+  isTransactionAbortedOn,
 } from "@/lib/server/mysql-errors";
+import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
@@ -275,5 +277,46 @@ describe("ER_AUTOINC_READ_FAILED — interblocage sur le verrou AUTO-INC", () =>
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
     warn.mockRestore();
+  });
+});
+
+describe("isTransactionAbortedOn — 1467 tranché par l'état du serveur", () => {
+  const autoInc = () => Object.assign(new Error("Failed to read auto-increment value from storage engine"), { errno: 1467 });
+
+  it("isTransactionAbortedOn_autoIncTransactionClosed_returnsTrue", async () => {
+    const connection = connectionMock();
+    connection.query.mockResolvedValue([{ serverStatus: 2 }]);
+
+    expect(await isTransactionAbortedOn(fakeConnection(connection), autoInc())).toBe(true);
+    expect(connection.query).toHaveBeenCalledWith("DO 0");
+  });
+
+  it("isTransactionAbortedOn_autoIncTransactionStillOpen_returnsFalse", async () => {
+    // Délai de verrou dépassé : la requête seule est annulée, la transaction reste.
+    const connection = connectionMock();
+    connection.query.mockResolvedValue([{ serverStatus: 3 }]);
+
+    expect(await isTransactionAbortedOn(fakeConnection(connection), autoInc())).toBe(false);
+  });
+
+  it("isTransactionAbortedOn_statusCheckFails_returnsTrue", async () => {
+    const connection = connectionMock();
+    connection.query.mockRejectedValue(new Error("connexion tombée"));
+
+    expect(await isTransactionAbortedOn(fakeConnection(connection), autoInc())).toBe(true);
+  });
+
+  it("isTransactionAbortedOn_deadlock_returnsTrueWithoutQuery", async () => {
+    const connection = connectionMock();
+
+    expect(await isTransactionAbortedOn(fakeConnection(connection), Object.assign(new Error("x"), { code: "ER_LOCK_DEADLOCK" }))).toBe(true);
+    expect(connection.query).not.toHaveBeenCalled();
+  });
+
+  it("isTransactionAbortedOn_lockWaitTimeout_returnsFalseWithoutQuery", async () => {
+    const connection = connectionMock();
+
+    expect(await isTransactionAbortedOn(fakeConnection(connection), Object.assign(new Error("x"), { code: "ER_LOCK_WAIT_TIMEOUT" }))).toBe(false);
+    expect(connection.query).not.toHaveBeenCalled();
   });
 });

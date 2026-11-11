@@ -48,7 +48,7 @@ import { discardAutoValidatedNotices, flushAutoValidatedNotices } from "./auto-v
 import { discardCastChanges, flushCastChanges } from "./cast-notices";
 import { discardRefereeChanges, flushRefereeChanges } from "./referee-notices";
 import { getDatabase } from "@/lib/server/database";
-import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { botLogTournamentId } from "@/lib/shared/bot-log-batch";
 import {
   formatEndurancePenaltyLiftedLog,
@@ -933,7 +933,7 @@ export async function queueRefereeAlert(
     // la **transaction entière** de l'appelant. L'avaler laisserait le moteur
     // poursuivre — propager une qualifiée, commiter — sur une transaction
     // défaite, et rendre un 200 pour un report de score qui n'existe plus.
-    if (isTransactionAborted(error)) throw error;
+    if (await isTransactionAbortedOn(connection, error)) throw error;
 
     // Tout le reste laisse la transaction debout : la réservation est seulement
     // inaccessible — table absente, verrou dépassé. Le conflit part quand même,
@@ -1017,7 +1017,7 @@ async function claimRoundAlerts(
       const claimId = await claimRefereeAlert(connection, match.matchId, alertKey);
       if (claimId !== null) claimed.push({ ...match, claimId });
     } catch (error) {
-      if (isTransactionAborted(error)) throw error;
+      if (await isTransactionAbortedOn(connection, error)) throw error;
       break;
     }
   }
@@ -1034,7 +1034,7 @@ async function releaseRoundClaims(connection: PoolConnection, claimIds: readonly
     try {
       await releaseRefereeAlert(connection, claimId);
     } catch (error) {
-      if (isTransactionAborted(error)) throw error;
+      if (await isTransactionAbortedOn(connection, error)) throw error;
       // Meilleur effort : au pire, ce match n'aura pas son alerte.
     }
   }

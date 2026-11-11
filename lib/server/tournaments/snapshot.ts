@@ -56,6 +56,7 @@ import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { DUE_LAUNCH_SQL } from "./sync-scope";
 import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -298,16 +299,21 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
 
     return syncResult.row;
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     // Interblocage (verrous de `bg_match_maps` pendant la clôture d'un report
     // expiré, `MAP_SCORES.md`) : l'entretien est rejoué au prochain passage, et
     // l'instantané se construit sur l'état d'avant plutôt que de rendre un 500
     // à tous les spectateurs.
-    if (isTransactionAborted(error)) return tournamentRow;
+    if (isTransactionAborted(error)) {
+      // Avalé, mais pas en silence : un entretien défait à répétition se voit
+      // dans pm2.
+      console.warn("[snapshot] entretien du tournoi défait (interblocage), rejoué au prochain passage", error);
+      return tournamentRow;
+    }
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 

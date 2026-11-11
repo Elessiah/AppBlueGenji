@@ -313,7 +313,7 @@ async function openToldMark(
   const db = await getDatabase();
   const [rows] = await db.execute<ToldStateRow[]>(
     `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id,
-            r.id AS told_id, r.start_at
+            r.match_id AS told_id, r.start_at
        FROM bg_matches m
        LEFT JOIN bg_match_reminders r ON r.match_id = m.id AND r.offset_key = ?
       WHERE m.id = ? LIMIT 1`,

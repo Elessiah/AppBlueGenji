@@ -30,7 +30,7 @@ describe("reprise des marques de rappel héritées", () => {
     const statement = source.slice(source.indexOf("DELETE r FROM bg_match_reminders r"));
     // Les marques des arbitres (`STAFF`, `REFS`) ne disent rien des joueurs : elles ne retiennent pas l'observation seule.
     expect(statement).toMatch(/LEFT JOIN bg_match_reminders o ON o\.match_id = r\.match_id AND o\.offset_key NOT IN \('SEEN', 'STAFF', 'REFS'\)/);
-    expect(statement).toMatch(/WHERE r\.offset_key = 'SEEN' AND o\.id IS NULL/);
+    expect(statement).toMatch(/WHERE r\.offset_key = 'SEEN' AND o\.match_id IS NULL/);
     expect(statement).toMatch(/r\.sent_at < '2026-10-31' AND m\.start_at > NOW\(\)/);
   });
 });

@@ -38,12 +38,14 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   try {
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_match_reminders (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
         match_id BIGINT NOT NULL,
         offset_key VARCHAR(8) NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         start_at DATETIME NULL,
-        UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key),
+        -- Clé naturelle, sans compteur AUTO-INC : l'INSERT … SELECT des
+        -- marques ne prend plus le verrou de table qui faisait rendre les
+        -- réservations concurrentes en ER_AUTOINC_READ_FAILED (1467).
+        PRIMARY KEY (match_id, offset_key),
         CONSTRAINT fk_bg_match_reminders_match FOREIGN KEY (match_id)
           REFERENCES bg_matches(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -448,6 +448,8 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(drops).toEqual([
       // EF-43 : le nombre de présents des salons vocaux n'est plus gardé.
       "`ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,",
+      // DB-SCHEMA-LOT : les marques de rappel passent sur leur clé naturelle.
+      "`ALTER TABLE bg_match_reminders DROP COLUMN id, DROP INDEX uniq_bg_match_reminders,",
       "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
       'const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";',
       // Les visites ne désignent plus de compte : seul `authenticated` reste.

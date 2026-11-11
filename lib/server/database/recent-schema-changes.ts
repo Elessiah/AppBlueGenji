@@ -278,7 +278,7 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `DELETE r FROM bg_match_reminders r
        JOIN bg_matches m ON m.id = r.match_id
        LEFT JOIN bg_match_reminders o ON o.match_id = r.match_id AND o.offset_key NOT IN ('SEEN', 'STAFF', 'REFS')
-      WHERE r.offset_key = 'SEEN' AND o.id IS NULL
+      WHERE r.offset_key = 'SEEN' AND o.match_id IS NULL
         AND r.sent_at < '2026-10-31' AND m.start_at > NOW()`,
     // Conditions v6 — acceptation dans la fenêtre bloquante par un compte
     // qui ne gère aucune équipe (`SIGNED_IN`).
@@ -490,6 +490,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // valides), permises avant #514 : la copie « à tous les tours » les reprenait
     // et chaque lot était refusé (`INVALID_ROUND`), sans moyen de les retirer.
     `DELETE FROM bg_tournament_round_maps WHERE round_number > ${ROUND_NUMBER_MAX}`,
+    // DB-SCHEMA-LOT — marques de rappel sur leur clé naturelle : plus de
+    // compteur AUTO-INC, donc plus de verrou de table pris par l'`INSERT …
+    // SELECT` des marques (ER_AUTOINC_READ_FAILED). Jouée une fois : ensuite
+    // `id` n'existe plus et l'erreur est tolérée.
+    `ALTER TABLE bg_match_reminders DROP COLUMN id, DROP INDEX uniq_bg_match_reminders,
+       ADD PRIMARY KEY (match_id, offset_key)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
