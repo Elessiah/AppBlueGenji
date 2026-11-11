@@ -23,7 +23,7 @@ import {
   DATA_CONTACT_ROLE_EN,
   NOTIFIER_FOLLOW_UP_EN,
   REPORT_FORM_NAME_EN,
-  STREAM_NOTICE_OBJECTION_EN,
+  STREAM_NOTICE_SERVICE_EN,
   STREAM_NOTICE_SHOWN_EN,
   WEB_ACCESS_LOG_FIELDS_EN,
   copyrightNoticeElementsTextEn,
@@ -1093,9 +1093,12 @@ export function RgpdEn({
             registration, goes with it, is never copied onto their profile nor presented as proven, and the “OW
             BattleTag” setting of the profile does not hide it — the caster is the one giving it, for this match,
             as part of the performance of the service (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).{" "}
-            {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
-            promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
-            removed from the site, and a video published by the association&apos;s channel is hidden or deleted.
+            {STREAM_NOTICE_SHOWN_EN} {STREAM_NOTICE_SERVICE_EN} Since version 11 of the terms of use
+            (section “Match streaming”), this streaming therefore falls under <strong>performance of the
+            service</strong>, and no longer under legitimate interest: there is no longer an objection through a
+            “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
+            stream and replay links published on the site remains based on the association&apos;s legitimate
+            interest in promoting its competitions.
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
@@ -1106,9 +1109,9 @@ export function RgpdEn({
             solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an evening message that is no longer edited: unless changed, the Discord username or BattleTag
             taken when the account was created, or even the Google account name for a Google account created before
             September 30, 2026; never the numeric Discord identifier; “a player” for an entry without an account, a deleted account or a
-            registration made before 16 October 2026), the tournament&apos;s name and the stream link. This username is not based on legitimate
-            interest but on <strong>performance of the service</strong>: the announcement is part of the solo
-            tournament the player registers for, and the neutral name applies to the stream only — a player who does
+            registration made before 16 October 2026), the tournament&apos;s name and the stream link. This username rests on
+            <strong>performance of the service</strong> too: the announcement is part of the solo
+            tournament the player registers for — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
             server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the

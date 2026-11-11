@@ -158,10 +158,11 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(byRef("T08").retention.join(" ")).toMatch(/Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur/);
     expect(byRef("T08").dataCategories.join(" ")).toMatch(/l'annonce #live, elle, reste publiée dans le salon \(traitement T16\)/);
     expect(byRef("T16").subPurposes.join(" ")).toMatch(/modifiable dans Mon profil, sans effet sur un message de soirée qui n'est plus modifié/);
-    // Pseudo solo dans #live : exécution du service, pas intérêt légitime (décision du 2026-10-14).
-    expect(byRef("T16").legalBasis).toMatch(/exécution du service demandé par le joueur \(RGPD, art\. 6\.1\.b — conditions d'utilisation\) pour son pseudo public dans l'annonce #live d'un tournoi individuel/);
+    // Pseudo solo dans #live : exécution du service, pas intérêt légitime (décision du 2026-10-14) ;
+    // depuis les conditions v11 (D50), la diffusion sous le pseudo aussi.
+    expect(byRef("T16").legalBasis).toMatch(/^Exécution du service demandé par le joueur \(RGPD, art\. 6\.1\.b — conditions d'utilisation, section « Retransmission des matchs », depuis leur version 11\)/);
+    expect(byRef("T16").legalBasis).toMatch(/et pour son pseudo public dans l'annonce #live d'un tournoi individuel/);
     expect(byRef("T16").legalBasis).toMatch(/ne pas y être nommé revient à ne pas s'inscrire/);
-    expect(byRef("T16").retention.join(" ")).toMatch(/relève de l'exécution du service et non de l'intérêt légitime/);
     // Un blocage AutoMod peut porter le texte de l'annonce au salon d'alertes des modérateurs.
     expect(byRef("T16").recipients.join(" ")).toMatch(/si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte \(pseudo public compris en tournoi individuel\) peut parvenir au salon d'alertes de modération du serveur/);
     // LEGAL-OPTOUT-BASIS : garder le choix des messages de match relève d'une obligation légale
@@ -594,9 +595,11 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.transfers.join(" ")).toContain(SPICEWORKS_SCC_FALLBACK);
   });
 
-  it("donne une fiche à la retransmission, avec un droit d'opposition", () => {
+  it("donne une fiche à la retransmission : exécution du service pour les joueurs, intérêt légitime pour les casters", () => {
     const sheet = byRef("T16");
-    expect(sheet.legalBasis).toMatch(/Intérêt légitime/);
+    // Conditions v11 (D50) : la diffusion sous le pseudo fait partie du tournoi.
+    expect(sheet.legalBasis).toMatch(/pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo, avec le nom de son équipe et ses résultats et performances en jeu, qui font partie du tournoi auquel il participe — ne pas y paraître revient à ne pas y participer/);
+    expect(sheet.legalBasis).toMatch(/intérêt légitime \(RGPD, art\. 6\.1\.f\) de l'association à faire connaître ses compétitions, objet de ses statuts, pour ce qui touche les casters/);
     expect(sheet.legalBasis).toMatch(/droit d'opposition/);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
@@ -619,7 +622,8 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.retention.join(" ")).toMatch(/Annonce sur Discord : .* effacée avec le match/);
     expect(sheet.recipients.join(" ")).toMatch(/n'intègre aucun lecteur/);
     expect(sheet.dataCategories.join(" ")).toMatch(/ni webcam ni chat vocal des joueurs/);
-    expect(sheet.retention.join(" ")).toMatch(/nom neutre/);
+    expect(text(sheet)).not.toMatch(/nom neutre/);
+    expect(sheet.retention.join(" ")).not.toMatch(/Droit d'opposition/);
     expect(text(sheet)).not.toMatch(/décision requise/);
   });
 

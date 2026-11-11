@@ -7,6 +7,7 @@ import {
   LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
+import { REPORT_FORM_NAME_EN } from "@/lib/shared/legal-text-en";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   BOT_ACTIVITY_AUTHOR_RETENTION_DAYS,
@@ -85,10 +86,13 @@ describe("bot legal content is fully bilingual", () => {
 
 describe("bot legal content carries the contact details", () => {
   it.each(DOCS)("%s gives the report form, never an email, in both languages", (_name, doc) => {
+    // D47 : l'anglais nomme le formulaire comme l'interface anglaise le montre.
+    expect(JSON.stringify(doc.fr)).toContain(REPORT_FORM_NAME);
+    expect(JSON.stringify(doc.en)).toContain(`The **“${REPORT_FORM_NAME_EN}”** form at the bottom of every page of the site (“GDPR” category for your data)`);
+    expect(JSON.stringify(doc.en)).not.toContain(REPORT_FORM_NAME);
+    expect(JSON.stringify(doc.en)).not.toContain("“RGPD” category");
     for (const lang of [doc.fr, doc.en]) {
-      const flat = JSON.stringify(lang);
-      expect(flat).toContain(REPORT_FORM_NAME);
-      expect(flat).not.toMatch(/[^\s@"*]+@[^\s@"*]+\.[a-z]{2,}/i);
+      expect(JSON.stringify(lang)).not.toMatch(/[^\s@"*]+@[^\s@"*]+\.[a-z]{2,}/i);
     }
   });
 
@@ -533,7 +537,7 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
     const article01 = (lang: "fr" | "en") => JSON.stringify(TERMS_OF_SERVICE[lang].sections[0]);
     expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne) et informations sur les données.");
     expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team — a takeover mentions “an admin”, naming no one) and data-protection notices.");
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["6 novembre 2026", "6 November 2026"]);
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
   });
 
   it("terms_article01_neverNamesWhoInvitesOrOffersFrAndEn", () => {

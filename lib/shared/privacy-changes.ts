@@ -41,7 +41,9 @@
  * Voir `docs/features/PRIVACY_CHANGES_CONSENT.md`.
  */
 
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import {
+  VOICE_BOT_RELEASED_MAX_HOURS,
   VOICE_BOT_UNRELEASED_MAX_HOURS,
   VOICE_CHANNEL_LATE_HOURS,
   VOICE_CHANNEL_LEAD_MINUTES,
@@ -1864,6 +1866,35 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [
       { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
       { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },
+    ],
+  },
+  {
+    // TERMS-V11 (décisions de l'utilisateur D50 et D51 du 2026-11-11, avec D44
+    // et D47) : conditions d'utilisation, version 11. Être diffusé et
+    // enregistré sous son pseudo passe de l'intérêt légitime (opposition par
+    // « nom neutre ») à l'exécution du service. Pour tous les comptes. Même
+    // date que `TERMS_UPDATED_AT` — tout avancer ensemble si la mise en ligne
+    // glisse.
+    id: "2026-11-conditions-v11-diffusion-sous-le-pseudo",
+    publishedAt: "2026-11-13",
+    title: "Conditions d'utilisation : version 11 (diffusion des matchs sous ton pseudo, précisions)",
+    links: [
+      { href: "/conditions-utilisation#retransmission", label: "Lire la section « Retransmission des matchs »" },
+      { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs » de la politique" },
+    ],
+    summary:
+      "Les conditions d'utilisation passent en version 11 : être diffusé et enregistré sous ton pseudo pendant un match de tournoi fait désormais partie du tournoi (exécution du service), et il n'est plus possible de s'y opposer pour apparaître sous un nom neutre. Elles précisent aussi la reprise d'une équipe à la suppression d'un compte, le BattleTag tapé à la main, l'arbitre désigné et les salons vocaux d'équipe. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+    asksTermsAcceptance: true,
+    details: [
+      "Retransmission des matchs — ce qui change : jusqu'ici, la diffusion en direct et l'enregistrement d'un match (ton pseudo, le nom de ton équipe, tes résultats et performances en jeu — jamais de webcam ni de chat vocal) reposaient sur l'intérêt légitime de l'association, et tu pouvais t'y opposer pour apparaître sous un nom neutre. Ils font désormais partie du tournoi auquel tu participes, au titre de l'exécution du service, comme l'annonce #live d'un tournoi individuel : ne pas y paraître revient à ne pas participer au tournoi. Les mentions affichées à l'inscription à un tournoi, la politique de confidentialité et le registre (T16) le disent.",
+      "Retransmission des matchs — ce qui ne change pas : ce qui apparaît à l'écran ; le site ne transmet toujours rien aux plateformes de diffusion ; une annonce #live est toujours supprimée sur demande (bouton « Signaler un problème », catégorie RGPD) ; ce qui touche les casters et les liens de diffusion et de rediffusion publiés sur le site reste fondé sur l'intérêt légitime.",
+      `Compte : à la suppression d'un compte, la propriété d'une équipe passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre de l'équipe (pas seulement un joueur : un coach, par exemple), un membre dont la suppression du compte est elle-même demandée n'étant pas compté ; l'équipe devient fantôme ou est dissoute quand il ne reste aucun autre membre. C'est ce que le site faisait déjà : seul le texte est corrigé. La suppression d'un compte se « demande » depuis le profil : elle ne devient définitive qu'au bout de ${ACCOUNT_REACTIVATION_DAYS} jours.`,
+      "Contenus et contacts de match : un BattleTag enregistré avant que le site n'en note l'origine, fin octobre 2026, sur un compte auquel Battle.net est rattaché, est tenu pour reçu de Battle.net jusqu'à la prochaine connexion Battle.net, même s'il avait été tapé. Le tag Discord certifié de l'arbitre désigné n'est lu que par les parties du match (ses deux équipes, ses casters), jamais par les arbitres sans rôle sur ce match : les conditions le disent maintenant dans une phrase à part, sans changement du traitement.",
+      `Salons vocaux d'équipe : seuls les matchs programmés (ceux qui ont un horaire) ont des salons ; le bot les supprime une fois que le site les lui a rendus et qu'ils sont vides, au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu même occupés, un salon jamais rendu restant tant qu'il est occupé et une erreur de Discord pouvant retarder une suppression ; la page du match dit si chaque salon est ouvert, bientôt ouvert ou indisponible. Rien ne change dans le traitement : les conditions le disent maintenant comme la politique de confidentialité.`,
+      "Bot Discord : sa politique de confidentialité dit désormais, comme ses conditions, que le message privé d'une reprise d'équipe cite « un admin », sans nommer personne ; rien ne change dans ce message.",
+      "Conditions d'utilisation : la version 11, en vigueur depuis le 13 novembre 2026, le dit dans ses sections « Retransmission des matchs », « Compte », « Contenus publiés par les utilisateurs » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
     ],
   },
 ];

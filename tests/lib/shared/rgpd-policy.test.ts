@@ -17,6 +17,7 @@ import {
   VERIFIED_BADGE_SCOPE,
   MATCH_CONTACTS_SCOPE,
   LIVE_PSEUDO_SCOPE,
+  STREAM_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
   MODERATION_DM_SCOPE,
   DATA_NOTICE_DM_SCOPE,
@@ -509,11 +510,16 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toMatch(/#live announcements of a solo tournament that posted your username stay in the Discord channel until they are deleted, on a separate request/);
     // Le pseudo #live repose sur l'exécution du service, pas l'intérêt légitime (décision du 2026-10-14) :
     // le droit d'opposition l'exclut, ne pas y être nommé = ne pas s'inscrire.
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire/);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering/);
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/Le pseudo publié dans l'annonce #live d'un tournoi individuel non plus : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire/);
+    // Conditions v11 (D50) : la diffusion sous le pseudo relève aussi de l'exécution du service.
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/La diffusion et l'enregistrement de vos matchs de tournoi sous votre pseudo n'en font pas partie : ils relèvent de l'exécution du service, le tournoi auquel vous participez — ne pas y paraître revient à ne pas y participer/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The streaming and recording of your tournament matches under your username are not part of it: they fall under performance of the service, the tournament you take part in — not appearing in them means not taking part/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/Nor is the username posted in the #live announcement of a solo tournament: it falls under performance of the service you register for — not being named in it means not registering/);
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
     // Revue légale #445 : l'alerte AutoMod repose sur l'intérêt légitime (modérer le serveur), pas sur le contrat.
     expect(pseudo?.extraBases).toEqual([
+      // Conditions v11 (D50) : le pseudo à l'écran d'un match diffusé et enregistré.
+      { base: "Exécution du contrat", scope: STREAM_PSEUDO_SCOPE },
       { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
       { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
       // Revue juridique de #491 : le pseudo de l'arbitre désigné, même base que son BattleTag.
@@ -523,6 +529,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
       { base: "Intérêt légitime", scope: REFEREE_USERNAME_MEMBERS_SCOPE },
     ]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
+      { base: "Exécution du contrat", scope: "live streaming and recording of the tournament matches you take part in" },
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
       { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7 or a later one)" },

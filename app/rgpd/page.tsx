@@ -78,7 +78,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
+import { STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -1303,11 +1303,13 @@ function RgpdFr({
             recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
             masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
             service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}
-            {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
-            légitime de l&apos;association à faire connaître ses compétitions.{" "}
-            {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
-            retiré du site, et une vidéo publiée par la chaîne de l&apos;association est masquée
-            ou supprimée. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
+            {STREAM_NOTICE_SHOWN} {STREAM_NOTICE_SERVICE} Depuis la version 11 des conditions
+            d&apos;utilisation (section « Retransmission des matchs »), cette diffusion relève ainsi de
+            l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
+            plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
+            chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site reste
+            fondé sur l&apos;intérêt légitime de l&apos;association à faire connaître ses compétitions.
+            Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
             l&apos;association, en un message par soirée (quatre heures depuis le premier direct) qui liste à
@@ -1319,9 +1321,9 @@ function RgpdFr({
             BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
             le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
             entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le
-            lien de la diffusion. Ce pseudo ne repose pas sur l&apos;intérêt légitime mais sur
+            lien de la diffusion. Ce pseudo repose lui aussi sur
             l&apos;<strong>exécution du service</strong> : l&apos;annonce fait partie du tournoi individuel
-            auquel le joueur s&apos;inscrit, et le nom neutre ne vaut que pour la diffusion — un joueur qui
+            auquel le joueur s&apos;inscrit — un joueur qui
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte

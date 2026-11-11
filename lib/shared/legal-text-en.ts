@@ -40,13 +40,13 @@ export const NOTIFIER_FOLLOW_UP_EN =
 export const STREAM_NOTICE_SHOWN_EN =
   "What appears is the players' usernames, their team's name and their in-game results and performance — never a webcam or voice chat.";
 
-/** `STREAM_NOTICE_OBJECTION` (`stream-notice.ts`). */
-export const STREAM_NOTICE_OBJECTION_EN =
-  "Any player can object: they then appear under a neutral name. The request is made through the “Report a problem” button, GDPR category.";
+/** `STREAM_NOTICE_SERVICE` (`stream-notice.ts`). */
+export const STREAM_NOTICE_SERVICE_EN =
+  "Streaming and recording a match under its players' usernames is part of the tournament they take part in (performance of the service): a player who does not want to appear in it does not take part.";
 
 /** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_LIVE_EN =
-  "Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for (performance of the service, not legitimate interest): the neutral name does not apply to it, and a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the same button.";
+  "Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for too (performance of the service): a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the “Report a problem” button, GDPR category.";
 
 /** `AUTHORITY_CONTACT_LANGUAGES` (`legal-contact.ts`), same order. */
 export const AUTHORITY_CONTACT_LANGUAGES_EN: readonly string[] = ["French", "English"];

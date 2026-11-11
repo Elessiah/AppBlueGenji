@@ -54,8 +54,8 @@ import {
 } from "@/lib/shared/legal-text-en";
 import { isMigratedRoute, localeAlternates, type Locale } from "@/lib/shared/locales";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
-import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
-import { STREAM_NOTICE_OBJECTION_EN, STREAM_NOTICE_SHOWN_EN } from "@/lib/shared/legal-text-en";
+import { STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
+import { STREAM_NOTICE_SERVICE_EN, STREAM_NOTICE_SHOWN_EN } from "@/lib/shared/legal-text-en";
 import { TERMS_SECTIONS, TERMS_VERSION, formatTermsDate, formatTermsDateIn } from "@/lib/shared/terms-of-use";
 import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import { SITE_HOST } from "@/lib/shared/site-host";
@@ -111,8 +111,8 @@ describe("français : le texte qui fait foi ne bouge pas", () => {
   });
 
   it("la version des conditions n'avance pas pour une traduction", () => {
-    // Version 10 : avatar supprimé par la modération, reprise d'équipe, annonce #live (#571), pas une traduction.
-    expect(TERMS_VERSION).toBe(10);
+    // Version 11 : diffusion sous le pseudo au titre de l'exécution du service (TERMS-V11, D50), pas une traduction.
+    expect(TERMS_VERSION).toBe(11);
   });
 });
 
@@ -286,7 +286,7 @@ describe("parité du texte : l'anglais suit le français, élément par élémen
     expect(WEB_ACCESS_LOG_FIELDS_EN.split(", ")).toHaveLength(WEB_ACCESS_LOG_FIELDS.split(", ").length);
     expect(numbers(NOTIFIER_FOLLOW_UP_EN)).toEqual(numbers(NOTIFIER_FOLLOW_UP));
     expect(numbers(STREAM_NOTICE_SHOWN_EN)).toEqual(numbers(STREAM_NOTICE_SHOWN));
-    expect(numbers(STREAM_NOTICE_OBJECTION_EN)).toEqual(numbers(STREAM_NOTICE_OBJECTION));
+    expect(numbers(STREAM_NOTICE_SERVICE_EN)).toEqual(numbers(STREAM_NOTICE_SERVICE));
   });
 
   it("la déclaration anglaise suit la liste des limites connues (critère, contournement)", () => {

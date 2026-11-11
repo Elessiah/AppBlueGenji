@@ -166,7 +166,7 @@
     {
       "title": "Team voice channels",
       "body": [
-        "A tournament can turn on the “Team voice channels” option (off by default, see its settings). It is then part of its <b>rules</b>: from {voiceLead} minutes before each match's time, the association's Discord bot opens a {voiceCapacity}-seat voice channel named after each of the two teams; each team may meet there before playing, with no obligation."
+        "A tournament can turn on the “Team voice channels” option (off by default, see its settings). It is then part of its <b>rules</b>: from {voiceLead} minutes before the time of each scheduled match (a match with no set time has no channel), the association's Discord bot opens a {voiceCapacity}-seat voice channel named after each of the two teams; each team may meet there before playing, with no obligation."
       ],
       "bullets": [
         "The channels never hold the match's launch: it launches as in any other tournament.",

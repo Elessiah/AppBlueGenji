@@ -42,7 +42,9 @@ gauche à droite) donne la même réponse.
 
 `0` par défaut, **sans remplissage** : on ne sait pas lesquelles ont été tapées.
 Elles gardent la règle d'avant (Battle.net rattaché et un BattleTag) jusqu'à la
-prochaine connexion Battle.net, qui réécrit la colonne.
+prochaine connexion Battle.net, qui réécrit la colonne. Les conditions
+d'utilisation le disent depuis leur version 11 (sections « Contenus publiés par
+les utilisateurs » et « Contacts de match », FR et EN).
 
 ## Données personnelles
 

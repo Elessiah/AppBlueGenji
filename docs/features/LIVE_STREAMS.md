@@ -450,7 +450,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
   (`deletion.residual`), qui le rappelle au joueur ; les conditions d'utilisation
   (section « Retransmission des matchs », `STREAM_NOTICE_LIVE` / `_EN`) disent que
-  le nom neutre ne couvre pas cette annonce. Le bot préfixe la mention du public (`@everyone` ou le rôle StreamViewer) et n'autorise qu'elle
+  cette annonce fait partie du tournoi individuel (ne pas y être nommé = ne pas
+  s'inscrire). Le bot préfixe la mention du public (`@everyone` ou le rôle StreamViewer) et n'autorise qu'elle
   (`{ parse: ["everyone"] }` ou `{ roles: [StreamViewer] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
@@ -524,11 +525,20 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 
 ## Information des joueurs (RGPD)
 
-La retransmission est un traitement (registre, **T16**) : intérêt légitime de
-l'association, droit d'opposition. **Exception** (décision du 2026-10-14) : le
-pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose sur
-l'**exécution du service** (art. 6.1.b — l'annonce fait partie du tournoi auquel
-il s'inscrit), pas sur l'intérêt légitime : pas de nom neutre, ne pas y être
+La retransmission est un traitement (registre, **T16**). **Depuis la version 11
+des conditions d'utilisation** (13 novembre 2026, décision de l'utilisateur D50
+du 2026-11-11), être diffusé et enregistré sous son pseudo — avec le nom de son
+équipe et ses résultats en jeu — fait partie du tournoi : **exécution du
+service** (art. 6.1.b), ne pas y paraître = ne pas participer
+(`STREAM_NOTICE_SERVICE` / `_EN`, `STREAM_PSEUDO_SCOPE`). L'opposition par « nom
+neutre » (intérêt légitime, jusqu'à la version 10), qui se traitait à la main
+sur demande, **n'existe plus** : ni le site ni le staff n'ont de nom neutre à
+poser. Restent fondés sur l'intérêt légitime de l'association à faire connaître
+ses compétitions ce qui touche les casters (voix, pseudo, lien de leur chaîne,
+mode d'antenne) et les liens de diffusion et de rediffusion publiés sur le site.
+Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose de
+même sur l'**exécution du service** depuis le 2026-10-14 (l'annonce fait partie
+du tournoi auquel il s'inscrit) : ne pas y être
 nommé = ne pas s'inscrire, une annonce passée est supprimée sur demande. Dit par
 T16, `/rgpd#retransmission`, `DONNEES_PROFIL` (« Pseudo site »), le droit
 d'opposition, la mention d'inscription solo, `STREAM_NOTICE_LIVE` (conditions,
@@ -556,8 +566,8 @@ Le joueur en est informé là où il s'engage, sans case à cocher — ce n'est 
 un consentement : sous le bouton d'inscription de la fiche du tournoi
 (`TournamentHeader`, en équipe comme en individuel) et dans la confirmation
 d'inscription (`registration-confirm.ts`). Sur la fiche, l'information est **en
-couches** (`INFO_HINTS.md`) : une ligne visible dit l'essentiel et le droit
-d'opposition (`REGISTRATION_STREAM_NOTICE_SHORT`, `register.streamNoticeShort`),
+couches** (`INFO_HINTS.md`) : une ligne visible dit l'essentiel — y jouer,
+c'est y paraître sous son pseudo (`REGISTRATION_STREAM_NOTICE_SHORT`, `register.streamNoticeShort`),
 le bouton « i » porte la mention entière et le lien vers `/rgpd#retransmission` ;
 la confirmation, elle, relit la mention entière. Les phrases viennent d'un module pur,
 `lib/shared/stream-notice.ts`, partagé avec la section « Retransmission des
@@ -566,9 +576,10 @@ de la soirée nomme équipes et joueurs avant le début d'un match programmé da
 la soirée et une fois le match terminé, pas seulement à son départ ; décidé le
 2026-10-28, décision 33 de l'utilisateur : en tournoi individuel, un joueur
 qui n'a accepté que la version 6 y est nommé aussi avant et après son match,
-sans attendre qu'il accepte la version 7) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
-« Signaler un problème », catégorie RGPD : le joueur apparaît alors sous un nom
-neutre, et un lien de rediffusion qui le montre est retiré.
+sans attendre qu'il accepte la version 7) ; le détail est sur `/rgpd#retransmission`. Depuis la
+version 11, ces mentions ne proposent plus d'opposition : la diffusion fait
+partie du tournoi (voir ci-dessus) ; seule la suppression d'une annonce #live
+passée se demande encore par « Signaler un problème », catégorie RGPD.
 
 ## Liste blanche de plateformes
 

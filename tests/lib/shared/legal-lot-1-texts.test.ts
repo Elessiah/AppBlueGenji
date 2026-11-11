@@ -24,7 +24,8 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
   it("rectificatifHebergement_published_datedAfterLastPublishedEntryForAllAccounts", () => {
     expect(entry()?.publishedAt).toBe("2026-11-13");
     expect(entry()?.audience).toBeUndefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ID);
+    // L'entrée des conditions v11, datée du même jour, la suit.
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {
