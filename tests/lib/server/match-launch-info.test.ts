@@ -1524,6 +1524,17 @@ describe("loadViewerMatchContacts — arbitre désigné qui caste aussi le match
     expect(coCaster(info)).toMatchObject({ discordTag: "caster", battletag: "Caster#1", contactsShown: true });
   });
 
+  it("loadViewerMatchContacts_designatedRefereeCastingMarvelRivalsBeforeStart_coCasterDiscordWithoutBattletag", async () => {
+    state.candidates = [scheduled({ tournament_game: "MR", referee_user_id: VIEWER })];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    const co = coCaster(info);
+    expect(co).toMatchObject({ discordTag: "caster", contactsShown: true });
+    expect(co).not.toHaveProperty("battletag");
+    expect(co).not.toHaveProperty("battletagVerified");
+  });
+
   it("loadViewerMatchContacts_staffCasterNotDesignatedBeforeStart_coCasterContactsWait", async () => {
     state.candidates = [scheduled()];
 
