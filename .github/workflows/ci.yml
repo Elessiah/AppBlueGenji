@@ -64,8 +64,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
       # --with-deps installe aussi les libs système Linux requises par Chromium.
+      # Repli sans --with-deps si le miroir apt du runner est injoignable (panne
+      # DNS azure.archive.ubuntu.com du 2026-11-11) : l'image ubuntu-latest porte
+      # déjà les bibliothèques de Chromium, seul le navigateur manque.
       - name: Install Playwright browser
-        run: ./node_modules/.bin/playwright install --with-deps chromium
+        run: |
+          ./node_modules/.bin/playwright install --with-deps chromium             || { echo "::warning::apt injoignable, installation de Chromium sans --with-deps"; ./node_modules/.bin/playwright install chromium; }
       # Pas de DB en CI : seuls les tests auth (sans prérequis) s'exécutent ;
       # le parcours authentifié reste skippé tant que E2E_AUTH_USER n'est pas défini.
       - name: Run E2E tests
