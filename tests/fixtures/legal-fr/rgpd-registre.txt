@@ -140,6 +140,7 @@ Discord, qui achemine le message privé d'une demande d'adhésion, d'une invitat
 Le service de push du navigateur du joueur prévenu (Google, Mozilla, Apple ou Microsoft), qui achemine la notification push chiffrée des mêmes avis (T12)
 Transferts hors UE
 États-Unis : Discord (acheminement des messages privés) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+États-Unis : service de push du navigateur du joueur prévenu, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — Google, Mozilla, Apple et Microsoft, certifiés EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
 Sécurité
 Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
 Chiffrement des échanges (HTTPS)
@@ -393,7 +394,7 @@ Journal des suppressions : 60 jours par entrée
 Copie de la base du bot écrite à côté d'elle avant une restauration (non chiffrée, sur la machine du bot) : supprimée à la restauration réussie suivante, au plus tard dans la nuit qui suit ses 30 jours
 Destinataires
 Keryan Houssin, responsable technique de l'association, qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement), seul détenteur des clés de déchiffrement
-Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit par son responsable technique, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen, qui stocke les copies chiffrées sans pouvoir les lire
+Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen, qui stocke les copies chiffrées sans pouvoir les lire
 Transferts hors UE
 Aucun
 Sécurité

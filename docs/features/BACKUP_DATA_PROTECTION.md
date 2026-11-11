@@ -139,7 +139,7 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
 - **Hébergement** : depuis le **1er octobre 2026**, Hetzner Storage Share
   (Nextcloud géré), exploité par **Hetzner Online GmbH**, Allemagne. Hetzner est
   **sous-traitant** de l'association ; son responsable technique a souscrit
-  le service et **accepté le contrat de traitement des données de Hetzner
+  le service pour le compte de l'association et **accepté le contrat de traitement des données de Hetzner
   (Data Processing Agreement, version 1.2) le 1er octobre 2026**. Traitement
   **exclusivement dans l'Union européenne / l'EEE** (§ 3 de ce contrat) :
   **aucun transfert hors de l'Union**. Le contrat signé est confidentiel et
@@ -160,8 +160,8 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   en production le 30 septembre 2026, maintenu au passage à Hetzner). Le
   transport HTTPS/TLS s'y ajoute. Le chiffrement est une mesure de sécurité
   (art. 32) : il ne tient pas lieu de contrat de sous-traitance (art. 28), que
-  le contrat de Hetzner fournit. Reste en suspens la seule signature du contrat
-  entre l'association et l'hébergeur — voir `ERREUR.txt`.
+  le contrat de Hetzner fournit. L'hébergeur n'étant pas un prestataire
+  (`HOST_ARRANGEMENT`), aucun contrat n'est à signer avec lui.
 - **Actions requises en production** (non vérifiables depuis le dépôt) :
   désactiver la corbeille et les versions du Nextcloud (voir plus haut) ; une
   fois une restauration depuis Hetzner vérifiée, **effacer définitivement les

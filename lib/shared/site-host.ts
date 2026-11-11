@@ -2,8 +2,9 @@
  * L'hébergeur du site — une seule fois, pour les deux pages qui le nomment.
  *
  * Les mentions légales (`/mentions-legales#hebergement`) le doivent au lecteur
- * (LCEN), le registre des traitements (`/rgpd/registre`) le déclare comme
- * **sous-traitant** : c'est lui qui héberge les données. Deux copies de cette
+ * (LCEN), le registre des traitements (`/rgpd/registre`) le nomme : c'est lui
+ * qui héberge les données, sur sa propre machine et pour le compte de
+ * l'association — sans être sous-traitant (`HOST_ARRANGEMENT`). Deux copies de cette
  * adresse auraient fini par diverger — et le registre aurait alors déclaré un
  * hébergeur que les mentions légales ne connaissent plus.
  *

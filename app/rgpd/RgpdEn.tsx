@@ -613,7 +613,7 @@ export function RgpdEn({
           <p>
             <strong>Purpose.</strong> Knowing how much the site is visited: number of visits over 24 hours, 7
             days, 30 days and since the launch, and of unique visitors over 24 hours, 7 days, 30 days and{" "}
-            {SITE_VISITOR_RETENTION_MONTHS} months. No third-party tool is used, and none of it is used for
+            {monthsEn(SITE_VISITOR_RETENTION_MONTHS)}. No third-party tool is used, and none of it is used for
             advertising.
           </p>
           <p>
@@ -644,7 +644,7 @@ export function RgpdEn({
             {SITE_VISIT_DETAIL_RETENTION_DAYS} days, after being added to a daily counter that only keeps the number
             of visits. To count unique visitors, the site also keeps one hash per visitor, without page but with the
             “logged-in visitor” indicator and the date of the last visit: it is erased{" "}
-            <strong>{SITE_VISITOR_RETENTION_MONTHS} months after that last visit</strong> — including after an
+            <strong>{monthsEn(SITE_VISITOR_RETENTION_MONTHS)} after that last visit</strong> — including after an
             account is deleted, which does not erase it sooner. Hashes recorded before this rule are dated from when
             it was introduced, as their last visit had not been kept.
           </p>
@@ -828,7 +828,7 @@ export function RgpdEn({
               log on Discord carries neither their username nor the reason.
             </li>
             <li>
-              <strong>Period</strong>: while it runs, then {SUSPENSION_RETENTION_MONTHS} months after it is lifted or
+              <strong>Period</strong>: while it runs, then {monthsEn(SUSPENSION_RETENTION_MONTHS)} after it is lifted or
               expires — the period for contesting —, before being erased at the first login to the site after that
               period; also erased with the account, or when it is anonymized. It appears in the export of your data,
               without the name of who imposed it.

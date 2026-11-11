@@ -11,7 +11,8 @@ import { join } from "node:path";
 import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
-import { ASSOCIATION_GMAIL_FRAMEWORK } from "@/lib/shared/processing-register";
+import { ASSOCIATION_GMAIL_FRAMEWORK, PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 
 const ID = "2026-11-rectificatifs-hebergement-courriel-push";
 const read = (path: string) => readFileSync(join(__dirname, "..", "..", "..", path), "utf8");
@@ -94,5 +95,30 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
 
   it("botPrivacyPolicy_lastUpdated_datedWithSiteRectification", () => {
     expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
+  });
+});
+
+describe("corrections de la revue (LEGAL-LOT-1)", () => {
+  it("registerT03_transfers_listBrowserPushServiceWithDpfBasisFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T03")?.transfers.join(" ") ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T03")?.transfers.join(" ") ?? "";
+
+    expect(fr).toContain("service de push du navigateur du joueur prévenu");
+    expect(fr).toContain("Google, Mozilla, Apple et Microsoft, certifiés EU-U.S. Data Privacy Framework");
+    expect(en).toContain("push service of the notified player's browser");
+    expect(en).toContain("Data Privacy Framework");
+  });
+
+  it("legalNotice_gmail_saysMovingToWorkspaceFrAndEn", () => {
+    expect(read("app/mentions-legales/page.tsx")).toContain("Google (Gmail, en cours de passage à Google Workspace)");
+    expect(read("app/mentions-legales/MentionsLegalesEn.tsx")).toContain("Google (Gmail, currently moving to Google Workspace)");
+  });
+
+  it("rgpdEn_monthCounts_useMonthsEnHelper", () => {
+    const source = read("app/rgpd/RgpdEn.tsx");
+
+    expect(source).toContain("{monthsEn(SUSPENSION_RETENTION_MONTHS)} after it is lifted");
+    expect(source).toContain("{monthsEn(SITE_VISITOR_RETENTION_MONTHS)} after that last visit");
+    expect(source).not.toMatch(/\{(SUSPENSION|SITE_VISITOR)_RETENTION_MONTHS\} months/);
   });
 });

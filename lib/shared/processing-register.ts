@@ -208,7 +208,7 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
  * sur Hetzner Storage Share (Nextcloud géré). Hetzner Online GmbH (Allemagne)
  * est **sous-traitant** de l'association : son responsable technique, qui
  * héberge le site sur sa propre machine (aucun prestataire d'hébergement,
- * `HOST_ARRANGEMENT`), a souscrit le service et accepté son contrat de
+ * `HOST_ARRANGEMENT`), a souscrit le service pour le compte de l'association et accepté son contrat de
  * traitement des données (version 1.2, le 1er octobre 2026 — le document
  * signé n'est pas publié) ;
  * traitement exclusivement dans l'Union européenne ou l'Espace économique
@@ -217,7 +217,7 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
  * (art. 32) qui s'y ajoute : Hetzner stocke des copies qu'il ne peut pas lire.
  */
 export const HETZNER_BACKUP_FRAMEWORK =
-  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit par son responsable technique, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
+  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
 
 /**
  * Portail de support (T15) : Spiceworks est **sous-traitant** de l'association,
@@ -367,7 +367,7 @@ export function transferBasisEn(recipients: readonly TransferRecipient[]): strin
 
 /** `HETZNER_BACKUP_FRAMEWORK`. */
 export const HETZNER_BACKUP_FRAMEWORK_EN =
-  "Hetzner Online GmbH (Germany), Storage Share service, processor of the association, subscribed by its technical manager, who accepted its data processing agreement (Data Processing Agreement, version 1.2) on October 1, 2026; processing exclusively in the European Union or the European Economic Area";
+  "Hetzner Online GmbH (Germany), Storage Share service, processor of the association, subscribed on the association's behalf by its technical manager, who accepted its data processing agreement (Data Processing Agreement, version 1.2) on October 1, 2026; processing exclusively in the European Union or the European Economic Area";
 
 /** `SPICEWORKS_PROCESSOR_FRAMEWORK`. */
 export const SPICEWORKS_PROCESSOR_FRAMEWORK_EN =
@@ -631,6 +631,8 @@ const ACTIVITIES = registerActivities({
     transfers: [
       frEn(`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`,
         `United States: Discord (delivery of direct messages) — ${transferBasisEn(["DISCORD"])}`),
+      frEn(`États-Unis : service de push du navigateur du joueur prévenu, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+        `United States: push service of the notified player's browser, which only receives end-to-end encrypted messages (RFC 8291) — ${transferBasisEn(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`),
     ],
     security: [
       ...COMMON_SECURITY,

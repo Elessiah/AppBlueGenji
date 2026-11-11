@@ -49,7 +49,7 @@ L'hébergeur technique n'est **pas** sous-traitant : aucun prestataire
 d'hébergement, le responsable technique de l'association fait tourner le site
 et le bot sur sa propre machine, pour le compte de l'association (décision de
 l'association, novembre 2026) — pas de contrat de l'article 28,
-`HOST_ARRANGEMENT` le dit dans la rubrique de l'hébergeur et dans `T09`.
+`HOST_ARRANGEMENT` le dit dans la rubrique de l'hébergeur ; `T09` le résume dans ses destinataires (« aucun prestataire d'hébergement ») — à changer avec lui.
 Le courriel de l'association est une messagerie
 Gmail, en cours de passage à Google Workspace : Google en est destinataire
 (`T11`, `ASSOCIATION_GMAIL_FRAMEWORK`, à réécrire sous les conditions de

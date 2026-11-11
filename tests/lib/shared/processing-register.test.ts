@@ -644,10 +644,10 @@ describe("décisions de l'association du 2026-09-30", () => {
     const fr = byRef("T09").recipients.join(" ");
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T09")?.recipients.join(" ") ?? "";
     expect(fr).toContain("qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement)");
-    expect(fr).toContain("sous-traitant de l'association, souscrit par son responsable technique");
+    expect(fr).toContain("sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique");
     expect(fr).not.toMatch(/sous-traitant ultérieur|en attente de signature|art\. 28\)/);
     expect(en).toContain("who hosts the site on their own machine on the association's behalf (no hosting provider)");
-    expect(en).toContain("processor of the association, subscribed by its technical manager");
+    expect(en).toContain("processor of the association, subscribed on the association's behalf by its technical manager");
     expect(en).not.toMatch(/sub-processor|awaiting signature/);
   });
 
