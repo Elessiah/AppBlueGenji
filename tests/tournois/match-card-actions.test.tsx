@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MatchCardActions, closePanelOnTabOut, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
+import { MatchCardActions, castFocusAction, closePanelOnTabOut, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import {
@@ -547,5 +547,15 @@ describe("Diffusion officielle — libellé du staff (D26)", () => {
   it("titre la fenêtre du même nom", () => {
     expect(messages("fr", "tournamentDialogs").live.title).toBe("Diffusion officielle");
     expect(messages("en", "tournamentDialogs").live.title).toBe("Official broadcast");
+  });
+});
+
+describe("castFocusAction — le bouton de cast qui reprend le focus", () => {
+  it("castFocusAction_afterRelease_targetsClaimCast", () => {
+    expect(castFocusAction(true)).toBe("claimCast");
+  });
+
+  it("castFocusAction_afterClaim_targetsCastConfig", () => {
+    expect(castFocusAction(false)).toBe("castConfig");
   });
 });

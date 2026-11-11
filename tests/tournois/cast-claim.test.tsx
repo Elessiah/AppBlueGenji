@@ -377,10 +377,17 @@ describe("MatchCardActions — branchements du cast", () => {
   it("inscrit, le focus passe au bouton qui remplace « Caster » (« Ne plus caster », sinon « Plus d'actions »)", () => {
     expectContains(card, [
       "claimedRef.current = true;",
-      "if (!claimedRef.current || hasClaimCast) return;",
-      'querySelector<HTMLElement>(\'[data-action="castConfig"]\')',
-      "(settings ?? toggleRef.current)?.focus({ preventScroll: true });",
+      "const pending = hasClaimCast ? releasedRef : claimedRef;",
+      "querySelector<HTMLElement>(`[data-action=\"${castFocusAction(hasClaimCast)}\"]`)",
+      "(replacement ?? toggleRef.current)?.focus({ preventScroll: true });",
     ]);
+  });
+
+  it("CastSettingsDialog_release_raisesOnReleasedBeforeRefresh", () => {
+    // Retiré depuis sa fenêtre, « Configurer ma diffusion » disparaît : le focus va à « Caster », revenu.
+    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
+    expect(settings).toMatch(/showSuccess\(t\("cardActions\.notCasting"\)\);\s+onReleased\?\.\(\);\s+onSaved\(\);/);
+    expect(card).toContain("releasedRef.current = true;");
   });
 
   it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire depuis sa fenêtre", () => {

@@ -88,6 +88,17 @@ describe("offersCastSettings", () => {
     expect(offersCastSettings(played, true, false)).toBe(false);
   });
 
+  it("offersCastSettings_noLivePermissionMatchToPlay_offersForReleaseOnly", () => {
+    // Sans `live`, la fenêtre ne sert plus qu'au retrait — encore possible avant le match.
+    expect(offersCastSettings(match({ liveTrigger: "AUTO" }), true, false)).toBe(true);
+  });
+
+  it("offersCastSettings_noLivePermissionPlayedStillMarked_notOffered", () => {
+    // Joué et encore marqué : le staff y règlerait la diffusion, le caster sans `live` n'y peut rien.
+    const marked = match({ status: "COMPLETED" as MatchStatus, forfeitTeamId: 10, liveTrigger: "MANUAL" });
+    expect(offersCastSettings(marked, true, false)).toBe(false);
+  });
+
   it("rien sur un match joué par forfait et jamais casté : aucune diffusion, aucune rediff", () => {
     const forfeit = match({ status: "COMPLETED" as MatchStatus, forfeitTeamId: 10 });
     expect(offersCastSettings(forfeit, true, true)).toBe(false);

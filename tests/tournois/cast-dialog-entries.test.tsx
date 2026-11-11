@@ -224,6 +224,20 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
     expect(readSource(`${DIR}/_lib/request-json.ts`)).toContain("response.json().catch(() => ({}))");
   });
 
+  it("CastSettingsDialog_noLivePermission_hidesSettingsAndSaveShowsHint", () => {
+    expect(settings).toContain("const settable = controls.canManage;");
+    expect(settings).toContain("{cast !== null && settable && (");
+    expect(settings).toContain("{!played && settable && (");
+    expect(settings).toContain('t("cardActions.castSettings.noLive")');
+  });
+
+  it("castSettingsTexts_noLive_presentInFrAndEn", () => {
+    expect(frActions.cardActions.castSettings.noLiveTitle).toBe("Permission de diffusion retirée");
+    expect(enActions.cardActions.castSettings.noLiveTitle).toBe("Streaming permission removed");
+    expect(frActions.cardActions.castSettings.noLive).toContain("te retirer");
+    expect(enActions.cardActions.castSettings.noLive).toContain("withdraw");
+  });
+
   it("CastSettingsDialog_unmarkedMatch_noModePreselected", () => {
     expect(settings).toContain("(pickedTrigger ?? match.liveTrigger)");
   });
@@ -358,6 +372,20 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
   it("matchLiveBody_castableEmptyLink_sendsNullLink", () => {
     expect(matchLiveBody({ castable: true, trigger: "AUTO", liveUrl: " ", organisationLink: undefined, streamLinks: undefined })).toEqual({
       trigger: "AUTO",
+      liveUrl: null,
+    });
+  });
+
+  it("matchLiveBody_castableEmptyLinkWithOrigin_omitsOrganisationLink", () => {
+    expect(matchLiveBody({ castable: true, trigger: "AUTO", liveUrl: " ", organisationLink: true, streamLinks: undefined })).toEqual({
+      trigger: "AUTO",
+      liveUrl: null,
+    });
+  });
+
+  it("matchLiveBody_unmarkedWithOrigin_omitsOrganisationLink", () => {
+    expect(matchLiveBody({ castable: true, trigger: null, liveUrl: "https://twitch.tv/a", organisationLink: true, streamLinks: undefined })).toEqual({
+      trigger: null,
       liveUrl: null,
     });
   });

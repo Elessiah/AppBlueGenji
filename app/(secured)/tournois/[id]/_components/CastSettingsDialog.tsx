@@ -69,12 +69,15 @@ export function CastSettingsDialog({
   matchLabel,
   onClose,
   onSaved,
+  onReleased,
 }: Readonly<{
   match: BracketMatch;
   matchLabel: string;
   onClose: () => void;
   /** Un réglage enregistré : la page relit le match (et la modale de lancement). */
   onSaved: () => void;
+  /** Retrait abouti : la carte rendra le focus à « Caster », qui revient. */
+  onReleased?: () => void;
 }>) {
   const actionText = useActionsText();
   const { t } = actionText;
@@ -135,6 +138,9 @@ export function CastSettingsDialog({
   // Un match joué ne prend plus ni lien ni BattleTag (`MATCH_CAST_CLOSED`) :
   // la fenêtre ne garde que la rediff et le retrait.
   const played = match.status === "COMPLETED";
+  // Sans la permission `live`, le serveur refuse tout réglage (`NOT_CASTER`) :
+  // la fenêtre ne garde que le retrait, seule voie qui aboutisse encore.
+  const settable = controls.canManage;
   const streamEditable = cast !== null && !cast.staffStream && !played;
   const urlRefused = streamEditable && castUrlInvalid(url);
   const urlChanged = cast !== null && url.trim() !== (cast.liveUrl ?? "");
@@ -198,6 +204,7 @@ export function CastSettingsDialog({
     try {
       await requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED");
       showSuccess(t("cardActions.notCasting"));
+      onReleased?.();
       onSaved();
       onClose();
       return true;
@@ -232,7 +239,16 @@ export function CastSettingsDialog({
           </InfoHintRow>
         )}
 
-        {cast !== null && (
+        {cast !== null && !settable && (
+          <InfoHintRow inline>
+            <p className={styles.subtitle}>{t("cardActions.castSettings.noLiveTitle")}</p>
+            <InfoHint id={`${titleId}-no-live`} subject={t("cardActions.castSettings.noLiveTitle")}>
+              <p>{t("cardActions.castSettings.noLive")}</p>
+            </InfoHint>
+          </InfoHintRow>
+        )}
+
+        {cast !== null && settable && (
           <>
             {!played && (
               <CastUrlField
@@ -336,7 +352,7 @@ export function CastSettingsDialog({
               {played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
             </button>
             {/* Un match joué ne prend plus ni lien, ni mode, ni BattleTag : rien à enregistrer. */}
-            {!played && (
+            {!played && settable && (
               <button type="submit" className={`btn ${styles.button}`} disabled={busy || blocked || cast === null}>
                 {busy ? t("cardActions.castSettings.saving") : t("cardActions.castSettings.save")}
               </button>

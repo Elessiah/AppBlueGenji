@@ -79,7 +79,12 @@ Fenêtre du caster, sur **son** cast :
 - **« Ne plus caster »** : `DELETE …/caster`, derrière un `ConfirmActionDialog` (il rend
   la place et retire le stream : geste sans retour ; le caster qui se retire
   lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
-  terminé, où le bouton n'est pas offert (`offersCastRelease`).
+  terminé, où le bouton n'est pas offert (`offersCastRelease`). Retiré, le focus
+  passe au bouton « Caster » revenu sur la carte (`castFocusAction`, WCAG 2.4.3).
+- **Sans la permission `live`** (perdue en gardant l'inscription, match lancé) :
+  tout réglage serait refusé (`NOT_CASTER`) ; la fenêtre ne montre que le retrait,
+  avec une aide « Permission de diffusion retirée », et n'est offerte que sur un
+  match pas encore joué (`offersCastSettings`).
 
 La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
 (`loadOwnCastSettings`) : le BattleTag d'un cast **ne voyage pas** dans
