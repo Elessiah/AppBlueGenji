@@ -2622,8 +2622,7 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
 
   it("privacyChanges_voiceClearAndReschedule_lastEntryForAllAccountsFrAndEn", () => {
     const entry = PRIVACY_CHANGES.find((c) => c.id === voiceClearId)!;
-    // Suivie de l'entrée du vidage par l'équipe (VOICE-CLEAR-TEAM, D36), puis de REF-CASTER-CONTACTS.
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(voiceClearId);
+    // Sa place est fixée par `after` (`expectStandaloneEntry`), sans compter depuis la fin.
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v10-avatar-et-succession", publishedAt: "2026-11-11", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[entry.id], {
@@ -2635,7 +2634,6 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   it("privacyChanges_voiceClearByTeam_lastEntryForAllAccountsFrAndEn", () => {
     const id = "2026-11-salons-vocaux-vidage-par-l-equipe";
     const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(id);
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[id], { after: voiceClearId, publishedAt: "2026-11-11", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[id], {
@@ -2707,7 +2705,6 @@ describe("PRIVACY_CHANGES — contacts du caster à l'arbitre désigné qui cast
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
 
   it("privacyChanges_refCasterContacts_lastEntryForLiveStaffFitsOneDm", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[id], {
       after: "2026-11-salons-vocaux-vidage-par-l-equipe",
       publishedAt: "2026-11-12",

@@ -293,6 +293,15 @@ function filterContact(
   };
 }
 
+/**
+ * Le lecteur est-il l'arbitre désigné du match, et le reste-t-il
+ * (`refereeEligible`, `keepEligibleReferees`) ? Une seule définition pour le
+ * rôle (`viewerRole`) et pour la lecture des co-casters (`casterContactsRole`).
+ */
+function isDesignatedReferee(row: CandidateRow, userId: number): boolean {
+  return row.refereeEligible && row.referee_user_id !== null && Number(row.referee_user_id) === userId;
+}
+
 function viewerRole(
   row: CandidateRow,
   userId: number,
@@ -315,7 +324,7 @@ function viewerRole(
   if (casters.some((caster) => caster.userId === userId)) {
     return { role: "CASTER", canDeclareReady: true };
   }
-  if (row.refereeEligible && Number(row.referee_user_id) === userId) {
+  if (isDesignatedReferee(row, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
   // Un arbitre n'a pas de « Prêt » à donner : il lit les contacts, rien de plus.
@@ -334,8 +343,7 @@ function viewerRole(
  * (`keepEligibleReferees`).
  */
 function casterContactsRole(row: CandidateRow, userId: number, role: MatchLaunchViewerRole): MatchLaunchViewerRole {
-  const designated = row.refereeEligible && row.referee_user_id !== null && Number(row.referee_user_id) === userId;
-  return role === "CASTER" && designated ? "MATCH_REFEREE" : role;
+  return role === "CASTER" && isDesignatedReferee(row, userId) ? "MATCH_REFEREE" : role;
 }
 
 /**

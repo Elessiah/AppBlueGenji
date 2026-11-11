@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
-import { launchSidesLaterText, useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
+import { launchCastersLaterText, launchSidesLaterText, useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
@@ -368,7 +368,7 @@ export function MatchLaunchCenter({
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
             </div>
 
-            <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} />
+            <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} laterText={launchCastersLaterText(text, current.viewer)} />
             <RefereeCard referee={current.referee} selfManaged={current.selfManaged} phase={current.phase} onCopy={copy} />
           </div>
 

@@ -36,6 +36,23 @@ export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchI
 }
 
 /**
+ * Note des contacts tus d'un caster, dans la modale de lancement. À l'arbitre
+ * désigné du match — qu'il le caste aussi ou non —, l'action « Contacts » de la
+ * carte ouvre déjà ceux des casters quand elle lui ouvre le match
+ * (`viewer.earlyContacts`, `casterContactsRole` au serveur) : la note y renvoie,
+ * comme celle des engagées. À tout autre lecteur, `undefined` : la fiche garde
+ * sa note par défaut (« au lancement »), les co-casters et les équipes
+ * attendant le départ.
+ */
+export function launchCastersLaterText(
+  text: LaunchText,
+  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isReferee" | "earlyContacts">,
+): string | undefined {
+  const referee = viewer.isReferee && (viewer.role === "CASTER" || viewer.role === "MATCH_REFEREE");
+  return referee && viewer.earlyContacts ? text.t("casterContactsAtLaunchOrNow") : undefined;
+}
+
+/**
  * Note des contacts tus de l'arbitre désigné, sur la page du match. Un arbitre
  * qui caste aussi le match suit la règle des casters : ses contacts attendent
  * le départ, pour tout lecteur (« au départ du match »). Sinon, au lecteur dont

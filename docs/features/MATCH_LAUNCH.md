@@ -123,7 +123,10 @@ rien de plus (`exposes` reste sa borne ; la modale de lancement n'ouvre rien
 avant le départ). Seul le rôle `CASTER` est relevé : un joueur reste joueur,
 et un arbitre qui joue n'est plus éligible avant le départ
 (`keepEligibleReferees`). Un membre du staff qui caste **sans** être l'arbitre
-désigné attend le départ, comme tout caster.
+désigné attend le départ, comme tout caster. Dans la modale de lancement, la note
+des contacts tus d'un caster renvoie l'arbitre désigné (qu'il caste ou non) à
+l'action « Contacts » de la carte, qui les lui ouvre déjà
+(`launchCastersLaterText`, clé `casterContactsAtLaunchOrNow`).
 Les deux modales rendent `CasterCard` sur la décision du serveur
 (`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté
 client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
