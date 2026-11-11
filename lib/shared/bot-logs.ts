@@ -258,7 +258,7 @@ function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements
   const others = evenings.length - cited.length;
   if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
   if (liveAnnouncements.truncated) cited.push("et d'autres, plus anciennes");
-  return ` Modération : ce compte a été annoncé dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
+  return ` Modération : ce compte a pu paraître dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
 }
 
 /**

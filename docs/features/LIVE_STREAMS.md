@@ -570,8 +570,10 @@ demandée » du journal du staff (`formatAccountDeletionLog`, catégorie
 tournoi individuel où le compte a pu paraître — tournoi, jour et plus ancienne
 heure connue (Paris) (`listLiveAnnouncementsForDeletionLog` : ses annonces de
 `bg_live_announcements`, refusées comprises, car un refus d'AutoMod laisse une
-alerte, et l'heure de ses matchs castés programmés `START_TIME`, listés à
-l'avance même s'ils ne passent jamais à l'antenne ; cinq soirées citées, les
+alerte, et ses matchs castés programmés `START_TIME`, listés à l'avance même
+s'ils ne passent jamais à l'antenne, datés de leur heure moins la fenêtre d'une
+soirée (4 h, au plus tôt de leur listage ; un match plus lointain n'a encore
+été listé nulle part) ; cinq soirées citées, les
 autres comptées) — et d'y supprimer, avant comme après l'heure citée, les
 alertes des messages qui citent ses matchs ;
 **jamais un pseudo ni un identifiant** ; rien de plus pour un compte jamais annoncé, et « vérifier

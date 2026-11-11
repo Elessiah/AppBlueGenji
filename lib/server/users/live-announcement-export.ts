@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { toIso } from "@/lib/server/serialization";
+import { LIVE_EVENING_WINDOW_HOURS } from "@/lib/shared/live-announcements";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
 /**
@@ -43,9 +44,12 @@ export const DELETION_LOG_ANNOUNCEMENTS_LIMIT = 500;
  * Moments où le compte a pu paraître dans #live en tournoi individuel, du plus
  * récent au plus ancien : le nom du tournoi et une date — jamais un pseudo. Ce
  * sont ses annonces (refusées comprises : un refus d'AutoMod est justement
- * celui qui laisse une alerte) **et** l'heure de ses matchs programmés
- * (`START_TIME`) castés, que le message d'une soirée liste avant leur passage
- * à l'antenne, même s'ils n'y sont jamais passés. Lus à la demande de
+ * celui qui laisse une alerte) **et** ses matchs programmés (`START_TIME`)
+ * castés, que le message d'une soirée liste avant leur passage à l'antenne,
+ * même s'ils n'y sont jamais passés : au plus tôt `LIVE_EVENING_WINDOW_HOURS`
+ * heures avant leur heure (la fenêtre d'une soirée), d'où la date retenue —
+ * un match d'après minuit listé la veille est cité la veille. Un match
+ * programmé plus tard que cette fenêtre n'a encore été listé nulle part. Lus à la demande de
  * suppression pour la ligne du journal du staff (`formatAccountDeletionLog`,
  * décision D56b) : les modérateurs y trouvent quelles soirées parcourir pour
  * supprimer à la main les alertes AutoMod. Rien n'en est gardé.
@@ -64,11 +68,12 @@ export async function listLiveAnnouncementsForDeletionLog(
      JOIN bg_teams st ON st.solo_user_id = ?
       AND FIND_IN_SET(st.id, REPLACE(a.pairing, ':', ',')) > 0
      UNION ALL
-     SELECT t.name, m.start_at AS sent_at, m.id AS match_id
+     SELECT t.name, DATE_SUB(m.start_at, INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR) AS sent_at, m.id AS match_id
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
      JOIN bg_teams st ON st.solo_user_id = ? AND st.id IN (m.team1_id, m.team2_id)
-     WHERE m.live_trigger = 'START_TIME' AND m.is_bye = 0 AND m.start_at IS NOT NULL
+     WHERE m.live_trigger = 'START_TIME' AND m.is_bye = 0
+       AND m.start_at <= DATE_ADD(NOW(), INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)
      ORDER BY sent_at DESC, match_id DESC
      LIMIT ${DELETION_LOG_ANNOUNCEMENTS_LIMIT + 1}`,
     [userId, userId],
