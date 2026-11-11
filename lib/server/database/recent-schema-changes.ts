@@ -567,7 +567,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
 const TRANSIENT_ATTEMPTS = 3;
 
 /**
- * Un délai de verrou dépassé a déjà attendu `innodb_lock_wait_timeout` (50 s) :
+ * Un délai de verrou dépassé a déjà attendu 50 s — `innodb_lock_wait_timeout`
+ * pour une ligne, `lock_wait_timeout` borné à la connexion pour le verrou de
+ * métadonnées d'un `ALTER` (`METADATA_LOCK_WAIT_SECONDS`, `database.ts`) :
  * le rejouer trois fois gèlerait le démarrage (`getDatabase()` attend la passe)
  * jusqu'à 150 s par instruction. Une seule reprise ; l'interblocage et le
  * refus d'instantané, rendus aussitôt, gardent {@link TRANSIENT_ATTEMPTS}.

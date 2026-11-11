@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { publishStaffAction } from "@/lib/server/staff-audit";
+import { releaseWithServerLockWait, rollbackKeepingError } from "@/lib/server/tournaments/lock-wait";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { ROLE_LABELS, type PlatformRole, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
@@ -68,10 +69,12 @@ export async function setUserRoles(
     );
     await connection.commit();
   } catch (error) {
-    await connection.rollback().catch(() => undefined);
+    // Un `ROLLBACK` raté (connexion tombée) détruit la connexion au retour
+    // plutôt que de la rendre au pool avec une transaction peut-être ouverte.
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 
   // Un flux SSE de tournoi ne lit les droits qu'à son ouverture : il gardait

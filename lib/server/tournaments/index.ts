@@ -174,7 +174,7 @@ import { reportMatchScore, type ProposalConfirmation } from "./scoring";
 import { loadFreshMatchProposals, loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { retryOnDeadlock } from "./deadlock-retry";
+import { isReplayableContention, replayPause, retryOnDeadlock } from "./deadlock-retry";
 import type { AdminResolveEntry, AdminScoreEntry, AutoValidationPause } from "./admin";
 import {
   publishMatchUpdatedEvent,
@@ -232,6 +232,64 @@ let lastSyncAt = 0;
  */
 const SYNC_THROTTLE_MS = 15_000;
 
+const SYNC_ATTEMPTS = 3;
+
+/**
+ * Une passe de synchronisation d'un tournoi, dans sa transaction. Un
+ * interblocage (l'entretien des lancements relit l'éligibilité en
+ * `LOCK IN SHARE MODE` sur `bg_users` après le verrou du match, ordre inverse
+ * de la suppression de compte) est rejoué comme une écriture
+ * (`isReplayableContention`) ; un échec restant est journalisé — sans donnée
+ * personnelle : l'identifiant du tournoi et le code du serveur — au lieu d'être
+ * avalé jusqu'au balayage suivant.
+ */
+async function syncOneTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+): Promise<"changed" | "launches" | "none" | "failed"> {
+  for (let attempt = 1; ; attempt += 1) {
+    const startedAt = Date.now();
+    try {
+      await connection.beginTransaction();
+      const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(connection, tournamentId);
+      await connection.commit();
+      flushBotLogs(connection);
+      // `contentChanged` autant que `stateChanged` : un plateau créé ou une
+      // manche tranchée par le délai ne déplace pas le tournoi d'un état,
+      // mais c'est bien ce que les spectateurs attendent de voir. La
+      // publication reste **après le commit**. `publishUpdatedEvent` vide tout
+      // l'accueil, son direct compris : un lancement de la même passe y est
+      // couvert ; un lancement seul ne concerne que le plateau du tournoi.
+      if (stateChanged || contentChanged) return "changed";
+      return launchesChanged ? "launches" : "none";
+    } catch (error) {
+      // Un `ROLLBACK` raté (connexion tombée) est journalisé, et la
+      // connexion détruite au retour plutôt que rendue au pool avec une
+      // transaction peut-être ouverte.
+      await rollbackKeepingError(connection);
+      if (
+        !isUnsettled(connection) &&
+        attempt < SYNC_ATTEMPTS &&
+        isReplayableContention(error, Date.now() - startedAt)
+      ) {
+        await replayPause();
+        continue;
+      }
+      console.warn(
+        `[tournaments] synchronisation du tournoi ${tournamentId} abandonnée : ${errorCodeOf(error)}`,
+      );
+      return "failed";
+    } finally {
+      discardBotLogs(connection);
+    }
+  }
+}
+
+function errorCodeOf(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error && typeof error.code === "string") return error.code;
+  return error instanceof Error ? error.name : "UNKNOWN";
+}
+
 /**
  * Entretien de fond des tournois.
  *
@@ -270,33 +328,9 @@ export async function syncVisibleTournaments(): Promise<void> {
       const candidates = await findTournamentsNeedingSync(connection);
 
       for (const tournamentId of candidates) {
-        try {
-          await connection.beginTransaction();
-          const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(
-            connection,
-            tournamentId,
-          );
-          await connection.commit();
-          flushBotLogs(connection);
-          // `contentChanged` autant que `stateChanged` : un plateau créé ou une
-          // manche tranchée par le délai ne déplace pas le tournoi d'un état,
-          // mais c'est bien ce que les spectateurs attendent de voir. La
-          // publication reste **après le commit** — c'est tout l'objet de ce
-          // retour plutôt qu'un événement publié depuis le fond du moteur.
-          // `publishUpdatedEvent` vide tout l'accueil, son direct compris
-          // (`invalidateLandingAggregates`) : un lancement de la même passe y est couvert.
-          if (stateChanged || contentChanged) changedIds.push(tournamentId);
-          // Un lancement ne concerne que le plateau de ce tournoi : ni la liste,
-          // ni la vitrine, ni le classement n'ont à être vidés pour lui.
-          else if (launchesChanged) launchIds.push(tournamentId);
-        } catch {
-          // Un `ROLLBACK` raté (connexion tombée) est journalisé, et la
-          // connexion détruite au retour plutôt que rendue au pool avec une
-          // transaction peut-être ouverte.
-          await rollbackKeepingError(connection);
-        } finally {
-          discardBotLogs(connection);
-        }
+        const outcome = await syncOneTournament(connection, tournamentId);
+        if (outcome === "changed") changedIds.push(tournamentId);
+        else if (outcome === "launches") launchIds.push(tournamentId);
         // Transaction peut-être encore ouverte : le `START TRANSACTION` du
         // tournoi suivant validerait en silence les écritures défaites. La
         // passe s'arrête ; le balayage suivant reprend les autres.

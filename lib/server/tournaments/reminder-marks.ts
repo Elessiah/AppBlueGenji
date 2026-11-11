@@ -92,7 +92,18 @@ export async function releaseDatedMarks(
  */
 export type StaffReservation =
   | { kind: "held" }
-  | { kind: "reserved"; matchId: number; startAt: string; previous: Date | string | null }
+  | {
+      kind: "reserved";
+      matchId: number;
+      startAt: string;
+      previous: Date | string | null;
+      /**
+       * `sent_at` posé par cette réservation : le jeton de sa ligne. Un rendu
+       * ne touche qu'une marque qui le porte encore — pas celle qu'une autre
+       * réservation aurait recréée au même horaire après un retrait (ABA).
+       */
+      stamp: Date;
+    }
   /** Marque illisible : l'envoi part, rien à rendre. */
   | { kind: "unmarked" };
 
@@ -195,6 +206,8 @@ async function reserveStaffMark(
   startAt: string,
 ): Promise<StaffReservation | null | typeof MARK_MOVED> {
   const time = new Date(startAt);
+  // `sent_at` est un DATETIME à la seconde : le jeton est tronqué comme lui.
+  const stamp = new Date(Math.floor(Date.now() / 1000) * 1000);
   // Une table par lecture verrouillante (MariaDB).
   const [matches] = await connection.execute<(RowDataPacket & { start_at: Date | string | null })[]>(
     `SELECT start_at FROM bg_matches WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
@@ -213,11 +226,11 @@ async function reserveStaffMark(
     // elle (voir `markStaffPushed`). `IGNORE` : une marque parue entre-temps
     // n'est pas une erreur — la réservation reprend, et la lira.
     const [inserted] = await connection.execute<ResultSetHeader>(
-      `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
-      [matchId, MATCH_STAFF_KEY, time],
+      `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at, sent_at) VALUES (?, ?, ?, ?)`,
+      [matchId, MATCH_STAFF_KEY, time, stamp],
     );
     if (inserted.affectedRows !== 1) return MARK_MOVED;
-    return { kind: "reserved", matchId, startAt, previous: null };
+    return { kind: "reserved", matchId, startAt, previous: null, stamp };
   }
   // Marque présente : lue sous verrou d'écriture, par sa clé primaire (sa
   // ligne, pas un intervalle).
@@ -232,32 +245,32 @@ async function reserveStaffMark(
   if (before.start_at !== null && new Date(before.start_at).getTime() === time.getTime()) {
     return { kind: "held" };
   }
-  await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?`, [
-    time,
-    matchId,
-    MATCH_STAFF_KEY,
-  ]);
-  return { kind: "reserved", matchId, startAt, previous: before.start_at };
+  await connection.execute(
+    `UPDATE bg_match_reminders SET start_at = ?, sent_at = ? WHERE match_id = ? AND offset_key = ?`,
+    [time, stamp, matchId, MATCH_STAFF_KEY],
+  );
+  return { kind: "reserved", matchId, startAt, previous: before.start_at, stamp };
 }
 
 /**
  * Rend la marque réservée par {@link markStaffPushed} : l'envoi n'a atteint
  * aucun appareil. Elle retrouve ce qu'elle tenait (ou disparaît), sur sa
- * ligne et seulement si elle tient encore l'horaire de cet envoi.
+ * ligne et seulement si elle tient encore l'horaire **et le jeton** de cet
+ * envoi : une marque retirée puis recréée au même horaire par une autre
+ * réservation (son envoi, lui, a abouti) n'est pas la sienne.
  */
 export async function releaseStaffPush(reservation: StaffReservation): Promise<void> {
   if (reservation.kind !== "reserved") return;
-  const { matchId, startAt, previous } = reservation;
+  const { matchId, startAt, previous, stamp } = reservation;
   if (previous === null) {
-    await writeStaffMark(`DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`, [
-      matchId,
-      MATCH_STAFF_KEY,
-      new Date(startAt),
-    ]);
+    await writeStaffMark(
+      `DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ? AND sent_at = ?`,
+      [matchId, MATCH_STAFF_KEY, new Date(startAt), stamp],
+    );
   } else {
     await writeStaffMark(
-      `UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ? AND start_at <=> ?`,
-      [new Date(previous), matchId, MATCH_STAFF_KEY, new Date(startAt)],
+      `UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ? AND start_at <=> ? AND sent_at = ?`,
+      [new Date(previous), matchId, MATCH_STAFF_KEY, new Date(startAt), stamp],
     );
   }
 }

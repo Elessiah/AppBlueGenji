@@ -62,13 +62,13 @@ function battletagOrigin(
   row: { overwatch_battletag: string | null; blizzard_sub: string | null; overwatch_battletag_typed?: unknown },
   known: boolean,
 ): { typed: boolean | null; fromBlizzard: boolean | null } {
-  if (!known) return { typed: null, fromBlizzard: null };
-  const typed = Number(row.overwatch_battletag_typed ?? 0) === 1;
+  const typed = known ? Number(row.overwatch_battletag_typed ?? 0) === 1 : null;
+  // Sans BattleTag, la réponse est connue quelle que soit la colonne : non.
+  if (!row.overwatch_battletag) return { typed, fromBlizzard: false };
+  if (typed === null) return { typed, fromBlizzard: null };
   return {
     typed,
-    fromBlizzard:
-      Boolean(row.overwatch_battletag) &&
-      battletagFromBlizzard({ blizzard_sub: row.blizzard_sub, overwatch_battletag_typed: typed ? 1 : 0 }),
+    fromBlizzard: battletagFromBlizzard({ blizzard_sub: row.blizzard_sub, overwatch_battletag_typed: typed ? 1 : 0 }),
   };
 }
 

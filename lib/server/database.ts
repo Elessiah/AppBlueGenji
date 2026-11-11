@@ -101,7 +101,8 @@ export async function getDatabase(): Promise<Pool> {
 const englishMessagesPools = new WeakSet<Pool>();
 
 /**
- * Messages d'erreur du serveur **en anglais** sur toute connexion du pool :
+ * Messages d'erreur du serveur **en anglais** (et attente de verrou de
+ * métadonnées bornée) sur toute connexion du pool :
  * `fail()` (`lib/server/http.ts`) ne reçoit que `error.message` et reconnaît
  * l'interblocage, le refus d'instantané et le délai de verrou sur le texte
  * anglais du moteur. Un serveur aux `lc_messages` réglés autrement rendait 500
@@ -118,8 +119,18 @@ function forceEnglishServerMessages(created: Pool): void {
     core.query("SET SESSION lc_messages = 'en_US'", (error) => {
       if (error) console.warn("[db] lc_messages non réglé sur la connexion", error);
     });
+    // Attente d'un verrou de **métadonnées** bornée comme celle d'une ligne :
+    // un `ALTER TABLE` du démarrage (`recent-schema-changes.ts`) derrière une
+    // transaction longue attendait `lock_wait_timeout` (un jour sous MariaDB,
+    // un an sous MySQL), et `getDatabase()` avec lui — tout le site figé.
+    core.query(`SET SESSION lock_wait_timeout = ${METADATA_LOCK_WAIT_SECONDS}`, (error) => {
+      if (error) console.warn("[db] lock_wait_timeout non réglé sur la connexion", error);
+    });
   });
 }
+
+/** Attente maximale d'un verrou de métadonnées, en secondes (celle d'InnoDB pour une ligne). */
+export const METADATA_LOCK_WAIT_SECONDS = 50;
 
 /** Une passe par heure au plus, par processus (`scheduleDueAccountDeletions`). */
 const DUE_DELETIONS_INTERVAL_MS = 60 * 60 * 1000;

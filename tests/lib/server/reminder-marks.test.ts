@@ -136,7 +136,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
   const OTHER = new Date("2099-01-02T18:00:00.000Z");
 
   const MATCH_LOCK = "SELECT start_at FROM bg_matches WHERE id = ? LIMIT 1 LOCK IN SHARE MODE";
-  const MARK_INSERT = "INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)";
+  const MARK_INSERT = "INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at, sent_at) VALUES (?, ?, ?, ?)";
   const MARK_LOCK = "SELECT start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1 FOR UPDATE";
 
   function transactionMock() {
@@ -149,7 +149,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
   }
 
   const MARK_SEEN = "SELECT start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1";
-  const MARK_UPDATE = "UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ?";
+  const MARK_UPDATE = "UPDATE bg_match_reminders SET start_at = ?, sent_at = ? WHERE match_id = ? AND offset_key = ?";
 
   /**
    * Transaction de réservation : horaire de la manche, lecture simple de la
@@ -169,17 +169,32 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
   const sqlsOf = (connection: ReturnType<typeof connectionMock>) => connection.execute.mock.calls.map(([sql]) => String(sql));
 
+  it("markStaffPushed_reservation_stampTruncatedToTheSecond", async () => {
+    jest.useFakeTimers({ now: new Date("2099-01-01T17:00:00.789Z") });
+    try {
+      staffDb(null);
+
+      const reservation = await markStaffPushed(31, T);
+
+      // `sent_at` est un DATETIME à la seconde : un jeton à la milliseconde ne
+      // retrouverait jamais sa ligne au rendu.
+      expect(reservation).toMatchObject({ stamp: new Date("2099-01-01T17:00:00.000Z") });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("markStaffPushed_noMarkYet_insertsWithoutLockingRead", async () => {
     const connection = staffDb(null);
 
     const reservation = await markStaffPushed(31, T);
 
-    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null });
+    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null, stamp: expect.any(Date) });
     // La manche, une lecture simple, puis l'insertion — aucune lecture
     // verrouillante de la marque absente : elle verrouillerait l'intervalle,
     // où l'insertion attendrait la réservation des joueurs (interblocage).
     expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_INSERT]);
-    expect(connection.execute.mock.calls[2]).toEqual([MARK_INSERT, [31, "STAFF", new Date(T)]]);
+    expect(connection.execute.mock.calls[2]).toEqual([MARK_INSERT, [31, "STAFF", new Date(T), expect.any(Date)]]);
     expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
@@ -209,9 +224,9 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
     const reservation = await markStaffPushed(31, T);
 
-    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: OTHER });
+    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: OTHER, stamp: expect.any(Date) });
     expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_LOCK, MARK_UPDATE]);
-    expect(connection.execute.mock.calls[3]).toEqual([MARK_UPDATE, [new Date(T), 31, "STAFF"]]);
+    expect(connection.execute.mock.calls[3]).toEqual([MARK_UPDATE, [new Date(T), expect.any(Date), 31, "STAFF"]]);
   });
 
   it("markStaffPushed_markAppearsDuringInsert_restartsAndReadsIt", async () => {
@@ -229,7 +244,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
     const reservation = await markStaffPushed(31, T);
 
-    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: OTHER });
+    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: OTHER, stamp: expect.any(Date) });
     expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_INSERT, MATCH_LOCK, MARK_SEEN, MARK_LOCK, MARK_UPDATE]);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
@@ -249,7 +264,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
     const reservation = await markStaffPushed(31, T);
 
-    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null });
+    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null, stamp: expect.any(Date) });
     // Jamais d'insertion dans la transaction qui a verrouillé l'intervalle.
     expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_LOCK, MATCH_LOCK, MARK_SEEN, MARK_INSERT]);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
@@ -288,7 +303,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const reservation = await markStaffPushed(31, T);
 
     // L'horaire poussé est retenu : la transaction défaite est rejouée entière.
-    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null });
+    expect(reservation).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null, stamp: expect.any(Date) });
     expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
@@ -307,7 +322,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-    expect(await markStaffPushed(31, T)).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null });
+    expect(await markStaffPushed(31, T)).toEqual({ kind: "reserved", matchId: 31, startAt: T, previous: null, stamp: expect.any(Date) });
 
     expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
     expect(error).not.toHaveBeenCalled();
@@ -378,16 +393,19 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    await releaseStaffPush({ kind: "reserved", matchId: 31, startAt: T, previous: OTHER });
-    await releaseStaffPush({ kind: "reserved", matchId: 32, startAt: T, previous: null });
+    const stamp = new Date("2099-01-01T17:00:00.000Z");
+    await releaseStaffPush({ kind: "reserved", matchId: 31, startAt: T, previous: OTHER, stamp });
+    await releaseStaffPush({ kind: "reserved", matchId: 32, startAt: T, previous: null, stamp });
 
+    // Jeton `sent_at` : une marque recréée au même horaire par une autre
+    // réservation (retrait puis remise) n'est ni effacée ni ramenée.
     expect(execute.mock.calls[0]).toEqual([
-      "UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ? AND start_at <=> ?",
-      [OTHER, 31, "STAFF", new Date(T)],
+      "UPDATE bg_match_reminders SET start_at = ? WHERE match_id = ? AND offset_key = ? AND start_at <=> ? AND sent_at = ?",
+      [OTHER, 31, "STAFF", new Date(T), stamp],
     ]);
     expect(execute.mock.calls[1]).toEqual([
-      "DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ?",
-      [32, "STAFF", new Date(T)],
+      "DELETE FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? AND start_at <=> ? AND sent_at = ?",
+      [32, "STAFF", new Date(T), stamp],
     ]);
   });
 

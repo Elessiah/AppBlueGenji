@@ -207,6 +207,22 @@ describe("setUserRoles — failures leave nothing behind", () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it("setUserRoles_rollbackFails_keepsOriginalErrorAndDestroysConnection", async () => {
+    const connection = await mockTransaction();
+    connection.execute
+      .mockResolvedValueOnce([[ACTOR_ADMIN, TARGET]])
+      .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    connection.rollback.mockRejectedValueOnce(new Error("connection lost"));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(setUserRoles(7, [], 3)).rejects.toThrow("ER_LOCK_DEADLOCK");
+
+    // Transaction peut-être encore ouverte : la connexion n'est pas rendue au pool.
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it("setUserRoles_commitFails_rollsBackAndRethrows", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);

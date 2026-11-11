@@ -70,5 +70,28 @@ describe("getDatabase", () => {
 
     expect(on).toHaveBeenCalledWith("connection", expect.any(Function));
     expect(query).toHaveBeenCalledWith("SET SESSION lc_messages = 'en_US'", expect.any(Function));
+    // Un ALTER du démarrage ne fige plus le site derrière une transaction longue.
+    expect(query).toHaveBeenCalledWith("SET SESSION lock_wait_timeout = 50", expect.any(Function));
+  });
+
+  it("getDatabase_sessionSettingFails_onlyWarns", async () => {
+    let listener: ((connection: unknown) => void) | undefined;
+    const on = jest.fn((event: string, handler: (connection: unknown) => void) => {
+      if (event === "connection") listener = handler;
+    });
+    createPool.mockReturnValue(fakePool({ on }));
+    let fresh: typeof getDatabase = getDatabase;
+    jest.isolateModules(() => {
+      fresh = (jest.requireActual("@/lib/server/database") as { getDatabase: typeof getDatabase }).getDatabase;
+    });
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await fresh();
+    const query = jest.fn((_sql: string, done: (error: Error | null) => void) => done(new Error("denied")));
+    expect(() => listener?.({ query })).not.toThrow();
+
+    expect(warn).toHaveBeenCalledWith("[db] lc_messages non réglé sur la connexion", expect.any(Error));
+    expect(warn).toHaveBeenCalledWith("[db] lock_wait_timeout non réglé sur la connexion", expect.any(Error));
+    warn.mockRestore();
   });
 });

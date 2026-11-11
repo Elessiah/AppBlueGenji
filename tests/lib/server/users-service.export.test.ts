@@ -369,6 +369,22 @@ describe("exportOwnData", () => {
     expect([data.account.overwatchBattletagTyped, data.profile.battletagFromBlizzard]).toEqual([null, null]);
   });
 
+  it("exportOwnData_originColumnRefusedWithoutBattletag_notFromBlizzard", async () => {
+    // Sans BattleTag, la réponse est connue même sans la colonne d'origine : non.
+    const unknownColumn = Object.assign(new Error("Unknown column 'overwatch_battletag_typed' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(unknownColumn)
+      .mockResolvedValueOnce([[exportRow({ blizzard_sub: "sub-1", overwatch_battletag: null })]])
+      .mockResolvedValueOnce([[fullProfileRow({})]])
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    const data = await exportOwnData(42);
+
+    expect([data.account.overwatchBattletagTyped, data.profile.battletagFromBlizzard]).toEqual([null, false]);
+  });
+
   it("rend ses casts, les liens qu'il a fournis et ses arbitrages", async () => {
     const execute = jest
       .fn<SqlQuery>()
