@@ -10,7 +10,7 @@ const invalidateLists = jest.fn();
 const invalidatePreview = jest.fn();
 const invalidateLanding = jest.fn();
 const invalidateLandingLive = jest.fn();
-const invalidateMiniBrackets = jest.fn();
+const invalidateMiniBrackets = jest.fn<(tournamentId: number) => void>();
 const invalidateRanking = jest.fn();
 const invalidateRankingFull = jest.fn();
 const invalidateStats = jest.fn();
@@ -31,7 +31,7 @@ jest.mock("@/lib/server/tournaments/preview-cache", () => ({
 jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: () => invalidateLanding(),
   invalidateLandingLive: () => invalidateLandingLive(),
-  invalidateLandingMiniBrackets: () => invalidateMiniBrackets(),
+  invalidateLandingMiniBracket: (tournamentId: number) => invalidateMiniBrackets(tournamentId),
 }));
 
 jest.mock("@/lib/server/ranking-cache", () => ({
@@ -178,7 +178,9 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidatePreview).toHaveBeenCalledWith(7);
     expect(invalidateLists).toHaveBeenCalledTimes(1);
     expect(invalidateLandingLive).toHaveBeenCalledTimes(1);
+    // Revue #542 : le seul mini-arbre de ce tournoi, pas ceux des autres.
     expect(invalidateMiniBrackets).toHaveBeenCalledTimes(1);
+    expect(invalidateMiniBrackets).toHaveBeenCalledWith(7);
     expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "match_updated", tournamentId: 7 }));
   });
 

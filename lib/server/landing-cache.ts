@@ -119,10 +119,19 @@ export function invalidateLandingTeamViews(): void {
 }
 
 /**
- * Oublie les seuls mini-arbres de l'accueil : pour une écriture qui repose des
- * appariements sans changer aucun résultat — l'annulation d'un abandon
- * (`FORFEIT_CANCELLATION.md`).
+ * Oublie tous les mini-arbres de l'accueil (vues qui nomment des équipes).
+ * Pour un seul tournoi : {@link invalidateLandingMiniBracket}.
  */
 export function invalidateLandingMiniBrackets(): void {
   invalidateCachedPrefix(`${PREFIX}${LANDING_MINI_BRACKET_KEY_PREFIX}`);
+}
+
+/**
+ * Oublie le seul mini-arbre de l'accueil **d'un tournoi** : pour un rejeu qui
+ * repose ses appariements sans changer aucun résultat — l'annulation d'un
+ * abandon (`FORFEIT_CANCELLATION.md`), le retrait d'une pénalité. Les
+ * mini-arbres des autres tournois n'ont pas bougé.
+ */
+export function invalidateLandingMiniBracket(tournamentId: number): void {
+  invalidateCached(`${PREFIX}${LANDING_MINI_BRACKET_KEY_PREFIX}${tournamentId}`);
 }
