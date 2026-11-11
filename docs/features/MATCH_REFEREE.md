@@ -262,7 +262,8 @@ règle a changé avec l'arbitre hôte.
   l'a que si l'arbitre visé arbitre un match non terminé (`objectable[].busy`,
   lu tous tournois confondus). L'opposition ne part que pour un arbitre encore
   proposé par le panneau relu (`objectionOffered`), et le pseudo du titre
-  d'une confirmation d'opposition est figé à son ouverture. La liste des
+  d'une confirmation d'opposition est figé à son ouverture, comme son ton et
+  son texte (`confirm.bodyIdle` quand aucun match ne lui est retiré). La liste des
   cartes du tour porte le nom de son titre (`aria-labelledby`) ; le bouton
   « Enregistrer la carte » partage la ligne de la saisie, l'erreur de champ
   dessous.

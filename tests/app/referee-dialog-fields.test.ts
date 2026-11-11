@@ -119,9 +119,30 @@ describe("RefereeDialog — gestes et textes (EF-30)", () => {
   });
 
   it("RefereeDialog_confirmations_toneFromGesture", () => {
+    expect(source).toContain('tone={confirmTone(confirm ?? "removeReferee", panel, confirmBusy)}');
+    expect(source).toContain('return panel ? refereeConfirmTone(gesture, panel) : "danger";');
+  });
+
+  it("RefereeDialog_objectionConfirm_toneAndBodyFrozenAtOpening", () => {
+    // Le panneau relu après le geste dit l'arbitre libre : ni le ton ni le texte ne basculent.
     expect(source).toContain(
-      'tone={panel ? refereeConfirmTone(confirm ?? "removeReferee", panel, objectionOffered?.userId ?? null) : "danger"}',
+      'setConfirmBusy(refereeConfirmTone("objection", panel, objectionOffered.userId) === "danger");',
     );
+    expect(source).toContain('if (gesture === "objection") return objectionBusy ? "danger" : "primary";');
+    expect(source).toContain('objection.confirm.${confirmBusy ? "body" : "bodyIdle"}');
+  });
+
+  it("RefereeDialog_objectionOfIdleReferee_bodyDoesNotAnnounceARemoval", () => {
+    expect(fr.cardActions.refereeDialog.objection.confirm.bodyIdle).toBe(
+      "Il n'arbitre aucun match non terminé : rien ne lui est retiré. Il ne peut plus arbitrer tant que l'opposition n'est pas levée.",
+    );
+    expect(en.cardActions.refereeDialog.objection.confirm.bodyIdle).toBe(
+      "They referee no unfinished match: nothing is taken from them. They can no longer referee until the objection is lifted.",
+    );
+  });
+
+  it("RefereeDialog_objectionRefereeNoLongerOffered_confirmationCloses", () => {
+    expect(source).toMatch(/if \(!objectionOffered\) \{\s+setConfirm\(null\);\s+return false;\s+\}/);
   });
 
   it("RefereeDialog_roundGestureWithoutEffect_neutralToast_noRefreshNoReload", () => {

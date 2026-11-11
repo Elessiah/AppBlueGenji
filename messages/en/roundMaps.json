@@ -93,7 +93,7 @@
       "confirm": "Apply to every round"
     },
     "appliedAll": "Maps applied to every round.",
-    "roundsSkipped": "Maps saved, except on {count, plural, one {# round that no longer exists} other {# rounds that no longer exist}} in this tournament: reload the page to see the current rounds.",
+    "roundsSkipped": "Maps saved, except on {count, plural, one {# round that no longer exists} other {# rounds that no longer exist}} in this tournament.",
     "copyLabel": "Copy these maps to",
     "copy": "Copy",
     "copyConfirm": {

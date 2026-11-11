@@ -51,6 +51,12 @@ function refereeStatusText(panel: RefereePanelView, t: ReturnType<typeof useActi
  * geste (`GET /api/admin/matches/[id]/referee`) : l'arbitre n'est nommé que
  * là, jamais dans l'instantané diffusé.
  */
+/** Ton d'une confirmation ; celui d'une opposition est figé à son ouverture (`busy`). */
+function confirmTone(gesture: PendingConfirm, panel: RefereePanelView | null, objectionBusy: boolean): "danger" | "primary" {
+  if (gesture === "objection") return objectionBusy ? "danger" : "primary";
+  return panel ? refereeConfirmTone(gesture, panel) : "danger";
+}
+
 export function RefereeDialog({
   match,
   matchLabel,
@@ -92,6 +98,10 @@ export function RefereeDialog({
   // geste réussi vide `liftTarget` / `objectionPick` avant que la confirmation
   // se ferme, et son titre se lirait un instant avec un pseudo vide.
   const [confirmPseudo, setConfirmPseudo] = useState("");
+  // De même, ce que l'opposition retire (`objectable[].busy`), figé à
+  // l'ouverture : le panneau relu après le geste dit l'arbitre libre, et le ton
+  // comme le texte de la confirmation basculeraient avant qu'elle se ferme.
+  const [confirmBusy, setConfirmBusy] = useState(false);
   // Le contrôle d'un geste est désactivé le temps de l'envoi (le navigateur
   // lâche alors le focus), et un geste retire souvent son propre bouton
   // (« Arbitrer ce match » devient « Ne plus arbitrer ») : le focus tomberait
@@ -197,8 +207,9 @@ export function RefereeDialog({
   const objectionUrl = (userId: number | string) => `/api/admin/referees/${userId}/objection`;
   const upholdObjection = (event: FormEvent) => {
     event.preventDefault();
-    if (!objectionOffered) return;
+    if (!objectionOffered || !panel) return;
     setConfirmPseudo(objectionOffered.pseudo);
+    setConfirmBusy(refereeConfirmTone("objection", panel, objectionOffered.userId) === "danger");
     setConfirm("objection");
   };
   const roundBody = (enabled: boolean) =>
@@ -248,10 +259,15 @@ export function RefereeDialog({
     },
     objection: {
       title: t("cardActions.refereeDialog.objection.confirm.title", { pseudo: confirmPseudo }),
-      body: t("cardActions.refereeDialog.objection.confirm.body"),
+      // Sans match non terminé à lui retirer, le texte ne l'annonce pas.
+      body: t(`cardActions.refereeDialog.objection.confirm.${confirmBusy ? "body" : "bodyIdle"}`),
       confirm: t("cardActions.refereeDialog.objection.confirm.confirm"),
       action: async () => {
-        if (!objectionOffered) return false;
+        // L'arbitre n'est plus proposé (panneau relu) : la confirmation n'a plus d'objet, elle se referme.
+        if (!objectionOffered) {
+          setConfirm(null);
+          return false;
+        }
         const done = await run(
           () => send(objectionUrl(objectionOffered.userId), "PUT", { upheld: true }),
           (payload) =>
@@ -502,7 +518,7 @@ export function RefereeDialog({
           title={pending.title}
           confirmLabel={pending.confirm}
           pendingLabel={t("cardActions.refereeDialog.pending")}
-          tone={panel ? refereeConfirmTone(confirm ?? "removeReferee", panel, objectionOffered?.userId ?? null) : "danger"}
+          tone={confirmTone(confirm ?? "removeReferee", panel, confirmBusy)}
           onClose={() => setConfirm(null)}
           onConfirm={pending.action}
         >
