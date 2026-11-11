@@ -126,7 +126,8 @@ et un arbitre qui joue n'est plus éligible avant le départ
 désigné attend le départ, comme tout caster. Dans la modale de lancement, la note
 des contacts tus d'un caster renvoie l'arbitre désigné (qu'il caste ou non) à
 l'action « Contacts » de la carte, sur la page du tournoi, qui les lui ouvre
-déjà (la modale est montée sur toutes les pages : la note dit où la trouver)
+déjà (la modale est montée sur toutes les pages : la note dit où la trouver,
+menu « Plus d'actions » compris)
 (`launchCastersLaterText`, clé `casterContactsAtLaunchOrNow`).
 Les deux modales rendent `CasterCard` sur la décision du serveur
 (`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté

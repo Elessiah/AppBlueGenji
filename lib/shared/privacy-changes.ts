@@ -1832,7 +1832,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-11-12",
     title: "Contacts du caster : lus par l'arbitre désigné avant le match, même s'il caste aussi",
     summary:
-      "Si tu castes un match, son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, comme les arbitres qui ne castent pas le match — désormais aussi quand il caste lui-même le match (il ne les voyait alors que le temps du match). Ses deux équipes et ses autres casters ne les voient toujours que le temps du match.",
+      "Si tu castes un match, son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, désormais même quand il caste lui-même le match (il ne les voyait alors que le temps du match). Ses deux équipes et ses autres casters ne les voient toujours que le temps du match.",
     details: [
       "Ce qui change : l'arbitre désigné d'un match qui le caste aussi lisait jusqu'ici les contacts de ses co-casters le temps du match seulement, comme un caster ; il les lit maintenant en arbitre, dans la fenêtre « Contacts » du match et sur sa page, dès que ses deux adversaires sont connus et jusqu'à sa fin. Ce sont les mêmes informations qu'avant : ton tag Discord certifié et, dans un tournoi Overwatch seulement, ton BattleTag, même masqué.",
       "Textes corrigés : la politique de confidentialité et les avis sur le tag Discord (profil, connexion) disaient que l'arbitre désigné d'un match ne lisait le tag Discord certifié de ses casters que le temps du match ; il le lit, comme les arbitres qui ne castent pas le match, dès que les deux adversaires sont connus. Ces textes le disent maintenant.",

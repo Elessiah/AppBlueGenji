@@ -401,14 +401,14 @@ describe("fiches de contact — noms cliquables", () => {
   // carte, même s'il caste aussi le match (REF-CASTER-CONTACTS) : la note y renvoie.
   describe("modale de lancement — note du caster à l'arbitre désigné", () => {
     const EN_LAUNCH_TEXT = scopedText("en", enLaunchModal);
-    const NOW_FR = "Ses contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi.";
+    const NOW_FR = "Ses contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).";
 
     it("launchCastersLaterText_refereeCasterEarlyContacts_pointsToContactsActionFrAndEn", () => {
       const viewer = { isReferee: true, earlyContacts: true };
 
       expect(launchCastersLaterText(FR_LAUNCH_TEXT, viewer)).toBe(NOW_FR);
       expect(launchCastersLaterText(EN_LAUNCH_TEXT, viewer)).toBe(
-        "Their contacts show up at launch — or right now through the match's “Contacts” action on the tournament page.",
+        "Their contacts show up at launch — or right now through the match's “Contacts” action on the tournament page (under “More actions” if needed).",
       );
     });
 
@@ -447,7 +447,7 @@ describe("fiches de contact — noms cliquables", () => {
         />,
       );
 
-      expect(html.split("ou dès maintenant par l&#x27;action « Contacts » du match, sur la page du tournoi.</p>")).toHaveLength(3);
+      expect(html.split("ou dès maintenant par l&#x27;action « Contacts » du match, sur la page du tournoi (menu « Plus d&#x27;actions » au besoin).</p>")).toHaveLength(3);
     });
   });
 

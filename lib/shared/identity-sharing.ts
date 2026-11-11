@@ -40,7 +40,7 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
     "les administrateurs, à tout moment ;",
     "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
     "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
-    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et son arbitre désigné, même s'il le caste aussi, et les arbitres qui ne le castent pas, dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page, et, le temps du match, son arbitre désigné aussi dans sa fenêtre de lancement ;",
+    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page ; son arbitre désigné, qu'il caste ou non le match, et les arbitres qui ne le castent pas, dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page — son arbitre désigné aussi dans sa fenêtre de lancement, le temps du match ;",
     "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (pour l'arbitrage : nécessaire au service une fois la version 9 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
     "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
   ],
