@@ -137,7 +137,11 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
     connection.rollback.mockResolvedValue(undefined);
     connection.commit.mockResolvedValue(undefined);
     const { getDatabase } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: async () => fakeConnection(connection) }));
+    // La cible existe (ligne lue avant la transaction, sans verrou).
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 7 }]]);
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ execute, getConnection: async () => fakeConnection(connection) }),
+    );
     return connection;
   }
 
