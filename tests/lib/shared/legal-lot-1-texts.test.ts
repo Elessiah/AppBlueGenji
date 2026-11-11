@@ -30,8 +30,10 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {
     expect(detailsFr()).toContain("Il n'y a pas de prestataire d'hébergement");
     expect(detailsFr()).toContain("il n'est pas sous-traitant, et aucun contrat de sous-traitance n'est requis");
-    expect(detailsFr()).toContain("y agit comme sous-traitant, dans le cadre du contrat de traitement des données de Hetzner que le responsable technique de l'association a accepté");
+    expect(detailsFr()).toContain("agit comme sous-traitant, dans le cadre du contrat de traitement des données de Hetzner que le responsable technique de l'association a accepté");
     expect(detailsEn()).toContain("There is no hosting service provider");
+    expect(detailsFr()).not.toContain("non plus comme");
+    expect(detailsEn()).not.toContain("no longer as");
     expect(detailsEn()).toContain("they are not a processor, and no processing agreement is required");
     expect(detailsEn()).toContain("acts as a processor under Hetzner's data processing agreement accepted by the association's technical manager");
   });
@@ -69,7 +71,7 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
 
   // [cas, texte français attendu, texte anglais attendu]
   const sentences: Array<[string, string, string]> = [
-    ["host_saysNoHostingProvider", "aucun prestataire d'hébergement, donc pas de sous-traitant", "no hosting service provider, so no processor"],
+    ["host_saysNoHostingProvider", "aucun prestataire d'hébergement, il n'est donc pas sous-traitant", "no hosting service provider, so they are not a processor"],
     ["hetzner_isProcessorUnderItsAgreement", "dans l'Union européenne : sous-traitant, dans le cadre du contrat de traitement des données de Hetzner accepté par le responsable technique de l'association.", "within the European Union: processor, under Hetzner's data processing agreement accepted by the association's technical manager."],
     ["moderationNotice_listsRestoredTeamLogo", "logo d'équipe masqué, retiré, supprimé ou rétabli", "a team logo masked, removed, deleted or restored"],
     [

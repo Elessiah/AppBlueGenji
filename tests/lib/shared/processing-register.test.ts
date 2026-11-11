@@ -647,6 +647,8 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(fr).toContain("qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement)");
     expect(fr).toContain("souscrit par le responsable technique de l'association, qui a accepté le contrat de traitement des données de Hetzner");
     expect(fr).toContain("Hetzner y agissant comme sous-traitant");
+    expect(fr).toContain("— Hetzner stocke les copies chiffrées sans pouvoir les lire");
+    expect(en).toContain("— Hetzner stores the encrypted copies without being able to read them");
     expect(fr).not.toMatch(/sous-traitant ultérieur|en attente de signature|art\. 28\)/);
     expect(en).toContain("who hosts the site on their own machine on the association's behalf (no hosting service provider)");
     expect(en).toContain("subscribed by the association's technical manager, who accepted Hetzner's data processing agreement");

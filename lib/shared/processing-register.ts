@@ -1048,8 +1048,8 @@ const ACTIVITIES = registerActivities({
     recipients: [
       frEn(`${SITE_HOST.name}, responsable technique de l'association, qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement), seul détenteur des clés de déchiffrement`,
         `${SITE_HOST.name}, the association's technical manager, who hosts the site on their own machine on the association's behalf (no hosting service provider), sole holder of the decryption keys`),
-      frEn(`${HETZNER_BACKUP_FRAMEWORK}, qui stocke les copies chiffrées sans pouvoir les lire`,
-        `${HETZNER_BACKUP_FRAMEWORK_EN}, which stores the encrypted copies without being able to read them`),
+      frEn(`${HETZNER_BACKUP_FRAMEWORK} — Hetzner stocke les copies chiffrées sans pouvoir les lire`,
+        `${HETZNER_BACKUP_FRAMEWORK_EN} — Hetzner stores the encrypted copies without being able to read them`),
     ],
     // Stockage en Allemagne, traitement exclusivement dans l'UE/EEE (§ 3 du
     // contrat de Hetzner) : aucun transfert hors de l'Union.
