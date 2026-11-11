@@ -349,7 +349,7 @@ const SECTIONS_EN: { title: string; meta: string; body: ReactNode; id?: string }
           players and the public, and some data is disclosed to third-party services — Discord, Google,
           Blizzard, your browser&apos;s push service, Hetzner (Germany) for encrypted backups,
           Microsoft for the mailbox of the person to contact for your requests (with no encryption added
-          by the association), Google (Gmail) for the association&apos;s email, as well as the
+          by the association), Google (Gmail, currently moving to Google Workspace) for the association&apos;s email, as well as the
           telephone operators of that person and of the association if you call them or leave them a text
           or voice message, and Spiceworks for the support portal —, within the limits described in the{" "}
           <EnglishLegalLink href="/rgpd#destinataires">“Recipients and transfers”</EnglishLegalLink>{" "}

@@ -107,7 +107,7 @@ describe("message #live de la soirée (conditions v7)", () => {
   });
 
   it("dit sur /rgpd qu'un match listé avant son passage à l'antenne ne laisse aucune trace sur le site (FR et EN)", () => {
-    expect(readSource("app/rgpd/page.tsx").replace(/\s+/g, " ")).toContain("programmé dans la soirée, ne laisse aucune trace sur le site");
-    expect(readSource("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("scheduled that evening, leaves no trace on the site");
+    expect(readSource("app/rgpd/page.tsx").replace(/\s+/g, " ")).toContain("programmé dans la soirée pour une diffusion ouverte à son heure de début, ne laisse aucune trace sur le site");
+    expect(readSource("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("scheduled that evening for a broadcast opening at its start time, leaves no trace on the site");
   });
 });

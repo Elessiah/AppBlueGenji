@@ -972,6 +972,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: both teams and the other casters of the match only read your contacts while the match is being played; the launch window only shows contacts at the start of the match; nothing changes for players. As before, this reading is based on the performance of the service — running the tournament (terms of use, “Match contacts” section, with no new version to accept).",
     ],
   },
+  "2026-11-rectificatifs-hebergement-courriel-push": {
+    linkLabels: [READ_RECIPIENTS, "Read the “Push notifications” section"],
+    title: "Hosting, the association's email and push notifications: clarifications",
+    summary:
+      "The site and the bot have no hosting service provider: the association's technical manager runs them on their own machine, with no processing agreement. The association's email is moving to Google Workspace. A new push notification topic is on by default on a device already subscribed.",
+    details: [
+      "Hosting: the register said that a processing agreement with the site's host had been drafted and was awaiting signature. There is no hosting service provider: the association's technical manager runs the site and the bot on their own machine, on the association's behalf; they are not a processor, and no processing agreement is required. Hetzner, which stores the encrypted backups in the European Union, acts as a processor under Hetzner's data processing agreement accepted by the association's technical manager — not as a “sub-processor, through the host”, since the host is not a processor. Nothing changes in what is collected or in who reads it.",
+      "The association's email: its Gmail mailbox is moving to Google Workspace. Google remains the recipient of what you write there; the privacy policy and the register will state its framework once the move is done.",
+      "Push notifications: a topic added after notifications were turned on on a device — such as “Team invitations” — is on by default there, like the others; you can turn it off in “My profile”, topic by topic, or turn off the device's notifications. The notification of a team invitation, takeover or ownership follows the same caps as the Discord direct message and only names the team.",
+      "Other clarifications, with no change to the processing: the evening announcement in the #live channel only lists in advance the matches whose broadcast is set to open at their start time; a team's voice channel is also handed back to the bot when the match or the tournament is deleted, and a channel never handed back and occupied is only deleted once empty; the match page says whether a channel is open, opening soon or unavailable; the staff log on Discord also records round maps and ban rules being changed, without naming anyone.",
+    ],
+  },
 };
 
 /**

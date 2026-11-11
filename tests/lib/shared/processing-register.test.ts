@@ -24,7 +24,8 @@ import {
   registerController,
   registerExportFilename,
   registerToCsv,
-  HOST_PROCESSING_AGREEMENT,
+  HOST_ARRANGEMENT,
+  HOST_ARRANGEMENT_EN,
   REGISTER_SCOPE_DETAIL,
   SUPPORT_TICKET_RETENTION_MONTHS,
   WEB_ACCESS_LOG_RETENTION_DAYS,
@@ -377,10 +378,11 @@ describe("registerController", () => {
     expect(controller.legalForm).toMatch(/loi 1901/);
   });
 
-  it("déclare l'hébergeur des mentions légales comme sous-traitant, en France", () => {
+  it("nomme l'hébergeur des mentions légales, sans prestataire ni sous-traitant, en France", () => {
     expect(controller.host).toContain(SITE_HOST.name);
     expect(controller.host).toContain(SITE_HOST.address);
-    expect(controller.host).toMatch(/sous-traitant/);
+    expect(controller.host).toContain("aucun prestataire d'hébergement");
+    expect(controller.host).toContain("pas de sous-traitant au sens de l'article 28 du RGPD");
     expect(controller.host).toMatch(/hébergées en France/);
   });
 
@@ -444,7 +446,7 @@ describe("registerToCsv", () => {
     expect(col("Date de mise à jour")).toBe(REGISTER_UPDATED_AT);
     expect(col("Durées de conservation").split("\n")).toEqual(byRef("T09").retention);
     expect(col("Responsable du traitement")).toContain(RGPD_CONTACT_LINE);
-    expect(col("Hébergeur (sous-traitant)")).toContain(SITE_HOST.address);
+    expect(col("Hébergeur")).toContain(SITE_HOST.address);
   });
 
   it("accepte une liste de traitements fournie", () => {
@@ -628,11 +630,33 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.transfers).toEqual(["Aucun"]);
   });
 
-  it("dit le contrat de l'article 28 avec l'hébergeur rédigé, pas signé", () => {
-    expect(HOST_PROCESSING_AGREEMENT).toMatch(/art\. 28/);
-    expect(HOST_PROCESSING_AGREEMENT).toMatch(/en attente de signature/);
-    expect(controller.host).toContain(HOST_PROCESSING_AGREEMENT);
-    expect(byRef("T09").recipients.join(" ")).toContain(HOST_PROCESSING_AGREEMENT);
+  // LEGAL-LOT-1, décision D1 : aucun prestataire d'hébergement, donc ni
+  // sous-traitant ni contrat de l'article 28 (le projet de contrat est retiré).
+  it("hostArrangement_noHostingProvider_saysNoProcessorNorArticle28ContractFrAndEn", () => {
+    expect(HOST_ARRANGEMENT).toContain("aucun prestataire d'hébergement");
+    expect(HOST_ARRANGEMENT).toContain("pas de sous-traitant au sens de l'article 28 du RGPD, donc pas de contrat de sous-traitance");
+    expect(HOST_ARRANGEMENT_EN).toContain("no hosting service provider");
+    expect(HOST_ARRANGEMENT_EN).toContain("no processor within the meaning of Article 28 GDPR, so no processing agreement");
+    expect(controller.host).toContain(HOST_ARRANGEMENT);
+    expect(controller.host).not.toMatch(/sous-traitant \(|en attente de signature/);
+  });
+
+  it("registerT09_recipients_hostIsNotProcessorAndHetznerIsAssociationProcessorFrAndEn", () => {
+    const fr = byRef("T09").recipients.join(" ");
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T09")?.recipients.join(" ") ?? "";
+    expect(fr).toContain("qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement)");
+    expect(fr).toContain("souscrit par le responsable technique de l'association, qui a accepté le contrat de traitement des données de Hetzner");
+    expect(fr).toContain("Hetzner y agissant comme sous-traitant");
+    expect(fr).toContain("— Hetzner stocke les copies chiffrées sans pouvoir les lire");
+    expect(en).toContain("— Hetzner stores the encrypted copies without being able to read them");
+    expect(fr).not.toMatch(/sous-traitant ultérieur|en attente de signature|art\. 28\)/);
+    expect(en).toContain("who hosts the site on their own machine on the association's behalf (no hosting service provider)");
+    expect(en).toContain("subscribed by the association's technical manager, who accepted Hetzner's data processing agreement");
+    expect(en).toContain("Hetzner acting as a processor under it");
+    expect(en).not.toMatch(/sub-processor|awaiting signature/);
+  });
+
+  it("garde la vérification du chiffrement des sauvegardes", () => {
     expect(byRef("T09").security.join(" ")).toMatch(/remote rclone de type crypt .* vérifié en production le 30 septembre 2026/);
   });
 

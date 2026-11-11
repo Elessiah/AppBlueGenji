@@ -177,7 +177,9 @@ reviendra).
   n'est pas une erreur, la première date fait foi. L'insertion ne se pose que
   sur un compte vivant (`is_deleted = 0`).
 - **Aucun refus, aucune suppression** : l'introduction dit qu'aucun accord n'est
-  demandé, et le pied renvoie aux réglages de « Mon profil » (ce qui repose sur
+  demandé — sauf pour des conditions d'utilisation nouvelles, qu'elle annonce
+  (`introOneTerms` / `introManyTerms`) et que seule `TermsAcceptanceModal` fait
+  accepter —, et le pied renvoie aux réglages de « Mon profil » (ce qui repose sur
   le consentement) et à `/rgpd` (opposition et autres droits). La suppression du
   compte reste où elle a toujours été, sur `/profil`.
 - **Ni Échap ni clic à côté ne la ferment** : ne rien faire la fait revenir au

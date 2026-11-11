@@ -127,7 +127,7 @@ export function RegistreEn() {
             <Field label="Data controller" items={`${controller.name} — ${controller.legalForm}, ${controller.seat}`} />
             <Field label="Contact" items={controller.contact} />
             <Field label="Person to contact for requests regarding data" items={controller.dataContact} />
-            <Field label="Host (processor)" items={controller.host} />
+            <Field label="Host" items={controller.host} />
           </tbody>
         </table>
       </section>

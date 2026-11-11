@@ -320,7 +320,7 @@ export function RgpdEn({
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
           the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
-          avatar moderation never deleted goes without leaving any hash. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
+          avatar moderation never deleted goes without leaving any hash. The staff log on Discord records the request, its reactivation and each registration withdrawal or forfeit it causes (one line per tournament for those), without
           naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
@@ -613,7 +613,7 @@ export function RgpdEn({
           <p>
             <strong>Purpose.</strong> Knowing how much the site is visited: number of visits over 24 hours, 7
             days, 30 days and since the launch, and of unique visitors over 24 hours, 7 days, 30 days and{" "}
-            {SITE_VISITOR_RETENTION_MONTHS} months. No third-party tool is used, and none of it is used for
+            {monthsEn(SITE_VISITOR_RETENTION_MONTHS)}. No third-party tool is used, and none of it is used for
             advertising.
           </p>
           <p>
@@ -644,7 +644,7 @@ export function RgpdEn({
             {SITE_VISIT_DETAIL_RETENTION_DAYS} days, after being added to a daily counter that only keeps the number
             of visits. To count unique visitors, the site also keeps one hash per visitor, without page but with the
             “logged-in visitor” indicator and the date of the last visit: it is erased{" "}
-            <strong>{SITE_VISITOR_RETENTION_MONTHS} months after that last visit</strong> — including after an
+            <strong>{monthsEn(SITE_VISITOR_RETENTION_MONTHS)} after that last visit</strong> — including after an
             account is deleted, which does not erase it sooner. Hashes recorded before this rule are dated from when
             it was introduced, as their last visit had not been kept.
           </p>
@@ -828,7 +828,7 @@ export function RgpdEn({
               log on Discord carries neither their username nor the reason.
             </li>
             <li>
-              <strong>Period</strong>: while it runs, then {SUSPENSION_RETENTION_MONTHS} months after it is lifted or
+              <strong>Period</strong>: while it runs, then {monthsEn(SUSPENSION_RETENTION_MONTHS)} after it is lifted or
               expires — the period for contesting —, before being erased at the first login to the site after that
               period; also erased with the account, or when it is anonymized. It appears in the export of your data,
               without the name of who imposed it.
@@ -925,7 +925,7 @@ export function RgpdEn({
             and its removal (with the reason for an automatic removal)
             are noted in the staff log on Discord without naming anyone (“a caster”, “the staff”); so are the
             staff&apos;s other actions on a match or a tournament (result confirmed, score saved, forced launch, host,
-            broadcast, replay, tournament edited, seeding, stage brought forward, ghost teams, image), with the match&apos;s team names (“a player” in a
+            broadcast, replay, tournament edited, round maps and ban rules, seeding, stage brought forward, ghost teams, image), with the match&apos;s team names (“a player” in a
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
@@ -944,7 +944,7 @@ export function RgpdEn({
             match&apos;s “Contacts” and launch windows and on the match page (which also repeats, for the parties to the match alone — never referees with no role in that match —, the teams&apos; contacts), to the same parties and at the same times as the match
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
-            window shows the match. Their certified Discord tag is also presented, in the “Contacts” window and on the match page, to the parties to the match alone (both its teams, its casters), at the same times as their BattleTag — never to referees with no role in that match nor in the launch window (if they also
+            window shows the match. Their certified Discord tag is also presented, in the “Contacts” window and on the match page, to the parties to the match alone — to both its teams as soon as both its opponents are known until its end, to its casters while the match is being played — never to referees with no role in that match nor in the launch window (if they also
             cast the match, their tag and BattleTag follow the casters&apos; rule: its parties read them only while the match is being played, launch window included, the other referees from the moment both its opponents are known). The staff who manage tournaments read at any time, in a match&apos;s “Refereeing” window, the username of its assigned referee and of the accounts that can referee. Any signed-in member also reads their username alone (never their BattleTag) on the card and
             page of a match, until its score is reported or the tournament ends; visitors without an account only read “Referee assigned”. Their “Ready” is
             expected like those of the teams and casters; only the parties to the match and the referees read it, in the
@@ -953,14 +953,14 @@ export function RgpdEn({
             deleted account is removed from all its matches. When someone else removes it from them (the staff,
             another referee the match is assigned to, self-management, their upheld objection) or it is removed automatically, they are
             notified by push notification only, with the reason. These actions (except a removal on objection, see below), a match&apos;s self-management,
-            its first map and the maps picked from the round&apos;s pool are noted in the staff log on Discord without naming anyone, and a match that enters its
+            its first map and the maps picked from the round&apos;s pool (by the staff or, in self-management, by a team of the match) are noted in the staff log on Discord without naming anyone, and a match that enters its
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
             the parties to the match falls under <strong>performance of the service</strong> once they have
-            accepted version 7 or a later version of the terms of use, which provide for it (“Match contacts” section), so that the
+            accepted version 7 or a later version of the terms of use, which provide for it (“Match contacts” section); its aim is that the
             parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category). Showing their username to any signed-in member falls under <strong>legitimate interest</strong>{" "}
-            (members knowing who referees a match), with the same right to object; presenting their certified Discord tag to the parties to the match falls, since 6 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning (without it, the parties cannot reach their referee), once the referee has accepted version 9 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own; once upheld, their referee objection (to their presentation before version 7, or to the display of their username to members) removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
+            (members knowing who referees a match), with the same right to object; presenting their certified Discord tag to the parties to the match falls, since 6 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning (without it, the parties cannot reach their referee), once the referee has accepted version 9 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own; once upheld, their referee objection (to their presentation before version 7 — before version 9 for their Discord tag —, or to the display of their username to members) removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
             covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” also falls under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>); the removal notice, sent as a push notification, falls under the consent given by turning them on (<LocaleLink href="/rgpd/registre#t12">register, T12</LocaleLink>).
           </p>
@@ -969,17 +969,17 @@ export function RgpdEn({
             association&apos;s Discord bot opens, from {VOICE_CHANNEL_LEAD_MINUTES} minutes before a match&apos;s time (on the site&apos;s first pass within that
             window), a {VOICE_CHANNEL_CAPACITY}-seat voice channel for each of its two teams, named after the team — never for a solo
             entry, whose name would be a username, nor for a match against a ghost team. The match&apos;s launch doesn&apos;t depend on them: it launches as in any other tournament. To know whether a channel is empty, the bot holds in memory, at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
-            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, the times of creation and of hand-back (or of a bot outage, and whether it hit the whole bot, or of a refused hand-back) — no user data: never who is in a channel, nor how many; the match page only tells its parties and staff whether each channel is open, which any signed-in member can read; a visitor without an account sees none of it. The channels are open to whoever sees the match category; referees (referees and administrators, never someone playing the match) can clear a team&apos;s open channel, and a team&apos;s owner, a manager or its captain can clear their own team&apos;s channel, never the opponent&apos;s (the site then reads their team and roles to check it, without keeping anything): the bot disconnects all its occupants, read from the voice state held in memory, without keeping, logging or telling the site anything about them, and the channel stays open; for a clearing by the referees, the staff activity log on Discord notes it without naming its author, the server logs name that author (username and account number), with the match and the outcome, unless they are the match&apos;s assigned referee, never named; a clearing by the team is noted neither in those logs nor on Discord; in both cases, Discord&apos;s audit log keeps the disconnections (their number and the clearing&apos;s reason, as Discord records them). The channel is handed back to the bot when the match is finished (score confirmed),
-            cancelled, back to waiting, taken off the schedule or left without a confirmed score {VOICE_CHANNEL_LATE_HOURS} hours after its time, when the team leaves the pairing, when a solo entry or a ghost team enters the match, or when the tournament is no longer running (finished, or moved back before its start), is hidden again or turns the option off, or when the match is rescheduled to more than {VOICE_CHANNEL_LEAD_MINUTES} minutes away (its channels reopen {VOICE_CHANNEL_LEAD_MINUTES} minutes before its new time); the bot deletes it as soon as it is
+            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, the times of creation and of hand-back (or of a bot outage, and whether it hit the whole bot, or of a refused hand-back) — no user data: never who is in a channel, nor how many; the match page only tells its parties and staff whether each channel is open, opening soon or unavailable, which any signed-in member can read; a visitor without an account sees none of it. The channels are open to whoever sees the match category; referees (referees and administrators, never someone playing the match) can clear a team&apos;s open channel, and a team&apos;s owner, a manager or its captain can clear their own team&apos;s channel, never the opponent&apos;s (the site then reads their team and roles to check it, without keeping anything): the bot disconnects all its occupants, read from the voice state held in memory, without keeping, logging or telling the site anything about them, and the channel stays open; for a clearing by the referees, the staff activity log on Discord notes it without naming its author, the server logs name that author (username and account number), with the match and the outcome, unless they are the match&apos;s assigned referee, never named; a clearing by the team is noted neither in those logs nor on Discord; in both cases, Discord&apos;s audit log keeps the disconnections (their number and the clearing&apos;s reason, as Discord records them). The channel is handed back to the bot when the match or the tournament is deleted, when the match is finished (score confirmed),
+            back to waiting, taken off the schedule or left without a confirmed score {VOICE_CHANNEL_LATE_HOURS} hours after its time, when the team leaves the pairing, when a solo entry or a ghost team enters the match, or when the tournament is no longer running (finished, or moved back before its start), is hidden again or turns the option off, or when the match is rescheduled to more than {VOICE_CHANNEL_LEAD_MINUTES} minutes away (its channels reopen {VOICE_CHANNEL_LEAD_MINUTES} minutes before its new time); the bot deletes it as soon as it is
             empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running; if Discord prevents it, it retries at every sweep, and if it can no longer read the channel{" "}
             {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse, it forgets it: the channel then stays until the
             server&apos;s moderation deletes it; a channel never handed back is deleted if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours
-            after its creation or its reuse — occupied, it stays until it is handed back; moved out of the match category, the bot stops tracking it without deleting it
+            after its creation or its reuse — occupied, it stays for as long as it is, and the bot deletes it at the first sweep that finds it empty; moved out of the match category, the bot stops tracking it without deleting it
             and it falls to the server&apos;s moderation — as after a deletion by moderation or the bot forgetting it, a new channel is then opened for the team if its match
             has no confirmed score yet, is less than {VOICE_CHANNEL_LEAD_MINUTES} minutes from its time or past it, and is not more than {VOICE_CHANNEL_LATE_HOURS} hours past its time), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the bot has taken the channel back or said it no longer tracks it (channel already deleted, moved out of the category or forgotten) (apart from the encrypted backup
             copies); without that answer from the bot, the record is never closed: if it refuses to take the channel back, the site hands it back again about once a minute, then once an hour from {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after the current channel was created, with no limit; if it is unavailable, as the site is used (at most about once a minute) for as long as it is — except a channel the bot says it can never track (invalid identifier or key), whose record is closed at once. Apart from a clearing, the server logs only keep technical lines about the channels (match number, error code), without any player data. The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
-            it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
+            it or while Discord answers it with another error — (apart from the encrypted backup copies and the unencrypted copy of the bot&apos;s database kept before a restoration). Its other periods
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
             deletion of each channel, with its name, and the disconnections of a clearing (their number and reason, as Discord records them), readable by the server&apos;s administration, for the period Discord sets. These channels rest on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
             team before its match); joining a channel remains a choice, with no effect on the match&apos;s launch (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
@@ -1037,7 +1037,7 @@ export function RgpdEn({
               <a href="#exercer-vos-droits">“Exercising your rights”</a>).
             </li>
             <li>
-              <strong>Google</strong> (Gmail): the association&apos;s email is a Gmail mailbox. An email you send it,
+              <strong>Google</strong> (Gmail): the association&apos;s email is a Gmail mailbox, currently moving to Google Workspace. An email you send it,
               and its reply, go through it without encryption of the association&apos;s own: Google can therefore
               read them (period: section <a href="#exercer-vos-droits">“Exercising your rights”</a>).
             </li>
@@ -1073,7 +1073,7 @@ export function RgpdEn({
             stream or in “Configure my broadcast”: that link always goes with their account (a link a caster had
             called the organizers&apos; before 10 November 2026 goes with that stream once no caster holds it any
             more). A link set in that configuration before the site recorded who provided it has no
-            known author and stays with the match.{" "}
+            known author and stays with the match. Saving again a link already set does not change its author.{" "}
             When a match goes live (“live mode”) belongs to the match&apos;s caster who sets it, or who changes a mode with no
             holder: only they, the match&apos;s assigned referee and the staff who hold both the refereeing and the streaming
             permissions change or remove it afterwards. The site keeps that caster&apos;s account with the match, erases it when
@@ -1100,7 +1100,7 @@ export function RgpdEn({
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
             server, in one message per evening (four hours from the first live stream) that lists with their times
-            the matches live, those scheduled until the end of the evening and those finished (“<span lang="fr">Terminé</span>”, with
+            the matches live, those scheduled until the end of the evening whose broadcast is set to open at their start time and those finished (“<span lang="fr">Terminé</span>”, with
             their score), and that is edited at each match start and end, up to four hours after the evening ends (when it can no longer be edited, a new message without a mention takes over; the old one stays in the channel); it mentions @everyone for the association&apos;s official channel, only the StreamViewer role for
             any other channel. It gives the names of both teams (never their players&apos; usernames) or, in a
             solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an evening message that is no longer edited: unless changed, the Discord username or BattleTag
@@ -1113,7 +1113,7 @@ export function RgpdEn({
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
             server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
             association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). A
-            match listed in that message before it goes on air, scheduled that evening, leaves no trace on the
+            match listed in that message before it goes on air, scheduled that evening for a broadcast opening at its start time, leaves no trace on the
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
             in the export of your data — neither the text of the message nor the list of scheduled matches it gives. Your
@@ -1239,8 +1239,8 @@ export function RgpdEn({
           <p>
             <strong>When this policy changes</strong>, every user registered before the change is informed at their
             next visit, by a window that summarizes what changes, and, if they do not come back, by Discord direct
-            message or by push notification if they have turned them on. This is information: no agreement is
-            requested, and reading it does not take away any of the rights described above. What is based on your
+            message or by push notification if they have turned them on. This is information, and reading it does not take
+            away any of the rights described above: no agreement is requested — except, for a new version of the terms of use, the one the site asks for if you have not accepted it yet. What is based on your
             consent is set in “My profile”, without losing your account.
           </p>
         </div>

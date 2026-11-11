@@ -511,8 +511,8 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    // EF-43 (salons vocaux) : datée du lendemain de la mise en ligne du 5 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["11 novembre 2026", "11 November 2026"]);
+    // LEGAL-LOT-1 : datée comme le rectificatif du site du 13 novembre 2026.
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
   });
 });
 

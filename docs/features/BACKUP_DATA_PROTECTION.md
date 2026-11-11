@@ -129,15 +129,16 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
 - **Données** : l'ensemble des données de la plateforme (profils pseudonymes,
   identifiants de connexion, résultats de tournois, avatars et logos).
 - **Destinataires** : le responsable technique de l'association, Keryan
-  Houssin (`SITE_HOST`) — qui est aussi l'hébergeur du site, donc son
-  sous-traitant (contrat de l'article 28 rédigé dans
-  `docs/legal/contrat-sous-traitance-hebergement.md`, **non signé** à ce
-  jour) —, **seul détenteur des clés de déchiffrement**. `/rgpd` le dit ainsi plutôt que « une clé que seule
+  Houssin (`SITE_HOST`) — qui est aussi l'hébergeur du site, sur sa propre
+  machine et pour le compte de l'association : aucun prestataire
+  d'hébergement, donc ni sous-traitant ni contrat de l'article 28
+  (`HOST_ARRANGEMENT`, décision de l'association de novembre 2026) —,
+  **seul détenteur des clés de déchiffrement**. `/rgpd` le dit ainsi plutôt que « une clé que seule
   l'association détient », formule qui masquait que le détenteur est aussi
   l'hébergeur.
 - **Hébergement** : depuis le **1er octobre 2026**, Hetzner Storage Share
-  (Nextcloud géré), exploité par **Hetzner Online GmbH**, Allemagne. Hetzner est
-  **sous-traitant ultérieur** de l'association, par l'hébergeur, qui a souscrit
+  (Nextcloud géré), exploité par **Hetzner Online GmbH**, Allemagne. Hetzner y agit
+  comme **sous-traitant** ; le responsable technique de l'association a souscrit
   le service et **accepté le contrat de traitement des données de Hetzner
   (Data Processing Agreement, version 1.2) le 1er octobre 2026**. Traitement
   **exclusivement dans l'Union européenne / l'EEE** (§ 3 de ce contrat) :
@@ -159,8 +160,8 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   en production le 30 septembre 2026, maintenu au passage à Hetzner). Le
   transport HTTPS/TLS s'y ajoute. Le chiffrement est une mesure de sécurité
   (art. 32) : il ne tient pas lieu de contrat de sous-traitance (art. 28), que
-  le contrat de Hetzner fournit. Reste en suspens la seule signature du contrat
-  entre l'association et l'hébergeur — voir `ERREUR.txt`.
+  le contrat de Hetzner fournit. L'hébergeur n'étant pas un prestataire
+  (`HOST_ARRANGEMENT`), aucun contrat n'est à signer avec lui.
 - **Actions requises en production** (non vérifiables depuis le dépôt) :
   désactiver la corbeille et les versions du Nextcloud (voir plus haut) ; une
   fois une restauration depuis Hetzner vérifiée, **effacer définitivement les

@@ -1843,6 +1843,29 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       DATA_COLLECTED_SECTION_LINK,
     ],
   },
+  {
+    // LEGAL-LOT-1 (décisions de l'utilisateur D1, D2 et D5 du 2026-11-09) :
+    // rectificatif. Aucun prestataire d'hébergement (D1 : le registre parlait
+    // d'un contrat de sous-traitance en attente de signature), courriel de
+    // l'association en cours de passage à Google Workspace (D2), nouveau sujet
+    // push actif d'office sur un appareil déjà abonné (D5), et précisions de
+    // textes alignés sur le code. Pour tous les comptes.
+    id: "2026-11-rectificatifs-hebergement-courriel-push",
+    publishedAt: "2026-11-13",
+    title: "Hébergement, courriel de l'association et notifications push : précisions",
+    summary:
+      "Le site et le bot n'ont pas d'hébergeur prestataire : le responsable technique de l'association les fait tourner sur sa propre machine, sans contrat de sous-traitance. Le courriel de l'association est en cours de passage à Google Workspace. Un nouveau sujet de notification push est actif d'office sur un appareil déjà abonné.",
+    details: [
+      "Hébergement : le registre disait qu'un contrat de sous-traitance avec l'hébergeur du site était rédigé et attendait sa signature. Il n'y a pas de prestataire d'hébergement : le responsable technique de l'association fait tourner le site et le bot sur sa propre machine, pour le compte de l'association ; il n'est pas sous-traitant, et aucun contrat de sous-traitance n'est requis. Hetzner, qui stocke dans l'Union européenne les sauvegardes chiffrées, agit comme sous-traitant, dans le cadre du contrat de traitement des données de Hetzner que le responsable technique de l'association a accepté — et non comme « sous-traitant ultérieur, par l'hébergeur », l'hébergeur n'étant pas sous-traitant. Rien ne change dans ce qui est collecté ni dans qui le lit.",
+      "Courriel de l'association : sa messagerie Gmail est en cours de passage à Google Workspace. Google reste le destinataire de ce que tu y écris ; la politique de confidentialité et le registre en diront le cadre une fois le passage fait.",
+      "Notifications push : un sujet ajouté après l'activation des notifications sur un appareil — ainsi « Invitations d'équipe » — y est actif d'office, comme les autres ; tu peux le couper dans « Mon profil », sujet par sujet, ou couper les notifications de l'appareil. La notification d'une invitation, d'une reprise ou d'une propriété d'équipe suit les mêmes plafonds que le message privé Discord et ne nomme que l'équipe.",
+      "Autres précisions, sans changement du traitement : l'annonce de la soirée dans le salon #live ne liste à l'avance que les matchs dont la diffusion doit s'ouvrir à leur heure de début ; le salon vocal d'une équipe est aussi rendu au bot quand le match ou le tournoi est supprimé, et un salon jamais rendu et occupé n'est supprimé qu'une fois vide ; la page du match dit d'un salon s'il est ouvert, bientôt ouvert ou indisponible ; le journal du staff sur Discord note aussi les cartes de manche et les règles de ban modifiées, sans nommer personne.",
+    ],
+    links: [
+      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+      { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

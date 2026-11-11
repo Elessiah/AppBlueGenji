@@ -159,8 +159,8 @@ describe("revue juridique cycle 4", () => {
   const v9En = () => PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join("\n");
 
   it("rgpdPage_staffLog_namesReactivationAndPerTournamentLineForWithdrawalsOnlyFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci)");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("its reactivation and each withdrawal or forfeit it causes (one line per tournament for those)");
+    expect(readSource("app/rgpd/page.tsx")).toContain("sa réactivation et chaque retrait d&apos;inscription ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci)");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("its reactivation and each registration withdrawal or forfeit it causes (one line per tournament for those)");
   });
 
   it("privacyChangesV9_staffLog_perTournamentLineForWithdrawalsOnlyFrAndEn", () => {
