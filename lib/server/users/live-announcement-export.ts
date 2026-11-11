@@ -46,10 +46,11 @@ export const DELETION_LOG_ANNOUNCEMENTS_LIMIT = 500;
  * sont ses annonces (refusées comprises : un refus d'AutoMod est justement
  * celui qui laisse une alerte) **et** ses matchs programmés (`START_TIME`)
  * castés, que le message d'une soirée liste avant leur passage à l'antenne,
- * même s'ils n'y sont jamais passés : au plus tôt `LIVE_EVENING_WINDOW_HOURS`
- * heures avant leur heure (la fenêtre d'une soirée), d'où la date retenue —
- * un match d'après minuit listé la veille est cité la veille. Un match
- * programmé plus tard que cette fenêtre n'a encore été listé nulle part. Lus à la demande de
+ * même s'ils n'y sont jamais passés : entre `LIVE_EVENING_WINDOW_HOURS`
+ * heures avant leur heure (la fenêtre d'une soirée) et leur heure. Les deux
+ * bornes sont rendues : quand cet intervalle passe minuit, les deux jours sont
+ * cités. Un match programmé plus tard que cette fenêtre n'a encore été listé
+ * nulle part. Lus à la demande de
  * suppression pour la ligne du journal du staff (`formatAccountDeletionLog`,
  * décision D56b) : les modérateurs y trouvent quelles soirées parcourir pour
  * supprimer à la main les alertes AutoMod. Rien n'en est gardé.
@@ -68,10 +69,11 @@ export async function listLiveAnnouncementsForDeletionLog(
      JOIN bg_teams st ON st.solo_user_id = ?
       AND FIND_IN_SET(st.id, REPLACE(a.pairing, ':', ',')) > 0
      UNION ALL
-     SELECT t.name, DATE_SUB(m.start_at, INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR) AS sent_at, m.id AS match_id
+     SELECT t.name, DATE_SUB(m.start_at, INTERVAL sh.shift HOUR) AS sent_at, m.id AS match_id
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
      JOIN bg_teams st ON st.solo_user_id = ? AND st.id IN (m.team1_id, m.team2_id)
+     CROSS JOIN (SELECT 0 AS shift UNION ALL SELECT ${LIVE_EVENING_WINDOW_HOURS}) sh
      WHERE m.live_trigger = 'START_TIME' AND m.is_bye = 0
        AND m.start_at <= DATE_ADD(NOW(), INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)
      ORDER BY sent_at DESC, match_id DESC

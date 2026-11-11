@@ -220,6 +220,22 @@ describe("formatAccountDeletionLog", () => {
     expect(actual).toContain("(« B » le 13/11/2026 vers 21:00 ; « A » le 13/11/2026 vers 20:00) —");
   });
 
+  it("formatAccountDeletionLog_scheduledSpanAcrossMidnight_citesBothDays", () => {
+    // Un match programmé à 02:30 (Paris) peut avoir été listé dès 22:30 la veille.
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: {
+        announcements: [
+          { tournamentName: "Cup", sentAt: "2026-11-13T01:30:00.000Z" },
+          { tournamentName: "Cup", sentAt: "2026-11-12T21:30:00.000Z" },
+        ],
+        truncated: false,
+      },
+    });
+
+    expect(actual).toContain("(« Cup » le 13/11/2026 vers 02:30 ; « Cup » le 12/11/2026 vers 22:30) —");
+  });
+
   it("formatAccountDeletionLog_afterParisMidnight_usesParisDay", () => {
     const actual = formatAccountDeletionLog({
       days: 30,

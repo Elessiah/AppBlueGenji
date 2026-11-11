@@ -83,8 +83,9 @@ describe("listLiveAnnouncementsForDeletionLog", () => {
     // Le message d'une soirée liste à l'avance les matchs programmés, pseudo compris.
     const [sql] = execute.mock.calls[0];
     expect(sql).toMatch(/UNION ALL/);
-    // Listé au plus tôt une fenêtre de soirée (4 h) avant son heure, jamais au-delà.
-    expect(sql).toMatch(/DATE_SUB\(m\.start_at, INTERVAL 4 HOUR\) AS sent_at/);
+    // Listé entre une fenêtre de soirée (4 h) avant son heure et son heure : les deux bornes.
+    expect(sql).toMatch(/DATE_SUB\(m\.start_at, INTERVAL sh\.shift HOUR\) AS sent_at/);
+    expect(sql).toMatch(/\(SELECT 0 AS shift UNION ALL SELECT 4\) sh/);
     expect(sql).toMatch(/m\.start_at <= DATE_ADD\(NOW\(\), INTERVAL 4 HOUR\)/);
     expect(sql).toMatch(/m\.live_trigger = 'START_TIME'/);
     expect(sql).toMatch(/st\.id IN \(m\.team1_id, m\.team2_id\)/);
