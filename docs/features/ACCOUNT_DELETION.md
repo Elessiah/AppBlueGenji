@@ -1079,11 +1079,12 @@ La ligne « Suppression de compte demandée » du journal du staff sur Discord
 tournoi individuel ou programmé (`START_TIME`) sur un match casté, des soirées
 #live où il a pu paraître — tournoi, jour, une heure
 (`listLiveAnnouncementsForDeletionLog`) : les modérateurs suppriment **à la
-main** les alertes AutoMod des messages de ces soirées qui citent ses matchs,
+main** toutes les alertes AutoMod des messages de ces soirées (la ligne ne dit pas
+lesquelles citent le compte),
 avant comme après l'heure citée (le message d'une soirée liste à l'avance les
 matchs programmés et reprend ceux déjà annoncés), que ni le site ni le bot ne savent
 retrouver. Jamais un pseudo ni un identifiant ; cinq soirées citées, les
 autres comptées puis citées par des lignes de suite, cinq par ligne
-(`formatAccountDeletionFollowUpLogs` ; « et d'autres, plus anciennes » au-delà de 500 annonces lues) ;
+(`formatAccountDeletionFollowUpLogs` ; « et d'autres, plus anciennes » au-delà de 500 lignes lues, un match programmé en comptant deux) ;
 lecture en échec → « vérifier le salon d'alertes ». Détail :
 `LIVE_STREAMS.md` § Information des joueurs.

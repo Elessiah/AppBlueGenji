@@ -576,8 +576,8 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
 
   it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
     // Conditions v11 (D53) : exécution du service, comme le pseudo de l'annonce.
-    expect(fr).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, dont les modérateurs suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier");
-    expect(en).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, of which the moderators delete by hand, when the player's account is deleted, those they can identify");
+    expect(fr).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée : à la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver");
+    expect(en).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found");
     expect(fr).not.toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod");
   });
 
@@ -604,9 +604,9 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   });
 
   it("dit combien de temps l'alerte AutoMod reste, sans suppression sur demande (D55, FR et EN)", () => {
-    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur, dont le site avertit le staff sans nommer le joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur (dès la demande, le site en avertit le staff sans nommer le joueur), les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
     expect(fr).not.toContain("est supprimée sur demande de la même façon");
-    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel; when the player's account is deleted, of which the website tells the staff without naming the player, the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
+    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel; when the player's account is deleted (as soon as deletion is requested, the website tells the staff without naming the player), the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
     expect(en).not.toContain("is deleted on request in the same way");
   });
 

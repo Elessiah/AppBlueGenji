@@ -321,7 +321,7 @@ export function RgpdEn({
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
           the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
           avatar moderation never deleted goes without leaving any hash. The staff log on Discord records the request, its reactivation and each registration withdrawal or forfeit it causes (one line per tournament for those), without
-          naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+          naming the player (“a player”); for an account that may have appeared in #live in a solo tournament, the line of the request also quotes the tournament, the day and a time of each evening concerned, so that the moderators delete by hand the AutoMod alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>;{" "}<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content";
+import { formatAccountDeletionLog } from "@/lib/shared/bot-logs";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import {
   REPORT_FORM_NAME_EN,
@@ -148,8 +149,8 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
   });
 
   it("botPrivacyPolicy_autoModAlert_restsOnPerformanceOfTheServiceFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, dont les modérateurs suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier.");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, of which the moderators delete by hand, when the player's account is deleted, those they can identify.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée : à la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found.");
   });
 
   it("privacyChange_termsV11_saysCastersLinksAndAlertMoveAndNoTransitionFrAndEn", () => {
@@ -316,8 +317,8 @@ describe("D55 et revue standard v11", () => {
 
     expect(fr).not.toContain("est supprimée sur demande de la même façon");
     expect(en).not.toContain("is deleted on request in the same way");
-    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur, dont le site avertit le staff sans nommer le joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
-    expect(en).toContain("its alert stays in the moderation alert channel; when the player's account is deleted, of which the website tells the staff without naming the player, the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
+    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur (dès la demande, le site en avertit le staff sans nommer le joueur), les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(en).toContain("its alert stays in the moderation alert channel; when the player's account is deleted (as soon as deletion is requested, the website tells the staff without naming the player), the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
     expect(fr).toContain("supprimées sur demande de l'équipe, du joueur ou du caster concerné");
   });
 
@@ -435,8 +436,8 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
   const tEn = (ref: string) => JSON.stringify(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref));
 
   it("streamNoticeCasters_alert_deletedByHandAtAccountDeletionFrAndEn", () => {
-    expect(STREAM_NOTICE_CASTERS).toContain("où elle reste : à la suppression du compte du joueur, le site en avertit le staff, sans nommer le joueur, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
-    expect(STREAM_NOTICE_CASTERS_EN).toContain("where it stays: when the player's account is deleted, the site tells the staff, without naming the player, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
+    expect(STREAM_NOTICE_CASTERS).toContain("où elle reste : à la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver — dès la demande de suppression, le site en avertit le staff, sans nommer le joueur ; elle n'est pas supprimée sur demande autrement.");
+    expect(STREAM_NOTICE_CASTERS_EN).toContain("where it stays: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found — as soon as deletion is requested, the site tells the staff, without naming the player; it is not deleted on request otherwise.");
   });
 
   it("registerT16_retention_saysStaffLogCarriesTournamentAndTimeOnlyFrAndEn", () => {
@@ -458,8 +459,8 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
 
   it("rgpdPolicy_alert_deletedByHandAtAccountDeletionFrAndEn", () => {
     expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, qui suppriment à la main, à la suppression de ton compte, celles qu'ils parviennent à identifier (sans garantie de toutes les retrouver)");
-    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toContain("à la suppression de votre compte, le site avertit le staff de votre demande, sans vous nommer, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
-    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toContain("when your account is deleted, the site tells the staff of your request, without naming you, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
+    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toContain("à la suppression de votre compte, le site avertit le staff dès votre demande, sans vous nommer, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toContain("when your account is deleted, the site tells the staff as soon as you request it, without naming you, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
   });
 
   it("rgpdPages_alert_sayHandDeletionAndAnonymousStaffNoticeFrAndEn", () => {
@@ -473,9 +474,9 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
   });
 
   it("botPrivacyPolicy_alert_saysHandDeletionAndStaffLogContentFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dont les modérateurs suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain(": à la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver.");
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("of which the moderators delete by hand, when the player's account is deleted, those they can identify.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain(": when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found.");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("the tournament, the day and a time of each #live evening in which they may have appeared, so that the moderators delete by hand those of their AutoMod alerts they can identify");
   });
 
@@ -510,5 +511,37 @@ describe("D57b — aucun régime à part pour un joueur sans compte", () => {
     ].join(" ");
 
     expect(texts).not.toMatch(/player with no account|STREAM_NOTICE_ACCOUNTLESS/);
+  });
+});
+
+// Revue légale delta (D56c) : la section « Suppression du compte » de /rgpd
+// dit ce que la ligne du staff ajoute ; la ligne demande toutes les alertes de
+// ces soirées (elle ne nomme personne) ; le staff est averti dès la demande.
+describe("revue légale delta (D56c)", () => {
+  it("rgpdDeletionSection_staffLogLine_citesLiveEveningsFrAndEn", () => {
+    const fr = readSource("app/rgpd/page.tsx");
+    const en = readSource("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).toContain("la ligne de la demande cite aussi le tournoi, le jour et une heure de chaque soirée concernée, pour que les modérateurs suppriment à la main les alertes AutoMod qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href=\"#retransmission\">");
+    expect(en).toContain("the line of the request also quotes the tournament, the day and a time of each evening concerned, so that the moderators delete by hand the AutoMod alerts they can identify, with no guarantee that all are found (<a href=\"#retransmission\">");
+  });
+
+  it("formatAccountDeletionLog_announcedAccount_asksToDeleteAllAlertsOfThoseEvenings", () => {
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: { announcements: [{ tournamentName: "Solo Cup", sentAt: "2026-11-13T20:04:00.000Z" }], truncated: false },
+    });
+
+    expect(actual).toContain("supprimer à la main, dans le salon d'alertes AutoMod, toutes les alertes des messages #live de ces soirées");
+    expect(actual).not.toContain("qui citent ses matchs");
+  });
+
+  it("legalTexts_staffWarning_saysAsSoonAsRequestFrAndEn", () => {
+    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toContain("le site avertit le staff dès votre demande");
+    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toContain("the site tells the staff as soon as you request it");
+    expect(STREAM_NOTICE_CASTERS).toContain("dès la demande de suppression, le site en avertit le staff");
+    expect(STREAM_NOTICE_CASTERS_EN).toContain("as soon as deletion is requested, the site tells the staff");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("(dès la demande, le site en avertit le staff sans nommer le joueur)");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("(as soon as deletion is requested, the website tells the staff without naming the player)");
   });
 });

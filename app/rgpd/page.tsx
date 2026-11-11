@@ -432,7 +432,7 @@ function RgpdFr({
           d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
           modération avait déjà supprimé (section <a href="#signalements">« Signalements »</a>) ; un
           avatar que la modération n&apos;a jamais supprimé part sans laisser d&apos;empreinte. Le journal du staff sur Discord note la demande,
-          sa réactivation et chaque retrait d&apos;inscription ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
+          sa réactivation et chaque retrait d&apos;inscription ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») ; pour un compte qui a pu paraître dans #live en tournoi individuel, la ligne de la demande cite aussi le tournoi, le jour et une heure de chaque soirée concernée, pour que les modérateurs suppriment à la main les alertes AutoMod qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a> ;{" "}
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
       </section>

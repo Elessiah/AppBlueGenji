@@ -299,7 +299,7 @@ function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements
   if (others > 0) cited.push(others === 1 ? "et 1 autre, citée à la suite" : `et ${others} autres, citées à la suite`);
   // Avec des lignes de suite, c'est la dernière qui dit que la lecture s'est arrêtée à sa limite.
   if (liveAnnouncements.truncated && others === 0) cited.push(OLDER_EVENINGS_UNREAD);
-  return ` Modération : ce compte a pu paraître dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
+  return ` Modération : ce compte a pu paraître dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, toutes les alertes des messages #live de ces soirées, avant comme après l'heure citée (rien ne dit lesquelles citent ce compte) : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
 }
 
 /**
