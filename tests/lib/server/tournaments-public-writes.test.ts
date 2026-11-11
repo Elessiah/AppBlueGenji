@@ -59,7 +59,7 @@ import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { notifyScoreToConfirm } from "@/lib/server/tournaments/player-pushes";
 import { forfeitOwnMatch } from "@/lib/server/tournaments/player-forfeit";
-import { forfeitDeletedEntryNextMatch } from "@/lib/server/tournaments/deleted-entry-forfeit";
+import { forfeitDeletedEntryNextMatch, hasOpenDeletedEntryMatch } from "@/lib/server/tournaments/deleted-entry-forfeit";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import type { AdminScoreEntry } from "@/lib/server/tournaments/admin";
 import { forfeitSurvivalTeam, reconcileSurvival } from "@/lib/server/tournaments/survival";
@@ -494,17 +494,31 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
     expect(publishScoreReportedEvent).toHaveBeenCalledWith(5, 70);
   });
 
-  it("forfeitDeletedEntryMatchPublic_matchForfeited_returnsIdAndPublishes", async () => {
+  it("forfeitDeletedEntryMatchPublic_matchForfeited_publishesResolvedWithoutConfirmPush", async () => {
+    jest.mocked(hasOpenDeletedEntryMatch).mockResolvedValue(true);
     jest.mocked(forfeitDeletedEntryNextMatch).mockResolvedValue(70);
 
     expect(await forfeitDeletedEntryMatchPublic(5, 40)).toBe(70);
 
     expect(forfeitDeletedEntryNextMatch).toHaveBeenCalledWith(expect.anything(), 5, 40);
     expectCommitted();
-    expect(publishScoreReportedEvent).toHaveBeenCalledWith(5, 70);
+    expect(publishScoreResolvedEvent).toHaveBeenCalledWith(5, 70);
+    expect(publishScoreReportedEvent).not.toHaveBeenCalled();
+    expect(notifyScoreToConfirm).not.toHaveBeenCalled();
+  });
+
+  it("forfeitDeletedEntryMatchPublic_noOpenMatchOnPrecheck_nullWithoutTransaction", async () => {
+    jest.mocked(hasOpenDeletedEntryMatch).mockResolvedValue(false);
+
+    expect(await forfeitDeletedEntryMatchPublic(5, 40)).toBeNull();
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(forfeitDeletedEntryNextMatch).not.toHaveBeenCalled();
+    expect(publishScoreResolvedEvent).not.toHaveBeenCalled();
   });
 
   it("forfeitDeletedEntryMatchPublic_nothingToDo_nullAndNoEvent", async () => {
+    jest.mocked(hasOpenDeletedEntryMatch).mockResolvedValue(true);
     jest.mocked(forfeitDeletedEntryNextMatch).mockResolvedValue(null);
 
     expect(await forfeitDeletedEntryMatchPublic(5, 40)).toBeNull();

@@ -39,6 +39,29 @@ export async function lockDeletedSoloEntryStillForfeitable(
   return Number(users[0]?.is_deleted ?? 0) === 1;
 }
 
+/** Le prochain match à jouer de l'entrée : à planifier ou planifié, ses deux engagées connues. */
+const OPEN_ENTRY_MATCH_WHERE = `tournament_id = ?
+        AND status IN ('PENDING', 'READY')
+        AND team1_id IS NOT NULL AND team2_id IS NOT NULL
+        AND (team1_id = ? OR team2_id = ?)`;
+
+/**
+ * Relevé **sans verrou** : l'entrée a-t-elle encore un match ouvert ? Évite au
+ * passage horaire une transaction complète qui ne trouverait rien ; un « oui »
+ * se relit sous verrou (`forfeitDeletedEntryNextMatch`).
+ */
+export async function hasOpenDeletedEntryMatch(
+  runner: Pick<PoolConnection, "execute">,
+  tournamentId: number,
+  teamId: number,
+): Promise<boolean> {
+  const [rows] = await runner.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_matches WHERE ${OPEN_ENTRY_MATCH_WHERE} LIMIT 1`,
+    [tournamentId, teamId, teamId],
+  );
+  return rows.length > 0;
+}
+
 /**
  * Forfait du prochain match à jouer de l'entrée solo d'un compte en
  * suppression (E1, `docs/features/ACCOUNT_DELETION.md`), sur la transaction de
@@ -64,19 +87,26 @@ export async function forfeitDeletedEntryNextMatch(
   if (!(await lockDeletedSoloEntryStillForfeitable(connection, tournamentId, teamId))) return null;
 
   // Table seule, sans jointure (MariaDB) : le verrou ne porte que sur le match.
-  const [matches] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_matches
-      WHERE tournament_id = ?
-        AND status IN ('PENDING', 'READY')
-        AND team1_id IS NOT NULL AND team2_id IS NOT NULL
-        AND (team1_id = ? OR team2_id = ?)
+  const [matches] = await connection.execute<(RowDataPacket & { id: number; team1_id: number; team2_id: number })[]>(
+    `SELECT id, team1_id, team2_id FROM bg_matches
+      WHERE ${OPEN_ENTRY_MATCH_WHERE}
       ORDER BY id
       LIMIT 1
       FOR UPDATE`,
     [tournamentId, teamId, teamId],
   );
   if (matches.length === 0) return null;
-  const matchId = Number(matches[0].id);
-  await adminResolveMatch(connection, matchId, { forfeitTeamId: teamId });
+  const match = matches[0];
+  const matchId = Number(match.id);
+  const opponentId = Number(match.team1_id) === teamId ? Number(match.team2_id) : Number(match.team1_id);
+  // Deux entrées en suppression qui se rencontrent : double forfait. Sinon la
+  // première traitée perdait et l'autre montait — une victoire au palmarès
+  // d'un compte supprimé, qui ne joue de toute façon plus.
+  const opponentAlsoDeleted = await lockDeletedSoloEntryStillForfeitable(connection, tournamentId, opponentId);
+  await adminResolveMatch(
+    connection,
+    matchId,
+    opponentAlsoDeleted ? { doubleForfeit: true } : { forfeitTeamId: teamId },
+  );
   return matchId;
 }

@@ -732,7 +732,12 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   puis le verrou du match, il relit tournoi `RUNNING`, compte en suppression,
   entrée jamais jouée et match encore ouvert, puis tranche par
   `adminResolveMatch` — un relevé hors verrou aurait pu « corriger » en forfait
-  un résultat que l'arbitre venait de saisir). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
+  un résultat que l'arbitre venait de saisir). Si l'adversaire est lui aussi
+  une entrée en suppression jamais jouée, le match est un **double forfait** :
+  aucun compte supprimé ne monte au palmarès. Un relevé sans verrou
+  (`hasOpenDeletedEntryMatch`) évite la transaction quand plus rien n'est
+  ouvert, et le geste publie `score_resolved` (rien à confirmer, aucune
+  notification « score à confirmer »). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
   l'entrée solo est unique pour tous les tournois du compte. Chaque forfait
   relit d'abord `is_deleted` : un compte réactivé entre-temps garde ses matchs.
   Cette relecture se fait **sur la transaction du forfait**, après le verrou du

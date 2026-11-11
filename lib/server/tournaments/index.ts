@@ -181,6 +181,7 @@ import {
   publishStandingsReplayedEvent,
   publishUpdatedEvent,
   publishScoreReportedEvent,
+  publishScoreResolvedEvent,
 } from "./notifications";
 import { discardBotLogs, flushBotLogs, markResultValidatedByStaff, queueBotLog } from "./bot-logs";
 import { isUnsettled, releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
@@ -1541,7 +1542,12 @@ export async function forfeitDeletedEntryMatchPublic(
   tournamentId: number,
   teamId: number,
 ): Promise<number | null> {
-  const { forfeitDeletedEntryNextMatch } = await import("./deleted-entry-forfeit");
+  const { forfeitDeletedEntryNextMatch, hasOpenDeletedEntryMatch } = await import("./deleted-entry-forfeit");
+  // Relevé sans verrou d'abord : le passage horaire rappelle ce geste pour
+  // chaque entrée en attente, et une transaction complète (verrou du tournoi,
+  // quatre réconciliations) qui ne trouve rien ne sert à rien. Tout est relu
+  // sous verrou ensuite.
+  if (!(await hasOpenDeletedEntryMatch(await getDatabase(), tournamentId, teamId))) return null;
   let forfeited: number | null = null;
   await retryOnDeadlock(() =>
     runPlayerMatchWrite(
@@ -1550,6 +1556,8 @@ export async function forfeitDeletedEntryMatchPublic(
       async (connection) => {
         forfeited = await forfeitDeletedEntryNextMatch(connection, tournamentId, teamId);
       },
+      // Un forfait d'arbitrage clôt le match : rien à confirmer par l'adversaire.
+      "resolved",
     ),
   );
   return forfeited;
@@ -1567,6 +1575,9 @@ async function runPlayerMatchWrite(
   // Un id, ou sa lecture après l'écriture quand c'est elle qui le choisit (`null` : aucun match touché).
   matchId: number | (() => number | null),
   write: (connection: PoolConnection) => Promise<unknown>,
+  // « reported » : un score attend la confirmation de l'adversaire ;
+  // « resolved » : le match est clos (forfait d'arbitrage), rien à confirmer.
+  outcome: "reported" | "resolved" = "reported",
 ): Promise<void> {
   const stateBefore = await readTournamentState(tournamentId);
   const db = await getDatabase();
@@ -1603,7 +1614,9 @@ async function runPlayerMatchWrite(
     flushBotLogs(connection);
 
     const touchedMatchId = typeof matchId === "function" ? matchId() : matchId;
-    if (touchedMatchId !== null) {
+    if (touchedMatchId !== null && outcome === "resolved") {
+      publishScoreResolvedEvent(tournamentId, touchedMatchId);
+    } else if (touchedMatchId !== null) {
       publishScoreReportedEvent(tournamentId, touchedMatchId);
       // L'adversaire a un score à confirmer : il le sait sans avoir la page ouverte.
       void notifyScoreToConfirm(touchedMatchId);
