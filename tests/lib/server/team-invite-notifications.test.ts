@@ -121,7 +121,10 @@ describe("notifyTeamInvite", () => {
     await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     const budgetSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS any_player"));
-    expect(budgetSql).toContain(`NOT LIKE '%"OWNER"%'`);
+    expect(budgetSql).toContain(`COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 0`);
+    // Appartenance au tableau JSON, pas sous-chaîne : le rendu texte du JSON
+    // diffère entre MySQL et MariaDB.
+    expect(budgetSql).not.toContain("LIKE");
   });
 
   it("notifyTeamInvite_invite_budgetParamsInOrder", async () => {
@@ -157,7 +160,8 @@ describe("notifyTeamInvite", () => {
     await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     const offersCall = execute.mock.calls.find(([sql]) => sql.includes("AS offers"));
-    expect(offersCall?.[0]).toContain(`LIKE '%"OWNER"%'`);
+    expect(offersCall?.[0]).toContain(`COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 1`);
+    expect(offersCall?.[0]).not.toContain("LIKE");
     expect(offersCall?.[1]).toEqual([TEAM_ID, PLAYER_ID]);
     expect(execute.mock.calls.some(([sql]) => sql.includes("AS any_player"))).toBe(false);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);

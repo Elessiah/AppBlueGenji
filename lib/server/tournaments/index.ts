@@ -290,13 +290,16 @@ export async function syncVisibleTournaments(): Promise<void> {
           // ni la vitrine, ni le classement n'ont à être vidés pour lui.
           else if (launchesChanged) launchIds.push(tournamentId);
         } catch {
-          await connection.rollback().catch(() => undefined);
+          // Un `ROLLBACK` raté (connexion tombée) est journalisé, et la
+          // connexion détruite au retour plutôt que rendue au pool avec une
+          // transaction peut-être ouverte.
+          await rollbackKeepingError(connection);
         } finally {
           discardBotLogs(connection);
         }
       }
     } finally {
-      connection.release();
+      await releaseWithServerLockWait(connection);
     }
 
     for (const id of changedIds) {
@@ -584,11 +587,11 @@ export async function createTournament(
     invalidateTournamentLists();
     return tournamentId;
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 
@@ -902,11 +905,11 @@ export async function registerCurrentUserTeam(tournamentId: number, userId: numb
 
     publishUpdatedEvent(tournamentId);
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 
@@ -962,11 +965,11 @@ export async function registerGhostTeams(tournamentId: number, teamIds: number[]
 
     publishUpdatedEvent(tournamentId);
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 
@@ -1569,11 +1572,11 @@ async function runPlayerMatchWrite(
     }
     await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 
@@ -1831,11 +1834,11 @@ async function forfeitTournamentTeamOnce(
 
     publishUpdatedEvent(tournamentId);
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
   return settledDisputes;
 }
@@ -1995,11 +1998,11 @@ export async function applyEndurancePenaltyPublic(
 
     publishUpdatedEvent(tournamentId);
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 
@@ -2198,10 +2201,10 @@ async function adminResolveMatchOnce(
     invalidateTournamentLists();
     return dispute;
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }

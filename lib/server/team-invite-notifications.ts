@@ -76,7 +76,7 @@ export async function notifyTeamInvite(
               COUNT(DISTINCT CASE WHEN user_id = ? THEN team_id END) AS teams_to_player
        FROM bg_team_invitations
        WHERE (team_id = ? OR created_by = ? OR user_id = ?)
-         AND kind = 'INVITE' AND COALESCE(roles_json, '') NOT LIKE '%"OWNER"%' AND ${windowSql}`,
+         AND kind = 'INVITE' AND COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 0 AND ${windowSql}`,
       [teamId, userId, teamId, actorId, userId, teamId, actorId, userId],
     );
     const budget = {
@@ -91,7 +91,7 @@ export async function notifyTeamInvite(
     const [offers] = await db.execute<(RowDataPacket & { offers: number | string })[]>(
       `SELECT COUNT(*) AS offers FROM bg_team_invitations
        WHERE team_id = ? AND user_id = ? AND kind = 'INVITE'
-         AND COALESCE(roles_json, '') LIKE '%"OWNER"%' AND ${windowSql}`,
+         AND COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 1 AND ${windowSql}`,
       [teamId, userId],
     );
     if (!withinGhostClaimNoticeBudget(Number(offers[0]?.offers ?? 0))) return;

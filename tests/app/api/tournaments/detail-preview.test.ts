@@ -124,4 +124,30 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
 
     expect(res.status).toBe(404);
   });
+
+  it("GET_detailThrowsDeadlockMessage_returns409RetryCode", async () => {
+    login({ id: 1, isAdmin: true, roles: ["ADMIN"] });
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest
+      .mocked(service.getTournamentDetail)
+      .mockRejectedValue(new Error("Deadlock found when trying to get lock; try restarting transaction"));
+
+    const res = await get("7");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+    warn.mockRestore();
+  });
+
+  it("GET_detailThrowsPoolError_returns500WithoutRawMessage", async () => {
+    login({ id: 1, isAdmin: true, roles: ["ADMIN"] });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(service.getTournamentDetail).mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.1:3306"));
+
+    const res = await get("7");
+
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(await res.json())).not.toContain("ECONNREFUSED");
+    error.mockRestore();
+  });
 });
