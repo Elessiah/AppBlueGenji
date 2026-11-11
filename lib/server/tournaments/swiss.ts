@@ -743,6 +743,9 @@ export async function loadSwissMeta(
   conn: PoolConnection,
   tournamentId: number,
   phaseId = 0,
+  // Borne de la fenêtre d'annulation déjà connue (matchs chargés par
+  // l'instantané, `lastInputRoundOf`) : la requête est alors épargnée.
+  lastInputRound?: number,
 ): Promise<SwissMeta | null> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (tournament?.format !== "SWISS") return null;
@@ -785,7 +788,7 @@ export async function loadSwissMeta(
       status: row.status,
       forfeitRound: row.forfeit_round === null ? null : Number(row.forfeit_round),
     })),
-    { open: tournament.state === "RUNNING" },
+    { open: tournament.state === "RUNNING", lastInputRound },
   );
 
   return {

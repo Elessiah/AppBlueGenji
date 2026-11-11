@@ -433,12 +433,21 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
         (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SURVIVAL",
       )?.id ?? null;
 
+    // Borne de la fenêtre d'annulation des abandons, tirée des matchs déjà
+    // chargés : chaque instantané épargne une relecture de `bg_matches`.
+    const { lastInputRoundOf } = await import("./forfeit-window");
+
     const loadSurvival = async () => {
       if (card.format === "SURVIVAL") {
-        return (await import("./survival")).loadSurvivalMeta(connection, tournamentId);
+        return (await import("./survival")).loadSurvivalMeta(connection, tournamentId, 0, lastInputRoundOf(matches, 0));
       }
       if (survivalPhaseId !== null) {
-        return (await import("./survival")).loadSurvivalMeta(connection, tournamentId, survivalPhaseId);
+        return (await import("./survival")).loadSurvivalMeta(
+          connection,
+          tournamentId,
+          survivalPhaseId,
+          lastInputRoundOf(matches, survivalPhaseId),
+        );
       }
       return null;
     };
@@ -459,10 +468,15 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
 
     const loadSwiss = async () => {
       if (card.format === "SWISS") {
-        return (await import("./swiss")).loadSwissMeta(connection, tournamentId);
+        return (await import("./swiss")).loadSwissMeta(connection, tournamentId, 0, lastInputRoundOf(matches, 0));
       }
       if (swissPhaseId !== null) {
-        return (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId);
+        return (await import("./swiss")).loadSwissMeta(
+          connection,
+          tournamentId,
+          swissPhaseId,
+          lastInputRoundOf(matches, swissPhaseId),
+        );
       }
       return null;
     };

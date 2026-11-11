@@ -1,9 +1,10 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { FR_ERRORS_TEXT, mapError, mapParticipantError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { loadCancellableForfeitIds } from "@/lib/server/tournaments/forfeit-window";
+import { lastInputRoundOf, loadCancellableForfeitIds } from "@/lib/server/tournaments/forfeit-window";
 import { tournamentErrorsText } from "@/lib/shared/tournament-actions-text";
 import { type SqlQuery, fakeConnection } from "../helpers/sql-double";
+import { matchRow } from "../helpers/tournament-rows";
 
 /**
  * L'interface ne propose « Annuler l'abandon » que dans la fenêtre que le
@@ -78,6 +79,52 @@ describe("loadCancellableForfeitIds — options", () => {
     const { execute, conn } = connection(5);
     expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { lastInputRound: 0 })).toEqual([2, 3]);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * Borne de la fenêtre tirée des matchs déjà chargés par l'instantané : même
+ * règle que `HAS_SCORE_INPUT_SQL`, sans relire `bg_matches`.
+ */
+describe("lastInputRoundOf", () => {
+  const blank = { team1_score: null, team2_score: null, winner_team_id: null, status: "READY" as const };
+
+  it("lastInputRoundOf_noMatches_zero", () => {
+    expect(lastInputRoundOf([], 0)).toBe(0);
+  });
+
+  it("lastInputRoundOf_scoredRounds_returnsHighestRound", () => {
+    const matches = [
+      matchRow({ round_number: 1, team1_score: 2, team2_score: 0, status: "COMPLETED" }),
+      matchRow({ ...blank, round_number: 3, team1_reported_at: new Date("2026-11-12T10:00:00Z") }),
+      matchRow({ ...blank, round_number: 4 }),
+    ];
+
+    expect(lastInputRoundOf(matches, 0)).toBe(3);
+  });
+
+  it("lastInputRoundOf_otherPhaseInput_ignored", () => {
+    const matches = [
+      matchRow({ round_number: 5, phase_id: 7, team1_score: 2, status: "COMPLETED" }),
+      matchRow({ round_number: 2, phase_id: 0, team1_score: 2, status: "COMPLETED" }),
+    ];
+
+    expect(lastInputRoundOf(matches, 0)).toBe(2);
+  });
+
+  it("lastInputRoundOf_byeOrUncompletedDoubleForfeit_ignored", () => {
+    const matches = [
+      matchRow({ round_number: 4, team2_id: null, team1_score: 1, team2_score: 0, status: "COMPLETED" }),
+      matchRow({ ...blank, round_number: 3, double_forfeit: 1, status: "PENDING" }),
+    ];
+
+    expect(lastInputRoundOf(matches, 0)).toBe(0);
+  });
+
+  it("lastInputRoundOf_awaitingConfirmationWithoutScore_counts", () => {
+    const matches = [matchRow({ ...blank, round_number: 2, status: "AWAITING_CONFIRMATION" })];
+
+    expect(lastInputRoundOf(matches, 0)).toBe(2);
   });
 });
 

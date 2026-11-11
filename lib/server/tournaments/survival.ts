@@ -714,6 +714,9 @@ export async function loadSurvivalMeta(
   conn: PoolConnection,
   tournamentId: number,
   phaseId = 0,
+  // Borne de la fenêtre d'annulation déjà connue (matchs chargés par
+  // l'instantané, `lastInputRoundOf`) : la requête est alors épargnée.
+  lastInputRound?: number,
 ): Promise<import("@/lib/shared/types").SurvivalMeta | null> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (tournament?.format !== "SURVIVAL") return null;
@@ -741,7 +744,7 @@ export async function loadSurvivalMeta(
       status: row.status,
       forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
     })),
-    { open: tournament.state === "RUNNING" },
+    { open: tournament.state === "RUNNING", lastInputRound },
   );
 
   return {
