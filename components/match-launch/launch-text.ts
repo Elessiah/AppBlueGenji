@@ -40,7 +40,7 @@ export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchI
  * désigné du match — qu'il le caste aussi ou non —, l'action « Contacts » de la
  * carte ouvre déjà ceux des casters quand elle lui ouvre le match
  * (`viewer.earlyContacts`, `casterContactsRole` au serveur) : la note y renvoie,
- * en bref (celle des engagées, juste au-dessus, dit déjà où la trouver). Un
+ * avec sa place (la modale est montée sur toutes les pages). Un
  * arbitre désigné éligible ne joue pas le match et tient la permission
  * `tournaments` : `earlyContacts` n'est qu'un filet. À tout autre lecteur,
  * `undefined` : la fiche garde

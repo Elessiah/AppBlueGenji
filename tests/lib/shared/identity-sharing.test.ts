@@ -36,7 +36,7 @@ describe("DISCORD_TAG_AUDIENCE", () => {
 
   it("dit les parties d'un match, joué ou casté, et leurs moments", () => {
     expect(discord).toContain("les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match");
-    expect(discord).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les arbitres qui ne castent pas le match — son arbitre désigné toujours, même s'il le caste aussi — dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page (son arbitre désigné le voit aussi dans sa fenêtre de lancement, le temps du match)");
+    expect(discord).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et son arbitre désigné, même s'il le caste aussi, et les arbitres qui ne le castent pas, dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page, et, le temps du match, son arbitre désigné aussi dans sa fenêtre de lancement");
   });
 
   it("nomme les autres joueurs comme un public choisi, pas acquis", () => {

@@ -2717,12 +2717,12 @@ describe("PRIVACY_CHANGES — contacts du caster à l'arbitre désigné qui cast
     const [english] = localizedPrivacyChanges([entry], "en");
     const said: [PrivacyChange, string[]][] = [
       [entry, [
-        "son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, comme les autres arbitres — désormais aussi quand il caste lui-même le match",
+        "son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, comme les arbitres qui ne castent pas le match — désormais aussi quand il caste lui-même le match",
         "Ses deux équipes et ses autres casters ne les voient toujours que le temps du match",
         "sans nouvelle version à accepter",
       ]],
       [english, [
-        "its assigned referee sees your contacts as soon as both its opponents are known, like the other referees — now also when they cast the match themselves",
+        "its assigned referee sees your contacts as soon as both its opponents are known, like the referees who don't cast the match — now also when they cast the match themselves",
         "Both its teams and its other casters still only see them while the match is being played",
         "with no new version to accept",
         "Read the “Match contacts” section",
