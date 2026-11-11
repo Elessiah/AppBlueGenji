@@ -15,7 +15,11 @@ import {
 import { parseRoles } from "@/lib/server/serialization";
 import { rolesGranting } from "@/lib/shared/permissions";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
-import { formatAccountDeletionLog, type DeletedAccountLiveAnnouncements } from "@/lib/shared/bot-logs";
+import {
+  formatAccountDeletionFollowUpLogs,
+  formatAccountDeletionLog,
+  type DeletedAccountLiveAnnouncements,
+} from "@/lib/shared/bot-logs";
 import { listLiveAnnouncementsForDeletionLog } from "@/lib/server/users/live-announcement-export";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { closeUserStreams } from "@/lib/server/session-streams";
@@ -430,15 +434,14 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
   }
   // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5). La
   // ligne dit aussi aux modérateurs quelles alertes AutoMod supprimer à la main
-  // (D56b) : chaque soirée #live du compte (tournoi, jour, heure), jamais un pseudo.
+  // (D56b) : chaque soirée #live du compte (tournoi, jour, heure), jamais un pseudo —
+  // au-delà de celles que la ligne cite, des lignes de suite citent les autres.
   try {
-    sendBotLog(
-      formatAccountDeletionLog({
-        days: ACCOUNT_REACTIVATION_DAYS,
-        liveAnnouncements: await deletionLogLiveAnnouncements(userId),
-      }),
-      { category: "signups" },
-    );
+    const liveAnnouncements = await deletionLogLiveAnnouncements(userId);
+    sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS, liveAnnouncements }), {
+      category: "signups",
+    });
+    for (const line of formatAccountDeletionFollowUpLogs(liveAnnouncements)) sendBotLog(line, { category: "signups" });
   } catch (error) {
     console.error("[account-deletion] alerte de suppression non écrite", error);
   }

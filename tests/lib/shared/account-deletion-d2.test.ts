@@ -8,7 +8,11 @@ import {
   successorRoles,
   type TeamSuccessorCandidate,
 } from "@/lib/shared/account-deletion";
-import { formatAccountDeletionLog, formatAccountReactivationLog, formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
+import {
+  formatAccountDeletionFollowUpLogs,
+  formatAccountDeletionLog,
+  formatAccountReactivationLog,
+  formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
 
 /*
  * ERASURE-D2 — règles pures de la suppression différée : fenêtre de trente
@@ -207,17 +211,17 @@ describe("formatAccountDeletionLog", () => {
     expect(actual).not.toContain("autre");
   });
 
-  it("formatAccountDeletionLog_sixEvenings_citesFiveAndCountsOneOther", () => {
+  it("formatAccountDeletionLog_sixEvenings_citesFiveAndCountsOneOtherCitedBelow", () => {
     const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(6) });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre) — supprimer à la main");
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre, citée à la suite) — supprimer à la main");
     expect(actual).not.toContain("Cup 6");
   });
 
   it("formatAccountDeletionLog_sevenEvenings_countsOthersInPlural", () => {
     const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(7) });
 
-    expect(actual).toContain("; et 2 autres) — supprimer à la main");
+    expect(actual).toContain("; et 2 autres, citées à la suite) — supprimer à la main");
   });
 
   it("formatAccountDeletionLog_truncatedRead_saysOlderOnesExist", () => {
@@ -235,7 +239,7 @@ describe("formatAccountDeletionLog", () => {
   it("formatAccountDeletionLog_truncatedWithOthers_countsOthersThenSaysOlderOnesExist", () => {
     const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: { ...evenings(6), truncated: true } });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre ; et d'autres, plus anciennes) —");
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre, citée à la suite ; et d'autres, plus anciennes) —");
   });
 
   it("formatAccountDeletionLog_unreadableAnnouncements_tellsStaffToCheckTheAlertChannel", () => {
@@ -248,6 +252,80 @@ describe("formatAccountDeletionLog", () => {
 
   it("formatAccountDeletionLog_tournamentNameWithMention_isNeutralised", () => {
     const actual = logFor(["@everyone **Cup**", "2026-07-01T12:00:00.000Z"]);
+
+    expect(actual).not.toContain("@everyone");
+    expect(actual).not.toContain("**Cup**");
+  });
+});
+
+// Les textes publiés promettent au staff chaque soirée : au-delà des cinq de la
+// première ligne, des lignes de suite citent les autres, cinq par ligne.
+describe("formatAccountDeletionFollowUpLogs", () => {
+  it("formatAccountDeletionFollowUpLogs_null_returnsNoLine", () => {
+    const actual = formatAccountDeletionFollowUpLogs(null);
+
+    expect(actual).toEqual([]);
+  });
+
+  it("formatAccountDeletionFollowUpLogs_undefined_returnsNoLine", () => {
+    const actual = formatAccountDeletionFollowUpLogs(undefined);
+
+    expect(actual).toEqual([]);
+  });
+
+  it("formatAccountDeletionFollowUpLogs_fiveEvenings_returnsNoLine", () => {
+    const actual = formatAccountDeletionFollowUpLogs(evenings(5));
+
+    expect(actual).toEqual([]);
+  });
+
+  it("formatAccountDeletionFollowUpLogs_sixEvenings_oneLineCitingTheSixth", () => {
+    const actual = formatAccountDeletionFollowUpLogs(evenings(6));
+
+    expect(actual).toEqual([
+      "🗑️ Suppression de compte demandée (suite) — Modération : autres soirées #live du même compte (« Cup 6 » le 06/07/2026 vers 14:00).",
+    ]);
+  });
+
+  it("formatAccountDeletionFollowUpLogs_tenEvenings_oneLineOfFive", () => {
+    const actual = formatAccountDeletionFollowUpLogs(evenings(10));
+
+    expect(actual).toEqual([
+      "🗑️ Suppression de compte demandée (suite) — Modération : autres soirées #live du même compte (« Cup 6 » le 06/07/2026 vers 14:00 ; « Cup 7 » le 07/07/2026 vers 14:00 ; « Cup 8 » le 08/07/2026 vers 14:00 ; « Cup 9 » le 09/07/2026 vers 14:00 ; « Cup 10 » le 10/07/2026 vers 14:00).",
+    ]);
+  });
+
+  it("formatAccountDeletionFollowUpLogs_elevenEvenings_secondLineCitesTheEleventh", () => {
+    const actual = formatAccountDeletionFollowUpLogs(evenings(11));
+
+    expect(actual).toHaveLength(2);
+    expect(actual[1]).toBe(
+      "🗑️ Suppression de compte demandée (suite) — Modération : autres soirées #live du même compte (« Cup 11 » le 11/07/2026 vers 14:00).",
+    );
+  });
+
+  it("formatAccountDeletionFollowUpLogs_sameEveningRepeated_returnsNoLine", () => {
+    const announcements = [
+      { tournamentName: "Cup", sentAt: "2026-07-01T17:00:00.000Z" },
+      { tournamentName: "Cup", sentAt: "2026-07-01T16:00:00.000Z" },
+      { tournamentName: "Cup", sentAt: "2026-07-01T15:00:00.000Z" },
+      { tournamentName: "Cup", sentAt: "2026-07-01T14:00:00.000Z" },
+      { tournamentName: "Cup", sentAt: "2026-07-01T13:00:00.000Z" },
+      { tournamentName: "Cup", sentAt: "2026-07-01T12:00:00.000Z" },
+    ];
+
+    const actual = formatAccountDeletionFollowUpLogs({ announcements, truncated: false });
+
+    expect(actual).toEqual([]);
+  });
+
+  it("formatAccountDeletionFollowUpLogs_tournamentNameWithMention_isNeutralised", () => {
+    const sixth = { tournamentName: "@everyone **Cup**", sentAt: "2026-07-06T12:00:00.000Z" };
+
+    const [actual] = formatAccountDeletionFollowUpLogs({
+      announcements: [...evenings(5).announcements, sixth],
+      truncated: false,
+    });
 
     expect(actual).not.toContain("@everyone");
     expect(actual).not.toContain("**Cup**");
@@ -270,7 +348,7 @@ function evenings(count: number): { announcements: { tournamentName: string; sen
   return {
     announcements: Array.from({ length: count }, (_, index) => ({
       tournamentName: `Cup ${index + 1}`,
-      sentAt: `2026-07-0${index + 1}T12:00:00.000Z`,
+      sentAt: `2026-07-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
     })),
     truncated: false,
   };

@@ -576,7 +576,9 @@ alerte, et ses matchs castés programmés `START_TIME`, listés à l'avance mêm
 s'ils ne passent jamais à l'antenne, datés de leur heure moins la fenêtre d'une
 soirée (4 h, au plus tôt de leur listage ; un match plus lointain n'a encore
 été listé nulle part) ; cinq soirées citées, les
-autres comptées) — et d'y supprimer, avant comme après l'heure citée, les
+autres comptées puis citées à leur tour par des lignes de suite, cinq par
+ligne, `formatAccountDeletionFollowUpLogs` : les textes publiés promettent
+chaque soirée) — et d'y supprimer, avant comme après l'heure citée, les
 alertes des messages qui citent ses matchs ;
 **jamais un pseudo ni un identifiant** ; rien de plus pour un compte jamais annoncé, et « vérifier
 le salon d'alertes » si la lecture échoue. Une réactivation ne rétablit pas une

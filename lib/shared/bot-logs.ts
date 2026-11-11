@@ -194,7 +194,12 @@ export interface DeletedAccountLiveAnnouncements {
   truncated: boolean;
 }
 
-/** Soirées citées dans la ligne ; les autres sont comptées (« et N autres »). */
+/**
+ * Soirées citées par ligne : la ligne de la demande cite les plus récentes et
+ * compte les autres (« et N autres, citées à la suite »), que des lignes de
+ * suite citent à leur tour ({@link formatAccountDeletionFollowUpLogs}) — les
+ * textes publiés promettent **chaque** soirée au staff.
+ */
 export const ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS = 5;
 
 let announcementTimeFormat: Intl.DateTimeFormat | null = null;
@@ -235,6 +240,36 @@ function announcementEvenings(
   return [...evenings.values()];
 }
 
+/** Une soirée telle qu'une ligne la cite : « Nom » le JJ/MM/AAAA vers HH:MM — jamais un pseudo. */
+function citedEvening(evening: { tournamentName: string; day: string; time: string }): string {
+  return `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} vers ${evening.time}`;
+}
+
+/**
+ * Lignes de suite de la demande de suppression : les soirées #live que
+ * {@link formatAccountDeletionLog} n'a fait que compter, citées à leur tour
+ * par groupes de {@link ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS}, de la plus
+ * récente à la plus ancienne. Sans elles, un compte paru plus de cinq soirs
+ * laissait les modérateurs sans repère pour les plus anciennes, alors que le
+ * registre et la politique disent que chaque soirée leur est donnée. Même
+ * discrétion : tournoi, jour, heure — ni pseudo ni identifiant. Vide quand la
+ * première ligne a tout cité, ou que les annonces n'ont pas pu être relues.
+ */
+export function formatAccountDeletionFollowUpLogs(
+  liveAnnouncements: DeletedAccountLiveAnnouncements | null | undefined,
+): string[] {
+  if (!liveAnnouncements) return [];
+  const rest = announcementEvenings(liveAnnouncements.announcements).slice(ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS);
+  const lines: string[] = [];
+  for (let start = 0; start < rest.length; start += ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS) {
+    const cited = rest.slice(start, start + ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS).map(citedEvening);
+    lines.push(
+      `${leadOn("🗑️", "Suppression de compte demandée (suite)", "Modération : autres soirées #live du même compte")} (${cited.join(" ; ")}).`,
+    );
+  }
+  return lines;
+}
+
 /**
  * Suite de la ligne de suppression (décision de l'utilisateur D56b,
  * 2026-11-11) : l'alerte AutoMod d'une annonce #live bloquée ou signalée est
@@ -252,11 +287,9 @@ function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements
   }
   if (!liveAnnouncements || liveAnnouncements.announcements.length === 0) return "";
   const evenings = announcementEvenings(liveAnnouncements.announcements);
-  const cited = evenings
-    .slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS)
-    .map((evening) => `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} vers ${evening.time}`);
+  const cited = evenings.slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS).map(citedEvening);
   const others = evenings.length - cited.length;
-  if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
+  if (others > 0) cited.push(others === 1 ? "et 1 autre, citée à la suite" : `et ${others} autres, citées à la suite`);
   if (liveAnnouncements.truncated) cited.push("et d'autres, plus anciennes");
   return ` Modération : ce compte a pu paraître dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
 }

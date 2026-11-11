@@ -1083,6 +1083,7 @@ main** les alertes AutoMod des messages de ces soirées qui citent ses matchs,
 avant comme après l'heure citée (le message d'une soirée liste à l'avance les
 matchs programmés et reprend ceux déjà annoncés), que ni le site ni le bot ne savent
 retrouver. Jamais un pseudo ni un identifiant ; cinq soirées citées, les
-autres comptées (« et d'autres, plus anciennes » au-delà de 500 annonces lues) ;
+autres comptées puis citées par des lignes de suite, cinq par ligne
+(`formatAccountDeletionFollowUpLogs` ; « et d'autres, plus anciennes » au-delà de 500 annonces lues) ;
 lecture en échec → « vérifier le salon d'alertes ». Détail :
 `LIVE_STREAMS.md` § Information des joueurs.

@@ -986,6 +986,39 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
     expect(message).toContain("(« Solo Cup » le 13/11/2026 vers 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.");
   });
 
+  it("requestAccountDeletion_sixEvenings_sendsFollowUpLineInSignups", async () => {
+    jest.mocked(listLiveAnnouncementsForDeletionLog).mockResolvedValue({
+      announcements: [
+        { tournamentName: "Cup 6", sentAt: "2026-07-06T12:00:00.000Z" },
+        { tournamentName: "Cup 5", sentAt: "2026-07-05T12:00:00.000Z" },
+        { tournamentName: "Cup 4", sentAt: "2026-07-04T12:00:00.000Z" },
+        { tournamentName: "Cup 3", sentAt: "2026-07-03T12:00:00.000Z" },
+        { tournamentName: "Cup 2", sentAt: "2026-07-02T12:00:00.000Z" },
+        { tournamentName: "Cup 1", sentAt: "2026-07-01T12:00:00.000Z" },
+      ],
+      truncated: false,
+    });
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    const [message, options] = jest.mocked(sendBotLog).mock.calls[1];
+    expect(message).toBe(
+      "🗑️ Suppression de compte demandée (suite) — Modération : autres soirées #live du même compte (« Cup 1 » le 01/07/2026 vers 14:00).",
+    );
+    expect(options).toEqual({ category: "signups" });
+  });
+
+  it("requestAccountDeletion_announcementLookupFails_sendsNoFollowUpLine", async () => {
+    jest.mocked(listLiveAnnouncementsForDeletionLog).mockRejectedValue(new Error("DB_DOWN"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
   it("requestAccountDeletion_announcementLookupFails_logLineAsksToCheckAlertChannel", async () => {
     jest.mocked(listLiveAnnouncementsForDeletionLog).mockRejectedValue(new Error("DB_DOWN"));
     jest.spyOn(console, "error").mockImplementation(() => {});
