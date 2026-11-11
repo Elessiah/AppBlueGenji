@@ -30,8 +30,19 @@ describe("applySchemaChange", () => {
     expect(error).not.toHaveBeenCalled();
   });
 
-  it("applySchemaChange_transientLockWaitEveryTime_reportsAfterThreeTries", async () => {
+  it("applySchemaChange_transientLockWaitEveryTime_reportsAfterTwoTries", async () => {
+    // Chaque essai a déjà attendu 50 s : une seule reprise, pas trois.
     const execute = jest.fn<SqlQuery>().mockRejectedValue(lockWait());
+
+    await applySchemaChange(fakePool({ execute }), ADD);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it("applySchemaChange_deadlockEveryTime_reportsAfterThreeTries", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(deadlock);
 
     await applySchemaChange(fakePool({ execute }), ADD);
 

@@ -566,6 +566,21 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
 /** Tentatives d'une instruction en échec passager (verrou, interblocage). */
 const TRANSIENT_ATTEMPTS = 3;
 
+/**
+ * Un délai de verrou dépassé a déjà attendu `innodb_lock_wait_timeout` (50 s) :
+ * le rejouer trois fois gèlerait le démarrage (`getDatabase()` attend la passe)
+ * jusqu'à 150 s par instruction. Une seule reprise ; l'interblocage et le
+ * refus d'instantané, rendus aussitôt, gardent {@link TRANSIENT_ATTEMPTS}.
+ */
+const LOCK_WAIT_ATTEMPTS = 2;
+
+const isLockWaitTimeout = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  ((error as { code?: unknown }).code === "ER_LOCK_WAIT_TIMEOUT" || (error as { errno?: unknown }).errno === 1205);
+
+const transientAttempts = (error: unknown) => (isLockWaitTimeout(error) ? LOCK_WAIT_ATTEMPTS : TRANSIENT_ATTEMPTS);
+
 /** Attente entre deux tentatives d'une instruction en échec passager. */
 const TRANSIENT_PAUSE_MS = 250;
 
@@ -586,7 +601,7 @@ async function runSchemaStatement(db: Pool, statement: string): Promise<boolean>
       await db.execute(statement);
       return true;
     } catch (error) {
-      if (isContentionError(error) && attempt < TRANSIENT_ATTEMPTS) {
+      if (isContentionError(error) && attempt < transientAttempts(error)) {
         await new Promise((resolve) => setTimeout(resolve, TRANSIENT_PAUSE_MS));
         continue;
       }
