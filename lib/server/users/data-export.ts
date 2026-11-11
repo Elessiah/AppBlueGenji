@@ -53,6 +53,26 @@ export function refusedOptionalColumn(
 }
 
 /**
+ * L'origine du BattleTag rendue par l'export. Colonne d'origine refusée (ALTER
+ * manqué) : l'origine est **inconnue** (`null`), et l'export ne dit ni « tapé »
+ * ni « fourni par Battle.net ». Sans BattleTag, rien n'a d'origine : jamais
+ * « fourni par Battle.net ».
+ */
+function battletagOrigin(
+  row: { overwatch_battletag: string | null; blizzard_sub: string | null; overwatch_battletag_typed?: unknown },
+  known: boolean,
+): { typed: boolean | null; fromBlizzard: boolean | null } {
+  if (!known) return { typed: null, fromBlizzard: null };
+  const typed = Number(row.overwatch_battletag_typed ?? 0) === 1;
+  return {
+    typed,
+    fromBlizzard:
+      Boolean(row.overwatch_battletag) &&
+      battletagFromBlizzard({ blizzard_sub: row.blizzard_sub, overwatch_battletag_typed: typed ? 1 : 0 }),
+  };
+}
+
+/**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
  * pour l'export RGPD (droit à la portabilité, art. 20). Retourne les données
  * brutes non masquées — l'appelant DOIT s'assurer que `userId` est bien celui
@@ -115,10 +135,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
   if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");
   const row = rows[0];
   const dateOf = (column: OptionalAccountColumn) => toIso((row[column] as Date | null | undefined) ?? null);
-  // Colonne d'origine refusée (ALTER manqué) : l'origine est **inconnue**, et
-  // l'export ne dit ni « tapé » ni « fourni par Battle.net ».
-  const originKnown = optional.includes("overwatch_battletag_typed");
-  const battletagTyped = Number(row.overwatch_battletag_typed ?? 0) === 1;
+  const origin = battletagOrigin(row, optional.includes("overwatch_battletag_typed"));
 
   // Réutilise l'agrégation existante pour les stats, l'historique d'équipes et
   // le palmarès de tournois (vue « self » = données complètes non masquées).
@@ -160,7 +177,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       refereeObjectionAt: dateOf("referee_objection_at"),
       // L'origine du BattleTag (`overwatch_battletag_typed`, `battletag-origin.ts`) :
       // tapé à la main, il n'est jamais tenu pour vérifié — donnée détenue, rendue.
-      overwatchBattletagTyped: originKnown ? battletagTyped : null,
+      overwatchBattletagTyped: origin.typed,
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {
@@ -168,10 +185,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       overwatchBattletag: row.overwatch_battletag,
       // Fourni par Battle.net (donc tenu pour vérifié) ou non.
       // Sans BattleTag, rien n'a d'origine : jamais « fourni par Battle.net ».
-      battletagFromBlizzard: originKnown
-        ? Boolean(row.overwatch_battletag) &&
-          battletagFromBlizzard({ blizzard_sub: row.blizzard_sub, overwatch_battletag_typed: battletagTyped ? 1 : 0 })
-        : null,
+      battletagFromBlizzard: origin.fromBlizzard,
       marvelRivalsTag: row.marvel_rivals_tag,
       visibility: {
         avatar: Boolean(row.visible_avatar),
