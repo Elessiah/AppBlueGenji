@@ -7,7 +7,7 @@
  * ligne au journal du staff, sans nommer personne.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { withConnection } from "@/lib/server/database";
+import { getDatabase } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { formatMapRulesLog } from "@/lib/shared/bot-logs";
 import {
@@ -37,6 +37,7 @@ import {
 import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { releaseWithServerLockWait, withShortLockWait } from "./lock-wait";
 import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
@@ -505,8 +506,11 @@ export async function pickMatchMap(
 ): Promise<void> {
   // Rejouée sur interblocage : le verrou tournoi puis match croise les
   // écritures d'arbitrage qui prennent le match puis le tournoi.
-  const tournamentId = await retryOnDeadlock(() =>
-    withConnection(async (connection) => {
+  // Connexion prise ici (pas `withConnection`) : rendue par
+  // `releaseWithServerLockWait`, jamais au pool sous le délai de verrou court.
+  const tournamentId = await retryOnDeadlock(async () => {
+    const connection = await (await getDatabase()).getConnection();
+    try {
       // Le match lu avant la transaction (lecture autonome) : sous REPEATABLE
       // READ, une lecture dans la transaction avant le verrou figerait la vue, et
       // le pool relu ensuite serait celui d'avant un `setRoundMaps` simultané
@@ -517,11 +521,16 @@ export async function pickMatchMap(
       await assertMapPicker(connection, pre[0], viewer);
       if (pre[0].status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
       const ownerId = Number(pre[0].tournament_id);
-      return transact(connection, async () => {
+      // `await` : le `finally` ne rend la connexion qu'une fois la transaction close.
+      return await transact(connection, async () => {
         // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
         // contre un pool que le staff remplace au même instant. Verrou partagé :
-        // les choix de deux matchs ne s'attendent pas l'un l'autre.
-        await lockTournamentShared(connection, ownerId);
+        // les choix de deux matchs ne s'attendent pas l'un l'autre. Attente
+        // bornée (`withShortLockWait`) : un verrou exclusif tenu longtemps
+        // (remplacement du pool, avancement) ne garde pas la connexion jusqu'à
+        // `innodb_lock_wait_timeout` — passé le délai court, `ER_LOCK_WAIT_TIMEOUT`
+        // rend 409 `CONCURRENT_UPDATE_RETRY` (`launchFailure`).
+        await withShortLockWait(connection, () => lockTournamentShared(connection, ownerId));
         const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
         const row = rows[0];
         if (!row) throw new Error("MATCH_NOT_FOUND");
@@ -539,8 +548,10 @@ export async function pickMatchMap(
         queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
         return ownerId;
       });
-    }),
-  );
+    } finally {
+      await releaseWithServerLockWait(connection);
+    }
+  });
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 

@@ -8,7 +8,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/referee-notices");
 jest.mock("@/lib/server/tournaments/match-launch");
 
-import { withConnection } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
@@ -27,7 +27,7 @@ import {
 } from "@/lib/server/tournaments/round-maps";
 import { briefTiebreakMap, type LobbyBriefRow } from "@/lib/server/tournaments/lobby-brief";
 import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
-import { connectionMock, fakeConnection, type SqlMock } from "../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool, type SqlMock } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
 
 /**
@@ -63,6 +63,7 @@ const BO3_ROW = {
 };
 
 let connection: ReturnType<typeof connectionMock>;
+let getConnection: jest.Mock<() => Promise<unknown>>;
 
 /** Aiguille `execute` : chaque motif SQL rend ses lignes. */
 function route(execute: SqlMock, table: { pattern: RegExp; rows: Rows }[]) {
@@ -84,6 +85,8 @@ beforeEach(() => {
   connection.commit.mockResolvedValue();
   connection.rollback.mockResolvedValue();
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection(connection)));
+  getConnection = jest.fn(async () => fakeConnection(connection));
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection }));
   jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
@@ -538,10 +541,43 @@ describe("pickMatchMap", () => {
       return routed!(sql, params);
     });
     await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
-    expect(withConnection).toHaveBeenCalledTimes(2);
+    expect(getConnection).toHaveBeenCalledTimes(2);
+    expect(connection.release).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(writes(/UPDATE bg_matches SET first_map/)).toHaveLength(1);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("pickMatchMap_tournamentLockHeld_waitsShortlyAndThrowsLockWaitTimeout", async () => {
+    withMatch(MATCH);
+    const routed = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (/FROM bg_tournaments[\s\S]*LOCK IN SHARE MODE/.test(sql)) {
+        throw Object.assign(new Error("Lock wait timeout exceeded"), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 });
+      }
+      return routed!(sql, params);
+    });
+
+    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toMatchObject({ code: "ER_LOCK_WAIT_TIMEOUT" });
+
+    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual([
+      "SET SESSION innodb_lock_wait_timeout = 5",
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+    ]);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(1);
+    expect(writes(/UPDATE bg_matches SET/)).toHaveLength(0);
+  });
+
+  it("pickMatchMap_restoreFailsAfterLock_destroysConnectionInsteadOfReleasing", async () => {
+    withMatch(MATCH);
+    connection.query.mockResolvedValueOnce([[], []]).mockRejectedValue(new Error("connexion tombée"));
+
+    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toThrow("connexion tombée");
+
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    expect(writes(/UPDATE bg_matches SET/)).toHaveLength(0);
   });
 
   it("un membre du staff qui joue le match ne choisit pas hors autogestion", async () => {
