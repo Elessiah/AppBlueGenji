@@ -418,9 +418,9 @@ describe("revue juridique v11 — joueurs sans compte et textes alignés", () =>
   });
 
   it("registerT16_accountlessPlayers_legitimateInterestClauseFrAndEn", () => {
-    expect(t16Fr.legalBasis).toContain("pour un joueur sans compte sur le site (équipe fantôme, sans membre sur le site, entrée individuelle sans compte), qui n'a pas accepté les conditions d'utilisation : intérêt légitime");
+    expect(t16Fr.legalBasis).toContain("pour un joueur sans compte sur le site (équipe fantôme — sans membre sur le site —, ou entrée individuelle sans compte), qui n'a pas accepté les conditions d'utilisation : intérêt légitime");
     expect(t16Fr.legalBasis).toContain("avec droit d'opposition (art. 21) sur demande");
-    expect(t16En.legalBasis).toContain("for a player with no account on the site (ghost team, with no member on the site, solo entry with no account), who has not accepted the terms of use: the association's legitimate interest");
+    expect(t16En.legalBasis).toContain("for a player with no account on the site (ghost team — with no member on the site —, or solo entry with no account), who has not accepted the terms of use: the association's legitimate interest");
     expect(t16En.legalBasis).toContain("with a right to object (art. 21) on request");
   });
 
@@ -438,9 +438,9 @@ describe("revue juridique v11 — joueurs sans compte et textes alignés", () =>
     const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
     const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
 
-    expect(fr).toContain("une erreur de Discord peut retarder une suppression sans limite : le bot réessaie alors à chaque balayage, et un salon qu'il finit par oublier, faute de pouvoir encore le lire, relève de la modération du serveur");
+    expect(fr).toContain("une erreur de Discord peut retarder une suppression sans limite : le bot réessaie alors à chaque balayage, et un salon qu'il finit par oublier relève de la modération du serveur");
     expect(fr).not.toContain("sans limite, le salon relevant alors");
-    expect(en).toContain("a Discord error can delay a deletion without limit: the bot then retries at every sweep, and a channel it ends up forgetting, as it can no longer read it, falls to the server's moderation");
+    expect(en).toContain("a Discord error can delay a deletion without limit: the bot then retries at every sweep, and a channel it ends up forgetting falls to the server's moderation");
     expect(en).not.toContain("without limit, the channel then falling");
   });
 
