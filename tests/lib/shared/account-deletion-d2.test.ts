@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { BOT_LOG_MESSAGE_MAX_CHARS } from "@/lib/shared/bot-log-batch";
+import { botLogHeader } from "@/lib/shared/bot-log-category";
 import {
   ACCOUNT_REACTIVATION_DAYS,
   isReactivationWindowOpen,
@@ -12,7 +14,8 @@ import {
   formatAccountDeletionFollowUpLogs,
   formatAccountDeletionLog,
   formatAccountReactivationLog,
-  formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
+  formatDeletionWithdrawalLog,
+} from "@/lib/shared/bot-logs";
 
 /*
  * ERASURE-D2 — règles pures de la suppression différée : fenêtre de trente
@@ -236,10 +239,10 @@ describe("formatAccountDeletionLog", () => {
     expect(actual).toContain("(« Cup » le 01/07/2026 vers 14:00 ; et d'autres, plus anciennes) —");
   });
 
-  it("formatAccountDeletionLog_truncatedWithOthers_countsOthersThenSaysOlderOnesExist", () => {
+  it("formatAccountDeletionLog_truncatedWithOthers_leavesOlderOnesToTheLastFollowUpLine", () => {
     const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: { ...evenings(6), truncated: true } });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre, citée à la suite ; et d'autres, plus anciennes) —");
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre, citée à la suite) —");
   });
 
   it("formatAccountDeletionLog_unreadableAnnouncements_tellsStaffToCheckTheAlertChannel", () => {
@@ -302,6 +305,26 @@ describe("formatAccountDeletionFollowUpLogs", () => {
     expect(actual[1]).toBe(
       "🗑️ Suppression de compte demandée (suite) — Modération : autres soirées #live du même compte (« Cup 11 » le 11/07/2026 vers 14:00).",
     );
+  });
+
+  it("formatAccountDeletionFollowUpLogs_truncatedRead_lastLineSaysOlderOnesExist", () => {
+    const actual = formatAccountDeletionFollowUpLogs({ ...evenings(11), truncated: true });
+
+    expect(actual[0]).not.toContain("plus anciennes");
+    expect(actual[1]).toBe(
+      "🗑️ Suppression de compte demandée (suite) — Modération : autres soirées #live du même compte (« Cup 11 » le 11/07/2026 vers 14:00 ; et d'autres, plus anciennes).",
+    );
+  });
+
+  it("formatAccountDeletionFollowUpLogs_fiveLongestEscapedNames_fitsOneDiscordMessage", () => {
+    const announcements = Array.from({ length: 10 }, (_, index) => ({
+      tournamentName: `${"*".repeat(119)}${index}`,
+      sentAt: `2026-07-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
+    }));
+
+    const [actual] = formatAccountDeletionFollowUpLogs({ announcements, truncated: true });
+
+    expect(actual.length).toBeLessThanOrEqual(BOT_LOG_MESSAGE_MAX_CHARS - botLogHeader("signups").length - 1);
   });
 
   it("formatAccountDeletionFollowUpLogs_sameEveningRepeated_returnsNoLine", () => {

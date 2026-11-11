@@ -240,6 +240,9 @@ function announcementEvenings(
   return [...evenings.values()];
 }
 
+/** Fin d'une liste de soirées dont la lecture a atteint sa limite. */
+const OLDER_EVENINGS_UNREAD = "et d'autres, plus anciennes";
+
 /** Une soirée telle qu'une ligne la cite : « Nom » le JJ/MM/AAAA vers HH:MM — jamais un pseudo. */
 function citedEvening(evening: { tournamentName: string; day: string; time: string }): string {
   return `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} vers ${evening.time}`;
@@ -252,7 +255,8 @@ function citedEvening(evening: { tournamentName: string; day: string; time: stri
  * récente à la plus ancienne. Sans elles, un compte paru plus de cinq soirs
  * laissait les modérateurs sans repère pour les plus anciennes, alors que le
  * registre et la politique disent que chaque soirée leur est donnée. Même
- * discrétion : tournoi, jour, heure — ni pseudo ni identifiant. Vide quand la
+ * discrétion : tournoi, jour, heure — ni pseudo ni identifiant. La dernière
+ * dit, le cas échéant, que la lecture s'est arrêtée à sa limite. Vide quand la
  * première ligne a tout cité, ou que les annonces n'ont pas pu être relues.
  */
 export function formatAccountDeletionFollowUpLogs(
@@ -263,6 +267,9 @@ export function formatAccountDeletionFollowUpLogs(
   const lines: string[] = [];
   for (let start = 0; start < rest.length; start += ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS) {
     const cited = rest.slice(start, start + ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS).map(citedEvening);
+    // Lecture arrêtée à sa limite : dit en fin de liste, là où elle s'arrête vraiment.
+    const last = start + ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS >= rest.length;
+    if (last && liveAnnouncements.truncated) cited.push(OLDER_EVENINGS_UNREAD);
     lines.push(
       `${leadOn("🗑️", "Suppression de compte demandée (suite)", "Modération : autres soirées #live du même compte")} (${cited.join(" ; ")}).`,
     );
@@ -290,7 +297,8 @@ function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements
   const cited = evenings.slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS).map(citedEvening);
   const others = evenings.length - cited.length;
   if (others > 0) cited.push(others === 1 ? "et 1 autre, citée à la suite" : `et ${others} autres, citées à la suite`);
-  if (liveAnnouncements.truncated) cited.push("et d'autres, plus anciennes");
+  // Avec des lignes de suite, c'est la dernière qui dit que la lecture s'est arrêtée à sa limite.
+  if (liveAnnouncements.truncated && others === 0) cited.push(OLDER_EVENINGS_UNREAD);
   return ` Modération : ce compte a pu paraître dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
 }
 
