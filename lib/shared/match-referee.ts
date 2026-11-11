@@ -259,6 +259,22 @@ function refereeNameMissing(match: RefereeNamedMatch, names: readonly RefereeNam
   return entry === undefined || (entry.pseudo === "" && entry.mine !== true);
 }
 
+/**
+ * Faut-il relire les pseudos, et quel essai retenir ? `missing` : la clé de
+ * {@link missingRefereeNamesKey} ; `attempted` : celle du dernier essai.
+ *
+ * - rien ne manque : **l'essai est oublié**. Un pseudo élagué de l'état du
+ *   client (score déclaré) puis de nouveau montré (score rejeté) redonne la
+ *   même clé, qui doit relancer une relecture — sinon « Arbitre désigné »
+ *   resterait, et l'arbitre perdrait sa marque `mine` jusqu'à la reconnexion ;
+ * - même clé que le dernier essai : pas de relecture (pseudo vide, réponse en retard) ;
+ * - clé nouvelle : une relecture.
+ */
+export function refereeNamesAttempt(missing: string, attempted: string): { read: boolean; attempted: string } {
+  if (missing === "") return { read: false, attempted: "" };
+  return { read: missing !== attempted, attempted };
+}
+
 /** Nombre de désignations montrées dont le pseudo manque dans `names`. */
 function missingRefereeNamesCount(
   matches: readonly RefereeNamedMatch[],

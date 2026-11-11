@@ -32,7 +32,12 @@ import {
 import { announceViewerChanges } from "../_lib/live-alerts";
 import { openLiveConnection } from "../_lib/live-connection";
 import { createLiveRenderGate, createQuietStream } from "../_lib/live-render-gate";
-import { missingRefereeNamesKey, parseRefereeNames, refereeNamesImprove } from "@/lib/shared/match-referee";
+import {
+  missingRefereeNamesKey,
+  parseRefereeNames,
+  refereeNamesAttempt,
+  refereeNamesImprove,
+} from "@/lib/shared/match-referee";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -280,12 +285,14 @@ export function useTournamentLive(tournamentId: number) {
     const detail = stateRef.current.detail;
     if (!detail) return;
     const missing = missingRefereeNamesKey(detail.matches, detail.refereeNames);
-    // Plus rien ne manque : l'essai est oublié. Un pseudo élagué (score déclaré,
-    // `pruneRefereeNames`) puis de nouveau montré (score rejeté) redonne la même
-    // clé, qui doit relancer une relecture — sinon « Arbitre désigné » resterait,
-    // et l'arbitre perdrait sa marque `mine` jusqu'à la reconnexion.
-    if (missing === "" && namesTimerRef.current === null) namesAttemptRef.current = "";
-    if (missing === "" || missing === namesAttemptRef.current || namesTimerRef.current !== null) return;
+    // Plus rien ne manque : l'essai est oublié (`refereeNamesAttempt`), minuteur
+    // en attente ou non — sa relecture compare sa propre clé.
+    const attempt = refereeNamesAttempt(missing, namesAttemptRef.current);
+    if (!attempt.read) {
+      namesAttemptRef.current = attempt.attempted;
+      return;
+    }
+    if (namesTimerRef.current !== null) return;
     namesAttemptRef.current = missing;
     const forTournament = detail.card.id;
     // Une lecture ratée (429, 5xx, réseau) rouvre le même ensemble : le

@@ -4,7 +4,14 @@ import { applyLiveMessage } from "@/app/(secured)/tournois/[id]/_lib/live-state"
 import { MapScoreList } from "@/app/(secured)/tournois/[id]/_components/MapScoreList";
 import { refereeReadyRereadDue } from "@/components/match-launch/MatchContactsDialog";
 import { splitChannelText } from "@/components/cyber/landing/LiveCard";
-import { missingRefereeNamesKey, parseRefereeNames, refereeNameOf, refereeNamesImprove, showsRefereeName } from "@/lib/shared/match-referee";
+import {
+  missingRefereeNamesKey,
+  parseRefereeNames,
+  refereeNameOf,
+  refereeNamesAttempt,
+  refereeNamesImprove,
+  showsRefereeName,
+} from "@/lib/shared/match-referee";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { matchMapNames, type RoundMapConfig } from "@/lib/shared/round-maps";
 import { bracketMatch } from "../../helpers/bracket-match";
@@ -58,6 +65,28 @@ describe("refereeNameOf", () => {
 
   it("refereeNameOf_staleKey_returnsNull", () => {
     expect(refereeNameOf(shown(5, "k-nouveau"), NAMES)).toBeNull();
+  });
+});
+
+describe("refereeNamesAttempt", () => {
+  it("refereeNamesAttempt_newMissingKey_readsAndKeepsThePreviousAttemptUntilArmed", () => {
+    expect(refereeNamesAttempt("5:k5", "")).toEqual({ read: true, attempted: "" });
+  });
+
+  it("refereeNamesAttempt_sameKeyAsLastAttempt_doesNotReadAgain", () => {
+    expect(refereeNamesAttempt("5:k5", "5:k5")).toEqual({ read: false, attempted: "5:k5" });
+  });
+
+  it("refereeNamesAttempt_nothingMissing_forgetsTheAttempt", () => {
+    // Score déclaré (pseudo élagué) : l'essai est oublié…
+    expect(refereeNamesAttempt("", "5:k5")).toEqual({ read: false, attempted: "" });
+  });
+
+  it("refereeNamesAttempt_sameKeyBackAfterNothingMissing_readsAgain", () => {
+    // … et le score rejeté, même empreinte, relit le pseudo.
+    const forgotten = refereeNamesAttempt("", "5:k5").attempted;
+
+    expect(refereeNamesAttempt("5:k5", forgotten).read).toBe(true);
   });
 });
 

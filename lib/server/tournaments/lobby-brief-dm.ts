@@ -312,9 +312,10 @@ function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Loc
     ...(url === null ? [] : [contacts(discordUrl(localizedSiteUrl(url, locale)))]),
     "",
     text.beforeKickoff,
-    // Le salon de check-in s'ouvre au quart d'heure d'un horaire : sans horaire
-    // (check-in parti à l'ouverture du salon du match), il n'a pas de fenêtre, la
-    // ligne est tue — comme celle du vocal.
+    // Le salon de check-in s'ouvre au quart d'heure d'un horaire : hors de ce
+    // quart d'heure (`UNSCHEDULED` — match sans horaire, ou lancé bien avant le
+    // sien : check-in parti à l'ouverture du salon du match), la ligne est tue,
+    // comme celle du vocal.
     ...(kickoff === "UNSCHEDULED" ? [] : [`* ${text.checkIn(CHECK_IN_INVITE_URL)}`]),
     // Jamais de vocal en individuel ni contre une fantôme : le bot n'en ouvre
     // aucun pour ces matchs (`MATCH_VOICE.md`).
