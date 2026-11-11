@@ -78,7 +78,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
+import { STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -403,7 +403,7 @@ function RgpdFr({
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
-          demande, comme l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
+          demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo — le staff est averti de votre demande sans que vous soyez nommé, et les modérateurs suppriment à la main les alertes qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -423,8 +423,8 @@ function RgpdFr({
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
           ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
-          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres ; une équipe dont il était le seul
-          joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
+          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres et un membre dont la suppression du compte est elle-même demandée n&apos;étant pas compté ; une équipe où il ne reste aucun autre
+          membre devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
@@ -432,7 +432,7 @@ function RgpdFr({
           d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
           modération avait déjà supprimé (section <a href="#signalements">« Signalements »</a>) ; un
           avatar que la modération n&apos;a jamais supprimé part sans laisser d&apos;empreinte. Le journal du staff sur Discord note la demande,
-          sa réactivation et chaque retrait d&apos;inscription ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
+          sa réactivation et chaque retrait d&apos;inscription ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») ; pour un compte qui a pu paraître dans #live en tournoi individuel, les lignes de la demande citent aussi le tournoi, le jour et une heure de chaque soirée concernée, pour que les modérateurs suppriment à la main les alertes AutoMod qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a> ;{" "}
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
       </section>
@@ -1035,7 +1035,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels, du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère ; une reprise dit « un admin », sans nommer personne), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
@@ -1303,11 +1303,13 @@ function RgpdFr({
             recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
             masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
             service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}
-            {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
-            légitime de l&apos;association à faire connaître ses compétitions.{" "}
-            {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
-            retiré du site, et une vidéo publiée par la chaîne de l&apos;association est masquée
-            ou supprimée. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
+            {STREAM_NOTICE_SHOWN} {STREAM_NOTICE_SERVICE} Depuis la version 11 des conditions
+            d&apos;utilisation (section « Retransmission des matchs »), cette diffusion relève ainsi de
+            l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
+            plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
+            chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
+            de la même base, que la même section des conditions prévoit.
+            Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
             l&apos;association, en un message par soirée (quatre heures depuis le premier direct) qui liste à
@@ -1319,14 +1321,18 @@ function RgpdFr({
             BattleTag repris à la création du compte, voire le nom du compte Google pour un compte Google créé avant
             le 30 septembre 2026 ; jamais l&apos;identifiant Discord numérique ; « un joueur » pour une
             entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026), celui du tournoi et le
-            lien de la diffusion. Ce pseudo ne repose pas sur l&apos;intérêt légitime mais sur
+            lien de la diffusion. Ce pseudo repose lui aussi sur
             l&apos;<strong>exécution du service</strong> : l&apos;annonce fait partie du tournoi individuel
-            auquel le joueur s&apos;inscrit, et le nom neutre ne vaut que pour la diffusion — un joueur qui
+            auquel le joueur s&apos;inscrit — un joueur qui
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
-            reste jusqu&apos;à sa suppression par les modérateurs, au titre de l&apos;intérêt légitime de
-            l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Un match listé dans
+            reste. À la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu&apos;ils
+            parviennent à identifier, sans garantie de toutes les retrouver : dès la demande de suppression, le site en
+            avertit le staff dans son journal d&apos;activité sur Discord, sans nommer le joueur (seuls y figurent le tournoi,
+            le jour et une heure de chaque soirée #live d&apos;un tournoi individuel où il a pu paraître). L&apos;alerte n&apos;est
+            pas supprimée sur demande autrement ; elle relève, elle aussi, de
+            l&apos;exécution du service depuis la version 11 des conditions. Un match listé dans
             ce message avant son passage à l&apos;antenne, programmé dans la soirée pour une diffusion ouverte à son heure de début, ne laisse aucune trace sur
             le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne
             (<Link href="/rgpd/registre#t16">registre, T16</Link>), qui figure, en tournoi individuel, dans
@@ -1335,8 +1341,8 @@ function RgpdFr({
             êtes l&apos;arbitre désigné et ceux dont vous avez posé le mode d&apos;antenne figurent aussi dans l&apos;export de vos données. Ces annonces restent dans le salon tant
             que le salon #live existe ; à la suppression du compte d&apos;un caster, le message d&apos;une soirée encore en
             cours est remis à jour sans le lien de sa chaîne s&apos;il garde un autre lien — sinon, ou une fois la soirée
-            finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut en demander la
-            suppression, comme celle de ces alertes, par le bouton « Signaler
+            finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut demander la
+            suppression de ces annonces par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>

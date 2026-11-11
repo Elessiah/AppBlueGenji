@@ -209,7 +209,6 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
 
     // Lendemain de la mise en ligne prévue, même jour que la version 10 qui la suit.
     expect(entry?.publishedAt).toBe("2026-11-11");
-    expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(entry?.audience).toBeUndefined();
     // Voisines, l'empreinte d'abord — sans compter depuis la fin : d'autres entrées les suivent.
     const ids = PRIVACY_CHANGES.map((change) => change.id);
@@ -373,14 +372,15 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
 
 describe("D12 — conditions d'utilisation, version 10", () => {
   it("terms_v10_versionAndDate", () => {
-    expect(TERMS_VERSION).toBe(10);
-    expect(TERMS_UPDATED_AT).toBe("2026-11-11");
+    // La version 11 (TERMS-V11) a suivi le 13 novembre 2026 : la 10 reste couverte.
+    expect(TERMS_VERSION).toBeGreaterThanOrEqual(10);
+    expect(TERMS_UPDATED_AT >= "2026-11-11").toBe(true);
   });
 
   it("terms_account_suspendedPlayerInheritsLastAndHeldAvatarFrAndEn", () => {
-    expect(termsSection("compte")).toContain("sinon à un autre joueur de l'équipe, un joueur suspendu ne passant qu'après tous les autres");
+    expect(termsSection("compte")).toContain("sinon à un autre membre de l'équipe, un membre suspendu ne passant qu'après tous les autres");
     expect(termsSection("compte")).toContain("et son avatar, sauf s'il est alors masqué ou supprimé par la modération");
-    expect(termsSectionEn("compte")).toContain("else another player of the team, a suspended player only coming after all the others");
+    expect(termsSectionEn("compte")).toContain("else another member of the team, a suspended member only coming after all the others");
     expect(termsSectionEn("compte")).toContain("and its avatar, unless moderation has hidden or deleted it by then");
   });
 
@@ -402,7 +402,7 @@ describe("D12 — conditions d'utilisation, version 10", () => {
     const fr = PRIVACY_CHANGES.find((change) => change.id === TERMS_V10_ID)!;
     const en = PRIVACY_CHANGES_EN[TERMS_V10_ID];
 
-    expect(fr.publishedAt).toBe(TERMS_UPDATED_AT);
+    expect(fr.publishedAt).toBe("2026-11-11");
     expect(fr.asksTermsAcceptance).toBe(true);
     expect(fr.audience).toBeUndefined();
     expect(fr.title.startsWith("Conditions d'utilisation : version 10")).toBe(true);

@@ -42,12 +42,13 @@ describe("/rgpd — destinataires et transferts", () => {
     expect(section).toContain("{DATA_CONTACT_NAME}");
   });
 
-  it("informe de la retransmission et du droit d'opposition, sans transfert par le site", () => {
+  it("informe de la retransmission et de sa base (exécution du service), sans transfert par le site", () => {
     const retransmission = section.slice(section.indexOf('id="retransmission"'));
     expect(section).toContain('id="retransmission"');
     // Les phrases viennent du module partagé avec l'inscription et les conditions.
     expect(retransmission).toContain("{STREAM_NOTICE_SHOWN}");
-    expect(retransmission).toContain("{STREAM_NOTICE_OBJECTION}");
+    expect(retransmission).toContain("{STREAM_NOTICE_SERVICE}");
+    expect(retransmission).not.toContain("nom neutre ne vaut");
     expect(section).toMatch(/il ne leur\s+transmet rien et n&apos;intègre aucun de leurs lecteurs/);
     // Les plateformes ne figurent pas dans la liste des destinataires.
     const list = section.slice(section.indexOf("<ul>"), section.indexOf("</ul>"));

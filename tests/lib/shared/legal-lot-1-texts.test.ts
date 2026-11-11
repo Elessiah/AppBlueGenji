@@ -24,7 +24,8 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
   it("rectificatifHebergement_published_datedAfterLastPublishedEntryForAllAccounts", () => {
     expect(entry()?.publishedAt).toBe("2026-11-13");
     expect(entry()?.audience).toBeUndefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ID);
+    // L'entrée des conditions v11, datée du même jour, la suit.
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {
@@ -84,7 +85,7 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
       "pour les messages privés d'équipe — demande d'adhésion, invitation d'une équipe, reprise d'une équipe fantôme proposée, propriété d'équipe transférée —, auxquels chacun peut s'opposer sur demande",
       "for team direct messages — join request, a team's invitation, offered takeover of a ghost team, transferred team ownership —, which anyone may object to on request",
     ],
-    ["staffLog_namesAccountDeletionRequests", "demandes de suppression de compte et leur réactivation, « un joueur »", "account deletion requests and their reactivation, “a player”"],
+    ["staffLog_namesAccountDeletionRequests", "demandes de suppression de compte — avec, pour un compte annoncé dans #live en tournoi individuel, le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier — et leur réactivation, « un joueur »", "account deletion requests — with, for an account announced in #live in a solo tournament, the tournament, the day and a time of each #live evening in which they may have appeared, so that the moderators delete by hand those of their AutoMod alerts they can identify — and their reactivation, “a player”"],
   ];
 
   it.each(sentences)("botPrivacyPolicy_%s_frAndEn", (_case, frText, enText) => {

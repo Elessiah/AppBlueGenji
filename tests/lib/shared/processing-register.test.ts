@@ -153,15 +153,16 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
     // T05 ne contredit pas T04 sur la base du programme d'arbitrage envoyé au staff.
     expect(t04.legalBasis).toMatch(/l'intérêt légitime \(bon déroulement des tournois\) restant la base à l'égard des joueurs et équipes qu'ils citent/);
-    expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande, et l'alerte AutoMod d'une telle annonce bloquée ou signalée le garde dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande \(T16\)/);
+    expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande, et l'alerte AutoMod d'une telle annonce bloquée ou signalée le garde dans le salon d'alertes des modérateurs : le staff est averti de la demande de suppression sans que le joueur soit nommé, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver \(T16\)/);
     expect(byRef("T08").subPurposes.join(" ")).toMatch(/salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne \(noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs/);
     expect(byRef("T08").retention.join(" ")).toMatch(/Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur/);
     expect(byRef("T08").dataCategories.join(" ")).toMatch(/l'annonce #live, elle, reste publiée dans le salon \(traitement T16\)/);
     expect(byRef("T16").subPurposes.join(" ")).toMatch(/modifiable dans Mon profil, sans effet sur un message de soirée qui n'est plus modifié/);
-    // Pseudo solo dans #live : exécution du service, pas intérêt légitime (décision du 2026-10-14).
-    expect(byRef("T16").legalBasis).toMatch(/exécution du service demandé par le joueur \(RGPD, art\. 6\.1\.b — conditions d'utilisation\) pour son pseudo public dans l'annonce #live d'un tournoi individuel/);
+    // Pseudo solo dans #live : exécution du service, pas intérêt légitime (décision du 2026-10-14) ;
+    // depuis les conditions v11 (D50), la diffusion sous le pseudo aussi.
+    expect(byRef("T16").legalBasis).toMatch(/^Exécution du service demandé par le joueur \(RGPD, art\. 6\.1\.b — conditions d'utilisation, section « Retransmission des matchs », depuis leur version 11\)/);
+    expect(byRef("T16").legalBasis).toMatch(/et pour son pseudo public dans l'annonce #live d'un tournoi individuel/);
     expect(byRef("T16").legalBasis).toMatch(/ne pas y être nommé revient à ne pas s'inscrire/);
-    expect(byRef("T16").retention.join(" ")).toMatch(/relève de l'exécution du service et non de l'intérêt légitime/);
     // Un blocage AutoMod peut porter le texte de l'annonce au salon d'alertes des modérateurs.
     expect(byRef("T16").recipients.join(" ")).toMatch(/si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte \(pseudo public compris en tournoi individuel\) peut parvenir au salon d'alertes de modération du serveur/);
     // LEGAL-OPTOUT-BASIS : garder le choix des messages de match relève d'une obligation légale
@@ -278,9 +279,9 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
     expect(en("T04").subPurposes.join(" ")).toMatch(/direct messages only go to accounts with a certified Discord tag \(an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam\)/);
   });
 
-  it("T16 dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande", () => {
-    expect(fr("T16").retention.join(" ")).toMatch(/Alerte AutoMod \(annonce #live bloquée ou signalée\) : gardée dans le salon d'alertes de modération du serveur jusqu'à sa suppression par les modérateurs, et supprimée sur demande/);
-    expect(en("T16").retention.join(" ")).toMatch(/AutoMod alert \(blocked or flagged #live announcement\): kept in the server's moderation alert channel until the moderators delete it, and deleted at the request/);
+  it("T16 dit combien de temps l'alerte AutoMod reste : supprimée à la main à la suppression du compte, sans autre suppression sur demande (D55, D56b)", () => {
+    expect(fr("T16").retention.join("\n")).toMatch(/Alerte AutoMod \(annonce #live bloquée ou signalée\) : gardée dans le salon d'alertes de modération du serveur ; à la suppression du compte du joueur, les modérateurs suppriment à la main celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver : .* ; elle n'est pas supprimée sur demande autrement$/m);
+    expect(en("T16").retention.join("\n")).toMatch(/AutoMod alert \(blocked or flagged #live announcement\): kept in the server's moderation alert channel; when the player's account is deleted, the moderators delete by hand those they can identify, with no guarantee that all are found: .*; it is not deleted on request otherwise$/m);
     expect(fr("T16").retention).toHaveLength(en("T16").retention.length);
   });
 
@@ -289,9 +290,12 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
     expect(en("T13").subPurposes.join(" ")).toMatch(/at a login started from the login page \(click on Google, Discord or Blizzard, or submission of the code received on Discord\) within ten minutes of accepting the terms there \(an acceptance only kept by the browser is not carried over to an existing account\)/);
   });
 
-  it("T16 donne une base à l'alerte AutoMod : intérêt légitime de modérer le serveur, opposition = suppression (FR et EN)", () => {
-    expect(fr("T16").legalBasis).toMatch(/intérêt légitime de l'association à modérer son serveur Discord pour l'alerte AutoMod d'une annonce #live bloquée ou signalée[^;]*droit d'opposition \(art\. 21\) : l'alerte est supprimée sur demande/);
-    expect(en("T16").legalBasis).toMatch(/legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked or flagged #live announcement[^;]*right to object \(art\. 21\): the alert is deleted on request/);
+  // Conditions v11 (D53) : l'alerte passe de l'intérêt légitime à l'exécution du service.
+  it("T16 donne une base à l'alerte AutoMod : exécution du service, supprimée à la main à la suppression du compte (FR et EN)", () => {
+    expect(fr("T16").legalBasis).toMatch(/même base, prévue par la même section des conditions, pour .* et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver$/);
+    expect(en("T16").legalBasis).toMatch(/same basis, provided for by the same section of the terms, for .* and for the AutoMod alert of a blocked or flagged #live announcement, kept in the moderators' alert channel, where they delete by hand, when the player's account is deleted, those they can identify, with no guarantee that all are found$/);
+    // D57b : aucun régime à part pour un joueur sans compte.
+    expect(en("T16").legalBasis).not.toMatch(/legitimate interest|right to object|no account/i);
   });
 
   it("T16 dit la finalité de modération de l'alerte AutoMod (FR et EN)", () => {
@@ -299,9 +303,9 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
     expect(en("T16").subPurposes.join(" ")).toMatch(/Moderating the association's Discord server: a Discord AutoMod rule that blocks or flags a #live announcement copies its text/);
   });
 
-  it("T08 garde la même durée de l'alerte AutoMod que T16 et la politique du bot, compte supprimé compris", () => {
-    expect(fr("T08").retention.join(" ")).toMatch(/Alerte AutoMod d'une annonce #live bloquée ou signalée : dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, même après la suppression du compte du joueur, et supprimée sur demande/);
-    expect(en("T08").retention.join(" ")).toMatch(/AutoMod alert for a blocked or flagged #live announcement: in the moderation alert channel until the moderators delete it, even after the player's account is deleted, and deleted at the request/);
+  it("T08 garde la même durée de l'alerte AutoMod que T16 et la politique du bot : jusqu'à la suppression du compte", () => {
+    expect(fr("T08").retention.join(" ")).toMatch(/Alerte AutoMod d'une annonce #live bloquée ou signalée : dans le salon d'alertes de modération ; à la suppression du compte du joueur, les modérateurs suppriment à la main celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver \(traitement T16\)/);
+    expect(en("T08").retention.join(" ")).toMatch(/AutoMod alert for a blocked or flagged #live announcement: in the moderation alert channel; when the player's account is deleted, the moderators delete by hand those they can identify, with no guarantee that all are found \(processing activity T16\)/);
     expect(fr("T08").retention).toHaveLength(en("T08").retention.length);
   });
 });
@@ -594,10 +598,13 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.transfers.join(" ")).toContain(SPICEWORKS_SCC_FALLBACK);
   });
 
-  it("donne une fiche à la retransmission, avec un droit d'opposition", () => {
+  it("donne une fiche à la retransmission : exécution du service pour les joueurs comme pour les casters", () => {
     const sheet = byRef("T16");
-    expect(sheet.legalBasis).toMatch(/Intérêt légitime/);
-    expect(sheet.legalBasis).toMatch(/droit d'opposition/);
+    // Conditions v11 (D50) : la diffusion sous le pseudo fait partie du tournoi.
+    expect(sheet.legalBasis).toMatch(/pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo, avec le nom de son équipe et ses résultats et performances en jeu, qui font partie du tournoi auquel il participe — ne pas y paraître revient à ne pas y participer/);
+    // D53 : casters, liens publiés et alerte AutoMod sur la même base, sans opposition.
+    expect(sheet.legalBasis).toMatch(/même base, prévue par la même section des conditions, pour ce qui touche les casters \(voix, pseudo, lien de leur chaîne, mode d'antenne\), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver$/);
+    expect(sheet.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
     // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.
@@ -619,7 +626,8 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.retention.join(" ")).toMatch(/Annonce sur Discord : .* effacée avec le match/);
     expect(sheet.recipients.join(" ")).toMatch(/n'intègre aucun lecteur/);
     expect(sheet.dataCategories.join(" ")).toMatch(/ni webcam ni chat vocal des joueurs/);
-    expect(sheet.retention.join(" ")).toMatch(/nom neutre/);
+    expect(text(sheet)).not.toMatch(/nom neutre/);
+    expect(sheet.retention.join(" ")).not.toMatch(/Droit d'opposition/);
     expect(text(sheet)).not.toMatch(/décision requise/);
   });
 

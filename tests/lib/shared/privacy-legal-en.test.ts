@@ -182,13 +182,13 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T16").dataCategories.join(" ")).toMatch(/Public BlueGenji username of the players of a solo tournament, posted in the #live announcement/);
     expect(sheet("T04").subPurposes.join(" ")).toMatch(/the notice that a match leaves their schedule/);
     expect(sheet("T04").legalBasis).toMatch(/legitimate interest \(smooth running of tournaments\) remaining the basis with regard to the players and teams they mention/);
-    expect(sheet("T01").retention.join(" ")).toMatch(/#live announcements of a solo tournament keep the username in the Discord channel until they are deleted on request, and the AutoMod alert for such an announcement when blocked or flagged keeps it in the moderators' alert channel until they delete it or on request \(T16\)/);
+    expect(sheet("T01").retention.join(" ")).toMatch(/#live announcements of a solo tournament keep the username in the Discord channel until they are deleted on request, and the AutoMod alert for such an announcement when blocked or flagged keeps it in the moderators' alert channel: the staff is told of the deletion request without the player being named, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found \(T16\)/);
     expect(sheet("T08").subPurposes.join(" ")).toMatch(/#live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel \(team names or, in a solo tournament, the players' public BlueGenji username/);
     expect(sheet("T16").subPurposes.join(" ")).toMatch(/or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier/);
     expect(sheet("T08").retention.join(" ")).toMatch(/#live announcements: in the channel as long as it exists, even after the player's account is deleted/);
     expect(sheet("T08").retention).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.retention.length);
     expect(sheet("T16").subPurposes.join(" ")).toMatch(/editable in My profile, with no effect on an evening message that is no longer edited/);
-    expect(sheet("T16").legalBasis).toMatch(/performance of the service requested by the player \(GDPR, art\. 6\.1\.b — terms of use\) for their public username in the #live announcement of a solo tournament/);
+    expect(sheet("T16").legalBasis).toMatch(/^Performance of the service requested by the player \(GDPR, art\. 6\.1\.b — terms of use, section “Match streaming”, since their version 11\) for the live streaming and recording of their matches under their username.* and for their public username in the #live announcement of a solo tournament/);
     expect(sheet("T16").recipients.join(" ")).toMatch(/if a Discord AutoMod rule blocks or flags a #live announcement, its text \(including the public username in a solo tournament\) may reach the server's moderation alert channel/);
     expect(sheet("T16").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T16")!.recipients.length);
     expect(sheet("T04").legalBasis).toMatch(/legal obligation \(GDPR, art\. 6\.1\.c\) for keeping their choice about match direct messages \(keeping it is what allows their objection to keep being honoured, art\. 21 and 12\)/);
@@ -201,9 +201,10 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
 });
 
 describe("terms of use (EN): #live announcement of a solo tournament", () => {
-  it("states that the neutral name does not cover it, like the French terms", () => {
+  it("states that it is part of the tournament, like the French terms", () => {
     const section = TERMS_SECTIONS_EN.find((s) => s.id === "retransmission")!;
     expect(section.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE_EN);
-    expect(STREAM_NOTICE_LIVE_EN).toMatch(/That announcement is part of the solo tournament the player registers for \(performance of the service, not legitimate interest\): the neutral name does not apply to it, and a player who does not want to be named in it does not register/);
+    expect(STREAM_NOTICE_LIVE_EN).toMatch(/That announcement is part of the solo tournament the player registers for too \(performance of the service\): a player who does not want to be named in it does not register/);
+    expect(STREAM_NOTICE_LIVE_EN).not.toMatch(/neutral name/);
   });
 });

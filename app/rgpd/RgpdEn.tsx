@@ -23,7 +23,7 @@ import {
   DATA_CONTACT_ROLE_EN,
   NOTIFIER_FOLLOW_UP_EN,
   REPORT_FORM_NAME_EN,
-  STREAM_NOTICE_OBJECTION_EN,
+  STREAM_NOTICE_SERVICE_EN,
   STREAM_NOTICE_SHOWN_EN,
   WEB_ACCESS_LOG_FIELDS_EN,
   copyrightNoticeElementsTextEn,
@@ -293,7 +293,7 @@ export function RgpdEn({
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
-          are deleted on request, as does the moderation alert for such an announcement blocked or flagged by AutoMod (<a href="#retransmission">“Match streaming”</a>);
+          are deleted on request, and to the moderation alert for such an announcement blocked or flagged by AutoMod, which keeps your username — the staff is told of your request without you being named, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions and the platform roles they granted or removed remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
@@ -313,15 +313,15 @@ export function RgpdEn({
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
           bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
-          teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others; a team of which it was the
-          only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
+          teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others and a member whose own account deletion has been requested not being counted; a team left with
+          no other member becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
           the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
           avatar moderation never deleted goes without leaving any hash. The staff log on Discord records the request, its reactivation and each registration withdrawal or forfeit it causes (one line per tournament for those), without
-          naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+          naming the player (“a player”); for an account that may have appeared in #live in a solo tournament, the lines of the request also quote the tournament, the day and a time of each evening concerned, so that the moderators delete by hand the AutoMod alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>;{" "}<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
 
@@ -852,7 +852,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers; a takeover says “an admin”, naming no one), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,
@@ -1093,9 +1093,12 @@ export function RgpdEn({
             registration, goes with it, is never copied onto their profile nor presented as proven, and the “OW
             BattleTag” setting of the profile does not hide it — the caster is the one giving it, for this match,
             as part of the performance of the service (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).{" "}
-            {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
-            promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
-            removed from the site, and a video published by the association&apos;s channel is hidden or deleted.
+            {STREAM_NOTICE_SHOWN_EN} {STREAM_NOTICE_SERVICE_EN} Since version 11 of the terms of use
+            (section “Match streaming”), this streaming therefore falls under <strong>performance of the
+            service</strong>, and no longer under legitimate interest: there is no longer an objection through a
+            “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
+            stream and replay links published on the site falls under the same basis, which the same section
+            of the terms provides for.
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
@@ -1106,13 +1109,17 @@ export function RgpdEn({
             solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an evening message that is no longer edited: unless changed, the Discord username or BattleTag
             taken when the account was created, or even the Google account name for a Google account created before
             September 30, 2026; never the numeric Discord identifier; “a player” for an entry without an account, a deleted account or a
-            registration made before 16 October 2026), the tournament&apos;s name and the stream link. This username is not based on legitimate
-            interest but on <strong>performance of the service</strong>: the announcement is part of the solo
-            tournament the player registers for, and the neutral name applies to the stream only — a player who does
+            registration made before 16 October 2026), the tournament&apos;s name and the stream link. This username rests on{" "}
+            <strong>performance of the service</strong> too: the announcement is part of the solo
+            tournament the player registers for — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
-            server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
-            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). A
+            server moderators&apos; alert channel, where the alert stays. When the player&apos;s account is deleted, the moderators delete by hand
+            the alerts they can identify, with no guarantee that all are found: as soon as deletion is requested, the site tells the
+            staff in its activity log on Discord, without naming the player (only the tournament, the day and a time of each #live
+            evening of a solo tournament in which they may have appeared are given). The alert is not deleted on request
+            otherwise; it also falls under
+            performance of the service since version 11 of the terms. A
             match listed in that message before it goes on air, scheduled that evening for a broadcast opening at its start time, leaves no trace on the
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
@@ -1122,7 +1129,7 @@ export function RgpdEn({
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —
             otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can
-            ask for their deletion, and for that of these alerts,
+            ask for these announcements to be deleted
             through the “Report a problem” button, GDPR category.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>

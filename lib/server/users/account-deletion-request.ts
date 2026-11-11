@@ -15,7 +15,12 @@ import {
 import { parseRoles } from "@/lib/server/serialization";
 import { rolesGranting } from "@/lib/shared/permissions";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
-import { formatAccountDeletionLog } from "@/lib/shared/bot-logs";
+import {
+  formatAccountDeletionFollowUpLogs,
+  formatAccountDeletionLog,
+  type DeletedAccountLiveAnnouncements,
+} from "@/lib/shared/bot-logs";
+import { listLiveAnnouncementsForDeletionLog } from "@/lib/server/users/live-announcement-export";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -369,6 +374,20 @@ type DeletionRequestEffects = {
   soloTournaments: number[];
 };
 
+/**
+ * Annonces #live du compte pour la ligne de suppression du journal (D56b) ;
+ * `null` si elles n'ont pas pu être relues — la ligne le dit alors au staff
+ * plutôt que de se taire. Ne lève jamais.
+ */
+async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAccountLiveAnnouncements | null> {
+  try {
+    return await listLiveAnnouncementsForDeletionLog(userId);
+  } catch (error) {
+    console.error("[account-deletion] annonces #live du compte non relues", error);
+    return null;
+  }
+}
+
 /** Rafraîchit les lecteurs, notifie le successeur, journalise et joue les forfaits. */
 async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
   const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments, replay } = effects;
@@ -413,9 +432,16 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     await forfeitSoloEntriesAfterCommit(forfeitable, { silent: true });
     return;
   }
-  // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5).
+  // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5). La
+  // ligne dit aussi aux modérateurs quelles alertes AutoMod supprimer à la main
+  // (D56b) : chaque soirée #live du compte (tournoi, jour, heure), jamais un pseudo —
+  // au-delà de celles que la ligne cite, des lignes de suite citent les autres.
   try {
-    sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS }), { category: "signups" });
+    const liveAnnouncements = await deletionLogLiveAnnouncements(userId);
+    sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS, liveAnnouncements }), {
+      category: "signups",
+    });
+    for (const line of formatAccountDeletionFollowUpLogs(liveAnnouncements)) sendBotLog(line, { category: "signups" });
   } catch (error) {
     console.error("[account-deletion] alerte de suppression non écrite", error);
   }

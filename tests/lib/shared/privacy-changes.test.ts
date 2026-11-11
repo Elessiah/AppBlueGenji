@@ -20,7 +20,7 @@ import {
   REGISTER_UPDATED_AT,
 } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
-import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
+import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_UPDATED_AT, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { MATCH_REMINDER_LOOKAHEAD_MS } from "@/lib/shared/discord-notifications";
 import { PRIVACY_CHANGES_EN, localizedPrivacyChanges, type PrivacyChangeTranslation } from "@/lib/shared/privacy-changes-en";
@@ -394,6 +394,22 @@ describe("PRIVACY_CHANGES — versions des conditions à accepter", () => {
     );
     expect(termsEntries.map((entry) => entry.id)).toContain("2026-10-conditions-v7-casters-et-arbitre");
     expect(termsEntries.filter((entry) => entry.asksTermsAcceptance !== true)).toEqual([]);
+  });
+
+  // TERMS-V11 (ERREUR.txt, revue EF-19 #501) : le garde-fou ci-dessus repère une
+  // entrée par le préfixe de son titre ; celui-ci part de la version en vigueur,
+  // quel que soit le titre — l'entrée datée de `TERMS_UPDATED_AT` qui lie les
+  // conditions et nomme leur version les dit à accepter.
+  it("PRIVACY_CHANGES_entryAnnouncingCurrentTermsVersion_carriesAsksTermsAcceptance", () => {
+    const announcing = PRIVACY_CHANGES.filter(
+      (entry) =>
+        entry.publishedAt === TERMS_UPDATED_AT &&
+        entry.links?.some((link) => link.href.startsWith(TERMS_PATH)) === true &&
+        entry.details.join(" ").includes(`version ${TERMS_VERSION}`),
+    );
+
+    expect(announcing).toHaveLength(1);
+    expect(announcing[0].asksTermsAcceptance).toBe(true);
   });
 });
 

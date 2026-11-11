@@ -455,7 +455,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
   (`deletion.residual`), qui le rappelle au joueur ; les conditions d'utilisation
   (section « Retransmission des matchs », `STREAM_NOTICE_LIVE` / `_EN`) disent que
-  le nom neutre ne couvre pas cette annonce. Le bot préfixe la mention du public (`@everyone` ou le rôle StreamViewer) et n'autorise qu'elle
+  cette annonce fait partie du tournoi individuel (ne pas y être nommé = ne pas
+  s'inscrire). Le bot préfixe la mention du public (`@everyone` ou le rôle StreamViewer) et n'autorise qu'elle
   (`{ parse: ["everyone"] }` ou `{ roles: [StreamViewer] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
@@ -529,20 +530,59 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 
 ## Information des joueurs (RGPD)
 
-La retransmission est un traitement (registre, **T16**) : intérêt légitime de
-l'association, droit d'opposition. **Exception** (décision du 2026-10-14) : le
-pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose sur
-l'**exécution du service** (art. 6.1.b — l'annonce fait partie du tournoi auquel
-il s'inscrit), pas sur l'intérêt légitime : pas de nom neutre, ne pas y être
+La retransmission est un traitement (registre, **T16**). **Depuis la version 11
+des conditions d'utilisation** (13 novembre 2026, décision de l'utilisateur D50
+du 2026-11-11), être diffusé et enregistré sous son pseudo — avec le nom de son
+équipe et ses résultats en jeu — fait partie du tournoi : **exécution du
+service** (art. 6.1.b), ne pas y paraître = ne pas participer
+(`STREAM_NOTICE_SERVICE` / `_EN`, `STREAM_PSEUDO_SCOPE`). L'opposition par « nom
+neutre » (intérêt légitime, jusqu'à la version 10), qui se traitait à la main
+sur demande, **n'existe plus** : ni le site ni le staff n'ont de nom neutre à
+poser. Ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode
+d'antenne), les liens de diffusion et de rediffusion publiés sur le site et
+l'alerte AutoMod d'une annonce #live relèvent de la même base (décision D53,
+`STREAM_NOTICE_CASTERS`) : plus d'intérêt légitime ni de droit d'opposition
+dans T16 ; l'alerte n'est plus supprimée sur demande (D55) : les modérateurs la
+suppriment **à la main** à la suppression du compte (D56b, ci-dessous). Aucun
+régime transitoire (D54). Les textes ne prévoient **aucun régime à part pour un
+joueur sans compte** (décision D57b du 2026-11-11 : la formulation ajoutée par
+la revue juridique, `STREAM_NOTICE_ACCOUNTLESS`, est retirée ; aucun garde-fou
+de code n'est ajouté).
+Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose de
+même sur l'**exécution du service** depuis le 2026-10-14 (l'annonce fait partie
+du tournoi auquel il s'inscrit) : ne pas y être
 nommé = ne pas s'inscrire, une annonce passée est supprimée sur demande. Dit par
 T16, `/rgpd#retransmission`, `DONNEES_PROFIL` (« Pseudo site »), le droit
 d'opposition, la mention d'inscription solo, `STREAM_NOTICE_LIVE` (conditions,
 version 4) et la politique du bot. **AutoMod** : si une règle AutoMod de Discord
 bloque **ou signale** une annonce, son texte (pseudo compris en individuel) peut
 parvenir au salon d'alertes des modérateurs du serveur. T16 en fait une finalité
-(modérer le serveur), sur l'**intérêt légitime** de l'association ; l'alerte reste
-jusqu'à sa suppression par les modérateurs, ou sur demande (c'est l'opposition) —
-**décision requise** : aucune durée fixe. Textes à tenir ensemble : T16
+(modérer le serveur), sur l'**exécution du service** depuis la version 11 des
+conditions (D53 ; intérêt légitime et opposition jusque-là) ; l'alerte reste
+jusqu'à sa suppression par les modérateurs, plus sur demande depuis la version 11 (D55).
+**Suppression à la main à la suppression du compte, au mieux** (décisions D56b
+et D56c du 2026-11-11 — les textes ne promettent que la suppression des alertes
+que les modérateurs **parviennent à identifier**, sans garantie de toutes les
+retrouver) : l'alerte est un message que l'AutoMod de Discord poste lui-même —
+ni le site ni le bot n'en gardent l'identifiant, le salon ou le match, et le bot
+ne voit même pas une alerte seulement « signalée » : ils ne peuvent pas
+l'effacer. À la **demande de suppression**, la ligne « Suppression de compte
+demandée » du journal du staff (`formatAccountDeletionLog`, catégorie
+`signups`) dit donc aux modérateurs quoi supprimer : chaque soirée #live d'un
+tournoi individuel où le compte a pu paraître — tournoi, jour et plus ancienne
+heure connue (Paris) (`listLiveAnnouncementsForDeletionLog` : ses annonces de
+`bg_live_announcements`, refusées comprises, car un refus d'AutoMod laisse une
+alerte, et ses matchs castés programmés `START_TIME`, listés à l'avance même
+s'ils ne passent jamais à l'antenne, datés de leur heure moins la fenêtre d'une
+soirée (4 h, au plus tôt de leur listage ; un match plus lointain n'a encore
+été listé nulle part) ; cinq soirées citées, les
+autres comptées puis citées à leur tour par des lignes de suite, cinq par
+ligne, `formatAccountDeletionFollowUpLogs` : les textes publiés promettent
+chaque soirée) — et d'y supprimer, avant comme après l'heure citée, les
+alertes des messages de ces soirées (toutes : la ligne ne dit pas lesquelles citent le compte) ;
+**jamais un pseudo ni un identifiant** ; rien de plus pour un compte jamais annoncé, et « vérifier
+le salon d'alertes » si la lecture échoue. Une réactivation ne rétablit pas une
+alerte supprimée. Textes à tenir ensemble : T16
 (finalité, base, destinataire, conservation, transfert), T08, T01 (suppression),
 `/rgpd` (#retransmission, tableau `AUTOMOD_ALERT_SCOPE`, suppression du compte,
 transfert Discord), `DROITS` (effacement, opposition), la confirmation de
@@ -561,8 +601,8 @@ Le joueur en est informé là où il s'engage, sans case à cocher — ce n'est 
 un consentement : sous le bouton d'inscription de la fiche du tournoi
 (`TournamentHeader`, en équipe comme en individuel) et dans la confirmation
 d'inscription (`registration-confirm.ts`). Sur la fiche, l'information est **en
-couches** (`INFO_HINTS.md`) : une ligne visible dit l'essentiel et le droit
-d'opposition (`REGISTRATION_STREAM_NOTICE_SHORT`, `register.streamNoticeShort`),
+couches** (`INFO_HINTS.md`) : une ligne visible dit l'essentiel — y jouer,
+c'est y paraître sous son pseudo (`REGISTRATION_STREAM_NOTICE_SHORT`, `register.streamNoticeShort`),
 le bouton « i » porte la mention entière et le lien vers `/rgpd#retransmission` ;
 la confirmation, elle, relit la mention entière. Les phrases viennent d'un module pur,
 `lib/shared/stream-notice.ts`, partagé avec la section « Retransmission des
@@ -571,9 +611,10 @@ de la soirée nomme équipes et joueurs avant le début d'un match programmé da
 la soirée et une fois le match terminé, pas seulement à son départ ; décidé le
 2026-10-28, décision 33 de l'utilisateur : en tournoi individuel, un joueur
 qui n'a accepté que la version 6 y est nommé aussi avant et après son match,
-sans attendre qu'il accepte la version 7) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
-« Signaler un problème », catégorie RGPD : le joueur apparaît alors sous un nom
-neutre, et un lien de rediffusion qui le montre est retiré.
+sans attendre qu'il accepte la version 7) ; le détail est sur `/rgpd#retransmission`. Depuis la
+version 11, ces mentions ne proposent plus d'opposition : la diffusion fait
+partie du tournoi (voir ci-dessus) ; seule la suppression d'une annonce #live
+passée se demande encore par « Signaler un problème », catégorie RGPD.
 
 ## Liste blanche de plateformes
 

@@ -264,10 +264,10 @@ export function TournamentHeader({
             </CyberButton>
           )}
           {/* Information sur la retransmission, à l'endroit où l'on s'engage —
-              sans case à cocher : la base est l'intérêt légitime, le joueur
-              garde son droit d'opposition (`lib/shared/stream-notice.ts`). */}
-          {/* Information en couches : une ligne visible dit l'essentiel et le
-              droit d'opposition, le « i » porte la mention entière — que la
+              sans case à cocher : la diffusion fait partie du tournoi
+              (exécution du service, `lib/shared/stream-notice.ts`). */}
+          {/* Information en couches : une ligne visible dit l'essentiel (y
+              jouer, c'est y paraître), le « i » porte la mention entière — que la
               confirmation de l'inscription relit de toute façon. */}
           {detail.canRegister && !frozen && (
             <div className={s.registerNotice}>

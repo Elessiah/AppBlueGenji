@@ -166,7 +166,7 @@
     {
       "title": "Salons vocaux d'équipe",
       "body": [
-        "Un tournoi peut activer l'option « Salons vocaux d'équipe » (éteinte par défaut, voir ses réglages). Elle fait alors partie de son <b>règlement</b> : à partir de {voiceLead} minutes avant l'heure de chaque match, le bot Discord de l'association ouvre un salon vocal de {voiceCapacity} places au nom de chacune des deux équipes ; chaque équipe peut s'y retrouver avant de jouer, sans obligation."
+        "Un tournoi peut activer l'option « Salons vocaux d'équipe » (éteinte par défaut, voir ses réglages). Elle fait alors partie de son <b>règlement</b> : à partir de {voiceLead} minutes avant l'heure de chaque match programmé (un match sans horaire n'a pas de salon), le bot Discord de l'association ouvre un salon vocal de {voiceCapacity} places au nom de chacune des deux équipes ; chaque équipe peut s'y retrouver avant de jouer, sans obligation."
       ],
       "bullets": [
         "Les salons ne retiennent jamais le lancement du match : il se lance comme dans tout autre tournoi.",

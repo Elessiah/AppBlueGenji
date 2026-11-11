@@ -2,8 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import {
   REGISTRATION_STREAM_NOTICE_LINK_LABEL,
   STREAM_NOTICE_LIVE,
-  STREAM_NOTICE_OBJECTION,
   STREAM_NOTICE_PRIVACY_PATH,
+  STREAM_NOTICE_SERVICE,
   STREAM_NOTICE_SHOWN,
   registrationStreamNotice,
 } from "@/lib/shared/stream-notice";
@@ -26,10 +26,11 @@ describe("information sur la retransmission des matchs", () => {
     expect(STREAM_NOTICE_SHOWN).toMatch(/jamais de webcam ni de chat vocal/);
   });
 
-  it("dit le droit d'opposition et la façon de l'exercer", () => {
-    expect(STREAM_NOTICE_OBJECTION).toMatch(/s'y opposer/);
-    expect(STREAM_NOTICE_OBJECTION).toMatch(/nom neutre/);
-    expect(STREAM_NOTICE_OBJECTION).toMatch(/« Signaler un problème », catégorie RGPD/);
+  // Conditions v11 (D50) : la diffusion fait partie du tournoi, plus d'opposition par « nom neutre ».
+  it("dit que la diffusion fait partie du tournoi, au titre de l'exécution du service", () => {
+    expect(STREAM_NOTICE_SERVICE).toMatch(/font partie du tournoi auquel ils participent \(exécution du service\)/);
+    expect(STREAM_NOTICE_SERVICE).toMatch(/un joueur qui ne veut pas y paraître n'y participe pas/);
+    expect(STREAM_NOTICE_SERVICE).not.toMatch(/opposer|nom neutre/);
   });
 
   it("ne prête pas d'équipe à un engagé en individuel", () => {
@@ -38,14 +39,14 @@ describe("information sur la retransmission des matchs", () => {
     // L'annonce dans #live nomme l'équipe ; une entrée individuelle, son pseudo (2026-10-14).
     expect(registrationStreamNotice(false)).toMatch(/le nom de ton équipe est aussi annoncé sur le Discord de l'association/);
     expect(registrationStreamNotice(true)).toMatch(/ton pseudo est aussi annoncé sur le Discord de l'association/);
-    // S'opposer au pseudo dans #live = ne pas s'inscrire ; une annonce passée reste supprimable (2026-10-14).
-    // Base : l'exécution du service — l'annonce fait partie du tournoi auquel on s'inscrit (2026-10-14).
-    expect(registrationStreamNotice(true)).toMatch(/cette annonce fait partie du tournoi auquel tu t'inscris, le nom neutre ne s'y applique pas, et elle est supprimée sur demande\./);
+    // Une annonce passée reste supprimable (2026-10-14) ; base : l'exécution du service.
+    expect(registrationStreamNotice(true)).toMatch(/cette annonce fait elle aussi partie du tournoi, et elle est supprimée sur demande\./);
     expect(registrationStreamNotice(false)).not.toMatch(/supprimée sur demande/);
     for (const solo of [true, false]) {
       expect(registrationStreamNotice(solo)).toMatch(/diffusés en direct et enregistrés/);
       expect(registrationStreamNotice(solo)).toMatch(/jamais de webcam ni de chat vocal/);
-      expect(registrationStreamNotice(solo)).toMatch(/t'y opposer/);
+      expect(registrationStreamNotice(solo)).toMatch(/Cette diffusion fait partie du tournoi : y jouer, c'est y paraître sous ton pseudo\./);
+      expect(registrationStreamNotice(solo)).not.toMatch(/opposer|nom neutre/);
     }
   });
 });
@@ -57,10 +58,10 @@ describe("conditions d'utilisation — retransmission des matchs", () => {
     expect(section).toBeDefined();
     const text = section!.paragraphs.join(" ");
     expect(text).toContain(STREAM_NOTICE_SHOWN);
-    expect(text).toContain(STREAM_NOTICE_OBJECTION);
-    // Le nom neutre ne couvre pas l'annonce #live d'un tournoi individuel (2026-10-14).
+    expect(text).toContain(STREAM_NOTICE_SERVICE);
     expect(text).toContain(STREAM_NOTICE_LIVE);
-    expect(STREAM_NOTICE_LIVE).toMatch(/en tournoi individuel, les joueurs par leur pseudo public\. Cette annonce fait partie du tournoi individuel auquel le joueur s'inscrit \(exécution du service, et non intérêt légitime\) : le nom neutre ne s'y applique pas, et un joueur qui ne veut pas y être nommé ne s'inscrit pas/);
+    expect(STREAM_NOTICE_LIVE).toMatch(/en tournoi individuel, les joueurs par leur pseudo public\. Cette annonce fait elle aussi partie du tournoi individuel auquel le joueur s'inscrit \(exécution du service\) : un joueur qui ne veut pas y être nommé ne s'inscrit pas/);
+    expect(text).not.toMatch(/nom neutre/);
     expect(section!.links?.map((l) => l.href)).toEqual([STREAM_NOTICE_PRIVACY_PATH]);
   });
 

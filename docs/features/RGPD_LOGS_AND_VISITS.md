@@ -56,7 +56,7 @@ inscription antérieure à la publication du changement qui l'annonce →
 voire nom Google d'un compte Google d'avant le 30 septembre 2026 s'il n'a pas
 été changé, ce que les textes disent), jamais un `#id`, comme un diffuseur nomme les
 joueurs à l'antenne. Un match d'équipes n'y nomme que les équipes. Base :
-intérêt légitime (retransmission, registre T16), sans case à cocher ; la mention
+exécution du service (l'annonce fait partie du tournoi individuel, registre T16), sans case à cocher ; la mention
 d'inscription l'annonce, `/rgpd` et `PRIVACY_CHANGES` le déclarent. Journaux,
 alertes, programme d'arbitrage et tout autre message Discord gardent « un joueur » —
 y compris la citation d'une annonce échouée au canal de logs du bot, faite sur

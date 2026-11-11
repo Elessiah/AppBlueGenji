@@ -130,12 +130,12 @@ describe("lignes visibles : courtes, en français comme en anglais", () => {
     }
   });
 
-  it("la retransmission : une ligne visible avec le droit d'opposition, écrite une fois", () => {
+  it("la retransmission : une ligne visible qui dit ce que jouer emporte, écrite une fois", () => {
     expect(frActions.register.streamNoticeShort).toBe(REGISTRATION_STREAM_NOTICE_SHORT);
     expect(REGISTRATION_STREAM_NOTICE_SHORT).toMatch(/diffusés en direct et enregistrés/);
-    expect(REGISTRATION_STREAM_NOTICE_SHORT).toMatch(/opposer/);
+    expect(REGISTRATION_STREAM_NOTICE_SHORT).toMatch(/y jouer, c'est y paraître sous ton pseudo/);
     expect(enActions.register.streamNoticeShort).toMatch(/streamed live and recorded/);
-    expect(enActions.register.streamNoticeShort).toMatch(/object/);
+    expect(enActions.register.streamNoticeShort).toMatch(/playing in them means appearing under your username/);
     // La mention entière, derrière le « i », reste celle du module.
     for (const type of ["TEAM", "SOLO"] as const) {
       expect(frActions.register.streamNotice[type]).toBe(registrationStreamNotice(type === "SOLO"));

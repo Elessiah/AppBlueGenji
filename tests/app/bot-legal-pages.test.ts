@@ -7,6 +7,7 @@ import {
   LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
+import { REPORT_FORM_NAME_EN } from "@/lib/shared/legal-text-en";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   BOT_ACTIVITY_AUTHOR_RETENTION_DAYS,
@@ -85,10 +86,13 @@ describe("bot legal content is fully bilingual", () => {
 
 describe("bot legal content carries the contact details", () => {
   it.each(DOCS)("%s gives the report form, never an email, in both languages", (_name, doc) => {
+    // D47 : l'anglais nomme le formulaire comme l'interface anglaise le montre.
+    expect(JSON.stringify(doc.fr)).toContain(REPORT_FORM_NAME);
+    expect(JSON.stringify(doc.en)).toContain(`The **“${REPORT_FORM_NAME_EN}”** form at the bottom of every page of the site (“GDPR” category for your data)`);
+    expect(JSON.stringify(doc.en)).not.toContain(REPORT_FORM_NAME);
+    expect(JSON.stringify(doc.en)).not.toContain("“RGPD” category");
     for (const lang of [doc.fr, doc.en]) {
-      const flat = JSON.stringify(lang);
-      expect(flat).toContain(REPORT_FORM_NAME);
-      expect(flat).not.toMatch(/[^\s@"*]+@[^\s@"*]+\.[a-z]{2,}/i);
+      expect(JSON.stringify(lang)).not.toMatch(/[^\s@"*]+@[^\s@"*]+\.[a-z]{2,}/i);
     }
   });
 
@@ -533,7 +537,7 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
     const article01 = (lang: "fr" | "en") => JSON.stringify(TERMS_OF_SERVICE[lang].sections[0]);
     expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne) et informations sur les données.");
     expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team — a takeover mentions “an admin”, naming no one) and data-protection notices.");
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["6 novembre 2026", "6 November 2026"]);
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
   });
 
   it("terms_article01_neverNamesWhoInvitesOrOffersFrAndEn", () => {
@@ -571,8 +575,10 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   });
 
   it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
-    expect(fr).toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande");
-    expect(en).toContain("the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request");
+    // Conditions v11 (D53) : exécution du service, comme le pseudo de l'annonce.
+    expect(fr).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée : à la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver");
+    expect(en).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found");
+    expect(fr).not.toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod");
   });
 
   it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {
@@ -597,9 +603,11 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("if a Discord AutoMod rule blocks or flags a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");
   });
 
-  it("dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande (FR et EN)", () => {
-    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.");
-    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.");
+  it("dit combien de temps l'alerte AutoMod reste, sans suppression sur demande (D55, FR et EN)", () => {
+    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur (dès la demande, le site en avertit le staff sans nommer le joueur), les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(fr).not.toContain("est supprimée sur demande de la même façon");
+    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel; when the player's account is deleted (as soon as deletion is requested, the website tells the staff without naming the player), the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
+    expect(en).not.toContain("is deleted on request in the same way");
   });
 
   it("dit la base des messages de match, de la conservation du choix et du pseudo solo (FR et EN)", () => {

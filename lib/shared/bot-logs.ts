@@ -167,11 +167,139 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
  * {@link formatPlayerSignupLog}, même canal (`signups`), même discrétion — ni
  * pseudo ni identifiant. La suppression ne devient définitive qu'au bout de
  * `days` jours (réactivation possible d'ici là) : la ligne le dit, pour qu'un
- * départ ne soit pas compté deux fois si le joueur revient.
+ * départ ne soit pas compté deux fois si le joueur revient. Elle dit aussi aux
+ * modérateurs quelles alertes AutoMod supprimer à la main (D56b).
  */
-export function formatAccountDeletionLog(context: { days: number }): string {
+export function formatAccountDeletionLog(context: {
+  days: number;
+  /**
+   * Annonces #live d'un tournoi individuel qui ont concerné le compte ; `null`
+   * si elles n'ont pas pu être lues.
+   */
+  liveAnnouncements?: DeletedAccountLiveAnnouncements | null;
+}): string {
   const detail = `définitive sous ${context.days} jours, sauf réactivation`;
-  return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.`;
+  return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.${automodAlertsToClear(context.liveAnnouncements)}`;
+}
+
+/** Une annonce #live (ou un match programmé listé à l'avance) d'un tournoi individuel du compte supprimé. */
+export interface DeletedAccountLiveAnnouncement {
+  tournamentName: string;
+  sentAt: string | Date;
+}
+
+/** Annonces et matchs programmés du compte supprimé, et `truncated` si leur lecture s'est arrêtée à sa limite. */
+export interface DeletedAccountLiveAnnouncements {
+  announcements: readonly DeletedAccountLiveAnnouncement[];
+  truncated: boolean;
+}
+
+/**
+ * Soirées citées par ligne : la ligne de la demande cite les plus récentes et
+ * compte les autres (« et N autres, citées à la suite »), que des lignes de
+ * suite citent à leur tour ({@link formatAccountDeletionFollowUpLogs}) — les
+ * textes publiés promettent **chaque** soirée au staff.
+ */
+export const ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS = 5;
+
+let announcementTimeFormat: Intl.DateTimeFormat | null = null;
+
+/** Jour et heure de Paris d'une annonce, séparés : « 12/11/2026 », « 21:04 ». */
+function announcementTime(sentAt: string | Date): { day: string; time: string } {
+  announcementTimeFormat ??= new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Paris",
+  });
+  const parts = announcementTimeFormat.formatToParts(sentAt instanceof Date ? sentAt : new Date(sentAt));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return { day: `${part("day")}/${part("month")}/${part("year")}`, time: `${part("hour")}:${part("minute")}` };
+}
+
+/**
+ * Soirées #live où le compte a pu paraître : une par tournoi et par jour
+ * (Paris), de la plus récente à la plus ancienne, avec la plus ancienne heure
+ * connue ce jour-là. Le message d'une soirée liste à l'avance les matchs
+ * programmés et reprend, à chaque modification, ceux déjà annoncés : une
+ * alerte d'avant comme d'après cette heure peut porter le pseudo — c'est la
+ * soirée entière qu'il faut parcourir.
+ */
+function announcementEvenings(
+  announcements: readonly DeletedAccountLiveAnnouncement[],
+): { tournamentName: string; day: string; time: string }[] {
+  const evenings = new Map<string, { tournamentName: string; day: string; time: string }>();
+  for (const announcement of announcements) {
+    const { day, time } = announcementTime(announcement.sentAt);
+    // Liste de la plus récente à la plus ancienne : la dernière vue du jour en est la première.
+    evenings.set(`${day} ${announcement.tournamentName}`, { tournamentName: announcement.tournamentName, day, time });
+  }
+  return [...evenings.values()];
+}
+
+/** Fin d'une liste de soirées dont la lecture a atteint sa limite. */
+const OLDER_EVENINGS_UNREAD = "et d'autres, plus anciennes";
+
+/** Une soirée telle qu'une ligne la cite : « Nom » le JJ/MM/AAAA vers HH:MM — jamais un pseudo. */
+function citedEvening(evening: { tournamentName: string; day: string; time: string }): string {
+  return `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} vers ${evening.time}`;
+}
+
+/**
+ * Lignes de suite de la demande de suppression : les soirées #live que
+ * {@link formatAccountDeletionLog} n'a fait que compter, citées à leur tour
+ * par groupes de {@link ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS}, de la plus
+ * récente à la plus ancienne. Sans elles, un compte paru plus de cinq soirs
+ * laissait les modérateurs sans repère pour les plus anciennes, alors que le
+ * registre et la politique disent que chaque soirée leur est donnée. Même
+ * discrétion : tournoi, jour, heure — ni pseudo ni identifiant. La dernière
+ * dit, le cas échéant, que la lecture s'est arrêtée à sa limite. Vide quand la
+ * première ligne a tout cité, ou que les annonces n'ont pas pu être relues.
+ */
+export function formatAccountDeletionFollowUpLogs(
+  liveAnnouncements: DeletedAccountLiveAnnouncements | null | undefined,
+): string[] {
+  if (!liveAnnouncements) return [];
+  const rest = announcementEvenings(liveAnnouncements.announcements).slice(ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS);
+  const lines: string[] = [];
+  for (let start = 0; start < rest.length; start += ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS) {
+    const cited = rest.slice(start, start + ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS).map(citedEvening);
+    // Lecture arrêtée à sa limite : dit en fin de liste, là où elle s'arrête vraiment.
+    const last = start + ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS >= rest.length;
+    if (last && liveAnnouncements.truncated) cited.push(OLDER_EVENINGS_UNREAD);
+    lines.push(
+      `${leadOn("🗑️", "Suppression de compte demandée (suite)", "Modération : autres soirées #live du même compte")} (${cited.join(" ; ")}).`,
+    );
+  }
+  return lines;
+}
+
+/**
+ * Suite de la ligne de suppression (décision de l'utilisateur D56b,
+ * 2026-11-11) : l'alerte AutoMod d'une annonce #live bloquée ou signalée est
+ * un message de Discord que ni le site ni le bot ne savent retrouver — les
+ * modérateurs la suppriment **à la main** quand le compte est supprimé. La
+ * ligne leur dit où chercher sans nommer personne : chaque soirée #live d'un
+ * tournoi individuel où le compte a pu paraître (tournoi, jour, une heure),
+ * jamais un pseudo ni un identifiant — toute alerte d'un message de cette
+ * soirée peut le porter. Rien n'est ajouté pour un compte jamais annoncé ni
+ * programmé.
+ */
+function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements | null | undefined): string {
+  if (liveAnnouncements === null) {
+    return " Modération : ses annonces #live n'ont pas pu être relues — vérifier le salon d'alertes AutoMod et y supprimer à la main les alertes qui portent le pseudo d'un compte supprimé.";
+  }
+  if (!liveAnnouncements || liveAnnouncements.announcements.length === 0) return "";
+  const evenings = announcementEvenings(liveAnnouncements.announcements);
+  const cited = evenings.slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS).map(citedEvening);
+  const others = evenings.length - cited.length;
+  if (others > 0) cited.push(others === 1 ? "et 1 autre, citée à la suite" : `et ${others} autres, citées à la suite`);
+  // Avec des lignes de suite, c'est la dernière qui dit que la lecture s'est arrêtée à sa limite.
+  if (liveAnnouncements.truncated && others === 0) cited.push(OLDER_EVENINGS_UNREAD);
+  return ` Modération : ce compte a pu paraître dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, toutes les alertes des messages #live de ces soirées, avant comme après l'heure citée (rien ne dit lesquelles citent ce compte), une fois relevé ce qui sert encore à un cas de modération en cours : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
 }
 
 /**

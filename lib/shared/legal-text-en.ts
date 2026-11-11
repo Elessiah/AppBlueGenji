@@ -8,8 +8,10 @@
  * that both lists have the same length, so an item added in French without
  * its English fails.
  *
- * Pure module, importable anywhere — but only the English legal pages
- * import it: no French page carries any of these strings.
+ * Pure module, importable anywhere — the English legal pages import it, and so
+ * do the bilingual bot documents (`bot-legal-content.ts`, which also feed the
+ * bot's `LegalTerms`): changing a constant here can change those documents
+ * too. No French page carries any of these strings.
  */
 
 /** `REPORT_FORM_NAME` — the button as the shell shows it under `/en` (`shell.footer.reportProblem`). */
@@ -40,13 +42,17 @@ export const NOTIFIER_FOLLOW_UP_EN =
 export const STREAM_NOTICE_SHOWN_EN =
   "What appears is the players' usernames, their team's name and their in-game results and performance — never a webcam or voice chat.";
 
-/** `STREAM_NOTICE_OBJECTION` (`stream-notice.ts`). */
-export const STREAM_NOTICE_OBJECTION_EN =
-  "Any player can object: they then appear under a neutral name. The request is made through the “Report a problem” button, GDPR category.";
+/** `STREAM_NOTICE_SERVICE` (`stream-notice.ts`). */
+export const STREAM_NOTICE_SERVICE_EN =
+  "Streaming and recording a match under its players' usernames is part of the tournament they take part in (performance of the service): a player who does not want to appear in it does not take part.";
+
+/** `STREAM_NOTICE_CASTERS` (`stream-notice.ts`). */
+export const STREAM_NOTICE_CASTERS_EN =
+  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found — as soon as deletion is requested, the site tells the staff, without naming the player; it is not deleted on request otherwise.";
 
 /** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_LIVE_EN =
-  "Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for (performance of the service, not legitimate interest): the neutral name does not apply to it, and a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the same button.";
+  `Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for too (performance of the service): a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the “${REPORT_FORM_NAME_EN}” button, GDPR category.`;
 
 /** `AUTHORITY_CONTACT_LANGUAGES` (`legal-contact.ts`), same order. */
 export const AUTHORITY_CONTACT_LANGUAGES_EN: readonly string[] = ["French", "English"];

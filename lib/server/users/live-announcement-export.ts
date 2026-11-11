@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { toIso } from "@/lib/server/serialization";
+import { LIVE_EVENING_WINDOW_HOURS } from "@/lib/shared/live-announcements";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
 /**
@@ -31,4 +32,57 @@ export async function listOwnLiveAnnouncements(userId: number): Promise<Personal
     sentAt: toIso(row.sent_at),
     refused: Boolean(Number(row.refused)),
   }));
+}
+
+/**
+ * Annonces relues pour la ligne de suppression : bien au-delà de ce qu'un
+ * compte cumule ; atteinte, la ligne dit que sa liste est incomplète.
+ */
+export const DELETION_LOG_ANNOUNCEMENTS_LIMIT = 500;
+
+/**
+ * Moments où le compte a pu paraître dans #live en tournoi individuel, du plus
+ * récent au plus ancien : le nom du tournoi et une date — jamais un pseudo. Ce
+ * sont ses annonces (refusées comprises : un refus d'AutoMod est justement
+ * celui qui laisse une alerte) **et** ses matchs programmés (`START_TIME`)
+ * castés, que le message d'une soirée liste avant leur passage à l'antenne,
+ * même s'ils n'y sont jamais passés : entre `LIVE_EVENING_WINDOW_HOURS`
+ * heures avant leur heure (la fenêtre d'une soirée) et leur heure. Les deux
+ * bornes sont rendues : quand cet intervalle passe minuit, les deux jours sont
+ * cités. Un match programmé plus tard que cette fenêtre n'a encore été listé
+ * nulle part. Lus à la demande de
+ * suppression pour la ligne du journal du staff (`formatAccountDeletionLog`,
+ * décision D56b) : les modérateurs y trouvent quelles soirées parcourir pour
+ * supprimer à la main les alertes AutoMod. Rien n'en est gardé.
+ *
+ * @returns Les annonces, et `truncated` si la lecture a atteint sa limite.
+ */
+export async function listLiveAnnouncementsForDeletionLog(
+  userId: number,
+): Promise<{ announcements: { tournamentName: string; sentAt: string }[]; truncated: boolean }> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { name: string; sent_at: Date | string | null })[]>(
+    `SELECT t.name, a.sent_at, a.match_id
+     FROM bg_live_announcements a
+     JOIN bg_matches m ON m.id = a.match_id
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     JOIN bg_teams st ON st.solo_user_id = ?
+      AND FIND_IN_SET(st.id, REPLACE(a.pairing, ':', ',')) > 0
+     UNION ALL
+     SELECT t.name, DATE_SUB(m.start_at, INTERVAL sh.shift HOUR) AS sent_at, m.id AS match_id
+     FROM bg_matches m
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     JOIN bg_teams st ON st.solo_user_id = ? AND st.id IN (m.team1_id, m.team2_id)
+     CROSS JOIN (SELECT 0 AS shift UNION ALL SELECT ${LIVE_EVENING_WINDOW_HOURS}) sh
+     WHERE m.live_trigger = 'START_TIME' AND m.is_bye = 0
+       AND m.start_at <= DATE_ADD(NOW(), INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)
+     ORDER BY sent_at DESC, match_id DESC
+     LIMIT ${DELETION_LOG_ANNOUNCEMENTS_LIMIT + 1}`,
+    [userId, userId],
+  );
+  const announcements = rows.slice(0, DELETION_LOG_ANNOUNCEMENTS_LIMIT).flatMap((row) => {
+    const sentAt = toIso(row.sent_at);
+    return sentAt ? [{ tournamentName: String(row.name), sentAt }] : [];
+  });
+  return { announcements, truncated: rows.length > DELETION_LOG_ANNOUNCEMENTS_LIMIT };
 }

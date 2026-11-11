@@ -13,7 +13,9 @@
  * this module.
  */
 
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import {
+  VOICE_BOT_RELEASED_MAX_HOURS,
   VOICE_BOT_UNRELEASED_MAX_HOURS,
   VOICE_CHANNEL_LATE_HOURS,
   VOICE_CHANNEL_LEAD_MINUTES,
@@ -982,6 +984,27 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The association's email: its Gmail mailbox is moving to Google Workspace. Google remains the recipient of what you write there; the privacy policy and the register will state its framework once the move is done.",
       "Push notifications: a topic added after notifications were turned on on a device — such as “Team invitations” — is on by default there, like the others; you can turn it off in “My profile”, topic by topic, or turn off the device's notifications. The notification of a team invitation, takeover or ownership follows the same caps as the Discord direct message and only names the team.",
       "Other clarifications, with no change to the processing: the evening announcement in the #live channel only lists in advance the matches whose broadcast is set to open at their start time; a team's voice channel is also handed back to the bot when the match or the tournament is deleted, and a channel never handed back and occupied is only deleted once empty; the match page says whether a channel is open, opening soon or unavailable; the staff log on Discord also records round maps and ban rules being changed, without naming anyone.",
+    ],
+  },
+  "2026-11-conditions-v11-diffusion-sous-le-pseudo": {
+    linkLabels: [
+      "Read the “Match streaming” section",
+      "Read the “Account” section",
+      "Read the “Match contacts” section",
+      "Read the policy's “Match streaming” paragraph",
+    ],
+    title: "Terms of use: version 11 (matches streamed under your username, clarifications)",
+    summary:
+      "The terms of use move to version 11: being streamed and recorded under your username during a tournament match is now part of the tournament (performance of the service), and it is no longer possible to object to it and appear under a neutral name; what concerns the casters, the published stream links and the AutoMod alert of a #live announcement moves to the same basis, that alert no longer being deleted on request. They also clarify the takeover of a team when an account is deleted, the hand-typed BattleTag, the assigned referee and team voice channels. It must be accepted: a window presents it to you until you have accepted it.",
+    details: [
+      "Match streaming — what changes: until now, the live streaming and recording of a match (your username, your team's name, your in-game results and performance — never a webcam or voice chat) rested on the association's legitimate interest, and you could object to it and appear under a neutral name. They are now part of the tournament you take part in, under performance of the service, like the #live announcement of a solo tournament: not appearing in them means not taking part in the tournament. The notices shown when registering for a tournament, the privacy policy and the register (T16) say so.",
+      "Casters, links and AutoMod alert: a caster's voice, username and channel link, their setting of how a match goes live, the stream and replay links published on the site, and the copy of a #live announcement blocked or flagged by AutoMod in the moderators' alert channel rested on legitimate interest, with a right to object; they now fall under performance of the service too, which the “Match streaming” section provides for. The alert is no longer deleted on request: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found. As soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player: only the tournament, the day and a time of each #live evening of a solo tournament in which they may have appeared are given, to find those alerts.",
+      `Match streaming — what stays: what appears on screen; the site still sends nothing to the streaming platforms; a #live announcement is still deleted on request (“${REPORT_FORM_NAME_EN}” button, GDPR category). Version 11 applies as soon as it goes online, with no transitional rule.`,
+      `Account: when an account is deleted, a team's ownership goes to a co-owner, else a manager, else a captain, else another member of the team (not only a player: a coach, for example), a member whose own account deletion has been requested not being counted; the team becomes a ghost team or is disbanded when no other member is left. That is what the site already did: only the wording is corrected. Deleting an account is “requested” from the profile: it only becomes final after ${ACCOUNT_REACTIVATION_DAYS} days.`,
+      "Content and match contacts: a BattleTag saved before the site recorded its origin, in late October 2026, on an account with Battle.net linked, is treated as received from Battle.net until the next Battle.net login, even if it had been typed. The assigned referee's certified Discord tag is only read by the other parties to the match (both its teams, its casters), never by referees who have no role in that match (unless the assigned referee also casts that match, their tag then following the casters' rule): the terms now say so in a sentence of its own, with no change to the processing.",
+      `Team voice channels: only scheduled matches (those that have a set time) have channels; the bot deletes them once the site has handed them back and they are empty, at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back even when occupied, a channel never handed back being deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and staying as long as it is occupied, and a Discord error possibly delaying a deletion without limit; the match page says whether each channel is open, opening soon or unavailable. Nothing changes in the processing: the terms now say it as the privacy policy does. Unlike what the entry “Team voice channels: no more counting, no more waiting” said, the site keeps, for each channel, its identifier, the match and team numbers, its times (creation, hand-back, bot outage or refused hand-back) and whether an outage hit the whole bot, as the terms, the policy and the register say.`,
+      "Discord bot: its privacy policy now says, like its terms, that the direct message of a team takeover mentions “an admin”, naming no one; nothing changes in that message. It also says, like our policy, that the caster concerned can, like the team or player, ask for a #live announcement to be deleted.",
+      "Terms of use: version 11, in force since 13 November 2026, says so in its “Match streaming”, “Account”, “Content published by users” and “Match contacts” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
 };

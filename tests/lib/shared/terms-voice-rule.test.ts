@@ -123,9 +123,9 @@ describe("/regles — règle commune « Salons vocaux d'équipe »", () => {
     const frBody = formatMessage("fr", frSection?.body[0] ?? "", ruleTextValues("fr", frRules));
     const enBody = formatMessage("en", enSection?.body[0] ?? "", ruleTextValues("en", enRules));
 
-    expect(frBody).toContain(`à partir de ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure de chaque match`);
+    expect(frBody).toContain(`à partir de ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure de chaque match programmé (un match sans horaire n'a pas de salon)`);
     expect(frBody).toContain(`un salon vocal de ${VOICE_CHANNEL_CAPACITY} places`);
-    expect(enBody).toContain(`from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before each match's time`);
+    expect(enBody).toContain(`from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before the time of each scheduled match (a match with no set time has no channel)`);
     expect(enBody).toContain(`a ${VOICE_CHANNEL_CAPACITY}-seat voice channel`);
     // EF-43 (décision 22 du 2026-11-04) : le départ ne dépend plus des salons,
     // le site ne compte plus personne.
@@ -151,11 +151,11 @@ const voiceTermsEn = () => TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-m
 
 describe("conditions d'utilisation v10 — salons vocaux", () => {
   it("termsV10_voiceParagraph_openToCategoryAndJoiningIsAChoiceFrAndEn", () => {
-    expect(voiceTermsFr()).toContain("proposer à chaque équipe son salon vocal Discord avant chacun de ses matchs fait partie du **déroulement du tournoi**");
+    expect(voiceTermsFr()).toContain("proposer à chaque équipe son salon vocal Discord avant chacun de ses matchs programmés (ceux qui ont un horaire) fait partie du **déroulement du tournoi**");
     expect(voiceTermsFr()).toContain("Les rejoindre reste un choix : le lancement du match n'en dépend pas.");
     expect(voiceTermsFr()).toContain("Ils sont ouverts à qui voit la catégorie des matchs sur le serveur Discord de l'association.");
     expect(voiceTermsFr()).not.toContain("personne n'y est compté");
-    expect(voiceTermsEn()).toContain("offering each team its Discord voice channel before each of its matches is part of the **running of the tournament**");
+    expect(voiceTermsEn()).toContain("offering each team its Discord voice channel before each of its scheduled matches (those that have a set time) is part of the **running of the tournament**");
     expect(voiceTermsEn()).toContain("Joining them remains a choice: the match's launch does not depend on them.");
     expect(voiceTermsEn()).toContain("They are open to whoever sees the match category on the association's Discord server.");
     expect(voiceTermsEn()).not.toContain("no one is counted");
@@ -174,11 +174,11 @@ describe("conditions d'utilisation v10 — salons vocaux", () => {
   });
 
   it("termsV10_voiceParagraph_siteKeepsNoUserDataAndLegitimateInterestKeptFrAndEn", () => {
-    expect(voiceTermsFr()).toContain("que son identifiant, les numéros du match et de l'équipe et des horaires (création, rendu, panne du bot) — ni qui s'y trouve, ni combien —");
+    expect(voiceTermsFr()).toContain("que son identifiant, les numéros du match et de l'équipe, des horaires (création, rendu, panne du bot ou rendu refusé) et si une panne touchait tout le bot — ni qui s'y trouve, ni combien —");
     expect(voiceTermsFr()).toContain("un vidage par l'arbitrage nomme en outre son auteur dans les journaux du serveur, sauf l'arbitre désigné du match");
     expect(voiceTermsFr()).toContain("Ces salons reposent sur l'intérêt légitime de l'association au bon déroulement des tournois.");
     expect(voiceTermsFr()).not.toContain("s'y opposer");
-    expect(voiceTermsEn()).toContain("only keeps its identifier, the match and team numbers and times (creation, hand-back, bot outage) — neither who is in it nor how many —");
+    expect(voiceTermsEn()).toContain("only keeps its identifier, the match and team numbers, times (creation, hand-back, bot outage or refused hand-back) and whether an outage hit the whole bot — neither who is in it nor how many —");
     expect(voiceTermsEn()).toContain("a clearing by the referees also names its author in the server logs, unless they are the match's assigned referee");
     expect(voiceTermsEn()).toContain("These channels rest on the association's legitimate interest in the smooth running of tournaments.");
     expect(voiceTermsEn()).not.toContain("object to it");
@@ -207,9 +207,9 @@ describe("salons vocaux — la page dit seulement si chaque salon est ouvert (FR
     const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
     const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
 
-    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert.");
+    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert, bientôt ouvert ou indisponible.");
     expect(fr).not.toContain("attend ses salons");
-    expect(en).toContain("the match page only says whether each channel is open.");
+    expect(en).toContain("the match page only says whether each channel is open, opening soon or unavailable.");
     expect(en).not.toContain("waiting for its channels");
     // /regles ne parle plus d'attente non plus (EF-43).
     expect(JSON.stringify(frRules)).not.toContain("si le match attend ses salons");
