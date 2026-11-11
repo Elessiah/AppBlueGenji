@@ -22,16 +22,18 @@ afterEach(() => {
 const claim = (affectedRows: number) => [{ affectedRows }, undefined];
 
 describe("purgePreHostCookieSessions", () => {
-  it("purgePreHostCookieSessions_productionMarkerClaimed_deletesAllSessions", async () => {
+  it("purgePreHostCookieSessions_productionMarkerClaimed_deletesSessionsBeforeCutoffOnly", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(claim(1)).mockResolvedValueOnce(claim(4));
 
     await purgePreHostCookieSessions(fakePool({ execute }));
 
     expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
       "INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, '1')",
-      "DELETE FROM bg_user_sessions",
+      "DELETE FROM bg_user_sessions WHERE created_at < ?",
     ]);
     expect(execute.mock.calls[0][1]).toEqual([HOST_COOKIE_SESSIONS_MARKER]);
+    // Bornée par la date fixe du passage : aucune session ouverte depuis.
+    expect(execute.mock.calls[1][1]).toEqual(["2026-10-29 00:00:00"]);
   });
 
   it("purgePreHostCookieSessions_productionMarkerAlreadySet_deletesNothing", async () => {

@@ -43,7 +43,7 @@ export type SeedingBoard = {
  * (`./player-forfeit`), l'arbitrage aussi (`./admin`) : poser ce verrou-ci les
  * fait attendre la fin du réordonnancement, ou le fait attendre la leur.
  *
- * Coût assumé : lue par l'index non unique `idx_bg_matches_tournament` sous
+ * Coût assumé : lue par l'index non unique `idx_bg_matches_phase_round` sous
  * `REPEATABLE READ`, la requête verrouille aussi les **intervalles** qui
  * bordent les matchs du tournoi — une insertion de matchs du tournoi voisin
  * dans l'index peut attendre la fin du réordonnancement. Verrouiller par clé

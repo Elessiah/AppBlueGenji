@@ -60,7 +60,11 @@ intacte, un changement de schéma voulu la met à jour (`-u`).
 Replier les anciens `ALTER` dans les `CREATE` n'est donc sans danger que parce
 que **la production porte déjà le schéma complet** : elle a joué tous ces
 `ALTER`, un par un, avant cette consolidation. Une base restée à une version
-antérieure n'est **pas** rattrapée par ce fichier et doit être migrée à la main.
+antérieure n'est **pas** rattrapée par ce fichier et doit être migrée à la main —
+sauf le dernier lot replié (sigle d'équipe, nuls et « hors course » de
+l'endurance, formats de match et de play-offs, `game` en `('OW','MR')`), remis
+en tête de `RECENT_SCHEMA_CHANGES` (DB-SCHEMA-LOT) : une base de dev restée
+avant lui arrêtait le seed sur « Unknown column 'endurance_max_rounds' ».
 
 ## La règle pour la suite — inchangée
 
@@ -85,6 +89,16 @@ sait dire qu'`ADD COLUMN`, si bien que la règle n'aurait couvert ni un `ENUM`
 élargi, ni un index posé, ni une clé primaire recomposée — la prochaine valeur de
 `format` n'aurait existé que dans le `CREATE TABLE`, et la base qui tourne aurait
 rendu « Data truncated for column 'format' » sur le premier tournoi créé.
+
+Une entrée est une instruction, ou un **groupe** de pas dépendants
+(`SchemaChange` : `{ steps, when? }`), joués dans l'ordre et arrêtés au premier
+échec réel — un no-op (colonne ou index déjà là, déjà parti) n'arrête rien. Une
+pose suivie du retrait de l'index qu'elle remplace, ou un ajout suivi de son
+remplissage et de son resserrement, s'écrivent ainsi : un retrait ne part
+jamais sans la pose. `when`, une lecture d'`information_schema`, garde une
+conversion d'`ENUM` qui copierait la table à chaque démarrage. Une instruction
+en échec **passager** (attente de verrou au déploiement, interblocage) est
+rejouée deux fois avant d'être journalisée.
 
 Ce qu'elle contient aujourd'hui :
 
@@ -122,7 +136,8 @@ Ce qu'elle contient aujourd'hui :
 | #441 (horaires de match) | `bg_match_reminders` | `start_at` — sur `TOLD`, l'horaire que les joueurs ont reçu (cité par « au lieu du … » et l'avis de retrait ; `NULL` : un retrait remis) ; sur l'observation et un palier, l'horaire pour lequel la marque est prise (seul son envoi la rend) ; sur `STAFF` (clé ajoutée sans changement de schéma), l'horaire poussé aux arbitres, seul retiré chez eux — `docs/features/DISCORD_NOTIFICATIONS.md` |
 | #441 (horaires de match) | `bg_matches` | index `idx_bg_matches_start_at` — fenêtre de lecture du balayage des rappels (`lib/server/tournaments/match-reminders.ts`), sans lequel chaque passage relisait toute l'histoire des matchs |
 | — (EF-07) | `bg_matches` | index `idx_bg_matches_status_updated` `(status, updated_at)` — les trois derniers matchs terminés du bandeau de l'accueil (`loadLandingTicker`), lus sans trier tout l'historique terminé |
-| — (EF-24) | `bg_matches` | retrait de l'index `idx_bg_matches_status (status)`, préfixe strict de `idx_bg_matches_status_updated` (tenu à chaque écriture sans gain de lecture) — `DROP INDEX` tolérant, joué après la pose du composé |
+| — (EF-24) | `bg_matches` | retrait de l'index `idx_bg_matches_status (status)`, préfixe strict de `idx_bg_matches_status_updated` (tenu à chaque écriture sans gain de lecture) — `DROP INDEX` tolérant, dans le groupe de la pose du composé (jamais sans elle) |
+| — (DB-SCHEMA-LOT) | `bg_matches` | retrait de l'index `idx_bg_matches_tournament (tournament_id)`, préfixe strict de `idx_bg_matches_phase_round` — `DROP INDEX` tolérant, dans le groupe de la pose de ce dernier |
 | — (EF-14) | `bg_discord_login_challenges` | `purpose` — `ENUM('LOGIN','HANDLE') NOT NULL` (une base existante y passe après avoir marqué consommés les défis d'avant, qui comptent encore dans les plafonds) : usage du code (connexion, ou certification / changement de tag) ; un défi d'un autre usage est refusé ; un code plus récent n'annule que ceux du même usage (`BOT_DM_LANGUAGE.md`) |
 | — (EF-24) | `bg_teams` | index `idx_bg_teams_solo_deleted` `(solo_user_id, deleted_at)` — compteur « Équipes actives » de l'accueil (`loadSiteCounts`) lu dans l'index seul |
 | — (EF-15) | `bg_matches` | index `idx_bg_matches_phase_round` `(tournament_id, phase_id, round_number)` à la place de `idx_bg_matches_phase (tournament_id, phase_id)`, son préfixe strict : les lectures verrouillantes des manches postérieures (`laterRoundsHaveScoreInput`) et le `DELETE … AND round_number = ?` du réappariement suisse ne verrouillent que leurs manches, plus toute la phase et ses intervalles — pose et retrait dans **un** `ALTER` (atomique : une pose refusée ne laisse jamais la phase sans index), suivis d'une pose seule tolérante pour une base où l'ancien index manquait |

@@ -1,6 +1,17 @@
-import type { Pool } from "mysql2/promise";
+import type { Pool, RowDataPacket } from "mysql2/promise";
+import { isContentionError, isSchemaNoOpError } from "@/lib/server/mysql-errors";
 import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
 import { reportSchemaFailure } from "./report-schema-failure";
+
+/**
+ * Un changement de schéma : une instruction seule, ou un **groupe** de pas
+ * dépendants, joués dans l'ordre et arrêtés au premier échec réel (un no-op —
+ * colonne ou index déjà là, déjà parti — n'arrête rien : le pas suivant est
+ * idempotent). `when`, s'il est donné, est une lecture (`information_schema`)
+ * qui doit rendre au moins une ligne pour que le groupe joue : une conversion
+ * qui coûterait une copie de table à chaque démarrage ne part qu'une fois.
+ */
+export type SchemaChange = string | { readonly when?: string; readonly steps: readonly string[] };
 
 /** Migrations : les changements trop récents pour être repliés (`RECENT_SCHEMA_CHANGES`). */
 export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
@@ -30,7 +41,37 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
   // colonne neuve. La prochaine valeur de `format` n'aurait existé que dans le
   // `CREATE TABLE`, et la base qui tourne aurait rendu « Data truncated for
   // column 'format' » sur le premier tournoi créé.
-  const RECENT_SCHEMA_CHANGES: readonly string[] = [
+  const RECENT_SCHEMA_CHANGES: readonly SchemaChange[] = [
+    // DB-SCHEMA-LOT — colonnes et énumérations repliées dans les `CREATE
+    // TABLE` sans que toute base vivante les ait jouées : une base de dev
+    // restée en arrière (et le seed) s'arrêtait sur « Unknown column
+    // 'endurance_max_rounds' ». Rattrapées ici, en tête (les `AFTER` plus bas
+    // s'appuient dessus) ; partout ailleurs, des no-op.
+    `ALTER TABLE bg_teams ADD COLUMN tag VARCHAR(4) NULL`,
+    `ALTER TABLE bg_teams ADD UNIQUE KEY uniq_bg_teams_tag (tag)`,
+    `ALTER TABLE bg_endurance_standings ADD COLUMN draws INT NOT NULL DEFAULT 0`,
+    {
+      when: columnTypeContains("bg_endurance_standings", "status", "NOT LIKE '%''OUT_OF_CONTENTION''%'"),
+      steps: [
+        `ALTER TABLE bg_endurance_standings MODIFY COLUMN status
+           ENUM('ACTIVE', 'ELIMINATED', 'OUT_OF_CONTENTION', 'FORFEIT') NOT NULL DEFAULT 'ACTIVE'`,
+      ],
+    },
+    `ALTER TABLE bg_tournaments ADD COLUMN match_format_max_maps INT NULL`,
+    `ALTER TABLE bg_tournaments ADD COLUMN match_format_draws TINYINT(1) NOT NULL DEFAULT 0`,
+    `ALTER TABLE bg_tournaments ADD COLUMN endurance_max_rounds INT NULL`,
+    `ALTER TABLE bg_tournaments ADD COLUMN endurance_playoff_format_type ENUM('BO', 'FT') NULL`,
+    `ALTER TABLE bg_tournaments ADD COLUMN endurance_playoff_format_value INT NULL`,
+    // `game` resté en `ENUM('OW2','MR')` : élargi, converti, puis resserré —
+    // une seule fois (la lecture ne trouve plus `'OW2'` ensuite).
+    {
+      when: columnTypeContains("bg_tournaments", "game", "LIKE '%''OW2''%'"),
+      steps: [
+        `ALTER TABLE bg_tournaments MODIFY COLUMN game ENUM('OW2', 'OW', 'MR') NOT NULL DEFAULT 'OW'`,
+        `UPDATE bg_tournaments SET game = 'OW' WHERE game = 'OW2'`,
+        `ALTER TABLE bg_tournaments MODIFY COLUMN game ENUM('OW', 'MR') NOT NULL DEFAULT 'OW'`,
+      ],
+    },
     // PR #135 — certification du tag Discord.
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN handle VARCHAR(64) NULL`,
     `ALTER TABLE bg_users ADD COLUMN discord_verified_at DATETIME NULL`,
@@ -143,7 +184,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // de certification ne connecte pas, un code de connexion ne certifie pas.
     // `NULL` le temps de la migration : les défis d'avant sont marqués consommés
     // juste après (le joueur redemande un code). Les bases neuves la créent `NOT NULL`.
-    `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
+    // Les trois pas forment un groupe : une colonne non posée (verrou) n'est
+    // ni remplie ni resserrée.
+    {
+      steps: [
+        `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
     // Puis `NOT NULL`, comme sur une base neuve : sous le `sql_mode` strict par
     // défaut de MySQL 8 et de MariaDB, une insertion qui oublierait l'usage
     // échoue partout, au lieu d'émettre en production un code refusé de tous.
@@ -154,9 +199,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // insertion sans usage ne suit le `MODIFY`. **Retour arrière** : une version
     // d'avant EF-14 n'écrit pas l'usage et n'émet plus aucun code sur cette base
     // (`docs/DEPLOYMENT.md`). Rejouées, les deux ne changent rien.
-    `UPDATE bg_discord_login_challenges SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())
-       WHERE purpose IS NULL`,
-    `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL`,
+        `UPDATE bg_discord_login_challenges SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())
+           WHERE purpose IS NULL`,
+        `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL`,
+      ],
+    },
     // Cible d'un signalement réellement prévenue : le délai de reprévenance et
     // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
     // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles
@@ -236,13 +283,19 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`WHERE status = 'COMPLETED' ORDER BY updated_at DESC LIMIT 3`) à chaque
     // recalcul de son cache : avec le seul index sur `status`, tout l'historique
     // terminé était lu puis trié pour en garder trois.
-    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_status_updated (status, updated_at)`,
     // EF-24 — `idx_bg_matches_status (status)` est un préfixe strict de
     // `idx_bg_matches_status_updated` : tenu à chaque écriture de match sans
     // servir une lecture de plus (aucune requête ne le force). Retiré **après**
-    // la pose du composé, pour qu'aucune lecture par statut ne reste sans index ;
-    // sur une base où il est déjà parti, `ER_CANT_DROP_FIELD_OR_KEY` est un no-op.
-    `ALTER TABLE bg_matches DROP INDEX idx_bg_matches_status`,
+    // la pose du composé, dans le même groupe : une pose en échec réel
+    // (verrou, disque) le garde, et aucune lecture par statut ne reste sans
+    // index ; composé déjà là (`ER_DUP_KEYNAME`) ou ancien déjà parti
+    // (`ER_CANT_DROP_FIELD_OR_KEY`) : des no-op.
+    {
+      steps: [
+        `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_status_updated (status, updated_at)`,
+        `ALTER TABLE bg_matches DROP INDEX idx_bg_matches_status`,
+      ],
+    },
     // EF-24 — compteur « Équipes actives » de l'accueil (`loadSiteCounts` :
     // `solo_user_id IS NULL AND deleted_at IS NULL`) lu dans l'index seul, sans
     // parcourir chaque ligne d'équipe à chaque reconstruction des statistiques.
@@ -435,7 +488,16 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Base où l'ancien index manquait : l'échange tombe sur son `DROP`
     // (`ER_CANT_DROP_FIELD_OR_KEY`, toléré) et ne pose rien — la pose seule le
     // rattrape. Partout ailleurs, `ER_DUP_KEYNAME`, un no-op.
-    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
+    // DB-SCHEMA-LOT — `idx_bg_matches_tournament (tournament_id)` est un
+    // préfixe strict de `idx_bg_matches_phase_round` : un B-tree de plus à
+    // chaque écriture de match. Retiré dans le groupe de la pose, jamais sans
+    // elle (la clé étrangère `tournament_id` garde ainsi toujours un index).
+    {
+      steps: [
+        `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
+        `ALTER TABLE bg_matches DROP INDEX idx_bg_matches_tournament`,
+      ],
+    },
     // EF-16 — la visibilité (`start_visibility_at <= ?`, ou `> ?` pour les
     // invisibles du staff) borne toutes les lectures de la liste des tournois,
     // du décompte des terminés et du sous-ensemble des plus récents : sans
@@ -498,11 +560,64 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        ADD PRIMARY KEY (match_id, offset_key)`,
   ];
 
-  for (const statement of RECENT_SCHEMA_CHANGES) {
+  for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);
+}
+
+/** Tentatives d'une instruction en échec passager (verrou, interblocage). */
+const TRANSIENT_ATTEMPTS = 3;
+
+/** Attente entre deux tentatives d'une instruction en échec passager. */
+const TRANSIENT_PAUSE_MS = 250;
+
+const oneLine = (sql: string) => sql.replace(/\s+/g, " ").trim();
+
+/**
+ * Joue une instruction : rejouée sur un échec **passager** (attente de verrou
+ * dépassée au déploiement, interblocage), qui sinon laissait le code écrire
+ * dans une colonne absente jusqu'au redémarrage suivant ; tout autre échec est
+ * journalisé (`reportSchemaFailure`), jamais relancé.
+ *
+ * @returns `true` si le schéma est là où l'instruction le voulait (jouée, ou
+ *          no-op) — un groupe peut poursuivre.
+ */
+async function runSchemaStatement(db: Pool, statement: string): Promise<boolean> {
+  for (let attempt = 1; ; attempt += 1) {
     try {
       await db.execute(statement);
+      return true;
     } catch (error) {
-      reportSchemaFailure(error, statement.replace(/\s+/g, " ").trim());
+      if (isContentionError(error) && attempt < TRANSIENT_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, TRANSIENT_PAUSE_MS));
+        continue;
+      }
+      reportSchemaFailure(error, oneLine(statement));
+      return isSchemaNoOpError(error, statement);
     }
   }
 }
+
+/** Joue un changement : instruction seule, ou groupe (voir {@link SchemaChange}). */
+export async function applySchemaChange(db: Pool, change: SchemaChange): Promise<void> {
+  if (typeof change === "string") {
+    await runSchemaStatement(db, change);
+    return;
+  }
+  if (change.when !== undefined) {
+    try {
+      const [rows] = await db.execute<RowDataPacket[]>(change.when);
+      if (rows.length === 0) return;
+    } catch (error) {
+      reportSchemaFailure(error, oneLine(change.when));
+      return;
+    }
+  }
+  for (const step of change.steps) {
+    if (!(await runSchemaStatement(db, step))) return;
+  }
+}
+
+/** Lecture `when` : la colonne `table.column` porte encore `fragment` dans son type. */
+const columnTypeContains = (table: string, column: string, fragment: string) =>
+  `SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${table}' AND COLUMN_NAME = '${column}'
+      AND COLUMN_TYPE ${fragment}`;

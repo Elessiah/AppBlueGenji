@@ -186,7 +186,6 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       replay_url VARCHAR(255) NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_bg_matches_tournament (tournament_id),
       INDEX idx_bg_matches_status_updated (status, updated_at),
       INDEX idx_bg_matches_round (round_number),
       INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
