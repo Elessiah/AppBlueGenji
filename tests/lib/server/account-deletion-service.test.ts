@@ -146,8 +146,8 @@ function fakeDb(
       return [tournaments.map((id) => ({ tournament_id: id }))];
     }
     if (q.startsWith("SELECT r.tournament_id, r.team_id, t.state")) return [soloRegistrations];
-    if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
-      return [(options.refereed ?? []).map((match) => ({ match_id: match.matchId }))];
+    if (q.startsWith("SELECT 'C' AS kind, c.match_id FROM bg_match_casters")) {
+      return [(options.refereed ?? []).map((match) => ({ kind: "R", match_id: match.matchId }))];
     }
     if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
       return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];

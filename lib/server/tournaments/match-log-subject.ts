@@ -18,6 +18,9 @@ export type MatchLogRow = RowDataPacket & {
   swiss_round: number | null;
   team1_name: string | null;
   team2_name: string | null;
+  /** Appariement relu ; absent des doubles de test qui ne le jugent pas. */
+  team1_id?: number | null;
+  team2_id?: number | null;
   tournament_id: number;
   tournament_name: string;
   participant_type: string | null;
@@ -28,7 +31,7 @@ export type MatchLogRow = RowDataPacket & {
  * journal qui désignent un match, partagé avec `loadMatch` de `./bot-logs`
  * (qui y ajoute score et statut) — une seule requête à tenir à jour.
  */
-export const MATCH_LOG_COLUMNS_SQL = `m.id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")},
+export const MATCH_LOG_COLUMNS_SQL = `m.id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")}, m.team1_id, m.team2_id,
             t1.name AS team1_name, t2.name AS team2_name,
             tr.id AS tournament_id, tr.name AS tournament_name, tr.participant_type`;
 

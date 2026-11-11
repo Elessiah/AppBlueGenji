@@ -52,7 +52,7 @@ import {
   type CasterIdentityRow,
   type RefereeStanding,
 } from "./cast-eligibility";
-import { announceCastChange, queueCastChange } from "./cast-notices";
+import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
 import { applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type CastSettings } from "./cast-settings";
 import {
   lockMatchCasters,
@@ -292,7 +292,13 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
     // Annoncé comme tout retrait d'office (journal du staff, avis au caster),
     // après le commit de la transaction appelante : `inTransaction` ici,
     // `flushBotLogs` pour l'entretien.
-    queueCastChange(connection, { kind: "AUTO_RELEASED", matchId: Number(row.id), casterId, reason: "JOINED_TEAM" });
+    queueCastChange(connection, {
+      kind: "AUTO_RELEASED",
+      matchId: Number(row.id),
+      casterId,
+      reason: "JOINED_TEAM",
+      pairing: castPairingOf(row),
+    });
   }
   return true;
 }
@@ -879,6 +885,7 @@ async function releaseIneligibleCasters(
       casterId: caster.userId,
       reason: "INELIGIBLE",
       block: blocks.get(caster.userId) ?? null,
+      pairing: castPairingOf(row),
     });
   }
   return true;
@@ -928,7 +935,7 @@ export async function claimMatchCast(
   if (settings.battletag !== undefined) parseCastBattletagInput(settings.battletag);
   // Deux inscriptions simultanées se croisent sur les verrous d'intervalle
   // d'InnoDB : l'interblocage se rejoue.
-  const { tournamentId, claimed, triggerSkipped } = await retryOnDeadlock(() =>
+  const { tournamentId, claimed, triggerSkipped, pairing } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       // Ligne du compte verrouillée en première instruction, avant le match —
       // l'ordre de la suppression de compte (compte, puis ses matchs).
@@ -942,7 +949,7 @@ export async function claimMatchCast(
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
-        return { tournamentId: Number(row.tournament_id), claimed: false, triggerSkipped: false };
+        return { tournamentId: Number(row.tournament_id), claimed: false, triggerSkipped: false, pairing: castPairingOf(row) };
       }
       // Seul **jouer** le match ferme le cast : l'arbitre désigné peut le
       // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
@@ -997,7 +1004,12 @@ export async function claimMatchCast(
         { ...settings, trigger, liveUrl: undefined, skipLockedTrigger: true },
         access,
       );
-      return { tournamentId: Number(row.tournament_id), claimed: true, triggerSkipped: outcome.triggerSkipped };
+      return {
+        tournamentId: Number(row.tournament_id),
+        claimed: true,
+        triggerSkipped: outcome.triggerSkipped,
+        pairing: castPairingOf(row),
+      };
     }),
   );
   // Une inscription change ce que montrent l'accueil et ses bandeaux (un
@@ -1005,7 +1017,7 @@ export async function claimMatchCast(
   // visible) ; une inscription déjà acquise (double clic) ne change rien.
   if (claimed) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
-  if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null });
+  if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null, pairing });
   return { triggerSkipped };
 }
 
@@ -1088,13 +1100,13 @@ export async function releaseMatchCast(
   canManage: boolean,
   casterId: number = userId,
 ): Promise<void> {
-  const { tournamentId, releasedCasterId } = await retryOnDeadlock(() =>
+  const { tournamentId, releasedCasterId, pairing } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
       if (casterId !== userId && !canManage) throw new Error("NOT_MATCH_CASTER");
       if (!row.casters.some((caster) => caster.userId === casterId)) {
-        return { tournamentId: Number(row.tournament_id), releasedCasterId: null };
+        return { tournamentId: Number(row.tournament_id), releasedCasterId: null, pairing: castPairingOf(row) };
       }
       // Un match joué est de l'histoire : l'inscription, son stream et son lien
       // restent (l'inscription et l'anonymisation refusent de même de le réécrire).
@@ -1115,14 +1127,20 @@ export async function releaseMatchCast(
         await connection.execute(`UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?`, [matchId]);
       }
       if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
-      return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId };
+      return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId, pairing: castPairingOf(row) };
     }),
   );
   // Un retrait qui ne retire rien (double clic, carte périmée) ne vide pas le
   // cache de l'accueil et ne pousse rien aux lecteurs.
   if (releasedCasterId !== null) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   if (releasedCasterId !== null) {
-    announceCastChange({ kind: "RELEASED", matchId, casterId: releasedCasterId, byStaff: releasedCasterId !== userId });
+    announceCastChange({
+      kind: "RELEASED",
+      matchId,
+      casterId: releasedCasterId,
+      byStaff: releasedCasterId !== userId,
+      pairing,
+    });
   }
 }
 
@@ -1140,6 +1158,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   let tournamentId: number | null = null;
   let reason: "INELIGIBLE" | "JOINED_TEAM" = "INELIGIBLE";
   let block: CastBlock | null = null;
+  let pairing: CastPairing | undefined;
   await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       // Un nouvel essai (interblocage) relit tout : rien ne reste de l'essai précédent.
@@ -1176,11 +1195,12 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
       await unmarkIfUncast(connection, row);
       if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
       tournamentId = Number(row.tournament_id);
+      pairing = castPairingOf(row);
     }),
   );
   if (tournamentId === null) return false;
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-  announceCastChange({ kind: "AUTO_RELEASED", matchId, casterId, reason, block });
+  announceCastChange({ kind: "AUTO_RELEASED", matchId, casterId, reason, block, pairing });
   return true;
 }
 
@@ -1961,4 +1981,9 @@ export async function releaseObjectingReferee(
   if (tournamentId === null) return false;
   publishMatchUpdatedEvent(tournamentId);
   return true;
+}
+
+/** L'appariement lu sous verrou, porté par l'annonce d'un changement de caster (`CastPairing`). */
+function castPairingOf(row: { team1_id?: number | null; team2_id?: number | null }): CastPairing {
+  return { team1Id: nullableId(row.team1_id ?? null), team2Id: nullableId(row.team2_id ?? null) };
 }

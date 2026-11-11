@@ -48,6 +48,8 @@ import { fakeConnection } from "../../helpers/sql-double";
 
 const TEAM1 = 10;
 const TEAM2 = 20;
+/** L'appariement de `matchState()`, lu sous verrou et porté par l'annonce d'un changement de caster. */
+const PAIRING = { team1Id: TEAM1, team2Id: TEAM2 };
 const CASTER = 900;
 
 type MatchState = {
@@ -678,6 +680,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
       matchId: 42,
       casterId: CASTER,
       reason: "JOINED_TEAM",
+      pairing: PAIRING,
     });
     expect(announceCastChange).not.toHaveBeenCalled();
   });
@@ -832,7 +835,7 @@ describe("claimMatchCast", () => {
     expect(state.match?.casters).toEqual([{ user_id: CASTER, stream_id: 1, ready_at: null }]);
     // Une inscription neuve : l'accueil relit (un co-caster éligible peut rendre un stream visible).
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null, pairing: PAIRING });
   });
 
   it("claimMatchCast_anyClaim_locksTheAccountRowFirst", async () => {
@@ -1026,7 +1029,7 @@ describe("claimMatchCast", () => {
       { user_id: 901, stream_id: 1, ready_at: STAMP },
       { user_id: CASTER, stream_id: 2, ready_at: null },
     ]);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null, pairing: PAIRING });
   });
 
   it("un match lancé accueille un co-caster sans toucher au caster en place", async () => {
@@ -1054,13 +1057,13 @@ describe("releaseMatchCast", () => {
     await releaseMatchCast(42, CASTER, false);
     expect(casterOf(state)).toBeNull();
     expect(casterReadyOf(state)).toBeNull();
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false, pairing: PAIRING });
   });
 
   it("un arbitre qui retire sa propre inscription n'est pas « le staff »", async () => {
     state.match = matchState({ caster_user_id: CASTER });
     await releaseMatchCast(42, CASTER, true);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false, pairing: PAIRING });
   });
 
   it("lance le match quand les deux équipes n'attendaient plus que le caster", async () => {
@@ -1080,7 +1083,7 @@ describe("releaseMatchCast", () => {
     await expect(releaseMatchCast(42, 901, false, CASTER)).rejects.toThrow("NOT_MATCH_CASTER");
     await releaseMatchCast(42, 1, true, CASTER);
     expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([901]);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true, pairing: PAIRING });
   });
 
   it("co-caster qui part : l'autre reste, avec son « Prêt », sur le stream qu'ils partageaient", async () => {
@@ -1354,7 +1357,7 @@ describe("releaseIneligibleCast", () => {
     expect(casterOf(state)).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE", block: "NOT_CASTER" });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE", block: "NOT_CASTER", pairing: PAIRING });
   });
 
   it.each<[string, MatchOverrides]>([
@@ -1413,7 +1416,7 @@ describe("releaseIneligibleCast", () => {
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
     expect(casterOf(state)).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM", block: null });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM", block: null, pairing: PAIRING });
   });
 
   it("dit d'abord les conditions du cast quand le caster, inéligible, a aussi rejoint une équipe du match", async () => {
@@ -1421,7 +1424,7 @@ describe("releaseIneligibleCast", () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE", block: "NOT_CASTER" });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE", block: "NOT_CASTER", pairing: PAIRING });
   });
 });
 
@@ -1600,7 +1603,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     await claimMatchCast(42, REFEREE, true, OWN_STREAM);
     expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
     expect(state.match?.referee_user_id).toBe(REFEREE);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: REFEREE, replacedCasterId: null });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: REFEREE, replacedCasterId: null, pairing: PAIRING });
   });
 
   it("claimMatchCast_readyReferee_registersWithoutReadyAndKeepsRefereeReady", async () => {
@@ -1625,7 +1628,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(state.match?.casters).toEqual([]);
     expect(state.match?.referee_user_id).toBe(REFEREE);
     expect(state.match?.referee_ready_at).toBe(STAMP);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: REFEREE, byStaff: false });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: REFEREE, byStaff: false, pairing: PAIRING });
   });
 
   it("claimMatchCast_playerWhoIsAlsoReferee_stillRefused", async () => {

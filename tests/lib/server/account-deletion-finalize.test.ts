@@ -72,8 +72,8 @@ function fakeDb(options: {
     queries.push(q);
     if (options.failLock && q.includes("FROM bg_users WHERE id = ? FOR UPDATE")) throw new Error("DB_DOWN");
     if (options.failErase && q.startsWith("DELETE FROM bg_users")) throw new Error("ERASE_FAILED");
-    if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
-      return [(options.refereed ?? []).map((match) => ({ match_id: match.matchId }))];
+    if (q.startsWith("SELECT 'C' AS kind, c.match_id FROM bg_match_casters")) {
+      return [(options.refereed ?? []).map((match) => ({ kind: "R", match_id: match.matchId }))];
     }
     if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
       return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];

@@ -26,12 +26,24 @@ import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
 import type { CastReleaseReason, CastReleasedMatch } from "@/lib/shared/cast-notices";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { nullableId } from "@/lib/shared/nullable-id";
 import { castReleasedPush } from "@/lib/shared/push-messages";
 import { formatCastReleasedNotice } from "./cast-release-message";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
+/**
+ * L'appariement du match tel que la transaction du geste l'a lu sous verrou.
+ * Le match est relu après le commit (noms, tournoi) : un appariement relu qui
+ * en diffère (réinitialisation, retour arrière concurrents) ne fait pas nommer
+ * d'autres équipes que celles du geste.
+ */
+export interface CastPairing {
+  team1Id: number | null;
+  team2Id: number | null;
+}
+
 /** Un changement d'inscription de caster, tel que `match-launch.ts` le constate sous verrou. */
-export type CastChange =
+export type CastChange = (
   /** Inscription posée par `casterId` ; `replacedCasterId` : le titulaire inéligible dont la place est reprise. */
   | { kind: "CLAIMED"; matchId: number; casterId: number; replacedCasterId: number | null }
   /** Inscription retirée par son caster (`byStaff: false`) ou par le staff. */
@@ -46,7 +58,20 @@ export type CastChange =
       casterId: number;
       reason: "INELIGIBLE" | "JOINED_TEAM";
       block?: CastBlock | null;
-    };
+    }
+) & {
+  /** Appariement lu sous verrou par le geste ; absent : le match relu fait foi. */
+  pairing?: CastPairing;
+};
+
+/** L'appariement relu après le commit est-il encore celui du geste ? */
+export function pairingStillCurrent(change: CastChange, row: { team1_id?: number | null; team2_id?: number | null }): boolean {
+  if (change.pairing === undefined) return true;
+  return (
+    change.pairing.team1Id === nullableId(row.team1_id ?? null) &&
+    change.pairing.team2Id === nullableId(row.team2_id ?? null)
+  );
+}
 
 /** Ligne du journal de ce changement. */
 export function castLogChange(change: CastChange): CastLogChange {
@@ -106,7 +131,15 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
       : null,
   ]);
   if (!row) return;
-  const match = matchLogSubject(row);
+  const current = pairingStillCurrent(change, row);
+  // « Tu joues désormais ce match » ne tient plus quand l'appariement a changé
+  // depuis (un retour arrière vide le match dans la même transaction) : ni
+  // ligne fausse au journal, ni avis faux au caster.
+  if (!current && change.kind === "AUTO_RELEASED" && change.reason === "JOINED_TEAM") return;
+  // Appariement changé depuis le geste : le match est désigné sans ses
+  // engagés plutôt que par ceux d'un autre appariement.
+  const named = current ? row : { ...row, team1_name: null, team2_name: null };
+  const match = matchLogSubject(named);
   sendBotLog(formatCastChangeLog({ ...match, change: castLogChange(change) }), {
     tournamentId: match.tournament.id,
     category: castLogCategory(change),
@@ -120,8 +153,8 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
     bracket: match.bracket,
     roundNumber: match.roundNumber,
     swiss: match.swiss,
-    team1Name: row.team1_name,
-    team2Name: row.team2_name,
+    team1Name: named.team1_name,
+    team2Name: named.team2_name,
     solo: match.participantType === "SOLO",
     reason: notice.reason,
     block: notice.block,

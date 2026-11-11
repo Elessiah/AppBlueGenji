@@ -18,6 +18,7 @@ import {
   flushCastChanges,
   flushCastToggles,
   queueCastChange,
+  pairingStillCurrent,
   resetCastToggles,
   CAST_TOGGLE_WINDOW_MS,
   type CastChange,
@@ -228,6 +229,48 @@ describe("deliverCastChange", () => {
     await deliverCastChange({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
     expect(loggedLine("staff-removal")).toContain("Renards vs TBD");
     expect(notification().discord?.message("fr")).toContain("« Renards » contre TBD");
+  });
+
+  it("deliverCastChange_joinedTeamPairingChanged_silencesLogAndNotice", async () => {
+    // Un retour arrière a vidé le match après l'entretien : « tu joues ce match » serait faux.
+    mockMatch(matchRow({ team1_id: null, team2_id: null, team1_name: null, team2_name: null }));
+
+    await deliverCastChange({
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      casterId: CASTER,
+      reason: "JOINED_TEAM",
+      pairing: { team1Id: 10, team2Id: 20 },
+    });
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("deliverCastChange_staffReleasePairingChanged_namesMatchWithoutTeams", async () => {
+    // Réinitialisé entre le geste et l'annonce : les équipes relues ne sont pas celles du geste.
+    mockMatch(matchRow({ team1_id: 30, team2_id: 40, team1_name: "Orques", team2_name: "Lynx" }));
+
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true, pairing: { team1Id: 10, team2Id: 20 } });
+
+    const line = loggedLine("staff-removal");
+    expect(line).toContain("TBD vs TBD (#42)");
+    expect(line).not.toContain("Orques");
+    expect(notification().discord?.message("fr")).not.toContain("Orques");
+  });
+
+  it("deliverCastChange_samePairing_namesTeams", async () => {
+    mockMatch(matchRow({ team1_id: 10, team2_id: 20 }));
+
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true, pairing: { team1Id: 10, team2Id: 20 } });
+
+    expect(loggedLine("staff-removal")).toContain("Renards vs Nova (#42)");
+  });
+
+  it("pairingStillCurrent_noPairing_trustsRow", () => {
+    const change: CastChange = { kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true };
+
+    expect(pairingStillCurrent(change, { team1_id: 30, team2_id: 40 })).toBe(true);
   });
 
   it("se tait sur un match disparu", async () => {

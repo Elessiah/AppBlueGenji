@@ -27,6 +27,12 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   (`queueCastChange`) et n'est annoncé qu'après le commit (`flushCastChanges`,
   appelé par `inTransaction`, `flushBotLogs` et l'entretien de la modale) ;
   une transaction annulée le jette (`discardCastChanges`).
+- Chaque changement porte l'appariement lu sous verrou par son geste
+  (`CastPairing`). Le match est relu après le commit pour ses noms : relu
+  sous un autre appariement (réinitialisation, retour arrière concurrents), il
+  est désigné sans engagés (« TBD vs TBD ») plutôt que par les équipes d'un
+  autre appariement, et un `JOINED_TEAM` se tait (ni journal ni avis : le
+  caster ne joue plus ce match).
 - Retrait d'office : si le caster est à la fois inéligible et devenu joueur du
   match, le motif dit les conditions du cast (`INELIGIBLE`). Le blocage lu
   (`loadCastBlocks`) précise le motif : permission `live` perdue
