@@ -238,6 +238,18 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
     expect(enActions.cardActions.castSettings.noLive).toContain("withdraw");
   });
 
+  it("CastSettingsDialog_triggerChanged_sendsSeenTrigger", () => {
+    expect(settings).toContain("settings.expectedTrigger = match.liveTrigger;");
+  });
+
+  it("castErrors_liveTriggerChanged_presentFrEn", () => {
+    expect(frErrors.codes.LIVE_TRIGGER_CHANGED).toContain("a changé pendant que la fenêtre était ouverte");
+    expect(enErrors.codes.LIVE_TRIGGER_CHANGED).toContain("changed while the window was open");
+    expect(frModal.errors.LIVE_TRIGGER_CHANGED).toBe(frErrors.codes.LIVE_TRIGGER_CHANGED);
+    expect(enModal.errors.LIVE_TRIGGER_CHANGED).toBe(enErrors.codes.LIVE_TRIGGER_CHANGED);
+    expect(LAUNCH_ERROR_MESSAGES.LIVE_TRIGGER_CHANGED).toBe(frErrors.codes.LIVE_TRIGGER_CHANGED);
+  });
+
   it("CastSettingsDialog_unmarkedMatch_noModePreselected", () => {
     expect(settings).toContain("(pickedTrigger ?? match.liveTrigger)");
   });

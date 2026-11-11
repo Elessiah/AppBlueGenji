@@ -2283,6 +2283,34 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
+  it("setCastSettings_expectedTriggerStale_throwsLiveTriggerChangedAndWritesNothing", async () => {
+    // Le staff a posé « manuel » pendant que la fenêtre du caster montrait un match non casté.
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "MANUAL" });
+
+    await expect(setCastSettings(42, CASTER, true, { trigger: "AUTO", expectedTrigger: null })).rejects.toThrow("LIVE_TRIGGER_CHANGED");
+
+    expect(state.match?.live_trigger).toBe("MANUAL");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_expectedTriggerMatches_writesTrigger", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { trigger: "AUTO", expectedTrigger: null });
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("setCastSettings_expectedTriggerWithoutTrigger_ignored", async () => {
+    // Sans mode choisi, le mode vu ne juge rien : le BattleTag s'enregistre.
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(setCastSettings(42, CASTER, true, { battletag: "Voix#1234", expectedTrigger: "MANUAL" })).resolves.toBeUndefined();
+  });
+
   it("setCastSettings_completedMatch_throwsMatchCastClosed", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ status: "COMPLETED", caster_user_id: CASTER });

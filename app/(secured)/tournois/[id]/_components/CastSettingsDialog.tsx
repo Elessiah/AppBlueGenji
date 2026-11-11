@@ -175,7 +175,12 @@ export function CastSettingsDialog({
       // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
       // diffusion), et n'est envoyée que si elle a changé.
       const settings: Record<string, unknown> = {};
-      if (triggerChanged) settings.trigger = pickedTrigger;
+      // Le mode vu part avec le mode choisi : changé entre-temps, le serveur
+      // refuse (`LIVE_TRIGGER_CHANGED`) plutôt que d'écraser ce qu'il ignore.
+      if (triggerChanged) {
+        settings.trigger = pickedTrigger;
+        settings.expectedTrigger = match.liveTrigger;
+      }
       if (streamEditable && urlChanged) {
         settings.liveUrl = url.trim() === "" ? null : url.trim();
       }

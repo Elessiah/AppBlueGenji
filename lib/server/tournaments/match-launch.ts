@@ -1027,6 +1027,7 @@ export async function claimMatchCast(
  *   | `MATCH_CAST_CLOSED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
  *   | `MATCH_START_AT_REQUIRED` | `INVALID_STREAM_URL` | `CAST_STREAM_NOT_OWNED`
  *   | `INVALID_CAST_BATTLETAG` | `STREAM_NOT_FOUND` | `LIVE_TRIGGER_NOT_OWNED`
+ *   | `LIVE_TRIGGER_CHANGED`
  */
 export async function setCastSettings(
   matchId: number,

@@ -555,6 +555,14 @@ describe("castOrganisationLinkRefusal / parseCastSettings — décision D7 du 20
     expect(castOrganisationLinkRefusal({ organisationLink: value })).toEqual({ code: "INVALID_ORGANISATION_LINK", status: 400 });
   });
 
+  it("parseCastSettings_expectedTriggerNull_kept", () => {
+    expect(parseCastSettings({ trigger: "AUTO", expectedTrigger: null })).toEqual({ trigger: "AUTO", expectedTrigger: null });
+  });
+
+  it("parseCastSettings_expectedTriggerInvalid_returnsNull", () => {
+    expect(parseCastSettings({ trigger: "AUTO", expectedTrigger: "NOPE" })).toBeNull();
+  });
+
   it("parseCastSettings_organisationLinkPresent_neverSetsOrigin", () => {
     expect(parseCastSettings({ battletag: "Voix#1234", organisationLink: true })).toEqual({ battletag: "Voix#1234" });
   });

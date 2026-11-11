@@ -138,7 +138,7 @@ cette fenêtre et à celle du staff.
 | --- | --- | --- |
 | `GET …/caster` | caster inscrit | — → `{ streamId, liveUrl, staffStream, battletag }` |
 | `POST …/caster` | permission `live` | `{ streamId }` ou `{ liveUrl }` (obligatoire), plus `trigger`, `battletag` |
-| `PUT …/caster` | caster inscrit | `trigger`, `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
+| `PUT …/caster` | caster inscrit | `trigger` (avec `expectedTrigger`, le mode que la fenêtre affichait : changé entre-temps → 409 `LIVE_TRIGGER_CHANGED`, rien n'est écrit), `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
 | `DELETE …/caster` | le caster, ou `tournaments` pour un autre | `?userId=` |
 
 Un corps qui dit `organisationLink: true` (quel que soit le lecteur) : 403

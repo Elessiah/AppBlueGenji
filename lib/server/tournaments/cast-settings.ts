@@ -40,6 +40,13 @@ import type { LaunchMatchRow } from "./match-launch";
 export type CastSettings = {
   /** Mode d'antenne du match (`null` : le match n'est plus casté). */
   trigger?: MatchLiveTrigger | null;
+  /**
+   * Le mode que la fenêtre affichait quand le caster a choisi `trigger`. Lu
+   * sous le verrou, un mode qui a changé entre-temps (le staff, un autre
+   * caster) refuse tout l'enregistrement (`LIVE_TRIGGER_CHANGED`) : la valeur
+   * périmée du caster n'écrase pas le changement qu'il n'a pas vu.
+   */
+  expectedTrigger?: MatchLiveTrigger | null;
   /** Lien de **son** stream (`null` est refusé : `STREAM_URL_REQUIRED`). */
   liveUrl?: string | null;
   /** BattleTag donné pour ce cast (`null` : celui de son compte). */
@@ -347,6 +354,13 @@ export async function applyCastSettings(
   const matchId = Number(row.id);
   // Le mode puis le lien jugent le même caster : une seule lecture.
   const memo: ShownMemo = new Map();
+  if (
+    settings.trigger !== undefined &&
+    settings.expectedTrigger !== undefined &&
+    (row.live_trigger ?? null) !== settings.expectedTrigger
+  ) {
+    throw new Error("LIVE_TRIGGER_CHANGED");
+  }
   const triggerSkipped =
     settings.trigger !== undefined &&
     !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true, memo));
