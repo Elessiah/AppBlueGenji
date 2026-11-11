@@ -217,7 +217,7 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
  * (art. 32) qui s'y ajoute : Hetzner stocke des copies qu'il ne peut pas lire.
  */
 export const HETZNER_BACKUP_FRAMEWORK =
-  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
+  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique, qui a accepté le contrat de traitement des données de Hetzner (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
 
 /**
  * Portail de support (T15) : Spiceworks est **sous-traitant** de l'association,
@@ -367,7 +367,7 @@ export function transferBasisEn(recipients: readonly TransferRecipient[]): strin
 
 /** `HETZNER_BACKUP_FRAMEWORK`. */
 export const HETZNER_BACKUP_FRAMEWORK_EN =
-  "Hetzner Online GmbH (Germany), Storage Share service, processor of the association, subscribed on the association's behalf by its technical manager, who accepted its data processing agreement (Data Processing Agreement, version 1.2) on October 1, 2026; processing exclusively in the European Union or the European Economic Area";
+  "Hetzner Online GmbH (Germany), Storage Share service, processor of the association, subscribed on the association's behalf by its technical manager, who accepted Hetzner's data processing agreement (Data Processing Agreement, version 1.2) on October 1, 2026; processing exclusively in the European Union or the European Economic Area";
 
 /** `SPICEWORKS_PROCESSOR_FRAMEWORK`. */
 export const SPICEWORKS_PROCESSOR_FRAMEWORK_EN =

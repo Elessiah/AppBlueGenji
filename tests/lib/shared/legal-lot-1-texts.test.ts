@@ -106,7 +106,7 @@ describe("corrections de la revue (LEGAL-LOT-1)", () => {
     expect(fr).toContain("service de push du navigateur du joueur prévenu");
     expect(fr).toContain("Google, Mozilla, Apple et Microsoft, certifiés EU-U.S. Data Privacy Framework");
     expect(en).toContain("push service of the notified player's browser");
-    expect(en).toContain("Data Privacy Framework");
+    expect(en).toContain("Google, Mozilla, Apple and Microsoft, certified under the EU-U.S. Data Privacy Framework");
   });
 
   it("legalNotice_gmail_saysMovingToWorkspaceFrAndEn", () => {
