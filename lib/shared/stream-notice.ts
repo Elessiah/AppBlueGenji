@@ -35,22 +35,12 @@ export const STREAM_NOTICE_SERVICE =
   "La diffusion et l'enregistrement d'un match sous le pseudo de ses joueurs font partie du tournoi auquel ils participent (exécution du service) : un joueur qui ne veut pas y paraître n'y participe pas.";
 
 /**
- * Un joueur sans compte (équipe fantôme, sans membre sur le site, entrée
- * individuelle sans compte) n'a accepté aucune version des conditions : la
- * base contractuelle de D50 ne peut pas le couvrir. Sa diffusion garde la base
- * d'avant la version 11 — l'intérêt légitime —, avec le droit d'opposition que
- * l'article 21 attache à cette base (revue juridique TERMS-V11).
- */
-export const STREAM_NOTICE_ACCOUNTLESS =
-  `Un joueur sans compte sur le site (équipe dite « fantôme », qui n'a aucun membre sur le site, ou entrée individuelle sans compte) n'a pas accepté les conditions d'utilisation : la diffusion et l'enregistrement de ses matchs reposent, pour lui, sur l'intérêt légitime de l'association à retransmettre ses tournois (RGPD, art. 6.1.f), et il peut s'y opposer (art. 21) par le formulaire « ${REPORT_FORM_NAME} » (catégorie RGPD).`;
-
-/**
  * Le reste de la retransmission (décision de l'utilisateur D53, 2026-11-11) :
  * ce qui touche les casters, les liens publiés et l'alerte AutoMod relève aussi
  * de l'exécution du service — plus d'intérêt légitime ni de droit d'opposition.
  */
 export const STREAM_NOTICE_CASTERS =
-  "Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster qui s'inscrit sur un match, publiés avec ce match, et son réglage du passage à l'antenne ; les liens de diffusion et de rediffusion publiés sur le site ; et la copie du texte d'une annonce #live que la modération automatique de Discord (AutoMod) bloque ou signale, envoyée au salon d'alertes des modérateurs du serveur, où elle reste jusqu'à sa suppression par eux.";
+  "Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster qui s'inscrit sur un match, publiés avec ce match, et son réglage du passage à l'antenne ; les liens de diffusion et de rediffusion publiés sur le site ; et la copie du texte d'une annonce #live que la modération automatique de Discord (AutoMod) bloque ou signale, envoyée au salon d'alertes des modérateurs du serveur, où elle reste jusqu'à ce qu'ils la suppriment à la main à la suppression du compte du joueur — le site en avertit alors le staff, sans nommer le joueur — ; elle n'est pas supprimée sur demande autrement.";
 
 /**
  * L'annonce #live dans les conditions d'utilisation (décision du 2026-10-14 :

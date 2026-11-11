@@ -137,7 +137,8 @@ import { STREAM_NOTICE_CASTERS, STREAM_NOTICE_LIVE, STREAM_NOTICE_PRIVACY_PATH, 
  * #live d'un tournoi individuel) : l'opposition par « nom neutre » disparaît
  * (`STREAM_NOTICE_SERVICE`) ; ce qui touche les casters, les liens publiés et
  * l'alerte AutoMod relève aussi de l'exécution du service (D53,
- * `STREAM_NOTICE_CASTERS`). Aucun régime transitoire : la version s'applique
+ * `STREAM_NOTICE_CASTERS`) ; l'alerte AutoMod est supprimée à la main par les
+ * modérateurs à la suppression du compte (D56b). Aucun régime transitoire : la version s'applique
  * à sa mise en ligne (D54). « Compte » — la propriété d'une équipe passe à un
  * autre **membre** (pas seulement un joueur), un membre dont la suppression
  * est elle-même demandée n'étant pas compté ; la suppression se **demande**.

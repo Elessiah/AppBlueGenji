@@ -78,7 +78,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import { STREAM_NOTICE_ACCOUNTLESS, STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
+import { STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -403,7 +403,7 @@ function RgpdFr({
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
-          demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo jusqu&apos;à sa suppression par les modérateurs (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
+          demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo jusqu&apos;à ce que les modérateurs la suppriment à la main, le staff étant averti de votre demande sans que vous soyez nommé (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -1308,7 +1308,7 @@ function RgpdFr({
             l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
             plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
             chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
-            de la même base, que la même section des conditions prévoit. {STREAM_NOTICE_ACCOUNTLESS}{" "}
+            de la même base, que la même section des conditions prévoit.
             Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
@@ -1327,7 +1327,10 @@ function RgpdFr({
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
-            reste jusqu&apos;à sa suppression par les modérateurs, au titre, elle aussi, de
+            reste jusqu&apos;à ce que les modérateurs la suppriment à la main à la suppression du compte du joueur — dès la
+            demande de suppression, le site en avertit le staff dans son journal d&apos;activité sur Discord, sans nommer le
+            joueur : seuls le tournoi et l&apos;heure de ses annonces #live d&apos;un tournoi individuel y figurent —, sans
+            autre suppression sur demande, au titre, elle aussi, de
             l&apos;exécution du service depuis la version 11 des conditions. Un match listé dans
             ce message avant son passage à l&apos;antenne, programmé dans la soirée pour une diffusion ouverte à son heure de début, ne laisse aucune trace sur
             le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne

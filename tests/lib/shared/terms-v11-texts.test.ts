@@ -3,7 +3,6 @@ import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import {
   REPORT_FORM_NAME_EN,
-  STREAM_NOTICE_ACCOUNTLESS_EN,
   STREAM_NOTICE_CASTERS_EN,
   STREAM_NOTICE_LIVE_EN,
   STREAM_NOTICE_SERVICE_EN,
@@ -16,7 +15,6 @@ import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, DROITS, STREAM_PSEUDO_SCOPE } from
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import {
   REGISTRATION_STREAM_NOTICE_SHORT,
-  STREAM_NOTICE_ACCOUNTLESS,
   STREAM_NOTICE_CASTERS,
   STREAM_NOTICE_LIVE,
   STREAM_NOTICE_SERVICE,
@@ -108,11 +106,11 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
 
     expect(fr.legalBasis).toContain("pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo");
     expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
-    // Seul un joueur sans compte (aucune acceptation des conditions) garde l'intérêt légitime (revue juridique v11).
-    expect(fr.legalBasis.split("; pour un joueur sans compte")[0]).not.toMatch(/intérêt légitime|droit d'opposition/i);
+    // D57b : aucun régime à part pour un joueur sans compte — plus d'intérêt légitime dans la base.
+    expect(fr.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
     expect(en.legalBasis).toContain("for the live streaming and recording of their matches under their username");
     expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), under the service the caster registers for on a match, for the stream and replay links published on the site and for the AutoMod alert");
-    expect(en.legalBasis.split("; for a player with no account")[0]).not.toMatch(/legitimate interest|right to object/i);
+    expect(en.legalBasis).not.toMatch(/legitimate interest|right to object|no account/i);
     expect(en.retention).toHaveLength(fr.retention.length);
   });
 
@@ -150,8 +148,8 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
   });
 
   it("botPrivacyPolicy_autoModAlert_restsOnPerformanceOfTheServiceFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée jusqu'à sa suppression par les modérateurs.");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, kept until the moderators delete it.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, que les modérateurs suppriment à la main à la suppression du compte du joueur.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, which the moderators delete by hand when the player's account is deleted.");
   });
 
   it("privacyChange_termsV11_saysCastersLinksAndAlertMoveAndNoTransitionFrAndEn", () => {
@@ -277,9 +275,9 @@ describe("documents du bot — D47 et reprise d'équipe", () => {
 
 /**
  * Revue standard de la v11 et décision de l'utilisateur D55 (2026-11-11) :
- * l'alerte AutoMod d'une annonce #live n'est plus supprimée sur demande — elle
- * reste jusqu'à sa suppression par les modérateurs ; l'annonce #live, elle,
- * reste supprimée sur demande.
+ * l'alerte AutoMod d'une annonce #live n'est plus supprimée sur demande — les
+ * modérateurs la suppriment à la main à la suppression du compte (D56b) ;
+ * l'annonce #live, elle, reste supprimée sur demande.
  */
 describe("D55 et revue standard v11", () => {
   const v11Fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
@@ -288,18 +286,16 @@ describe("D55 et revue standard v11", () => {
   const t16En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
   const autoModLines = (lines: readonly string[]) => lines.filter((line) => /AutoMod/.test(line));
 
-  it("streamNoticeCasters_autoModAlert_keptUntilModeratorsDeleteNoRequestFrAndEn", () => {
-    expect(STREAM_NOTICE_CASTERS.endsWith("où elle reste jusqu'à sa suppression par eux.")).toBe(true);
-    expect(STREAM_NOTICE_CASTERS).not.toContain("sur demande");
-    expect(STREAM_NOTICE_CASTERS_EN.endsWith("where it stays until they delete it.")).toBe(true);
-    expect(STREAM_NOTICE_CASTERS_EN).not.toContain("on request");
+  it("streamNoticeCasters_autoModAlert_notDeletedOnRequestOtherwiseFrAndEn", () => {
+    expect(STREAM_NOTICE_CASTERS.endsWith("; elle n'est pas supprimée sur demande autrement.")).toBe(true);
+    expect(STREAM_NOTICE_CASTERS_EN.endsWith("; it is not deleted on request otherwise.")).toBe(true);
   });
 
   it("autoModAlertScope_noDeletionOnRequestFrAndEn", () => {
     const scopeEn = DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases?.find((b) => b.scope.startsWith("AutoMod alert"))?.scope;
 
-    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux");
-    expect(scopeEn).toBe("AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it");
+    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à ce qu'ils la suppriment à la main, à la suppression de ton compte");
+    expect(scopeEn).toBe("AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it by hand, when your account is deleted");
   });
 
   it("register_autoModAlert_noDeletionOnRequestInT01T08T16FrAndEn", () => {
@@ -320,15 +316,15 @@ describe("D55 et revue standard v11", () => {
 
     expect(fr).not.toContain("est supprimée sur demande de la même façon");
     expect(en).not.toContain("is deleted on request in the same way");
-    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs.");
-    expect(en).toContain("its alert stays in the moderation alert channel until the moderators delete it.");
+    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération jusqu'à ce que les modérateurs la suppriment à la main, à la suppression du compte du joueur, dont le site avertit le staff sans nommer le joueur ; elle n'est pas supprimée sur demande autrement.");
+    expect(en).toContain("its alert stays in the moderation alert channel until the moderators delete it by hand, when the player's account is deleted, of which the website tells the staff without naming the player; it is not deleted on request otherwise.");
     expect(fr).toContain("supprimées sur demande de l'équipe, du joueur ou du caster concerné");
   });
 
   it("privacyChangeV11_autoModAlert_saysNoLongerDeletedOnRequestFrAndEn", () => {
-    expect(v11Fr.details[1]).toContain("L'alerte n'est plus supprimée sur demande : elle reste dans le salon jusqu'à sa suppression par les modérateurs");
+    expect(v11Fr.details[1]).toContain("L'alerte n'est plus supprimée sur demande : les modérateurs la suppriment à la main quand le compte du joueur est supprimé.");
     expect(v11Fr.details.join(" ")).not.toContain("L'alerte reste supprimée sur demande");
-    expect(v11En.details[1]).toContain("The alert is no longer deleted on request: it stays in the channel until the moderators delete it");
+    expect(v11En.details[1]).toContain("The alert is no longer deleted on request: the moderators delete it by hand when the player's account is deleted.");
     expect(v11En.details.join(" ")).not.toContain("The alert is still deleted on request");
   });
 
@@ -397,32 +393,9 @@ describe("revue sécurité v11 — textes alignés sur le code", () => {
   });
 });
 
-describe("revue juridique v11 — joueurs sans compte et textes alignés", () => {
+describe("revue juridique v11 — textes alignés", () => {
   const v11Fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
   const v11En = PRIVACY_CHANGES_EN[V11_ID];
-  const t16Fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T16")!;
-  const t16En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
-
-  it("streamNoticeAccountless_ghostAndAccountlessEntries_legitimateInterestWithObjectionFrAndEn", () => {
-    expect(STREAM_NOTICE_ACCOUNTLESS).toContain("intérêt légitime de l'association à retransmettre ses tournois (RGPD, art. 6.1.f)");
-    expect(STREAM_NOTICE_ACCOUNTLESS).toContain(`il peut s'y opposer (art. 21) par le formulaire « ${REPORT_FORM_NAME} »`);
-    expect(STREAM_NOTICE_ACCOUNTLESS_EN).toContain("legitimate interest in broadcasting its tournaments (GDPR, art. 6(1)(f))");
-    expect(STREAM_NOTICE_ACCOUNTLESS_EN).toContain(`they can object to it (art. 21) through the “${REPORT_FORM_NAME_EN}” form`);
-  });
-
-  it("rgpdPages_retransmissionAndObjection_quoteAccountlessNoticeFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("{STREAM_NOTICE_ACCOUNTLESS}");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("{STREAM_NOTICE_ACCOUNTLESS_EN}");
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(STREAM_NOTICE_ACCOUNTLESS);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(STREAM_NOTICE_ACCOUNTLESS_EN);
-  });
-
-  it("registerT16_accountlessPlayers_legitimateInterestClauseFrAndEn", () => {
-    expect(t16Fr.legalBasis).toContain("pour un joueur sans compte sur le site (équipe fantôme — sans membre sur le site —, ou entrée individuelle sans compte), qui n'a pas accepté les conditions d'utilisation : intérêt légitime");
-    expect(t16Fr.legalBasis).toContain("avec droit d'opposition (art. 21) sur demande");
-    expect(t16En.legalBasis).toContain("for a player with no account on the site (ghost team — with no member on the site —, or solo entry with no account), who has not accepted the terms of use: the association's legitimate interest");
-    expect(t16En.legalBasis).toContain("with a right to object (art. 21) on request");
-  });
 
   it("privacyChangeV11_refereeTag_readByOtherPartiesFrAndEn", () => {
     expect(v11Fr.details.join(" ")).toContain("n'est lu que par les autres parties du match (ses deux équipes, ses casters)");
@@ -444,11 +417,6 @@ describe("revue juridique v11 — joueurs sans compte et textes alignés", () =>
     expect(en).not.toContain("without limit, the channel then falling");
   });
 
-  it("rgpdPages_accountlessNotice_followedBySpaceFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain('{STREAM_NOTICE_ACCOUNTLESS}{" "}');
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain('{STREAM_NOTICE_ACCOUNTLESS_EN}{" "}');
-  });
-
   it("privacyChangeV11_botDetail_mentionsCasterDeletionRequestFrAndEn", () => {
     expect(v11Fr.details.join(" ")).toContain("le caster concerné peut, comme l'équipe ou le joueur, demander la suppression d'une annonce #live");
     expect(v11En.details.join(" ")).toContain("the caster concerned can, like the team or player, ask for a #live announcement to be deleted");
@@ -456,5 +424,91 @@ describe("revue juridique v11 — joueurs sans compte et textes alignés", () =>
 
   it("botPolicy_liveAnnouncementDeletion_includesCasterEn", () => {
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("deleted at the request of the team, player or caster concerned");
+  });
+});
+
+// D56b (2026-11-11) : l'alerte AutoMod est supprimée à la main par les
+// modérateurs à la suppression du compte, que le journal du staff leur signale
+// sans nommer le joueur. D57b : plus de régime à part pour un joueur sans compte.
+describe("D56b — alerte AutoMod supprimée à la main à la suppression du compte", () => {
+  const t = (ref: string) => JSON.stringify(PROCESSING_ACTIVITIES.find((a) => a.ref === ref));
+  const tEn = (ref: string) => JSON.stringify(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref));
+
+  it("streamNoticeCasters_alert_deletedByHandAtAccountDeletionFrAndEn", () => {
+    expect(STREAM_NOTICE_CASTERS).toContain("où elle reste jusqu'à ce qu'ils la suppriment à la main à la suppression du compte du joueur — le site en avertit alors le staff, sans nommer le joueur — ; elle n'est pas supprimée sur demande autrement.");
+    expect(STREAM_NOTICE_CASTERS_EN).toContain("where it stays until they delete it by hand when the player's account is deleted — the site then tells the staff, without naming the player —; it is not deleted on request otherwise.");
+  });
+
+  it("registerT16_retention_saysStaffLogCarriesTournamentAndTimeOnlyFrAndEn", () => {
+    expect(t("T16")).toContain("dès la demande de suppression, le site en avertit le staff dans son journal d'activité sur Discord, sans nommer le joueur (seuls le tournoi et l'heure de chaque annonce #live d'un tournoi individuel qui l'a concerné y figurent, T05) ; elle n'est pas supprimée sur demande autrement");
+    expect(tEn("T16")).toContain("as soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player (only the tournament and the time of each #live announcement of a solo tournament that concerned them appear in it, T05); it is not deleted on request otherwise");
+  });
+
+  it("registerT05_staffLog_declaresTheDeletionLineContentFrAndEn", () => {
+    expect(t("T05")).toContain("la ligne de sa demande de suppression cite le tournoi et l'heure de ces annonces, pour que les modérateurs suppriment à la main leurs alertes AutoMod (T16)");
+    expect(tEn("T05")).toContain("the line of its deletion request quotes the tournament and the time of those announcements, so that the moderators delete their AutoMod alerts by hand (T16)");
+  });
+
+  it("registerT01AndT08_alert_noLongerKeptAfterAccountDeletionFrAndEn", () => {
+    expect(t("T01")).toContain("jusqu'à ce qu'ils la suppriment à la main, le staff étant averti de la demande de suppression sans que le joueur soit nommé (T16)");
+    expect(t("T08")).toContain("jusqu'à ce que les modérateurs la suppriment à la main, à la suppression du compte du joueur (traitement T16)");
+    expect(t("T08") + t("T16")).not.toContain("même après la suppression du compte du joueur\"");
+    expect(tEn("T08")).toContain("until the moderators delete it by hand, when the player's account is deleted (processing activity T16)");
+  });
+
+  it("rgpdPolicy_alert_deletedByHandAtAccountDeletionFrAndEn", () => {
+    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à ce qu'ils la suppriment à la main, à la suppression de ton compte");
+    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toContain("jusqu'à ce que les modérateurs la suppriment à la main, à la suppression de votre compte : le site avertit le staff de votre demande, sans vous nommer ; elle n'est pas supprimée sur demande autrement.");
+    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toContain("until the moderators delete it by hand, when your account is deleted: the site tells the staff of your request, without naming you; it is not deleted on request otherwise.");
+  });
+
+  it("rgpdPages_alert_sayHandDeletionAndAnonymousStaffNoticeFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("seuls le tournoi et l&apos;heure de ses annonces #live d&apos;un tournoi individuel y figurent");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("only the tournament and the time of their #live announcements of a solo tournament appear in it");
+  });
+
+  it("deletionResidual_alert_saysHandDeletionFrAndEn", () => {
+    expect(JSON.stringify(frProfile)).toContain("qui garde ton pseudo jusqu'à ce que les modérateurs la suppriment à la main (le staff est averti de ta demande, sans te nommer)");
+    expect(JSON.stringify(enProfile)).toContain("which keeps your username until the moderators delete it by hand (the staff is told of your request, without naming you)");
+  });
+
+  it("botPrivacyPolicy_alert_saysHandDeletionAndStaffLogContentFrAndEn", () => {
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("que les modérateurs suppriment à la main à la suppression du compte du joueur.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("le tournoi et l'heure de ces annonces, pour que les modérateurs suppriment à la main leurs alertes AutoMod");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which the moderators delete by hand when the player's account is deleted.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("the tournament and the time of those announcements, so that the moderators delete their AutoMod alerts by hand");
+  });
+
+  it("privacyChangeV11_alert_saysHandDeletionAndStaffNoticeFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
+
+    expect(fr.details[1]).toContain("les modérateurs la suppriment à la main quand le compte du joueur est supprimé. Dès la demande de suppression, le site en avertit le staff dans son journal d'activité sur Discord, sans nommer le joueur");
+    expect(PRIVACY_CHANGES_EN[V11_ID].details[1]).toContain("the moderators delete it by hand when the player's account is deleted. As soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player");
+  });
+});
+
+describe("D57b — aucun régime à part pour un joueur sans compte", () => {
+  it("v11Texts_everywhere_carryNoAccountlessPlayerWordingFr", () => {
+    const texts = [
+      TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" "),
+      DROITS.map((d) => d.text).join(" "),
+      JSON.stringify(PROCESSING_ACTIVITIES.find((a) => a.ref === "T16")),
+      readSource("app/rgpd/page.tsx"),
+      readSource("lib/shared/stream-notice.ts"),
+    ].join(" ");
+
+    expect(texts).not.toMatch(/joueur sans compte|STREAM_NOTICE_ACCOUNTLESS/);
+  });
+
+  it("v11Texts_everywhere_carryNoAccountlessPlayerWordingEn", () => {
+    const texts = [
+      TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" "),
+      DROITS_EN.map((d) => d.text).join(" "),
+      JSON.stringify(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")),
+      readSource("app/rgpd/RgpdEn.tsx"),
+      readSource("lib/shared/legal-text-en.ts"),
+    ].join(" ");
+
+    expect(texts).not.toMatch(/player with no account|STREAM_NOTICE_ACCOUNTLESS/);
   });
 });

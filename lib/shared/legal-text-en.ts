@@ -46,13 +46,9 @@ export const STREAM_NOTICE_SHOWN_EN =
 export const STREAM_NOTICE_SERVICE_EN =
   "Streaming and recording a match under its players' usernames is part of the tournament they take part in (performance of the service): a player who does not want to appear in it does not take part.";
 
-/** `STREAM_NOTICE_ACCOUNTLESS` (`stream-notice.ts`). */
-export const STREAM_NOTICE_ACCOUNTLESS_EN =
-  `A player with no account on the site (a so-called “ghost” team, which has no member on the site, or a solo entry with no account) has not accepted the terms of use: for them, the streaming and recording of their matches rest on the association's legitimate interest in broadcasting its tournaments (GDPR, art. 6(1)(f)), and they can object to it (art. 21) through the “${REPORT_FORM_NAME_EN}” form (GDPR category).`;
-
 /** `STREAM_NOTICE_CASTERS` (`stream-notice.ts`). */
 export const STREAM_NOTICE_CASTERS_EN =
-  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays until they delete it.";
+  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays until they delete it by hand when the player's account is deleted — the site then tells the staff, without naming the player —; it is not deleted on request otherwise.";
 
 /** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_LIVE_EN =

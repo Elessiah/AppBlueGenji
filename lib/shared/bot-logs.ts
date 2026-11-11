@@ -167,11 +167,66 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
  * {@link formatPlayerSignupLog}, même canal (`signups`), même discrétion — ni
  * pseudo ni identifiant. La suppression ne devient définitive qu'au bout de
  * `days` jours (réactivation possible d'ici là) : la ligne le dit, pour qu'un
- * départ ne soit pas compté deux fois si le joueur revient.
+ * départ ne soit pas compté deux fois si le joueur revient. Elle dit aussi aux
+ * modérateurs quelles alertes AutoMod supprimer à la main (D56b).
  */
-export function formatAccountDeletionLog(context: { days: number }): string {
+export function formatAccountDeletionLog(context: {
+  days: number;
+  /**
+   * Annonces #live d'un tournoi individuel qui ont concerné le compte, de la
+   * plus récente à la plus ancienne ; `null` si elles n'ont pas pu être lues.
+   */
+  liveAnnouncements?: readonly DeletedAccountLiveAnnouncement[] | null;
+}): string {
   const detail = `définitive sous ${context.days} jours, sauf réactivation`;
-  return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.`;
+  return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.${automodAlertsToClear(context.liveAnnouncements)}`;
+}
+
+/** Une annonce #live d'un tournoi individuel où paraissait le compte supprimé. */
+export interface DeletedAccountLiveAnnouncement {
+  tournamentName: string;
+  sentAt: string | Date;
+}
+
+/** Annonces citées dans la ligne ; les autres sont comptées (« et N autres »). */
+export const ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS = 5;
+
+let announcementTimeFormat: Intl.DateTimeFormat | null = null;
+
+/** « 12/11/2026 21:04 », heure de Paris : de quoi retrouver l'alerte dans le salon. */
+function announcementTime(sentAt: string | Date): string {
+  announcementTimeFormat ??= new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Paris",
+  });
+  return announcementTimeFormat.format(sentAt instanceof Date ? sentAt : new Date(sentAt));
+}
+
+/**
+ * Suite de la ligne de suppression (décision de l'utilisateur D56b,
+ * 2026-11-11) : l'alerte AutoMod d'une annonce #live bloquée ou signalée est
+ * un message de Discord que ni le site ni le bot ne savent retrouver — les
+ * modérateurs la suppriment **à la main** quand le compte est supprimé. La
+ * ligne leur dit où chercher sans nommer personne : le tournoi et l'heure de
+ * chaque annonce d'un tournoi individuel qui a concerné le compte, jamais un
+ * pseudo ni un identifiant. Rien n'est ajouté pour un compte jamais annoncé.
+ */
+function automodAlertsToClear(announcements: readonly DeletedAccountLiveAnnouncement[] | null | undefined): string {
+  if (announcements === null) {
+    return " Modération : ses annonces #live n'ont pas pu être relues — vérifier le salon d'alertes AutoMod et y supprimer à la main les alertes qui portent le pseudo d'un compte supprimé.";
+  }
+  if (!announcements || announcements.length === 0) return "";
+  const cited = announcements
+    .slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS)
+    .map((announcement) => `${discordQuoted(announcement.tournamentName, "fr")} le ${announcementTime(announcement.sentAt)}`);
+  const others = announcements.length - cited.length;
+  if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
+  return ` Modération : ce compte a été annoncé dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes de ces annonces.`;
 }
 
 /**

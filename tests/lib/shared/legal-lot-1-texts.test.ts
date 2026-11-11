@@ -85,7 +85,7 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
       "pour les messages privés d'équipe — demande d'adhésion, invitation d'une équipe, reprise d'une équipe fantôme proposée, propriété d'équipe transférée —, auxquels chacun peut s'opposer sur demande",
       "for team direct messages — join request, a team's invitation, offered takeover of a ghost team, transferred team ownership —, which anyone may object to on request",
     ],
-    ["staffLog_namesAccountDeletionRequests", "demandes de suppression de compte et leur réactivation, « un joueur »", "account deletion requests and their reactivation, “a player”"],
+    ["staffLog_namesAccountDeletionRequests", "demandes de suppression de compte — avec, pour un compte annoncé dans #live en tournoi individuel, le tournoi et l'heure de ces annonces, pour que les modérateurs suppriment à la main leurs alertes AutoMod — et leur réactivation, « un joueur »", "account deletion requests — with, for an account announced in #live in a solo tournament, the tournament and the time of those announcements, so that the moderators delete their AutoMod alerts by hand — and their reactivation, “a player”"],
   ];
 
   it.each(sentences)("botPrivacyPolicy_%s_frAndEn", (_case, frText, enText) => {

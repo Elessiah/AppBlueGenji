@@ -38,6 +38,7 @@ jest.mock("@/lib/server/users/account-deletion", () => ({
   mergeTournamentIds: (...lists: (readonly number[])[]) => [...new Set(lists.flat())].sort((a, b) => a - b),
 }));
 jest.mock("@/lib/server/account-deletion-journal");
+jest.mock("@/lib/server/users/live-announcement-export");
 jest.mock("@/lib/server/users/account-deletion-hold");
 jest.mock("@/lib/server/users/deleted-solo-entries", () => ({
   forfeitSoloEntriesAfterCommit: jest.fn(),
@@ -50,6 +51,7 @@ import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { holdAccountIdentity } from "@/lib/server/users/account-deletion-hold";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { listLiveAnnouncementsForDeletionLog } from "@/lib/server/users/live-announcement-export";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
@@ -955,6 +957,41 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
     expect(message).toContain("Suppression de compte demandée");
     expect(message).not.toMatch(/#7\b|7\)/);
     expect(options).toEqual({ category: "signups" });
+  });
+
+  // D56b : la ligne dit aux modérateurs quelles alertes AutoMod supprimer à la main.
+  it("requestAccountDeletion_neverAnnouncedAccount_logLineStaysBare", async () => {
+    jest.mocked(listLiveAnnouncementsForDeletionLog).mockResolvedValue([]);
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    const [message] = jest.mocked(sendBotLog).mock.calls[0];
+    expect(message).toBe("🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation.");
+  });
+
+  it("requestAccountDeletion_announcedAccount_logLineCitesTournamentAndTime", async () => {
+    jest
+      .mocked(listLiveAnnouncementsForDeletionLog)
+      .mockResolvedValue([{ tournamentName: "Solo Cup", sentAt: "2026-11-13T20:04:00.000Z" }]);
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(listLiveAnnouncementsForDeletionLog)).toHaveBeenCalledWith(7);
+    const [message] = jest.mocked(sendBotLog).mock.calls[0];
+    expect(message).toContain("(« Solo Cup » le 13/11/2026 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes de ces annonces.");
+  });
+
+  it("requestAccountDeletion_announcementLookupFails_logLineAsksToCheckAlertChannel", async () => {
+    jest.mocked(listLiveAnnouncementsForDeletionLog).mockRejectedValue(new Error("DB_DOWN"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    const [message] = jest.mocked(sendBotLog).mock.calls[0];
+    expect(message).toContain("ses annonces #live n'ont pas pu être relues — vérifier le salon d'alertes AutoMod");
   });
 
   it("requestAccountDeletion_withdrawnRegistration_logsEachWithdrawal", async () => {

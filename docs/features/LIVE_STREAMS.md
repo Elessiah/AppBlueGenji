@@ -542,12 +542,12 @@ poser. Ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode
 d'antenne), les liens de diffusion et de rediffusion publiés sur le site et
 l'alerte AutoMod d'une annonce #live relèvent de la même base (décision D53,
 `STREAM_NOTICE_CASTERS`) : plus d'intérêt légitime ni de droit d'opposition
-dans T16 ; l'alerte n'est plus supprimée sur demande (D55) : elle reste jusqu'à sa suppression par les modérateurs. Aucun régime transitoire (D54).
-Seul un **joueur sans compte** (équipe fantôme inscrite par le staff, entrée
-individuelle sans compte), qui n'a accepté aucune version des conditions, garde
-l'**intérêt légitime** et le droit d'opposition de l'article 21, sur demande par
-le formulaire de signalement (`STREAM_NOTICE_ACCOUNTLESS` / `_EN`, dans
-`/rgpd#retransmission`, `DROITS` et la base de T16 — revue juridique v11).
+dans T16 ; l'alerte n'est plus supprimée sur demande (D55) : les modérateurs la
+suppriment **à la main** à la suppression du compte (D56b, ci-dessous). Aucun
+régime transitoire (D54). Les textes ne prévoient **aucun régime à part pour un
+joueur sans compte** (décision D57b du 2026-11-11 : la formulation ajoutée par
+la revue juridique, `STREAM_NOTICE_ACCOUNTLESS`, est retirée ; aucun garde-fou
+de code n'est ajouté).
 Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose de
 même sur l'**exécution du service** depuis le 2026-10-14 (l'annonce fait partie
 du tournoi auquel il s'inscrit) : ne pas y être
@@ -559,8 +559,20 @@ bloque **ou signale** une annonce, son texte (pseudo compris en individuel) peut
 parvenir au salon d'alertes des modérateurs du serveur. T16 en fait une finalité
 (modérer le serveur), sur l'**exécution du service** depuis la version 11 des
 conditions (D53 ; intérêt légitime et opposition jusque-là) ; l'alerte reste
-jusqu'à sa suppression par les modérateurs, plus sur demande depuis la version 11 (D55) —
-**décision requise** : aucune durée fixe. Textes à tenir ensemble : T16
+jusqu'à sa suppression par les modérateurs, plus sur demande depuis la version 11 (D55).
+**Suppression à la main à la suppression du compte** (décision D56b du
+2026-11-11) : l'alerte est un message que l'AutoMod de Discord poste lui-même —
+ni le site ni le bot n'en gardent l'identifiant, le salon ou le match, et le bot
+ne voit même pas une alerte seulement « signalée » : ils ne peuvent pas
+l'effacer. À la **demande de suppression**, la ligne « Suppression de compte
+demandée » du journal du staff (`formatAccountDeletionLog`, catégorie
+`signups`) dit donc aux modérateurs quoi supprimer : le tournoi et l'heure
+(Paris) de chaque annonce #live d'un tournoi individuel qui a concerné le
+compte (`listLiveAnnouncementsForDeletionLog`, lues dans
+`bg_live_announcements`, cinq citées, les autres comptées) — **jamais un pseudo
+ni un identifiant** ; rien de plus pour un compte jamais annoncé, et « vérifier
+le salon d'alertes » si la lecture échoue. Une réactivation ne rétablit pas une
+alerte supprimée. Textes à tenir ensemble : T16
 (finalité, base, destinataire, conservation, transfert), T08, T01 (suppression),
 `/rgpd` (#retransmission, tableau `AUTOMOD_ALERT_SCOPE`, suppression du compte,
 transfert Discord), `DROITS` (effacement, opposition), la confirmation de

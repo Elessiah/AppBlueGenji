@@ -1,6 +1,5 @@
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
-import { STREAM_NOTICE_ACCOUNTLESS } from "@/lib/shared/stream-notice";
 
 /**
  * Les annonces d'horaire et rappels de match remis en message privé Discord
@@ -36,9 +35,10 @@ export const STREAM_PSEUDO_SCOPE = "diffusion en direct et enregistrement des ma
  * signalée (registre T16) : exécution du service depuis la version 11 des
  * conditions (décision de l'utilisateur D53, 2026-11-11) — auparavant intérêt
  * légitime de l'association à modérer son serveur. Plus supprimée sur demande
- * (décision D55) : gardée jusqu'à sa suppression par les modérateurs.
+ * (décision D55) : les modérateurs la suppriment à la main à la suppression du
+ * compte, que le journal du staff leur signale sans nommer personne (D56b).
  */
-export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux";
+export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à ce qu'ils la suppriment à la main, à la suppression de ton compte";
 
 /**
  * Contacts d'un match (registre T04) : exécution du service, que les
@@ -432,7 +432,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit à l'effacement",
-    text: "Vous pouvez demander la suppression de votre compte et de vos données de profil, ou la faire vous-même dans Mon profil — ou, sans accepter les conditions d'utilisation, depuis la fenêtre qui vous demande de les accepter. Voir ci-dessus pour les données de palmarès, et pour les données de connexion, que la loi impose de garder un an (RGPD, art. 17.3.b). Les annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte (« Signaler un problème », catégorie RGPD) ; l'alerte de modération d'une telle annonce bloquée ou signalée par AutoMod garde le pseudo jusqu'à sa suppression par les modérateurs.",
+    text: "Vous pouvez demander la suppression de votre compte et de vos données de profil, ou la faire vous-même dans Mon profil — ou, sans accepter les conditions d'utilisation, depuis la fenêtre qui vous demande de les accepter. Voir ci-dessus pour les données de palmarès, et pour les données de connexion, que la loi impose de garder un an (RGPD, art. 17.3.b). Les annonces #live d'un tournoi individuel qui ont publié votre pseudo restent dans le salon Discord jusqu'à leur suppression, sur une demande distincte (« Signaler un problème », catégorie RGPD) ; l'alerte de modération d'une telle annonce bloquée ou signalée par AutoMod garde le pseudo jusqu'à ce que les modérateurs la suppriment à la main, à la suppression de votre compte : le site avertit le staff de votre demande, sans vous nommer ; elle n'est pas supprimée sur demande autrement.",
   },
   {
     title: "Droit à la limitation",
@@ -440,7 +440,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: `Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, check-in du match, annonces d'un nouveau match et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, la présentation de l'arbitre désigné aux parties de ses matchs — pseudo et BattleTag en Overwatch tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, tag Discord certifié tant qu'il n'a pas accepté la version 9 ou une version suivante —, par le formulaire de signalement, catégorie RGPD). La diffusion et l'enregistrement de vos matchs de tournoi sous votre pseudo n'en font pas partie : ils relèvent de l'exécution du service, le tournoi auquel vous participez — ne pas y paraître revient à ne pas y participer. Le pseudo publié dans l'annonce #live d'un tournoi individuel non plus : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord, et ce qui touche les casters et les liens de diffusion publiés relèvent de la même base ; l'alerte reste jusqu'à sa suppression par les modérateurs. ${STREAM_NOTICE_ACCOUNTLESS}`,
+    text: `Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, check-in du match, annonces d'un nouveau match et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, la présentation de l'arbitre désigné aux parties de ses matchs — pseudo et BattleTag en Overwatch tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, tag Discord certifié tant qu'il n'a pas accepté la version 9 ou une version suivante —, par le formulaire de signalement, catégorie RGPD). La diffusion et l'enregistrement de vos matchs de tournoi sous votre pseudo n'en font pas partie : ils relèvent de l'exécution du service, le tournoi auquel vous participez — ne pas y paraître revient à ne pas y participer. Le pseudo publié dans l'annonce #live d'un tournoi individuel non plus : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord, et ce qui touche les casters et les liens de diffusion publiés relèvent de la même base ; l'alerte est supprimée à la main par les modérateurs quand votre compte est supprimé, le site avertissant le staff de votre demande sans vous nommer.`,
   },
   {
     title: "Droit à la portabilité",
