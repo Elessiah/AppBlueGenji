@@ -184,6 +184,24 @@ describe("match-lock — adaptation depuis BracketMatch", () => {
     expect(fromBracketMatch({ ...base, status: "AWAITING_CONFIRMATION" }).hasPendingReport).toBe(true);
     expect(hasScoreInput(fromBracketMatch({ ...base, status: "AWAITING_CONFIRMATION" }))).toBe(true);
   });
+
+  // Revue #542 : le serveur lit les dates de report, pas le statut — une
+  // proposition gardée hors `AWAITING_CONFIRMATION` verrouille aussi le bouton.
+  const report = { team1Score: 2, team2Score: 1, reportedAt: "2026-08-16T10:00:00.000Z", maps: [] };
+
+  it("fromBracketMatch_team1ReportWithoutAwaitingStatus_hasPendingReport", () => {
+    const state = fromBracketMatch({ ...base, status: "READY", team1Report: report, team2Report: null });
+    expect(state.hasPendingReport).toBe(true);
+    expect(hasScoreInput(state)).toBe(true);
+  });
+
+  it("fromBracketMatch_team2ReportWithoutAwaitingStatus_hasPendingReport", () => {
+    expect(fromBracketMatch({ ...base, status: "PENDING", team1Report: null, team2Report: report }).hasPendingReport).toBe(true);
+  });
+
+  it("fromBracketMatch_noReportReadyStatus_noPendingReport", () => {
+    expect(fromBracketMatch({ ...base, status: "READY", team1Report: null, team2Report: null }).hasPendingReport).toBe(false);
+  });
 });
 
 describe("match-lock — match nul", () => {

@@ -85,7 +85,12 @@ export function fromBracketMatch(match: BracketMatch): MatchScoreState {
     forfeitTeamId: match.forfeitTeamId,
     doubleForfeit: match.doubleForfeit,
     decided: match.status === "COMPLETED",
-    hasPendingReport: match.status === "AWAITING_CONFIRMATION",
+    // Comme le serveur (`HAS_SCORE_INPUT_SQL`, verrou d'arbitrage), qui lit les
+    // dates de report : une proposition présente compte, quel que soit le
+    // statut — un match aval qui la garderait sans `AWAITING_CONFIRMATION`
+    // verrouillait le serveur (409) sans masquer « Éditer le score ».
+    hasPendingReport:
+      match.status === "AWAITING_CONFIRMATION" || Boolean(match.team1Report) || Boolean(match.team2Report),
     nextWinnerMatchId: match.nextWinnerMatchId,
     nextLoserMatchId: match.nextLoserMatchId,
     phaseId: match.phaseId,
