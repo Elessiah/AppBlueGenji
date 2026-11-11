@@ -1,5 +1,5 @@
 {
-  "count": 219,
+  "count": 220,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -96,6 +96,7 @@
     "INVALID_TIEBREAK_MAP": "Nom de map de départage invalide (64 caractères au plus).",
     "INVALID_TOURNAMENT_ID": "Identifiant de tournoi invalide.",
     "ISSUE_REPORT_FAILED": "Erreur lors de l'envoi du signalement.",
+    "LIVE_TRIGGER_CHANGED": "Le mode de passage à l'antenne a changé pendant que la fenêtre était ouverte : rouvre-la pour voir le mode actuel avant de recommencer.",
     "LIVE_TRIGGER_NOT_MANUAL": "Ce match passe à l'antenne automatiquement : il n'y a rien à basculer.",
     "MAP_AFTER_DECISION": "Une map suit la fin du match : le résultat était déjà acquis.",
     "MAP_COUNT_EXCEEDED": "Trop de maps pour le format de ce match.",

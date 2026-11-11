@@ -26,7 +26,7 @@
  */
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { createHash } from "node:crypto";
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { cached, invalidateCached, isCachedOrLoading } from "@/lib/server/cache";
@@ -489,19 +489,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Casters et streams, une lecture chacun pour tout le plateau — dans
     // l'instantané commun eux aussi (`docs/features/MATCH_LAUNCH.md`).
     const matchIds = matches.map((row) => Number(row.id));
-    let streamsByMatch = await loadMatchStreams(connection, matchIds);
-    // Tout caster tient un stream (`stream_id`, clé étrangère) : sans stream
-    // sur le plateau, il n'a aucun caster à lire.
-    const castersByMatch =
-      streamsByMatch.size === 0
-        ? new Map<number, MatchCasterRow[]>()
-        : await loadMatchCasters(connection, matchIds);
-    // Deux lectures séparées : un caster qui ouvre son stream entre elles
-    // serait rendu sur un stream absent. Le cas, rare, relit les streams —
-    // le caster lu tient un stream déjà écrit (clé étrangère).
-    if (castersOnUnreadStream(streamsByMatch, castersByMatch)) {
-      streamsByMatch = await loadMatchStreams(connection, matchIds);
-    }
+    const { streamsByMatch, castersByMatch } = await loadCastersAndStreams(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
@@ -636,6 +624,23 @@ export async function getTournamentSnapshot(
 ): Promise<TournamentSnapshot | null> {
   const frame = await getTournamentSnapshotFrame(tournamentId);
   return frame?.snapshot ?? null;
+}
+
+/**
+ * Streams et casters du plateau, une lecture chacun. Tout caster tient un
+ * stream (`stream_id`, clé étrangère) : sans stream, aucun caster à lire.
+ * Deux lectures séparées : un caster qui ouvre son stream entre elles serait
+ * rendu sur un stream absent. Le cas, rare, relit les streams — le caster lu
+ * tient un stream déjà écrit (clé étrangère).
+ */
+async function loadCastersAndStreams(connection: PoolConnection, matchIds: number[]) {
+  let streamsByMatch = await loadMatchStreams(connection, matchIds);
+  const castersByMatch =
+    streamsByMatch.size === 0 ? new Map<number, MatchCasterRow[]>() : await loadMatchCasters(connection, matchIds);
+  if (castersOnUnreadStream(streamsByMatch, castersByMatch)) {
+    streamsByMatch = await loadMatchStreams(connection, matchIds);
+  }
+  return { streamsByMatch, castersByMatch };
 }
 
 /**
