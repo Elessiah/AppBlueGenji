@@ -64,7 +64,7 @@ import {
 } from "@/lib/server/notify";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
-import { LOBBY_BRIEF_LEAD_MINUTES, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import { LOBBY_BRIEF_LEAD_MINUTES, type LobbyBriefKickoff, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { LOCALES, type Locale } from "@/lib/shared/locales";
 import type { PushContent } from "@/lib/shared/push-notifications";
 import type { TournamentGame } from "@/lib/shared/types";
@@ -196,6 +196,8 @@ export type LobbyBriefRow = RowDataPacket & {
   referee_user_id: number | null;
   /** Déjà lancé (lancement forcé, ou tous « Prêt » avant le balayage) : le brief dit « lancé ». */
   launched_at?: Date | string | null;
+  /** Déclencheur du check-in, jugé sur l'horloge de la base (`LobbyBriefKickoff`). */
+  kickoff_state?: string | null;
   /** Engagées fantômes (`is_ghost`) : personne à briefer de ce côté. */
   team1_ghost?: number | null;
   team2_ghost?: number | null;
@@ -216,6 +218,11 @@ export type LobbyBriefRow = RowDataPacket & {
   endurance_playoff_format_type?: "BO" | "FT" | null;
   endurance_playoff_format_value?: number | null;
 };
+
+/** Déclencheur lu de la base ; une valeur absente (ancienne ligne de test) vaut l'horaire à venir. */
+function briefKickoff(state: string | null | undefined): LobbyBriefKickoff {
+  return state === "PASSED" || state === "UNSCHEDULED" ? state : "SOON";
+}
 
 /**
  * Map de départage annoncée au brief : celle du tour, si le tour s'y prête
@@ -256,6 +263,8 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             t1.is_ghost AS team1_ghost, t2.is_ghost AS team2_ghost,
             m.launch_pairing, CONCAT(m.team1_id, ':', m.team2_id) AS brief_pairing,
             m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
+            CASE WHEN m.start_at IS NULL THEN 'UNSCHEDULED' WHEN m.start_at > NOW() THEN 'SOON' ELSE 'PASSED' END
+              AS kickoff_state,
             (t.team_voice_channels = 1 AND t.participant_type <> 'SOLO'
               AND t1.is_ghost = 0 AND t2.is_ghost = 0 AND m.start_at IS NOT NULL) AS voice_tracked,
             CASE WHEN m.live_trigger IS NULL THEN NULL ELSE ${firstStreamUrlSql("m")} END AS stream_url,
@@ -288,7 +297,10 @@ const BRIEF_FROM = `FROM bg_matches m
  * est vide tant qu'aucun lancement n'a été adopté (`adoptCurrentPairing`), et
  * le check-in part avant l'ouverture du salon. Par le salon, il l'est : un salon
  * ouvert pour un appariement remplacé (correction de score) ne vaut rien pour le
- * nouveau. Un tournoi masqué de nouveau (`start_visibility_at` à venir) n'envoie
+ * nouveau. Par le salon encore, l'horaire ne doit pas être **à venir** : un
+ * match programmé dont le salon s'ouvre tôt (lancement forcé à 18 h pour 21 h)
+ * recevait son check-in à l'ouverture — « moins de 15 minutes », ligne du vocal
+ * — et plus rien à H-15 ; il attend désormais son quart d'heure. Un tournoi masqué de nouveau (`start_visibility_at` à venir) n'envoie
  * rien, comme les salons vocaux : son nom et ses équipes ne sortent pas. La
  * réservation porte l'engagée, pas l'appariement : ni `adoptCurrentPairing` ni
  * une nouvelle heure ne l'effacent.
@@ -303,6 +315,7 @@ const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
               AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
               AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)
           OR (m.lobby_opened_at IS NOT NULL
+              AND (m.start_at IS NULL OR m.start_at <= NOW())
               AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
               AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
 
@@ -417,7 +430,10 @@ export function lobbyBriefSides(
     swiss: isSwissRound(row),
     game: row.game,
     solo: row.participant_type === "SOLO",
-    launched: (row.launched_at ?? null) !== null,
+    // `launched_at` peut venir d'un appariement remplacé (correction de score) :
+    // « match lancé » ne se dit que si le lancement est celui de l'appariement courant.
+    launched: (row.launched_at ?? null) !== null && row.launch_pairing === row.brief_pairing,
+    kickoff: briefKickoff(row.kickoff_state),
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
     tiebreakMap: briefTiebreakMap(row),
@@ -625,9 +641,14 @@ async function briefClaimedSide(
 ): Promise<SideOutcome | "lost" | "closed"> {
   const sides = await freshSides(db, row, claimId, context);
   if (typeof sides === "string") return sides;
+  // Destinataires relus juste avant l'envoi : ils ont été lus au début du
+  // balayage, et un membre retiré entre-temps (`left_at`) recevrait encore le
+  // lien du match, l'adversaire et l'ordre des bans. Une relecture en panne
+  // lève : la réservation est rendue, le côté rejoué au balayage suivant.
+  const stillActive = new Set((await loadEntrantManagerIds([slotTeamId(row, slot)])).get(slotTeamId(row, slot)) ?? []);
   const outcome = await sendSideBrief(
     Number(row.id),
-    context.recipients.filter((recipient) => userIds.includes(recipient.userId)),
+    context.recipients.filter((recipient) => userIds.includes(recipient.userId) && stillActive.has(recipient.userId)),
     sides[slot - 1].side,
     siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
   );
@@ -678,10 +699,18 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Pr
   // déjà briefé garde la sienne, sinon il le serait deux fois au retour de
   // l'appariement.
   const ghosts: number[] = [];
+  // Comptes déjà servis par le premier côté : membre actif des deux engagées,
+  // un compte recevrait deux check-ins contradictoires (« à ton équipe de créer
+  // la partie » puis « vérifie les paramètres »). Il garde celui du premier côté.
+  const served = new Set<number>();
   for (const slot of [1, 2] as const) {
-    const managers = sideManagers(row, slot, context);
-    if (managers === null) continue;
+    const sideOf = sideManagers(row, slot, context);
+    if (sideOf === null) continue;
+    const managers = { ...sideOf, userIds: sideOf.userIds.filter((userId) => !served.has(userId)) };
     const { claimId, outcome, error } = await briefSlot(db, row, slot, managers, context);
+    if (outcome === "sent" || outcome === "unreached" || outcome === "failed") {
+      for (const userId of managers.userIds) served.add(userId);
+    }
     if (claimId === null) {
       if (outcome === "error") return { ...brief, error };
       continue;

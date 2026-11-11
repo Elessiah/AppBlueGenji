@@ -15,7 +15,14 @@ import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { CHECK_IN_INVITE_URL } from "@/lib/shared/discord";
 import { discordInline, discordUrl } from "@/lib/shared/discord-text";
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
-import { GAME_SETTINGS_TEXT, lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import {
+  GAME_SETTINGS_TEXT,
+  LOBBY_BRIEF_LEAD_MINUTES,
+  lobbyBriefNames,
+  neutralizeQuotes,
+  type LobbyBriefKickoff,
+  type LobbyBriefSide,
+} from "@/lib/shared/lobby-brief";
 import type { Locale } from "@/lib/shared/locales";
 import { pushRoundLabel } from "@/lib/shared/push-messages";
 import { GAME_SETTINGS } from "@/lib/shared/match-page";
@@ -49,8 +56,11 @@ type TournamentText = {
   title: (subject: string) => string;
   /** Sujet du titre : les deux équipes, ou « ton match » en individuel. */
   titleSubject: (side: LobbyBriefSide, quote: (name: string) => string) => string;
-  /** Sous-titre : manche, tournoi et état (coup d'envoi proche, ou match lancé). */
-  subtitle: (round: string, tournament: string) => string;
+  /**
+   * Sous-titre : manche, tournoi et état — selon le déclencheur (horaire à
+   * venir, horaire passé, salon d'un match sans horaire), ou match lancé.
+   */
+  subtitle: Readonly<Record<LobbyBriefKickoff, (round: string, tournament: string) => string>>;
   subtitleLaunched: (round: string, tournament: string) => string;
   /** Phrase d'ouverture : l'autogestion, ou neutre contre une fantôme. */
   introSelfManaged: string;
@@ -97,12 +107,17 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     title: (subject) => `# Check-in ${subject}`,
     titleSubject: (side, quote) =>
       side.solo ? "de ton match" : `du match ${quote(side.teamName)} Vs ${quote(side.opponentName)}`,
-    subtitle: (round, tournament) => `*${round} · ${tournament} — coup d'envoi dans moins de 15 minutes.*`,
+    subtitle: {
+      SOON: (round, tournament) =>
+        `*${round} · ${tournament} — coup d'envoi dans moins de ${LOBBY_BRIEF_LEAD_MINUTES} minutes.*`,
+      PASSED: (round, tournament) => `*${round} · ${tournament} — l'heure du coup d'envoi est arrivée.*`,
+      UNSCHEDULED: (round, tournament) => `*${round} · ${tournament} — le salon du match est ouvert.*`,
+    },
     subtitleLaunched: (round, tournament) => `*${round} · ${tournament} — match lancé.*`,
-    introSelfManaged: "**Votre match est en autogestion.** Voici les éléments importants à savoir.",
+    introSelfManaged: "**Ton match est en autogestion.** Voici les éléments importants à savoir.",
     introGhost: "Voici les éléments importants à savoir avant le coup d'envoi.",
     contacts: (url) => `*Les contacts et les BattleTags à inviter sont sur la page du match : ${url}*`,
-    contactsNoBattletag: (url) => `*Vous pouvez retrouver les contacts sur la page du match : ${url}*`,
+    contactsNoBattletag: (url) => `*Tu peux retrouver les contacts sur la page du match : ${url}*`,
     beforeKickoff: "## Avant le coup d'envoi",
     settings: "## Paramètres de partie",
     mapsSection: "## Déroulé des maps",
@@ -127,18 +142,23 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     },
     tiebreak: "Map de départage (jouée seulement si la série est à égalité après les maps régulières) : ",
     live: (url) => `Diffusion : ${url}`,
-    inviteCasters: "Invitez les casters inscrits (leurs contacts sont sur la page du match).",
-    notifyCasters: "Prévenez les casters inscrits (leurs contacts sont sur la page du match).",
-    sortByRole: "Triez les joueurs par rôle dans le salon.",
-    scores: "N'oubliez pas de rentrer les scores du match **au plus vite après la fin de votre match**.",
-    issue: "Un problème ? Signalez-le depuis la page du match, ou pinguez le rôle @Arbitre sur Discord.",
+    inviteCasters: "Invite les casters inscrits (leurs contacts sont sur la page du match).",
+    notifyCasters: "Préviens les casters inscrits (leurs contacts sont sur la page du match).",
+    sortByRole: "Trie les joueurs par rôle dans le salon.",
+    scores: "N'oublie pas de rentrer les scores du match **au plus vite après la fin de ton match**.",
+    issue: "Un problème ? Signale-le depuis la page du match, ou pingue le rôle @Arbitre sur Discord.",
     goodLuck: "GL HF :)",
   },
   en: {
     title: (subject) => `# ${subject} check-in`,
     titleSubject: (side, quote) =>
       side.solo ? "Your match" : `${quote(side.teamName)} Vs ${quote(side.opponentName)}`,
-    subtitle: (round, tournament) => `*${round} · ${tournament} — kickoff in less than 15 minutes.*`,
+    subtitle: {
+      SOON: (round, tournament) =>
+        `*${round} · ${tournament} — kickoff in less than ${LOBBY_BRIEF_LEAD_MINUTES} minutes.*`,
+      PASSED: (round, tournament) => `*${round} · ${tournament} — kickoff time has come.*`,
+      UNSCHEDULED: (round, tournament) => `*${round} · ${tournament} — the match lobby is open.*`,
+    },
     subtitleLaunched: (round, tournament) => `*${round} · ${tournament} — match started.*`,
     introSelfManaged: "**Your match is self-managed.** Here is what you need to know.",
     introGhost: "Here is what you need to know before kickoff.",
@@ -253,7 +273,21 @@ export function formatLobbyBriefDm(side: LobbyBriefSide, url: string | null, loc
   }
   const bare = buildLobbyBriefDm(side, url, locale, 0);
   // Dernier recours (noms et lien aux longueurs maximales) : coupé, jamais refusé par Discord.
-  return bare.length <= DISCORD_MESSAGE_MAX ? bare : `${bare.slice(0, DISCORD_MESSAGE_MAX - 1)}…`;
+  return bare.length <= DISCORD_MESSAGE_MAX ? bare : clipToDiscordMax(bare);
+}
+
+/**
+ * Coupe à `DISCORD_MESSAGE_MAX` unités, par **points de code** : une coupe par
+ * unités UTF-16 pouvait tomber au milieu d'une paire de substitution (émoji) et
+ * laisser une moitié de caractère en fin de message.
+ */
+function clipToDiscordMax(text: string): string {
+  let kept = "";
+  for (const char of text) {
+    if (kept.length + char.length > DISCORD_MESSAGE_MAX - 1) break;
+    kept += char;
+  }
+  return `${kept}…`;
 }
 
 /** Pas de réduction du bloc des cartes quand le message dépasse `DISCORD_MESSAGE_MAX`. */
@@ -267,17 +301,23 @@ function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Loc
   const tournament = quote(side.tournamentName);
   const creation = creationLine(side, locale);
   const contacts = battletagRelevantFor(side.game) ? text.contacts : text.contactsNoBattletag;
+  const kickoff = side.kickoff ?? "SOON";
   return [
     text.title(text.titleSubject(side, quote)),
-    side.launched ? text.subtitleLaunched(round, tournament) : text.subtitle(round, tournament),
+    side.launched ? text.subtitleLaunched(round, tournament) : text.subtitle[kickoff](round, tournament),
     "",
     introLine(side, locale),
-    ...(url === null ? [] : [contacts(localizedSiteUrl(url, locale))]),
+    // Entre chevrons (`discordUrl`) : nu, l'autolien de Discord pouvait avaler
+    // l'astérisque qui ferme l'italique (lien vers « …/34* », italique jamais fermée).
+    ...(url === null ? [] : [contacts(discordUrl(localizedSiteUrl(url, locale)))]),
     "",
     text.beforeKickoff,
+    // Le salon de check-in s'ouvre au quart d'heure d'un horaire : sans horaire
+    // (check-in parti à l'ouverture du salon du match), il n'a pas de fenêtre, la
+    // ligne est tue — comme celle du vocal.
+    ...(kickoff === "UNSCHEDULED" ? [] : [`* ${text.checkIn(CHECK_IN_INVITE_URL)}`]),
     // Jamais de vocal en individuel ni contre une fantôme : le bot n'en ouvre
     // aucun pour ces matchs (`MATCH_VOICE.md`).
-    `* ${text.checkIn(CHECK_IN_INVITE_URL)}`,
     ...(side.voice ? [`* ${text.voice(CHECK_IN_INVITE_URL)}`] : []),
     `* ${text.seats(names.left, names.right)}`,
     ...(creation === null ? [] : [`* ${creation}`]),

@@ -162,7 +162,7 @@ describe("dispatchLobbyBriefs", () => {
     // En retard, même fenêtre que le salon : pas de check-in en pleine partie.
     expect(sql).toMatch(/m\.start_at > NOW\(\) - INTERVAL 20 MINUTE/);
     // Sans horaire, le salon : le repli d'avant la fusion.
-    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
+    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND \(m\.start_at IS NULL OR m\.start_at <= NOW\(\)\)\s+AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
     // Un match qui porte un score est joué : aucun salon à régler.
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'une de ses deux engagées n'est pas réservée
@@ -323,8 +323,8 @@ describe("dispatchLobbyBriefs", () => {
     expect(team1.dm()).toContain("* Gauche (hôte) : « Renards » · Droite : « Nova »");
     // Les paramètres de partie, les mêmes pour tous les jeux.
     expect(team1.dm()).toContain("## Paramètres de partie\n* Mode compétitif\n* Pas de killcam\n* Pause à la déconnexion");
-    expect(team1.dm()).toContain("N'oubliez pas de rentrer les scores");
-    expect(team1.dm()).toContain("pinguez le rôle @Arbitre sur Discord");
+    expect(team1.dm()).toContain("N'oublie pas de rentrer les scores");
+    expect(team1.dm()).toContain("pingue le rôle @Arbitre sur Discord");
     expect(team1.dm()).toContain("GL HF :)");
     expect(team1.dm()).toContain("https://bluegenji.test/tournois/4/matchs/40");
     expect(team1.push().url).toBe("/tournois/4/matchs/40");
@@ -388,6 +388,73 @@ describe("dispatchLobbyBriefs", () => {
     expect(sends()[0].dm()).not.toContain("coup d'envoi dans moins de 15 minutes");
     expect(sends()[0].dm()).toContain("* Gauche (hôte) : « Renards »");
     expect(sends()[0].push().title).toBe("Match lancé : réglages de la partie");
+  });
+
+  it("dispatchLobbyBriefs_launchedAtFromReplacedPairing_notSaidLaunched", async () => {
+    // `launched_at` date d'un appariement remplacé (correction de score) : pas « match lancé ».
+    mockDb([{ ...MATCH, launched_at: "2026-11-03 20:00:00", launch_pairing: "1:9" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(sends()[0].dm()).not.toContain("match lancé");
+  });
+
+  it("dispatchLobbyBriefs_kickoffTimeAlreadyPassed_subtitleDoesNotPromiseFifteenMinutes", async () => {
+    mockDb([{ ...MATCH, kickoff_state: "PASSED" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(sends()[0].dm()).toContain("l'heure du coup d'envoi est arrivée");
+    expect(sends()[0].dm()).not.toContain("moins de 15 minutes");
+  });
+
+  it("dispatchLobbyBriefs_unscheduledMatch_noCheckInChannelLine", async () => {
+    mockDb([{ ...MATCH, kickoff_state: "UNSCHEDULED" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(sends()[0].dm()).toContain("le salon du match est ouvert");
+    expect(sends()[0].dm()).not.toContain("Le salon de check-in est ouvert");
+  });
+
+  it("dispatchLobbyBriefs_memberLeftBetweenSweepReadAndSend_notBriefed", async () => {
+    mockDb([MATCH]);
+    // Lecture du balayage, puis relecture de chaque côté juste avant son envoi : 11 a quitté l'équipe 1.
+    jest
+      .mocked(loadEntrantManagerIds)
+      .mockResolvedValueOnce(new Map([[1, [10, 11]], [2, [20]]]))
+      .mockResolvedValueOnce(new Map([[1, [10]]]))
+      .mockResolvedValueOnce(new Map([[2, [20]]]));
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[10], [20]]);
+  });
+
+  it("dispatchLobbyBriefs_sideReread_asksOnlyThatSidesTeam", async () => {
+    mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    expect(jest.mocked(loadEntrantManagerIds).mock.calls.slice(1)).toEqual([[[1]], [[2]]]);
+  });
+
+  it("dispatchLobbyBriefs_accountActiveInBothEntrants_briefedOnceOnFirstSide", async () => {
+    mockDb([MATCH]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(
+      new Map([
+        [1, [10, 11]],
+        [2, [11, 20]],
+      ]),
+    );
+    // Comme la vraie lecture : un compte, une ligne.
+    jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
+      [...new Set(ids)].map((userId) => ({ userId, discord: { discordId: String(userId), handle: null, label: `u${userId}` } })),
+    );
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[10, 11], [20]]);
   });
 
   it("dispatchLobbyBriefs_ghostOpponent_claimKeptOnlyRealTeamBriefedWithoutMutualInviteLine", async () => {
@@ -466,7 +533,7 @@ describe("dispatchLobbyBriefs", () => {
     const dm = sends()[0].dm();
     expect(dm).not.toContain("BattleTag");
     // Hors Overwatch, on ne s'invite pas par BattleTag : on prévient les casters.
-    expect(dm).toContain("* Prévenez les casters inscrits");
+    expect(dm).toContain("* Préviens les casters inscrits");
   });
 
   it("suit l'hôte choisi, la tête de série en BG Survie et le cast", async () => {
@@ -481,7 +548,7 @@ describe("dispatchLobbyBriefs", () => {
     // Règle par défaut : celle qui n'héberge pas bannit la première.
     expect(m40.dm()).toContain("* Bans de la carte 1 : « Renards » d'abord, puis « Nova ».");
     expect(m40.dm()).toContain("## Match casté");
-    expect(m40.dm()).toContain("**Votre match est en autogestion.**");
+    expect(m40.dm()).toContain("**Ton match est en autogestion.**");
     expect(m40.dm()).toContain("L'équipe hôte crée la partie");
     expect(m41.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
     expect(m41.dm()).not.toContain("## Match casté");

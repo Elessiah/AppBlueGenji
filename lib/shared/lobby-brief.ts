@@ -57,6 +57,14 @@ export type LobbyBriefSide = {
    * balayage) : le brief le dit, et garde les réglages, utiles pour créer la partie.
    */
   launched?: boolean;
+  /**
+   * Ce qui a déclenché le check-in : horaire à venir (`SOON`, défaut), horaire
+   * déjà passé (`PASSED` : match devenu jouable en retard) ou match sans
+   * horaire dont le salon s'ouvre (`UNSCHEDULED`). Le sous-titre le dit, et la
+   * ligne du salon de check-in — ouvert au quart d'heure d'un horaire — n'est
+   * pas écrite sans horaire.
+   */
+  kickoff?: LobbyBriefKickoff;
   /** L'engagée du destinataire héberge-t-elle (gauche) ? */
   hosting: boolean;
   /** L'engagée du destinataire bannit-elle la première sur la carte 1 (règle du tournoi) ? */
@@ -84,6 +92,9 @@ export type LobbyBriefSide = {
    */
   streamUrl?: string | null;
 };
+
+/** Déclencheur du check-in (`LobbyBriefSide.kickoff`). */
+export type LobbyBriefKickoff = "SOON" | "PASSED" | "UNSCHEDULED";
 
 /**
  * Combien de temps avant le coup d'envoi part le check-in du match.
