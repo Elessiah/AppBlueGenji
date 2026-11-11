@@ -369,7 +369,7 @@ export async function setRoundTiebreak(tournamentId: number, round: RoundKey, ra
         [tournamentId, round.phaseId, round.bracket, round.roundNumber, map],
       );
     }
-    await queueRoundMapsNotice(connection, tournamentId, [round]);
+    await queueRoundMapsNotice(connection, tournamentId, [round], { tiebreak: true });
     return true;
   });
   if (changed) {

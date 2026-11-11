@@ -196,8 +196,9 @@ describe("setRoundMaps", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
     // Aucune ligne Discord à l'enregistrement : la manche est mise en attente.
     expect(sendBotLog).not.toHaveBeenCalled();
-    expect(writes(/INSERT INTO bg_round_maps_notices/).map(([, params]) => params)).toEqual([
-      [7, '[{"phaseId":0,"bracket":"UPPER","roundNumber":2}]', 60],
+    expect(writes(/INSERT INTO bg_round_maps_notices/).map(([, params]) => params)).toEqual([[7, 60]]);
+    expect(writes(/UPDATE bg_round_maps_notices SET rounds_json/).map(([, params]) => params)).toEqual([
+      ['[{"phaseId":0,"bracket":"UPPER","roundNumber":2}]', 7],
     ]);
   });
 
@@ -285,8 +286,8 @@ describe("setRoundsMaps", () => {
     ]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(sendBotLog).not.toHaveBeenCalled();
-    const [notice] = writes(/INSERT INTO bg_round_maps_notices/);
-    expect(JSON.parse(String((notice[1] as unknown[])[1]))).toEqual([
+    const [notice] = writes(/UPDATE bg_round_maps_notices SET rounds_json/);
+    expect(JSON.parse(String((notice[1] as unknown[])[0]))).toEqual([
       { phaseId: 0, bracket: "UPPER", roundNumber: 2 },
       { phaseId: 0, bracket: "UPPER", roundNumber: 3 },
     ]);

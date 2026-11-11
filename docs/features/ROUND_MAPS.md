@@ -256,6 +256,18 @@ au pool.
   préfixe la phase (« Phase 2 · Manche 1 ») et prend le format suisse de la
   phase. La ligne est revendiquée par
   `DELETE … WHERE changes = ?` : pas de doublon, pas de changement perdu.
+  La mise en attente **prend la ligne avant de la lire** (l'écriture qui avance
+  `changes` d'abord, la lecture ensuite, puis `rounds_json`) : un balayage, qui
+  ne prend pas le verrou du tournoi, ne peut plus la revendiquer entre la
+  lecture et l'écriture (ses manches reparaissaient dans le résumé suivant) ;
+  pas de `SELECT … FOR UPDATE`, qui poserait un verrou d'intervalle sur une
+  ligne absente. Le minuteur de fin de fenêtre qui tombe sur un balayage en
+  vol en relance un à sa suite. `rounds_json` retient au plus
+  `ROUND_MAPS_NOTICE_KEYS_MAX` (200) manches ; les suivantes sont **comptées**
+  (`{ more: n }`, reprises dans « et N autres »), jamais « Data too long ».
+  Les manches sont listées tableau principal, perdants, grande finale, petite
+  finale ; un changement de la seule **map de départage** est noté à part
+  (`tiebreak`) et dit « Manche 2 (map de départage) ».
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
 - Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche

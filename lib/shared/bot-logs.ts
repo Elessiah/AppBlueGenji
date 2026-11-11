@@ -749,12 +749,14 @@ export function formatRoundMapsSummaryLog(context: {
   tournament: BotLogTournament;
   roundLabels: readonly string[];
   listed: number;
+  /** Manches modifiées au-delà de celles retenues (`ROUND_MAPS_NOTICE_KEYS_MAX`) : comptées, jamais nommées. */
+  more?: number;
 }): string {
   const shown = context.roundLabels.slice(0, context.listed);
-  const rest = context.roundLabels.length - shown.length;
+  const count = context.roundLabels.length + (context.more ?? 0);
+  const rest = count - shown.length;
   const others = rest > 1 ? "autres" : "autre";
   const names = rest > 0 ? `${shown.join(", ")} et ${rest} ${others}` : shown.join(", ");
-  const count = context.roundLabels.length;
   return `${lead("🗺️", "Cartes de manche modifiées", context.tournament)} : ${names} (${count} manche${count > 1 ? "s" : ""}), par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
