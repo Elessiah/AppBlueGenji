@@ -640,9 +640,18 @@ export function formatRoundRolledBackLog(context: {
  * - `RELEASED` — le caster retire lui-même son inscription ;
  * - `RELEASED_BY_STAFF` — le staff la retire ;
  * - `INELIGIBLE` / `JOINED_TEAM` — retirée d'office : le caster ne remplit plus
- *   les conditions du cast, ou il joue désormais le match.
+ *   les conditions du cast, ou il joue désormais le match ;
+ * - `MATCH_DELETED` — le match supprimé (retour arrière, manche régénérée)
+ *   emporte l'inscription.
  */
-export type CastLogChange = "CLAIMED" | "REPLACED" | "RELEASED" | "RELEASED_BY_STAFF" | "INELIGIBLE" | "JOINED_TEAM";
+export type CastLogChange =
+  | "CLAIMED"
+  | "REPLACED"
+  | "RELEASED"
+  | "RELEASED_BY_STAFF"
+  | "INELIGIBLE"
+  | "JOINED_TEAM"
+  | "MATCH_DELETED";
 
 const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> = {
   CLAIMED: { kind: "Cast réservé", detail: "un caster s'inscrit sur le match" },
@@ -657,6 +666,7 @@ const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> 
     detail: "le caster ne remplit plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net en Overwatch)",
   },
   JOINED_TEAM: { kind: "Cast retiré d'office", detail: "le caster joue désormais ce match" },
+  MATCH_DELETED: { kind: "Cast retiré", detail: "le match supprimé emporte l'inscription du caster" },
 };
 
 /**

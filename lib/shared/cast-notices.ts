@@ -25,7 +25,11 @@
 import type { CastBlock } from "./match-launch";
 
 /** Motif donné au caster. L'énumération reste ouverte : l'arbitrage des matchs en ajoutera. */
-export type CastReleaseReason = "STAFF" | "REPLACED" | "INELIGIBLE" | "JOINED_TEAM";
+/**
+ * `MATCH_DELETED` — le match n'existe plus (retour arrière, manche régénérée,
+ * plateau reconstruit) : l'inscription part avec lui.
+ */
+export type CastReleaseReason = "STAFF" | "REPLACED" | "INELIGIBLE" | "JOINED_TEAM" | "MATCH_DELETED";
 
 /** Le match d'un avis de retrait, tel que la notification et le message le nomment. */
 export type CastReleasedMatch = {

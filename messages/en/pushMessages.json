@@ -179,7 +179,8 @@
       "INELIGIBLE_PERMISSION": "you no longer have the streaming permission",
       "INELIGIBLE_IDENTITY": "your caster identity is incomplete (certified Discord tag and Battle.net account), see “My profile”",
       "INELIGIBLE_DISCORD": "your Discord tag is no longer certified, see “My profile”",
-      "JOINED_TEAM": "you now play in this match"
+      "JOINED_TEAM": "you now play in this match",
+      "MATCH_DELETED": "the match was deleted (rolled back or round redone)"
     }
   },
   "refereeReleased": {

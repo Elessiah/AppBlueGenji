@@ -15,10 +15,11 @@
  * Appelé **après le commit**, sans attendre : le bot est optionnel, et un envoi
  * lent n'a pas à retarder le geste. Ne lève jamais.
  */
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer, trackAnnouncement } from "@/lib/server/coalescer";
 import { failureReason } from "@/lib/server/failure-reason";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
@@ -26,10 +27,11 @@ import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
 import type { CastReleaseReason, CastReleasedMatch } from "@/lib/shared/cast-notices";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { castReleasedPush } from "@/lib/shared/push-messages";
 import { formatCastReleasedNotice } from "./cast-release-message";
-import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
+import { loadMatchLogRow, MATCH_LOG_COLUMNS_SQL, matchLogSubject, type MatchLogRow } from "./match-log-subject";
 
 /**
  * L'appariement du match tel que la transaction du geste l'a lu sous verrou.
@@ -59,6 +61,11 @@ export type CastChange = (
       reason: "INELIGIBLE" | "JOINED_TEAM";
       block?: CastBlock | null;
     }
+  /**
+   * Inscription emportée par la suppression du match (`queueDeletedMatchCasts`) ;
+   * `subject` : le match lu avant la suppression, que l'annonce ne peut plus relire.
+   */
+  | { kind: "MATCH_DELETED"; matchId: number; casterId: number; subject: MatchLogRow }
 ) & {
   /** Appariement lu sous verrou par le geste ; absent : le match relu fait foi. */
   pairing?: CastPairing;
@@ -82,6 +89,8 @@ export function castLogChange(change: CastChange): CastLogChange {
       return change.byStaff ? "RELEASED_BY_STAFF" : "RELEASED";
     case "AUTO_RELEASED":
       return change.reason;
+    case "MATCH_DELETED":
+      return "MATCH_DELETED";
   }
 }
 
@@ -89,10 +98,11 @@ export function castLogChange(change: CastChange): CastLogChange {
  * Catégorie de la ligne de journal : `staff-removal` (alerte) quand un caster
  * est retiré du match — retrait, retrait d'office —, `casts` (trace) pour une
  * inscription, y compris celle qui reprend la place d'un titulaire : le
- * créneau est repourvu dans la même transaction, rien n'est à repourvoir.
+ * créneau est repourvu dans la même transaction, rien n'est à repourvoir —
+ * et pour un match supprimé, qui n'a plus de créneau.
  */
 export function castLogCategory(change: CastChange): BotLogCategory {
-  return change.kind === "CLAIMED" ? "casts" : "staff-removal";
+  return change.kind === "CLAIMED" || change.kind === "MATCH_DELETED" ? "casts" : "staff-removal";
 }
 
 /** Le caster à prévenir et son motif ; `null` quand personne n'a à l'être (il s'est retiré lui-même, ou rien n'est retiré). */
@@ -108,6 +118,8 @@ export function castReleaseNotice(
       return change.block === undefined
         ? { casterId: change.casterId, reason: change.reason }
         : { casterId: change.casterId, reason: change.reason, block: change.block };
+    case "MATCH_DELETED":
+      return { casterId: change.casterId, reason: "MATCH_DELETED" };
   }
 }
 
@@ -119,7 +131,8 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
   // « Mon profil » le coupe (droit d'opposition), le push garde son sujet.
   // Comme tout message de match, seul un tag Discord certifié le reçoit.
   const [row, recipients] = await Promise.all([
-    loadMatchLogRow(change.matchId),
+    // Un match supprimé ne se relit plus : la ligne lue avant la suppression.
+    change.kind === "MATCH_DELETED" ? change.subject : loadMatchLogRow(change.matchId),
     // Une lecture qui échoue ne coûte que l'avis au caster : la ligne du journal part quand même.
     notice
       ? loadNotificationRecipients([notice.casterId], "certified", { matchDm: true }).catch((error) => {
@@ -312,4 +325,46 @@ export function flushCastChanges(connection: PoolConnection): void {
   const queued = pendingChanges.get(connection);
   pendingChanges.delete(connection);
   for (const change of queued ?? []) announceCastChange(change);
+}
+
+/**
+ * Les casters des manches **sur le point d'être supprimées** (appelé par
+ * `noteDeletedMatches`, juste avant le `DELETE`) : chacun est prévenu, après le
+ * commit, que son inscription part avec le match, comme d'un retrait par le
+ * staff (`CAST_NOTICES.md`). Une manche jouée garde son histoire : son cast a
+ * eu lieu, rien n'est annoncé.
+ */
+export async function queueDeletedMatchCasts(
+  connection: PoolConnection,
+  matches: readonly { id: number; status: string }[],
+): Promise<void> {
+  const open = matches.filter((match) => !isPlayedMatchStatus(String(match.status))).map((match) => Number(match.id));
+  for (const ids of chunkIds(open)) {
+    const placeholders = sqlPlaceholders(ids.length);
+    const [casters] = await connection.execute<(RowDataPacket & { match_id: number; user_id: number })[]>(
+      `SELECT match_id, user_id FROM bg_match_casters WHERE match_id IN (${placeholders}) ORDER BY match_id, user_id`,
+      ids,
+    );
+    if (casters.length === 0) continue;
+    const [subjects] = await connection.execute<MatchLogRow[]>(
+      `SELECT ${MATCH_LOG_COLUMNS_SQL}
+         FROM bg_matches m
+         JOIN bg_tournaments tr ON tr.id = m.tournament_id
+         LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
+         LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+        WHERE m.id IN (${placeholders})`,
+      ids,
+    );
+    const byMatch = new Map(subjects.map((subject) => [Number(subject.id), subject]));
+    for (const caster of casters) {
+      const subject = byMatch.get(Number(caster.match_id));
+      if (!subject) continue;
+      queueCastChange(connection, {
+        kind: "MATCH_DELETED",
+        matchId: Number(caster.match_id),
+        casterId: Number(caster.user_id),
+        subject,
+      });
+    }
+  }
 }

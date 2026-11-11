@@ -18,6 +18,7 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 | Le staff la retire (`tournaments`, pas le caster lui-même) | « 🎙️ Cast retiré », par le staff | motif `STAFF` |
 | Retrait d'office : conditions du cast plus remplies | « 🎙️ Cast retiré d'office » | motif `INELIGIBLE` |
 | Retrait d'office : il joue le match (son équipe, ou son entrée solo) | « 🎙️ Cast retiré d'office » | motif `JOINED_TEAM` |
+| Match à jouer supprimé (retour arrière, manche régénérée, plateau refait) | « 🎙️ Cast retiré » (trace `casts`) | motif `MATCH_DELETED` |
 
 - Une inscription rejouée (déjà titulaire) ou refusée ne s'annonce pas ; un
   retrait sur un match sans caster non plus.
@@ -27,6 +28,10 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   (`queueCastChange`) et n'est annoncé qu'après le commit (`flushCastChanges`,
   appelé par `inTransaction`, `flushBotLogs` et l'entretien de la modale) ;
   une transaction annulée le jette (`discardCastChanges`).
+- Un match supprimé emporte ses inscriptions : `noteDeletedMatches`, l'entonnoir
+  de tout `DELETE FROM bg_matches` du moteur, relève ses casters et le match
+  (`queueDeletedMatchCasts`) avant la suppression ; l'annonce, après le commit,
+  lit cette ligne au lieu de relire le match disparu. Une manche jouée se tait.
 - Chaque changement porte l'appariement lu sous verrou par son geste
   (`CastPairing`). Le match est relu après le commit pour ses noms : relu
   sous un autre appariement (réinitialisation, retour arrière concurrents), il

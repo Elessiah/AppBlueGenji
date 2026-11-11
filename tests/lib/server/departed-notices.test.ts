@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/match-reminders");
 jest.mock("@/lib/server/tournaments/schedule-notices");
+jest.mock("@/lib/server/tournaments/cast-notices");
 
 import {
   departuresBetween,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/server/tournaments/departed-notices";
 import { announceEntrantsWithdrawn } from "@/lib/server/tournaments/match-reminders";
 import { announceDeletedMatchesToStaff } from "@/lib/server/tournaments/schedule-notices";
+import { queueDeletedMatchCasts } from "@/lib/server/tournaments/cast-notices";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 const AHEAD = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
@@ -254,6 +256,15 @@ describe("departuresBetween", () => {
 });
 
 describe("noteDeletedMatches", () => {
+  it("noteDeletedMatches_doomedRows_passesThemToQueueDeletedMatchCasts", async () => {
+    const doomed = [{ id: 31, team1_id: 101, team2_id: 102, status: "READY", start_at: null }];
+    const { connection } = connectionHolding({}, { doomed });
+
+    await noteDeletedMatches(connection, "tournament_id = ?", [7]);
+
+    expect(queueDeletedMatchCasts).toHaveBeenCalledWith(connection, doomed);
+  });
+
   it("note les deux engagées des manches supprimées qui tenaient un horaire", async () => {
     const { mock, connection } = connectionHolding(
       { 31: AHEAD },

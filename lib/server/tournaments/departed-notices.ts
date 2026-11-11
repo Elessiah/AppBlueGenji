@@ -35,6 +35,7 @@ import { MATCH_STAFF_KEY, MATCH_TOLD_KEY } from "@/lib/shared/discord-notificati
 import { announceEntrantsWithdrawn, type DepartedEntrant, type WithdrawnMatch } from "./match-reminders";
 import { toPoster, type Poster, type PosterRow } from "./match-poster";
 import { HELD_TIME_GRACE_MS } from "./reminder-marks";
+import { queueDeletedMatchCasts } from "./cast-notices";
 import { announceDeletedMatchesToStaff } from "./schedule-notices";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -393,6 +394,8 @@ export async function noteDeletedMatches(
   // en arrière règle lui-même, lit les horaires tenus et ne garde que ceux-là.
   await noteDepartedEntrants(connection, departuresBetween(before, new Map()));
   await noteStaffRemovals(connection, rows);
+  // Leurs casters perdent leur inscription avec la manche : prévenus après le commit.
+  await queueDeletedMatchCasts(connection, rows);
 }
 
 /** Une manche sur le point d'être supprimée : ses places, son état, son horaire. */

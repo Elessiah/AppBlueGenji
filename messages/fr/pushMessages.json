@@ -179,7 +179,8 @@
       "INELIGIBLE_PERMISSION": "tu n'as plus la permission de diffusion",
       "INELIGIBLE_IDENTITY": "ton identité de caster est incomplète (tag Discord certifié et compte Battle.net), voir « Mon profil »",
       "INELIGIBLE_DISCORD": "ton tag Discord n'est plus certifié, voir « Mon profil »",
-      "JOINED_TEAM": "tu joues désormais ce match"
+      "JOINED_TEAM": "tu joues désormais ce match",
+      "MATCH_DELETED": "le match a été supprimé (retour arrière ou manche refaite)"
     }
   },
   "refereeReleased": {

@@ -21,6 +21,7 @@ const DM_REASONS: Readonly<Record<Locale, Readonly<Record<CastReleaseReasonKey, 
       "ton identité de caster est incomplète (tag Discord certifié et compte Battle.net rattaché, à vérifier dans « Mon profil »)",
     INELIGIBLE_DISCORD: "ton tag Discord n'est plus certifié (à vérifier dans « Mon profil »)",
     JOINED_TEAM: "tu joues désormais ce match",
+    MATCH_DELETED: "le match a été supprimé (retour arrière ou manche refaite par le staff)",
   },
   en: {
     STAFF: "staff decision",
@@ -33,6 +34,7 @@ const DM_REASONS: Readonly<Record<Locale, Readonly<Record<CastReleaseReasonKey, 
       "your caster identity is incomplete (certified Discord tag and linked Battle.net account, check “My profile”)",
     INELIGIBLE_DISCORD: "your Discord tag is no longer certified (check “My profile”)",
     JOINED_TEAM: "you now play in this match",
+    MATCH_DELETED: "the match was deleted (rolled back or round redone by the staff)",
   },
 };
 
