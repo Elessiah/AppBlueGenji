@@ -54,7 +54,8 @@ export type RefereePanel = {
   /** Arbitres (permission `tournaments`) dont l'opposition est retenue, par pseudo. */
   objections: RefereePanelUser[];
   /** Arbitres dont le staff peut retenir l'opposition, par pseudo — une opposition déjà retenue comprise : la retenir de nouveau rejoue le retrait de ses matchs. */
-  objectable: RefereePanelUser[];
+  /** `busy` : il arbitre un match non terminé (ton de la confirmation). */
+  objectable: (RefereePanelUser & { busy: boolean })[];
 };
 
 type PanelMatchRow = RowDataPacket & {
@@ -132,6 +133,17 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     const objected = (row: StaffRow) => (row.referee_objection_at ?? null) !== null;
     // Un arbitre : la permission `tournaments`, quelle que soit son identité.
     const referees = staff.filter((row) => refereeEligibilityBlock(row, game) !== "NOT_REFEREE");
+    // Ceux qui arbitrent un match non terminé, tous tournois confondus : ce
+    // qu'une opposition retenue leur retirerait (ton de sa confirmation).
+    const busyReferees = new Set<number>();
+    if (referees.length > 0) {
+      const [busyRows] = await connection.execute<(RowDataPacket & { referee_user_id: number })[]>(
+        `SELECT DISTINCT referee_user_id FROM bg_matches
+          WHERE status <> 'COMPLETED' AND referee_user_id IN (${referees.map(() => "?").join(", ")})`,
+        referees.map((row) => Number(row.id)),
+      );
+      for (const row of busyRows) busyReferees.add(Number(row.referee_user_id));
+    }
     // L'ordre de `writeReferee` : condition, opposition, joueur du match.
     const ineligibility = (row: StaffRow | undefined, userId: number, countsPlayer: boolean): RefereeIneligibility | null => {
       if (!row) return "ACCOUNT_GONE";
@@ -176,7 +188,7 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
       // Toute opposition retenue, même sur un compte qui n'arbitre plus : elle
       // doit rester visible et pouvoir être levée (la route le permet).
       objections: staff.filter(objected).map(panelUser).sort(byPseudo),
-      objectable: referees.map(panelUser).sort(byPseudo),
+      objectable: referees.map((row) => ({ ...panelUser(row), busy: busyReferees.has(Number(row.id)) })).sort(byPseudo),
     };
   });
 }

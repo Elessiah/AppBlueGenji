@@ -249,10 +249,18 @@ règle a changé avec l'arbitre hôte.
   peut, les autres lisent le message du refus) et l'état de la manche (matchs
   encore à jouer, en autogestion, arbitrés) : « Toute la manche en
   autogestion » et « Lever l'autogestion de la manche » ne s'offrent que s'ils
-  changent quelque chose (sinon « Rien à changer »). Sans autre compte
+  changent quelque chose (sinon « Rien à changer », en notification neutre
+  `showInfo`, sans rafraîchissement ni relecture du panneau). Sans autre compte
   désignable, une phrase le dit à la place de la liste ; le choix se vide
   après « Désigner ». Les confirmations ne prennent le ton `danger` que pour
-  un geste qui retire quelqu'un (`refereeConfirmTone`).
+  un geste qui retire quelqu'un (`refereeConfirmTone`) : une opposition ne
+  l'a que si l'arbitre visé arbitre un match non terminé (`objectable[].busy`,
+  lu tous tournois confondus). L'opposition ne part que pour un arbitre encore
+  proposé par le panneau relu (`objectionOffered`), et le pseudo du titre
+  d'une confirmation d'opposition est figé à son ouverture. La liste des
+  cartes du tour porte le nom de son titre (`aria-labelledby`) ; le bouton
+  « Enregistrer la carte » partage la ligne de la saisie, l'erreur de champ
+  dessous.
 
 ## Annonces
 

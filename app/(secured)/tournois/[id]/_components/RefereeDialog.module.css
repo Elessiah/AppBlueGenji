@@ -34,6 +34,21 @@
   min-width: 0;
 }
 
+/* Première carte : saisie et bouton sur une ligne, l'erreur de champ dessous
+   (forme de `.mapRow` de la page du match). */
+.mapRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* `flex-basis` l'emporte sur la largeur pleine de `.field input`. */
+.mapRow > input:not([type="checkbox"]):not([type="radio"]) {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 .footer {
   display: flex;
   justify-content: flex-end;

@@ -283,30 +283,46 @@ describe("refereeConfirmTone (fenêtre « Arbitrage »)", () => {
   const round = { phaseId: 0, roundNumber: 1, bracket: "UPPER", open: 2, selfManaged: 0, refereed: 0 };
   const referee = { userId: 2, pseudo: "Autre", eligible: true, reason: null };
 
-  it("refereeConfirmTone_removeAndObjection_danger", () => {
-    expect(refereeConfirmTone("removeReferee", { referee, round })).toBe("danger");
-    expect(refereeConfirmTone("objection", { referee: null, round })).toBe("danger");
+  const objectable = [
+    { userId: 5, pseudo: "Occupé", busy: true },
+    { userId: 6, pseudo: "Libre", busy: false },
+  ];
+
+  it("refereeConfirmTone_removeReferee_danger", () => {
+    expect(refereeConfirmTone("removeReferee", { referee, round, objectable })).toBe("danger");
+  });
+
+  it("refereeConfirmTone_objectionOnRefereeWithOpenMatch_danger", () => {
+    expect(refereeConfirmTone("objection", { referee: null, round, objectable }, 5)).toBe("danger");
+  });
+
+  it("refereeConfirmTone_objectionOnRefereeWithoutOpenMatch_primary", () => {
+    expect(refereeConfirmTone("objection", { referee: null, round, objectable }, 6)).toBe("primary");
+  });
+
+  it("refereeConfirmTone_objectionOnAccountNoLongerOffered_primary", () => {
+    expect(refereeConfirmTone("objection", { referee: null, round, objectable }, 99)).toBe("primary");
   });
 
   it("refereeConfirmTone_selfOnWithoutReferee_primary", () => {
-    expect(refereeConfirmTone("selfOn", { referee: null, round })).toBe("primary");
+    expect(refereeConfirmTone("selfOn", { referee: null, round, objectable })).toBe("primary");
   });
 
   it("refereeConfirmTone_selfOnWithReferee_danger", () => {
-    expect(refereeConfirmTone("selfOn", { referee, round })).toBe("danger");
+    expect(refereeConfirmTone("selfOn", { referee, round, objectable })).toBe("danger");
   });
 
   it("refereeConfirmTone_roundOnWithRefereed_danger", () => {
-    expect(refereeConfirmTone("roundOn", { referee: null, round: { ...round, refereed: 1 } })).toBe("danger");
+    expect(refereeConfirmTone("roundOn", { referee: null, round: { ...round, refereed: 1 }, objectable })).toBe("danger");
   });
 
   it("refereeConfirmTone_roundOnWithoutRefereed_primary", () => {
-    expect(refereeConfirmTone("roundOn", { referee: null, round })).toBe("primary");
+    expect(refereeConfirmTone("roundOn", { referee: null, round, objectable })).toBe("primary");
   });
 
   it("refereeConfirmTone_roundOffAndLift_primary", () => {
-    expect(refereeConfirmTone("roundOff", { referee, round })).toBe("primary");
-    expect(refereeConfirmTone("liftObjection", { referee, round })).toBe("primary");
+    expect(refereeConfirmTone("roundOff", { referee, round, objectable })).toBe("primary");
+    expect(refereeConfirmTone("liftObjection", { referee, round, objectable })).toBe("primary");
   });
 });
 
