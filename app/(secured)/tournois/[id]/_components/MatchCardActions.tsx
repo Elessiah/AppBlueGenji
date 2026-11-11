@@ -583,14 +583,18 @@ export function MatchCardActions({
   if (actions.length === 0) return null;
 
   const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
+    // Levé **avant** l'envoi : l'instantané du flux peut retirer « Caster »
+    // avant la réponse du POST, et le focus tomberait sur <body>. Un refus le
+    // baisse — il ne vit qu'entre une inscription et sa réussite.
+    claimedRef.current = true;
     try {
       const payload = await request(`/api/matches/${match.id}/caster`, "POST", body);
       // Le mode d'antenne choisi a été posé entre-temps par un autre : inscrit quand même, sans lui.
       showSuccess(t(payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"));
-      claimedRef.current = true;
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return { ok: true };
     } catch (error) {
+      claimedRef.current = false;
       const code = (error as Error).message;
       const message = launchError(code);
       showError(message);

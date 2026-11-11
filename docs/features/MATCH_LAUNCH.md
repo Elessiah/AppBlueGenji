@@ -430,6 +430,8 @@ une fois (`castersOnUnreadStream`), jamais rendu sur un stream absent.
   d'ouverture va à « Annuler » (un Entrée réflexe sur une radio n'inscrit
   personne) ; les casters d'un stream se joignent par `Intl.ListFormat`. Inscrit,
   le focus passe à « Configurer ma diffusion » (sinon « Plus d'actions »).
+  Le drapeau qui l'arme se lève avant l'envoi (le flux peut retirer « Caster »
+  avant la réponse) et se baisse sur un refus.
   Le retrait par le staff nomme le caster prévenu ; un caster choisi qui part
   pendant le choix ferme la fenêtre par un toast ; les radios sont figées
   (`aria-disabled`) pendant l'envoi. La carte n'offre ce retrait qu'à

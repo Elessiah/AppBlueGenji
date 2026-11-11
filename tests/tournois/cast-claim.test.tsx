@@ -383,6 +383,12 @@ describe("MatchCardActions — branchements du cast", () => {
     ]);
   });
 
+  it("claim_flagRaisedBeforePostAndLoweredOnRefusal", () => {
+    // Un instantané du flux arrivé avant la réponse du POST trouve le drapeau levé ; un refus le baisse.
+    expect(card).toMatch(/claimedRef\.current = true;\s+try \{\s+const payload = await request\(`\/api\/matches\/\$\{match\.id\}\/caster`, "POST", body\);/);
+    expect(card).toMatch(/\} catch \(error\) \{\s+claimedRef\.current = false;/);
+  });
+
   it("CastSettingsDialog_release_raisesOnReleasedBeforeRefresh", () => {
     // Retiré depuis sa fenêtre, « Configurer ma diffusion » disparaît : le focus va à « Caster », revenu.
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
