@@ -206,9 +206,9 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
 /**
  * Cadre des sauvegardes hors du serveur, déposées depuis le 1er octobre 2026
  * sur Hetzner Storage Share (Nextcloud géré). Hetzner Online GmbH (Allemagne)
- * est **sous-traitant** de l'association : son responsable technique, qui
- * héberge le site sur sa propre machine (aucun prestataire d'hébergement,
- * `HOST_ARRANGEMENT`), a souscrit le service pour le compte de l'association et accepté son contrat de
+ * y agit comme **sous-traitant** : le responsable technique de l'association,
+ * qui héberge le site sur sa propre machine (aucun prestataire d'hébergement,
+ * `HOST_ARRANGEMENT`), a souscrit le service et accepté son contrat de
  * traitement des données (version 1.2, le 1er octobre 2026 — le document
  * signé n'est pas publié) ;
  * traitement exclusivement dans l'Union européenne ou l'Espace économique
@@ -217,7 +217,7 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
  * (art. 32) qui s'y ajoute : Hetzner stocke des copies qu'il ne peut pas lire.
  */
 export const HETZNER_BACKUP_FRAMEWORK =
-  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique, qui a accepté le contrat de traitement des données de Hetzner (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
+  "Hetzner Online GmbH (Allemagne), service Storage Share, souscrit par le responsable technique de l'association, qui a accepté le contrat de traitement des données de Hetzner (Data Processing Agreement, version 1.2) le 1er octobre 2026, Hetzner y agissant comme sous-traitant ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
 
 /**
  * Portail de support (T15) : Spiceworks est **sous-traitant** de l'association,
@@ -367,7 +367,7 @@ export function transferBasisEn(recipients: readonly TransferRecipient[]): strin
 
 /** `HETZNER_BACKUP_FRAMEWORK`. */
 export const HETZNER_BACKUP_FRAMEWORK_EN =
-  "Hetzner Online GmbH (Germany), Storage Share service, processor of the association, subscribed on the association's behalf by its technical manager, who accepted Hetzner's data processing agreement (Data Processing Agreement, version 1.2) on October 1, 2026; processing exclusively in the European Union or the European Economic Area";
+  "Hetzner Online GmbH (Germany), Storage Share service, subscribed by the association's technical manager, who accepted Hetzner's data processing agreement (Data Processing Agreement, version 1.2) on October 1, 2026, Hetzner acting as a processor under it; processing exclusively in the European Union or the European Economic Area";
 
 /** `SPICEWORKS_PROCESSOR_FRAMEWORK`. */
 export const SPICEWORKS_PROCESSOR_FRAMEWORK_EN =
@@ -387,7 +387,7 @@ export const ASSOCIATION_GMAIL_FRAMEWORK_EN =
 
 /** `HOST_ARRANGEMENT`. */
 export const HOST_ARRANGEMENT_EN =
-  "no hosting provider: the association's technical manager runs the site and the bot on their own machine, on the association's behalf — no processor within the meaning of Article 28 GDPR, so no processing agreement";
+  "no hosting service provider: the association's technical manager runs the site and the bot on their own machine, on the association's behalf — no processor within the meaning of Article 28 GDPR, so no processing agreement";
 
 /** `RGPD_CONTACT_LINE` (`legal-contact.ts`). */
 export const RGPD_CONTACT_LINE_EN = `Requests regarding data: ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE_EN}, appointed by the association to receive them — email and phone (privacy policy and legal notice of the site) —, or the site's “${REPORT_FORM_NAME_EN}” form (footer), “GDPR” category; the association: email and phone (legal notice of the site)`;
@@ -1047,7 +1047,7 @@ const ACTIVITIES = registerActivities({
     ],
     recipients: [
       frEn(`${SITE_HOST.name}, responsable technique de l'association, qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement), seul détenteur des clés de déchiffrement`,
-        `${SITE_HOST.name}, the association's technical manager, who hosts the site on their own machine on the association's behalf (no hosting provider), sole holder of the decryption keys`),
+        `${SITE_HOST.name}, the association's technical manager, who hosts the site on their own machine on the association's behalf (no hosting service provider), sole holder of the decryption keys`),
       frEn(`${HETZNER_BACKUP_FRAMEWORK}, qui stocke les copies chiffrées sans pouvoir les lire`,
         `${HETZNER_BACKUP_FRAMEWORK_EN}, which stores the encrypted copies without being able to read them`),
     ],

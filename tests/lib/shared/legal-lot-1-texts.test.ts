@@ -30,10 +30,10 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {
     expect(detailsFr()).toContain("Il n'y a pas de prestataire d'hébergement");
     expect(detailsFr()).toContain("il n'est pas sous-traitant, et aucun contrat de sous-traitance n'est requis");
-    expect(detailsFr()).toContain("est sous-traitant de l'association");
-    expect(detailsEn()).toContain("There is no hosting provider");
+    expect(detailsFr()).toContain("y agit comme sous-traitant, dans le cadre du contrat de traitement des données de Hetzner que le responsable technique de l'association a accepté");
+    expect(detailsEn()).toContain("There is no hosting service provider");
     expect(detailsEn()).toContain("they are not a processor, and no processing agreement is required");
-    expect(detailsEn()).toContain("is a processor of the association");
+    expect(detailsEn()).toContain("acts as a processor under Hetzner's data processing agreement accepted by the association's technical manager");
   });
 
   it("rectificatifHebergement_gmail_saysMovingToWorkspaceWithoutClaimingItDoneFrAndEn", () => {
@@ -69,8 +69,8 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
 
   // [cas, texte français attendu, texte anglais attendu]
   const sentences: Array<[string, string, string]> = [
-    ["host_saysNoHostingProvider", "aucun prestataire d'hébergement, donc pas de sous-traitant", "no hosting provider, so no processor"],
-    ["hetzner_isAssociationProcessor", "dans l'Union européenne : sous-traitant de l'association.", "within the European Union: processor of the association."],
+    ["host_saysNoHostingProvider", "aucun prestataire d'hébergement, donc pas de sous-traitant", "no hosting service provider, so no processor"],
+    ["hetzner_isProcessorUnderItsAgreement", "dans l'Union européenne : sous-traitant, dans le cadre du contrat de traitement des données de Hetzner accepté par le responsable technique de l'association.", "within the European Union: processor, under Hetzner's data processing agreement accepted by the association's technical manager."],
     ["moderationNotice_listsRestoredTeamLogo", "logo d'équipe masqué, retiré, supprimé ou rétabli", "a team logo masked, removed, deleted or restored"],
     [
       "liveEvening_listsInAdvanceOnlyStartTimeBroadcasts",

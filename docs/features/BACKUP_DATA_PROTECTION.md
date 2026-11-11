@@ -137,9 +137,9 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   l'association détient », formule qui masquait que le détenteur est aussi
   l'hébergeur.
 - **Hébergement** : depuis le **1er octobre 2026**, Hetzner Storage Share
-  (Nextcloud géré), exploité par **Hetzner Online GmbH**, Allemagne. Hetzner est
-  **sous-traitant** de l'association ; son responsable technique a souscrit
-  le service pour le compte de l'association et **accepté le contrat de traitement des données de Hetzner
+  (Nextcloud géré), exploité par **Hetzner Online GmbH**, Allemagne. Hetzner y agit
+  comme **sous-traitant** ; le responsable technique de l'association a souscrit
+  le service et **accepté le contrat de traitement des données de Hetzner
   (Data Processing Agreement, version 1.2) le 1er octobre 2026**. Traitement
   **exclusivement dans l'Union européenne / l'EEE** (§ 3 de ce contrat) :
   **aucun transfert hors de l'Union**. Le contrat signé est confidentiel et

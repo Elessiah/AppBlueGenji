@@ -635,7 +635,7 @@ describe("décisions de l'association du 2026-09-30", () => {
   it("hostArrangement_noHostingProvider_saysNoProcessorNorArticle28ContractFrAndEn", () => {
     expect(HOST_ARRANGEMENT).toContain("aucun prestataire d'hébergement");
     expect(HOST_ARRANGEMENT).toContain("pas de sous-traitant au sens de l'article 28 du RGPD, donc pas de contrat de sous-traitance");
-    expect(HOST_ARRANGEMENT_EN).toContain("no hosting provider");
+    expect(HOST_ARRANGEMENT_EN).toContain("no hosting service provider");
     expect(HOST_ARRANGEMENT_EN).toContain("no processor within the meaning of Article 28 GDPR, so no processing agreement");
     expect(controller.host).toContain(HOST_ARRANGEMENT);
     expect(controller.host).not.toMatch(/sous-traitant \(|en attente de signature/);
@@ -645,10 +645,12 @@ describe("décisions de l'association du 2026-09-30", () => {
     const fr = byRef("T09").recipients.join(" ");
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T09")?.recipients.join(" ") ?? "";
     expect(fr).toContain("qui héberge le site sur sa propre machine pour le compte de l'association (aucun prestataire d'hébergement)");
-    expect(fr).toContain("sous-traitant de l'association, souscrit pour le compte de l'association par son responsable technique");
+    expect(fr).toContain("souscrit par le responsable technique de l'association, qui a accepté le contrat de traitement des données de Hetzner");
+    expect(fr).toContain("Hetzner y agissant comme sous-traitant");
     expect(fr).not.toMatch(/sous-traitant ultérieur|en attente de signature|art\. 28\)/);
-    expect(en).toContain("who hosts the site on their own machine on the association's behalf (no hosting provider)");
-    expect(en).toContain("processor of the association, subscribed on the association's behalf by its technical manager");
+    expect(en).toContain("who hosts the site on their own machine on the association's behalf (no hosting service provider)");
+    expect(en).toContain("subscribed by the association's technical manager, who accepted Hetzner's data processing agreement");
+    expect(en).toContain("Hetzner acting as a processor under it");
     expect(en).not.toMatch(/sub-processor|awaiting signature/);
   });
 
