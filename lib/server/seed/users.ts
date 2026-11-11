@@ -137,8 +137,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
   {
     pseudo: "BattletagTape",
     purpose:
-      "Battle.net rattaché qui n'a donné aucun BattleTag : le BattleTag tapé est gardé, sans pastille « vérifié », et reste modifiable",
+      "Battle.net rattaché qui n'a donné aucun BattleTag : le BattleTag tapé est gardé, sans pastille « vérifié », et reste modifiable ; rôles CASTER + ARBITRE et Discord certifié, pour vérifier à la main que le BattleTag tapé seul refuse cast et arbitrage",
+    platformRoles: ["CASTER", "ARBITRE"],
     isAdult: 1,
+    discordId: "900000000000000029",
+    discordTag: "test_battletag_tape",
+    discordVerified: true,
     blizzardSub: "seed-blizzard-tape",
     battletagTyped: true,
   },
