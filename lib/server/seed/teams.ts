@@ -119,6 +119,19 @@ async function ensureSeedTeamLogo(): Promise<string> {
   return toServedUploadUrl(`/uploads/teams/${filename}`);
 }
 
+/**
+ * Reprend un sigle du jeu de test à l'équipe qui le porterait encore : le
+ * nettoyage n'efface que les équipes « Test - … », et une équipe semée
+ * renommée hors préfixe (noms piégés, autre session) gardait son sigle — la
+ * recréation échouait alors sur `uniq_bg_teams_tag` et l'équipe manquait à la
+ * matrice. Le seed ne tourne jamais en production : ces sigles sont les siens.
+ */
+export async function releaseSeedTeamTag(db: Pool, tag: string | null): Promise<void> {
+  if (tag === null) return;
+  const [result] = await db.execute<ResultSetHeader>(`UPDATE bg_teams SET tag = NULL WHERE tag = ?`, [tag]);
+  if (result.affectedRows > 0) console.log(`  ↺ sigle ${tag} repris à une équipe hors du jeu de test`);
+}
+
 export async function createTeams(db: Pool, userIds: number[]): Promise<number[]> {
   console.log("🏆 Création des équipes...");
   const teamIds: number[] = [];
@@ -126,6 +139,7 @@ export async function createTeams(db: Pool, userIds: number[]): Promise<number[]
   for (const team of FICTIONAL_TEAMS) {
     const teamName = `Test - ${team.name}`;
     try {
+      await releaseSeedTeamTag(db, team.tag);
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_teams (name, tag, logo_url) VALUES (?, ?, ?)`,
         [teamName, team.tag, team.logo ? seedLogoUrl : null]
@@ -160,6 +174,7 @@ export const UNPLAYED_SEED_TEAM = { name: "Test - Sans Match", tag: "NOMT" } as 
 
 export async function createUnplayedTeam(db: Pool, userIds: number[]): Promise<number | null> {
   try {
+    await releaseSeedTeamTag(db, UNPLAYED_SEED_TEAM.tag);
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO bg_teams (name, tag) VALUES (?, ?)`,
       [UNPLAYED_SEED_TEAM.name, UNPLAYED_SEED_TEAM.tag],
@@ -197,6 +212,7 @@ export async function createGhostTeams(db: Pool): Promise<number[]> {
   const teamIds: number[] = [];
   for (const team of GHOST_TEAMS) {
     try {
+      await releaseSeedTeamTag(db, team.tag);
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_teams (name, tag, logo_url, description, is_ghost) VALUES (?, ?, NULL, ?, 1)`,
         [team.name, team.tag, team.description],
@@ -269,6 +285,7 @@ export async function createBulkTeams(db: Pool, count: number): Promise<number[]
       );
       const userId = userResult.insertId as number;
 
+      await releaseSeedTeamTag(db, bulkTeamTag(i));
       const [teamResult] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_teams (name, tag, logo_url) VALUES (?, ?, NULL)`,
         [`Test - Bracket Team ${i}`, bulkTeamTag(i)]
