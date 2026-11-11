@@ -85,8 +85,10 @@ export function refereeLogChange(change: RefereeChange): RefereeLogChange {
 
 /**
  * Catégorie de la ligne de journal : `staff-removal` (alerte) quand un arbitre
- * est retiré du match — retrait, remplacement, retrait d'office, autogestion
- * qui l'écarte —, `referees` (trace) sinon.
+ * est retiré et que le match reste sans arbitre — retrait, retrait d'office,
+ * autogestion qui l'écarte —, `referees` (trace) sinon : une désignation qui
+ * remplace le titulaire repourvoit le créneau dans la même transaction, il n'y
+ * a rien à repourvoir.
  */
 export function refereeLogCategory(change: RefereeChange): BotLogCategory {
   switch (change.kind) {
@@ -96,6 +98,7 @@ export function refereeLogCategory(change: RefereeChange): BotLogCategory {
     case "ACCOUNT_WITHDRAWN":
       return "staff-removal";
     case "ASSIGNED":
+      return "referees";
     case "SELF_MANAGED":
       return change.replacedRefereeId === null ? "referees" : "staff-removal";
     case "TAKEN":

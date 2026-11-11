@@ -87,12 +87,12 @@ export function castLogChange(change: CastChange): CastLogChange {
 
 /**
  * Catégorie de la ligne de journal : `staff-removal` (alerte) quand un caster
- * est retiré du match — retrait, remplacement, retrait d'office —, `casts`
- * (trace) pour une simple inscription.
+ * est retiré du match — retrait, retrait d'office —, `casts` (trace) pour une
+ * inscription, y compris celle qui reprend la place d'un titulaire : le
+ * créneau est repourvu dans la même transaction, rien n'est à repourvoir.
  */
 export function castLogCategory(change: CastChange): BotLogCategory {
-  if (change.kind === "CLAIMED") return change.replacedCasterId === null ? "casts" : "staff-removal";
-  return "staff-removal";
+  return change.kind === "CLAIMED" ? "casts" : "staff-removal";
 }
 
 /** Le caster à prévenir et son motif ; `null` quand personne n'a à l'être (il s'est retiré lui-même, ou rien n'est retiré). */

@@ -100,7 +100,8 @@ describe("castLogChange / castReleaseNotice", () => {
 describe("castLogCategory — un retrait alerte, une inscription reste une trace", () => {
   it.each<[CastChange, string]>([
     [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: null }, "casts"],
-    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "staff-removal"],
+    // Place reprise : le créneau est repourvu dans la même transaction, simple trace.
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "casts"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "staff-removal"],
@@ -113,7 +114,6 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false }],
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true }],
     [{ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" }],
-    [{ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: CASTER }],
   ])("deliverCastChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
     mockMatch(matchRow());
     await deliverCastChange(change);
@@ -197,7 +197,7 @@ describe("deliverCastChange", () => {
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: 901 });
-    expect(loggedLine("staff-removal")).toContain("Cast repris");
+    expect(loggedLine("casts")).toContain("Cast repris");
     expect(loadNotificationRecipients).toHaveBeenCalledWith([901], "certified", { matchDm: true });
     expect(notification().discord?.message("fr")).toContain("un autre caster a pris le match");
   });
