@@ -308,6 +308,27 @@ describe("requestAccountDeletion — le compte", () => {
     );
   });
 
+  // D67 : l'échéance annoncée et le journal suivent la date écrite par la base,
+  // dont l'horloge juge la fenêtre — pas l'horloge de Node.
+  it("requestAccountDeletion_storedDate_finalAtAndJournalFollowDatabaseDate", async () => {
+    fakeDb({ storedRequestedAt: "2026-11-10 09:15:00" });
+    const stored = new Date("2026-11-10 09:15:00");
+
+    const outcome = await requestAccountDeletion(7);
+
+    expect(outcome.finalAt).toBe(new Date(stored.getTime() + 30 * 24 * 3600 * 1000).toISOString());
+    expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ deletedAt: stored.toISOString() }));
+  });
+
+  it("requestAccountDeletion_storedDateUnparsable_fallsBackToRequestedAt", async () => {
+    fakeDb({ storedRequestedAt: "not a date" });
+    const original = new Date("2026-11-01T08:15:00Z");
+
+    const outcome = await requestAccountDeletion(7, { requestedAt: original });
+
+    expect(outcome.finalAt).toBe("2026-12-01T08:15:00.000Z");
+  });
+
   it("requestAccountDeletion_storedDateUnreadable_journalsWithoutRawDate", async () => {
     fakeDb({});
 

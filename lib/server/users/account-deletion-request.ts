@@ -675,10 +675,14 @@ export async function requestAccountDeletion(
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
   // réactivation la retire ; la suppression définitive écrit la sienne.
+  // La date que la base a écrite (`NOW()`, D67) et dont elle juge la fenêtre :
+  // l'échéance annoncée et le journal la suivent, pas l'horloge de Node.
+  const storedAt = requestedAtRaw === undefined ? null : new Date(requestedAtRaw);
+  const stampedAt = storedAt !== null && Number.isFinite(storedAt.getTime()) ? storedAt : requestedAt;
   await recordAccountDeletion({
     userId,
     accountCreatedAt,
-    deletedAt: requestedAt.toISOString(),
+    deletedAt: stampedAt.toISOString(),
     pending: true,
     ...(requestedAtRaw === undefined ? {} : { requestedAt: requestedAtRaw }),
   });
@@ -693,5 +697,5 @@ export async function requestAccountDeletion(
     replay: options.accountCreatedAt !== undefined,
   });
 
-  return { ...plan, finalAt: reactivationDeadline(requestedAt).toISOString() };
+  return { ...plan, finalAt: reactivationDeadline(stampedAt).toISOString() };
 }
