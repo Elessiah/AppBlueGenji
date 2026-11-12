@@ -64,10 +64,8 @@ describe("politique du bot — fiches de membre (T08)", () => {
   it("botPrivacyPolicy_memberProfiles_heldInMemoryNeverRecordedFrAndEn", () => {
     const fr = JSON.stringify(PRIVACY_POLICY.fr);
     const en = JSON.stringify(PRIVACY_POLICY.en);
-    expect(fr).toContain("Le Bot la tient en mémoire, à jour de Discord, sans jamais l'enregistrer, pour lire les membres dont il a besoin : adhésions à l'association, rôle d'arbitrage, commandes.");
-    expect(fr).toContain("**Fiches de membre** : en mémoire seulement, perdues à l'arrêt du Bot.");
-    expect(en).toContain("The Bot holds them in memory, kept up to date by Discord, without ever recording them, to read the members it needs: memberships of the association, refereeing role, commands.");
-    expect(en).toContain("**Member profiles**: in memory only, lost when the Bot stops.");
+    expect(fr).toContain("Le Bot la tient en mémoire, à jour de Discord, sans jamais l'enregistrer, pour lire les membres dont il a besoin : adhésions à l'association, rôle d'arbitrage, commandes, remise des messages privés du site et recherche du compte Discord à qui envoyer un code.");
+    expect(en).toContain("The Bot holds them in memory, kept up to date by Discord, without ever recording them, to read the members it needs: memberships of the association, refereeing role, commands, delivery of the website's direct messages and finding the Discord account a code goes to.");
   });
 });
 
@@ -79,16 +77,16 @@ describe("/rgpd — salons vocaux", () => {
     expect(fr).toContain("seul le vidage d&apos;un salon par l&apos;arbitrage peut nommer son auteur, dans les journaux du serveur");
     expect(fr).not.toContain("aucune donnée");
     expect(en).toContain("the site never records who is in them");
-    expect(en).toContain("of a channel by the referees can name its author, in the server logs");
+    expect(en).toContain("of a channel by the referees or administrators can name its author, in the server logs");
     expect(en).not.toContain("no user data");
   });
 
   it("rgpdPages_voiceParagraph_mentionsStaffLogMessagesFrAndEn", () => {
     expect(readSource("app/rgpd/page.tsx")).toContain(
-      "le bot écrit aussi au salon de journal privé du staff, que lit le staff, des messages techniques sur les salons (identifiant d&apos;un salon dont la suppression est reportée, bilans de balayage, alerte de permission manquante), sans donnée de joueur, gardés un an.",
+      "le bot écrit aussi au salon de journal privé du staff, que lit le staff, des messages techniques sur les salons (identifiant d&apos;un salon et erreur de Discord quand sa suppression ou son suivi échoue, bilan ou échec d&apos;un balayage, alerte de permission manquante), sans donnée de joueur, gardés un an.",
     );
     expect(readSource("app/rgpd/RgpdEn.tsx")).toContain(
-      "the bot also writes to the staff&apos;s private log channel, read by staff, technical messages about the channels (identifier of a channel whose deletion is postponed, sweep reports, missing-permission alert), without any player data, kept for one year.",
+      "the bot also writes to the staff&apos;s private log channel, read by staff, technical messages about the channels (identifier of a channel and Discord&apos;s error when its deletion or tracking fails, sweep report or failure, missing-permission alert), without any player data, kept for one year.",
     );
   });
 });
@@ -99,9 +97,9 @@ describe("registre T03 — avis d'équipe", () => {
     const en = JSON.stringify(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T03"));
     expect(fr).not.toContain("un admin");
     expect(fr).toContain("(une fois par équipe et par joueur, 10 joueurs par auteur et 3 reprises par joueur dans ce délai)");
-    expect(fr).toContain("compté en mémoire : un redémarrage du site peut en laisser partir un de plus");
+    expect(fr).toContain("compté en mémoire : un redémarrage du site, ou plus de mille transferts dans ce délai, peut en laisser partir un de plus");
     expect(en).not.toContain("an admin");
     expect(en).toContain("(once per team and per player, 10 players per author and 3 takeovers per player within that time)");
-    expect(en).toContain("counted in memory: a restart of the site may let one more through");
+    expect(en).toContain("counted in memory: a restart of the site, or more than a thousand transfers within that time, may let one more through");
   });
 });

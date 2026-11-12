@@ -107,7 +107,7 @@ Organiser des tournois amateurs et en conserver les résultats
 Sous-finalités
 Constituer des équipes (membres, rôles, invitations)
 Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)
-Prévenir un joueur en message privé Discord, sans nommer qui invite, propose ou transfère (le nom de l'équipe seul), de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les 24 h, 10 joueurs par équipe ou par auteur et 3 équipes par joueur dans ce délai), de la reprise d'une équipe fantôme que le staff lui propose (une fois par équipe et par joueur, 10 joueurs par auteur et 3 reprises par joueur dans ce délai), et de la propriété de son équipe qui lui est transférée (une fois par équipe et par joueur dans ce délai, compté en mémoire : un redémarrage du site peut en laisser partir un de plus) ; la notification push des mêmes avis (T12) suit les mêmes plafonds
+Prévenir un joueur en message privé Discord, sans nommer qui invite, propose ou transfère (le nom de l'équipe seul), de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les 24 h, 10 joueurs par équipe ou par auteur et 3 équipes par joueur dans ce délai), de la reprise d'une équipe fantôme que le staff lui propose (une fois par équipe et par joueur, 10 joueurs par auteur et 3 reprises par joueur dans ce délai), et de la propriété de son équipe qui lui est transférée (une fois par équipe et par joueur dans ce délai, compté en mémoire : un redémarrage du site, ou plus de mille transferts dans ce délai, peut en laisser partir un de plus) ; la notification push des mêmes avis (T12) suit les mêmes plafonds
 Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores
 Publier résultats, classements, statistiques et palmarès
 Laisser suivre sans compte la fiche d'un tournoi publié (/suivre/tournois/…) : plateau, scores, classements, noms et logos des équipes et pseudos des engagés (et, en tournoi individuel, leur avatar s'il n'est pas masqué et leur numéro de compte interne, pour la marque du podium), pénalités d'une BlueGenji Survie sans motif ni arbitre, sans les codes de replay ; page exclue des moteurs de recherche
@@ -339,7 +339,7 @@ Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et m
 Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée
 Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée
 Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site), le texte du message et, pour le seul code envoyé en message privé (connexion, certification ou changement du tag), la langue du compte du site rattaché à ce compte Discord (dans laquelle le bot rédige le code), transmis par le site et remis sans être enregistrés par le bot ; l'annonce #live, elle, reste publiée dans le salon (traitement T16)
-Fiche de membre des serveurs où le bot est installé (pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), que Discord lui transmet pour lire les membres (adhésions, rôle d'arbitrage, commandes) et qu'il joint à l'état vocal (traitement T18) : tenue en mémoire, à jour de Discord, jamais enregistrée
+Fiche de membre des serveurs où le bot est installé (pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), que Discord lui transmet pour lire les membres (adhésions, rôle d'arbitrage, commandes, remise des messages privés du site, recherche du compte Discord à qui envoyer un code) et qu'il joint à l'état vocal (traitement T18) : tenue en mémoire, à jour de Discord, jamais enregistrée
 Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)
 Données sensibles
 Aucune
@@ -712,7 +712,7 @@ Pseudo et numéro de compte du membre du staff qui vide un salon, avec le numér
 Équipe active et rôles d'équipe de qui vide le salon de son équipe, lus pour vérifier qu'il la mène (propriétaire, manager, capitaine), sans être gardés
 État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré ni transmis au site
 Fiche du salon chez le bot : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu
-Messages du bot au salon de journal privé du staff sur les salons : identifiant d'un salon dont la suppression est reportée, bilans de balayage, alerte de permission manquante — sans donnée de joueur
+Messages du bot au salon de journal privé du staff sur les salons : identifiant d'un salon et erreur de Discord quand sa suppression ou son suivi échoue, bilan ou échec d'un balayage, alerte de permission manquante — sans donnée de joueur
 Données sensibles
 Aucune
 Conservation
@@ -722,7 +722,7 @@ Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au 
 Fiche du salon chez le bot : effacée avec le salon ; oubliée 96 heures après sa création ou sa reprise si le bot ne peut plus lire le salon ; gardée sans limite tant que le salon, jamais rendu, reste occupé, ou qu'il le lit sans pouvoir le supprimer ou que Discord répond par une autre erreur ; hors les copies de sauvegarde chiffrées (T09, 30 jours au plus) et la copie non chiffrée de la base du bot écrite avant une restauration (T09 : jusqu'à la restauration réussie suivante, au plus tard la nuit qui suit ses 30 jours)
 Autres délais du bot (hors le plafond d'un salon rendu, qui l'inclut) : chacun s'entend à un balayage près (au plus 30 minutes de plus)
 Vidage d'un salon : rien n'est gardé de ses occupants, ni par le site ni par le bot — ils ne sont lus, dans l'état vocal tenu en mémoire, que pour être déconnectés
-Journaux du serveur, selon leur rotation : lignes techniques des salons (numéro du match, code d'erreur), sans donnée de joueur ; pour un vidage par l'arbitrage, son auteur (pseudo et numéro de compte), le match et l'issue, sauf si l'auteur est l'arbitre désigné du match, jamais nommé ; rien pour un vidage par l'équipe
+Journaux du serveur, selon leur rotation : lignes techniques des salons (numéro du match, identifiant du salon, code d'erreur), sans donnée de joueur ; pour un vidage par l'arbitrage, son auteur (pseudo et numéro de compte), le match et l'issue, sauf si l'auteur est l'arbitre désigné du match, jamais nommé ; rien pour un vidage par l'équipe
 Messages du bot au salon de journal privé du staff : 365 jours (un an), selon la durée de ce salon (traitement T08)
 Journal d'audit du serveur sur Discord : création et suppression de chaque salon, avec son nom, et déconnexions d'un vidage (leur nombre et leur motif, tels que Discord les y inscrit), pour la durée que Discord fixe
 Destinataires
@@ -731,7 +731,7 @@ Autres membres connectés, qui peuvent lire ces mêmes états dans les données 
 Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord
 Administration du serveur Discord de l'association, qui lit dans le journal d'audit de Discord la création et la suppression de chaque salon, avec son nom, et les déconnexions d'un vidage
 Staff, à qui le journal d'activité sur Discord dit qu'un salon d'équipe a été vidé par le staff, sans nommer son auteur (T05) — jamais un vidage par l'équipe
-Staff, qui lit au salon de journal privé les messages techniques du bot sur les salons (suppression reportée, bilans de balayage, alerte de permission)
+Staff, qui lit au salon de journal privé les messages techniques du bot sur les salons (suppressions ou suivis en échec, balayages, alerte de permission)
 Discord (plateforme d'exécution)
 Transferts hors UE
 États-Unis : Discord — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
