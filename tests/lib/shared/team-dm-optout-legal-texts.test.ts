@@ -57,6 +57,7 @@ describe("entrée PRIVACY_CHANGES du réglage des messages d'équipe", () => {
   it("privacyChange_teamNoticeCaps_linksTheProfileSettingFrAndEn", () => {
     const id = "2026-11-avis-d-equipe-plafonds-et-base";
     expect(PRIVACY_CHANGES.find((c) => c.id === id)?.links?.at(-1)).toEqual({ href: "/profil#notifications", label: "Ouvrir le réglage dans « Mon profil »" });
+    expect(PRIVACY_CHANGES_EN[id]?.linkLabels).toHaveLength(PRIVACY_CHANGES.find((c) => c.id === id)?.links?.length ?? -1);
     expect(PRIVACY_CHANGES_EN[id]?.linkLabels?.at(-1)).toBe("Open the setting in “My profile”");
   });
 });
@@ -96,6 +97,11 @@ describe("politique et registre", () => {
     expect(fr).toContain("auxquels chacun s'oppose par le même interrupteur de « Mon profil »");
     expect(en).toContain("the same box turns off their team direct messages");
     expect(en).toContain("which anyone objects to with the same switch in “My profile”");
+  });
+
+  it("profileNotificationsLead_namesMatchesAndTeamsFrAndEn", () => {
+    expect(readSource("messages/fr/profile.json")).toContain("et messages privés du bot pour tes matchs et tes équipes.");
+    expect(readSource("messages/en/profile.json")).toContain("and bot direct messages about your matches and teams.");
   });
 
   it("botPrivacyPolicy_teamDms_formingTeamsPurposeAndNoRequestRouteFrAndEn", () => {
