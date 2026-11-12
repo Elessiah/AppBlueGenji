@@ -81,6 +81,7 @@ import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { inBatches } from "@/lib/shared/in-batches";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -570,6 +571,11 @@ export function flushBotLogs(connection: PoolConnection): void {
     const announcedConflicts = new Set<number>();
     /** Vidages avant alerte déjà lancés par ce passage, par tournoi. */
     const preFlushed = new Map<number, Promise<void>>();
+    /**
+     * Matchs lus par ce vidage : l'escalade reprend la lecture de l'alerte de sa
+     * manche (même instant que les autres lectures du vidage) au lieu d'une troisième.
+     */
+    const reads: MatchReads = new Map();
 
     /** Envoie une alerte déjà rédigée aux arbitres, et dit s'ils l'ont reçue. */
     async function deliver(resolved: ResolvedBotLog): Promise<void> {
@@ -637,11 +643,11 @@ export function flushBotLogs(connection: PoolConnection): void {
     // commits), en arrière-plan ; les alertes partent sans attendre ce tour ni
     // la lecture des lignes.
     if (hasLogLines) {
-      void resolveBotLogs(restLines)
+      void resolveBotLogs(restLines, reads)
         .catch((): ResolvedBotLog[] => [])
         .then((lines) => deliverLogLinesInTurn(lines, previousWait, releaseTurn));
     }
-    const resolvedAlerts = await resolveBotLogs(restAlerts);
+    const resolvedAlerts = await resolveBotLogs(restAlerts, reads);
 
     /** Réservations des matchs sortis d'une alerte de manche pourtant remise. */
     const droppedClaims: number[] = [];
@@ -650,7 +656,7 @@ export function flushBotLogs(connection: PoolConnection): void {
       if (delivered.has(entryKey(resolved.entry))) droppedClaims.push(...droppedClaimIds(resolved));
     }
 
-    for (const resolved of await resolveBotLogs(escalations)) {
+    for (const resolved of await resolveBotLogs(escalations, reads)) {
       // Le téléphone de l'arbitre vient de sonner pour cette manche : un second
       // message dans la même seconde ne dirait pas une seconde chose. La
       // réservation est **gardée** — la rendre ferait repartir l'escalade au
@@ -1066,6 +1072,21 @@ async function releaseRefereeAlertOnPool(claimId: number): Promise<void> {
 export const BOT_LOG_RESOLVE_CONCURRENCY = 4;
 
 /**
+ * Matchs relus en même temps par une alerte de manche (`resolveRoundNoRefereeLog`).
+ * Les deux passages d'un vidage (lignes et alertes) tournent ensemble : au plus
+ * 4 × 2 lectures pour les lignes (tournoi et engagé lus ensemble) et 4 × 3 pour les
+ * alertes, soit une vingtaine de connexions au pire — sous les 25 du pool.
+ */
+export const ROUND_ALERT_READ_CONCURRENCY = 3;
+
+/**
+ * Matchs déjà lus pendant un vidage (`flushBotLogs`), par identifiant : l'escalade
+ * reprend la lecture faite pour l'alerte de la même manche au lieu de la refaire.
+ * Propre à un vidage — jamais gardé d'un vidage à l'autre.
+ */
+export type MatchReads = Map<number, Promise<MatchLogRow | null>>;
+
+/**
  * Traduit des entrées en lignes de journal, en relisant la base.
  *
  * Exporté pour les tests : c'est là que vit tout ce qui peut se tromper de nom,
@@ -1073,31 +1094,33 @@ export const BOT_LOG_RESOLVE_CONCURRENCY = 4;
  * entre-temps, bye, engagé sans nom) est **silencieusement ignorée** — un
  * journal manquant vaut mieux qu'un journal faux, et rien ici ne justifie de
  * remonter une erreur.
+ *
+ * Quelques entrées à la fois ({@link BOT_LOG_RESOLVE_CONCURRENCY}), pas une par
+ * une : un balayage qui clôt ~200 matchs ne fait plus ~200 allers-retours en
+ * file. Chaque résultat garde la place de son entrée, l'ordre des lignes reste
+ * celui des commits.
+ *
+ * @param entries Entrées à traduire.
+ * @param reads Matchs déjà lus pendant ce vidage, partagés entre ses passages.
  */
 export async function resolveBotLogs(
   entries: readonly PendingBotLog[],
+  reads: MatchReads = new Map(),
 ): Promise<ResolvedBotLog[]> {
   const slots: (ResolvedBotLog | null)[] = entries.map(() => null);
-  let next = 0;
-
-  // Quelques lectures à la fois, pas une par une : un balayage qui clôt ~200
-  // matchs ne fait plus ~200 allers-retours en file. Chaque résultat garde la
-  // place de son entrée, l'ordre des lignes reste celui des commits.
-  const worker = async (): Promise<void> => {
-    while (next < entries.length) {
-      const index = next++;
-      const entry = entries[index];
+  await inBatches(
+    entries.map((entry, index) => ({ entry, index })),
+    BOT_LOG_RESOLVE_CONCURRENCY,
+    async ({ entry, index }) => {
       try {
-        const resolved = await resolveOne(entry);
+        const resolved = await resolveOne(entry, reads);
         const line = typeof resolved === "string" ? { message: resolved } : resolved;
         if (line?.message) slots[index] = { entry, channel: botEventChannel(entry.kind), ...line };
       } catch {
         // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
       }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(BOT_LOG_RESOLVE_CONCURRENCY, entries.length) }, worker));
-
+    },
+  );
   return slots.filter((line): line is ResolvedBotLog => line !== null);
 }
 
@@ -1176,7 +1199,21 @@ type MatchLogRow = SubjectRow & {
   self_managed?: number | null;
 };
 
-async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
+/**
+ * Relit un match, une seule fois par vidage quand `reads` est fourni : une lecture
+ * en échec n'est pas gardée, la suivante réessaie.
+ */
+function loadMatch(matchId: number, reads?: MatchReads): Promise<MatchLogRow | null> {
+  if (!reads) return readMatch(matchId);
+  const known = reads.get(matchId);
+  if (known) return known;
+  const reading = readMatch(matchId);
+  reads.set(matchId, reading);
+  reading.catch(() => reads.delete(matchId));
+  return reading;
+}
+
+async function readMatch(matchId: number): Promise<MatchLogRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<MatchLogRow[]>(
     `SELECT
@@ -1202,8 +1239,12 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
  * rien à arbitrer entre une équipe et une case vide, et le message ne saurait
  * pas quoi nommer.
  */
-async function loadRefereeAlertContext(matchId: number, openOnly = false): Promise<RefereeAlertContext | null> {
-  const match = await loadMatch(matchId);
+async function loadRefereeAlertContext(
+  matchId: number,
+  openOnly = false,
+  reads?: MatchReads,
+): Promise<RefereeAlertContext | null> {
+  const match = await loadMatch(matchId, reads);
   if (!match?.team1_name || !match.team2_name) return null;
   // Alerte « sans arbitre » d'une manche : un match joué, arbitré ou passé en
   // autogestion entre la file et l'envoi n'est plus sans arbitre — ni listé, ni compté.
@@ -1279,8 +1320,9 @@ async function resolveForfeitLog(
 
 async function resolveMatchFinishedLog(
   entry: Extract<PendingBotLog, { kind: "match_finished" }>,
+  reads: MatchReads,
 ): Promise<ResolvedMatchLine | null> {
-  const match = await loadMatch(entry.matchId);
+  const match = await loadMatch(entry.matchId, reads);
   // Un bye ou un match fantôme porte un score posé par le moteur, pas saisi
   // par une équipe : il n'a rien à raconter (et il y en a autant que
   // d'effectifs impairs).
@@ -1324,15 +1366,17 @@ function refereeMatchOf(context: RefereeAlertContext): RefereeAlertMatch {
 
 async function resolveScoreConflictLog(
   entry: Extract<PendingBotLog, { kind: "score_conflict" }>,
+  reads: MatchReads,
 ): Promise<ResolvedRefereeLine | null> {
-  const context = await loadRefereeAlertContext(entry.matchId);
+  const context = await loadRefereeAlertContext(entry.matchId, false, reads);
   return context === null ? null : { message: formatScoreConflictAlert(context), refereeMatch: refereeMatchOf(context) };
 }
 
 async function resolveScoreReportStalledLog(
   entry: Extract<PendingBotLog, { kind: "score_report_stalled" }>,
+  reads: MatchReads,
 ): Promise<ResolvedRefereeLine | null> {
-  const context = await loadRefereeAlertContext(entry.matchId);
+  const context = await loadRefereeAlertContext(entry.matchId, false, reads);
   return context === null
     ? null
     : {
@@ -1343,9 +1387,10 @@ async function resolveScoreReportStalledLog(
 
 async function resolveNoRefereeLog(
   entry: Extract<PendingBotLog, { kind: "match_no_referee" }>,
+  reads: MatchReads,
 ): Promise<ResolvedRefereeLine | null> {
-  if (entry.roundMatchIds) return resolveRoundNoRefereeLog(entry.roundMatchIds);
-  const context = await loadRefereeAlertContext(entry.matchId);
+  if (entry.roundMatchIds) return resolveRoundNoRefereeLog(entry.roundMatchIds, reads);
+  const context = await loadRefereeAlertContext(entry.matchId, false, reads);
   return context === null ? null : { message: formatNoRefereeAlert(context), refereeMatch: refereeMatchOf(context) };
 }
 
@@ -1357,9 +1402,17 @@ async function resolveNoRefereeLog(
  * tranché, supprimé, arbitré ou passé en autogestion avant l'envoi ne compte
  * plus, et rend lui aussi sa réservation.
  */
-async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<ResolvedRefereeLine | null> {
+async function resolveRoundNoRefereeLog(
+  matchIds: readonly number[],
+  reads: MatchReads,
+): Promise<ResolvedRefereeLine | null> {
   const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
-  const contexts = await Promise.all(listed.map((matchId) => loadRefereeAlertContext(matchId, true)));
+  // Lectures bornées ({@link ROUND_ALERT_READ_CONCURRENCY}) : plusieurs alertes de
+  // manche se résolvent en même temps, chacune ne prend que quelques connexions.
+  const contexts: (RefereeAlertContext | null)[] = listed.map(() => null);
+  await inBatches(listed.map((matchId, index) => ({ matchId, index })), ROUND_ALERT_READ_CONCURRENCY, async ({ matchId, index }) => {
+    contexts[index] = await loadRefereeAlertContext(matchId, true, reads);
+  });
   const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
   const first = found[0];
   if (!first) return null;
@@ -1475,7 +1528,10 @@ async function resolveEndurancePenaltyLiftedLog(
   });
 }
 
-async function resolveOne(entry: PendingBotLog): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
+async function resolveOne(
+  entry: PendingBotLog,
+  reads: MatchReads,
+): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
   switch (entry.kind) {
     case "tournament_created":
       return resolveTournamentCreatedLog(entry);
@@ -1484,13 +1540,13 @@ async function resolveOne(entry: PendingBotLog): Promise<string | ResolvedRefere
     case "forfeit":
       return resolveForfeitLog(entry);
     case "match_finished":
-      return resolveMatchFinishedLog(entry);
+      return resolveMatchFinishedLog(entry, reads);
     case "score_conflict":
-      return resolveScoreConflictLog(entry);
+      return resolveScoreConflictLog(entry, reads);
     case "score_report_stalled":
-      return resolveScoreReportStalledLog(entry);
+      return resolveScoreReportStalledLog(entry, reads);
     case "match_no_referee":
-      return resolveNoRefereeLog(entry);
+      return resolveNoRefereeLog(entry, reads);
     case "tournament_started":
       return resolveTournamentStartedLog(entry);
     case "tournament_finished":

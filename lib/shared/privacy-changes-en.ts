@@ -1042,6 +1042,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing new is collected; it is the same choice, kept for the lifetime of the account (legal obligation: that is what lets the site keep honouring your objection) and included in the export of your data. These messages are still based on the association's legitimate interest in forming teams (register, T03).",
     ],
   },
+  "2026-11-bot-avis-d-exclusion": {
+    linkLabels: ["Read the bot's privacy policy", "Read processing activity T08 in the register"],
+    title: "Discord bot: the notice sent to an excluded member",
+    summary:
+      "When a member excluded from the network posts an announcement in a relayed channel, the bot copies the reason for their exclusion to them by direct message. This was already the case: the bot's policy and the register now say so, along with what the bot keeps.",
+    details: [
+      "What the bot does: at most once a day, it copies the reason for their exclusion to the excluded member by direct message; a new notice replaces the previous one, which is deleted. It keeps the ID of that message and the time of the last attempt to send it.",
+      "When the exclusion is lifted, the notice is deleted with the rest. If Discord refuses to delete it, the ID of the excluded member and that of the message are kept to retry every night, for 30 days at most. A notice sent before the bot kept its ID remains in the excluded member's direct conversation with the bot.",
+    ],
+  },
 };
 
 /**

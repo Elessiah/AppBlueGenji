@@ -134,7 +134,9 @@ const LAST_UPDATED_EN = "13 November 2026";
 // mémoire (registre T08), la politique seule — VOICE-NOTIFS-LOT, même date, celle de
 // l'entrée `2026-11-reprise-d-equipe-et-fiche-de-membre-du-bot` ; messages privés
 // d'équipe coupés par l'interrupteur de « Mon profil » (TEAM-DM-OPTOUT, D68), la
-// politique seule — même date, celle de l'entrée `2026-11-messages-d-equipe-reglage-du-profil`.
+// politique seule — même date, celle de l'entrée `2026-11-messages-d-equipe-reglage-du-profil` ;
+// avis d'exclusion remis en message privé à l'exclu et ce que le bot en garde (BOT-LOT,
+// rectificatif), la politique seule — même date, celle de l'entrée `2026-11-bot-avis-d-exclusion`.
 const PRIVACY_LAST_UPDATED_FR = "13 novembre 2026";
 const PRIVACY_LAST_UPDATED_EN = "13 November 2026";
 

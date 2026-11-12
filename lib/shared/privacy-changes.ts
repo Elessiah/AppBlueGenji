@@ -1964,6 +1964,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#messages-d-equipe", label: "Lire le paragraphe « Messages privés Discord d'équipe »" },
     ],
   },
+  {
+    // BOT-LOT (ERREUR.txt), rectificatif : l'avis d'exclusion que le bot envoie
+    // en message privé à l'exclu, et ce qu'il en garde, que ni la politique du
+    // bot ni le registre (T08) ne disaient. Rien de nouveau n'est collecté. Pour
+    // tous les comptes ; datée du lendemain de la nuit de déploiement.
+    id: "2026-11-bot-avis-d-exclusion",
+    publishedAt: "2026-11-13",
+    title: "Bot Discord : l'avis envoyé à un membre exclu",
+    summary:
+      "Quand un membre exclu du réseau publie une annonce dans un salon relayé, le bot lui recopie le motif de son exclusion en message privé. C'était déjà le cas : la politique du bot et le registre le disent maintenant, avec ce que le bot en garde.",
+    details: [
+      "Ce que fait le bot : au plus une fois par jour, il recopie à l'exclu le motif de son exclusion en message privé ; un nouvel avis remplace le précédent, qui est supprimé. Il garde l'identifiant de ce message et l'heure du dernier essai d'envoi.",
+      "À la levée de l'exclusion, l'avis est supprimé avec le reste. Si Discord refuse de le supprimer, l'identifiant de l'exclu et celui du message sont gardés pour réessayer chaque nuit, 30 jours au plus. Un avis envoyé avant que le bot ne garde son identifiant reste dans la conversation privée de l'exclu avec le bot.",
+    ],
+    links: [
+      { href: "/privacy-policy-bot", label: "Lire la politique de confidentialité du bot" },
+      { href: "/rgpd/registre#t08", label: "Lire le traitement T08 du registre" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

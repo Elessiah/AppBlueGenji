@@ -9,8 +9,9 @@ HTTP calls to an internal Discord bot (configurable host/port). Gracefully degra
 
 ## Salons vocaux d'équipe
 
-`ensureVoiceChannel(key, name)` → `POST /internal/voice/channels` (`{ key, name }`,
-rend `channelId`), `releaseVoiceChannel(id)` → `POST /internal/voice/channels/:id/release`
+`ensureVoiceChannel(key, name, fallback = false)` → `POST /internal/voice/channels`
+(`{ key, name, fallback }`, rend `channelId` ; `fallback: true` quand `name` est le nom
+de repli, que le bot numérote — sans le drapeau, il retomberait sur l'égalité des noms), `releaseVoiceChannel(id)` → `POST /internal/voice/channels/:id/release`
 (le site ne demande plus jamais au bot combien de personnes sont dans un salon, EF-43).
 Réponse `VoiceCallOutcome` : `ok`, `gone` (404 : `VOICE_CHANNEL_NOT_TRACKED` au rendu
 = déjà fait) ou
