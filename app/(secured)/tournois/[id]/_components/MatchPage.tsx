@@ -668,8 +668,9 @@ function MapsSection({
 
 /**
  * Paramètres de partie : les mêmes pour tous les jeux et pour tous les matchs
- * (décision de l'utilisateur, 2026-11-04). Lue par **tout le monde**, y
- * compris sans compte : ce sont les règles de la partie, pas une consigne
+ * (décision de l'utilisateur, 2026-11-04). Lue par **tout compte connecté**
+ * qui ouvre la page (elle vit sous `(secured)` : sans session, la carte
+ * « Connexion requise » la remplace) : ce sont les règles de la partie, pas une consigne
  * d'organisation — l'aide-mémoire de l'autogestion les reprend pour qui
  * organise le match, et le check-in du match les écrit sur Discord
  * (`docs/features/MATCH_LOBBY_BRIEF.md`). Une seule liste
