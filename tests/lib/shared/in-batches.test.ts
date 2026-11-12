@@ -69,6 +69,14 @@ function held<T>(value: T) {
 
 const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
+/** Tâche qui note son départ sous `name` dans `started`, puis rend `result` (son nom par défaut). */
+function recorded(started: string[], name: string, result: Promise<string> = Promise.resolve(name)) {
+  return async (): Promise<string> => {
+    started.push(name);
+    return result;
+  };
+}
+
 describe("mapInBatches", () => {
   it("mapInBatches_laterItemFinishesFirst_resultsKeepItemOrder", async () => {
     const first = held("un");
@@ -125,18 +133,9 @@ describe("createLimiter", () => {
     const first = held("A");
     const started: string[] = [];
 
-    const a = limit(async () => {
-      started.push("A");
-      return first.promise;
-    });
-    const b = limit(async () => {
-      started.push("B");
-      return "B";
-    });
-    const c = limit(async () => {
-      started.push("C");
-      return "C";
-    });
+    const a = limit(recorded(started, "A", first.promise));
+    const b = limit(recorded(started, "B"));
+    const c = limit(recorded(started, "C"));
     await tick();
     expect(started).toEqual(["A"]);
     first.release();
@@ -178,18 +177,9 @@ describe("createLimiter", () => {
     const first = held("A");
     const started: string[] = [];
 
-    const a = limit(async () => {
-      started.push("A");
-      return first.promise;
-    });
-    const b = limit(async () => {
-      started.push("B");
-      return "B";
-    });
-    const c = limit(async () => {
-      started.push("C");
-      return "C";
-    }, true);
+    const a = limit(recorded(started, "A", first.promise));
+    const b = limit(recorded(started, "B"));
+    const c = limit(recorded(started, "C"), true);
     await tick();
     first.release();
 
@@ -203,14 +193,8 @@ describe("createLimiter", () => {
     const started: string[] = [];
 
     const a = limit(async () => first.promise);
-    const b = limit(async () => {
-      started.push("B");
-      return "B";
-    }, true);
-    const c = limit(async () => {
-      started.push("C");
-      return "C";
-    }, true);
+    const b = limit(recorded(started, "B"), true);
+    const c = limit(recorded(started, "C"), true);
     await tick();
     first.release();
     await Promise.all([a, b, c]);
