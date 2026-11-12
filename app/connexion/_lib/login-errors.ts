@@ -79,6 +79,9 @@ const LOGIN_ERRORS: Readonly<Record<LoginErrorCode, true>> = {
   // Suppression demandée il y a plus de trente jours, pas encore finalisée par
   // la passe horaire : plus rien ne s'ouvre, ni session ni réactivation.
   ACCOUNT_DELETED: true,
+  // Contention de verrous pendant la demande ou la vérification du code : rien
+  // n'a été écrit, recommencer suffit.
+  CONCURRENT_UPDATE_RETRY: true,
 };
 
 function isLoginErrorCode(code: string): code is LoginErrorCode {

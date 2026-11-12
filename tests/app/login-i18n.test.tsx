@@ -418,6 +418,18 @@ describe("refus — codes traduits à l'affichage", () => {
     expect(loginErrorMessage("UNKNOWN_CODE", EN_TEXT)).toBe("An internal error occurred.");
   });
 
+  it("loginErrorMessage_concurrentUpdateRetryFr_saysRetryNotFallback", () => {
+    const fr = loginErrorMessage("CONCURRENT_UPDATE_RETRY", FR_TEXT);
+    expect(fr).not.toBe(loginErrorMessage("UNKNOWN_CODE", FR_TEXT));
+    expect(fr).toContain("Réessaie");
+  });
+
+  it("loginErrorMessage_concurrentUpdateRetryEn_saysRetryNotFallback", () => {
+    const en = loginErrorMessage("CONCURRENT_UPDATE_RETRY", EN_TEXT);
+    expect(en).not.toBe(loginErrorMessage("UNKNOWN_CODE", EN_TEXT));
+    expect(en).toContain("Try again");
+  });
+
   it("chaque refus OAuth a son anglais, conseil de navigateur compris", () => {
     for (const kind of ["not_configured", "unavailable", "params", "state", "oauth", "session", "terms", "deleted", "suspended"]) {
       for (const environment of ["BROWSER", "IOS_INSTALLED_APP", "IN_APP_BROWSER"] as const) {

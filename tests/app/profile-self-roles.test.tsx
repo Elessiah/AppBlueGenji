@@ -208,7 +208,8 @@ describe("SelfRolesField — administration retirée pendant la session", () => 
     const field = readFileSync(join(process.cwd(), "app/(secured)/profil/_components/SelfRolesField.tsx"), "utf8");
     expect(field).toMatch(/if \(code === "FORBIDDEN" \|\| code === "CANNOT_MODIFY_SELF"\) onAdminLost\?\.\(\);/);
     const page = readFileSync(join(process.cwd(), "app/(secured)/profil/page.tsx"), "utf8");
-    expect(page).toMatch(/setData\(\(prev\) => \(prev \? \{ \.\.\.prev, isAdmin: false \} : prev\)\)/);
+    expect(page).toMatch(/isAdmin: false, roles: prev\.roles\.filter\(\(role\) => role !== "ADMIN"\)/);
+    expect(page).toMatch(/dropOwnAdmin = useCallback\([\s\S]*?focusMainContent\(\);/);
     expect(page).toContain("onAdminLost={dropOwnAdmin}");
   });
 });

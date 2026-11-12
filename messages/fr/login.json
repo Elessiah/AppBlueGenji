@@ -49,6 +49,7 @@
     "BOT_INTERNAL_UNAUTHORIZED": "Connexion Discord indisponible (token interne invalide). Tu peux passer par Google.",
     "DISCORD_DM_FAILED": "Impossible de t'envoyer le code en message privé : le bot doit partager un serveur avec toi, et tes DM doivent y être ouverts. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
     "DISCORD_USER_NOT_FOUND": "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
+    "CONCURRENT_UPDATE_RETRY": "Une autre demande est passée au même moment : rien n'a été enregistré. Réessaie.",
     "FAILED_TO_SEND_CODE": "Le code n'a pas pu être envoyé. Réessaie dans un instant.",
     "INVALID_DISCORD_HANDLE": "Renseigne ton tag Discord ou ton ID.",
     "INVALID_DISCORD_ID": "Identifiant Discord invalide.",
