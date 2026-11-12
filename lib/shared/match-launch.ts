@@ -46,6 +46,14 @@ export const LAUNCH_AUTO_DELAY_MINUTES = 15;
  */
 export type MatchLaunchPhase = "NONE" | "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAUNCHED";
 
+/** Lecture d'un match suffisante pour dire s'il est lancé pour son appariement. */
+type PairingLaunchRead = {
+  launched_at?: Date | string | null;
+  launch_pairing?: string | null;
+  team1_id?: number | string | null;
+  team2_id?: number | string | null;
+};
+
 /**
  * Le match est-il lancé **pour son appariement courant** ? Un lancement d'un
  * appariement d'avant (réappariement pas encore adopté) ne compte pas, quand la
@@ -53,12 +61,7 @@ export type MatchLaunchPhase = "NONE" | "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAU
  * fait foi. Règle commune à {@link castBeforeLaunch}, au panneau de l'arbitre
  * et au verrou de lancement (`refereePlayCounts`).
  */
-export function launchedForCurrentPairing(match: {
-  launched_at?: Date | string | null;
-  launch_pairing?: string | null;
-  team1_id?: number | string | null;
-  team2_id?: number | string | null;
-}): boolean {
+export function launchedForCurrentPairing(match: PairingLaunchRead): boolean {
   if ((match.launched_at ?? null) === null) return false;
   if (match.launch_pairing === undefined) return true;
   return launchStateIsCurrent(match.launch_pairing, nullableId(match.team1_id), nullableId(match.team2_id));
@@ -70,13 +73,7 @@ export function launchedForCurrentPairing(match: {
  * seule définition pour l'instantané (`_internal.ts`) et les gestes du serveur
  * (`live-streams.ts`, `cast-settings.ts`) : ils jugent le même maître du mode.
  */
-export function castBeforeLaunch(match: {
-  status: string;
-  launched_at?: Date | string | null;
-  launch_pairing?: string | null;
-  team1_id?: number | string | null;
-  team2_id?: number | string | null;
-}): boolean {
+export function castBeforeLaunch(match: PairingLaunchRead & { status: string }): boolean {
   if (match.status === "COMPLETED") return false;
   return !launchedForCurrentPairing(match);
 }

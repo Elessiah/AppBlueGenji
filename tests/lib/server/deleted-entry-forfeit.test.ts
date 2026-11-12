@@ -28,25 +28,28 @@ type Options = {
   opponentDeleted?: boolean;
 };
 
+/** Entrée en suppression jamais jouée : la nôtre (40), ou l'adversaire (41) s'il l'est aussi. */
+function soloEntryRows(options: Options, params?: unknown) {
+  const isOpponent = Array.isArray(params) && params[0] === 41;
+  if (isOpponent) return options.opponentDeleted ? [{ solo_user_id: 71 }] : [];
+  return options.neverPlayed === false ? [] : [{ solo_user_id: 70 }];
+}
+
+function openMatchRows(options: Options) {
+  const id = options.openMatch === undefined ? 101 : options.openMatch;
+  const [team1_id, team2_id] = options.pairing ?? [40, 41];
+  return id === null ? [] : [{ id, team1_id, team2_id }];
+}
+
 function fakeTx(options: Options) {
   const queries: string[] = [];
   const execute = jest.fn(async (sql: string, params?: unknown) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push(q);
     if (q.startsWith("SELECT state FROM bg_tournaments")) return [[{ state: options.state ?? "RUNNING" }]];
-    if (q.startsWith("SELECT s.solo_user_id FROM bg_teams s")) {
-      const isOpponent = Array.isArray(params) && params[0] === 41;
-      if (isOpponent) return [options.opponentDeleted ? [{ solo_user_id: 71 }] : []];
-      return [options.neverPlayed === false ? [] : [{ solo_user_id: 70 }]];
-    }
-    if (q.startsWith("SELECT is_deleted FROM bg_users")) {
-      return [[{ is_deleted: options.entryDeleted === false ? 0 : 1 }]];
-    }
-    if (q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) {
-      const id = options.openMatch === undefined ? 101 : options.openMatch;
-      const [team1_id, team2_id] = options.pairing ?? [40, 41];
-      return [id === null ? [] : [{ id, team1_id, team2_id }]];
-    }
+    if (q.startsWith("SELECT s.solo_user_id FROM bg_teams s")) return [soloEntryRows(options, params)];
+    if (q.startsWith("SELECT is_deleted FROM bg_users")) return [[{ is_deleted: options.entryDeleted === false ? 0 : 1 }]];
+    if (q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) return [openMatchRows(options)];
     return [[]];
   });
   return { connection: fakeConnection({ execute }), queries };

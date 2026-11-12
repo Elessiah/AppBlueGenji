@@ -278,7 +278,7 @@ export function AdminScoreDialog({
   const { t } = text;
   // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
   // les maps de la proposition unique, et voit celles des deux en désaccord.
-  const { match, proposals: readableProposals, detailPending } = useProposalMaps(liveMatch, proposals);
+  const { match, detailPending } = useProposalMaps(liveMatch, proposals);
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.

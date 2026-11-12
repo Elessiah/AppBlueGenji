@@ -261,7 +261,7 @@ export function PlayerScoreDialog({
   // de l'adversaire (codes et scores), à confirmer d'un clic.
   // `detailPending` : seulement pour qui peut lire le détail (`canReportScore`),
   // et levé quand les relectures ont pris fin sans lui.
-  const { match, proposals: readableProposals, detailPending: detailLoading } = useProposalMaps(
+  const { match, detailPending: detailLoading } = useProposalMaps(
     liveMatch,
     proposals,
     canReportScore,
