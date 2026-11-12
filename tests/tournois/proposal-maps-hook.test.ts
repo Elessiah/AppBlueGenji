@@ -276,6 +276,56 @@ describe("useProposalMaps", () => {
   });
 });
 
+/*
+ * Revue #542 : les relectures épuisées sans détail (429, réseau, refus)
+ * ne levaient pas l'attente, et les dialogues gardaient leurs boutons figés sur
+ * « détail en attente » jusqu'au prochain report.
+ */
+describe("useProposalMaps — detailPending", () => {
+  it("useProposalMaps_readInFlight_detailPending", () => {
+    fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+
+    expect(render(match, NO_PROPOSALS).detailPending).toBe(true);
+  });
+
+  it("useProposalMaps_attemptsExhausted_detailPendingLifted", async () => {
+    fetchMock.mockResolvedValue(failure(500));
+
+    render(match, NO_PROPOSALS);
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+
+    expect(render(match, NO_PROPOSALS).detailPending).toBe(false);
+  });
+
+  it("useProposalMaps_definitiveRefusal_detailPendingLifted", async () => {
+    fetchMock.mockResolvedValue(failure(404));
+
+    render(match, NO_PROPOSALS);
+    await settle();
+
+    expect(render(match, NO_PROPOSALS).detailPending).toBe(false);
+  });
+
+  it("useProposalMaps_newReportAfterGivingUp_detailPendingAgain", async () => {
+    fetchMock.mockResolvedValue(failure(404));
+    render(match, NO_PROPOSALS);
+    await settle();
+    const newer = bracketMatch({
+      ...match,
+      team1Report: { team1Score: 2, team2Score: 0, reportedAt: "2026-11-03T18:05:00.000Z", maps: [] },
+    });
+
+    const result = render(newer, NO_PROPOSALS);
+
+    expect(result.detailPending).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("useProposalMaps_cannotRead_neverPending", () => {
+    expect(render(match, NO_PROPOSALS, false).detailPending).toBe(false);
+  });
+});
+
 describe("proposalRetryDelayMs", () => {
   it("proposalRetryDelayMs_noHeader_returnsBaseDelay", () => {
     expect(proposalRetryDelayMs(null)).toBe(4000);

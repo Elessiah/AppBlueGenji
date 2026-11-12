@@ -16,7 +16,6 @@ import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
 import { useProposalMaps } from "../_hooks/useProposalMaps";
-import { proposalsNeedRefresh } from "@/lib/shared/player-score-report";
 import { useLiveControls } from "../_lib/live-context";
 import {
   forfeitParties,
@@ -229,7 +228,7 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
   team1: string;
   team2: string;
   paused: boolean;
-  /** Détail map par map de la proposition encore en lecture (`proposalsNeedRefresh`). */
+  /** Détail map par map de la proposition encore en lecture (`detailPending` de `useProposalMaps`). */
   loading: boolean;
   /** Les champs portent déjà cette proposition : « Reprendre » ne changerait rien. */
   adopted: boolean;
@@ -279,7 +278,7 @@ export function AdminScoreDialog({
   const { t } = text;
   // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
   // les maps de la proposition unique, et voit celles des deux en désaccord.
-  const { match, proposals: readableProposals } = useProposalMaps(liveMatch, proposals);
+  const { match, proposals: readableProposals, detailPending } = useProposalMaps(liveMatch, proposals);
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.
@@ -301,7 +300,7 @@ export function AdminScoreDialog({
   // l'arbitre ne doit pas les ressaisir. Les boutons de score attendent qu'il
   // arrive.
   const awaitingDetail =
-    proposalsNeedRefresh(liveMatch, readableProposals) &&
+    detailPending &&
     !form.maps.some(isMapTouched) &&
     form.forfeitTeamId === undefined &&
     !form.doubleForfeit;
@@ -525,7 +524,7 @@ export function AdminScoreDialog({
               team1={team1}
               team2={team2}
               paused={match.scoreAutoValidationPaused}
-              loading={proposalsNeedRefresh(liveMatch, readableProposals)}
+              loading={detailPending}
               adopted={form.forfeitTeamId === undefined && !form.doubleForfeit && formHoldsReport(form.maps, pendingReport.report)}
               submitting={form.submitting}
               onAdopt={() => {

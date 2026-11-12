@@ -33,6 +33,11 @@ export function proposalRetryDelayMs(retryAfterHeader: string | null): number {
  * une proposition déposée depuis se repère à son instant de dépôt, porté par
  * l'instantané, et se relit par la route légère du **seul** match
  * (`/matches/[matchId]/proposals`) — jamais le tournoi entier.
+ *
+ * `detailPending` : le détail est attendu **et** une lecture est encore en
+ * cours ou prévue. Les tentatives épuisées sans détail (429, réseau, refus),
+ * l'attente se lève : les dialogues rendent la main (« proposition sans
+ * détail ») au lieu de garder leurs boutons figés jusqu'au prochain report.
  */
 export function useProposalMaps(
   liveMatch: BracketMatch,
@@ -43,8 +48,11 @@ export function useProposalMaps(
    * une requête pour rien, à chaque nouvelle proposition.
    */
   canRead = true,
-): { match: BracketMatch; proposals: ReadonlyArray<MatchProposalMaps> } {
+): { match: BracketMatch; proposals: ReadonlyArray<MatchProposalMaps>; detailPending: boolean } {
   const [fetched, setFetched] = useState<MatchProposalMaps | null>(null);
+  // Les propositions (`reportsKey`) dont les tentatives ont pris fin : un
+  // nouveau report change la clé et rouvre l'attente.
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const readable = useMemo(
     () => mergeMatchProposals(liveMatch, proposals, fetched),
     [liveMatch, proposals, fetched],
@@ -101,7 +109,11 @@ export function useProposalMaps(
     const attempt = async () => {
       tries += 1;
       const waitMs = await read();
-      if (waitMs === null || controller.signal.aborted || tries >= PROPOSAL_REFRESH_ATTEMPTS) return;
+      if (controller.signal.aborted) return;
+      if (waitMs === null || tries >= PROPOSAL_REFRESH_ATTEMPTS) {
+        setSettledKey(reportsKey);
+        return;
+      }
       timer = setTimeout(() => void attempt(), waitMs);
     };
     void attempt();
@@ -110,5 +122,5 @@ export function useProposalMaps(
       if (timer !== null) clearTimeout(timer);
     };
   }, [needsRefresh, reportsKey, tournamentId, matchId]);
-  return { match, proposals: readable };
+  return { match, proposals: readable, detailPending: needsRefresh && settledKey !== reportsKey };
 }

@@ -30,7 +30,6 @@ import {
   playerReportInitialMaps,
   enteredScoreRelation,
   playerReportView,
-  proposalsNeedRefresh,
   toReporterScores,
 } from "@/lib/shared/player-score-report";
 import { useProposalMaps } from "../_hooks/useProposalMaps";
@@ -173,15 +172,6 @@ function theirMapsWorthShowing(
   return phase === "THEIRS_PENDING" && form.missedProposal && !form.confirmsAsIs;
 }
 
-/** Détail adverse en lecture — seulement pour qui peut le lire (`canReportScore`). */
-function proposalDetailLoading(
-  canRead: boolean,
-  match: BracketMatch,
-  proposals: ReadonlyArray<MatchProposalMaps>,
-): boolean {
-  return canRead && proposalsNeedRefresh(match, proposals);
-}
-
 /** Phrase d'état quand l'adversaire a proposé un score, selon le détail reçu. */
 function theirsPendingStatus(
   text: TournamentDialogsText,
@@ -269,8 +259,13 @@ export function PlayerScoreDialog({
   const mapError = useMapError();
   // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
   // de l'adversaire (codes et scores), à confirmer d'un clic.
-  const { match, proposals: readableProposals } = useProposalMaps(liveMatch, proposals, canReportScore);
-  const detailLoading = proposalDetailLoading(canReportScore, liveMatch, readableProposals);
+  // `detailPending` : seulement pour qui peut lire le détail (`canReportScore`),
+  // et levé quand les relectures ont pris fin sans lui.
+  const { match, proposals: readableProposals, detailPending: detailLoading } = useProposalMaps(
+    liveMatch,
+    proposals,
+    canReportScore,
+  );
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
