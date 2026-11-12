@@ -49,7 +49,9 @@ Un `OWNER` d'équipe n'a **aucun** pouvoir sur la plateforme.
   `MAX_DISCORD_CODE_ATTEMPTS` (5 essais par code, après quoi il est **brûlé**,
   correct ou non), `MAX_DISCORD_CODES_PER_WINDOW` (5 codes par compte et par
   quart d'heure) et `MAX_DISCORD_CODES_PER_DAY` (10 codes par compte et par
-  jour, refus `TOO_MANY_CODE_REQUESTS_TODAY`). Cette dernière tient la force
+  jour, refus `TOO_MANY_CODE_REQUESTS_TODAY`), comptés **par usage** (connexion
+  ou certification de tag : la connexion anonyme ne ferme pas la certification).
+  Cette dernière tient la force
   brute **lente** : à l'échelle du seul quart d'heure, vingt-cinq essais rejoués
   sans relâche prenaient la session d'un joueur nommé avec ≈ 60 % de chances
   sur un an ; cinquante essais par jour ramènent ce risque à ≈ 2 %, au prix de
