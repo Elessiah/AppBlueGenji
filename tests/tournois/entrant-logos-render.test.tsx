@@ -1,4 +1,10 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
+
+// Le lien « Page du match » préchargé au survol lit le routeur (`useLocaleRouter`).
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/tournois/1",
+  useRouter: () => ({ prefetch: () => undefined, push: () => undefined, refresh: () => undefined }),
+}));
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ReactNode } from "react";

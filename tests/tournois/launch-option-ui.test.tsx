@@ -303,7 +303,7 @@ describe("fiches de contact — noms cliquables", () => {
   it("MatchPage_connectionSection_namesEntrantsThroughEntrantLink", () => {
     const source = read("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
     expect(source).toContain("renderName={connectionSideName}");
-    expect(source).toMatch(/function connectionSideName\(side: LaunchSide\) \{\s*return <EntrantLink teamId=\{side\.teamId\}>/);
+    expect(source).toMatch(/function connectionSideName\(side: LaunchSide\) \{\s*return <EntrantName teamId=\{side\.teamId\} name=\{side\.name\} \/>;/);
   });
 
   it("caster → son profil", () => {

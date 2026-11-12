@@ -67,7 +67,6 @@ import {
   type VoiceClearViewer,
 } from "../_lib/match-voice-view";
 import { EntrantName, type EntrantLogoSize } from "./EntrantName";
-import { EntrantLink } from "../_lib/entrant-link";
 import { MatchCardActions } from "./MatchCardActions";
 import { LaunchPhaseBadge, hasLaunchPhaseBadge } from "./MatchLaunchStrip";
 import { MapResultList } from "./MapResultList";
@@ -745,11 +744,11 @@ function ConnectionSection({
 
 /**
  * Nom d'une engagée de la section « Infos de connexion » : comme partout sur
- * un écran de tournoi, par `EntrantLink` (entrée solo vers la fiche du joueur,
+ * un écran de tournoi, par `EntrantName` (emblème, puis `EntrantLink` : entrée solo vers la fiche du joueur,
  * compte sans fiche sans lien), pas par le choix propre de `SideCard`.
  */
 function connectionSideName(side: LaunchSide) {
-  return <EntrantLink teamId={side.teamId}>{side.name}</EntrantLink>;
+  return <EntrantName teamId={side.teamId} name={side.name} />;
 }
 
 /** Libellé d'un salon (« Salon vocal : ouvert », « bientôt ouvert », « indisponible ») — jamais son nombre de présents. */
