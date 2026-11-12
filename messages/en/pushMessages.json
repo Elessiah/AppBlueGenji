@@ -73,15 +73,15 @@
   },
   "teamInvitation": {
     "title": "Team invitation",
-    "body": "{team} invites you to join. Accept or decline from your profile."
+    "body": "The team “{team}” invites you to join it. Accept or decline from your profile."
   },
   "ghostTeamClaim": {
     "title": "Team takeover offered",
-    "body": "An admin offers you to take over the team {team}."
+    "body": "You can take over the team “{team}”. Accept or decline from your profile."
   },
   "teamOwnershipTransfer": {
     "title": "You now own your team",
-    "body": "Ownership of {team} has just been transferred to you. You now manage its name, tag and members."
+    "body": "Ownership of your team “{team}” has just been transferred to you. You now manage its name, tag and members."
   },
   "contentReport": {
     "title": "A report concerns you",

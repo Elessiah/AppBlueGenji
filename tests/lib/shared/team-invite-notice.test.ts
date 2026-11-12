@@ -183,7 +183,7 @@ const NOTICE_CASES: NoticeCase[] = [
     kind: "GHOST_CLAIM",
     locale: "fr",
     url: PROFILE_URL,
-    expected: "📨 BlueGenji — Un admin te propose de reprendre l'équipe [Les Glaciers](https://site.test/profil#invitations)",
+    expected: "📨 BlueGenji — Tu peux reprendre l'équipe [Les Glaciers](https://site.test/profil#invitations). Accepte ou refuse depuis ton profil.",
   },
   {
     name: "formatTeamInviteNotice_ownershipFr_linksTeamPage",
@@ -204,7 +204,7 @@ const NOTICE_CASES: NoticeCase[] = [
     kind: "GHOST_CLAIM",
     locale: "en",
     url: PROFILE_URL,
-    expected: "📨 BlueGenji — An admin offers you to take over the team [Les Glaciers](https://site.test/en/profil#invitations)",
+    expected: "📨 BlueGenji — You can take over the team [Les Glaciers](https://site.test/en/profil#invitations). Accept or decline from your profile.",
   },
   {
     name: "formatTeamInviteNotice_ownershipEn_localizedTeamPage",
@@ -227,12 +227,14 @@ describe("formatTeamInviteNotice", () => {
     expect(text).toContain(String.raw`\[y`);
     const activeLinks = text.split("](").filter((before, index, all) => index < all.length - 1 && !before.endsWith("\\"));
     expect(activeLinks).toHaveLength(1);
-    expect(text.endsWith(`](${locale === "en" ? "https://site.test/en/profil#invitations" : PROFILE_URL})`)).toBe(true);
+    expect(text).toContain(`](${locale === "en" ? "https://site.test/en/profil#invitations" : PROFILE_URL}).`);
   });
 
   it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_namesNoPerson", (locale) => {
     const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url: PROFILE_URL }, locale);
-    expect(text).toMatch(locale === "fr" ? /^📨 BlueGenji — Un admin te propose/ : /^📨 BlueGenji — An admin offers you/);
+    // Décision D4 : le nom de l'équipe seul, ni « un admin » ni personne.
+    expect(text).toMatch(locale === "fr" ? /^📨 BlueGenji — Tu peux reprendre l'équipe \[Les Glaciers\]/ : /^📨 BlueGenji — You can take over the team \[Les Glaciers\]/);
+    expect(text).not.toMatch(/admin/i);
   });
 
   it("formatTeamInviteNotice_mentionInTeamName_neutralized", () => {
@@ -252,7 +254,7 @@ const PUSH_CASES: PushCase[] = [
     locale: "fr",
     expected: {
       title: "Invitation d'équipe",
-      body: "Les Glaciers t'invite à la rejoindre. Accepte ou refuse depuis ton profil.",
+      body: "L'équipe «\u00a0Les Glaciers\u00a0» t'invite à la rejoindre. Accepte ou refuse depuis ton profil.",
       url: "/profil#invitations",
       tag: "team-7-invite",
     },
@@ -263,9 +265,9 @@ const PUSH_CASES: PushCase[] = [
     locale: "en",
     expected: {
       title: "Team takeover offered",
-      body: "An admin offers you to take over the team Les Glaciers.",
+      body: "You can take over the team “Les Glaciers”. Accept or decline from your profile.",
       url: "/en/profil#invitations",
-      tag: "team-7-invite",
+      tag: "team-7-ghost",
     },
   },
   {
@@ -274,7 +276,7 @@ const PUSH_CASES: PushCase[] = [
     locale: "fr",
     expected: {
       title: "Tu es propriétaire de ton équipe",
-      body: "La propriété de Les Glaciers vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres.",
+      body: "La propriété de ton équipe «\u00a0Les Glaciers\u00a0» vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres.",
       url: "/equipes/7",
       tag: "team-7-owner",
     },
@@ -289,7 +291,28 @@ describe("teamInvitationPush", () => {
   it("teamInvitationPush_bidiControlsInTeamName_stripped", () => {
     const { body } = teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "\u202Enimda\u200B" }, "fr");
 
-    expect(body).toBe("nimda t'invite à la rejoindre. Accepte ou refuse depuis ton profil.");
+    expect(body).toBe("L'équipe «\u00a0nimda\u00a0» t'invite à la rejoindre. Accepte ou refuse depuis ton profil.");
+  });
+
+  it("teamInvitationPush_compatibilityCharsInTeamName_normalizedLikeTheDirectMessage", () => {
+    // ERREUR.txt (revue sécurité #544) : NFKC et espaces resserrés, comme `discordInline`.
+    const { body } = teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "  Ｌｅｓ   Glaciers " }, "fr");
+
+    expect(body).toBe("L'équipe «\u00a0Les Glaciers\u00a0» t'invite à la rejoindre. Accepte ou refuse depuis ton profil.");
+  });
+
+  it("teamInvitationPush_quoteMarksInTeamName_cannotCloseTheQuotation", () => {
+    const { body } = teamInvitationPush({ kind: "OWNERSHIP", teamId: 7, teamName: "A » B" }, "fr");
+
+    expect(body).toContain('«\u00a0A " B\u00a0»');
+  });
+
+  it("teamInvitationPush_inviteThenGhostClaimSameTeam_distinctTags", () => {
+    // ERREUR.txt (revue UI/UX #544) : une reprise ne remplace pas l'invitation affichée.
+    const invite = teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "Les Glaciers" }, "fr");
+    const ghost = teamInvitationPush({ kind: "GHOST_CLAIM", teamId: 7, teamName: "Les Glaciers" }, "fr");
+
+    expect(invite.tag).not.toBe(ghost.tag);
   });
 
   it("teamInvitationPush_ownershipEn_englishTeamPage", () => {
@@ -308,7 +331,14 @@ describe("sujet TEAM_INVITATION", () => {
   });
 
   it("pushTopics_teamInvitation_labelledInFrenchAndEnglish", () => {
-    expect(frPush.topics.TEAM_INVITATION.label).toBe("Invitations d'équipe");
-    expect(enPush.topics.TEAM_INVITATION.label).toBe("Team invitations");
+    // Distinct du titre de la section « Invitations d'équipe » de Mon profil.
+    expect(frPush.topics.TEAM_INVITATION.label).toBe("Invitations et propriété d'équipe");
+    expect(enPush.topics.TEAM_INVITATION.label).toBe("Team invitations and ownership");
+    expect(PUSH_TOPICS.TEAM_INVITATION.label).toBe(frPush.topics.TEAM_INVITATION.label);
+  });
+
+  it("pushTopics_teamInvitation_saysTheDirectMessageStillGoes", () => {
+    expect(frPush.topics.TEAM_INVITATION.description).toContain("le message privé Discord part quand même");
+    expect(enPush.topics.TEAM_INVITATION.description).toContain("the Discord direct message is still sent");
   });
 });

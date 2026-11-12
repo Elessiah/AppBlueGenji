@@ -129,6 +129,19 @@ describe("claimGhostTeam", () => {
     expect(notifiedAt).toBeGreaterThan(committedAt);
   });
 
+  it("claimGhostTeam_notifierThrowsAfterCommit_neverRollsBackAndStillInvites", async () => {
+    const connection = await mockDb(claimableReads());
+    jest.mocked(notifyTeamInviteInBackground).mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("boom");
+
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
   it("claimGhostTeam_rolledBack_doesNotNotify (TEAM-INVITE-NOTIFY)", async () => {
     const execute = jest
       .fn<SqlQuery>()

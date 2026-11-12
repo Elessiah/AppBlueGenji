@@ -46,7 +46,17 @@ avertissement. Une invitation qui valide une demande déjà en attente
   distinctes dans la fenêtre, pour que le bot ne soit pas classé comme
   spammeur. L'invitation, elle, est toujours enregistrée.
 - Reprise proposée par le staff : une fois par équipe et par joueur dans la
-  même fenêtre (proposition retirée puis refaite comprise).
+  même fenêtre (proposition retirée puis refaite comprise), et les mêmes
+  plafonds qu'une invitation : 10 joueurs distincts par auteur, 3 fantômes
+  distinctes par joueur (`GhostClaimNoticeBudget`, une seule requête).
+- Propriété transférée : aucune ligne ne garde le transfert, donc une
+  réservation en mémoire (`claimOwnershipNoticeSlot`, clé équipe + joueur,
+  1 000 entrées au plus) limite l'avis à une fois par fenêtre — deux
+  propriétaires qui se renvoient l'équipe n'écrivent pas à chaque geste. Elle
+  se prend une fois l'avis décidé (un compte suspendu n'en consomme pas) ; un
+  redémarrage l'oublie (au pire un avis de plus).
+- `claimGhostTeam` envoie l'avis **après** sa transaction et son `finally` : un
+  rédacteur qui lève ne peut pas défaire la reprise validée.
 - Les comptes portent sur les **lignes écrites** (l'invitation qui vient
   d'être enregistrée comprise) : la ligne est la réservation. Deux invitations
   simultanées se voient au pire l'une l'autre et se taisent, jamais l'inverse.

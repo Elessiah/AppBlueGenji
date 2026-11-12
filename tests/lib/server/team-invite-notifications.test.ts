@@ -8,7 +8,13 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://si
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
-import { notifyTeamInvite, notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
+import {
+  claimOwnershipNoticeSlot,
+  notifyTeamInvite,
+  notifyTeamInviteInBackground,
+  resetOwnershipNoticeSlots,
+} from "@/lib/server/team-invite-notifications";
+import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-invite-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
@@ -20,6 +26,7 @@ const ACTOR_ID = 1;
 
 type Scenario = {
   thisPlayer?: number;
+  ghostToThisPlayer?: number;
   byActor?: number;
   teamsToPlayer?: number;
   offers?: number;
@@ -47,6 +54,7 @@ function accountRow(overrides: Record<string, unknown> = {}) {
 
 function mockDb({
   thisPlayer = 1,
+  ghostToThisPlayer = 1,
   byActor = 1,
   teamsToPlayer = 1,
   offers = 1,
@@ -59,6 +67,9 @@ function mockDb({
       return [[{ this_player: String(thisPlayer), any_player: 1, by_actor: byActor, teams_to_player: teamsToPlayer }], []];
     }
     if (sql.includes("AS offers")) return [[{ offers }], []];
+    if (sql.includes("AS this_player")) {
+      return [[{ this_player: String(ghostToThisPlayer), by_actor: byActor, teams_to_player: teamsToPlayer }], []];
+    }
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_users u")) return [account === null ? [] : [account], []];
     throw new Error(`requête inattendue : ${sql}`);
@@ -71,6 +82,7 @@ function mockDb({
 describe("notifyTeamInvite", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetOwnershipNoticeSlots();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
     jest.mocked(pushToUsers).mockResolvedValue(1);
   });
@@ -159,17 +171,17 @@ describe("notifyTeamInvite", () => {
 
     await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
-    const offersCall = execute.mock.calls.find(([sql]) => sql.includes("AS offers"));
+    const offersCall = execute.mock.calls.find(([sql]) => sql.includes("AS this_player"));
     expect(offersCall?.[0]).toContain(`COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 1`);
     expect(offersCall?.[0]).not.toContain("LIKE");
-    expect(offersCall?.[1]).toEqual([TEAM_ID, PLAYER_ID]);
+    expect(offersCall?.[1]).toEqual([TEAM_ID, PLAYER_ID, ACTOR_ID, PLAYER_ID, PLAYER_ID, ACTOR_ID]);
     expect(execute.mock.calls.some(([sql]) => sql.includes("AS any_player"))).toBe(false);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 
   it("notifyTeamInvite_ghostClaimReofferedWithinWindow_sendsNothing", async () => {
-    mockDb({ offers: 2, team: teamRow({ is_ghost: 1 }) });
+    mockDb({ ghostToThisPlayer: 2, team: teamRow({ is_ghost: 1 }) });
 
     await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
@@ -182,7 +194,45 @@ describe("notifyTeamInvite", () => {
 
     await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
-    expect(execute.mock.calls.some(([sql]) => sql.includes("AS any_player") || sql.includes("AS offers"))).toBe(false);
+    expect(
+      execute.mock.calls.some(([sql]) => sql.includes("AS any_player") || sql.includes("AS this_player")),
+    ).toBe(false);
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyTeamInvite_ghostClaimActorOverDailyCap_sendsNothing", async () => {
+    mockDb({ byActor: 1000, team: teamRow({ is_ghost: 1 }) });
+
+    await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("notifyTeamInvite_ghostClaimPlayerOfferedTooManyTeams_sendsNothing", async () => {
+    mockDb({ teamsToPlayer: 1000, team: teamRow({ is_ghost: 1 }) });
+
+    await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("notifyTeamInvite_ownershipTwiceWithinWindow_sendsOnce", async () => {
+    mockDb();
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyTeamInvite_ownershipSuspendedAccount_consumesNoSlot", async () => {
+    mockDb({ account: accountRow({ suspended: 1 }) });
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+    mockDb();
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
     expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 
@@ -252,5 +302,35 @@ describe("notifyTeamInviteInBackground", () => {
 
     expect(error).toHaveBeenCalledTimes(1);
     expect(error.mock.calls[0][0]).toBe("[teams] joueur non prévenu (INVITE)");
+  });
+});
+
+describe("claimOwnershipNoticeSlot", () => {
+  const WINDOW_MS = TEAM_INVITE_NOTICE_COOLDOWN_HOURS * 3_600_000;
+
+  beforeEach(() => {
+    resetOwnershipNoticeSlots();
+  });
+
+  it("claimOwnershipNoticeSlot_firstNotice_granted", () => {
+    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0)).toBe(true);
+  });
+
+  it("claimOwnershipNoticeSlot_justBeforeWindowEnds_refused", () => {
+    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+
+    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, WINDOW_MS - 1)).toBe(false);
+  });
+
+  it("claimOwnershipNoticeSlot_windowElapsed_grantedAgain", () => {
+    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+
+    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, WINDOW_MS)).toBe(true);
+  });
+
+  it("claimOwnershipNoticeSlot_otherTeam_granted", () => {
+    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+
+    expect(claimOwnershipNoticeSlot(TEAM_ID + 1, PLAYER_ID, 1)).toBe(true);
   });
 });
