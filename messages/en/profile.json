@@ -223,7 +223,7 @@
     "confirm": "Delete my account",
     "pending": "Deleting…",
     "residual": "As with any deleted account, what remains is: the site's encrypted backups ({backupDays} days), the record of your deletion in the log used to replay it after a restore (at least {journalDays} days), the audience-measurement fingerprint described in the privacy policy, your connection data (IP address, date, login method), which the law requires us to keep for {logDays} days, the announcements of your solo-tournament matches posted in the Discord #live channel, which keep your username until they are deleted on request, the moderation alert for an announcement blocked or flagged by AutoMod, which keeps your username (the staff is told of your request, without naming you, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found), and, if you're a staff member, the trace of your actions in the server logs.",
-    "irreversible": "The deletion becomes final after 30 days: until then, signing in again lets you reactivate your account. From the request, your account will be shown as anonymous everywhere, without your username or avatar; reactivation gives them back to you, except an avatar moderation hid or deleted in the meantime.",
+    "irreversible": "The deletion becomes final after {days} days: until then, signing in again lets you reactivate your account. From the request, your account will be shown as anonymous everywhere, without your username or avatar; reactivation gives them back to you, except an avatar moderation hid or deleted in the meantime.",
     "handover": "Right away, you will leave your teams (ownership will go to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others; if no other member is left, the team will become a ghost team if it is entered in a tournament that hasn't finished, otherwise it will be disbanded), your organised tournaments will go to another staff member when someone can take them over, your registrations for solo tournaments that haven't started yet, your casts of matches not yet completed, your referee assignments and your pending team invitations and join requests will be withdrawn, and your remaining matches in a running solo tournament where you never played will be lost by forfeit. Reactivating your account won't undo these steps.",
     "ownedTeamsFromTerms": "From this window, transferring or disbanding your team first requires accepting the terms of use. Without accepting them, you can ask the association for a complete erasure (“Exercising your rights”, in the privacy policy).",
     "consequences": {
@@ -235,18 +235,18 @@
       "UNKNOWN": "The site couldn't tell what will remain: depending on what you left behind (a match played, an entry in a solo tournament that has already started or ended, a tournament organized), it will be anonymized or erased entirely."
     },
     "outcome": {
-      "TOURNAMENTS": "Deletion requested. Your statistics will be kept under a borrowed username. To cancel it, sign in again within 30 days and confirm the reactivation.",
-      "SOLO_REGISTRATIONS": "Deletion requested. Your solo tournament registrations will carry a borrowed username. To cancel it, sign in again within 30 days and confirm the reactivation.",
-      "ORGANIZED_TOURNAMENTS": "Deletion requested. Your tournaments will keep an anonymous organizer. To cancel it, sign in again within 30 days and confirm the reactivation.",
-      "OWNED_TEAMS": "Deletion requested. Your team will keep an anonymous owner. To cancel it, sign in again within 30 days and confirm the reactivation.",
-      "NONE": "Deletion requested. Your account and profile will be erased; only the traces described in the privacy policy and its register will remain (backups, deletion log, audience measurement). To cancel it, sign in again within 30 days and confirm the reactivation.",
-      "UNKNOWN": "Deletion requested. To cancel it, sign in again within 30 days and confirm the reactivation."
+      "TOURNAMENTS": "Deletion requested. Your statistics will be kept under a borrowed username. To cancel it, sign in again within {days} days and confirm the reactivation.",
+      "SOLO_REGISTRATIONS": "Deletion requested. Your solo tournament registrations will carry a borrowed username. To cancel it, sign in again within {days} days and confirm the reactivation.",
+      "ORGANIZED_TOURNAMENTS": "Deletion requested. Your tournaments will keep an anonymous organizer. To cancel it, sign in again within {days} days and confirm the reactivation.",
+      "OWNED_TEAMS": "Deletion requested. Your team will keep an anonymous owner. To cancel it, sign in again within {days} days and confirm the reactivation.",
+      "NONE": "Deletion requested. Your account and profile will be erased; only the traces described in the privacy policy and its register will remain (backups, deletion log, audience measurement). To cancel it, sign in again within {days} days and confirm the reactivation.",
+      "UNKNOWN": "Deletion requested. To cancel it, sign in again within {days} days and confirm the reactivation."
     },
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Your account was linked to a tournament or a team during the deletion. Try again: it will then be anonymized rather than erased.",
       "LAST_ADMIN_ACCOUNT": "You are the last administrator: appoint another administrator before deleting your account.",
       "fallback": "Account deletion failed. Try again in a moment.",
-      "sessionGone": "Your session has ended: either your account has just been deleted, or your session expired. The page is reloading. If your deletion request was recorded, logging in again within 30 days lets you reactivate your account; otherwise, log in again to restart it."
+      "sessionGone": "Your session has ended: either your account has just been deleted, or your session expired. The page is reloading. If your deletion request was recorded, logging in again within {days} days lets you reactivate your account; otherwise, log in again to restart it."
     }
   },
   "errors": {

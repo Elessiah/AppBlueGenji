@@ -484,7 +484,7 @@ describe("anglais — phrases", () => {
   it("session fermée pendant la suppression : ni certitude d'effacement, ni « reconnecte-toi pour vérifier » (une connexion après suppression crée un compte)", () => {
     const fr = deletionErrorText(FR_PROFILE, "UNAUTHORIZED");
     const en = deletionErrorText(EN_PROFILE, "USER_NOT_FOUND");
-    expect(fr).toBe(FR_PROFILE.t("deletion.errors.sessionGone"));
+    expect(fr).toBe(FR_PROFILE.t("deletion.errors.sessionGone", { days: 30 }));
     expect(fr).toMatch(/soit ton compte vient d'être supprimé, soit ta session a expiré/);
     expect(fr).toMatch(/d'ici 30 jours te permet de réactiver ton compte/);
     expect(fr).not.toMatch(/créerait un nouveau compte/);

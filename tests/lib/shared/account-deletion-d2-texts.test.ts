@@ -45,8 +45,8 @@ describe("confirmation de suppression", () => {
   it("deletionMessages_handoverAndWindow_presentInBothLanguages", () => {
     expect(frProfile.deletion.handover).toBeTruthy();
     expect(enProfile.deletion.handover).toBeTruthy();
-    expect(frProfile.deletion.irreversible).toContain("30");
-    expect(enProfile.deletion.irreversible).toContain("30");
+    expect(frProfile.deletion.irreversible).toContain("{days} jours");
+    expect(enProfile.deletion.irreversible).toContain("{days} days");
   });
 });
 
@@ -503,5 +503,16 @@ describe("anglais — un seul terme pour le pseudo d'emprunt", () => {
     const texts = JSON.stringify([enProfile, enPlayers.deletedNotice]);
     expect(texts).not.toMatch(/placeholder (one|username)|that placeholder/);
     expect(enProfile.deletion.outcome.SOLO_REGISTRATIONS).toContain("borrowed username");
+  });
+});
+
+describe("délai de réactivation — tiré de la constante", () => {
+  it("deletionOutcomes_frAndEn_interpolateDaysInsteadOfHardcoding", () => {
+    for (const outcome of [frProfile.deletion.outcome, enProfile.deletion.outcome]) {
+      for (const text of Object.values(outcome)) {
+        expect(text).not.toMatch(/30 (jours|days)/);
+        expect(text).toContain("{days}");
+      }
+    }
   });
 });
