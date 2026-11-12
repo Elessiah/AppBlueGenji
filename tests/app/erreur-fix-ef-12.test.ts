@@ -27,7 +27,7 @@ describe("refusalNeedsServerInvite", () => {
 
   it("le paragraphe s'annonce (région status montée d'avance) et le champ le cite", () => {
     const form = readSource("app/connexion/_components/LoginForm.tsx");
-    const region = form.indexOf('<div role="status">');
+    const region = form.indexOf('role="status">');
     expect(region).toBeGreaterThan(-1);
     expect(form.indexOf("{inviteAfterRefusal && (", region)).toBeGreaterThan(region);
     expect(form).toContain('<p id={LOGIN_INVITE_ID}');

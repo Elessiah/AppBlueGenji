@@ -395,7 +395,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                     refus qui se lève en rejoignant le serveur, il se lit à découvert.
                     La région `status` est toujours montée (une région live créée
                     avec son contenu n'est pas annoncée) et le champ la cite. */}
-                <div role="status">
+                <div /* NOSONAR S6819 — région live montée d'avance autour d'un paragraphe à lien ; `<output>` est une valeur de formulaire */ role="status">
                 {inviteAfterRefusal && (
                   <p id={LOGIN_INVITE_ID} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
                     {richNodes(

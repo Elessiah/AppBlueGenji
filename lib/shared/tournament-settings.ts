@@ -204,7 +204,7 @@ export function tournamentSettingsGroups(input: TournamentSettingsInput): Tourna
   }
   conditions.push(
     { label: "Tag Discord certifié", value: PLAYER_REQUIREMENT_LABELS[filters.discordRequirement] },
-    { label: "Compte Battle.net rattaché", value: PLAYER_REQUIREMENT_LABELS[filters.blizzardRequirement] },
+    { label: "Compte Battle.net lié", value: PLAYER_REQUIREMENT_LABELS[filters.blizzardRequirement] },
   );
 
   return [
