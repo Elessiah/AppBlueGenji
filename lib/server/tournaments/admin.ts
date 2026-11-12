@@ -14,6 +14,7 @@ import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
 import { SINGLE_REPORT_SQL } from "./score-report-sql";
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
+import { withShortLockWait } from "./lock-wait";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { assertForfeitBelongsToMatch, assertMatchSavable, mapEntryOf } from "./save-guard";
 
@@ -175,24 +176,55 @@ async function multiPhaseDependentsHaveInput(
   const self = states.find((s) => s.id === matchId);
   if (!self) return false;
 
-  return dependentMatches(self, states, "MULTI", phaseRows[0]?.format).some(hasScoreInput);
+  return dependentsOrFreshHaveInput(connection, dependentMatches(self, states, "MULTI", phaseRows[0]?.format));
+}
+
+/**
+ * Les dépendants portent-ils une saisie — dans l'image de la transaction, puis,
+ * s'ils y paraissent vierges, **relus sous verrou** ? L'image est figée par la
+ * lecture jointe de {@link checkDownstreamMatchesHaveNoScores} : un report
+ * concurrent, écrit sous le verrou du match aval et pas encore commité, y est
+ * invisible, et la correction réécrirait un résultat dont dépend un match
+ * entamé. La relecture verrouillante attend ce report et voit sa saisie une
+ * fois commitée. Seules les lignes dépendantes sont verrouillées (par
+ * identifiant), sous attente bornée ({@link withShortLockWait}) ; la structure
+ * des liens, elle, ne bouge pas sous un report.
+ */
+async function dependentsOrFreshHaveInput(
+  connection: PoolConnection,
+  dependents: readonly MatchScoreState[],
+): Promise<boolean> {
+  if (dependents.some(hasScoreInput)) return true;
+  if (dependents.length === 0) return false;
+  const ids = dependents.map((dependent) => dependent.id);
+  return withShortLockWait(connection, async () => {
+    const [rows] = await connection.query<DependentMatchRow[]>(
+      `SELECT ${DEPENDENT_COLUMNS} FROM bg_matches WHERE id IN (?) FOR UPDATE`,
+      [ids],
+    );
+    return rows.map(toMatchScoreState).some(hasScoreInput);
+  });
 }
 
 /**
  * Manches ultérieures de la phase du match : la règle partagée
- * (`laterRoundsHaveScoreInput`), en lecture d'**instantané**. Pas de verrou
- * ici : la lecture ordinaire de `checkDownstreamMatchesHaveNoScores` a déjà
- * figé l'image de la transaction, et sous MariaDB (`innodb_snapshot_isolation`)
- * un `FOR UPDATE` sur une manche qu'un « Prêt » vient de toucher serait refusé
- * (`ER_CHECKREAD`) — une rafale de « Prêt » épuiserait les rejeux de la
- * correction, et l'attente du verrou se ferait match verrouillé.
+ * (`laterRoundsHaveScoreInput`), d'abord en lecture d'**instantané** — une
+ * saisie déjà visible suffit à refuser, sans rien verrouiller —, puis, si elle
+ * n'en voit aucune, **verrouillée** : un report concurrent pas encore commité
+ * échappe à l'image de la transaction (voir {@link dependentsOrFreshHaveInput}).
+ * L'image vient d'être prise par la lecture jointe qui précède : sous MariaDB
+ * (`innodb_snapshot_isolation`), seule une écriture commitée dans cet
+ * intervalle de quelques millisecondes vaut un `ER_CHECKREAD`, rejoué
+ * (`retryOnDeadlock`) ; l'attente du verrou est bornée.
  */
-function laterRoundsHaveInput(connection: PoolConnection, current: CurrentMatchRow): Promise<boolean> {
-  return laterRoundsHaveScoreInput(connection, {
+async function laterRoundsHaveInput(connection: PoolConnection, current: CurrentMatchRow): Promise<boolean> {
+  const scope = {
     tournamentId: Number(current.tournament_id),
     phaseId: Number(current.phase_id ?? 0),
     afterRound: Number(current.round_number),
-  });
+  };
+  if (await laterRoundsHaveScoreInput(connection, scope)) return true;
+  return laterRoundsHaveScoreInput(connection, { ...scope, lock: true });
 }
 
 async function bracketDependentsHaveInput(
@@ -244,7 +276,7 @@ async function bracketDependentsHaveInput(
     nextLoserMatchId: nullableId(current.next_loser_match_id),
   };
 
-  return dependentMatches(self, states, current.format).some(hasScoreInput);
+  return dependentsOrFreshHaveInput(connection, dependentMatches(self, states, current.format));
 }
 
 /**

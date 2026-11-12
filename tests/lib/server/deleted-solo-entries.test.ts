@@ -144,6 +144,21 @@ describe("forfeitUnplayedSoloEntry — compte réactivé", () => {
 
     await expect(forfeitUnplayedSoloEntry(4, 40)).rejects.toThrow("FORMAT_WITHOUT_FORFEIT");
   });
+
+  it("forfeitUnplayedSoloEntry_alreadyOutWithOpenMatch_forfeitsMatch", async () => {
+    fakeDb({ format: "SURVIVAL", openMatches: [101] });
+    jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
+
+    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
+    expect(forfeitDeletedEntryMatch).toHaveBeenCalledWith(4, 40);
+  });
+
+  it("forfeitUnplayedSoloEntry_notInTournament_zeroWithoutError", async () => {
+    fakeDb({ format: "SWISS" });
+    jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_NOT_IN_TOURNAMENT"));
+
+    await expect(forfeitUnplayedSoloEntry(4, 40)).resolves.toBe(0);
+  });
 });
 
 describe("forfeitUnplayedSoloEntry — match non tranché", () => {
@@ -152,6 +167,17 @@ describe("forfeitUnplayedSoloEntry — match non tranché", () => {
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
     expect(forfeitDeletedEntryMatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("forfeitUnplayedSoloEntry_sameMatchStillOpen_logsWarning", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    fakeDb({ format: "SINGLE", openMatches: [101, 101] });
+
+    await forfeitUnplayedSoloEntry(4, 40);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("match 101");
+    warn.mockRestore();
   });
 });
 

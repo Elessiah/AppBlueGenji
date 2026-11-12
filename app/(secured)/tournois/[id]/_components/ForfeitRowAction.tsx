@@ -103,11 +103,15 @@ export const FOCUS_WATCH_RELAXED_MS = 250;
 function focusScripted(target: HTMLElement | null): void {
   if (!target) return;
   // Un bouton l'est déjà (`tabIndex >= 0`) : seule une ligne ou un cadenas non focalisable est touché.
-  if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) {
+  const scripted = target.tabIndex < 0 && !target.hasAttribute("tabindex");
+  if (scripted) {
     target.setAttribute("tabindex", "-1");
     target.addEventListener("blur", () => target.removeAttribute("tabindex"), { once: true });
   }
   target.focus({ preventScroll: true });
+  // Focus refusé (ligne masquée, retirée avant l'appel) : aucun `blur` ne
+  // viendra, l'attribut se retire tout de suite.
+  if (scripted && document.activeElement !== target) target.removeAttribute("tabindex");
 }
 
 /**
@@ -132,8 +136,11 @@ export function focusRowAfterChange(teamId: number, now: () => number = () => pe
     for (const type of stopEvents) document.removeEventListener(type, stop, true);
   };
   for (const type of stopEvents) document.addEventListener(type, stop, true);
+  // Onglet en arrière-plan : les trames s'arrêtent, et les écouteurs globaux
+  // resteraient posés jusqu'au retour. Le délai fixe, lui, mène la veille à
+  // son échéance.
   const schedule = (callback: () => void) => {
-    if (relaxed) setTimeout(callback, FOCUS_WATCH_RELAXED_MS);
+    if (relaxed || document.hidden) setTimeout(callback, FOCUS_WATCH_RELAXED_MS);
     else requestAnimationFrame(callback);
   };
   const tick = () => {

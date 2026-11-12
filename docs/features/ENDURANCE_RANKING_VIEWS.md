@@ -30,10 +30,11 @@ Dans l'ordre (`EnduranceView`) :
    encore posés sont projetés, petite finale comprise) — jamais « 0 sur 4 » aux
    quarts puis « 4 sur 6 » aux demies, une barre qui reculerait.
    Tournoi fini : pas de bandeau.
-3. **Vues du classement** (`EnduranceRankingViews`) — la légende « Hors
-   course » (`outLegend`) et celle des gestes (« 🔒 Figé ») sont rendues dans le
-   panneau « Général », en un même pied, avant la navigation du bas —, puis le
-   journal des sanctions.
+3. **Vues du classement** (`EnduranceRankingViews`) — la légende des gestes
+   (« 🔒 Figé ») est rendue dans le panneau « Général », en pied, avant la
+   navigation du bas ; « Hors course » (`outLegend`, texte de `outLegendText`)
+   s'explique derrière un « i » (`InfoHint`) dans **chaque** vue, toutes pouvant
+   afficher ce statut —, puis le journal des sanctions.
 4. **Volet « Évolution de l'endurance »** (`EnduranceChartPanel`), replié.
 5. Aperçu de la manche suivante (arbitrage), play-offs (s'ils sont lancés),
    volets de manche (`ENDURANCE_ROUND_PANELS.md`).
@@ -259,7 +260,10 @@ du registre.
 - **Bandeau** : entre deux manches (close, suivante pas tirée) il dit « Manche n
   terminée · prochaine manche pas encore tirée » (« play-offs pas encore lancés » après la dernière
   manche prévue) ; la barre des play-offs porte son propre nom ; l'horloge de
-  60 s ne tourne que si un match non joué de la manche est daté. L'arbre final
+  60 s ne tourne que si un match non joué de la manche est daté **à venir** (un
+  match en retard l'arrête au battement suivant, `useNextMatchClock`) ; le
+  bandeau « entre deux manches » n'a pas d'`aria-label` (son texte visible le
+  nomme déjà). L'arbre final
   ne compte pas les exemptions (ni jouées ni à jouer) et ne projette pas de
   petite finale quand une demie est exemptée (`endurancePlayoffMatchTotal`).
 - **Vues** : le sous-titre de « Manche N — matchs déjà joués » et celui de la

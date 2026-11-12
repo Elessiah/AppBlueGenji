@@ -399,14 +399,19 @@ export function nextScheduledMatch(matches: BracketMatch[], round: number, now: 
 }
 
 /**
- * Un match non joué de la manche porte-t-il une date ? Sans cela, « Prochain
- * match » reste vide quelle que soit l'heure : l'horloge du bandeau n'a pas à
- * tourner.
+ * Un match non joué de la manche porte-t-il une date **à venir** ? Sans cela,
+ * « Prochain match » reste vide quelle que soit l'heure : l'horloge du bandeau
+ * n'a pas à tourner. Un match en retard (date passée) ne la relance pas.
+ * `now` vaut `null` avant le montage : toute date compte alors, l'heure du
+ * lecteur n'étant pas encore connue.
  */
-export function hasScheduledPendingMatch(matches: BracketMatch[], round: number): boolean {
-  return qualificationMatches(matches).some(
-    (match) => match.roundNumber === round && !isMatchPlayed(match) && match.startAt !== null,
-  );
+export function hasScheduledPendingMatch(matches: BracketMatch[], round: number, now: number | null): boolean {
+  return qualificationMatches(matches).some((match) => {
+    if (match.roundNumber !== round || isMatchPlayed(match) || match.startAt === null) return false;
+    if (now === null) return true;
+    const at = Date.parse(match.startAt);
+    return !Number.isNaN(at) && at >= now;
+  });
 }
 
 /** Engagés de la manche en cours qui n'ont pas encore joué leur rencontre. */

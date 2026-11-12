@@ -37,7 +37,7 @@ import { PhaseStandingsBlock } from "@/app/(secured)/tournois/[id]/_components/P
 import { BracketSections } from "@/app/(secured)/tournois/[id]/_components/BracketSections";
 import { SwissView } from "@/app/(secured)/tournois/[id]/_components/SwissView";
 import { SurvivalView } from "@/app/(secured)/tournois/[id]/_components/SurvivalView";
-import { EnduranceView } from "@/app/(secured)/tournois/[id]/_components/EnduranceView";
+import { EnduranceView, outLegendText } from "@/app/(secured)/tournois/[id]/_components/EnduranceView";
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
@@ -479,6 +479,9 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
     expect(html).toContain("1 team in contention → 4 in the playoffs");
     expect(html).toContain("Overall ranking");
     expect(html).toContain("Out of contention");
+    // « Hors course » s'explique derrière un « i », plus en paragraphe permanent.
+    expect(html).toContain("What does “out of contention” mean?");
+    expect(html).not.toContain("OUT OF CONTENTION =");
     expect(html).toContain("REFEREE PENALTIES");
   });
 
@@ -690,8 +693,12 @@ describe("français inchangé — les messages égalent les tables d'origine", (
   });
 
   it("compteurs anglais à 1 : singulier (manches prévues, joueurs, maps, cadence)", () => {
-    expect(EN.t("endurance.outLegendRounds", { count: 1 })).toBe(" IN THE 1 PLANNED ROUND");
-    expect(EN.t("endurance.outLegendRounds", { count: 8 })).toBe(" IN THE 8 PLANNED ROUNDS");
+    expect(EN.t("endurance.outLegendRounds", { count: 1 })).toBe(" in the 1 planned round");
+    expect(EN.t("endurance.outLegendRounds", { count: 8 })).toBe(" in the 8 planned rounds");
+    expect(FR_ENDURANCE_TEXT.t("endurance.outLegendRounds", { count: 1 })).toBe(" dans l'unique manche prévue");
+    expect(outLegendText(EN.t, 8)).toBe("“Out of contention”: the entrant still has pool left, but no chance of reaching the playoffs anymore in the 8 planned rounds.");
+    expect(outLegendText(FR_ENDURANCE_TEXT.t, 8)).toBe("« Hors course » : l'engagé garde du capital, mais n'a plus aucune chance d'atteindre les play-offs dans les 8 manches prévues.");
+    expect(outLegendText(EN.t, null)).toBe("“Out of contention”: the entrant still has pool left, but no chance of reaching the playoffs anymore.");
     expect(EN.t("header.filters.minPlayers", { count: 1 })).toBe("1 player minimum");
     expect(EN.t("matchFormat.withMaps", { base: "BO3", maps: 1 })).toBe("BO3 · 1 map");
     expect(EN.t("live.cadenceMinutes", { minutes: 1 })).toBe("at most every 1 minute");

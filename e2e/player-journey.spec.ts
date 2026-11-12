@@ -60,9 +60,12 @@ test.describe("Parcours joueur dans un tournoi", () => {
    * l'ajoutant si besoin : code de replay, puis score de chaque équipe, nommée.
    */
   const fillMap = async (dialog: Locator, index: number, code: string, scores: Record<string, number>) => {
-    const rows = dialog.getByRole("listitem");
-    if ((await rows.count()) <= index) await dialog.getByRole("button", { name: "Ajouter une map" }).click();
-    const row = rows.nth(index);
+    // Affichage progressif (MAP_SCORES.md) : la ligne suivante paraît d'elle-même
+    // quand la précédente est complète et le match pas encore acquis — pas de
+    // bouton « ajouter ». En confirmation, les lignes adverses arrivent avec le
+    // détail de la proposition : on les attend.
+    const row = dialog.getByRole("listitem").nth(index);
+    await expect(row).toBeVisible();
     await row.getByRole("textbox", { name: "Code de replay" }).fill(code);
     for (const [team, score] of Object.entries(scores)) {
       await row.getByRole("spinbutton", { name: team }).fill(String(score));
@@ -92,9 +95,17 @@ test.describe("Parcours joueur dans un tournoi", () => {
    * l'ouverture de la fiche, par `dismissSiteOverlays`.
    */
   async function dismissLaunchCenter(page: Page) {
-    for (let attempt = 0; attempt < 4; attempt++) {
+    // Il s'ouvre après l'hydratation de la fiche, parfois après que la carte du
+    // match est visible, et se rouvre quand la phase change (« à planifier » puis
+    // salon : une annonce par phase) : on lui laisse le temps de paraître, à
+    // chaque tour, sans échouer s'il ne vient pas (match déjà lancé).
+    for (let attempt = 0; attempt < 6; attempt++) {
       const overlay = page.getByRole("dialog").filter({ hasNotText: "Score de mon match" }).first();
-      if (!(await overlay.isVisible().catch(() => false))) return;
+      const shown = await overlay
+        .waitFor({ state: "visible", timeout: attempt === 0 ? 5_000 : 2_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!shown) return;
       await page.keyboard.press("Escape");
       // Attente sur la fermeture effective de la modale plutôt qu'un délai fixe ;
       // si elle reste ouverte, la boucle réessaie Échap.
@@ -122,8 +133,11 @@ test.describe("Parcours joueur dans un tournoi", () => {
     await matchCard(pageA, matchId).getByRole("button", { name: /Saisir le score/ }).click();
     const dialogA = scoreDialog(pageA);
     await expect(dialogA).toBeVisible();
-    // Aucune map à l'ouverture : aucun score inventé (MAP_SCORES.md).
-    await expect(dialogA.getByRole("textbox", { name: "Code de replay" })).toHaveCount(0);
+    // Une seule ligne vierge à l'ouverture (affichage progressif) : aucun score
+    // inventé, et le compteur ne la compte pas (MAP_SCORES.md).
+    await expect(dialogA.getByRole("textbox", { name: "Code de replay" })).toHaveCount(1);
+    await expect(dialogA.getByRole("textbox", { name: "Code de replay" })).toHaveValue("");
+    await expect(dialogA.getByRole("group", { name: "Maps jouées (0/3)" })).toBeVisible();
     await expect(dialogA.getByRole("button", { name: "Envoyer le score" })).toBeDisabled();
 
     // 2 – 1 pour A, map par map : deux maps gagnées, une perdue.

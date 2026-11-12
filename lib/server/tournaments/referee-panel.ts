@@ -15,6 +15,7 @@ import type { RefereeIneligibility } from "@/lib/shared/match-referee";
 import type { TournamentGame } from "@/lib/shared/types";
 import { parseStoredSlots } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
+import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import { refereeEligibilityBlock, type CastEligibilityRow } from "./cast-eligibility";
 import { loadMatchPlayerIds } from "./match-players";
 
@@ -71,6 +72,7 @@ type PanelMatchRow = RowDataPacket & {
   team2_id: number | null;
   status: string;
   launched_at: Date | string | null;
+  launch_pairing: string | null;
   tournament_game: TournamentGame;
 };
 
@@ -86,7 +88,7 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
   return withConnection(async (connection) => {
     const [matches] = await connection.execute<PanelMatchRow[]>(
       `SELECT m.id, m.tournament_id, m.phase_id, m.round_number, m.bracket, m.self_managed, m.first_map, m.referee_user_id,
-              m.team1_id, m.team2_id, m.status, m.launched_at, t.game AS tournament_game
+              m.team1_id, m.team2_id, m.status, m.launched_at, m.launch_pairing, t.game AS tournament_game
          FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1`,
       [matchId],
     );
@@ -124,8 +126,9 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     );
     const roundState = roundStateRows[0];
     // Avant le départ, l'arbitre qui joue désormais le match ne compte plus —
-    // la règle de l'instantané (`refereeKept`), que le bandeau du staff lit déjà.
-    const beforeStart = match.status !== "COMPLETED" && match.launched_at === null;
+    // la règle de l'instantané (`refereeKept`), que le bandeau du staff lit déjà :
+    // un lancement d'un appariement d'avant ne compte pas (`castBeforeLaunch`).
+    const beforeStart = castBeforeLaunch(match);
     const game = match.tournament_game;
     const refereeId = match.referee_user_id === null ? null : Number(match.referee_user_id);
     const refereeRow = refereeId === null ? undefined : byId.get(refereeId);

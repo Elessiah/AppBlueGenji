@@ -77,10 +77,10 @@ interface EnduranceRankingViewsProps {
    */
   actionsLegend?: ReactNode;
   /**
-   * Légende des lignes « hors course », même pied de panneau que
-   * `actionsLegend` : lue dans le panneau « Général », avant la navigation.
+   * Explication des lignes « hors course », derrière un « i » : chaque vue peut
+   * afficher ce statut, l'explication suit donc dans chaque panneau.
    */
-  outLegend?: ReactNode;
+  outLegend?: string | null;
   /** Une ligne porte deux gestes (arbitrage) : colonne élargie. */
   wideActions: boolean;
 }
@@ -606,13 +606,18 @@ export function EnduranceRankingViews({
           );
         })}
         {/* Dans le panneau « Général » qu'elle explique : lue avec lui. */}
-        {isGeneral && ((withActions && actionsLegend) || outLegend) && (
-          <div className={styles.legend}>
-            {withActions && actionsLegend}
-            {outLegend}
-          </div>
-        )}
+        {withActions && actionsLegend && <div className={styles.legend}>{actionsLegend}</div>}
       </div>
+
+      {/* « Hors course » se lit dans toutes les vues : un « i » l'explique dans chacune. */}
+      {outLegend && (
+        <InfoHintRow>
+          <span className={`mono ${styles.seedHintLabel}`}>{t("endurance.outHintLabel")}</span>
+          <InfoHint id={`${baseId}-out-hint`} subject={t("endurance.outHintSubject")}>
+            {outLegend}
+          </InfoHint>
+        </InfoHintRow>
+      )}
 
       {/* « S3 » ne s'explique ni au survol ni au toucher : un « i » le dit. */}
       {rows.length > 0 && (

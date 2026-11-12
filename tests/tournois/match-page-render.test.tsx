@@ -220,7 +220,8 @@ describe("page d'un match — ce que tout le monde lit", () => {
     const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
     expect(header).toContain("Bravo 1 – 3");
     // Le libellé nomme les deux équipes, dans l'ordre affiché : il se lit seul.
-    expect(header).toContain("Score : Bravo 1, Alpha 3");
+    // Nom et score séparés par « : » — un nom qui finit par un chiffre reste lisible.
+    expect(header).toContain("Score — Bravo : 1 ; Alpha : 3");
     expect(header).toContain("Victoire de Alpha");
     expect(html).toContain('class="pill pill-success');
   });
@@ -229,7 +230,7 @@ describe("page d'un match — ce que tout le monde lit", () => {
     const html = render(match({ status: "COMPLETED", forfeitTeamId: ALPHA, winnerTeamId: BRAVO }), "public");
     const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
     expect(header).toContain("Bravo contre Alpha : forfait de Alpha");
-    expect(header).not.toContain("Score :");
+    expect(header).not.toContain("Score —");
   });
 
   it("render_forfeitEnglish_screenReaderNamesForfeitingTeam", () => {
@@ -239,7 +240,7 @@ describe("page d'un match — ce que tout le monde lit", () => {
 
   it("render_scoreEnglish_scoreNamesBothTeams", () => {
     const html = render(match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA }), "public", false, "en");
-    expect(visible(html)).toContain("Score: Bravo 1, Alpha 3");
+    expect(visible(html)).toContain("Score — Bravo: 1; Alpha: 3");
   });
 
   it("render_nothingForRightColumn_singleColumnGrid", () => {

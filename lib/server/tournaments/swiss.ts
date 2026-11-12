@@ -26,6 +26,7 @@ import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 import { noteDeletedMatches } from "./departed-notices";
+import { roundHasScoreInput } from "./bg-survie/round-progress";
 import { loadCancellableForfeitIds } from "./forfeit-window";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
@@ -449,29 +450,6 @@ async function readRoundPlan(
 }
 
 /**
- * La ronde `round` porte-t-elle déjà une saisie ? Une ronde générée mais non
- * entamée peut être réappariée sans rien détruire ; dès qu'un score y a été
- * saisi, elle est figée (les byes, posés par le moteur, ne comptent pas).
- */
-async function roundHasScoreInput(
-  conn: PoolConnection,
-  tournamentId: number,
-  round: number,
-  phaseId = 0,
-): Promise<boolean> {
-  const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND is_bye = 0
-       AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
-            OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
-            OR double_forfeit = 1
-            OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL)`,
-    [tournamentId, phaseId, round],
-  );
-  return Number(rows[0]?.c ?? 0) > 0;
-}
-
-/**
  * Garantit que la ronde donnée colle au classement courant : elle est créée si
  * elle n'existe pas, et **réappariée** si une correction de score en amont a
  * changé le classement — tant qu'aucun score n'y a été saisi. Sans cela, les
@@ -494,7 +472,9 @@ async function ensureRound(
   }
 
   if (samePlan(existing, desired)) return false;
-  if (await roundHasScoreInput(conn, tournamentId, round, phaseId)) return false;
+  // Saisie relue **sous verrou** juste avant de défaire : l'image de la
+  // transaction peut ignorer un « Enregistrer » commité depuis (`roundHasScoreInput`).
+  if (await roundHasScoreInput(conn, tournamentId, round, { phaseId, lock: true })) return false;
 
   // Leurs engagées tenaient peut-être un horaire : l'avis se note avant la
   // suppression (`departed-notices.ts`).
@@ -763,6 +743,9 @@ export async function loadSwissMeta(
   conn: PoolConnection,
   tournamentId: number,
   phaseId = 0,
+  // Borne de la fenêtre d'annulation déjà connue (matchs chargés par
+  // l'instantané, `lastInputRoundOf`) : la requête est alors épargnée.
+  lastInputRound?: number,
 ): Promise<SwissMeta | null> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (tournament?.format !== "SWISS") return null;
@@ -805,7 +788,7 @@ export async function loadSwissMeta(
       status: row.status,
       forfeitRound: row.forfeit_round === null ? null : Number(row.forfeit_round),
     })),
-    { open: tournament.state === "RUNNING" },
+    { open: tournament.state === "RUNNING", lastInputRound },
   );
 
   return {

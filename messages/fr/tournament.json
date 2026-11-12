@@ -220,8 +220,8 @@
     "yourMatch": "Votre match",
     "matchCount": "{count, plural, one {# match} other {# matchs}}",
     "treeLabel": "Tableau du tournoi — défilement horizontal",
-    "goToMatchTitle": "{label} — aller au match",
-    "goToMatchLabel": "{label} — aller au match d'arrivée"
+    "goToMatchLabel": "{label} — aller au match d'arrivée",
+    "goToSlotLabel": "{label} — aller à la case d'arrivée, pas encore pourvue"
   },
   "sections": {
     "TO_PLAN": "À planifier",

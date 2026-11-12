@@ -9,7 +9,7 @@
  * afficher un score périmé.
  */
 import { publishTournamentEvent } from "@/lib/server/live";
-import { invalidateLandingAggregates, invalidateLandingLive, invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingLive, invalidateLandingMiniBracket } from "@/lib/server/landing-cache";
 import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { invalidateTournamentLists } from "./list-cache";
@@ -131,7 +131,8 @@ export function publishMatchUpdatedEvent(
  * matchs clos restent en cache. Le rejeu peut en revanche réécrire des colonnes
  * de `bg_tournaments` (manche d'endurance courante, phase), le classement que
  * lisent les listes, et reposer les matchs d'une manche périmée : instantané,
- * aperçu, listes, direct et mini-arbres de l'accueil sont oubliés. Une seule
+ * aperçu, listes, direct et le mini-arbre de l'accueil **de ce tournoi** sont
+ * oubliés. Une seule
  * règle pour les deux gestes.
  */
 export function publishStandingsReplayedEvent(tournamentId: number): void {
@@ -143,7 +144,7 @@ export function publishStandingsReplayedEvent(tournamentId: number): void {
   invalidateTournamentPreview(tournamentId);
   invalidateTournamentLists();
   invalidateLandingLive();
-  invalidateLandingMiniBrackets();
+  invalidateLandingMiniBracket(tournamentId);
   publishTournamentEvent({
     type: "match_updated",
     tournamentId,

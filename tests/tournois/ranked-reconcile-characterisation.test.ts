@@ -119,7 +119,7 @@ const execute = jest.fn<SqlQuery>(async (sql, params) => {
   }
   return [{ affectedRows: 1 }, []];
 });
-const connection = fakeConnection({ execute });
+const connection = fakeConnection({ execute, query: jest.fn<SqlQuery>(async () => [[], []]) });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -212,6 +212,8 @@ const SWISS_CASES: Case[] = [
   { name: "terminé, phase", phaseId: 4, world: { format: "SWISS", state: "FINISHED", current: 3, totalRounds: 3, teams: FOUR, matches: [played(1, 11, 13), played(1, 12, 14)], incomplete: {} } },
 ];
 
+// Revue #542 / EF-15 : relevés « suivante saisie » repris — la saisie de la manche se relit désormais
+// par `HAS_SCORE_INPUT_SQL` partagé et sous verrou (texte de requête seul changé, même nombre d'appels).
 const SURVIVAL_GOLDEN: Record<string, string> = {
   "mauvais format": "1/46eca4a5f8f1ccb2",
   "introuvable": "1/46eca4a5f8f1ccb2",
@@ -224,8 +226,8 @@ const SURVIVAL_GOLDEN: Record<string, string> = {
   "manche close, cible atteinte, phase": "5/89490e4d9d0581c7",
   "manche close, manche suivante posée": "17/1a3516d5d4422395",
   "manche close, manche suivante, phase": "17/13555cefbccd5d7d",
-  "manche suivante saisie, appariements périmés": "7/40d80ee3794414a3",
-  "manche en cours, suivante saisie": "12/d52da7dc422a0e80",
+  "manche suivante saisie, appariements périmés": "7/5d1018d5e024b299",
+  "manche en cours, suivante saisie": "12/039896f267393243",
   "terminé": "7/9dba66a902234d01",
   "terminé, phase": "4/13b8ea86fed007b5",
 };
@@ -243,7 +245,7 @@ const SWISS_GOLDEN: Record<string, string> = {
   "ronde close, une seule active": "8/bef0b7372eea6ee1",
   "ronde close, ronde suivante posée": "21/88235d9e2c72a5db",
   "ronde close, ronde suivante, phase": "23/1993d29997574152",
-  "ronde suivante saisie, appariements périmés": "7/f78f1e6db2e14650",
+  "ronde suivante saisie, appariements périmés": "7/4e1ecad9e5a4b17d",
   "terminé": "7/bc265050d28b8898",
   "terminé, phase": "5/24dfa6ed9fd6146c",
 };

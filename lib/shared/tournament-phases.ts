@@ -262,7 +262,7 @@ export const PHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_QUALIFIER_COUNT: NON_DECREASING_QUALIFIER_MESSAGE,
   NON_DECREASING_PHASE_QUALIFIERS: NON_DECREASING_QUALIFIER_MESSAGE,
   INVALID_PHASE_SWISS_ROUNDS: "Nombre de manches ronde suisse invalide : 1 à 20 attendues.",
-  INVALID_PHASE_SURVIVAL_ROUNDS: "Cadence de survie invalide : 1 à 50 attendues.",
+  INVALID_PHASE_SURVIVAL_ROUNDS: "Cadence de Survie par coupes invalide : 1 à 50 attendues.",
 };
 
 /** Réglage d'une phase qu'un refus de `findPhaseIssue` peut désigner. */

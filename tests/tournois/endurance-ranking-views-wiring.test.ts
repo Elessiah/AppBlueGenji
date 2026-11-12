@@ -97,6 +97,14 @@ describe("gestes de chaque rôle — toujours atteignables", () => {
   });
 });
 
+describe("EnduranceRankingViews — « hors course » expliqué dans chaque vue", () => {
+  it("le « i » de « hors course » n'est pas réservé au panneau Général", () => {
+    expect(RANKING).toContain("{outLegend && (");
+    expect(RANKING).not.toContain("isGeneral && ((withActions && actionsLegend) || outLegend)");
+    expect(RANKING).toContain('<InfoHint id={`${baseId}-out-hint`} subject={t("endurance.outHintSubject")}>');
+  });
+});
+
 describe("EnduranceRankingViews — gestes réservés au Général", () => {
   it("n'affiche la colonne d'action que dans la vue « Général »", () => {
     expect(RANKING).toContain('const isGeneral = view.kind === "GENERAL"');
@@ -254,7 +262,13 @@ describe("EnduranceCard — bandeau des play-offs", () => {
   });
 
   it("ne fait tourner l'horloge que si un match non joué de la manche porte une date", () => {
-    expect(CARD).toContain("hasScheduledPendingMatch(matches, current.round)");
+    expect(CARD).toContain("hasScheduledPendingMatch(matches, round, now)");
+    expect(CARD).toContain("useClock(NEXT_MATCH_CLOCK_MS, clockOn)");
+  });
+
+  it("le bandeau « entre deux manches » ne double pas son texte visible par un aria-label", () => {
+    expect(CARD).toContain("<section className={`${styles.strip} ${styles.stripBetween}`}>");
+    expect(CARD).not.toContain('aria-label={t("endurance.stripDone"');
   });
 
   it("dit où en est le tournoi entre deux manches, avant les play-offs", () => {

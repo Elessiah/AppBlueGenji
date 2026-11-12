@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { useClock } from "@/lib/shared/hooks/useClock";
@@ -23,6 +24,20 @@ import styles from "./EnduranceCard.module.css";
 const NEXT_MATCH_CLOCK_MS = 60_000;
 
 /**
+ * Horloge de « Prochain match » : elle ne tourne que si un match non joué de
+ * la manche porte une date à venir — sans elle, chaque battement ne servirait
+ * à rien. Le premier `now` se lit au montage même horloge arrêtée ; une fois la
+ * dernière date passée (match en retard), le battement suivant l'arrête.
+ */
+function useNextMatchClock(matches: BracketMatch[], round: number | null): number | null {
+  const [clockOn, setClockOn] = useState(true);
+  const now = useClock(NEXT_MATCH_CLOCK_MS, clockOn);
+  const ticking = round !== null && hasScheduledPendingMatch(matches, round, now);
+  if (ticking !== clockOn) setClockOn(ticking);
+  return now;
+}
+
+/**
  * En-tête du plateau « BlueGenji Survie » et bandeau de la manche en cours
  * (`docs/features/ENDURANCE_RANKING_VIEWS.md`) : ce qui bouge, d'un coup d'œil
  * — la manche, son avancement, qui doit encore jouer, et la prochaine
@@ -40,9 +55,7 @@ export function EnduranceCard({
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
   const current = endurance.playoffsStarted || isFinished ? null : enduranceCurrentRound(matches);
   // `null` avant le montage : l'heure du serveur n'est pas celle du lecteur.
-  // L'horloge ne tourne que si un match non joué de la manche porte une date :
-  // sans date, « Prochain match » reste vide et chaque battement ne servirait à rien.
-  const now = useClock(NEXT_MATCH_CLOCK_MS, current !== null && hasScheduledPendingMatch(matches, current.round));
+  const now = useNextMatchClock(matches, current?.round ?? null);
   const next = current !== null && now !== null ? nextScheduledMatch(matches, current.round, now) : null;
 
   // Play-offs : le bandeau dit l'avancement de l'arbre à la place.
@@ -138,7 +151,7 @@ export function EnduranceCard({
       )}
 
       {progress === null && closedRound !== null && (
-        <section className={`${styles.strip} ${styles.stripBetween}`} aria-label={t("endurance.stripDone", { round: String(closedRound) })}>
+        <section className={`${styles.strip} ${styles.stripBetween}`}>
           <span className={`mono ${styles.stripLabel}`}>{t("endurance.stripDone", { round: String(closedRound) })}</span>
           <span className={styles.stripSoon}>{t(lastRoundPlayed ? "endurance.stripPlayoffsSoon" : "endurance.stripSoon")}</span>
         </section>

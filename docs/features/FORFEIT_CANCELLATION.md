@@ -174,7 +174,10 @@ calculée au serveur par `loadCancellableForfeitIds`
 suisse, survie et BG Survie ; hors `RUNNING` (et, en BG Survie, une fois les
 play-offs lancés) elle rend `[]` sans requête — l'interface n'y propose aucune
 annulation —, et en BG Survie la borne déjà lue pour les pénalités
-(`lastRoundWithScoreInput`) est réutilisée : une seule lecture.
+(`lastRoundWithScoreInput`) est réutilisée : une seule lecture. En suisse et
+en survie, l'instantané tire la borne des matchs qu'il a déjà chargés
+(`lastInputRoundOf`, même règle que `HAS_SCORE_INPUT_SQL`) : aucune relecture
+de `bg_matches` par instantané.
 
 Il ouvre une `ConfirmActionDialog` au ton primaire, dont la confirmation
 « Effacer l'abandon » se distingue du « Annuler » qui ferme ; le succès et

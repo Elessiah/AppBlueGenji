@@ -10,6 +10,65 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { HAS_SCORE_INPUT_SQL } from "./bg-survie/round-progress";
+import type { MatchRow } from "./_internal";
+import { hasScoreInput } from "@/lib/shared/match-lock";
+
+/** Ce qu'il faut d'un match pour juger s'il porte une saisie. */
+export type ScoreInputMatchRow = Pick<
+  MatchRow,
+  | "round_number"
+  | "phase_id"
+  | "status"
+  | "team1_id"
+  | "team2_id"
+  | "team1_score"
+  | "team2_score"
+  | "winner_team_id"
+  | "forfeit_team_id"
+  | "double_forfeit"
+  | "team1_reported_at"
+  | "team2_reported_at"
+>;
+
+/**
+ * Même règle que `HAS_SCORE_INPUT_SQL`, sur une ligne déjà chargée : la ligne
+ * se lit par le prédicat partagé `hasScoreInput` (`lib/shared/match-lock`),
+ * seul endroit qui dit ce qu'est une saisie — le double forfait ne compte que
+ * clos, une proposition compte dès sa date de report, comme la requête.
+ */
+function rowHasScoreInput(row: ScoreInputMatchRow): boolean {
+  return hasScoreInput({
+    id: 0,
+    roundNumber: Number(row.round_number),
+    team1Id: row.team1_id,
+    team2Id: row.team2_id,
+    team1Score: row.team1_score,
+    team2Score: row.team2_score,
+    winnerTeamId: row.winner_team_id,
+    forfeitTeamId: row.forfeit_team_id,
+    doubleForfeit: Number(row.double_forfeit ?? 0) === 1 && row.status === "COMPLETED",
+    decided: row.status === "COMPLETED",
+    hasPendingReport:
+      row.status === "AWAITING_CONFIRMATION" || row.team1_reported_at !== null || row.team2_reported_at !== null,
+    nextWinnerMatchId: null,
+    nextLoserMatchId: null,
+  });
+}
+
+/**
+ * Dernière manche de la phase `phaseId` portant une saisie, lue sur les matchs
+ * **déjà chargés** par l'instantané : la borne de {@link loadCancellableForfeitIds}
+ * (`options.lastInputRound`) sans relire `bg_matches` à chaque instantané. 0
+ * quand aucune manche n'a de saisie, comme la requête.
+ */
+export function lastInputRoundOf(matches: readonly ScoreInputMatchRow[], phaseId: number): number {
+  let last = 0;
+  for (const row of matches) {
+    if (Number(row.phase_id ?? 0) !== phaseId || !rowHasScoreInput(row)) continue;
+    last = Math.max(last, Number(row.round_number));
+  }
+  return last;
+}
 
 /** Ligne de classement vue par la fenêtre : statut et manche de sortie. */
 export type ForfeitWindowRow = {

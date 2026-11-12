@@ -13,6 +13,7 @@ import {
   invalidateLandingLive,
   invalidateLandingCounters,
   invalidateLandingMiniBrackets,
+  invalidateLandingMiniBracket,
 } from "@/lib/server/landing-cache";
 
 /**
@@ -149,6 +150,31 @@ describe("cache de la vitrine", () => {
     await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
 
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue #542 : un rejeu n'oublie que le mini-arbre de son tournoi.
+  it("invalidateLandingMiniBracket_twoTournamentsCached_reloadsOnlyTheNamedOne", async () => {
+    const seven = jest.fn(async () => "sept");
+    const eight = jest.fn(async () => "huit");
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, seven as () => Promise<string>);
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}8`, LANDING_TTL_MS, eight as () => Promise<string>);
+
+    invalidateLandingMiniBracket(7);
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, seven as () => Promise<string>);
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}8`, LANDING_TTL_MS, eight as () => Promise<string>);
+
+    expect(seven).toHaveBeenCalledTimes(2);
+    expect(eight).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidateLandingMiniBracket_prefixSharingId_keepsLongerId", async () => {
+    const seventy = jest.fn(async () => "soixante-dix");
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}70`, LANDING_TTL_MS, seventy as () => Promise<string>);
+
+    invalidateLandingMiniBracket(7);
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}70`, LANDING_TTL_MS, seventy as () => Promise<string>);
+
+    expect(seventy).toHaveBeenCalledTimes(1);
   });
 
   it("invalidateLandingMiniBrackets_cachedLeaderboardTickerStats_keepsThem", async () => {

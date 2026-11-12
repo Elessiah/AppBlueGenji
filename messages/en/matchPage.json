@@ -1,6 +1,6 @@
 {
   "header": {
-    "scoreLabel": "Score: {team1} {score1}, {team2} {score2}",
+    "scoreLabel": "Score — {team1}: {score1}; {team2}: {score2}",
     "forfeitLabel": "{team1} versus {team2}: forfeit by {team}",
     "versus": "VS",
     "completed": "Finished",

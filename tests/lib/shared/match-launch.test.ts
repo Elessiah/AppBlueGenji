@@ -7,6 +7,7 @@ import {
   canPlayersReportScore,
   castBeforeLaunch,
   connectionReader,
+  launchedForCurrentPairing,
   castBlockReason,
   identityBlockIsDiscordOnly,
   identityComplete,
@@ -675,5 +676,25 @@ describe("castBeforeLaunch — la condition du cast se rejoue jusqu'au lancement
 
   it("castBeforeLaunch_completed_false", () => {
     expect(castBeforeLaunch({ status: "COMPLETED" })).toBe(false);
+  });
+});
+
+describe("launchedForCurrentPairing — règle commune du lancement de l'appariement courant", () => {
+  const launched = new Date("2026-11-05T20:00:00Z");
+
+  it("launchedForCurrentPairing_notLaunched_false", () => {
+    expect(launchedForCurrentPairing({ launched_at: null, launch_pairing: "7:5", team1_id: 7, team2_id: 5 })).toBe(false);
+  });
+
+  it("launchedForCurrentPairing_launchedWithoutPairingInRead_true", () => {
+    expect(launchedForCurrentPairing({ launched_at: launched })).toBe(true);
+  });
+
+  it("launchedForCurrentPairing_launchedOnPreviousPairing_false", () => {
+    expect(launchedForCurrentPairing({ launched_at: launched, launch_pairing: "5:9", team1_id: 7, team2_id: 5 })).toBe(false);
+  });
+
+  it("launchedForCurrentPairing_launchedOnCurrentPairing_true", () => {
+    expect(launchedForCurrentPairing({ launched_at: launched, launch_pairing: "7:5", team1_id: 7, team2_id: 5 })).toBe(true);
   });
 });

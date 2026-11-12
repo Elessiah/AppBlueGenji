@@ -251,7 +251,9 @@ réponse du précédent (jamais deux lectures en vol sur un serveur lent), 4 s p
 tard, ou au `Retry-After` d'un 429 s'il est plus long (`proposalRetryDelayMs`) ;
 un 4xx hors 429 arrête les essais, comme toute réponse lue — même une
 proposition plus récente que l'instantané, dont la diffusion relancera la
-lecture. Engagés,
+lecture. Les essais finis sans détail, l'attente se lève (`detailPending`) :
+les dialogues de score rendent la main (« proposition sans détail ») au lieu
+de garder leurs boutons figés jusqu'au prochain report. Engagés,
 statut et reports du match y sont **relus avec les maps**, en une instruction
 (`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps` — jointure
 limitée aux matchs des engagés du lecteur, aucune map pour un lecteur étranger

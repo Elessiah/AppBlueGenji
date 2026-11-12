@@ -22,6 +22,7 @@ import {
   isAutoLaunchDue,
   launchPairingKey,
   launchReadiness,
+  launchedForCurrentPairing,
   launchStateIsCurrent,
   matchLaunchPhase,
   type CastBlock,
@@ -359,10 +360,8 @@ const LAUNCH_MATCH_OWN_COLUMNS = `
  * joué, dont la lecture ne change pas.
  */
 function refereePlayCounts(base: LaunchMatchBaseRow): boolean {
-  return (
-    base.launched_at === null ||
-    !launchStateIsCurrent(base.launch_pairing ?? null, nullableId(base.team1_id), nullableId(base.team2_id))
-  );
+  // Empreinte absente de la ligne = aucun appariement lancé connu (`null`).
+  return !launchedForCurrentPairing({ ...base, launch_pairing: base.launch_pairing ?? null });
 }
 
 /**

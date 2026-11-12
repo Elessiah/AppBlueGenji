@@ -6,9 +6,10 @@ jest.mock("@/lib/server/tournaments/admin", () => ({ adminResolveMatch: jest.fn(
 import { adminResolveMatch } from "@/lib/server/tournaments/admin";
 import {
   forfeitDeletedEntryNextMatch,
+  hasOpenDeletedEntryMatch,
   lockDeletedSoloEntryStillForfeitable,
 } from "@/lib/server/tournaments/deleted-entry-forfeit";
-import { fakeConnection } from "../../helpers/sql-double";
+import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 /*
  * E1 — forfait du prochain match de l'entrée d'un compte en suppression, tout
@@ -16,24 +17,39 @@ import { fakeConnection } from "../../helpers/sql-double";
  * « corrigé » en forfait.
  */
 
-type Options = { state?: string; entryDeleted?: boolean; neverPlayed?: boolean; openMatch?: number | null };
+type Options = {
+  state?: string;
+  entryDeleted?: boolean;
+  neverPlayed?: boolean;
+  openMatch?: number | null;
+  /** Engagées du match ouvert (40 contre 41 par défaut). */
+  pairing?: [number, number];
+  /** L'adversaire 41 est lui aussi une entrée en suppression jamais jouée. */
+  opponentDeleted?: boolean;
+};
+
+/** Entrée en suppression jamais jouée : la nôtre (40), ou l'adversaire (41) s'il l'est aussi. */
+function soloEntryRows(options: Options, params?: unknown) {
+  const isOpponent = Array.isArray(params) && params[0] === 41;
+  if (isOpponent) return options.opponentDeleted ? [{ solo_user_id: 71 }] : [];
+  return options.neverPlayed === false ? [] : [{ solo_user_id: 70 }];
+}
+
+function openMatchRows(options: Options) {
+  const id = options.openMatch === undefined ? 101 : options.openMatch;
+  const [team1_id, team2_id] = options.pairing ?? [40, 41];
+  return id === null ? [] : [{ id, team1_id, team2_id }];
+}
 
 function fakeTx(options: Options) {
   const queries: string[] = [];
-  const execute = jest.fn(async (sql: string) => {
+  const execute = jest.fn(async (sql: string, params?: unknown) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push(q);
     if (q.startsWith("SELECT state FROM bg_tournaments")) return [[{ state: options.state ?? "RUNNING" }]];
-    if (q.startsWith("SELECT s.solo_user_id FROM bg_teams s")) {
-      return [options.neverPlayed === false ? [] : [{ solo_user_id: 70 }]];
-    }
-    if (q.startsWith("SELECT is_deleted FROM bg_users")) {
-      return [[{ is_deleted: options.entryDeleted === false ? 0 : 1 }]];
-    }
-    if (q.startsWith("SELECT id FROM bg_matches")) {
-      const id = options.openMatch === undefined ? 101 : options.openMatch;
-      return [id === null ? [] : [{ id }]];
-    }
+    if (q.startsWith("SELECT s.solo_user_id FROM bg_teams s")) return [soloEntryRows(options, params)];
+    if (q.startsWith("SELECT is_deleted FROM bg_users")) return [[{ is_deleted: options.entryDeleted === false ? 0 : 1 }]];
+    if (q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) return [openMatchRows(options)];
     return [[]];
   });
   return { connection: fakeConnection({ execute }), queries };
@@ -78,9 +94,41 @@ describe("forfeitDeletedEntryNextMatch", () => {
 
     await forfeitDeletedEntryNextMatch(connection, 4, 40);
 
-    const matchQuery = queries.find((q) => q.startsWith("SELECT id FROM bg_matches"));
+    const matchQuery = queries.find((q) => q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches"));
     expect(matchQuery).toContain("FOR UPDATE");
     expect(matchQuery).not.toContain("JOIN");
+  });
+
+  it("forfeitDeletedEntryNextMatch_opponentAlsoDeleted_doubleForfeit", async () => {
+    const { connection } = fakeTx({ opponentDeleted: true });
+
+    expect(await forfeitDeletedEntryNextMatch(connection, 4, 40)).toBe(101);
+    expect(adminResolveMatch).toHaveBeenCalledWith(connection, 101, { doubleForfeit: true });
+  });
+
+  it("forfeitDeletedEntryNextMatch_entryIsTeam2_checksTeam1AsOpponent", async () => {
+    const { connection } = fakeTx({ pairing: [41, 40], opponentDeleted: true });
+
+    await forfeitDeletedEntryNextMatch(connection, 4, 40);
+
+    expect(adminResolveMatch).toHaveBeenCalledWith(connection, 101, { doubleForfeit: true });
+  });
+});
+
+describe("hasOpenDeletedEntryMatch", () => {
+  it("hasOpenDeletedEntryMatch_openMatch_trueWithoutLock", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ 1: 1 }], undefined]);
+
+    expect(await hasOpenDeletedEntryMatch(fakeConnection({ execute }), 4, 40)).toBe(true);
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).not.toContain("FOR UPDATE");
+    expect(params).toEqual([4, 40, 40]);
+  });
+
+  it("hasOpenDeletedEntryMatch_noOpenMatch_false", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
+
+    expect(await hasOpenDeletedEntryMatch(fakeConnection({ execute }), 4, 40)).toBe(false);
   });
 });
 

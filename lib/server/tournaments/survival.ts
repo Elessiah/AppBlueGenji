@@ -16,6 +16,7 @@ import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 import { loadCancellableForfeitIds } from "./forfeit-window";
 import { noteDeletedMatches } from "./departed-notices";
+import { roundHasScoreInput } from "./bg-survie/round-progress";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 const DEFAULT_ROUNDS_PER_CUT = 3;
@@ -414,29 +415,6 @@ async function finalizeSurvival(
   await finishTournament(conn, tournamentId);
 }
 
-/**
- * Le round `round` porte-t-il déjà une saisie ? Un round généré mais non entamé
- * peut être réapparié sans rien détruire ; dès qu'un score y a été saisi, il est
- * figé (les byes, posés par le moteur, ne comptent pas comme une saisie).
- */
-async function roundHasScoreInput(
-  conn: PoolConnection,
-  tournamentId: number,
-  round: number,
-  phaseId = 0,
-): Promise<boolean> {
-  const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND is_bye = 0
-       AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
-            OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
-            OR double_forfeit = 1
-            OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL)`,
-    [tournamentId, phaseId, round],
-  );
-  return Number(rows[0]?.c ?? 0) > 0;
-}
-
 /** Crée les matchs d'un round à partir d'un plan d'appariement. */
 async function writeRound(
   conn: PoolConnection,
@@ -519,7 +497,9 @@ async function ensureNextRound(
   }
 
   if (samePairings(existing, desired)) return false;
-  if (await roundHasScoreInput(conn, tournamentId, nextRound, phaseId)) return false;
+  // Saisie relue **sous verrou** juste avant de défaire : l'image de la
+  // transaction peut ignorer un « Enregistrer » commité depuis (`roundHasScoreInput`).
+  if (await roundHasScoreInput(conn, tournamentId, nextRound, { phaseId, lock: true })) return false;
 
   // Leurs engagées tenaient peut-être un horaire : l'avis se note avant la
   // suppression (`departed-notices.ts`).
@@ -734,6 +714,9 @@ export async function loadSurvivalMeta(
   conn: PoolConnection,
   tournamentId: number,
   phaseId = 0,
+  // Borne de la fenêtre d'annulation déjà connue (matchs chargés par
+  // l'instantané, `lastInputRoundOf`) : la requête est alors épargnée.
+  lastInputRound?: number,
 ): Promise<import("@/lib/shared/types").SurvivalMeta | null> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
   if (tournament?.format !== "SURVIVAL") return null;
@@ -761,7 +744,7 @@ export async function loadSurvivalMeta(
       status: row.status,
       forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
     })),
-    { open: tournament.state === "RUNNING" },
+    { open: tournament.state === "RUNNING", lastInputRound },
   );
 
   return {

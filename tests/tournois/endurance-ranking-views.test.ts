@@ -516,20 +516,35 @@ describe("enduranceLastClosedRound — entre deux manches", () => {
 });
 
 describe("hasScheduledPendingMatch — l'horloge du bandeau", () => {
-  it("vrai pour un match non joué daté de la manche", () => {
-    expect(hasScheduledPendingMatch(MATCHES, 2)).toBe(true);
+  const BEFORE = Date.parse("2026-10-23T18:00:00.000Z");
+  const AFTER = Date.parse("2026-10-23T20:00:00.000Z");
+
+  it("vrai pour un match non joué de la manche daté à venir", () => {
+    expect(hasScheduledPendingMatch(MATCHES, 2, BEFORE)).toBe(true);
+  });
+
+  it("faux pour un match en retard : sa date est passée, l'horloge n'a plus rien à attendre", () => {
+    expect(hasScheduledPendingMatch(MATCHES, 2, AFTER)).toBe(false);
+  });
+
+  it("avant le montage (heure inconnue), toute date compte", () => {
+    expect(hasScheduledPendingMatch(MATCHES, 2, null)).toBe(true);
+  });
+
+  it("faux pour une date illisible", () => {
+    expect(hasScheduledPendingMatch([pending(1, 2, 1, 2, "pas une date")], 2, BEFORE)).toBe(false);
   });
 
   it("faux sans date", () => {
-    expect(hasScheduledPendingMatch([pending(1, 2, 1, 2)], 2)).toBe(false);
+    expect(hasScheduledPendingMatch([pending(1, 2, 1, 2)], 2, null)).toBe(false);
   });
 
   it("faux pour un match joué, même daté", () => {
-    expect(hasScheduledPendingMatch([played(1, 2, 1, 2, 3, 0, "2026-10-20T19:00:00.000Z")], 2)).toBe(false);
+    expect(hasScheduledPendingMatch([played(1, 2, 1, 2, 3, 0, "2026-10-20T19:00:00.000Z")], 2, null)).toBe(false);
   });
 
   it("faux pour une autre manche", () => {
-    expect(hasScheduledPendingMatch(MATCHES, 1)).toBe(false);
+    expect(hasScheduledPendingMatch(MATCHES, 1, null)).toBe(false);
   });
 });
 

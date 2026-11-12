@@ -90,7 +90,11 @@ Le bypass `DEV_AUTH_USER_ID` n'offrant qu'une identité par serveur, la fixture
 (`e2e/helpers/player-journey-fixture.ts`) crée ses comptes en base et leur ouvre
 de vraies sessions (ligne `bg_user_sessions` + cookie `bg_session`) ; tout le
 reste passe par l'API, comme un utilisateur. Comptes, équipes et tournois sont
-effacés à la fin.
+effacés à la fin. Le tournoi active la phase de lancement (`launchPhase: true`) :
+sans elle, un match jouable est lancé d'office et « Prêt » répond 409
+`MATCH_ALREADY_LAUNCHED`. Le centre de lancement, qui s'ouvre de lui-même (et se
+rouvre à chaque changement de phase), est refermé avant d'agir ; la modale de
+score s'ouvre sur une ligne de map vierge, les suivantes paraissant d'elles-mêmes.
 
 Prérequis : une base MySQL configurée dans `.env`, et **pas** d'`E2E_AUTH_USER`
 (le bypass masquerait les sessions). Ignoré sinon — donc en CI sans base.

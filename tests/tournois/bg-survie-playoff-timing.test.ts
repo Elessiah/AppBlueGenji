@@ -4,7 +4,7 @@ jest.mock("@/lib/server/tournaments/repository");
 
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { createMatch } from "@/lib/server/tournaments/repository";
-import type { SqlMock } from "../helpers/sql-double";
+import type { SqlMock, SqlQuery } from "../helpers/sql-double";
 
 /**
  * La bascule en play-offs attend la **fin de la manche**.
@@ -108,7 +108,7 @@ function makeConn(options: { completed: number; matchesInRound?: number }) {
     return [[]];
   });
 
-  return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
+  return { execute, query: jest.fn<SqlQuery>(async () => [[], []]) } as never as Parameters<typeof reconcileEndurance>[1] & {
     execute: SqlMock;
   };
 }
@@ -155,7 +155,7 @@ function makeStaleRoundConn() {
     return [[]];
   });
 
-  return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
+  return { execute, query: jest.fn<SqlQuery>(async () => [[], []]) } as never as Parameters<typeof reconcileEndurance>[1] & {
     execute: SqlMock;
   };
 }

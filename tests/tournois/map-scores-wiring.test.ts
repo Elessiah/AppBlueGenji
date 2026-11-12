@@ -139,7 +139,7 @@ describe("détail map par map — arbitrage et relecture", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useProposalMaps.ts");
     expect(hook).toContain("const PROPOSAL_REFRESH_ATTEMPTS = 3;");
     // Chaque essai part après la réponse du précédent (revue perf #542).
-    expect(hook).toContain("if (waitMs === null || controller.signal.aborted || tries >= PROPOSAL_REFRESH_ATTEMPTS) return;");
+    expect(hook).toContain("if (waitMs === null || tries >= PROPOSAL_REFRESH_ATTEMPTS) {");
     expect(hook).toContain("timer = setTimeout(() => void attempt(), waitMs);");
     expect(hook).toContain("if (timer !== null) clearTimeout(timer);");
   });
@@ -234,7 +234,8 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 
   it("un détail adverse encore en lecture est annoncé comme tel, sans inviter à ressaisir", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain("return canRead && proposalsNeedRefresh(match, proposals);");
+    // Le détail attendu, levé quand les relectures ont pris fin sans lui (`detailPending`).
+    expect(dialog).toContain("detailPending: detailLoading } = useProposalMaps(");
     expect(dialog).toContain('if (reader.detailLoading) return text.t("score.player.theirs.loading", values);');
     expect(FR_SCORE.player.theirs.loading).toContain("Lecture du détail de ses maps…");
     expect(dialog.indexOf("if ((theirs.maps ?? []).length > 0)")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));
@@ -244,7 +245,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 describe("détail map par map — arbitrage pendant la lecture du détail proposé", () => {
   it("les boutons de score attendent le détail de la proposition, pour ne pas en effacer les codes", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, readableProposals\) &&\s*!form\.maps\.some\(isMapTouched\)/);
+    expect(dialog).toMatch(/const awaitingDetail =\s*detailPending &&\s*!form\.maps\.some\(isMapTouched\)/);
     expect(dialog).toContain("const saveBlocked = (!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail;");
     expect(dialog).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
     expect(dialog).toContain("if (!form.submitting && !saveBlocked) void run(\"save\");");
