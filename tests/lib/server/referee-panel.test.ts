@@ -56,6 +56,7 @@ beforeEach(() => {
     team2_id: 11,
     status: "READY",
     launched_at: null,
+    launch_pairing: null,
     tournament_game: "OW",
   };
   users = [];
@@ -143,10 +144,19 @@ describe("loadRefereePanel", () => {
   });
 
   it("une fois le match lancé, l'arbitre qui en est joueur reste désigné", async () => {
-    match = { ...match, referee_user_id: 3, launched_at: STAMP };
+    match = { ...match, referee_user_id: 3, launched_at: STAMP, launch_pairing: "10:11" };
     users = [staffUser(3, "Joueur")];
     players = [3];
     await expect(loadRefereePanel(42, VIEWER)).resolves.toMatchObject({ referee: { userId: 3, eligible: true, reason: null } });
+  });
+
+  it("loadRefereePanel_launchedOnPreviousPairing_playingRefereeStillBlocked", async () => {
+    // Réappariement pas encore adopté : le lancement d'avant ne vaut pas pour
+    // ce match, qui est encore « avant le départ » (`castBeforeLaunch`).
+    match = { ...match, referee_user_id: 3, launched_at: STAMP, launch_pairing: "10:99" };
+    users = [staffUser(3, "Joueur")];
+    players = [3];
+    await expect(loadRefereePanel(42, VIEWER)).resolves.toMatchObject({ referee: { userId: 3, eligible: false, reason: "REFEREE_IS_PLAYER" } });
   });
 
   it("sans adversaire connu, aucun joueur à relire", async () => {
@@ -231,7 +241,7 @@ describe("loadRefereePanel", () => {
   });
 
   it("loadRefereePanel_viewerPlaysMatch_viewerBlockIsPlayer_evenAfterLaunch", async () => {
-    match = { ...match, launched_at: STAMP };
+    match = { ...match, launched_at: STAMP, launch_pairing: "10:11" };
     users = [staffUser(VIEWER, "Moi")];
     players = [VIEWER];
     await expect(loadRefereePanel(42, VIEWER)).resolves.toMatchObject({ viewerBlock: "REFEREE_IS_PLAYER" });
