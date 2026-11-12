@@ -9,16 +9,24 @@ import { useCallback, useSyncExternalStore } from "react";
  * monté. Suit les changements (rotation, fenêtre redimensionnée).
  */
 export function useMediaMatch(query: string): boolean | null {
-  const subscribe = useCallback(
-    (onChange: () => void) => {
-      const list = mediaQueryList(query);
-      list.addEventListener("change", onChange);
-      return () => list.removeEventListener("change", onChange);
-    },
-    [query],
-  );
+  const subscribe = useCallback((onChange: () => void) => subscribeMediaQuery(query, onChange), [query]);
   const getSnapshot = useCallback(() => mediaQueryList(query).matches, [query]);
   return useSyncExternalStore<boolean | null>(subscribe, getSnapshot, () => null);
+}
+
+/**
+ * Abonne `onChange` aux bascules de `query` ; rend le désabonnement. Safari
+ * antérieur à 14 ne connaît que `addListener` : l'appel moderne y lèverait et
+ * ferait tomber toute la mise en page.
+ */
+export function subscribeMediaQuery(query: string, onChange: () => void): () => void {
+  const list = mediaQueryList(query);
+  if (typeof list.addEventListener === "function") {
+    list.addEventListener("change", onChange);
+    return () => list.removeEventListener("change", onChange);
+  }
+  list.addListener(onChange);
+  return () => list.removeListener(onChange);
 }
 
 /** Une seule `MediaQueryList` par requête : lue à chaque rendu, jamais réallouée. */

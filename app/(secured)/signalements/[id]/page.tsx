@@ -125,7 +125,7 @@ export default function ConcernedReportPage() {
         </h1>
         <p className={styles.muted}>{t("concerned.signedOutBody")}</p>
         <div>
-          <LocaleLink href={authGateLoginHref(localeHref(`/signalements/${reportId}`, locale), "", "")} className="btn">
+          <LocaleLink href={authGateLoginHref(localeHref(`/signalements/${encodeURIComponent(params.id)}`, locale), "", "")} className="btn">
             {t("concerned.signIn")}
           </LocaleLink>
         </div>
