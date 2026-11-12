@@ -60,7 +60,9 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
       const pm2Detail = upheld ? ` Matchs retirés : ${result.released}.` : "";
       publishStaffAction(discordLine, { id: user.id, pseudo: user.pseudo }, {
         auditLine: `${discordLine} Arbitre : #${refereeId}.${pm2Detail}`,
-        category: upheld && result.released > 0 ? "staff-removal" : "referees",
+        // Une opposition retenue part toujours en alerte : l'en-tête ne dit pas
+        // si l'arbitre avait des matchs ouverts (revue sécurité #536).
+        category: upheld ? "staff-removal" : "referees",
       });
     }
     if (result.failed > 0) return fail("REFEREE_OBJECTION_FAILED", 500);

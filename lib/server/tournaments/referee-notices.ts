@@ -25,8 +25,12 @@ import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
 /** Un changement d'arbitrage ou d'organisation, constaté sous verrou. */
 export type RefereeChange =
-  /** Un arbitre prend le match lui-même. */
-  | { kind: "TAKEN"; matchId: number }
+  /**
+   * Un arbitre prend le match lui-même. `afterRemoval` : il le reprend à un
+   * arbitre devenu inéligible, retiré dans le même geste — la ligne suit
+   * celle du retrait, dans la même catégorie (même lot, même minuteur).
+   */
+  | { kind: "TAKEN"; matchId: number; afterRemoval?: true }
   /**
    * Le staff désigne un arbitre ; `replacedRefereeId` : celui qu'il remplace ;
    * `actorId` : l'auteur du geste (l'arbitre qui se remplace n'est pas prévenu).
@@ -102,6 +106,7 @@ export function refereeLogCategory(change: RefereeChange): BotLogCategory {
     case "SELF_MANAGED":
       return change.replacedRefereeId === null ? "referees" : "staff-removal";
     case "TAKEN":
+      return change.afterRemoval ? "staff-removal" : "referees";
     case "FIRST_MAP":
     case "MAP_PICK":
       return "referees";
@@ -228,8 +233,12 @@ export function discardRefereeChanges(connection: PoolConnection): void {
   pendingChanges.delete(connection);
 }
 
+/**
+ * Annonce les changements de la transaction **dans leur ordre** : le retrait
+ * d'un arbitre inéligible part avant la reprise du match (revue sécurité #536).
+ */
 export function flushRefereeChanges(connection: PoolConnection): void {
   const queued = pendingChanges.get(connection);
   pendingChanges.delete(connection);
-  for (const change of queued ?? []) announceRefereeChange(change);
+  announceRefereeChanges(queued ?? []);
 }

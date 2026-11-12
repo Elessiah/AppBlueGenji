@@ -105,6 +105,15 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     expect(pm2Line).toContain("Matchs retirés : 2.");
   });
 
+  it("PUT_upheldWithNoOpenMatch_stillLogsAsStaffRemoval", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 0, failed: 0 });
+
+    await PUT(putRequest({ upheld: true }), params("9"));
+
+    // L'en-tête ne dit pas si l'arbitre avait des matchs : une opposition retenue alerte toujours.
+    expect(jest.mocked(publishStaffAction).mock.calls[0][2].category).toBe("staff-removal");
+  });
+
   it("PUT_lift_logsLiftLine", async () => {
     jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 0, failed: 0 });
 

@@ -1544,7 +1544,7 @@ export async function takeMatchReferee(matchId: number, userId: number): Promise
       if (current !== null && row.refereeEligible) throw new Error("MATCH_ALREADY_REFEREED");
       await writeReferee(connection, row, userId);
       if (current !== null) queueRefereeChange(connection, takenOverChange(row, matchId, current));
-      queueRefereeChange(connection, { kind: "TAKEN", matchId });
+      queueRefereeChange(connection, { kind: "TAKEN", matchId, ...(current !== null ? { afterRemoval: true as const } : {}) });
       return Number(row.tournament_id);
     }),
   );

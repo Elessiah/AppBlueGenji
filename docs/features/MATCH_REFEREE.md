@@ -121,7 +121,9 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   « le staff », sans nombre de matchs) ; auteur, `#id` de l'arbitre et nombre
   de matchs retirés dans pm2, sur un vrai changement ou un
   balayage rejoué qui retire encore un match ou qui échoue. La ligne dit « déjà retenue,
-  balayage rejoué » quand l'opposition était déjà écrite, et « retrait
+  balayage rejoué » quand l'opposition était déjà écrite (catégorie
+  `staff-removal` dès que l'opposition est retenue, même sans match retiré ;
+  `referees` pour une levée), et « retrait
   incomplet, à rejouer » quand un match n'a pas pu être retiré ; l'échec d'un
   retrait s'écrit dans pm2 **sans numéro de match** (pm2 porte déjà le `#id`
   de l'arbitre). La levée répond 200 que le compte existe ou non (pas de
@@ -148,7 +150,9 @@ l'arbitre visible d'un match à jouer — ni rôle `MATCH_REFEREE`, ni contacts
 des casters, ni nom aux parties —, et la lecture de la modale rattrape le
 retrait (`releaseObjectingReferee`, lancé compris). Une reprise du match par un
 autre arbitre (« Je prends ce match ») ou ce rattrapage ne sont pas le balayage :
-la ligne du match part dans `staff-removal`, au motif générique « condition
+la ligne du match part dans `staff-removal` (« Je prends ce match » qui
+remplace un titulaire y range aussi sa ligne `TAKEN`, `afterRemoval`, envoyée
+après celle du retrait), au motif générique « condition
 d'arbitrage » (`INELIGIBLE`, `takenOver`), qui ne dit pas l'opposition ; l'avis
 à l'arbitre garde le motif `OBJECTION`. Un retrait en série ne remet ses matchs
 partis sans arbitre (`undecided`) qu'une fois chaque transaction validée : une
