@@ -12,6 +12,7 @@ import { getTeamDetail } from "@/lib/server/teams/detail";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
 import { updateTeamMeta } from "@/lib/server/teams/identity";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
+import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
 import { can } from "@/lib/shared/permissions";
 import { INVALID_TEAM_FIELDS, teamFieldsAreText } from "@/lib/shared/team-name";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -34,8 +35,10 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     // Une entrée solo est une ligne de `bg_teams` sans fiche d'équipe : son
     // identité publique est le profil du joueur. Un lien vers `/equipes/[id]`
     // reste donc valide — il mène ailleurs, il ne casse pas.
+    // Sauf un compte supprimé **sans fiche** (D13) : la redirection mènerait à
+    // une page introuvable — l'entrée n'a alors nulle part où mener.
     const soloUserId = await findSoloEntryUser(teamId);
-    if (soloUserId !== null) {
+    if (soloUserId !== null && !(await loadProfilelessPlayerIds()).includes(soloUserId)) {
       return fail("TEAM_IS_SOLO_ENTRY", 404, { soloUserId });
     }
     return fail("TEAM_NOT_FOUND", 404);

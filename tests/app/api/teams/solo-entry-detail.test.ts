@@ -5,11 +5,13 @@ jest.mock("@/lib/server/teams/detail");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/identity");
 jest.mock("@/lib/server/solo-entries-service");
+jest.mock("@/lib/server/users/profileless-players");
 
 import { GET as teamDetailRoute } from "@/app/api/teams/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getTeamDetail } from "@/lib/server/teams/detail";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
+import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";
 
@@ -30,6 +32,7 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.mocked(loadProfilelessPlayerIds).mockResolvedValue([]);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -45,6 +48,18 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
     // de quoi rebondir, il n'affirme pas le contraire.
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "TEAM_IS_SOLO_ENTRY", soloUserId: 77 });
+  });
+
+  it("teamDetail_soloEntryOfProfilelessDeletedAccount_returnsBareNotFound", async () => {
+    // D13 : le compte supprimé sans fiche n'a pas de profil où mener.
+    jest.mocked(getTeamDetail).mockResolvedValue(null);
+    jest.mocked(findSoloEntryUser).mockResolvedValue(77);
+    jest.mocked(loadProfilelessPlayerIds).mockResolvedValue([77]);
+
+    const res = await teamDetailRoute(req("15245"), params("15245"));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "TEAM_NOT_FOUND" });
   });
 
   it("garde le 404 nu pour une équipe qui n'existe pas", async () => {

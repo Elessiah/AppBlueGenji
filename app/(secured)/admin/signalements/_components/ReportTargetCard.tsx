@@ -15,6 +15,7 @@ import {
   type ContestOutcome,
   type LogoQuarantineView,
 } from "@/lib/shared/logo-quarantine";
+import { useHasPlayerPage } from "@/components/profileless-players";
 import { ArmedButton } from "./ArmedButton";
 import styles from "../reports.module.css";
 
@@ -69,6 +70,8 @@ export function ReportTargetCard({
 }: Readonly<ReportTargetCardProps>) {
   // L'issue ne change le blocage de l'empreinte que pour un avatar (D6).
   const isAvatar = target.type === "USER";
+  // Un compte supprimé sans fiche (D13) : son nom reste un nom, le lien menait à une page introuvable.
+  const targetHasPage = useHasPlayerPage(isAvatar ? target.id : undefined);
   const hidden = quarantines.find((quarantine) => quarantine.status === "HIDDEN") ?? null;
   const closed = quarantines.filter((quarantine) => quarantine.status !== "HIDDEN");
   const image = IMAGE_NOUN[target.type];
@@ -87,13 +90,16 @@ export function ReportTargetCard({
         )}
         <div className={styles.targetText}>
           <span className={styles.targetType}>{REPORT_TARGET_LABELS[target.type].one}</span>
-          {target.exists ? (
+          {target.exists && targetHasPage ? (
             <Link href={reportTargetHref(target)} target="_blank" rel="noreferrer" className={styles.inlineLink}>
               <span className={styles.targetName}>{target.label}</span>
               <span className="sr-only"> (nouvel onglet)</span>
             </Link>
           ) : (
-            <span className={styles.targetName}>{target.label} — supprimé</span>
+            <span className={styles.targetName}>
+              {target.label}
+              {target.exists ? "" : " — supprimé"}
+            </span>
           )}
           {target.detail && <span className={styles.targetDetail}>{target.detail}</span>}
         </div>
