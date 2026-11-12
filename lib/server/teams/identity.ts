@@ -1,4 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, type SqlParams } from "@/lib/server/database";
 import {
   assertTeamNameAvailable,
@@ -11,7 +11,7 @@ import { checkTeamName, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
-import { assertCanActOnTeam, lockMemberRoles, userCanManageTeam, userOwnsTeam } from "./access";
+import { assertCanActOnTeam, lockMemberRoles, teamEverRegistered, userCanManageTeam, userOwnsTeam } from "./access";
 
 /*
  * Identité d'une équipe : création, nom, sigle et description, logo (par la
@@ -101,6 +101,13 @@ export async function createTeam(
 /**
  * Met à jour les métadonnées d'une équipe. Un champ absent du patch n'est pas
  * touché ; `tag: null` (ou une chaîne vide) **retire** le sigle.
+ *
+ * Tout se joue sous le verrou de la ligne de l'équipe, en toute première
+ * instruction — celui de la dissolution et des gestes du roster : le nom
+ * actuel se relit dessous (lu avant, sur le pool, deux renommages simultanés
+ * lisaient le même ancien nom), et le droit est **rejugé** (un propriétaire qui
+ * vient de transférer l'équipe, ou le staff sur une fantôme reprise
+ * entre-temps, ne la renomme plus ; une équipe dissoute non plus).
  */
 export async function updateTeamMeta(
   requesterId: number,
@@ -109,64 +116,115 @@ export async function updateTeamMeta(
   viewerManagesGhostTeams = false,
 ): Promise<void> {
   const db = await getDatabase();
-  await assertCanActOnTeam(await userOwnsTeam(teamId, requesterId), requesterId, teamId, viewerManagesGhostTeams);
+  const viaOwnership = await userOwnsTeam(teamId, requesterId);
+  await assertCanActOnTeam(viaOwnership, requesterId, teamId, viewerManagesGhostTeams);
 
-  const updates: string[] = [];
-  const params: SqlParams = [];
-  let renamed = false;
-
+  // Mêmes bornes qu'à la création : le renommage n'en contrôlait aucune, si
+  // bien qu'un nom vide s'enregistrait et qu'un nom trop long partait en
+  // erreur MySQL brute jusqu'à la notification. Jugées avant la transaction :
+  // un nom refusé n'ouvre rien.
+  let wantedName: string | undefined;
   if (patch.name !== undefined) {
-    // Mêmes bornes qu'à la création : le renommage n'en contrôlait aucune, si
-    // bien qu'un nom vide s'enregistrait et qu'un nom trop long partait en
-    // erreur MySQL brute jusqu'à la notification.
     const check = checkTeamName(patch.name);
     if (!check.ok) throw new Error(check.reason);
+    wantedName = check.name;
+  }
+  if (patch.name === undefined && patch.description === undefined && patch.tag === undefined) return;
+
+  let renamed = false;
+  let everRegistered = false;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const currentName = await lockEditableTeam(connection, teamId, requesterId, viaOwnership);
     // Le formulaire renvoie toujours le nom : seul un nom **changé** (casse
     // comprise, comparaison exacte) s'écrit et vide les vues qui le montrent —
     // sans quoi chaque enregistrement d'une description ferait recalculer
     // podium et cartes d'aperçu aux visiteurs.
-    const [current] = await db.execute<(RowDataPacket & { name: string })[]>(
-      `SELECT name FROM bg_teams WHERE id = ?`,
-      [teamId],
-    );
-    renamed = current[0]?.name !== check.name;
-    if (renamed) {
-      await assertTeamNameAvailable(db, check.name, teamId);
-      updates.push("name = ?");
-      params.push(check.name);
-    }
-  }
-
-  if (patch.description !== undefined) {
-    updates.push("description = ?");
-    params.push(patch.description?.trim() ? patch.description.trim() : null);
-  }
-
-  if (patch.tag !== undefined) {
-    const normalizedTag = resolveTeamTag(patch.tag);
-    // L'équipe garde le sien : sans cette exclusion, réenregistrer la fiche
-    // sans toucher au sigle le déclarerait pris par elle-même.
-    await assertTeamTagAvailable(db, normalizedTag, teamId);
-    updates.push("tag = ?");
-    params.push(normalizedTag);
-  }
-
-  if (updates.length === 0) return;
-
-  params.push(teamId);
-  try {
-    await mapTeamTagConflict(() =>
-      db.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params));
+    renamed = wantedName !== undefined && currentName !== wantedName;
+    await writeTeamMeta(connection, teamId, {
+      name: renamed ? wantedName : undefined,
+      description: patch.description,
+      tag: patch.tag,
+    });
+    if (renamed) everRegistered = await teamEverRegistered(connection, teamId);
+    await connection.commit();
   } catch (error) {
-    // La course entre deux renommages vers le même nom : le `SELECT` préalable
-    // les a laissés passer tous les deux, l'index tranche.
-    if (isTeamNameConflict(error)) throw new Error(TEAM_NAME_ALREADY_USED);
+    await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
   }
   // Le nom est servi par l'accueil et `/classement` depuis le cache de la
   // vitrine (leaderboard, bandeau, mini-arbre) et par la liste du classement
   // (podium, cartes d'aperçu) : sans cela, l'ancien nom y restait jusqu'à 60 s.
-  if (renamed) invalidateTeamIdentityViews();
+  // Une équipe jamais inscrite n'y figure pas (aucun match, aucun rang) : la
+  // renommer en boucle ne vide plus rien.
+  if (renamed && everRegistered) invalidateTeamIdentityViews();
+}
+
+/**
+ * Verrouille la ligne de l'équipe (première instruction de la transaction),
+ * rejuge le droit dessous et rend le nom actuel. Refus `FORBIDDEN` : équipe
+ * dissoute, propriétaire qui ne l'est plus, ou fantôme reprise pour le staff.
+ */
+async function lockEditableTeam(
+  connection: PoolConnection,
+  teamId: number,
+  requesterId: number,
+  viaOwnership: boolean,
+): Promise<string> {
+  const [locked] = await connection.execute<
+    (RowDataPacket & { name: string; deleted_at: Date | null; is_ghost: 0 | 1 })[]
+  >(`SELECT name, deleted_at, is_ghost FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+  if (locked.length === 0 || locked[0].deleted_at) throw new Error("FORBIDDEN");
+  const allowed = viaOwnership
+    ? Boolean((await lockMemberRoles(connection, teamId, requesterId))?.includes("OWNER"))
+    : locked[0].is_ghost === 1;
+  if (!allowed) throw new Error("FORBIDDEN");
+  return locked[0].name;
+}
+
+/**
+ * Écrit les champs fournis (`name` : déjà vérifié et **changé**), sous le
+ * verrou de l'équipe. Nom et sigle se contrôlent avant l'écriture ; l'index
+ * tranche un renommage concurrent vers le même nom.
+ */
+async function writeTeamMeta(
+  connection: PoolConnection,
+  teamId: number,
+  fields: { name?: string; description?: string | null; tag?: string | null },
+): Promise<void> {
+  const updates: string[] = [];
+  const params: SqlParams = [];
+  if (fields.name !== undefined) {
+    await assertTeamNameAvailable(connection, fields.name, teamId);
+    updates.push("name = ?");
+    params.push(fields.name);
+  }
+  if (fields.description !== undefined) {
+    updates.push("description = ?");
+    params.push(fields.description?.trim() ? fields.description.trim() : null);
+  }
+  if (fields.tag !== undefined) {
+    const normalizedTag = resolveTeamTag(fields.tag);
+    // L'équipe garde le sien : sans cette exclusion, réenregistrer la fiche
+    // sans toucher au sigle le déclarerait pris par elle-même.
+    await assertTeamTagAvailable(connection, normalizedTag, teamId);
+    updates.push("tag = ?");
+    params.push(normalizedTag);
+  }
+  if (updates.length === 0) return;
+  params.push(teamId);
+  try {
+    await mapTeamTagConflict(() =>
+      connection.execute(`UPDATE bg_teams SET ${updates.join(", ")} WHERE id = ?`, params));
+  } catch (error) {
+    // Un renommage concurrent vers le même nom par une **autre** équipe :
+    // le `SELECT` préalable l'a laissé passer, l'index tranche.
+    if (isTeamNameConflict(error)) throw new Error(TEAM_NAME_ALREADY_USED);
+    throw error;
+  }
 }
 
 /**
@@ -192,6 +250,8 @@ export async function updateTeamLogo(
   const db = await getDatabase();
   const connection = await db.getConnection();
   let previousLogoUrl: string | null = null;
+  /** Inscrite au moins une fois : seule une telle équipe figure aux vues mises en cache. */
+  let everRegistered = false;
   try {
     await connection.beginTransaction();
     // Le droit est **rejugé** sous le verrou, comme à la dissolution
@@ -211,6 +271,7 @@ export async function updateTeamLogo(
     }
     previousLogoUrl = rows[0].logo_url ?? null;
     await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
+    if (previousLogoUrl !== logoPath) everRegistered = await teamEverRegistered(connection, teamId);
     await connection.commit();
   } catch (error) {
     await connection.rollback();
@@ -220,8 +281,10 @@ export async function updateTeamLogo(
   }
   // Logo servi par le leaderboard de l'accueil et de `/classement` (cache de la
   // vitrine), le podium et les cartes d'aperçu (liste du classement) — vidés
-  // seulement s'il a changé : retirer un logo absent ne coûte rien aux visiteurs.
-  if (previousLogoUrl !== logoPath) invalidateTeamIdentityViews();
+  // seulement s'il a changé : retirer un logo absent ne coûte rien aux visiteurs,
+  // et seulement pour une équipe déjà inscrite à un tournoi — aucune de ces
+  // vues ne montre une équipe qui n'a jamais joué.
+  if (previousLogoUrl !== logoPath && everRegistered) invalidateTeamIdentityViews();
   return { previousLogoUrl };
 }
 

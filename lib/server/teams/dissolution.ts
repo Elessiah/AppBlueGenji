@@ -1,10 +1,11 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { invalidateLandingCounters } from "@/lib/server/landing-cache";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats, invalidateStatsOf } from "@/lib/server/stats-cache";
-import { ghostAdminOverride, lockMemberRoles, userOwnsTeam } from "./access";
+import { cancelPendingTeamInvitations, ghostAdminOverride, lockMemberRoles, teamEverRegistered, userOwnsTeam } from "./access";
 import { refreshTeamViewers, teamStreamTournamentIds } from "./roster";
 
 async function teamIsDeleted(teamId: number): Promise<boolean> {
@@ -54,20 +55,11 @@ export async function dissolveTeamOn(
   );
 
   // Annule les invitations/demandes en attente.
-  await connection.execute(
-    `UPDATE bg_team_invitations
-     SET status = 'CANCELLED', responded_at = NOW()
-     WHERE team_id = ? AND status = 'PENDING'`,
-    [teamId],
-  );
+  await cancelPendingTeamInvitations(connection, teamId);
 
   // Sans inscription, l'équipe n'a ni match, ni rang, ni ligne de bandeau ou
   // de mini-arbre : rien d'autre que le compteur de l'accueil ne la montre.
-  const [registrations] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_tournament_registrations WHERE team_id = ? LIMIT 1`,
-    [teamId],
-  );
-  return { detachedUserIds, everRegistered: registrations.length > 0 };
+  return { detachedUserIds, everRegistered: await teamEverRegistered(connection, teamId) };
 }
 
 /**
@@ -145,18 +137,25 @@ export async function softDeleteTeam(
   // fiche et celles de ses membres : on ne vide alors que celles-là et le
   // compteur d'équipes de l'accueil — une boucle « créer → dissoudre » ne fait
   // plus recalculer le classement et le podium aux visiteurs.
-  if (everRegistered) {
-    invalidateTeamIdentityViews();
-    invalidateStats();
-  } else {
-    invalidateLandingCounters();
-    invalidateStatsOf([teamId], detachedUserIds);
+  //
+  // La dissolution est commitée : rien de ce qui suit ne lève (la route rend
+  // la place du plafond sur toute erreur, qui doit donc précéder le commit).
+  try {
+    if (everRegistered) {
+      invalidateTeamIdentityViews();
+      invalidateStats();
+    } else {
+      invalidateLandingCounters();
+      invalidateStatsOf([teamId], detachedUserIds);
+    }
+    // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : les
+    // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
+    // jusqu'à la reconnexion (`session-streams.ts`). Un seul passage sur le
+    // registre pour tous les membres, limité aux tournois concernés.
+    refreshTeamViewers(teamId, detachedUserIds, streamTournamentIds ?? new Set());
+  } catch (error) {
+    console.error("[teams] suites de la dissolution non jouées", failureReason(error));
   }
-  // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : les
-  // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
-  // jusqu'à la reconnexion (`session-streams.ts`). Un seul passage sur le
-  // registre pour tous les membres, limité aux tournois concernés.
-  refreshTeamViewers(teamId, detachedUserIds, streamTournamentIds ?? new Set());
 
   // Vider la colonne ne retirait pas l'image : le fichier restait servi par
   // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un

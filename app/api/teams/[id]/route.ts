@@ -2,7 +2,8 @@
 import {
   DIRECTORY_READ_RULE,
   enforceRateLimit,
-  refundRateLimitFor,
+  enforceTeamIdentityWriteLimit,
+  reserveRateLimit,
   TEAM_LIFECYCLE_RULE,
 } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -50,10 +51,15 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const teamId = parseTeamId(id);
   if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
+  // Plafond des écritures d'identité d'un compte (renommage en boucle) ; le
+  // staff `tournaments` (équipes fantômes) n'y est pas soumis.
+  const managesGhostTeams = can(user, "tournaments");
+  const throttled = enforceTeamIdentityWriteLimit(user.id, managesGhostTeams);
+  if (throttled) return throttled;
+
   try {
     const body = (await readJsonBody(req)) as { name?: string; description?: string | null; tag?: string | null };
     if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
-    const managesGhostTeams = can(user, "tournaments");
     await updateTeamMeta(
       user.id,
       teamId,
@@ -80,17 +86,17 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   // Plafond des créations et dissolutions d'un compte ; le staff `tournaments`
   // (équipes fantômes) n'y est pas soumis.
   const capped = !can(user, "tournaments");
-  if (capped) {
-    // Réservée en une instruction, rendue si la dissolution est refusée.
-    const throttled = enforceRateLimit(TEAM_LIFECYCLE_RULE, user.id);
-    if (throttled) return throttled;
-  }
+  // Réservée en une instruction, rendue si la dissolution est refusée — et
+  // seulement alors : `softDeleteTeam` ne lève qu'avant son commit (ce qui suit
+  // le commit, effacement du logo compris, ne lève jamais).
+  const reservation = capped ? reserveRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
+  if (reservation?.refused) return reservation.refused;
 
   try {
     await softDeleteTeam(user.id, teamId, can(user, "tournaments"));
     return ok({ deleted: true });
   } catch (error) {
-    if (capped) refundRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
+    reservation?.refund();
     const message = (error as Error).message;
     return fail(message || "TEAM_DELETE_FAILED", teamErrorStatus(TEAM_DELETE_ERROR_STATUS, message));
   }

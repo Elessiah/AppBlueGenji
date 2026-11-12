@@ -88,6 +88,7 @@ export function MembersSection({
   };
 
   const withdraw = async (invitation: TeamSentInvitation) => {
+    if (cancellingId === invitation.id) return;
     setCancellingId(invitation.id);
     await cancelInvitation(invitation.id, invitation.pseudo);
     setCancellingId(null);
@@ -253,7 +254,8 @@ export function MembersSection({
                   <button
                     type="button"
                     className={`btn ghost ${styles.smallButton}`}
-                    disabled={cancellingId === invitation.id}
+                    aria-disabled={cancellingId === invitation.id || undefined}
+                    aria-busy={cancellingId === invitation.id || undefined}
                     aria-label={t("members.withdrawLabel", { pseudo: invitation.pseudo })}
                     onClick={() => void withdraw(invitation)}
                   >

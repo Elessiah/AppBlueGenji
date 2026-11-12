@@ -93,7 +93,7 @@ describe("withinTeamInviteNoticeBudget", () => {
   /** Toutes les bornes juste satisfaites : seul le champ surchargé les franchit. */
   function budget(overrides: Partial<TeamInviteNoticeBudget> = {}): TeamInviteNoticeBudget {
     return {
-      toThisPlayer: 1,
+      formerMember: false,
       toAnyPlayer: TEAM_INVITE_NOTICES_DAILY_CAP,
       byActor: TEAM_INVITE_NOTICES_DAILY_CAP,
       teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
@@ -105,8 +105,18 @@ describe("withinTeamInviteNoticeBudget", () => {
     expect(withinTeamInviteNoticeBudget(budget())).toBe(true);
   });
 
-  it("withinTeamInviteNoticeBudget_reinviteWithinWindow_returnsFalse", () => {
-    expect(withinTeamInviteNoticeBudget(budget({ toThisPlayer: 2 }))).toBe(false);
+  // Le délai par joueur se tient désormais en mémoire, sur les avis réellement
+  // partis (claimTeamNoticeSlot) : la base ne le compte plus.
+  it("withinTeamInviteNoticeBudget_formerMemberOverTeamCap_returnsTrue", () => {
+    expect(
+      withinTeamInviteNoticeBudget(budget({ formerMember: true, teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP + 1 })),
+    ).toBe(true);
+  });
+
+  it("withinTeamInviteNoticeBudget_formerMemberTeamOverCap_returnsFalse", () => {
+    expect(
+      withinTeamInviteNoticeBudget(budget({ formerMember: true, toAnyPlayer: TEAM_INVITE_NOTICES_DAILY_CAP + 1 })),
+    ).toBe(false);
   });
 
   it("withinTeamInviteNoticeBudget_teamOverCap_returnsFalse", () => {
@@ -124,7 +134,7 @@ describe("withinTeamInviteNoticeBudget", () => {
 
 describe("withinGhostClaimNoticeBudget", () => {
   const ghostBudget = (over: Partial<GhostClaimNoticeBudget> = {}): GhostClaimNoticeBudget => ({
-    toThisPlayer: 1,
+    formerMember: false,
     byActor: 1,
     teamsToThisPlayer: 1,
     ...over,
@@ -134,8 +144,16 @@ describe("withinGhostClaimNoticeBudget", () => {
     expect(withinGhostClaimNoticeBudget(ghostBudget())).toBe(true);
   });
 
-  it("withinGhostClaimNoticeBudget_reOfferWithinWindow_returnsFalse", () => {
-    expect(withinGhostClaimNoticeBudget(ghostBudget({ toThisPlayer: 2 }))).toBe(false);
+  it("withinGhostClaimNoticeBudget_formerMemberOverTeamsCap_returnsTrue", () => {
+    expect(
+      withinGhostClaimNoticeBudget(ghostBudget({ formerMember: true, teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP + 1 })),
+    ).toBe(true);
+  });
+
+  it("withinGhostClaimNoticeBudget_formerMemberActorOverCap_returnsFalse", () => {
+    expect(
+      withinGhostClaimNoticeBudget(ghostBudget({ formerMember: true, byActor: TEAM_INVITE_NOTICES_DAILY_CAP + 1 })),
+    ).toBe(false);
   });
 
   it("withinGhostClaimNoticeBudget_actorAtDailyCap_returnsTrue", () => {

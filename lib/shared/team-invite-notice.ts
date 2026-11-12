@@ -56,61 +56,76 @@ export const TEAM_INVITE_NOTICES_DAILY_CAP = 10;
 export const TEAM_INVITE_NOTICES_PER_PLAYER_CAP = 3;
 
 /**
+ * Messages privés d'équipe (invitation, reprise, propriété) que le site entier
+ * peut faire partir par heure. Les plafonds ci-dessus sont par compte : N
+ * comptes jetables écriraient sinon à 10 × N joueurs par jour. Au-delà, le
+ * joueur reçoit la seule notification push (et voit l'invitation sur « Mon
+ * profil ») : le bot n'est pas classé comme spammeur par Discord, ce qui
+ * couperait aussi la connexion par code.
+ */
+export const TEAM_NOTICE_DMS_HOURLY_CAP = 60;
+
+/**
  * Ce que la base compte dans la fenêtre, invitation qui vient d'être écrite
- * **comprise** — la ligne écrite est la réservation : deux invitations
- * simultanées se voient l'une l'autre au pire, et se taisent plutôt que
- * d'écrire deux fois.
+ * **comprise** : des **tentatives** — une invitation retenue par un plafond
+ * compte quand même, sans quoi un compte qui invite en boucle ne serait jamais
+ * borné. L'avis déjà parti à ce joueur pour cette équipe, lui, se compte en
+ * mémoire (`claimTeamNoticeSlot`, côté serveur) : seul un avis **remis** retient
+ * le suivant pendant {@link TEAM_INVITE_NOTICE_COOLDOWN_HOURS}.
  */
 export type TeamInviteNoticeBudget = {
-  /** Invitations de cette équipe à ce joueur. */
-  toThisPlayer: number;
   /** Joueurs distincts invités par cette équipe. */
   toAnyPlayer: number;
   /** Joueurs distincts invités par l'auteur, toutes équipes confondues. */
   byActor: number;
   /** Équipes distinctes qui ont invité ce joueur. */
   teamsToThisPlayer: number;
+  /**
+   * Le joueur a déjà été membre de cette équipe : son retour n'est pas une
+   * sollicitation d'un tiers, il échappe au plafond par joueur (trois équipes
+   * inconnues ne taisent pas l'invitation de son ancienne équipe).
+   */
+  formerMember: boolean;
 };
 
 /**
- * Borne d'une invitation ordinaire : la **seule** invitation de cette équipe à
- * ce joueur dans la fenêtre (celle qui vient d'être écrite, d'où `<= 1`), tant
- * que les joueurs invités par l'équipe, ou par l'auteur, n'excèdent pas
- * {@link TEAM_INVITE_NOTICES_DAILY_CAP} et que les équipes qui invitent ce
- * joueur n'excèdent pas {@link TEAM_INVITE_NOTICES_PER_PLAYER_CAP}.
+ * Borne d'une invitation ordinaire : les joueurs invités par l'équipe, ou par
+ * l'auteur, n'excèdent pas {@link TEAM_INVITE_NOTICES_DAILY_CAP}, et les
+ * équipes qui invitent ce joueur n'excèdent pas
+ * {@link TEAM_INVITE_NOTICES_PER_PLAYER_CAP} — sauf son ancienne équipe.
  */
 export function withinTeamInviteNoticeBudget(input: TeamInviteNoticeBudget): boolean {
   return (
-    input.toThisPlayer <= 1 &&
     input.toAnyPlayer <= TEAM_INVITE_NOTICES_DAILY_CAP &&
     input.byActor <= TEAM_INVITE_NOTICES_DAILY_CAP &&
-    input.teamsToThisPlayer <= TEAM_INVITE_NOTICES_PER_PLAYER_CAP
+    (input.formerMember || input.teamsToThisPlayer <= TEAM_INVITE_NOTICES_PER_PLAYER_CAP)
   );
 }
 
 /** Ce que la base compte des reprises proposées dans la fenêtre, celle-ci comprise. */
 export type GhostClaimNoticeBudget = {
-  /** Propositions de cette fantôme à ce joueur. */
-  toThisPlayer: number;
   /** Joueurs distincts à qui l'auteur a proposé une reprise, toutes fantômes confondues. */
   byActor: number;
   /** Fantômes distinctes proposées à ce joueur. */
   teamsToThisPlayer: number;
+  /** Le joueur a déjà été membre de cette équipe (voir {@link TeamInviteNoticeBudget}). */
+  formerMember: boolean;
 };
 
 /**
- * Borne d'une reprise proposée par le staff : une fois par équipe et par
- * joueur dans la fenêtre (proposition retirée puis refaite comprise), et les
- * mêmes plafonds qu'une invitation — un compte staff ne fait pas écrire à plus
- * de {@link TEAM_INVITE_NOTICES_DAILY_CAP} joueurs, un joueur ne reçoit pas
- * plus de {@link TEAM_INVITE_NOTICES_PER_PLAYER_CAP} reprises (revue sécurité
- * #544). Au-delà, la proposition reste visible sur « Mon profil ».
+ * Borne d'une reprise proposée par le staff : les mêmes plafonds qu'une
+ * invitation — un compte staff ne fait pas écrire à plus de
+ * {@link TEAM_INVITE_NOTICES_DAILY_CAP} joueurs, un joueur ne reçoit pas plus
+ * de {@link TEAM_INVITE_NOTICES_PER_PLAYER_CAP} reprises (revue sécurité #544),
+ * sauf celle d'une équipe dont il a été membre. Une fois par équipe et par
+ * joueur dans la fenêtre (proposition retirée puis refaite comprise) : compté
+ * en mémoire, comme pour une invitation. Au-delà, la proposition reste visible
+ * sur « Mon profil ».
  */
 export function withinGhostClaimNoticeBudget(input: GhostClaimNoticeBudget): boolean {
   return (
-    input.toThisPlayer <= 1 &&
     input.byActor <= TEAM_INVITE_NOTICES_DAILY_CAP &&
-    input.teamsToThisPlayer <= TEAM_INVITE_NOTICES_PER_PLAYER_CAP
+    (input.formerMember || input.teamsToThisPlayer <= TEAM_INVITE_NOTICES_PER_PLAYER_CAP)
   );
 }
 

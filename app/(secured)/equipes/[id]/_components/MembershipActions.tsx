@@ -38,6 +38,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     request: () => Promise<string>,
     translate: (code: string) => string,
   ): Promise<boolean> => {
+    // Les boutons restent focalisables pendant un geste (`aria-disabled`) : la garde est ici.
+    if (busy) return false;
     setBusy(true);
     try {
       showSuccess(await request());
@@ -151,7 +153,9 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
               type="button"
               className={`btn ${styles.primaryButton}`}
               onClick={() => void acceptGhostClaim()}
-              disabled={busy || team.viewerInvitationId === null}
+              disabled={team.viewerInvitationId === null}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
             >
               {t("membership.takeOver")}
             </button>
@@ -159,7 +163,9 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
               type="button"
               className="btn ghost"
               onClick={() => void declineInvitation()}
-              disabled={busy || team.viewerInvitationId === null}
+              disabled={team.viewerInvitationId === null}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
             >
               {t("membership.decline")}
             </button>
@@ -176,20 +182,22 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     team.viewerInvitation === "INVITED" ? (
       <div className={styles.actionsRow}>
         <p className={styles.notice}>{t("membership.invited")}</p>
-        <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
+        <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
           {t("membership.join")}
         </button>
         <button
           type="button"
           className="btn ghost"
           onClick={() => void declineInvitation()}
-          disabled={busy || team.viewerInvitationId === null}
+          disabled={team.viewerInvitationId === null}
+          aria-disabled={busy || undefined}
+          aria-busy={busy || undefined}
         >
           {t("membership.decline")}
         </button>
       </div>
     ) : (
-      <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
+      <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
         {t("membership.requestToJoin")}
       </button>
     );
@@ -205,7 +213,9 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                 type="button"
                 className={`btn ghost ${styles.smallButton}`}
                 onClick={() => void withdrawRequest()}
-                disabled={busy || team.viewerInvitationId === null}
+                disabled={team.viewerInvitationId === null}
+                aria-disabled={busy || undefined}
+                aria-busy={busy || undefined}
               >
                 {t("membership.withdrawRequest")}
               </button>
@@ -218,7 +228,11 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
 
       {team.viewerMembership === "MEMBER" && (
         <div className={`ds-block ${styles.block} ${styles.leaveBlock}`}>
-          <button type="button" className="btn ghost" onClick={() => setConfirmLeave(true)} disabled={busy}>
+          <button type="button" className="btn ghost" onClick={() => {
+              if (!busy) setConfirmLeave(true);
+            }}
+            aria-disabled={busy || undefined}
+          >
             {t("membership.leave")}
           </button>
         </div>
@@ -243,7 +257,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                     type="button"
                     className={`btn ${styles.smallButton}`}
                     onClick={() => void respondRequest(r, true)}
-                    disabled={busy}
+                    aria-disabled={busy || undefined}
+                    aria-busy={busy || undefined}
                     aria-label={t("membership.acceptLabel", { pseudo: r.pseudo })}
                   >
                     {t("membership.accept")}
@@ -252,7 +267,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                     type="button"
                     className={`btn ghost ${styles.smallButton}`}
                     onClick={() => void respondRequest(r, false)}
-                    disabled={busy}
+                    aria-disabled={busy || undefined}
+                    aria-busy={busy || undefined}
                     aria-label={t("membership.refuseLabel", { pseudo: r.pseudo })}
                   >
                     {t("membership.refuse")}

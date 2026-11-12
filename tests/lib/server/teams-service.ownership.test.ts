@@ -25,6 +25,8 @@ type Scenario = {
   affected?: number[];
   /** Erreur levée par le n-ième `UPDATE` (0 = le premier). */
   failUpdateAt?: number;
+  /** Autres membres en cours de l'équipe, hors du geste. */
+  teammates?: number[];
 };
 
 /**
@@ -54,6 +56,10 @@ async function mockDb(scenario: Scenario) {
       return [{ affectedRows: scenario.affected?.[index] ?? 1 }, []];
     }
     if (/UNION\s+SELECT id FROM bg_tournaments/.test(sql)) return [[{ id: 40 }], []];
+    if (/SELECT user_id FROM bg_team_members WHERE team_id = \? AND left_at IS NULL/.test(sql)) {
+      const members = [...Object.keys(scenario.roster).map(Number), ...(scenario.teammates ?? [])];
+      return [members.map((user_id) => ({ user_id })), []];
+    }
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
@@ -233,13 +239,13 @@ describe("transferTeamOwnership", () => {
     await expect(transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID)).rejects.toThrow("FORBIDDEN");
   });
 
-  it("transferTeamOwnership_committed_reconnectsBothAccountsOnTeamTournaments", async () => {
-    await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"], [TARGET_ID]: ["DPS"] } });
+  it("transferTeamOwnership_committed_reconnectsWholeTeamOnTeamTournaments", async () => {
+    await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"], [TARGET_ID]: ["DPS"] }, teammates: [99] });
 
     await transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID);
 
     expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([
-      [[REQUESTER_ID, TARGET_ID], { tournamentIds: new Set([40]) }],
+      [expect.arrayContaining([REQUESTER_ID, TARGET_ID, 99]), { tournamentIds: new Set([40]) }],
     ]);
   });
 

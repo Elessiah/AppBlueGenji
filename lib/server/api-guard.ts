@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import {
   ANONYMOUS_IDENTITY,
   refundRateLimit,
+  rateLimitWindowOf,
   checkRateLimit,
   consumeRateLimit,
   rateLimitIdentity,
@@ -293,14 +294,38 @@ export const DIRECTORY_READ_RULE: RateLimitRule = {
  * staff `tournaments` (équipes fantômes) n'est pas plafonné. Seul un geste
  * **réussi** est décompté : le geste est réservé d'une seule instruction
  * ({@link enforceRateLimit}, sans `await` entre contrôle et décompte — des
- * requêtes parallèles ne passent pas toutes), puis rendu s'il échoue
- * ({@link refundRateLimitFor}) : un nom déjà pris ne coûte rien.
+ * requêtes parallèles ne passent pas toutes), puis rendu s'il est refusé
+ * avant d'avoir eu lieu ({@link reserveRateLimit}) : un nom déjà pris ne coûte
+ * rien.
  */
 export const TEAM_LIFECYCLE_RULE: RateLimitRule = {
   name: "team-lifecycle",
   limit: 10,
   windowMs: 60 * 60_000,
 };
+
+/**
+ * Écritures d'identité d'une équipe — nom, sigle, description, logo posé ou
+ * retiré (`PATCH /api/teams/[id]`, `POST`/`DELETE /api/teams/[id]/logo`), par
+ * compte. Un renommage ou un logo changé d'une équipe inscrite vide le
+ * classement, ses PNG et les vues de l'accueil : sans plafond, une boucle le
+ * commandait à volonté. Trente écritures en dix minutes couvrent largement
+ * une fiche qu'on retouche ; le staff `tournaments` (équipes fantômes, saisie
+ * en série) n'est pas plafonné.
+ */
+export const TEAM_IDENTITY_WRITE_RULE: RateLimitRule = {
+  name: "team-identity-write",
+  limit: 30,
+  windowMs: 10 * 60_000,
+};
+
+/**
+ * {@link TEAM_IDENTITY_WRITE_RULE} pour un compte : la réponse 429 au-delà du
+ * plafond, `null` sinon — et toujours `null` pour le staff `tournaments`.
+ */
+export function enforceTeamIdentityWriteLimit(userId: number, managesGhostTeams: boolean): NextResponse | null {
+  return managesGhostTeams ? null : enforceRateLimit(TEAM_IDENTITY_WRITE_RULE, userId);
+}
 
 /**
  * « Ne plus voir » de l'invitation à certifier de la fiche tournoi
@@ -639,13 +664,31 @@ export function peekRateLimit(
 }
 
 /**
- * Rend une action réservée par {@link enforceRateLimit} qui a échoué : un refus
- * métier (nom pris, droit manquant) ne consomme ainsi rien. Sans effet pour une
- * identité inconnue.
+ * Réserve une action comme {@link enforceRateLimit} (contrôle et décompte en
+ * une instruction) et rend, avec la réservation, de quoi la **rendre** si
+ * l'action est refusée avant d'avoir eu lieu (refus métier : nom pris, droit
+ * manquant). La place rendue est celle de **cette** fenêtre : si la fenêtre
+ * s'est rouverte entre-temps, rien n'est décrémenté. Une identité inconnue
+ * n'est ni plafonnée ni décomptée.
  */
-export function refundRateLimitFor(rule: RateLimitRule, identity: RateIdentity): void {
+export function reserveRateLimit(
+  rule: RateLimitRule,
+  identity: RateIdentity,
+): { refused: NextResponse; refund: () => void } | { refused: null; refund: () => void } {
   const key = rateLimitIdentity(identity);
-  if (key !== ANONYMOUS_IDENTITY) refundRateLimit(rule, key);
+  if (key === ANONYMOUS_IDENTITY) return { refused: null, refund: () => undefined };
+  const state = consumeRateLimit(rule, key);
+  if (!state.allowed) return { refused: tooManyRequests(state.retryAfterMs), refund: () => undefined };
+  const windowResetAt = rateLimitWindowOf(rule, key) ?? undefined;
+  let refunded = false;
+  return {
+    refused: null,
+    refund: () => {
+      if (refunded) return;
+      refunded = true;
+      refundRateLimit(rule, key, Date.now(), windowResetAt);
+    },
+  };
 }
 
 /**

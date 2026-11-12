@@ -1,11 +1,13 @@
 "use client";
 
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useAppLocale } from "@/components/i18n/locale-context";
 import { PodiumPaint, useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
 import { useSpectatorView } from "@/components/spectator-view";
 import { useHasPlayerPage } from "@/components/profileless-players";
 import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
 import { podiumTierClass, podiumTierFamily, type PodiumTier, type PodiumTierKind } from "@/lib/shared/podium-tiers";
+import { shownEntityName, type FallbackEntityKind } from "@/lib/shared/entity-fallback-name";
 import type { CSSProperties, ReactNode } from "react";
 
 /**
@@ -119,25 +121,48 @@ export function EntityLink({
   );
 }
 
+/**
+ * Un nom passé en texte qui ne se voit pas (ancien nom fait d'invisibles)
+ * devient « Équipe #id » / « Joueur #id » : le lien garde un texte, donc un nom
+ * accessible (`entity-fallback-name.ts`). Un contenu composé (avatar et nom)
+ * reste celui de l'appelant.
+ */
+function useShownChildren(children: ReactNode, kind: FallbackEntityKind, id: number): ReactNode {
+  const locale = useAppLocale();
+  return typeof children === "string" ? shownEntityName(children, kind, id, locale) : children;
+}
+
 /** Nom d'équipe cliquable → `/equipes/[id]`, habillé de sa marche du podium. */
 export function TeamLink({
   teamId,
   podiumTier,
+  children,
   ...rest
 }: Readonly<EntityLinkProps & PodiumTierOverride & { teamId: number }>) {
   const podium = linkPodium(podiumTier, useTeamPodiumTier(teamId), "team");
-  return <EntityLink href={`/equipes/${teamId}`} podium={podium} {...rest} />;
+  const shown = useShownChildren(children, "team", teamId);
+  return (
+    <EntityLink href={`/equipes/${teamId}`} podium={podium} {...rest}>
+      {shown}
+    </EntityLink>
+  );
 }
 
 /** Pseudo cliquable → `/joueurs/[id]`, habillé de la marche (adoucie) de son équipe. */
 export function PlayerLink({
   userId,
   podiumTier,
+  children,
   ...rest
 }: Readonly<EntityLinkProps & PodiumTierOverride & { userId: number }>) {
   const podium = linkPodium(podiumTier, useMemberPodiumTier(userId), "member");
   const linked = useHasPlayerPage(userId);
-  return <EntityLink href={`/joueurs/${userId}`} podium={podium} linked={linked} {...rest} />;
+  const shown = useShownChildren(children, "player", userId);
+  return (
+    <EntityLink href={`/joueurs/${userId}`} podium={podium} linked={linked} {...rest}>
+      {shown}
+    </EntityLink>
+  );
 }
 
 /**

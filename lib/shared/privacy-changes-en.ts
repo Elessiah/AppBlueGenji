@@ -44,6 +44,7 @@ import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+  TEAM_NOTICE_DMS_HOURLY_CAP,
 } from "@/lib/shared/team-invite-notice";
 
 /** The translated part of an entry: its wording, and its links' labels (same targets, same order). */
@@ -1017,6 +1018,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       `Team ownership transferred: contrary to what the entry “Team invitations announced by push and on Discord” said, it no longer notifies at every transfer, but once per team and per player every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours (a restart of the site, or more than a thousand transfers within that time, may let one more through). The notification topic is now called “Team invitations and ownership”; turning it off only turns off the notification, not the Discord direct message.`,
       "Discord bot: to read the members of its servers (memberships, refereeing role, commands, delivery of the site's direct messages, finding the Discord account a code goes to), the bot holds in memory the member profile Discord sends it (username, nickname, avatar, roles, join and boost dates, timeout), kept up to date by Discord, never recorded, lost when it stops. This was already the case: its privacy policy and the register (T08) now say so.",
       "Team voice channels: the bot writes to the staff's private log channel technical messages about the channels (identifier of a channel and Discord's error when its deletion or tracking fails, sweep report or failure, missing-permission alert), without any player data, kept for one year. This was already the case: the policy and the register (T18) now say so.",
+    ],
+  },
+  "2026-11-avis-d-equipe-plafonds-et-base": {
+    linkLabels: ["Read the “Team Discord direct messages” paragraph", "Read processing activity T03 in the register"],
+    title: "Team messages on Discord: caps and legal basis",
+    summary:
+      "Team Discord direct messages (invitation, takeover, ownership, join request) are now described in the policy, with their basis: the association's legitimate interest in forming teams. Their caps change slightly: only a message actually sent counts towards the delay, a team you were a member of no longer counts towards the per-player cap, and the whole site has an hourly cap.",
+    details: [
+      `Delay: the same team still writes to you only once per kind of message every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, but only a message actually sent now counts — an invitation that stayed silent (suspended account, cap reached) no longer holds back the next one. This delay is counted in memory: a restart of the site, or more than a thousand messages within that time, may let one more through.`,
+      `Former team: you still receive invitations from ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams at most within ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, but a team you were a member of no longer counts. To know this, the site reads, at each invitation or takeover, whether you were part of the inviting team (the team history it already keeps).`,
+      `Site cap: beyond ${TEAM_NOTICE_DMS_HOURLY_CAP} invitations, takeovers or ownerships announced by direct message within one hour, all accounts together, the notice is sent as a push notification only; the invitation stays in “My profile”.`,
+      "Legal basis: these messages are based on the association's legitimate interest in forming teams (register, T03); you can object through the “Exercising your rights” section of the policy. This was already the case: the policy now says so, next to the match direct messages.",
     ],
   },
 };

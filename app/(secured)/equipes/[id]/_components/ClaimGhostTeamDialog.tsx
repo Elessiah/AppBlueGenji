@@ -64,10 +64,21 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
       onSubmit={submit}
       footer={
         <>
-          <button type="button" className="btn ghost" disabled={busy} onClick={onClose}>
+          <button
+            type="button"
+            className="btn ghost"
+            aria-disabled={busy || undefined}
+            onClick={busy ? undefined : onClose}
+          >
             {t("claim.cancel")}
           </button>
-          <button type="submit" className={`btn ${styles.primaryButton}`} disabled={busy || !trimmed}>
+          <button
+            type="submit"
+            className={`btn ${styles.primaryButton}`}
+            disabled={!trimmed && !busy}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+          >
             {busy ? t("claim.pending") : t("claim.submit")}
           </button>
         </>

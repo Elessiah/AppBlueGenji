@@ -1,10 +1,12 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { enforceTeamIdentityWriteLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
+import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { TEAM_LOGO_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, isGhostTeam } from "@/lib/server/teams/access";
 import { updateTeamLogo } from "@/lib/server/teams/identity";
-import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
+import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { can } from "@/lib/shared/permissions";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 import {
@@ -25,6 +27,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!(await canManageTeam(teamId, user.id)) && !(managesGhostTeams && (await isGhostTeam(teamId)))) {
     return fail("FORBIDDEN", 403);
   }
+  const throttled = enforceTeamIdentityWriteLimit(user.id, managesGhostTeams);
+  if (throttled) return throttled;
 
   const form = await readImageUploadForm(req, user.id);
   if (form instanceof Response) return form;
@@ -59,7 +63,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       }
       throw error;
     }
-    await deleteStoredImage(toDiskUploadPath(previousLogoUrl));
+    // L'ancien fichier part s'il vit dans `teams/` et que plus aucune ligne ne
+    // le désigne — un logo partagé par une autre équipe lui reste (même règle
+    // que la dissolution).
+    await deleteUnreferencedUpload(previousLogoUrl, "teams");
     return ok({ logoUrl: servedUrl });
   } catch (error) {
     const message = (error as Error).message;
@@ -75,9 +82,13 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   const teamId = parseTeamId(id);
   if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
+  const managesGhostTeams = can(user, "tournaments");
+  const throttled = enforceTeamIdentityWriteLimit(user.id, managesGhostTeams);
+  if (throttled) return throttled;
+
   try {
-    const { previousLogoUrl } = await updateTeamLogo(user.id, teamId, null, can(user, "tournaments"));
-    await deleteStoredImage(toDiskUploadPath(previousLogoUrl));
+    const { previousLogoUrl } = await updateTeamLogo(user.id, teamId, null, managesGhostTeams);
+    await deleteUnreferencedUpload(previousLogoUrl, "teams");
     return ok({ logoUrl: null });
   } catch (error) {
     const message = (error as Error).message;

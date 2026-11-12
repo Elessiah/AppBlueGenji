@@ -4,5 +4,9 @@
   },
   "infoHint": {
     "label": "Plus d'infos : {subject}"
+  },
+  "entityFallback": {
+    "team": "Équipe #{id}",
+    "player": "Joueur #{id}"
   }
 }

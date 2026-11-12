@@ -30,6 +30,10 @@ describe("teamPageTitle", () => {
     expect(teamPageTitle({ name: "   " })).toBe(TEAM_PAGE_FALLBACK_TITLE);
   });
 
+  it("teamPageTitle_invisibleOnlyName_returnsGenericTitle", () => {
+    expect(teamPageTitle({ name: "​‍‮" })).toBe(TEAM_PAGE_FALLBACK_TITLE);
+  });
+
   it("rogne les espaces du nom", () => {
     expect(teamPageTitle({ name: "  Nova  " })).toBe("Nova · Équipe");
   });

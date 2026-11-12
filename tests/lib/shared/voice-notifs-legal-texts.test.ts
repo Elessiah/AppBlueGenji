@@ -19,7 +19,8 @@ const voiceSummary = (source: string) =>
 
 describe("entrée PRIVACY_CHANGES de la reprise d'équipe (#595)", () => {
   it("privacyChange_takeoverEntry_isLastDated20261113ForAllAccounts", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
+    // Suivie, le même jour, de l'entrée des avis d'équipe (TEAMS-LOT).
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
     expect(entryFr?.publishedAt).toBe("2026-11-13");
     expect(entryFr?.audience).toBeUndefined();
     expect(entryFr?.asksTermsAcceptance).toBeUndefined();
@@ -97,9 +98,9 @@ describe("registre T03 — avis d'équipe", () => {
     const en = JSON.stringify(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T03"));
     expect(fr).not.toContain("un admin");
     expect(fr).toContain("(une fois par équipe et par joueur, 10 joueurs par auteur et 3 reprises par joueur dans ce délai)");
-    expect(fr).toContain("compté en mémoire : un redémarrage du site, ou plus de mille transferts dans ce délai, peut en laisser partir un de plus");
+    expect(fr).toContain("compté en mémoire sur les avis réellement partis (un redémarrage du site, ou plus de mille avis dans ce délai, peut en laisser partir un de plus)");
     expect(en).not.toContain("an admin");
     expect(en).toContain("(once per team and per player, 10 players per author and 3 takeovers per player within that time)");
-    expect(en).toContain("counted in memory: a restart of the site, or more than a thousand transfers within that time, may let one more through");
+    expect(en).toContain("counted in memory on the notices actually sent (a restart of the site, or more than a thousand notices within that time, may let one more through)");
   });
 });

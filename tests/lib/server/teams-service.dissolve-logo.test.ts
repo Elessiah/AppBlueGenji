@@ -117,6 +117,22 @@ describe("softDeleteTeam — fichier du logo", () => {
     expect(reconnectUserStreams).not.toHaveBeenCalled();
   });
 
+  // La dissolution commitée ne lève plus : la route rendrait sinon la place du
+  // plafond pour une équipe bel et bien dissoute.
+  it("softDeleteTeam_postCommitRefreshThrows_resolvesAndStillDeletesLogo", async () => {
+    mockDb("/api/uploads/teams/12-abc.webp");
+    jest.mocked(reconnectUserStreams).mockImplementationOnce(() => {
+      throw new Error("REGISTRY_BROKEN");
+    });
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(softDeleteTeam(1, 12)).resolves.toBeUndefined();
+
+    expect(deleteUnreferencedUpload).toHaveBeenCalledWith("/api/uploads/teams/12-abc.webp", "teams");
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+
   it("délègue sans adresse quand l'équipe n'a pas de logo", async () => {
     mockDb(null);
     await softDeleteTeam(1, 12);

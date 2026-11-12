@@ -10,12 +10,14 @@ jest.mock("@/lib/server/ghost-teams-service");
 jest.mock("@/lib/server/solo-entries-service");
 
 import { POST as createTeamRoute } from "@/app/api/teams/route";
-import { DELETE as deleteTeamRoute } from "@/app/api/teams/[id]/route";
-import { TEAM_LIFECYCLE_RULE } from "@/lib/server/api-guard";
+import { DELETE as deleteTeamRoute, PATCH as patchTeamRoute } from "@/app/api/teams/[id]/route";
+import { TEAM_IDENTITY_WRITE_RULE, TEAM_LIFECYCLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
-import { createTeam } from "@/lib/server/teams/identity";
+import { createTeam, updateTeamMeta } from "@/lib/server/teams/identity";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { teamDetailResponse } from "../../../helpers/team-detail";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -41,6 +43,16 @@ const dissolve = () =>
   deleteTeamRoute(new Request("http://localhost/api/teams/12", { method: "DELETE" }), {
     params: Promise.resolve({ id: "12" }),
   });
+
+const rename = () =>
+  patchTeamRoute(
+    new Request("http://localhost/api/teams/12", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Dragon Squad" }),
+    }),
+    { params: Promise.resolve({ id: "12" }) },
+  );
 
 async function useUpTheBucket(gesture: () => Promise<Response>): Promise<void> {
   for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await gesture()).status).toBeLessThan(300);
@@ -146,5 +158,30 @@ describe("DELETE /api/teams/[id] — plafond de dissolution", () => {
     await useUpTheBucket(create);
 
     expect((await dissolve()).status).toBe(429);
+  });
+});
+
+// Écritures d'identité (nom, sigle, description) : une boucle de renommages
+// vidait à volonté le classement et les vues de l'accueil.
+describe("PATCH /api/teams/[id] — plafond des écritures d'identité", () => {
+  beforeEach(() => {
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
+    jest.mocked(getTeamDetail).mockResolvedValue(teamDetailResponse());
+  });
+
+  it("PATCH_overIdentityWriteLimit_returns429WithoutWriting", async () => {
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await rename()).status).toBe(200);
+
+    const res = await rename();
+
+    expect(res.status).toBe(429);
+    expect(updateTeamMeta).toHaveBeenCalledTimes(TEAM_IDENTITY_WRITE_RULE.limit);
+  });
+
+  it("PATCH_staffTournaments_isNotCapped", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(staff);
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) await rename();
+
+    expect((await rename()).status).toBe(200);
   });
 });

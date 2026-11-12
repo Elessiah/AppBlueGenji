@@ -66,10 +66,21 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
       onSubmit={save}
       footer={
         <>
-          <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={pending ? undefined : onClose}
+            aria-disabled={pending || undefined}
+          >
             {t("roles.cancel")}
           </button>
-          <button type="submit" className={`btn ${styles.primaryButton}`} disabled={unchanged || pending}>
+          <button
+            type="submit"
+            className={`btn ${styles.primaryButton}`}
+            disabled={unchanged && !pending}
+            aria-disabled={pending || undefined}
+            aria-busy={pending || undefined}
+          >
             {pending ? t("roles.saving") : t("roles.save")}
           </button>
         </>

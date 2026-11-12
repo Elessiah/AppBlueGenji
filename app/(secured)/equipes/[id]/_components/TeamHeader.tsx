@@ -4,6 +4,7 @@ import { LogoWithGlow } from "@/components/logo-with-glow";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { displayTeamTag } from "@/lib/shared/team-tag";
+import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import { statsRate, statsText } from "@/lib/shared/stats-text";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
@@ -64,7 +65,9 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
             )}
             <div className={headerStyles.titles}>
               <h1 className={`ds-title purple ${headerStyles.name}`}>
-                <TeamPodiumName teamId={team.team.id}>{team.team.name}</TeamPodiumName>
+                <TeamPodiumName teamId={team.team.id}>
+                  {shownEntityName(team.team.name, "team", team.team.id, locale)}
+                </TeamPodiumName>
                 {team.team.isGhost && (
                   <span className={`mono ${headerStyles.ghostBadge}`} title={t("header.ghostTitle")}>
                     {t("header.ghostBadge")}

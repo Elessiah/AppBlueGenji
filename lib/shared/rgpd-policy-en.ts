@@ -27,6 +27,7 @@ import {
   MATCH_CONTACTS_SCOPE,
   MATCH_TIME_DM_SCOPE,
   MODERATION_DM_SCOPE,
+  TEAM_NOTICE_DM_SCOPE,
 } from "@/lib/shared/rgpd-policy";
 import type { DonneEntry, DroitEntry, LegalBase } from "@/lib/shared/rgpd-policy";
 
@@ -69,6 +70,7 @@ const SCOPE_EN: Record<string, string> = {
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message",
   [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
+  [TEAM_NOTICE_DM_SCOPE]: "join requests, invitations, offered team takeovers and team ownership received by direct message",
   [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
   [STREAM_PSEUDO_SCOPE]: "live streaming and recording of the tournament matches you take part in",
   [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",

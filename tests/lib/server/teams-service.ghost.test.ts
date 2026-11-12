@@ -69,9 +69,10 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
       .fn<SqlQuery>()
       .mockResolvedValueOnce(NOT_A_MEMBER) // userOwnsTeam
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // isGhostTeam
-      .mockResolvedValueOnce([[{ name: "Ancien nom" }]]) // nom actuel
+      .mockResolvedValueOnce([[{ name: "Ancien nom", deleted_at: null, is_ghost: 1 }]]) // sous verrou : toujours fantôme
       .mockResolvedValueOnce([[]]) // nom libre (assertTeamNameAvailable)
-      .mockResolvedValueOnce([{ affectedRows: 1 }]); // UPDATE
+      .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
+      .mockResolvedValueOnce([[]]); // jamais inscrite
     await mockDb(execute);
 
     await updateTeamMeta(99, 3, { name: "Nouveau nom" }, true);
@@ -79,6 +80,18 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
     const [sql, params] = execute.mock.calls[4] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_teams SET name = \?/);
     expect(params).toEqual(["Nouveau nom", 3]);
+  });
+
+  it("updateTeamMeta_ghostClaimedBeforeLock_throwsForbidden", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(NOT_A_MEMBER)
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // fantôme à la lecture
+      .mockResolvedValueOnce([[{ name: "Ancien nom", deleted_at: null, is_ghost: 0 }]]); // reprise entre-temps
+    await mockDb(execute);
+
+    await expect(updateTeamMeta(99, 3, { name: "Nouveau nom" }, true)).rejects.toThrow("FORBIDDEN");
+    expect(execute.mock.calls.some(([sql]) => /UPDATE bg_teams/.test(sql))).toBe(false);
   });
 
   it("refuse le même staff sur une équipe réelle", async () => {
@@ -116,7 +129,8 @@ describe("updateTeamLogo — dérogation staff", () => {
       .mockResolvedValueOnce(NOT_A_MEMBER) // getMemberRoles
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
       .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]) // logo précédent et droit, sous verrou
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([[]]); // jamais inscrite
     await mockDb(execute);
 
     await updateTeamLogo(99, 3, "/api/uploads/teams/x.webp", true);

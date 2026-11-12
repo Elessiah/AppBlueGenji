@@ -130,10 +130,24 @@ et le compteur de l'accueil (`invalidateLandingCounters`) sont vidés ; une
 équipe déjà inscrite vide les vues d'identité et tous les bilans. Créations et
 dissolutions partagent un plafond par compte (`TEAM_LIFECYCLE_RULE`, 10 gestes
 par heure, 429 `TOO_MANY_REQUESTS`) : la place est réservée d'une instruction
-avant l'écriture (`enforceRateLimit`, des requêtes parallèles ne passent pas
-toutes) et rendue si le geste échoue (`refundRateLimitFor`) — seul un geste
-réussi compte ; le staff `tournaments` n'est pas plafonné. Une boucle « créer → dissoudre » ne fait
-plus recalculer le classement et le podium aux visiteurs.
+avant l'écriture (`reserveRateLimit`, des requêtes parallèles ne passent pas
+toutes) et rendue si le geste est refusé avant son commit — dans la fenêtre de
+la réservation seulement (une fenêtre rouverte entre-temps n'est pas
+décrémentée) ; ce qui suit le commit d'une dissolution ne lève plus. Seul un
+geste réussi compte ; le staff `tournaments` n'est pas plafonné. Une boucle
+« créer → dissoudre » ne fait plus recalculer le classement et le podium aux
+visiteurs.
+
+**Écritures d'identité** : renommer, changer le sigle, la description ou le
+logo d'une équipe sont plafonnés par compte (`TEAM_IDENTITY_WRITE_RULE`, 30 en
+dix minutes, 429 ; staff `tournaments` exempté). Un renommage ou un logo
+changé ne vide les vues d'identité (`invalidateTeamIdentityViews`) que pour une
+équipe déjà inscrite à un tournoi (`teamEverRegistered`, lu sous le verrou de
+l'équipe) ; même règle pour une fantôme reprise. `updateTeamMeta` verrouille la
+ligne de l'équipe en première instruction, y relit le nom actuel et y rejuge le
+droit (propriétaire, ou fantôme pour le staff). L'ancien logo s'efface par
+`deleteUnreferencedUpload(…, "teams")` : seulement s'il vit dans `teams/` et
+qu'aucune ligne ne le désigne plus.
 
 **Nuls à l'annuaire** : `TeamListItem.draws` — la carte d'équipe ajoute une
 colonne « Matchs nuls » quand il y en a, le podium de l'annuaire

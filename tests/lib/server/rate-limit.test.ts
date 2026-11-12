@@ -3,6 +3,7 @@ import {
   chargeRateLimit,
   checkRateLimit,
   consumeRateLimit,
+  rateLimitWindowOf,
   refundRateLimit,
   refundTokenBucket,
   takeTokenBucket,
@@ -105,6 +106,27 @@ describe("refundRateLimit", () => {
     refundRateLimit(RULE, "nobody");
 
     expect(checkRateLimit(RULE, "nobody").remaining).toBe(3);
+  });
+
+  it("refundRateLimit_sameWindow_givesTheSlotBack", () => {
+    const now = 1_000_000;
+    for (let i = 0; i < 3; i += 1) consumeRateLimit(RULE, "a", now);
+    const windowResetAt = rateLimitWindowOf(RULE, "a", now) ?? undefined;
+
+    refundRateLimit(RULE, "a", now + 1, windowResetAt);
+
+    expect(checkRateLimit(RULE, "a", now + 1).remaining).toBe(1);
+  });
+
+  it("refundRateLimit_windowReopenedSinceReservation_keepsNewWindowCount", () => {
+    const now = 1_000_000;
+    consumeRateLimit(RULE, "a", now);
+    const windowResetAt = rateLimitWindowOf(RULE, "a", now) ?? undefined;
+    consumeRateLimit(RULE, "a", now + 2_000); // nouvelle fenêtre, une action prise
+
+    refundRateLimit(RULE, "a", now + 2_001, windowResetAt);
+
+    expect(checkRateLimit(RULE, "a", now + 2_001).remaining).toBe(2);
   });
 
   it("refundRateLimit_afterWindowReset_doesNotGoBelowFreshQuota", () => {
@@ -225,5 +247,23 @@ describe("rate-limit — seau à jetons", () => {
     for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "k", 0);
     resetRateLimit(BUCKET.name);
     expect(tokensLeft(BUCKET, "k", 0)).toBe(3);
+  });
+});
+
+describe("rateLimitWindowOf", () => {
+  it("rateLimitWindowOf_openWindow_returnsItsReset", () => {
+    consumeRateLimit(RULE, "a", 5_000);
+
+    expect(rateLimitWindowOf(RULE, "a", 5_500)).toBe(6_000);
+  });
+
+  it("rateLimitWindowOf_windowElapsed_returnsNull", () => {
+    consumeRateLimit(RULE, "a", 5_000);
+
+    expect(rateLimitWindowOf(RULE, "a", 6_000)).toBeNull();
+  });
+
+  it("rateLimitWindowOf_unknownKey_returnsNull", () => {
+    expect(rateLimitWindowOf(RULE, "nobody", 5_000)).toBeNull();
   });
 });

@@ -372,7 +372,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   };
 
   const onLogoSend = async () => {
-    if (!pendingLogo) return;
+    if (logoBusy || !pendingLogo) return;
     if (!logoRights) {
       showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
       logoRightsRef.current?.focus();
@@ -450,13 +450,22 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
           <button
             type="button"
             className="btn"
-            disabled={logoBusy}
-            onClick={() => logoFileRef.current?.click()}
+            aria-disabled={logoBusy || undefined}
+            onClick={() => {
+              if (!logoBusy) logoFileRef.current?.click();
+            }}
           >
             {pendingLogo ? t("settings.chooseAnother") : savedLogoLabel}
           </button>
           {team.team.logoUrl && !pendingLogo ? (
-            <button type="button" className="btn ghost" disabled={logoBusy} onClick={() => setRemoveLogoOpen(true)}>
+            <button
+              type="button"
+              className="btn ghost"
+              aria-disabled={logoBusy || undefined}
+              onClick={() => {
+                if (!logoBusy) setRemoveLogoOpen(true);
+              }}
+            >
               {t("settings.removeLogo")}
             </button>
           ) : null}
@@ -488,13 +497,33 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
             </span>
           </label>
           <div className={styles.actionsRow}>
-            <button type="button" className="btn" disabled={logoBusy} onClick={onLogoSend}>
+            <button
+              type="button"
+              className="btn"
+              aria-disabled={logoBusy || undefined}
+              aria-busy={logoBusy || undefined}
+              onClick={() => void onLogoSend()}
+            >
               {logoBusy ? t("settings.sending") : t("settings.sendLogo")}
             </button>
-            <button type="button" className="btn ghost" disabled={logoBusy} onClick={() => void onLogoRecrop()}>
+            <button
+              type="button"
+              className="btn ghost"
+              aria-disabled={logoBusy || undefined}
+              onClick={() => {
+                if (!logoBusy) void onLogoRecrop();
+              }}
+            >
               {t("settings.recrop")}
             </button>
-            <button type="button" className="btn ghost" disabled={logoBusy} onClick={cancelPendingLogo}>
+            <button
+              type="button"
+              className="btn ghost"
+              aria-disabled={logoBusy || undefined}
+              onClick={() => {
+                if (!logoBusy) cancelPendingLogo();
+              }}
+            >
               {t("settings.cancel")}
             </button>
           </div>
@@ -555,7 +584,8 @@ function TeamDangerZone({
               <button
                 type="button"
                 className="btn ghost"
-                disabled={withdrawingClaimId !== null}
+                aria-disabled={withdrawingClaimId !== null || undefined}
+                aria-busy={withdrawingClaimId === claim.id || undefined}
                 onClick={() => void onWithdraw(claim.id, claim.pseudo)}
               >
                 {t("settings.withdraw")}

@@ -57,6 +57,7 @@ import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+  TEAM_NOTICE_DMS_HOURLY_CAP,
 } from "@/lib/shared/team-invite-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
@@ -1919,6 +1920,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [
       { href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" },
       { href: "/rgpd/registre#t08", label: "Lire le traitement T08 du registre" },
+    ],
+  },
+  {
+    // TEAMS-LOT (ERREUR.txt, entrées sur les avis d'équipe) : délai compté sur
+    // les avis partis, ancienne équipe exemptée du plafond par joueur (lecture
+    // de l'historique d'appartenance), plafond horaire du site, et la
+    // politique décrit enfin ces messages et leur base (T03). Pour tous les
+    // comptes ; même date que la mise en ligne des entrées qui précèdent.
+    id: "2026-11-avis-d-equipe-plafonds-et-base",
+    publishedAt: "2026-11-13",
+    title: "Messages d'équipe sur Discord : plafonds et base légale",
+    summary:
+      "Les messages privés Discord d'équipe (invitation, reprise, propriété, demande d'adhésion) sont maintenant décrits dans la politique, avec leur base : l'intérêt légitime de l'association à la constitution des équipes. Leurs plafonds changent un peu : seul un message réellement parti compte pour le délai, l'équipe dont tu as été membre n'entre plus dans le plafond par joueur, et le site entier a un plafond par heure.",
+    details: [
+      `Délai : une même équipe ne t'écrit toujours qu'une fois par sorte de message toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, mais seul un message réellement parti compte désormais — une invitation restée muette (compte suspendu, plafond atteint) ne retient plus la suivante. Ce délai est compté en mémoire : un redémarrage du site, ou plus de mille messages dans ce délai, peut en laisser partir un de plus.`,
+      `Ancienne équipe : tu ne reçois toujours l'invitation que de ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes au plus en ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, mais une équipe dont tu as été membre n'entre plus dans ce compte. Pour le savoir, le site relit, à chaque invitation ou reprise, si tu as fait partie de l'équipe qui t'invite (l'historique des équipes qu'il garde déjà).`,
+      `Plafond du site : au-delà de ${TEAM_NOTICE_DMS_HOURLY_CAP} invitations, reprises ou propriétés annoncées par message privé en une heure, tous comptes confondus, l'avis ne part qu'en notification push ; l'invitation reste dans « Mon profil ».`,
+      "Base légale : ces messages reposent sur l'intérêt légitime de l'association à la constitution des équipes (registre, T03) ; tu peux t'y opposer depuis la section « Exercer vos droits » de la politique. C'était déjà le cas : la politique le dit maintenant, près des messages privés de match.",
+    ],
+    links: [
+      { href: "/rgpd#messages-d-equipe", label: "Lire le paragraphe « Messages privés Discord d'équipe »" },
+      { href: "/rgpd/registre#t03", label: "Lire le traitement T03 du registre" },
     ],
   },
 ];

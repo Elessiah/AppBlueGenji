@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import {
   DIRECTORY_READ_RULE,
   enforceRateLimit,
-  refundRateLimitFor,
+  reserveRateLimit,
   TEAM_LIFECYCLE_RULE,
 } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -63,12 +63,13 @@ async function createCappedTeam(
   tag: string | null,
 ) {
   const capped = !can(user, "tournaments");
-  const throttled = capped ? enforceRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
-  if (throttled) return throttled;
+  const reservation = capped ? reserveRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
+  if (reservation?.refused) return reservation.refused;
   try {
     return ok({ teamId: await createTeam(user.id, name, description, tag) }, 201);
   } catch (error) {
-    if (capped) refundRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
+    // `createTeam` ne lève qu'avant son commit (refus, transaction défaite).
+    reservation?.refund();
     throw error;
   }
 }

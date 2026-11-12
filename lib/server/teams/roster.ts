@@ -12,20 +12,57 @@ import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notificat
 
 /**
  * Tournois dont le flux lit l'équipe `teamId` dans le contexte du lecteur :
- * ceux où elle est engagée, et ceux qui ne sont pas commencés (inscription
- * possible). Les autres ne changent pas d'un geste de roster.
+ * ceux où elle est engagée et qui ne sont pas terminés, et ceux qui ne sont
+ * pas commencés (inscription possible). Les autres — dont tout l'historique
+ * terminé de l'équipe, où aucune invitation à certifier ni aucun geste ne
+ * dépend plus de son roster — ne changent pas d'un geste de roster.
+ *
+ * À lire sous le verrou de l'équipe : l'inscription le prend aussi
+ * (`tournaments/registration.ts`), et une inscription ne vise qu'un tournoi
+ * pas commencé, que la seconde branche compte de toute façon.
  */
 export async function teamStreamTournamentIds(
   connection: Pick<PoolConnection, "execute">,
   teamId: number,
 ): Promise<Set<number>> {
   const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT tournament_id AS id FROM bg_tournament_registrations WHERE team_id = ?
+    `SELECT r.tournament_id AS id
+       FROM bg_tournament_registrations r
+       JOIN bg_tournaments t ON t.id = r.tournament_id
+      WHERE r.team_id = ? AND t.state <> 'FINISHED'
      UNION
      SELECT id FROM bg_tournaments WHERE state IN ('UPCOMING', 'REGISTRATION')`,
     [teamId],
   );
   return new Set(rows.map((row) => Number(row.id)));
+}
+
+/** Qui rafraîchir après un geste de roster, et sur quels tournois. */
+export type TeamViewerScope = { userIds: number[]; tournamentIds: Set<number> };
+
+/**
+ * Les comptes dont le contexte de tournoi dépend de l'équipe — **tous** ses
+ * membres en cours, plus `alsoUserIds` (qui vient de la quitter) — et les
+ * tournois concernés ({@link teamStreamTournamentIds}). À lire sous le verrou
+ * de l'équipe, après l'écriture : un membre arrivé ou parti y est compté.
+ *
+ * Tous les membres, et pas seulement l'auteur ou la cible du geste :
+ * l'invitation à certifier (« équipe sans contact », celle du meneur) se juge
+ * sur la composition de l'équipe, et le flux d'un coéquipier ouvert gardait
+ * celle reçue à son ouverture jusqu'à sa reconnexion.
+ */
+export async function teamViewerScope(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+  alsoUserIds: readonly number[] = [],
+): Promise<TeamViewerScope> {
+  const [members] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_team_members WHERE team_id = ? AND left_at IS NULL`,
+    [teamId],
+  );
+  const userIds = new Set<number>(alsoUserIds);
+  for (const member of members) userIds.add(Number(member.user_id));
+  return { userIds: [...userIds], tournamentIds: await teamStreamTournamentIds(connection, teamId) };
 }
 
 /**
@@ -34,6 +71,7 @@ export async function teamStreamTournamentIds(
  * tournois concernés, sont fermés pour se reconnecter, et les invitations à
  * certifier de toute l'équipe sont oubliées (« équipe sans contact »,
  * invitation du meneur) — `session-streams.ts`, `certification-prompt-cache.ts`.
+ * Les comptes et tournois viennent de {@link teamViewerScope}.
  */
 export function refreshTeamViewers(
   teamId: number,
@@ -64,8 +102,7 @@ export async function updateTeamMemberRoles(
   memberUserId: number,
   roles: TeamRole[],
 ): Promise<void> {
-  let tournamentIds = new Set<number>();
-  await withTeamRosterLock(teamId, async (connection) => {
+  const scope = await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
     const requesterIsOwner = requesterRoles.includes("OWNER");
@@ -97,11 +134,12 @@ export async function updateTeamMemberRoles(
       teamId,
       memberUserId,
     );
-    tournamentIds = await teamStreamTournamentIds(connection, teamId);
+    return teamViewerScope(connection, teamId);
   });
   // Rôle changé : un MANAGER rétrogradé gardait l'invitation du meneur (et les
-  // gestes de gestion) jusqu'à sa reconnexion, un promu ne la recevait pas.
-  refreshTeamViewers(teamId, [memberUserId], tournamentIds);
+  // gestes de gestion) jusqu'à sa reconnexion, un promu ne la recevait pas — et
+  // ses coéquipiers, celle d'une « équipe sans contact » qui n'en est plus une.
+  refreshTeamViewers(teamId, scope.userIds, scope.tournamentIds);
 }
 
 /**
@@ -114,8 +152,7 @@ export async function updateTeamMemberRoles(
  * `CANNOT_KICK_OWNER`, emportant le seul `OWNER` de l'équipe.
  */
 export async function removeTeamMember(requesterId: number, teamId: number, memberUserId: number): Promise<void> {
-  let tournamentIds = new Set<number>();
-  await withTeamRosterLock(teamId, async (connection) => {
+  const scope = await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
     const requesterIsOwner = requesterRoles.includes("OWNER");
@@ -134,13 +171,14 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
     }
 
     await writeActiveMembership(connection, "left_at = NOW()", [], teamId, memberUserId);
-    tournamentIds = await teamStreamTournamentIds(connection, teamId);
+    return teamViewerScope(connection, teamId, [memberUserId]);
   });
   // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : exclu,
   // il gardait l'invitation à certifier de son ancienne équipe (et son
   // engagement) jusqu'à la reconnexion. Le fermer fait reconnecter le client,
-  // et la route recalcule le contexte (`session-streams.ts`).
-  refreshTeamViewers(teamId, [memberUserId], tournamentIds);
+  // et la route recalcule le contexte (`session-streams.ts`) ; ses anciens
+  // coéquipiers relisent le leur (composition changée).
+  refreshTeamViewers(teamId, scope.userIds, scope.tournamentIds);
 }
 
 /**
@@ -151,17 +189,17 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
  * pendant son départ partait avec, et l'équipe restait sans propriétaire.
  */
 export async function leaveTeam(userId: number, teamId: number): Promise<void> {
-  let tournamentIds = new Set<number>();
-  await withTeamRosterLock(teamId, async (connection) => {
+  const scope = await withTeamRosterLock(teamId, async (connection) => {
     const roles = await lockMemberRoles(connection, teamId, userId);
     if (!roles) throw new Error("NOT_A_MEMBER");
     if (roles.includes("OWNER")) throw new Error("OWNER_MUST_TRANSFER");
 
     await writeActiveMembership(connection, "left_at = NOW()", [], teamId, userId);
-    tournamentIds = await teamStreamTournamentIds(connection, teamId);
+    return teamViewerScope(connection, teamId, [userId]);
   });
-  // Parti : ses flux de tournoi recalculent son contexte (voir `removeTeamMember`).
-  refreshTeamViewers(teamId, [userId], tournamentIds);
+  // Parti : ses flux de tournoi et ceux de l'équipe recalculent leur contexte
+  // (voir `removeTeamMember`).
+  refreshTeamViewers(teamId, scope.userIds, scope.tournamentIds);
 }
 
 /**
@@ -233,8 +271,7 @@ export async function transferTeamOwnership(
   }
 
   let targetDeleted = false;
-  let tournamentIds = new Set<number>();
-  await withTeamRosterLock(
+  const scope = await withTeamRosterLock(
     teamId,
     async (connection) => {
       const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
@@ -271,7 +308,7 @@ export async function transferTeamOwnership(
         teamId,
         newOwnerUserId,
       );
-      tournamentIds = await teamStreamTournamentIds(connection, teamId);
+      return teamViewerScope(connection, teamId);
     },
     async (connection) => {
       const [targetAccount] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
@@ -281,8 +318,8 @@ export async function transferTeamOwnership(
       targetDeleted = targetAccount.length === 0 || targetAccount[0].is_deleted === 1;
     },
   );
-  // Les deux rôles ont changé : les deux contextes se relisent.
-  refreshTeamViewers(teamId, [requesterId, newOwnerUserId], tournamentIds);
+  // Les deux rôles ont changé : les contextes de l'équipe se relisent.
+  refreshTeamViewers(teamId, scope.userIds, scope.tournamentIds);
   // Transaction validée (`withTeamRosterLock` lève sinon) : le nouveau
   // propriétaire est prévenu, sans attendre.
   notifyTeamInviteInBackground("OWNERSHIP", teamId, newOwnerUserId, requesterId);

@@ -11,6 +11,14 @@ export const MATCH_TIME_DM_SCOPE = "annonces d'horaire, rappels, avis de retrait
 /** Avis de suspension ou de modération en message privé : intérêt légitime à faire respecter les conditions (registre T11). */
 export const MODERATION_DM_SCOPE = "avis de suspension ou de modération en message privé";
 
+/**
+ * Avis d'équipe en message privé Discord (registre T03) : demande d'adhésion
+ * aux gérants, invitation, reprise d'équipe proposée, propriété reçue. Intérêt
+ * légitime à constituer les équipes, sur un moyen prouvé seulement (identifiant
+ * Discord ou tag certifié).
+ */
+export const TEAM_NOTICE_DM_SCOPE = "demandes d'adhésion, invitations, reprises d'équipe proposées et propriété d'équipe reçue en message privé";
+
 /** Information sur les données en message privé : obligation légale d'information (registre T10). */
 export const DATA_NOTICE_DM_SCOPE = "information sur tes données en message privé";
 
@@ -259,7 +267,10 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Authentification Discord, codes du bot en message privé (connexion, rattachement, certification), notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: CONTRAT,
-    extraBases: [{ base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE }],
+    extraBases: [
+      { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
+      { base: INTERET_LEGITIME, scope: TEAM_NOTICE_DM_SCOPE },
+    ],
     duree: DUREE_DU_COMPTE,
   },
   {
@@ -292,6 +303,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     base: CONTRAT,
     extraBases: [
       { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
+      { base: INTERET_LEGITIME, scope: TEAM_NOTICE_DM_SCOPE },
       { base: INTERET_LEGITIME, scope: MODERATION_DM_SCOPE },
       { base: OBLIGATION_LEGALE, scope: DATA_NOTICE_DM_SCOPE },
     ],

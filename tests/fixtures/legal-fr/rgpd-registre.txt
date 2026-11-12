@@ -107,7 +107,7 @@ Organiser des tournois amateurs et en conserver les résultats
 Sous-finalités
 Constituer des équipes (membres, rôles, invitations)
 Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)
-Prévenir un joueur en message privé Discord, sans nommer qui invite, propose ou transfère (le nom de l'équipe seul), de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les 24 h, 10 joueurs par équipe ou par auteur et 3 équipes par joueur dans ce délai), de la reprise d'une équipe fantôme que le staff lui propose (une fois par équipe et par joueur, 10 joueurs par auteur et 3 reprises par joueur dans ce délai), et de la propriété de son équipe qui lui est transférée (une fois par équipe et par joueur dans ce délai, compté en mémoire : un redémarrage du site, ou plus de mille transferts dans ce délai, peut en laisser partir un de plus) ; la notification push des mêmes avis (T12) suit les mêmes plafonds
+Prévenir un joueur en message privé Discord, sans nommer qui invite, propose ou transfère (le nom de l'équipe seul), de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les 24 h, 10 joueurs par équipe ou par auteur et 3 équipes par joueur dans ce délai, une équipe dont il a été membre n'entrant pas dans ce dernier plafond), de la reprise d'une équipe fantôme que le staff lui propose (une fois par équipe et par joueur, 10 joueurs par auteur et 3 reprises par joueur dans ce délai), et de la propriété de son équipe qui lui est transférée (une fois par équipe et par joueur dans ce délai) ; le « une fois par équipe et par joueur » est compté en mémoire sur les avis réellement partis (un redémarrage du site, ou plus de mille avis dans ce délai, peut en laisser partir un de plus) ; au-delà de 60 messages privés d'équipe par heure pour tout le site, l'avis ne part qu'en notification push ; la notification push des mêmes avis (T12) suit les mêmes plafonds
 Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores
 Publier résultats, classements, statistiques et palmarès
 Laisser suivre sans compte la fiche d'un tournoi publié (/suivre/tournois/…) : plateau, scores, classements, noms et logos des équipes et pseudos des engagés (et, en tournoi individuel, leur avatar s'il n'est pas masqué et leur numéro de compte interne, pour la marque du podium), pénalités d'une BlueGenji Survie sans motif ni arbitre, sans les codes de replay ; page exclue des moteurs de recherche
@@ -120,7 +120,7 @@ Staff d'arbitrage
 Visiteurs sans compte de la fiche publique d'un tournoi
 Données
 Appartenance à une équipe et rôles d'équipe
-Invitations d'équipe (équipe, joueur invité, compte qui invite, date), dont celles des dernières 24 h sont relues pour les plafonds des avis
+Invitations d'équipe (équipe, joueur invité, compte qui invite, date), dont celles des dernières 24 h sont relues pour les plafonds des avis, avec l'historique d'appartenance du joueur à l'équipe qui l'invite
 Identifiant Discord ou tag Discord certifié du joueur prévenu (T01), seule adresse du message privé d'un avis d'équipe
 Adresse IP d'un visiteur sans compte, en mémoire seulement, pour plafonner ses lectures de la fiche publique
 Inscriptions, scores, forfaits, pénalités (avec motif et arbitre auteur), classements

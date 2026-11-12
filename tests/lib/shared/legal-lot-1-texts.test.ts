@@ -25,8 +25,8 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
     expect(entry()?.publishedAt).toBe("2026-11-13");
     expect(entry()?.audience).toBeUndefined();
     // L'entrée des conditions v11 puis le rectificatif de la reprise d'équipe
-    // (#595), datés du même jour, la suivent.
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(ID);
+    // (#595) et l'entrée des avis d'équipe (TEAMS-LOT), datés du même jour, la suivent.
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {
