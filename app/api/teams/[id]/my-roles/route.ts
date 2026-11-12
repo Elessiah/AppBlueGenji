@@ -1,3 +1,4 @@
+import { TEAM_OWN_ROLES_WRITE_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TEAM_OWN_ROLES_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
@@ -16,6 +17,9 @@ import { readJsonBody } from "@/lib/server/request-body";
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+  // Avant toute lecture : un client en boucle ne doit pas occuper le pool.
+  const throttled = enforceRateLimit(TEAM_OWN_ROLES_WRITE_RULE, user.id);
+  if (throttled) return throttled;
 
   const { id } = await context.params;
   const teamId = parseTeamId(id);

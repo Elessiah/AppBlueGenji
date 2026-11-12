@@ -9,6 +9,10 @@ jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/ghost-teams-service");
 jest.mock("@/lib/server/solo-entries-service");
+jest.mock("@/lib/server/api-guard", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard");
+  return { ...actual, enforceRateLimit: jest.fn(actual.enforceRateLimit) };
+});
 
 import { POST as membersPost, DELETE as membersDelete, PATCH as membersPatch } from "@/app/api/teams/[id]/members/route";
 import { GET as invitationsGet, POST as invitationsPost } from "@/app/api/teams/[id]/invitations/route";
@@ -17,11 +21,14 @@ import { PATCH as teamPatch } from "@/app/api/teams/[id]/route";
 import { POST as teamCreate } from "@/app/api/teams/route";
 import { POST as transferPost } from "@/app/api/teams/[id]/transfer-ownership/route";
 import { PUT as myRolesPut } from "@/app/api/teams/[id]/my-roles/route";
+import { POST as leavePost } from "@/app/api/teams/[id]/leave/route";
+import { NextResponse } from "next/server";
+import { TEAM_OWN_ROLES_WRITE_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getTeamDetail } from "@/lib/server/teams/detail";
 import { createTeam, updateTeamMeta } from "@/lib/server/teams/identity";
 import { cancelInvitation, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams/invitations";
-import { removeTeamMember, transferTeamOwnership, updateOwnGameRoles, updateTeamMemberRoles } from "@/lib/server/teams/roster";
+import { leaveTeam, removeTeamMember, transferTeamOwnership, updateOwnGameRoles, updateTeamMemberRoles } from "@/lib/server/teams/roster";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_VERSION } from "@/lib/shared/terms-of-use";
@@ -320,6 +327,19 @@ describe("PUT /api/teams/[id]/my-roles", () => {
     expect(updateOwnGameRoles).not.toHaveBeenCalled();
   });
 
+  it("PUT_rateLimited_returns429TooManyRequestsWithoutWriting", async () => {
+    jest.mocked(enforceRateLimit).mockReturnValueOnce(
+      NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 }),
+    );
+
+    const res = await myRolesPut(req("PUT", { roles: ["DPS"] }), params("7"));
+
+    expect(res.status).toBe(429);
+    expect(await errorOf(res)).toBe("TOO_MANY_REQUESTS");
+    expect(enforceRateLimit).toHaveBeenCalledWith(TEAM_OWN_ROLES_WRITE_RULE, 2);
+    expect(updateOwnGameRoles).not.toHaveBeenCalled();
+  });
+
   it("PUT_invalidTeamId_returns400", async () => {
     const res = await myRolesPut(req("PUT", { roles: ["DPS"] }), params("abc"));
 
@@ -367,5 +387,16 @@ describe("PUT /api/teams/[id]/my-roles", () => {
 
     expect(res.status).toBe(status);
     expect(await errorOf(res)).toBe(code);
+  });
+});
+
+describe("POST /api/teams/[id]/leave", () => {
+  it("POST_notAMember_returns403", async () => {
+    jest.mocked(leaveTeam).mockRejectedValue(new Error("NOT_A_MEMBER"));
+
+    const res = await leavePost(req("POST"), params("7"));
+
+    expect(res.status).toBe(403);
+    expect(await errorOf(res)).toBe("NOT_A_MEMBER");
   });
 });

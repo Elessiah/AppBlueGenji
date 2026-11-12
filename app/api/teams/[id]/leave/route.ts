@@ -17,7 +17,9 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     return ok({ left: true });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "NOT_A_MEMBER") return fail(message, 404);
+    // 403, comme « Mes rôles » et tout geste sur une équipe dont on ne fait pas
+    // partie (`TEAM_OWN_ROLES_ERROR_STATUS`) : un même refus, un même statut.
+    if (message === "NOT_A_MEMBER") return fail(message, 403);
     if (message === "OWNER_MUST_TRANSFER") return fail(message, 400);
     return fail(message || "TEAM_LEAVE_FAILED", 400);
   }

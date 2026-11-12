@@ -114,14 +114,14 @@ describe("transferTeamOwnership", () => {
     expect(connection.release).toHaveBeenCalled();
   });
 
-  it("laisse l'ancien propriétaire dans l'équipe avec un rôle par défaut", async () => {
-    // Un membre sans aucun rôle n'existe pas côté modèle : OWNER seul retombe
-    // sur DPS, comme à l'arrivée d'un membre (`acceptIntoTeam`).
+  it("transferTeamOwnership_ownerWithoutOtherRole_leavesFormerOwnerWithNoRole", async () => {
+    // Un membre peut n'avoir aucun rôle (D71) : OWNER seul ne retombe plus sur
+    // un DPS que personne n'a choisi.
     const { updates } = await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"], [TARGET_ID]: ["HEAL"] } });
 
     await transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID);
 
-    expect(updates()[0][1]).toEqual([JSON.stringify(["DPS"]), TEAM_ID, REQUESTER_ID]);
+    expect(updates()[0][1]).toEqual([JSON.stringify([]), TEAM_ID, REQUESTER_ID]);
   });
 
   it("ne duplique pas OWNER si la cible le porte déjà", async () => {

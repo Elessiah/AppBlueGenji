@@ -23,6 +23,12 @@ siens : rien n'était enregistré. Les deux gestes sont désormais séparés.
   (antérieure), ou dont la liste non vide ne porte aucun code connu (rôle retiré
   depuis), arrive toujours en `DPS` (`invitationRoles` → `null`) ; seule une
   liste vide stockée (`[]`) fait arriver sans rôle.
+- Rôles de direction (`MANAGER`, `CAPITAINE`) d'une invitation : relus à
+  l'arrivée (`grantableArrivalRoles`, `lib/server/teams/invitations.ts`), sous
+  le verrou partagé de l'équipe — si l'auteur ne gère plus l'équipe
+  (rétrogradé, exclu, compte supprimé), le joueur entre avec les seuls rôles de
+  jeu. Un transfert de propriété laisse l'ancien propriétaire sans rôle s'il
+  n'en avait pas d'autre (plus de `DPS` imposé).
 - Décisions de la modale (fermer, vider le champ) : `invitationOutcome`
   (`app/(secured)/equipes/[id]/_lib/member-roles.ts`).
 
@@ -36,11 +42,14 @@ siens : rien n'était enregistré. Les deux gestes sont désormais séparés.
   « Enregistrer mes rôles » (`aria-disabled` tant que rien ne change), et
   « Ce que fait chaque rôle » (`RoleGuideDialog`, tableau en lecture).
 - `PUT /api/teams/[id]/my-roles` `{ roles: string[] }` → `updateOwnGameRoles`
-  (`lib/server/teams/roster.ts`) : soi seul, sous le verrou de **sa ligne de membre**
-  (`withMemberRowLock`, pas celui de l'équipe : un choix cosmétique ne fait pas
-  attendre l'inscription), liste dédoublonnée avant le verrou, aucune écriture si
+  (`lib/server/teams/roster.ts`) : plafond par compte (`TEAM_OWN_ROLES_WRITE_RULE`,
+  429 `TOO_MANY_REQUESTS`) ; appartenance jugée d'abord, sans verrou ni
+  transaction (`findActiveMemberRowId` : un non-membre reçoit `NOT_A_MEMBER`
+  quel que soit le corps) ; soi seul, sous le verrou de **sa ligne de membre**
+  prise par sa clé primaire (`withMemberRowLock`, `lockMemberRowById` — ni
+  verrou de l'équipe, ni verrou d'intervalle qui ferait attendre une arrivée), liste dédoublonnée avant le verrou, aucune écriture si
   rien ne change, conditions acceptées ; un rôle hors jeu → `ROLE_NOT_SELF_ASSIGNABLE` (400),
-  hors roster → `NOT_A_MEMBER` (403), conditions → 409. Les rôles de direction
+  hors roster → `NOT_A_MEMBER` (403, comme `POST …/leave`), conditions → 409. Les rôles de direction
   restent tels quels (`withOwnGameRoles`). Liste absente ou portant un code
   inconnu → `INVALID_ROLES` (`rolesListFromBody`), jamais lue comme « aucun
   rôle ». Réponse : `{ roles }` (rôles enregistrés), pas la fiche ; le client

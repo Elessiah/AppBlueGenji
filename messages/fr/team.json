@@ -216,7 +216,7 @@
     "confirm": "Confirmer définitivement",
     "pending": "Transfert…",
     "bodyKeepsManagement": "Le nouveau propriétaire pourra renommer, transférer et dissoudre l'équipe. Tu perds le rôle de propriétaire et gardes tes autres rôles — dont celui de manager : tu continues de gérer le roster.",
-    "bodyLosesManagement": "Le nouveau propriétaire pourra renommer, transférer et dissoudre l'équipe. Tu perds le rôle de propriétaire et gardes tes autres rôles (DPS si tu n'en as pas d'autre) : sans le rôle de manager, tu ne gères plus l'équipe.",
+    "bodyLosesManagement": "Le nouveau propriétaire pourra renommer, transférer et dissoudre l'équipe. Tu perds le rôle de propriétaire et gardes tes autres rôles (aucun si tu n'en as pas d'autre) : sans le rôle de manager, tu ne gères plus l'équipe.",
     "noCandidate": "Aucun autre membre dans l'équipe : invite d'abord le joueur à qui la confier.",
     "newOwner": "Nouveau propriétaire",
     "rolesOf": "Rôles de {pseudo}",
