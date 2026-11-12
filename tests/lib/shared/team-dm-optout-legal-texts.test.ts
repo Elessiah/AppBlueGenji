@@ -3,6 +3,7 @@ import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register";
+import { DONNEES_PROFIL } from "@/lib/shared/rgpd-policy";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -47,6 +48,15 @@ describe("politique et registre", () => {
     expect(en).toContain("“Discord direct messages about my matches and teams”");
     expect(en).toContain('<EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>');
     expect(en).not.toContain("Exercising your rights");
+  });
+
+  it("donneesProfilMatchDmRow_frAndEn_teamReachLinkedOrCertified", () => {
+    // Les messages d'équipe partent à un compte Discord lié OU un tag certifié
+    // (`teamInviteNoticeRecipient`) ; ceux de match, au seul tag certifié.
+    const fr = DONNEES_PROFIL.find((d) => d.finalite.includes("pour tes équipes"))?.finalite ?? "";
+    const en = readSource("lib/shared/rgpd-policy-en.ts");
+    expect(fr).toContain("demande d'adhésion à une équipe que tu gères), si ton compte Discord est lié ou ton tag certifié ;");
+    expect(en).toContain("request to join a team you manage), if your Discord account is linked or your tag certified;");
   });
 
   it("registerT03_legalBasis_namesTheProfileBoxFrAndEn", () => {

@@ -366,7 +366,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // (registre T04), exportée et remise au défaut à l'anonymisation. Le garder
     // relève d'une obligation légale (art. 6.1.c : honorer l'opposition, art. 21).
     finalite:
-      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs et pour l'annonce d'un nouveau match, si ton tag Discord est certifié, ainsi que pour tes équipes (invitation, reprise d'équipe proposée, propriété reçue, demande d'adhésion à une équipe que tu gères) ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé au titre d'une obligation légale : c'est ce qui permet de continuer d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs et pour l'annonce d'un nouveau match, si ton tag Discord est certifié, ainsi que pour tes équipes (invitation, reprise d'équipe proposée, propriété reçue, demande d'adhésion à une équipe que tu gères), si ton compte Discord est lié ou ton tag certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé au titre d'une obligation légale : c'est ce qui permet de continuer d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
     base: OBLIGATION_LEGALE,
     duree: DUREE_DU_COMPTE,
   },

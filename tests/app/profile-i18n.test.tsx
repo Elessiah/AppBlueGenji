@@ -586,7 +586,7 @@ describe("langue du compte (lot 9-3)", () => {
 
   it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
-    expect(en).toContain("Without a verified Discord tag, the messages about your matches can&#x27;t reach you (anti-spam).");
+    expect(en).toContain("Without a verified Discord tag, match messages can&#x27;t reach you, nor team messages without a linked Discord account (anti-spam).");
     expect(en).toMatch(/<a href="#comptes" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
@@ -597,7 +597,10 @@ describe("langue du compte (lot 9-3)", () => {
     }
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
     expect(fr.notCertified).toBe(
-      "Sans tag Discord certifié, les messages de tes matchs ne peuvent pas te parvenir (contre le spam).",
+      "Sans tag Discord certifié, les messages de tes matchs ne te parviennent pas, ni ceux de tes équipes sans Discord lié (contre le spam).",
+    );
+    expect((await import("@/messages/en/profile.json")).default.matchDms.notCertified).toBe(
+      "Without a verified Discord tag, match messages can't reach you, nor team messages without a linked Discord account (anti-spam).",
     );
     expect(fr.certifyLink).toBe("Certifier mon tag Discord");
     // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
@@ -693,8 +696,8 @@ describe("langue du compte (lot 9-3)", () => {
     // Activés sans tag certifié : le toast ne promet pas un envoi (FR et EN).
     expect(source).toMatch(/return discordReachable === false \? "matchDms\.enabledNotCertified" : "matchDms\.enabled";/);
     const [fr, en] = [(await import("@/messages/fr/profile.json")).default.matchDms, (await import("@/messages/en/profile.json")).default.matchDms];
-    expect(fr.enabledNotCertified).toBe("Messages privés de match et d'équipe activés : ceux de tes matchs partiront une fois ton tag Discord certifié.");
-    expect(en.enabledNotCertified).toBe("Match and team direct messages turned on: the ones about your matches will be sent once your Discord tag is verified.");
+    expect(fr.enabledNotCertified).toBe("Messages privés de match et d'équipe activés : ceux de tes matchs partiront une fois ton tag Discord certifié, ceux de tes équipes dès que ton compte Discord est lié.");
+    expect(en.enabledNotCertified).toBe("Match and team direct messages turned on: the ones about your matches will be sent once your Discord tag is verified, the ones about your teams as soon as your Discord account is linked.");
     expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
   });
 
