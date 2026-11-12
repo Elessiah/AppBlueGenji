@@ -500,7 +500,7 @@ describe("revue juridique #571, cycle 2", () => {
 
 describe("anglais — un seul terme pour le pseudo d'emprunt", () => {
   it("deletionTexts_en_sayBorrowedUsernameLikeRgpdAndRegister", () => {
-    const texts = JSON.stringify([enProfile, enPlayers.deletedNotice]);
+    const texts = JSON.stringify([enProfile, enPlayers.page.deletedNotice]);
     expect(texts).not.toMatch(/placeholder (one|username)|that placeholder/);
     expect(enProfile.deletion.outcome.SOLO_REGISTRATIONS).toContain("borrowed username");
   });
@@ -510,7 +510,7 @@ describe("délai de réactivation — tiré de la constante", () => {
   it("deletionOutcomes_frAndEn_interpolateDaysInsteadOfHardcoding", () => {
     for (const outcome of [frProfile.deletion.outcome, enProfile.deletion.outcome]) {
       for (const text of Object.values(outcome)) {
-        expect(text).not.toMatch(/30 (jours|days)/);
+        expect(text).not.toMatch(/ 30 (jours|days)/);
         expect(text).toContain("{days}");
       }
     }

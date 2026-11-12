@@ -7,6 +7,11 @@ import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
 
+/** Refus non nommé : 500 pour le code de repli (panne), 400 pour un code du service. */
+function fallbackStatus(message: string, fallback: string): number {
+  return message === fallback ? 500 : 400;
+}
+
 /** Accepte ou refuse une invitation/demande en attente. Body: { accept: boolean }. */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -28,7 +33,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (message === "INVITATION_NOT_PENDING") return fail(message, 409);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
-    return fail(message, message === "INVITATION_RESPOND_FAILED" ? 500 : 400);
+    return fail(message, fallbackStatus(message, "INVITATION_RESPOND_FAILED"));
   }
 }
 
@@ -53,6 +58,6 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "INVITATION_NOT_FOUND") return fail(message, 404);
     if (message === "INVITATION_NOT_PENDING") return fail(message, 409);
-    return fail(message, message === "INVITATION_CANCEL_FAILED" ? 500 : 400);
+    return fail(message, fallbackStatus(message, "INVITATION_CANCEL_FAILED"));
   }
 }

@@ -118,6 +118,11 @@ async function assertBattletagWritable(
   }
 }
 
+/** Tag Discord ou BattleTag touché **et** ligne modifiée : invitations à certifier oubliées. */
+function forgetPromptsOnIdentityChange(userId: number, touchesIdentity: boolean, result: ResultSetHeader): void {
+  if (touchesIdentity && Number(result.changedRows ?? 0) > 0) void forgetCertificationPromptsAround(userId);
+}
+
 export async function updateOwnProfile(
   userId: number,
   patch: {
@@ -367,9 +372,7 @@ export async function updateOwnProfile(
   // celles de ses coéquipiers, s'oublient tout de suite plutôt qu'à
   // l'expiration de l'entrée. `changedRows` : seulement si la ligne a bougé.
   // Sans attendre — l'oubli ne rejette jamais.
-  if ((touchesDiscordTag || touchesBattletag) && Number(result.changedRows ?? 0) > 0) {
-    void forgetCertificationPromptsAround(userId);
-  }
+  forgetPromptsOnIdentityChange(userId, touchesDiscordTag || touchesBattletag, result);
 
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
