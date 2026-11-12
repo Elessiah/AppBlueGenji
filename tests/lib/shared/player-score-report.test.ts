@@ -292,6 +292,14 @@ describe("entryComparison (saisie face à la déclaration adverse)", () => {
     nothingEntered: false,
   };
 
+  it("entryComparison_noOpponentDetail_returnsStableEmptyList", () => {
+    const first = entryComparison(null, mapsFor(2, 1), form);
+    const second = entryComparison(null, mapsFor(2, 1), form);
+
+    expect(first.theirMaps).toEqual([]);
+    expect(second.theirMaps).toBe(first.theirMaps);
+  });
+
   it("entryComparison_arrivedAndIdentical_showsSameScoreBanner", () => {
     const result = entryComparison(theirsPending, mapsFor(2, 1), { ...form, arrivedDuringEntry: true, confirmsAsIs: true });
 

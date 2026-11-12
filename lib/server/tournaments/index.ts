@@ -1515,6 +1515,9 @@ export async function reportMatchScorePublic(
   let completed = false;
   await retryOnDeadlock(() =>
     runPlayerMatchWrite(tournamentId, matchId, async (connection) => {
+      // Un essai annulé après la fin de `reportMatchScore` (échec au commit) ne
+      // laisse pas son `true` à l'essai suivant.
+      completed = false;
       completed = await reportMatchScore(connection, tournamentId, matchId, userId, maps, confirm, seenOpponentReport);
     }),
   );

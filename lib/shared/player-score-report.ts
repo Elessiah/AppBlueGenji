@@ -166,6 +166,9 @@ export function mapListDifferences(
   return differences;
 }
 
+/** Liste vide partagée : identité stable rendue par `entryComparison` sans détail adverse. */
+const NO_MAPS: ReadonlyArray<MatchMapInput> = Object.freeze([]);
+
 /**
  * La saisie face à la déclaration adverse en attente :
  * - `sameScoreArrived` — arrivée pendant la saisie, identique : bandeau, et le
@@ -193,7 +196,7 @@ export function entryComparison(
   offerConfirmTheirs: boolean;
 } {
   const theirs = view?.phase === "THEIRS_PENDING" ? view.theirs : null;
-  const theirMaps = theirs?.maps ?? [];
+  const theirMaps = theirs?.maps ?? NO_MAPS;
   const known = form.canEnterScore && opponentDetailKnown(theirs);
   return {
     theirs,

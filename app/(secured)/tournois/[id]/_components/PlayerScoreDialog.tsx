@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { SCORE_LOCKED_DISPUTE, autoValidateTimeText } from "@/lib/shared/score-dispute";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -389,7 +389,7 @@ export function PlayerScoreDialog({
   const backdrop = useBackdropDismiss(onClose, submitting);
   const [forfeitOpen, setForfeitOpen] = useState(false);
 
-  const view = playerReportView(match, myTeamId);
+  const view = useMemo(() => playerReportView(match, myTeamId), [match, myTeamId]);
   const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
   const shown1 = useShownEntrantName(match.team1Id, match.team1Name);
   const shown2 = useShownEntrantName(match.team2Id, match.team2Name);
@@ -405,7 +405,7 @@ export function PlayerScoreDialog({
   const [rows, setRows] = useState<MatchMapInput[]>(() =>
     progressiveMapRows(matchFormat, game, playerReportInitialMaps(view)),
   );
-  const maps = trimTrailingBlankMaps(rows);
+  const maps = useMemo(() => trimTrailingBlankMaps(rows), [rows]);
   const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", rows.length));
   // Réalignement sur le flux : tant que le lecteur n'a rien touché, une
   // proposition qui arrive (l'adversaire vient d'envoyer la sienne) remplit les
@@ -487,13 +487,20 @@ export function PlayerScoreDialog({
   // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
   // joueurs — le dire avant l'envoi, pas après.
   const opensDispute = sendingOpensDispute(canEnterScore, view, { entered, confirmsAsIs, error: check.error });
-  const { theirs, sameScoreArrived, differences, offerConfirmTheirs } = entryComparison(view, maps, {
-    canEnterScore,
-    arrivedDuringEntry,
-    confirmsAsIs,
-    opensDispute,
-    nothingEntered,
-  });
+  // Mémorisée : une frappe ne change que `rows`, et la liste des différences
+  // (rendue deux fois, en ligne et dans la confirmation) garde son identité
+  // tant que ni les maps ni l'état adverse ne bougent.
+  const { theirs, sameScoreArrived, differences, offerConfirmTheirs } = useMemo(
+    () =>
+      entryComparison(view, maps, {
+        canEnterScore,
+        arrivedDuringEntry,
+        confirmsAsIs,
+        opensDispute,
+        nothingEntered,
+      }),
+    [view, maps, canEnterScore, arrivedDuringEntry, confirmsAsIs, opensDispute, nothingEntered],
+  );
   // « Envoyer ma version » face à la déclaration adverse : confirmé à part
   // (`ConfirmActionDialog`), avec l'instant de dépôt de la version **vue** à
   // l'ouverture — le serveur refuse (`PROPOSAL_ARRIVED`) si elle a changé.

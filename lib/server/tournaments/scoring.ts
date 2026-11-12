@@ -340,6 +340,11 @@ export type ProposalConfirmation = { reportedAt: string };
  * match), et se recale sur `NOW()` dès que l'horloge l'a rattrapé. Aucun délai
  * n'en dépend — l'échéance de validation d'office part de `NOW()`
  * (`scoreDeadlineAssignment`), la date de jeu du plus **ancien** report.
+ *
+ * La colonne ne se lit que dans sa propre affectation : MySQL et MariaDB
+ * évaluent les affectations d'un `UPDATE` de gauche à droite, sur la valeur déjà
+ * posée — une clause ultérieure qui la lirait verrait l'instant avancé (épinglé
+ * par un test).
  */
 function reportedAtAssignment(side: "team1" | "team2"): string {
   return `GREATEST(NOW(), COALESCE(DATE_ADD(${side}_reported_at, INTERVAL 1 SECOND), NOW()))`;

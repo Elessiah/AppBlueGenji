@@ -661,6 +661,21 @@ describe("tournaments-service: match state machine", () => {
         );
       });
 
+      it("reportMatchScore_reportWrite_onlyItsOwnAssignmentReadsReportedAt", async () => {
+        const { connection, calls } = reportConnection();
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null);
+
+        // MySQL et MariaDB évaluent les affectations de gauche à droite sur la valeur
+        // déjà posée : la colonne ne se lit que dans sa propre affectation, jamais
+        // dans l'échéance ou le statut qui la suivent.
+        const update = writes(calls)[0].sql;
+        const reads = update.match(/team1_reported_at/g) ?? [];
+        expect(reads).toHaveLength(2);
+        const afterOwnAssignment = update.slice(update.indexOf("INTERVAL 1 SECOND), NOW()))") + 1);
+        expect(afterOwnAssignment).not.toContain("_reported_at");
+      });
+
       it("reportMatchScore_confirmWithSeenNull_confirmPathWins", async () => {
         const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
 

@@ -454,7 +454,7 @@ describe("détail map par map — lignes progressives dans les modales", () => {
   it("engagé comme arbitrage partent d'une ligne vierge ; ce qui part la retire", () => {
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).toContain("progressiveMapRows(matchFormat, game, playerReportInitialMaps(view))");
-    expect(player).toContain("const maps = trimTrailingBlankMaps(rows);");
+    expect(player).toContain("const maps = useMemo(() => trimTrailingBlankMaps(rows), [rows]);");
     expect(player).toMatch(/maps=\{rows\}\s*onChange=\{setRows\}\s*format=\{matchFormat\}/);
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
     expect(hook).toContain("const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), ADMIN_MAP_RULES);");
