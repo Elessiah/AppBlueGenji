@@ -16,7 +16,7 @@ import {
   loadRegisteredTeamIds,
 } from "@/lib/server/tournaments/repository";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
-import type { SqlMock } from "../helpers/sql-double";
+import type { SqlMock, SqlQuery } from "../helpers/sql-double";
 
 type Row = Record<string, unknown>;
 
@@ -71,7 +71,7 @@ function makeConn(results: unknown[], overrides: [string, unknown][] = []) {
     return queue.length > 0 ? queue.shift() : [[]];
   });
 
-  return { execute } as never as Parameters<typeof generateEnduranceRound>[1] & {
+  return { execute, query: jest.fn<SqlQuery>(async () => [[], []]) } as never as Parameters<typeof generateEnduranceRound>[1] & {
     execute: SqlMock;
   };
 }

@@ -119,7 +119,7 @@ const execute = jest.fn<SqlQuery>(async (sql, params) => {
   }
   return [{ affectedRows: 1 }, []];
 });
-const connection = fakeConnection({ execute });
+const connection = fakeConnection({ execute, query: jest.fn<SqlQuery>(async () => [[], []]) });
 
 beforeEach(() => {
   jest.clearAllMocks();

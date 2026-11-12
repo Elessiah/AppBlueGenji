@@ -56,13 +56,19 @@ export async function roundHasScoreInput(
   round: number,
   options: { phaseId?: number; lock?: boolean } = {},
 ): Promise<boolean> {
-  const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND round_number = ?
-       AND ${HAS_SCORE_INPUT_SQL}${options.lock ? " FOR UPDATE" : ""}`,
-    [tournamentId, options.phaseId ?? 0, round],
-  );
-  return Number(rows[0]?.c ?? 0) > 0;
+  const read = async () => {
+    const [rows] = await conn.execute<(RowDataPacket & { c: number })[]>(
+      `SELECT COUNT(*) AS c FROM bg_matches
+       WHERE tournament_id = ? AND phase_id = ? AND round_number = ?
+         AND ${HAS_SCORE_INPUT_SQL}${options.lock ? " FOR UPDATE" : ""}`,
+      [tournamentId, options.phaseId ?? 0, round],
+    );
+    return Number(rows[0]?.c ?? 0) > 0;
+  };
+  // Verrouillante : attente bornée, comme `laterRoundsHaveScoreInput` — la
+  // réconciliation tient le verrou du tournoi, et un report qui tient une ligne
+  // de la manche la ferait attendre 50 s, tout le tournoi derrière elle.
+  return options.lock ? withShortLockWait(conn, read) : read();
 }
 
 /**

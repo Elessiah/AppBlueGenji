@@ -507,6 +507,9 @@ export function BracketTree({
                   </>
                 );
                 const sourceMatch = slot.match;
+                // Infobulle et nom accessible disent la même chose : une case
+                // d'arrivée encore vide n'est pas annoncée comme un match.
+                const badgeName = dest == null ? "" : t(qualifyBadgeLabelKey(dest), { label: qualifyLabel ?? "" });
                 return (
                   <Fragment key={slot.id}>
                     <div
@@ -524,8 +527,8 @@ export function BracketTree({
                       <button
                         type="button"
                         onClick={() => onQualifyClick!(sourceMatch)}
-                        title={t("bracket.goToMatchTitle", { label: qualifyLabel ?? "" })}
-                        aria-label={t(qualifyBadgeLabelKey(dest), { label: qualifyLabel ?? "" })}
+                        title={badgeName}
+                        aria-label={badgeName}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-1)")}
                         style={badgeStyle}

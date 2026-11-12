@@ -321,6 +321,22 @@ describe("useProposalMaps — detailPending", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  // Revue standard #592 : le droit de lecture rendu après des tentatives
+  // closes relance les lectures, même `reportsKey` — l'attente doit rouvrir,
+  // sans quoi l'arbitrage tranchait « sans détail » pendant la lecture.
+  it("useProposalMaps_readRightRegainedAfterSettled_detailPendingWhileRefetching", async () => {
+    fetchMock.mockResolvedValueOnce(failure(404));
+    render(match, NO_PROPOSALS);
+    await settle();
+    render(match, NO_PROPOSALS, false);
+    fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+
+    const result = render(match, NO_PROPOSALS, true);
+
+    expect(result.detailPending).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("useProposalMaps_cannotRead_neverPending", () => {
     expect(render(match, NO_PROPOSALS, false).detailPending).toBe(false);
   });

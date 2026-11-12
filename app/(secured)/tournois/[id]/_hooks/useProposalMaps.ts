@@ -120,6 +120,10 @@ export function useProposalMaps(
     return () => {
       controller.abort();
       if (timer !== null) clearTimeout(timer);
+      // Une nouvelle série de lectures (droit de lecture rendu, autre match à
+      // même `reportsKey`) rouvre l'attente : la clé des tentatives closes ne
+      // doit pas lever `detailPending` pendant qu'elle est en vol.
+      setSettledKey(null);
     };
   }, [needsRefresh, reportsKey, tournamentId, matchId]);
   return { match, proposals: readable, detailPending: needsRefresh && settledKey !== reportsKey };

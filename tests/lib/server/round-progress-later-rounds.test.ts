@@ -195,4 +195,28 @@ describe("roundHasScoreInput", () => {
     expect(sql).toMatch(/FOR UPDATE$/);
     expect(sql).not.toContain("JOIN");
   });
+
+  // Revue standard #592 : la relecture verrouillée de la manche, prise sous le
+  // verrou du tournoi à chaque réconciliation qui réapparierait, n'attend pas
+  // 50 s un report qui tient une ligne de la manche.
+  it("roundHasScoreInput_lock_boundsLockWaitAroundRead", async () => {
+    const { conn, execute, query } = connectionReturning([{ c: 1 }]);
+
+    await expect(roundHasScoreInput(conn, 7, 3, { lock: true })).resolves.toBe(true);
+
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      "SET SESSION innodb_lock_wait_timeout = 5",
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+    ]);
+    expect(query.mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[0]);
+    expect(query.mock.invocationCallOrder[1]).toBeGreaterThan(execute.mock.invocationCallOrder[0]);
+  });
+
+  it("roundHasScoreInput_withoutLock_readsWithoutTouchingTimeout", async () => {
+    const { conn, query } = connectionReturning([{ c: 0 }]);
+
+    await roundHasScoreInput(conn, 7, 3);
+
+    expect(query).not.toHaveBeenCalled();
+  });
 });

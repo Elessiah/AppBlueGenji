@@ -328,6 +328,8 @@ function fakeDb(options: {
 
       return readTournament() ?? readMatches() ?? writeMatches() ?? writeStandings() ?? [[], []];
     },
+    // Attente bornée de la relecture verrouillée (`withShortLockWait`).
+    query: async () => [[], []],
   } as unknown as PoolConnection;
 
   return {

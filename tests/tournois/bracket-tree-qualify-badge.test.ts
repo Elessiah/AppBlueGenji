@@ -28,7 +28,17 @@ describe("qualifyBadgeLabelKey", () => {
   });
 
   it("le badge lit son nom accessible par cette règle", () => {
-    expect(TREE).toContain("aria-label={t(qualifyBadgeLabelKey(dest), { label: qualifyLabel ?? \"\" })}");
+    expect(TREE).toContain("const badgeName = dest == null ? \"\" : t(qualifyBadgeLabelKey(dest), { label: qualifyLabel ?? \"\" });");
+    expect(TREE).toContain("aria-label={badgeName}");
+  });
+
+  // Revue standard #592 : l'infobulle disait encore « aller au match » sur une
+  // case à pourvoir, en désaccord avec le nom accessible.
+  it("badge_titleAndAriaLabel_shareSlotAwareName", () => {
+    expect(TREE).toContain("title={badgeName}");
+    expect(TREE).not.toContain("bracket.goToMatchTitle");
+    expect(frTournament.bracket).not.toHaveProperty("goToMatchTitle");
+    expect(enTournament.bracket).not.toHaveProperty("goToMatchTitle");
   });
 
   it("la clé de la case à pourvoir existe en français et en anglais", () => {

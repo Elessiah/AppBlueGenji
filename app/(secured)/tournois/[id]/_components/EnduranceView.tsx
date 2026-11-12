@@ -87,14 +87,6 @@ interface EnduranceViewProps {
 }
 
 /**
- * Intitulé d'un bloc du plateau (« Play-offs », « Manches qualificatives »).
- *
- * Un `<h3>` et non un `<div>` : le plateau se parcourt au lecteur d'écran par
- * ses titres, et deux blocs de volets côte à côte sans titre de niveau ne se
- * distinguent plus l'un de l'autre. La casse est décidée par la feuille de
- * style, pas écrite dans le texte.
- */
-/**
  * Explication de « hors course », lue derrière le « i » de chaque vue du
  * classement — avec le nombre de manches prévues quand il est fixé.
  */
@@ -103,6 +95,14 @@ export function outLegendText(t: TournamentPageText["t"], maxRounds: number | nu
   return `${t("endurance.outLegend")}${rounds}.`;
 }
 
+/**
+ * Intitulé d'un bloc du plateau (« Play-offs », « Manches qualificatives »).
+ *
+ * Un `<h3>` et non un `<div>` : le plateau se parcourt au lecteur d'écran par
+ * ses titres, et deux blocs de volets côte à côte sans titre de niveau ne se
+ * distinguent plus l'un de l'autre. La casse est décidée par la feuille de
+ * style, pas écrite dans le texte.
+ */
 function BoardHeading({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <h3 className={`mono ${styles.boardHeading}`}>{children}</h3>

@@ -220,7 +220,6 @@
     "yourMatch": "Your match",
     "matchCount": "{count, plural, one {# match} other {# matches}}",
     "treeLabel": "Tournament bracket — horizontal scroll",
-    "goToMatchTitle": "{label} — go to the match",
     "goToMatchLabel": "{label} — go to the next match",
     "goToSlotLabel": "{label} — go to the next slot, not filled yet"
   },
