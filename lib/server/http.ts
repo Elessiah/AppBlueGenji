@@ -72,11 +72,47 @@ export function fail<T extends object = Record<string, never>>(
 /**
  * Message brut réduit pour pm2 : le texte d'un pilote cite entre guillemets la
  * valeur en cause (« Duplicate entry 'x@y' for key … ») — une donnée
- * personnelle possible. Chaque passage cité est masqué jusqu'au guillemet qui
- * le ferme (suivi d'une espace, d'une ponctuation ou de la fin : une
- * apostrophe dans la valeur ne la coupe pas) ; le reste
+ * personnelle possible. Un guillemet **ouvre** une citation en début de texte
+ * ou après une espace, `(`, `=` ou `:` (l'apostrophe de « doesn't » n'en ouvre
+ * pas) ; elle se ferme au même guillemet suivi d'une espace, d'une ponctuation
+ * ou de la fin (une apostrophe dans la valeur ne la coupe pas). Chaque
+ * citation est masquée, une citation jamais fermée jusqu'au bout ; le reste
  * (forme de l'erreur, utile au diagnostic) est gardé, borné à 160 caractères.
+ * Parcours linéaire, sans expression régulière à retour arrière.
  */
 export function maskLoggedMessage(message: string): string {
-  return message.replace(/(['"`])[\s\S]*?\1(?=[\s,.;:)\]]|$)/g, "$1…$1").slice(0, 160);
+  const text = message.slice(0, MASK_INPUT_MAX_CHARS);
+  let masked = "";
+  let index = 0;
+  while (index < text.length && masked.length < 160) {
+    const char = text[index];
+    if (QUOTES.has(char) && opensQuote(text, index)) {
+      const close = closingQuote(text, index + 1, char);
+      masked += `${char}…${close === -1 ? "" : char}`;
+      if (close === -1) break;
+      index = close + 1;
+    } else {
+      masked += char;
+      index += 1;
+    }
+  }
+  return masked.slice(0, 160);
+}
+
+/** Borne de lecture du message (la sortie en garde 160 caractères). */
+const MASK_INPUT_MAX_CHARS = 4_000;
+const QUOTES: ReadonlySet<string> = new Set(["'", '"', "`"]);
+const QUOTE_OPENERS: ReadonlySet<string> = new Set([" ", "\t", "\n", "(", "=", ":"]);
+const QUOTE_CLOSERS: ReadonlySet<string> = new Set([" ", "\t", "\n", ",", ".", ";", ":", ")", "]"]);
+
+function opensQuote(text: string, index: number): boolean {
+  return index === 0 || QUOTE_OPENERS.has(text[index - 1]);
+}
+
+/** Position du guillemet qui ferme la citation ouverte avant `from`, ou -1. */
+function closingQuote(text: string, from: number, quote: string): number {
+  for (let index = from; index < text.length; index += 1) {
+    if (text[index] === quote && (index + 1 === text.length || QUOTE_CLOSERS.has(text[index + 1]))) return index;
+  }
+  return -1;
 }
