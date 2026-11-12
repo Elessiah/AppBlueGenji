@@ -202,6 +202,7 @@
       "CANNOT_REMOVE_OWN_ADMIN": "You can't remove your own administrator role.",
       "INVALID_PAYLOAD": "The role selection is invalid.",
       "USER_NOT_FOUND": "Your account can't be found.",
+      "ROLES_CHANGED": "Your roles changed in the meantime: check them before saving.",
       "fallback": "Updating your roles failed."
     },
     "nothingToSave": "No role has changed: tick or untick a role before saving."

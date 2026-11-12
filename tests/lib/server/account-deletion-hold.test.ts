@@ -165,6 +165,18 @@ describe("holdAccountIdentity", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 
+  it("holdAccountIdentity_noRequestDate_datesTheRequestWithTheDatabaseClock", async () => {
+    // D67 : une demande neuve se date par `NOW()`, la même horloge que les
+    // fenêtres de réactivation calculées en SQL.
+    const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
+
+    await holdAccountIdentity(fakeConnection(connection), 7, null);
+
+    const [mark] = updatesOf(connection);
+    expect(mark.sql).toContain("is_deleted = 1, deletion_requested_at = NOW()");
+    expect(mark.params.slice(1)).toEqual([7]);
+  });
+
   it("holdAccountIdentity_noPreviousHold_insertsWithoutDelete", async () => {
     const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
 

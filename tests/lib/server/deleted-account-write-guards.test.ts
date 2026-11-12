@@ -166,7 +166,7 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
       .mockResolvedValueOnce([[{ id: 1, is_admin: 1 }, { id: 7, is_admin: 0 }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-    await expect(setUserRoles(7, ["ARBITRE"], 1)).resolves.toEqual(["ARBITRE"]);
+    await expect(setUserRoles(7, ["ARBITRE"], 1)).resolves.toEqual({ roles: ["ARBITRE"], previous: [] });
 
     const [sql] = connection.execute.mock.calls[1] as [string];
     expect(sql).toMatch(/WHERE id = \? AND is_deleted = 0/);

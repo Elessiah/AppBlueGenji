@@ -56,11 +56,21 @@ s'additionnent.
   d'intervalle en fin d'index (qui retiendrait les inscriptions).
 - **Ses propres rôles** (ADMIN-SELF-ROLES) : `setOwnPlatformRoles(adminId, roles)`
   — voir § « Un administrateur règle ses propres rôles ».
-- **Journal du staff** : tout enregistrement réussi passe par
-  `publishRolesChange` (`publishStaffAction`) — sur Discord une ligne sans
-  personne nommée (`ROLES_CHANGE_DISCORD_LINE`), dans pm2 l'auteur, le compte
-  visé par son identifiant (« son propre compte » quand c'est le sien) et les
-  rôles enregistrés (`rolesChangeAuditLine`). Un refus ne laisse aucune trace.
+- **Rôles attendus** : les deux écrans envoient `expectedRoles`, les rôles
+  affichés à l'ouverture ; s'ils ne sont plus ceux lus sous le verrou de la
+  ligne, rien n'est écrit (`409 ROLES_CHANGED`) — l'écran le dit et relit les
+  rôles enregistrés, au lieu que la dernière écriture efface la précédente.
+  Sans `expectedRoles`, aucun contrôle. « Enregistrer » sans écart ne part pas
+  de la fiche d'un joueur (notification neutre).
+- **Journal du staff** : tout enregistrement qui **accorde ou retire** un rôle
+  passe par `publishRolesChange` (`publishStaffAction`), appelé hors du `try` de
+  l'écriture (une levée après commit ne rend pas 500) — sur Discord une ligne
+  sans personne nommée, propre à l'administration accordée ou retirée
+  (`ADMIN_GRANTED_DISCORD_LINE` / `ADMIN_REMOVED_DISCORD_LINE`, sinon
+  `ROLES_CHANGE_DISCORD_LINE`), dans pm2 l'auteur, le compte visé par son
+  identifiant (« son propre compte » quand c'est le sien), les rôles accordés,
+  retirés et enregistrés (`rolesChangeAuditLine`, écart aux rôles lus sous le
+  verrou). Un refus ou un enregistrement sans écart ne laisse aucune trace.
 
 ## Un administrateur règle ses propres rôles
 

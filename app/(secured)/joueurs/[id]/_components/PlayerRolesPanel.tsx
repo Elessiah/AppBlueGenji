@@ -40,7 +40,7 @@ export function PlayerRolesPanel({
   roles: PlatformRole[] | undefined;
   onSaved: () => Promise<void> | void;
 }>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const staffLang = useStaffLang();
   const toastLang = staffLang ? { lang: staffLang } : undefined;
   const [rolesBusy, setRolesBusy] = useState(false);
@@ -64,15 +64,24 @@ export function PlayerRolesPanel({
       const res = await fetch(`/api/admin/users/${userId}/roles`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ roles: selectedRoles }),
+        // Les rôles affichés : si un autre réglage a abouti depuis, la route
+        // refuse (`ROLES_CHANGED`) au lieu de l'effacer sans le dire.
+        body: JSON.stringify(roles ? { roles: selectedRoles, expectedRoles: roles } : { roles: selectedRoles }),
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
       showSuccess("Rôles mis à jour.", toastLang);
       await onSaved();
       return true;
     } catch (e) {
-      showError(rolesErrorMessage((e as Error).message), toastLang);
+      const code = (e as Error).message;
+      showError(rolesErrorMessage(code), toastLang);
+      if (code === "ROLES_CHANGED") {
+        // La fiche relit les rôles enregistrés (la sélection s'y resynchronise)
+        // et la confirmation, qui annonçait un écart périmé, se ferme.
+        await onSaved();
+        return true;
+      }
       return false;
     } finally {
       setRolesBusy(false);
@@ -82,6 +91,8 @@ export function PlayerRolesPanel({
   const requestSave = () => {
     const change = diffPlatformRoles(roles ?? [], selectedRoles);
     if (roleChangeNeedsConfirmation(change)) setPendingChange(change);
+    // Aucune case changée : rien à enregistrer (ni requête, ni ligne au journal du staff).
+    else if (roles) showInfo("Aucun rôle n'a changé : rien à enregistrer.", toastLang);
     else void saveRoles();
   };
 
