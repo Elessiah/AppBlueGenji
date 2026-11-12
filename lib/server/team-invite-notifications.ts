@@ -227,8 +227,12 @@ async function sendTeamInviteNotice(
  * sollicite déjà.
  */
 const teamNotices = new Map<string, number>();
-/** Au-delà, les avis les plus anciens sont oubliés : la mémoire reste bornée. */
-const TEAM_NOTICE_MEMORY = 1000;
+/**
+ * Au-delà, les avis les plus anciens sont oubliés : la mémoire reste bornée.
+ * Assez large pour qu'une poignée de comptes jetables (10 joueurs par auteur et
+ * par jour) ne chasse pas la réservation d'un joueur encore dans sa fenêtre.
+ */
+const TEAM_NOTICE_MEMORY = 20_000;
 
 /**
  * Réserve l'avis `kind` de `userId` pour `teamId` : `false` si un avis est déjà

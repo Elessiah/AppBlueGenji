@@ -484,6 +484,15 @@ describe("claimTeamNoticeSlot", () => {
 
     expect(claimTeamNoticeSlot("GHOST_CLAIM", TEAM_ID, PLAYER_ID, 1)).toBe(false);
   });
+
+  it("claimTeamNoticeSlot_thousandsOfOtherClaims_keepsPlayerReservation", () => {
+    // Une poignée de comptes jetables ne chasse pas la réservation d'un joueur
+    // encore dans sa fenêtre (revue sécurité #596).
+    claimTeamNoticeSlot("INVITE", TEAM_ID, PLAYER_ID, 0);
+    for (let other = 1; other <= 5_000; other += 1) claimTeamNoticeSlot("INVITE", TEAM_ID + other, PLAYER_ID, other);
+
+    expect(claimTeamNoticeSlot("INVITE", TEAM_ID, PLAYER_ID, 5_001)).toBe(false);
+  });
 });
 
 describe("claimTeamNoticeDmSlot", () => {

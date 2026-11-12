@@ -134,7 +134,9 @@ avant l'écriture (`reserveRateLimit`, des requêtes parallèles ne passent pas
 toutes) et rendue si le geste est refusé avant son commit — dans la fenêtre de
 la réservation seulement (une fenêtre rouverte entre-temps n'est pas
 décrémentée) ; ce qui suit le commit d'une dissolution ne lève plus. Seul un
-geste réussi compte ; le staff `tournaments` n'est pas plafonné. Une boucle
+geste réussi compte — sauf un refus de droit (`FORBIDDEN`, `isRightsRefusal`),
+qui garde sa place : un compte sans qualité qui boucle sur les équipes des
+autres reste plafonné ; le staff `tournaments` n'est pas plafonné. Une boucle
 « créer → dissoudre » ne fait plus recalculer le classement et le podium aux
 visiteurs.
 

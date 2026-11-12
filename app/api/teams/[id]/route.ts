@@ -74,6 +74,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
         { name: body.name, description: body.description, tag: body.tag },
         managesGhostTeams,
       );
+      // Un patch vide n'écrit rien (droit jugé quand même) : il rend sa place.
+      if (body.name === undefined && body.description === undefined && body.tag === undefined) {
+        reservation.refund();
+      }
     } catch (error) {
       // `updateTeamMeta` ne lève qu'avant son commit (ce qui suit ne lève pas).
       // Un refus de droit, lui, garde sa place : un compte sans qualité qui
@@ -101,7 +105,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   // Plafond des créations et dissolutions d'un compte ; le staff `tournaments`
   // (équipes fantômes) n'y est pas soumis.
   const capped = !can(user, "tournaments");
-  // Réservée en une instruction, rendue si la dissolution est refusée — et
+  // Réservée en une instruction, rendue si la dissolution est refusée (sauf
+  // refus de droit) — et
   // seulement alors : `softDeleteTeam` ne lève qu'avant son commit (ce qui suit
   // le commit, effacement du logo compris, ne lève jamais).
   const reservation = capped ? reserveRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
@@ -111,7 +116,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     await softDeleteTeam(user.id, teamId, can(user, "tournaments"));
     return ok({ deleted: true });
   } catch (error) {
-    reservation?.refund();
+    // Comme les écritures d'identité : un refus de droit garde sa place — un
+    // compte sans qualité qui boucle sur les équipes des autres reste plafonné.
+    if (!isRightsRefusal(error)) reservation?.refund();
     const message = (error as Error).message;
     return fail(message || "TEAM_DELETE_FAILED", teamErrorStatus(TEAM_DELETE_ERROR_STATUS, message));
   }

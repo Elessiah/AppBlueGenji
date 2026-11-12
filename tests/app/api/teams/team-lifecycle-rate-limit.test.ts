@@ -54,6 +54,16 @@ const rename = () =>
     { params: Promise.resolve({ id: "12" }) },
   );
 
+const emptyPatch = () =>
+  patchTeamRoute(
+    new Request("http://localhost/api/teams/12", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    { params: Promise.resolve({ id: "12" }) },
+  );
+
 async function useUpTheBucket(gesture: () => Promise<Response>): Promise<void> {
   for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await gesture()).status).toBeLessThan(300);
 }
@@ -127,11 +137,20 @@ describe("DELETE /api/teams/[id] — plafond de dissolution", () => {
   });
 
   it("DELETE_refusedDissolution_isNotCharged", async () => {
-    jest.mocked(softDeleteTeam).mockRejectedValue(new Error("FORBIDDEN"));
-    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) await dissolve();
+    jest.mocked(softDeleteTeam).mockRejectedValue(new Error("TEAM_ALREADY_DELETED"));
+    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await dissolve()).status).toBe(409);
     jest.mocked(softDeleteTeam).mockResolvedValue(undefined);
 
     expect((await dissolve()).status).toBe(200);
+  });
+
+  it("DELETE_forbiddenRefusals_keepTheirPlace", async () => {
+    // Un compte sans qualité qui boucle sur les équipes des autres reste plafonné.
+    jest.mocked(softDeleteTeam).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await dissolve()).status).toBe(403);
+    jest.mocked(softDeleteTeam).mockResolvedValue(undefined);
+
+    expect((await dissolve()).status).toBe(429);
   });
 
   it("DELETE_parallelRequestsAtLastSlot_onlyOnePasses", async () => {
@@ -214,6 +233,23 @@ describe("PATCH /api/teams/[id] — plafond des écritures d'identité", () => {
     const res = await rename();
 
     expect(res.status).toBe(200);
+  });
+
+  it("PATCH_emptyBody_doesNotUseUpTheLimit", async () => {
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await emptyPatch()).status).toBe(200);
+
+    const res = await rename();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("PATCH_emptyBodyForbidden_keepsItsPlace", async () => {
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await emptyPatch()).status).toBe(403);
+
+    const res = await emptyPatch();
+
+    expect(res.status).toBe(429);
   });
 
   it("PATCH_staffTournaments_isNotCapped", async () => {

@@ -55,7 +55,7 @@ avertissement. Une invitation qui valide une demande déjà en attente
 - **Une fois par sorte, équipe et joueur** dans la fenêtre (invitation retirée
   puis renvoyée, reprise refaite, propriété que deux membres se renvoient) :
   réservation en mémoire `claimTeamNoticeSlot` (clé `sorte:équipe:joueur`,
-  1 000 entrées au plus). Comptée sur les avis **partis**, pas sur les lignes
+  20 000 entrées au plus). Comptée sur les avis **partis**, pas sur les lignes
   écrites : une invitation restée muette (compte suspendu, plafond atteint) ne
   retient plus l'avis suivant de la même équipe. Elle se prend une fois l'avis
   décidé et se rend si rien n'a été remis (bot tombé sans appareil, ou erreur :
