@@ -48,6 +48,8 @@ import enDialogs from "@/messages/en/tournamentDialogs.json";
 import { savedToastKey } from "@/app/(secured)/tournois/[id]/_hooks/useScoreForm";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import enTournamentErrors from "@/messages/en/tournamentErrors.json";
+import frTournamentErrors from "@/messages/fr/tournamentErrors.json";
 import {
   ERROR_MESSAGES,
   FR_ERRORS_TEXT,
@@ -216,6 +218,28 @@ const BO3: MatchFormat = { type: "BO", value: 3 };
 const FT3: MatchFormat = { type: "FT", value: 3 };
 
 // ─── Table des refus ─────────────────────────────────────────────────────────
+
+/*
+ * « Survie » nu se confondait avec « BlueGenji Survie » : les refus propres au
+ * mode à coupes le nomment comme le sélecteur de format (`labels.json`).
+ */
+describe("refus du mode Survie par coupes", () => {
+  it("survivalRefusals_fr_nameSurvieParCoupes", () => {
+    const errors = frTournamentErrors.codes;
+    expect(errors.NOT_SURVIVAL).toContain("Survie par coupes");
+    expect(errors.INVALID_SURVIVAL_ROUNDS).toContain("Survie par coupes");
+    expect(errors.INVALID_SURVIVAL_FIRST_CUT).toContain("Survie par coupes");
+    expect(errors.INVALID_PHASE_SURVIVAL_ROUNDS).toContain("Survie par coupes");
+  });
+
+  it("survivalRefusals_en_nameSurvivalCuts", () => {
+    const errors = enTournamentErrors.codes;
+    expect(errors.NOT_SURVIVAL).toContain("Survival (cuts)");
+    expect(errors.INVALID_SURVIVAL_ROUNDS).toContain("Survival (cuts)");
+    expect(errors.INVALID_SURVIVAL_FIRST_CUT).toContain("Survival (cuts)");
+    expect(errors.INVALID_PHASE_SURVIVAL_ROUNDS).toContain("Survival (cuts)");
+  });
+});
 
 describe("table des refus (error-map)", () => {
   it("le français est celui d'avant le lot, code par code", () => {
