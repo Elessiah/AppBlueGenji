@@ -104,6 +104,16 @@ describe("politique et registre", () => {
     expect(readSource("messages/en/profile.json")).toContain("and bot direct messages about your matches and teams.");
   });
 
+  it("profileHint_messagesItSaysTheBoxDoesNotCover_neverReadTheOptOut", () => {
+    // L'aide de la case cite ces messages comme indépendants d'elle : aucun ne
+    // passe par l'opposition (`matchDm` ou `withoutOptedOutDiscord`).
+    const optOut = /matchDm|withoutOptedOutDiscord/;
+    expect(readSource("lib/server/privacy-change-notifications.ts")).not.toMatch(optOut);
+    expect(readSource("lib/server/account-suspensions.ts")).not.toMatch(optOut);
+    expect(readSource("lib/server/content-reports.ts")).not.toMatch(optOut);
+    expect(readSource("lib/server/logo-quarantine.ts")).not.toMatch(optOut);
+  });
+
   it("botPrivacyPolicy_teamDms_formingTeamsPurposeAndNoRequestRouteFrAndEn", () => {
     const fr = JSON.stringify(PRIVACY_POLICY.fr);
     const en = JSON.stringify(PRIVACY_POLICY.en);
