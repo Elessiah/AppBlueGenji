@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createLimiter, inBatches, mapInBatches } from "@/lib/shared/in-batches";
+import { createLimiter, inBatches, mapInBatches, withTimeout } from "@/lib/shared/in-batches";
 
 describe("inBatches", () => {
   it("traite chaque élément, jamais plus de `size` à la fois", async () => {
@@ -171,5 +171,92 @@ describe("createLimiter", () => {
 
     expect(await Promise.all([limit(task), limit(task)])).toEqual(["fait", "fait"]);
     expect(peak).toBe(1);
+  });
+
+  it("createLimiter_urgentTaskQueued_startsBeforeEarlierOrdinaryTasks", async () => {
+    const limit = createLimiter(1);
+    const first = held("A");
+    const started: string[] = [];
+
+    const a = limit(async () => {
+      started.push("A");
+      return first.promise;
+    });
+    const b = limit(async () => {
+      started.push("B");
+      return "B";
+    });
+    const c = limit(async () => {
+      started.push("C");
+      return "C";
+    }, true);
+    await tick();
+    first.release();
+
+    expect(await Promise.all([a, b, c])).toEqual(["A", "B", "C"]);
+    expect(started).toEqual(["A", "C", "B"]);
+  });
+
+  it("createLimiter_twoUrgentTasks_startInArrivalOrder", async () => {
+    const limit = createLimiter(1);
+    const first = held("A");
+    const started: string[] = [];
+
+    const a = limit(async () => first.promise);
+    const b = limit(async () => {
+      started.push("B");
+      return "B";
+    }, true);
+    const c = limit(async () => {
+      started.push("C");
+      return "C";
+    }, true);
+    await tick();
+    first.release();
+    await Promise.all([a, b, c]);
+
+    expect(started).toEqual(["B", "C"]);
+  });
+});
+
+describe("withTimeout", () => {
+  it("withTimeout_promiseSettlesBeforeDelay_returnsItsValue", async () => {
+    expect(await withTimeout(Promise.resolve("fait"), 1_000)).toBe("fait");
+  });
+
+  it("withTimeout_promiseRejectsBeforeDelay_rejectsWithItsError", async () => {
+    await expect(withTimeout(Promise.reject(new Error("refus")), 1_000)).rejects.toThrow("refus");
+  });
+
+  it("withTimeout_promiseNeverSettles_rejectsTimeoutError", async () => {
+    jest.useFakeTimers();
+    try {
+      const bounded = withTimeout(new Promise<string>(() => undefined), 30_000);
+      const outcome = expect(bounded).rejects.toMatchObject({ name: "TimeoutError" });
+
+      await jest.advanceTimersByTimeAsync(30_000);
+
+      await outcome;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("withTimeout_oneMsBeforeDelay_stillPending", async () => {
+    jest.useFakeTimers();
+    try {
+      let settled = false;
+      void withTimeout(new Promise<string>(() => undefined), 30_000).catch(() => {
+        settled = true;
+      });
+
+      await jest.advanceTimersByTimeAsync(29_999);
+
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

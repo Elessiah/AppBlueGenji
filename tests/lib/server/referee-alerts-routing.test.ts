@@ -10,6 +10,7 @@ import {
   flushBotLogs,
   ALERT_FLUSH_WAIT_MS,
   BOT_LOG_ORDER_WAIT_MS,
+  BOT_LOG_RESOLVE_TIMEOUT_MS,
   markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
@@ -1107,8 +1108,10 @@ describe("tour du journal et vidage avant alerte", () => {
       flushBotLogs(second);
       await flushed();
       await flushed();
-      // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé.
-      expect(timers).toHaveBeenCalledTimes(1);
+      // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé
+      // (hors bornes de résolution, `BOT_LOG_RESOLVE_TIMEOUT_MS`, une par entrée).
+      const turnTimers = timers.mock.calls.filter(([, delay]) => delay !== BOT_LOG_RESOLVE_TIMEOUT_MS);
+      expect(turnTimers).toHaveLength(1);
     } finally {
       timers.mockRestore();
     }

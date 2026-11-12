@@ -52,13 +52,18 @@ export async function mapInBatches<T, R>(
   return results;
 }
 
-/** Tâche passée par un {@link createLimiter}. */
-export type Limited = <R>(task: () => Promise<R>) => Promise<R>;
+/**
+ * Tâche passée par un {@link createLimiter}. Une tâche `urgent` passe devant toutes
+ * les tâches ordinaires qui attendent (premier arrivé, premier servi entre urgentes) ;
+ * elle n'interrompt jamais une tâche déjà en cours.
+ */
+export type Limited = <R>(task: () => Promise<R>, urgent?: boolean) => Promise<R>;
 
 /**
  * Borne partagée : au plus `size` tâches en cours à la fois pour **tous** les
  * appelants qui passent par la fonction rendue, les autres attendent leur tour
- * (premier arrivé, premier servi). Une tâche qui échoue rend sa place aussi.
+ * (premier arrivé, premier servi, les urgentes d'abord). Une tâche qui échoue rend
+ * sa place aussi.
  *
  * @param size Tâches en même temps, au plus (au moins une).
  * @returns Fonction qui exécute une tâche dès qu'une place se libère.
@@ -66,21 +71,22 @@ export type Limited = <R>(task: () => Promise<R>) => Promise<R>;
 export function createLimiter(size: number): Limited {
   const capacity = Math.max(size, 1);
   let active = 0;
+  const waitingUrgent: (() => void)[] = [];
   const waiting: (() => void)[] = [];
   const release = (): void => {
-    const next = waiting.shift();
+    const next = waitingUrgent.shift() ?? waiting.shift();
     if (next) {
       next();
     } else {
       active -= 1;
     }
   };
-  return async <R>(task: () => Promise<R>): Promise<R> => {
+  return async <R>(task: () => Promise<R>, urgent = false): Promise<R> => {
     if (active < capacity) {
       active += 1;
     } else {
       // La place passe directement de la tâche qui finit à celle-ci : `active` ne bouge pas.
-      await new Promise<void>((resolve) => waiting.push(resolve));
+      await new Promise<void>((resolve) => (urgent ? waitingUrgent : waiting).push(resolve));
     }
     try {
       return await task();
@@ -88,4 +94,29 @@ export function createLimiter(size: number): Limited {
       release();
     }
   };
+}
+
+/**
+ * Rejette si `promise` ne s'est pas réglée en `ms` : qui l'attend (et la place
+ * d'un {@link createLimiter} qu'elle tient) n'attend pas une requête qui ne
+ * reviendra jamais. La promesse elle-même continue ; son résultat tardif est perdu.
+ *
+ * @param promise Promesse à borner.
+ * @param ms Délai (ms).
+ * @returns Le résultat de `promise`, ou un rejet `TimeoutError` passé le délai.
+ */
+export function withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`délai de ${ms} ms dépassé`);
+      error.name = "TimeoutError";
+      reject(error);
+    }, ms);
+    // Côté serveur, la borne seule ne retient pas le processus (arrêt, fin des tests).
+    if (typeof timer === "object" && timer !== null && "unref" in timer) timer.unref();
+  });
+  // Un rejet tardif de la promesse abandonnée ne doit pas remonter en rejet non géré.
+  promise.catch(() => undefined);
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

@@ -81,7 +81,7 @@ import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { createLimiter, mapInBatches } from "@/lib/shared/in-batches";
+import { createLimiter, mapInBatches, withTimeout } from "@/lib/shared/in-batches";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -641,8 +641,8 @@ export function flushBotLogs(connection: PoolConnection): void {
     }
 
     // Les lignes du journal rejoignent leur lot à leur tour (ordre des
-    // commits), en arrière-plan ; les alertes partent sans attendre ce tour ni
-    // la lecture des lignes.
+    // commits), en arrière-plan ; les alertes partent sans attendre ce tour, et
+    // passent devant les lectures de lignes qui attendent une place (`resolveSlot`).
     if (hasLogLines) {
       void resolveBotLogs(restLines, reads)
         .catch((): ResolvedBotLog[] => [])
@@ -1091,8 +1091,20 @@ export const ROUND_ALERT_READ_CONCURRENCY = 3;
  */
 export const BOT_LOG_RESOLVE_SLOTS = 6;
 
-/** Borne partagée de {@link BOT_LOG_RESOLVE_SLOTS}. */
+/**
+ * Borne partagée de {@link BOT_LOG_RESOLVE_SLOTS}. Les alertes et escalades (canal
+ * arbitre) passent devant les lignes de journal qui attendent : le téléphone de
+ * l'arbitre ne sonne pas après tout l'arriéré du journal.
+ */
 const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS);
+
+/**
+ * Durée au-delà de laquelle une résolution rend sa place ({@link withTimeout}) : une
+ * requête qui ne revient jamais (connexion morte) ne bloque pas, à six, tout le
+ * journal et toutes les alertes du site jusqu'à son redémarrage. Une résolution
+ * normale prend quelques millisecondes.
+ */
+export const BOT_LOG_RESOLVE_TIMEOUT_MS = 30_000;
 
 /**
  * Âge au-delà duquel une lecture d'un vidage n'est plus reprise par l'escalade :
@@ -1147,7 +1159,10 @@ export async function resolveBotLogs(
 ): Promise<ResolvedBotLog[]> {
   const slots = await mapInBatches(entries, BOT_LOG_RESOLVE_CONCURRENCY, async (entry): Promise<ResolvedBotLog | null> => {
     try {
-      const resolved = await resolveSlot(() => resolveOne(entry, reads));
+      const resolved = await resolveSlot(
+        () => withTimeout(resolveOne(entry, reads), BOT_LOG_RESOLVE_TIMEOUT_MS),
+        botEventChannel(entry.kind) === "REFEREE",
+      );
       const line = typeof resolved === "string" ? { message: resolved } : resolved;
       return line?.message ? { entry, channel: botEventChannel(entry.kind), ...line } : null;
     } catch {
@@ -1235,11 +1250,12 @@ type MatchLogRow = SubjectRow & {
 
 /**
  * Relit un match, une seule fois par vidage (`reads`) : une lecture en échec n'est
- * pas gardée, la suivante réessaie.
+ * pas gardée, la suivante réessaie. Une lecture reprise qui échoue est refaite une
+ * fois : elle peut venir d'une copie (`recentReads`) que l'effacement ne touche pas.
  */
 function loadMatch(matchId: number, reads: MatchReads): Promise<MatchLogRow | null> {
   const known = reads.get(matchId);
-  if (known) return known.reading;
+  if (known) return known.reading.catch(() => readMatch(matchId));
   const reading = readMatch(matchId);
   const read: MatchRead = { startedAt: Date.now(), reading };
   reads.set(matchId, read);
