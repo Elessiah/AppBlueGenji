@@ -259,7 +259,10 @@ du registre.
 - **Bandeau** : entre deux manches (close, suivante pas tirée) il dit « Manche n
   terminée · prochaine manche pas encore tirée » (« play-offs pas encore lancés » après la dernière
   manche prévue) ; la barre des play-offs porte son propre nom ; l'horloge de
-  60 s ne tourne que si un match non joué de la manche est daté. L'arbre final
+  60 s ne tourne que si un match non joué de la manche est daté **à venir** (un
+  match en retard l'arrête au battement suivant, `useNextMatchClock`) ; le
+  bandeau « entre deux manches » n'a pas d'`aria-label` (son texte visible le
+  nomme déjà). L'arbre final
   ne compte pas les exemptions (ni jouées ni à jouer) et ne projette pas de
   petite finale quand une demie est exemptée (`endurancePlayoffMatchTotal`).
 - **Vues** : le sous-titre de « Manche N — matchs déjà joués » et celui de la

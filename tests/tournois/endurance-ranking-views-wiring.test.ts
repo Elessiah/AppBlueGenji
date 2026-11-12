@@ -254,7 +254,13 @@ describe("EnduranceCard — bandeau des play-offs", () => {
   });
 
   it("ne fait tourner l'horloge que si un match non joué de la manche porte une date", () => {
-    expect(CARD).toContain("hasScheduledPendingMatch(matches, current.round)");
+    expect(CARD).toContain("hasScheduledPendingMatch(matches, round, now)");
+    expect(CARD).toContain("useClock(NEXT_MATCH_CLOCK_MS, clockOn)");
+  });
+
+  it("le bandeau « entre deux manches » ne double pas son texte visible par un aria-label", () => {
+    expect(CARD).toContain("<section className={`${styles.strip} ${styles.stripBetween}`}>");
+    expect(CARD).not.toContain('aria-label={t("endurance.stripDone"');
   });
 
   it("dit où en est le tournoi entre deux manches, avant les play-offs", () => {
