@@ -7,6 +7,8 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { notifyUsers } from "@/lib/server/notify";
+import { withoutOptedOutDiscord } from "@/lib/server/users/match-dm-preference";
+import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import { teamJoinRequestPush } from "@/lib/shared/push-messages";
 import { parseRoles } from "@/lib/server/serialization";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -65,7 +67,8 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
      WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?`,
     [teamId, requesterId],
   );
-  const recipients = teamJoinNoticeRecipients(
+  // Messages privés coupés dans « Mon profil » (D68) : le push seul.
+  const recipients = await withoutOptedOutDiscord(teamJoinNoticeRecipients(
     rows.map((row) => ({
       userId: Number(row.id),
       pseudo: row.pseudo,
@@ -74,13 +77,14 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
       discordPseudo: row.discord_pseudo,
       discordVerified: Boolean(row.discord_verified_at),
     })),
-  );
+  ));
   if (recipients.length === 0) return;
 
   const url = `${siteCanonicalBase()}/equipes/${teamId}`;
+  const settingsUrl = `${siteCanonicalBase()}${MATCH_DM_SETTINGS_PATH}`;
   await notifyUsers(recipients, {
     topic: "TEAM_JOIN_REQUEST",
-    discord: { message: (locale) => formatTeamJoinRequestNotice({ teamName: teams[0].name, url }, locale), context: "team-join-request" },
+    discord: { message: (locale) => formatTeamJoinRequestNotice({ teamName: teams[0].name, url, settingsUrl }, locale), context: "team-join-request" },
     push: (locale) => teamJoinRequestPush({ teamId, teamName: teams[0].name }, locale),
   });
 }

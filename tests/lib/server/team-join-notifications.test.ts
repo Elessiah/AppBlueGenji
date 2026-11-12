@@ -13,16 +13,27 @@ import { TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP } from "@/lib/shared/team-join-requ
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
-type Rows = { requests?: number; allTeams?: number; team?: { name: string } | null; members?: Record<string, unknown>[] };
+type Rows = {
+  requests?: number;
+  allTeams?: number;
+  team?: { name: string } | null;
+  members?: Record<string, unknown>[];
+  /** Comptes qui ont décoché « Messages privés Discord de mes matchs et de mes équipes » (D68). */
+  optedOut?: number[];
+};
 
-function mockDb({ requests = 1, allTeams, team = { name: "Les Glaciers" }, members = [] }: Rows) {
+function mockDb({ requests = 1, allTeams, team = { name: "Les Glaciers" }, members = [], optedOut = [] }: Rows) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("AS any_team")) return [[{ this_team: String(requests), any_team: allTeams ?? requests }], []];
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_team_members")) return [members, []];
     throw new Error(`requête inattendue : ${sql}`);
   });
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  const query = jest.fn<SqlQuery>(async (sql) => {
+    if (sql.includes("match_dm_enabled = 0")) return [optedOut.map((id) => ({ id })), []];
+    return [[], []];
+  });
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
   return execute;
 }
 
@@ -62,6 +73,17 @@ describe("notifyTeamJoinRequest", () => {
     expect(message).toContain("https://site.test/equipes/5");
     expect(recipients.map((r) => r.label)).toEqual(["Owner", "Manager"]);
     expect(context).toBe("team-join-request");
+  });
+
+  it("notifyTeamJoinRequest_optedOutManager_excludedFromDmKeptForPush", async () => {
+    mockDb({ members: [row(), row({ id: 2, pseudo: "Manager", roles_json: ["MANAGER"], discord_id: "2" })], optedOut: [1] });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(recipients.map((r) => r.label)).toEqual(["Manager"]);
+    expect(message).toContain("<https://site.test/profil#notifications>");
+    expect(jest.mocked(pushToUsers).mock.calls[0][0]).toEqual([1, 2]);
   });
 
   it("se tait sur une demande redéposée dans la fenêtre", async () => {

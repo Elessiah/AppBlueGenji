@@ -25,7 +25,7 @@ fantôme ; comptes supprimés écartés) reçoivent, vu de leur engagée :
 d'opposition `matchDmOptOutLine` (où couper ces messages) comme tout message
 privé de match. Message privé
   **de match** : tag Discord certifié seulement, coupé par la case « Messages
-  privés Discord de mes matchs » (`loadNotificationRecipients(…, "certified",
+  privés Discord de mes matchs et de mes équipes » (`loadNotificationRecipients(…, "certified",
   { matchDm: true })`).
 
 Noms d'équipe seulement (`discordInline`, guillemets neutralisés) ; en tournoi

@@ -13,6 +13,7 @@
  */
 
 import { discordInline } from "./discord-text";
+import { matchDmOptOutLine } from "./discord-notifications";
 import { localizedSiteUrl } from "./dm-language";
 import type { Locale } from "./locales";
 
@@ -193,8 +194,15 @@ export function teamInviteNoticeRecipient(account: TeamInviteNoticeAccount): {
  * @param input.url adresse absolue du site, en français ; passée à l'anglais ici (`localizedSiteUrl`).
  */
 export function formatTeamInviteNotice(
-  input: { kind: TeamInviteNoticeKind; teamName: string; url: string },
+  input: { kind: TeamInviteNoticeKind; teamName: string; url: string; settingsUrl?: string | null },
   locale: Locale = "fr",
+): string {
+  return `${teamInviteNoticeBody(input, locale)}\n${matchDmOptOutLine(input.settingsUrl, locale)}`;
+}
+
+function teamInviteNoticeBody(
+  input: { kind: TeamInviteNoticeKind; teamName: string; url: string },
+  locale: Locale,
 ): string {
   const url = localizedSiteUrl(input.url, locale);
   const team = discordInline(input.teamName);

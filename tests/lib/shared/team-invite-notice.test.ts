@@ -261,7 +261,18 @@ const NOTICE_CASES: NoticeCase[] = [
 
 describe("formatTeamInviteNotice", () => {
   it.each(NOTICE_CASES)("$name", ({ kind, locale, url, expected }) => {
-    expect(formatTeamInviteNotice({ kind, teamName: "Les Glaciers", url }, locale)).toBe(expected);
+    expect(formatTeamInviteNotice({ kind, teamName: "Les Glaciers", url }, locale).split("\n")[0]).toBe(expected);
+  });
+
+  it("formatTeamInviteNotice_withSettingsUrl_appendsOptOutLineFrAndEn", () => {
+    const input = { kind: "INVITE" as const, teamName: "Les Glaciers", url: "https://site.test/profil#invitations", settingsUrl: "https://site.test/profil#notifications" };
+
+    const fr = formatTeamInviteNotice(input, "fr").split("\n");
+    const en = formatTeamInviteNotice(input, "en").split("\n");
+
+    expect(fr).toHaveLength(2);
+    expect(fr[1]).toBe("Tu peux couper ces messages privés dans ton profil, section Notifications : <https://site.test/profil#notifications>");
+    expect(en[1]).toBe("You can turn off these direct messages in your profile, Notifications section: <https://site.test/en/profil#notifications>");
   });
 
   it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_bracketsCannotCloseTheLink", (locale) => {

@@ -519,7 +519,9 @@ describe("langue du compte (lot 9-3)", () => {
 
   it("interrupteur des messages privés de match : libellé et aide en anglais, case liée à son aide", () => {
     const on = inEnglish(<MatchDmField initial />);
-    expect(on).toContain("Discord direct messages about my matches");
+    expect(on).toContain("Discord direct messages about my matches and teams");
+    // D68 : la même case coupe les messages privés d'équipe.
+    expect(on).toContain("It also messages you about your teams");
     expect(on).toContain("On by default");
     expect(on).toContain("messages you get as a referee don&#x27;t depend on it");
     expect(on).toContain("when a match leaves your schedule");
@@ -563,9 +565,10 @@ describe("langue du compte (lot 9-3)", () => {
 
   it("interrupteur des messages privés de match : le français dit l'opposition et les push à part", async () => {
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
-    expect(fr.label).toBe("Messages privés Discord de mes matchs");
+    expect(fr.label).toBe("Messages privés Discord de mes matchs et de mes équipes");
     expect(fr.hint).toMatch(/Activés par défaut/);
-    expect(fr.hint).toMatch(/Les notifications push et les messages reçus comme arbitre n'en dépendent pas/);
+    expect(fr.hint).toMatch(/les notifications push et les messages reçus comme arbitre n'en dépendent pas/);
+    expect(fr.hint).toMatch(/Il t'écrit aussi pour tes équipes : invitation d'une équipe, reprise d'une équipe fantôme que le staff te propose, propriété d'une équipe qui t'est transférée et demande d'adhésion à une équipe que tu gères. Décochée, la case les coupe tous/);
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     expect(fr.hint).toMatch(/quand un match quitte ton programme/);
@@ -583,7 +586,7 @@ describe("langue du compte (lot 9-3)", () => {
 
   it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
-    expect(en).toContain("Without a verified Discord tag, these messages can&#x27;t reach you (anti-spam).");
+    expect(en).toContain("Without a verified Discord tag, the messages about your matches can&#x27;t reach you (anti-spam).");
     expect(en).toMatch(/<a href="#comptes" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
@@ -594,7 +597,7 @@ describe("langue du compte (lot 9-3)", () => {
     }
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
     expect(fr.notCertified).toBe(
-      "Sans tag Discord certifié, ces messages ne peuvent pas te parvenir (contre le spam).",
+      "Sans tag Discord certifié, les messages de tes matchs ne peuvent pas te parvenir (contre le spam).",
     );
     expect(fr.certifyLink).toBe("Certifier mon tag Discord");
     // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
@@ -690,16 +693,16 @@ describe("langue du compte (lot 9-3)", () => {
     // Activés sans tag certifié : le toast ne promet pas un envoi (FR et EN).
     expect(source).toMatch(/return discordReachable === false \? "matchDms\.enabledNotCertified" : "matchDms\.enabled";/);
     const [fr, en] = [(await import("@/messages/fr/profile.json")).default.matchDms, (await import("@/messages/en/profile.json")).default.matchDms];
-    expect(fr.enabledNotCertified).toBe("Messages privés de match activés : ils partiront une fois ton tag Discord certifié.");
-    expect(en.enabledNotCertified).toBe("Match direct messages turned on: they'll be sent once your Discord tag is verified.");
+    expect(fr.enabledNotCertified).toBe("Messages privés de match et d'équipe activés : ceux de tes matchs partiront une fois ton tag Discord certifié.");
+    expect(en.enabledNotCertified).toBe("Match and team direct messages turned on: the ones about your matches will be sent once your Discord tag is verified.");
     expect(source).toMatch(/initial !== shown && !busy && \(!chosenHere \|\| initial === undefined\)/);
   });
 
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
     const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
     const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
-    expect(fr).toBe("Les messages privés Discord ont leur propre case : « Messages privés Discord de mes matchs ».");
-    expect(en).toBe("Discord direct messages have their own box: “Discord direct messages about my matches”.");
+    expect(fr).toBe("Les messages privés Discord ont leur propre case : « Messages privés Discord de mes matchs et de mes équipes ».");
+    expect(en).toBe("Discord direct messages have their own box: “Discord direct messages about my matches and teams”.");
     expect(fr).toBe(`Les messages privés Discord ont leur propre case : « ${(await import("@/messages/fr/profile.json")).default.matchDms.label} ».`);
   });
 

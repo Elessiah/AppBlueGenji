@@ -39,6 +39,8 @@ type Scenario = {
   team?: Record<string, unknown> | null;
   account?: Record<string, unknown> | null;
   locale?: string;
+  /** Case « Messages privés Discord de mes matchs et de mes équipes » décochée (D68). */
+  dmOptedOut?: boolean;
 };
 
 function teamRow(overrides: Record<string, unknown> = {}) {
@@ -66,6 +68,7 @@ function mockDb({
   team = teamRow(),
   account = accountRow(),
   locale = "fr",
+  dmOptedOut = false,
 }: Scenario = {}) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("AS any_player")) {
@@ -80,7 +83,10 @@ function mockDb({
     if (sql.includes("FROM bg_users u")) return [account === null ? [] : [account], []];
     throw new Error(`requête inattendue : ${sql}`);
   });
-  const query = jest.fn<SqlQuery>(async () => [[{ id: PLAYER_ID, locale }], []]);
+  const query = jest.fn<SqlQuery>(async (sql) => {
+    if (sql.includes("match_dm_enabled = 0")) return [dmOptedOut ? [{ id: PLAYER_ID }] : [], []];
+    return [[{ id: PLAYER_ID, locale }], []];
+  });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
   return execute;
 }
@@ -227,6 +233,30 @@ describe("notifyTeamInvite", () => {
     await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     expect(claimTeamNoticeDmSlot(Date.now())).toBe(false);
+  });
+
+  it("notifyTeamInvite_optedOut_pushOnlyNoDm", async () => {
+    mockDb({ dmOptedOut: true });
+    const now = Date.now();
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP - 1; i += 1) claimTeamNoticeDmSlot(now);
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(jest.mocked(pushToUsers).mock.calls[0][0]).toEqual([PLAYER_ID]);
+    // L'opposition ne consomme pas le plafond horaire des messages privés.
+    expect(claimTeamNoticeDmSlot(Date.now())).toBe(true);
+  });
+
+  it("notifyTeamInvite_dm_endsWithOptOutLine", async () => {
+    mockDb();
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message.split("\n").at(-1)).toBe(
+      "Tu peux couper ces messages privés dans ton profil, section Notifications : <https://site.test/profil#notifications>",
+    );
   });
 
   it("notifyTeamInvite_deliveryThrows_dmHourlySlotReturned", async () => {
