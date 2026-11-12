@@ -101,7 +101,7 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
         </h2>
         <p className={s.lede}>{t("ghostDialog.lede")}</p>
 
-        <form onSubmit={submit}>
+        <form className="dim-disabled" onSubmit={submit}>
           <div className="field">
             <label htmlFor="ghost-team-name">{t("identity.name")}</label>
             <input

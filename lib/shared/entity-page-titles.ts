@@ -12,7 +12,7 @@
  * les deux mises en page ne la réécrivent pas chacune à sa façon.
  */
 
-import { visibleText } from "@/lib/shared/visible-text";
+import { hasVisibleName } from "@/lib/shared/entity-fallback-name";
 
 /** Titre d'une fiche d'équipe qu'on ne peut pas nommer. */
 export const TEAM_PAGE_FALLBACK_TITLE = "Équipe";
@@ -54,7 +54,8 @@ export function teamPageTitle(
   words: Readonly<EntityTitleWords> = FR_TEAM_TITLE_WORDS,
 ): string {
   // Un nom fait seulement d'invisibles (ancien, laissé par `cleanStoredNames`) se tait comme un nom vide.
-  const name = team ? visibleText(team.name) : "";
+  // Le titre garde le nom tel qu'affiché (seulement rogné) : pas de normalisation NFKC.
+  const name = team && hasVisibleName(team.name) ? team.name.trim() : "";
   return name ? `${name} · ${words.fallback}` : words.fallback;
 }
 
@@ -68,7 +69,7 @@ export function playerPageTitle(
 ): string {
   if (!player) return words.fallback;
   if (player.isDeleted) return `${words.deleted} · ${words.fallback}`;
-  const pseudo = visibleText(player.pseudo);
+  const pseudo = hasVisibleName(player.pseudo) ? player.pseudo.trim() : "";
   return pseudo ? `${pseudo} · ${words.fallback}` : words.fallback;
 }
 

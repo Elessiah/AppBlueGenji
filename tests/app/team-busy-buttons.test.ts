@@ -53,4 +53,39 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
   it("RolesDialog_submitWhilePending_ignoredByHandler", () => {
     expect(source("app/(secured)/equipes/[id]/_components/RolesDialog.tsx")).toMatch(/if \(unchanged \|\| pending\) return;/);
   });
+
+  it("teamModuleCss_ariaDisabledButton_isDimmedAndNotAllowed", () => {
+    const css = source("app/(secured)/equipes/[id]/team.module.css");
+    expect(css).toMatch(/\.page :global\(\.btn\):where\(:disabled, \[aria-disabled="true"\]\) \{[^}]*cursor: not-allowed;[^}]*opacity: 0\.55;/);
+  });
+
+  it("teamModuleCss_busyButton_keepsLabelReadable", () => {
+    const css = source("app/(secured)/equipes/[id]/team.module.css");
+    expect(css).toMatch(/\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*opacity: 1;[^}]*cursor: progress;/);
+  });
+
+  it("globalsCss_dimDisabledScope_definesDimmedAndBusyRules", () => {
+    const css = source("app/globals.css");
+    expect(css).toMatch(/\.dim-disabled \.btn\[aria-disabled="true"\] \{[^}]*opacity: 0\.55;/);
+    expect(css).toMatch(/\.dim-disabled \.btn\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*opacity: 1;/);
+  });
+
+  it.each([
+    ["app/(secured)/equipes/creer/CreateTeamForm.tsx"],
+    ["app/(secured)/equipes/GhostTeamDialog.tsx"],
+  ])("%s_form_carriesDimDisabled", (path) => {
+    expect(source(path)).toMatch(/<form className="dim-disabled"/);
+  });
+
+  it("MembersSection_labels_useInvisibleNameFallback", () => {
+    const code = source("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
+    expect(code).toContain('shownEntityName(pseudo, "player", userId, locale)');
+    expect(code).not.toMatch(/pseudo: (?:member|invitation|kickTarget)\.pseudo/);
+  });
+
+  it("MembershipActions_act_usesSynchronousRefLock", () => {
+    const code = source("app/(secured)/equipes/[id]/_components/MembershipActions.tsx");
+    expect(code).toMatch(/if \(busyRef\.current\) return false;\s+busyRef\.current = true;\s+setBusy\(true\);/);
+    expect(code).toMatch(/finally \{\s+busyRef\.current = false;/);
+  });
 });

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { PlayerLink } from "@/components/entity-link";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
+import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import type { TeamMember, TeamRole, TeamSentInvitation } from "@/lib/shared/types";
 import { DEFAULT_INVITE_ROLES, sortTeamMembers } from "@/lib/shared/team-role-display";
 import { useToast } from "@/components/ui/toast";
@@ -53,6 +54,8 @@ export function MembersSection({
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const { showError } = useToast();
   const { t, locale } = useTeamPageText();
+  // Un pseudo ancien fait de caractères invisibles se lit « Joueur #id » partout, noms accessibles compris.
+  const playerName = (pseudo: string, userId: number) => shownEntityName(pseudo, "player", userId, locale);
   const teamErrorMessage = useTeamErrorMessage();
   const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, INVITE_FIELD_IDS);
 
@@ -90,7 +93,7 @@ export function MembersSection({
   const withdraw = async (invitation: TeamSentInvitation) => {
     if (cancellingId === invitation.id) return;
     setCancellingId(invitation.id);
-    await cancelInvitation(invitation.id, invitation.pseudo);
+    await cancelInvitation(invitation.id, playerName(invitation.pseudo, invitation.userId));
     setCancellingId(null);
   };
 
@@ -155,7 +158,7 @@ export function MembersSection({
                       {isViewer ? <span className={styles.youTag}>{t("members.you")}</span> : null}
                     </span>
                     <span role="cell">
-                      <RolePills roles={member.roles} label={t("members.rolesOf", { pseudo: member.pseudo })} />
+                      <RolePills roles={member.roles} label={t("members.rolesOf", { pseudo: playerName(member.pseudo, member.userId) })} />
                     </span>
                     <span role="cell" className={styles.joinedAt}>
                       <span className={styles.cellLabel}>{t("members.joinedOnLabel")}</span>{" "}
@@ -167,11 +170,11 @@ export function MembersSection({
                           <button
                             type="button"
                             className={`btn ${styles.smallButton}`}
-                            aria-label={t("members.editRolesLabel", { pseudo: member.pseudo })}
+                            aria-label={t("members.editRolesLabel", { pseudo: playerName(member.pseudo, member.userId) })}
                             onClick={() =>
                               setRolesTarget({
                                 userId: member.userId,
-                                pseudo: member.pseudo,
+                                pseudo: playerName(member.pseudo, member.userId),
                                 isOwner,
                                 isViewer,
                                 selected: member.roles.filter((r) => r !== "OWNER"),
@@ -185,7 +188,7 @@ export function MembersSection({
                           <button
                             type="button"
                             className={`btn ghost ${styles.smallButton} ${styles.dangerButton}`}
-                            aria-label={t("members.kickLabel", { pseudo: member.pseudo })}
+                            aria-label={t("members.kickLabel", { pseudo: playerName(member.pseudo, member.userId) })}
                             onClick={() => setKickTarget(member)}
                           >
                             {t("members.kick")}
@@ -254,7 +257,7 @@ export function MembersSection({
                 <li key={invitation.id} className={styles.pendingItem}>
                   <span className={styles.pendingMain}>
                     <PlayerLink userId={invitation.userId}>{invitation.pseudo}</PlayerLink>
-                    <RolePills roles={invitation.roles} label={t("members.proposedRoles", { pseudo: invitation.pseudo })} />
+                    <RolePills roles={invitation.roles} label={t("members.proposedRoles", { pseudo: playerName(invitation.pseudo, invitation.userId) })} />
                     <span className={styles.pendingDate}>
                       {t("members.sentOn", { date: formatLocalDate(invitation.createdAt, locale) })}
                     </span>
@@ -264,7 +267,7 @@ export function MembersSection({
                     className={`btn ghost ${styles.smallButton}`}
                     aria-disabled={cancellingId === invitation.id || undefined}
                     aria-busy={cancellingId === invitation.id || undefined}
-                    aria-label={t("members.withdrawLabel", { pseudo: invitation.pseudo })}
+                    aria-label={t("members.withdrawLabel", { pseudo: playerName(invitation.pseudo, invitation.userId) })}
                     onClick={() => void withdraw(invitation)}
                   >
                     {cancellingId === invitation.id ? t("members.withdrawing") : t("members.withdraw")}
@@ -290,17 +293,17 @@ export function MembersSection({
 
       {kickTarget ? (
         <ConfirmActionDialog
-          title={t("members.kickTitle", { pseudo: kickTarget.pseudo })}
+          title={t("members.kickTitle", { pseudo: playerName(kickTarget.pseudo, kickTarget.userId) })}
           confirmLabel={t("members.kick")}
           pendingLabel={t("members.kickPending")}
           onClose={() => setKickTarget(null)}
           onConfirm={async () => {
-            const ok = await removeMember(kickTarget.userId, kickTarget.pseudo);
+            const ok = await removeMember(kickTarget.userId, playerName(kickTarget.pseudo, kickTarget.userId));
             if (ok) setKickTarget(null);
             return ok;
           }}
         >
-          <p>{t("members.kickBody", { pseudo: kickTarget.pseudo, team: teamName })}</p>
+          <p>{t("members.kickBody", { pseudo: playerName(kickTarget.pseudo, kickTarget.userId), team: teamName })}</p>
         </ConfirmActionDialog>
       ) : null}
     </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { TeamDetailResponse, TeamJoinRequest } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { PlayerLink } from "@/components/entity-link";
@@ -28,6 +28,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   const membershipErrorMessage = useMembershipErrorMessage();
   const teamId = team.team.id;
   const [busy, setBusy] = useState(false);
+  // Verrou synchrone : l'état `busy` ne se relit qu'au rendu suivant.
+  const busyRef = useRef(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   /**
@@ -39,7 +41,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     translate: (code: string) => string,
   ): Promise<boolean> => {
     // Les boutons restent focalisables pendant un geste (`aria-disabled`) : la garde est ici.
-    if (busy) return false;
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     try {
       showSuccess(await request());
@@ -54,6 +57,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       showError(translate((e as Error).message));
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -228,7 +232,10 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
 
       {team.viewerMembership === "MEMBER" && (
         <div className={`ds-block ${styles.block} ${styles.leaveBlock}`}>
-          <button type="button" className="btn ghost" onClick={() => {
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => {
               if (!busy) setConfirmLeave(true);
             }}
             aria-disabled={busy || undefined}

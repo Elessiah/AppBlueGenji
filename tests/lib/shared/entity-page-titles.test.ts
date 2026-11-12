@@ -37,9 +37,20 @@ describe("teamPageTitle", () => {
   it("rogne les espaces du nom", () => {
     expect(teamPageTitle({ name: "  Nova  " })).toBe("Nova · Équipe");
   });
+  it("teamPageTitle_fullWidthName_keptWithoutNormalisation", () => {
+    expect(teamPageTitle({ name: "ＮＯＶＡ" })).toBe("ＮＯＶＡ · Équipe");
+  });
+
+  it("teamPageTitle_doubleSpaceName_notCollapsed", () => {
+    expect(teamPageTitle({ name: "A  B" })).toBe("A  B · Équipe");
+  });
 });
 
 describe("playerPageTitle", () => {
+  it("playerPageTitle_fullWidthPseudo_keptWithoutNormalisation", () => {
+    expect(playerPageTitle({ pseudo: "ＮＯＶＡ", isDeleted: false })).toBe("ＮＯＶＡ · Joueur");
+  });
+
   it("nomme le joueur par son pseudo", () => {
     expect(playerPageTitle({ pseudo: "Nova", isDeleted: false })).toBe("Nova · Joueur");
   });
