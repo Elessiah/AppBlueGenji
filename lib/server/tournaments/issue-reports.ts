@@ -195,8 +195,9 @@ export async function reportTournamentIssue(
         dmMessage: staffAlertDm(
           alertMessage,
           issueReportPush(
-            { tournamentId, tournamentName: discordInline(String(context.tournament_name)), match },
+            { tournamentId, tournamentName: String(context.tournament_name), match },
             "en",
+            discordInline,
           ),
         ),
       }),

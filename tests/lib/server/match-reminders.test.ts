@@ -376,9 +376,10 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     jest.mocked(pushDiscordDirectMessages).mockClear();
     jest.mocked(pushToUsers).mockClear();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    await matchAtRetry({});
 
     retries[0]();
-    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+    for (let tick = 0; tick < 30; tick += 1) await Promise.resolve();
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
@@ -401,15 +402,27 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     return retries[0];
   }
 
-  /** La manche telle que la reprise la relit. */
-  async function matchAtRetry(options: Parameters<typeof executeDouble>[0]): Promise<void> {
+  /**
+   * La manche et ses joueurs tels que la reprise les relit : membres actuels
+   * des engagées (`bg_team_members`) et comptes (`bg_users`, comptes
+   * supprimés absents).
+   */
+  async function matchAtRetry(
+    options: Parameters<typeof executeDouble>[0],
+    recipients: Recipient[] = RECIPIENTS,
+  ): Promise<void> {
+    const query = jest.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes("bg_team_members")) return [recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))];
+      const ids = new Set(params ?? []);
+      return [recipients.filter((r) => ids.has(r.id)).map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))];
+    });
     const { getDatabase } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn(), execute: executeDouble(options) }));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble(options) }));
   }
 
   async function runRetry(retry: () => void): Promise<void> {
     retry();
-    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+    for (let tick = 0; tick < 30; tick += 1) await Promise.resolve();
   }
 
   it("dispatchDueMatchReminders_matchRescheduledBeforeRetry_retryStaysSilent", async () => {
@@ -446,6 +459,38 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     await runRetry(retry);
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchDueMatchReminders_recipientOptedOutBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({}, [RECIPIENTS[0], RECIPIENTS[1], { ...RECIPIENTS[2], match_dm_enabled: 0 }]);
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_recipientLeftTeamBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({}, [RECIPIENTS[0], RECIPIENTS[1]]);
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_accountDeletedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    // Toujours membre, mais le compte n'est plus lu (`is_deleted = 0` filtre).
+    const query = jest.fn(async (sql: string) =>
+      sql.includes("bg_team_members") ? [[{ team_id: 102, user_id: 3 }]] : [[]],
+    );
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble({}) }));
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
   it("dispatchDueMatchReminders_nothingDelivered_schedulesNoDmRetry", async () => {

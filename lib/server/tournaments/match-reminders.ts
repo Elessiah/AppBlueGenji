@@ -603,6 +603,7 @@ async function sendToSide(
         ? null
         : {
             recipients: recipients.filter((recipient) => unreached.has(recipient.userId)),
+            teamId: side.teamId,
             notification,
             match,
             sentStart: clearedStartAt ? null : new Date(match.start_at),
@@ -617,6 +618,8 @@ async function sendToSide(
 /** Reprise des messages privés non remis d'une engagée. */
 type DmRetry = {
   recipients: NotificationRecipient[];
+  /** Engagée des destinataires : un joueur qui l'a quittée n'est pas repris. */
+  teamId: number;
   notification: UserNotification;
   match: ScheduledMatch;
   /** Horaire que le message annonce ; `null` pour un avis de retrait. */
@@ -656,6 +659,19 @@ async function retryStillCurrent(retry: DmRetry): Promise<boolean> {
   return sameInstant(state.match_start_at, retry.sentStart) && samePoster(state, retry.match);
 }
 
+/**
+ * Les destinataires de la reprise, **relus** : un joueur qui, pendant
+ * l'attente, a quitté l'engagée, supprimé son compte ou s'est opposé aux
+ * messages privés de match (`matchDm`) n'en reçoit pas — l'envoi d'origine
+ * avait lu ces réglages, la reprise les relit aussi (RGPD, article 21).
+ */
+async function retryRecipients(retry: DmRetry): Promise<NotificationRecipient[]> {
+  const members = new Set((await loadEntrantPlayerIds([retry.teamId])).get(retry.teamId) ?? []);
+  const ids = retry.recipients.map((recipient) => recipient.userId).filter((id) => members.has(id));
+  const fresh = await loadNotificationRecipients(ids, "certified", { matchDm: true });
+  return fresh.filter((recipient) => recipient.discord !== null);
+}
+
 /** Délai avant la reprise des messages privés non remis : le bot a le temps de revenir. */
 export const MATCH_DM_RETRY_DELAY_MS = 120_000;
 
@@ -675,10 +691,12 @@ function scheduleDmRetry(retries: readonly DmRetry[]): void {
   const timer = setTimeout(() => {
     for (const retry of retries) {
       void retryStillCurrent(retry)
-        .then((current) => {
+        .then(async (current) => {
           if (!current) return null;
+          const recipients = await retryRecipients(retry);
+          if (recipients.length === 0) return null;
           retry.refresh();
-          return notifyUsers(retry.recipients, { ...retry.notification, discordOnly: true });
+          return notifyUsers(recipients, { ...retry.notification, discordOnly: true });
         })
         .then((report) => {
           if (!report) return;

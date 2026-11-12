@@ -245,9 +245,10 @@ au pool.
   ensuite le lot du journal du tournoi (`LOG_BATCHING.md`).
   La mise en attente tourne sous `SAVEPOINT round_maps_notice` : son échec
   (table absente, JSON illisible) est journalisé et défait seul, sans emporter
-  l'enregistrement des cartes — sauf transaction déjà abandonnée (verrou
-  expiré, interblocage, instantané périmé), relevée telle quelle pour que
-  l'appelant rejoue. Chaque manche garde l'empreinte de ses cartes **avant**
+  l'enregistrement des cartes — sauf transaction déjà abandonnée
+  (interblocage, verrou AUTO-INC, instantané périmé), relevée telle quelle
+  pour que l'appelant rejoue. Une attente de verrou dépassée n'annule que la
+  requête : elle se défait au point de sauvegarde, annonce perdue (pm2). Chaque manche garde l'empreinte de ses cartes **avant**
   la série (`roundMapsFingerprint`, la première écriture de la série fait foi) ;
   à l'envoi, une manche revenue à cet état (réglée puis défaite) est retirée,
   et rien ne part si aucune ne reste. Le minuteur de processus tient une liste

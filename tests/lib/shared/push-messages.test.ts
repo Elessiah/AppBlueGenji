@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
+import { discordInline } from "@/lib/shared/discord-text";
 import {
   contentReportPush,
+  issueReportPush,
   matchReminderPush,
   matchScheduleClearedPush,
   matchScheduledStaffPush,
@@ -318,5 +320,38 @@ describe("noms affichés dans les push (visibleText)", () => {
 
     expect(content.body).toContain("Coupe");
     expect(content.body).not.toMatch(/[\u200b\u202e]/);
+  });
+});
+
+describe("nom de tournoi du message privé aux arbitres (discordInline)", () => {
+  const HOSTILE = "Cup @everyone free-nitro.gg";
+  const ALERT_MATCH = { tournamentId: 7, tournamentName: HOSTILE, matchId: 31, bracket: "UPPER", roundNumber: 2 };
+
+  it("refereeAlertPush_englishWithDiscordFormatter_keepsZeroWidthBreaks", () => {
+    const content = refereeAlertPush("ligne", "k", "en", "other", ALERT_MATCH, discordInline);
+
+    expect(content.body).toContain("@​everyone");
+    expect(content.body).toContain("nitro.​gg");
+  });
+
+  it("refereeAlertPush_defaultFormatter_stripsInvisibles", () => {
+    const content = refereeAlertPush("ligne", "k", "en", "other", { ...ALERT_MATCH, tournamentName: "Coupe‮" });
+
+    expect(content.body).toContain("Coupe");
+    expect(content.body).not.toContain("‮");
+  });
+
+  it("issueReportPush_englishWithDiscordFormatter_keepsZeroWidthBreaks", () => {
+    const content = issueReportPush({ tournamentId: 7, tournamentName: HOSTILE, match: null }, "en", discordInline);
+
+    expect(content.body).toContain("@​everyone");
+    expect(content.body).toContain("nitro.​gg");
+  });
+
+  it("issueReportPush_roundWithDiscordFormatter_keepsZeroWidthBreaks", () => {
+    const match = { id: 31, bracket: "UPPER", roundNumber: 2 };
+    const content = issueReportPush({ tournamentId: 7, tournamentName: HOSTILE, match }, "en", discordInline);
+
+    expect(content.body).toContain("@​everyone");
   });
 });

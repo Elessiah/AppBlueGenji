@@ -866,6 +866,11 @@ export type RefereeAlertMatch = {
  * n'est jamais lu dans la ligne, dont une URL peut venir d'un nom de tournoi
  * ou d'équipe — même ramenée à un chemin du site, elle mènerait où l'auteur
  * du nom l'a voulu (`/connexion?redirect=…`, une route d'API…).
+ *
+ * `name` met en forme le nom du tournoi : {@link shown} par défaut ; le
+ * message privé Discord passe `discordInline` — ses espaces de largeur nulle
+ * (mentions, adresses nues) ne doivent pas être retirées par un second
+ * `visibleText` (`UNTRUSTED_NAMES.md`).
  */
 export function refereeAlertPush(
   message: string,
@@ -873,6 +878,7 @@ export function refereeAlertPush(
   locale: Locale = DEFAULT_LOCALE,
   kind: RefereeAlertKind = "other",
   match: RefereeAlertMatch | null = null,
+  name: (value: string) => string = shown,
 ): PushContent {
   const text = TEXT[locale];
   const url = localeHref(match ? tournamentMatchHref(match.tournamentId, match.matchId) : "/tournois", locale);
@@ -880,7 +886,7 @@ export function refereeAlertPush(
   if (locale === "fr") body = stripMarkdown(message);
   else if (match) {
     body = text.t(`refereeAlert.${kind}Match`, {
-      tournament: shown(match.tournamentName),
+      tournament: name(match.tournamentName),
       round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
       count: match.matchCount ?? 1,
     });
@@ -896,20 +902,24 @@ export function refereeAlertPush(
   };
 }
 
-/** Problème signalé par un engagé pendant un match (`issue-reports.ts`). */
+/**
+ * Problème signalé par un engagé pendant un match (`issue-reports.ts`).
+ * `name` : comme {@link refereeAlertPush}.
+ */
 export function issueReportPush(
   input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number; swiss?: boolean } | null },
   locale: Locale = DEFAULT_LOCALE,
+  name: (value: string) => string = shown,
 ): PushContent {
   const text = TEXT[locale];
   return {
     title: text.t("refereeAlert.title"),
     body: input.match
       ? text.t("issueReport.bodyRound", {
-          tournament: shown(input.tournamentName),
+          tournament: name(input.tournamentName),
           round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale, input.match.swiss),
         })
-      : text.t("issueReport.body", { tournament: shown(input.tournamentName) }),
+      : text.t("issueReport.body", { tournament: name(input.tournamentName) }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.match?.id ?? null), locale),
     tag: `issue-${input.tournamentId}-${input.match?.id ?? 0}`,
   };
