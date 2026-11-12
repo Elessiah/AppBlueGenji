@@ -20,7 +20,7 @@ jest.mock("@/components/ui/toast", () => ({
 }));
 
 import { SelfRolesField, SelfRolesSection, selfRolesErrorMessage } from "@/app/(secured)/profil/_components/SelfRolesField";
-import { Coche, pillColors } from "@/components/Coche";
+import { Coche, cocheCursor, pillColors } from "@/components/Coche";
 import { FR_PROFILE_TEXT, ProfileTextProvider } from "@/components/i18n/profile-text";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
@@ -169,6 +169,32 @@ describe("Coche — aria-disabled", () => {
     expect(label).toContain("cursor:not-allowed");
     expect(html).toContain("color:var(--ink-mute)");
     expect(html).not.toMatch(/opacity:0\.\d/);
+  });
+
+  it("coche_busy_keepsActiveColoursWithProgressCursor", () => {
+    const html = renderToStaticMarkup(
+      <Coche id="b" label="Arbitre" checked={false} aria-busy aria-disabled onChange={() => undefined} />,
+    );
+    const label = /<label[^>]*>/.exec(html)?.[0] ?? "";
+    expect(label).toContain("cursor:progress");
+    expect(html).toContain("border:1px solid var(--line)");
+    expect(html).not.toContain("rgba(255,255,255,0.12)");
+    expect(html).not.toContain("color:var(--ink-mute)");
+  });
+
+  it("cocheCursor_states", () => {
+    expect(cocheCursor(true, false)).toBe("not-allowed");
+    expect(cocheCursor(true, true)).toBe("not-allowed");
+    expect(cocheCursor(false, true)).toBe("progress");
+    expect(cocheCursor(false, false)).toBe("pointer");
+  });
+
+  it("selfRolesField_lockedAdminNeverBusy", () => {
+    const source = readFileSync(
+      join(process.cwd(), "app", "(secured)", "profil", "_components", "SelfRolesField.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("aria-busy={(busy && !locked) || undefined}");
   });
 
   it("coche_enabled_keepsPointerCursor", () => {

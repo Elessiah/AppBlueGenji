@@ -188,7 +188,9 @@ export function SelfRolesField({
                   label={t(`platformRoles.labels.${role}`)}
                   checked={selected.includes(role)}
                   theme="joueur"
-                  aria-busy={busy || undefined}
+                  // Verrouillée (ADMIN) ou occupée (envoi) : deux états, deux
+                  // apparences (`Coche`) ; la case verrouillée n'est jamais « occupée ».
+                  aria-busy={(busy && !locked) || undefined}
                   aria-disabled={locked || busy || undefined}
                   {...(locked
                     ? fieldErrors.aria("admin", descriptionId, ADMIN_HINT_ID)
