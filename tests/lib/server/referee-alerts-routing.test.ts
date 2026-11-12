@@ -15,6 +15,7 @@ import {
   queueRefereeAlert,
   queueRoundNoRefereeAlert,
   resolveBotLogs,
+  MATCH_READ_REUSE_MS,
 } from "@/lib/server/tournaments/bot-logs";
 import {
   flushBotLogBatch,
@@ -1128,5 +1129,79 @@ describe("tour du journal et vidage avant alerte", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe("lectures partagées par un vidage", () => {
+  /** Lectures du match (requête du journal, pas une écriture de réservation). */
+  function matchReads(execute: SqlMock): number {
+    return execute.mock.calls.filter((call) => String(call[0]).includes("m.self_managed")).length;
+  }
+
+  async function settle(): Promise<void> {
+    for (let turn = 0; turn < 10; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  /** Horloge simulée ; la première remise d'alerte dure plus que la fenêtre de reprise. */
+  function slowFirstDelivery(): () => void {
+    let now = 1_000_000;
+    const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+    jest.mocked(pushRefereeAlert).mockImplementationOnce(async () => {
+      now += MATCH_READ_REUSE_MS + 1;
+      return DELIVERED;
+    });
+    return () => clock.mockRestore();
+  }
+
+  it("flushBotLogs_noRefereeAlertAndEscalationOnSameMatch_matchReadOnce", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "match_no_referee", matchId: 31, pairing: "10:20" });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+    flushBotLogs(connection);
+    await settle();
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
+    expect(matchReads(execute)).toBe(1);
+  });
+
+  it("flushBotLogs_alertDeliveryOutlastsReuseWindow_escalationReadsMatchAgain", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
+    const restore = slowFirstDelivery();
+
+    try {
+      queueBotLog(connection, { kind: "match_no_referee", matchId: 31, pairing: "10:20" });
+      queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+      flushBotLogs(connection);
+      await settle();
+    } finally {
+      restore();
+    }
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
+    expect(matchReads(execute)).toBe(2);
+  });
+
+  it("flushBotLogs_conflictAnnounced_escalationNeitherReadNorSent", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
+    // Remise lente : une escalade résolue avant d'être écartée relirait le match.
+    const restore = slowFirstDelivery();
+
+    try {
+      queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
+      queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+      flushBotLogs(connection);
+      await settle();
+    } finally {
+      restore();
+    }
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(matchReads(execute)).toBe(1);
+    const deletes = execute.mock.calls.filter((call) => String(call[0]).trim().startsWith("DELETE"));
+    expect(deletes).toHaveLength(0);
   });
 });

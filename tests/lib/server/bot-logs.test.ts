@@ -7,12 +7,15 @@ import type { PoolConnection } from "mysql2/promise";
 import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
   BOT_LOG_RESOLVE_CONCURRENCY,
+  BOT_LOG_RESOLVE_SLOTS,
   discardBotLogs,
   flushBotLogs,
   markResultValidatedByStaff,
   MAX_PENDING_PER_TRANSACTION,
   queueBotLog,
   resolveBotLogs,
+  MATCH_READ_REUSE_MS,
+  recentReads,
   ROUND_ALERT_READ_CONCURRENCY,
   type MatchReads,
 } from "@/lib/server/tournaments/bot-logs";
@@ -491,7 +494,7 @@ describe("resolveBotLogs", () => {
     expect(state.maxInFlight).toBe(4);
   });
 
-  it("resolveBotLogs_twoEntriesOnSameMatchWithSharedReads_readsMatchOnce", async () => {
+  it("resolveBotLogs_sameCallSameMatch_readsOnce", async () => {
     const execute = mockDbByParams({ 31: [OPEN_MATCH_ROW] });
     const reads: MatchReads = new Map();
 
@@ -505,6 +508,20 @@ describe("resolveBotLogs", () => {
 
     expect(lines).toHaveLength(2);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolveBotLogs_concurrentCallsBeyondSlots_atMostSixResolutionsInFlight", async () => {
+    const { state, drain } = heldQueries(() => [TOURNAMENT_ROW]);
+    const batch = () => Array.from({ length: 4 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
+
+    // Trois vidages qui se chevauchent : chacun prendrait 4 places à lui seul.
+    const resolving = Promise.all([resolveBotLogs(batch()), resolveBotLogs(batch()), resolveBotLogs(batch())]);
+    await drain();
+    const lines = await resolving;
+
+    expect(BOT_LOG_RESOLVE_SLOTS).toBe(6);
+    expect(state.maxInFlight).toBe(6);
+    expect(lines.flat()).toHaveLength(12);
   });
 
   it("resolveBotLogs_sharedReadsAcrossCalls_reusesEarlierRead", async () => {
@@ -684,5 +701,22 @@ describe("resolveBotLogs", () => {
 
     expect(entry.message).toContain("3/16 équipes");
     expect(entry.message).toContain("(ajout du staff)");
+  });
+});
+
+describe("recentReads", () => {
+  const read = (startedAt: number) => ({ startedAt, reading: Promise.resolve(null) });
+
+  it("recentReads_readAtTheLimit_kept", () => {
+    const reads: MatchReads = new Map([[31, read(1_000)]]);
+
+    expect([...recentReads(reads, 1_000 + MATCH_READ_REUSE_MS).keys()]).toEqual([31]);
+  });
+
+  it("recentReads_readOneMsOverTheLimit_droppedWithoutTouchingTheFlushReads", () => {
+    const reads: MatchReads = new Map([[31, read(1_000)]]);
+
+    expect(recentReads(reads, 1_001 + MATCH_READ_REUSE_MS).size).toBe(0);
+    expect(reads.size).toBe(1);
   });
 });

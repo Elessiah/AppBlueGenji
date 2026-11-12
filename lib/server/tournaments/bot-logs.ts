@@ -81,7 +81,7 @@ import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { inBatches } from "@/lib/shared/in-batches";
+import { createLimiter, mapInBatches } from "@/lib/shared/in-batches";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -573,7 +573,8 @@ export function flushBotLogs(connection: PoolConnection): void {
     const preFlushed = new Map<number, Promise<void>>();
     /**
      * Matchs lus par ce vidage : l'escalade reprend la lecture de l'alerte de sa
-     * manche (même instant que les autres lectures du vidage) au lieu d'une troisième.
+     * manche au lieu d'une troisième, tant qu'elle est récente
+     * ({@link MATCH_READ_REUSE_MS}).
      */
     const reads: MatchReads = new Map();
 
@@ -656,16 +657,20 @@ export function flushBotLogs(connection: PoolConnection): void {
       if (delivered.has(entryKey(resolved.entry))) droppedClaims.push(...droppedClaimIds(resolved));
     }
 
-    for (const resolved of await resolveBotLogs(escalations, reads)) {
-      // Le téléphone de l'arbitre vient de sonner pour cette manche : un second
-      // message dans la même seconde ne dirait pas une seconde chose. La
-      // réservation est **gardée** — la rendre ferait repartir l'escalade au
-      // balayage suivant, soit le doublon qu'on vient d'éviter ; et si la manche
-      // est tranchée, `finalizeMatch` l'effacera de toute façon.
-      if (announcedConflicts.has(refereeAlertMatchId(resolved.entry))) {
-        delivered.add(entryKey(resolved.entry));
-        continue;
-      }
+    // Le téléphone de l'arbitre vient de sonner pour cette manche : un second
+    // message dans la même seconde ne dirait pas une seconde chose. L'escalade est
+    // écartée **avant** d'être relue et rédigée, et sa réservation est **gardée** —
+    // la rendre ferait repartir l'escalade au balayage suivant, soit le doublon
+    // qu'on vient d'éviter ; et si la manche est tranchée, `finalizeMatch`
+    // l'effacera de toute façon.
+    const pendingEscalations = escalations.filter((entry) => {
+      if (!announcedConflicts.has(refereeAlertMatchId(entry))) return true;
+      delivered.add(entryKey(entry));
+      return false;
+    });
+    // Les remises qui précèdent ont pu durer (fenêtre du bot) : seules les lectures
+    // récentes sont reprises, un match changé entre-temps est relu.
+    for (const resolved of await resolveBotLogs(pendingEscalations, recentReads(reads, Date.now()))) {
       await deliver(resolved);
     }
 
@@ -1065,26 +1070,59 @@ async function releaseRefereeAlertOnPool(claimId: number): Promise<void> {
 }
 
 /**
- * Entrées résolues en même temps par `resolveBotLogs` : assez pour ne plus
- * enchaîner les allers-retours, assez peu pour laisser des connexions au pool
- * pendant un balayage.
+ * Entrées résolues en même temps par **un** appel de `resolveBotLogs` : assez pour
+ * ne plus enchaîner les allers-retours, assez peu pour laisser des connexions au
+ * pool pendant un balayage.
  */
 export const BOT_LOG_RESOLVE_CONCURRENCY = 4;
 
 /**
- * Matchs relus en même temps par une alerte de manche (`resolveRoundNoRefereeLog`).
- * Les deux passages d'un vidage (lignes et alertes) tournent ensemble : au plus
- * 4 × 2 lectures pour les lignes (tournoi et engagé lus ensemble) et 4 × 3 pour les
- * alertes, soit une vingtaine de connexions au pire — sous les 25 du pool.
+ * Matchs relus en même temps par une alerte de manche (`resolveRoundNoRefereeLog`) :
+ * la plus gourmande des résolutions, aucune autre ne tient plus de lectures à la fois.
  */
 export const ROUND_ALERT_READ_CONCURRENCY = 3;
 
 /**
- * Matchs déjà lus pendant un vidage (`flushBotLogs`), par identifiant : l'escalade
- * reprend la lecture faite pour l'alerte de la même manche au lieu de la refaire.
- * Propre à un vidage — jamais gardé d'un vidage à l'autre.
+ * Résolutions en cours en même temps pour **tout le module** — tous vidages et tous
+ * passages confondus (chaque commit lance le sien, lignes et alertes tournent
+ * ensemble). Chacune tient au plus {@link ROUND_ALERT_READ_CONCURRENCY} lectures :
+ * 6 × 3 = 18 connexions au pire, sous les 25 du pool, quel que soit le nombre de
+ * vidages qui se chevauchent. La borne est tenue par le code, pas par un calcul.
  */
-export type MatchReads = Map<number, Promise<MatchLogRow | null>>;
+export const BOT_LOG_RESOLVE_SLOTS = 6;
+
+/** Borne partagée de {@link BOT_LOG_RESOLVE_SLOTS}. */
+const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS);
+
+/**
+ * Âge au-delà duquel une lecture d'un vidage n'est plus reprise par l'escalade :
+ * les remises d'alertes qui la précèdent peuvent attendre le bot ~30 s, un match
+ * changé (réapparié, supprimé, renommé) entre-temps doit être relu.
+ */
+export const MATCH_READ_REUSE_MS = 5_000;
+
+/** Lecture d'un match gardée par un vidage, avec l'instant où elle a commencé. */
+export type MatchRead = { startedAt: number; reading: Promise<MatchLogRow | null> };
+
+/**
+ * Matchs déjà lus pendant un vidage (`flushBotLogs`), par identifiant : l'escalade
+ * reprend la lecture faite pour l'alerte de la même manche au lieu de la refaire,
+ * si elle est récente ({@link recentReads}). Propre à un vidage — jamais gardé d'un
+ * vidage à l'autre.
+ */
+export type MatchReads = Map<number, MatchRead>;
+
+/**
+ * Les lectures d'un vidage commencées depuis moins de {@link MATCH_READ_REUSE_MS} :
+ * une nouvelle table, les plus anciennes seront relues. Exporté pour les tests.
+ *
+ * @param reads Lectures du vidage.
+ * @param now Instant présent (ms).
+ * @returns Les lectures encore assez fraîches pour être reprises.
+ */
+export function recentReads(reads: MatchReads, now: number): MatchReads {
+  return new Map([...reads].filter(([, read]) => now - read.startedAt <= MATCH_READ_REUSE_MS));
+}
 
 /**
  * Traduit des entrées en lignes de journal, en relisant la base.
@@ -1107,20 +1145,16 @@ export async function resolveBotLogs(
   entries: readonly PendingBotLog[],
   reads: MatchReads = new Map(),
 ): Promise<ResolvedBotLog[]> {
-  const slots: (ResolvedBotLog | null)[] = entries.map(() => null);
-  await inBatches(
-    entries.map((entry, index) => ({ entry, index })),
-    BOT_LOG_RESOLVE_CONCURRENCY,
-    async ({ entry, index }) => {
-      try {
-        const resolved = await resolveOne(entry, reads);
-        const line = typeof resolved === "string" ? { message: resolved } : resolved;
-        if (line?.message) slots[index] = { entry, channel: botEventChannel(entry.kind), ...line };
-      } catch {
-        // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
-      }
-    },
-  );
+  const slots = await mapInBatches(entries, BOT_LOG_RESOLVE_CONCURRENCY, async (entry): Promise<ResolvedBotLog | null> => {
+    try {
+      const resolved = await resolveSlot(() => resolveOne(entry, reads));
+      const line = typeof resolved === "string" ? { message: resolved } : resolved;
+      return line?.message ? { entry, channel: botEventChannel(entry.kind), ...line } : null;
+    } catch {
+      // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
+      return null;
+    }
+  });
   return slots.filter((line): line is ResolvedBotLog => line !== null);
 }
 
@@ -1200,16 +1234,18 @@ type MatchLogRow = SubjectRow & {
 };
 
 /**
- * Relit un match, une seule fois par vidage quand `reads` est fourni : une lecture
- * en échec n'est pas gardée, la suivante réessaie.
+ * Relit un match, une seule fois par vidage (`reads`) : une lecture en échec n'est
+ * pas gardée, la suivante réessaie.
  */
-function loadMatch(matchId: number, reads?: MatchReads): Promise<MatchLogRow | null> {
-  if (!reads) return readMatch(matchId);
+function loadMatch(matchId: number, reads: MatchReads): Promise<MatchLogRow | null> {
   const known = reads.get(matchId);
-  if (known) return known;
+  if (known) return known.reading;
   const reading = readMatch(matchId);
-  reads.set(matchId, reading);
-  reading.catch(() => reads.delete(matchId));
+  const read: MatchRead = { startedAt: Date.now(), reading };
+  reads.set(matchId, read);
+  reading.catch(() => {
+    if (reads.get(matchId) === read) reads.delete(matchId);
+  });
   return reading;
 }
 
@@ -1241,8 +1277,8 @@ async function readMatch(matchId: number): Promise<MatchLogRow | null> {
  */
 async function loadRefereeAlertContext(
   matchId: number,
+  reads: MatchReads,
   openOnly = false,
-  reads?: MatchReads,
 ): Promise<RefereeAlertContext | null> {
   const match = await loadMatch(matchId, reads);
   if (!match?.team1_name || !match.team2_name) return null;
@@ -1368,7 +1404,7 @@ async function resolveScoreConflictLog(
   entry: Extract<PendingBotLog, { kind: "score_conflict" }>,
   reads: MatchReads,
 ): Promise<ResolvedRefereeLine | null> {
-  const context = await loadRefereeAlertContext(entry.matchId, false, reads);
+  const context = await loadRefereeAlertContext(entry.matchId, reads);
   return context === null ? null : { message: formatScoreConflictAlert(context), refereeMatch: refereeMatchOf(context) };
 }
 
@@ -1376,7 +1412,7 @@ async function resolveScoreReportStalledLog(
   entry: Extract<PendingBotLog, { kind: "score_report_stalled" }>,
   reads: MatchReads,
 ): Promise<ResolvedRefereeLine | null> {
-  const context = await loadRefereeAlertContext(entry.matchId, false, reads);
+  const context = await loadRefereeAlertContext(entry.matchId, reads);
   return context === null
     ? null
     : {
@@ -1390,7 +1426,7 @@ async function resolveNoRefereeLog(
   reads: MatchReads,
 ): Promise<ResolvedRefereeLine | null> {
   if (entry.roundMatchIds) return resolveRoundNoRefereeLog(entry.roundMatchIds, reads);
-  const context = await loadRefereeAlertContext(entry.matchId, false, reads);
+  const context = await loadRefereeAlertContext(entry.matchId, reads);
   return context === null ? null : { message: formatNoRefereeAlert(context), refereeMatch: refereeMatchOf(context) };
 }
 
@@ -1409,10 +1445,9 @@ async function resolveRoundNoRefereeLog(
   const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
   // Lectures bornées ({@link ROUND_ALERT_READ_CONCURRENCY}) : plusieurs alertes de
   // manche se résolvent en même temps, chacune ne prend que quelques connexions.
-  const contexts: (RefereeAlertContext | null)[] = listed.map(() => null);
-  await inBatches(listed.map((matchId, index) => ({ matchId, index })), ROUND_ALERT_READ_CONCURRENCY, async ({ matchId, index }) => {
-    contexts[index] = await loadRefereeAlertContext(matchId, true, reads);
-  });
+  const contexts = await mapInBatches(listed, ROUND_ALERT_READ_CONCURRENCY, (matchId) =>
+    loadRefereeAlertContext(matchId, reads, true),
+  );
   const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
   const first = found[0];
   if (!first) return null;

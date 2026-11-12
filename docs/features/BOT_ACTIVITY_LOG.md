@@ -123,7 +123,7 @@ par une règle pure et unique (`lib/shared/referee-alerts.ts`). Voir
 | Rédaction (pur) | `lib/shared/bot-logs.ts` |
 | Tri journal / canal arbitre (pur) | `lib/shared/referee-alerts.ts` |
 | Libellés format / jeu (pur, partagés avec l'en-tête) | `lib/shared/tournament-labels.ts` |
-| File par transaction et résolution (quatre entrées relues à la fois, `BOT_LOG_RESOLVE_CONCURRENCY`, ordre gardé ; une alerte de manche relit trois matchs à la fois, `ROUND_ALERT_READ_CONCURRENCY` ; un match n'est lu qu'une fois par vidage, `MatchReads` — l'escalade reprend la lecture de l'alerte) | `lib/server/tournaments/bot-logs.ts` |
+| File par transaction et résolution (quatre entrées relues à la fois, `BOT_LOG_RESOLVE_CONCURRENCY`, ordre gardé ; une alerte de manche relit trois matchs à la fois, `ROUND_ALERT_READ_CONCURRENCY` ; au plus six résolutions en cours pour tout le module, tous vidages confondus, `BOT_LOG_RESOLVE_SLOTS` ; un match n'est lu qu'une fois par vidage, `MatchReads` — l'escalade, écartée avant relecture si son désaccord vient d'être annoncé, reprend la lecture de l'alerte si elle a moins de 5 s, `MATCH_READ_REUSE_MS`) | `lib/server/tournaments/bot-logs.ts` |
 | Déclenchement de l'inscription d'un joueur | `lib/server/users/sign-in.ts` (`announcePlayerSignup`) |
 | Transport vers le bot | `lib/server/bot-integration.ts` (`sendBotLog`) |
 

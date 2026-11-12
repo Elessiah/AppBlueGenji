@@ -20,16 +20,29 @@ describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
 
   it("privacyChange_botExclusionNotice_frenchSaysWhatIsKeptAndRetried", () => {
     expect(entryFr?.details).toEqual([
-      expect.stringContaining("l'identifiant de ce message et l'heure du dernier essai d'envoi"),
-      expect.stringContaining("réessayer chaque nuit, 30 jours au plus"),
+      expect.stringContaining("au plus une fois par jour"),
+      expect.stringContaining("momentanément injoignable, l'identifiant de l'exclu et celui du message sont gardés pour réessayer chaque nuit, 30 jours au plus"),
     ]);
+    expect(entryFr?.details[0]).toContain("l'identifiant de ce message et l'heure du dernier essai d'envoi");
+    expect(entryFr?.details[0]).toContain("que le bot supprime s'il le peut");
+  });
+
+  it("privacyChange_botExclusionNotice_frenchSaysARefusalIsNotRetried", () => {
+    // Le bot oublie un avis que Discord refuse d'effacer (`deleteDirectMessage` → `refused`).
+    expect(entryFr?.details[1]).toContain("refuse de supprimer pour de bon");
+    expect(entryFr?.details[1]).toContain("n'est plus réessayé");
+    expect(entryFr?.details[1]).not.toMatch(/Si Discord refuse de le supprimer, l'identifiant/);
   });
 
   it("privacyChange_botExclusionNotice_englishSaysWhatIsKeptAndRetried", () => {
     expect(entryEn?.details).toEqual([
-      expect.stringContaining("the ID of that message and the time of the last attempt to send it"),
-      expect.stringContaining("retry every night, for 30 days at most"),
+      expect.stringContaining("at most once a day"),
+      expect.stringContaining("temporarily unreachable, the ID of the excluded member and that of the message are kept to retry every night, for 30 days at most"),
     ]);
+    expect(entryEn?.details[0]).toContain("the ID of that message and the time of the last attempt to send it");
+    expect(entryEn?.details[0]).toContain("which the bot deletes if it can");
+    expect(entryEn?.details[1]).toContain("refuses to delete for good");
+    expect(entryEn?.details[1]).toContain("is no longer retried");
     expect(entryEn?.linkLabels).toEqual([expect.stringContaining("privacy policy"), expect.stringContaining("T08")]);
   });
 
@@ -37,7 +50,29 @@ describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
     expect(entryFr?.links?.map((link) => link.href)).toEqual(["/privacy-policy-bot", "/rgpd/registre#t08"]);
   });
 
-  it("botPrivacyPolicy_exclusionNotice_matchesTheEntry", () => {
-    expect(JSON.stringify(PRIVACY_POLICY)).toMatch(/au plus une fois par jour.*30 jours au plus/);
+  it("botPrivacyPolicy_exclusionNotice_frenchMatchesTheEntry", () => {
+    const texts = policyTexts(PRIVACY_POLICY.fr);
+    expect(texts.find((text) => text.startsWith("Identifiants de l'utilisateur exclu"))).toContain("au plus une fois par jour");
+    const retention = texts.find((text) => text.startsWith("**Exclusions**"));
+    expect(retention).toContain("momentanément injoignable");
+    expect(retention).toContain("30 jours au plus");
+    expect(retention).toContain("n'est plus réessayé");
+  });
+
+  it("botPrivacyPolicy_exclusionNotice_englishMatchesTheEntry", () => {
+    const texts = policyTexts(PRIVACY_POLICY.en);
+    expect(texts.find((text) => text.startsWith("IDs of the excluded user"))).toContain("at most once a day");
+    const retention = texts.find((text) => text.startsWith("**Exclusions**"));
+    expect(retention).toContain("temporarily unreachable");
+    expect(retention).toContain("30 days at most");
+    expect(retention).toContain("is no longer retried");
   });
 });
+
+/** Toutes les chaînes d'un texte de politique, dans l'ordre. */
+function policyTexts(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(policyTexts);
+  if (value !== null && typeof value === "object") return Object.values(value).flatMap(policyTexts);
+  return [];
+}
