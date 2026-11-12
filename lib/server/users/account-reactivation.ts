@@ -4,6 +4,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import {
+  ACCOUNT_DELETED_ERROR,
   ACCOUNT_PENDING_DELETION_CODE,
   isReactivationWindowOpen,
   REACTIVATION_TICKET_MINUTES,
@@ -43,6 +44,19 @@ export class AccountPendingDeletionError extends Error {
   constructor(readonly ticket: string) {
     super(ACCOUNT_PENDING_DELETION);
     this.name = "AccountPendingDeletionError";
+  }
+}
+
+/**
+ * Connexion d'un compte dont le délai de réactivation est écoulé, avant que la
+ * passe horaire ne joue la suppression définitive : plus rien ne s'ouvre. Typée
+ * pour que chaque porte la rende lisible (410 au code Discord, `error=deleted`
+ * à l'OAuth) au lieu d'un échec générique.
+ */
+export class AccountDeletedError extends Error {
+  constructor() {
+    super(ACCOUNT_DELETED_ERROR);
+    this.name = "AccountDeletedError";
   }
 }
 

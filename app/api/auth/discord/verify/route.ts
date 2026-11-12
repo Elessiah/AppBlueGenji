@@ -1,7 +1,8 @@
 import { createSession } from "@/lib/server/auth";
-import { ACCOUNT_PENDING_DELETION, AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
+import { ACCOUNT_PENDING_DELETION, AccountDeletedError, AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
+import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
@@ -121,6 +122,9 @@ function signInFailure(error: unknown) {
   // Suppression demandée : la page de connexion ouvre l'écran de
   // réactivation (ticket en cookie, `createSession`).
   if (error instanceof AccountPendingDeletionError) return fail(ACCOUNT_PENDING_DELETION, 409);
+  // Délai de réactivation écoulé, suppression définitive pas encore jouée :
+  // le compte n'existe plus pour la connexion.
+  if (error instanceof AccountDeletedError) return fail(ACCOUNT_DELETED_ERROR, 410);
   // Un code (`MAJUSCULES_SOULIGNÉES`) passe tel quel ; toute autre phrase
   // (texte du pilote SQL…) reste au journal, la réponse ne porte qu'un code.
   const message = error instanceof Error ? error.message : "";

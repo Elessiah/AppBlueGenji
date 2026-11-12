@@ -24,7 +24,7 @@
 import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, getCurrentUser } from "@/lib/server/auth";
-import { AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
+import { AccountDeletedError, AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
 import { REACTIVATION_PATH } from "@/lib/shared/account-deletion";
 import { AccountSuspendedError } from "@/lib/server/account-suspensions";
 import {
@@ -366,6 +366,10 @@ async function completeLogin(
     // en cookie, `createSession`).
     if (error instanceof AccountPendingDeletionError) {
       return NextResponse.redirect(new URL(localeHref(REACTIVATION_PATH, locale), base));
+    }
+    // Délai de réactivation écoulé : ni session ni réactivation, une phrase.
+    if (error instanceof AccountDeletedError) {
+      return loginFailure(base, provider, "deleted", locale);
     }
     if (error instanceof AccountSuspendedError) {
       const response = loginFailure(base, provider, "suspended", locale);

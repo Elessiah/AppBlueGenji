@@ -61,7 +61,8 @@
     "UNSUPPORTED_CONTENT_TYPE": "Request refused. Reload the login page, then try again.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait about fifteen minutes, or log in with Google.",
     "DISCORD_AUTH_FAILED": "Discord login failed. Try again in a moment.",
-    "TERMS_REQUIRED": "To create your account, accept the terms of use. Reload the page to see them."
+    "TERMS_REQUIRED": "To create your account, accept the terms of use. Reload the page to see them.",
+    "ACCOUNT_DELETED": "This account has been deleted: its reactivation period is over, so it can no longer be reopened."
   },
   "oauthErrors": {
     "providerFallback": "OAuth",
@@ -71,7 +72,8 @@
     "state": "Login session expired or invalid. Start the login again.",
     "oauth": "{provider} login failed. Try again in a moment.",
     "session": "You need to be logged in to link an app. Log in, then try again.",
-    "terms": "To create your account, accept the terms of use, then start the login again."
+    "terms": "To create your account, accept the terms of use, then start the login again.",
+    "deleted": "This account has been deleted: its reactivation period is over, so it can no longer be reopened."
   },
   "suspension": {
     "title": "Account suspended",

@@ -781,7 +781,8 @@ réactive aussi** (décision du 2026-11-04) : `createSession` lit la demande en
 attente avant la suspension, la réactivation se fait, puis la session est
 refusée (`403 ACCOUNT_SUSPENDED` avec `reactivated: true`) ; l'écran dit la
 réactivation, puis la suspension. Au-delà de trente jours, la connexion est
-refusée (`ACCOUNT_DELETED`). Depuis ACCOUNT-DELETION-3 : plusieurs tickets
+refusée (`AccountDeletedError`, code `ACCOUNT_DELETED` : 410 au code Discord,
+`?error=deleted` au retour OAuth, une phrase FR/EN sur `/connexion`). Depuis ACCOUNT-DELETION-3 : plusieurs tickets
 valides par compte (une seconde connexion ne périme pas l'écran ouvert) ; tous
 partent à la réactivation, à « Ne pas réactiver » (`DELETE /api/auth/reactivate`,
 qui retire aussi le cookie — `/rgpd` le dit, FR + EN) et à toute nouvelle

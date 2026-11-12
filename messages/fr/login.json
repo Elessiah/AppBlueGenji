@@ -61,7 +61,8 @@
     "UNSUPPORTED_CONTENT_TYPE": "Requête refusée. Recharge la page de connexion, puis réessaie.",
     "TOO_MANY_REQUESTS": "Trop de tentatives. Attends une quinzaine de minutes, ou connecte-toi avec Google.",
     "DISCORD_AUTH_FAILED": "La connexion Discord a échoué. Réessaie dans un instant.",
-    "TERMS_REQUIRED": "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher."
+    "TERMS_REQUIRED": "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher.",
+    "ACCOUNT_DELETED": "Ce compte a été supprimé : son délai de réactivation est écoulé, il ne peut plus être rouvert."
   },
   "oauthErrors": {
     "providerFallback": "OAuth",
@@ -71,7 +72,8 @@
     "state": "Session de connexion expirée ou invalide. Relance la connexion.",
     "oauth": "Échec de la connexion {provider}. Réessaie dans un instant.",
     "session": "Tu dois être connecté pour lier une application. Connecte-toi, puis réessaie.",
-    "terms": "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion."
+    "terms": "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion.",
+    "deleted": "Ce compte a été supprimé : son délai de réactivation est écoulé, il ne peut plus être rouvert."
   },
   "suspension": {
     "title": "Compte suspendu",

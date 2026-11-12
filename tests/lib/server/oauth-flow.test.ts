@@ -24,6 +24,7 @@ import {
 import { buildBlizzardAuthorizationUrl, fetchBlizzardUser } from "@/lib/server/blizzard-oauth";
 import type { OAuthProvider } from "@/lib/shared/oauth-providers";
 import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import { AccountDeletedError } from "@/lib/server/users/account-reactivation";
 import { SUSPENSION_NOTICE_COOKIE, parseSuspensionNotice } from "@/lib/shared/account-suspension";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
 import { authUser } from "../../helpers/auth-user";
@@ -489,6 +490,15 @@ describe("completeOAuth — connexion", () => {
     // Seule l'erreur typée porte un exposé : un message homonyme n'en invente pas.
     expect(response.headers.get("location")).toBe("http://localhost:3000/connexion?error=oauth&provider=google");
     expect(response.cookies.get(SUSPENSION_NOTICE_COOKIE)).toBeUndefined();
+  });
+
+  it("completeOAuth_reactivationWindowClosed_redirectsWithDeletedError", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    jest.mocked(createSession).mockRejectedValueOnce(new AccountDeletedError());
+
+    const response = await login("GOOGLE");
+
+    expect(response.headers.get("location")).toBe("http://localhost:3000/connexion?error=deleted&provider=google");
   });
 
   it("refiltre la destination à la sortie du cookie, qui n'est pas signé", async () => {

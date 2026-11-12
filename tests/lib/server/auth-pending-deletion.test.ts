@@ -20,6 +20,7 @@ import { cookies } from "next/headers";
 import { createSession } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
 import {
+  AccountDeletedError,
   AccountPendingDeletionError,
   createReactivationTicket,
   readPendingDeletion,
@@ -58,6 +59,7 @@ describe("createSession — compte en attente de suppression", () => {
     jest.mocked(readPendingDeletion).mockResolvedValue({ requestedAt: "2026-09-01T00:00:00.000Z", windowOpen: false });
 
     await expect(createSession(7, "LOGIN_GOOGLE")).rejects.toThrow("ACCOUNT_DELETED");
+    await expect(createSession(7, "LOGIN_GOOGLE")).rejects.toBeInstanceOf(AccountDeletedError);
 
     expect(createReactivationTicket).not.toHaveBeenCalled();
     expect(set).not.toHaveBeenCalled();
