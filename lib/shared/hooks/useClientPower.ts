@@ -21,6 +21,10 @@ import {
   type PerformanceLimit,
   type PerformanceProbe,
 } from "@/lib/shared/client-power";
+import { subscribeMediaQuery } from "@/lib/shared/hooks/useMediaMatch";
+
+/** Préférence système « réduire les animations ». */
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 /**
  * Magasin du régime de charge (`lib/shared/client-power.ts`), côté navigateur.
@@ -129,7 +133,7 @@ function readIgnorePerformance(): boolean {
 
 function readReducedMotion(): boolean {
   try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return window.matchMedia(REDUCED_MOTION_QUERY).matches;
   } catch {
     return false;
   }
@@ -273,11 +277,14 @@ function attach(): () => void {
     }
   };
   const onChange = () => refresh();
-  let motion: MediaQueryList | null = null;
+  // `subscribeMediaQuery` retombe sur `addListener` (Safari antérieur à 14) :
+  // sans lui, un réglage « réduire les animations » changé page ouverte y
+  // passerait inaperçu jusqu'au rechargement.
+  let unsubscribeMotion: () => void = () => {};
   try {
-    motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    unsubscribeMotion = subscribeMediaQuery(REDUCED_MOTION_QUERY, onChange);
   } catch {
-    motion = null;
+    // `matchMedia` absent : la préférence est lue à chaque rafraîchissement.
   }
 
   probe = { ...probe, ...readHardware() };
@@ -288,7 +295,6 @@ function attach(): () => void {
   window.addEventListener("blur", onChange);
   window.addEventListener("pageshow", onChange);
   window.addEventListener("storage", onStorage);
-  motion?.addEventListener?.("change", onChange);
   // Le menu d'accessibilité change l'attribut de `<html>` sans rien publier :
   // on l'observe plutôt que de lui faire connaître ce module.
   const settings = new MutationObserver(onChange);
@@ -300,7 +306,7 @@ function attach(): () => void {
     window.removeEventListener("blur", onChange);
     window.removeEventListener("pageshow", onChange);
     window.removeEventListener("storage", onStorage);
-    motion?.removeEventListener?.("change", onChange);
+    unsubscribeMotion();
     settings.disconnect();
     cancelSample();
     if (expiryTimer !== null) {
