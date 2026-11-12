@@ -53,6 +53,12 @@ describe("entrée PRIVACY_CHANGES du réglage des messages d'équipe", () => {
     expect(en).toContain("To object, untick “Discord direct messages about my matches and teams” in “My profile”");
     expect(en).not.toContain("Exercising your rights");
   });
+
+  it("privacyChange_teamNoticeCaps_linksTheProfileSettingFrAndEn", () => {
+    const id = "2026-11-avis-d-equipe-plafonds-et-base";
+    expect(PRIVACY_CHANGES.find((c) => c.id === id)?.links?.at(-1)).toEqual({ href: "/profil#notifications", label: "Ouvrir le réglage dans « Mon profil »" });
+    expect(PRIVACY_CHANGES_EN[id]?.linkLabels?.at(-1)).toBe("Open the setting in “My profile”");
+  });
 });
 
 describe("politique et registre", () => {
@@ -104,7 +110,7 @@ describe("politique et registre", () => {
   it("droitsOpposition_teamDmList_parenthesisedSoTheAsideStaysPairedFrAndEn", () => {
     const fr = DROITS.find((d) => d.title === "Droit d'opposition")?.text ?? "";
     const en = DROITS_EN.find((d) => d.title === "Right to object")?.text ?? "";
-    expect(fr).toContain("demande d'adhésion à une équipe que vous gérez) — ces messages se coupent directement");
-    expect(en).toContain("request to join a team you manage) — these messages are turned off directly");
+    expect(fr).toContain("demande d'adhésion à une équipe que vous gérez) — ces messages privés de match et d'équipe se coupent directement");
+    expect(en).toContain("request to join a team you manage) — these match and team direct messages are turned off directly");
   });
 });
