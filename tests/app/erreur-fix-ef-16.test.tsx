@@ -130,3 +130,12 @@ describe("relecture de la liste", () => {
     expect(list).not.toContain("setWantFinishedArchive");
   });
 });
+
+describe("index du créateur d'invitation", () => {
+  it("se pose dans le CREATE TABLE et dans l'ALTER tolérant", () => {
+    const create = readSource("lib/server/database/schema/teams.ts");
+    const recent = readSource("lib/server/database/recent-schema-changes.ts");
+    expect(create).toContain("INDEX idx_bg_team_inv_creator (created_by),");
+    expect(recent).toContain("`ALTER TABLE bg_team_invitations ADD INDEX idx_bg_team_inv_creator (created_by)`");
+  });
+});

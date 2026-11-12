@@ -14,6 +14,7 @@ import {
   scheduleRoundMapsNotice,
 } from "@/lib/server/tournaments/round-maps-notice";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
+import { ROUND_MAPS_NOTICE_WINDOW_SECONDS } from "@/lib/shared/round-maps";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -638,5 +639,16 @@ describe("scheduleRoundMapsNotice", () => {
     await jest.advanceTimersByTimeAsync(62_000);
 
     expect(sweeps()).toBe(2);
+  });
+
+  it("scheduleRoundMapsNotice_deadlineFiresSlightlyEarly_doesNotRearmAtZero", async () => {
+    const windowMs = (ROUND_MAPS_NOTICE_WINDOW_SECONDS + 2) * 1000;
+    scheduleRoundMapsNotice(Date.now() - windowMs + 20);
+
+    await jest.advanceTimersByTimeAsync(40);
+    await jest.advanceTimersByTimeAsync(200);
+
+    expect(sweeps()).toBe(1);
+    expect(jest.getTimerCount()).toBe(0);
   });
 });

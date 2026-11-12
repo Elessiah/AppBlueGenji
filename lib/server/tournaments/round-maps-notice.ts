@@ -516,10 +516,14 @@ function armTimer(): void {
   timer.unref?.();
 }
 
+const EARLY_TIMER_SLACK_MS = 50;
+
 function onDeadline(): void {
   timer = null;
   const now = Date.now();
-  deadlines = deadlines.filter((at) => at > now);
+  // Marge : un minuteur peut partir quelques ms trop tôt ; sans elle, l'échéance
+  // atteinte resterait en tête et le minuteur tournerait à vide à 0 ms.
+  deadlines = deadlines.filter((at) => at > now + EARLY_TIMER_SLACK_MS);
   lastSweepAt = 0;
   void dispatchDueRoundMapsNotices(true);
   armTimer();
