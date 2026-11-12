@@ -224,10 +224,11 @@ export const PUSH_TAG_MAX = 64;
 
 /**
  * Espaces **sécables** (retours à la ligne compris) : les insécables U+00A0 et
- * U+202F restent, ils tiennent un guillemet français à son nom.
+ * U+202F restent, ils tiennent un guillemet français à son nom. Classe énumérée :
+ * le lint refuse `[^\S…]` (`\s` moins ces deux-là).
  */
-const BREAKING_SPACES = /[^\S\u00a0\u202f]+/g;
-const EDGE_BREAKING_SPACES = /^[^\S\u00a0\u202f]+|[^\S\u00a0\u202f]+$/g;
+const BREAKING_SPACES = /[\t\n\v\f\r \u1680\u2000-\u200a\u2028\u2029\u205f\u3000\ufeff]+/g;
+const EDGE_BREAKING_SPACES = /^[\t\n\v\f\r \u1680\u2000-\u200a\u2028\u2029\u205f\u3000\ufeff]+|[\t\n\v\f\r \u1680\u2000-\u200a\u2028\u2029\u205f\u3000\ufeff]+$/g;
 
 /** Une suite d'espaces sécables devient une espace ; les bords sont rognés, insécables gardées. */
 function foldSpaces(line: string): string {

@@ -9,6 +9,7 @@ import {
   teamInviteNoticeRecipient,
   withinGhostClaimNoticeBudget,
   withinTeamInviteNoticeBudget,
+  type GhostClaimNoticeBudget,
   type TeamInviteNoticeBudget,
   type TeamInviteNoticeAccount,
   type TeamInviteNoticeKind,
@@ -122,12 +123,37 @@ describe("withinTeamInviteNoticeBudget", () => {
 });
 
 describe("withinGhostClaimNoticeBudget", () => {
+  const ghostBudget = (over: Partial<GhostClaimNoticeBudget> = {}): GhostClaimNoticeBudget => ({
+    toThisPlayer: 1,
+    byActor: 1,
+    teamsToThisPlayer: 1,
+    ...over,
+  });
+
   it("withinGhostClaimNoticeBudget_firstOffer_returnsTrue", () => {
-    expect(withinGhostClaimNoticeBudget(1)).toBe(true);
+    expect(withinGhostClaimNoticeBudget(ghostBudget())).toBe(true);
   });
 
   it("withinGhostClaimNoticeBudget_reOfferWithinWindow_returnsFalse", () => {
-    expect(withinGhostClaimNoticeBudget(2)).toBe(false);
+    expect(withinGhostClaimNoticeBudget(ghostBudget({ toThisPlayer: 2 }))).toBe(false);
+  });
+
+  it("withinGhostClaimNoticeBudget_actorAtDailyCap_returnsTrue", () => {
+    expect(withinGhostClaimNoticeBudget(ghostBudget({ byActor: TEAM_INVITE_NOTICES_DAILY_CAP }))).toBe(true);
+  });
+
+  it("withinGhostClaimNoticeBudget_actorOverDailyCap_returnsFalse", () => {
+    expect(withinGhostClaimNoticeBudget(ghostBudget({ byActor: TEAM_INVITE_NOTICES_DAILY_CAP + 1 }))).toBe(false);
+  });
+
+  it("withinGhostClaimNoticeBudget_playerAtTeamsCap_returnsTrue", () => {
+    expect(withinGhostClaimNoticeBudget(ghostBudget({ teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP }))).toBe(true);
+  });
+
+  it("withinGhostClaimNoticeBudget_playerOverTeamsCap_returnsFalse", () => {
+    expect(
+      withinGhostClaimNoticeBudget(ghostBudget({ teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP + 1 })),
+    ).toBe(false);
   });
 });
 

@@ -378,7 +378,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
-    const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0] as [string, { label: string }[]];
+    const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("**Team Nova** contre");
     expect(recipients.map((r) => r.label)).toEqual(["Nova"]);
     expect(pushToUsers).not.toHaveBeenCalled();
