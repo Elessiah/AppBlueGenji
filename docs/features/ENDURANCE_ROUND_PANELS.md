@@ -131,20 +131,23 @@ passer pour une :
 | une place dans sa colonne, et les traits qui y mènent | d'action, d'arbitrage ni de planification |
 | une case d'emblème vide, pour aligner les noms d'une colonne à l'autre | de badge « Qualifié en X » — la rencontre qui l'occupera n'existe pas |
 
-**Sur téléphone** (`NARROW_LAYOUT_QUERY`, ≤ 720 px), l'arbre ne dessine que le
-**prochain** tour à pourvoir (`playoffGhostsShown`) : sept colonnes `TBD` ne
-tiennent pas à cette largeur. Au rendu serveur, la largeur est inconnue
-(`useMediaMatch` rend `null`) : l'arbre entier, puis la seule variante utile
-une fois monté. Un volet qui contient des créneaux à pourvoir porte en tête la
-rangée « Cases à pourvoir » (« Slots to be filled » sous `/en`) et son
-`<InfoHint>` (`bracket.ghostSlots`, `bracket.ghostSlotsHint`).
-
 Il compte **en revanche** dans la pastille du volet, qui annonce la taille du
 tableau et non le nombre de matchs jouables : c'est déjà ce qu'elle fait sur un
 tableau à élimination, dont les tours à venir sont de vraies rencontres sans
 engagées. Au-delà de huit qualifiées, un volet entier peut naître à pourvoir —
 il annonçait alors « 0 match » en dessinant sept cartes. Un tel volet ne réserve
 pas non plus la colonne des badges, qui serait vide (`hasQualifyBadges`).
+
+**Sur téléphone** (`NARROW_LAYOUT_QUERY`, ≤ 720 px), l'arbre ne dessine que le
+**prochain** tour à pourvoir (`playoffGhostsShown`) : sept colonnes `TBD` ne
+tiennent pas à cette largeur. Le découpage en volets et leurs pastilles se
+calculent alors sur cette liste réduite — la pastille compte les cases
+dessinées, non la taille du tableau. Au rendu serveur, la largeur est inconnue
+(`useMediaMatch` rend `null`) : l'arbre entier, puis la seule variante utile
+une fois monté. Un volet qui dessine une case à pourvoir (créneau, ou petite
+finale pas encore posée) porte en tête la rangée « Cases à pourvoir »
+(« Slots to be filled » sous `/en`) et son `<InfoHint>` (`bracket.ghostSlots`,
+`bracket.ghostSlotsHint`).
 
 **Un tournoi clos n'annonce plus aucun tour.** Deux demi-finales closes sur un
 double forfait ne qualifient personne : `advancePlayoffsOneStep` clôt alors le

@@ -10,7 +10,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
-import { visibleText } from "@/lib/shared/visible-text";
+import { shownEntrantName } from "@/lib/shared/visible-text";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import {
   CASTER_ARRIVAL_ANNOUNCE_MS,
@@ -204,7 +204,7 @@ export function SideCard({
   // emblème : la carte ne pose pas le sien en plus.
   const customName = linkNames && renderName !== undefined;
   return (
-    <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={visibleText(side.name)}>
+    <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={shownEntrantName(side.name) ?? "—"}>
       <div className={styles.sideHead}>
         {!customName && (
           <span className={styles.emblem} aria-hidden="true">

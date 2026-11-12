@@ -46,7 +46,7 @@ describe("page d'un signalement : panne passagère", () => {
 
   it("session expirée : carte de reconnexion qui ramène au signalement, dans la langue de la page", () => {
     expect(page).toContain('state.status === "signedOut"');
-    expect(page).toContain("authGateLoginHref(localeHref(`/signalements/${encodeURIComponent(params.id)}`, locale), \"\", \"\")");
+    expect(page).toContain("authGateLoginHref(localeHref(`/signalements/${params.id}`, locale), \"\", \"\")");
     for (const reports of [frReports, enReports]) {
       expect(reports.concerned.signedOutTitle).not.toBe("");
       expect(reports.concerned.signedOutBody).not.toBe("");

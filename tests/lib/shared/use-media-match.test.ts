@@ -71,9 +71,9 @@ describe("subscribeMediaQuery", () => {
 });
 
 describe("LaunchContactCards : nom de section nettoyé", () => {
-  it("sideCard_ariaLabel_usesVisibleText", () => {
+  it("sideCard_ariaLabel_usesShownEntrantName", () => {
     const cards = readSource("components/match-launch/LaunchContactCards.tsx");
-    expect(cards).toContain("aria-label={visibleText(side.name)}");
+    expect(cards).toContain('aria-label={shownEntrantName(side.name) ?? "—"}');
     expect(cards).not.toContain("aria-label={side.name}");
   });
 });
