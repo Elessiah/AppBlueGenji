@@ -153,7 +153,7 @@ export function loginDestination(value: unknown, locale: Locale): string {
 }
 
 /**
- * Destination **scellée** dans le cookie d'état OAuth (`bg_oauth`), avec la
+ * Destination **scellée** dans le cookie d'état OAuth (`oauthCookieName`, `__Host-bg_oauth` en production), avec la
  * langue de la page de départ : l'adresse de la page dans cette langue, préfixe
  * compris **même pour une route pas encore traduite** (`/en/tournois`, qui
  * répondrait 307 vers `/tournois`). Le cookie ne porte ainsi rien de plus que

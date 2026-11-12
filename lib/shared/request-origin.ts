@@ -13,7 +13,7 @@
  * `<form method=post enctype=text/plain>` dont le nom de champ reconstitue un
  * JSON valide (`{"credential":"<jeton de l'attaquant>","x":"` + `=` + `"}`) :
  * `req.json()` l'acceptait sans regarder le `Content-Type`, la réponse posait
- * `bg_session`, et la victime se retrouvait connectée **au compte de
+ * le cookie de session (`sessionCookieName`, `lib/shared/auth-cookies.ts`), et la victime se retrouvait connectée **au compte de
  * l'attaquant** — où elle rattachait ensuite ses propres identités. Même
  * mécanisme pour déconnecter n'importe qui.
  *

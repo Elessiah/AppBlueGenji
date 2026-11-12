@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { PROCESSING_ACTIVITIES, REGISTER_UPDATED_AT } from "@/lib/shared/processing-register";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { SITE_VISITOR_RETENTION_MONTHS } from "@/lib/shared/site-visits";
+import { oauthCookieName, reactivationCookieName, sessionCookieName } from "@/lib/shared/auth-cookies";
 
 /**
  * `/rgpd#cookies` se dit la liste **complète** de ce que le site dépose ou lit
@@ -59,6 +60,14 @@ describe("/rgpd — inventaire des cookies et du stockage", () => {
   it("nomme chaque cookie et chaque clé de stockage du site", () => {
     const missing = storageKeys().filter((key) => !cookies.includes(key.value));
     expect(missing).toEqual([]);
+  });
+
+  it("nomme les cookies de production, au nom calculé (`__Host-`)", () => {
+    // Le balayage ne voit que les constantes nues : les noms préfixés se
+    // calculent (`hostCookieName`), et leur retrait de /rgpd passerait sinon.
+    for (const name of [sessionCookieName(true), oauthCookieName(true), reactivationCookieName(true)]) {
+      expect(cookies).toContain(name);
+    }
   });
 
   it("nomme le cache du service worker, posé pour tout visiteur", () => {
