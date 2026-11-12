@@ -143,3 +143,39 @@ describe("DELETE /api/profile/connections/[provider]", () => {
     expect(response.status).toBe(500);
   });
 });
+
+describe("connexions — erreurs du service réduites à un code", () => {
+  beforeEach(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("GET_driverSentence_returnsFallbackCode500", async () => {
+    jest.mocked(listAccountConnections).mockRejectedValue(new Error("connect ECONNREFUSED 127.0.0.1:3306"));
+
+    const response = await GET();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "CONNECTIONS_LOAD_FAILED" });
+  });
+
+  it("DELETE_driverSentence_returnsFallbackCode500", async () => {
+    jest.mocked(unlinkOAuthIdentity).mockRejectedValue(new Error("Duplicate entry 'x' for key 'y'"));
+
+    const response = await DELETE(new Request("http://localhost/api/profile/connections/google"), params("google"));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "CONNECTION_UNLINK_FAILED" });
+  });
+
+  it("DELETE_deadlock_returnsConcurrentUpdateRetry409", async () => {
+    jest.mocked(unlinkOAuthIdentity).mockRejectedValue(
+      new Error("Deadlock found when trying to get lock; try restarting transaction"),
+    );
+
+    const response = await DELETE(new Request("http://localhost/api/profile/connections/google"), params("google"));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+  });
+});

@@ -4,6 +4,7 @@ import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { consumeDiscordLoginChallenge, isDiscordChallengeToken } from "@/lib/server/users/discord-challenges";
@@ -127,8 +128,7 @@ function signInFailure(error: unknown) {
   if (error instanceof AccountDeletedError) return fail(ACCOUNT_DELETED_ERROR, 410);
   // Un code (`MAJUSCULES_SOULIGNÉES`) passe tel quel ; toute autre phrase
   // (texte du pilote SQL…) reste au journal, la réponse ne porte qu'un code.
-  const message = error instanceof Error ? error.message : "";
-  if (/^[A-Z][A-Z0-9_]*$/.test(message)) return fail(message, 500);
-  console.error("[discord-verify] connexion par code refusée", error);
-  return fail("DISCORD_AUTH_FAILED", 500);
+  // Un code du site tel quel, une contention passagère en 409 (« réessaie »),
+  // tout le reste (texte du pilote) réduit à `DISCORD_AUTH_FAILED`, journalisé.
+  return fail(serviceErrorCode(error, "DISCORD_AUTH_FAILED"), 500);
 }

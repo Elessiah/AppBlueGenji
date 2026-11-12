@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { cancelInvitation, respondToInvitation } from "@/lib/server/teams/invitations";
@@ -20,14 +21,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     await respondToInvitation(user.id, invitationId, Boolean(body.accept));
     return ok({ ok: true });
   } catch (error) {
-    const message = (error as Error).message;
+    const message = serviceErrorCode(error, "INVITATION_RESPOND_FAILED");
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === "INVITATION_NOT_FOUND") return fail(message, 404);
     if (message === "INVITATION_NOT_PENDING") return fail(message, 409);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
-    return fail(message || "INVITATION_RESPOND_FAILED", 400);
+    return fail(message, message === "INVITATION_RESPOND_FAILED" ? 500 : 400);
   }
 }
 
@@ -48,10 +49,10 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     await cancelInvitation(user.id, invitationId, can(user, "tournaments"));
     return ok({ ok: true });
   } catch (error) {
-    const message = (error as Error).message;
+    const message = serviceErrorCode(error, "INVITATION_CANCEL_FAILED");
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "INVITATION_NOT_FOUND") return fail(message, 404);
     if (message === "INVITATION_NOT_PENDING") return fail(message, 409);
-    return fail(message || "INVITATION_CANCEL_FAILED", 400);
+    return fail(message, message === "INVITATION_CANCEL_FAILED" ? 500 : 400);
   }
 }

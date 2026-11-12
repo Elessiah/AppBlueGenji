@@ -301,12 +301,22 @@ describe("POST /api/auth/discord/verify — erreur interne", () => {
   });
 
   it("POST_sqlErrorSentence_returnsDiscordAuthFailed500", async () => {
-    createSessionMock.mockRejectedValueOnce(new Error("Lock wait timeout exceeded; try restarting transaction"));
+    createSessionMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED 127.0.0.1:3306"));
 
     const res = await attempt(VICTIM_CHALLENGE, "424242");
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "DISCORD_AUTH_FAILED" });
+  });
+
+  it("POST_lockWaitTimeout_returnsConcurrentUpdateRetry409", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    createSessionMock.mockRejectedValueOnce(new Error("Lock wait timeout exceeded; try restarting transaction"));
+
+    const res = await attempt(VICTIM_CHALLENGE, "424242");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 
   it("POST_codeLikeError_passesCodeThrough500", async () => {

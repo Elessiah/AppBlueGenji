@@ -13,6 +13,7 @@
  */
 import { getCurrentUser } from "@/lib/server/auth";
 import { listAccountConnections } from "@/lib/server/account-identities";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 
 export async function GET() {
@@ -22,7 +23,7 @@ export async function GET() {
   try {
     return ok({ connections: await listAccountConnections(user.id) });
   } catch (error) {
-    const message = (error as Error).message || "CONNECTIONS_LOAD_FAILED";
+    const message = serviceErrorCode(error, "CONNECTIONS_LOAD_FAILED");
     return fail(message, message === "PROFILE_NOT_FOUND" ? 404 : 500);
   }
 }
