@@ -24,6 +24,15 @@ describe("refusalNeedsServerInvite", () => {
     expect(enLogin.page.inviteAfterRefusal).toContain("<join>");
     expect(readSource("app/connexion/_components/LoginForm.tsx")).toContain("inviteAfterRefusal &&");
   });
+
+  it("le paragraphe s'annonce (région status montée d'avance) et le champ le cite", () => {
+    const form = readSource("app/connexion/_components/LoginForm.tsx");
+    const region = form.indexOf('<div role="status">');
+    expect(region).toBeGreaterThan(-1);
+    expect(form.indexOf("{inviteAfterRefusal && (", region)).toBeGreaterThan(region);
+    expect(form).toContain('<p id={LOGIN_INVITE_ID}');
+    expect(form).toContain('fieldErrors.aria("handle", "login-discord-handle-help", inviteAfterRefusal && LOGIN_INVITE_ID)');
+  });
 });
 
 describe("page d'un signalement : panne passagère", () => {
