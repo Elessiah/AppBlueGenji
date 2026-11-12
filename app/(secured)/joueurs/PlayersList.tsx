@@ -110,10 +110,9 @@ export default function PlayersList() {
   // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2). Tous
   // les tris départagent par pseudo, dans la langue de la page.
   // Tri et filtres : fonctions pures de `player-directory.ts`, testées hors du composant.
-  const sortLocale = text.locale;
   const sorted = useMemo(
-    () => sortPlayers(listed, sort, sortLocale),
-    [listed, sort, sortLocale],
+    () => sortPlayers(listed, sort, text.locale),
+    [listed, sort, text.locale],
   );
   const rolesAllowed = statusFilterAllowsRoles(statusFilter);
   const filtered = useMemo(

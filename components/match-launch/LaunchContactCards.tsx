@@ -199,17 +199,22 @@ export function SideCard({
   renderName?: (side: LaunchSide) => ReactNode;
 }>) {
   const { t } = useLaunchText();
+  // Le nom rendu par l'écran de tournoi (`EntrantName`) porte déjà son
+  // emblème : la carte ne pose pas le sien en plus.
+  const customName = linkNames && renderName !== undefined;
   return (
     <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={side.name}>
       <div className={styles.sideHead}>
-        <span className={styles.emblem} aria-hidden="true">
-          {side.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- fichier du site, déjà optimisé au téléversement
-            <img src={side.logoUrl} alt="" />
-          ) : (
-            Array.from(side.name.trim())[0]?.toUpperCase() ?? "?"
-          )}
-        </span>
+        {!customName && (
+          <span className={styles.emblem} aria-hidden="true">
+            {side.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- fichier du site, déjà optimisé au téléversement
+              <img src={side.logoUrl} alt="" />
+            ) : (
+              Array.from(side.name.trim())[0]?.toUpperCase() ?? "?"
+            )}
+          </span>
+        )}
         <span className={styles.sideName}>
           {linkNames ? (renderName?.(side) ?? <SideName side={side} />) : side.name}
         </span>

@@ -9,7 +9,7 @@ import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import { useShellText } from "./i18n/shell-text";
-import { responsiveCopies, useMediaMatch } from "@/lib/shared/hooks/useMediaMatch";
+import { NARROW_LAYOUT_QUERY, responsiveCopies, useMediaMatch } from "@/lib/shared/hooks/useMediaMatch";
 import s from "./site-nav.module.css";
 
 type SiteNavProps = {
@@ -42,8 +42,8 @@ export const SITE_NAV_LINKS = [
 ] as const satisfies ReadonlyArray<{ href: string; labelKey: ShellKey; rgb: string }>;
 const links = SITE_NAV_LINKS;
 
-/** Largeur où la barre passe sur deux lignes (`site-nav.module.css`, même seuil). */
-export const NAV_NARROW_QUERY = "(max-width: 720px)";
+/** Largeur où la barre passe sur deux lignes (`site-nav.module.css`, même seuil) : la largeur étroite commune. */
+export const NAV_NARROW_QUERY = NARROW_LAYOUT_QUERY;
 
 export function SiteNav({
   pseudo,

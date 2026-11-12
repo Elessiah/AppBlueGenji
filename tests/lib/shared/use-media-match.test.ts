@@ -3,8 +3,8 @@
  * `responsiveCopies`) : au rendu serveur les deux, triées par le CSS ; monté,
  * la seule de la largeur courante.
  */
-import { describe, expect, it } from "@jest/globals";
-import { responsiveCopies } from "@/lib/shared/hooks/useMediaMatch";
+import { describe, expect, it, jest } from "@jest/globals";
+import { NARROW_LAYOUT_QUERY, mediaQueryList, responsiveCopies } from "@/lib/shared/hooks/useMediaMatch";
 import { readSource } from "../../helpers/read-source";
 
 describe("responsiveCopies", () => {
@@ -25,9 +25,28 @@ describe("useMediaMatch", () => {
   const hook = readSource("lib/shared/hooks/useMediaMatch.ts");
 
   it("rend null côté serveur et suit les changements de la requête", () => {
-    expect(hook).toContain("() => window.matchMedia(query).matches, () => null");
+    expect(hook).toContain("useSyncExternalStore<boolean | null>(subscribe, getSnapshot, () => null)");
+    expect(hook).toContain("const getSnapshot = useCallback(() => mediaQueryList(query).matches, [query]);");
     expect(hook).toContain('list.addEventListener("change", onChange);');
     expect(hook).toContain('list.removeEventListener("change", onChange);');
+  });
+});
+
+describe("mediaQueryList", () => {
+  it("mediaQueryList_sameQueryTwice_allocatesOneList", () => {
+    const list = { matches: true } as unknown as MediaQueryList;
+    const matchMedia = jest.fn<(query: string) => MediaQueryList>(() => list);
+    const previous = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = { matchMedia };
+    try {
+      expect(mediaQueryList("(max-width: 1px)")).toBe(list);
+      expect(mediaQueryList("(max-width: 1px)")).toBe(list);
+      expect(matchMedia).toHaveBeenCalledTimes(1);
+      mediaQueryList("(max-width: 2px)");
+      expect(matchMedia).toHaveBeenCalledTimes(2);
+    } finally {
+      (globalThis as { window?: unknown }).window = previous;
+    }
   });
 });
 
@@ -44,7 +63,8 @@ describe("SiteNav : une seule copie montée", () => {
   });
 
   it("le seuil JS est celui du CSS", () => {
-    expect(nav).toContain('NAV_NARROW_QUERY = "(max-width: 720px)"');
+    expect(nav).toContain("NAV_NARROW_QUERY = NARROW_LAYOUT_QUERY;");
+    expect(NARROW_LAYOUT_QUERY).toBe("(max-width: 720px)");
     expect(css).toContain("@media (max-width: 720px)");
   });
 });

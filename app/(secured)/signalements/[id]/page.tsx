@@ -65,6 +65,14 @@ export default function ConcernedReportPage() {
   const focusTitle = useCallback((node: HTMLElement | null) => {
     if (node !== null && focusAfterRetry.current) node.focus();
   }, []);
+  // Résultat : le titre vit dans `ConcernedReport` ; le focus va à lui, pas à
+  // la section entière (qui ferait lire tout le signalement d'un trait).
+  const focusReportTitle = useCallback((node: HTMLElement | null) => {
+    const title = node?.querySelector<HTMLElement>("h1");
+    if (!title || !focusAfterRetry.current) return;
+    title.tabIndex = -1;
+    title.focus();
+  }, []);
 
   /** « Réessayer » : retour à l'état de chargement, le focus suit le titre affiché. */
   const retry = useCallback(() => {
@@ -137,7 +145,7 @@ export default function ConcernedReportPage() {
   }
 
   return (
-    <section ref={focusTitle} tabIndex={-1} className={`fade-in container ${styles.page}`}>
+    <section ref={focusReportTitle} className={`fade-in container ${styles.page}`}>
       <ConcernedReport report={state.report} onContest={() => setContesting(true)} />
 
       {contesting && (

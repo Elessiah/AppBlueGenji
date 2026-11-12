@@ -67,7 +67,9 @@ export interface PointerTarget {
  * Contrôles qui reçoivent un `click` sur iOS : le geste leur revient. Rôles
  * ARIA des widgets compris (onglet, interrupteur, option, liste déroulante…)
  * et tout élément atteignable au clavier (`tabindex` ≥ 0) ; un conteneur de
- * modale (`tabindex="-1"`) n'en est pas un — toucher son texte referme.
+ * modale (`tabindex="-1"`) n'en est pas un — toucher son texte referme —, ni
+ * une zone défilante (`<ScrollArea>` qui déborde : `tabindex="0"` pour le
+ * clavier, `role="region"`), dont le texte n'est pas un contrôle.
  */
 const INTERACTIVE_SELECTOR = [
   "a[href]",
@@ -78,7 +80,7 @@ const INTERACTIVE_SELECTOR = [
   "label",
   "summary",
   '[contenteditable="true"]',
-  '[tabindex]:not([tabindex="-1"])',
+  '[tabindex]:not([tabindex="-1"]):not(.scroll-area):not([role="region"])',
   ...[
     "button",
     "link",

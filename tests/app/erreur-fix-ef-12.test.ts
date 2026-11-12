@@ -61,6 +61,13 @@ describe("page d'un signalement : panne passagère", () => {
     expect(page).toContain('if (state.status !== "loading") focusAfterRetry.current = false;');
   });
 
+  it("ConcernedReportPage_readyAfterRetry_focusesHeadingNotSection", () => {
+    expect(page).toContain('const title = node?.querySelector<HTMLElement>("h1");');
+    expect(page).toContain("title.tabIndex = -1;");
+    expect(page).toContain("<section ref={focusReportTitle} className={`fade-in container ${styles.page}`}>");
+    expect(page).not.toContain("<section ref={focusTitle}");
+  });
+
   it("porte les trois textes en français et en anglais", () => {
     for (const reports of [frReports, enReports]) {
       expect(reports.concerned.errorTitle).not.toBe("");

@@ -47,7 +47,7 @@ describe("isInteractivePointerTarget (sélecteur élargi)", () => {
     for (const part of ['[role="tab"]', '[role="switch"]', '[role="radio"]', '[role="option"]', '[role="combobox"]']) {
       expect(selector).toContain(part);
     }
-    expect(selector).toContain('[tabindex]:not([tabindex="-1"])');
+    expect(selector).toContain('[tabindex]:not([tabindex="-1"]):not(.scroll-area):not([role="region"])');
   });
 });
 

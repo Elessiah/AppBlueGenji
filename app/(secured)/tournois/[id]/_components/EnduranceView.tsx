@@ -41,12 +41,12 @@ import { EnduranceChartPanel } from "./EnduranceChartPanel";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { projectPlayoffGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
 import { BracketSections } from "./BracketSections";
-import { useMediaMatch } from "@/lib/shared/hooks/useMediaMatch";
+import { NARROW_LAYOUT_QUERY, useMediaMatch } from "@/lib/shared/hooks/useMediaMatch";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
 import styles from "./EnduranceView.module.css";
 
 /** Largeur sous laquelle l'arbre final n'annonce que le prochain tour (téléphone). */
-const PLAYOFF_TREE_NARROW_QUERY = "(max-width: 720px)";
+const PLAYOFF_TREE_NARROW_QUERY = NARROW_LAYOUT_QUERY;
 
 interface EnduranceViewProps {
   endurance: EnduranceMeta;

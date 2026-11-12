@@ -251,11 +251,11 @@
      les deux blocs. Quand les pastilles passent à la ligne, il tombe hors du
      bord gauche de la rangée et y est rogné : il ne reste jamais seul en fin
      de ligne, quelle que soit la largeur ou la langue. Les 4 px de marge
-     intérieure gardent visible l'anneau de focus d'une pastille en début de
-     ligne. */
+     intérieure, de chaque côté, gardent visible l'anneau de focus d'une
+     pastille en début de ligne comme du « i » en fin de ligne. */
   overflow-x: clip;
-  padding-left: 4px;
-  margin-left: -4px;
+  padding-inline: 4px;
+  margin-inline: -4px;
 }
 .statusOpts {
   position: relative;
@@ -274,6 +274,8 @@
   transform: translateY(-50%);
   pointer-events: none;
 }
+/* Règle à part, sur une ligne : le « · » est un séparateur, seul ornement
+   admis en --ink-faint (`accessibility-styles.test.ts`). */
 .statusOpts::before { color: var(--ink-faint); }
 
 /* sort row */

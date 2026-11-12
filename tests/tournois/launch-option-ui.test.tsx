@@ -300,6 +300,29 @@ describe("fiches de contact — noms cliquables", () => {
     expect(html).not.toContain("href=");
   });
 
+  // Le nom fourni par l'écran de tournoi (`EntrantName`) porte son emblème :
+  // la carte ne double pas le sien.
+  it("SideCard_renderNameWithLinkNames_omitsOwnEmblem", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames renderName={(s) => <span>{s.name}</span>} />,
+    );
+    expect(html).not.toContain('class="emblem"');
+  });
+
+  it("SideCard_linkNamesWithoutRenderName_keepsOwnEmblem", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
+    );
+    expect(html).toContain('class="emblem"');
+  });
+
+  it("SideCard_renderNameWithoutLinkNames_keepsOwnEmblem", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} renderName={(s) => <span>{s.name}</span>} />,
+    );
+    expect(html).toContain('class="emblem"');
+  });
+
   it("MatchPage_connectionSection_namesEntrantsThroughEntrantLink", () => {
     const source = read("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
     expect(source).toContain("renderName={connectionSideName}");

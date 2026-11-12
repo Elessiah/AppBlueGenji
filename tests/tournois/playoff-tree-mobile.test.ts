@@ -30,7 +30,7 @@ describe("EnduranceView : l'arbre n'annonce qu'un tour sur téléphone", () => {
   const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
 
   it("filtre les cases selon la largeur, l'arbre entier au rendu serveur", () => {
-    expect(view).toContain('PLAYOFF_TREE_NARROW_QUERY = "(max-width: 720px)"');
+    expect(view).toContain("PLAYOFF_TREE_NARROW_QUERY = NARROW_LAYOUT_QUERY;");
     expect(view).toContain("useMediaMatch(PLAYOFF_TREE_NARROW_QUERY) === true");
     expect(view).toContain("playoffGhostsShown(playoffGhosts, narrowTree)");
     expect(view).toContain("ghostSlots={shownPlayoffGhosts}");
