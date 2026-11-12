@@ -6,8 +6,12 @@ describe("concernedReportLoadFailure", () => {
     expect(concernedReportLoadFailure(status)).toBe("missing");
   });
 
-  it.each([500, 502, 503, 429, 408, 401])("le statut %i propose de réessayer", (status) => {
+  it.each([500, 502, 503, 429, 408])("le statut %i propose de réessayer", (status) => {
     expect(concernedReportLoadFailure(status)).toBe("error");
+  });
+
+  it("401 (session expirée) propose de se reconnecter, jamais « Réessayer » en boucle", () => {
+    expect(concernedReportLoadFailure(401)).toBe("signedOut");
   });
 
   it("une requête qui n'a pas abouti (réseau) propose de réessayer", () => {

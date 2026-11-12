@@ -35,6 +35,23 @@ describe("page d'un signalement : panne passagère", () => {
     expect(page).toContain('t("concerned.retry")');
   });
 
+  it("session expirée : carte de reconnexion qui ramène au signalement, dans la langue de la page", () => {
+    expect(page).toContain('state.status === "signedOut"');
+    expect(page).toContain("authGateLoginHref(localeHref(`/signalements/${reportId}`, locale), \"\", \"\")");
+    for (const reports of [frReports, enReports]) {
+      expect(reports.concerned.signedOutTitle).not.toBe("");
+      expect(reports.concerned.signedOutBody).not.toBe("");
+      expect(reports.concerned.signIn).not.toBe("");
+    }
+  });
+
+  it("« Réessayer » rend le focus au titre de l'état suivant (chargement, puis résultat)", () => {
+    expect(page).toContain("focusAfterRetry.current = true;");
+    expect(page).toMatch(/<p ref=\{focusTitle\} tabIndex=\{-1\}/);
+    expect(page.match(/<h1 ref=\{focusTitle\} tabIndex=\{-1\}/g)).toHaveLength(3);
+    expect(page).toContain('if (state.status !== "loading") focusAfterRetry.current = false;');
+  });
+
   it("porte les trois textes en français et en anglais", () => {
     for (const reports of [frReports, enReports]) {
       expect(reports.concerned.errorTitle).not.toBe("");
