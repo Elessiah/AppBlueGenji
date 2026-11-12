@@ -10,6 +10,7 @@ import {
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
+  MATCH_DM_RETRY_DELAY_MS,
   pendingRefereeDigest,
   resetMatchReminderThrottle,
   type MatchNotice,
@@ -344,6 +345,64 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       ([sql]) => sql.startsWith("DELETE") || sql.startsWith("UPDATE"),
     );
     expect(writes).toEqual([]);
+  });
+
+  /** Les reprises de messages privés programmées pendant l'appel (minuteur capturé, pas lancé). */
+  function captureDmRetries(): (() => void)[] {
+    const retries: (() => void)[] = [];
+    const realSetTimeout = setTimeout;
+    jest.spyOn(global, "setTimeout").mockImplementation(((callback: () => void, delay?: number) => {
+      if (delay === MATCH_DM_RETRY_DELAY_MS) {
+        retries.push(callback);
+        return { unref: () => undefined } as unknown as ReturnType<typeof setTimeout>;
+      }
+      return realSetTimeout(callback, delay);
+    }) as typeof setTimeout);
+    return retries;
+  }
+
+  it("dispatchDueMatchReminders_botDownForOneSide_retriesItsDmOnceWithoutPush", async () => {
+    await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) =>
+      message.includes("**Team Nova** contre") ? null : { sent: 2, unresolved: [], failed: [] },
+    );
+    const retries = captureDmRetries();
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    expect(retries).toHaveLength(1);
+    jest.mocked(pushDiscordDirectMessages).mockClear();
+    jest.mocked(pushToUsers).mockClear();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+
+    retries[0]();
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0] as [string, { label: string }[]];
+    expect(message).toContain("**Team Nova** contre");
+    expect(recipients.map((r) => r.label)).toEqual(["Nova"]);
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_nothingDelivered_schedulesNoDmRetry", async () => {
+    await mockDb({});
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
+    const retries = captureDmRetries();
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+
+    expect(retries).toHaveLength(0);
+  });
+
+  it("dispatchDueMatchReminders_everyDmDelivered_schedulesNoDmRetry", async () => {
+    await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    const retries = captureDmRetries();
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+
+    expect(retries).toHaveLength(0);
   });
 
   it("n'envoie rien quand l'horaire a changé depuis la lecture du balayage", async () => {

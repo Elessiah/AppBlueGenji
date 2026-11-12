@@ -71,6 +71,12 @@ export type UserNotification = {
    */
   discord?: { message: LocalizedDm; context: string };
   pushOptions?: PushOptions;
+  /**
+   * Message privé seul, sans push : la **reprise** d'un message privé que le
+   * bot n'a pas remis à quelques comptes, quand le push est déjà parti avec
+   * le premier envoi (`match-reminders.ts`).
+   */
+  discordOnly?: true;
 };
 
 export type NotificationReport = {
@@ -119,7 +125,9 @@ export async function notifyUsers(
     // Un sujet réservé à une permission ne part qu'à qui la détient encore, non
     // suspendu : `pushToUsers` en juge sur les lignes d'abonnement qu'il lit
     // déjà — aucune lecture de plus, et aucune sans configuration push.
-    pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions),
+    notification.discordOnly
+      ? Promise.resolve(0)
+      : pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions),
   ]);
   return { discord: discord.report, discordUnreachedUserIds: discord.unreached, pushed };
 }

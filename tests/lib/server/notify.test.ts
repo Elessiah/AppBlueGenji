@@ -52,6 +52,19 @@ describe("notifyUsers", () => {
     expect(report).toEqual({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 2 });
   });
 
+  it("notifyUsers_discordOnly_sendsTheDmWithoutAnyPush", async () => {
+    const report = await notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" } }], {
+      topic: "MATCH_REMINDER",
+      push: PUSH,
+      discord: { message: DM, context: "match-reminder" },
+      discordOnly: true,
+    });
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(report.pushed).toBe(0);
+  });
+
   it("écrit à chacun dans la langue de son compte : un appel au bot par langue", async () => {
     const query = accountLocales([
       { id: 1, locale: "fr" },

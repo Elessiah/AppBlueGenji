@@ -38,7 +38,9 @@ import {
   loadNotificationRecipients,
   notifyUsers,
   type NotificationRecipient,
+  type UserNotification,
 } from "@/lib/server/notify";
+import { failureReason } from "@/lib/server/failure-reason";
 import { usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush, pushRoundLabel } from "@/lib/shared/push-messages";
 import type { LocalizedDm } from "@/lib/shared/dm-language";
@@ -514,12 +516,14 @@ type MatchSide = ReturnType<typeof matchSides>[number];
  * push dans la langue de chaque destinataire.
  *
  * @returns L'envoi a-t-il atteint quelqu'un (message privé remis, ou appareil) ?
+ *   Et la reprise des messages privés que le bot n'a pas remis (comptes de
+ *   l'appel perdu, langues non tentées), `null` s'il n'y en a pas.
  */
 async function sendToSide(
   { match, offset, remaining, announcement = FIRST_SCHEDULE, clearedStartAt, now, plannedAt }: PlannedSend,
   side: MatchSide,
   recipients: NotificationRecipient[],
-): Promise<boolean> {
+): Promise<SideOutcome> {
   const swiss = isSwissRound(match);
   const solo = match.participant_type === "SOLO";
   // Un avis de retrait porte l'horaire qui ne vaut plus.
@@ -579,15 +583,59 @@ async function sendToSide(
   }
 
   const offsetKey = offset ? offset.key : null;
-  const report = await notifyUsers(recipients, {
+  const notification: UserNotification = {
     topic: "MATCH_REMINDER",
     discord: { message, context: discordContext },
     push: (locale) =>
       clearedStartAt
         ? matchScheduleClearedPush(pushSide, locale)
         : matchReminderPush(pushSide, offsetKey, locale, announcement),
-  });
-  return (report.discord?.sent ?? 0) > 0 || report.pushed > 0;
+  };
+  const report = await notifyUsers(recipients, notification);
+  const unreached = new Set(report.discordUnreachedUserIds);
+  return {
+    delivered: (report.discord?.sent ?? 0) > 0 || report.pushed > 0,
+    retry:
+      unreached.size === 0
+        ? null
+        : { recipients: recipients.filter((recipient) => unreached.has(recipient.userId)), notification },
+  };
+}
+
+/** Bilan d'un envoi à une engagée (`sendToSide`). */
+type SideOutcome = {
+  delivered: boolean;
+  retry: { recipients: NotificationRecipient[]; notification: UserNotification } | null;
+};
+
+/** Délai avant la reprise des messages privés non remis : le bot a le temps de revenir. */
+export const MATCH_DM_RETRY_DELAY_MS = 120_000;
+
+/**
+ * Reprend **une fois**, message privé seul, les comptes que le bot n'a pas
+ * joints alors que l'envoi a atteint quelqu'un — sa marque est gardée, le
+ * balayage ne le retentera pas. Sans cela, un bot tombé entre l'appel français
+ * et l'appel anglais d'une engagée laissait ses joueurs anglophones sans
+ * message ni nouvel essai (revue sécurité #469). Le push, lui, est déjà parti :
+ * il ne sonne pas une seconde fois. En mémoire : un redémarrage dans
+ * l'intervalle la perd (meilleur effort, comme l'envoi).
+ */
+function scheduleDmRetry(retries: readonly NonNullable<SideOutcome["retry"]>[]): void {
+  if (retries.length === 0) return;
+  const timer = setTimeout(() => {
+    for (const { recipients, notification } of retries) {
+      void notifyUsers(recipients, { ...notification, discordOnly: true })
+        .then((report) => {
+          if (report.discordUnreachedUserIds.length > 0) {
+            console.warn(
+              `[match-reminders] bot injoignable à la reprise : ${report.discordUnreachedUserIds.length} message(s) privé(s) perdu(s)`,
+            );
+          }
+        })
+        .catch((error: unknown) => console.error("[match-reminders] reprise des messages privés impossible", failureReason(error)));
+    }
+  }, MATCH_DM_RETRY_DELAY_MS);
+  timer.unref?.();
 }
 
 /**
@@ -629,11 +677,13 @@ async function dispatchPlannedSend(
   );
   // Une engagée atteinte suffit : l'horaire est reçu, même si l'autre envoi a
   // échoué. Rien d'atteint (ou tout en échec) : la marque reprend son état.
+  const outcomes = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+  const delivered = outcomes.some((outcome) => outcome.delivered);
+  // Marques gardées : les messages privés non remis sont repris à part. Marques
+  // rendues : le passage suivant renvoie tout, une reprise ferait doublon.
+  if (delivered) scheduleDmRetry(outcomes.flatMap((outcome) => (outcome.retry ? [outcome.retry] : [])));
   try {
-    await closeToldMark(
-      told,
-      results.some((result) => result.status === "fulfilled" && result.value),
-    );
+    await closeToldMark(told, delivered);
   } catch (error) {
     // La marque garde l'horaire écrit avant l'envoi : pm2 le dit, et l'échec
     // de l'envoi lui-même reste celui qui remonte.
