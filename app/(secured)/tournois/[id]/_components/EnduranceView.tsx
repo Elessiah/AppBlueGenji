@@ -16,8 +16,10 @@ import {
   endurancePlayoffThirdPlaceSlot,
   enduranceRoundSections,
   splitEnduranceMatches,
+  playoffGhostsShown,
   splitPlayoffBrackets,
 } from "../_lib/endurance-sections";
+
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
@@ -39,8 +41,12 @@ import { EnduranceChartPanel } from "./EnduranceChartPanel";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { projectPlayoffGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
 import { BracketSections } from "./BracketSections";
+import { useMediaMatch } from "@/lib/shared/hooks/useMediaMatch";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
 import styles from "./EnduranceView.module.css";
+
+/** Largeur sous laquelle l'arbre final n'annonce que le prochain tour (téléphone). */
+const PLAYOFF_TREE_NARROW_QUERY = "(max-width: 720px)";
 
 interface EnduranceViewProps {
   endurance: EnduranceMeta;
@@ -308,6 +314,13 @@ export function EnduranceView({
       detachedThirdPlace: thirdPlace.filter((match) => match.id !== thirdPlaceSlot?.match?.id),
     };
   }, [matches, isFinished]);
+  // Téléphone : le seul prochain tour à pourvoir (`playoffGhostsShown`). Au
+  // rendu serveur, la largeur est inconnue : l'arbre entier, comme avant.
+  const narrowTree = useMediaMatch(PLAYOFF_TREE_NARROW_QUERY) === true;
+  const shownPlayoffGhosts = useMemo(
+    () => playoffGhostsShown(playoffGhosts, narrowTree),
+    [playoffGhosts, narrowTree],
+  );
   const resolvePlayoffNext = (slot: BracketSlotRef) => playoffLinks.get(slot.id) ?? null;
 
   // Abandon : proposé sur les équipes encore en lice, à leurs représentants
@@ -517,7 +530,7 @@ export function EnduranceView({
             bracketLabel={t("endurance.playoffs")}
             showBracketLabel={false}
             matches={decisive}
-            ghostSlots={playoffGhosts}
+            ghostSlots={shownPlayoffGhosts}
             ghostEntrants={playoffGhostEntrants}
             thirdPlace={thirdPlaceSlot}
             grandFinalLabel

@@ -454,3 +454,16 @@ export function endurancePlayoffLinks(
 
   return links;
 }
+
+/**
+ * Les cases à pourvoir **dessinées** : toutes en largeur ordinaire, celles du
+ * seul **prochain tour** sur un téléphone (`narrow`). À 375 px, l'arbre entier
+ * faisait traverser au lecteur des colonnes de cases vides jusqu'à une finale
+ * isolée ; le tour suivant suffit à dire où mène chaque rencontre, et les tours
+ * plus lointains se dessinent à mesure qu'ils approchent.
+ */
+export function playoffGhostsShown(ghosts: readonly BracketSlotRef[], narrow: boolean): readonly BracketSlotRef[] {
+  if (!narrow || ghosts.length === 0) return ghosts;
+  const next = Math.min(...ghosts.map((slot) => slot.roundNumber));
+  return ghosts.filter((slot) => slot.roundNumber === next);
+}

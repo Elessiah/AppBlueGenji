@@ -16,6 +16,8 @@ import {
 } from "../_lib/bracket-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import styles from "./BracketSections.module.css";
 
 interface BracketSectionsProps {
   bracketType: BracketType;
@@ -234,6 +236,18 @@ export function BracketSections({
               flag={hasMyMatch ? text.t("bracket.yourMatch") : null}
               meta={<PanelPill>{text.t("bracket.matchCount", { count: matchCount })}</PanelPill>}
             >
+              {/* Un volet de cases à pourvoir dit ce qu'elles sont — sans quoi un
+                  volet qui n'en contient que montre des boîtes identiques sans un mot. */}
+              {(sectionGhosts.length > 0 || (sectionThirdPlace !== null && !sectionThirdPlace.match)) && (
+                <div className={styles.ghostHint}>
+                  <InfoHintRow>
+                    <span>{text.t("bracket.ghostSlots")}</span>
+                    <InfoHint id={`${panelId}-ghost-hint`} subject={text.t("bracket.ghostSlots")}>
+                      <p>{text.t("bracket.ghostSlotsHint")}</p>
+                    </InfoHint>
+                  </InfoHintRow>
+                </div>
+              )}
               <BracketTree
                 matches={sectionMatches}
                 ghostSlots={sectionGhosts}
