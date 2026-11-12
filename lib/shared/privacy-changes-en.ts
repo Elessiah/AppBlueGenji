@@ -1042,6 +1042,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing new is collected; it is the same choice, kept for the lifetime of the account (legal obligation: that is what lets the site keep honouring your objection) and included in the export of your data. These messages are still based on the association's legitimate interest in forming teams (register, T03).",
     ],
   },
+  "2026-11-bot-avis-d-exclusion": {
+    linkLabels: ["Read the bot's privacy policy", "Read processing activity T08 in the register"],
+    title: "Discord bot: the notice sent to an excluded member",
+    summary:
+      "When a member excluded from the network posts an advertisement in a relayed channel, the bot copies the reason for their exclusion to them by direct message. This was already the case: the bot's policy and the register now say so, along with what the bot keeps; lifting the exclusion now also retries at once deleting up to ten replaced notices still queued.",
+    details: [
+      "What the bot does: at most once a day, it copies the reason for their exclusion to the excluded member by direct message; a new notice replaces the previous one, which the bot deletes if it can. It keeps the ID of that message and the time of the last attempt to send it.",
+      "When the exclusion is lifted, the notice is deleted with the rest. If Discord is temporarily unreachable, the ID of the excluded member, that of the message and the time it was queued are kept to retry during the bot's clean-up (every night, and when it restarts or after a restore; a limited number of notices each time), for 30 days at most, even after the exclusion is lifted; new: when it is lifted, up to ten of those replaced notices still queued are also retried at once, the others during the next clean-up. If lifting fails (the bot's database unavailable), the current notice may be deleted during a clean-up while the exclusion still applies. A notice that Discord refuses to delete for good (conversation or access closed), or that is still there after those 30 days, is no longer retried: the bot forgets its ID and the notice remains in the excluded member's direct conversation with the bot, like a notice sent before the bot kept its ID. If the bot's database is unavailable just after sending, or Discord's reply is lost, a notice may also remain without the bot keeping its ID; the same goes, after the bot's database is restored from a backup, for a notice sent since that backup.",
+    ],
+  },
 };
 
 /**

@@ -48,7 +48,8 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
 - Nom du salon = nom de l'équipe seul ; aucun pseudo n'est envoyé au bot. Le nom
   passe par `visibleText` (`UNTRUSTED_NAMES.md`) ; si le bot le refuse
   (`INVALID_VOICE_CHANNEL_NAME`), le salon est redemandé sous « Salon d'équipe »
-  (`VOICE_FALLBACK_CHANNEL_NAME`).
+  (`VOICE_FALLBACK_CHANNEL_NAME`), avec `fallback: true` : seul ce drapeau fait
+  numéroter le salon par le bot — une équipe nommée « Salon d'équipe » garde son nom.
 - **Échéance** : de T−15 min à T+24 h (`VOICE_CHANNEL_LATE_HOURS`) — un match
   oublié bien après son heure n'ouvre plus de salon. et ses salons déjà ouverts sont rendus au bot
   passé ce délai (`RELEASABLE_SQL`), pour que la passe revienne au garde-fou.

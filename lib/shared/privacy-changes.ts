@@ -1964,6 +1964,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#messages-d-equipe", label: "Lire le paragraphe « Messages privés Discord d'équipe »" },
     ],
   },
+  {
+    // BOT-LOT (ERREUR.txt), rectificatif : l'avis d'exclusion que le bot envoie
+    // en message privé à l'exclu, et ce qu'il en garde, que ni la politique du
+    // bot ni le registre (T08) ne disaient. Rien de nouveau n'est collecté. Pour
+    // tous les comptes ; datée du lendemain de la nuit de déploiement.
+    id: "2026-11-bot-avis-d-exclusion",
+    publishedAt: "2026-11-13",
+    title: "Bot Discord : l'avis envoyé à un membre exclu",
+    summary:
+      "Quand un membre exclu du réseau publie une annonce dans un salon relayé, le bot lui recopie le motif de son exclusion en message privé. C'était déjà le cas : la politique du bot et le registre le disent maintenant, avec ce que le bot en garde ; la levée de l'exclusion réessaie aussi, désormais, d'effacer sur-le-champ dix au plus des avis remplacés restés en file.",
+    details: [
+      "Ce que fait le bot : au plus une fois par jour, il recopie à l'exclu le motif de son exclusion en message privé ; un nouvel avis remplace le précédent, que le bot supprime s'il le peut. Il garde l'identifiant de ce message et l'heure du dernier essai d'envoi.",
+      "À la levée de l'exclusion, l'avis est supprimé avec le reste. Si Discord est momentanément injoignable, l'identifiant de l'exclu, celui du message et l'heure de sa mise en file sont gardés pour réessayer lors du ménage du bot (chaque nuit, et à son redémarrage ou après une restauration ; un nombre limité d'avis à chaque passage), 30 jours au plus, même après la levée ; nouveau : à la levée, dix au plus de ces avis remplacés restés en file sont aussi réessayés sur-le-champ, les autres au ménage suivant. Si la levée échoue (base du bot indisponible), l'avis en cours peut être supprimé lors d'un ménage alors que l'exclusion court toujours. Un avis que Discord refuse de supprimer pour de bon (conversation ou accès fermé), ou toujours là au bout de ces 30 jours, n'est plus réessayé : le bot oublie son identifiant et l'avis reste dans la conversation privée de l'exclu avec le bot, comme un avis envoyé avant que le bot ne garde son identifiant. Si la base du bot est indisponible juste après un envoi, ou que la réponse de Discord se perd, un avis peut aussi rester sans que le bot en garde l'identifiant ; de même, après une restauration de la base du bot depuis une sauvegarde, pour un avis envoyé depuis cette sauvegarde.",
+    ],
+    links: [
+      { href: "/privacy-policy-bot", label: "Lire la politique de confidentialité du bot" },
+      { href: "/rgpd/registre#t08", label: "Lire le traitement T08 du registre" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

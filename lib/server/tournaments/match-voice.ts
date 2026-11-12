@@ -516,7 +516,7 @@ async function writeFailure(matchId: number, teamId: number): Promise<void> {
 async function ensureTeamChannel(key: string, name: string): Promise<VoiceCallOutcome<string>> {
   const first = await ensureVoiceChannel(key, name);
   if (first.kind === "ok" || first.code !== "INVALID_VOICE_CHANNEL_NAME") return first;
-  return ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME);
+  return ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME, true);
 }
 
 /**

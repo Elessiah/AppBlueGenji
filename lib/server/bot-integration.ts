@@ -1181,9 +1181,11 @@ function readChannelId(payload: unknown): string | null {
 /**
  * Crée (ou retrouve, même `key`) le salon vocal d'une équipe. `name` : le nom
  * de l'équipe seulement — jamais un pseudo (aucun salon pour une entrée solo).
+ * `fallback` dit au bot que `name` est le nom de repli (il le numérote) : sans
+ * lui, une équipe nommée comme le repli recevrait le libellé numéroté.
  */
-export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCallOutcome<string>> {
-  return voiceCall("POST", "/internal/voice/channels", { key, name }, readChannelId);
+export function ensureVoiceChannel(key: string, name: string, fallback = false): Promise<VoiceCallOutcome<string>> {
+  return voiceCall("POST", "/internal/voice/channels", { key, name, fallback }, readChannelId);
 }
 
 /**

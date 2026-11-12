@@ -90,7 +90,23 @@ describe("bot-integration — salons vocaux", () => {
     await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({ kind: "ok", value: "123456789012345678" });
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/internal\/voice\/channels$/);
-    expect(JSON.parse(String(init?.body))).toEqual({ key: "match:42:team:1", name: "Alpha" });
+    expect(JSON.parse(String(init?.body))).toEqual({ key: "match:42:team:1", name: "Alpha", fallback: false });
+  });
+
+  it("ensureVoiceChannel_fallbackName_sendsFallbackTrue", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789012345678" }));
+
+    await ensureVoiceChannel("match:42:team:1", "Salon d'équipe", true);
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ key: "match:42:team:1", name: "Salon d'équipe", fallback: true });
+  });
+
+  it("ensureVoiceChannel_teamNamedLikeFallback_sendsFallbackFalse", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789012345678" }));
+
+    await ensureVoiceChannel("match:42:team:1", "Salon d'équipe");
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ key: "match:42:team:1", name: "Salon d'équipe", fallback: false });
   });
 
   it("ensureVoiceChannel_channelIdShorterThanSnowflake_notKept", async () => {

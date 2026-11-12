@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -10,11 +10,15 @@ import {
   flushBotLogs,
   ALERT_FLUSH_WAIT_MS,
   BOT_LOG_ORDER_WAIT_MS,
+  BOT_LOG_AFTER_FLUSH_SLOTS,
+  BOT_LOG_RESOLVE_ABANDON_MS,
+  BOT_LOG_RESOLVE_TIMEOUT_MS,
   markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
   queueRoundNoRefereeAlert,
   resolveBotLogs,
+  MATCH_READ_REUSE_MS,
 } from "@/lib/server/tournaments/bot-logs";
 import {
   flushBotLogBatch,
@@ -23,7 +27,7 @@ import {
   sendBotLog,
 } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
-import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlMock, type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 
 /**
@@ -92,6 +96,24 @@ function mockDb(rows: unknown[][]): SqlMock {
  * la réservation. Les tests qui éprouvent l'échec le remplacent.
  */
 const DELIVERED = { sent: 1, unresolved: [], failed: [] };
+
+/**
+ * Requêtes « figées » des tests de lenteur : rendues (vides) à la fin de chaque test,
+ * pour que le compte de résolutions en cours du module ne garde rien d'un test à l'autre.
+ */
+const hungQueries: (() => void)[] = [];
+
+/** Une requête qui ne revient qu'à la fin du test. */
+function hungQuery(): Promise<unknown> {
+  return new Promise((resolve) => {
+    hungQueries.push(() => resolve([[]]));
+  });
+}
+
+afterEach(async () => {
+  for (const settle of hungQueries.splice(0)) settle();
+  await new Promise((resolve) => setImmediate(resolve));
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -330,6 +352,30 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
       .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
       .filter((call) => call.sql.trim().startsWith("DELETE"));
   }
+
+  // Base lente : des vidages qui se chevauchent ne rendent pas chacun leurs réservations
+  // en même temps — la borne du module garde le pool aux joueurs.
+  it("releaseRefereeAlerts_overlappingFlushes_atMostTwoWritesInFlight", async () => {
+    let hold = true;
+    const execute = jest.fn<SqlQuery>((sql) => (hold && String(sql).trim().startsWith("DELETE") ? hungQuery() : Promise.resolve([[]])));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    for (let claimId = 1; claimId <= 5; claimId += 1) {
+      const connection = fakeConnection();
+      queueBotLog(connection, { kind: "score_report_stalled", matchId: 30 + claimId, claimId });
+      flushBotLogs(connection);
+    }
+    for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+
+    const inFlight = writes(execute).length;
+    // Remise à plat : les écritures en attente passent, la borne du module est rendue vide.
+    hold = false;
+    for (const settle of hungQueries.splice(0)) settle();
+    for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+
+    expect(inFlight).toBe(BOT_LOG_AFTER_FLUSH_SLOTS);
+    expect(writes(execute)).toHaveLength(5);
+  });
 
   // Bot injoignable : la réservation posée en base doit être rendue, sinon la
   // manche reste bloquée et plus aucun balayage ne réessaiera.
@@ -1057,7 +1103,7 @@ describe("tour du journal et vidage avant alerte", () => {
   it("flushBotLogs_alertAndSlowLogLineSamePass_alertSentWithoutWaitingForTheLine", async () => {
     const connection = fakeConnection();
     const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-      params?.[0] === 12 ? new Promise(() => undefined) : Promise.resolve([[MATCH_ROW]]),
+      params?.[0] === 12 ? hungQuery() : Promise.resolve([[MATCH_ROW]]),
     );
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
@@ -1074,7 +1120,7 @@ describe("tour du journal et vidage avant alerte", () => {
     jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
     try {
       const connection = fakeConnection();
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => new Promise(() => undefined));
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => hungQuery());
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
       queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
@@ -1106,8 +1152,12 @@ describe("tour du journal et vidage avant alerte", () => {
       flushBotLogs(second);
       await flushed();
       await flushed();
-      // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé.
-      expect(timers).toHaveBeenCalledTimes(1);
+      // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé
+      // (hors bornes de résolution, `BOT_LOG_RESOLVE_TIMEOUT_MS`, une par entrée ; aucun délai
+      // d'abandon pour une résolution qui revient à temps).
+      const turnTimers = timers.mock.calls.filter(([, delay]) => delay !== BOT_LOG_RESOLVE_TIMEOUT_MS);
+      expect(timers.mock.calls.some(([, delay]) => delay === BOT_LOG_RESOLVE_ABANDON_MS)).toBe(false);
+      expect(turnTimers).toHaveLength(1);
     } finally {
       timers.mockRestore();
     }
@@ -1128,5 +1178,79 @@ describe("tour du journal et vidage avant alerte", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe("lectures partagées par un vidage", () => {
+  /** Lectures du match (requête du journal, pas une écriture de réservation). */
+  function matchReads(execute: SqlMock): number {
+    return execute.mock.calls.filter((call) => String(call[0]).includes("m.self_managed")).length;
+  }
+
+  async function settle(): Promise<void> {
+    for (let turn = 0; turn < 10; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  /** Horloge simulée ; la première remise d'alerte dure plus que la fenêtre de reprise. */
+  function slowFirstDelivery(): () => void {
+    let now = 1_000_000;
+    const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+    jest.mocked(pushRefereeAlert).mockImplementationOnce(async () => {
+      now += MATCH_READ_REUSE_MS + 1;
+      return DELIVERED;
+    });
+    return () => clock.mockRestore();
+  }
+
+  it("flushBotLogs_noRefereeAlertAndEscalationOnSameMatch_matchReadOnce", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "match_no_referee", matchId: 31, pairing: "10:20" });
+    queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+    flushBotLogs(connection);
+    await settle();
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
+    expect(matchReads(execute)).toBe(1);
+  });
+
+  it("flushBotLogs_alertDeliveryOutlastsReuseWindow_escalationReadsMatchAgain", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
+    const restore = slowFirstDelivery();
+
+    try {
+      queueBotLog(connection, { kind: "match_no_referee", matchId: 31, pairing: "10:20" });
+      queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+      flushBotLogs(connection);
+      await settle();
+    } finally {
+      restore();
+    }
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(2);
+    expect(matchReads(execute)).toBe(2);
+  });
+
+  it("flushBotLogs_conflictAnnounced_escalationNeitherReadNorSent", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [MATCH_ROW]]);
+    // Remise lente : une escalade résolue avant d'être écartée relirait le match.
+    const restore = slowFirstDelivery();
+
+    try {
+      queueBotLog(connection, { kind: "score_conflict", matchId: 31, claimId: 88 });
+      queueBotLog(connection, { kind: "score_report_stalled", matchId: 31, claimId: 77 });
+      flushBotLogs(connection);
+      await settle();
+    } finally {
+      restore();
+    }
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(matchReads(execute)).toBe(1);
+    const deletes = execute.mock.calls.filter((call) => String(call[0]).trim().startsWith("DELETE"));
+    expect(deletes).toHaveLength(0);
   });
 });

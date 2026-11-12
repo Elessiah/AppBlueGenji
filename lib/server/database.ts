@@ -83,6 +83,12 @@ export async function getDatabase(): Promise<Pool> {
     waitForConnections: true,
     connectionLimit: 25,
     connectTimeout: 10000,
+    // Sondes TCP dès 30 s de silence (au lieu des deux heures du système) : une connexion
+    // à moitié ouverte lève une erreur en une douzaine de minutes au plus, et la requête
+    // qui l'attendait rend sa connexion — et sa place dans les bornes du journal du bot
+    // (`BOT_LOG_RESOLVE_UNSETTLED_MAX`, `bot-logs.ts`).
+    enableKeepAlive: true,
+    keepAliveInitialDelay: DB_KEEPALIVE_INITIAL_DELAY_MS,
     namedPlaceholders: true,
     charset: "utf8mb4",
     dateStrings: true,
@@ -97,6 +103,9 @@ export async function getDatabase(): Promise<Pool> {
   scheduleDueAccountDeletions();
   return pool;
 }
+
+/** Silence, en ms, avant la première sonde TCP d'une connexion du pool. */
+export const DB_KEEPALIVE_INITIAL_DELAY_MS = 30_000;
 
 /** Pools déjà réglés (un double de test peut être rendu deux fois). */
 const englishMessagesPools = new WeakSet<Pool>();
