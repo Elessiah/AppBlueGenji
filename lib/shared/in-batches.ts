@@ -157,6 +157,17 @@ export function createLimiter(size: number, maxWaiting: number = Number.POSITIVE
  */
 export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: number): Promise<R> {
   const controller = new AbortController();
+  // La tâche est lancée avant d'armer le délai : une tâche qui lève sans rendre de
+  // promesse rejette l'appel tout de suite, sans laisser derrière elle un délai armé
+  // dont le rejet tardif ne serait attendu par personne.
+  let promise: Promise<R>;
+  try {
+    promise = Promise.resolve(task(controller.signal));
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  // Un rejet tardif de la promesse abandonnée ne doit pas remonter en rejet non géré.
+  promise.catch(() => undefined);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
@@ -168,19 +179,56 @@ export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: n
     // Côté serveur, la borne seule ne retient pas le processus (arrêt, fin des tests).
     if (typeof timer === "object" && timer !== null && "unref" in timer) timer.unref();
   });
-  const promise = task(controller.signal);
-  // Un rejet tardif de la promesse abandonnée ne doit pas remonter en rejet non géré.
-  promise.catch(() => undefined);
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
- * {@link withDeadline} pour une promesse déjà lancée (rien à interrompre).
- *
- * @param promise Promesse à borner.
- * @param ms Délai (ms).
- * @returns Le résultat de `promise`, ou un rejet `TimeoutError` passé le délai.
+ * Compte borné de travaux **en cours**, y compris ceux qu'un délai a abandonnés sans
+ * que leur requête soit revenue. Un travail compté au-delà de `abandonAfterMs` est
+ * oublié quand même (`onForgotten`) : une requête qui ne revient jamais (connexion à
+ * moitié ouverte) ne retient pas une place jusqu'au redémarrage du processus.
  */
-export function withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {
-  return withDeadline(() => promise, ms);
+export type InFlightGate = {
+  /**
+   * Compte un travail s'il reste une place.
+   * @returns La fonction qui le décompte (sans effet après le premier appel), ou `null` si tout est pris.
+   */
+  tryEnter(): (() => void) | null;
+  /** Travaux comptés en ce moment. */
+  readonly count: number;
+};
+
+/**
+ * Crée un {@link InFlightGate}.
+ *
+ * @param max Travaux comptés en même temps, au plus.
+ * @param abandonAfterMs Durée au-delà de laquelle un travail encore compté est oublié.
+ * @param onForgotten Appelé quand un travail est oublié ainsi (journal).
+ * @returns Le compte.
+ */
+export function createInFlightGate(max: number, abandonAfterMs: number, onForgotten: () => void = () => undefined): InFlightGate {
+  let count = 0;
+  return {
+    get count() {
+      return count;
+    },
+    tryEnter() {
+      if (count >= max) return null;
+      count += 1;
+      let left = false;
+      const leave = (): void => {
+        if (left) return;
+        left = true;
+        count -= 1;
+        clearTimeout(timer);
+      };
+      const timer = setTimeout(() => {
+        if (left) return;
+        leave();
+        onForgotten();
+      }, abandonAfterMs);
+      if (typeof timer === "object" && timer !== null && "unref" in timer) timer.unref();
+      return leave;
+    },
+  };
 }

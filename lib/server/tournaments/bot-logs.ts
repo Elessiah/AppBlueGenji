@@ -81,7 +81,7 @@ import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { createLimiter, mapInBatches, withDeadline } from "@/lib/shared/in-batches";
+import { createInFlightGate, createLimiter, mapInBatches, withDeadline, type InFlightGate } from "@/lib/shared/in-batches";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -668,9 +668,9 @@ export function flushBotLogs(connection: PoolConnection): void {
       delivered.add(entryKey(entry));
       return false;
     });
-    // Les remises qui précèdent ont pu durer (fenêtre du bot) : seules les lectures
-    // récentes sont reprises, un match changé entre-temps est relu.
-    for (const resolved of await resolveBotLogs(pendingEscalations, recentReads(reads, Date.now()))) {
+    // Les remises qui précèdent ont pu durer (fenêtre du bot) : `loadMatch` ne reprend
+    // que les lectures récentes, un match changé entre-temps est relu.
+    for (const resolved of await resolveBotLogs(pendingEscalations, reads)) {
       await deliver(resolved);
     }
 
@@ -1087,13 +1087,14 @@ export const ROUND_ALERT_READ_CONCURRENCY = 3;
  * passages confondus (chaque commit lance le sien, lignes et alertes tournent
  * ensemble). Chacune tient au plus {@link ROUND_ALERT_READ_CONCURRENCY} lectures,
  * et les résolutions abandonnées au délai mais encore en cours sont comptées en plus
- * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) : (6 + 1) × 3 = 21 connexions au pire pour
- * les **lectures de résolution**, sous les 25 du pool, quel que soit le nombre de
- * vidages qui se chevauchent — `bot-logs.test.ts` le vérifie sur les constantes. La
- * remise qui suit (réservations rendues, vidage avant alerte) prend au plus une
- * connexion à la fois par vidage et reste hors de cette borne.
+ * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) : (4 + 1) × 3 = 15 connexions au pire pour
+ * les **lectures de résolution**, et au moins dix des 25 du pool restent aux requêtes
+ * des joueurs quand la base ralentit, quel que soit le nombre de vidages qui se
+ * chevauchent — `bot-logs.test.ts` le vérifie sur les constantes. La remise qui suit
+ * (réservations rendues, vidage avant alerte) prend au plus une connexion à la fois
+ * par vidage et reste hors de cette borne.
  */
-export const BOT_LOG_RESOLVE_SLOTS = 6;
+export const BOT_LOG_RESOLVE_SLOTS = 4;
 
 /**
  * Résolutions **en cours** en même temps, au plus, y compris celles que le délai
@@ -1120,16 +1121,50 @@ export const BOT_LOG_RESOLVE_QUEUE_MAX = 200;
  */
 const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS, BOT_LOG_RESOLVE_QUEUE_MAX);
 
-/** Résolutions commencées dont la requête n'est pas revenue (abandonnées au délai ou non). */
-let inFlightResolutions = 0;
+/**
+ * Durée au-delà de laquelle une résolution abandonnée dont la requête n'est toujours pas
+ * revenue cesse d'être comptée ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) : une connexion à
+ * moitié ouverte (coupure réseau) ne bloque pas tout le journal et toutes les alertes
+ * jusqu'au redémarrage. Bien au-delà du délai d'une résolution, et l'oubli est journalisé.
+ */
+export const BOT_LOG_RESOLVE_ABANDON_MS = 5 * 60_000;
 
-/** Remet à zéro le compte des résolutions en cours (tests). */
-export function resetInFlightResolutions(): void {
-  inFlightResolutions = 0;
+/** Délai entre deux lignes de journal « résolution refusée » (une panne ne remplit pas pm2). */
+const SHED_LOG_COOLDOWN_MS = 60_000;
+
+/**
+ * Compte des résolutions commencées dont la requête n'est pas revenue (abandonnées au
+ * délai ou non), pour tout le module.
+ */
+const resolveGate = createInFlightGate(BOT_LOG_RESOLVE_INFLIGHT_MAX, BOT_LOG_RESOLVE_ABANDON_MS, () => {
+  console.error("[bot-logs] BOT_LOG_RESOLUTION_FORGOTTEN");
+});
+
+let lastShedLogAt = Number.NEGATIVE_INFINITY;
+let shedSinceLog = 0;
+
+/** Note une résolution refusée faute de place : une ligne au journal par minute, au plus, avec le compte. */
+function noteShedResolution(): void {
+  shedSinceLog += 1;
+  const now = Date.now();
+  if (now - lastShedLogAt < SHED_LOG_COOLDOWN_MS) return;
+  console.error(`[bot-logs] BOT_LOG_RESOLUTION_SHED (${shedSinceLog})`);
+  lastShedLogAt = now;
+  shedSinceLog = 0;
 }
 
 /**
- * Durée au-delà de laquelle une résolution rend sa place ({@link withTimeout}) : une
+ * Crée un compte de résolutions en cours, propre à l'appelant (tests) : {@link resolveBotLogs}
+ * le reçoit en paramètre au lieu du compte du module.
+ *
+ * @returns Un compte vide, aux mêmes bornes que celui du module.
+ */
+export function createResolveGate(): InFlightGate {
+  return createInFlightGate(BOT_LOG_RESOLVE_INFLIGHT_MAX, BOT_LOG_RESOLVE_ABANDON_MS);
+}
+
+/**
+ * Durée au-delà de laquelle une résolution rend sa place ({@link withDeadline}) : une
  * requête qui ne revient jamais (connexion morte) ne bloque pas, à six, tout le
  * journal et toutes les alertes du site jusqu'à son redémarrage. Une résolution
  * normale prend quelques millisecondes. Son résultat tardif est perdu : pour une
@@ -1160,22 +1195,10 @@ export type MatchRead = {
 /**
  * Matchs déjà lus pendant un vidage (`flushBotLogs`), par identifiant : l'escalade
  * reprend la lecture faite pour l'alerte de la même manche au lieu de la refaire,
- * si elle est récente ({@link recentReads}). Propre à un vidage — jamais gardé d'un
+ * si elle est récente ({@link MATCH_READ_REUSE_MS}, vérifié par `loadMatch`). Propre à un vidage — jamais gardé d'un
  * vidage à l'autre.
  */
 export type MatchReads = Map<number, MatchRead>;
-
-/**
- * Les lectures d'un vidage commencées depuis moins de {@link MATCH_READ_REUSE_MS} :
- * une nouvelle table, les plus anciennes seront relues. Exporté pour les tests.
- *
- * @param reads Lectures du vidage.
- * @param now Instant présent (ms).
- * @returns Les lectures encore assez fraîches pour être reprises.
- */
-export function recentReads(reads: MatchReads, now: number): MatchReads {
-  return new Map([...reads].filter(([, read]) => now - read.startedAt <= MATCH_READ_REUSE_MS));
-}
 
 /**
  * Traduit des entrées en lignes de journal, en relisant la base.
@@ -1193,15 +1216,17 @@ export function recentReads(reads: MatchReads, now: number): MatchReads {
  *
  * @param entries Entrées à traduire.
  * @param reads Matchs déjà lus pendant ce vidage, partagés entre ses passages.
+ * @param gate Compte des résolutions en cours (celui du module ; un compte propre en test).
  */
 export async function resolveBotLogs(
   entries: readonly PendingBotLog[],
   reads: MatchReads = new Map(),
+  gate: InFlightGate = resolveGate,
 ): Promise<ResolvedBotLog[]> {
   const slots = await mapInBatches(entries, BOT_LOG_RESOLVE_CONCURRENCY, async (entry): Promise<ResolvedBotLog | null> => {
     try {
       const resolved = await resolveSlot(
-        () => resolveWithinDeadline(entry, reads),
+        () => resolveWithinDeadline(entry, reads, gate),
         botEventChannel(entry.kind) === "REFEREE",
       );
       const line = typeof resolved === "string" ? { message: resolved } : resolved;
@@ -1217,20 +1242,23 @@ export async function resolveBotLogs(
 /**
  * Une résolution, bornée à {@link BOT_LOG_RESOLVE_TIMEOUT_MS}. Au délai, son signal
  * est levé (une alerte de manche ne lance plus de lecture) ; si sa requête court
- * encore, elle reste comptée en cours ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) jusqu'à son retour.
+ * encore, elle reste comptée en cours ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) jusqu'à son
+ * retour, ou au plus {@link BOT_LOG_RESOLVE_ABANDON_MS}. Une résolution refusée faute de
+ * place est journalisée (code seul, une ligne par minute au plus).
  */
 function resolveWithinDeadline(
   entry: PendingBotLog,
   reads: MatchReads,
+  gate: InFlightGate,
 ): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
-  if (inFlightResolutions >= BOT_LOG_RESOLVE_INFLIGHT_MAX) return Promise.resolve(null);
+  const leave = gate.tryEnter();
+  if (!leave) {
+    noteShedResolution();
+    return Promise.resolve(null);
+  }
   return withDeadline((signal) => {
-    inFlightResolutions += 1;
     const work = resolveOne(entry, reads, signal);
-    const done = (): void => {
-      inFlightResolutions -= 1;
-    };
-    work.then(done, done);
+    work.then(leave, leave);
     return work;
   }, BOT_LOG_RESOLVE_TIMEOUT_MS);
 }
@@ -1299,7 +1327,8 @@ async function loadEntrantName(teamId: number): Promise<string | null> {
   return rows[0]?.name ?? null;
 }
 
-type MatchLogRow = SubjectRow & {
+/** Ligne d'un match relu pour le journal (exportée pour les tests). */
+export type MatchLogRow = SubjectRow & {
   team1_score: number | null;
   team2_score: number | null;
   forfeit_team_id: number | null;
@@ -1313,7 +1342,7 @@ type MatchLogRow = SubjectRow & {
 /**
  * Relit un match, une seule fois par vidage (`reads`) : une lecture en échec n'est
  * pas gardée, la suivante réessaie. Une lecture reprise qui échoue est refaite une
- * fois : elle peut venir d'une copie (`recentReads`) que l'effacement ne touche pas.
+ * fois pour tous ceux qui l'attendaient déjà (`retry`), pas une fois par attentif.
  */
 function loadMatch(matchId: number, reads: MatchReads): Promise<MatchLogRow | null> {
   const known = reads.get(matchId);

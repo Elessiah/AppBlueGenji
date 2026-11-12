@@ -7,9 +7,10 @@ import type { PoolConnection } from "mysql2/promise";
 import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
   BOT_LOG_RESOLVE_CONCURRENCY,
+  BOT_LOG_RESOLVE_ABANDON_MS,
   BOT_LOG_RESOLVE_INFLIGHT_MAX,
-  resetInFlightResolutions,
   BOT_LOG_RESOLVE_SLOTS,
+  createResolveGate,
   BOT_LOG_RESOLVE_TIMEOUT_MS,
   discardBotLogs,
   flushBotLogs,
@@ -18,8 +19,8 @@ import {
   queueBotLog,
   resolveBotLogs,
   MATCH_READ_REUSE_MS,
-  recentReads,
   ROUND_ALERT_READ_CONCURRENCY,
+  type MatchLogRow,
   type MatchReads,
 } from "@/lib/server/tournaments/bot-logs";
 import { sendBotLog } from "@/lib/server/bot-integration";
@@ -112,7 +113,6 @@ const OPEN_MATCH_ROW = { ...MATCH_ROW, team1_score: null, team2_score: null, sta
 
 beforeEach(() => {
   jest.clearAllMocks();
-  resetInFlightResolutions();
   jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
@@ -514,7 +514,7 @@ describe("resolveBotLogs", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("resolveBotLogs_concurrentCallsBeyondSlots_atMostSixResolutionsInFlight", async () => {
+  it("resolveBotLogs_concurrentCallsBeyondSlots_atMostFourResolutionsInFlight", async () => {
     const { state, drain } = heldQueries(() => [TOURNAMENT_ROW]);
     const batch = () => Array.from({ length: 4 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
@@ -523,8 +523,8 @@ describe("resolveBotLogs", () => {
     await drain();
     const lines = await resolving;
 
-    expect(BOT_LOG_RESOLVE_SLOTS).toBe(6);
-    expect(state.maxInFlight).toBe(6);
+    expect(BOT_LOG_RESOLVE_SLOTS).toBe(4);
+    expect(state.maxInFlight).toBe(4);
     expect(lines.flat()).toHaveLength(12);
   });
 
@@ -564,7 +564,7 @@ describe("resolveBotLogs", () => {
   });
 
   it("resolveBotLogs_reusedReadRejected_rereadsTheMatch", async () => {
-    // Copie de `recentReads` : l'échec de la lecture d'origine ne l'efface que de la table du vidage.
+    // Lecture partagée en échec : elle est refaite, pas rendue en échec à l'escalade.
     const execute = mockDbByParams({ 31: [OPEN_MATCH_ROW] });
     const failed = Promise.reject(new Error("ER_LOCK_WAIT_TIMEOUT"));
     failed.catch(() => undefined);
@@ -580,14 +580,14 @@ describe("resolveBotLogs", () => {
     const { execute, drain } = heldQueries((params) => (Number(params?.[0]) === 31 ? [OPEN_MATCH_ROW] : [TOURNAMENT_ROW]));
     const batch = () => Array.from({ length: 4 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
-    // Huit lignes de journal : six en cours, deux en attente ; l'alerte arrive après elles.
+    // Huit lignes de journal : quatre en cours, quatre en attente ; l'alerte arrive après elles.
     const lines = Promise.all([resolveBotLogs(batch()), resolveBotLogs(batch())]);
     await new Promise((resolve) => setImmediate(resolve));
     const alert = resolveBotLogs([{ kind: "score_conflict", matchId: 31 }]);
     await drain();
     await Promise.all([lines, alert]);
 
-    expect(execute.mock.calls[6]?.[1]).toEqual([31]);
+    expect(execute.mock.calls[BOT_LOG_RESOLVE_SLOTS]?.[1]).toEqual([31]);
   });
 
   it("resolveBotLogs_resolutionsHangPastTimeout_releaseTheirSlots", async () => {
@@ -599,9 +599,10 @@ describe("resolveBotLogs", () => {
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
-      // Six résolutions qui ne reviendront jamais : toutes les places du module.
-      const hanging = Promise.all([resolveBotLogs(stuck(4)), resolveBotLogs(stuck(2))]);
-      const later = resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }]);
+      // Quatre résolutions qui ne reviendront jamais : toutes les places du module.
+      const gate = createResolveGate();
+      const hanging = Promise.all([resolveBotLogs(stuck(2), new Map(), gate), resolveBotLogs(stuck(2), new Map(), gate)]);
+      const later = resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }], new Map(), gate);
       await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS - 1);
       expect(execute).not.toHaveBeenCalledWith(expect.anything(), [13]);
 
@@ -759,51 +760,70 @@ describe("resolveBotLogs", () => {
   });
 });
 
-describe("recentReads", () => {
-  const read = (startedAt: number) => ({ startedAt, reading: Promise.resolve(null) });
-
-  it("recentReads_readAtTheLimit_kept", () => {
-    const reads: MatchReads = new Map([[31, read(1_000)]]);
-
-    expect([...recentReads(reads, 1_000 + MATCH_READ_REUSE_MS).keys()]).toEqual([31]);
-  });
-
-  it("recentReads_readOneMsOverTheLimit_droppedWithoutTouchingTheFlushReads", () => {
-    const reads: MatchReads = new Map([[31, read(1_000)]]);
-
-    expect(recentReads(reads, 1_001 + MATCH_READ_REUSE_MS).size).toBe(0);
-    expect(reads.size).toBe(1);
-  });
-});
-
 describe("resolveBotLogs resource bounds", () => {
   it("resolveBotLogs_poolConstants_lookupsNeverExceedPool", () => {
     // Pool de 25 (`lib/server/database.ts`) : résolutions en cours (places + figées) × lectures de manche.
-    expect(BOT_LOG_RESOLVE_INFLIGHT_MAX * ROUND_ALERT_READ_CONCURRENCY).toBeLessThanOrEqual(25 - 4);
+    // Au moins dix connexions restent aux requêtes des joueurs quand la base ralentit.
+    expect(BOT_LOG_RESOLVE_INFLIGHT_MAX * ROUND_ALERT_READ_CONCURRENCY).toBeLessThanOrEqual(25 - 10);
     expect(BOT_LOG_RESOLVE_INFLIGHT_MAX).toBeGreaterThanOrEqual(BOT_LOG_RESOLVE_SLOTS);
   });
 
-  it("resolveBotLogs_sixHangingResolutions_laterOnesAreShedBeyondInFlightMax", async () => {
+  it("resolveBotLogs_hangingResolutionsUpToMaxMinusOne_laterOnesAreShedBeyondInFlightMax", async () => {
     jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
     try {
+      const gate = createResolveGate();
       const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
         Number(params?.[0]) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
       );
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-      const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
-      const hanging = Promise.all([resolveBotLogs(stuck(4)), resolveBotLogs(stuck(2))]);
+      const stuck = Array.from({ length: BOT_LOG_RESOLVE_INFLIGHT_MAX - 1 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
+      const hanging = resolveBotLogs(stuck, new Map(), gate);
       await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS);
       await hanging;
 
-      // Six requêtes toujours en vol : une seule résolution de plus est lancée, l'autre est ignorée.
-      const lines = await resolveBotLogs([
-        { kind: "tournament_started", tournamentId: 13 },
-        { kind: "tournament_started", tournamentId: 13 },
-      ]);
+      // Quatre requêtes toujours en vol : une seule résolution de plus est lancée, l'autre est refusée.
+      const lines = await resolveBotLogs(
+        [
+          { kind: "tournament_started", tournamentId: 13 },
+          { kind: "tournament_started", tournamentId: 13 },
+        ],
+        new Map(),
+        gate,
+      );
 
       expect(lines).toHaveLength(1);
       expect(execute.mock.calls.filter(([, params]) => Number(params?.[0]) === 13)).toHaveLength(1);
+      expect(errors.mock.calls.some(([line]) => String(line).startsWith("[bot-logs] BOT_LOG_RESOLUTION_SHED"))).toBe(true);
     } finally {
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it("resolveBotLogs_hungQueriesBeyondAbandonDelay_resolutionsRunAgain", async () => {
+    // Connexions à moitié ouvertes : passé le délai d'abandon, le journal et les alertes repartent.
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const gate = createResolveGate();
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+        Number(params?.[0]) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
+      );
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      const stuck = Array.from({ length: BOT_LOG_RESOLVE_INFLIGHT_MAX }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
+      const hanging = resolveBotLogs(stuck, new Map(), gate);
+      // Cinq résolutions pour quatre places : la cinquième part au premier délai, échoue au second.
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS * 2);
+      await hanging;
+      expect(await resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }], new Map(), gate)).toHaveLength(0);
+
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_ABANDON_MS);
+
+      expect(gate.count).toBe(0);
+      expect(await resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }], new Map(), gate)).toHaveLength(1);
+    } finally {
+      errors.mockRestore();
       jest.useRealTimers();
     }
   });
@@ -849,7 +869,8 @@ describe("resolveBotLogs resource bounds", () => {
 
   it("resolveBotLogs_staleSharedRead_readsTheMatchAgain", async () => {
     const execute = mockDbByParams({ 31: [OPEN_MATCH_ROW] });
-    const stale = Promise.resolve({ ...OPEN_MATCH_ROW, team1_name: "Ancien nom" } as never);
+    const staleRow = { ...OPEN_MATCH_ROW, team1_name: "Ancien nom" } as MatchLogRow;
+    const stale = Promise.resolve(staleRow);
     const reads: MatchReads = new Map([[31, { startedAt: Date.now() - MATCH_READ_REUSE_MS - 1, reading: stale }]]);
 
     const lines = await resolveBotLogs([{ kind: "score_report_stalled", matchId: 31 }], reads);

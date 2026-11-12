@@ -67,6 +67,21 @@ describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
     expect(retention).toContain("30 days at most");
     expect(retention).toContain("is no longer retried");
   });
+
+  it("botPrivacyPolicy_previousNoticeNotDeletable_frenchDoesNotPromiseASingleNotice", () => {
+    // L'ancien avis que Discord ne laisse pas effacer tout de suite coexiste avec le nouveau.
+    const notice = policyTexts(PRIVACY_POLICY.fr).find((text) => text.startsWith("Identifiants de l'utilisateur exclu"));
+
+    expect(notice).not.toContain("remplace le précédent, supprimé.");
+    expect(notice).toContain("supprimé avant l'envoi quand Discord le permet (sinon par la purge de nuit, section 03 ; un avis que Discord refuse de supprimer reste)");
+  });
+
+  it("botPrivacyPolicy_previousNoticeNotDeletable_englishDoesNotPromiseASingleNotice", () => {
+    const notice = policyTexts(PRIVACY_POLICY.en).find((text) => text.startsWith("IDs of the excluded user"));
+
+    expect(notice).not.toContain("replaces the previous one, which is deleted.");
+    expect(notice).toContain("deleted before sending when Discord allows it (otherwise by the nightly purge, section 03; a notice that Discord refuses to delete remains)");
+  });
 });
 
 /** Toutes les chaînes d'un texte de politique, dans l'ordre. */

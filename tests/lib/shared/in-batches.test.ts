@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createLimiter, inBatches, LimiterFullError, mapInBatches, URGENT_STREAK_MAX, withDeadline, withTimeout } from "@/lib/shared/in-batches";
+import { createInFlightGate, createLimiter, inBatches, LimiterFullError, mapInBatches, URGENT_STREAK_MAX, withDeadline } from "@/lib/shared/in-batches";
 
 describe("inBatches", () => {
   it("traite chaque élément, jamais plus de `size` à la fois", async () => {
@@ -203,19 +203,19 @@ describe("createLimiter", () => {
   });
 });
 
-describe("withTimeout", () => {
-  it("withTimeout_promiseSettlesBeforeDelay_returnsItsValue", async () => {
-    expect(await withTimeout(Promise.resolve("fait"), 1_000)).toBe("fait");
+describe("withDeadline bounds", () => {
+  it("withDeadline_taskSettlesBeforeDelay_returnsItsValue", async () => {
+    expect(await withDeadline(() => Promise.resolve("fait"), 1_000)).toBe("fait");
   });
 
-  it("withTimeout_promiseRejectsBeforeDelay_rejectsWithItsError", async () => {
-    await expect(withTimeout(Promise.reject(new Error("refus")), 1_000)).rejects.toThrow("refus");
+  it("withDeadline_taskRejectsBeforeDelay_rejectsWithItsError", async () => {
+    await expect(withDeadline(() => Promise.reject(new Error("refus")), 1_000)).rejects.toThrow("refus");
   });
 
-  it("withTimeout_promiseNeverSettles_rejectsTimeoutError", async () => {
+  it("withDeadline_taskNeverSettles_rejectsTimeoutError", async () => {
     jest.useFakeTimers();
     try {
-      const bounded = withTimeout(new Promise<string>(() => undefined), 30_000);
+      const bounded = withDeadline(() => new Promise<string>(() => undefined), 30_000);
       const outcome = expect(bounded).rejects.toMatchObject({ name: "TimeoutError" });
 
       await jest.advanceTimersByTimeAsync(30_000);
@@ -226,11 +226,11 @@ describe("withTimeout", () => {
     }
   });
 
-  it("withTimeout_oneMsBeforeDelay_stillPending", async () => {
+  it("withDeadline_oneMsBeforeDelay_stillPending", async () => {
     jest.useFakeTimers();
     try {
       let settled = false;
-      void withTimeout(new Promise<string>(() => undefined), 30_000).catch(() => {
+      void withDeadline(() => new Promise<string>(() => undefined), 30_000).catch(() => {
         settled = true;
       });
 
@@ -239,6 +239,22 @@ describe("withTimeout", () => {
       expect(settled).toBe(false);
       await jest.advanceTimersByTimeAsync(1);
       expect(settled).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe("withDeadline synchronous throw", () => {
+  it("withDeadline_taskThrowsSynchronously_rejectsAndArmsNoTimer", async () => {
+    jest.useFakeTimers();
+    try {
+      const outcome = withDeadline((): Promise<string> => {
+        throw new Error("garde");
+      }, 30_000);
+
+      await expect(outcome).rejects.toThrow("garde");
+      expect(jest.getTimerCount()).toBe(0);
     } finally {
       jest.useRealTimers();
     }
@@ -358,5 +374,62 @@ describe("withDeadline", () => {
 
     expect(result).toBe("fait");
     expect(received?.aborted).toBe(false);
+  });
+});
+
+describe("createInFlightGate", () => {
+  it("createInFlightGate_full_refusesUntilOneLeaves", () => {
+    const gate = createInFlightGate(2, 60_000);
+    const first = gate.tryEnter();
+    gate.tryEnter();
+
+    expect(gate.tryEnter()).toBeNull();
+    first?.();
+    expect(gate.tryEnter()).not.toBeNull();
+  });
+
+  it("createInFlightGate_leaveCalledTwice_countsOnce", () => {
+    const gate = createInFlightGate(2, 60_000);
+    const leave = gate.tryEnter();
+    gate.tryEnter();
+
+    leave?.();
+    leave?.();
+
+    expect(gate.count).toBe(1);
+  });
+
+  it("createInFlightGate_workNeverReturns_forgottenAfterAbandonDelay", async () => {
+    jest.useFakeTimers();
+    try {
+      const forgotten = jest.fn();
+      const gate = createInFlightGate(1, 60_000, forgotten);
+      gate.tryEnter();
+
+      await jest.advanceTimersByTimeAsync(59_999);
+      expect(gate.tryEnter()).toBeNull();
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(forgotten).toHaveBeenCalledTimes(1);
+      expect(gate.count).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("createInFlightGate_leftBeforeAbandonDelay_neverForgotten", async () => {
+    jest.useFakeTimers();
+    try {
+      const forgotten = jest.fn();
+      const gate = createInFlightGate(1, 60_000, forgotten);
+      gate.tryEnter()?.();
+
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      expect(forgotten).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
