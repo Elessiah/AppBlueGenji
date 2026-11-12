@@ -21,7 +21,7 @@ import {
   type PerformanceLimit,
   type PerformanceProbe,
 } from "@/lib/shared/client-power";
-import { subscribeMediaQuery } from "@/lib/shared/hooks/useMediaMatch";
+import { mediaQueryList, subscribeMediaQuery } from "@/lib/shared/hooks/useMediaMatch";
 
 /** Préférence système « réduire les animations ». */
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
@@ -133,7 +133,7 @@ function readIgnorePerformance(): boolean {
 
 function readReducedMotion(): boolean {
   try {
-    return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+    return mediaQueryList(REDUCED_MOTION_QUERY).matches;
   } catch {
     return false;
   }

@@ -117,7 +117,7 @@ export function middleware(request: NextRequest) {
   // cloisonné par port. Derrière nginx, `X-Forwarded-Proto` donne le protocole.
   // À retirer après le 2026-11-28 (trente jours après le déploiement du
   // préfixe : plus aucun ancien cookie de session en vie).
-  const clearsLegacyAuth = request.nextUrl.protocol === "https:" && isDocumentRequest(request);
+  const clearsLegacyAuth = isHttpsRequest(request) && isDocumentRequest(request);
   for (const name of clearsLegacyAuth ? legacyAuthCookieNames() : []) {
     if (request.cookies.has(name)) {
       response.cookies.set(name, "", { path: "/", maxAge: 0, secure: true, httpOnly: true, sameSite: "lax" });
@@ -186,6 +186,16 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   const base = process.env.BG_PUBLIC_ORIGIN?.trim().replace(/\/+$/, "") || siteBaseUrl() || request.nextUrl.origin; // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
   const target = new URL(`${redirectPath}${request.nextUrl.search}`, base);
   return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
+}
+
+/**
+ * Requête reçue en https : le protocole de l'URL, ou — derrière nginx, où
+ * Next peut ne voir que le saut http interne — le premier `X-Forwarded-Proto`.
+ */
+function isHttpsRequest(request: NextRequest): boolean {
+  if (request.nextUrl.protocol === "https:") return true;
+  const forwarded = request.headers.get("x-forwarded-proto");
+  return forwarded !== null && forwarded.split(",")[0].trim().toLowerCase() === "https";
 }
 
 /** Chargement d'un document, et non `fetch` du routeur (préchargement, navigation client). */
