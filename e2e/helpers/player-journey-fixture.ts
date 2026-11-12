@@ -90,10 +90,19 @@ async function createUser(
  * Nom du cookie de session que sert `baseURL` : `__Host-bg_session` derrière
  * https (une build de production, `E2E_BASE_URL`), le nom nu ailleurs — sans
  * quoi les parcours tourneraient déconnectés contre la production.
+ *
+ * Le serveur choisit le nom sur `NODE_ENV`, pas sur le protocole : une build
+ * de production servie en http (`next start` local) ou un serveur de
+ * développement en https se désignent par `E2E_PRODUCTION_COOKIES` (`1` / `0`),
+ * qui l'emporte sur le protocole.
  */
-export function journeySessionCookie(baseURL: string): { name: string; secure: boolean } {
-  const secure = new URL(baseURL).protocol === "https:";
-  return { name: sessionCookieName(secure), secure };
+export function journeySessionCookie(
+  baseURL: string,
+  override: string | undefined = process.env.E2E_PRODUCTION_COOKIES,
+): { name: string; secure: boolean } {
+  const https = new URL(baseURL).protocol === "https:";
+  const production = override === "1" ? true : override === "0" ? false : https;
+  return { name: sessionCookieName(production), secure: production };
 }
 
 /** Client HTTP authentifié par la session donnée. */

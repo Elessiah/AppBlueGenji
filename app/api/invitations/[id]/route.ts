@@ -7,6 +7,9 @@ import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
 
+const RESPOND_FAILED = "INVITATION_RESPOND_FAILED";
+const CANCEL_FAILED = "INVITATION_CANCEL_FAILED";
+
 /** Refus non nommé : 500 pour le code de repli (panne), 400 pour un code du service. */
 function fallbackStatus(message: string, fallback: string): number {
   return message === fallback ? 500 : 400;
@@ -26,14 +29,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     await respondToInvitation(user.id, invitationId, Boolean(body.accept));
     return ok({ ok: true });
   } catch (error) {
-    const message = serviceErrorCode(error, "INVITATION_RESPOND_FAILED");
+    const message = serviceErrorCode(error, RESPOND_FAILED);
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === "INVITATION_NOT_FOUND") return fail(message, 404);
     if (message === "INVITATION_NOT_PENDING") return fail(message, 409);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
-    return fail(message, fallbackStatus(message, "INVITATION_RESPOND_FAILED"));
+    return fail(message, fallbackStatus(message, RESPOND_FAILED));
   }
 }
 
@@ -54,10 +57,10 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     await cancelInvitation(user.id, invitationId, can(user, "tournaments"));
     return ok({ ok: true });
   } catch (error) {
-    const message = serviceErrorCode(error, "INVITATION_CANCEL_FAILED");
+    const message = serviceErrorCode(error, CANCEL_FAILED);
     if (message === "FORBIDDEN") return fail(message, 403);
     if (message === "INVITATION_NOT_FOUND") return fail(message, 404);
     if (message === "INVITATION_NOT_PENDING") return fail(message, 409);
-    return fail(message, fallbackStatus(message, "INVITATION_CANCEL_FAILED"));
+    return fail(message, fallbackStatus(message, CANCEL_FAILED));
   }
 }

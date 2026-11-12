@@ -346,6 +346,10 @@ export async function createOrGetDiscordUser(
       if (await isPendingDeletionWithDiscord(userId, discordId)) return userId;
       throw new Error("DISCORD_AUTH_FAILED");
     }
+    // Tag Discord renommé : `DISCORD_NAMED_PSEUDO_SQL` vient de retirer la
+    // certification — comme pour Battle.net, les invitations à certifier du
+    // compte et de ses coéquipiers s'oublient tout de suite.
+    if (handle && Number(refreshed.changedRows ?? 0) > 0) void forgetCertificationPromptsAround(userId);
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
     return userId;

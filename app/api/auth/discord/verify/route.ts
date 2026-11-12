@@ -126,8 +126,6 @@ function signInFailure(error: unknown) {
   // Délai de réactivation écoulé, suppression définitive pas encore jouée :
   // le compte n'existe plus pour la connexion.
   if (error instanceof AccountDeletedError) return fail(ACCOUNT_DELETED_ERROR, 410);
-  // Un code (`MAJUSCULES_SOULIGNÉES`) passe tel quel ; toute autre phrase
-  // (texte du pilote SQL…) reste au journal, la réponse ne porte qu'un code.
   // Un code du site tel quel, une contention passagère en 409 (« réessaie »),
   // tout le reste (texte du pilote) réduit à `DISCORD_AUTH_FAILED`, journalisé.
   return fail(serviceErrorCode(error, "DISCORD_AUTH_FAILED"), 500);

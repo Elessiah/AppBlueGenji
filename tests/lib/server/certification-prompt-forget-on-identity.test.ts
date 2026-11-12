@@ -19,8 +19,8 @@ import { getDatabase } from "@/lib/server/database";
 import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { unlinkOAuthIdentity } from "@/lib/server/account-identities";
-import { createOrGetBlizzardUser } from "@/lib/server/users/sign-in";
-import { fakePool } from "../../helpers/sql-double";
+import { createOrGetBlizzardUser, createOrGetDiscordUser } from "@/lib/server/users/sign-in";
+import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
  * Un geste qui change la certification d'un compte (tag Discord, BattleTag,
@@ -32,7 +32,7 @@ import { fakePool } from "../../helpers/sql-double";
 type Reply = { select?: unknown[]; update: { affectedRows: number; changedRows?: number } };
 
 function mockDb({ select = [], update }: Reply) {
-  const execute = jest.fn(async (sql: string) => {
+  const execute = jest.fn<SqlQuery>(async (sql) => {
     if (/^\s*UPDATE/.test(sql)) return [update, []];
     return [select, []];
   });
@@ -127,6 +127,32 @@ describe("createOrGetBlizzardUser — invitations à certifier", () => {
     mockDb({ select: [{ id: 7 }], update: { affectedRows: 1, changedRows: 0 } });
 
     await createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: true });
+
+    expect(forgetCertificationPromptsAround).not.toHaveBeenCalled();
+  });
+});
+
+describe("createOrGetDiscordUser — invitations à certifier", () => {
+  it("createOrGetDiscordUser_existingRowHandleChanged_forgetsPromptsAround", async () => {
+    mockDb({ select: [{ id: 7 }], update: { affectedRows: 1, changedRows: 1 } });
+
+    await createOrGetDiscordUser("123456789012345678", undefined, "nova", { method: "OAUTH", termsAccepted: true });
+
+    expect(forgetCertificationPromptsAround).toHaveBeenCalledWith(7);
+  });
+
+  it("createOrGetDiscordUser_existingRowUnchanged_doesNotForget", async () => {
+    mockDb({ select: [{ id: 7 }], update: { affectedRows: 1, changedRows: 0 } });
+
+    await createOrGetDiscordUser("123456789012345678", undefined, "nova", { method: "OAUTH", termsAccepted: true });
+
+    expect(forgetCertificationPromptsAround).not.toHaveBeenCalled();
+  });
+
+  it("createOrGetDiscordUser_noHandle_doesNotForget", async () => {
+    mockDb({ select: [{ id: 7 }], update: { affectedRows: 1, changedRows: 1 } });
+
+    await createOrGetDiscordUser("123456789012345678", undefined, null, { method: "OAUTH", termsAccepted: true });
 
     expect(forgetCertificationPromptsAround).not.toHaveBeenCalled();
   });

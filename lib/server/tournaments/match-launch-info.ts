@@ -258,7 +258,7 @@ export function shownName(raw: string | null): string {
   return shownEntrantName(raw) ?? "—";
 }
 
-/** Membre lu → candidat contact (aussi lu par l'invitation à certifier, `certification-prompt.ts`). */
+/** Membre lu → candidat contact. */
 export function toCandidate(row: {
   user_id: number;
   pseudo: string;
