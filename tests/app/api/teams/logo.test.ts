@@ -122,6 +122,46 @@ describe("POST /api/teams/[id]/logo", () => {
     expect(processAndStoreImage).not.toHaveBeenCalled();
   });
 
+  // Le dépôt a aussi son propre plafond (`IMAGE_UPLOAD_RULE`, plus bas) : le
+  // plafond d'identité se remplit ici par des retraits, qui n'y passent pas.
+  const removeLogo = () => DELETE(new Request("http://localhost/api/teams/3/logo"), params("3"));
+
+  it("POST_rightsNotCertifiedRefusal_doesNotUseUpTheLimit", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(canManageTeam).mockResolvedValue(true);
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit - 1; i += 1) await removeLogo();
+    expect((await POST(fileReq(pngFile(), null), params("3"))).status).toBe(400);
+
+    const res = await removeLogo();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("POST_writeRefused_doesNotUseUpTheLimit", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(canManageTeam).mockResolvedValue(true);
+    jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/new.webp");
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit - 1; i += 1) await removeLogo();
+    jest.mocked(updateTeamLogo).mockRejectedValueOnce(new Error("FORBIDDEN"));
+    expect((await POST(fileReq(pngFile()), params("3"))).status).toBe(403);
+
+    const res = await removeLogo();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("POST_writeDone_usesUpTheLimit", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(canManageTeam).mockResolvedValue(true);
+    jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/new.webp");
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit - 1; i += 1) await removeLogo();
+    expect((await POST(fileReq(pngFile()), params("3"))).status).toBe(200);
+
+    const res = await removeLogo();
+
+    expect(res.status).toBe(429);
+  });
+
   it("surfaces processing errors as 400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
@@ -215,6 +255,18 @@ describe("DELETE /api/teams/[id]/logo", () => {
     for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) await remove();
 
     expect((await remove()).status).toBe(200);
+  });
+
+  it("DELETE_forbiddenRefusals_doNotUseUpTheLimit", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    const remove = () => DELETE(new Request("http://localhost/api/teams/3/logo"), params("3"));
+    jest.mocked(updateTeamLogo).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await remove()).status).toBe(403);
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
+
+    const res = await remove();
+
+    expect(res.status).toBe(200);
   });
 
   it("DELETE_overIdentityWriteLimit_returns429WithoutWriting", async () => {

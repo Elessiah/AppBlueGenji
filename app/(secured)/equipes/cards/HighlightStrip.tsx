@@ -4,6 +4,8 @@ import { memo } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useTeamsText } from "@/components/i18n/teams-text";
 import { teamPointsHint } from "../_lib/team-points";
@@ -22,6 +24,7 @@ import s from "./HighlightStrip.module.css";
 function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
   const text = useTeamsText();
   const { t } = text;
+  const locale = useAppLocale();
   // Seules les équipes classées montent : une équipe sans rang (aucun match
   // compté) ne figure pas au classement, donc pas à son podium. La liste arrive
   // rangée par rang, les équipes sans rang à la fin (`compareDirectoryRank`) :
@@ -36,12 +39,12 @@ function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
           <LocaleLink
             href={`/equipes/${team.id}`}
             className={s.cardOverlay}
-            aria-label={t("card.viewTeam", { name: team.name })}
+            aria-label={t("card.viewTeam", { name: shownEntityName(team.name, "team", team.id, locale) })}
           />
           <div className={s.rank}>{String(team.rank).padStart(2, "0")}</div>
           <div>
             <div className={s.name}>
-              <TeamPodiumName teamId={team.id}>{team.name}</TeamPodiumName>
+              <TeamPodiumName teamId={team.id}>{shownEntityName(team.name, "team", team.id, locale)}</TeamPodiumName>
             </div>
             <div className={s.meta}>
               {richNodes(

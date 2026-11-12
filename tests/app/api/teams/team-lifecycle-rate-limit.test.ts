@@ -178,6 +178,33 @@ describe("PATCH /api/teams/[id] — plafond des écritures d'identité", () => {
     expect(updateTeamMeta).toHaveBeenCalledTimes(TEAM_IDENTITY_WRITE_RULE.limit);
   });
 
+  it("PATCH_nameTakenRefusals_doNotUseUpTheLimit", async () => {
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error("TEAM_NAME_ALREADY_USED"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await rename()).status).toBe(409);
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
+
+    const res = await rename();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("PATCH_invalidFields_doNotUseUpTheLimit", async () => {
+    const invalid = () =>
+      patchTeamRoute(
+        new Request("http://localhost/api/teams/12", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: 42 }),
+        }),
+        { params: Promise.resolve({ id: "12" }) },
+      );
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await invalid()).status).toBe(400);
+
+    const res = await rename();
+
+    expect(res.status).toBe(200);
+  });
+
   it("PATCH_staffTournaments_isNotCapped", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(staff);
     for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) await rename();

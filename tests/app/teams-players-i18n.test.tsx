@@ -611,6 +611,33 @@ describe("revue UI/UX", () => {
     expect(html).toContain('title="Open Glaciers&#x27;s page"');
   });
 
+  // Un ancien nom fait seulement d'invisibles : les cartes d'annuaire gardent
+  // un nom, « Équipe #id » / « Joueur #id » dans la langue de la page.
+  it("carte d'équipe : nom invisible remplacé par « Team #id »", () => {
+    const html = inEnglish(<TeamCard team={listTeam({ id: 12, name: "​⁠" })} />);
+    expect(html).toContain('aria-label="Open Team #12&#x27;s page"');
+    expect(html).toContain(">Team #12<");
+  });
+
+  it("podium d'équipes : nom invisible remplacé par « Équipe #id »", () => {
+    const html = renderToStaticMarkup(
+      <HighlightStrip
+        teams={[listTeam({ id: 1, name: "​", rank: 1 }), listTeam({ id: 2, name: "B", rank: 2 }), listTeam({ id: 3, name: "C", rank: 3 })]}
+      />,
+    );
+    expect(html).toContain(">Équipe #1<");
+  });
+
+  it("carte joueur : pseudo et équipe invisibles remplacés par leur numéro", () => {
+    const html = inEnglish(
+      <PlayerCard player={directoryPlayer({ id: 2, pseudo: "⁠", team: { id: 4, name: "​", colorIndex: 1 } })} />,
+    );
+    expect(html).toContain("View Player #2&#x27;s profile");
+    expect(html).toContain(">Player #2<");
+    expect(html).toContain('title="Open Team #4&#x27;s page"');
+    expect(html).toContain("TEAM #4");
+  });
+
   it("fiche joueur : un échec de chargement dit sa raison, la même que la notification", () => {
     const loader = jest.requireMock<{ useResourceLoader: unknown }>("@/lib/shared/hooks/useResourceLoader");
     const original = loader.useResourceLoader;

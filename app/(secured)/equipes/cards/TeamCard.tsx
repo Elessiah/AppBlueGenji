@@ -9,6 +9,8 @@ import { TeamPodiumName } from "@/components/podium-tiers";
 import { displayTeamTag } from "@/lib/shared/team-tag";
 import { formatMonthYear } from "@/lib/shared/dates";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import { useTeamsText } from "@/components/i18n/teams-text";
 import { teamPointsHint } from "../_lib/team-points";
 import s from "./TeamCard.module.css";
@@ -33,6 +35,9 @@ import s from "./TeamCard.module.css";
 function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
   const text = useTeamsText();
   const { t } = text;
+  // Un ancien nom fait seulement d'invisibles s'affiche « Équipe #id »
+  // (`entity-fallback-name.ts`).
+  const name = shownEntityName(team.name, "team", team.id, useAppLocale());
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank !== null && team.rank <= 3;
   // Classée = présente au classement, donc avec un rang : la règle que
@@ -47,7 +52,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
       <LocaleLink
         href={`/equipes/${team.id}`}
         className={s.cardOverlay}
-        aria-label={t("card.viewTeam", { name: team.name })}
+        aria-label={t("card.viewTeam", { name })}
       />
 
       {/* Sans match compté, l'équipe n'est pas au classement : pas de rang. */}
@@ -76,12 +81,12 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
               className={s.sigilLogo}
             />
           ) : (
-            team.name[0].toUpperCase()
+            name[0].toUpperCase()
           )}
         </div>
         <div className={s.headText}>
           <div className={s.name}>
-            <TeamPodiumName teamId={team.id}>{team.name}</TeamPodiumName>
+            <TeamPodiumName teamId={team.id}>{name}</TeamPodiumName>
             {team.isGhost && (
               <span className={s.ghostBadge} title={t("card.ghostTitle")}>
                 {t("card.ghostBadge")}
@@ -89,7 +94,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
             )}
           </div>
           <div className={s.tag}>
-            {displayTeamTag(team.tag, team.name)}
+            {displayTeamTag(team.tag, name)}
             {team.region && ` · ${team.region}`}
           </div>
         </div>

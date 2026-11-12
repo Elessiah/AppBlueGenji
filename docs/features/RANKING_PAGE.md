@@ -140,10 +140,13 @@ visiteurs.
 
 **Écritures d'identité** : renommer, changer le sigle, la description ou le
 logo d'une équipe sont plafonnés par compte (`TEAM_IDENTITY_WRITE_RULE`, 30 en
-dix minutes, 429 ; staff `tournaments` exempté). Un renommage ou un logo
+dix minutes, 429 ; staff `tournaments` exempté), réservés en une instruction
+(`reserveTeamIdentityWrite`) et **rendus** quand l'écriture est refusée avant
+d'avoir eu lieu (corps ou fichier invalide, nom ou sigle pris, droit
+manquant) : seule une écriture faite compte. Un renommage ou un logo
 changé ne vide les vues d'identité (`invalidateTeamIdentityViews`) que pour une
 équipe déjà inscrite à un tournoi (`teamEverRegistered`, lu sous le verrou de
-l'équipe) ; même règle pour une fantôme reprise. `updateTeamMeta` verrouille la
+l'équipe, que l'inscription d'un joueur prend aussi après celui du tournoi) ; même règle pour une fantôme reprise. `updateTeamMeta` verrouille la
 ligne de l'équipe en première instruction, y relit le nom actuel et y rejuge le
 droit (propriétaire, ou fantôme pour le staff). L'ancien logo s'efface par
 `deleteUnreferencedUpload(…, "teams")` : seulement s'il vit dans `teams/` et

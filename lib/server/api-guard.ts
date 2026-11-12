@@ -320,11 +320,18 @@ export const TEAM_IDENTITY_WRITE_RULE: RateLimitRule = {
 };
 
 /**
- * {@link TEAM_IDENTITY_WRITE_RULE} pour un compte : la réponse 429 au-delà du
- * plafond, `null` sinon — et toujours `null` pour le staff `tournaments`.
+ * {@link TEAM_IDENTITY_WRITE_RULE} pour un compte, réservée en une instruction
+ * ({@link reserveRateLimit}) : `refused` porte la réponse 429 au-delà du
+ * plafond, `refund` rend la place d'une écriture refusée avant d'avoir eu lieu
+ * (nom pris, droit manquant, fichier invalide) — seule une écriture faite
+ * compte, comme pour {@link TEAM_LIFECYCLE_RULE}. Jamais plafonnée pour le
+ * staff `tournaments`.
  */
-export function enforceTeamIdentityWriteLimit(userId: number, managesGhostTeams: boolean): NextResponse | null {
-  return managesGhostTeams ? null : enforceRateLimit(TEAM_IDENTITY_WRITE_RULE, userId);
+export function reserveTeamIdentityWrite(
+  userId: number,
+  managesGhostTeams: boolean,
+): ReturnType<typeof reserveRateLimit> {
+  return managesGhostTeams ? { refused: null, refund: () => undefined } : reserveRateLimit(TEAM_IDENTITY_WRITE_RULE, userId);
 }
 
 /**

@@ -2,8 +2,8 @@
 import {
   DIRECTORY_READ_RULE,
   enforceRateLimit,
-  enforceTeamIdentityWriteLimit,
   reserveRateLimit,
+  reserveTeamIdentityWrite,
   TEAM_LIFECYCLE_RULE,
 } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -54,18 +54,30 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   // Plafond des écritures d'identité d'un compte (renommage en boucle) ; le
   // staff `tournaments` (équipes fantômes) n'y est pas soumis.
   const managesGhostTeams = can(user, "tournaments");
-  const throttled = enforceTeamIdentityWriteLimit(user.id, managesGhostTeams);
-  if (throttled) return throttled;
+  // Une écriture refusée avant d'avoir eu lieu (corps invalide, nom ou sigle
+  // pris, droit manquant) rend sa place : seule une écriture faite compte.
+  const reservation = reserveTeamIdentityWrite(user.id, managesGhostTeams);
+  if (reservation.refused) return reservation.refused;
 
   try {
-    const body = (await readJsonBody(req)) as { name?: string; description?: string | null; tag?: string | null };
-    if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
-    await updateTeamMeta(
-      user.id,
-      teamId,
-      { name: body.name, description: body.description, tag: body.tag },
-      managesGhostTeams,
-    );
+    let body: { name?: string; description?: string | null; tag?: string | null };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+      if (!teamFieldsAreText(body, ["name", "description", "tag"])) {
+        reservation.refund();
+        return fail(INVALID_TEAM_FIELDS, 400);
+      }
+      await updateTeamMeta(
+        user.id,
+        teamId,
+        { name: body.name, description: body.description, tag: body.tag },
+        managesGhostTeams,
+      );
+    } catch (error) {
+      // `updateTeamMeta` ne lève qu'avant son commit (ce qui suit ne lève pas).
+      reservation.refund();
+      throw error;
+    }
 
     const detail = await getTeamDetail(teamId, user.id, managesGhostTeams);
     return ok(detail);

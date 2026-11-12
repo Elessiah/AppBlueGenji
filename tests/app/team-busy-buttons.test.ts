@@ -16,6 +16,7 @@ const SCREENS = [
   "app/(secured)/equipes/[id]/_components/ClaimGhostTeamDialog.tsx",
   "app/(secured)/equipes/[id]/_components/MembershipActions.tsx",
   "app/(secured)/equipes/[id]/_components/TeamSettings.tsx",
+  "app/(secured)/equipes/[id]/_components/MembersSection.tsx",
 ] as const;
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
@@ -26,13 +27,27 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
     const buttons = source(path).match(/<button[\s\S]*?<\/button>/g) ?? [];
 
     for (const button of buttons) {
-      expect(button).not.toMatch(/\sdisabled=\{(?:pending|loading|busy|logoBusy)\}/);
-      expect(button).not.toMatch(/\sdisabled=\{[^}]*\|\|\s*(?:pending|loading|busy|logoBusy)\}/);
+      expect(button).not.toMatch(/\sdisabled=\{(?:pending|loading|busy|logoBusy|saving|inviting)\}/);
+      expect(button).not.toMatch(/\sdisabled=\{[^}]*\|\|\s*(?:pending|loading|busy|logoBusy|saving|inviting)\}/);
     }
   });
 
   it.each(SCREENS.map((path) => [path]))("%s annonce l'envoi par aria-busy", (path) => {
-    expect(source(path)).toMatch(/aria-busy=\{(?:pending|loading|busy|logoBusy) \|\| undefined\}/);
+    expect(source(path)).toMatch(/aria-busy=\{(?:pending|loading|busy|logoBusy|saving|inviting|cancellingId === invitation\.id) \|\| undefined\}/);
+  });
+
+  // Enregistrer les réglages et inviter : la condition d'envoi (`canSave`,
+  // `canInvite`) comprend la requête en cours ; le `disabled` du bouton, non.
+  it("TeamSettings_saveWhileSaving_staysFocusable", () => {
+    const code = source("app/(secured)/equipes/[id]/_components/TeamSettings.tsx");
+    expect(code).toMatch(/disabled=\{!dirty \|\| !nameCheck\.ok \|\| !tagCheck\.ok\}\s+aria-disabled=\{saving \|\| undefined\}\s+aria-busy=\{saving \|\| undefined\}/);
+    expect(code).not.toMatch(/disabled=\{!canSave\}/);
+  });
+
+  it("MembersSection_inviteWhileInviting_staysFocusable", () => {
+    const code = source("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
+    expect(code).toMatch(/aria-disabled=\{inviting \|\| undefined\}\s+aria-busy=\{inviting \|\| undefined\}/);
+    expect(code).not.toMatch(/disabled=\{!canInvite\}/);
   });
 
   it("RolesDialog_submitWhilePending_ignoredByHandler", () => {

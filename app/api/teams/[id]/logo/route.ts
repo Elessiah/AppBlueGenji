@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { enforceTeamIdentityWriteLimit } from "@/lib/server/api-guard";
+import { reserveTeamIdentityWrite } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { TEAM_LOGO_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
@@ -27,33 +27,46 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!(await canManageTeam(teamId, user.id)) && !(managesGhostTeams && (await isGhostTeam(teamId)))) {
     return fail("FORBIDDEN", 403);
   }
-  const throttled = enforceTeamIdentityWriteLimit(user.id, managesGhostTeams);
-  if (throttled) return throttled;
+  // Un dépôt refusé avant l'écriture (formulaire, fichier, garantie, droit
+  // retiré) rend sa place : seule une écriture faite compte.
+  const reservation = reserveTeamIdentityWrite(user.id, managesGhostTeams);
+  if (reservation.refused) return reservation.refused;
+  const refused = (response: Response) => {
+    reservation.refund();
+    return response;
+  };
 
   const form = await readImageUploadForm(req, user.id);
-  if (form instanceof Response) return form;
+  if (form instanceof Response) return refused(form);
 
   const file = form.get("file");
-  if (!(file instanceof File)) return fail("FILE_MISSING", 400);
+  if (!(file instanceof File)) return refused(fail("FILE_MISSING", 400));
 
   // La zone choisie dans la modale de recadrage ; absente, le gabarit seul.
   const crop = parseImageCropField(form.get(IMAGE_CROP_FIELD));
-  if (!crop.ok) return fail(IMAGE_CROP_INVALID, 400);
+  if (!crop.ok) return refused(fail(IMAGE_CROP_INVALID, 400));
 
   // La garantie des droits passe **avant** le traitement du fichier : c'est une
   // saisie du formulaire, rien à convertir pour la refuser. Les conditions
   // d'utilisation, elles, sont jugées par `updateTeamLogo` (règle unique des
   // gestes de gestion) ; un refus y efface le fichier tout juste écrit.
-  if (form.get(LOGO_RIGHTS_FIELD) !== "1") return fail(LOGO_RIGHTS_NOT_CERTIFIED, 400);
+  if (form.get(LOGO_RIGHTS_FIELD) !== "1") return refused(fail(LOGO_RIGHTS_NOT_CERTIFIED, 400));
 
   try {
-    const diskPath = await processAndStoreImage(file, "team-logo", teamId, crop.crop);
+    let diskPath: string;
+    try {
+      diskPath = await processAndStoreImage(file, "team-logo", teamId, crop.crop);
+    } catch (error) {
+      reservation.refund();
+      throw error;
+    }
     const servedUrl = toServedUploadUrl(diskPath);
     // L'ancien logo est celui que l'écriture a remplacé, relu sous son verrou.
     let previousLogoUrl: string | null;
     try {
       ({ previousLogoUrl } = await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams));
     } catch (error) {
+      reservation.refund();
       // Refusé entre-temps (rôle retiré, course) : le fichier neuf ne désigne
       // rien, il part.
       try {
@@ -83,11 +96,18 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   const managesGhostTeams = can(user, "tournaments");
-  const throttled = enforceTeamIdentityWriteLimit(user.id, managesGhostTeams);
-  if (throttled) return throttled;
+  const reservation = reserveTeamIdentityWrite(user.id, managesGhostTeams);
+  if (reservation.refused) return reservation.refused;
 
   try {
-    const { previousLogoUrl } = await updateTeamLogo(user.id, teamId, null, managesGhostTeams);
+    let previousLogoUrl: string | null;
+    try {
+      ({ previousLogoUrl } = await updateTeamLogo(user.id, teamId, null, managesGhostTeams));
+    } catch (error) {
+      // Refusé (droit manquant, équipe dissoute) : rien n'a été écrit.
+      reservation.refund();
+      throw error;
+    }
     await deleteUnreferencedUpload(previousLogoUrl, "teams");
     return ok({ logoUrl: null });
   } catch (error) {

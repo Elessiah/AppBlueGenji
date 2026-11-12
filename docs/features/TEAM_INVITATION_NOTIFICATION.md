@@ -43,9 +43,12 @@ avertissement. Une invitation qui valide une demande déjà en attente
   équipe recréée ne repart pas de zéro) —, et un joueur ne reçoit l'invitation
   que de `TEAM_INVITE_NOTICES_PER_PLAYER_CAP` (3) équipes distinctes dans la
   fenêtre, pour que le bot ne soit pas classé comme spammeur. Une équipe dont
-  le joueur a été membre (ligne `bg_team_members`, partie comprise) échappe à
-  ce dernier plafond : trois équipes inconnues ne taisent pas son ancienne
-  équipe (`formerMember`). L'invitation, elle, est toujours enregistrée.
+  le joueur a été membre (ligne `bg_team_members`, partie comprise) n'entre
+  pas dans ce dernier plafond, dans les deux sens : elle n'est pas comptée
+  parmi les équipes qui le sollicitent (`NOT EXISTS` dans `teams_to_player`),
+  et son invitation passe même au-delà de trois équipes inconnues
+  (`formerMember`, lu par une requête à part). L'invitation, elle, est
+  toujours enregistrée.
 - Reprise proposée par le staff : les mêmes plafonds qu'une invitation : 10
   joueurs distincts par auteur, 3 fantômes distinctes par joueur, ancienne
   équipe exemptée (`GhostClaimNoticeBudget`, une seule requête).
@@ -61,6 +64,9 @@ avertissement. Une invitation qui valide une demande déjà en attente
   d'équipe par heure, tous comptes confondus (`claimTeamNoticeDmSlot`, en
   mémoire) — les plafonds par compte ne bornent pas N comptes jetables. Au-delà,
   le push seul : rien ne part sur Discord, l'invitation reste sur « Mon profil ».
+  Une place prise pour un message privé qui n'est pas parti (bot injoignable,
+  envoi refusé, erreur) est rendue (`releaseTeamNoticeDmSlot`, dans la même
+  fenêtre seulement) : une panne du bot n'épuise pas le plafond.
 - `claimGhostTeam` envoie l'avis **après** sa transaction et son `finally` : un
   rédacteur qui lève ne peut pas défaire la reprise validée.
 - Les plafonds en base comptent les **tentatives** (lignes écrites,
@@ -71,9 +77,9 @@ avertissement. Une invitation qui valide une demande déjà en attente
 
 Le **nom de l'équipe seul** (`discordInline` sur Discord : ni mention, ni lien,
 ni balisage), jamais le pseudo ni le `#id` de qui invite, propose ou transfère.
-Une reprise dit « Un admin te propose de reprendre l'équipe [nom](lien) » / "An
-admin offers you to take over the team [name](link)" (décision de l'utilisateur,
-2026-11-03) : le nom en lien masqué vers `/profil#invitations`, ses crochets et
+Une reprise dit « Tu peux reprendre l'équipe [nom](lien) » / "You can take
+over the team [name](link)" — le nom de l'équipe seul, sans « un admin »
+(décision D4 de l'utilisateur, 2026-11-09) : le nom en lien masqué vers `/profil#invitations`, ses crochets et
 parenthèses échappés par `discordInline` ; le push dit la même phrase sans lien.
 Langue du compte (`BOT_DM_LANGUAGE.md`), bilingue si elle est illisible. Lien :
 `/profil#invitations` pour répondre (invitation, reprise), `/equipes/[id]` pour

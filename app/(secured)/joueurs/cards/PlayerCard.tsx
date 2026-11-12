@@ -11,6 +11,8 @@ import { playerRosterStatus } from "@/lib/shared/player-roster-status";
 import { TeamLink } from "@/components/entity-link";
 import { teamRoleTone } from "@/lib/shared/team-role-display";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useAppLocale } from "@/components/i18n/locale-context";
+import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import { usePlayersText, type PlayersText } from "@/components/i18n/players-text";
 import s from "../../_shared/annuaire.module.css";
 
@@ -34,6 +36,11 @@ function cardRoleLabel(text: PlayersText, role: string): string {
 function PlayerCardView({ player }: Readonly<{ player: DirectoryPlayer }>) {
   const text = usePlayersText();
   const { t } = text;
+  // Un ancien pseudo fait seulement d'invisibles s'affiche « Joueur #id » :
+  // carte, lien et initiale de repli gardent un nom (`entity-fallback-name.ts`).
+  const locale = useAppLocale();
+  const pseudo = player.id === null ? player.pseudo : shownEntityName(player.pseudo, "player", player.id, locale);
+  const teamName = player.team ? shownEntityName(player.team.name, "team", player.team.id, locale) : "";
   // Le statut d'un compte sans équipe est une **invitation à recruter** —
   // « FREE AGENT » ouvertement, « SANS ÉQUIPE » par défaut —, et un compte
   // supprimé est justement celui qu'on ne peut plus rattacher :
@@ -58,7 +65,7 @@ function PlayerCardView({ player }: Readonly<{ player: DirectoryPlayer }>) {
         <LocaleLink
           href={`/joueurs/${player.id}`}
           className={s.cardOverlay}
-          aria-label={t("card.viewProfile", { name: player.pseudo })}
+          aria-label={t("card.viewProfile", { name: pseudo })}
         />
       )}
       <div className={s.plHead}>
@@ -67,20 +74,20 @@ function PlayerCardView({ player }: Readonly<{ player: DirectoryPlayer }>) {
             {player.avatarUrl ? (
               <Image
                 src={player.avatarUrl}
-                alt={player.pseudo}
+                alt={pseudo}
                 width={64}
                 height={64}
               />
             ) : (
-              <span className={s.plAvatarFallback}>{avatarInitial(player.pseudo)}</span>
+              <span className={s.plAvatarFallback}>{avatarInitial(pseudo)}</span>
             )}
           </div>
         </div>
         <div className={s.plPseudo}>
           {player.isDeleted ? (
-            player.pseudo
+            pseudo
           ) : (
-            <PlayerPodiumName userId={player.id}>{player.pseudo}</PlayerPodiumName>
+            <PlayerPodiumName userId={player.id}>{pseudo}</PlayerPodiumName>
           )}
         </div>
         {player.isDeleted && (
@@ -101,9 +108,9 @@ function PlayerCardView({ player }: Readonly<{ player: DirectoryPlayer }>) {
                 teamId={player.team.id}
                 podiumTier={player.isDeleted ? null : undefined}
                 className={`${s.aboveOverlay} tap-target`}
-                title={t("card.viewTeam", { name: player.team.name })}
+                title={t("card.viewTeam", { name: teamName })}
               >
-                <em>{player.team.name.toUpperCase()}</em>
+                <em>{teamName.toUpperCase()}</em>
               </TeamLink>
             </>
           ) : (

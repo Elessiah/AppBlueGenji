@@ -223,6 +223,20 @@ export async function registerCurrentUserTeam(
   if (!activeTeam) {
     throw new Error("NO_ACTIVE_TEAM");
   }
+  // La ligne de l'équipe, verrouillée après celle du tournoi (l'ordre de
+  // `registerTeamsByIds`) : une dissolution ou une écriture d'identité
+  // (`withTeamRosterLock`, `updateTeamMeta`) attend la fin de l'inscription, et
+  // `teamEverRegistered`, lu sous ce même verrou, la voit. Lecture verrouillante,
+  // donc à jour : l'appartenance lue plus haut vient de l'instantané, figé avant
+  // qu'une dissolution concurrente ne commite — une équipe dissoute entre-temps
+  // n'entre pas.
+  const [teamRows] = await connection.execute<(RowDataPacket & { deleted_at: Date | string | null })[]>(
+    `SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE`,
+    [activeTeam.teamId],
+  );
+  if (teamRows.length === 0 || (teamRows[0].deleted_at ?? null) !== null) {
+    throw new Error("NO_ACTIVE_TEAM");
+  }
 
   // Les rôles sont relus **dans la transaction**, sur la ligne d'appartenance
   // que `getUserActiveTeam` vient de lire : le droit d'engager se juge à
@@ -287,7 +301,7 @@ export async function registerTeamsByIds(
   if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
 
   // Le tournoi d'abord, les équipes ensuite — même ordre que l'inscription d'un
-  // joueur (qui, elle, ne verrouille que le tournoi) : aucun cycle possible
+  // joueur (le tournoi, puis son équipe active) : aucun cycle possible
   // entre les deux chemins.
   await lockTournamentRow(connection, tournamentId);
 

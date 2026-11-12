@@ -50,6 +50,7 @@ function fakeConnection(options: {
   teams: Row[];
   registered?: number;
   alreadyRegistered?: number[];
+  activeTeamDeletedAt?: string | null;
 }) {
   const inserted: number[] = [];
   let registered = options.registered ?? 0;
@@ -71,6 +72,11 @@ function fakeConnection(options: {
       }
       // `loadTournamentRow` : la lecture complète du chemin joueur.
       if (q.includes("FROM bg_tournaments")) return [[TOURNAMENT], []];
+      // Verrou de l'équipe active (chemin joueur) : elle existe, non dissoute,
+      // sauf si le test la dissout.
+      if (q.startsWith("SELECT deleted_at FROM bg_teams")) {
+        return [[{ deleted_at: options.activeTeamDeletedAt ?? null }], []];
+      }
       if (q.includes("FROM bg_teams")) return [options.teams, []];
       if (q.includes("COUNT(*)") && q.includes("AND team_id = ?")) {
         return [[{ c: (options.alreadyRegistered ?? []).includes(Number(params[1])) ? 1 : 0 }], []];
@@ -374,6 +380,30 @@ describe("ordre de verrouillage des points d'entrée", () => {
     expect(firstStatement(connection)).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
   });
 
+  it("verrouille l'équipe active après le tournoi, avant d'inscrire", async () => {
+    // Une dissolution ou une écriture d'identité tient la même ligne : l'ordre
+    // tournoi → équipe est celui de l'inscription d'un lot (aucun cycle).
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    const { connection } = fakeConnection({ teams: [] });
+
+    await registerCurrentUserTeam(connection, 12, 42);
+
+    const sql = sqlOf(connection);
+    const teamLock = sql.indexOf("SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE");
+    expect(teamLock).toBeGreaterThan(0);
+    expect(sql.findIndex((q) => q.startsWith("INSERT INTO bg_tournament_registrations"))).toBeGreaterThan(teamLock);
+    const call = (connection.execute as unknown as SqlMock).mock.calls[teamLock];
+    expect(call[1]).toEqual([101]);
+  });
+
+  it("refuse une équipe dissoute entre la lecture de l'appartenance et le verrou", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
+    const { connection, inserted } = fakeConnection({ teams: [], activeTeamDeletedAt: "2026-11-12 10:00:00" });
+
+    await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("NO_ACTIVE_TEAM");
+    expect(inserted).toEqual([]);
+  });
+
   it("cherche l'équipe active sur la connexion de la transaction", async () => {
     // Verrou du tournoi en main, emprunter une *seconde* place du pool arme un
     // convoi : le porteur du verrou attend une connexion que les transactions
@@ -396,7 +426,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
     await registerTeamsByIds(connection, 12, [900]);
 
     // Le tournoi d'abord, les équipes ensuite : même ordre que le chemin joueur
-    // (qui ne verrouille, lui, que le tournoi), donc aucun cycle possible.
+    // (tournoi puis équipe active), donc aucun cycle possible.
     expect(firstStatement(connection)).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
     expect(sqlOf(connection)[1]).toContain("SELECT id, is_ghost, deleted_at");
   });
