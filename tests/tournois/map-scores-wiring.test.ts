@@ -227,7 +227,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 
   it("une proposition adverse dont le détail reste introuvable invite à actualiser au lieu de « Confirme-le »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(dialog).toContain('if ((theirs.maps ?? []).length > 0) return text.t("score.player.theirs.withMaps", values);');
+    expect(dialog).toContain('if (opponentDetailKnown(theirs)) return text.t("score.player.theirs.withMaps", values);');
     expect(dialog).toContain('return text.t("score.player.theirs.withoutMaps", values);');
     expect(FR_SCORE.player.theirs.withoutMaps).toContain("mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer");
   });
@@ -238,7 +238,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     expect(dialog).toContain("detailPending: detailLoading } = useProposalMaps(");
     expect(dialog).toContain('if (reader.detailLoading) return text.t("score.player.theirs.loading", values);');
     expect(FR_SCORE.player.theirs.loading).toContain("Lecture du détail de ses maps…");
-    expect(dialog.indexOf("if ((theirs.maps ?? []).length > 0)")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));
+    expect(dialog.indexOf("if (opponentDetailKnown(theirs))")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));
   });
 });
 
@@ -495,7 +495,7 @@ describe("détail map par map — formulaire vierge", () => {
 describe("détail map par map — premier report sans verrou d'intervalle", () => {
   it("le report d'une engagée sans report antérieur n'efface rien avant d'insérer", () => {
     const scoring = readSource("lib/server/tournaments/scoring.ts");
-    expect(scoring).toContain("const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;");
+    expect(scoring).toContain("reportPresent(isTeam1Reporter ? match.team1_report_score : match.team2_report_score) ||");
     expect(scoring).toContain("await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });");
   });
 });

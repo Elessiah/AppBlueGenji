@@ -258,11 +258,16 @@ montré.
 - **Maintenir sa version** : « Envoyer le score » ouvre une confirmation
   (`ConfirmActionDialog` : litige, saisie verrouillée, arbitre alerté), puis
   l'envoi passe par le chemin ordinaire du désaccord.
-- **Modale périmée — contrat serveur.** Tout envoi simple porte
-  `seenOpponentReportAt` : l'instant de dépôt de la déclaration adverse que la
-  modale montrait (`null` : aucune, ou son détail pas encore lu — une saisie
-  comparée au seul score ne vaut pas « vue », `seenOpponentReportAt()` ;
-  **absent vaut `null`** ; un report sans instant se lit `""` des deux côtés). Sous le verrou du
+- **Modale périmée — contrat serveur.** Tout envoi simple — litige confirmé
+  compris, même règle (`seenOpponentReportAt()`, `lib/shared/player-score-report.ts`)
+  — porte `seenOpponentReportAt` : l'instant de dépôt de la déclaration adverse
+  que la modale montrait, quand la saisie s'y est vraiment comparée (détail
+  connu, `opponentDetailKnown()`, ou **score** déjà différent). `null` sinon :
+  aucune déclaration, ou un score identique au détail pas encore lu — qui ne
+  vaut pas « vue » ; le refus relit la vue REST, détail compris
+  (`matchProposals`). **Absent vaut `null`** ; un report sans instant se lit
+  `""` des deux côtés (et compte comme report : ses maps sont effacées avant
+  les nouvelles). Sous le verrou du
   match (table seule, première lecture verrouillante — MariaDB),
   `assertOpponentReportSeen` compare avec le report adverse en base : même
   dépôt, ou aucun report adverse → chemin ordinaire ; autre dépôt et version
@@ -276,10 +281,13 @@ montré.
 - **Un dépôt, un instant.** `teamN_reported_at` est à la seconde : chaque
   report s'écrit `GREATEST(NOW(), ancien + 1 s)` (`reportedAtAssignment`), si
   bien qu'une retouche dans la même seconde change quand même l'instant que
-  les deux gardes comparent.
+  les deux gardes comparent. L'avance sur l'horloge reste bornée (une seconde
+  par retouche dans la même seconde, recalée sur `NOW()` ensuite) et aucun
+  délai n'en dépend (échéances calculées depuis `NOW()`).
 - **Réponse.** `200 { success, completed }` : `completed` dit que l'envoi a
   clos le match (versions concordantes) — la modale annonce alors « score
-  confirmé », pas « en attente de l'adversaire ».
+  confirmé », pas « en attente de l'adversaire » (`reportClosedMatch()` : seul
+  `completed: true` compte).
 
 **Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
 (BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne

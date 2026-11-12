@@ -79,7 +79,7 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
     // module pur, jamais par une inversion recopiée.
     expect(PLAYER_DIALOG).toContain("toReporterScores(myTeamIsTeam1,");
     expect(PLAYER_DIALOG).toContain("? { maps: send.maps, confirm: { reportedAt: theirs.reportedAt } }");
-    expect(PLAYER_DIALOG).toContain("void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt: seenOpponentReportAt(view?.theirs) });");
+    expect(PLAYER_DIALOG).toContain("void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt });");
   });
 
   it("la liste de maps est celle de l'arbitrage : une seule implémentation", () => {

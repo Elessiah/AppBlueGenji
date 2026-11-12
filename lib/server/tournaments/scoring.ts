@@ -329,17 +329,17 @@ async function reportsConcord(
 export type ProposalConfirmation = { reportedAt: string };
 
 /**
- * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
- * instant de dépôt, et les mêmes maps que celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
- * verrouillée ; le détail adverse est relu sous verrou (la dernière version),
- * et rendu pour que la comparaison des deux reports ne le relise pas.
- */
-/**
  * Nouvel instant de dépôt d'un report : maintenant, et **toujours plus tard**
  * que le dépôt qu'il remplace. La colonne est à la seconde : une retouche dans
  * la même seconde garderait sinon le même instant, et les gardes qui
  * l'identifient (`assertProposalUnchanged`, `assertOpponentReportSeen`)
  * prendraient la nouvelle version pour celle que l'adversaire a lue.
+ *
+ * Avance bornée : l'instant ne dépasse l'horloge que d'une seconde par
+ * retouche **dans la même seconde** (envois sérialisés par le verrou du
+ * match), et se recale sur `NOW()` dès que l'horloge l'a rattrapé. Aucun délai
+ * n'en dépend — l'échéance de validation d'office part de `NOW()`
+ * (`scoreDeadlineAssignment`), la date de jeu du plus **ancien** report.
  */
 function reportedAtAssignment(side: "team1" | "team2"): string {
   return `GREATEST(NOW(), COALESCE(DATE_ADD(${side}_reported_at, INTERVAL 1 SECOND), NOW()))`;
@@ -355,6 +355,13 @@ function opponentReportInstant(match: MatchRow, isTeam1Reporter: boolean): strin
   return toIso((isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at) ?? null) ?? "";
 }
 
+/**
+ * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
+ * instant de dépôt, et les mêmes maps que celles renvoyées. Lève
+ * `PROPOSAL_STALE` sinon. La ligne du match est déjà verrouillée ; le détail
+ * adverse est relu sous verrou (la dernière version), et rendu pour que la
+ * comparaison des deux reports ne le relise pas.
+ */
 async function assertProposalUnchanged(
   connection: PoolConnection,
   match: MatchRow,
@@ -602,7 +609,12 @@ export async function reportMatchScore(
   // que l'adversaire confirme d'un clic, et elle qui devient le résultat retenu.
   // Premier report de l'engagée (ligne du match verrouillée) : aucune ligne à
   // effacer, donc pas de lecture verrouillante sur un intervalle vide.
-  const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;
+  // Un report se reconnaît à son score **ou** à son instant : un score sans
+  // instant (donnée ancienne, que les gardes lisent `""`) a lui aussi des maps
+  // à effacer avant les nouvelles.
+  const hadReport =
+    reportPresent(isTeam1Reporter ? match.team1_report_score : match.team2_report_score) ||
+    (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;
   await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });
 
   const [updatedRows] = await connection.execute<MatchRow[]>(

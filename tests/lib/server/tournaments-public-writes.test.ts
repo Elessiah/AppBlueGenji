@@ -483,8 +483,10 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
     poolExecute
       .mockResolvedValueOnce([[{ state: "RUNNING" }], undefined])
       .mockRejectedValueOnce(new Error("DB_DOWN"));
+    jest.mocked(reportMatchScore).mockResolvedValueOnce(false);
 
-    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).resolves.toHaveProperty("completed");
+    // Le report attend l'adversaire : l'échec de relecture ne le dit pas clos.
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).resolves.toEqual({ completed: false });
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
 

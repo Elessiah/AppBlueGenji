@@ -56,6 +56,63 @@ export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
 }
 
 /**
+ * Le détail map par map de la déclaration adverse est-il connu ? Encore en
+ * lecture ou illisible, elle ne se compare qu'au score. Seule définition de
+ * « détail connu » : l'état affiché, l'avertissement de litige, la comparaison
+ * et l'instant « vu » envoyé au serveur s'accordent ainsi toujours.
+ */
+export function opponentDetailKnown(theirs: Pick<MatchScoreReport, "maps"> | null | undefined): boolean {
+  return (theirs?.maps ?? []).length > 0;
+}
+
+/**
+ * Ce que la modale dit avoir **vu** de la déclaration adverse (`MAP_SCORES.md`) :
+ * son instant de dépôt quand la saisie s'y est réellement comparée — détail
+ * connu, ou score déjà différent (le litige se sait alors sans le détail).
+ * Sinon `null` : un score identique au détail encore inconnu n'a rien vu des
+ * maps, et le serveur refuse (`PROPOSAL_ARRIVED`) une version qui en diffère
+ * par elles plutôt que d'ouvrir un litige à l'aveugle — le refus relit la vue,
+ * détail compris (`matchProposals` du contexte du lecteur).
+ */
+export function seenOpponentReportAt(
+  theirs: MatchScoreReport | null | undefined,
+  entered: Pick<MatchScoreReport, "team1Score" | "team2Score"> | null,
+): string | null {
+  if (!theirs) return null;
+  if (opponentDetailKnown(theirs)) return theirs.reportedAt;
+  const scoreDiffers =
+    entered !== null && (entered.team1Score !== theirs.team1Score || entered.team2Score !== theirs.team2Score);
+  return scoreDiffers ? theirs.reportedAt : null;
+}
+
+/**
+ * Envoi de « Confirmer la déclaration adverse » : ses maps telles quelles et
+ * son instant de dépôt — la saisie du lecteur n'y entre pas et n'est pas
+ * remplacée (un refus la lui rend intacte). `null` tant que le détail adverse
+ * n'est pas connu : rien à confirmer d'un clic.
+ */
+export function confirmTheirsSend(
+  theirs: MatchScoreReport | null | undefined,
+): { maps: MatchMapInput[]; confirmTheirs: true; seenAt: string } | null {
+  if (!theirs || !opponentDetailKnown(theirs)) return null;
+  return {
+    maps: (theirs.maps ?? []).map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score })),
+    confirmTheirs: true,
+    seenAt: theirs.reportedAt,
+  };
+}
+
+/**
+ * Un envoi accepté a-t-il **clos** le match ? Oui pour une confirmation, ou
+ * quand le serveur le dit (`completed: true` — versions concordantes) ; toute
+ * autre réponse (champ absent, autre type) reste « en attente de l'adversaire ».
+ */
+export function reportClosedMatch(confirmTheirs: boolean, payload: unknown): boolean {
+  if (confirmTheirs) return true;
+  return typeof payload === "object" && payload !== null && (payload as { completed?: unknown }).completed === true;
+}
+
+/**
  * Maps à l'ouverture de la modale : la proposition du lecteur, sinon celle de
  * l'adversaire (confirmer d'un clic), sinon une liste vide.
  */
@@ -137,7 +194,7 @@ export function entryComparison(
 } {
   const theirs = view?.phase === "THEIRS_PENDING" ? view.theirs : null;
   const theirMaps = theirs?.maps ?? [];
-  const known = form.canEnterScore && theirMaps.length > 0;
+  const known = form.canEnterScore && opponentDetailKnown(theirs);
   return {
     theirs,
     theirMaps,

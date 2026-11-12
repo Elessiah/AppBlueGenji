@@ -30,8 +30,12 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { isMyTeamTeam1, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
   playerReportInitialMaps,
+  confirmTheirsSend,
   enteredScoreRelation,
   entryComparison,
+  opponentDetailKnown,
+  reportClosedMatch,
+  seenOpponentReportAt,
   playerReportView,
   toReporterScores,
   type MapDifference,
@@ -187,7 +191,7 @@ function theirsPendingStatus(
   // Qui ne peut pas reporter ne reçoit jamais le détail (`matchProposals`) :
   // rien à confirmer ni à ressaisir de son côté, et rien à dire du détail.
   if (!reader.canReport) return text.t("score.player.theirs.readOnly", values);
-  if ((theirs.maps ?? []).length > 0) return text.t("score.player.theirs.withMaps", values);
+  if (opponentDetailKnown(theirs)) return text.t("score.player.theirs.withMaps", values);
   // Détail encore en lecture (proposition arrivée par le flux) : ne pas
   // inviter à ressaisir ce qui va pré-remplir le formulaire.
   if (reader.detailLoading) return text.t("score.player.theirs.loading", values);
@@ -228,21 +232,6 @@ function reportBody(
   );
 }
 
-/**
- * Ce que la modale dit avoir vu de la déclaration adverse : son instant de
- * dépôt **une fois son détail lu** — score et maps sous les yeux. Détail
- * encore en lecture ou illisible, la saisie n'a pu être comparée qu'au score :
- * `null`, et le serveur refuse (`PROPOSAL_ARRIVED`) une version qui en diffère
- * par les maps plutôt que d'ouvrir un litige à l'aveugle.
- */
-export function seenOpponentReportAt(theirs: MatchScoreReport | null | undefined): string | null {
-  return theirs && (theirs.maps ?? []).length > 0 ? theirs.reportedAt : null;
-}
-
-/** Les seules colonnes d'une map, telles que la route les attend. */
-function plainMaps(maps: ReadonlyArray<MatchMapInput>): MatchMapInput[] {
-  return maps.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score }));
-}
 
 /** Une map d'un côté de la comparaison : « 2 – 1 · CODE », ou « aucune ». */
 function mapValueText(text: TournamentDialogsText, map: MatchMapInput | null): string {
@@ -307,7 +296,7 @@ function sendingOpensDispute(
   // Détail adverse connu : toute retouche le contredit. Encore en lecture ou
   // illisible, seul un **score** différent se sait contradictoire — le serveur
   // compare lui-même le détail, et une saisie identique y confirmerait.
-  if ((view.theirs.maps ?? []).length > 0) return !form.confirmsAsIs;
+  if (opponentDetailKnown(view.theirs)) return !form.confirmsAsIs;
   return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;
 }
 
@@ -460,7 +449,7 @@ export function PlayerScoreDialog({
   // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
   // joueurs — le dire avant l'envoi, pas après.
   const opensDispute = sendingOpensDispute(canEnterScore, view, { entered, confirmsAsIs, error: check.error });
-  const { theirs, theirMaps, sameScoreArrived, differences, offerConfirmTheirs } = entryComparison(view, maps, {
+  const { theirs, sameScoreArrived, differences, offerConfirmTheirs } = entryComparison(view, maps, {
     canEnterScore,
     arrivedDuringEntry,
     confirmsAsIs,
@@ -538,7 +527,7 @@ export function PlayerScoreDialog({
       // (modale périmée, ou arrivée identique) — le match est clos, pas « en
       // attente de l'adversaire ».
       showSuccess(
-        send.confirmTheirs || payload.completed === true
+        reportClosedMatch(send.confirmTheirs, payload)
           ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
           : t("score.player.submitted", {
               team1,
@@ -572,8 +561,9 @@ export function PlayerScoreDialog({
    * laisse au lecteur sa propre version intacte ; accepté, la modale se ferme.
    */
   const confirmTheirs = () => {
-    if (submitting || !theirs || theirMaps.length === 0) return;
-    void submitScore({ maps: plainMaps(theirMaps), confirmTheirs: true, seenAt: theirs.reportedAt });
+    const send = confirmTheirsSend(theirs);
+    if (submitting || send === null) return;
+    void submitScore(send);
   };
 
   const submitForfeit = async () => {
@@ -614,11 +604,13 @@ export function PlayerScoreDialog({
     if (submitting || nothingEntered || unchangedMine) return;
     // Version différente de la déclaration adverse : l'envoi ouvre un litige,
     // confirmé à part.
-    if (opensDispute && view?.theirs) {
-      setDisputeSeenAt(view.theirs.reportedAt);
+    // Les deux envois suivent la même règle du « vu » (`seenOpponentReportAt`).
+    const seenAt = seenOpponentReportAt(view?.theirs, entered);
+    if (opensDispute && seenAt !== null) {
+      setDisputeSeenAt(seenAt);
       return;
     }
-    void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt: seenOpponentReportAt(view?.theirs) });
+    void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt });
   };
 
   // État du cycle, en une phrase : c'est ce que le formulaire d'avant ne disait

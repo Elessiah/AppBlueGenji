@@ -92,7 +92,7 @@ import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { MatchScheduleDialog } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PlayerScoreDialog, seenOpponentReportAt } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
+import { PlayerScoreDialog } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { RemoveEntrantDialog } from "@/app/(secured)/tournois/[id]/_components/RemoveEntrantDialog";
 import { RollbackRoundDialog } from "@/app/(secured)/tournois/[id]/_components/RollbackRoundDialog";
@@ -816,43 +816,26 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain('t("score.player.confirmTheirs")');
     // Un simple envoi dit la déclaration adverse vue ; « Envoyer ma version » passe par une confirmation.
     expect(source).toContain("{ maps: send.maps, seenOpponentReportAt: send.seenAt }");
-    expect(source).toContain("if (opensDispute && view?.theirs) {");
+    expect(source).toContain("if (opensDispute && seenAt !== null) {");
     expect(source).toContain("<ConfirmActionDialog");
     expect(source).toContain('t("score.player.dispute.body", { opponent: opponentName })');
     expect(source).toContain('<InfoHint id="player-score-diff-help"');
     expect(source).not.toMatch(/window\.confirm/);
   });
 
-  describe("seenOpponentReportAt (déclaration adverse vue, MAP_SCORES.md)", () => {
-    const map = { mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 1 };
-
-    it("seenOpponentReportAt_detailKnown_returnsReportedAt", () => {
-      expect(seenOpponentReportAt({ team1Score: 2, team2Score: 1, maps: [map], reportedAt: "2026-05-05T10:00:00.000Z" })).toBe(
-        "2026-05-05T10:00:00.000Z",
-      );
-    });
-
-    it("seenOpponentReportAt_detailNotLoaded_returnsNull", () => {
-      expect(seenOpponentReportAt({ team1Score: 2, team2Score: 1, maps: [], reportedAt: "2026-05-05T10:00:00.000Z" })).toBeNull();
-    });
-
-    it("seenOpponentReportAt_noOpponent_returnsNull", () => {
-      expect(seenOpponentReportAt(null)).toBeNull();
-      expect(seenOpponentReportAt(undefined)).toBeNull();
-    });
-  });
-
-  it("confirmTheirs_doesNotReplaceRows", () => {
+  // Câblage seulement (pas de DOM sous Jest ici) : le comportement de ces
+  // décisions est testé dans `tests/lib/shared/player-score-report.test.ts`.
+  it("score (engagé) : confirmer, maintenir et le toast passent par les décisions partagées", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
-    const body = source.slice(source.indexOf("const confirmTheirs = () => {"), source.indexOf("const submitForfeit"));
-    expect(body).toContain("void submitScore({ maps: plainMaps(theirMaps), confirmTheirs: true, seenAt: theirs.reportedAt });");
-    expect(body).not.toContain("setRows(");
-  });
-
-  it("submitScore_completedPayload_showsConfirmedToast", () => {
-    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
-    expect(source).toContain("send.confirmTheirs || payload.completed === true");
-    expect(source).toContain("seenAt: seenOpponentReportAt(view?.theirs)");
+    const confirmBody = source.slice(source.indexOf("const confirmTheirs = () => {"), source.indexOf("const submitForfeit"));
+    expect(confirmBody).toContain("confirmTheirsSend(theirs)");
+    expect(confirmBody).not.toContain("setRows(");
+    const submitBody = source.slice(source.indexOf("const onSubmitForm ="), source.indexOf("État du cycle, en une phrase"));
+    // Litige confirmé et envoi simple : une seule règle du « vu ».
+    expect(submitBody.match(/seenOpponentReportAt\(/g)).toHaveLength(1);
+    expect(submitBody).toContain("setDisputeSeenAt(seenAt)");
+    expect(source).toContain("reportClosedMatch(send.confirmTheirs, payload)");
+    expect(source).not.toMatch(/\(theirs\.maps \?\? \[\]\)\.length|\(view\.theirs\.maps \?\? \[\]\)\.length/);
   });
 
   it("score (engagé) : textes de la déclaration adverse en français et en anglais", () => {
@@ -874,7 +857,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     expect(source).toContain('if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;');
     // Détail adverse inconnu (en lecture, illisible) : seul un score différent s'annonce comme un litige.
-    expect(source).toContain("if ((view.theirs.maps ?? []).length > 0) return !form.confirmsAsIs;");
+    expect(source).toContain("if (opponentDetailKnown(view.theirs)) return !form.confirmsAsIs;");
     expect(source).toContain("return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;");
     expect(source).toContain('t("score.player.counterWarning", { opponent: opponentName })');
     // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.

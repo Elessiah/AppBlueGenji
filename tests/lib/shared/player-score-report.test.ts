@@ -1,8 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   canOpenPlayerScoreDialog,
+  confirmTheirsSend,
   entryComparison,
   mapListDifferences,
+  opponentDetailKnown,
+  reportClosedMatch,
+  seenOpponentReportAt,
   pendingReportNotice,
   pendingReportState,
   playerReportInitialScores,
@@ -245,6 +249,12 @@ describe("mapListDifferences (déclaration adverse arrivée pendant la saisie, M
     expect(mapListDifferences([map(Number.NaN, 1)], [map(1, 1)])[0].kinds).toEqual(["SCORE"]);
   });
 
+  it("mapListDifferences_infiniteScoreAgainstDraw_reportsScoreNotWinner", () => {
+    // Score non fini : `mapWinnerSide` n'y voit aucun vainqueur, comme dans la
+    // map nulle — l'écart est de score, pas de vainqueur.
+    expect(mapListDifferences([map(Number.POSITIVE_INFINITY, 1)], [map(1, 1)])[0].kinds).toEqual(["SCORE"]);
+  });
+
   it("mapListDifferences_sameWinnerOtherScore_reportsScore", () => {
     expect(mapListDifferences([map(3, 1)], [map(2, 1)])[0].kinds).toEqual(["SCORE"]);
   });
@@ -335,5 +345,71 @@ describe("entryComparison (saisie face à la déclaration adverse)", () => {
     });
 
     expect(result).toMatchObject({ sameScoreArrived: false, offerConfirmTheirs: false, differences: [] });
+  });
+});
+
+describe("déclaration adverse vue, confirmée, close (MAP_SCORES.md — modale périmée)", () => {
+  const AT = "2026-09-28T20:00:00.000Z";
+  const theirMap = { mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 1 };
+  const withDetail: MatchScoreReport = { team1Score: 1, team2Score: 0, reportedAt: AT, maps: [theirMap] };
+  const withoutDetail: MatchScoreReport = { team1Score: 1, team2Score: 0, reportedAt: AT, maps: [] };
+
+  it("opponentDetailKnown_mapsPresent_returnsTrue", () => {
+    expect(opponentDetailKnown(withDetail)).toBe(true);
+  });
+
+  it("opponentDetailKnown_noMapsOrNoReport_returnsFalse", () => {
+    expect(opponentDetailKnown(withoutDetail)).toBe(false);
+    expect(opponentDetailKnown(null)).toBe(false);
+  });
+
+  it("seenOpponentReportAt_detailKnown_returnsReportedAt", () => {
+    expect(seenOpponentReportAt(withDetail, { team1Score: 1, team2Score: 0 })).toBe(AT);
+  });
+
+  it("seenOpponentReportAt_detailUnknownScoreDiffers_returnsReportedAt", () => {
+    // Score différent : le litige se sait sans le détail (même règle que la confirmation du litige).
+    expect(seenOpponentReportAt(withoutDetail, { team1Score: 0, team2Score: 1 })).toBe(AT);
+  });
+
+  it("seenOpponentReportAt_detailUnknownSameScore_returnsNull", () => {
+    expect(seenOpponentReportAt(withoutDetail, { team1Score: 1, team2Score: 0 })).toBeNull();
+  });
+
+  it("seenOpponentReportAt_detailUnknownNothingEntered_returnsNull", () => {
+    expect(seenOpponentReportAt(withoutDetail, null)).toBeNull();
+  });
+
+  it("seenOpponentReportAt_noOpponent_returnsNull", () => {
+    expect(seenOpponentReportAt(null, { team1Score: 1, team2Score: 0 })).toBeNull();
+    expect(seenOpponentReportAt(undefined, null)).toBeNull();
+  });
+
+  it("confirmTheirsSend_detailKnown_returnsTheirPlainMapsAndInstant", () => {
+    expect(confirmTheirsSend(withDetail)).toEqual({
+      maps: [{ replayCode: "ABC123", team1Score: 2, team2Score: 1 }],
+      confirmTheirs: true,
+      seenAt: AT,
+    });
+  });
+
+  it("confirmTheirsSend_detailUnknown_returnsNull", () => {
+    expect(confirmTheirsSend(withoutDetail)).toBeNull();
+    expect(confirmTheirsSend(null)).toBeNull();
+  });
+
+  it("reportClosedMatch_confirmTheirs_returnsTrue", () => {
+    expect(reportClosedMatch(true, {})).toBe(true);
+  });
+
+  it("reportClosedMatch_completedTrue_returnsTrue", () => {
+    expect(reportClosedMatch(false, { success: true, completed: true })).toBe(true);
+  });
+
+  it("reportClosedMatch_completedFalseMissingOrMalformed_returnsFalse", () => {
+    expect(reportClosedMatch(false, { success: true, completed: false })).toBe(false);
+    expect(reportClosedMatch(false, { success: true })).toBe(false);
+    expect(reportClosedMatch(false, { completed: "true" })).toBe(false);
+    expect(reportClosedMatch(false, null)).toBe(false);
   });
 });

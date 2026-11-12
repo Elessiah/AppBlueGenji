@@ -304,6 +304,32 @@ describe("tournaments-service: match state machine", () => {
       expect(queueRefereeAlert).not.toHaveBeenCalled();
     });
 
+    const mapClearReads = (calls: Call[]) =>
+      calls.filter((c) => c.sql.startsWith("SELECT 1 FROM bg_match_maps"));
+
+    it("reportMatchScore_firstReport_skipsMapClear", async () => {
+      const { connection, calls } = reportConnection();
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(mapClearReads(calls)).toHaveLength(0);
+    });
+
+    it("reportMatchScore_ownScoreWithoutInstant_clearsOldMaps", async () => {
+      // Report sans instant (donnée ancienne) : c'est quand même un report, ses maps s'effacent.
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team1_report_score: 2,
+        team1_report_opponent_score: 0,
+        team1_reported_at: null,
+      });
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(mapClearReads(calls)).toHaveLength(1);
+      expect(mapClearReads(calls)[0].params).toEqual([10, "TEAM1"]);
+    });
+
     it("l'échéance d'un premier report ne court qu'après une fin de série plausible", async () => {
       const { connection, calls } = reportConnection();
 
