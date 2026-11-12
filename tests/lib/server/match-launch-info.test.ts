@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
+import { listViewerMatchLaunches, loadViewerMatchContacts, shownName } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import * as castNotices from "@/lib/server/tournaments/cast-notices";
 import { isUnsettled } from "@/lib/server/tournaments/lock-wait";
@@ -1691,5 +1691,37 @@ describe("loadViewerMatchContacts — arbitre désigné qui caste aussi le match
     const info = await loadViewerMatchContacts(viewer, 42);
 
     expect(info).toBeNull();
+  });
+});
+
+describe("listViewerMatchLaunches — noms nettoyés des fiches de contact", () => {
+  const RLO = "\u202E";
+  const ZWSP = "\u200B";
+
+  it("shownName_invisiblesAndDirectionControls_areRemoved", () => {
+    expect(shownName(`Al${RLO}pha${ZWSP}`)).toBe("Alpha");
+  });
+
+  it("shownName_nothingVisibleOrNull_fallsBackToDash", () => {
+    expect(shownName(`${ZWSP}${RLO}`)).toBe("—");
+    expect(shownName(null)).toBe("—");
+  });
+
+  it("listViewerMatchLaunches_storedNamesWithInvisibles_cardsShowCleanNames", async () => {
+    state.candidates = [candidate({ team1_name: `${RLO}Alpha`, team2_name: `Bra${ZWSP}vo`, caster_user_id: CASTER })];
+    state.members = [
+      member(TEAM1, 1, {
+        pseudo: `Cap${RLO}itaine`,
+        roles_json: JSON.stringify(["CAPITAINE"]),
+        discord_pseudo: "cap",
+        discord_verified_at: OPENED,
+      }),
+    ];
+    state.users = [casterUser(CASTER, { pseudo: `${ZWSP}Voix${RLO}` })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.team1.name).toBe("Alpha");
+    expect(info.team2.name).toBe("Bravo");
+    expect(info.team1.contacts[0]?.pseudo).toBe("Capitaine");
+    expect(info.casters[0]?.pseudo).toBe("Voix");
   });
 });

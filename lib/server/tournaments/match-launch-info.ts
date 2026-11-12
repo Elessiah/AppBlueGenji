@@ -28,6 +28,7 @@ import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { visibleDiscordTag } from "@/lib/shared/discord-identity";
+import { shownEntrantName } from "@/lib/shared/visible-text";
 import {
   autoLaunchAt,
   canDeclareTeamReady,
@@ -248,7 +249,16 @@ async function loadCandidates(
   return rows.map((row) => Object.assign(row, { casters: casters.get(Number(row.id)) ?? [], refereeEligible: false }));
 }
 
-/** Membre lu → candidat contact (aussi lu par l'invitation à certifier, `certification-prompt.ts`). */
+/**
+ * Nom d'engagé ou pseudo tel que les fiches de contact le montrent : sans
+ * invisibles ni commande de direction (`UNTRUSTED_NAMES.md`) — un nom ancien
+ * peut encore en porter —, « — » quand il ne garde rien de visible.
+ */
+export function shownName(raw: string | null): string {
+  return shownEntrantName(raw) ?? "—";
+}
+
+/** Membre lu → candidat contact. */
 export function toCandidate(row: {
   user_id: number;
   pseudo: string;
@@ -261,7 +271,7 @@ export function toCandidate(row: {
 }): ContactCandidate {
   return {
     userId: Number(row.user_id),
-    pseudo: row.pseudo,
+    pseudo: shownName(row.pseudo),
     roles: row.roles,
     discordTag: row.discord_pseudo,
     discordVerified: row.discord_verified_at !== null,
@@ -668,7 +678,7 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
   }
   return {
     teamId,
-    name: side.name ?? "—",
+    name: shownName(side.name),
     logoUrl: localUploadUrl(side.logoUrl),
     isGhost: side.isGhost,
     isSolo: side.soloUserId !== null,
@@ -708,7 +718,7 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
     ? filterContact(
         {
           userId: Number(user.id),
-          pseudo: user.pseudo,
+          pseudo: shownName(user.pseudo),
           roles: [],
           discordTag,
           // Hors Overwatch le BattleTag n'est pas même lu (`withGameBattletag` le jetterait).
@@ -726,7 +736,7 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
     game,
     {
       userId: Number(user.id),
-      pseudo: user.pseudo,
+      pseudo: shownName(user.pseudo),
       discordTag: contact?.discordTag ?? null,
       ready: ctx.readiness.casters.some((entry) => entry.userId === caster.userId && entry.ready),
       contactsShown: ctx.exposesCaster,
@@ -793,7 +803,7 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
     row.tournament_game,
     {
       userId: Number(user.id),
-      pseudo: user.pseudo,
+      pseudo: shownName(user.pseudo),
       ...discord,
       ready: ctx.readiness.referee?.ready ?? false,
       contactsShown: open,

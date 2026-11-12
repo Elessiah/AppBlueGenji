@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/tournaments/certification-prompt", () => ({ forgetCertificationPromptsAround: jest.fn(async () => undefined) }));
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 // `normalizeDiscordHandle` (`users/tag-normalization`) reste **la vraie** :
@@ -266,7 +267,7 @@ describe("startDiscordVerification — le compte Google", () => {
       expiresAt: "2026-09-20T12:10:00.000Z",
     });
     expect(result).not.toHaveProperty("discordId");
-    expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan", "handle");
+    expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan", "handle", "7:certify");
     // Tag pas encore prouvé : jamais la langue du demandeur (compte 7, "en"),
     // celle du compte qui porte déjà ce Discord — ici aucun, donc bilingue.
     expect(jest.mocked(accountLocaleForDiscordId)).toHaveBeenCalledWith("900000000000000002");
@@ -328,7 +329,7 @@ describe("confirmDiscordVerification", () => {
 
     expect(result).toEqual({ tag: "keryan" });
     // Le défi est désigné par son jeton ; l'identifiant vient de sa ligne.
-    expect(consumeMock).toHaveBeenCalledWith(CHALLENGE, "123456", "handle");
+    expect(consumeMock).toHaveBeenCalledWith(CHALLENGE, "123456", "handle", "7:certify");
     expect(db.state.discord_pseudo).toBe("keryan");
     expect(db.state.discord_verified_at).not.toBeNull();
   });

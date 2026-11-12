@@ -183,8 +183,10 @@ async function writeVerifiedTag(userId: number, discordId: string, tag: string):
     throw new Error("DISCORD_ID_MISMATCH");
   }
   // Certifié : l'invitation de la fiche tournoi retenue pour ce compte — et
-  // celles de ses coéquipiers, « équipe sans contact » — ne valent plus.
-  await forgetCertificationPromptsAround(userId);
+  // celles de ses coéquipiers, « équipe sans contact » — ne valent plus. Le
+  // compte est oublié sur-le-champ ; ses coéquipiers sans attendre la relecture
+  // de son équipe (l'oubli ne rejette jamais).
+  void forgetCertificationPromptsAround(userId);
 }
 
 
@@ -242,7 +244,7 @@ export async function certifyLinkedDiscordTag(
     if (Number(result.affectedRows) > 0) {
       // Certifié : l'invitation de la fiche tournoi retenue pour ce compte — et
       // celles de ses coéquipiers — ne valent plus.
-      await forgetCertificationPromptsAround(userId);
+      void forgetCertificationPromptsAround(userId);
       return { status: "VERIFIED", tag: expected };
     }
   }
@@ -307,7 +309,17 @@ export async function startDiscordVerification(
   // quelqu'un, et un plafond posé après n'aurait plus rien à refuser.
   guardBeforeSend?.(discordId);
 
-  return sendHandleChallenge(discordId, tag);
+  return sendHandleChallenge(discordId, tag, challengeBinding(userId, "certify"));
+}
+
+/**
+ * Lien d'un défi de tag avec le compte qui l'a demandé et son parcours
+ * (`lookupHash`, `discord-challenges.ts`) : le jeton et le code d'une
+ * certification ne confirment ni un changement de tag, ni le geste d'un autre
+ * compte, même transmis.
+ */
+function challengeBinding(userId: number, flow: "certify" | "handle-update"): string {
+  return `${userId}:${flow}`;
 }
 
 /**
@@ -334,7 +346,7 @@ export async function confirmDiscordVerification(
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
-  const proof = await consumeDiscordLoginChallenge(challenge, code, "handle");
+  const proof = await consumeDiscordLoginChallenge(challenge, code, "handle", challengeBinding(userId, "certify"));
   if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   const { discordId } = proof;
   // Relu après l'aller-retour du joueur : son compte a pu se rattacher entre la
@@ -358,7 +370,7 @@ export async function confirmDiscordVerification(
  * à son échec, sinon il masque comme « dernier émis » de son usage celui que le joueur
  * détient vraiment.
  */
-async function sendHandleChallenge(discordId: string, tag: string): Promise<CodeSent> {
+async function sendHandleChallenge(discordId: string, tag: string, binding: string): Promise<CodeSent> {
   // Dans la langue du compte **destinataire** — celui qui porte déjà ce
   // Discord —, jamais dans celle du demandeur : le tag saisi n'est pas encore
   // prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, message
@@ -366,7 +378,7 @@ async function sendHandleChallenge(discordId: string, tag: string): Promise<Code
   // (quota, avalanche) ne coûte aucune lecture de plus.
   // « handle » : le message dit que ce code rattache un tag, qu'il ne connecte
   // pas — et le défi le retient, la connexion le refuse.
-  const challenge = await createDiscordLoginChallenge(discordId, tag, "handle");
+  const challenge = await createDiscordLoginChallenge(discordId, tag, "handle", binding);
   try {
     await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId), "handle");
   } catch (error) {
@@ -420,7 +432,7 @@ export async function startDiscordHandleUpdate(
 
   // Avant le défi et avant l'envoi, comme pour la certification.
   guardBeforeSend?.(discordId);
-  return sendHandleChallenge(discordId, tag);
+  return sendHandleChallenge(discordId, tag, challengeBinding(userId, "handle-update"));
 }
 
 /**
@@ -454,7 +466,7 @@ export async function confirmDiscordHandleUpdate(
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
-  const proof = await consumeDiscordLoginChallenge(challenge, code, "handle");
+  const proof = await consumeDiscordLoginChallenge(challenge, code, "handle", challengeBinding(userId, "handle-update"));
   if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   const { discordId } = proof;
   if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");

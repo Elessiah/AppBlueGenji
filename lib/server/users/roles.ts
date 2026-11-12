@@ -120,7 +120,17 @@ export async function setOwnPlatformRoles(
     `UPDATE bg_users SET platform_roles_json = ? WHERE id = ? AND is_deleted = 0 AND is_admin = 1`,
     [JSON.stringify(scopedRoles), adminUserId],
   );
-  if (result.affectedRows === 0) throw new Error("NOT_ADMIN");
+  if (result.affectedRows === 0) {
+    // Zéro ligne : administration retirée **ou** compte supprimé pendant la
+    // requête. Relu pour nommer le bon refus — « Tu n'es plus administrateur »
+    // serait faux pour un compte qui n'existe plus.
+    const [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
+      `SELECT is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
+      [adminUserId],
+    );
+    if (!rows[0] || Number(rows[0].is_deleted) === 1) throw new Error("USER_NOT_FOUND");
+    throw new Error("NOT_ADMIN");
+  }
 
   // Aucun flux fermé : `is_admin` n'est jamais écrit ici, et un administrateur
   // tient toutes les permissions (`can`) — le contexte de ses flux de tournoi

@@ -122,19 +122,22 @@ async function applyIdentity(
   entryId: number,
   user: UserIdentityRow,
   userId: number,
-): Promise<void> {
+): Promise<boolean> {
   for (const name of soloEntryNameCandidates(user.pseudo, userId)) {
     try {
-      await connection.execute(`UPDATE bg_teams SET name = ?, logo_url = ? WHERE id = ?`, [
+      const [result] = await connection.execute<ResultSetHeader>(`UPDATE bg_teams SET name = ?, logo_url = ? WHERE id = ?`, [
         name,
         soloEntryLogo(user),
         entryId,
       ]);
-      return;
+      // `changedRows` : une réécriture à l'identique (bascule de visibilité
+      // sans avatar, rattrapage des avatars) ne vide pas les vues.
+      return Number(result.changedRows ?? 0) > 0;
     } catch (error) {
       if (!isDuplicateNameError(error)) throw error;
     }
   }
+  return false;
 }
 
 /**
@@ -195,7 +198,7 @@ export async function ensureSoloEntry(
 
 /**
  * Resynchronise l'identité affichée de l'entrée solo, si le joueur en a une.
- * Rend `true` si une entrée a été réécrite : l'appelant en transaction vide
+ * Rend `true` si son nom ou son logo a **changé** : l'appelant en transaction vide
  * alors les vues de la vitrine **après** son commit (`invalidateLandingTeamViews`).
  */
 export async function syncSoloEntryIdentityOn(
@@ -208,14 +211,14 @@ export async function syncSoloEntryIdentityOn(
   const user = await loadUserIdentity(connection, userId);
   if (!user) return false;
 
-  await applyIdentity(connection, entryId, user, userId);
-  return true;
+  return applyIdentity(connection, entryId, user, userId);
 }
 
 /**
  * Même synchronisation, hors transaction (mise à jour de profil, avatar). Le
  * nom et le logo de l'entrée solo sont servis par les vues de la vitrine
- * (bandeau, mini-arbre) : elles sont vidées dès qu'une entrée a été réécrite.
+ * (bandeau, mini-arbre) : elles sont vidées dès que l'entrée a changé — et
+ * seulement alors (l'appelant n'a pas à les vider lui-même).
  */
 export async function syncSoloEntryIdentity(userId: number): Promise<void> {
   const db = await getDatabase();

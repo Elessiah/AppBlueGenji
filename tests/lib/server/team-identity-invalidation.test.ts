@@ -159,11 +159,20 @@ describe("syncSoloEntryIdentity", () => {
   ];
 
   it("syncSoloEntryIdentity_playerWithSoloEntry_invalidatesLandingViews", async () => {
-    install([], [[/SELECT id FROM bg_teams WHERE solo_user_id = \?/, () => [[{ id: 40 }]]], user, [/UPDATE bg_teams/, () => [{}]]]);
+    install([], [[/SELECT id FROM bg_teams WHERE solo_user_id = \?/, () => [[{ id: 40 }]]], user, [/UPDATE bg_teams/, () => [{ affectedRows: 1, changedRows: 1 }]]]);
 
     await syncSoloEntryIdentity(9);
 
     expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("syncSoloEntryIdentity_entryAlreadyUpToDate_invalidatesNothing", async () => {
+    install([], [[/SELECT id FROM bg_teams WHERE solo_user_id = \?/, () => [[{ id: 40 }]]], user, [/UPDATE bg_teams/, () => [{ affectedRows: 1, changedRows: 0 }]]]);
+
+    await syncSoloEntryIdentity(9);
+
+    expect(invalidateLandingTeamViews).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 

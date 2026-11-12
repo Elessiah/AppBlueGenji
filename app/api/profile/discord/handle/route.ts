@@ -20,6 +20,7 @@ import {
   DISCORD_VERIFY_TAG_RULE,
   enforceRateLimit,
 } from "@/lib/server/api-guard";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import {
   confirmDiscordHandleUpdate,
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
     );
     return ok(result);
   } catch (error) {
-    const message = (error as Error).message || "DISCORD_HANDLE_UPDATE_FAILED";
+    const message = serviceErrorCode(error, "DISCORD_HANDLE_UPDATE_FAILED");
     return fail(message, discordHandleStatusFor(message));
   }
 }
@@ -107,7 +108,7 @@ export async function PUT(req: Request) {
 
     return ok({ status: "UPDATED", ...result });
   } catch (error) {
-    const message = (error as Error).message || "DISCORD_HANDLE_UPDATE_FAILED";
+    const message = serviceErrorCode(error, "DISCORD_HANDLE_UPDATE_FAILED");
     return fail(message, discordHandleStatusFor(message));
   }
 }

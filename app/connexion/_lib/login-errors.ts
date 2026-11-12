@@ -76,6 +76,12 @@ const LOGIN_ERRORS: Readonly<Record<LoginErrorCode, true>> = {
   // l'écran d'accueil de la page a été contournée (ou l'onglet est antérieur à
   // la règle). Recharger la page la représente.
   TERMS_REQUIRED: true,
+  // Suppression demandée il y a plus de trente jours, pas encore finalisée par
+  // la passe horaire : plus rien ne s'ouvre, ni session ni réactivation.
+  ACCOUNT_DELETED: true,
+  // Contention de verrous pendant la demande ou la vérification du code : rien
+  // n'a été écrit, recommencer suffit.
+  CONCURRENT_UPDATE_RETRY: true,
 };
 
 function isLoginErrorCode(code: string): code is LoginErrorCode {
@@ -132,6 +138,7 @@ export function loginErrorMessage(code: string | null | undefined, text: LoginTe
  * - `session` : `intent=link` sans session, la connexion a expiré pendant
  *   l'aller-retour ;
  * - `terms` : compte neuf sans les conditions d'utilisation acceptées ;
+ * - `deleted` : compte dont le délai de réactivation est écoulé ;
  * - `suspended` : compte suspendu, l'exposé n'ayant pas voyagé (cookie expiré,
  *   page rechargée plus tard) — la phrase générique, qui dit comment contester.
  */
@@ -144,6 +151,7 @@ const OAUTH_ERRORS: ReadonlySet<string> = new Set<OAuthErrorKind | "suspended">(
   "oauth",
   "session",
   "terms",
+  "deleted",
   "suspended",
 ]);
 

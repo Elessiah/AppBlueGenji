@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/api-guard";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users/discord-challenges";
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
       expiresAt: challenge.expiresAt.toISOString(),
     });
   } catch (error) {
-    const mapped = mapRequestError((error as Error).message || "");
+    const mapped = mapRequestError(serviceErrorCode(error, "FAILED_TO_SEND_CODE"));
     return fail(mapped.code, mapped.status);
   }
 }

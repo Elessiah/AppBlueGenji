@@ -11,7 +11,7 @@
  */
 import frProfile from "@/messages/fr/profile.json";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { SESSION_GONE_CODES, type ConfirmationSubject } from "@/lib/shared/account-deletion";
+import { ACCOUNT_REACTIVATION_DAYS, SESSION_GONE_CODES, type ConfirmationSubject } from "@/lib/shared/account-deletion";
 import type {
   AccountConnection,
   ConnectionUnlinkRefusal,
@@ -112,12 +112,12 @@ export function deletionConsequencesParagraphs(text: ProfileText, subject: Confi
   const kind = deletionCase(subject);
   const consequence = t(`deletion.consequences.${kind}`);
   const termsNote = fromTerms && kind === "OWNED_TEAMS" ? [t("deletion.ownedTeamsFromTerms")] : [];
-  return [consequence, ...termsNote, t("deletion.handover"), t("deletion.irreversible"), residual];
+  return [consequence, ...termsNote, t("deletion.handover"), t("deletion.irreversible", { days: ACCOUNT_REACTIVATION_DAYS }), residual];
 }
 
 /** `accountDeletionOutcome` dans la langue du texte. */
 export function deletionOutcomeText(text: ProfileText, subject: ConfirmationSubject): string {
-  return text.t(`deletion.outcome.${deletionCase(subject)}`);
+  return text.t(`deletion.outcome.${deletionCase(subject)}`, { days: ACCOUNT_REACTIVATION_DAYS });
 }
 
 /** `accountDeletionErrorMessage` dans la langue du texte. */
@@ -126,7 +126,7 @@ export function deletionErrorText(text: ProfileText, code: string | undefined): 
   if (code === "LAST_ADMIN_ACCOUNT") return text.t("deletion.errors.LAST_ADMIN_ACCOUNT");
   // Session ou compte déjà partis (une suppression faite dont la réponse s'est
   // perdue) : la page se recharge — cas propre à l'écran, sans sœur française.
-  if (code !== undefined && SESSION_GONE_CODES.has(code)) return text.t("deletion.errors.sessionGone");
+  if (code !== undefined && SESSION_GONE_CODES.has(code)) return text.t("deletion.errors.sessionGone", { days: ACCOUNT_REACTIVATION_DAYS });
   return text.t("deletion.errors.fallback");
 }
 

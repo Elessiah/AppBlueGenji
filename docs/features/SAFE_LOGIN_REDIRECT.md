@@ -73,7 +73,7 @@ traduite reste française (`/tournois`), un visiteur français reste français.
   cette langue (`sealedReturnPath` : `/en/tournois`, préfixe compris même pour
   une route pas encore traduite) ; le retour relit la langue dans cette
   destination (`sealedReturnLocale`), renvoie un refus sur `/en/connexion` et une
-  réussite sur `loginDestination(saved.redirectTo, locale)`. Le cookie `bg_oauth`
+  réussite sur `loginDestination(saved.redirectTo, locale)`. Le cookie d'état (`__Host-bg_oauth` en production, `bg_oauth` ailleurs — `lib/shared/auth-cookies.ts`)
   ne gagne **aucun champ de langue** (ce que `/rgpd` en dit, « la page où vous ramener »,
   reste exact ; le lot 9-3 n'y ajoute que `localeFromPage`, départ cliqué sur une page du site), et l'**adresse de rappel** enregistrée chez Google, Discord et
   Blizzard (`/api/auth/<slug>/callback`) ne change pas. Sans cookie d'état

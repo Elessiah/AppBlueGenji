@@ -27,6 +27,12 @@ toi-même :
 E2E_BASE_URL=http://localhost:3000 npm run test:e2e
 ```
 
+Le parcours joueur pose lui-même le cookie de session, nommé d'après le
+protocole (`__Host-bg_session` en https, `bg_session` en http). Une build de
+production servie en http (`next start`) se signale par
+`E2E_PRODUCTION_COOKIES=1`, un serveur de développement en https par
+`E2E_PRODUCTION_COOKIES=0`.
+
 ### Contrôle du bypass d'authentification
 La config impose `DEV_AUTH_USER_ID` au serveur de test (et a priorité sur le
 `.env`, que Next.js n'écrase pas) :

@@ -225,6 +225,12 @@ describe("clientNetworkKey", () => {
     expect(clientNetworkKey("[::ffff:203.0.113.7]:80")).toBe("203.0.113.7");
   });
 
+  it("clientNetworkKey_mappedIpv4WithPortWithoutBrackets_portRemoved", () => {
+    expect(clientNetworkKey("::ffff:203.0.113.7:51234")).toBe("203.0.113.7");
+    expect(clientNetworkKey("::FFFF:203.0.113.7:80")).toBe("203.0.113.7");
+    expect(clientNetworkKey("::ffff:203.0.113.8:80")).not.toBe(clientNetworkKey("::ffff:203.0.113.7:80"));
+  });
+
   it("ne prend pas les deux-points d'une IPv6 sans crochets pour un port", () => {
     expect(clientNetworkKey("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2::/64");
     expect(clientNetworkKey("203.0.113.7:99999999")).toBe("203.0.113.7:99999999");

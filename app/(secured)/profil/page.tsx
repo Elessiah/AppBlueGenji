@@ -1,6 +1,7 @@
 "use client";
 
 import { UserAvatar } from "@/components/user-avatar";
+import { focusMainContent } from "@/components/accessibility/SkipLink";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
@@ -815,6 +816,15 @@ export default function ProfilePage() {
   const saveOwnRoles = useCallback((roles: FullProfileResponse["roles"]) => {
     setData((prev) => (prev ? { ...prev, roles } : prev));
   }, []);
+  /** Administration retirée pendant la session : « Mes rôles » disparaît. */
+  const dropOwnAdmin = useCallback(() => {
+    setData((prev) =>
+      prev ? { ...prev, isAdmin: false, roles: prev.roles.filter((role) => role !== "ADMIN") } : prev,
+    );
+    // La section qui portait le focus disparaît au prochain rendu : sans cible,
+    // le focus tomberait sur `<body>` (WCAG 2.4.3). Le début du contenu le reprend.
+    focusMainContent();
+  }, []);
 
   if (!data) {
     return (
@@ -1269,6 +1279,7 @@ export default function ProfilePage() {
         userId={data.profile.id}
         roles={data.roles}
         onSaved={saveOwnRoles}
+        onAdminLost={dropOwnAdmin}
       />
 
       <ProfileSection section={sectionById.statistiques}>

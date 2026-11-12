@@ -757,4 +757,17 @@ describe("forgetCertificationPromptsAround (EF-23)", () => {
     errors.mockRestore();
     forgetCertificationPrompts();
   });
+
+  // Revue de sécurité #594 : une ligne d'échec ne porte qu'un code (`failureReason`).
+  it("forgetCertificationPromptsAround_sqlErrorWithText_logsCodeOnly", async () => {
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const failure = Object.assign(new Error("near 'secret@example.com'"), { code: "ER_PARSE_ERROR", sqlMessage: "secret@example.com" });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockRejectedValue(failure) }));
+
+    await forgetCertificationPromptsAround(7);
+
+    expect(errors).toHaveBeenCalledWith(expect.any(String), "ER_PARSE_ERROR");
+    errors.mockRestore();
+    forgetCertificationPrompts();
+  });
 });

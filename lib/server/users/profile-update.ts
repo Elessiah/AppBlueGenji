@@ -8,8 +8,8 @@ import { battletagFromBlizzard, verifiedBattletagSql } from "@/lib/server/battle
 import { DISCORD_TAG_LOCKED, isDiscordTagLocked } from "@/lib/shared/discord-tag-lock";
 import { normalizePseudo } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
-import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { forgetRefereeNamesOf } from "@/lib/server/tournaments/referee-names";
+import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
 
@@ -116,6 +116,11 @@ async function assertBattletagWritable(
     // est posé.
     if (lockRow.overwatch_battletag !== nextBattletag) throw new Error(BATTLETAG_LOCKED);
   }
+}
+
+/** Tag Discord ou BattleTag touché **et** ligne modifiée : invitations à certifier oubliées. */
+function forgetPromptsOnIdentityChange(userId: number, touchesIdentity: boolean, result: ResultSetHeader): void {
+  if (touchesIdentity && Number(result.changedRows ?? 0) > 0) void forgetCertificationPromptsAround(userId);
 }
 
 export async function updateOwnProfile(
@@ -362,6 +367,13 @@ export async function updateOwnProfile(
   // de l'entrée solo, qui republierait l'identité qu'on vient de refuser.
   if (result.affectedRows === 0) throw new Error(ACCOUNT_DELETED_ERROR);
 
+  // Un tag Discord ou un BattleTag changé peut faire perdre (ou gagner) sa
+  // certification au compte : ses invitations « équipe sans contact », et
+  // celles de ses coéquipiers, s'oublient tout de suite plutôt qu'à
+  // l'expiration de l'entrée. `changedRows` : seulement si la ligne a bougé.
+  // Sans attendre — l'oubli ne rejette jamais.
+  forgetPromptsOnIdentityChange(userId, touchesDiscordTag || touchesBattletag, result);
+
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
   // visibilité de l'avatar — sans quoi masquer son image n'aurait effacé que la
@@ -369,11 +381,10 @@ export async function updateOwnProfile(
   if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
   }
-  // Le bandeau et le mini-arbre de la vitrine, mis en cache sans compte,
-  // nomment l'entrée solo à son pseudo : l'ancien y resterait jusqu'à une
-  // minute après le renommage — comme pour une équipe renommée.
+  // Le bandeau et le mini-arbre de la vitrine nomment l'entrée solo à son
+  // pseudo : `syncSoloEntryIdentity` les vide elle-même, seulement si l'entrée
+  // a changé (un formulaire renvoie le pseudo à chaque enregistrement).
   if (patch.pseudo) {
-    invalidateLandingTeamViews();
     // Un arbitre renommé : son ancien pseudo n'est plus servi du cache des
     // pseudos d'arbitre (la version de l'instantané, elle, n'a pas bougé) —
     // seulement s'il arbitre un match dont le nom se montre. Sans attendre :

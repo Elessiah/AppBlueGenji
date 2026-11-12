@@ -32,6 +32,13 @@ import {
 } from "./account-deletion-journal";
 
 /**
+ * Délai pendant lequel une suppression demandée se défait par une nouvelle
+ * connexion (réactivation explicite). Passé ce délai, le compte est effacé ou
+ * anonymisé pour de bon (`finalizeDueAccountDeletions`).
+ */
+export const ACCOUNT_REACTIVATION_DAYS = 30;
+
+/**
  * Ce qu'un compte laisse derrière lui.
  *
  * Quatre traces, et aucune n'est décorative :
@@ -252,17 +259,17 @@ export function accountDeletionOutcome(
 ): string {
   switch (reason) {
     case "TOURNAMENTS":
-      return "Suppression demandée. Tes statistiques resteront conservées sous un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.";
+      return `Suppression demandée. Tes statistiques resteront conservées sous un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici ${ACCOUNT_REACTIVATION_DAYS} jours et confirme la réactivation.`;
     case "SOLO_REGISTRATIONS":
-      return "Suppression demandée. Tes inscriptions en tournoi individuel porteront un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.";
+      return `Suppression demandée. Tes inscriptions en tournoi individuel porteront un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici ${ACCOUNT_REACTIVATION_DAYS} jours et confirme la réactivation.`;
     case "ORGANIZED_TOURNAMENTS":
-      return "Suppression demandée. Tes tournois garderont un organisateur anonyme. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.";
+      return `Suppression demandée. Tes tournois garderont un organisateur anonyme. Pour l'annuler, reconnecte-toi d'ici ${ACCOUNT_REACTIVATION_DAYS} jours et confirme la réactivation.`;
     case "OWNED_TEAMS":
-      return "Suppression demandée. Ton équipe gardera un propriétaire anonyme. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.";
+      return `Suppression demandée. Ton équipe gardera un propriétaire anonyme. Pour l'annuler, reconnecte-toi d'ici ${ACCOUNT_REACTIVATION_DAYS} jours et confirme la réactivation.`;
     case null:
-      return "Suppression demandée. Ton compte et ton profil seront effacés ; seules resteront les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience). Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.";
+      return `Suppression demandée. Ton compte et ton profil seront effacés ; seules resteront les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience). Pour l'annuler, reconnecte-toi d'ici ${ACCOUNT_REACTIVATION_DAYS} jours et confirme la réactivation.`;
     default:
-      return "Suppression demandée. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.";
+      return `Suppression demandée. Pour l'annuler, reconnecte-toi d'ici ${ACCOUNT_REACTIVATION_DAYS} jours et confirme la réactivation.`;
   }
 }
 
@@ -335,7 +342,7 @@ export const ACCOUNT_DELETION_HANDOVER =
 
 /** La fenêtre de réactivation (E4). */
 export const ACCOUNT_DELETION_WINDOW =
-  "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte. Dès la demande, ton compte sera montré anonyme partout, sans ton pseudo ni ton avatar ; la réactivation te les rendra, sauf un avatar que la modération aurait masqué ou supprimé entre-temps.";
+  `La suppression deviendra définitive au bout de ${ACCOUNT_REACTIVATION_DAYS} jours : d'ici là, te reconnecter te permettra de réactiver ton compte. Dès la demande, ton compte sera montré anonyme partout, sans ton pseudo ni ton avatar ; la réactivation te les rendra, sauf un avatar que la modération aurait masqué ou supprimé entre-temps.`;
 
 /**
  * Le corps de la modale : `accountDeletionConfirmation` sans la question, déjà
@@ -349,12 +356,6 @@ export function accountDeletionConsequences(reason: ConfirmationSubject): string
 
 // ─── Suppression réversible 30 jours (ERASURE-D2, décisions E1–E6) ──────────
 
-/**
- * Délai pendant lequel une suppression demandée se défait par une nouvelle
- * connexion (réactivation explicite). Passé ce délai, le compte est effacé ou
- * anonymisé pour de bon (`finalizeDueAccountDeletions`).
- */
-export const ACCOUNT_REACTIVATION_DAYS = 30;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

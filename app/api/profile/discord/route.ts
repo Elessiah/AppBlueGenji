@@ -20,6 +20,7 @@ import {
   DISCORD_VERIFY_TAG_RULE,
   enforceRateLimit,
 } from "@/lib/server/api-guard";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import {
   confirmDiscordVerification,
@@ -123,7 +124,7 @@ export async function POST(req: Request) {
 
     return ok(result);
   } catch (error) {
-    const message = (error as Error).message || "DISCORD_VERIFICATION_FAILED";
+    const message = serviceErrorCode(error, "DISCORD_VERIFICATION_FAILED");
     return fail(message, statusFor(message));
   }
 }
@@ -150,7 +151,7 @@ export async function PUT(req: Request) {
 
     return ok({ status: "VERIFIED", ...result });
   } catch (error) {
-    const message = (error as Error).message || "DISCORD_VERIFICATION_FAILED";
+    const message = serviceErrorCode(error, "DISCORD_VERIFICATION_FAILED");
     return fail(message, statusFor(message));
   }
 }

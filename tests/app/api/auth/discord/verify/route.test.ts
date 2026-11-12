@@ -28,6 +28,7 @@ import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
+import { AccountDeletedError } from "@/lib/server/users/account-reactivation";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 /**
@@ -300,7 +301,7 @@ describe("POST /api/auth/discord/verify — erreur interne", () => {
   });
 
   it("POST_sqlErrorSentence_returnsDiscordAuthFailed500", async () => {
-    createSessionMock.mockRejectedValueOnce(new Error("Lock wait timeout exceeded; try restarting transaction"));
+    createSessionMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED 127.0.0.1:3306"));
 
     const res = await attempt(VICTIM_CHALLENGE, "424242");
 
@@ -308,12 +309,31 @@ describe("POST /api/auth/discord/verify — erreur interne", () => {
     expect(await res.json()).toEqual({ error: "DISCORD_AUTH_FAILED" });
   });
 
+  it("POST_lockWaitTimeout_returnsConcurrentUpdateRetry409", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    createSessionMock.mockRejectedValueOnce(new Error("Lock wait timeout exceeded; try restarting transaction"));
+
+    const res = await attempt(VICTIM_CHALLENGE, "424242");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+  });
+
   it("POST_codeLikeError_passesCodeThrough500", async () => {
-    createSessionMock.mockRejectedValueOnce(new Error("ACCOUNT_DELETED"));
+    createSessionMock.mockRejectedValueOnce(new Error("SOME_STORE_FAILURE"));
 
     const res = await attempt(VICTIM_CHALLENGE, "424242");
 
     expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "SOME_STORE_FAILURE" });
+  });
+
+  it("POST_reactivationWindowClosed_answers410AccountDeleted", async () => {
+    createSessionMock.mockRejectedValueOnce(new AccountDeletedError());
+
+    const res = await attempt(VICTIM_CHALLENGE, "424242");
+
+    expect(res.status).toBe(410);
     expect(await res.json()).toEqual({ error: "ACCOUNT_DELETED" });
   });
 });

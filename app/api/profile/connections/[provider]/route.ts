@@ -12,6 +12,7 @@
  */
 import { getCurrentUser, revokeOtherSessions } from "@/lib/server/auth";
 import { unlinkOAuthIdentity } from "@/lib/server/account-identities";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { oauthProviderFromSlug } from "@/lib/shared/oauth-providers";
 
@@ -42,7 +43,7 @@ export async function DELETE(
   try {
     await unlinkOAuthIdentity(user.id, provider);
   } catch (error) {
-    const message = (error as Error).message || "CONNECTION_UNLINK_FAILED";
+    const message = serviceErrorCode(error, "CONNECTION_UNLINK_FAILED");
     return fail(message, statusFor(message));
   }
 

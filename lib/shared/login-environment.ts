@@ -2,7 +2,7 @@
  * Où tourne la page de connexion — et la connexion OAuth peut-elle y aboutir ?
  *
  * Google, Discord et Blizzard font sortir le joueur du site puis l'y ramènent,
- * le cookie d'état (`bg_oauth`) posé au départ devant être relu au retour. Deux
+ * le cookie d'état (`oauthCookieName`, `__Host-bg_oauth` en production) posé au départ devant être relu au retour. Deux
  * contextes cassent cet aller-retour, sans que le serveur puisse les
  * distinguer d'un simple lien expiré :
  *

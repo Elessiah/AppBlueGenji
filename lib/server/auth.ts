@@ -15,6 +15,7 @@ import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { certifyPromptDoor } from "@/lib/shared/discord-certify-prompt";
 import {
+  AccountDeletedError,
   AccountPendingDeletionError,
   createReactivationTicket,
   reactivationCookieName,
@@ -138,7 +139,7 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
   // suppression définitive est due et rien ne s'ouvre.
   const pending = await readPendingDeletion(userId);
   if (pending) {
-    if (!pending.windowOpen) throw new Error("ACCOUNT_DELETED");
+    if (!pending.windowOpen) throw new AccountDeletedError();
     const ticket = await createReactivationTicket(userId, event);
     // Posé ici comme le cookie de session : la porte (rappel OAuth, code
     // Discord) n'a plus qu'à renvoyer vers l'écran de réactivation.

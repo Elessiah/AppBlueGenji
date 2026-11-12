@@ -154,6 +154,7 @@ describe("startDiscordHandleUpdate", () => {
       "900000000000000001",
       "keryan_neuf",
       "handle",
+      "7:handle-update",
     );
     // Dans la langue du compte qui porte ce Discord — ici le sien.
     expect(accountLocaleForDiscordId).toHaveBeenCalledWith("900000000000000001");
@@ -296,7 +297,7 @@ describe("confirmDiscordHandleUpdate", () => {
     await expect(
       confirmDiscordHandleUpdate(7, CHALLENGE, "123456"),
     ).rejects.toThrow("DISCORD_ID_MISMATCH");
-    expect(consumeDiscordLoginChallenge).toHaveBeenCalledWith(CHALLENGE, "123456", "handle");
+    expect(consumeDiscordLoginChallenge).toHaveBeenCalledWith(CHALLENGE, "123456", "handle", "7:handle-update");
     expect(db.writes).toHaveLength(0);
   });
 

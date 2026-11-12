@@ -49,6 +49,7 @@
     "BOT_INTERNAL_UNAUTHORIZED": "Connexion Discord indisponible (token interne invalide). Tu peux passer par Google.",
     "DISCORD_DM_FAILED": "Impossible de t'envoyer le code en message privé : le bot doit partager un serveur avec toi, et tes DM doivent y être ouverts. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
     "DISCORD_USER_NOT_FOUND": "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, ou passe par le bouton Discord.",
+    "CONCURRENT_UPDATE_RETRY": "Une autre demande est passée au même moment : la connexion n'a pas abouti. Réessaie, avec un nouveau code si celui-ci est refusé.",
     "FAILED_TO_SEND_CODE": "Le code n'a pas pu être envoyé. Réessaie dans un instant.",
     "INVALID_DISCORD_HANDLE": "Renseigne ton tag Discord ou ton ID.",
     "INVALID_DISCORD_ID": "Identifiant Discord invalide.",
@@ -61,7 +62,8 @@
     "UNSUPPORTED_CONTENT_TYPE": "Requête refusée. Recharge la page de connexion, puis réessaie.",
     "TOO_MANY_REQUESTS": "Trop de tentatives. Attends une quinzaine de minutes, ou connecte-toi avec Google.",
     "DISCORD_AUTH_FAILED": "La connexion Discord a échoué. Réessaie dans un instant.",
-    "TERMS_REQUIRED": "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher."
+    "TERMS_REQUIRED": "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher.",
+    "ACCOUNT_DELETED": "Ce compte a été supprimé : son délai de réactivation est écoulé, il ne peut plus être rouvert."
   },
   "oauthErrors": {
     "providerFallback": "OAuth",
@@ -71,7 +73,8 @@
     "state": "Session de connexion expirée ou invalide. Relance la connexion.",
     "oauth": "Échec de la connexion {provider}. Réessaie dans un instant.",
     "session": "Tu dois être connecté pour lier une application. Connecte-toi, puis réessaie.",
-    "terms": "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion."
+    "terms": "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion.",
+    "deleted": "Ce compte a été supprimé : son délai de réactivation est écoulé, il ne peut plus être rouvert."
   },
   "suspension": {
     "title": "Compte suspendu",
@@ -131,7 +134,7 @@
       "title": "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs Overwatch, dans leur fenêtre de lancement et sur la page du match :",
       "match": "si tu es présenté comme contact (fenêtres « Contacts » et de lancement) : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
       "asCaster": "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
-      "asReferee": "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage des matchs Overwatch, qui demande celui de Battle.net) ;",
+      "asReferee": "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; détacher Battle.net ou effacer ton BattleTag te retirerait l'arbitrage des matchs Overwatch, qui demande celui de Battle.net) ;",
       "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses contacts d'équipe (aux seules parties du match), de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
       "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
     }

@@ -49,6 +49,7 @@
     "BOT_INTERNAL_UNAUTHORIZED": "Discord login unavailable (invalid internal token). You can use Google instead.",
     "DISCORD_DM_FAILED": "Could not send you the code by direct message: the bot has to share a server with you, and your direct messages must be open there. Join the BlueGenji server, or use the Discord button.",
     "DISCORD_USER_NOT_FOUND": "Tag not found: the bot has to share a server with you. Join the BlueGenji server, or use the Discord button.",
+    "CONCURRENT_UPDATE_RETRY": "Another request went through at the same moment: you were not signed in. Try again, with a new code if this one is refused.",
     "FAILED_TO_SEND_CODE": "The code could not be sent. Try again in a moment.",
     "INVALID_DISCORD_HANDLE": "Enter your Discord tag or your ID.",
     "INVALID_DISCORD_ID": "Invalid Discord ID.",
@@ -61,7 +62,8 @@
     "UNSUPPORTED_CONTENT_TYPE": "Request refused. Reload the login page, then try again.",
     "TOO_MANY_REQUESTS": "Too many attempts. Wait about fifteen minutes, or log in with Google.",
     "DISCORD_AUTH_FAILED": "Discord login failed. Try again in a moment.",
-    "TERMS_REQUIRED": "To create your account, accept the terms of use. Reload the page to see them."
+    "TERMS_REQUIRED": "To create your account, accept the terms of use. Reload the page to see them.",
+    "ACCOUNT_DELETED": "This account has been deleted: its reactivation period is over, so it can no longer be reopened."
   },
   "oauthErrors": {
     "providerFallback": "OAuth",
@@ -71,7 +73,8 @@
     "state": "Login session expired or invalid. Start the login again.",
     "oauth": "{provider} login failed. Try again in a moment.",
     "session": "You need to be logged in to link an app. Log in, then try again.",
-    "terms": "To create your account, accept the terms of use, then start the login again."
+    "terms": "To create your account, accept the terms of use, then start the login again.",
+    "deleted": "This account has been deleted: its reactivation period is over, so it can no longer be reopened."
   },
   "suspension": {
     "title": "Account suspended",
@@ -131,7 +134,7 @@
       "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your Overwatch matches, in their launch window and on the match page:",
       "match": "if you're shown as a contact (“Contacts” and launch windows): the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;",
       "asCaster": "if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
-      "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played — both its teams only while the match is being played if you also cast it (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing of Overwatch matches, which requires the one from Battle.net);",
+      "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played — both its teams only while the match is being played if you also cast it (you can withdraw from a match at any time; unlinking Battle.net or erasing your BattleTag would remove your refereeing of Overwatch matches, which requires the one from Battle.net);",
       "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its team contacts (to the parties to the match alone), its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
       "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
     }

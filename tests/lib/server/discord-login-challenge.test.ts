@@ -14,7 +14,6 @@ import {
   MAX_DISCORD_CODE_ATTEMPTS,
   MAX_DISCORD_CODES_PER_DAY,
   MAX_DISCORD_CODES_PER_WINDOW,
-  verifyDiscordChallenge,
 } from "@/lib/server/users/discord-challenges";
 import { getDatabase } from "@/lib/server/database";
 import { fakePool } from "../../helpers/sql-double";
@@ -173,6 +172,13 @@ function pendingChallenge(overrides: Partial<Challenge> = {}): Challenge {
   };
 }
 
+/**
+ * Le code de connexion désigné par son jeton (le seul chemin de lecture : la
+ * lecture par compte, sans appelant, est retirée).
+ */
+const verifyDiscordChallenge = async (_discordId: string, code: string): Promise<boolean> =>
+  (await consumeDiscordLoginChallenge(TOKEN, code, "login")) !== null;
+
 const statementsOf = (execute: { mock: { calls: unknown[][] } }) =>
   execute.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " ").trim());
 
@@ -259,7 +265,7 @@ describe("verifyDiscordChallenge — quota d'essais", () => {
     await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(false);
   });
 
-  it("ne lit que le **dernier** code émis", async () => {
+  it("ne lit que le **dernier** code émis de l'usage", async () => {
     // C'est ce qui rend un code neuf suffisant pour périmer le précédent, sans
     // aucune écriture — et ce qui oblige, symétriquement, à supprimer la ligne
     // d'un envoi raté (voir `discardDiscordChallenge`).
@@ -267,9 +273,9 @@ describe("verifyDiscordChallenge — quota d'essais", () => {
 
     await verifyDiscordChallenge("123", "424242");
 
-    const read = statementsOf(execute).find((q) => q.startsWith("SELECT id, discord_id, code_hash"))!;
-    expect(read).toContain("ORDER BY id DESC");
-    expect(read).toContain("LIMIT 1");
+    const read = statementsOf(execute).find((q) => q.startsWith("SELECT c.id, c.discord_id, c.code_hash"))!;
+    expect(read).toContain("NOT EXISTS");
+    expect(read).toContain("newer.id > c.id");
   });
 });
 
@@ -356,7 +362,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     const count = connection.execute.mock.calls.find(([sql]) =>
       String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT SUM(created_at >"),
     ) as [string, unknown[]];
-    expect(count[1]).toEqual([DISCORD_CODE_WINDOW_MINUTES, "123", DISCORD_CODE_DAY_HOURS]);
+    expect(count[1]).toEqual([DISCORD_CODE_WINDOW_MINUTES, "123", "LOGIN", DISCORD_CODE_DAY_HOURS]);
   });
 
   it("refuse au-delà du plafond journalier, même fenêtre vide", async () => {
@@ -653,27 +659,71 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
     expect(state!.attempts).toBe(MAX_DISCORD_CODE_ATTEMPTS);
   });
 
-  it("verifyDiscordChallenge_rightCodeOnLastAttempt_accepted", async () => {
-    fakeDb(pendingChallenge({ attempts: MAX_DISCORD_CODE_ATTEMPTS - 1 }));
-
-    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
-  });
-
-  it("verifyDiscordChallenge_accountRead_scopedToLoginPurpose", async () => {
-    // La lecture par compte ne prend que les défis de connexion (filtre `purpose` dans la requête).
-    const { execute } = fakeDb(pendingChallenge());
-
-    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
-
-    const call = execute.mock.calls.find(([q]) => String(q).replace(/\s+/g, " ").trim().startsWith("SELECT id, discord_id, code_hash"));
-    expect(String(call?.[0]).replace(/\s+/g, " ")).toContain("WHERE discord_id = ? AND purpose = ?");
-    expect(call?.[1]).toEqual(["123", "LOGIN"]);
-  });
-
-  it("verifyDiscordChallenge_onlyHandleCodePending_rejectedWithoutAttempt", async () => {
+  it("consumeDiscordLoginChallenge_onlyHandleCodePending_loginRejectedWithoutAttempt", async () => {
     const { state } = fakeDb(pendingChallenge({ purpose: "HANDLE" }));
 
-    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(false);
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
     expect(state!.attempts).toBe(0);
+  });
+});
+
+describe("défis de tag liés au compte demandeur et au parcours", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("createDiscordLoginChallenge_quota_countedPerPurpose", async () => {
+    // Dix demandes de connexion anonymes ne ferment plus la certification du joueur visé.
+    const { connection } = fakeDb(null, 0);
+    await createDiscordLoginChallenge("123", "nova", "handle", "5:certify");
+
+    const count = connection.execute.mock.calls.find(([sql]) =>
+      String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT SUM(created_at >"),
+    ) as [string, unknown[]];
+    expect(String(count[0]).replace(/\s+/g, " ")).toContain("WHERE discord_id = ? AND purpose = ?");
+    expect(count[1]).toEqual([DISCORD_CODE_WINDOW_MINUTES, "123", "HANDLE", DISCORD_CODE_DAY_HOURS]);
+  });
+
+  it("createDiscordLoginChallenge_withBinding_storesBoundLookupHash", async () => {
+    const { connection } = fakeDb(null, 0);
+    const challenge = await createDiscordLoginChallenge("123", "nova", "handle", "5:certify");
+
+    const insert = connection.execute.mock.calls.find(([q]) => String(q).trim().startsWith("INSERT")) as unknown as [string, unknown[]];
+    expect(insert[1][1]).toBe(hash(`${challenge.challengeToken}:5:certify`));
+    expect(insert[1][1]).not.toBe(hash(challenge.challengeToken));
+  });
+
+  it("createDiscordLoginChallenge_withoutBinding_storesTokenHash", async () => {
+    const { connection } = fakeDb(null, 0);
+    const challenge = await createDiscordLoginChallenge("123", null, "login");
+
+    const insert = connection.execute.mock.calls.find(([q]) => String(q).trim().startsWith("INSERT")) as unknown as [string, unknown[]];
+    expect(insert[1][1]).toBe(hash(challenge.challengeToken));
+  });
+
+  it("consumeDiscordLoginChallenge_sameAccountAndFlow_accepted", async () => {
+    fakeDb(pendingChallenge({ purpose: "HANDLE", lookup_hash: hash(`${TOKEN}:5:certify`) }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle", "5:certify")).resolves.not.toBeNull();
+  });
+
+  it("consumeDiscordLoginChallenge_otherAccount_rejectedWithoutAttempt", async () => {
+    const { state } = fakeDb(pendingChallenge({ purpose: "HANDLE", lookup_hash: hash(`${TOKEN}:5:certify`) }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle", "6:certify")).resolves.toBeNull();
+    expect(state!.attempts).toBe(0);
+  });
+
+  it("consumeDiscordLoginChallenge_otherFlow_rejectedWithoutAttempt", async () => {
+    const { state } = fakeDb(pendingChallenge({ purpose: "HANDLE", lookup_hash: hash(`${TOKEN}:5:certify`) }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle", "5:handle-update")).resolves.toBeNull();
+    expect(state!.attempts).toBe(0);
+  });
+
+  it("consumeDiscordLoginChallenge_boundChallengeWithoutBinding_rejected", async () => {
+    fakeDb(pendingChallenge({ purpose: "HANDLE", lookup_hash: hash(`${TOKEN}:5:certify`) }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle")).resolves.toBeNull();
   });
 });

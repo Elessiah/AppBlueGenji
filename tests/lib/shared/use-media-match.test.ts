@@ -114,3 +114,13 @@ describe("SiteNav : une seule copie montée", () => {
     expect(css).toContain("@media (max-width: 720px)");
   });
 });
+
+describe("useClientPower — préférence de mouvement", () => {
+  const source = readSource("lib/shared/hooks/useClientPower.ts");
+
+  it("useClientPower_reducedMotionListener_goesThroughLegacySafariFallback", () => {
+    expect(source).toContain("unsubscribeMotion = subscribeMediaQuery(REDUCED_MOTION_QUERY, onChange);");
+    expect(source).toContain("unsubscribeMotion();");
+    expect(source).not.toMatch(/motion\?\.addEventListener/);
+  });
+});

@@ -418,8 +418,20 @@ describe("refus — codes traduits à l'affichage", () => {
     expect(loginErrorMessage("UNKNOWN_CODE", EN_TEXT)).toBe("An internal error occurred.");
   });
 
+  it("loginErrorMessage_concurrentUpdateRetryFr_saysRetryNotFallback", () => {
+    const fr = loginErrorMessage("CONCURRENT_UPDATE_RETRY", FR_TEXT);
+    expect(fr).not.toBe(loginErrorMessage("UNKNOWN_CODE", FR_TEXT));
+    expect(fr).toContain("Réessaie");
+  });
+
+  it("loginErrorMessage_concurrentUpdateRetryEn_saysRetryNotFallback", () => {
+    const en = loginErrorMessage("CONCURRENT_UPDATE_RETRY", EN_TEXT);
+    expect(en).not.toBe(loginErrorMessage("UNKNOWN_CODE", EN_TEXT));
+    expect(en).toContain("Try again");
+  });
+
   it("chaque refus OAuth a son anglais, conseil de navigateur compris", () => {
-    for (const kind of ["not_configured", "unavailable", "params", "state", "oauth", "session", "terms", "suspended"]) {
+    for (const kind of ["not_configured", "unavailable", "params", "state", "oauth", "session", "terms", "deleted", "suspended"]) {
       for (const environment of ["BROWSER", "IOS_INSTALLED_APP", "IN_APP_BROWSER"] as const) {
         const en = oauthErrorMessage(kind, "discord", environment, EN_TEXT);
         expect(en).not.toBeNull();
@@ -431,6 +443,13 @@ describe("refus — codes traduits à l'affichage", () => {
     );
     expect(oauthErrorMessage("oauth", null, "BROWSER", EN_TEXT)).toBe("OAuth login failed. Try again in a moment.");
     expect(oauthErrorMessage("nope", "google", "BROWSER", EN_TEXT)).toBeNull();
+  });
+
+  it("loginErrorMessage_accountDeleted_saysReactivationPeriodOver", () => {
+    expect(loginErrorMessage("ACCOUNT_DELETED")).toBe(FR.errors.ACCOUNT_DELETED);
+    expect(loginErrorMessage("ACCOUNT_DELETED", EN_TEXT)).toBe(EN.errors.ACCOUNT_DELETED);
+    expect(oauthErrorMessage("deleted", "google", "BROWSER")).toBe(FR.oauthErrors.deleted);
+    expect(oauthErrorMessage("deleted", "google", "IN_APP_BROWSER", EN_TEXT)).toBe(EN.oauthErrors.deleted);
   });
 
   it("le français reste celui d'avant le lot 6", () => {

@@ -179,6 +179,18 @@ const DISCORD_CODE_LOCK_PREFIX = "bg_discord_code:";
 const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
 
 /**
+ * Empreinte qui désigne un défi. Sans `binding` (connexion, anonyme), celle du
+ * seul jeton. Avec (`"<compte>:<parcours>"`, certification ou changement de
+ * tag), celle du jeton **lié** au compte demandeur et au parcours : un couple
+ * jeton + code fuité ne sert ni à un autre compte connecté, ni à l'autre
+ * parcours — la lecture par jeton n'y trouve aucune ligne. Rien de plus n'est
+ * écrit en base : le lien vit dans l'empreinte.
+ */
+function lookupHash(challengeToken: string, binding: string | undefined): string {
+  return hashCode(binding === undefined ? challengeToken : `${challengeToken}:${binding}`);
+}
+
+/**
  * Émet un code de connexion.
  *
  * **Ne périme pas les codes précédents**, et n'a pas à le faire :
@@ -219,6 +231,7 @@ export async function createDiscordLoginChallenge(
   discordId: string,
   handle: string | null | undefined,
   purpose: DiscordCodePurpose,
+  binding?: string,
 ): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
@@ -251,6 +264,13 @@ export async function createDiscordLoginChallenge(
         // Deux horizons dans la même lecture : le quart d'heure (la rafale) et
         // la journée (la force brute lente, voir `MAX_DISCORD_CODES_PER_DAY`).
         // La journée d'abord — c'est le refus qui dit d'attendre le plus.
+        //
+        // **Par usage** : la connexion se demande sans compte, la certification
+        // depuis un compte connecté. Un budget commun laissait dix demandes
+        // anonymes fermer pour la journée la certification du joueur visé. Un
+        // code de certification n'ouvre aucune session et ne sert qu'au compte
+        // qui l'a demandé (`binding`) : il n'ajoute rien à la force brute de la
+        // connexion.
         const [recent] = await connection.execute<
           (RowDataPacket & { windowCount: number | string | null; dayCount: number | string | null })[]
         >(
@@ -258,9 +278,9 @@ export async function createDiscordLoginChallenge(
              SUM(created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS windowCount,
              COUNT(*) AS dayCount
            FROM bg_discord_login_challenges
-           WHERE discord_id = ?
+           WHERE discord_id = ? AND purpose = ?
              AND created_at > DATE_SUB(NOW(), INTERVAL ? HOUR)`,
-          [DISCORD_CODE_WINDOW_MINUTES, discordId, DISCORD_CODE_DAY_HOURS],
+          [DISCORD_CODE_WINDOW_MINUTES, discordId, PURPOSE_COLUMN[purpose], DISCORD_CODE_DAY_HOURS],
         );
         if (Number(recent[0]?.dayCount ?? 0) >= MAX_DISCORD_CODES_PER_DAY) {
           throw new Error("TOO_MANY_CODE_REQUESTS_TODAY");
@@ -272,7 +292,7 @@ export async function createDiscordLoginChallenge(
         const [insert] = await connection.execute<ResultSetHeader>(
           `INSERT INTO bg_discord_login_challenges (discord_id, lookup_hash, code_hash, handle, purpose, expires_at)
            VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
-          [discordId, hashCode(challengeToken), hashCode(code), storedHandle, PURPOSE_COLUMN[purpose]],
+          [discordId, lookupHash(challengeToken, binding), hashCode(code), storedHandle, PURPOSE_COLUMN[purpose]],
         );
 
         const [rows] = await connection.execute<(RowDataPacket & { expires_at: Date | string })[]>(
@@ -323,35 +343,6 @@ export async function discardDiscordChallenge(challengeId: number): Promise<void
 }
 
 /**
- * Consomme un code juste et rend ce que la ligne du défi prouve
- * ({@link DiscordChallengeProof}), ou `null` pour tout refus.
- *
- * Séparé de {@link verifyDiscordChallenge}, qui n'en garde que le « oui » : la
- * connexion n'a besoin de rien d'autre, la **certification** du tag a besoin du
- * tag résolu. Une seule consommation, donc un seul décompte d'essai — deux
- * fonctions qui liraient la même ligne à la suite en brûleraient deux.
- */
-export async function consumeDiscordChallenge(
-  discordId: string,
-  code: string,
-  purpose: DiscordCodePurpose,
-): Promise<DiscordChallengeProof | null> {
-  const db = await getDatabase();
-
-  const [rows] = await db.execute<ChallengeRow[]>(
-    `SELECT id, discord_id, code_hash, handle, purpose, expires_at, consumed_at, attempts
-     FROM bg_discord_login_challenges
-     WHERE discord_id = ? AND purpose = ?
-     ORDER BY id DESC
-     LIMIT 1`,
-    [discordId, PURPOSE_COLUMN[purpose]],
-  );
-
-  if (rows.length === 0) return null;
-  return settleChallengeAttempt(db, rows[0], code);
-}
-
-/**
  * Consomme un code **désigné par le jeton de son défi** — chemin de la
  * connexion.
  *
@@ -372,11 +363,15 @@ export async function consumeDiscordChallenge(
  * défi que suit un défi plus récent du même usage pour le même compte est
  * refusé. Une demande de connexion (anonyme) n'annule donc pas le code de
  * certification qu'attend le joueur, ni l'inverse.
+ *
+ * `binding` doit être celui donné à l'émission ({@link lookupHash}) : un défi de
+ * certification n'est trouvé que par le compte et le parcours qui l'ont demandé.
  */
 export async function consumeDiscordLoginChallenge(
   challengeToken: string,
   code: string,
   purpose: DiscordCodePurpose,
+  binding?: string,
 ): Promise<DiscordLoginProof | null> {
   if (!isDiscordChallengeToken(challengeToken)) return null;
   const db = await getDatabase();
@@ -391,7 +386,7 @@ export async function consumeDiscordLoginChallenge(
            AND newer.purpose = c.purpose
        )
      LIMIT 1`,
-    [hashCode(challengeToken), PURPOSE_COLUMN[purpose]],
+    [lookupHash(challengeToken, binding), PURPOSE_COLUMN[purpose]],
   );
 
   if (rows.length === 0) return null;
@@ -473,14 +468,4 @@ async function settleChallengeAttempt(
   if (Number(consumed.affectedRows) !== 1) return null;
 
   return { handle: normalizeDiscordHandle(challenge.handle) };
-}
-
-/**
- * Le code est-il juste ? Chemin de la **connexion**, qui n'a que faire du tag.
- *
- * Un mince habillage de {@link consumeDiscordChallenge} : deux implémentations
- * de la réservation d'essai divergeraient, et c'est elle qui tient le secret.
- */
-export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {
-  return (await consumeDiscordChallenge(discordId, code, "login")) !== null;
 }

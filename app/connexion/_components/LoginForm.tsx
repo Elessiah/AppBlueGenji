@@ -56,7 +56,7 @@ const LEGACY_ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
 const TERMS_STORAGE_KEY = "bg_terms_consent";
 /**
  * Durée pendant laquelle une acceptation donnée dans la page vaut « acceptée
- * maintenant » : celle d'un aller-retour OAuth (`bg_oauth`). Au-delà, l'onglet
+ * maintenant » : celle d'un aller-retour OAuth (cookie d'état `oauthCookieName`). Au-delà, l'onglet
  * resté ouvert peut servir à une autre personne (ordinateur partagé) : son
  * acceptation ne met plus à jour un compte existant.
  */

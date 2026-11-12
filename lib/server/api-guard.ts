@@ -234,7 +234,9 @@ export const SPECTATOR_REBUILD_RULE: TokenBucketRule = {
 function withoutPort(value: string): string {
   const bracketed = /^(\[[^\]]*\]):\d{1,5}$/.exec(value);
   if (bracketed) return bracketed[1];
-  const ipv4 = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(value);
+  // IPv4, nue ou écrite en IPv6 (`::ffff:203.0.113.7:4433`) : sans ce second
+  // cas, le port restait collé et l'adresse passait pour un /64 commun.
+  const ipv4 = /^((?:::ffff:)?\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/i.exec(value);
   return ipv4 ? ipv4[1] : value;
 }
 

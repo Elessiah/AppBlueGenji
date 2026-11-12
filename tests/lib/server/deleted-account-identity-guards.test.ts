@@ -8,7 +8,6 @@ jest.mock("@/lib/server/user-avatar-import");
 // BattleTag ou non), donc du nombre de variantes à garder.
 jest.mock("@/lib/server/users/discord-challenges", () => ({
   createDiscordLoginChallenge: jest.fn(),
-  consumeDiscordChallenge: jest.fn(),
   discardDiscordChallenge: jest.fn(),
 }));
 // La copie de la photo est hors sujet ici, et elle est déjà avalée par

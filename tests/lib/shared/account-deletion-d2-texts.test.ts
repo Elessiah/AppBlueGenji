@@ -12,6 +12,7 @@ import frLogin from "@/messages/fr/login.json";
 import enLogin from "@/messages/en/login.json";
 import frProfile from "@/messages/fr/profile.json";
 import enProfile from "@/messages/en/profile.json";
+import enPlayers from "@/messages/en/players.json";
 import { readSource } from "../../helpers/read-source";
 
 /*
@@ -44,8 +45,8 @@ describe("confirmation de suppression", () => {
   it("deletionMessages_handoverAndWindow_presentInBothLanguages", () => {
     expect(frProfile.deletion.handover).toBeTruthy();
     expect(enProfile.deletion.handover).toBeTruthy();
-    expect(frProfile.deletion.irreversible).toContain("30");
-    expect(enProfile.deletion.irreversible).toContain("30");
+    expect(frProfile.deletion.irreversible).toContain("{days} jours");
+    expect(enProfile.deletion.irreversible).toContain("{days} days");
   });
 });
 
@@ -494,5 +495,24 @@ describe("revue juridique #571, cycle 2", () => {
     expect(en?.details?.join(" ")).toContain("dated to the day they were set, which may be that of the erasure");
     expect(PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.retention.join(" ")).toContain("datées du jour de leur pose");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.retention.join(" ")).toContain("dated to the day they were set");
+  });
+});
+
+describe("anglais — un seul terme pour le pseudo d'emprunt", () => {
+  it("deletionTexts_en_sayBorrowedUsernameLikeRgpdAndRegister", () => {
+    const texts = JSON.stringify([enProfile, enPlayers.page.deletedNotice]);
+    expect(texts).not.toMatch(/placeholder (one|username)|that placeholder/);
+    expect(enProfile.deletion.outcome.SOLO_REGISTRATIONS).toContain("borrowed username");
+  });
+});
+
+describe("délai de réactivation — tiré de la constante", () => {
+  it("deletionOutcomes_frAndEn_interpolateDaysInsteadOfHardcoding", () => {
+    for (const outcome of [frProfile.deletion.outcome, enProfile.deletion.outcome]) {
+      for (const text of Object.values(outcome)) {
+        expect(text).not.toMatch(/ 30 (jours|days)/);
+        expect(text).toContain("{days}");
+      }
+    }
   });
 });

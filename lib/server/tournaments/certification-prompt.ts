@@ -7,6 +7,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { failureReason } from "@/lib/server/failure-reason";
 import { battletagFromBlizzard } from "@/lib/server/battletag-origin";
 import { hasVerifiedBattletag, hasVerifiedDiscord } from "@/lib/shared/match-launch";
 import { forgetCertificationPromptsOf, forgetCertificationPromptsOfTeam } from "./certification-prompt-cache";
@@ -215,6 +216,6 @@ export async function forgetCertificationPromptsAround(userId: number): Promise<
     );
     for (const row of rows) forgetCertificationPromptsOfTeam(Number(row.team_id));
   } catch (error) {
-    console.error("[tournaments] équipe du compte illisible pour l'invitation à certifier :", error);
+    console.error("[tournaments] équipe du compte illisible pour l'invitation à certifier :", failureReason(error));
   }
 }
