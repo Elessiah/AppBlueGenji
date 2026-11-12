@@ -1059,6 +1059,13 @@ async function releaseRefereeAlertOnPool(claimId: number): Promise<void> {
 }
 
 /**
+ * Entrées résolues en même temps par `resolveBotLogs` : assez pour ne plus
+ * enchaîner les allers-retours, assez peu pour laisser des connexions au pool
+ * pendant un balayage.
+ */
+export const BOT_LOG_RESOLVE_CONCURRENCY = 4;
+
+/**
  * Traduit des entrées en lignes de journal, en relisant la base.
  *
  * Exporté pour les tests : c'est là que vit tout ce qui peut se tromper de nom,
@@ -1070,19 +1077,28 @@ async function releaseRefereeAlertOnPool(claimId: number): Promise<void> {
 export async function resolveBotLogs(
   entries: readonly PendingBotLog[],
 ): Promise<ResolvedBotLog[]> {
-  const messages: ResolvedBotLog[] = [];
+  const slots: (ResolvedBotLog | null)[] = entries.map(() => null);
+  let next = 0;
 
-  for (const entry of entries) {
-    try {
-      const resolved = await resolveOne(entry);
-      const line = typeof resolved === "string" ? { message: resolved } : resolved;
-      if (line?.message) messages.push({ entry, channel: botEventChannel(entry.kind), ...line });
-    } catch {
-      // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
+  // Quelques lectures à la fois, pas une par une : un balayage qui clôt ~200
+  // matchs ne fait plus ~200 allers-retours en file. Chaque résultat garde la
+  // place de son entrée, l'ordre des lignes reste celui des commits.
+  const worker = async (): Promise<void> => {
+    while (next < entries.length) {
+      const index = next++;
+      const entry = entries[index];
+      try {
+        const resolved = await resolveOne(entry);
+        const line = typeof resolved === "string" ? { message: resolved } : resolved;
+        if (line?.message) slots[index] = { entry, channel: botEventChannel(entry.kind), ...line };
+      } catch {
+        // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
+      }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(BOT_LOG_RESOLVE_CONCURRENCY, entries.length) }, worker));
 
-  return messages;
+  return slots.filter((line): line is ResolvedBotLog => line !== null);
 }
 
 type TournamentLogRow = RowDataPacket & {

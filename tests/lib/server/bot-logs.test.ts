@@ -6,6 +6,7 @@ jest.mock("@/lib/server/bot-integration");
 import type { PoolConnection } from "mysql2/promise";
 import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
+  BOT_LOG_RESOLVE_CONCURRENCY,
   discardBotLogs,
   flushBotLogs,
   markResultValidatedByStaff,
@@ -52,7 +53,8 @@ const MATCH_ROW = {
 
 /**
  * Câble la base : chaque requête rend la première ligne restante.
- * L'ordre suffit — les résolutions sont séquentielles, une entrée à la fois.
+ * L'ordre suffit tant que chaque entrée ne fait qu'une lecture : les entrées se
+ * résolvent par petits groupes (`BOT_LOG_RESOLVE_CONCURRENCY`), dans l'ordre.
  */
 function mockDb(rows: unknown[][]): SqlMock {
   const execute = jest.fn<() => Promise<unknown>>();
@@ -435,6 +437,57 @@ describe("resolveBotLogs", () => {
     const messages = await resolveBotLogs([{ kind: "tournament_started", tournamentId: 12 }]);
 
     expect(messages).toEqual([]);
+  });
+
+  it("resolveBotLogs_moreEntriesThanConcurrency_atMostFourQueriesInFlight", async () => {
+    const pending: (() => void)[] = [];
+    const execute = jest.fn<() => Promise<unknown>>(
+      () => new Promise((resolve) => pending.push(() => resolve([[TOURNAMENT_ROW]]))),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const entries = Array.from({ length: 10 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
+
+    const resolving = resolveBotLogs(entries);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(BOT_LOG_RESOLVE_CONCURRENCY).toBe(4);
+    expect(execute).toHaveBeenCalledTimes(4);
+    while (pending.length > 0) {
+      pending.shift()?.();
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    expect(await resolving).toHaveLength(10);
+  });
+
+  it("resolveBotLogs_laterEntryResolvesFirst_keepsEntryOrder", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+      params?.[0] === 12
+        ? new Promise((resolve) => {
+            releaseFirst = () => resolve([[TOURNAMENT_ROW]]);
+          })
+        : Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13, name: "Coupe Nova" }]]),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const resolving = resolveBotLogs([
+      { kind: "tournament_started", tournamentId: 12 },
+      { kind: "tournament_started", tournamentId: 13 },
+    ]);
+    await new Promise((resolve) => setImmediate(resolve));
+    releaseFirst();
+    const messages = (await resolving).map((line) => line.message);
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toContain("Coupe BlueGenji");
+    expect(messages[1]).toContain("Coupe Nova");
+  });
+
+  it("resolveBotLogs_noEntries_returnsEmptyWithoutQuery", async () => {
+    const execute = mockDb([]);
+
+    expect(await resolveBotLogs([])).toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("perd la ligne fautive, pas les suivantes", async () => {

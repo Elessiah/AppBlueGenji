@@ -143,7 +143,7 @@ describe("dispatchMatchVoiceChannels — création", () => {
       .mockResolvedValueOnce({ kind: "failed", code: "INVALID_VOICE_CHANNEL_NAME" })
       .mockResolvedValueOnce({ kind: "ok", value: "902" });
     await dispatchMatchVoiceChannels();
-    expect(jest.mocked(ensureVoiceChannel).mock.calls[2]).toEqual(["match:42:team:2", VOICE_FALLBACK_CHANNEL_NAME]);
+    expect(jest.mocked(ensureVoiceChannel).mock.calls[2]).toEqual(["match:42:team:2", VOICE_FALLBACK_CHANNEL_NAME, true]);
   });
 
   it("dispatchMatchVoiceChannels_ensureFails_marksFailedLogsWithoutNamesAndPublishes", async () => {
