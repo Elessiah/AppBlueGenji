@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createLimiter, inBatches, mapInBatches, withTimeout } from "@/lib/shared/in-batches";
+import { createLimiter, inBatches, LimiterFullError, mapInBatches, URGENT_STREAK_MAX, withDeadline, withTimeout } from "@/lib/shared/in-batches";
 
 describe("inBatches", () => {
   it("traite chaque élément, jamais plus de `size` à la fois", async () => {
@@ -242,5 +242,121 @@ describe("withTimeout", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe("inBatches options", () => {
+  it("inBatches_failFast_startsNoItemAfterFirstFailure", async () => {
+    const ran: number[] = [];
+
+    const batch = inBatches(
+      [1, 2, 3, 4, 5, 6],
+      2,
+      async (item) => {
+        ran.push(item);
+        if (item === 1) throw new Error("échec");
+        await tick();
+      },
+      { failFast: true },
+    );
+
+    await expect(batch).rejects.toThrow("échec");
+    expect(ran).toEqual([1, 2]);
+  });
+
+  it("inBatches_signalAborted_startsNoNewItemButFinishesRunningOnes", async () => {
+    const controller = new AbortController();
+    const ran: number[] = [];
+    const first = held("un");
+
+    const batch = inBatches(
+      [1, 2, 3],
+      1,
+      async (item) => {
+        ran.push(item);
+        await first.promise;
+      },
+      { signal: controller.signal },
+    );
+    await tick();
+    controller.abort();
+    first.release();
+    await batch;
+
+    expect(ran).toEqual([1]);
+  });
+
+  it("mapInBatches_signalAlreadyAborted_runsNothing", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = jest.fn(async () => "x");
+
+    await mapInBatches([1, 2], 2, run, { signal: controller.signal });
+
+    expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe("createLimiter bounds", () => {
+  it("createLimiter_waitingQueueFull_refusesOrdinaryTaskButNotUrgent", async () => {
+    const limit = createLimiter(1, 1);
+    const first = held("A");
+    const a = limit(async () => first.promise);
+    const b = limit(async () => "B");
+
+    await expect(limit(async () => "C")).rejects.toBeInstanceOf(LimiterFullError);
+    const urgent = limit(async () => "U", true);
+    first.release();
+
+    expect(await Promise.all([a, b, urgent])).toEqual(["A", "B", "U"]);
+  });
+
+  it("createLimiter_manyUrgentTasks_ordinaryTaskStillGetsItsTurn", async () => {
+    const limit = createLimiter(1);
+    const first = held("A");
+    const started: string[] = [];
+
+    const all = [limit(recorded(started, "A", first.promise))];
+    all.push(limit(recorded(started, "ordinary")));
+    for (let i = 0; i < URGENT_STREAK_MAX + 3; i += 1) all.push(limit(recorded(started, `u${i}`), true));
+    await tick();
+    first.release();
+    await Promise.all(all);
+
+    // Après URGENT_STREAK_MAX urgentes de suite, l'ordinaire passe avant les suivantes.
+    expect(started.indexOf("ordinary")).toBe(URGENT_STREAK_MAX + 1);
+  });
+});
+
+describe("withDeadline", () => {
+  it("withDeadline_delayElapsed_abortsSignalAndRejects", async () => {
+    jest.useFakeTimers();
+    try {
+      let received: AbortSignal | undefined;
+      const outcome = withDeadline((signal) => {
+        received = signal;
+        return new Promise<string>(() => undefined);
+      }, 1_000).catch((error: Error) => error.name);
+
+      expect(received?.aborted).toBe(false);
+      await jest.advanceTimersByTimeAsync(1_000);
+
+      expect(await outcome).toBe("TimeoutError");
+      expect(received?.aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("withDeadline_taskSettlesInTime_leavesSignalUntouched", async () => {
+    let received: AbortSignal | undefined;
+
+    const result = await withDeadline(async (signal) => {
+      received = signal;
+      return "fait";
+    }, 1_000);
+
+    expect(result).toBe("fait");
+    expect(received?.aborted).toBe(false);
   });
 });

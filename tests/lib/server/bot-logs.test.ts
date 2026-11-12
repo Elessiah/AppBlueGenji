@@ -7,6 +7,8 @@ import type { PoolConnection } from "mysql2/promise";
 import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
   BOT_LOG_RESOLVE_CONCURRENCY,
+  BOT_LOG_RESOLVE_INFLIGHT_MAX,
+  resetInFlightResolutions,
   BOT_LOG_RESOLVE_SLOTS,
   BOT_LOG_RESOLVE_TIMEOUT_MS,
   discardBotLogs,
@@ -110,6 +112,7 @@ const OPEN_MATCH_ROW = { ...MATCH_ROW, team1_score: null, team2_score: null, sta
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetInFlightResolutions();
   jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
@@ -770,5 +773,106 @@ describe("recentReads", () => {
 
     expect(recentReads(reads, 1_001 + MATCH_READ_REUSE_MS).size).toBe(0);
     expect(reads.size).toBe(1);
+  });
+});
+
+describe("resolveBotLogs resource bounds", () => {
+  it("resolveBotLogs_poolConstants_lookupsNeverExceedPool", () => {
+    // Pool de 25 (`lib/server/database.ts`) : résolutions en cours (places + figées) × lectures de manche.
+    expect(BOT_LOG_RESOLVE_INFLIGHT_MAX * ROUND_ALERT_READ_CONCURRENCY).toBeLessThanOrEqual(25 - 4);
+    expect(BOT_LOG_RESOLVE_INFLIGHT_MAX).toBeGreaterThanOrEqual(BOT_LOG_RESOLVE_SLOTS);
+  });
+
+  it("resolveBotLogs_sixHangingResolutions_laterOnesAreShedBeyondInFlightMax", async () => {
+    jest.useFakeTimers();
+    try {
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+        Number(params?.[0]) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
+      );
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
+      const hanging = Promise.all([resolveBotLogs(stuck(4)), resolveBotLogs(stuck(2))]);
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS);
+      await hanging;
+
+      // Six requêtes toujours en vol : une seule résolution de plus est lancée, l'autre est ignorée.
+      const lines = await resolveBotLogs([
+        { kind: "tournament_started", tournamentId: 13 },
+        { kind: "tournament_started", tournamentId: 13 },
+      ]);
+
+      expect(lines).toHaveLength(1);
+      expect(execute.mock.calls.filter(([, params]) => Number(params?.[0]) === 13)).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("resolveBotLogs_roundAlertTimesOut_startsNoMoreMatchReads", async () => {
+    jest.useFakeTimers();
+    try {
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(
+        (_sql, params) =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve([[{ ...OPEN_MATCH_ROW, id: Number(params?.[0]) }]]), BOT_LOG_RESOLVE_TIMEOUT_MS + 10_000);
+          }),
+      );
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const resolving = resolveBotLogs([
+        { kind: "match_no_referee", matchId: 31, pairing: "10:20", roundMatchIds: [31, 32, 33, 34, 35, 36], roundClaimIds: [1, 2, 3, 4, 5, 6] },
+      ]);
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS + 20_000);
+
+      expect(await resolving).toEqual([]);
+      // Les trois lectures déjà parties finissent ; les trois suivantes ne démarrent jamais.
+      expect(execute).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("resolveBotLogs_roundAlertReadFails_stopsReadingTheRestOfTheRound", async () => {
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) => {
+      if (Number(params?.[0]) === 31) throw new Error("ER_CON_COUNT_ERROR");
+      return [[{ ...OPEN_MATCH_ROW, id: Number(params?.[0]) }]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const lines = await resolveBotLogs([
+      { kind: "match_no_referee", matchId: 31, pairing: "10:20", roundMatchIds: [31, 32, 33, 34, 35, 36], roundClaimIds: [1, 2, 3, 4, 5, 6] },
+    ]);
+
+    expect(lines).toEqual([]);
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("resolveBotLogs_staleSharedRead_readsTheMatchAgain", async () => {
+    const execute = mockDbByParams({ 31: [OPEN_MATCH_ROW] });
+    const stale = Promise.resolve({ ...OPEN_MATCH_ROW, team1_name: "Ancien nom" } as never);
+    const reads: MatchReads = new Map([[31, { startedAt: Date.now() - MATCH_READ_REUSE_MS - 1, reading: stale }]]);
+
+    const lines = await resolveBotLogs([{ kind: "score_report_stalled", matchId: 31 }], reads);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(lines[0]?.message).not.toContain("Ancien nom");
+  });
+
+  it("resolveBotLogs_sharedReadFailedForSeveralWaiters_retriesOnlyOnce", async () => {
+    const execute = mockDbByParams({ 31: [OPEN_MATCH_ROW] });
+    const failed = Promise.reject(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    failed.catch(() => undefined);
+    const reads: MatchReads = new Map([[31, { startedAt: Date.now(), reading: failed }]]);
+
+    const lines = await resolveBotLogs(
+      [
+        { kind: "score_report_stalled", matchId: 31 },
+        { kind: "score_conflict", matchId: 31 },
+      ],
+      reads,
+    );
+
+    expect(lines).toHaveLength(2);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });

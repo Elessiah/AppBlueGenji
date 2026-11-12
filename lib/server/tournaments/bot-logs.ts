@@ -81,7 +81,7 @@ import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { createLimiter, mapInBatches, withTimeout } from "@/lib/shared/in-batches";
+import { createLimiter, mapInBatches, withDeadline } from "@/lib/shared/in-batches";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -1085,24 +1085,57 @@ export const ROUND_ALERT_READ_CONCURRENCY = 3;
 /**
  * Résolutions en cours en même temps pour **tout le module** — tous vidages et tous
  * passages confondus (chaque commit lance le sien, lignes et alertes tournent
- * ensemble). Chacune tient au plus {@link ROUND_ALERT_READ_CONCURRENCY} lectures :
- * 6 × 3 = 18 connexions au pire, sous les 25 du pool, quel que soit le nombre de
- * vidages qui se chevauchent. La borne est tenue par le code, pas par un calcul.
+ * ensemble). Chacune tient au plus {@link ROUND_ALERT_READ_CONCURRENCY} lectures,
+ * et les résolutions abandonnées au délai mais encore en cours sont comptées en plus
+ * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) : (6 + 1) × 3 = 21 connexions au pire pour
+ * les **lectures de résolution**, sous les 25 du pool, quel que soit le nombre de
+ * vidages qui se chevauchent — `bot-logs.test.ts` le vérifie sur les constantes. La
+ * remise qui suit (réservations rendues, vidage avant alerte) prend au plus une
+ * connexion à la fois par vidage et reste hors de cette borne.
  */
 export const BOT_LOG_RESOLVE_SLOTS = 6;
 
 /**
+ * Résolutions **en cours** en même temps, au plus, y compris celles que le délai
+ * ({@link BOT_LOG_RESOLVE_TIMEOUT_MS}) a abandonnées sans que leur requête soit revenue :
+ * elles rendent leur place du limiteur mais continuent de tenir leurs connexions.
+ * Passé ce nombre, toute résolution est refusée sans rien lire (ligne ignorée,
+ * réservation d'alerte rendue et rejouée au balayage suivant) — une base figée ne
+ * reçoit pas six requêtes de plus toutes les 30 s.
+ */
+export const BOT_LOG_RESOLVE_INFLIGHT_MAX = BOT_LOG_RESOLVE_SLOTS + 1;
+
+/**
+ * Lignes de journal en attente d'une place, au plus : au-delà, une ligne de plus est
+ * ignorée (meilleur effort, comme une résolution qui échoue) plutôt que de garder
+ * sans fin ses fermetures en mémoire pendant une panne. Les alertes ne sont jamais refusées.
+ */
+export const BOT_LOG_RESOLVE_QUEUE_MAX = 200;
+
+/**
  * Borne partagée de {@link BOT_LOG_RESOLVE_SLOTS}. Les alertes et escalades (canal
  * arbitre) passent devant les lignes de journal qui attendent : le téléphone de
- * l'arbitre ne sonne pas après tout l'arriéré du journal.
+ * l'arbitre ne sonne pas après tout l'arriéré du journal (sans l'affamer : le
+ * limiteur sert une ligne après quelques alertes de suite).
  */
-const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS);
+const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS, BOT_LOG_RESOLVE_QUEUE_MAX);
+
+/** Résolutions commencées dont la requête n'est pas revenue (abandonnées au délai ou non). */
+let inFlightResolutions = 0;
+
+/** Remet à zéro le compte des résolutions en cours (tests). */
+export function resetInFlightResolutions(): void {
+  inFlightResolutions = 0;
+}
 
 /**
  * Durée au-delà de laquelle une résolution rend sa place ({@link withTimeout}) : une
  * requête qui ne revient jamais (connexion morte) ne bloque pas, à six, tout le
  * journal et toutes les alertes du site jusqu'à son redémarrage. Une résolution
- * normale prend quelques millisecondes.
+ * normale prend quelques millisecondes. Son résultat tardif est perdu : pour une
+ * alerte, la réservation est rendue comme pour toute alerte non remise et le
+ * balayage suivant la rejoue (rien n'est perdu) ; pour une ligne de journal, c'est
+ * le meilleur effort d'une résolution qui échoue.
  */
 export const BOT_LOG_RESOLVE_TIMEOUT_MS = 30_000;
 
@@ -1113,8 +1146,16 @@ export const BOT_LOG_RESOLVE_TIMEOUT_MS = 30_000;
  */
 export const MATCH_READ_REUSE_MS = 5_000;
 
-/** Lecture d'un match gardée par un vidage, avec l'instant où elle a commencé. */
-export type MatchRead = { startedAt: number; reading: Promise<MatchLogRow | null> };
+/**
+ * Lecture d'un match gardée par un vidage, avec l'instant où elle a commencé. Si elle
+ * échoue, la reprise ({@link loadMatch}) est faite **une fois** et partagée entre tous
+ * les attentifs, pas une par attentif sur une base déjà en peine.
+ */
+export type MatchRead = {
+  startedAt: number;
+  reading: Promise<MatchLogRow | null>;
+  retry?: Promise<MatchLogRow | null>;
+};
 
 /**
  * Matchs déjà lus pendant un vidage (`flushBotLogs`), par identifiant : l'escalade
@@ -1160,7 +1201,7 @@ export async function resolveBotLogs(
   const slots = await mapInBatches(entries, BOT_LOG_RESOLVE_CONCURRENCY, async (entry): Promise<ResolvedBotLog | null> => {
     try {
       const resolved = await resolveSlot(
-        () => withTimeout(resolveOne(entry, reads), BOT_LOG_RESOLVE_TIMEOUT_MS),
+        () => resolveWithinDeadline(entry, reads),
         botEventChannel(entry.kind) === "REFEREE",
       );
       const line = typeof resolved === "string" ? { message: resolved } : resolved;
@@ -1171,6 +1212,27 @@ export async function resolveBotLogs(
     }
   });
   return slots.filter((line): line is ResolvedBotLog => line !== null);
+}
+
+/**
+ * Une résolution, bornée à {@link BOT_LOG_RESOLVE_TIMEOUT_MS}. Au délai, son signal
+ * est levé (une alerte de manche ne lance plus de lecture) ; si sa requête court
+ * encore, elle reste comptée en cours ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) jusqu'à son retour.
+ */
+function resolveWithinDeadline(
+  entry: PendingBotLog,
+  reads: MatchReads,
+): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
+  if (inFlightResolutions >= BOT_LOG_RESOLVE_INFLIGHT_MAX) return Promise.resolve(null);
+  return withDeadline((signal) => {
+    inFlightResolutions += 1;
+    const work = resolveOne(entry, reads, signal);
+    const done = (): void => {
+      inFlightResolutions -= 1;
+    };
+    work.then(done, done);
+    return work;
+  }, BOT_LOG_RESOLVE_TIMEOUT_MS);
 }
 
 type TournamentLogRow = RowDataPacket & {
@@ -1255,7 +1317,12 @@ type MatchLogRow = SubjectRow & {
  */
 function loadMatch(matchId: number, reads: MatchReads): Promise<MatchLogRow | null> {
   const known = reads.get(matchId);
-  if (known) return known.reading.catch(() => readMatch(matchId));
+  // Une lecture de plus de {@link MATCH_READ_REUSE_MS} (partie tard, ou restée en attente
+  // d'une place) n'est pas reprise : le match a pu être réapparié ou renommé depuis.
+  if (known && Date.now() - known.startedAt <= MATCH_READ_REUSE_MS) {
+    // Reprise partagée : une seule relecture pour tous ceux qui attendaient la même lecture.
+    return known.reading.catch(() => (known.retry ??= readMatch(matchId)));
+  }
   const reading = readMatch(matchId);
   const read: MatchRead = { startedAt: Date.now(), reading };
   reads.set(matchId, read);
@@ -1440,8 +1507,9 @@ async function resolveScoreReportStalledLog(
 async function resolveNoRefereeLog(
   entry: Extract<PendingBotLog, { kind: "match_no_referee" }>,
   reads: MatchReads,
+  signal?: AbortSignal,
 ): Promise<ResolvedRefereeLine | null> {
-  if (entry.roundMatchIds) return resolveRoundNoRefereeLog(entry.roundMatchIds, reads);
+  if (entry.roundMatchIds) return resolveRoundNoRefereeLog(entry.roundMatchIds, reads, signal);
   const context = await loadRefereeAlertContext(entry.matchId, reads);
   return context === null ? null : { message: formatNoRefereeAlert(context), refereeMatch: refereeMatchOf(context) };
 }
@@ -1457,13 +1525,20 @@ async function resolveNoRefereeLog(
 async function resolveRoundNoRefereeLog(
   matchIds: readonly number[],
   reads: MatchReads,
+  signal?: AbortSignal,
 ): Promise<ResolvedRefereeLine | null> {
   const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
   // Lectures bornées ({@link ROUND_ALERT_READ_CONCURRENCY}) : plusieurs alertes de
-  // manche se résolvent en même temps, chacune ne prend que quelques connexions.
-  const contexts = await mapInBatches(listed, ROUND_ALERT_READ_CONCURRENCY, (matchId) =>
-    loadRefereeAlertContext(matchId, reads, true),
+  // manche se résolvent en même temps, chacune ne prend que quelques connexions. Une
+  // lecture en échec arrête les suivantes (une base en peine n'en reçoit pas d'autres,
+  // dont on jetterait le résultat), comme le délai de la résolution (`signal`).
+  const contexts = await mapInBatches(
+    listed,
+    ROUND_ALERT_READ_CONCURRENCY,
+    (matchId) => loadRefereeAlertContext(matchId, reads, true),
+    { failFast: true, signal },
   );
+  if (signal?.aborted) return null;
   const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
   const first = found[0];
   if (!first) return null;
@@ -1582,6 +1657,7 @@ async function resolveEndurancePenaltyLiftedLog(
 async function resolveOne(
   entry: PendingBotLog,
   reads: MatchReads,
+  signal?: AbortSignal,
 ): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
   switch (entry.kind) {
     case "tournament_created":
@@ -1597,7 +1673,7 @@ async function resolveOne(
     case "score_report_stalled":
       return resolveScoreReportStalledLog(entry, reads);
     case "match_no_referee":
-      return resolveNoRefereeLog(entry, reads);
+      return resolveNoRefereeLog(entry, reads, signal);
     case "tournament_started":
       return resolveTournamentStartedLog(entry);
     case "tournament_finished":
