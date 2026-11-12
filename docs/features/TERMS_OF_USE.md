@@ -315,7 +315,7 @@ vivant, coach compris, et écarte un membre dont la suppression est demandée),
 Discord de l'arbitre désigné sorti de l'incise, une seule définition des
 parties du match, salons vocaux (matchs programmés, suppression selon T18,
 trois états de la page du match). Documents du bot : puce de contact anglaise
-(« Report a problem », « GDPR ») et reprise d'équipe qui cite « un admin » dans
+(« Report a problem », « GDPR ») et reprise d'équipe qui cite « un admin » (retiré par #595 : la reprise ne nomme que l'équipe, D4) dans
 la politique, les deux datés du 13 novembre 2026. Annoncée par
 `2026-11-conditions-v11-diffusion-sous-le-pseudo` ; **tout compte la
 réaccepte** dans la fenêtre bloquante. Le garde-fou de
