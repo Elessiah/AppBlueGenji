@@ -175,6 +175,22 @@ describe("maskLoggedMessage", () => {
     expect(maskLoggedMessage("x".repeat(300))).toHaveLength(160);
   });
 
+  it("maskLoggedMessage_apostropheInsideWord_keepsWord", () => {
+    expect(maskLoggedMessage("Table 'x.y' doesn't exist")).toBe("Table '…' doesn't exist");
+  });
+
+  it("maskLoggedMessage_unclosedQuote_masksToTheEnd", () => {
+    expect(maskLoggedMessage("Duplicate entry 'a@b.fr")).toBe("Duplicate entry '…");
+  });
+
+  it("maskLoggedMessage_manyUnclosedQuotes_staysFast", () => {
+    const start = Date.now();
+
+    maskLoggedMessage(" '".repeat(50_000));
+
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
   it("fail_duplicateEntryMessage_logsMaskedForm", () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
