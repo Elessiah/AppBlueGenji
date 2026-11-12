@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { isCheckboxEnter } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 interface TeamDialogProps {
@@ -90,6 +91,10 @@ export function TeamDialog({
         <form
           {...panelProps}
           ref={dialogRef as unknown as React.Ref<HTMLFormElement>}
+          onKeyDown={(event: KeyboardEvent) => {
+            // Entrée sur une case ne l'envoie pas (soumission implicite).
+            if (isCheckboxEnter(event.key, event.target)) event.preventDefault();
+          }}
           onSubmit={(event: FormEvent) => {
             event.preventDefault();
             if (!busy) onSubmit();

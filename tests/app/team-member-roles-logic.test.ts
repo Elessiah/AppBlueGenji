@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   invitationOutcome,
+  isCheckboxEnter,
   memberRolesToSave,
   ownGameRolesToSave,
   sameRoleSet,
@@ -56,14 +57,38 @@ describe("ownGameRolesToSave — « Mes rôles »", () => {
 
 describe("invitationOutcome — modale d'invitation", () => {
   it("invitationOutcome_success_clearsPseudoAndCloses", () => {
-    expect(invitationOutcome(true, false)).toEqual({ clearPseudo: true, closeDialog: true });
+    expect(invitationOutcome(true, false)).toEqual({ clearPseudo: true, closeDialog: true, keepRoles: false });
   });
 
   it("invitationOutcome_pseudoRefused_closesAndKeepsPseudo", () => {
-    expect(invitationOutcome(false, true)).toEqual({ clearPseudo: false, closeDialog: true });
+    expect(invitationOutcome(false, true)).toEqual({ clearPseudo: false, closeDialog: true, keepRoles: true });
   });
 
   it("invitationOutcome_otherRefusal_keepsDialogOpen", () => {
-    expect(invitationOutcome(false, false)).toEqual({ clearPseudo: false, closeDialog: false });
+    expect(invitationOutcome(false, false)).toEqual({ clearPseudo: false, closeDialog: false, keepRoles: false });
+  });
+});
+
+describe("isCheckboxEnter — Entrée sur une case ne soumet pas", () => {
+  const checkbox = { tagName: "INPUT", type: "checkbox" };
+
+  it("isCheckboxEnter_enterOnCheckbox_returnsTrue", () => {
+    expect(isCheckboxEnter("Enter", checkbox)).toBe(true);
+  });
+
+  it("isCheckboxEnter_enterOnTextInput_returnsFalse", () => {
+    expect(isCheckboxEnter("Enter", { tagName: "INPUT", type: "text" })).toBe(false);
+  });
+
+  it("isCheckboxEnter_enterOnButton_returnsFalse", () => {
+    expect(isCheckboxEnter("Enter", { tagName: "BUTTON" })).toBe(false);
+  });
+
+  it("isCheckboxEnter_spaceOnCheckbox_returnsFalse", () => {
+    expect(isCheckboxEnter(" ", checkbox)).toBe(false);
+  });
+
+  it("isCheckboxEnter_nullTarget_returnsFalse", () => {
+    expect(isCheckboxEnter("Enter", null)).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { MANAGER_ASSIGNABLE_ROLES } from "@/lib/shared/team-role-display";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { TeamDialog } from "./TeamDialog";
 import { RoleTable } from "./RoleTable";
 import styles from "../team.module.css";
@@ -11,6 +12,8 @@ import styles from "../team.module.css";
 interface InviteRolesDialogProps {
   /** Pseudo saisi, tel qu'il partira. */
   pseudo: string;
+  /** Rôles déjà cochés : ceux d'une tentative dont le pseudo a été refusé. */
+  initialRoles?: readonly TeamRole[];
   onClose: () => void;
   /** Rend `true` si l'invitation est partie — la modale ne se ferme qu'alors (ou sur un refus du pseudo, que l'appelant gère). */
   onConfirm: (roles: TeamRole[]) => Promise<boolean>;
@@ -25,8 +28,8 @@ interface InviteRolesDialogProps {
  * Ici, rien n'est coché d'avance (décision D71) : inviter sans rôle est permis,
  * le joueur choisira ses rôles de jeu lui-même (« Mes rôles »).
  */
-export function InviteRolesDialog({ pseudo, onClose, onConfirm }: Readonly<InviteRolesDialogProps>) {
-  const [selected, setSelected] = useState<TeamRole[]>([]);
+export function InviteRolesDialog({ pseudo, initialRoles = [], onClose, onConfirm }: Readonly<InviteRolesDialogProps>) {
+  const [selected, setSelected] = useState<TeamRole[]>([...initialRoles]);
   const [pending, setPending] = useState(false);
   const { t } = useTeamPageText();
 
@@ -67,7 +70,12 @@ export function InviteRolesDialog({ pseudo, onClose, onConfirm }: Readonly<Invit
         </>
       }
     >
-      <p>{t("inviteDialog.intro")}</p>
+      <InfoHintRow>
+        <span className={styles.roleTableLead}>{t("inviteDialog.lead")}</span>
+        <InfoHint id="team-invite-roles-help" subject={t("inviteDialog.lead")}>
+          <p>{t("inviteDialog.intro")}</p>
+        </InfoHint>
+      </InfoHintRow>
       <RoleTable selected={selected} onChange={setSelected} checkable={MANAGER_ASSIGNABLE_ROLES} />
     </TeamDialog>
   );

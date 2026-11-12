@@ -127,7 +127,8 @@ describe("InviteRolesDialog", () => {
   it("InviteRolesDialog_render_noRolePreChecked", () => {
     const src = read("app/(secured)/equipes/[id]/_components/InviteRolesDialog.tsx");
 
-    expect(src).toContain("useState<TeamRole[]>([])");
+    expect(src).toContain("useState<TeamRole[]>([...initialRoles])");
+    expect(src).toContain("initialRoles = []");
     expect(src).toContain("checkable={MANAGER_ASSIGNABLE_ROLES}");
   });
 
@@ -139,8 +140,70 @@ describe("InviteRolesDialog", () => {
   });
 });
 
+describe("RoleTable — mode à cocher", () => {
+  it("RoleTable_tickMode_ownerIsMutedLabelNotPill", () => {
+    const html = render(<RoleTable selected={[]} onChange={() => undefined} checkable={MANAGER_ASSIGNABLE_ROLES} />);
+
+    expect(checkboxes(html)).toBe(6);
+    expect(html).toContain("roleTableStatic");
+    expect(html).toContain("Se transfère");
+  });
+
+  it("RoleTable_readOnly_noStaticLabel", () => {
+    expect(render(<RoleTable />)).not.toContain("roleTableStatic");
+  });
+
+  it("RoleTable_body_isATapZone", () => {
+    expect(render(<RoleTable />)).toContain("data-tap-zone");
+  });
+
+  it("RoleTable_noticesLine_onlyInsideTheHint", () => {
+    const html = render(<RoleTable />);
+
+    expect(html).toMatch(/class="panel" hidden=""><p>Tout membre reçoit/);
+    expect(html).not.toContain('class="help"');
+  });
+});
+
+describe("câblage des modales de rôles", () => {
+  it("MembersSection_myRolesBlock_isNotRemountedByAKey", () => {
+    const src = read("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
+
+    expect(src).toMatch(/<MyRolesBlock roles={viewerMember.roles}/);
+    expect(src).not.toMatch(/key={viewerMember/);
+  });
+
+  it("MyRolesBlock_savedRolesChange_resyncsDraftWithoutRemount", () => {
+    const src = read("app/(secured)/equipes/[id]/_components/MyRolesBlock.tsx");
+
+    expect(src).toContain("setSyncedKey(savedKey)");
+    expect(src).toContain("isCheckboxEnter");
+  });
+
+  it("MembersSection_refusedPseudo_keepsTickedRoles", () => {
+    const src = read("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
+
+    expect(src).toContain("setKeptRoles(outcome.keepRoles ? roles : [])");
+    expect(src).toContain("initialRoles={keptRoles}");
+  });
+
+  it("TeamDialog_form_guardsEnterOnCheckbox", () => {
+    expect(read("app/(secured)/equipes/[id]/_components/TeamDialog.tsx")).toContain("isCheckboxEnter(event.key");
+  });
+
+  it("teamCss_roleTable_foldsOnItsOwnWidthWithClassHook", () => {
+    const css = read("app/(secured)/equipes/[id]/team.module.css");
+
+    expect(css).toContain("@container roleTable (max-width: 700px)");
+    expect(css).toContain(".roleTableBody > .roleTableRow:first-child");
+    expect(css).not.toMatch(/@media (max-width: 680px)[^}]*roleTable/);
+  });
+});
+
 describe("textes de la fiche", () => {
   it("teamJson_newNamespaces_sameKeysInFrAndEn", () => {
+    expect(frTeam.inviteDialog.lead).toBeTruthy();
+    expect(enTeam.inviteDialog.lead).toBeTruthy();
     for (const ns of ["inviteDialog", "myRoles", "roleGuide"] as const) {
       expect(leafKeys(enTeam[ns]).sort()).toEqual(leafKeys(frTeam[ns]).sort());
     }

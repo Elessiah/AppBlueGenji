@@ -133,6 +133,7 @@
   },
   "inviteDialog": {
     "title": "Inviter {pseudo}",
+    "lead": "Rôles à lui donner",
     "intro": "Coche les rôles à lui donner à son arrivée. Aucun n'est obligatoire : il choisira lui-même ses rôles de jeu.",
     "confirm": "Envoyer l'invitation",
     "sending": "Envoi…",

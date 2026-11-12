@@ -714,6 +714,7 @@
 /* ── Tableau des rôles (`RoleTable`) ───────────────────── */
 
 .roleTableWrap {
+  container: roleTable / inline-size;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -721,6 +722,7 @@
 }
 
 .roleTable {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -728,7 +730,7 @@
 
 .roleTableRow {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
   padding: 10px 12px;
@@ -760,17 +762,26 @@
   color: var(--ink-soft);
 }
 
-/* Libellé de cellule (`data-label`), montré seulement quand la ligne s'empile. */
-.roleTableRow [data-label]::before {
-  content: none;
+/* Libellé court qui porte un « i » (invitation, annonces de match). */
+.roleTableLead {
+  font-size: 13px;
+  color: var(--ink-soft);
 }
 
-/* Repli à la largeur de la **fenêtre** sous laquelle la modale de 820 px ne
-   laisse plus de quoi lire quatre colonnes (`RESPONSIVE_TABLES.md` : le
+/* Rôle sans case (propriétaire) dans un tableau à cocher : un libellé atténué,
+   jamais la pastille pleine qui dit « a ce rôle » dans le roster. */
+.roleTableStatic {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* Repli à la largeur **du tableau** (conteneur `roleTableWrap`), non de la
+   fenêtre : la modale est bornée à 820 px, et entre 681 et 820 px de fenêtre ses
+   quatre colonnes tombaient à ~135 px (`RESPONSIVE_TABLES.md` : le
    `.table-row` global replie à 920 px, réglage pensé pour une page). L'en-tête
    reste lisible par les lecteurs d'écran ; le `data-label` n'est qu'un
    libellé visuel. */
-@media (max-width: 680px) {
+@container roleTable (max-width: 700px) {
   .roleTableHeader {
     position: absolute;
     width: 1px;
@@ -786,7 +797,7 @@
   }
 
   /* En-tête masqué : la première ligne ne double pas le cadre du tableau. */
-  [role="rowgroup"]:last-child > .roleTableRow:first-child {
+  .roleTableBody > .roleTableRow:first-child {
     border-top: none;
   }
 

@@ -12,8 +12,10 @@ siens : rien n'était enregistré. Les deux gestes sont désormais séparés.
   `useBackdropDismiss`) : le tableau des rôles, **aucun coché d'avance** ;
   inviter sans rôle est permis (décision D71).
 - Pseudo refusé (introuvable, déjà invité…) : la modale se ferme, le refus est
-  rattaché au champ (`useFieldErrors`) et notifié ; autre refus : la modale
-  reste ouverte avec sa sélection.
+  rattaché au champ (`useFieldErrors`) et notifié, et les rôles cochés sont gardés
+  (`keepRoles`) pour la rouvrir ; autre refus : la modale reste ouverte avec sa
+  sélection. Entrée sur une case ne soumet jamais (`isCheckboxEnter`, aussi dans
+  « Mes rôles »).
 - Serveur : `inviteRolesFromBody` — absent → défaut `DPS` (anciens appelants),
   liste (même vide) de codes connus → `OWNER` retiré ; pas un tableau, ou un
   élément qui n'est pas un code de rôle connu (`"PILOTE"`, `3`) → `INVALID_ROLES`
@@ -50,10 +52,12 @@ siens : rien n'était enregistré. Les deux gestes sont désormais séparés.
 
 ## Tableau des rôles (`RoleTable`)
 
-Rôles ARIA de tableau, une ligne par rôle (`TEAM_ROLE_ORDER`), colonnes « Sur
+Le propriétaire, sans case dans un tableau à cocher, se lit en libellé atténué
+(jamais la pastille pleine) ; « Mes rôles » ne se remonte pas à chaque
+enregistrement (le focus reste sur le bouton). Rôles ARIA de tableau, une ligne par rôle (`TEAM_ROLE_ORDER`), colonnes « Sur
 l'équipe », « En match », « Messages reçus » ; un `<InfoHint>` par rôle (qui le
-donne, ce qu'il ne permet pas). Sous 680 px de fenêtre, chaque ligne se replie en
-une colonne, cellules libellées par `data-label` (en-têtes gardés pour les
+donne, ce qu'il ne permet pas). Sous 700 px de **largeur du tableau** (`@container roleTable`, la modale
+étant bornée à 820 px), chaque ligne se replie en une colonne, cellules libellées par `data-label` (en-têtes gardés pour les
 lecteurs d'écran). Textes dans `messages/{fr,en}/team.json` (`roleGuide`,
 `myRoles`, `inviteDialog`).
 

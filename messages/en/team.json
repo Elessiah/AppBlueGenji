@@ -133,6 +133,7 @@
   },
   "inviteDialog": {
     "title": "Invite {pseudo}",
+    "lead": "Roles to give them",
     "intro": "Tick the roles to give them when they join. None is required: they'll pick their game roles themselves.",
     "confirm": "Send the invitation",
     "sending": "Sending…",

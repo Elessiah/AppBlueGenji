@@ -21,6 +21,15 @@ interface RoleTableProps {
 }
 
 /**
+ * Rôle sans case. Dans un tableau à cocher (propriétaire) : un libellé, pas la
+ * pastille pleine qui dit « a ce rôle » partout ailleurs ; en lecture : la pastille.
+ */
+function roleLabel(role: TeamRole, label: string, tickMode: boolean) {
+  if (tickMode) return <span className={styles.roleTableStatic}>{label}</span>;
+  return <RolePills roles={[role]} label={label} />;
+}
+
+/**
  * Tableau de **tous** les rôles d'équipe : ce que chacun peut faire sur
  * l'équipe, en match, et les messages qu'il reçoit — le « i » de chaque rôle
  * dit qui le donne et ce qu'il ne permet pas.
@@ -60,7 +69,7 @@ export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleT
             <span role="columnheader">{columns.messages}</span>
           </div>
         </div>
-        <div role="rowgroup">
+        <div role="rowgroup" className={styles.roleTableBody} data-tap-zone>
           {TEAM_ROLE_ORDER.map((role) => {
             const label = teamRoleLabel(role, locale);
             const hintId = `${baseId}-${role}`;
@@ -78,7 +87,7 @@ export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleT
                         aria-describedby={hintId}
                       />
                     ) : (
-                      <RolePills roles={[role]} label={label} />
+                      roleLabel(role, label, Boolean(selected))
                     )}
                     <InfoHint id={hintId} subject={label}>
                       <p>{t(`roleGuide.roles.${role}.hint`)}</p>
@@ -103,8 +112,9 @@ export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleT
         </div>
       </div>
       <InfoHintRow>
-        <p className={styles.help}>{t("roleGuide.noticesLine")}</p>
+        <span className={styles.roleTableLead}>{t("roleGuide.noticesTitle")}</span>
         <InfoHint id={`${baseId}-notices`} subject={t("roleGuide.noticesTitle")}>
+          <p>{t("roleGuide.noticesLine")}</p>
           <p>{t("roleGuide.noticesHint")}</p>
         </InfoHint>
       </InfoHintRow>

@@ -38,6 +38,23 @@ export function ownGameRolesToSave(saved: readonly TeamRole[], selected: readonl
  * se ferme pour montrer l'erreur sur le champ, qui garde sa saisie ; sur tout
  * autre refus (conflit, limite…), la modale reste ouverte avec sa sélection.
  */
-export function invitationOutcome(ok: boolean, pseudoRefused: boolean): { clearPseudo: boolean; closeDialog: boolean } {
-  return { clearPseudo: ok, closeDialog: ok || pseudoRefused };
+export function invitationOutcome(
+  ok: boolean,
+  pseudoRefused: boolean,
+): { clearPseudo: boolean; closeDialog: boolean; keepRoles: boolean } {
+  // Pseudo refusé : la modale se ferme, mais les rôles cochés sont gardés pour
+  // la rouvrir après correction de la faute de frappe.
+  return { clearPseudo: ok, closeDialog: ok || pseudoRefused, keepRoles: !ok && pseudoRefused };
+}
+
+/**
+ * Entrée sur une case à cocher d'un formulaire : le navigateur la prend pour un
+ * envoi (soumission implicite). Une case se bascule à la barre d'espace ; on
+ * n'envoie ni une invitation ni un changement de rôles sur un geste qui
+ * voulait seulement la parcourir.
+ */
+export function isCheckboxEnter(key: string, target: unknown): boolean {
+  if (key !== "Enter" || typeof target !== "object" || target === null || !("tagName" in target)) return false;
+  const element = target as { tagName: string; type?: string };
+  return element.tagName === "INPUT" && element.type === "checkbox";
 }

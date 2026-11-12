@@ -9,7 +9,7 @@ import { SELF_ASSIGNABLE_ROLES, isLeadingRole } from "@/lib/shared/team-roles";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { RolePills } from "./RolePills";
 import { RoleGuideDialog } from "./RoleGuideDialog";
-import { ownGameRolesToSave } from "../_lib/member-roles";
+import { isCheckboxEnter, ownGameRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 interface MyRolesBlockProps {
@@ -30,6 +30,15 @@ export function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
   const saved = SELF_ASSIGNABLE_ROLES.filter((role) => roles.includes(role));
   const leading = roles.filter(isLeadingRole);
   const [selected, setSelected] = useState<TeamRole[]>(saved);
+  // Rôles enregistrés changés (enregistrement, ou modale de la gestion) : le
+  // brouillon repart d'eux **sans remonter le bloc** — un remontage ferait
+  // perdre le focus du bouton « Enregistrer » et refermerait la modale du guide.
+  const savedKey = saved.join(",");
+  const [syncedKey, setSyncedKey] = useState(savedKey);
+  if (syncedKey !== savedKey) {
+    setSyncedKey(savedKey);
+    setSelected(saved);
+  }
   const [pending, setPending] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const toSave = ownGameRolesToSave(saved, selected);
@@ -58,6 +67,9 @@ export function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
       <form
         className={styles.myRoles}
         aria-labelledby="team-my-roles-title"
+        onKeyDown={(event) => {
+          if (isCheckboxEnter(event.key, event.target)) event.preventDefault();
+        }}
         onSubmit={(event) => {
           event.preventDefault();
           void save();

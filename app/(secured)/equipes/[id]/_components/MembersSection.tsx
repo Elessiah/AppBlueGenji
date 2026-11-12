@@ -49,6 +49,8 @@ export function MembersSection({
   const [memberPseudo, setMemberPseudo] = useState("");
   /** Pseudo dont la modale des rôles d'invitation est ouverte. */
   const [inviteTarget, setInviteTarget] = useState<string | null>(null);
+  /** Rôles cochés dont le pseudo a été refusé : la modale rouverte les retrouve. */
+  const [keptRoles, setKeptRoles] = useState<TeamRole[]>([]);
   const [rolesTarget, setRolesTarget] = useState<RolesDialogTarget | null>(null);
   const [kickTarget, setKickTarget] = useState<TeamMember | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
@@ -93,6 +95,7 @@ export function MembersSection({
     const outcome = invitationOutcome(ok, pseudoRefused);
     if (outcome.clearPseudo) setMemberPseudo("");
     if (outcome.closeDialog) setInviteTarget(null);
+    setKeptRoles(outcome.keepRoles ? roles : []);
     return ok;
   };
 
@@ -210,13 +213,7 @@ export function MembersSection({
         )}
 
         {viewerMember ? (
-          <MyRolesBlock
-            // Rôles changés ailleurs (modale de la gestion) : le bloc repart
-            // de ceux qui sont enregistrés.
-            key={viewerMember.roles.toString()}
-            roles={viewerMember.roles}
-            onSave={updateOwnRoles}
-          />
+          <MyRolesBlock roles={viewerMember.roles} onSave={updateOwnRoles} />
         ) : null}
 
         {canManage ? (
@@ -296,7 +293,11 @@ export function MembersSection({
       {inviteTarget === null ? null : (
         <InviteRolesDialog
           pseudo={inviteTarget}
-          onClose={() => setInviteTarget(null)}
+          initialRoles={keptRoles}
+          onClose={() => {
+            setInviteTarget(null);
+            setKeptRoles([]);
+          }}
           onConfirm={(roles) => sendInvitation(inviteTarget, roles)}
         />
       )}
