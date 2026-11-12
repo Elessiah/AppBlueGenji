@@ -144,7 +144,8 @@ describe("showInfo — notice neutre", () => {
 });
 
 describe("withToast — option once", () => {
-  const shown = [{ id: 1, message: "Maximum 8", type: "error" as const }];
+  type Shown = { id: number; message: string; type: "error" | "info" | "success" };
+  const shown: Shown[] = [{ id: 1, message: "Maximum 8", type: "error" }];
 
   it("withToast_onceAndSameMessageShown_keepsStack", () => {
     expect(withToast(shown, { id: 2, message: "Maximum 8", type: "error" }, true)).toBe(shown);
