@@ -88,20 +88,14 @@ export type PlayerSortKey = "pseudo" | "tournaments" | "created";
 
 type SortablePlayer = { pseudo: string; createdAt: string | null; tournamentsCount?: number };
 
-/**
- * Langue dont dépend un tri : seuls « Pseudo » et « Plus récents » (à égalité
- * de seconde) comparent des pseudos. `null` pour « Tournois » : changer de
- * langue n'a pas à le refaire.
- */
-export function sortLocaleOf(sort: PlayerSortKey, locale: Locale): Locale | null {
-  return sort === "tournaments" ? null : locale;
-}
-
 /** Copie triée de l'annuaire, l'entrée n'est pas touchée. */
 export function sortPlayers<T extends SortablePlayer>(players: readonly T[], sort: PlayerSortKey, locale: Locale): T[] {
   const sorted = [...players];
   if (sort === "tournaments") {
-    sorted.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
+    // À nombre égal (0 pour la plupart des joueurs), le pseudo départage :
+    // sans lui, l'ordre suivait celui de la base, sans logique visible.
+    const compare = compareLocalText(locale);
+    sorted.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0) || compare(a.pseudo, b.pseudo));
   } else if (sort === "pseudo") {
     const compare = compareLocalText(locale);
     sorted.sort((a, b) => compare(a.pseudo, b.pseudo));
@@ -144,4 +138,13 @@ export function filterPlayers<R extends string, T extends FilterablePlayer>(
  */
 export function roleAfterStatusChoice<R extends string>(role: R | "all", next: PlayerStatusFilter): R | "all" {
   return statusFilterAllowsRoles(next) ? role : "all";
+}
+
+/**
+ * Le choix d'un statut remet-il le filtre de rôle sur « Tous » ? Seulement
+ * s'il en filtrait un : la remise s'annonce alors (toast neutre), sans quoi
+ * le rôle choisi disparaîtrait sans un mot.
+ */
+export function statusChoiceResetsRole<R extends string>(role: R | "all", next: PlayerStatusFilter): boolean {
+  return role !== "all" && roleAfterStatusChoice(role, next) === "all";
 }

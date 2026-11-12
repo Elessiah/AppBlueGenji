@@ -127,7 +127,7 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
     // l'arbre se réduit à sa première colonne et rien ne dit où mène un quart
     // de finale.
     expect(VIEW).toContain("endurancePlayoffGhostSlots(");
-    expect(VIEW).toContain("ghostSlots={playoffGhosts}");
+    expect(VIEW).toContain("ghostSlots={shownPlayoffGhosts}");
     // Un tournoi clos n'annonce plus de tour : deux demi-finales perdues sur
     // double forfait closent le tournoi sans que la finale soit posée.
     expect(VIEW).toContain("endurancePlayoffGhostSlots(decisive, isFinished)");

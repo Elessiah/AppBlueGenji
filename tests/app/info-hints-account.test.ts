@@ -104,7 +104,7 @@ describe("le détail derrière le « i », toujours cité par son champ", () => 
     expect(buttons).toContain("<InfoHint id={moreId} subject={OAUTH_PROVIDER_LABELS[provider]}>");
     const form = readSource("app/connexion/_components/LoginForm.tsx");
     expect(form).toContain('<InfoHint id="login-discord-handle-help" subject={t("page.handleLabel")}>');
-    expect(form).toContain('fieldErrors.aria("handle", "login-discord-handle-help")');
+    expect(form).toContain('fieldErrors.aria("handle", "login-discord-handle-help", inviteAfterRefusal && LOGIN_INVITE_ID)');
   });
 
   it("/joueurs/[id] : BattleTag masqué du titulaire", () => {

@@ -8,8 +8,9 @@
  * seule de ce qui est exposé : ces fiches ne font que le montrer.
  */
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
+import { shownEntrantName } from "@/lib/shared/visible-text";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import {
   CASTER_ARRIVAL_ANNOUNCE_MS,
@@ -171,6 +172,7 @@ export function SideCard({
   onCopy,
   linkNames = false,
   laterText,
+  renderName,
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
@@ -190,21 +192,32 @@ export function SideCard({
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
    */
   linkNames?: boolean;
+  /**
+   * Rendu du nom cliquable fourni par l'écran de tournoi (`EntrantLink`, qui
+   * connaît les entrées solo et les comptes sans fiche) ; sans lui, le choix
+   * `TeamLink` / `PlayerLink` de `SideName`. Lu seulement avec `linkNames`.
+   */
+  renderName?: (side: LaunchSide) => ReactNode;
 }>) {
   const { t } = useLaunchText();
+  // Le nom rendu par l'écran de tournoi (`EntrantName`) porte déjà son
+  // emblème : la carte ne pose pas le sien en plus.
+  const customName = linkNames && renderName !== undefined;
   return (
-    <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={side.name}>
+    <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={shownEntrantName(side.name) ?? "—"}>
       <div className={styles.sideHead}>
-        <span className={styles.emblem} aria-hidden="true">
-          {side.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- fichier du site, déjà optimisé au téléversement
-            <img src={side.logoUrl} alt="" />
-          ) : (
-            Array.from(side.name.trim())[0]?.toUpperCase() ?? "?"
-          )}
-        </span>
+        {!customName && (
+          <span className={styles.emblem} aria-hidden="true">
+            {side.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- fichier du site, déjà optimisé au téléversement
+              <img src={side.logoUrl} alt="" />
+            ) : (
+              Array.from(side.name.trim())[0]?.toUpperCase() ?? "?"
+            )}
+          </span>
+        )}
         <span className={styles.sideName}>
-          {linkNames ? <SideName side={side} /> : side.name}
+          {linkNames ? (renderName?.(side) ?? <SideName side={side} />) : side.name}
         </span>
         <ReadyChip ready={side.ready} phase={phase} />
       </div>

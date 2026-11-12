@@ -349,6 +349,11 @@ describe("page d'un match — ce que tout le monde lit", () => {
     expect(render(match(), "public", false, "en")).toContain('href="/en/suivre/tournois/12#match-34"');
   });
 
+  it("render_backLink_accessibleNameNamesTheTournamentAndContainsVisibleText", () => {
+    expect(render(match(), "staff")).toContain('aria-label="Retour au tournoi Coupe d&#x27;hiver"');
+    expect(render(match(), "public", false, "en")).toContain('aria-label="Back to the tournament Coupe d&#x27;hiver"');
+  });
+
   it("le nom du tournoi, qui n'est plus le bouton de retour, ouvre la ligne de situation", () => {
     expect(visible(render(match(), "public"))).toContain("Coupe d'hiver · Manche 2 · Match 3");
   });

@@ -31,6 +31,9 @@ import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { discordAudienceLines } from "@/lib/shared/identity-audience";
 
+/** Le paragraphe d'invitation au serveur, cité par le champ après un refus qui se lève en le rejoignant. */
+const LOGIN_INVITE_ID = "login-discord-invite-after-refusal";
+
 /**
  * Information d'entrée **lue** dans ce navigateur, à sa version. Ce n'est plus un
  * consentement (le compte repose sur l'exécution du service) : la clé garde son
@@ -385,24 +388,28 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   }}
                   placeholder={t("page.handlePlaceholder")}
                   required
-                  {...fieldErrors.aria("handle", "login-discord-handle-help")}
+                  {...fieldErrors.aria("handle", "login-discord-handle-help", inviteAfterRefusal && LOGIN_INVITE_ID)}
                 />
                 <FieldErrorText fieldId={LOGIN_FIELD_IDS.handle} message={fieldErrors.message("handle")} />
                 {/* Le seul lien d'invitation était derrière le « i » : après un
-                    refus qui se lève en rejoignant le serveur, il se lit à découvert. */}
-                {inviteAfterRefusal && (
-                  <p style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
-                    {richNodes(
-                      text.rich("page.inviteAfterRefusal", {}, {
-                        join: (children) => (
-                          <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
-                            {richNodes(children)}
-                          </a>
-                        ),
-                      }),
-                    )}
-                  </p>
-                )}
+                    refus qui se lève en rejoignant le serveur, il se lit à découvert.
+                    La région `status` est toujours montée (une région live créée
+                    avec son contenu n'est pas annoncée) et le champ la cite. */}
+                <div /* NOSONAR S6819 — région live montée d'avance autour d'un paragraphe à lien ; `<output>` est une valeur de formulaire */ role="status">
+                  {inviteAfterRefusal && (
+                    <p id={LOGIN_INVITE_ID} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
+                      {richNodes(
+                        text.rich("page.inviteAfterRefusal", {}, {
+                          join: (children) => (
+                            <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+                              {richNodes(children)}
+                            </a>
+                          ),
+                        }),
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
               <CyberButton
                 variant="ghost"

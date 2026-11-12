@@ -30,7 +30,7 @@ export type InfoHintGesture =
   | { kind: "key"; key: string }
   | { kind: "outsideClick" }
   | { kind: "insideClick" }
-  | { kind: "outsidePointerUp"; interactive: boolean };
+  | { kind: "outsidePointerUp"; interactive: boolean; moved?: boolean };
 
 /**
  * Ce que le geste fait de l'explication ouverte : `closeAndFocus` (Échap — le
@@ -42,7 +42,8 @@ export type InfoHintGesture =
  * perdu. Une cible **non interactive** (du texte, un fond) ne risque pas cela,
  * et Safari iOS n'envoie aucun `click` au `document` pour elle : elle referme
  * donc au relâchement (`outsidePointerUp`). Une cible interactive attend son
- * `click`.
+ * `click`, et un glissé (`moved`, au-delà de `POINTER_TAP_SLOP`) n'est pas un
+ * tap : un trait de stylet ou un glissé court ne replie pas le panneau.
  */
 export function infoHintReaction(gesture: InfoHintGesture): "closeAndFocus" | "close" | "keep" {
   switch (gesture.kind) {
@@ -51,7 +52,7 @@ export function infoHintReaction(gesture: InfoHintGesture): "closeAndFocus" | "c
     case "outsideClick":
       return "close";
     case "outsidePointerUp":
-      return gesture.interactive ? "keep" : "close";
+      return gesture.interactive || gesture.moved ? "keep" : "close";
     default:
       return "keep";
   }
@@ -62,9 +63,65 @@ export interface PointerTarget {
   closest?(selector: string): unknown;
 }
 
-/** Contrôles qui reçoivent un `click` sur iOS : le geste leur revient. */
-const INTERACTIVE_SELECTOR =
-  'a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"], [role="checkbox"], [role="menuitem"]';
+/**
+ * Contrôles qui reçoivent un `click` sur iOS : le geste leur revient. Rôles
+ * ARIA des widgets compris (onglet, interrupteur, option, liste déroulante…)
+ * et tout élément atteignable au clavier (`tabindex` ≥ 0) ; un conteneur de
+ * modale (`tabindex="-1"`) n'en est pas un — toucher son texte referme —, ni
+ * une zone défilante (`<ScrollArea>` qui déborde : `tabindex="0"` pour le
+ * clavier, `role="region"`), dont le texte n'est pas un contrôle.
+ */
+const INTERACTIVE_SELECTOR = [
+  "a[href]",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "label",
+  "summary",
+  '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"]):not(.scroll-area):not([role="region"])',
+  ...[
+    "button",
+    "link",
+    "checkbox",
+    "radio",
+    "switch",
+    "tab",
+    "option",
+    "combobox",
+    "slider",
+    "spinbutton",
+    "menuitem",
+    "menuitemcheckbox",
+    "menuitemradio",
+    "treeitem",
+  ].map((role) => `[role="${role}"]`),
+].join(", ");
+
+/** Déplacement (px) au-delà duquel un appui-relâchement est un glissé, pas un tap. */
+export const POINTER_TAP_SLOP = 10;
+
+/** Le pointeur a-t-il glissé entre l'appui et le relâchement ? Sans appui connu, non. */
+export function pointerMoved(
+  start: Readonly<{ x: number; y: number }> | null | undefined,
+  end: Readonly<{ x: number; y: number }>,
+): boolean {
+  if (!start) return false;
+  return Math.hypot(end.x - start.x, end.y - start.y) > POINTER_TAP_SLOP;
+}
+
+/**
+ * Contrôles qui se servent eux-mêmes d'Échap : liste d'un `combobox` ouverte,
+ * champ de recherche (Échap le vide), menu ou liste d'options ouverts.
+ */
+const ESCAPE_CONSUMER_SELECTOR =
+  '[role="combobox"][aria-expanded="true"], input[type="search"], [role="menu"], [role="listbox"]';
+
+/** Le focus est-il sur un contrôle qui consomme Échap lui-même ? */
+export function isEscapeConsumer(target: PointerTarget | null | undefined): boolean {
+  return Boolean(target?.closest?.(ESCAPE_CONSUMER_SELECTOR));
+}
 
 /** La cible d'un relâchement est-elle un contrôle (qui fermera au `click`) ? */
 export function isInteractivePointerTarget(target: PointerTarget | null | undefined): boolean {
@@ -99,11 +156,21 @@ export function topOpenModal(root: ModalSearchRoot): Node | null {
 }
 
 /**
- * Le « i » ouvert écoute Échap sur `document` : il ne doit pas le prendre à une
- * modale ouverte **au-dessus** de lui (`topModal`, la dernière ouverte). Sans
- * modale, ou une modale qui le porte, la touche est la sienne.
+ * Le « i » ouvert écoute Échap sur `document`. La touche est la sienne quand le
+ * focus (`active`) est **dans** le « i », quelle que soit la modale relevée en
+ * dernier dans le DOM. Elle revient à un contrôle focalisé qui s'en sert lui-même
+ * (`isEscapeConsumer` : liste ouverte, recherche, menu) : le « i » ne l'avale
+ * pas. Sinon, il ne la prend pas à une modale ouverte **au-dessus** de lui
+ * (`topModal`, la dernière ouverte) ; sans modale, ou une modale qui le porte,
+ * elle est la sienne — un champ voisin atteint par Tab compris.
  */
-export function infoHintOwnsEscape(root: Node | null, topModal: Node | null): boolean {
+export function infoHintOwnsEscape(
+  root: Node | null,
+  topModal: Node | null,
+  active?: (Node & PointerTarget) | null,
+): boolean {
+  if (root && active && root.contains(active)) return true;
+  if (isEscapeConsumer(active)) return false;
   return !topModal || (root !== null && topModal.contains(root));
 }
 

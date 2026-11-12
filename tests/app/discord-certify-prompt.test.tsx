@@ -309,8 +309,17 @@ describe("textes (certifyPrompt) — FR et EN", () => {
     expect(certifyPromptRowsFor(seen, ONE_CLICK)).toEqual([...seen]);
     expect(certifyPromptRowsFor([], DIALOG_UNLINKED)).toEqual([]);
     expect(SOURCE).toContain("{certifyPromptRowsFor(rows, prompt).map((row) => (");
-    expect(fr.rows.link.with).toContain("Le code reçu en message privé le lie, si ce Discord n'est pas déjà lié à un autre compte");
-    expect(en.rows.link.with).toContain("The code received by direct message links it, unless that Discord is already linked to another account");
+    expect(fr.rows.link.with).toContain("Le code reçu en message privé le lie");
+    expect(en.rows.link.with).toContain("The code received by direct message links it");
+  });
+
+  it("liaison : l'exception (Discord déjà lié ailleurs) sort de la cellule, derrière un « i » (375 px)", () => {
+    expect(fr.rows.link.with).not.toContain("déjà lié");
+    expect(en.rows.link.with).not.toContain("already linked");
+    expect(fr.rows.link.withException).toContain("déjà lié à un autre compte");
+    expect(en.rows.link.withException).toContain("already linked to another account");
+    expect(SOURCE).toContain('<InfoHint id={linkHintId} subject={t("rows.link.label")}>');
+    expect(SOURCE).toContain('<p>{t("rows.link.withException")}</p>');
   });
 
   it("certifyPromptRowsFor_dialogWithDiscordAlreadyLinked_omitsLinkRow (EF-23)", () => {

@@ -11,11 +11,9 @@
  * une taille de lecture. Les cartes d'aperçu (`components/og`) sont des images
  * rendues à 1200 px, hors du champ.
  *
- * Les schémas de `/regles` (`RuleDiagram.tsx`) sont écartés **nommément** :
- * leur texte est en unités SVG, mis à l'échelle avec le schéma, et monter ses
- * 9-10,5 unités sans refaire la mise en page ferait chevaucher les libellés —
- * texte réduit sur mobile **accepté** (décision de l'utilisateur, voir le
- * « Plancher de taille » de `CLAUDE.md`).
+ * Les schémas de `/regles` (`RuleDiagram.tsx`) sont balayés eux aussi : leurs
+ * textes, en unités SVG mis à l'échelle avec le schéma, sont montés à 11 unités
+ * au moins (vérifié sans chevauchement à 375 px, FR et EN).
  */
 import { describe, expect, it } from "@jest/globals";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -37,11 +35,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const EXCLUDED = new Set([join(ROOT, "components", "rules", "RuleDiagram.tsx")]);
-
-const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components")), ...walk(join(ROOT, "lib"))].filter(
-  (file) => !EXCLUDED.has(file),
-);
+const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components")), ...walk(join(ROOT, "lib"))];
 
 /** Tailles littérales en px (CSS) ou nombres nus (style en ligne React). */
 const PATTERNS = [

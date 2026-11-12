@@ -221,7 +221,9 @@
     "matchCount": "{count, plural, one {# match} other {# matchs}}",
     "treeLabel": "Tableau du tournoi — défilement horizontal",
     "goToMatchLabel": "{label} — aller au match d'arrivée",
-    "goToSlotLabel": "{label} — aller à la case d'arrivée, pas encore pourvue"
+    "goToSlotLabel": "{label} — aller à la case d'arrivée, pas encore pourvue",
+    "ghostSlots": "Cases à pourvoir",
+    "ghostSlotsHint": "Les tours à venir n'existent pas encore : leurs cases se remplissent dès que le tour précédent est joué."
   },
   "sections": {
     "TO_PLAN": "À planifier",
@@ -322,6 +324,7 @@
   },
   "matchPage": {
     "backToTournament": "Retour au tournoi",
+    "backToNamedTournament": "Retour au tournoi {name}",
     "firstMap": "Première map",
     "firstMapUnset": "Pas encore choisie",
     "opponentsPending": "Adversaires à venir",

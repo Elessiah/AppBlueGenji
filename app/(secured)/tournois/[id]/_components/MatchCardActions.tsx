@@ -23,10 +23,9 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useSpectatorView } from "@/components/spectator-view";
 import { matchPagePath } from "@/lib/shared/match-page";
-import { isPlainLeftClick } from "@/lib/shared/site-back";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -193,7 +192,6 @@ function MatchPageActionLink({
   label,
   name,
   onKeyDown,
-  onNavigate,
 }: Readonly<{
   href: string;
   Icon: LucideIcon;
@@ -201,20 +199,25 @@ function MatchPageActionLink({
   label: string;
   name: string;
   onKeyDown?: (e: ReactKeyboardEvent<HTMLElement>) => void;
-  onNavigate?: () => void;
 }>) {
+  const router = useLocaleRouter();
+  // Pas de préchargement à l'affichage : un grand tableau montrerait jusqu'à
+  // 127 liens, autant de requêtes RSC. La route se précharge à l'intention
+  // (survol, focus), juste avant le clic.
+  const prefetch = () => router.prefetch(href);
+  // Le clic ne referme pas le panneau et ne déplace pas le focus : la
+  // navigation démonte la carte, et si elle tarde ou échoue, le focus reste
+  // sur le lien choisi au lieu de tomber sur une carte qui va disparaître.
   return (
     <LocaleLink
       href={href}
+      prefetch={false}
       className={className}
       aria-label={name}
       data-action="matchPage"
       onKeyDown={onKeyDown}
-      // Clic ordinaire seulement : un clic avec Ctrl, ⌘ ou Maj (nouvel onglet)
-      // laisse le panneau ouvert, le focus ne disparaît pas avec lui.
-      onClick={(event) => {
-        if (isPlainLeftClick(event)) onNavigate?.();
-      }}
+      onMouseEnter={prefetch}
+      onFocus={prefetch}
     >
       <Icon size={16} aria-hidden />
       <span className={styles.label}>{label}</span>
@@ -690,14 +693,6 @@ export function MatchCardActions({
           label={action.label}
           name={actionName(action.label)}
           onKeyDown={inMenu ? onPanelKeyDown : undefined}
-          onNavigate={
-            inMenu
-              ? () => {
-                  setOpen(false);
-                  toggleRef.current?.focus();
-                }
-              : undefined
-          }
         />
       );
     }

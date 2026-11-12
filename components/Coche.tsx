@@ -56,6 +56,12 @@ export function pillColors(
   };
 }
 
+/** Curseur de la pastille : refus pour une case verrouillée, attente pendant un envoi. */
+export function cocheCursor(inert: boolean, busy: boolean): "not-allowed" | "progress" | "pointer" {
+  if (inert) return "not-allowed";
+  return busy ? "progress" : "pointer";
+}
+
 export function Coche({
   label,
   checked,
@@ -73,7 +79,13 @@ export function Coche({
   // focalisable — un lecteur d'écran l'entend, sa raison avec — mais l'appelant
   // ignore alors le geste : la pastille doit le **dire**, en couleurs et en
   // curseur, jamais en `opacity` (`globals.css`, cases désactivées).
-  const inert = props["aria-disabled"] === true || props["aria-disabled"] === "true";
+  const disabled = props["aria-disabled"] === true || props["aria-disabled"] === "true";
+  // Occupée (`aria-busy`, un envoi en cours) n'est pas verrouillée : le geste
+  // attend un instant, la case garde ses couleurs et prend le curseur
+  // d'attente. Peindre l'état inerte le temps d'un envoi faisait clignoter
+  // toutes les cases vers le style permanent d'une case verrouillée.
+  const busy = props["aria-busy"] === true || props["aria-busy"] === "true";
+  const inert = disabled && !busy;
   const { pillBorder, markBorder, labelColor } = pillColors(rgbColor, checked, inert);
 
   return (
@@ -87,7 +99,7 @@ export function Coche({
         {
           display: "inline-flex",
           position: "relative",
-          cursor: inert ? "not-allowed" : "pointer",
+          cursor: cocheCursor(inert, busy),
           "--coche-rgb": rgbColor,
         } as CSSProperties
       }

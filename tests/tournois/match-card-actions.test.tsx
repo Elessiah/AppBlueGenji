@@ -1,4 +1,10 @@
 import { describe, expect, it, jest } from "@jest/globals";
+
+// Le lien « Page du match » précharge sa route à l'intention (`useLocaleRouter`).
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/tournois/1",
+  useRouter: () => ({ prefetch: () => undefined, push: () => undefined, refresh: () => undefined }),
+}));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -325,8 +331,19 @@ describe("« Page du match » dans le panneau — câblage", () => {
     expect(read("en", "launchModal").viewMatch).toBe(cardLabel("en"));
   });
 
-  it("ne referme le panneau que sur un clic ordinaire (un clic avec modificateur ouvre un onglet)", () => {
-    expect(source).toMatch(/if \(isPlainLeftClick\(event\)\) onNavigate\?\.\(\);/);
+  it("le lien ne referme pas le panneau au clic : le focus reste sur lui tant que la navigation n'a pas démonté la carte", () => {
+    const link = source.slice(source.indexOf("function MatchPageActionLink("), source.indexOf("const TONE_CLASS"));
+    expect(link).not.toContain("onClick");
+    expect(link).not.toContain("onNavigate");
+    expect(link).not.toContain("focus()");
+  });
+
+  it("ne précharge pas la page du match à l'affichage, seulement à l'intention (survol, focus)", () => {
+    const link = source.slice(source.indexOf("function MatchPageActionLink("), source.indexOf("const TONE_CLASS"));
+    expect(link).toContain("prefetch={false}");
+    expect(link).toContain("onMouseEnter={prefetch}");
+    expect(link).toContain("onFocus={prefetch}");
+    expect(link).toContain("router.prefetch(href)");
   });
 
   it("prend son icône du tableau ICONS, source unique", () => {
@@ -459,11 +476,9 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   });
 
   it("le focus entre dans le panneau à l'ouverture", () => {
-    // Un panneau qui ne contient que le lien « Page du match » reçoit aussi le focus ;
-    // le lien choisi rend le focus au bouton « ... », comme ses voisins.
+    // Un panneau qui ne contient que le lien « Page du match » reçoit aussi le focus.
     expect(source).toContain("panelRef.current?.querySelector<HTMLElement>(PANEL_FOCUSABLE)?.focus({ preventScroll: true });");
     expect(source).toContain('const PANEL_FOCUSABLE = "button:not(:disabled), a[href]";');
-    expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*:\s*undefined/);
   });
 
   it("la tabulation qui sort du pied et du panneau le referme ; par un bout du panneau, rend le focus", () => {

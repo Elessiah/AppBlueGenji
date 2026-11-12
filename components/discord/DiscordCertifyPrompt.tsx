@@ -6,6 +6,7 @@ import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { CERTIFY_PROFILE_HREF, CERTIFY_PROMPT_OTHER_ACCOUNT, type CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
@@ -118,6 +119,7 @@ export function DiscordCertifyPrompt({ prompt, userId, canOpen, onProfile, onAns
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
   const titleId = useId();
+  const linkHintId = useId();
   const [closed, setClosed] = useState(false);
   const [busy, setBusy] = useState<"certify" | "never" | null>(null);
   const inFlight = useRef(false);
@@ -276,7 +278,20 @@ export function DiscordCertifyPrompt({ prompt, userId, canOpen, onProfile, onAns
                   <tr key={row}>
                     <th scope="row">{t(`rows.${row}.label`)}</th>
                     <td>{t(`rows.${row}.without`)}</td>
-                    <td className={styles.with}>{t(`rows.${row}.with`)}</td>
+                    <td className={styles.with}>
+                      {row === "link" ? (
+                        // L'effet dans la cellule, l'exception derrière le « i » : la
+                        // cellule reste courte à 375 px.
+                        <InfoHintRow inline>
+                          <span>{t("rows.link.with")}</span>
+                          <InfoHint id={linkHintId} subject={t("rows.link.label")}>
+                            <p>{t("rows.link.withException")}</p>
+                          </InfoHint>
+                        </InfoHintRow>
+                      ) : (
+                        t(`rows.${row}.with`)
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

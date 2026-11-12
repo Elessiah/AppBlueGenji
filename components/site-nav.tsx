@@ -9,6 +9,7 @@ import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import { useShellText } from "./i18n/shell-text";
+import { NARROW_LAYOUT_QUERY, responsiveCopies, useMediaMatch } from "@/lib/shared/hooks/useMediaMatch";
 import s from "./site-nav.module.css";
 
 type SiteNavProps = {
@@ -41,6 +42,9 @@ export const SITE_NAV_LINKS = [
 ] as const satisfies ReadonlyArray<{ href: string; labelKey: ShellKey; rgb: string }>;
 const links = SITE_NAV_LINKS;
 
+/** Largeur où la barre passe sur deux lignes (`site-nav.module.css`, même seuil) : la largeur étroite commune. */
+export const NAV_NARROW_QUERY = NARROW_LAYOUT_QUERY;
+
 export function SiteNav({
   pseudo,
   avatarUrl,
@@ -51,6 +55,10 @@ export function SiteNav({
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
   const { t } = useShellText();
+  // Une fois monté, seule la copie de la largeur courante est rendue : la page
+  // n'en porte plus deux (lecture sans CSS, mode lecture). Au rendu serveur, la
+  // largeur est inconnue : les deux copies, triées par le CSS (`display: none`).
+  const copies = responsiveCopies(useMediaMatch(NAV_NARROW_QUERY));
   // Le sélecteur se tait sur une route pas encore traduite (même décision que
   // lui) : le savoir d'avance évite un groupe d'outils vide au filet orphelin.
   const switchable = useSwitchablePath() !== null;
@@ -62,12 +70,12 @@ export function SiteNav({
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
       <div className={`container ${s.navInner}`}>
         {/* Largeur étroite : logo, compte, puis liens (ordre visuel = ordre du clavier).
-            Logo et liens existent en deux copies qui s'excluent en CSS par `display: none`, qui les retire
-            de l'arbre d'accessibilité et de l'ordre du focus : une seule est lue. */}
-        <HomeLogo className={s.navLogoMobile} />
-        <NavLinks className={s.navLeft} pathname={pathname} />
+            Logo et liens existent en deux copies : au rendu serveur, le CSS en retire une par `display: none`
+            (hors de l'arbre d'accessibilité et du focus) ; monté, seule celle de la largeur courante reste. */}
+        {copies.narrow && <HomeLogo className={s.navLogoMobile} />}
+        {copies.desktop && <NavLinks className={s.navLeft} pathname={pathname} />}
 
-        <HomeLogo className={s.navLogo} />
+        {copies.desktop && <HomeLogo className={s.navLogo} />}
 
         <div className={s.navRight}>
           {/* Barre allégée : l'accueil passe par le logo, « Mon équipe » par le
@@ -103,7 +111,7 @@ export function SiteNav({
           {/* Profil, équipe et déconnexion, à portée de main sur toutes les largeurs. */}
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
-        <NavLinks className={s.navLeftMobile} pathname={pathname} />
+        {copies.narrow && <NavLinks className={s.navLeftMobile} pathname={pathname} />}
       </div>
     </nav>
   );

@@ -128,7 +128,7 @@ function ColumnLabel({ x, y, children }: Readonly<{ x: number; y: number; childr
       x={x}
       y={y}
       fill={MUTE}
-      fontSize={10.5}
+      fontSize={11}
       fontFamily={MONO}
       letterSpacing="0.14em"
     >
@@ -197,7 +197,7 @@ function SingleEliminationDiagram({ t, locale }: DiagramProps) {
           x={647}
           y={170}
           fill={BLUE}
-          fontSize={9.5}
+          fontSize={11}
           fontFamily={MONO}
           textAnchor="middle"
           letterSpacing="0.1em"
@@ -260,7 +260,7 @@ function DoubleEliminationDiagram({ t }: DiagramProps) {
             x={cx + 8}
             y={150}
             fill={LOWER}
-            fontSize={10.5}
+            fontSize={11}
             fontFamily={MONO}
             aria-hidden={boxX < 0}
           >
@@ -367,7 +367,7 @@ function SurvivalDiagram({ t, locale }: DiagramProps) {
             stroke={inCut ? CUT : LINE}
             strokeWidth={1.1}
           />
-          <text x={x + 9} y={y + i * 26 + 15} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
+          <text x={x + 9} y={y + i * 26 + 15} fill={MUTE} fontSize={11} fontFamily={MONO}>
             {i + 1}
           </text>
           <text x={x + 26} y={y + i * 26 + 15} fill={inCut ? CUT : INK} fontSize={11} fontFamily={MONO}>
@@ -399,7 +399,7 @@ function SurvivalDiagram({ t, locale }: DiagramProps) {
             stroke={BLUE}
             strokeWidth={1.2}
           />
-          <text x={198} y={60 + p * 52} fill={BLUE} fontSize={10.5} fontFamily={MONO}>
+          <text x={198} y={60 + p * 52} fill={BLUE} fontSize={11} fontFamily={MONO}>
             {t.survival.versus}
           </text>
         </g>
@@ -478,7 +478,7 @@ function FunnelBox({ in: inCount, out: outCount, x, y }: Readonly<FunnelLevel>) 
       <text x={x + 80} y={y + 20} fill={INK} fontSize={18} fontWeight={600} textAnchor="middle" fontFamily={MONO}>
         {inCount}
       </text>
-      <text x={x + 80} y={y + 48} fill={MUTE} fontSize={10.5} textAnchor="middle" fontFamily={MONO}>
+      <text x={x + 80} y={y + 48} fill={MUTE} fontSize={11} textAnchor="middle" fontFamily={MONO}>
         {`→ ${outCount}`}
       </text>
     </g>
@@ -599,7 +599,7 @@ function BgSurvieDiagram({ t, locale }: DiagramProps) {
               stroke={out ? CUT : LINE}
               strokeWidth={1.1}
             />
-            <text x={30} y={48 + index * 32} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
+            <text x={30} y={48 + index * 32} fill={MUTE} fontSize={11} fontFamily={MONO}>
               {index + 1}
             </text>
             <text x={48} y={48 + index * 32} fill={out ? CUT : INK} fontSize={11} fontFamily={MONO}>
@@ -665,10 +665,10 @@ function BgSurvieDiagram({ t, locale }: DiagramProps) {
               « gauche / droite » entre les deux lignes chevauchait les noms. */}
           {index === 0 && (
             <>
-              <text x={436} y={50} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
+              <text x={436} y={50} fill={MUTE} fontSize={11} fontFamily={MONO} textAnchor="end">
                 {t.bgSurvie.left}
               </text>
-              <text x={436} y={70} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
+              <text x={436} y={70} fill={MUTE} fontSize={11} fontFamily={MONO} textAnchor="end">
                 {t.bgSurvie.right}
               </text>
             </>
@@ -697,7 +697,7 @@ function BgSurvieDiagram({ t, locale }: DiagramProps) {
       <text x={534} y={122} fill={LOWER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
         {t.bgSurvie.thirdPlace}
       </text>
-      <text x={534} y={142} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
+      <text x={534} y={142} fill={MUTE} fontSize={11} fontFamily={MONO}>
         {t.bgSurvie.withFinal}
       </text>
     </svg>

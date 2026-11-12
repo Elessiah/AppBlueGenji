@@ -20,6 +20,7 @@ import { VOICE_CHANNEL_CAPACITY, type MatchVoiceInfo, type MatchVoiceSideState }
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   connectionReader,
+  type LaunchSide,
   type MatchLaunchInfo,
   type MatchLaunchPhase,
 } from "@/lib/shared/match-launch";
@@ -668,8 +669,9 @@ function MapsSection({
 
 /**
  * Paramètres de partie : les mêmes pour tous les jeux et pour tous les matchs
- * (décision de l'utilisateur, 2026-11-04). Lue par **tout le monde**, y
- * compris sans compte : ce sont les règles de la partie, pas une consigne
+ * (décision de l'utilisateur, 2026-11-04). Lue par **tout compte connecté**
+ * qui ouvre la page (elle vit sous `(secured)` : sans session, la carte
+ * « Connexion requise » la remplace) : ce sont les règles de la partie, pas une consigne
  * d'organisation — l'aide-mémoire de l'autogestion les reprend pour qui
  * organise le match, et le check-in du match les écrit sur Discord
  * (`docs/features/MATCH_LOBBY_BRIEF.md`). Une seule liste
@@ -731,12 +733,22 @@ function ConnectionSection({
             phase={launch.phase}
             onCopy={onCopy}
             linkNames
+            renderName={connectionSideName}
             laterText={laterText}
           />
         ))}
       </div>
     </section>
   );
+}
+
+/**
+ * Nom d'une engagée de la section « Infos de connexion » : comme partout sur
+ * un écran de tournoi, par `EntrantName` (emblème, puis `EntrantLink` : entrée solo vers la fiche du joueur,
+ * compte sans fiche sans lien), pas par le choix propre de `SideCard`.
+ */
+function connectionSideName(side: LaunchSide) {
+  return <EntrantName teamId={side.teamId} name={side.name} />;
 }
 
 /** Libellé d'un salon (« Salon vocal : ouvert », « bientôt ouvert », « indisponible ») — jamais son nombre de présents. */
@@ -1149,8 +1161,14 @@ function MatchPageContent({
     <>
       <div className={styles.topbar}>
         {/* Le retour du site (`← Retour` de la fiche, même style) : un vrai lien
-            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`). */}
-        <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
+            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`).
+            Son nom accessible dit la destination (le nom du tournoi n'est plus
+            écrit que dans la ligne méta) ; pas de `<nav>` : un seul lien. */}
+        <LocaleLink
+          href={tournamentMatchHref(detail.card.id, match.id, spectator)}
+          className={`${styles.back} tap-target`}
+          aria-label={t("matchPage.backToNamedTournament", { name: visibleText(detail.card.name) })}
+        >
           <span aria-hidden="true">←</span> {t("matchPage.backToTournament")}
         </LocaleLink>
         {status}

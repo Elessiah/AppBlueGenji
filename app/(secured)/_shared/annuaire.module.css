@@ -247,21 +247,37 @@
   flex-wrap: wrap;
   gap: 10px 18px;
   align-items: center;
+  /* Le « · » (ci-dessous) se peint à gauche des pastilles, dans l'espace entre
+     les deux blocs. Quand les pastilles passent à la ligne, il tombe hors du
+     bord gauche de la rangée et y est rogné : il ne reste jamais seul en fin
+     de ligne, quelle que soit la largeur ou la langue. Les 4 px de marge
+     intérieure, de chaque côté, gardent visible l'anneau de focus d'une
+     pastille en début de ligne comme du « i » en fin de ligne. */
+  overflow-x: clip;
+  padding-inline: 4px;
+  margin-inline: -4px;
 }
-.statusSep { color: var(--ink-faint); }
 .statusOpts {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 10px 12px;
   align-items: center;
 }
-/* Sous 720 px, les pastilles passent à la ligne : le « · » resterait pendant
-   en fin de première ligne. */
-@media (max-width: 719px) {
-  .statusSep {
-    display: none;
-  }
+.statusOpts::before {
+  content: "·";
+  content: "·" / "";
+  position: absolute;
+  top: 50%;
+  left: -18px;
+  width: 18px;
+  text-align: center;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
+/* Règle à part, sur une ligne : le « · » est un séparateur, seul ornement
+   admis en --ink-faint (`accessibility-styles.test.ts`). */
+.statusOpts::before { color: var(--ink-faint); }
 
 /* sort row */
 .sortRow {

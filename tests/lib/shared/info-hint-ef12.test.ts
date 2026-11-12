@@ -6,8 +6,12 @@ import { describe, expect, it } from "@jest/globals";
 import {
   infoHintLocale,
   infoHintOwnsEscape,
+  infoHintReaction,
   infoHintRefocusAfterEscape,
+  isEscapeConsumer,
   isInteractivePointerTarget,
+  pointerMoved,
+  POINTER_TAP_SLOP,
   topOpenModal,
 } from "@/lib/shared/info-hint";
 
@@ -33,6 +37,51 @@ describe("isInteractivePointerTarget", () => {
     for (const tag of ["a[href]", "button", "input", "label", "select", "textarea"]) {
       expect(selectors[0]).toContain(tag);
     }
+  });
+});
+
+describe("isInteractivePointerTarget (sélecteur élargi)", () => {
+  it("compte les rôles de widgets et tout élément atteignable au clavier, pas un conteneur tabindex=-1", () => {
+    let selector = "";
+    isInteractivePointerTarget({ closest: (value: string) => ((selector = value), null) });
+    for (const part of ['[role="tab"]', '[role="switch"]', '[role="radio"]', '[role="option"]', '[role="combobox"]']) {
+      expect(selector).toContain(part);
+    }
+    expect(selector).toContain('[tabindex]:not([tabindex="-1"]):not(.scroll-area):not([role="region"])');
+  });
+});
+
+describe("pointerMoved", () => {
+  it("sans appui connu, aucun glissé", () => {
+    expect(pointerMoved(null, { x: 50, y: 50 })).toBe(false);
+  });
+
+  it("un déplacement égal au seuil reste un tap", () => {
+    expect(pointerMoved({ x: 0, y: 0 }, { x: POINTER_TAP_SLOP, y: 0 })).toBe(false);
+  });
+
+  it("au-delà du seuil, c'est un glissé", () => {
+    expect(pointerMoved({ x: 0, y: 0 }, { x: 0, y: POINTER_TAP_SLOP + 1 })).toBe(true);
+  });
+});
+
+describe("infoHintReaction (glissé)", () => {
+  it("un glissé hors du panneau ne le replie pas, même sur du texte", () => {
+    expect(infoHintReaction({ kind: "outsidePointerUp", interactive: false, moved: true })).toBe("keep");
+  });
+});
+
+describe("isEscapeConsumer", () => {
+  it("vrai dans un contrôle qui se sert d'Échap (liste ouverte, recherche, menu)", () => {
+    let selector = "";
+    expect(isEscapeConsumer({ closest: (value: string) => ((selector = value), {}) })).toBe(true);
+    expect(selector).toContain('[role="combobox"][aria-expanded="true"]');
+    expect(selector).toContain('input[type="search"]');
+  });
+
+  it("faux pour un champ ordinaire ou sans cible", () => {
+    expect(isEscapeConsumer({ closest: () => null })).toBe(false);
+    expect(isEscapeConsumer(null)).toBe(false);
   });
 });
 
@@ -68,6 +117,22 @@ describe("infoHintOwnsEscape", () => {
   it("garde Échap dans la modale du dessus qui le porte", () => {
     const root = node();
     expect(infoHintOwnsEscape(root, node((other) => other === root))).toBe(true);
+  });
+
+  it("garde Échap quand le focus est dans le « i », même sous une autre modale relevée en dernier", () => {
+    const active = Object.assign(node(), { closest: () => null });
+    expect(infoHintOwnsEscape(node((other) => other === active), node(), active)).toBe(true);
+  });
+
+  it("laisse Échap à un contrôle focalisé qui s'en sert (liste ouverte)", () => {
+    const combobox = Object.assign(node(), { closest: () => ({}) });
+    expect(infoHintOwnsEscape(node(), null, combobox)).toBe(false);
+  });
+
+  it("focus sur un champ ordinaire : la règle des modales décide", () => {
+    const field = Object.assign(node(), { closest: () => null });
+    expect(infoHintOwnsEscape(node(), null, field)).toBe(true);
+    expect(infoHintOwnsEscape(node(), node(), field)).toBe(false);
   });
 
   it("laisse Échap à une modale du dessus qui ne le porte pas", () => {

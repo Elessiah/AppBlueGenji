@@ -24,6 +24,15 @@ describe("refusalNeedsServerInvite", () => {
     expect(enLogin.page.inviteAfterRefusal).toContain("<join>");
     expect(readSource("app/connexion/_components/LoginForm.tsx")).toContain("inviteAfterRefusal &&");
   });
+
+  it("le paragraphe s'annonce (région status montée d'avance) et le champ le cite", () => {
+    const form = readSource("app/connexion/_components/LoginForm.tsx");
+    const region = form.indexOf('role="status">');
+    expect(region).toBeGreaterThan(-1);
+    expect(form.indexOf("{inviteAfterRefusal && (", region)).toBeGreaterThan(region);
+    expect(form).toContain('<p id={LOGIN_INVITE_ID}');
+    expect(form).toContain('fieldErrors.aria("handle", "login-discord-handle-help", inviteAfterRefusal && LOGIN_INVITE_ID)');
+  });
 });
 
 describe("page d'un signalement : panne passagère", () => {
@@ -33,6 +42,30 @@ describe("page d'un signalement : panne passagère", () => {
     expect(page).toContain("concernedReportLoadFailure(response.status)");
     expect(page).toContain("concernedReportLoadFailure(null)");
     expect(page).toContain('t("concerned.retry")');
+  });
+
+  it("session expirée : carte de reconnexion qui ramène au signalement, dans la langue de la page", () => {
+    expect(page).toContain('state.status === "signedOut"');
+    expect(page).toContain("authGateLoginHref(localeHref(`/signalements/${params.id}`, locale), \"\", \"\")");
+    for (const reports of [frReports, enReports]) {
+      expect(reports.concerned.signedOutTitle).not.toBe("");
+      expect(reports.concerned.signedOutBody).not.toBe("");
+      expect(reports.concerned.signIn).not.toBe("");
+    }
+  });
+
+  it("« Réessayer » rend le focus au titre de l'état suivant (chargement, puis résultat)", () => {
+    expect(page).toContain("focusAfterRetry.current = true;");
+    expect(page).toMatch(/<p ref=\{focusTitle\} tabIndex=\{-1\}/);
+    expect(page.match(/<h1 ref=\{focusTitle\} tabIndex=\{-1\}/g)).toHaveLength(3);
+    expect(page).toContain('if (state.status !== "loading") focusAfterRetry.current = false;');
+  });
+
+  it("ConcernedReportPage_readyAfterRetry_focusesHeadingNotSection", () => {
+    expect(page).toContain('const title = node?.querySelector<HTMLElement>("h1");');
+    expect(page).toContain("title.tabIndex = -1;");
+    expect(page).toContain("<section ref={focusReportTitle} className={`fade-in container ${styles.page}`}>");
+    expect(page).not.toContain("<section ref={focusTitle}");
   });
 
   it("porte les trois textes en français et en anglais", () => {

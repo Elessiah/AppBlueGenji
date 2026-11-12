@@ -57,8 +57,10 @@
  * Une ligne atteinte par Tab ne doit pas s'arrêter sous la barre collée :
  * `scroll-padding-top` ne compte que l'en-tête du site. La hauteur de la barre
  * (`--endurance-bar-h`) est mesurée par le composant ; sans barre, elle vaut 0.
+ * Seulement **barre collée** (`data-bar-stuck`, posé par le composant) : non
+ * collée, elle ne recouvre rien et la marge ferait sur-défiler la ligne.
  */
-.fadable :is(a, button, input, select, textarea, [tabindex]) {
+[data-bar-stuck] .fadable :is(a, button, input, select, textarea, [tabindex]) {
   scroll-margin-top: var(--endurance-bar-h, 0px);
 }
 

@@ -166,8 +166,8 @@
     },
     "blizzard": "Compte Blizzard",
     "blizzardHint": {
-      "TEAM": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag de chaque joueur ; un tag simplement saisi ne prouve rien.",
-      "SOLO": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag du joueur ; un tag simplement saisi ne prouve rien."
+      "TEAM": "Un compte Battle.net <em>lié</em> depuis « Mon profil » atteste le BattleTag de chaque joueur ; un tag simplement saisi ne prouve rien.",
+      "SOLO": "Un compte Battle.net <em>lié</em> depuis « Mon profil » atteste le BattleTag du joueur ; un tag simplement saisi ne prouve rien."
     },
     "blizzardMarvel": "Sans objet sur un tournoi Marvel Rivals : mieux vaut laisser « Aucun joueur ».",
     "minPlayers": "Joueurs minimum dans l'équipe",

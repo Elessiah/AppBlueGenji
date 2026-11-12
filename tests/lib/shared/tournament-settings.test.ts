@@ -104,7 +104,7 @@ describe("tournamentSettingsGroups — réglages généraux", () => {
     expect(group(groups, "Conditions d'inscription")).toEqual({
       "Effectif minimal du roster": "Aucun",
       "Tag Discord certifié": "Tous les joueurs",
-      "Compte Battle.net rattaché": "Aucun joueur",
+      "Compte Battle.net lié": "Aucun joueur",
     });
   });
 });

@@ -327,7 +327,7 @@ export function canDeclareTeamReady(roles: readonly TeamRole[] | null | undefine
 /**
  * Pour caster un match, il faut pouvoir être joint **et**, en Overwatch,
  * retrouvé en jeu : tag Discord certifié et, en Overwatch seulement, compte
- * Battle.net rattaché (`identityComplete`). Un caster se présente aux deux
+ * Battle.net lié (`identityComplete`). Un caster se présente aux deux
  * équipes dans la modale de lancement ; un tag saisi à la main ne dirait rien
  * de qui l'on invite dans son salon. Marvel Rivals ne s'invite pas par
  * BattleTag (décision 35) : le tag Discord certifié y suffit (décision de
@@ -381,7 +381,7 @@ export function identityComplete(identity: CasterIdentity, game: TournamentGame)
 }
 
 export const CAST_IDENTITY_NOTICE =
-  "Pour caster un match Overwatch, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.";
+  "Pour caster un match Overwatch, certifie ton tag Discord et lie ton compte Battle.net depuis ton profil.";
 
 /** Le refus d'un cast Marvel Rivals : le tag Discord certifié seul. */
 export const CAST_DISCORD_NOTICE = "Pour caster un match Marvel Rivals, certifie ton tag Discord depuis ton profil.";
@@ -399,7 +399,7 @@ export type ContactCandidate = {
   discordTag: string | null;
   discordVerified: boolean;
   battletag: string | null;
-  /** Compte Battle.net rattaché : le BattleTag vient de Blizzard. */
+  /** Compte Battle.net lié : le BattleTag vient de Blizzard. */
   blizzardLinked: boolean;
 };
 
@@ -411,7 +411,7 @@ export type LaunchContact = {
   /** Tag Discord **certifié** ; `null` sinon. */
   discordTag: string | null;
   battletag: string | null;
-  /** `true` si le BattleTag vient d'un compte Battle.net rattaché. */
+  /** `true` si le BattleTag vient d'un compte Battle.net lié. */
   battletagVerified: boolean;
 };
 
@@ -436,7 +436,7 @@ export function hasVerifiedDiscord(member: Pick<ContactCandidate, "discordVerifi
   return member.discordVerified && Boolean(member.discordTag);
 }
 
-/** BattleTag vérifié : un compte Battle.net rattaché **et** un BattleTag. */
+/** BattleTag vérifié : un compte Battle.net lié **et** un BattleTag. */
 export function hasVerifiedBattletag(member: Pick<ContactCandidate, "blizzardLinked" | "battletag">): boolean {
   return member.blizzardLinked && Boolean(member.battletag);
 }
@@ -532,7 +532,7 @@ export type LaunchCaster = {
    * Overwatch, le champ n'est pas envoyé (`withGameBattletag`, décision 35).
    */
   battletag?: string | null;
-  /** `true` si le BattleTag vient d'un compte Battle.net rattaché ; absent avec lui. */
+  /** `true` si le BattleTag vient d'un compte Battle.net lié ; absent avec lui. */
   battletagVerified?: boolean;
   ready: boolean;
   /**
@@ -837,7 +837,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_HOST_TEAM: "L'équipe hôte doit être l'une des deux engagées du match.",
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
   NOT_REFEREE: "Arbitrer un match demande le rôle arbitre.",
-  REFEREE_IDENTITY_REQUIRED: "Pour arbitrer un match Overwatch, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+  REFEREE_IDENTITY_REQUIRED: "Pour arbitrer un match Overwatch, certifie ton tag Discord et lie ton compte Battle.net depuis ton profil.",
   REFEREE_DISCORD_REQUIRED: "Pour arbitrer un match Marvel Rivals, certifie ton tag Discord depuis ton profil.",
   REFEREE_IS_PLAYER: "Ce compte joue ce match : il ne peut pas l'arbitrer.",
   REFEREE_OBJECTION: "Ce compte a une opposition retenue à l'arbitrage : il ne peut plus arbitrer de match.",

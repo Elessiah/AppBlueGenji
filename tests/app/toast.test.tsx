@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TOAST_DURATION_MS, ToastItem, ToastProvider, useToast } from "@/components/ui/toast";
+import { TOAST_DURATION_MS, ToastItem, ToastProvider, useToast, withToast } from "@/components/ui/toast";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -109,7 +109,7 @@ describe("showInfo — notice neutre", () => {
   const css = readSource("components/ui/toast.module.css");
 
   it("ajoute une notification de type info", () => {
-    expect(source).toMatch(/const showInfo = useCallback\(\(message: string, options\?: ToastOptions\) => add\(message, "info", options\?\.lang\), \[add\]\)/);
+    expect(source).toMatch(/const showInfo = useCallback\(\(message: string, options\?: ToastOptions\) => add\(message, "info", options\), \[add\]\)/);
   });
 
   it("l'annonce poliment, dans la zone des réussites — jamais en alerte", () => {
@@ -139,6 +139,30 @@ describe("showInfo — notice neutre", () => {
   it("dit « Ce caster ne caste plus ce match » en notice neutre", () => {
     expect(readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx")).toContain(
       '() => showInfo(t("cardActions.releaseConfirm.gone"))',
+    );
+  });
+});
+
+describe("withToast — option once", () => {
+  type Shown = { id: number; message: string; type: "error" | "info" | "success" };
+  const shown: Shown[] = [{ id: 1, message: "Maximum 8", type: "error" }];
+
+  it("withToast_onceAndSameMessageShown_keepsStack", () => {
+    expect(withToast(shown, { id: 2, message: "Maximum 8", type: "error" }, true)).toBe(shown);
+  });
+
+  it("withToast_onceButOtherTypeOrText_adds", () => {
+    expect(withToast(shown, { id: 2, message: "Maximum 8", type: "info" }, true)).toHaveLength(2);
+    expect(withToast(shown, { id: 3, message: "Autre", type: "error" }, true)).toHaveLength(2);
+  });
+
+  it("withToast_withoutOnce_stacksDuplicates", () => {
+    expect(withToast(shown, { id: 2, message: "Maximum 8", type: "error" }, false)).toHaveLength(2);
+  });
+
+  it("enduranceChart_fullSelection_toastOnce", () => {
+    expect(readSource("app/(secured)/tournois/[id]/_components/EnduranceChart.tsx")).toContain(
+      "{ max: ENDURANCE_CHART_PICK_MAX }), { once: true });",
     );
   });
 });

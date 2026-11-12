@@ -221,7 +221,9 @@
     "matchCount": "{count, plural, one {# match} other {# matches}}",
     "treeLabel": "Tournament bracket — horizontal scroll",
     "goToMatchLabel": "{label} — go to the next match",
-    "goToSlotLabel": "{label} — go to the next slot, not filled yet"
+    "goToSlotLabel": "{label} — go to the next slot, not filled yet",
+    "ghostSlots": "Slots to be filled",
+    "ghostSlotsHint": "The upcoming rounds do not exist yet: their slots fill up as soon as the previous round is played."
   },
   "sections": {
     "TO_PLAN": "To schedule",
@@ -322,6 +324,7 @@
   },
   "matchPage": {
     "backToTournament": "Back to the tournament",
+    "backToNamedTournament": "Back to the tournament {name}",
     "firstMap": "First map",
     "firstMapUnset": "Not chosen yet",
     "opponentsPending": "Opponents to come",

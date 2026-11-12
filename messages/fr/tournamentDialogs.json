@@ -402,8 +402,8 @@
     "rows": {
       "identity": {
         "topic": "Ton identité",
-        "does": "Prouve que ton tag Discord et ton BattleTag sont bien les tiens : Discord et Blizzard le confirment. Le compte rattaché pour cela devient un moyen de connexion, et Battle.net remplace ton BattleTag par le sien, verrouillé tant qu'il reste rattaché.",
-        "doesDiscordOnly": "Prouve que ton tag Discord est bien le tien : Discord le confirme. Le compte Discord rattaché pour cela devient un moyen de connexion.",
+        "does": "Prouve que ton tag Discord et ton BattleTag sont bien les tiens : Discord et Blizzard le confirment. Le compte lié pour cela devient un moyen de connexion, et Battle.net remplace ton BattleTag par le sien, verrouillé tant qu'il reste lié.",
+        "doesDiscordOnly": "Prouve que ton tag Discord est bien le tien : Discord le confirme. Le compte Discord lié pour cela devient un moyen de connexion.",
         "doesNot": "Ne donne au site accès ni à ton mot de passe, ni à tes messages, ni à tes amis."
       },
       "matches": {
@@ -415,7 +415,7 @@
       },
       "messages": {
         "topic": "Les messages du bot",
-        "does": "Une fois ton tag Discord certifié, le bot t'envoie en message privé l'horaire et les rappels de tes matchs. Discord rattaché à ton compte (la certification par code le rattache) lui sert aussi à t'écrire : demandes d'adhésion à une équipe que tu gères, avis de modération, information sur tes données. Pour t'écrire, le bot doit partager un serveur avec toi.",
+        "does": "Une fois ton tag Discord certifié, le bot t'envoie en message privé l'horaire et les rappels de tes matchs. Discord lié à ton compte (la certification par code le lie) lui sert aussi à t'écrire : demandes d'adhésion à une équipe que tu gères, avis de modération, information sur tes données. Pour t'écrire, le bot doit partager un serveur avec toi.",
         "doesNot": "Ne t'impose pas les messages de match : tu peux les couper depuis ton profil (section Notifications) sans perdre la certification."
       },
       "staff": {
@@ -427,8 +427,8 @@
         "topic": "Et ensuite",
         "does": "Compte pour les tournois qui exigent un Discord certifié ou un compte Battle.net (de tout le roster si le tournoi l'exige).",
         "doesDiscordOnly": "Compte pour les tournois qui exigent un Discord certifié (de tout le roster si le tournoi l'exige).",
-        "doesNot": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord ou Battle.net se détache depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter — détaché, Battle.net laisse ton BattleTag sur ta fiche, sans vérification, jusqu'à ce que tu l'effaces.",
-        "doesNotDiscordOnly": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord, s'il a été rattaché à ton compte pour certifier, se détache depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter."
+        "doesNot": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord ou Battle.net se retire depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter — retiré, Battle.net laisse ton BattleTag sur ta fiche, sans vérification, jusqu'à ce que tu l'effaces.",
+        "doesNotDiscordOnly": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord, s'il a été lié à ton compte pour certifier, se retire depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter."
       }
     },
     "neverAgain": "Ne plus voir",

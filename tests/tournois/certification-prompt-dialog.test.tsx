@@ -131,10 +131,10 @@ describe("CertificationPromptDialog", () => {
       expect(html).toContain("aux arbitres et aux administrateurs du site");
       expect(html).toContain("retirer ton tag Discord de ton profil retire sa certification");
       // Certifier par code rattache Discord : la modale dit comment le détacher.
-      expect(html).toContain("se détache depuis « Applications connectées » tant qu&#x27;il te reste une autre façon de te connecter");
+      expect(html).toContain("se retire depuis « Applications connectées » tant qu&#x27;il te reste une autre façon de te connecter");
     }
     expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et aux casters le temps du match");
-    expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste rattaché");
+    expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste lié");
     expect(render(OW_MANAGER)).toContain("Ne masque pas non plus ton BattleTag dans tes matchs : certifié ou non, présenté comme contact, il est montré même masqué");
     expect(render(OW_MANAGER)).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
     const en = render(MR_TEAM, "en");

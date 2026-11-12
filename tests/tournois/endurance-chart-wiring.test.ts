@@ -101,7 +101,7 @@ describe("performance (64 engagés × 12 manches)", () => {
   });
 
   it("des objets poussés de même contenu gardent séries et légende : clé de contenu", () => {
-    expect(CHART).toContain("const inputKey = enduranceChartInputKey(pushedEndurance, pushedMatches);");
+    expect(CHART).toMatch(/const inputKey = useMemo\(\s*\(\) => enduranceChartInputKey\(pushedEndurance, pushedMatches\),\s*\[pushedEndurance, pushedMatches\],\s*\);/);
     expect(CHART).toMatch(/useMemo\(\(\) => \(\{ endurance: pushedEndurance, matches: pushedMatches \}\), \[inputKey\]\)/);
   });
 
@@ -144,7 +144,7 @@ describe("mouvement", () => {
 
   it("l'encart dit à l'écran qu'une sélection est pleine (toast, FR + EN)", () => {
     expect(CHART).toContain('import { useToast } from "@/components/ui/toast";');
-    expect(CHART).toContain("if (next.full) showError(t(`endurance.chartPickMax${kind}`, { max: ENDURANCE_CHART_PICK_MAX }));");
+    expect(CHART).toContain("if (next.full) showError(t(`endurance.chartPickMax${kind}`, { max: ENDURANCE_CHART_PICK_MAX }), { once: true });");
     for (const base of ["chartPickMaxTeam", "chartPickMaxSolo"]) {
       expect(frViews.endurance).toHaveProperty(base);
       expect(enViews.endurance).toHaveProperty(base);
@@ -226,6 +226,11 @@ describe("légende : survol, focus, lecteur d'écran", () => {
 });
 
 describe("couleurs, polices, accessibilité", () => {
+  it("le seuil (trait-point) ne se confond pas avec la courbe survolée hors Top N (tirets simples)", () => {
+    expect(CSS).toMatch(/\.cut \{[^}]*stroke-dasharray: 10 4 2 4;/);
+    expect(LINES).toContain('const HOVER_DASH = "7 5";');
+  });
+
   it("aucun ambre dans les tracés ni la palette ; l'ambre n'est que le repère de sanction", () => {
     const amber = /--amber\b|--amber-rgb|245,\s*165,\s*36|#f5a524|\bAMBER\b/i;
     for (const source of [PANEL, CHART, LINES, LIB]) expect(source).not.toMatch(amber);

@@ -28,6 +28,9 @@
     "count": "{count, plural, one {# player} other {# players}}",
     "statusHint": "“No team” lists every player without a team, including those not open to offers — only “Free agents” are. Since roles come from the team, their filter is turned off under these two filters.",
     "statusHintSubject": "Status filters",
+    "roleReset": "Role filter reset to “All”: roles come from the team.",
+    "rolesInert": "No effect under “Free agents” and “No team”: roles come from the team.",
+    "deletedInert": "No effect under “Free agents” and “No team”, which already leave out deleted accounts.",
     "statusFilter": {
       "all": "ALL",
       "free": "FREE AGENTS",

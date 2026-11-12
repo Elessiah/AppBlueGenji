@@ -276,6 +276,59 @@ describe("fiches de contact — noms cliquables", () => {
     expect(hidden).not.toContain("href=");
   });
 
+  // Page du match (« Infos de connexion ») : le nom passe par `EntrantLink`,
+  // qui connaît les entrées solo même sans contact exposé (ERREUR.txt #531).
+  it("SideCard_renderNameGiven_usesItInsteadOfOwnLink", () => {
+    const html = renderToStaticMarkup(
+      <SideCard
+        side={side({ isSolo: true, contacts: [], contactsShown: false })}
+        isHost={false}
+        phase="SCHEDULED"
+        onCopy={noop}
+        laterText={LATER}
+        linkNames
+        renderName={(s) => <a href={`/joueurs/77`}>{s.name}</a>}
+      />,
+    );
+    expect(html).toContain('href="/joueurs/77"');
+  });
+
+  it("SideCard_renderNameWithoutLinkNames_plainName", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} renderName={() => <a href="/x">x</a>} />,
+    );
+    expect(html).not.toContain("href=");
+  });
+
+  // Le nom fourni par l'écran de tournoi (`EntrantName`) porte son emblème :
+  // la carte ne double pas le sien.
+  it("SideCard_renderNameWithLinkNames_omitsOwnEmblem", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames renderName={(s) => <span>{s.name}</span>} />,
+    );
+    expect(html).not.toContain('class="emblem"');
+  });
+
+  it("SideCard_linkNamesWithoutRenderName_keepsOwnEmblem", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
+    );
+    expect(html).toContain('class="emblem"');
+  });
+
+  it("SideCard_renderNameWithoutLinkNames_keepsOwnEmblem", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} renderName={(s) => <span>{s.name}</span>} />,
+    );
+    expect(html).toContain('class="emblem"');
+  });
+
+  it("MatchPage_connectionSection_namesEntrantsThroughEntrantLink", () => {
+    const source = read("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
+    expect(source).toContain("renderName={connectionSideName}");
+    expect(source).toMatch(/function connectionSideName\(side: LaunchSide\) \{\s*return <EntrantName teamId=\{side\.teamId\} name=\{side\.name\} \/>;/);
+  });
+
   it("caster → son profil", () => {
     const html = renderToStaticMarkup(
       <CasterCard

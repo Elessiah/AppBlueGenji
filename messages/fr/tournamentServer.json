@@ -39,7 +39,7 @@
       "minRoster": "Effectif minimal du roster",
       "minRosterValue": "{count, plural, one {# joueur} other {# joueurs}}",
       "discord": "Tag Discord certifié",
-      "blizzard": "Compte Battle.net rattaché"
+      "blizzard": "Compte Battle.net lié"
     },
     "mode": {
       "thirdPlace": "Petite finale",

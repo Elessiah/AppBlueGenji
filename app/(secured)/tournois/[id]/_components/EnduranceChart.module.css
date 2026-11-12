@@ -217,12 +217,14 @@
   fill: var(--ink-dim);
 }
 
-/* Seuil des play-offs : gris-bleu hors palette, en tirets — le vert est celui
-   de la 3e courbe, avec lequel il se confondait. */
+/* Seuil des play-offs : gris-bleu hors palette — le vert est celui de la 3e
+   courbe, avec lequel il se confondait —, en trait-point : la courbe survolée
+   hors Top N est en tirets simples (`HOVER_DASH`), les deux ne se confondent
+   pas. */
 .cut {
   stroke: var(--ink-mute);
   stroke-width: 1;
-  stroke-dasharray: 5 5;
+  stroke-dasharray: 10 4 2 4;
 }
 
 .cutLabel {

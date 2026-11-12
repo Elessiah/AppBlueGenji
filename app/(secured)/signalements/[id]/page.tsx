@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 // Import direct, voulu (revue de performance du lot 9-2) : contester est
 // l'action de cette page, ses textes sont déjà dans le morceau (la vue les
@@ -9,7 +9,9 @@ import { useParams } from "next/navigation";
 import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
 import { primeReportDialog } from "@/components/reports/report-form-loader";
 import type { ConcernedReportView } from "@/lib/shared/content-reports";
-import { useLocalePathname } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
+import { authGateLoginHref } from "../../_shared/AuthGate";
+import { localeHref } from "@/lib/shared/locales";
 import { useReportsText } from "@/components/reports/reports-text";
 import { concernedReportLoadFailure } from "@/lib/shared/concerned-report-load";
 import { ConcernedReport } from "./_components/ConcernedReport";
@@ -22,6 +24,7 @@ type LoadState =
   | { status: "loading" }
   | { status: "missing" }
   | { status: "error" }
+  | { status: "signedOut" }
   | { status: "ready"; report: ConcernedReportView };
 
 /**
@@ -35,7 +38,7 @@ type LoadState =
 export default function ConcernedReportPage() {
   const params = useParams<{ id: string }>();
   // Chemin sans préfixe de langue, comme le bouton du pied de page.
-  const { path: pathname } = useLocalePathname();
+  const { path: pathname, locale } = useLocalePathname();
   const { t } = useReportsText();
   const reportId = Number(params.id);
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -55,8 +58,25 @@ export default function ConcernedReportPage() {
     }
   }, [reportId]);
 
-  /** « Réessayer » : retour à l'état de chargement (le focus reste sur la page, annoncé par `aria-busy`). */
+  // « Réessayer » disparaît avec l'état d'erreur : le focus clavier tomberait
+  // sur le <body>. Il suit donc le titre de l'état qui le remplace —
+  // chargement, puis résultat (`focusTitle`).
+  const focusAfterRetry = useRef(false);
+  const focusTitle = useCallback((node: HTMLElement | null) => {
+    if (node !== null && focusAfterRetry.current) node.focus();
+  }, []);
+  // Résultat : le titre vit dans `ConcernedReport` ; le focus va à lui, pas à
+  // la section entière (qui ferait lire tout le signalement d'un trait).
+  const focusReportTitle = useCallback((node: HTMLElement | null) => {
+    const title = node?.querySelector<HTMLElement>("h1");
+    if (!title || !focusAfterRetry.current) return;
+    title.tabIndex = -1;
+    title.focus();
+  }, []);
+
+  /** « Réessayer » : retour à l'état de chargement, le focus suit le titre affiché. */
   const retry = useCallback(() => {
+    focusAfterRetry.current = true;
     setState({ status: "loading" });
     void load();
   }, [load]);
@@ -65,10 +85,18 @@ export default function ConcernedReportPage() {
     void load();
   }, [load]);
 
+  // Le titre du résultat a pris le focus (ref, avant les effets) : la suite
+  // (relecture après une contestation) ne le redéplace plus.
+  useEffect(() => {
+    if (state.status !== "loading") focusAfterRetry.current = false;
+  }, [state.status]);
+
   if (state.status === "loading") {
     return (
       <section className={`container ${styles.page}`} aria-busy="true">
-        <p className={styles.muted}>{t("concerned.loading")}</p>
+        <p ref={focusTitle} tabIndex={-1} className={styles.muted}>
+          {t("concerned.loading")}
+        </p>
       </section>
     );
   }
@@ -76,7 +104,9 @@ export default function ConcernedReportPage() {
   if (state.status === "error") {
     return (
       <section className={`container ${styles.page}`}>
-        <h1 className={`display ${styles.title}`}>{t("concerned.errorTitle")}</h1>
+        <h1 ref={focusTitle} tabIndex={-1} className={`display ${styles.title}`}>
+          {t("concerned.errorTitle")}
+        </h1>
         <p className={styles.muted}>{t("concerned.errorBody")}</p>
         <div>
           <button type="button" className="btn" onClick={retry}>
@@ -87,17 +117,35 @@ export default function ConcernedReportPage() {
     );
   }
 
+  if (state.status === "signedOut") {
+    return (
+      <section className={`container ${styles.page}`}>
+        <h1 ref={focusTitle} tabIndex={-1} className={`display ${styles.title}`}>
+          {t("concerned.signedOutTitle")}
+        </h1>
+        <p className={styles.muted}>{t("concerned.signedOutBody")}</p>
+        <div>
+          <LocaleLink href={authGateLoginHref(localeHref(`/signalements/${params.id}`, locale), "", "")} className="btn">
+            {t("concerned.signIn")}
+          </LocaleLink>
+        </div>
+      </section>
+    );
+  }
+
   if (state.status === "missing") {
     return (
       <section className={`container ${styles.page}`}>
-        <h1 className={`display ${styles.title}`}>{t("concerned.notFoundTitle")}</h1>
+        <h1 ref={focusTitle} tabIndex={-1} className={`display ${styles.title}`}>
+          {t("concerned.notFoundTitle")}
+        </h1>
         <p className={styles.muted}>{t("concerned.notFoundBody")}</p>
       </section>
     );
   }
 
   return (
-    <section className={`fade-in container ${styles.page}`}>
+    <section ref={focusReportTitle} className={`fade-in container ${styles.page}`}>
       <ConcernedReport report={state.report} onContest={() => setContesting(true)} />
 
       {contesting && (

@@ -138,6 +138,17 @@ engagées. Au-delà de huit qualifiées, un volet entier peut naître à pourvoi
 il annonçait alors « 0 match » en dessinant sept cartes. Un tel volet ne réserve
 pas non plus la colonne des badges, qui serait vide (`hasQualifyBadges`).
 
+**Sur téléphone** (`NARROW_LAYOUT_QUERY`, ≤ 720 px), l'arbre ne dessine que le
+**prochain** tour à pourvoir (`playoffGhostsShown`) : sept colonnes `TBD` ne
+tiennent pas à cette largeur. Le découpage en volets et leurs pastilles se
+calculent alors sur cette liste réduite — la pastille compte les cases
+dessinées, non la taille du tableau. Au rendu serveur, la largeur est inconnue
+(`useMediaMatch` rend `null`) : l'arbre entier, puis la seule variante utile
+une fois monté. Un volet qui dessine une case à pourvoir (créneau, ou petite
+finale pas encore posée) porte en tête la rangée « Cases à pourvoir »
+(« Slots to be filled » sous `/en`) et son `<InfoHint>` (`bracket.ghostSlots`,
+`bracket.ghostSlotsHint`).
+
 **Un tournoi clos n'annonce plus aucun tour.** Deux demi-finales closes sur un
 double forfait ne qualifient personne : `advancePlayoffsOneStep` clôt alors le
 tournoi sur le classement de qualification **sans jamais poser la finale**. Le

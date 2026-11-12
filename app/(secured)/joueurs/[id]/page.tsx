@@ -133,8 +133,9 @@ export default function PlayerDetailPage() {
     "player-battletag-more": Boolean(battletagHint),
   });
 
-  // Un compte supprimé garde sa fiche — ses résultats appartiennent aussi à
-  // ceux qu'il a affrontés —, mais sous un pseudo d'emprunt qui se lit comme
+  // Un compte supprimé ne garde sa fiche que s'il a au moins un match compté
+  // (D13 ; sinon la page est introuvable) — ses résultats appartiennent aussi
+  // à ceux qu'il a affrontés —, mais sous un pseudo d'emprunt qui se lit comme
   // un pseudo ordinaire : la fiche doit donc le **dire**, en tête et sans
   // équivoque (couleur, étiquette, avatar éteint), plutôt que de laisser croire
   // à un joueur actif dont tout serait masqué.
