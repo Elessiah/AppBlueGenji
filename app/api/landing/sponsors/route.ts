@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
-import { serviceErrorCode } from "@/lib/server/failure-reason";
+import { serviceErrorCode, failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createSponsor, listSponsors } from "@/lib/server/sponsors-service";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -10,7 +10,7 @@ export async function GET() {
     const sponsors = await listSponsors();
     return Response.json({ sponsors });
   } catch (error) {
-    console.error("Failed to fetch sponsors:", error);
+    console.error("Failed to fetch sponsors:", failureReason(error));
     return Response.json({ sponsors: [] }, { status: 500 });
   }
 }

@@ -17,6 +17,7 @@ import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { type RestoredIdentity, restoreAccountIdentity } from "./account-deletion-hold";
 import { reactivationWindowOpenSql, windowFlag } from "./reactivation-window";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Réactivation d'un compte dont la suppression est demandée (E4,
@@ -158,7 +159,7 @@ async function republishSoloEntryTournaments(userId: number): Promise<void> {
     const { publishUpdatedEvent } = await import("@/lib/server/tournaments/notifications");
     for (const tournamentId of await listSoloRegistrationTournamentIds(db, userId)) publishUpdatedEvent(tournamentId);
   } catch (error) {
-    console.error("[account-reactivation] tournois de l'entrée solo non rediffusés", error);
+    console.error("[account-reactivation] tournois de l'entrée solo non rediffusés", failureReason(error));
   }
 }
 
@@ -173,7 +174,7 @@ async function logReactivation(): Promise<void> {
     const { formatAccountReactivationLog } = await import("@/lib/shared/bot-logs");
     sendBotLog(formatAccountReactivationLog(), { category: "signups" });
   } catch (error) {
-    console.error("[account-reactivation] alerte de réactivation non écrite", error);
+    console.error("[account-reactivation] alerte de réactivation non écrite", failureReason(error));
   }
 }
 

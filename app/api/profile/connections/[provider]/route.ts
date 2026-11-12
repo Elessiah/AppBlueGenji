@@ -12,7 +12,7 @@
  */
 import { getCurrentUser, revokeOtherSessions } from "@/lib/server/auth";
 import { unlinkOAuthIdentity } from "@/lib/server/account-identities";
-import { serviceErrorCode } from "@/lib/server/failure-reason";
+import { serviceErrorCode, failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { oauthProviderFromSlug } from "@/lib/shared/oauth-providers";
 
@@ -51,7 +51,7 @@ export async function DELETE(
   try {
     revokedSessions = await revokeOtherSessions(user.id);
   } catch (error) {
-    console.error("[connections] fermeture des autres sessions impossible", error);
+    console.error("[connections] fermeture des autres sessions impossible", failureReason(error));
   }
   return ok({ success: true, revokedSessions });
 }

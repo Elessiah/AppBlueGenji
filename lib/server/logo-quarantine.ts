@@ -29,6 +29,7 @@
  * purge) ne connaissent, elles, que ce qui est réellement commun aux deux.
  */
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
+import { failureReason } from "@/lib/server/failure-reason";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import {
@@ -170,7 +171,7 @@ export async function removeModeratedAvatarFile(
   // bloquée dans tous les cas ; un fichier gardé — donc encore servi — est dit
   // dans pm2, pour qu'un exploitant retire l'autre usage.
   const stillUsed = await isUploadReferenced(avatarUrl).catch((error: unknown) => {
-    console.error("[moderation] usages de l'avatar supprimé non relus, fichier gardé", error);
+    console.error("[moderation] usages de l'avatar supprimé non relus, fichier gardé", failureReason(error));
     return true;
   });
   if (stillUsed) {
@@ -301,7 +302,7 @@ async function reportGrounds(reportId: number | null): Promise<ModerationGrounds
     );
     return moderationGroundsFor(rows[0]?.category ?? null);
   } catch (error) {
-    console.error("[moderation] fondement de la décision non relu", error);
+    console.error("[moderation] fondement de la décision non relu", failureReason(error));
     return moderationGroundsFor(null);
   }
 }
@@ -423,7 +424,7 @@ export async function deleteTeamLogoForReport(
   const files = shared ? null : logoFileLocations(logoUrl, teamId);
   if (files) {
     await unlinkIfPresent(files.live).catch((error) => {
-      console.error("[moderation] fichier du logo non effacé", error);
+      console.error("[moderation] fichier du logo non effacé", failureReason(error));
     });
   }
 
@@ -948,7 +949,7 @@ function announceRefusedRestoreOutcome(row: QuarantineRow, actor: ReportPerson):
   try {
     announceContestOutcome(row, "OVERTURNED", actor);
   } catch (error) {
-    console.error("[moderation] issue de la contestation non journalisée", error);
+    console.error("[moderation] issue de la contestation non journalisée", failureReason(error));
   }
 }
 
@@ -1163,7 +1164,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
       try {
         await rotate(Number(row.target_id));
       } catch (error) {
-        console.error("[moderation] avatar rétabli non renommé", error);
+        console.error("[moderation] avatar rétabli non renommé", failureReason(error));
       }
     }
     publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
@@ -1283,7 +1284,7 @@ async function removePurgedFileAndAnnounce(row: QuarantineRow, actor: ReportPers
     // L'empreinte d'un avatar supprimé est déjà bloquée (ou non, selon
     // l'issue) dans la transaction ci-dessus (D6, D22, D23).
     await unlinkIfPresent(files.quarantined).catch((error) => {
-      console.error("[moderation] fichier en quarantaine non effacé", error);
+      console.error("[moderation] fichier en quarantaine non effacé", failureReason(error));
     });
   }
 

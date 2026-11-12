@@ -18,6 +18,7 @@
  * `sharp`. Un logo absent ou illisible rend `null` — la marche garde l'initiale.
  */
 import { readFile } from "node:fs/promises";
+import { failureReason } from "@/lib/server/failure-reason";
 import path from "node:path";
 import sharp from "sharp";
 import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
@@ -71,7 +72,7 @@ export async function loadSharePodium(): Promise<PodiumShareInput[]> {
   try {
     return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}share-podium`, computeSharePodium);
   } catch (error) {
-    console.error("[share-podium] lecture impossible", error);
+    console.error("[share-podium] lecture impossible", failureReason(error));
     return [];
   }
 }

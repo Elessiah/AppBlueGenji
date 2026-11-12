@@ -25,6 +25,7 @@ import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Suppression de son compte par le joueur : ce qu'elle emportera (le plan,
@@ -443,7 +444,7 @@ export function afterCommit(step: () => void, failure: string): void {
   try {
     step();
   } catch (error) {
-    console.error(`[account-deletion] ${failure} :`, error);
+    console.error(`[account-deletion] ${failure} :`, failureReason(error));
   }
 }
 

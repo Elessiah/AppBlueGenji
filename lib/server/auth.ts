@@ -1,4 +1,5 @@
 ﻿import crypto from "node:crypto";
+import { failureReason } from "@/lib/server/failure-reason";
 import { requestCache } from "@/lib/server/request-cache";
 import { cookies } from "next/headers";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
@@ -225,7 +226,7 @@ async function carryRecruitmentModalOff(
   try {
     if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
   } catch (error) {
-    console.error("[auth] recruitment modal opt-out carry-over failed:", error);
+    console.error("[auth] recruitment modal opt-out carry-over failed:", failureReason(error));
     return;
   }
   // Compte jamais décidé seulement : un « réafficher » fait dans « Mon

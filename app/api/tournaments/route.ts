@@ -1,4 +1,5 @@
 ﻿import { createHash } from "node:crypto";
+import { failureReason } from "@/lib/server/failure-reason";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
@@ -79,7 +80,7 @@ export async function GET(req: Request) {
     // tournois) garde son message : `fail()` la rend en 409 « réessaie ».
     const message = (error as Error).message;
     if (isContentionMessage(message)) return fail(message, 500);
-    console.error("[tournaments] lecture de la liste en échec", error);
+    console.error("[tournaments] lecture de la liste en échec", failureReason(error));
     return fail("TOURNAMENT_LIST_FAILED", 500);
   }
   // `private` : la réponse dépend de la session (la lecture est refusée sans

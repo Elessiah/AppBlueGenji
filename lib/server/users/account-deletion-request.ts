@@ -57,6 +57,7 @@ import {
   logDeletionWithdrawal,
   withdrawSoloRegistrationsOn,
 } from "./deleted-solo-entries";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Demande de suppression de son compte (décisions E1, E3, E4, E5 —
@@ -394,7 +395,7 @@ async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAcco
   try {
     return await listLiveAnnouncementsForDeletionLog(userId);
   } catch (error) {
-    console.error("[account-deletion] annonces #live du compte non relues", error);
+    console.error("[account-deletion] annonces #live du compte non relues", failureReason(error));
     return null;
   }
 }
@@ -454,7 +455,7 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     });
     for (const line of formatAccountDeletionFollowUpLogs(liveAnnouncements)) sendBotLog(line, { category: "signups" });
   } catch (error) {
-    console.error("[account-deletion] alerte de suppression non écrite", error);
+    console.error("[account-deletion] alerte de suppression non écrite", failureReason(error));
   }
   for (const entry of withdrawn) await logDeletionWithdrawal(entry.tournamentId, false);
   // Les forfaits (une transaction d'arbitrage par match, plusieurs tournois
@@ -656,7 +657,7 @@ export async function requestAccountDeletion(
       try {
         flushBotLogs(connection);
       } catch (error) {
-        console.error("[account-deletion] annonces non envoyées", error);
+        console.error("[account-deletion] annonces non envoyées", failureReason(error));
       }
       return plan;
     } catch (error) {

@@ -90,8 +90,8 @@ describe("getDatabase", () => {
     const query = jest.fn((_sql: string, done: (error: Error | null) => void) => done(new Error("denied")));
     expect(() => listener?.({ query })).not.toThrow();
 
-    expect(warn).toHaveBeenCalledWith("[db] lc_messages non réglé sur la connexion", expect.any(Error));
-    expect(warn).toHaveBeenCalledWith("[db] lock_wait_timeout non réglé sur la connexion", expect.any(Error));
+    expect(warn).toHaveBeenCalledWith("[db] lc_messages non réglé sur la connexion", "Error");
+    expect(warn).toHaveBeenCalledWith("[db] lock_wait_timeout non réglé sur la connexion", "Error");
     warn.mockRestore();
   });
 });

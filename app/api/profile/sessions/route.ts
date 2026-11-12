@@ -6,6 +6,7 @@
  * restait sinon valide trente jours sans que la victime ait de quoi la fermer.
  */
 import { countOtherSessions, getCurrentUser, revokeOtherSessions } from "@/lib/server/auth";
+import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
   try {
     return ok({ otherSessions: await countOtherSessions(user.id) });
   } catch (error) {
-    console.error("[sessions] lecture impossible", error);
+    console.error("[sessions] lecture impossible", failureReason(error));
     return fail("SESSIONS_READ_FAILED", 500);
   }
 }
@@ -25,7 +26,7 @@ export async function DELETE() {
   try {
     return ok({ revoked: await revokeOtherSessions(user.id) });
   } catch (error) {
-    console.error("[sessions] fermeture impossible", error);
+    console.error("[sessions] fermeture impossible", failureReason(error));
     return fail("SESSIONS_REVOKE_FAILED", 500);
   }
 }

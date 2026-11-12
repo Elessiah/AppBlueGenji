@@ -9,6 +9,7 @@ import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./account-deletion";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Les inscriptions solo d'un compte dont la suppression est demandée (ou faite)
@@ -261,7 +262,7 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
       { tournamentId, category: "registrations" },
     );
   } catch (error) {
-    console.error("[account-deletion] ligne de journal du retrait non écrite", error);
+    console.error("[account-deletion] ligne de journal du retrait non écrite", failureReason(error));
   }
 }
 

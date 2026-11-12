@@ -10,6 +10,7 @@ import {
   type AccountReactivationKey,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Le fichier du journal des suppressions (`lib/shared/account-deletion-journal.ts`).
@@ -126,7 +127,7 @@ export function scheduleAccountDeletionJournalPrune(now: number = Date.now()): v
   if (last !== undefined && now - last < PRUNE_INTERVAL_MS) return;
   pruneState.__bgDeletionJournalPrunedAt = now;
   void pruneAccountDeletionJournal({ now: new Date(now) }).catch((error: unknown) => {
-    console.error("[account-deletion-journal] élagage impossible :", error);
+    console.error("[account-deletion-journal] élagage impossible :", failureReason(error));
   });
 }
 

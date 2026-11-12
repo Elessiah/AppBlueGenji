@@ -1,4 +1,5 @@
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
+import { failureReason } from "@/lib/server/failure-reason";
 
 // La mise en avant change rarement et la réponse est identique pour tous les
 // visiteurs : on autorise une mise en cache publique courte (navigateur/CDN)
@@ -18,7 +19,7 @@ export async function GET() {
     const spotlight = await getRecruitmentSpotlight();
     return Response.json(spotlight, { headers: { "Cache-Control": CACHE_CONTROL } });
   } catch (error) {
-    console.error("Failed to fetch recruitment spotlight:", error);
+    console.error("Failed to fetch recruitment spotlight:", failureReason(error));
     // En erreur, on ne met pas en cache pour ne pas figer un état dégradé.
     return Response.json(
       { modal: [], banner: [] },

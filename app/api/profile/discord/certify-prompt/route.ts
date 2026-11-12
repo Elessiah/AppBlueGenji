@@ -18,6 +18,7 @@
  * aucune écriture.
  */
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -45,7 +46,7 @@ export async function GET() {
   try {
     return ok({ prompt: await loadDiscordCertifyPrompt(user.id, await currentTokenHash(), { clearStale: false }) });
   } catch (error) {
-    console.error("[discord] GET certify-prompt failed:", error);
+    console.error("[discord] GET certify-prompt failed:", failureReason(error));
     return fail("CERTIFY_PROMPT_FAILED", 500);
   }
 }
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
   } catch (error) {
     // Colonne absente : la fenêtre ne s'ouvre pas non plus (`loadDiscordCertifyPrompt`).
     if (isUnknownColumnError(error)) return fail("CERTIFY_PROMPT_UNAVAILABLE", 503);
-    console.error("[discord] POST certify-prompt failed:", error);
+    console.error("[discord] POST certify-prompt failed:", failureReason(error));
     return fail("CERTIFY_PROMPT_FAILED", 500);
   }
 }

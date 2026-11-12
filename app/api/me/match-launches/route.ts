@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/server/http";
 import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Matchs du joueur connecté à présenter dans la modale de lancement : ceux
@@ -26,7 +27,7 @@ export async function GET() {
     const launches = await listViewerMatchLaunches(user);
     return ok({ launches });
   } catch (error) {
-    console.error("[match-launch] lecture impossible", error);
+    console.error("[match-launch] lecture impossible", failureReason(error));
     return fail("MATCH_LAUNCH_READ_FAILED", 500);
   }
 }

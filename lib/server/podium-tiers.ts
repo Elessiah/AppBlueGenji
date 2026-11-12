@@ -14,6 +14,7 @@
  * fenêtre, le classement lui-même étant déjà mutualisé.
  */
 import type { RowDataPacket } from "mysql2/promise";
+import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
@@ -51,7 +52,7 @@ export async function loadPodiumTiers(): Promise<PodiumTiers> {
   try {
     return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}podium-tiers`, computePodiumTiers);
   } catch (error) {
-    console.error("[podium-tiers] lecture impossible", error);
+    console.error("[podium-tiers] lecture impossible", failureReason(error));
     return EMPTY_PODIUM_TIERS;
   }
 }

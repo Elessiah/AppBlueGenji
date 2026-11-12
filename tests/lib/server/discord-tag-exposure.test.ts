@@ -46,7 +46,7 @@ function fakeDb(handler?: (q: string, params: unknown[]) => unknown) {
     if (handled !== undefined) return handled;
     // Le verrou que prend la suppression rend la ligne du compte : sans elle,
     // tout chemin d'écriture s'arrêterait sur `USER_NOT_FOUND`.
-    if (q.includes("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users")) {
+    if (q.startsWith("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at,")) {
       return [[{ avatar_url: null, discord_id: null, created_at: "2026-01-02 03:04:05", is_deleted: 0, deletion_requested_at: null }]];
     }
     return [[]];

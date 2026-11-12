@@ -5,6 +5,7 @@ import { createReport } from "@/lib/server/content-reports";
 import { validateReportSubmission } from "@/lib/shared/content-reports";
 import { can } from "@/lib/shared/permissions";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Signalement d'un problème à l'association, **ouvert à tous** : un titulaire
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
     // vise pas l'appelant : les identifiants sont consécutifs.
     if (message === "REPORT_NOT_CONCERNED") return fail(message, 403);
     if (message === "REPORTS_SATURATED") return fail(message, 429);
-    console.error("[reports] envoi impossible", error);
+    console.error("[reports] envoi impossible", failureReason(error));
     return fail("REPORT_FAILED", 500);
   }
 }

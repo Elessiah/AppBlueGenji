@@ -13,6 +13,7 @@
  * suivant — aucun signalement effacé ne « revient » durablement.
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "@/lib/server/database";
 import { pushLeadershipAlert } from "@/lib/server/bot-integration";
 import { staffAlertDm } from "@/lib/server/staff-alert-dm";
@@ -383,7 +384,7 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
   });
   alertLeadership(receivedInLastHour, message, reportId, false);
   void notifyReportTargets(reportId, submission.category, targets, viewer.userId).catch((error) => {
-    console.error("[reports] personnes visées non prévenues", error);
+    console.error("[reports] personnes visées non prévenues", failureReason(error));
   });
   void purgeExpiredReports().catch(() => undefined);
 

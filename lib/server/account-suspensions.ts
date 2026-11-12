@@ -17,6 +17,7 @@
  * sessions expirées qu'elle suit.
  */
 import { closeUserStreams } from "@/lib/server/session-streams";
+import { failureReason } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
@@ -146,7 +147,7 @@ export async function purgeEndedSuspensions(): Promise<void> {
       [SUSPENSION_RETENTION_MONTHS],
     );
   } catch (error) {
-    console.error("[moderation] purge des suspensions terminées impossible", error);
+    console.error("[moderation] purge des suspensions terminées impossible", failureReason(error));
   }
 }
 

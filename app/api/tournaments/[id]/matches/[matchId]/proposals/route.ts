@@ -5,6 +5,7 @@ import { isContentionError } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { getViewerMatchProposals } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Propositions map par map en attente sur **un** match (`MAP_SCORES.md`) : la
@@ -45,7 +46,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string; m
     return ok({ proposals: read.proposals });
   } catch (error) {
     if (isContentionError(error)) {
-      console.warn(`[tournaments] propositions du match ${matchId} : lecture en contention, rendue en ${CONCURRENT_UPDATE_RETRY} :`, error);
+      console.warn(`[tournaments] propositions du match ${matchId} : lecture en contention, rendue en ${CONCURRENT_UPDATE_RETRY} :`, failureReason(error));
       return fail(CONCURRENT_UPDATE_RETRY, 409);
     }
     return fail(error instanceof Error ? error.message : "INTERNAL_ERROR", 500);

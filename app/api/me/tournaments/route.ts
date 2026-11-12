@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { listMyActiveTournamentIds } from "@/lib/server/tournaments/my-tournaments";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Identifiants des tournois en cours ou à venir où le joueur connecté est
@@ -20,7 +21,7 @@ export async function GET() {
     const tournamentIds = await listMyActiveTournamentIds(user.id);
     return ok({ tournamentIds });
   } catch (error) {
-    console.error("[tournaments] lecture de mes tournois impossible", error);
+    console.error("[tournaments] lecture de mes tournois impossible", failureReason(error));
     return fail("MY_TOURNAMENTS_READ_FAILED", 500);
   }
 }

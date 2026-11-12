@@ -1,4 +1,5 @@
 ﻿import "dotenv/config";
+import { failureReason } from "@/lib/server/failure-reason";
 import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql2/promise";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
@@ -117,14 +118,14 @@ function forceEnglishServerMessages(created: Pool): void {
   created.on("connection", (connection) => {
     const core = connection as unknown as { query(sql: string, done: (error: Error | null) => void): unknown };
     core.query("SET SESSION lc_messages = 'en_US'", (error) => {
-      if (error) console.warn("[db] lc_messages non réglé sur la connexion", error);
+      if (error) console.warn("[db] lc_messages non réglé sur la connexion", failureReason(error));
     });
     // Attente d'un verrou de **métadonnées** bornée comme celle d'une ligne :
     // un `ALTER TABLE` du démarrage (`recent-schema-changes.ts`) derrière une
     // transaction longue attendait `lock_wait_timeout` (un jour sous MariaDB,
     // un an sous MySQL), et `getDatabase()` avec lui — tout le site figé.
     core.query(`SET SESSION lock_wait_timeout = ${METADATA_LOCK_WAIT_SECONDS}`, (error) => {
-      if (error) console.warn("[db] lock_wait_timeout non réglé sur la connexion", error);
+      if (error) console.warn("[db] lock_wait_timeout non réglé sur la connexion", failureReason(error));
     });
   });
 }
