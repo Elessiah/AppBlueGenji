@@ -17,3 +17,5 @@ Réponse `VoiceCallOutcome` : `ok`, `gone` (404 : `VOICE_CHANNEL_NOT_TRACKED` au
 `failed` (code seul, forme `[A-Z0-9_]{1,64}`, sinon `BOT_INTERNAL_REQUEST_FAILED`). Le coupe-circuit s'applique ; seule une panne de transport
 (5xx sans code `VOICE_*` ni `DISCORD_NOT_READY`) compte contre lui ; un 404 autre que `VOICE_CHANNEL_NOT_TRACKED` arrête le balayage sans compter. Jamais appelé
 sous transaction : seul le balayage de `MATCH_VOICE.md` l'utilise.
+
+**Code d'erreur du bot** (`safeReadError`) : le corps d'une réponse en échec se lit **4 Kio au plus** (`BOT_ERROR_BODY_MAX_BYTES`, au-delà rien n'est analysé) ; seul un code de mots en capitales joints par `_` (ou `UNAUTHORIZED` / `FORBIDDEN`) en sort (`isBotErrorCode`) — tout autre texte, mot seul en capitales compris, devient `BOT_INTERNAL_REQUEST_FAILED`.
