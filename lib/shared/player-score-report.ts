@@ -14,7 +14,7 @@
  */
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
-import { sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
+import { mapWinnerSide, normalizeReplayCode, sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
 import { autoValidateTimeText } from "./score-dispute";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
@@ -56,6 +56,82 @@ export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
 }
 
 /**
+ * Le détail map par map de la déclaration adverse est-il connu ? Encore en
+ * lecture ou illisible, elle ne se compare qu'au score. Seule définition de
+ * « détail connu » : l'état affiché, l'avertissement de litige, la comparaison
+ * et l'instant « vu » envoyé au serveur s'accordent ainsi toujours.
+ */
+export function opponentDetailKnown(theirs: Pick<MatchScoreReport, "maps"> | null | undefined): boolean {
+  return (theirs?.maps ?? []).length > 0;
+}
+
+/**
+ * Ce que la modale dit avoir **vu** de la déclaration adverse (`MAP_SCORES.md`) :
+ * son instant de dépôt quand la saisie s'y est réellement comparée — détail
+ * connu, ou score déjà différent (le litige se sait alors sans le détail).
+ * Sinon `null` : un score identique au détail encore inconnu n'a rien vu des
+ * maps, et le serveur refuse (`PROPOSAL_ARRIVED`) une version qui en diffère
+ * par elles plutôt que d'ouvrir un litige à l'aveugle — le refus relit la vue,
+ * détail compris (`matchProposals` du contexte du lecteur).
+ */
+export function seenOpponentReportAt(
+  theirs: MatchScoreReport | null | undefined,
+  entered: Pick<MatchScoreReport, "team1Score" | "team2Score"> | null,
+): string | null {
+  if (!theirs) return null;
+  if (opponentDetailKnown(theirs)) return theirs.reportedAt;
+  const scoreDiffers =
+    entered !== null && (entered.team1Score !== theirs.team1Score || entered.team2Score !== theirs.team2Score);
+  return scoreDiffers ? theirs.reportedAt : null;
+}
+
+/**
+ * Envoi de « Confirmer la déclaration adverse » : ses maps telles quelles et
+ * son instant de dépôt — la saisie du lecteur n'y entre pas et n'est pas
+ * remplacée (un refus la lui rend intacte). `null` tant que le détail adverse
+ * n'est pas connu : rien à confirmer d'un clic.
+ */
+export function confirmTheirsSend(
+  theirs: MatchScoreReport | null | undefined,
+): { maps: MatchMapInput[]; confirmTheirs: true; seenAt: string } | null {
+  if (!theirs || !opponentDetailKnown(theirs)) return null;
+  return {
+    maps: (theirs.maps ?? []).map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score })),
+    confirmTheirs: true,
+    seenAt: theirs.reportedAt,
+  };
+}
+
+/**
+ * Corps du report : la déclaration adverse confirmée telle quelle, ou une
+ * version envoyée avec la déclaration adverse que la modale montrait. L'instant
+ * confirmé est celui **capturé au geste** (`send.seenAt`), jamais relu de la
+ * vue : une déclaration retirée entre-temps ferait sinon d'une confirmation
+ * une première proposition — le serveur la refuse (`PROPOSAL_STALE`).
+ */
+export function reportBody(send: {
+  maps: ReadonlyArray<MatchMapInput>;
+  confirmTheirs: boolean;
+  seenAt: string | null;
+}): string {
+  return JSON.stringify(
+    send.confirmTheirs && send.seenAt !== null
+      ? { maps: send.maps, confirm: { reportedAt: send.seenAt } }
+      : { maps: send.maps, seenOpponentReportAt: send.seenAt },
+  );
+}
+
+/**
+ * Un envoi accepté a-t-il **clos** le match ? Oui pour une confirmation, ou
+ * quand le serveur le dit (`completed: true` — versions concordantes) ; toute
+ * autre réponse (champ absent, autre type) reste « en attente de l'adversaire ».
+ */
+export function reportClosedMatch(confirmTheirs: boolean, payload: unknown): boolean {
+  if (confirmTheirs) return true;
+  return typeof payload === "object" && payload !== null && (payload as { completed?: unknown }).completed === true;
+}
+
+/**
  * Maps à l'ouverture de la modale : la proposition du lecteur, sinon celle de
  * l'adversaire (confirmer d'un clic), sinon une liste vide.
  */
@@ -66,6 +142,88 @@ export function playerReportInitialMaps(view: PlayerReportView | null): MatchMap
     team1Score,
     team2Score,
   }));
+}
+
+/** Ce qui sépare une map de la saisie de la même map adverse. */
+export type MapDifferenceKind = "WINNER" | "SCORE" | "REPLAY_CODE" | "MISSING_MINE" | "MISSING_THEIRS";
+
+export interface MapDifference {
+  /** Rang de la map, à partir de 1. */
+  mapNumber: number;
+  mine: MatchMapInput | null;
+  theirs: MatchMapInput | null;
+  /** Ce qui diffère, dans l'ordre de lecture ; jamais vide. */
+  kinds: MapDifferenceKind[];
+}
+
+/**
+ * Différences, map par map, entre la saisie du lecteur et la déclaration
+ * adverse (`MAP_SCORES.md` — « Proposition adverse arrivée pendant la
+ * saisie ») — la même comparaison que `sameMapLists` (codes normalisés, scores
+ * de map), détaillée pour être montrée. Un vainqueur différent n'est pas
+ * redit en « score » ; une map présente d'un seul côté est dite absente de
+ * l'autre. Vide quand les deux listes concordent.
+ */
+export function mapListDifferences(
+  mine: ReadonlyArray<MatchMapInput>,
+  theirs: ReadonlyArray<MatchMapInput>,
+): MapDifference[] {
+  const differences: MapDifference[] = [];
+  for (let i = 0; i < Math.max(mine.length, theirs.length); i += 1) {
+    const a = mine[i] ?? null;
+    const b = theirs[i] ?? null;
+    const kinds: MapDifferenceKind[] = [];
+    if (a === null) kinds.push("MISSING_MINE");
+    else if (b === null) kinds.push("MISSING_THEIRS");
+    else {
+      if (mapWinnerSide(a) !== mapWinnerSide(b)) kinds.push("WINNER");
+      else if (a.team1Score !== b.team1Score || a.team2Score !== b.team2Score) kinds.push("SCORE");
+      if (normalizeReplayCode(a.replayCode) !== normalizeReplayCode(b.replayCode)) kinds.push("REPLAY_CODE");
+    }
+    if (kinds.length > 0) differences.push({ mapNumber: i + 1, mine: a, theirs: b, kinds });
+  }
+  return differences;
+}
+
+/** Liste vide partagée : identité stable rendue par `entryComparison` sans détail adverse. */
+const NO_MAPS: ReadonlyArray<MatchMapInput> = Object.freeze([]);
+
+/**
+ * La saisie face à la déclaration adverse en attente :
+ * - `sameScoreArrived` — arrivée pendant la saisie, identique : bandeau, et le
+ *   bouton principal devient « Confirmer le score » (`confirmsAsIs`) ;
+ * - `differences` — saisie valide qui en diffère, détail adverse connu : ce
+ *   qui diffère, map par map ;
+ * - `offerConfirmTheirs` — saisie écartée d'une déclaration adverse au détail
+ *   connu : la confirmer d'un clic plutôt que de tout ressaisir.
+ */
+export function entryComparison(
+  view: PlayerReportView | null,
+  maps: ReadonlyArray<MatchMapInput>,
+  form: {
+    canEnterScore: boolean;
+    arrivedDuringEntry: boolean;
+    confirmsAsIs: boolean;
+    opensDispute: boolean;
+    nothingEntered: boolean;
+  },
+): {
+  theirs: MatchScoreReport | null;
+  theirMaps: ReadonlyArray<MatchMapInput>;
+  sameScoreArrived: boolean;
+  differences: MapDifference[];
+  offerConfirmTheirs: boolean;
+} {
+  const theirs = view?.phase === "THEIRS_PENDING" ? view.theirs : null;
+  const theirMaps = theirs?.maps ?? NO_MAPS;
+  const known = form.canEnterScore && opponentDetailKnown(theirs);
+  return {
+    theirs,
+    theirMaps,
+    sameScoreArrived: form.canEnterScore && form.arrivedDuringEntry && form.confirmsAsIs,
+    differences: form.opensDispute && known ? mapListDifferences(maps, theirMaps) : [],
+    offerConfirmTheirs: known && !form.confirmsAsIs && !form.nothingEntered,
+  };
 }
 
 /**

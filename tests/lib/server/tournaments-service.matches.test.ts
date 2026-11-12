@@ -304,6 +304,32 @@ describe("tournaments-service: match state machine", () => {
       expect(queueRefereeAlert).not.toHaveBeenCalled();
     });
 
+    const mapClearReads = (calls: Call[]) =>
+      calls.filter((c) => c.sql.startsWith("SELECT 1 FROM bg_match_maps"));
+
+    it("reportMatchScore_firstReport_skipsMapClear", async () => {
+      const { connection, calls } = reportConnection();
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(mapClearReads(calls)).toHaveLength(0);
+    });
+
+    it("reportMatchScore_ownScoreWithoutInstant_clearsOldMaps", async () => {
+      // Report sans instant (donnée ancienne) : c'est quand même un report, ses maps s'effacent.
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team1_report_score: 2,
+        team1_report_opponent_score: 0,
+        team1_reported_at: null,
+      });
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(mapClearReads(calls)).toHaveLength(1);
+      expect(mapClearReads(calls)[0].params).toEqual([10, "TEAM1"]);
+    });
+
     it("l'échéance d'un premier report ne court qu'après une fin de série plausible", async () => {
       const { connection, calls } = reportConnection();
 
@@ -500,6 +526,174 @@ describe("tournaments-service: match state machine", () => {
 
         expect(completion(calls)).toBeUndefined();
         expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+    });
+
+    describe("déclaration adverse vue par la modale (PROPOSAL_ARRIVED, MAP_SCORES.md)", () => {
+      const depositedAt = new Date("2026-10-05T20:00:00.000Z");
+      // L'engagée 2 a déclaré 1-3 (vu d'elle) : 3-1 pour l'engagée 1 au plateau.
+      const pendingTeam2 = {
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+        team2_reported_at: depositedAt,
+      };
+      const opponentMapReads = (calls: Call[]) =>
+        calls.filter((c) => c.sql.startsWith("SELECT match_id, source, map_number, replay_code, team1_score, team2_score FROM"));
+
+      it("reportMatchScore_seenNullOpponentScoreDiffers_throwsProposalArrivedWithoutWrites", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null)).rejects.toThrow(
+          "PROPOSAL_ARRIVED",
+        );
+
+        expect(writes(calls)).toHaveLength(0);
+        expect(queueRefereeAlert).not.toHaveBeenCalled();
+      });
+
+      it("reportMatchScore_seenNullSameScoreOtherMaps_throwsProposalArrived", async () => {
+        const otherCodes = mapsFor(3, 1).map((m, i) => ({ ...m, replayCode: `OTHER${i}` }));
+        const { connection, calls } = reportConnection(pendingTeam2, otherCodes);
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, null)).rejects.toThrow(
+          "PROPOSAL_ARRIVED",
+        );
+
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("reportMatchScore_seenNullConcordantReport_closesMatchReadingOpponentMapsOnce", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, null);
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+        expect(opponentMapReads(calls)).toHaveLength(1);
+      });
+
+      it("reportMatchScore_seenEqualsOpponentDeposit_opensDisputeAndAlerts", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, depositedAt.toISOString());
+
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_seenOlderDeposit_throwsProposalArrived", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, "2026-10-05T19:00:00.000Z"),
+        ).rejects.toThrow("PROPOSAL_ARRIVED");
+
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("reportMatchScore_seenNullNoOpponentReport_writesProposal", async () => {
+        const { connection, calls } = reportConnection();
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null);
+
+        expect(writes(calls)[0].params.slice(0, 2)).toEqual([3, 0]);
+        expect(completion(calls)).toBeUndefined();
+      });
+
+      it("reportMatchScore_concordantReports_returnsTrue", async () => {
+        const { connection } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, depositedAt.toISOString()),
+        ).resolves.toBe(true);
+      });
+
+      it("reportMatchScore_disputeOpened_returnsFalse", async () => {
+        const { connection } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, depositedAt.toISOString()),
+        ).resolves.toBe(false);
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_firstReport_returnsFalse", async () => {
+        const { connection } = reportConnection();
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null)).resolves.toBe(false);
+      });
+
+      it("reportMatchScore_opponentReportWithoutInstant_seenEmptyString_opensDispute", async () => {
+        // Report adverse sans instant : la modale le lit `""` (`mapScoreReport`) et le renvoie tel quel.
+        const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, "");
+
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_opponentReportWithoutInstant_seenNull_throwsProposalArrived", async () => {
+        const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null)).rejects.toThrow(
+          "PROPOSAL_ARRIVED",
+        );
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("reportMatchScore_seenNullSameScoreOpponentWithoutMaps_opensDisputeInsteadOfProposalArrived", async () => {
+        // Report adverse déposé avant les scores map par map : aucun détail à
+        // montrer, jamais — refuser bouclerait (`MAP_SCORES.md`).
+        const { connection, calls } = reportConnection(pendingTeam2, []);
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, null)).resolves.toBe(false);
+
+        expect(writes(calls)[0].params.slice(0, 2)).toEqual([3, 1]);
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_confirmEmptyInstantOnNullReportedAt_closesMatch", async () => {
+        const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: "" });
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+      });
+
+      it("reportMatchScore_reportWrite_stampsStrictlyLaterInstant", async () => {
+        const { connection, calls } = reportConnection();
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null);
+
+        // Une retouche dans la même seconde change quand même l'instant de dépôt.
+        expect(writes(calls)[0].sql).toContain(
+          "team1_reported_at = GREATEST(NOW(), COALESCE(DATE_ADD(team1_reported_at, INTERVAL 1 SECOND), NOW()))",
+        );
+      });
+
+      it("reportMatchScore_reportWrite_onlyItsOwnAssignmentReadsReportedAt", async () => {
+        const { connection, calls } = reportConnection();
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null);
+
+        // MySQL et MariaDB évaluent les affectations de gauche à droite sur la valeur
+        // déjà posée : la colonne ne se lit que dans sa propre affectation, jamais
+        // dans l'échéance ou le statut qui la suivent.
+        const update = writes(calls)[0].sql;
+        const reads = update.match(/team1_reported_at/g) ?? [];
+        expect(reads).toHaveLength(2);
+        const afterOwnAssignment = update.slice(update.indexOf("INTERVAL 1 SECOND), NOW()))") + 1);
+        expect(afterOwnAssignment).not.toContain("_reported_at");
+      });
+
+      it("reportMatchScore_confirmWithSeenNull_confirmPathWins", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }, null);
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
       });
     });
 

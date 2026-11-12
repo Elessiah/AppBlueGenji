@@ -7,7 +7,7 @@ import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-laun
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { SCORE_LOCKED_DISPUTE, isScoreDisputed, reportPresent } from "@/lib/shared/score-dispute";
 import { toIso } from "@/lib/server/serialization";
-import { MatchRow } from "./_internal";
+import { MatchRow, reportInstant } from "./_internal";
 import { MATCH_RESULT_SET_SQL } from "./score-report-sql";
 import { pushTeamToTarget } from "./target-slot";
 import {
@@ -305,8 +305,9 @@ async function reportsConcord(
   maps: ReadonlyArray<MatchMapInput>,
   reporterSource: "TEAM1" | "TEAM2",
   /**
-   * Détail adverse déjà lu sous verrou par cette transaction **et comparé** aux
-   * maps confirmées (« Confirmer », {@link assertProposalUnchanged}) : il ne
+   * Détail adverse déjà lu sous verrou par cette transaction **et trouvé
+   * identique** aux maps envoyées (« Confirmer », {@link assertProposalUnchanged},
+   * ou envoi concordant d'une modale périmée, {@link assertOpponentReportSeen}) : il ne
    * peut plus changer — tout report passe par le verrou du match, tenu ici —,
    * inutile de le relire ni de le recomparer.
    */
@@ -316,8 +317,9 @@ async function reportsConcord(
     Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
     Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
   if (!scoresAgree) return false;
-  // « Confirmer » : `assertProposalUnchanged` vient de comparer ces mêmes
-  // listes (refus sinon) — une seule comparaison, une seule règle.
+  // « Confirmer » (`assertProposalUnchanged`) ou envoi d'une modale périmée
+  // (`assertOpponentReportSeen`) : ces mêmes listes viennent d'être comparées
+  // (refus sinon) — une seule comparaison, une seule règle.
   if (knownOtherMaps) return true;
   const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
   return sameMapLists(maps, await loadMatchMaps(connection, Number(updated.id), otherSource));
@@ -327,10 +329,61 @@ async function reportsConcord(
 export type ProposalConfirmation = { reportedAt: string };
 
 /**
+ * Nouvel instant de dépôt d'un report : maintenant, et **toujours plus tard**
+ * que le dépôt qu'il remplace. La colonne est à la seconde : une retouche dans
+ * la même seconde garderait sinon le même instant, et les gardes qui
+ * l'identifient (`assertProposalUnchanged`, `assertOpponentReportSeen`)
+ * prendraient la nouvelle version pour celle que l'adversaire a lue.
+ *
+ * Avance bornée : l'instant ne dépasse l'horloge que d'une seconde par
+ * retouche **dans la même seconde** (envois sérialisés par le verrou du
+ * match), et se recale sur `NOW()` dès que l'horloge l'a rattrapé ; le plafond
+ * des reports (`SCORE_REPORT_WRITE_RULE`, vingt par minute et par compte) la
+ * borne à une vingtaine de secondes, même en boucle. Aucun délai
+ * n'en dépend — l'échéance de validation d'office part de `NOW()`
+ * (`scoreDeadlineAssignment`), la date de jeu du plus **ancien** report.
+ *
+ * La colonne ne se lit que dans sa propre affectation : MySQL et MariaDB
+ * évaluent les affectations d'un `UPDATE` de gauche à droite, sur la valeur déjà
+ * posée — une clause ultérieure qui la lirait verrait l'instant avancé (épinglé
+ * par un test).
+ */
+function reportedAtAssignment(side: "team1" | "team2"): string {
+  return `GREATEST(NOW(), COALESCE(DATE_ADD(${side}_reported_at, INTERVAL 1 SECOND), NOW()))`;
+}
+
+/**
+ * La proposition adverse, vue de l'engagée qui reporte : son score, le score
+ * qu'elle prête au lecteur, son instant de dépôt sous la forme que la modale
+ * lit ({@link reportInstant}), et la source de son détail. Seul choix du côté
+ * adverse pour les deux gardes ({@link assertProposalUnchanged},
+ * {@link assertOpponentReportSeen}).
+ */
+function opponentReport(
+  match: MatchRow,
+  isTeam1Reporter: boolean,
+): { score: MatchRow["team1_report_score"]; opponentScore: MatchRow["team1_report_opponent_score"]; instant: string; source: "TEAM1" | "TEAM2" } {
+  return isTeam1Reporter
+    ? {
+        score: match.team2_report_score,
+        opponentScore: match.team2_report_opponent_score,
+        instant: reportInstant(match.team2_reported_at),
+        source: "TEAM2",
+      }
+    : {
+        score: match.team1_report_score,
+        opponentScore: match.team1_report_opponent_score,
+        instant: reportInstant(match.team1_reported_at),
+        source: "TEAM1",
+      };
+}
+
+/**
  * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
- * instant de dépôt, et les mêmes maps que celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
- * verrouillée ; le détail adverse est relu sous verrou (la dernière version),
- * et rendu pour que la comparaison des deux reports ne le relise pas.
+ * instant de dépôt, et les mêmes maps que celles renvoyées. Lève
+ * `PROPOSAL_STALE` sinon. La ligne du match est déjà verrouillée ; le détail
+ * adverse est relu sous verrou (la dernière version), et rendu pour que la
+ * comparaison des deux reports ne le relise pas.
  */
 async function assertProposalUnchanged(
   connection: PoolConnection,
@@ -339,13 +392,56 @@ async function assertProposalUnchanged(
   maps: ReadonlyArray<MatchMapInput>,
   confirm: ProposalConfirmation,
 ): Promise<ReadonlyArray<MatchMapInput>> {
-  const reportedAt = isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at;
-  const score = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
-  if (score === null || score === undefined || toIso(reportedAt ?? null) !== confirm.reportedAt) {
+  const theirs = opponentReport(match, isTeam1Reporter);
+  if (theirs.score === null || theirs.score === undefined || theirs.instant !== confirm.reportedAt) {
     throw new Error("PROPOSAL_STALE");
   }
-  const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), theirs.source);
   if (!sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
+  return theirMaps;
+}
+
+/**
+ * La proposition adverse que la modale montrait au lecteur quand il a envoyé
+ * **sa** version : son instant de dépôt, ou `null` s'il n'en voyait aucune.
+ * `undefined` : l'appelant ne dit rien de ce qu'il a vu (appel interne) — aucun
+ * contrôle. La route le pose toujours (`docs/features/MAP_SCORES.md`).
+ */
+export type SeenOpponentReport = string | null | undefined;
+
+/**
+ * Garde contre une modale **périmée** : l'engagé envoie sa version alors
+ * qu'une proposition adverse est arrivée (ou a changé) depuis ce qu'il a lu —
+ * flux coupé, onglet en veille. Si sa version **concorde** avec elle, rien à
+ * craindre : le match se clôt comme toujours. Si elle diffère, l'envoyer
+ * ouvrirait un litige qu'il n'a jamais vu venir : `PROPOSAL_ARRIVED`, rien
+ * d'écrit, la modale relit et montre la comparaison ; il pourra alors confirmer
+ * la version adverse ou maintenir la sienne en connaissance de cause (son
+ * renvoi porte cette fois le bon instant de dépôt). Ligne du match déjà
+ * verrouillée. Rend le détail adverse lu et **trouvé identique**, que la
+ * comparaison des deux reports n'a plus à relire.
+ */
+async function assertOpponentReportSeen(
+  connection: PoolConnection,
+  match: MatchRow,
+  isTeam1Reporter: boolean,
+  mine: { myScore: number; opponentScore: number; maps: ReadonlyArray<MatchMapInput> },
+  seen: SeenOpponentReport,
+): Promise<ReadonlyArray<MatchMapInput> | undefined> {
+  if (seen === undefined) return undefined;
+  const theirs = opponentReport(match, isTeam1Reporter);
+  if (!reportPresent(theirs.score)) return undefined;
+  if (theirs.instant === seen) return undefined;
+  const scoresAgree =
+    Number(theirs.score) === mine.opponentScore && Number(theirs.opponentScore) === mine.myScore;
+  if (!scoresAgree) throw new Error("PROPOSAL_ARRIVED");
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), theirs.source);
+  // Report adverse **sans détail** (déposé avant les scores map par map) : la
+  // modale n'a jamais rien eu à en montrer, et ne l'aura jamais — refuser
+  // bouclerait sans fin (chaque relecture renvoie `null`). L'envoi suit le
+  // chemin d'avant : comparé par `reportsConcord`, litige s'il diffère.
+  if (theirMaps.length === 0) return undefined;
+  if (!sameMapLists(mine.maps, theirMaps)) throw new Error("PROPOSAL_ARRIVED");
   return theirMaps;
 }
 
@@ -365,6 +461,11 @@ function reporterView(
     : { myScore: team2, opponentScore: team1, reporterSource: "TEAM2" };
 }
 
+/**
+ * Enregistre le report d'un engagé (maps, puis score dérivé). Rend `true`
+ * quand cet envoi clôt le match (les deux reports concordent), `false` s'il
+ * attend l'adversaire ou ouvre un litige.
+ */
 export async function reportMatchScore(
   connection: PoolConnection,
   tournamentId: number,
@@ -372,7 +473,8 @@ export async function reportMatchScore(
   userId: number,
   maps: ReadonlyArray<MatchMapInput>,
   confirm?: ProposalConfirmation,
-): Promise<void> {
+  seenOpponentReport?: SeenOpponentReport,
+): Promise<boolean> {
   const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
   const [matches] = await connection.execute<MatchRow[]>(
@@ -466,9 +568,17 @@ export async function reportMatchScore(
   // vue** — même dépôt, même détail. Elle a pu changer ou partir entre
   // l'ouverture de la modale et le clic : on refuse plutôt que de clore sur
   // autre chose que ce qui a été lu (`docs/features/MAP_SCORES.md`).
+  // Simple envoi : la proposition adverse doit être celle que la modale
+  // montrait, sauf concordance (`assertOpponentReportSeen`).
   const confirmedMaps = confirm
     ? await assertProposalUnchanged(connection, match, isTeam1Reporter, maps, confirm)
-    : undefined;
+    : await assertOpponentReportSeen(
+        connection,
+        match,
+        isTeam1Reporter,
+        { myScore, opponentScore, maps },
+        seenOpponentReport,
+      );
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
@@ -483,7 +593,7 @@ export async function reportMatchScore(
       `UPDATE bg_matches
        SET team1_report_score = ?,
            team1_report_opponent_score = ?,
-           team1_reported_at = NOW(),
+           team1_reported_at = ${reportedAtAssignment("team1")},
            ${scoreDeadlineAssignment("team2")},
            status = 'AWAITING_CONFIRMATION'${pauseResetAssignment(match)}
        WHERE id = ?`,
@@ -505,7 +615,7 @@ export async function reportMatchScore(
       `UPDATE bg_matches
        SET team2_report_score = ?,
            team2_report_opponent_score = ?,
-           team2_reported_at = NOW(),
+           team2_reported_at = ${reportedAtAssignment("team2")},
            ${scoreDeadlineAssignment("team1")},
            status = 'AWAITING_CONFIRMATION'${pauseResetAssignment(match)}
        WHERE id = ?`,
@@ -526,7 +636,12 @@ export async function reportMatchScore(
   // que l'adversaire confirme d'un clic, et elle qui devient le résultat retenu.
   // Premier report de l'engagée (ligne du match verrouillée) : aucune ligne à
   // effacer, donc pas de lecture verrouillante sur un intervalle vide.
-  const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;
+  // Un report se reconnaît à son score **ou** à son instant : un score sans
+  // instant (donnée ancienne, que les gardes lisent `""`) a lui aussi des maps
+  // à effacer avant les nouvelles.
+  const hadReport =
+    reportPresent(isTeam1Reporter ? match.team1_report_score : match.team2_report_score) ||
+    (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;
   await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });
 
   const [updatedRows] = await connection.execute<MatchRow[]>(
@@ -553,6 +668,9 @@ export async function reportMatchScore(
   );
 
   const updated = updatedRows[0];
+  // Les deux reports concordent : le match est clos par cet envoi — la modale
+  // dit « confirmé » plutôt que « en attente de l'adversaire ».
+  let completed = false;
 
   if (
     updated.team1_report_score !== null &&
@@ -579,6 +697,7 @@ export async function reportMatchScore(
         winnerTeamId,
         loserTeamId,
       });
+      completed = true;
     } else {
       await connection.execute(`UPDATE bg_matches SET status = 'AWAITING_CONFIRMATION' WHERE id = ?`, [
         matchId,
@@ -599,4 +718,5 @@ export async function reportMatchScore(
   }
 
   await tryAutoResolveByes(connection, tournamentId);
+  return completed;
 }

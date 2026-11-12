@@ -411,6 +411,16 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
  * Le stockage parle depuis l'engagée (« mon score », « score adverse ») : pour
  * l'équipe 2, son propre score est donc celui de la **seconde** colonne.
  */
+/**
+ * Instant de dépôt d'un report tel que les lecteurs le reçoivent : ISO, ou
+ * `""` pour un report sans instant. Seule forme : la sérialisation
+ * ({@link mapScoreReport}) et les gardes du report qui comparent l'instant
+ * renvoyé par la modale (`scoring.ts`) ne peuvent ainsi diverger.
+ */
+export function reportInstant(reportedAt: Date | string | null | undefined): string {
+  return toIso(reportedAt ?? null) ?? "";
+}
+
 export function mapScoreReport(
   score: number | null | undefined,
   opponentScore: number | null | undefined,
@@ -425,7 +435,7 @@ export function mapScoreReport(
   return {
     team1Score: side === 1 ? own : other,
     team2Score: side === 1 ? other : own,
-    reportedAt: toIso(reportedAt ?? null) ?? "",
+    reportedAt: reportInstant(reportedAt),
     maps: [],
   };
 }

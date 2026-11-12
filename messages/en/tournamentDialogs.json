@@ -145,6 +145,35 @@
         "hint": "{mine} forfeits this match: {opponent} wins {maps}-0, with no map played. The result is immediate — only the referee can reverse it.",
         "confirm": "Confirm {name}'s forfeit",
         "notAllowed": "A forfeit is declared by the team's owner or a manager."
+      },
+      "sameScoreArrived": "The opposing team reported the same score.",
+      "confirmTheirs": "Confirm the opponent's report",
+      "diff": {
+        "title": "What differs from {opponent}'s report",
+        "hint": "“Confirm the opponent's report” closes the match on {opponent}'s version. Sending your own score instead opens a dispute: score entry is locked for both opponents, and a referee settles it.",
+        "hintSubject": "opponent's report",
+        "map": "Map {number}",
+        "mapNamed": "Map {number} ({name})",
+        "kind": {
+          "WINNER": "winner",
+          "SCORE": "score",
+          "REPLAY_CODE": "replay code",
+          "MISSING_MINE": "missing from your entry",
+          "MISSING_THEIRS": "missing from their report"
+        },
+        "values": "you: {mine}; {opponent}: {theirs}",
+        "mapValue": "{score} · {code}",
+        "noCode": "no code",
+        "absent": "none",
+        "titleTheirs": "{opponent}'s report: {score}",
+        "kinds": "differs: {kinds}",
+        "announce": "{opponent} reported a different version from yours: compare the differences, then choose."
+      },
+      "dispute": {
+        "title": "Open a dispute?",
+        "body": "Your entry differs from {opponent}'s report. Sending it opens a dispute: score entry is locked for both opponents, forfeit included, and a referee is alerted to settle the match.",
+        "confirm": "Send the score",
+        "pending": "Sending…"
       }
     },
     "sending": "Sending…"

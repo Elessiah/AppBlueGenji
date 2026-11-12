@@ -225,6 +225,75 @@ La seconde équipe ne ressaisit rien :
 - **Code de replay** saisi brut (majuscules par la CSS, normalisé à la
   validation et au serveur) : le curseur reste en place pendant une correction.
 
+### Proposition adverse arrivée pendant la saisie (demande du 2026-11-12)
+
+Cas visé : l'équipe B remplit la modale quand l'équipe A envoie sa déclaration.
+
+**Avant ce lot.** La modale de B se réalignait déjà sur le flux : tant que B
+n'avait rien touché, la proposition de A remplissait les champs ; une saisie
+commencée n'était jamais écrasée, et le détail de A s'affichait à part. Mais un
+envoi de B après celui de A clôt le match si scores **et** maps concordent, et
+**ouvre un litige** à la moindre différence (arbitre alerté, saisie
+verrouillée, `SCORE_DISPUTE_LOCK.md`) — y compris quand la modale de B, ouverte
+avant le report de A et privée de flux (hors ligne, veille), ne l'avait jamais
+montré.
+
+**Maintenant.**
+
+- **Temps réel, deux portes.** La modale lit le match rafraîchi par le flux SSE
+  (`TournamentSnapshot`, ou la lecture REST de secours) et le détail par
+  `TournamentViewerContext.matchProposals` / `useProposalMaps` : la même
+  arrivée, quelle que soit la porte. Une saisie commencée n'est jamais
+  écrasée ; l'arrivée est notée (`arrivedDuringEntry`).
+- **Saisie identique** : bandeau « L'équipe adverse a déclaré le même score. »,
+  le bouton principal devient « Confirmer le score » (corps
+  `confirm: { reportedAt }`, `PROPOSAL_STALE` géré). Rien ne se clôt d'office.
+- **Saisie différente** (détail adverse connu) : la liste des différences map
+  par map (`mapListDifferences` : vainqueur, score, code de replay, map absente
+  d'un côté — mêmes règles que `sameMapLists`), un « i » qui explique le choix,
+  et « Confirmer la déclaration adverse » — qui envoie ses maps telles quelles
+  d'un clic, **sans toucher la saisie** (refusé, l'envoi laisse la version du
+  lecteur intacte). Ce bouton s'offre aussi pour une saisie
+  encore incomplète (`entryComparison`).
+- **Maintenir sa version** : « Envoyer le score » ouvre une confirmation
+  (`ConfirmActionDialog` : litige, saisie verrouillée, arbitre alerté), puis
+  l'envoi passe par le chemin ordinaire du désaccord.
+- **Modale périmée — contrat serveur.** Tout envoi simple — litige confirmé
+  compris, même règle (`seenOpponentReportAt()`, `lib/shared/player-score-report.ts`)
+  — porte `seenOpponentReportAt` : l'instant de dépôt de la déclaration adverse
+  que la modale montrait, quand la saisie s'y est vraiment comparée (détail
+  connu, `opponentDetailKnown()`, ou **score** déjà différent). `null` sinon :
+  aucune déclaration, ou un score identique au détail pas encore lu — qui ne
+  vaut pas « vue » ; le refus relit la vue REST, détail compris
+  (`matchProposals`). **Absent vaut `null`** ; un report sans instant se lit
+  `""` des deux côtés (et compte comme report : ses maps sont effacées avant
+  les nouvelles). Sous le verrou du
+  match (table seule, première lecture verrouillante — MariaDB),
+  `assertOpponentReportSeen` compare avec le report adverse en base : même
+  dépôt, ou aucun report adverse → chemin ordinaire ; autre dépôt et version
+  **concordante** → le match se clôt (rien à craindre, détail adverse déjà lu
+  réutilisé par `reportsConcord`) ; autre dépôt et version **différente** →
+  `409 PROPOSAL_ARRIVED`, rien d'écrit — sauf report adverse **sans détail**
+  (déposé avant les scores map par map) : rien n'a jamais été à montrer, le
+  refus bouclerait ; l'envoi suit le chemin ordinaire (`reportsConcord`).
+  La modale relit alors le contexte du
+  lecteur et montre la comparaison ; « maintenir » renvoie cette fois le bon
+  dépôt et ouvre le litige. « Confirmer » (`confirm`) garde sa propre garde
+  (`PROPOSAL_STALE`) et ignore ce champ. Un appel interne sans ce paramètre
+  (`undefined`) n'est pas contrôlé.
+- **Un dépôt, un instant.** `teamN_reported_at` est à la seconde : chaque
+  report s'écrit `GREATEST(NOW(), ancien + 1 s)` (`reportedAtAssignment`), si
+  bien qu'une retouche dans la même seconde change quand même l'instant que
+  les deux gardes comparent. L'avance sur l'horloge reste bornée (une seconde
+  par retouche dans la même seconde, recalée sur `NOW()` ensuite ; vingt
+  reports par minute et par compte au plus, `SCORE_REPORT_WRITE_RULE`, refus
+  compris → `429`) et aucun
+  délai n'en dépend (échéances calculées depuis `NOW()`).
+- **Réponse.** `200 { success, completed }` : `completed` dit que l'envoi a
+  clos le match (versions concordantes) — la modale annonce alors « score
+  confirmé », pas « en attente de l'adversaire » (`reportClosedMatch()` : seul
+  `completed: true` compte).
+
 **Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
 (BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne
 l'avancent que lorsqu'elles servent. La liste passe sur deux lignes selon **sa
@@ -386,6 +455,17 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 | Interface | `_components/MapScoreList.tsx`, `MatchMapDetails.tsx`, `MapDetailsDialog.tsx`, `MapResultList.tsx`, `PlayerScoreDialog.tsx`, `AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts`, `_hooks/useProposalMaps.ts` |
 | Relecture d'un match | `app/api/tournaments/[id]/matches/[matchId]/proposals/route.ts`, `getViewerMatchProposals` (`tournaments/index.ts`) |
 
+### Accessibilité de la comparaison
+
+L'arrivée est annoncée dans une région `aria-live="polite"` **toujours montée**
+(`ArrivalStatus`, vide puis remplie : un bandeau monté déjà rempli n'est pas lu),
+sans toucher au focus. La zone de comparaison est un `<fieldset>` nommé par son
+titre (qui dit les écarts, ou la déclaration adverse quand aucun écart n'est
+montré) ; « Confirmer la déclaration adverse » s'y rattache et prend
+`aria-busy` / « Envoi… » en vol. Chaque écart tient sur deux lignes (map et nature
+de l'écart, puis les deux versions) ; la confirmation du litige rappelle ces
+écarts. Même vocabulaire partout : « Envoyer le score ».
+
 ## Tests
 
 `tests/lib/shared/match-maps.test.ts`, `tests/lib/server/match-maps.test.ts`,
@@ -394,4 +474,8 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 `tests/app/api/tournaments/match-proposals.test.ts`, `tests/tournois/viewer-match-proposals.test.ts`,
 `tests/tournois/proposal-maps-hook.test.ts`,
 `tests/lib/server/match-format-report.test.ts`, `score-report-stalled.test.ts`,
-`tournaments-service.matches.test.ts`.
+`tournaments-service.matches.test.ts` (dont `PROPOSAL_ARRIVED`) ;
+`tests/lib/shared/player-score-report.test.ts` (`mapListDifferences`,
+`entryComparison`) ; `tests/app/tournament-actions-i18n.test.tsx` (bandeau,
+comparaison, confirmation du litige, FR + EN) ;
+`tests/tournois/score-arrival-announcement.test.ts` (annonce, titre de la zone).

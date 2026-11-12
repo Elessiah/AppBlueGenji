@@ -9,6 +9,8 @@ import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { SCORE_REPORT_WRITE_RULE } from "@/lib/server/api-guard";
 
 const params = { params: Promise.resolve({ id: "7", matchId: "42" }) };
 
@@ -27,6 +29,7 @@ function req(body: unknown = { maps: MAPS }) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetRateLimit();
   jest.mocked(canActOnTournament).mockResolvedValue(true);
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 2 }));
 });
@@ -45,24 +48,34 @@ describe("POST .../report — match pas encore lancé", () => {
   });
 
   it("accepte un report sur un match lancé", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
     expect((await POST(req(), params)).status).toBe(200);
     // Codes normalisés (majuscules) avant d'atteindre le service.
     expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, [
       { replayCode: "ABC123", team1Score: 2, team2Score: 1 },
       { replayCode: "DEF456", team1Score: 1, team2Score: 1 },
-    ], undefined);
+    ], undefined, null);
+  });
+
+  it("dit si l'envoi a clos le match (versions concordantes) ou s'il attend l'adversaire", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValueOnce({ completed: true });
+    const closed = await POST(req(), params);
+    expect(closed.status).toBe(200);
+    expect(await closed.json()).toEqual({ success: true, completed: true });
+
+    jest.mocked(reportMatchScore).mockResolvedValueOnce({ completed: false });
+    expect(await (await POST(req(), params)).json()).toEqual({ success: true, completed: false });
   });
 });
 
 describe("POST .../report — « Confirmer » la proposition adverse (MAP_SCORES.md)", () => {
   it("transmet l'instant de dépôt confirmé au service", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
     const res = await POST(req({ maps: MAPS, confirm: { reportedAt: "2026-10-05T20:00:00.000Z" } }), params);
     expect(res.status).toBe(200);
     expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, expect.any(Array), {
       reportedAt: "2026-10-05T20:00:00.000Z",
-    });
+    }, null);
   });
 
   it("refuse une confirmation mal formée en 400, sans atteindre le service", async () => {
@@ -143,5 +156,81 @@ describe("tournoi non publié", () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ error: "TOURNAMENT_NOT_FOUND" });
     expect(reportMatchScore).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST .../report — déclaration adverse vue par la modale (MAP_SCORES.md)", () => {
+  it("POST_seenOpponentReportAtString_passedToService", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+
+    const res = await POST(req({ maps: MAPS, seenOpponentReportAt: "2026-10-05T20:00:00.000Z" }), params);
+
+    expect(res.status).toBe(200);
+    expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, expect.any(Array), undefined, "2026-10-05T20:00:00.000Z");
+  });
+
+  it("POST_seenOpponentReportAt40Chars_accepted", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+
+    const res = await POST(req({ maps: MAPS, seenOpponentReportAt: "x".repeat(40) }), params);
+
+    expect(res.status).toBe(200);
+    expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, expect.any(Array), undefined, "x".repeat(40));
+  });
+
+  it("POST_seenOpponentReportAt41Chars_returns400", async () => {
+    const res = await POST(req({ maps: MAPS, seenOpponentReportAt: "x".repeat(41) }), params);
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_REQUEST" });
+    expect(reportMatchScore).not.toHaveBeenCalled();
+  });
+
+  it("POST_seenOpponentReportAtNumber_returns400", async () => {
+    const res = await POST(req({ maps: MAPS, seenOpponentReportAt: 12 }), params);
+
+    expect(res.status).toBe(400);
+    expect(reportMatchScore).not.toHaveBeenCalled();
+  });
+
+  it("POST_seenOpponentReportAtExplicitNull_passesNull", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+
+    await POST(req({ maps: MAPS, seenOpponentReportAt: null }), params);
+
+    expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, expect.any(Array), undefined, null);
+  });
+
+  it("POST_serviceThrowsProposalArrived_returns409", async () => {
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("PROPOSAL_ARRIVED"));
+
+    const res = await POST(req(), params);
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: "PROPOSAL_ARRIVED" });
+  });
+});
+
+describe("POST .../report — plafond par compte (SCORE_REPORT_WRITE_RULE)", () => {
+  it("POST_rateLimitExceeded_returns429BeforeService", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+    for (let i = 0; i < SCORE_REPORT_WRITE_RULE.limit; i += 1) await POST(req(), params);
+    jest.mocked(reportMatchScore).mockClear();
+
+    const res = await POST(req(), params);
+
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toMatchObject({ error: "TOO_MANY_REQUESTS" });
+    expect(reportMatchScore).not.toHaveBeenCalled();
+  });
+
+  it("POST_rateLimitPerAccount_otherUserNotThrottled", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+    for (let i = 0; i < SCORE_REPORT_WRITE_RULE.limit; i += 1) await POST(req(), params);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3 }));
+
+    const res = await POST(req(), params);
+
+    expect(res.status).toBe(200);
   });
 });

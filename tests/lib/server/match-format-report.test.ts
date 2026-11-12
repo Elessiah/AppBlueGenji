@@ -161,7 +161,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "BO", value: 5 });
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(3, 1))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(3, 1))).resolves.toBe(false);
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -190,7 +190,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament(null);
     const { conn, writes } = fakeConnection();
 
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(7, 2))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(7, 2))).resolves.toBe(false);
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -223,7 +223,7 @@ describe("reportMatchScore — respect du format de match", () => {
     const { conn, writes } = fakeConnection({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
 
     // Cinq maps sans tiebreaker : deux gagnées de chaque côté, une nulle.
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2, 1))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2, 1))).resolves.toBe(false);
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -233,7 +233,7 @@ describe("reportMatchScore — respect du format de match", () => {
     mockTournament({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
     const { conn, writes } = fakeConnection({ type: "FT", value: 3, draws: true }, "BG_SURVIE");
 
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 1, 2))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 1, 2))).resolves.toBe(false);
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 });

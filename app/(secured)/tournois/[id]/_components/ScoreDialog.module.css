@@ -124,6 +124,46 @@
   text-decoration: none;
 }
 
+/* Déclaration adverse arrivée pendant la saisie : ce qui diffère, map par
+   map, et « Confirmer la déclaration adverse ». */
+.diffZone {
+  min-width: 0;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft, #c3ccd8);
+}
+
+.diffList {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+/* Action à part entière (un clic clôt le match), pas un lien de phrase. */
+.confirmTheirs {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.diffMap {
+  font-weight: 700;
+  color: var(--blue-300, #8ad9ff);
+}
+
+/* Les deux versions sur leur propre ligne : une longue valeur se replie sans
+   casser la phrase de l'écart. */
+.diffValues {
+  display: block;
+  margin-top: 2px;
+}
+
 /* ---------- Rappel de format, puis forfait replié ---------- */
 
 .formatHint {
