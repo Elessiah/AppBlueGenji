@@ -715,6 +715,9 @@
 
 .roleTableWrap {
   container: roleTable / inline-size;
+  /* `inline-size` ignore le contenu : sans largeur propre, hors d'un parent
+     de bloc le tableau se réduirait à rien. */
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;

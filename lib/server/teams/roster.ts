@@ -9,7 +9,7 @@ import { sortTeamRoles } from "@/lib/shared/team-role-display";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
-import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
+import { lockMemberRoles, withMemberRowLock, withTeamRosterLock, writeActiveMembership } from "./access";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 
 /**
@@ -152,9 +152,11 @@ export async function updateTeamMemberRoles(
  *
  * Un code de direction ou inconnu dans `roles` est **refusé**
  * (`ROLE_NOT_SELF_ASSIGNABLE`) plutôt qu'ignoré : un client qui croirait
- * pouvoir se nommer capitaine doit l'apprendre. Sous le verrou de l'équipe,
- * comme tout geste sur le roster : relus avant, les rôles de direction
- * réécrits par une modale de la gestion au même instant seraient perdus.
+ * pouvoir se nommer capitaine doit l'apprendre. Sous le verrou de **sa ligne
+ * de membre** seulement (`withMemberRowLock`) : relus avant, les rôles de
+ * direction réécrits par une modale de la gestion au même instant seraient
+ * perdus, mais la ligne de l'équipe, elle, n'a pas à attendre un choix
+ * cosmétique.
  *
  * Aucun flux n'est rafraîchi : un rôle de jeu ne change ni les gestes du
  * lecteur (`canDeclareTeamReady`, `hasTeamManagementRole` ne lisent que des
@@ -167,12 +169,17 @@ export async function updateOwnGameRoles(userId: number, teamId: number, roles: 
   if (roles.some((role) => !SELF_ASSIGNABLE_ROLES.includes(role as TeamRole))) {
     throw new Error("ROLE_NOT_SELF_ASSIGNABLE");
   }
-  return withTeamRosterLock(teamId, async (connection) => {
+  // Dédoublonné avant tout verrou : au plus `SELF_ASSIGNABLE_ROLES.length` codes.
+  const chosen = Array.from(new Set(roles)) as TeamRole[];
+  return withMemberRowLock(async (connection) => {
     const current = await lockMemberRoles(connection, teamId, userId);
     if (!current) throw new Error("NOT_A_MEMBER");
     await assertTermsAccepted(userId, connection);
-    const finalRoles = sortTeamRoles(withOwnGameRoles(current, roles as TeamRole[]));
-    await writeActiveMembership(connection, "roles_json = ?", [JSON.stringify(finalRoles)], teamId, userId);
+    const finalRoles = sortTeamRoles(withOwnGameRoles(current, chosen));
+    // Rien à changer : pas d'écriture (un double clic, un onglet périmé).
+    if (JSON.stringify(finalRoles) !== JSON.stringify(current)) {
+      await writeActiveMembership(connection, "roles_json = ?", [JSON.stringify(finalRoles)], teamId, userId);
+    }
     return finalRoles;
   });
 }

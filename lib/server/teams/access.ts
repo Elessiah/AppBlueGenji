@@ -84,6 +84,33 @@ export async function withTeamRosterLock<T>(
 }
 
 /**
+ * Transaction d'une écriture qui ne touche qu'**une ligne de membre** (« Mes
+ * rôles »), sans prendre la ligne de l'équipe : la verrouiller en exclusif pour
+ * un choix cosmétique de son propre membre faisait attendre l'inscription à un
+ * tournoi, la dissolution et les gestes de la gestion derrière chaque
+ * enregistrement. Le verrou de la **ligne du membre** (`lockMemberRoles`, à
+ * prendre en première instruction de `work`) suffit : tout geste qui réécrit
+ * ses rôles, ou le fait partir (départ, exclusion, dissolution, transfert), la
+ * verrouille aussi, sous le verrou de l'équipe — l'ordre équipe puis membre
+ * reste celui des autres, et celui-ci n'en prend qu'un : pas d'interblocage.
+ */
+export async function withMemberRowLock<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * L'équipe a-t-elle été inscrite au moins une fois à un tournoi ? Seule une
  * telle équipe peut figurer aux vues mises en cache qui nomment des équipes
  * (classement, podium, cartes d'aperçu, vitrine) : sans match, ni rang, ni

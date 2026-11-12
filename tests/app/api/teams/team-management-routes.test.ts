@@ -299,6 +299,15 @@ describe("PATCH /api/teams/[id]/members — rôles d'un membre", () => {
     expect(res.status).toBe(200);
     expect(updateTeamMemberRoles).toHaveBeenCalledWith(2, 7, 3, []);
   });
+
+  it("PATCH_success_doesNotBuildTheTeamDetail", async () => {
+    jest.mocked(updateTeamMemberRoles).mockResolvedValue(undefined);
+
+    const res = await membersPatch(req("PATCH", { userId: 3, roles: ["TANK"] }), params("7"));
+
+    expect(res.status).toBe(200);
+    expect(getTeamDetail).not.toHaveBeenCalled();
+  });
 });
 
 describe("PUT /api/teams/[id]/my-roles", () => {

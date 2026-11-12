@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { memo, useCallback, useId, useRef } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { Coche } from "@/components/Coche";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -29,6 +29,61 @@ function roleLabel(role: TeamRole, label: string, tickMode: boolean) {
   return <RolePills roles={[role]} label={label} />;
 }
 
+function roleTableColumns(t: ReturnType<typeof useTeamPageText>["t"]) {
+  return {
+    team: t("roleGuide.column.team"),
+    matches: t("roleGuide.column.matches"),
+    messages: t("roleGuide.column.messages"),
+  };
+}
+
+interface RoleTableRowProps {
+  role: TeamRole;
+  hintId: string;
+  /** La ligne porte une case. */
+  tickable: boolean;
+  checked: boolean;
+  /** Tableau à cocher (et non de lecture) : un rôle sans case se lit en libellé. */
+  tickMode: boolean;
+  onToggle: (role: TeamRole) => void;
+}
+
+/**
+ * Une ligne du tableau, mémorisée : textes statiques (une vingtaine de
+ * recherches de clé et un « i ») que cocher une autre ligne ne change pas.
+ */
+const RoleTableRow = memo(function RoleTableRow({ role, hintId, tickable, checked, tickMode, onToggle }: Readonly<RoleTableRowProps>) {
+  const { t, locale } = useTeamPageText();
+  const label = teamRoleLabel(role, locale);
+  const columns = roleTableColumns(t);
+  return (
+    <div role="row" className={styles.roleTableRow}>
+      <span role="rowheader" className={styles.roleTableRole}>
+        <InfoHintRow>
+          {tickable ? (
+            <Coche label={label} checked={checked} theme="equipe" onChange={() => onToggle(role)} aria-describedby={hintId} />
+          ) : (
+            roleLabel(role, label, tickMode)
+          )}
+          <InfoHint id={hintId} subject={label}>
+            <p>{t(`roleGuide.roles.${role}.hint`)}</p>
+          </InfoHint>
+        </InfoHintRow>
+        {role === "OWNER" && tickMode ? <span className={styles.roleTableNote}>{t("roleGuide.transferOnly")}</span> : null}
+      </span>
+      <span role="cell" data-label={columns.team}>
+        {t(`roleGuide.roles.${role}.team`)}
+      </span>
+      <span role="cell" data-label={columns.matches}>
+        {t(`roleGuide.roles.${role}.matches`)}
+      </span>
+      <span role="cell" data-label={columns.messages}>
+        {t(`roleGuide.roles.${role}.messages`)}
+      </span>
+    </div>
+  );
+});
+
 /**
  * Tableau de **tous** les rôles d'équipe : ce que chacun peut faire sur
  * l'équipe, en match, et les messages qu'il reçoit — le « i » de chaque rôle
@@ -47,16 +102,17 @@ function roleLabel(role: TeamRole, label: string, tickMode: boolean) {
  */
 export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleTableProps>) {
   const baseId = useId();
-  const { t, locale } = useTeamPageText();
-  const toggle = (role: TeamRole) => {
-    if (!selected || !onChange) return;
-    onChange(selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role]);
-  };
-  const columns = {
-    team: t("roleGuide.column.team"),
-    matches: t("roleGuide.column.matches"),
-    messages: t("roleGuide.column.messages"),
-  };
+  const { t } = useTeamPageText();
+  // Le dernier état, lu à la bascule : `toggle` garde une identité fixe, si bien
+  // que cocher un rôle ne refait que **sa** ligne (`RoleTableRow` est mémorisée).
+  const latest = useRef({ selected, onChange });
+  latest.current = { selected, onChange };
+  const toggle = useCallback((role: TeamRole) => {
+    const { selected: current, onChange: change } = latest.current;
+    if (!current || !change) return;
+    change(current.includes(role) ? current.filter((r) => r !== role) : [...current, role]);
+  }, []);
+  const columns = roleTableColumns(t);
 
   return (
     <div className={styles.roleTableWrap}>
@@ -70,45 +126,17 @@ export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleT
           </div>
         </div>
         <div role="rowgroup" className={styles.roleTableBody} data-tap-zone>
-          {TEAM_ROLE_ORDER.map((role) => {
-            const label = teamRoleLabel(role, locale);
-            const hintId = `${baseId}-${role}`;
-            const canTick = Boolean(selected && onChange) && checkable.includes(role);
-            return (
-              <div role="row" key={role} className={styles.roleTableRow}>
-                <span role="rowheader" className={styles.roleTableRole}>
-                  <InfoHintRow>
-                    {canTick ? (
-                      <Coche
-                        label={label}
-                        checked={selected?.includes(role) ?? false}
-                        theme="equipe"
-                        onChange={() => toggle(role)}
-                        aria-describedby={hintId}
-                      />
-                    ) : (
-                      roleLabel(role, label, Boolean(selected))
-                    )}
-                    <InfoHint id={hintId} subject={label}>
-                      <p>{t(`roleGuide.roles.${role}.hint`)}</p>
-                    </InfoHint>
-                  </InfoHintRow>
-                  {role === "OWNER" && selected ? (
-                    <span className={styles.roleTableNote}>{t("roleGuide.transferOnly")}</span>
-                  ) : null}
-                </span>
-                <span role="cell" data-label={columns.team}>
-                  {t(`roleGuide.roles.${role}.team`)}
-                </span>
-                <span role="cell" data-label={columns.matches}>
-                  {t(`roleGuide.roles.${role}.matches`)}
-                </span>
-                <span role="cell" data-label={columns.messages}>
-                  {t(`roleGuide.roles.${role}.messages`)}
-                </span>
-              </div>
-            );
-          })}
+          {TEAM_ROLE_ORDER.map((role) => (
+            <RoleTableRow
+              key={role}
+              role={role}
+              hintId={`${baseId}-${role}`}
+              tickable={Boolean(selected && onChange) && checkable.includes(role)}
+              checked={selected?.includes(role) ?? false}
+              tickMode={Boolean(selected)}
+              onToggle={toggle}
+            />
+          ))}
         </div>
       </div>
       <InfoHintRow>

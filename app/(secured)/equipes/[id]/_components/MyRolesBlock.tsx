@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { memo, useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { Coche } from "@/components/Coche";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -8,9 +9,11 @@ import { teamRoleLabel } from "@/lib/shared/team-role-display";
 import { SELF_ASSIGNABLE_ROLES, isLeadingRole } from "@/lib/shared/team-roles";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { RolePills } from "./RolePills";
-import { RoleGuideDialog } from "./RoleGuideDialog";
 import { isCheckboxEnter, ownGameRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
+
+// Chargée au clic sur « Ce que fait chaque rôle » : elle embarque le tableau des rôles.
+const RoleGuideDialog = dynamic(() => import("./RoleGuideDialog").then((m) => m.RoleGuideDialog), { ssr: false });
 
 interface MyRolesBlockProps {
   /** Rôles actuels du lecteur dans cette équipe. */
@@ -25,7 +28,7 @@ interface MyRolesBlockProps {
  * que la gestion lui a donnés. Un bloc à part, titré, loin du formulaire
  * d'invitation : c'est la confusion entre les deux qui l'a fait naître.
  */
-export function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
+export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
   const { t, locale } = useTeamPageText();
   const saved = SELF_ASSIGNABLE_ROLES.filter((role) => roles.includes(role));
   const leading = roles.filter(isLeadingRole);
@@ -33,11 +36,14 @@ export function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
   // Rôles enregistrés changés (enregistrement, ou modale de la gestion) : le
   // brouillon repart d'eux **sans remonter le bloc** — un remontage ferait
   // perdre le focus du bouton « Enregistrer » et refermerait la modale du guide.
+  // Sauf s'il a été modifié à la main : une relecture venue d'ailleurs (un
+  // gestionnaire, un autre onglet) ne doit pas effacer une sélection en cours.
   const savedKey = saved.join(",");
   const [syncedKey, setSyncedKey] = useState(savedKey);
   if (syncedKey !== savedKey) {
+    const previous = syncedKey === "" ? [] : (syncedKey.split(",") as TeamRole[]);
     setSyncedKey(savedKey);
-    setSelected(saved);
+    if (ownGameRolesToSave(previous, selected) === null) setSelected(saved);
   }
   const [pending, setPending] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -116,4 +122,4 @@ export function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
       {guideOpen ? <RoleGuideDialog onClose={() => setGuideOpen(false)} /> : null}
     </div>
   );
-}
+});

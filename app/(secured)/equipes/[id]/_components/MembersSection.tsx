@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import dynamic from "next/dynamic";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import { PlayerLink } from "@/components/entity-link";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
@@ -13,14 +14,20 @@ import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { useMemberManagement } from "../_hooks/useMemberManagement";
-import { RolesDialog, type RolesDialogTarget } from "./RolesDialog";
+import type { RolesDialogTarget } from "./RolesDialog";
 import { RolePills } from "./RolePills";
-import { InviteRolesDialog } from "./InviteRolesDialog";
 import { MyRolesBlock } from "./MyRolesBlock";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
 import { invitationOutcome } from "../_lib/member-roles";
 import styles from "../team.module.css";
+
+// Chargées à l'ouverture : elles embarquent le tableau des rôles et ses « i »,
+// que la page n'a pas besoin de charger pour qui n'ouvre jamais ces modales.
+const RolesDialog = dynamic(() => import("./RolesDialog").then((m) => m.RolesDialog), { ssr: false });
+const InviteRolesDialog = dynamic(() => import("./InviteRolesDialog").then((m) => m.InviteRolesDialog), {
+  ssr: false,
+});
 
 const INVITE_FIELD_IDS = { pseudo: "team-invite-pseudo" } as const;
 
@@ -56,70 +63,34 @@ export function MembersSection({
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const { t, locale } = useTeamPageText();
   // Un pseudo ancien fait de caractères invisibles se lit « Joueur #id » partout, noms accessibles compris.
-  const playerName = (pseudo: string, userId: number) => shownEntityName(pseudo, "player", userId, locale);
+  const playerName = useCallback(
+    (pseudo: string, userId: number) => shownEntityName(pseudo, "player", userId, locale),
+    [locale],
+  );
   const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, INVITE_FIELD_IDS);
 
-  const refreshAll = () => {
+  // Stable : `useMemberManagement` en dépend, et chaque frappe du champ pseudo
+  // refait un rendu — des gestes d'identité neuve à chaque frappe sont inutiles.
+  const refreshAll = useCallback(() => {
     onChanged();
     onInvitationsChanged();
-  };
+  }, [onChanged, onInvitationsChanged]);
   const { addMember, removeMember, updateRoles, updateOwnRoles, cancelInvitation } = useMemberManagement(
     teamId,
     refreshAll,
     onChanged,
   );
 
-  const sortedMembers = sortTeamMembers(members);
   const viewerMember = members.find((member) => member.userId === viewerUserId) ?? null;
   const canInvite = memberPseudo.trim().length > 0 && inviteTarget === null;
 
-  // Premier temps : le pseudo seul. Les rôles se choisissent dans la modale
-  // (`InviteRolesDialog`) — inline, on les prenait pour les siens.
-  const invite = (event: FormEvent) => {
-    event.preventDefault();
-    if (!canInvite) return;
-    fieldErrors.clear();
-    setInviteTarget(memberPseudo.trim());
-  };
-
-  const sendInvitation = async (pseudo: string, roles: TeamRole[]): Promise<boolean> => {
-    let pseudoRefused = false;
-    // Un pseudo refusé (introuvable, déjà invité…) est signalé sur le champ :
-    // la modale se ferme pour le montrer, et le champ reprend le focus sans
-    // rouvrir ses suggestions. Les autres refus gardent la modale ouverte.
-    const ok = await addMember(pseudo, roles, (code, message) => {
-      pseudoRefused = fieldErrors.report(code, message);
-    });
-    // Refus : la saisie reste, pour corriger une faute de frappe sans tout
-    // retaper.
-    const outcome = invitationOutcome(ok, pseudoRefused);
-    if (outcome.clearPseudo) setMemberPseudo("");
-    if (outcome.closeDialog) setInviteTarget(null);
-    setKeptRoles(outcome.keepRoles ? roles : []);
-    return ok;
-  };
-
-  const withdraw = async (invitation: TeamSentInvitation) => {
-    if (cancellingId === invitation.id) return;
-    setCancellingId(invitation.id);
-    await cancelInvitation(invitation.id, playerName(invitation.pseudo, invitation.userId));
-    setCancellingId(null);
-  };
-
-  return (
-    <>
-      <section
-        className={`ds-block ${styles.block} ${canManage ? styles.overflowBlock : ""}`}
-        aria-labelledby="team-members-title"
-      >
-        <div className={`ds-section-title purple ${styles.sectionHead}`}>
-          <h2 id="team-members-title">{t("members.title")}</h2>
-          <span className={styles.count}>{t("members.count", { count: members.length })}</span>
-        </div>
-
-        {members.length === 0 ? (
+  // Le roster ne dépend pas du champ pseudo : mémorisé, une frappe ne refait
+  // ni son tri ni ses lignes.
+  const roster = useMemo(
+    () =>
+      members.length === 0 ? (
           <p className={styles.empty}>{t("members.empty")}</p>
-        ) : (
+      ) : (
           <div className={styles.roster} role="table" aria-label={t("members.rosterLabel", { team: teamName })}>
             <div role="rowgroup">
               <div
@@ -137,7 +108,7 @@ export function MembersSection({
               </div>
             </div>
             <div role="rowgroup">
-              {sortedMembers.map((member) => {
+              {sortTeamMembers(members).map((member) => {
                 const isOwner = member.roles.includes("OWNER");
                 const isViewer = member.userId === viewerUserId;
                 // Le serveur refuse qu'un manager touche aux rôles du
@@ -210,7 +181,55 @@ export function MembersSection({
               })}
             </div>
           </div>
-        )}
+      ),
+    [members, canManage, viewerUserId, teamName, t, locale, playerName],
+  );
+
+  // Premier temps : le pseudo seul. Les rôles se choisissent dans la modale
+  // (`InviteRolesDialog`) — inline, on les prenait pour les siens.
+  const invite = (event: FormEvent) => {
+    event.preventDefault();
+    if (!canInvite) return;
+    fieldErrors.clear();
+    setInviteTarget(memberPseudo.trim());
+  };
+
+  const sendInvitation = async (pseudo: string, roles: TeamRole[]): Promise<boolean> => {
+    let pseudoRefused = false;
+    // Un pseudo refusé (introuvable, déjà invité…) est signalé sur le champ :
+    // la modale se ferme pour le montrer, et le champ reprend le focus sans
+    // rouvrir ses suggestions. Les autres refus gardent la modale ouverte.
+    const ok = await addMember(pseudo, roles, (code, message) => {
+      pseudoRefused = fieldErrors.report(code, message);
+    });
+    // Refus : la saisie reste, pour corriger une faute de frappe sans tout
+    // retaper.
+    const outcome = invitationOutcome(ok, pseudoRefused);
+    if (outcome.clearPseudo) setMemberPseudo("");
+    if (outcome.closeDialog) setInviteTarget(null);
+    setKeptRoles(outcome.keepRoles ? roles : []);
+    return ok;
+  };
+
+  const withdraw = async (invitation: TeamSentInvitation) => {
+    if (cancellingId === invitation.id) return;
+    setCancellingId(invitation.id);
+    await cancelInvitation(invitation.id, playerName(invitation.pseudo, invitation.userId));
+    setCancellingId(null);
+  };
+
+  return (
+    <>
+      <section
+        className={`ds-block ${styles.block} ${canManage ? styles.overflowBlock : ""}`}
+        aria-labelledby="team-members-title"
+      >
+        <div className={`ds-section-title purple ${styles.sectionHead}`}>
+          <h2 id="team-members-title">{t("members.title")}</h2>
+          <span className={styles.count}>{t("members.count", { count: members.length })}</span>
+        </div>
+
+        {roster}
 
         {viewerMember ? (
           <MyRolesBlock roles={viewerMember.roles} onSave={updateOwnRoles} />

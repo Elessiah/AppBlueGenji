@@ -25,10 +25,11 @@ export function useMemberManagement(
   teamId: number,
   onChanged: () => void,
   /**
-   * Relecture après « Mes rôles » : la fiche seule — les invitations en attente
-   * ne bougent pas d'un rôle de jeu. Par défaut, `onChanged`.
+   * Relecture après un changement de rôles (les siens, ou ceux d'un membre) :
+   * la fiche seule — les invitations en attente ne bougent pas d'un rôle.
+   * Par défaut, `onChanged`.
    */
-  onOwnRolesChanged: () => void = onChanged,
+  onRolesChanged: () => void = onChanged,
 ) {
   const { showError, showSuccess } = useToast();
   const { t } = useTeamPageText();
@@ -81,8 +82,8 @@ export function useMemberManagement(
       run(async () => {
         await teamApi(`/api/teams/${teamId}/members`, jsonRequest("PATCH", { userId, roles }), "TEAM_MEMBER_UPDATE_FAILED");
         return t("members.rolesUpdated");
-      }),
-    [run, teamId, t],
+      }, undefined, onRolesChanged),
+    [run, teamId, t, onRolesChanged],
   );
 
   /** « Mes rôles » : le lecteur choisit ses propres rôles de jeu (D71). */
@@ -91,8 +92,8 @@ export function useMemberManagement(
       run(async () => {
         await teamApi(`/api/teams/${teamId}/my-roles`, jsonRequest("PUT", { roles }), "TEAM_OWN_ROLES_FAILED");
         return t("myRoles.saved");
-      }, undefined, onOwnRolesChanged),
-    [run, teamId, t, onOwnRolesChanged],
+      }, undefined, onRolesChanged),
+    [run, teamId, t, onRolesChanged],
   );
 
   const cancelInvitation = useCallback(

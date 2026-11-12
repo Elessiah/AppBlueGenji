@@ -51,8 +51,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     // Liste exigée : une liste vide est permise (membre sans rôle, D71), une
     // liste absente ne doit donc plus valoir « aucun rôle » (`INVALID_ROLES`).
     await updateTeamMemberRoles(user.id, teamId, body.userId, rolesListFromBody(body.roles));
-    const detail = await getTeamDetail(teamId, user.id);
-    return ok(detail);
+    // Pas la fiche : le client la relit (`refresh`) et jetait celle-ci.
+    return ok({ updated: true });
   } catch (error) {
     const message = (error as Error).message;
     return fail(message || "TEAM_MEMBER_UPDATE_FAILED", teamErrorStatus(TEAM_MEMBER_ROLES_ERROR_STATUS, message));

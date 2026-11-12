@@ -38,7 +38,9 @@ export function inviteRolesFromBody(raw: unknown): TeamRole[] | undefined {
 export function rolesListFromBody(raw: unknown): TeamRole[] {
   if (!Array.isArray(raw)) throw new Error("INVALID_ROLES");
   if (!raw.every(isKnownRole)) throw new Error("INVALID_ROLES");
-  return raw;
+  // Dédoublonnée ici : une liste de milliers de « TANK » ne doit pas être
+  // parcourue de nouveau sous le verrou d'une ligne ou de l'équipe.
+  return Array.from(new Set(raw));
 }
 
 function isKnownRole(role: unknown): role is TeamRole {

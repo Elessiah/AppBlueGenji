@@ -36,8 +36,10 @@ siens : rien n'était enregistré. Les deux gestes sont désormais séparés.
   « Enregistrer mes rôles » (`aria-disabled` tant que rien ne change), et
   « Ce que fait chaque rôle » (`RoleGuideDialog`, tableau en lecture).
 - `PUT /api/teams/[id]/my-roles` `{ roles: string[] }` → `updateOwnGameRoles`
-  (`lib/server/teams/roster.ts`) : soi seul, sous `withTeamRosterLock`,
-  conditions acceptées ; un rôle hors jeu → `ROLE_NOT_SELF_ASSIGNABLE` (400),
+  (`lib/server/teams/roster.ts`) : soi seul, sous le verrou de **sa ligne de membre**
+  (`withMemberRowLock`, pas celui de l'équipe : un choix cosmétique ne fait pas
+  attendre l'inscription), liste dédoublonnée avant le verrou, aucune écriture si
+  rien ne change, conditions acceptées ; un rôle hors jeu → `ROLE_NOT_SELF_ASSIGNABLE` (400),
   hors roster → `NOT_A_MEMBER` (403), conditions → 409. Les rôles de direction
   restent tels quels (`withOwnGameRoles`). Liste absente ou portant un code
   inconnu → `INVALID_ROLES` (`rolesListFromBody`), jamais lue comme « aucun
@@ -80,3 +82,10 @@ Tests : `tests/app/team-members-ux.test.tsx`, `tests/lib/server/teams-service.te
 (`updateOwnGameRoles`), `tests/app/api/teams/team-management-routes.test.ts`
 (`PUT …/my-roles`), `tests/lib/server/team-invite-roles.test.ts`,
 `tests/lib/shared/team-role-display.test.ts`, `tests/lib/shared/team-join.test.ts`.
+
+Performance : le roster est mémorisé (`useMemo`, une frappe du champ pseudo ne le
+refait pas), les lignes de `RoleTable` sont mémorisées (cocher n'en refait
+qu'une), les trois modales à tableau se chargent à l'ouverture (`next/dynamic`),
+un changement de rôles ne relit que la fiche (pas les invitations), `PATCH
+…/members` ne rend plus la fiche, et un brouillon de « Mes rôles » modifié à la
+main survit à une relecture venue d'ailleurs.

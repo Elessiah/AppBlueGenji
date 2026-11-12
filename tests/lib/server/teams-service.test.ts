@@ -355,6 +355,24 @@ describe("updateOwnGameRoles — « Mes rôles »", () => {
     expect(updates()).toHaveLength(0);
   });
 
+  it("updateOwnGameRoles_duplicatedCodes_writesDedupedRoles", async () => {
+    await updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK", "TANK", "HEAL", "TANK"]);
+    expect(updates()).toHaveLength(1);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["TANK", "HEAL"]), TEAM_ID, DPS_ID]);
+  });
+
+  it("updateOwnGameRoles_unchangedRoles_skipsWriteAndReturnsRoles", async () => {
+    await expect(updateOwnGameRoles(CAPTAIN_ID, TEAM_ID, ["HEAL"])).resolves.toEqual(["CAPITAINE", "HEAL"]);
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("updateOwnGameRoles_anyCall_locksMemberRowNotTeamRow", async () => {
+    await updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK"]);
+    const sqls = execute.mock.calls.map(([sql]) => sql);
+    expect(sqls.some((sql) => /FROM bg_teams WHERE id = \? FOR UPDATE/.test(sql))).toBe(false);
+    expect(sqls.some((sql) => /FROM bg_team_members[\s\S]*FOR UPDATE/.test(sql))).toBe(true);
+  });
+
   it("updateOwnGameRoles_member_writesOnlyTheirOwnRow", async () => {
     await updateOwnGameRoles(DPS_ID, TEAM_ID, ["HEAL"]);
     expect(updates()[0][1]).toEqual([JSON.stringify(["HEAL"]), TEAM_ID, DPS_ID]);

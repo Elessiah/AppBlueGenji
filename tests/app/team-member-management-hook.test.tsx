@@ -116,14 +116,14 @@ describe("useMemberManagement — gestion", () => {
     expect(onRefused).toHaveBeenCalledWith("USER_NOT_FOUND", expect.any(String));
   });
 
-  it("updateRoles_success_refreshesOnChanged", async () => {
+  it("updateRoles_success_refreshesRolesCallbackOnly", async () => {
     const onChanged = jest.fn<() => void>();
-    const onOwnRolesChanged = jest.fn<() => void>();
+    const onRolesChanged = jest.fn<() => void>();
     respond(200, {});
 
-    await captureGestures(onChanged, onOwnRolesChanged).updateRoles(3, []);
+    await captureGestures(onChanged, onRolesChanged).updateRoles(3, []);
 
-    expect(onChanged).toHaveBeenCalledTimes(1);
-    expect(onOwnRolesChanged).not.toHaveBeenCalled();
+    expect(onRolesChanged).toHaveBeenCalledTimes(1);
+    expect(onChanged).not.toHaveBeenCalled();
   });
 });

@@ -50,6 +50,10 @@ describe("rolesListFromBody", () => {
     expect(rolesListFromBody([])).toEqual([]);
   });
 
+  it("rolesListFromBody_repeatedCodes_returnsDedupedListInOrder", () => {
+    expect(rolesListFromBody(["TANK", "DPS", "TANK", ...Array(5000).fill("DPS")])).toEqual(["TANK", "DPS"]);
+  });
+
   it("rolesListFromBody_everyKnownCode_returnsList", () => {
     const all = ["OWNER", "MANAGER", "CAPITAINE", "COACH", "TANK", "DPS", "HEAL"];
     expect(rolesListFromBody(all)).toEqual(all);

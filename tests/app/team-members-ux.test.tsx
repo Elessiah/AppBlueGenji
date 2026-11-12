@@ -187,6 +187,28 @@ describe("câblage des modales de rôles", () => {
     expect(src).toContain("initialRoles={keptRoles}");
   });
 
+  it("MyRolesBlock_dirtyDraft_notOverwrittenByAnExternalChange", () => {
+    const src = read("app/(secured)/equipes/[id]/_components/MyRolesBlock.tsx");
+
+    expect(src).toContain("if (ownGameRolesToSave(previous, selected) === null) setSelected(saved)");
+  });
+
+  it("RoleTable_rows_areMemoizedWithAStableToggle", () => {
+    const src = read("app/(secured)/equipes/[id]/_components/RoleTable.tsx");
+
+    expect(src).toContain("const RoleTableRow = memo(");
+    expect(src).toContain("useCallback((role: TeamRole)");
+  });
+
+  it("MembersSection_roster_memoizedAndDialogsLazy", () => {
+    const src = read("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
+
+    expect(src).toContain("const roster = useMemo(");
+    expect(src).toMatch(/const RolesDialog = dynamic\(/);
+    expect(src).toMatch(/const InviteRolesDialog = dynamic\(/);
+    expect(read("app/(secured)/equipes/[id]/_components/MyRolesBlock.tsx")).toMatch(/const RoleGuideDialog = dynamic\(/);
+  });
+
   it("TeamDialog_form_guardsEnterOnCheckbox", () => {
     expect(read("app/(secured)/equipes/[id]/_components/TeamDialog.tsx")).toContain("isCheckboxEnter(event.key");
   });
