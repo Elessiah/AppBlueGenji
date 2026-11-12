@@ -103,9 +103,9 @@ ouvrir de fausse section.
 * **C'est à ton équipe de créer la partie.**
 
 ## Paramètres de partie
-* Mode compétitif
-* Pas de killcam
-* Pause à la déconnexion
+* Paramètres compétitifs
+* Killcam désactivée
+* Pause lors de la déconnexion d'un joueur
 
 ## Déroulé des maps
 * Map 1 : « Ilios »

@@ -63,9 +63,9 @@ describe("formatLobbyBriefDm", () => {
         "* **C'est à ton équipe de créer la partie.**",
         "",
         "## Paramètres de partie",
-        "* Mode compétitif",
-        "* Pas de killcam",
-        "* Pause à la déconnexion",
+        "* Paramètres compétitifs",
+        "* Killcam désactivée",
+        "* Pause lors de la déconnexion d'un joueur",
         "",
         "## Déroulé des maps",
         "* Map 1 : « Ilios »",
@@ -193,9 +193,9 @@ describe("formatLobbyBriefDm", () => {
         "* **Your team creates the game.**",
         "",
         "## Game settings",
-        "* Competitive mode",
-        "* No killcam",
-        "* Pause on disconnect",
+        "* Competitive settings",
+        "* Killcam disabled",
+        "* Pause when a player disconnects",
         "",
         "## Map order",
         "* Map 1: not set yet",
@@ -438,6 +438,11 @@ describe("paramètres de partie — une seule liste", () => {
     }
   });
 
+  it("GAME_SETTINGS_TEXT_eachLocale_equalsTheMatchPageLabels", () => {
+    expect(GAME_SETTINGS_TEXT.fr).toEqual(frTournament.matchPage.gameSettings);
+    expect(GAME_SETTINGS_TEXT.en).toEqual(enTournament.matchPage.gameSettings);
+  });
+
   it("le message privé les écrit dans l'ordre de la liste", () => {
     const dm = formatLobbyBriefDm(side(), URL);
     const lines = dm.split("\n");
@@ -454,7 +459,7 @@ describe("lobbyBriefPush", () => {
     const push = lobbyBriefPush(side({ cast: true }));
     expect(push.title).toBe("Check-in du match : réglages");
     expect(push.body).toBe(
-      "Match casté : trie les joueurs par rôle. Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.",
+      "Match casté : trie les joueurs par rôle. Gauche (hôte) : «\u00a0Renards\u00a0» · Droite (1er ban) : «\u00a0Nova\u00a0» · 1re carte : Ilios.",
     );
     expect(push.url).toBe(localeHref(matchPageHref(4, 40), "fr"));
     expect(push.url).toBe("/tournois/4/matchs/40");
@@ -478,7 +483,7 @@ describe("lobbyBriefPush", () => {
     );
 
     expect(push.body).toBe(
-      `Gauche (hôte) : « ${"N".repeat(50)} » · Droite (1er ban) : « ${"M".repeat(50)} » · 1re carte : ${"C".repeat(64)}.`,
+      `Gauche (hôte) : «\u00a0${"N".repeat(50)}\u00a0» · Droite (1er ban) : «\u00a0${"M".repeat(50)}\u00a0» · 1re carte : ${"C".repeat(64)}.`,
     );
     expect(clipPushText(push.body, PUSH_BODY_MAX)).toBe(push.body);
   });
@@ -492,7 +497,7 @@ describe("lobbyBriefPush", () => {
 
   it("lobbyBriefPush_mapEndingWithPunctuation_singleFinalPeriod", () => {
     expect(lobbyBriefPush(side({ firstMap: "Ilios." })).body).toBe(
-      "Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.",
+      "Gauche (hôte) : «\u00a0Renards\u00a0» · Droite (1er ban) : «\u00a0Nova\u00a0» · 1re carte : Ilios.",
     );
     expect(lobbyBriefPush(side({ firstMap: "Ilios !… " }), "en").body).toBe(
       "Left (host): “Renards” · Right (1st ban): “Nova” · 1st map: Ilios.",
@@ -504,19 +509,19 @@ describe("lobbyBriefPush", () => {
   it("lobbyBriefPush_nameWithSeparator_quotedSoTheBodyStaysReadable", () => {
     const push = lobbyBriefPush(side({ teamName: "A · B" }));
 
-    expect(push.body).toBe("Gauche (hôte) : « A · B » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
+    expect(push.body).toBe("Gauche (hôte) : «\u00a0A · B\u00a0» · Droite (1er ban) : «\u00a0Nova\u00a0» · 1re carte : Ilios.");
   });
 
   it("lobbyBriefPush_bidiOverrideInStoredName_strippedFromBody", () => {
     const push = lobbyBriefPush(side({ teamName: "Ren\u202Eards", opponentName: "No\u200Bva" }));
 
-    expect(push.body).toBe("Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
+    expect(push.body).toBe("Gauche (hôte) : «\u00a0Renards\u00a0» · Droite (1er ban) : «\u00a0Nova\u00a0» · 1re carte : Ilios.");
   });
 
   it("lobbyBriefPush_invisibleCharactersInMap_strippedFromBody", () => {
     const push = lobbyBriefPush(side({ firstMap: "Il\u202Eios\u200B." }));
 
-    expect(push.body).toBe("Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
+    expect(push.body).toBe("Gauche (hôte) : «\u00a0Renards\u00a0» · Droite (1er ban) : «\u00a0Nova\u00a0» · 1re carte : Ilios.");
   });
 
   it("lobbyBriefPush_emptyOrInvisibleOnlyMap_fallsBackToNotSetYet", () => {
@@ -528,7 +533,7 @@ describe("lobbyBriefPush", () => {
     const fr = lobbyBriefPush(side({ teamName: "A » · Droite : « B" }));
     const en = lobbyBriefPush(side({ teamName: "A” · Right: “B" }), "en");
 
-    expect(fr.body).toContain('Gauche (hôte) : « A " · Droite : " B » ·');
+    expect(fr.body).toContain('Gauche (hôte) : «\u00a0A " · Droite : " B\u00a0» ·');
     expect(en.body).toContain('Left (host): “A" · Right: "B” ·');
   });
 
@@ -548,7 +553,7 @@ describe("lobbyBriefPush", () => {
   it("lobbyBriefPush_nameWithOtherQuoteMarks_cannotCloseTheQuotation", () => {
     const push = lobbyBriefPush(side({ teamName: "A„ B‟ C‹ D›" }));
 
-    expect(push.body).toContain('Gauche (hôte) : « A" B" C" D" » ·');
+    expect(push.body).toContain('Gauche (hôte) : «\u00a0A" B" C" D"\u00a0» ·');
   });
 
   it("formatLobbyBriefDm_blankOrInvisibleFirstMap_fallsBackToNotSetYet", () => {

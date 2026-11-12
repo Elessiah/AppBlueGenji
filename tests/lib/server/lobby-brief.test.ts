@@ -411,7 +411,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(team1.dm()).toContain("coup d'envoi dans moins de 15 minutes");
     expect(team1.dm()).toContain("* Gauche (hôte) : « Renards » · Droite : « Nova »");
     // Les paramètres de partie, les mêmes pour tous les jeux.
-    expect(team1.dm()).toContain("## Paramètres de partie\n* Mode compétitif\n* Pas de killcam\n* Pause à la déconnexion");
+    expect(team1.dm()).toContain("## Paramètres de partie\n* Paramètres compétitifs\n* Killcam désactivée\n* Pause lors de la déconnexion d'un joueur");
     expect(team1.dm()).toContain("N'oublie pas de rentrer les scores");
     expect(team1.dm()).toContain("pingue le rôle @Arbitre sur Discord");
     expect(team1.dm()).toContain("GL HF :)");
@@ -423,7 +423,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(team1.dm()).toContain("**C'est à ton équipe de créer la partie.**");
     expect(team2.dm()).toContain("L'équipe hôte crée la partie");
     expect(team2.dm("en")).toContain("* Left (host): “Renards” · Right: “Nova”");
-    expect(team2.dm("en")).toContain("## Game settings\n* Competitive mode\n* No killcam\n* Pause on disconnect");
+    expect(team2.dm("en")).toContain("## Game settings\n* Competitive settings\n* Killcam disabled\n* Pause when a player disconnects");
   });
 
   it("dispatchLobbyBriefs_eachSide_claimedThenSentBeforeTheNextClaim", async () => {
