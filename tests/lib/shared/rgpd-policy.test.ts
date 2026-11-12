@@ -503,8 +503,8 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     // L'avis « Match retiré » et la case de Mon profil (revue juridique #444) ;
     // check-in du match (MATCH-CHECKIN) et retrait d'un cast (revue juridique de #491).
     expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels, avis de retrait de match, check-in du match, annonces d'un nouveau match et avis du retrait d'un cast en message privé");
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/case « Messages privés Discord de mes matchs » de Mon profil/);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/“Discord direct messages about my matches” box in My profile/);
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/case « Messages privés Discord de mes matchs et de mes équipes » de Mon profil/);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/“Discord direct messages about my matches and teams” box in My profile/);
   });
 
   it("déclare le pseudo #live et le choix des messages privés de match (revue juridique #444)", () => {

@@ -15,6 +15,7 @@
 import { hasTeamManagementRole } from "./team-roles";
 import type { TeamRole } from "./types";
 import { discordInline } from "./discord-text";
+import { matchDmOptOutLine } from "./discord-notifications";
 import { localizedSiteUrl } from "./dm-language";
 import type { Locale } from "./locales";
 
@@ -101,7 +102,14 @@ export function shouldNotifyTeamJoinRequest(input: { toThisTeam: number; toAnyTe
  * Discord du site (`docs/features/RGPD_LOGS_AND_VISITS.md`) : le demandeur se
  * lit sur la fiche de l'équipe, où mène le lien, derrière une connexion.
  */
-export function formatTeamJoinRequestNotice(input: { teamName: string; url: string }, locale: Locale = "fr"): string {
+export function formatTeamJoinRequestNotice(
+  input: { teamName: string; url: string; settingsUrl: string | null },
+  locale: Locale = "fr",
+): string {
+  return `${teamJoinRequestNoticeBody(input, locale)}\n${matchDmOptOutLine(input.settingsUrl, locale)}`;
+}
+
+function teamJoinRequestNoticeBody(input: { teamName: string; url: string }, locale: Locale): string {
   if (locale === "en") {
     return (
       `📨 BlueGenji — A player is asking to join your team “${discordInline(input.teamName)}”. ` +

@@ -222,7 +222,7 @@ function trimmedOrNull(value: string): string | null {
  * ne se dit qu'à lui — un tag qui ne l'est pas, invisible de tous, n'a rien
  * de cela à perdre (`removalBodyUnverified`, `removalBody2Unverified`). La
  * fin des messages privés de match ne se promet qu'à qui les reçoit encore
- * (`dms` : tag certifié et case « Messages privés Discord de mes matchs »
+ * (`dms` : tag certifié et case « Messages privés Discord de mes matchs et de mes équipes »
  * cochée).
  */
 function TagRemovalBody({ verified, dms }: Readonly<{ verified: boolean; dms: boolean }>) {
@@ -653,7 +653,7 @@ export default function ProfilePage() {
   const [tagRemovalVerified, setTagRemovalVerified] = useState(false);
   // Messages privés de match encore reçus à l'ouverture (case cochée).
   const [tagRemovalDms, setTagRemovalDms] = useState(false);
-  // Ce que montre la case « Messages privés Discord de mes matchs » : la fiche
+  // Ce que montre la case « Messages privés Discord de mes matchs et de mes équipes » : la fiche
   // relue par une sauvegarde du profil peut retarder sur un envoi en cours.
   // Une référence, pas un état : seul le clic « Retirer » la lit, et un état
   // ferait rendre toute la page à chaque coche (et au chargement de la fiche).
@@ -1218,8 +1218,8 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
-        {/* Un compte sans tag Discord certifié ne reçoit aucun de ces
-            messages : la case le dit (`matchDmReachable`, profil chargé en
+        {/* Un compte sans tag Discord certifié ne reçoit aucun message de
+            match (ceux d'équipe : Discord lié suffit) : la case le dit (`matchDmReachable`, profil chargé en
             repli de l'état Discord ; `null` tant qu'aucun des deux n'est lu). */}
         <MatchDmField
           initial={data?.matchDmEnabled}

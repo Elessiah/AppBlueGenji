@@ -14,8 +14,9 @@ const HINT_ID = "profile-match-dms-hint";
 const UNREACHABLE_ID = "profile-match-dms-unreachable";
 
 /**
- * Messages privés Discord de match (`bg_users.match_dm_enabled`) : le droit
+ * Messages privés Discord de match et d'équipe (`bg_users.match_dm_enabled`) : le droit
  * d'opposition du joueur aux messages que le bot lui envoie pour ses matchs
+ * et ses équipes — invitation, reprise, propriété, demande d'adhésion
  * (`lib/server/users/match-dm-preference.ts`). Les notifications push gardent
  * leurs réglages par sujet, juste au-dessus.
  *
@@ -25,8 +26,9 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
  * s'affiche et part à la suite (`runQueuedSaves`), jamais perdu.
  *
  * `discordReachable` : le compte a un tag Discord **certifié** — seul un tel
- * compte reçoit ces messages (`toNotificationRecipient`, portée `certified`,
- * contre le spam). À `false`, une ligne le dit et mène à la certification
+ * compte reçoit les messages de match (`toNotificationRecipient`, portée
+ * `certified`, contre le spam) ; ceux d'équipe partent aussi à un compte
+ * Discord lié (`teamInviteNoticeRecipient`). À `false`, une ligne le dit et mène à la certification
  * (section Discord, `#discord`) ; `null` (état pas encore lu) : rien.
  *
  * `onChoice` : ce que montre la case (choix du joueur, valeur retenue, fiche

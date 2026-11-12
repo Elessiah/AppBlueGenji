@@ -8,7 +8,7 @@ jest.mock("@/lib/server/solo-entries-service");
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients } from "@/lib/server/notify";
 import { getFullProfile } from "@/lib/server/users/full-profile";
-import { matchDmEnabled, recordMatchDmPreference } from "@/lib/server/users/match-dm-preference";
+import { matchDmEnabled, recordMatchDmPreference, withoutOptedOutDiscord } from "@/lib/server/users/match-dm-preference";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /** Messages privés de match : le droit d'opposition du joueur (`bg_users.match_dm_enabled`). */
@@ -240,5 +240,74 @@ describe("getFullProfile — choix du titulaire seul", () => {
     const { profile, sql } = await load(7);
     expect(sql).not.toMatch(/match_dm_enabled/);
     expect(profile).not.toHaveProperty("matchDmEnabled");
+  });
+});
+
+describe("withoutOptedOutDiscord — messages privés d'équipe (D68)", () => {
+  const KIRO = { userId: 1, discord: { discordId: "555", handle: "kiro", label: "Kiro" } };
+  const AYLA = { userId: 2, discord: { discordId: "777", handle: null, label: "Ayla" } };
+
+  it("withoutOptedOutDiscord_optedOutRecipient_discordRemovedKeptAsRecipient", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 2 }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await withoutOptedOutDiscord([KIRO, AYLA]);
+
+    expect(recipients).toEqual([KIRO, { userId: 2, discord: null }]);
+    expect(String(query.mock.calls[0][0])).toMatch(/match_dm_enabled = 0/);
+  });
+
+  it("withoutOptedOutDiscord_noDiscordChannel_noDatabaseRead", async () => {
+    const query = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    expect(await withoutOptedOutDiscord([{ userId: 3, discord: null }])).toEqual([{ userId: 3, discord: null }]);
+    expect(await withoutOptedOutDiscord([])).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("withoutOptedOutDiscord_columnMissing_nothingRemoved", async () => {
+    const missing = Object.assign(new Error("Unknown column 'match_dm_enabled'"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(missing);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    expect(await withoutOptedOutDiscord([KIRO, AYLA])).toEqual([KIRO, AYLA]);
+  });
+
+  it("withoutOptedOutDiscord_otherReadError_discordRemovedForAllAndReasonLogged", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const lost = Object.assign(new Error("connection lost"), { code: "PROTOCOL_CONNECTION_LOST" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(lost);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await withoutOptedOutDiscord([KIRO, AYLA]);
+
+    expect(recipients).toEqual([{ userId: 1, discord: null }, { userId: 2, discord: null }]);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][1]).toBe("PROTOCOL_CONNECTION_LOST");
+    expect(error.mock.calls[0].map(String).join(" ")).not.toMatch(/Kiro|Ayla/);
+    error.mockRestore();
+  });
+
+  it("withoutOptedOutDiscord_unknownOtherColumn_discordRemovedForAll", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const otherColumn = Object.assign(new Error("Unknown column 'is_deleted' in 'where clause'"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(otherColumn);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await withoutOptedOutDiscord([KIRO, AYLA]);
+
+    expect(recipients).toEqual([{ userId: 1, discord: null }, { userId: 2, discord: null }]);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
+  it("withoutOptedOutDiscord_duplicateIds_queriedOnce", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await withoutOptedOutDiscord([KIRO, KIRO]);
+
+    expect(query.mock.calls[0][1]).toEqual([1]);
   });
 });

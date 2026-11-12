@@ -1111,7 +1111,7 @@ function RgpdFr({
             éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent
             sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
-            mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
+            mes matchs et de mes équipes » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
             gardent leurs propres réglages. Le site garde ce choix le temps du compte, au titre d&apos;une{" "}
             <strong>obligation légale</strong> (c&apos;est ce qui lui permet de continuer d&apos;honorer votre opposition — cette conservation ne relève donc pas du droit d&apos;opposition) ; il figure dans
             l&apos;export de vos données. Les alertes et le programme d&apos;arbitrage adressés aux
@@ -1151,9 +1151,10 @@ function RgpdFr({
             entre pas) ; au-delà de {TEAM_NOTICE_DMS_HOURLY_CAP} invitations, reprises ou propriétés annoncées par
             heure pour tout le site, l&apos;avis ne part qu&apos;en notification push. L&apos;invitation, elle, reste
             dans <Link href="/profil#invitations">Mon profil</Link>. Ces messages reposent sur l&apos;
-            <strong>intérêt légitime</strong> de l&apos;association à la constitution des équipes, auquel vous pouvez
-            vous opposer (section <a href="#exercer-vos-droits">« Exercer vos droits »</a> ;{" "}
-            <Link href="/rgpd/registre#t03">registre, T03</Link>).
+            <strong>intérêt légitime</strong> de l&apos;association à la constitution des équipes ; vous pouvez
+            vous y opposer à tout moment en décochant « Messages privés Discord de mes matchs et de mes équipes »
+            dans <Link href="/profil#notifications">Mon profil</Link> — la notification push garde ses propres
+            réglages (<Link href="/rgpd/registre#t03">registre, T03</Link>).
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission

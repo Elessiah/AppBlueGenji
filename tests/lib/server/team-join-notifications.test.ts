@@ -3,26 +3,41 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/push-subscriptions");
-jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
+jest.mock("@/lib/server/site-url", () => ({
+  siteCanonicalBase: () => "https://site.test",
+  siteUrl: jest.fn((path: string) => `https://site.test${path}`),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
+import { siteUrl } from "@/lib/server/site-url";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP } from "@/lib/shared/team-join-request-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
-type Rows = { requests?: number; allTeams?: number; team?: { name: string } | null; members?: Record<string, unknown>[] };
+type Rows = {
+  requests?: number;
+  allTeams?: number;
+  team?: { name: string } | null;
+  members?: Record<string, unknown>[];
+  /** Comptes qui ont décoché « Messages privés Discord de mes matchs et de mes équipes » (D68). */
+  optedOut?: number[];
+};
 
-function mockDb({ requests = 1, allTeams, team = { name: "Les Glaciers" }, members = [] }: Rows) {
+function mockDb({ requests = 1, allTeams, team = { name: "Les Glaciers" }, members = [], optedOut = [] }: Rows) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("AS any_team")) return [[{ this_team: String(requests), any_team: allTeams ?? requests }], []];
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_team_members")) return [members, []];
     throw new Error(`requête inattendue : ${sql}`);
   });
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  const query = jest.fn<SqlQuery>(async (sql) => {
+    if (sql.includes("match_dm_enabled = 0")) return [optedOut.map((id) => ({ id })), []];
+    return [[], []];
+  });
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
   return execute;
 }
 
@@ -62,6 +77,40 @@ describe("notifyTeamJoinRequest", () => {
     expect(message).toContain("https://site.test/equipes/5");
     expect(recipients.map((r) => r.label)).toEqual(["Owner", "Manager"]);
     expect(context).toBe("team-join-request");
+  });
+
+  it("notifyTeamJoinRequest_optedOutManager_excludedFromDmKeptForPush", async () => {
+    mockDb({ members: [row(), row({ id: 2, pseudo: "Manager", roles_json: ["MANAGER"], discord_id: "2" })], optedOut: [1] });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(recipients.map((r) => r.label)).toEqual(["Manager"]);
+    expect(message).toContain("<https://site.test/profil#notifications>");
+    expect(jest.mocked(pushToUsers).mock.calls[0][0]).toEqual([1, 2]);
+  });
+
+  it("notifyTeamJoinRequest_managersQuery_excludesActiveSuspensions", async () => {
+    const execute = mockDb({ members: [row()] });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [membersSql] = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_team_members"))!;
+    expect(membersSql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus");
+    expect(membersSql).toContain("sus.lifted_at IS NULL");
+  });
+
+  it("notifyTeamJoinRequest_siteRootUnknown_optOutLineWithoutLink", async () => {
+    mockDb({ members: [row()] });
+    jest.mocked(siteUrl).mockReturnValueOnce(null);
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    // Langue du compte inconnue ici : message bilingue, chaque moitié sans lien.
+    expect(message).toContain("Tu peux couper ces messages privés dans « Mon profil », section Notifications, sur le site.");
+    expect(message).toContain("You can turn off these direct messages in “My profile”, Notifications section, on the site.");
+    expect(message).not.toContain("localhost");
   });
 
   it("se tait sur une demande redéposée dans la fenêtre", async () => {

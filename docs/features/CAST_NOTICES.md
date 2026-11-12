@@ -60,7 +60,7 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   l'arbitrage et sur un **autre** caster. « Ne plus caster » (le caster
   lui-même, qui n'est prévenu de rien) part depuis sa fenêtre
   « Configurer ma diffusion », après une confirmation (`CAST_SETTINGS.md`).
-- La case « Messages privés Discord de mes matchs » (`/profil`) coupe aussi ce
+- La case « Messages privés Discord de mes matchs et de mes équipes » (`/profil`) coupe aussi ce
   message privé : son aide (`matchDms.hint`, FR et EN) le dit.
 
 ## Confidentialité
@@ -75,7 +75,7 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   `[staff-log]`), jamais le message de mysql2, qui peut citer une valeur lue.
 - Message privé : `loadNotificationRecipients(…, "certified", { matchDm: true })`
   — un tag Discord certifié seulement, coupé par la case « Messages privés
-  Discord de mes matchs » de « Mon profil » (droit d'opposition). Le push a son
+  Discord de mes matchs et de mes équipes » de « Mon profil » (droit d'opposition). Le push a son
   sujet propre, `CAST_RELEASED` (audience `live`), réglable sur `/profil` ; un
   caster qui a perdu la permission `live` n'en voit plus le réglage : il ne
   reçoit que le message privé (`notifyUsers` filtre le push d'un sujet réservé).

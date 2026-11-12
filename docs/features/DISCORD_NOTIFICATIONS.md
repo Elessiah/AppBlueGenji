@@ -824,7 +824,10 @@ le sujet push ne les règle pas) : `/rgpd` la porte et peut changer.
 Décision de l'utilisateur (2026-10-14) : les messages privés de match d'un
 **joueur** reposent sur l'intérêt légitime, et son droit d'opposition est honoré
 par un interrupteur de `/profil` (section Notifications, « Messages privés
-Discord de mes matchs », `MatchDmField`) ; les envois au **staff** (alertes,
+Discord de mes matchs et de mes équipes », `MatchDmField`) — depuis la décision
+D68, la même case coupe aussi les messages privés d'équipe (invitation, reprise,
+propriété, demande d'adhésion : `withoutOptedOutDiscord`,
+`TEAM_INVITATION_NOTIFICATION.md`) ; les envois au **staff** (alertes,
 programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
 
 - **Stockage** : `bg_users.match_dm_enabled TINYINT(1) NOT NULL DEFAULT 1`

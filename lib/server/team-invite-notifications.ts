@@ -12,8 +12,10 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { notifyUsers, type NotificationReport } from "@/lib/server/notify";
-import { siteCanonicalBase } from "@/lib/server/site-url";
+import { siteCanonicalBase, siteUrl } from "@/lib/server/site-url";
 import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { withoutOptedOutDiscord } from "@/lib/server/users/match-dm-preference";
+import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import { teamInvitationPush } from "@/lib/shared/push-messages";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
@@ -187,7 +189,11 @@ async function sendTeamInviteNotice(
   claimedAt: number,
 ): Promise<NotificationReport> {
   const url = `${siteCanonicalBase()}${teamInviteNoticePath(kind, teamId)}`;
-  const proven = teamInviteNoticeRecipient(account);
+  // Racine inconnue : la phrase sans lien plutôt qu'un lien vers localhost.
+  const settingsUrl = siteUrl(MATCH_DM_SETTINGS_PATH);
+  // Messages privés coupés dans « Mon profil » (D68) : le push seul, sans
+  // consommer le plafond horaire des messages privés.
+  const [proven] = await withoutOptedOutDiscord([teamInviteNoticeRecipient(account)]);
   // Au-delà du plafond horaire du site, le push seul : rien ne part sur Discord.
   const dmClaimed = proven.discord !== null && claimTeamNoticeDmSlot(claimedAt);
   const recipient = proven.discord && !dmClaimed ? { ...proven, discord: null } : proven;
@@ -203,7 +209,7 @@ async function sendTeamInviteNotice(
     report = await notifyUsers([recipient], {
       topic: "TEAM_INVITATION",
       discord: {
-        message: (locale) => formatTeamInviteNotice({ kind, teamName, url }, locale),
+        message: (locale) => formatTeamInviteNotice({ kind, teamName, url, settingsUrl }, locale),
         context: "team-invitation",
       },
       push: (locale) => teamInvitationPush({ kind, teamId, teamName }, locale),

@@ -232,9 +232,9 @@ describe("politique du bot — droits", () => {
 
   it("le choix des messages de match, gardé au titre d'une obligation légale, échappe à l'opposition", () => {
     expect(text("fr")).toContain(
-      "La conservation par le site de votre choix des messages privés de match n'en relève pas non plus : elle repose sur une obligation légale",
+      "La conservation par le site de votre choix des messages privés de match et d'équipe n'en relève pas non plus : elle repose sur une obligation légale",
     );
-    expect(text("en")).toContain("Nor is the site's keeping of your match direct messages choice: it rests on a legal obligation");
+    expect(text("en")).toContain("Nor is the site's keeping of your match and team direct messages choice: it rests on a legal obligation");
   });
 
   it("la portabilité n'est écartée que pour les traitements propres au bot", () => {

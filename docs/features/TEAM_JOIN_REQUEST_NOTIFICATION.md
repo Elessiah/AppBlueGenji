@@ -23,13 +23,17 @@ pour y répondre**.
   reçoit rien — il n'aurait aucun geste à faire.
 - Joignables par un moyen **prouvé** seulement : identifiant Discord, ou tag
   **certifié**. Un tag saisi à la main peut désigner n'importe qui.
+- Sans canal Discord (push seul) pour qui a décoché « Messages privés Discord
+  de mes matchs et de mes équipes » (`withoutOptedOutDiscord`, décision D68,
+  même règle que `TEAM_INVITATION_NOTIFICATION.md`).
 
 ## Ce que dit le message
 
 Le nom de l'équipe et le lien de sa fiche (`/equipes/[id]`), où la demande
 s'accepte ou se refuse. **Aucun pseudo de joueur**, règle de tous les messages
 Discord du site (`docs/features/RGPD_LOGS_AND_VISITS.md`) : le demandeur se lit
-sur la fiche, derrière une connexion.
+sur la fiche, derrière une connexion. Dernière ligne : où couper ces messages
+(`matchDmOptOutLine`).
 
 ## Borne anti-répétition
 

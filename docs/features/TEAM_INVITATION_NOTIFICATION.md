@@ -37,6 +37,13 @@ avertissement. Une invitation qui valide une demande déjà en attente
   propriété ne concerne qu'une équipe réelle ; une reprise, qu'une fantôme.
 - Message privé : par un moyen **prouvé** seulement (identifiant Discord, ou tag
   certifié). Sinon le push seul.
+- Message privé coupé si le joueur a décoché « Messages privés Discord de mes
+  matchs et de mes équipes » (`bg_users.match_dm_enabled = 0`, décision D68) :
+  `withoutOptedOutDiscord` (`lib/server/users/match-dm-preference.ts`) lui
+  retire le canal Discord **avant** la réservation du plafond horaire — le push
+  part seul, avec ses réglages. Colonne absente : rien n'est retiré (personne
+  n'a pu s'opposer) ; toute autre erreur de lecture retire le canal à tous
+  (jamais une opposition enjambée).
 - Invitation ordinaire : `TEAM_INVITE_NOTICES_DAILY_CAP` (10) joueurs
   distincts au plus dans la fenêtre de `TEAM_INVITE_NOTICE_COOLDOWN_HOURS`
   (24 h) — par équipe **et** par auteur, toutes ses équipes confondues (une
@@ -81,7 +88,8 @@ Une reprise dit « Tu peux reprendre l'équipe [nom](lien) » / "You can take
 over the team [name](link)" — le nom de l'équipe seul, sans « un admin »
 (décision D4 de l'utilisateur, 2026-11-09) : le nom en lien masqué vers `/profil#invitations`, ses crochets et
 parenthèses échappés par `discordInline` ; le push dit la même phrase sans lien.
-Langue du compte (`BOT_DM_LANGUAGE.md`), bilingue si elle est illisible. Lien :
+Dernière ligne : où couper ces messages (`matchDmOptOutLine`, lien
+`/profil#notifications`). Langue du compte (`BOT_DM_LANGUAGE.md`), bilingue si elle est illisible. Lien :
 `/profil#invitations` pour répondre (invitation, reprise), `/equipes/[id]` pour
 la propriété — `/en/…` pour un compte anglais (`localizedSiteUrl`,
 `localeHref`). Étiquette du push : `team-<id>-invite` / `team-<id>-owner`.
@@ -99,7 +107,10 @@ Registre T03 (sous-finalité et destinataire Discord) et T12 (sujet push) ;
 `/rgpd` FR + EN (section « Notifications push », liste des messages privés du
 moyen Discord) ; `PRIVACY_CHANGES` `2026-11-invitations-equipe-notifiees`
 (datée du 2026-11-05, lendemain de la nuit de déploiement prévue — à avancer si
-la fusion glisse). Rien de nouveau n'est collecté ni conservé.
+la fusion glisse). Rien de nouveau n'est collecté ni conservé. Opposition par
+la case de `/profil` (D68) : `/rgpd` § « Messages privés Discord d'équipe » et
+droit d'opposition, registre T03 (base) et T04 (conservation du choix),
+politique du bot, entrée `2026-11-messages-d-equipe-reglage-du-profil`.
 
 ## Tests
 

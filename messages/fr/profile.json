@@ -24,7 +24,7 @@
     },
     "notifications": {
       "title": "Notifications",
-      "lead": "Notifications sur ton téléphone ou ton ordinateur, même site fermé, et messages privés du bot pour tes matchs."
+      "lead": "Notifications sur ton téléphone ou ton ordinateur, même site fermé, et messages privés du bot pour tes matchs et tes équipes."
     },
     "invitations": {
       "title": "Invitations d'équipe",
@@ -142,13 +142,13 @@
     "saved": "Langue des notifications enregistrée."
   },
   "matchDms": {
-    "label": "Messages privés Discord de mes matchs",
-    "notCertified": "Sans tag Discord certifié, ces messages ne peuvent pas te parvenir (contre le spam).",
+    "label": "Messages privés Discord de mes matchs et de mes équipes",
+    "notCertified": "Sans tag Discord certifié, les messages de tes matchs ne te parviennent pas, ni ceux de tes équipes sans Discord lié (contre le spam).",
     "certifyLink": "Certifier mon tag Discord",
-    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, quand un nouveau match t'attend (adversaire connu), quand ton inscription de caster sur un match est retirée par le staff ou d'office (avec le motif), 15 minutes avant un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel — ou à l'ouverture de son salon, si elle vient plus tôt — (check-in du match), et pour ses rappels (24 h et 10 h avant). Les notifications push et les messages reçus comme arbitre n'en dépendent pas.",
-    "enabled": "Messages privés de match activés.",
-    "enabledNotCertified": "Messages privés de match activés : ils partiront une fois ton tag Discord certifié.",
-    "disabled": "Messages privés de match coupés."
+    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, quand un nouveau match t'attend (adversaire connu), quand ton inscription de caster sur un match est retirée par le staff ou d'office (avec le motif), 15 minutes avant un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel — ou à l'ouverture de son salon, si elle vient plus tôt — (check-in du match), et pour ses rappels (24 h et 10 h avant). Ainsi que pour tes équipes (invitation, reprise d'une équipe fantôme, propriété transférée, demande d'adhésion). Décochée, la case coupe tout cela. Les notifications push n'en dépendent pas, ni les autres messages : par exemple ceux reçus comme arbitre, les avis de modération (logo, avatar, suspension, signalement) ou l'annonce d'un changement de la politique de confidentialité.",
+    "enabled": "Messages privés de match et d'équipe activés.",
+    "enabledNotCertified": "Messages privés de match et d'équipe activés : ceux de tes matchs partiront une fois ton tag Discord certifié, ceux de tes équipes dès que ton compte Discord est lié.",
+    "disabled": "Messages privés de match et d'équipe coupés."
   },
   "recruitmentModal": {
     "label": "Fenêtre des annonces de recrutement urgentes",

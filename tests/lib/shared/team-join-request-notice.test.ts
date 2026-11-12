@@ -90,14 +90,20 @@ describe("shouldNotifyTeamJoinRequest", () => {
 
 describe("formatTeamJoinRequestNotice", () => {
   it("nomme l'équipe et mène à sa fiche", () => {
-    const text = formatTeamJoinRequestNotice({ teamName: "Les Glaciers", url: "https://site.test/equipes/5" });
+    const text = formatTeamJoinRequestNotice({ teamName: "Les Glaciers", url: "https://site.test/equipes/5", settingsUrl: null });
     expect(text).toContain("« Les Glaciers »");
     expect(text).toContain("https://site.test/equipes/5");
     expect(text).toMatch(/demande à rejoindre/);
   });
 
+  it("formatTeamJoinRequestNotice_withSettingsUrl_appendsOptOutLine", () => {
+    const text = formatTeamJoinRequestNotice({ teamName: "X", url: "https://site.test/equipes/5", settingsUrl: "https://site.test/profil#notifications" });
+
+    expect(text.split("\n").at(-1)).toBe("Tu peux couper ces messages privés dans ton profil, section Notifications : <https://site.test/profil#notifications>");
+  });
+
   it("ne nomme aucun joueur", () => {
-    const text = formatTeamJoinRequestNotice({ teamName: "X", url: "https://site.test/equipes/5" });
+    const text = formatTeamJoinRequestNotice({ teamName: "X", url: "https://site.test/equipes/5", settingsUrl: null });
     expect(text).toContain("Un joueur");
   });
 });

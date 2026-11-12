@@ -1021,7 +1021,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-avis-d-equipe-plafonds-et-base": {
-    linkLabels: ["Read the “Team Discord direct messages” paragraph", "Read processing activity T03 in the register"],
+    linkLabels: ["Read the “Team Discord direct messages” paragraph", "Read processing activity T03 in the register", "Open the setting in “My profile”"],
     title: "Team messages on Discord: caps and legal basis",
     summary:
       "Team Discord direct messages (invitation, takeover, ownership, join request) are now described in the policy, with their basis: the association's legitimate interest in forming teams. Their caps change slightly: only a message actually sent counts towards the delay, a team you were a member of no longer counts towards the per-player cap, and the whole site has an hourly cap.",
@@ -1029,7 +1029,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       `Delay: the same team still writes to you only once per kind of message every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, but only a message actually sent now counts — an invitation that stayed silent (suspended account, cap reached) no longer holds back the next one. This delay is counted in memory: a restart of the site, or more than a thousand messages within that time, may let one more through.`,
       `Former team: you still receive invitations from ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams at most within ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, but a team you were a member of no longer counts. To know this, the site reads, at each invitation or takeover, whether you were part of the inviting team (the team history it already keeps).`,
       `Site cap: beyond ${TEAM_NOTICE_DMS_HOURLY_CAP} invitations, takeovers or ownerships announced by direct message within one hour, all accounts together, the notice is sent as a push notification only; the invitation stays in “My profile”.`,
-      "Legal basis: these messages are based on the association's legitimate interest in forming teams (register, T03); you can object through the “Exercising your rights” section of the policy. This was already the case: the policy now says so, next to the match direct messages.",
+      "Legal basis: these messages are based on the association's legitimate interest in forming teams (register, T03). This was already the case: the policy now says so, next to the match direct messages. To object, untick “Discord direct messages about my matches and teams” in “My profile”.",
+    ],
+  },
+  "2026-11-messages-d-equipe-reglage-du-profil": {
+    linkLabels: ["Open the setting in “My profile”", "Read the “Team Discord direct messages” paragraph"],
+    title: "Team direct messages: a box to turn them off",
+    summary:
+      "The “Discord direct messages about my matches” box in “My profile” becomes “Discord direct messages about my matches and teams”: unticked, it also turns off team Discord direct messages (invitation, offered ghost team takeover, transferred ownership, request to join a team you manage).",
+    details: [
+      "What changes: before each team direct message, the site reads this choice again; with the box unticked, only the push notification is sent, with its own settings. If you had already unticked the box, your team direct messages stop too. Each team direct message now ends with the link to this setting.",
+      "What does not change: nothing new is collected; it is the same choice, kept for the lifetime of the account (legal obligation: that is what lets the site keep honouring your objection) and included in the export of your data. These messages are still based on the association's legitimate interest in forming teams (register, T03).",
     ],
   },
 };
