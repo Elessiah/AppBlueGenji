@@ -157,15 +157,9 @@ export function createLimiter(size: number, maxWaiting: number = Number.POSITIVE
  */
 export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: number): Promise<R> {
   const controller = new AbortController();
-  // La tâche est lancée avant d'armer le délai : une tâche qui lève sans rendre de
-  // promesse rejette l'appel tout de suite, sans laisser derrière elle un délai armé
-  // dont le rejet tardif ne serait attendu par personne.
-  let promise: Promise<R>;
-  try {
-    promise = Promise.resolve(task(controller.signal));
-  } catch (error) {
-    return Promise.reject(error);
-  }
+  // Une tâche qui lève sans rendre de promesse devient une promesse rejetée : la course
+  // se règle aussitôt et `finally` désarme le délai, qui ne rejette donc jamais tard.
+  const promise = (async () => task(controller.signal))();
   // Un rejet tardif de la promesse abandonnée ne doit pas remonter en rejet non géré.
   promise.catch(() => undefined);
   let timer: ReturnType<typeof setTimeout> | undefined;
