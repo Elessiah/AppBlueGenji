@@ -811,7 +811,7 @@ export function PlayerScoreDialog({
               )}
               <button
                 type="button"
-                className={styles.conflictAction}
+                className={`btn ghost ${styles.confirmTheirs}`}
                 onClick={confirmTheirs}
                 aria-disabled={submitting || undefined}
               >

@@ -142,6 +142,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Action à part entière (un clic clôt le match), pas un lien de phrase. */
+.confirmTheirs {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+
 .diffMap {
   font-weight: 700;
   color: var(--blue-300, #8ad9ff);
