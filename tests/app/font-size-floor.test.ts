@@ -35,11 +35,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const EXCLUDED = new Set<string>();
-
-const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components")), ...walk(join(ROOT, "lib"))].filter(
-  (file) => !EXCLUDED.has(file),
-);
+const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components")), ...walk(join(ROOT, "lib"))];
 
 /** Tailles littérales en px (CSS) ou nombres nus (style en ligne React). */
 const PATTERNS = [
