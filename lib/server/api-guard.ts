@@ -161,6 +161,18 @@ export const MAP_PICK_WRITE_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/**
+ * Le même plafond pour l'arbitrage (`tournaments`), qui choisit pour tout un
+ * tour : soixante matchs à deux ou trois cartes, avec quelques corrections,
+ * dépassaient les cent vingt choix — un 429 en pleine manche. Seuls les choix
+ * acceptés comptent (un refus rend sa place, `reserveRateLimit`).
+ */
+export const MAP_PICK_STAFF_WRITE_RULE: RateLimitRule = {
+  name: "map-pick-staff-write",
+  limit: 600,
+  windowMs: 5 * 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",
