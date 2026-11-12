@@ -37,38 +37,49 @@ avertissement. Une invitation qui valide une demande déjà en attente
   propriété ne concerne qu'une équipe réelle ; une reprise, qu'une fantôme.
 - Message privé : par un moyen **prouvé** seulement (identifiant Discord, ou tag
   certifié). Sinon le push seul.
-- Invitation ordinaire : une même équipe ne fait écrire au même joueur qu'une
-  fois en `TEAM_INVITE_NOTICE_COOLDOWN_HOURS` (24 h — une invitation se retire
-  et se renvoie), et à `TEAM_INVITE_NOTICES_DAILY_CAP` (10) joueurs distincts
-  au plus dans la fenêtre — par équipe **et** par auteur, toutes ses équipes
-  confondues (une équipe recréée ne repart pas de zéro) —, et un joueur ne
-  reçoit l'invitation que de `TEAM_INVITE_NOTICES_PER_PLAYER_CAP` (3) équipes
-  distinctes dans la fenêtre, pour que le bot ne soit pas classé comme
-  spammeur. L'invitation, elle, est toujours enregistrée.
-- Reprise proposée par le staff : une fois par équipe et par joueur dans la
-  même fenêtre (proposition retirée puis refaite comprise), et les mêmes
-  plafonds qu'une invitation : 10 joueurs distincts par auteur, 3 fantômes
-  distinctes par joueur (`GhostClaimNoticeBudget`, une seule requête).
-- Propriété transférée : aucune ligne ne garde le transfert, donc une
-  réservation en mémoire (`claimOwnershipNoticeSlot`, clé équipe + joueur,
-  1 000 entrées au plus) limite l'avis à une fois par fenêtre — deux
-  propriétaires qui se renvoient l'équipe n'écrivent pas à chaque geste. Elle
-  se prend une fois l'avis décidé (un compte suspendu n'en consomme pas) et se
-  rend si rien n'a été remis (bot tombé sans appareil, ou erreur :
-  `releaseOwnershipNoticeSlot`) ; un redémarrage l'oublie (au pire un avis de plus).
+- Invitation ordinaire : `TEAM_INVITE_NOTICES_DAILY_CAP` (10) joueurs
+  distincts au plus dans la fenêtre de `TEAM_INVITE_NOTICE_COOLDOWN_HOURS`
+  (24 h) — par équipe **et** par auteur, toutes ses équipes confondues (une
+  équipe recréée ne repart pas de zéro) —, et un joueur ne reçoit l'invitation
+  que de `TEAM_INVITE_NOTICES_PER_PLAYER_CAP` (3) équipes distinctes dans la
+  fenêtre, pour que le bot ne soit pas classé comme spammeur. Une équipe dont
+  le joueur a été membre (ligne `bg_team_members`, partie comprise) n'entre
+  pas dans ce dernier plafond, dans les deux sens : elle n'est pas comptée
+  parmi les équipes qui le sollicitent (`NOT EXISTS` dans `teams_to_player`),
+  et son invitation passe même au-delà de trois équipes inconnues
+  (`formerMember`, lu par une requête à part). L'invitation, elle, est
+  toujours enregistrée.
+- Reprise proposée par le staff : les mêmes plafonds qu'une invitation : 10
+  joueurs distincts par auteur, 3 fantômes distinctes par joueur, ancienne
+  équipe exemptée (`GhostClaimNoticeBudget`, une seule requête).
+- **Une fois par sorte, équipe et joueur** dans la fenêtre (invitation retirée
+  puis renvoyée, reprise refaite, propriété que deux membres se renvoient) :
+  réservation en mémoire `claimTeamNoticeSlot` (clé `sorte:équipe:joueur`,
+  20 000 entrées au plus). Comptée sur les avis **partis**, pas sur les lignes
+  écrites : une invitation restée muette (compte suspendu, plafond atteint) ne
+  retient plus l'avis suivant de la même équipe. Elle se prend une fois l'avis
+  décidé et se rend si rien n'a été remis (bot tombé sans appareil, ou erreur :
+  `releaseTeamNoticeSlot`) ; un redémarrage l'oublie (au pire un avis de plus).
+- **Plafond du site** : `TEAM_NOTICE_DMS_HOURLY_CAP` (60) messages privés
+  d'équipe par heure, tous comptes confondus (`claimTeamNoticeDmSlot`, en
+  mémoire) — les plafonds par compte ne bornent pas N comptes jetables. Au-delà,
+  le push seul : rien ne part sur Discord, l'invitation reste sur « Mon profil ».
+  Une place prise pour un message privé qui n'est pas parti (bot injoignable,
+  envoi refusé, erreur) est rendue (`releaseTeamNoticeDmSlot`, dans la même
+  fenêtre seulement) : une panne du bot n'épuise pas le plafond.
 - `claimGhostTeam` envoie l'avis **après** sa transaction et son `finally` : un
   rédacteur qui lève ne peut pas défaire la reprise validée.
-- Les comptes portent sur les **lignes écrites** (l'invitation qui vient
-  d'être enregistrée comprise) : la ligne est la réservation. Deux invitations
-  simultanées se voient au pire l'une l'autre et se taisent, jamais l'inverse.
+- Les plafonds en base comptent les **tentatives** (lignes écrites,
+  l'invitation qui vient d'être enregistrée comprise) : un compte qui invite en
+  boucle reste borné même quand ses invitations ne font rien partir.
 
 ## Ce que dit le message
 
 Le **nom de l'équipe seul** (`discordInline` sur Discord : ni mention, ni lien,
 ni balisage), jamais le pseudo ni le `#id` de qui invite, propose ou transfère.
-Une reprise dit « Un admin te propose de reprendre l'équipe [nom](lien) » / "An
-admin offers you to take over the team [name](link)" (décision de l'utilisateur,
-2026-11-03) : le nom en lien masqué vers `/profil#invitations`, ses crochets et
+Une reprise dit « Tu peux reprendre l'équipe [nom](lien) » / "You can take
+over the team [name](link)" — le nom de l'équipe seul, sans « un admin »
+(décision D4 de l'utilisateur, 2026-11-09) : le nom en lien masqué vers `/profil#invitations`, ses crochets et
 parenthèses échappés par `discordInline` ; le push dit la même phrase sans lien.
 Langue du compte (`BOT_DM_LANGUAGE.md`), bilingue si elle est illisible. Lien :
 `/profil#invitations` pour répondre (invitation, reprise), `/equipes/[id]` pour

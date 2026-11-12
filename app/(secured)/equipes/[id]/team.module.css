@@ -3,13 +3,20 @@
  * Les couleurs de la page sont celles de la section « équipes » (violet néon,
  * `--violet-400-rgb`), le rouge étant réservé aux gestes destructeurs. */
 
-.page :global(.btn):disabled {
+.page :global(.btn):where(:disabled, [aria-disabled="true"]) {
   /* Le `.btn` global n'a pas d'état désactivé : un bouton en attente gardait
-     son survol et son curseur de clic. */
+     son survol et son curseur de clic. `aria-disabled` : le bouton garde le
+     focus clavier pendant son geste. */
   cursor: not-allowed;
   opacity: 0.55;
   transform: none;
   box-shadow: none;
+}
+
+/* En attente (`aria-busy`) : le libellé d'attente doit se lire, sans atténuation. */
+.page :global(.btn)[aria-disabled="true"][aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
 }
 
 /* ── Blocs ─────────────────────────────────────────────── */

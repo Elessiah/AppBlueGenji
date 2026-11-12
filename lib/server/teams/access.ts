@@ -83,6 +83,43 @@ export async function withTeamRosterLock<T>(
   }
 }
 
+/**
+ * L'équipe a-t-elle été inscrite au moins une fois à un tournoi ? Seule une
+ * telle équipe peut figurer aux vues mises en cache qui nomment des équipes
+ * (classement, podium, cartes d'aperçu, vitrine) : sans match, ni rang, ni
+ * ligne de bandeau ou de mini-arbre. Lue sous le verrou de l'équipe, que
+ * l'inscription prend aussi (`tournaments/registration.ts`) : une inscription
+ * concurrente attend ce verrou, ou a déjà commité et se voit.
+ */
+export async function teamEverRegistered(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_tournament_registrations WHERE team_id = ? LIMIT 1`,
+    [teamId],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Annule les invitations et demandes encore en attente d'une équipe — dissoute,
+ * passée fantôme (personne n'en a plus qualité pour y répondre) ou reprise
+ * (les autres propositions de reprise n'ont plus d'objet). Une seule
+ * instruction, partagée par ces trois gestes.
+ */
+export async function cancelPendingTeamInvitations(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+): Promise<void> {
+  await connection.execute(
+    `UPDATE bg_team_invitations
+     SET status = 'CANCELLED', responded_at = NOW()
+     WHERE team_id = ? AND status = 'PENDING'`,
+    [teamId],
+  );
+}
+
 /** Rôles en cours d'un membre, relus **sous verrou** dans la transaction. */
 export async function lockMemberRoles(
   connection: Pick<PoolConnection, "execute">,

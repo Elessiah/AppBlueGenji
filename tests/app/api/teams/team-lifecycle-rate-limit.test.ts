@@ -10,12 +10,14 @@ jest.mock("@/lib/server/ghost-teams-service");
 jest.mock("@/lib/server/solo-entries-service");
 
 import { POST as createTeamRoute } from "@/app/api/teams/route";
-import { DELETE as deleteTeamRoute } from "@/app/api/teams/[id]/route";
-import { TEAM_LIFECYCLE_RULE } from "@/lib/server/api-guard";
+import { DELETE as deleteTeamRoute, PATCH as patchTeamRoute } from "@/app/api/teams/[id]/route";
+import { TEAM_IDENTITY_WRITE_RULE, TEAM_LIFECYCLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
-import { createTeam } from "@/lib/server/teams/identity";
+import { createTeam, updateTeamMeta } from "@/lib/server/teams/identity";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { teamDetailResponse } from "../../../helpers/team-detail";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -41,6 +43,26 @@ const dissolve = () =>
   deleteTeamRoute(new Request("http://localhost/api/teams/12", { method: "DELETE" }), {
     params: Promise.resolve({ id: "12" }),
   });
+
+const rename = () =>
+  patchTeamRoute(
+    new Request("http://localhost/api/teams/12", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Dragon Squad" }),
+    }),
+    { params: Promise.resolve({ id: "12" }) },
+  );
+
+const emptyPatch = () =>
+  patchTeamRoute(
+    new Request("http://localhost/api/teams/12", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    { params: Promise.resolve({ id: "12" }) },
+  );
 
 async function useUpTheBucket(gesture: () => Promise<Response>): Promise<void> {
   for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await gesture()).status).toBeLessThan(300);
@@ -115,11 +137,20 @@ describe("DELETE /api/teams/[id] — plafond de dissolution", () => {
   });
 
   it("DELETE_refusedDissolution_isNotCharged", async () => {
-    jest.mocked(softDeleteTeam).mockRejectedValue(new Error("FORBIDDEN"));
-    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) await dissolve();
+    jest.mocked(softDeleteTeam).mockRejectedValue(new Error("TEAM_ALREADY_DELETED"));
+    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await dissolve()).status).toBe(409);
     jest.mocked(softDeleteTeam).mockResolvedValue(undefined);
 
     expect((await dissolve()).status).toBe(200);
+  });
+
+  it("DELETE_forbiddenRefusals_keepTheirPlace", async () => {
+    // Un compte sans qualité qui boucle sur les équipes des autres reste plafonné.
+    jest.mocked(softDeleteTeam).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit; i += 1) expect((await dissolve()).status).toBe(403);
+    jest.mocked(softDeleteTeam).mockResolvedValue(undefined);
+
+    expect((await dissolve()).status).toBe(429);
   });
 
   it("DELETE_parallelRequestsAtLastSlot_onlyOnePasses", async () => {
@@ -146,5 +177,85 @@ describe("DELETE /api/teams/[id] — plafond de dissolution", () => {
     await useUpTheBucket(create);
 
     expect((await dissolve()).status).toBe(429);
+  });
+});
+
+// Écritures d'identité (nom, sigle, description) : une boucle de renommages
+// vidait à volonté le classement et les vues de l'accueil.
+describe("PATCH /api/teams/[id] — plafond des écritures d'identité", () => {
+  beforeEach(() => {
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
+    jest.mocked(getTeamDetail).mockResolvedValue(teamDetailResponse());
+  });
+
+  it("PATCH_overIdentityWriteLimit_returns429WithoutWriting", async () => {
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await rename()).status).toBe(200);
+
+    const res = await rename();
+
+    expect(res.status).toBe(429);
+    expect(updateTeamMeta).toHaveBeenCalledTimes(TEAM_IDENTITY_WRITE_RULE.limit);
+  });
+
+  it("PATCH_nameTakenRefusals_doNotUseUpTheLimit", async () => {
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error("TEAM_NAME_ALREADY_USED"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await rename()).status).toBe(409);
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
+
+    const res = await rename();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("PATCH_forbiddenRefusals_keepTheirPlace", async () => {
+    // Un compte sans qualité qui boucle sur l'équipe d'un autre reste plafonné.
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await rename()).status).toBe(403);
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
+
+    const res = await rename();
+
+    expect(res.status).toBe(429);
+  });
+
+  it("PATCH_invalidFields_doNotUseUpTheLimit", async () => {
+    const invalid = () =>
+      patchTeamRoute(
+        new Request("http://localhost/api/teams/12", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: 42 }),
+        }),
+        { params: Promise.resolve({ id: "12" }) },
+      );
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await invalid()).status).toBe(400);
+
+    const res = await rename();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("PATCH_emptyBody_doesNotUseUpTheLimit", async () => {
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await emptyPatch()).status).toBe(200);
+
+    const res = await rename();
+
+    expect(res.status).toBe(200);
+  });
+
+  it("PATCH_emptyBodyForbidden_keepsItsPlace", async () => {
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await emptyPatch()).status).toBe(403);
+
+    const res = await emptyPatch();
+
+    expect(res.status).toBe(429);
+  });
+
+  it("PATCH_staffTournaments_isNotCapped", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(staff);
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) await rename();
+
+    expect((await rename()).status).toBe(200);
   });
 });

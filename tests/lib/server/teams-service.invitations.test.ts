@@ -5,6 +5,8 @@ jest.mock("@/lib/server/terms-acceptance", () =>
 );
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/team-invite-notifications");
+jest.mock("@/lib/server/session-streams");
+jest.mock("@/lib/server/ranking-cache");
 jest.mock("@/lib/server/users/roles", () => {
   const actual = jest.requireActual("@/lib/server/users/roles") as Record<string, unknown>;
   return { ...actual, getUserIdByPseudo: jest.fn() };
@@ -20,6 +22,8 @@ import {
 import { getDatabase } from "@/lib/server/database";
 import { getUserIdByPseudo } from "@/lib/server/users/roles";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
+import { reconnectUserStreams } from "@/lib/server/session-streams";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 import {
   cachedCertificationPrompt,
@@ -59,6 +63,8 @@ type State = {
    * les deux.
    */
   lateMembers: { team_id: number; user_id: number; roles: string[] }[];
+  /** Équipes qui ont déjà eu au moins une inscription à un tournoi. */
+  registeredTeams: Set<number>;
 };
 
 function freshState(): State {
@@ -68,6 +74,7 @@ function freshState(): State {
     deletedUsers: new Set(),
     teams: { 7: { deleted_at: null, is_ghost: 0, solo_user_id: null } },
     lateMembers: [],
+    registeredTeams: new Set(),
   };
 }
 
@@ -102,6 +109,15 @@ function readMembers(text: string, params: unknown[], members: State["members"])
   if (/SELECT id FROM bg_team_members WHERE user_id = \?/.test(text)) {
     const [userId] = params as number[];
     return [members.filter((m) => m.user_id === userId).map((_, i) => ({ id: i + 1 }))];
+  }
+  if (/SELECT user_id FROM bg_team_members WHERE team_id = \? AND left_at IS NULL/.test(text)) {
+    const [teamId] = params as number[];
+    return [members.filter((m) => m.team_id === teamId).map((m) => ({ user_id: m.user_id }))];
+  }
+  if (/UNION SELECT id FROM bg_tournaments/.test(text)) return [[{ id: 40 }]];
+  if (/SELECT 1 FROM bg_tournament_registrations WHERE team_id = \? LIMIT 1/.test(text)) {
+    const [teamId] = params as number[];
+    return [state.registeredTeams.has(teamId) ? [{ 1: 1 }] : []];
   }
   if (/SELECT is_deleted FROM bg_users WHERE id = \? FOR UPDATE/.test(text)) {
     const [userId] = params as number[];
@@ -362,6 +378,30 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     forgetCertificationPrompts();
   });
 
+  it("respondToInvitation_accepted_reconnectsWholeTeamStreams", async () => {
+    const inv = invite({ team_id: 7 });
+
+    await respondToInvitation(42, inv.id, true);
+
+    // Le propriétaire déjà là et le joueur qui arrive, sur les tournois de l'équipe.
+    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[[1, 42], { tournamentIds: new Set([40]) }]]);
+  });
+
+  it("respondToInvitation_declineAfterConcurrentAccept_throwsNotPendingAndKeepsAccepted", async () => {
+    const inv = invite();
+    // L'invitation est lue en attente, puis acceptée (autre onglet) avant le refus.
+    const execute = jest.fn(async (sql: unknown, params: unknown) => {
+      const result = run(String(sql), (params ?? []) as unknown[], false);
+      if (/SELECT team_id, user_id, kind, status/.test(String(sql))) inv.status = "ACCEPTED";
+      return result;
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection: jest.fn(async () => connection) }));
+
+    await expect(respondToInvitation(42, inv.id, false)).rejects.toThrow("INVITATION_NOT_PENDING");
+
+    expect(inv.status).toBe("ACCEPTED");
+  });
+
   it("décliner n'écrit aucune appartenance", async () => {
     const inv = invite();
     await respondToInvitation(42, inv.id, false);
@@ -387,6 +427,23 @@ describe("reprise d'une équipe fantôme — le joueur accepte", () => {
     expect(state.teams[9].is_ghost).toBe(0);
     expect(inv.status).toBe("ACCEPTED");
     expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("respondToInvitation_ghostClaimNeverRegistered_invalidatesNothing", async () => {
+    const inv = claimInvite();
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+  });
+
+  it("respondToInvitation_ghostClaimRegistered_invalidatesIdentityViews", async () => {
+    state.registeredTeams.add(9);
+    const inv = claimInvite();
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
   });
 
   it("verrouille la fantôme en exclusif, puisqu'elle va l'écrire", async () => {

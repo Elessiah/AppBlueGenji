@@ -126,7 +126,7 @@ describe("inscription d'un joueur", () => {
   it("passe quand l'équipe remplit les conditions", async () => {
     const { connection, inserts } = mockConnection(withDiscord(true, false, false, false, false));
 
-    await registerCurrentUserTeam(connection, 5, 7);
+    await registerCurrentUserTeam(connection, 5, 7, 42);
 
     expect(inserts).toHaveLength(1);
   });
@@ -135,7 +135,7 @@ describe("inscription d'un joueur", () => {
     const { connection, inserts } = mockConnection(withDiscord(true, false, false, false, false));
     jest.mocked(assertTermsAccepted).mockRejectedValueOnce(new Error("TERMS_ACCEPTANCE_REQUIRED"));
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow("TERMS_ACCEPTANCE_REQUIRED");
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow("TERMS_ACCEPTANCE_REQUIRED");
     expect(assertTermsAccepted).toHaveBeenCalledWith(7, connection);
     expect(inserts).toHaveLength(0);
   });
@@ -143,7 +143,7 @@ describe("inscription d'un joueur", () => {
   it("refuse une équipe trop petite, sans inscrire", async () => {
     const { connection, inserts } = mockConnection(withDiscord(true, true));
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow(
       "TEAM_TOO_FEW_PLAYERS",
     );
     expect(inserts).toHaveLength(0);
@@ -152,7 +152,7 @@ describe("inscription d'un joueur", () => {
   it("refuse une équipe sans aucun tag certifié", async () => {
     const { connection, inserts } = mockConnection(withDiscord(false, false, false, false, false));
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow(
       "TEAM_NEEDS_VERIFIED_DISCORD",
     );
     expect(inserts).toHaveLength(0);
@@ -163,7 +163,7 @@ describe("inscription d'un joueur", () => {
       registration_discord_requirement: "ALL_PLAYERS",
     });
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow(
       "TEAM_NEEDS_ALL_VERIFIED_DISCORD",
     );
   });
@@ -174,7 +174,7 @@ describe("inscription d'un joueur", () => {
       registration_min_players: 1,
     });
 
-    await registerCurrentUserTeam(connection, 5, 7);
+    await registerCurrentUserTeam(connection, 5, 7, 42);
     expect(inserts).toHaveLength(1);
   });
 
@@ -188,7 +188,7 @@ describe("inscription d'un joueur", () => {
     });
     const { connection } = mockConnection([]);
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow("NOT_TEAM_MANAGER");
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow("NOT_TEAM_MANAGER");
   });
 });
 
@@ -202,7 +202,7 @@ describe("condition Blizzard — la colonne lue est `blizzard_sub`", () => {
       registration_blizzard_requirement: "ALL_PLAYERS",
     });
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow(
       "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
     );
     expect(inserts).toHaveLength(0);
@@ -213,7 +213,7 @@ describe("condition Blizzard — la colonne lue est `blizzard_sub`", () => {
       registration_blizzard_requirement: "ANY_PLAYER",
     });
 
-    await registerCurrentUserTeam(connection, 5, 7);
+    await registerCurrentUserTeam(connection, 5, 7, 42);
     expect(inserts).toHaveLength(1);
   });
 
@@ -222,7 +222,7 @@ describe("condition Blizzard — la colonne lue est `blizzard_sub`", () => {
     // `NONE`, et ses conditions ne changent donc pas.
     const { connection, inserts } = mockConnection(withBlizzard(false, false, false, false, false));
 
-    await registerCurrentUserTeam(connection, 5, 7);
+    await registerCurrentUserTeam(connection, 5, 7, 42);
     expect(inserts).toHaveLength(1);
   });
 
@@ -241,7 +241,7 @@ describe("tournoi individuel", () => {
   it("ignore l'effectif minimal, et n'a pas créé d'entrée solo pour rien", async () => {
     const { connection, inserts } = mockConnection(withDiscord(true), solo);
 
-    await registerCurrentUserTeam(connection, 5, 7);
+    await registerCurrentUserTeam(connection, 5, 7, 42);
 
     expect(inserts).toHaveLength(1);
   });
@@ -252,7 +252,7 @@ describe("tournoi individuel", () => {
       registration_blizzard_requirement: "ALL_PLAYERS",
     });
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow(
       "TEAM_NEEDS_ALL_LINKED_BLIZZARD",
     );
     expect(ensureSoloEntry).not.toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe("tournoi individuel", () => {
     // d'équipe que personne n'a demandée.
     const { connection, inserts } = mockConnection(withDiscord(false), solo);
 
-    await expect(registerCurrentUserTeam(connection, 5, 7)).rejects.toThrow(
+    await expect(registerCurrentUserTeam(connection, 5, 7, 42)).rejects.toThrow(
       "TEAM_NEEDS_VERIFIED_DISCORD",
     );
     expect(ensureSoloEntry).not.toHaveBeenCalled();

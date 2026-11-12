@@ -31,10 +31,15 @@ function routed(routes: Route[]): jest.Mock<SqlQuery> {
 }
 
 let connection: ReturnType<typeof connectionMock>;
+/** L'équipe a-t-elle jamais été inscrite (lu sous verrou quand le logo change) ? */
+let everRegistered = true;
 
 function install(poolRoutes: Route[], connectionRoutes: Route[]) {
   connection = connectionMock();
-  connection.execute = routed(connectionRoutes);
+  connection.execute = routed([
+    ...connectionRoutes,
+    [/FROM bg_tournament_registrations WHERE team_id = \? LIMIT 1/, () => [everRegistered ? [{ 1: 1 }] : []]],
+  ]);
   jest.mocked(getDatabase).mockResolvedValue(
     fakePool({ execute: routed(poolRoutes), getConnection: async () => fakeConnection(connection) }),
   );
@@ -56,6 +61,7 @@ const ghostBeforeLock: Route = [/SELECT is_ghost, deleted_at FROM bg_teams/, () 
 
 beforeEach(() => {
   jest.clearAllMocks();
+  everRegistered = true;
 });
 
 describe("updateTeamLogo", () => {
@@ -105,6 +111,16 @@ describe("updateTeamLogo", () => {
     await updateTeamLogo(1, 7, null);
 
     expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+  });
+
+  it("updateTeamLogo_changedNeverRegistered_invalidatesNothing", async () => {
+    everRegistered = false;
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo(null), writeLogo]);
+
+    await updateTeamLogo(1, 7, "/api/uploads/teams/new.webp");
+
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+    expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
   it("updateTeamLogo_removingExistingLogo_invalidatesIdentityViews", async () => {

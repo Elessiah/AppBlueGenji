@@ -20,6 +20,7 @@ import {
   STREAM_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
   MODERATION_DM_SCOPE,
+  TEAM_NOTICE_DM_SCOPE,
   DATA_NOTICE_DM_SCOPE,
   groupedExtraBases,
 } from "@/lib/shared/rgpd-policy";
@@ -484,6 +485,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     // Revue légale DM-CERTIFIED-ONLY : l'ID sert aussi aux avis de modération (T11) et sur les données (T10).
     expect(DONNEES_PROFIL.find((d) => d.donnee === "ID Discord")?.extraBases).toEqual([
       { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
+      { base: "Intérêt légitime", scope: TEAM_NOTICE_DM_SCOPE },
       { base: "Intérêt légitime", scope: MODERATION_DM_SCOPE },
       { base: "Obligation légale", scope: DATA_NOTICE_DM_SCOPE },
     ]);
@@ -577,6 +579,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
     expect(entry?.extraBases).toEqual([
       { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message" },
+      { base: "Intérêt légitime", scope: "join requests, invitations, offered team takeovers and team ownership received by direct message" },
       { base: "Intérêt légitime", scope: "suspension or moderation notices by direct message" },
       { base: "Obligation légale", scope: "information about your data by direct message" },
     ]);

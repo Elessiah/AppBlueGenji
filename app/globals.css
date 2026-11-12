@@ -747,6 +747,25 @@ textarea,
   box-shadow: 0 4px 12px rgba(89, 212, 255, 0.15);
 }
 
+/* Désarmé, il ne promet pas non plus le clic. */
+.btn:where(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
+}
+
+/* Zone où `aria-disabled` remplace `disabled` (le bouton garde le focus) : le
+   `.btn` n'a pas d'état désarmé, on l'atténue ici. En attente (`aria-busy`) le
+   libellé doit rester lisible : pas d'atténuation, curseur d'attente. */
+.dim-disabled .btn[aria-disabled="true"] {
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+.dim-disabled .btn[aria-disabled="true"][aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+}
+
 .btn.secondary {
   background: rgba(var(--violet-400-rgb), 0.15);
 }

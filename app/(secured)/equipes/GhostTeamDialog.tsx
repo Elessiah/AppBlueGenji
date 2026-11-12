@@ -45,6 +45,7 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (busy) return;
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
       const message = teamErrorMessage(nameCheck.reason);
@@ -100,7 +101,7 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
         </h2>
         <p className={s.lede}>{t("ghostDialog.lede")}</p>
 
-        <form onSubmit={submit}>
+        <form className="dim-disabled" onSubmit={submit}>
           <div className="field">
             <label htmlFor="ghost-team-name">{t("identity.name")}</label>
             <input
@@ -151,10 +152,10 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
           </div>
 
           <div className={s.actions}>
-            <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+            <button type="button" className="btn ghost" onClick={busy ? undefined : onClose} aria-disabled={busy || undefined}>
               {t("ghostDialog.cancel")}
             </button>
-            <button type="submit" className="btn" disabled={busy}>
+            <button type="submit" className="btn" aria-disabled={busy || undefined} aria-busy={busy || undefined}>
               {busy ? t("ghostDialog.pending") : t("ghostDialog.submit")}
             </button>
           </div>

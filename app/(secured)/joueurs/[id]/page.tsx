@@ -15,6 +15,7 @@ import { StatsPanel } from "@/components/stats/StatsPanel";
 import { PlayerModerationBar } from "./_components/PlayerModerationBar";
 import { PlayerRolesPanel } from "./_components/PlayerRolesPanel";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import { richNodes } from "@/components/i18n/shell-text";
 import { usePlayersText, type PlayersText } from "@/components/i18n/players-text";
 import { useStatsPanelI18n } from "@/components/i18n/stats-panel-i18n";
@@ -183,7 +184,9 @@ export default function PlayerDetailPage() {
                   {deleted ? (
                     data.profile.pseudo
                   ) : (
-                    <PlayerPodiumName userId={data.profile.id}>{data.profile.pseudo}</PlayerPodiumName>
+                    <PlayerPodiumName userId={data.profile.id}>
+                      {shownEntityName(data.profile.pseudo, "player", data.profile.id, locale)}
+                    </PlayerPodiumName>
                   )}
                 </h1>
                 <fieldset

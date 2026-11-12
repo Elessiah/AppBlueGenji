@@ -148,7 +148,7 @@ describe("inscription", () => {
       roles: ["OWNER"],
     });
 
-    await registerCurrentUserTeam(registrationConnection(), 12, 42);
+    await registerCurrentUserTeam(registrationConnection(), 12, 42, 101);
 
     expect(queued()).toEqual([
       { kind: "registration", tournamentId: 12, teamId: 101, byStaff: false },
@@ -170,6 +170,7 @@ describe("inscription", () => {
           return Array.from({ length: 5 }, () => ({ verified: 1, blizzard: 0 }));
         }
         if (q.includes("COUNT(*)")) return [{ c: 1 }]; // déjà inscrite
+        if (q.includes("FROM bg_teams")) return [{ deleted_at: null }];
         if (q.includes("FROM bg_tournaments")) return [TOURNAMENT];
         return [];
       },
@@ -180,7 +181,7 @@ describe("inscription", () => {
       roles: ["OWNER"],
     });
 
-    await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("ALREADY_REGISTERED");
+    await expect(registerCurrentUserTeam(connection, 12, 42, 101)).rejects.toThrow("ALREADY_REGISTERED");
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 });

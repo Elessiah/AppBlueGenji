@@ -2,7 +2,8 @@
 import {
   DIRECTORY_READ_RULE,
   enforceRateLimit,
-  refundRateLimitFor,
+  reserveRateLimit,
+  reserveTeamIdentityWrite,
   TEAM_LIFECYCLE_RULE,
 } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -14,6 +15,7 @@ import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
 import { INVALID_TEAM_FIELDS, teamFieldsAreText } from "@/lib/shared/team-name";
 import { readJsonBody } from "@/lib/server/request-body";
+import { isRightsRefusal } from "@/lib/server/team-route-errors";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -50,16 +52,39 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const teamId = parseTeamId(id);
   if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
+  // Plafond des écritures d'identité d'un compte (renommage en boucle) ; le
+  // staff `tournaments` (équipes fantômes) n'y est pas soumis.
+  const managesGhostTeams = can(user, "tournaments");
+  // Une écriture refusée avant d'avoir eu lieu (corps invalide, nom ou sigle
+  // pris, droit manquant) rend sa place : seule une écriture faite compte.
+  const reservation = reserveTeamIdentityWrite(user.id, managesGhostTeams);
+  if (reservation.refused) return reservation.refused;
+
   try {
-    const body = (await readJsonBody(req)) as { name?: string; description?: string | null; tag?: string | null };
-    if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
-    const managesGhostTeams = can(user, "tournaments");
-    await updateTeamMeta(
-      user.id,
-      teamId,
-      { name: body.name, description: body.description, tag: body.tag },
-      managesGhostTeams,
-    );
+    let body: { name?: string; description?: string | null; tag?: string | null };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+      if (!teamFieldsAreText(body, ["name", "description", "tag"])) {
+        reservation.refund();
+        return fail(INVALID_TEAM_FIELDS, 400);
+      }
+      await updateTeamMeta(
+        user.id,
+        teamId,
+        { name: body.name, description: body.description, tag: body.tag },
+        managesGhostTeams,
+      );
+      // Un patch vide n'écrit rien (droit jugé quand même) : il rend sa place.
+      if (body.name === undefined && body.description === undefined && body.tag === undefined) {
+        reservation.refund();
+      }
+    } catch (error) {
+      // `updateTeamMeta` ne lève qu'avant son commit (ce qui suit ne lève pas).
+      // Un refus de droit, lui, garde sa place : un compte sans qualité qui
+      // boucle sur les équipes des autres reste plafonné.
+      if (!isRightsRefusal(error)) reservation.refund();
+      throw error;
+    }
 
     const detail = await getTeamDetail(teamId, user.id, managesGhostTeams);
     return ok(detail);
@@ -80,17 +105,20 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   // Plafond des créations et dissolutions d'un compte ; le staff `tournaments`
   // (équipes fantômes) n'y est pas soumis.
   const capped = !can(user, "tournaments");
-  if (capped) {
-    // Réservée en une instruction, rendue si la dissolution est refusée.
-    const throttled = enforceRateLimit(TEAM_LIFECYCLE_RULE, user.id);
-    if (throttled) return throttled;
-  }
+  // Réservée en une instruction, rendue si la dissolution est refusée (sauf
+  // refus de droit) — et
+  // seulement alors : `softDeleteTeam` ne lève qu'avant son commit (ce qui suit
+  // le commit, effacement du logo compris, ne lève jamais).
+  const reservation = capped ? reserveRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
+  if (reservation?.refused) return reservation.refused;
 
   try {
     await softDeleteTeam(user.id, teamId, can(user, "tournaments"));
     return ok({ deleted: true });
   } catch (error) {
-    if (capped) refundRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
+    // Comme les écritures d'identité : un refus de droit garde sa place — un
+    // compte sans qualité qui boucle sur les équipes des autres reste plafonné.
+    if (!isRightsRefusal(error)) reservation?.refund();
     const message = (error as Error).message;
     return fail(message || "TEAM_DELETE_FAILED", teamErrorStatus(TEAM_DELETE_ERROR_STATUS, message));
   }

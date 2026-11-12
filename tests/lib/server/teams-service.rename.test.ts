@@ -8,9 +8,10 @@ jest.mock("@/lib/server/database");
 import { updateTeamMeta } from "@/lib/server/teams/identity";
 import { assertTeamNameAvailable, isTeamNameConflict } from "@/lib/server/team-tags";
 import { getDatabase } from "@/lib/server/database";
-import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
+import * as rankingCache from "@/lib/server/ranking-cache";
 
 /**
  * Renommer une équipe : mêmes bornes qu'à la création, unicité dite en
@@ -21,6 +22,12 @@ import { LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
  */
 
 const owner = [[{ roles_json: JSON.stringify(["OWNER"]) }]];
+/** Ligne de l'équipe sous verrou, en tête de la transaction : son nom actuel y est relu. */
+const locked = (name: string, extra: Partial<{ deleted_at: Date | null; is_ghost: 0 | 1 }> = {}) => [
+  [{ name, deleted_at: null, is_ghost: 0, ...extra }],
+];
+const neverRegistered = [[]];
+const registered = [[{ 1: 1 }]];
 
 function dupError(key: string) {
   const message = `Duplicate entry 'X' for key '${key}'`;
@@ -28,11 +35,26 @@ function dupError(key: string) {
 }
 
 let execute: SqlMock;
+let connection: {
+  beginTransaction: jest.Mock<() => Promise<void>>;
+  commit: jest.Mock<() => Promise<void>>;
+  rollback: jest.Mock<() => Promise<void>>;
+  release: jest.Mock<() => void>;
+};
 
+/** Pool et connexion de transaction partagent le même `execute` : la séquence se lit d'un trait. */
 beforeEach(() => {
   jest.clearAllMocks();
   execute = jest.fn();
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  connection = {
+    beginTransaction: jest.fn(async () => undefined),
+    commit: jest.fn(async () => undefined),
+    rollback: jest.fn(async () => undefined),
+    release: jest.fn(),
+  };
+  jest.mocked(getDatabase).mockResolvedValue(
+    fakePool({ execute, getConnection: jest.fn(async () => fakeConnection({ execute, ...connection })) }),
+  );
 });
 
 const wrote = () => execute.mock.calls.some(([sql]) => /UPDATE bg_teams/.test(String(sql)));
@@ -53,7 +75,8 @@ describe("updateTeamMeta — nom", () => {
   it("refuse un nom déjà porté par une autre équipe, avant d'écrire", async () => {
     execute
       .mockResolvedValueOnce(owner)
-      .mockResolvedValueOnce([[{ name: "Ancien Nom" }]]) // nom actuel
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([[{ id: 9 }]]); // nom pris
 
     await expect(updateTeamMeta(1, 7, { name: "Dragon Squad" })).rejects.toThrow("TEAM_NAME_ALREADY_USED");
@@ -63,16 +86,18 @@ describe("updateTeamMeta — nom", () => {
   it("laisse l'équipe garder son propre nom (casse comprise)", async () => {
     execute
       .mockResolvedValueOnce(owner)
-      .mockResolvedValueOnce([[{ name: "rolex" }]]) // nom actuel, autre casse
+      .mockResolvedValueOnce(locked("rolex")) // nom actuel, autre casse
+      .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce(neverRegistered);
 
     await updateTeamMeta(1, 7, { name: "  Rolex  " });
 
-    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[3] as [string, unknown[]];
     expect(sql).toMatch(/WHERE name = \? AND id <> \?/);
     expect(params).toEqual(["Rolex", 7]);
-    const [, updateParams] = execute.mock.calls[3] as [string, unknown[]];
+    const [, updateParams] = execute.mock.calls[4] as [string, unknown[]];
     // Le nom écrit est rogné.
     expect(updateParams).toEqual(["Rolex", 7]);
   });
@@ -80,7 +105,8 @@ describe("updateTeamMeta — nom", () => {
   it("traduit la course entre deux renommages vers le même nom", async () => {
     execute
       .mockResolvedValueOnce(owner)
-      .mockResolvedValueOnce([[{ name: "Ancien Nom" }]])
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([[]])
       .mockRejectedValueOnce(dupError("bg_teams.name"));
 
@@ -89,6 +115,8 @@ describe("updateTeamMeta — nom", () => {
 
   it("garde la traduction du sigle quand c'est lui qui entre en collision", async () => {
     execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
       .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([[]]) // tag libre au SELECT
       .mockRejectedValueOnce(dupError("uniq_bg_teams_tag"));
@@ -103,6 +131,8 @@ describe("updateTeamMeta — nom", () => {
 
   it("ne touche pas au nom quand le patch ne le porte pas", async () => {
     execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
       .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -158,12 +188,14 @@ describe("updateTeamMeta — vues de l'accueil", () => {
     clearCache();
   });
 
-  it("updateTeamMeta_renamed_clearsLandingLeaderboard", async () => {
+  it("updateTeamMeta_renamedRegistered_clearsLandingLeaderboard", async () => {
     execute
       .mockResolvedValueOnce(owner)
-      .mockResolvedValueOnce([[{ name: "Ancien Nom" }]])
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce(registered);
     const loader = jest.fn(async () => "rangs");
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
 
@@ -173,10 +205,33 @@ describe("updateTeamMeta — vues de l'accueil", () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
+  it("updateTeamMeta_invalidationThrowsAfterCommit_resolvesAndLogs", async () => {
+    // Le renommage est commité : la route ne doit ni rendre la place de son
+    // plafond ni répondre en erreur.
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce(registered);
+    jest.spyOn(rankingCache, "invalidateTeamIdentityViews").mockImplementationOnce(() => {
+      throw new Error("cache en panne");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(updateTeamMeta(1, 7, { name: "Nouveau Nom" })).resolves.toBeUndefined();
+
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toBe("[teams] vues d'identité non vidées");
+    error.mockRestore();
+  });
+
   it("updateTeamMeta_unchangedNameResent_keepsLandingLeaderboard", async () => {
     execute
       .mockResolvedValueOnce(owner)
-      .mockResolvedValueOnce([[{ name: "Nouveau Nom" }]])
+      .mockResolvedValueOnce(locked("Nouveau Nom"))
+      .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     const loader = jest.fn(async () => "rangs");
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
@@ -190,7 +245,8 @@ describe("updateTeamMeta — vues de l'accueil", () => {
   it("updateTeamMeta_unchangedNameResent_skipsNameCheckAndWrite", async () => {
     execute
       .mockResolvedValueOnce(owner)
-      .mockResolvedValueOnce([[{ name: "Nouveau Nom" }]])
+      .mockResolvedValueOnce(locked("Nouveau Nom"))
+      .mockResolvedValueOnce(owner)
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await updateTeamMeta(1, 7, { name: "Nouveau Nom", description: "Texte" });
@@ -201,7 +257,11 @@ describe("updateTeamMeta — vues de l'accueil", () => {
   });
 
   it("updateTeamMeta_descriptionOnly_keepsLandingLeaderboard", async () => {
-    execute.mockResolvedValueOnce(owner).mockResolvedValueOnce([{ affectedRows: 1 }]);
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     const loader = jest.fn(async () => "rangs");
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
 
@@ -220,5 +280,72 @@ describe("updateTeamMeta — vues de l'accueil", () => {
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
 
     expect(loader).toHaveBeenCalledTimes(1);
+  });
+});
+
+// TEAMS-LOT (ERREUR.txt) : nom relu et droit rejugé sous le verrou de l'équipe,
+// vues vidées seulement pour une équipe qui a déjà joué.
+describe("updateTeamMeta — sous le verrou de l'équipe", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  it("updateTeamMeta_lockFirst_selectForUpdateIsFirstTransactionStatement", async () => {
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await updateTeamMeta(1, 7, { description: "Texte" });
+
+    // Appel 0 : droit lu sur le pool ; appel 1 : première instruction de la transaction.
+    expect(String(execute.mock.calls[1][0])).toMatch(/SELECT name, deleted_at, is_ghost FROM bg_teams WHERE id = \? FOR UPDATE/);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("updateTeamMeta_teamDeletedUnderLock_throwsForbiddenAndRollsBack", async () => {
+    execute.mockResolvedValueOnce(owner).mockResolvedValueOnce(locked("Ancien Nom", { deleted_at: new Date() }));
+
+    await expect(updateTeamMeta(1, 7, { name: "Nouveau Nom" })).rejects.toThrow("FORBIDDEN");
+
+    expect(wrote()).toBe(false);
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("updateTeamMeta_ownerLostUnderLock_throwsForbidden", async () => {
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["MANAGER"]) }]]);
+
+    await expect(updateTeamMeta(1, 7, { name: "Nouveau Nom" })).rejects.toThrow("FORBIDDEN");
+
+    expect(wrote()).toBe(false);
+  });
+
+  it("updateTeamMeta_renamedNeverRegistered_keepsLandingLeaderboard", async () => {
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce(neverRegistered);
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await updateTeamMeta(1, 7, { name: "Nouveau Nom" });
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTeamMeta_emptyPatch_opensNoTransaction", async () => {
+    execute.mockResolvedValueOnce(owner);
+
+    await updateTeamMeta(1, 7, {});
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
   });
 });

@@ -194,75 +194,82 @@ describe("updateTeamMeta — sigle", () => {
     jest.restoreAllMocks();
   });
 
-  /** L'auteur est OWNER de l'équipe : première lecture du service. */
-  function asOwner(poolExecute: Exec) {
+  /**
+   * L'auteur est OWNER : lu sur le pool, puis relu sous le verrou de l'équipe
+   * (ligne verrouillée, rôles de l'auteur) en tête de la transaction.
+   */
+  function asOwner(poolExecute: Exec, connectionExecute: Exec, name = "Ancien nom") {
     poolExecute.mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]);
+    connectionExecute
+      .mockResolvedValueOnce([[{ name, deleted_at: null, is_ghost: 0 }], []])
+      .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]);
   }
 
   it("met le sigle à jour en excluant l'équipe elle-même du contrôle", async () => {
-    const { poolExecute } = await mockDb();
-    asOwner(poolExecute);
-    poolExecute.mockResolvedValueOnce([[], []]); // sigle libre
-    poolExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+    const { poolExecute, connectionExecute } = await mockDb();
+    asOwner(poolExecute, connectionExecute);
+    connectionExecute.mockResolvedValueOnce([[], []]); // sigle libre
+    connectionExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
 
     await updateTeamMeta(1, 12, { tag: "bg" });
 
-    const check = poolExecute.mock.calls[1] as [string, unknown[]];
+    const check = connectionExecute.mock.calls[2] as [string, unknown[]];
     expect(check[1]).toEqual(["BG", 12]);
-    const update = poolExecute.mock.calls[2] as [string, unknown[]];
+    const update = connectionExecute.mock.calls[3] as [string, unknown[]];
     expect(update[0]).toMatch(/UPDATE bg_teams SET tag = \? WHERE id = \?/);
     expect(update[1]).toEqual(["BG", 12]);
   });
 
   it("retire le sigle sur une saisie vidée, sans le déclarer pris", async () => {
-    const { poolExecute } = await mockDb();
-    asOwner(poolExecute);
-    poolExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+    const { poolExecute, connectionExecute } = await mockDb();
+    asOwner(poolExecute, connectionExecute);
+    connectionExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
 
     await updateTeamMeta(1, 12, { tag: "" });
 
-    const update = poolExecute.mock.calls[1] as [string, unknown[]];
+    const update = connectionExecute.mock.calls[2] as [string, unknown[]];
     expect(update[0]).toMatch(/SET tag = \?/);
     expect(update[1]).toEqual([null, 12]);
   });
 
   it("ne touche pas au sigle quand le patch ne le mentionne pas", async () => {
-    const { poolExecute } = await mockDb();
-    asOwner(poolExecute);
-    poolExecute.mockResolvedValueOnce([[{ name: "Ancien nom" }], []]); // nom actuel
-    poolExecute.mockResolvedValueOnce([[], []]); // nom libre
-    poolExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+    const { poolExecute, connectionExecute } = await mockDb();
+    asOwner(poolExecute, connectionExecute);
+    connectionExecute.mockResolvedValueOnce([[], []]); // nom libre
+    connectionExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+    connectionExecute.mockResolvedValueOnce([[], []]); // jamais inscrite
 
     await updateTeamMeta(1, 12, { name: "Nouveau nom" });
 
-    expect(sqlOf(poolExecute)).not.toMatch(/tag/);
+    expect(sqlOf(connectionExecute)).not.toMatch(/\btag\b/);
   });
 
   it("refuse un sigle déjà porté par une autre équipe", async () => {
-    const { poolExecute } = await mockDb();
-    asOwner(poolExecute);
-    poolExecute.mockResolvedValueOnce([[{ id: 99 }], []]);
+    const { poolExecute, connectionExecute, connection } = await mockDb();
+    asOwner(poolExecute, connectionExecute);
+    connectionExecute.mockResolvedValueOnce([[{ id: 99 }], []]);
 
     await expect(updateTeamMeta(1, 12, { tag: "BG" })).rejects.toThrow("TEAM_TAG_ALREADY_USED");
-    expect(sqlOf(poolExecute)).not.toMatch(/UPDATE bg_teams/);
+    expect(sqlOf(connectionExecute)).not.toMatch(/UPDATE bg_teams/);
+    expect(connection.rollback).toHaveBeenCalled();
   });
 
   it("refuse un sigle mal formé sans rien écrire", async () => {
-    const { poolExecute } = await mockDb();
-    asOwner(poolExecute);
+    const { poolExecute, connectionExecute } = await mockDb();
+    asOwner(poolExecute, connectionExecute);
 
     await expect(updateTeamMeta(1, 12, { tag: "TROP-LONG" })).rejects.toThrow(
       "TEAM_TAG_NOT_ALPHANUMERIC",
     );
-    expect(sqlOf(poolExecute)).not.toMatch(/UPDATE bg_teams/);
+    expect(sqlOf(connectionExecute)).not.toMatch(/UPDATE bg_teams/);
   });
 
   it("refuse la modification à qui n'administre pas l'équipe", async () => {
-    const { poolExecute } = await mockDb();
+    const { poolExecute, connectionExecute } = await mockDb();
     poolExecute.mockResolvedValue([[], []]); // ni OWNER, ni équipe fantôme
 
     await expect(updateTeamMeta(1, 12, { tag: "BG" })).rejects.toThrow("FORBIDDEN");
-    expect(sqlOf(poolExecute)).not.toMatch(/UPDATE bg_teams/);
+    expect(connectionExecute).not.toHaveBeenCalled();
   });
 });
 

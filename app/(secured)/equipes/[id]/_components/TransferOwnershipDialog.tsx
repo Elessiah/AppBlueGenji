@@ -68,13 +68,20 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
       tone={confirmStep ? "danger" : "default"}
       footer={
         <>
-          <button type="button" className="btn ghost" disabled={pending} onClick={onClose}>
+          <button
+            type="button"
+            className="btn ghost"
+            aria-disabled={pending || undefined}
+            onClick={pending ? undefined : onClose}
+          >
             {t("transfer.cancel")}
           </button>
           <button
             type="submit"
             className={`btn ${confirmStep ? "danger" : styles.primaryButton}`}
-            disabled={!target || pending}
+            disabled={!target && !pending}
+            aria-disabled={pending || undefined}
+            aria-busy={pending || undefined}
           >
             {pending ? t("transfer.pending") : submitLabel}
           </button>

@@ -5,6 +5,12 @@ import { TranslationNotice } from "@/components/legal/TranslationNotice";
 import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+  TEAM_NOTICE_DMS_HOURLY_CAP,
+} from "@/lib/shared/team-invite-notice";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -942,6 +948,22 @@ export function RgpdEn({
             account concerned and the roles saved, on the basis of legitimate interest (administration of the
             platform), to which the person concerned may object (section{" "}
             <a href="#exercer-vos-droits">“Exercising your rights”</a>; <LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+          </p>
+          <p id="messages-d-equipe">
+            <strong>Team Discord direct messages.</strong> The bot also writes to you privately, in your account&apos;s
+            language and without naming who acts (the team&apos;s name only), when a team invites you, when the staff
+            offers you to take over a ghost team, when the ownership of your team is transferred to you and, if you
+            manage a team (owner or manager), when a player asks to join it (without naming them) — only to a linked
+            Discord identifier or a certified tag, otherwise as a push notification only. The same team writes to you
+            only once per kind of message every {TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h; a team or an account makes the
+            bot write to {TEAM_INVITE_NOTICES_DAILY_CAP} players at most, and you receive the notice from{" "}
+            {TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams at most within that time (a team you were a member of does not
+            count); beyond {TEAM_NOTICE_DMS_HOURLY_CAP} invitations, takeovers or ownerships announced per hour for
+            the whole site, the notice is sent as a push notification only. The invitation itself stays in{" "}
+            <EnglishLegalLink href="/profil#invitations">My profile</EnglishLegalLink>. These messages are based on
+            the association&apos;s <strong>legitimate interest</strong> in forming teams, to which you may object
+            (section <a href="#exercer-vos-droits">“Exercising your rights”</a>;{" "}
+            <LocaleLink href="/rgpd/registre#t03">register, T03</LocaleLink>).
           </p>
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,

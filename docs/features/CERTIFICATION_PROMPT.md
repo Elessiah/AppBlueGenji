@@ -226,11 +226,14 @@ l'onglet.
   contexte du même tournoi. La lecture REST de secours l'attend. La place de flux est prise
   **avant** toute lecture : une boucle au-delà du plafond ne coûte aucune
   requête. Quitter une équipe, en être retiré, la dissoudre, y changer de rôle
-  ou en transférer la propriété ferme les flux des comptes touchés sans
+  ou en transférer la propriété ferme les flux de **tous ses membres** (et de
+  qui vient de partir — `teamViewerScope`, lu sous le verrou après l'écriture ;
+  accepter une invitation aussi) sans
   révoquer leur session (`refreshTeamViewers`, `reconnectUserStreams` en
   motif `RECONNECT` : la route ne répond pas 401, même à un flux en cours
   d'ouverture, qui se ferme simplement), **sur les seuls tournois concernés**
-  (`teamStreamTournamentIds` : engagée, ou pas encore commencé), en un seul
+  (`teamStreamTournamentIds` : engagée dans un tournoi non terminé, ou pas
+  encore commencé), en un seul
   passage sur le registre pour tous les membres d'une dissolution ; les
   invitations de l'équipe sont oubliées (`forgetCertificationPromptsOfTeam`).
   Le client se reconnecte et relit son contexte. Mémoire pleine : une lecture abandonnée qui pend encore n'est

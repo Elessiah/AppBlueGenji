@@ -7,6 +7,7 @@ import {
   TEAM_MEMBER_REMOVE_ERROR_STATUS,
   TEAM_MEMBER_ROLES_ERROR_STATUS,
   TEAM_META_ERROR_STATUS,
+  isRightsRefusal,
   parseTeamId,
   teamErrorStatus,
 } from "@/lib/server/team-route-errors";
@@ -74,5 +75,19 @@ describe("parseTeamId", () => {
     ["", null],
   ])("%p → %p", (raw, expected) => {
     expect(parseTeamId(raw)).toBe(expected);
+  });
+});
+
+describe("isRightsRefusal", () => {
+  it("isRightsRefusal_forbidden_true", () => {
+    expect(isRightsRefusal(new Error("FORBIDDEN"))).toBe(true);
+  });
+
+  it("isRightsRefusal_businessRefusal_false", () => {
+    expect(isRightsRefusal(new Error(TEAM_NAME_ALREADY_USED))).toBe(false);
+  });
+
+  it("isRightsRefusal_notAnError_false", () => {
+    expect(isRightsRefusal("FORBIDDEN")).toBe(false);
   });
 });

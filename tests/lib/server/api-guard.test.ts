@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   LANDING_READ_RULE,
   MATCH_PROPOSALS_READ_RULE,
@@ -11,8 +11,9 @@ import {
   takeRateToken,
   peekRateLimit,
   requestClientIp,
+  reserveRateLimit,
 } from "@/lib/server/api-guard";
-import { resetRateLimit, type RateLimitRule, type TokenBucketRule } from "@/lib/server/rate-limit";
+import { checkRateLimit, resetRateLimit, type RateLimitRule, type TokenBucketRule } from "@/lib/server/rate-limit";
 
 const RULE: RateLimitRule = { name: "guard-test", limit: 2, windowMs: 60_000 };
 
@@ -266,5 +267,53 @@ describe("takeRateToken / refundRateToken", () => {
   it("ne plafonne jamais l'identité inconnue", () => {
     for (let i = 0; i < 5; i += 1) expect(takeRateToken(BUCKET, null)).toBeNull();
     refundRateToken(BUCKET, null);
+  });
+});
+
+describe("reserveRateLimit", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("reserveRateLimit_withinLimit_reservesOneSlot", () => {
+    const reservation = reserveRateLimit(RULE, 7);
+
+    expect(reservation.refused).toBeNull();
+    expect(checkRateLimit(RULE, "7").remaining).toBe(1);
+  });
+
+  it("reserveRateLimit_overLimit_returns429", async () => {
+    reserveRateLimit(RULE, 7);
+    reserveRateLimit(RULE, 7);
+
+    const { refused } = reserveRateLimit(RULE, 7);
+
+    expect(refused?.status).toBe(429);
+    expect(await refused?.json()).toEqual({ error: "TOO_MANY_REQUESTS" });
+  });
+
+  it("reserveRateLimit_refundTwice_givesBackOnlyOnce", () => {
+    reserveRateLimit(RULE, 7);
+    const reservation = reserveRateLimit(RULE, 7);
+
+    reservation.refund();
+    reservation.refund();
+
+    expect(checkRateLimit(RULE, "7").remaining).toBe(1);
+  });
+
+  it("reserveRateLimit_refundAfterWindowReopened_leavesNewWindowAlone", () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const reservation = reserveRateLimit(RULE, 7);
+    now.mockReturnValue(1_000_000 + RULE.windowMs);
+    reserveRateLimit(RULE, 7); // nouvelle fenêtre
+
+    reservation.refund();
+
+    expect(checkRateLimit(RULE, "7", 1_000_000 + RULE.windowMs).remaining).toBe(1);
+  });
+
+  it("reserveRateLimit_anonymous_neitherCappedNorCounted", () => {
+    for (let i = 0; i < RULE.limit + 1; i += 1) expect(reserveRateLimit(RULE, null).refused).toBeNull();
   });
 });

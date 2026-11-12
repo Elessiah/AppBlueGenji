@@ -120,9 +120,29 @@ export function chargeRateLimit(
  * lieu — un refus métier après la réservation. Sans effet si la fenêtre a été
  * remise à zéro entre-temps.
  */
-export function refundRateLimit(rule: RateLimitRule, key: string, now: number = Date.now()): void {
+export function refundRateLimit(
+  rule: RateLimitRule,
+  key: string,
+  now: number = Date.now(),
+  windowResetAt?: number,
+): void {
   const counter = bucketOf(rule).get(key);
-  if (counter && now < counter.resetAt && counter.count > 0) counter.count -= 1;
+  if (!counter || now >= counter.resetAt || counter.count <= 0) return;
+  // Rattachée à la fenêtre de sa réservation : une fenêtre rouverte entre-temps
+  // (autre `resetAt`) ne porte pas l'action réservée, la décrémenter rendrait
+  // une place jamais prise.
+  if (windowResetAt !== undefined && counter.resetAt !== windowResetAt) return;
+  counter.count -= 1;
+}
+
+/**
+ * Fenêtre courante d'une clé (`resetAt`, ms) — `null` si aucune n'est ouverte.
+ * Lue juste après un décompte, elle identifie la fenêtre de la réservation
+ * ({@link refundRateLimit}).
+ */
+export function rateLimitWindowOf(rule: RateLimitRule, key: string, now: number = Date.now()): number | null {
+  const counter = bucketOf(rule).get(key);
+  return counter && now < counter.resetAt ? counter.resetAt : null;
 }
 
 /**

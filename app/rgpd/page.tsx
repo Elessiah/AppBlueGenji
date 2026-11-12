@@ -91,6 +91,12 @@ import {
 } from "@/lib/shared/site-visits";
 import { headers } from "next/headers";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+  TEAM_NOTICE_DMS_HOURLY_CAP,
+} from "@/lib/shared/team-invite-notice";
 import styles from "./page.module.css";
 
 /**
@@ -1131,6 +1137,23 @@ function RgpdFr({
             l&apos;identifiant du compte visé et les rôles enregistrés, au titre de l&apos;intérêt légitime
             (administration de la plateforme), auquel la personne concernée peut s&apos;opposer (section{" "}
             <a href="#exercer-vos-droits">« Exercer vos droits »</a> ; <Link href="/rgpd/registre#t05">registre, T05</Link>).
+          </p>
+          <p id="messages-d-equipe">
+            <strong>Messages privés Discord d&apos;équipe.</strong> Le bot vous écrit aussi en privé, dans la langue
+            de votre compte et sans nommer qui agit (le nom de l&apos;équipe seul), quand une équipe vous invite, quand
+            le staff vous propose de reprendre une équipe fantôme, quand la propriété de votre équipe vous est
+            transférée et, si vous gérez une équipe (propriétaire ou manager), quand un joueur demande à la rejoindre
+            (sans le nommer) — seulement à un identifiant Discord rattaché ou à un tag certifié, sinon la
+            notification push seule. Une même équipe ne vous écrit qu&apos;une fois par sorte de message toutes les{" "}
+            {TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h ; une équipe ou un compte ne fait écrire qu&apos;à{" "}
+            {TEAM_INVITE_NOTICES_DAILY_CAP} joueurs, et vous ne recevez l&apos;avis que de{" "}
+            {TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes dans ce délai (une équipe dont vous avez été membre n&apos;y
+            entre pas) ; au-delà de {TEAM_NOTICE_DMS_HOURLY_CAP} invitations, reprises ou propriétés annoncées par
+            heure pour tout le site, l&apos;avis ne part qu&apos;en notification push. L&apos;invitation, elle, reste
+            dans <Link href="/profil#invitations">Mon profil</Link>. Ces messages reposent sur l&apos;
+            <strong>intérêt légitime</strong> de l&apos;association à la constitution des équipes, auquel vous pouvez
+            vous opposer (section <a href="#exercer-vos-droits">« Exercer vos droits »</a> ;{" "}
+            <Link href="/rgpd/registre#t03">registre, T03</Link>).
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission

@@ -41,7 +41,7 @@ describe("TeamSettings — propriétaire", () => {
     expect(html).toContain('value="GLC"');
     expect(html).toContain("Une équipe.");
     expect(html).not.toContain("Annuler les modifications");
-    expect(html).toMatch(/<button type="submit"[^>]*disabled=""[^>]*>Enregistrer<\/button>/);
+    expect(html).toMatch(/<button type="submit"[^>]*aria-disabled="true"[^>]*>Enregistrer<\/button>/);
   });
 
   it("propose d'ajouter un logo, sans le retirer", () => {
@@ -105,7 +105,7 @@ describe("TeamSettings — équipe avec un logo", () => {
 
   it("TeamSettings_removeLogoButton_opensConfirmationInsteadOfDeleting", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/equipes/[id]/_components/TeamSettings.tsx"), "utf8");
-    expect(source).toContain("onClick={() => setRemoveLogoOpen(true)}");
+    expect(source).toMatch(/onClick=\{\(\) => \{\s*if \(!logoBusy\) setRemoveLogoOpen\(true\);\s*\}\}/);
     expect(source).toMatch(/<ConfirmActionDialog\s+title=\{t\("settings\.removeLogoTitle"\)\}[\s\S]*?onConfirm=\{onLogoDelete\}/);
   });
 });

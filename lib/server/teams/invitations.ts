@@ -8,8 +8,8 @@ import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
-import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
-import { ghostAdminOverride, userCanManageTeam } from "./access";
+import { cancelPendingTeamInvitations, ghostAdminOverride, teamEverRegistered, userCanManageTeam } from "./access";
+import { refreshTeamViewers, teamViewerScope, type TeamViewerScope } from "./roster";
 
 /*
  * Entrées dans une équipe : invitations envoyées par la gestion, demandes
@@ -83,6 +83,8 @@ async function acceptIntoTeam(
 
   const db = await getDatabase();
   const connection = await db.getConnection();
+  let scope: TeamViewerScope;
+  let everRegistered = false;
   try {
     await connection.beginTransaction();
 
@@ -141,13 +143,11 @@ async function acceptIntoTeam(
       // d'objet — les laisser en attente, elles finiraient refusées en
       // `NOT_A_GHOST_TEAM` sous les yeux de qui les accepterait.
       await connection.execute(`UPDATE bg_teams SET is_ghost = 0 WHERE id = ?`, [teamId]);
-      await connection.execute(
-        `UPDATE bg_team_invitations
-         SET status = 'CANCELLED', responded_at = NOW()
-         WHERE team_id = ? AND status = 'PENDING'`,
-        [teamId],
-      );
+      await cancelPendingTeamInvitations(connection, teamId);
+      everRegistered = await teamEverRegistered(connection, teamId);
     }
+    // Lus sous les verrous, après l'arrivée : le joueur qui arrive est compté.
+    scope = await teamViewerScope(connection, teamId);
 
     await connection.commit();
   } catch (error) {
@@ -157,11 +157,15 @@ async function acceptIntoTeam(
     connection.release();
   }
   // Une arrivée change « équipe sans contact » pour tous : un joueur certifié
-  // qui rejoint lève l'invitation retenue de ses nouveaux coéquipiers.
-  forgetCertificationPromptsOfTeam(teamId);
+  // qui rejoint lève l'invitation retenue de ses nouveaux coéquipiers. Et le
+  // flux du joueur qui arrive ne lisait son équipe (aucune) qu'à son
+  // ouverture : comme pour tout geste de roster, les flux de l'équipe se
+  // reconnectent sur les tournois concernés.
+  refreshTeamViewers(teamId, scope.userIds, scope.tournamentIds);
   // Une fantôme reprise n'en est plus une : les cartes d'aperçu, qui écartent
-  // les fantômes (`share-team.ts`), la montrent dès sa reprise.
-  if (claim) invalidateTeamIdentityViews();
+  // les fantômes (`share-team.ts`), la montrent dès sa reprise — si elle a
+  // jamais joué : sans inscription, aucune vue ne la montre.
+  if (claim && everRegistered) invalidateTeamIdentityViews();
 }
 
 async function findPendingInvitation(
@@ -341,10 +345,15 @@ export async function respondToInvitation(
   }
 
   if (!accept) {
-    await db.execute(
-      `UPDATE bg_team_invitations SET status = 'DECLINED', responded_at = NOW() WHERE id = ?`,
+    // Conditionné à `PENDING`, comme l'acceptation et le retrait : un refus
+    // parti d'un vieil onglet ne réécrit plus en « refusée » une invitation
+    // acceptée entre-temps (le joueur resterait membre d'une équipe dont
+    // l'invitation se dirait refusée).
+    const [declined] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_team_invitations SET status = 'DECLINED', responded_at = NOW() WHERE id = ? AND status = 'PENDING'`,
       [invitationId],
     );
+    if (Number(declined.affectedRows) === 0) throw new Error("INVITATION_NOT_PENDING");
     return;
   }
 

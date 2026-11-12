@@ -182,6 +182,15 @@ solo) rendent le nom en texte quand le compte supprimé n'a joué aucun match �
 sa fiche répond 404. La liste vient du layout racine
 (`ProfilelessPlayersProvider`, `useHasPlayerPage`) → `ACCOUNT_DELETION.md`.
 
+**Nom invisible** : un nom ancien fait seulement de caractères invisibles
+(laissé tel quel par `cleanStoredNames`) rendait un lien sans texte, donc sans
+nom accessible. `TeamLink` / `PlayerLink` affichent alors « Équipe #id » /
+« Joueur #id » (« Team #id » / « Player #id » sur `/en`,
+`common.entityFallback`) quand leur contenu est une chaîne
+(`lib/shared/entity-fallback-name.ts`, `shownEntityName`) ; le titre (h1) des
+fiches d'équipe et de joueur fait de même, et le titre d'onglet retombe sur le
+générique (`entity-page-titles.ts`, lu par `visibleText`).
+
 ## Fichiers
 
 | Rôle | Fichier |

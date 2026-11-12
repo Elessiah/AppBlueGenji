@@ -64,6 +64,8 @@ export default function CreateTeamForm() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    // Le bouton reste focalisable pendant l'envoi (`aria-disabled`) : la garde est ici.
+    if (loading) return;
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
       const message = teamErrorMessage(nameCheck.reason);
@@ -146,7 +148,7 @@ export default function CreateTeamForm() {
       {/* Même marge interne que le formulaire de tournoi : sans elle, les
           champs touchaient le bord de la carte et le premier libellé son trait. */}
       <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
-        <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <form className="dim-disabled" onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="form-grid">
             <div className="field">
               <label htmlFor="team-name">{t("create.name")}</label>
@@ -217,8 +219,10 @@ export default function CreateTeamForm() {
                 <button
                   type="button"
                   className="btn"
-                  disabled={loading}
-                  onClick={() => logoInputRef.current?.click()}
+                  aria-disabled={loading || undefined}
+                  onClick={() => {
+                    if (!loading) logoInputRef.current?.click();
+                  }}
                   style={{ padding: "9px 18px", fontSize: 13 }}
                 >
                   {t("create.chooseLogo")}
@@ -229,8 +233,10 @@ export default function CreateTeamForm() {
                     <button
                       type="button"
                       className="btn ghost"
-                      disabled={loading}
-                      onClick={() => void onLogoRecrop()}
+                      aria-disabled={loading || undefined}
+                      onClick={() => {
+                        if (!loading) void onLogoRecrop();
+                      }}
                       style={{ padding: "6px 12px", fontSize: 12 }}
                     >
                       {t("create.recrop")}
@@ -238,8 +244,9 @@ export default function CreateTeamForm() {
                     <button
                       type="button"
                       className="btn ghost"
-                      disabled={loading}
+                      aria-disabled={loading || undefined}
                       onClick={() => {
+                        if (loading) return;
                         setLogo(null);
                         setLogoRights(false);
                       }}
@@ -304,8 +311,8 @@ export default function CreateTeamForm() {
             <CyberButton
               variant="primary"
               type="submit"
-              disabled={loading}
-              style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+              aria-disabled={loading || undefined}
+              aria-busy={loading || undefined}
             >
               {loading ? t("create.pending") : t("create.submit")}
             </CyberButton>

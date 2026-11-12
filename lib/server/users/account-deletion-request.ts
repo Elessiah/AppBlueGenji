@@ -35,9 +35,9 @@ import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-l
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
-import { lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
+import { cancelPendingTeamInvitations, lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
-import { refreshTeamViewers, teamStreamTournamentIds } from "@/lib/server/teams/roster";
+import { refreshTeamViewers, teamViewerScope } from "@/lib/server/teams/roster";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { holdAccountIdentity } from "./account-deletion-hold";
@@ -88,6 +88,7 @@ type TeamDeparture = {
   successorId: number | null;
   logoUrl: string | null;
   everRegistered: boolean;
+  /** Comptes dont les flux de tournoi se reconnectent : ceux qui partent et les membres qui restent. */
   detachedUserIds: number[];
   streamTournamentIds: ReadonlySet<number>;
 };
@@ -234,11 +235,7 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
       // Fantôme (`GHOST_TEAMS.md`) : le staff la conduit, la propose à un joueur
       // qui la reprend. Les invitations en attente ne viennent plus de personne.
       await connection.execute(`UPDATE bg_teams SET is_ghost = 1 WHERE id = ?`, [teamId]);
-      await connection.execute(
-        `UPDATE bg_team_invitations SET status = 'CANCELLED', responded_at = NOW()
-          WHERE team_id = ? AND status = 'PENDING'`,
-        [teamId],
-      );
+      await cancelPendingTeamInvitations(connection, teamId);
       // Une équipe fantôme n'a aucun membre (`GHOST_TEAMS.md`). Faute de
       // candidat vivant, les appartenances encore ouvertes sont celles de
       // comptes déjà supprimés (lignes d'avant le départ à la demande) : elles
@@ -259,7 +256,11 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
     await writeActiveMembership(connection, "left_at = NOW()", [], teamId, userId);
     departure.detachedUserIds = [userId];
   }
-  departure.streamTournamentIds = await teamStreamTournamentIds(connection, teamId);
+  // Le compte qui part (ou les membres détachés) et les membres qui restent :
+  // leur invitation à certifier se juge sur la composition de l'équipe.
+  const scope = await teamViewerScope(connection, teamId, departure.detachedUserIds);
+  departure.detachedUserIds = scope.userIds;
+  departure.streamTournamentIds = scope.tournamentIds;
   return departure;
 }
 

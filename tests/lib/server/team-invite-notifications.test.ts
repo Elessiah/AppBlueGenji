@@ -9,13 +9,19 @@ import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
 import {
-  claimOwnershipNoticeSlot,
-  releaseOwnershipNoticeSlot,
+  claimTeamNoticeDmSlot,
+  claimTeamNoticeSlot,
   notifyTeamInvite,
   notifyTeamInviteInBackground,
-  resetOwnershipNoticeSlots,
+  releaseTeamNoticeDmSlot,
+  releaseTeamNoticeSlot,
+  resetTeamNoticeSlots,
 } from "@/lib/server/team-invite-notifications";
-import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-invite-notice";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+  TEAM_NOTICE_DMS_HOURLY_CAP,
+} from "@/lib/shared/team-invite-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
@@ -26,8 +32,7 @@ const PLAYER_ID = 42;
 const ACTOR_ID = 1;
 
 type Scenario = {
-  thisPlayer?: number;
-  ghostToThisPlayer?: number;
+  formerMember?: 0 | 1;
   byActor?: number;
   teamsToPlayer?: number;
   offers?: number;
@@ -54,8 +59,7 @@ function accountRow(overrides: Record<string, unknown> = {}) {
 }
 
 function mockDb({
-  thisPlayer = 1,
-  ghostToThisPlayer = 1,
+  formerMember = 0,
   byActor = 1,
   teamsToPlayer = 1,
   offers = 1,
@@ -65,12 +69,13 @@ function mockDb({
 }: Scenario = {}) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("AS any_player")) {
-      return [[{ this_player: String(thisPlayer), any_player: 1, by_actor: byActor, teams_to_player: teamsToPlayer }], []];
+      return [[{ any_player: 1, by_actor: byActor, teams_to_player: teamsToPlayer }], []];
     }
     if (sql.includes("AS offers")) return [[{ offers }], []];
-    if (sql.includes("AS this_player")) {
-      return [[{ this_player: String(ghostToThisPlayer), by_actor: byActor, teams_to_player: teamsToPlayer }], []];
+    if (sql.includes("AS teams_to_player")) {
+      return [[{ by_actor: byActor, teams_to_player: String(teamsToPlayer) }], []];
     }
+    if (sql.includes("AS former_member")) return [formerMember === 1 ? [{ former_member: 1 }] : [], []];
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_users u")) return [account === null ? [] : [account], []];
     throw new Error(`requête inattendue : ${sql}`);
@@ -83,7 +88,7 @@ function mockDb({
 describe("notifyTeamInvite", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    resetOwnershipNoticeSlots();
+    resetTeamNoticeSlots();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
     jest.mocked(pushToUsers).mockResolvedValue(1);
   });
@@ -119,13 +124,46 @@ describe("notifyTeamInvite", () => {
     expect(message).toContain("https://site.test/en/equipes/7");
   });
 
-  it("notifyTeamInvite_reinviteWithinCooldown_sendsNothing", async () => {
-    mockDb({ thisPlayer: 2 });
+  // Le délai par joueur se compte sur les avis réellement partis (mémoire),
+  // plus sur les lignes d'invitation : un retrait-renvoi n'écrit qu'une fois.
+  it("notifyTeamInvite_reinviteWithinCooldown_sendsOnce", async () => {
+    mockDb();
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyTeamInvite_firstInviteNothingDelivered_nextInviteNotifies", async () => {
+    mockDb();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValueOnce({ sent: 0, unresolved: [], failed: [] });
+    jest.mocked(pushToUsers).mockResolvedValueOnce(0);
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushToUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it("notifyTeamInvite_formerMemberInvitedByTooManyTeams_sends", async () => {
+    mockDb({ formerMember: 1, teamsToPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP + 1 });
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyTeamInvite_dmHourlyCapReached_pushOnly", async () => {
+    mockDb();
+    const now = Date.now();
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP; i += 1) claimTeamNoticeDmSlot(now);
 
     await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
-    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 
   it("notifyTeamInvite_invite_budgetIgnoresGhostTakeoverRows", async () => {
@@ -134,7 +172,7 @@ describe("notifyTeamInvite", () => {
     await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     const budgetSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS any_player"));
-    expect(budgetSql).toContain(`COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 0`);
+    expect(budgetSql).toContain(`COALESCE(JSON_CONTAINS(i.roles_json, '"OWNER"'), 0) = 0`);
     // Appartenance au tableau JSON, pas sous-chaîne : le rendu texte du JSON
     // diffère entre MySQL et MariaDB.
     expect(budgetSql).not.toContain("LIKE");
@@ -146,7 +184,60 @@ describe("notifyTeamInvite", () => {
     await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     const budgetCall = execute.mock.calls.find(([sql]) => sql.includes("AS any_player"));
-    expect(budgetCall?.[1]).toEqual([TEAM_ID, PLAYER_ID, TEAM_ID, ACTOR_ID, PLAYER_ID, TEAM_ID, ACTOR_ID, PLAYER_ID]);
+    expect(budgetCall?.[1]).toEqual([TEAM_ID, ACTOR_ID, PLAYER_ID, TEAM_ID, ACTOR_ID, PLAYER_ID]);
+  });
+
+  it("notifyTeamInvite_invite_teamsToPlayerExcludesFormerTeams", async () => {
+    const execute = mockDb();
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const budgetSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS any_player"));
+    expect(budgetSql?.replace(/\s+/g, " ")).toContain(
+      "NOT EXISTS ( SELECT 1 FROM bg_team_members m WHERE m.team_id = i.team_id AND m.user_id = i.user_id )",
+    );
+  });
+
+  it("notifyTeamInvite_formerMember_probeReadsMembershipOfThisTeam", async () => {
+    const execute = mockDb();
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const probe = execute.mock.calls.find(([sql]) => sql.includes("AS former_member"));
+    expect(probe?.[0]).toContain("FROM bg_team_members WHERE team_id = ? AND user_id = ?");
+    expect(probe?.[1]).toEqual([TEAM_ID, PLAYER_ID]);
+  });
+
+  it("notifyTeamInvite_dmNotDelivered_dmHourlySlotReturned", async () => {
+    mockDb();
+    const now = Date.now();
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP - 1; i += 1) claimTeamNoticeDmSlot(now);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValueOnce({ sent: 0, unresolved: [], failed: [] });
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(claimTeamNoticeDmSlot(Date.now())).toBe(true);
+  });
+
+  it("notifyTeamInvite_dmDelivered_dmHourlySlotKept", async () => {
+    mockDb();
+    const now = Date.now();
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP - 1; i += 1) claimTeamNoticeDmSlot(now);
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(claimTeamNoticeDmSlot(Date.now())).toBe(false);
+  });
+
+  it("notifyTeamInvite_deliveryThrows_dmHourlySlotReturned", async () => {
+    mockDb();
+    const now = Date.now();
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP - 1; i += 1) claimTeamNoticeDmSlot(now);
+    jest.mocked(pushToUsers).mockRejectedValueOnce(new Error("push en panne"));
+
+    await expect(notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID)).rejects.toThrow("push en panne");
+
+    expect(claimTeamNoticeDmSlot(Date.now())).toBe(true);
   });
 
   it("notifyTeamInvite_actorOverCapAcrossTeams_sendsNothing", async () => {
@@ -168,26 +259,35 @@ describe("notifyTeamInvite", () => {
   });
 
   it("notifyTeamInvite_ghostClaimFirstOffer_sends", async () => {
-    const execute = mockDb({ thisPlayer: 5, team: teamRow({ is_ghost: 1 }) });
+    const execute = mockDb({ team: teamRow({ is_ghost: 1 }) });
 
     await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
-    const offersCall = execute.mock.calls.find(([sql]) => sql.includes("AS this_player"));
-    expect(offersCall?.[0]).toContain(`COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 1`);
+    const offersCall = execute.mock.calls.find(([sql]) => sql.includes("AS teams_to_player"));
+    expect(offersCall?.[0]).toContain(`COALESCE(JSON_CONTAINS(i.roles_json, '"OWNER"'), 0) = 1`);
+    expect(offersCall?.[0]).toContain("NOT EXISTS");
     expect(offersCall?.[0]).not.toContain("LIKE");
-    expect(offersCall?.[1]).toEqual([TEAM_ID, PLAYER_ID, ACTOR_ID, PLAYER_ID, PLAYER_ID, ACTOR_ID]);
+    expect(offersCall?.[1]).toEqual([ACTOR_ID, PLAYER_ID, PLAYER_ID, ACTOR_ID]);
     expect(execute.mock.calls.some(([sql]) => sql.includes("AS any_player"))).toBe(false);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 
-  it("notifyTeamInvite_ghostClaimReofferedWithinWindow_sendsNothing", async () => {
-    mockDb({ ghostToThisPlayer: 2, team: teamRow({ is_ghost: 1 }) });
+  it("notifyTeamInvite_ghostClaimReofferedWithinWindow_sendsOnce", async () => {
+    mockDb({ team: teamRow({ is_ghost: 1 }) });
+
+    await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
+    await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyTeamInvite_ghostClaimFormerMemberOverTeamsCap_sends", async () => {
+    mockDb({ formerMember: 1, teamsToPlayer: 1000, team: teamRow({ is_ghost: 1 }) });
 
     await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
-    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
-    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 
   it("notifyTeamInvite_ownership_runsNoBudgetQuery", async () => {
@@ -196,7 +296,7 @@ describe("notifyTeamInvite", () => {
     await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
     expect(
-      execute.mock.calls.some(([sql]) => sql.includes("AS any_player") || sql.includes("AS this_player")),
+      execute.mock.calls.some(([sql]) => sql.includes("AS teams_to_player") || sql.includes("AS former_member")),
     ).toBe(false);
     expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
@@ -328,42 +428,112 @@ describe("notifyTeamInviteInBackground", () => {
   });
 });
 
-describe("claimOwnershipNoticeSlot", () => {
+describe("claimTeamNoticeSlot (propriété)", () => {
   const WINDOW_MS = TEAM_INVITE_NOTICE_COOLDOWN_HOURS * 3_600_000;
 
   beforeEach(() => {
-    resetOwnershipNoticeSlots();
+    resetTeamNoticeSlots();
   });
 
-  it("claimOwnershipNoticeSlot_firstNotice_granted", () => {
-    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0)).toBe(true);
+  it("claimTeamNoticeSlot_ownershipfirstNotice_granted", () => {
+    expect(claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0)).toBe(true);
   });
 
-  it("claimOwnershipNoticeSlot_justBeforeWindowEnds_refused", () => {
-    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+  it("claimTeamNoticeSlot_ownershipjustBeforeWindowEnds_refused", () => {
+    claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0);
 
-    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, WINDOW_MS - 1)).toBe(false);
+    expect(claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, WINDOW_MS - 1)).toBe(false);
   });
 
-  it("claimOwnershipNoticeSlot_windowElapsed_grantedAgain", () => {
-    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+  it("claimTeamNoticeSlot_ownershipwindowElapsed_grantedAgain", () => {
+    claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0);
 
-    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, WINDOW_MS)).toBe(true);
+    expect(claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, WINDOW_MS)).toBe(true);
   });
 
-  it("releaseOwnershipNoticeSlot_newerClaim_keepsIt", () => {
-    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
-    releaseOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
-    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 5);
+  it("releaseTeamNoticeSlot_ownershipnewerClaim_keepsIt", () => {
+    claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0);
+    releaseTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0);
+    claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 5);
 
-    releaseOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+    releaseTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0);
 
-    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 6)).toBe(false);
+    expect(claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 6)).toBe(false);
   });
 
-  it("claimOwnershipNoticeSlot_otherTeam_granted", () => {
-    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+  it("claimTeamNoticeSlot_ownershipotherTeam_granted", () => {
+    claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 0);
 
-    expect(claimOwnershipNoticeSlot(TEAM_ID + 1, PLAYER_ID, 1)).toBe(true);
+    expect(claimTeamNoticeSlot("OWNERSHIP", TEAM_ID + 1, PLAYER_ID, 1)).toBe(true);
+  });
+});
+
+describe("claimTeamNoticeSlot", () => {
+  beforeEach(() => {
+    resetTeamNoticeSlots();
+  });
+
+  it("claimTeamNoticeSlot_sameTeamPlayerOtherKind_granted", () => {
+    claimTeamNoticeSlot("INVITE", TEAM_ID, PLAYER_ID, 0);
+
+    expect(claimTeamNoticeSlot("OWNERSHIP", TEAM_ID, PLAYER_ID, 1)).toBe(true);
+  });
+
+  it("claimTeamNoticeSlot_sameKindWithinWindow_refused", () => {
+    claimTeamNoticeSlot("GHOST_CLAIM", TEAM_ID, PLAYER_ID, 0);
+
+    expect(claimTeamNoticeSlot("GHOST_CLAIM", TEAM_ID, PLAYER_ID, 1)).toBe(false);
+  });
+
+  it("claimTeamNoticeSlot_thousandsOfOtherClaims_keepsPlayerReservation", () => {
+    // Une poignée de comptes jetables ne chasse pas la réservation d'un joueur
+    // encore dans sa fenêtre (revue sécurité #596).
+    claimTeamNoticeSlot("INVITE", TEAM_ID, PLAYER_ID, 0);
+    for (let other = 1; other <= 5_000; other += 1) claimTeamNoticeSlot("INVITE", TEAM_ID + other, PLAYER_ID, other);
+
+    expect(claimTeamNoticeSlot("INVITE", TEAM_ID, PLAYER_ID, 5_001)).toBe(false);
+  });
+});
+
+describe("claimTeamNoticeDmSlot", () => {
+  const HOUR_MS = 3_600_000;
+  const T0 = 10 * HOUR_MS;
+
+  beforeEach(() => {
+    resetTeamNoticeSlots();
+  });
+
+  it("claimTeamNoticeDmSlot_atHourlyCap_lastGranted", () => {
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP - 1; i += 1) claimTeamNoticeDmSlot(T0);
+
+    expect(claimTeamNoticeDmSlot(T0)).toBe(true);
+  });
+
+  it("claimTeamNoticeDmSlot_overHourlyCap_refused", () => {
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP; i += 1) claimTeamNoticeDmSlot(T0);
+
+    expect(claimTeamNoticeDmSlot(T0 + HOUR_MS - 1)).toBe(false);
+  });
+
+  it("releaseTeamNoticeDmSlot_claimFromPreviousWindow_ignored", () => {
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP; i += 1) claimTeamNoticeDmSlot(T0 + HOUR_MS);
+
+    releaseTeamNoticeDmSlot(T0);
+
+    expect(claimTeamNoticeDmSlot(T0 + HOUR_MS + 1)).toBe(false);
+  });
+
+  it("releaseTeamNoticeDmSlot_sameWindow_slotGrantedAgain", () => {
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP; i += 1) claimTeamNoticeDmSlot(T0);
+
+    releaseTeamNoticeDmSlot(T0);
+
+    expect(claimTeamNoticeDmSlot(T0 + 1)).toBe(true);
+  });
+
+  it("claimTeamNoticeDmSlot_hourElapsed_grantedAgain", () => {
+    for (let i = 0; i < TEAM_NOTICE_DMS_HOURLY_CAP; i += 1) claimTeamNoticeDmSlot(T0);
+
+    expect(claimTeamNoticeDmSlot(T0 + HOUR_MS)).toBe(true);
   });
 });
