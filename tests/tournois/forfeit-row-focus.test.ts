@@ -53,6 +53,7 @@ const body = { name: "body" };
 const documentListeners = new Map<string, Set<unknown>>();
 const doc = {
   body,
+  hidden: false,
   activeElement: body as unknown,
   nodes: {} as Record<string, FakeElement | null>,
   querySelector(selector: string) {
@@ -126,6 +127,7 @@ beforeEach(() => {
   powerInput = FULL_INPUT;
   documentListeners.clear();
   doc.activeElement = body;
+  doc.hidden = false;
   doc.nodes = {};
   globals.document = doc;
   globals.requestAnimationFrame = (cb: () => void) => {
@@ -256,6 +258,16 @@ describe("focusRowAfterChange — focalisable seulement à la reprise", () => {
     expect(button.hasAttribute("tabindex")).toBe(false);
   });
 
+  it("une ligne qui refuse le focus ne garde pas le tabindex posé pour la reprise", () => {
+    const row = unfocusable("row");
+    row.focus = () => undefined;
+    doc.nodes['[data-row-focus="7"]'] = row;
+    focusRowAfterChange(7, () => clock);
+    runFrame();
+    expect(doc.activeElement).toBe(body);
+    expect(row.hasAttribute("tabindex")).toBe(false);
+  });
+
   it("le cadenas d'une ligne figée, non focalisable, l'est le temps de la reprise", () => {
     const lock = unfocusable("lock");
     doc.nodes['[data-row-action="7"]'] = lock;
@@ -290,6 +302,21 @@ describe("focusRowAfterChange — régime de charge", () => {
     expect(timers).toHaveLength(1);
     runTimers(FOCUS_WATCH_MS);
     expect(timers).toHaveLength(0);
+    expect(listenerCount()).toBe(0);
+  });
+});
+
+describe("focusRowAfterChange — onglet masqué", () => {
+  it("onglet en arrière-plan : la veille passe aux minuteurs, atteint son échéance et retire ses écouteurs", () => {
+    doc.hidden = true;
+    const row = unfocusable("row");
+    doc.nodes['[data-row-focus="7"]'] = row;
+    focusRowAfterChange(7, () => clock);
+    expect(frames).toHaveLength(0);
+    expect(timers).toEqual([{ callback: expect.any(Function), delay: FOCUS_WATCH_RELAXED_MS }]);
+    runTimers(FOCUS_WATCH_MS + 1);
+    expect(timers).toHaveLength(0);
+    expect(frames).toHaveLength(0);
     expect(listenerCount()).toBe(0);
   });
 });
