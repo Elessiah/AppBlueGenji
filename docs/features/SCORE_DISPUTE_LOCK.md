@@ -282,6 +282,17 @@ l'envoi ou le forfait du lecteur qui tranche (`onOwnSettle`, y compris un refus
 `MATCH_ALREADY_COMPLETED`, qui a déjà son toast, et un échec sans code rendu —
 réseau coupé, 502 — dont l'issue est inconnue).
 
+### Litige ouvert par un envoi — jamais à l'aveugle (2026-11-12)
+
+Un litige naît quand la seconde équipe envoie une version qui diffère de la
+première (score ou détail des maps). Depuis le 2026-11-12, cet envoi est
+**délibéré** : la modale montre les différences et fait confirmer
+(`ConfirmActionDialog`) avant d'ouvrir le litige, et le serveur refuse
+(`409 PROPOSAL_ARRIVED`, rien d'écrit) l'envoi d'une modale qui n'avait pas vu
+la déclaration adverse (`seenOpponentReportAt`, `MAP_SCORES.md` — « Proposition
+adverse arrivée pendant la saisie »). Les règles du litige ne changent pas :
+verrou des deux équipes, alerte d'arbitrage, arbitrage seul pour trancher.
+
 ## 2. Validation d'office après 2 h de silence
 
 Quand **une seule** équipe a saisi un score et que l'autre ne fait **rien**
@@ -374,6 +385,7 @@ pas du report de score : inchangées.
 ## Tests
 
 `tests/lib/shared/score-dispute.test.ts`, `score-report-deadline.test.ts`,
+`tournaments-service.matches.test.ts` et `report-score.test.ts` (`PROPOSAL_ARRIVED`),
 `player-score-report.test.ts` ; `tests/lib/server/score-report-stalled.test.ts`
 (UPDATE conditionnel, idempotence, course perdue), `tournaments-service.matches.test.ts`
 (verrou des deux équipes, confirmation refusée, propagation `resultWritten`),

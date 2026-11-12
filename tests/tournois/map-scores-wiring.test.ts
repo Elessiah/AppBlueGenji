@@ -485,7 +485,7 @@ describe("détail map par map — formulaire vierge", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("const nothingEntered = !maps.some(isMapTouched);");
     expect(dialog).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
-    expect(dialog).toContain("if (nothingEntered || unchangedMine) return;");
+    expect(dialog).toContain("if (submitting || nothingEntered || unchangedMine) return;");
     // Pendant l'envoi : `aria-disabled` + `aria-busy`, le focus reste sur le bouton.
     expect(dialog).toContain("aria-busy={submitting || undefined}");
     expect(dialog).not.toContain("disabled={maps.length === 0 ||");

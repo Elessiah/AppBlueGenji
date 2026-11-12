@@ -503,6 +503,86 @@ describe("tournaments-service: match state machine", () => {
       });
     });
 
+    describe("déclaration adverse vue par la modale (PROPOSAL_ARRIVED, MAP_SCORES.md)", () => {
+      const depositedAt = new Date("2026-10-05T20:00:00.000Z");
+      // L'engagée 2 a déclaré 1-3 (vu d'elle) : 3-1 pour l'engagée 1 au plateau.
+      const pendingTeam2 = {
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+        team2_reported_at: depositedAt,
+      };
+      const opponentMapReads = (calls: Call[]) =>
+        calls.filter((c) => c.sql.startsWith("SELECT match_id, source, map_number, replay_code, team1_score, team2_score FROM"));
+
+      it("reportMatchScore_seenNullOpponentScoreDiffers_throwsProposalArrivedWithoutWrites", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null)).rejects.toThrow(
+          "PROPOSAL_ARRIVED",
+        );
+
+        expect(writes(calls)).toHaveLength(0);
+        expect(queueRefereeAlert).not.toHaveBeenCalled();
+      });
+
+      it("reportMatchScore_seenNullSameScoreOtherMaps_throwsProposalArrived", async () => {
+        const otherCodes = mapsFor(3, 1).map((m, i) => ({ ...m, replayCode: `OTHER${i}` }));
+        const { connection, calls } = reportConnection(pendingTeam2, otherCodes);
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, null)).rejects.toThrow(
+          "PROPOSAL_ARRIVED",
+        );
+
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("reportMatchScore_seenNullConcordantReport_closesMatchReadingOpponentMapsOnce", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, null);
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+        expect(opponentMapReads(calls)).toHaveLength(1);
+      });
+
+      it("reportMatchScore_seenEqualsOpponentDeposit_opensDisputeAndAlerts", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, depositedAt.toISOString());
+
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_seenOlderDeposit_throwsProposalArrived", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, "2026-10-05T19:00:00.000Z"),
+        ).rejects.toThrow("PROPOSAL_ARRIVED");
+
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("reportMatchScore_seenNullNoOpponentReport_writesProposal", async () => {
+        const { connection, calls } = reportConnection();
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null);
+
+        expect(writes(calls)[0].params.slice(0, 2)).toEqual([3, 0]);
+        expect(completion(calls)).toBeUndefined();
+      });
+
+      it("reportMatchScore_confirmWithSeenNull_confirmPathWins", async () => {
+        const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: depositedAt.toISOString() }, null);
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+      });
+    });
+
     it("même score mais maps différentes : désaccord, l'arbitrage est alerté (MAP_SCORES.md)", async () => {
       const { connection, calls } = reportConnection({
         status: "AWAITING_CONFIRMATION",

@@ -14,7 +14,7 @@
  */
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
-import { sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
+import { normalizeReplayCode, sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
 import { autoValidateTimeText } from "./score-dispute";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
@@ -66,6 +66,90 @@ export function playerReportInitialMaps(view: PlayerReportView | null): MatchMap
     team1Score,
     team2Score,
   }));
+}
+
+/** Ce qui sépare une map de la saisie de la même map adverse. */
+export type MapDifferenceKind = "WINNER" | "SCORE" | "REPLAY_CODE" | "MISSING_MINE" | "MISSING_THEIRS";
+
+export interface MapDifference {
+  /** Rang de la map, à partir de 1. */
+  mapNumber: number;
+  mine: MatchMapInput | null;
+  theirs: MatchMapInput | null;
+  /** Ce qui diffère, dans l'ordre de lecture ; jamais vide. */
+  kinds: MapDifferenceKind[];
+}
+
+function mapSide(map: MatchMapInput): 1 | 2 | 0 {
+  if (map.team1Score > map.team2Score) return 1;
+  return map.team2Score > map.team1Score ? 2 : 0;
+}
+
+/**
+ * Différences, map par map, entre la saisie du lecteur et la déclaration
+ * adverse (`MAP_SCORES.md` — « Proposition adverse arrivée pendant la
+ * saisie ») — la même comparaison que `sameMapLists` (codes normalisés, scores
+ * de map), détaillée pour être montrée. Un vainqueur différent n'est pas
+ * redit en « score » ; une map présente d'un seul côté est dite absente de
+ * l'autre. Vide quand les deux listes concordent.
+ */
+export function mapListDifferences(
+  mine: ReadonlyArray<MatchMapInput>,
+  theirs: ReadonlyArray<MatchMapInput>,
+): MapDifference[] {
+  const differences: MapDifference[] = [];
+  for (let i = 0; i < Math.max(mine.length, theirs.length); i += 1) {
+    const a = mine[i] ?? null;
+    const b = theirs[i] ?? null;
+    const kinds: MapDifferenceKind[] = [];
+    if (a === null) kinds.push("MISSING_MINE");
+    else if (b === null) kinds.push("MISSING_THEIRS");
+    else {
+      if (mapSide(a) !== mapSide(b)) kinds.push("WINNER");
+      else if (a.team1Score !== b.team1Score || a.team2Score !== b.team2Score) kinds.push("SCORE");
+      if (normalizeReplayCode(a.replayCode) !== normalizeReplayCode(b.replayCode)) kinds.push("REPLAY_CODE");
+    }
+    if (kinds.length > 0) differences.push({ mapNumber: i + 1, mine: a, theirs: b, kinds });
+  }
+  return differences;
+}
+
+/**
+ * La saisie face à la déclaration adverse en attente :
+ * - `sameScoreArrived` — arrivée pendant la saisie, identique : bandeau, et le
+ *   bouton principal devient « Confirmer le score » (`confirmsAsIs`) ;
+ * - `differences` — saisie valide qui en diffère, détail adverse connu : ce
+ *   qui diffère, map par map ;
+ * - `offerConfirmTheirs` — saisie écartée d'une déclaration adverse au détail
+ *   connu : la confirmer d'un clic plutôt que de tout ressaisir.
+ */
+export function entryComparison(
+  view: PlayerReportView | null,
+  maps: ReadonlyArray<MatchMapInput>,
+  form: {
+    canEnterScore: boolean;
+    arrivedDuringEntry: boolean;
+    confirmsAsIs: boolean;
+    opensDispute: boolean;
+    nothingEntered: boolean;
+  },
+): {
+  theirs: MatchScoreReport | null;
+  theirMaps: ReadonlyArray<MatchMapInput>;
+  sameScoreArrived: boolean;
+  differences: MapDifference[];
+  offerConfirmTheirs: boolean;
+} {
+  const theirs = view?.phase === "THEIRS_PENDING" ? view.theirs : null;
+  const theirMaps = theirs?.maps ?? [];
+  const known = form.canEnterScore && theirMaps.length > 0;
+  return {
+    theirs,
+    theirMaps,
+    sameScoreArrived: form.canEnterScore && form.arrivedDuringEntry && form.confirmsAsIs,
+    differences: form.opensDispute && known ? mapListDifferences(maps, theirMaps) : [],
+    offerConfirmTheirs: known && !form.confirmsAsIs && !form.nothingEntered,
+  };
 }
 
 /**

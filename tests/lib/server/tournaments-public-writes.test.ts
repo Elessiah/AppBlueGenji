@@ -444,7 +444,7 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
 
     await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
 
-    expect(reportMatchScore).toHaveBeenCalledWith(expect.anything(), 5, 70, 12, mapsFor(3, 1), undefined);
+    expect(reportMatchScore).toHaveBeenCalledWith(expect.anything(), 5, 70, 12, mapsFor(3, 1), undefined, undefined);
     const chain = [
       reportMatchScore,
       resolveExpiredScoreReports,

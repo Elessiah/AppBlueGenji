@@ -784,7 +784,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Le bouton d'envoi n'est jamais désactivé nativement : `aria-disabled`, gardes dans `onSubmitForm`.
     expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
     expect(source).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
-    expect(source).toMatch(/if \(nothingEntered \|\| unchangedMine\) return;\s*void submitScore\(\);/);
+    expect(source).toContain("if (submitting || nothingEntered || unchangedMine) return;");
     expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
     // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
@@ -808,6 +808,36 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain('{submitting ? t("score.sending") : t("score.player.forfeit.confirm", { name: myName })}');
   });
 
+  it("score (engagé) : déclaration adverse arrivée pendant la saisie — bandeau, comparaison, confirmation du litige", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    // Arrivée pendant la saisie : jamais écrasée, notée pour la comparaison.
+    expect(source).toContain('setArrivedDuringEntry(nextView?.phase === "THEIRS_PENDING" && typing);');
+    expect(source).toContain('t("score.player.sameScoreArrived")');
+    expect(source).toContain('t("score.player.confirmTheirs")');
+    // Un simple envoi dit la déclaration adverse vue ; « Envoyer ma version » passe par une confirmation.
+    expect(source).toContain("{ maps: send.maps, seenOpponentReportAt: send.seenAt }");
+    expect(source).toContain("if (opensDispute && view?.theirs) {");
+    expect(source).toContain("<ConfirmActionDialog");
+    expect(source).toContain('t("score.player.dispute.body", { opponent: opponentName })');
+    expect(source).toContain('<InfoHint id="player-score-diff-help"');
+    expect(source).not.toMatch(/window\.confirm/);
+  });
+
+  it("score (engagé) : textes de la déclaration adverse en français et en anglais", () => {
+    const fr = frDialogs.score.player;
+    const en = enDialogs.score.player;
+    expect(fr.sameScoreArrived).toBe("L'équipe adverse a déclaré le même score.");
+    expect(en.sameScoreArrived).toBe("The opposing team reported the same score.");
+    expect(fr.confirmTheirs).toBe("Confirmer la déclaration adverse");
+    expect(en.confirmTheirs).toBe("Confirm the opponent's report");
+    expect(Object.keys(en.diff.kind)).toEqual(Object.keys(fr.diff.kind));
+    expect(Object.keys(en.dispute)).toEqual(Object.keys(fr.dispute));
+    expect(en.dispute.body).toContain("referee");
+    expect(fr.dispute.body).toContain("arbitre");
+    expect(enTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^The opponent reported a different score/);
+    expect(frTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^L'adversaire a déclaré un score différent/);
+  });
+
   it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     expect(source).toContain('if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;');
@@ -818,7 +848,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.
     expect(source).toContain('aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}');
     // Refus « litige ouvert » : la modale relit l'état, à l'envoi comme au forfait.
-    expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"])');
+    expect(source).toMatch(/new Set\(\[\s*"PROPOSAL_STALE",\s*"PROPOSAL_ARRIVED",\s*SCORE_LOCKED_DISPUTE,\s*"MATCH_ALREADY_COMPLETED",?\s*\]\)/);
     expect(source.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\)/g)).toHaveLength(2);
     expect(source).toContain('return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;');
     // Verrou : la zone de forfait se replie, pour ne pas revenir dépliée si le litige est levé sans clore.

@@ -305,8 +305,9 @@ async function reportsConcord(
   maps: ReadonlyArray<MatchMapInput>,
   reporterSource: "TEAM1" | "TEAM2",
   /**
-   * Détail adverse déjà lu sous verrou par cette transaction **et comparé** aux
-   * maps confirmées (« Confirmer », {@link assertProposalUnchanged}) : il ne
+   * Détail adverse déjà lu sous verrou par cette transaction **et trouvé
+   * identique** aux maps envoyées (« Confirmer », {@link assertProposalUnchanged},
+   * ou envoi concordant d'une modale périmée, {@link assertOpponentReportSeen}) : il ne
    * peut plus changer — tout report passe par le verrou du match, tenu ici —,
    * inutile de le relire ni de le recomparer.
    */
@@ -316,8 +317,9 @@ async function reportsConcord(
     Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
     Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
   if (!scoresAgree) return false;
-  // « Confirmer » : `assertProposalUnchanged` vient de comparer ces mêmes
-  // listes (refus sinon) — une seule comparaison, une seule règle.
+  // « Confirmer » (`assertProposalUnchanged`) ou envoi d'une modale périmée
+  // (`assertOpponentReportSeen`) : ces mêmes listes viennent d'être comparées
+  // (refus sinon) — une seule comparaison, une seule règle.
   if (knownOtherMaps) return true;
   const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
   return sameMapLists(maps, await loadMatchMaps(connection, Number(updated.id), otherSource));
@@ -350,6 +352,47 @@ async function assertProposalUnchanged(
 }
 
 /**
+ * La proposition adverse que la modale montrait au lecteur quand il a envoyé
+ * **sa** version : son instant de dépôt, ou `null` s'il n'en voyait aucune.
+ * `undefined` : l'appelant ne dit rien de ce qu'il a vu (appel interne) — aucun
+ * contrôle. La route le pose toujours (`docs/features/MAP_SCORES.md`).
+ */
+export type SeenOpponentReport = string | null | undefined;
+
+/**
+ * Garde contre une modale **périmée** : l'engagé envoie sa version alors
+ * qu'une proposition adverse est arrivée (ou a changé) depuis ce qu'il a lu —
+ * flux coupé, onglet en veille. Si sa version **concorde** avec elle, rien à
+ * craindre : le match se clôt comme toujours. Si elle diffère, l'envoyer
+ * ouvrirait un litige qu'il n'a jamais vu venir : `PROPOSAL_ARRIVED`, rien
+ * d'écrit, la modale relit et montre la comparaison ; il pourra alors confirmer
+ * la version adverse ou maintenir la sienne en connaissance de cause (son
+ * renvoi porte cette fois le bon instant de dépôt). Ligne du match déjà
+ * verrouillée. Rend le détail adverse lu et **trouvé identique**, que la
+ * comparaison des deux reports n'a plus à relire.
+ */
+async function assertOpponentReportSeen(
+  connection: PoolConnection,
+  match: MatchRow,
+  isTeam1Reporter: boolean,
+  mine: { myScore: number; opponentScore: number; maps: ReadonlyArray<MatchMapInput> },
+  seen: SeenOpponentReport,
+): Promise<ReadonlyArray<MatchMapInput> | undefined> {
+  if (seen === undefined) return undefined;
+  const theirScore = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
+  if (!reportPresent(theirScore)) return undefined;
+  const theirReportedAt = toIso((isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at) ?? null);
+  if (theirReportedAt === seen) return undefined;
+  const theirOpponentScore = isTeam1Reporter ? match.team2_report_opponent_score : match.team1_report_opponent_score;
+  const scoresAgree =
+    Number(theirScore) === mine.opponentScore && Number(theirOpponentScore) === mine.myScore;
+  if (!scoresAgree) throw new Error("PROPOSAL_ARRIVED");
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
+  if (!sameMapLists(mine.maps, theirMaps)) throw new Error("PROPOSAL_ARRIVED");
+  return theirMaps;
+}
+
+/**
  * Score dérivé des maps, vu de l'engagée qui reporte (« mon score », « score
  * adverse » — le contrat des colonnes `teamN_report_*`). Lève le refus de la
  * liste, s'il y en a un.
@@ -372,6 +415,7 @@ export async function reportMatchScore(
   userId: number,
   maps: ReadonlyArray<MatchMapInput>,
   confirm?: ProposalConfirmation,
+  seenOpponentReport?: SeenOpponentReport,
 ): Promise<void> {
   const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
@@ -466,9 +510,17 @@ export async function reportMatchScore(
   // vue** — même dépôt, même détail. Elle a pu changer ou partir entre
   // l'ouverture de la modale et le clic : on refuse plutôt que de clore sur
   // autre chose que ce qui a été lu (`docs/features/MAP_SCORES.md`).
+  // Simple envoi : la proposition adverse doit être celle que la modale
+  // montrait, sauf concordance (`assertOpponentReportSeen`).
   const confirmedMaps = confirm
     ? await assertProposalUnchanged(connection, match, isTeam1Reporter, maps, confirm)
-    : undefined;
+    : await assertOpponentReportSeen(
+        connection,
+        match,
+        isTeam1Reporter,
+        { myScore, opponentScore, maps },
+        seenOpponentReport,
+      );
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).

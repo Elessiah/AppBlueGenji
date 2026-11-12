@@ -28,7 +28,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   try {
-    const body = (await readJsonBody(req)) as { maps?: unknown; confirm?: unknown };
+    const body = (await readJsonBody(req)) as { maps?: unknown; confirm?: unknown; seenOpponentReportAt?: unknown };
 
     // Un score se déclare **map par map** (`docs/features/MAP_SCORES.md`) :
     // l'ancien corps `myScore` / `opponentScore` n'a plus cours, et se refuse
@@ -40,7 +40,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const confirm = parseConfirm(body.confirm);
     if (confirm === false) return fail("INVALID_REQUEST", 400);
 
-    await reportMatchScore(tournamentId, matchId, user.id, maps, confirm);
+    const seen = parseSeenOpponentReport(body.seenOpponentReportAt);
+    if (seen === false) return fail("INVALID_REQUEST", 400);
+
+    await reportMatchScore(tournamentId, matchId, user.id, maps, confirm, seen);
 
     return ok({ success: true });
   } catch (error) {
@@ -60,6 +63,19 @@ function parseConfirm(raw: unknown): { reportedAt: string } | undefined | false 
   if (raw === undefined || raw === null) return undefined;
   const reportedAt = (raw as { reportedAt?: unknown }).reportedAt;
   return typeof reportedAt === "string" && reportedAt.length <= 40 ? { reportedAt } : false;
+}
+
+/**
+ * La proposition adverse que la modale montrait à l'envoi : son instant de
+ * dépôt, `null` s'il n'y en avait aucune — **absent vaut `null`** : un envoi
+ * qui ne dit pas avoir vu la proposition adverse est traité comme ne l'ayant
+ * pas vue. Le serveur refuse (`PROPOSAL_ARRIVED`) une version qui en diffère
+ * plutôt que d'ouvrir un litige à l'aveugle (`docs/features/MAP_SCORES.md`).
+ * `false` = corps mal formé.
+ */
+function parseSeenOpponentReport(raw: unknown): string | null | false {
+  if (raw === undefined || raw === null) return null;
+  return typeof raw === "string" && raw.length <= 40 ? raw : false;
 }
 
 const REPORT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
@@ -83,6 +99,9 @@ const REPORT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
   ["MATCH_NOT_STARTED", 409],
   // La proposition confirmée a changé ou n'existe plus : la modale se recharge.
   ["PROPOSAL_STALE", 409],
+  // Une proposition adverse que la modale ne montrait pas — arrivée ou changée
+  // depuis — contredit l'envoi : rien d'écrit, la modale relit et compare.
+  ["PROPOSAL_ARRIVED", 409],
   // Litige ouvert : la saisie est verrouillée pour les deux équipes, seul
   // l'arbitrage tranche (`docs/features/SCORE_DISPUTE_LOCK.md`).
   ["SCORE_LOCKED_DISPUTE", 409],

@@ -145,6 +145,32 @@
         "hint": "{mine} déclare forfait sur ce match : {opponent} l'emporte {maps}-0, sans map jouée. Le résultat est immédiat — seul l'arbitrage peut revenir dessus.",
         "confirm": "Confirmer le forfait de {name}",
         "notAllowed": "Un forfait se déclare par le propriétaire ou un manager de l'équipe."
+      },
+      "sameScoreArrived": "L'équipe adverse a déclaré le même score.",
+      "confirmTheirs": "Confirmer la déclaration adverse",
+      "diff": {
+        "title": "Ce qui diffère de la déclaration de {opponent}",
+        "hint": "« Confirmer la déclaration adverse » clôt le match sur la version de {opponent}. Maintenir la tienne ouvre un litige : la saisie est verrouillée pour les deux adversaires, et un arbitre tranche.",
+        "hintSubject": "déclaration adverse",
+        "map": "Map {number}",
+        "mapNamed": "Map {number} ({name})",
+        "kind": {
+          "WINNER": "vainqueur",
+          "SCORE": "score",
+          "REPLAY_CODE": "code de replay",
+          "MISSING_MINE": "absente de ta saisie",
+          "MISSING_THEIRS": "absente de sa déclaration"
+        },
+        "values": "toi : {mine} ; {opponent} : {theirs}",
+        "mapValue": "{score} · {code}",
+        "noCode": "sans code",
+        "absent": "aucune"
+      },
+      "dispute": {
+        "title": "Ouvrir un litige ?",
+        "body": "Ta saisie diffère de la déclaration de {opponent}. L'envoyer ouvre un litige : la saisie est verrouillée pour les deux adversaires, forfait compris, et un arbitre est alerté pour trancher le match.",
+        "confirm": "Envoyer ma version",
+        "pending": "Envoi…"
       }
     },
     "sending": "Envoi…"

@@ -225,6 +225,52 @@ La seconde équipe ne ressaisit rien :
 - **Code de replay** saisi brut (majuscules par la CSS, normalisé à la
   validation et au serveur) : le curseur reste en place pendant une correction.
 
+### Proposition adverse arrivée pendant la saisie (demande du 2026-11-12)
+
+Cas visé : l'équipe B remplit la modale quand l'équipe A envoie sa déclaration.
+
+**Avant ce lot.** La modale de B se réalignait déjà sur le flux : tant que B
+n'avait rien touché, la proposition de A remplissait les champs ; une saisie
+commencée n'était jamais écrasée, et le détail de A s'affichait à part. Mais un
+envoi de B après celui de A clôt le match si scores **et** maps concordent, et
+**ouvre un litige** à la moindre différence (arbitre alerté, saisie
+verrouillée, `SCORE_DISPUTE_LOCK.md`) — y compris quand la modale de B, ouverte
+avant le report de A et privée de flux (hors ligne, veille), ne l'avait jamais
+montré.
+
+**Maintenant.**
+
+- **Temps réel, deux portes.** La modale lit le match rafraîchi par le flux SSE
+  (`TournamentSnapshot`, ou la lecture REST de secours) et le détail par
+  `TournamentViewerContext.matchProposals` / `useProposalMaps` : la même
+  arrivée, quelle que soit la porte. Une saisie commencée n'est jamais
+  écrasée ; l'arrivée est notée (`arrivedDuringEntry`).
+- **Saisie identique** : bandeau « L'équipe adverse a déclaré le même score. »,
+  le bouton principal devient « Confirmer le score » (corps
+  `confirm: { reportedAt }`, `PROPOSAL_STALE` géré). Rien ne se clôt d'office.
+- **Saisie différente** (détail adverse connu) : la liste des différences map
+  par map (`mapListDifferences` : vainqueur, score, code de replay, map absente
+  d'un côté — mêmes règles que `sameMapLists`), un « i » qui explique le choix,
+  et « Confirmer la déclaration adverse » — qui reprend ses maps dans le
+  formulaire et les confirme d'un clic. Ce bouton s'offre aussi pour une saisie
+  encore incomplète (`entryComparison`).
+- **Maintenir sa version** : « Envoyer le score » ouvre une confirmation
+  (`ConfirmActionDialog` : litige, saisie verrouillée, arbitre alerté), puis
+  l'envoi passe par le chemin ordinaire du désaccord.
+- **Modale périmée — contrat serveur.** Tout envoi simple porte
+  `seenOpponentReportAt` : l'instant de dépôt de la déclaration adverse que la
+  modale montrait (`null` : aucune ; **absent vaut `null`**). Sous le verrou du
+  match (table seule, première lecture verrouillante — MariaDB),
+  `assertOpponentReportSeen` compare avec le report adverse en base : même
+  dépôt, ou aucun report adverse → chemin ordinaire ; autre dépôt et version
+  **concordante** → le match se clôt (rien à craindre, détail adverse déjà lu
+  réutilisé par `reportsConcord`) ; autre dépôt et version **différente** →
+  `409 PROPOSAL_ARRIVED`, rien d'écrit. La modale relit alors le contexte du
+  lecteur et montre la comparaison ; « maintenir » renvoie cette fois le bon
+  dépôt et ouvre le litige. « Confirmer » (`confirm`) garde sa propre garde
+  (`PROPOSAL_STALE`) et ignore ce champ. Un appel interne sans ce paramètre
+  (`undefined`) n'est pas contrôlé.
+
 **Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
 (BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne
 l'avancent que lorsqu'elles servent. La liste passe sur deux lignes selon **sa
@@ -394,4 +440,7 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 `tests/app/api/tournaments/match-proposals.test.ts`, `tests/tournois/viewer-match-proposals.test.ts`,
 `tests/tournois/proposal-maps-hook.test.ts`,
 `tests/lib/server/match-format-report.test.ts`, `score-report-stalled.test.ts`,
-`tournaments-service.matches.test.ts`.
+`tournaments-service.matches.test.ts` (dont `PROPOSAL_ARRIVED`) ;
+`tests/lib/shared/player-score-report.test.ts` (`mapListDifferences`,
+`entryComparison`) ; `tests/app/tournament-actions-i18n.test.tsx` (bandeau,
+comparaison, confirmation du litige, FR + EN).

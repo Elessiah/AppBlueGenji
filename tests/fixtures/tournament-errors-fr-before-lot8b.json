@@ -1,5 +1,5 @@
 {
-  "count": 220,
+  "count": 221,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -155,6 +155,7 @@
     "PENALTY_NOT_FOUND": "Cette pénalité n'existe plus.",
     "POINTS_NOT_POSITIVE": "Une pénalité retire au moins 1 point d'endurance.",
     "POINTS_TOO_HIGH": "Une pénalité ne peut pas dépasser 99 points d'endurance.",
+    "PROPOSAL_ARRIVED": "L'adversaire a déclaré un score différent du tien pendant ta saisie : rien n'est envoyé, compare les deux versions avant de choisir.",
     "PROPOSAL_STALE": "La proposition adverse a changé ou n'est plus en attente : la fenêtre affiche la version à jour.",
     "REASON_REQUIRED": "Indiquez le motif de la pénalité.",
     "REASON_TOO_LONG": "Le motif ne peut pas dépasser 200 caractères.",

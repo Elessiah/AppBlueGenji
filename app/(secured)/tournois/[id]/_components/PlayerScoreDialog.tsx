@@ -8,6 +8,8 @@ import { SCORE_LOCKED_DISPUTE, autoValidateTimeText } from "@/lib/shared/score-d
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -29,8 +31,10 @@ import { isMyTeamTeam1, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
   playerReportInitialMaps,
   enteredScoreRelation,
+  entryComparison,
   playerReportView,
   toReporterScores,
+  type MapDifference,
 } from "@/lib/shared/player-score-report";
 import { useProposalMaps } from "../_hooks/useProposalMaps";
 import { useShownEntrantName } from "./EntrantName";
@@ -200,7 +204,77 @@ function statusClassName(status: string | null, locked: boolean): string | undef
 
 /** Refus qui disent que l'état lu est périmé : la modale relit le serveur. */
 // `MATCH_ALREADY_COMPLETED` : la validation d'office a pu passer à l'heure dite.
-const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"]);
+// `PROPOSAL_ARRIVED` : une proposition adverse que la modale ne montrait pas
+// contredit l'envoi — relue, elle s'affiche avec la comparaison.
+const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set([
+  "PROPOSAL_STALE",
+  "PROPOSAL_ARRIVED",
+  SCORE_LOCKED_DISPUTE,
+  "MATCH_ALREADY_COMPLETED",
+]);
+
+/**
+ * Corps du report : la déclaration adverse confirmée telle quelle, ou une
+ * version envoyée avec la déclaration adverse que la modale montrait.
+ */
+function reportBody(
+  send: { maps: ReadonlyArray<MatchMapInput>; confirmTheirs: boolean; seenAt: string | null },
+  theirs: MatchScoreReport | null | undefined,
+): string {
+  return JSON.stringify(
+    send.confirmTheirs && theirs
+      ? { maps: send.maps, confirm: { reportedAt: theirs.reportedAt } }
+      : { maps: send.maps, seenOpponentReportAt: send.seenAt },
+  );
+}
+
+/** Les seules colonnes d'une map, telles que la route les attend. */
+function plainMaps(maps: ReadonlyArray<MatchMapInput>): MatchMapInput[] {
+  return maps.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score }));
+}
+
+/** Une map d'un côté de la comparaison : « 2 – 1 · CODE », ou « aucune ». */
+function mapValueText(text: TournamentDialogsText, map: MatchMapInput | null): string {
+  if (map === null) return text.t("score.player.diff.absent");
+  const code = map.replayCode.trim() === "" ? text.t("score.player.diff.noCode") : map.replayCode.trim().toUpperCase();
+  return text.t("score.player.diff.mapValue", { score: `${map.team1Score} – ${map.team2Score}`, code });
+}
+
+/**
+ * Ce qui sépare la saisie de la déclaration adverse, map par map : rang (et
+ * nom fixé), nature de l'écart, puis les deux versions — de quoi retrouver une
+ * faute de frappe avant de choisir entre confirmer et maintenir.
+ */
+function MapDifferenceList({
+  differences,
+  opponentName,
+  mapNames,
+}: Readonly<{ differences: ReadonlyArray<MapDifference>; opponentName: string; mapNames?: ReadonlyArray<string | null> }>) {
+  const text = useDialogsText();
+  const { t } = text;
+  return (
+    <ul className={styles.diffList}>
+      {differences.map((difference) => {
+        const name = mapNames?.[difference.mapNumber - 1] ?? null;
+        const label = name
+          ? t("score.player.diff.mapNamed", { number: difference.mapNumber, name })
+          : t("score.player.diff.map", { number: difference.mapNumber });
+        const kinds = difference.kinds.map((kind) => t(`score.player.diff.kind.${kind}`)).join(", ");
+        return (
+          <li key={difference.mapNumber}>
+            <span className={styles.diffMap}>{label}</span> — {kinds}
+            <br />
+            {t("score.player.diff.values", {
+              mine: mapValueText(text, difference.mine),
+              opponent: opponentName,
+              theirs: mapValueText(text, difference.theirs),
+            })}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 /**
  * Après un échec, le geste du lecteur a-t-il pu trancher ? Oui sans code du
@@ -304,9 +378,15 @@ export function PlayerScoreDialog({
   // Une proposition arrivée **pendant** une saisie ne la remplace pas : son
   // détail s'affiche alors à part (`theirMapsWorthShowing`).
   const [missedProposal, setMissedProposal] = useState(false);
+  // La proposition adverse est arrivée (ou a changé) **pendant** une saisie :
+  // la modale compare alors la saisie à la déclaration adverse — bandeau « même
+  // score » si elles concordent, différences et « Confirmer la déclaration
+  // adverse » sinon (`MAP_SCORES.md`).
+  const [arrivedDuringEntry, setArrivedDuringEntry] = useState(false);
   const signature = reportsSignature(match);
   useEffect(() => {
-    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(playerReportView(match, myTeamId)));
+    const nextView = playerReportView(match, myTeamId);
+    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(nextView));
     const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
     if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
@@ -314,6 +394,10 @@ export function PlayerScoreDialog({
       fieldErrors.clear();
       setRows(next);
     }
+    // Le détail adverse qui arrive après son score (lecture en cours) change
+    // aussi l'empreinte : la saisie, toujours écartée du pré-remplissage, reste
+    // « interrompue ».
+    setArrivedDuringEntry(nextView?.phase === "THEIRS_PENDING" && typing);
     setMissedProposal(typing && !sameMapLists(current.current, next));
     baseline.current = next;
     // `signature` résume exactement ce qui change la valeur d'ouverture.
@@ -365,6 +449,22 @@ export function PlayerScoreDialog({
   // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
   // joueurs — le dire avant l'envoi, pas après.
   const opensDispute = sendingOpensDispute(canEnterScore, view, { entered, confirmsAsIs, error: check.error });
+  const { theirs, theirMaps, sameScoreArrived, differences, offerConfirmTheirs } = entryComparison(view, maps, {
+    canEnterScore,
+    arrivedDuringEntry,
+    confirmsAsIs,
+    opensDispute,
+    nothingEntered,
+  });
+  // « Envoyer ma version » face à la déclaration adverse : confirmé à part
+  // (`ConfirmActionDialog`), avec l'instant de dépôt de la version **vue** à
+  // l'ouverture — le serveur refuse (`PROPOSAL_ARRIVED`) si elle a changé.
+  const [disputeSeenAt, setDisputeSeenAt] = useState<string | null>(null);
+  useEffect(() => {
+    // Plus de litige à ouvrir (verrou arrivé, adversaire aligné, retouche) :
+    // la confirmation n'a plus d'objet.
+    if (!opensDispute) setDisputeSeenAt(null);
+  }, [opensDispute]);
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -377,15 +477,26 @@ export function PlayerScoreDialog({
     return true;
   };
 
-  const submitScore = async () => {
-    if (submitting || unchangedMine) return;
-    if (check.error) {
-      flagRefusal(check.error);
-      showError(mapViolationText(text, check.error, matchFormat, game));
-      return;
+  /**
+   * Envoie une version : la saisie (`confirmTheirs: false`, avec l'instant de
+   * dépôt de la déclaration adverse **affichée**, `null` sans elle), ou la
+   * déclaration adverse telle quelle (`confirm: { reportedAt }`). Rend `true`
+   * si le serveur l'a acceptée.
+   */
+  const submitScore = async (send: {
+    maps: ReadonlyArray<MatchMapInput>;
+    confirmTheirs: boolean;
+    seenAt: string | null;
+  }): Promise<boolean> => {
+    if (submitting) return false;
+    const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true });
+    if (sendCheck.error) {
+      if (!send.confirmTheirs) flagRefusal(sendCheck.error);
+      showError(mapViolationText(text, sendCheck.error, matchFormat, game));
+      return false;
     }
-    const entered1 = check.score.team1;
-    const entered2 = check.score.team2;
+    const entered1 = sendCheck.score.team1;
+    const entered2 = sendCheck.score.team2;
     const body = toReporterScores(myTeamIsTeam1, entered1, entered2);
     setSubmitting(true);
     onOwnSettle?.(true);
@@ -400,10 +511,11 @@ export function PlayerScoreDialog({
           method: "POST",
           headers: { "content-type": "application/json" },
           // « Confirmer » renvoie le dépôt adverse lu ici : le serveur refuse
-          // (`PROPOSAL_STALE`) s'il a changé ou expiré depuis.
-          body: JSON.stringify(
-            confirmsAsIs && view?.theirs ? { maps, confirm: { reportedAt: view.theirs.reportedAt } } : { maps },
-          ),
+          // (`PROPOSAL_STALE`) s'il a changé ou expiré depuis. Un simple envoi
+          // dit quelle déclaration adverse la modale montrait : une autre,
+          // contraire, est refusée (`PROPOSAL_ARRIVED`) plutôt que d'ouvrir un
+          // litige à l'aveugle.
+          body: reportBody(send, view?.theirs),
         },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
@@ -412,7 +524,7 @@ export function PlayerScoreDialog({
         throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       }
       showSuccess(
-        confirmsAsIs
+        send.confirmTheirs
           ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
           : t("score.player.submitted", {
               team1,
@@ -423,19 +535,30 @@ export function PlayerScoreDialog({
       );
       onSubmitted();
       onClose();
+      return true;
     } catch (error) {
       const code = (error as Error).message;
       // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
       onOwnSettle?.(ownSettleAfterFailure(refusedCode));
-      flagRefusal(code);
+      if (!send.confirmTheirs) flagRefusal(code);
       showError(mapError(code));
       // Proposition changée ou expirée, ou litige ouvert entre-temps : la modale
       // se recharge sur l'état du serveur sans attendre le flux (peut-être en
       // reconnexion), plutôt que de laisser réessayer en vain.
       if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
+      return false;
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /** La déclaration adverse, reprise dans le formulaire et confirmée d'un clic. */
+  const confirmTheirs = () => {
+    if (submitting || !theirs || theirMaps.length === 0) return;
+    const theirPlain = plainMaps(theirMaps);
+    fieldErrors.clear();
+    setRows(progressiveMapRows(matchFormat, game, theirPlain));
+    void submitScore({ maps: theirPlain, confirmTheirs: true, seenAt: theirs.reportedAt });
   };
 
   const submitForfeit = async () => {
@@ -473,8 +596,14 @@ export function PlayerScoreDialog({
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
     // Le bouton n'est jamais `disabled` natif (`aria-disabled`) : la garde est ici.
-    if (nothingEntered || unchangedMine) return;
-    void submitScore();
+    if (submitting || nothingEntered || unchangedMine) return;
+    // Version différente de la déclaration adverse : l'envoi ouvre un litige,
+    // confirmé à part.
+    if (opensDispute && view?.theirs) {
+      setDisputeSeenAt(view.theirs.reportedAt);
+      return;
+    }
+    void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt: view?.theirs?.reportedAt ?? null });
   };
 
   // État du cycle, en une phrase : c'est ce que le formulaire d'avant ne disait
@@ -658,6 +787,39 @@ export function PlayerScoreDialog({
             </output>
           )}
 
+          {/* Déclaration adverse arrivée pendant la saisie, identique : un clic
+              sur « Confirmer le score » clôt le match — jamais d'office. */}
+          {sameScoreArrived && (
+            <output className={`${styles.stored} ${styles.notice}`}>{t("score.player.sameScoreArrived")}</output>
+          )}
+
+          {/* Saisie qui diffère de la déclaration adverse : ce qui diffère, map
+              par map, et la déclaration adverse à confirmer d'un clic plutôt
+              que de tout ressaisir. */}
+          {offerConfirmTheirs && (
+            <div className={styles.diffZone}>
+              {differences.length > 0 && (
+                <>
+                  <InfoHintRow>
+                    <p className={mapStyles.proposalTitle}>{t("score.player.diff.title", { opponent: opponentName })}</p>
+                    <InfoHint id="player-score-diff-help" subject={t("score.player.diff.hintSubject")}>
+                      <p>{t("score.player.diff.hint", { opponent: opponentName })}</p>
+                    </InfoHint>
+                  </InfoHintRow>
+                  <MapDifferenceList differences={differences} opponentName={opponentName} mapNames={mapNames} />
+                </>
+              )}
+              <button
+                type="button"
+                className={styles.conflictAction}
+                onClick={confirmTheirs}
+                aria-disabled={submitting || undefined}
+              >
+                {t("score.player.confirmTheirs")}
+              </button>
+            </div>
+          )}
+
           {canEnterScore && showBlocker && (
             <output className={`${styles.blocker} ${styles.notice}`}>
               {blocker}
@@ -697,6 +859,23 @@ export function PlayerScoreDialog({
           </div>
         </form>
       </div>
+      {disputeSeenAt !== null && (
+        <ConfirmActionDialog
+          title={t("score.player.dispute.title")}
+          confirmLabel={t("score.player.dispute.confirm")}
+          pendingLabel={t("score.player.dispute.pending")}
+          onClose={() => setDisputeSeenAt(null)}
+          onConfirm={async () => {
+            const sent = await submitScore({ maps, confirmTheirs: false, seenAt: disputeSeenAt });
+            // Refusé (déclaration adverse changée, litige ouvert…) : la
+            // confirmation se retire, la modale montre l'état relu.
+            if (!sent) setDisputeSeenAt(null);
+            return sent;
+          }}
+        >
+          <p>{t("score.player.dispute.body", { opponent: opponentName })}</p>
+        </ConfirmActionDialog>
+      )}
     </div>,
     document.body,
   );
