@@ -284,13 +284,37 @@ export function soloForfeitLockName(teamId: number): string {
  * de la demande, et par le passage horaire (`settleDeletedSoloEntries`), qui
  * reprend tout échec. `silent` (rejeu d'une demande après restauration) : sans
  * ligne au journal Discord, le forfait ayant déjà été annoncé.
+ *
+ * Les appels d'un même processus passent **un à un** : chacun tient une
+ * connexion du pool (celle du verrou nommé) pendant que le forfait en emprunte
+ * d'autres ; lancés en nombre (demandes simultanées, passage horaire), ils
+ * pouvaient occuper tout le pool à attendre une connexion qu'aucun ne rendait.
  */
-export async function forfeitSoloEntriesAfterCommit(
+export function forfeitSoloEntriesAfterCommit(
   entries: readonly DeletionWithdrawal[],
   options: { silent?: boolean } = {},
 ): Promise<number> {
+  const run = forfeitQueue.then(() => forfeitEntriesOneByOne(entries, options));
+  forfeitQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** File des forfaits du processus (voir {@link forfeitSoloEntriesAfterCommit}). */
+let forfeitQueue: Promise<unknown> = Promise.resolve();
+
+async function forfeitEntriesOneByOne(
+  entries: readonly DeletionWithdrawal[],
+  options: { silent?: boolean },
+): Promise<number> {
+  if (entries.length === 0) return 0;
   let forfeited = 0;
-  const db = await getDatabase();
+  let db: Awaited<ReturnType<typeof getDatabase>>;
+  try {
+    db = await getDatabase();
+  } catch (error) {
+    console.error("[account-deletion] forfaits reportés, base injoignable :", failureReason(error));
+    return 0;
+  }
   for (const entry of entries) {
     try {
       const forfeits = await withNamedLock(db, soloForfeitLockName(entry.teamId), 0, async () => {

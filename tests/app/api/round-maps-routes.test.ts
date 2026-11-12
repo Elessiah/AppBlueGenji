@@ -21,7 +21,12 @@ import { flushRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice
 import { PUT as roundMapsPut } from "@/app/api/admin/tournaments/[id]/round-maps/route";
 import { PUT as mapRulesPut } from "@/app/api/admin/tournaments/[id]/map-rules/route";
 import { PUT as mapPickPut } from "@/app/api/matches/[matchId]/map-pick/route";
-import { MAP_PICK_ATTEMPT_RULE, MAP_PICK_STAFF_WRITE_RULE, MAP_PICK_WRITE_RULE } from "@/lib/server/api-guard";
+import {
+  MAP_PICK_ATTEMPT_RULE,
+  MAP_PICK_PLAYER_ATTEMPT_RULE,
+  MAP_PICK_STAFF_WRITE_RULE,
+  MAP_PICK_WRITE_RULE,
+} from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { pickMatchMap, setRoundsMaps, setTournamentMapRules, type MapRulesInput } from "@/lib/server/tournaments/round-maps";
 import { authUser } from "../../helpers/auth-user";
@@ -224,12 +229,13 @@ describe("PUT /api/matches/[matchId]/map-pick", () => {
     expect((await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"))).status).toBe(200);
   });
 
-  it("PUT_refusedPicksBeyondAttemptCap_returns429WithoutPicking", async () => {
+  it("PUT_playerRefusedPicksBeyondPlayerAttemptCap_returns429WithoutPicking", async () => {
     // Les refus rendent leur place au plafond des choix, pas à celui des appels :
-    // une boucle de cartes refusées (verrous du tournoi et du match) reste bornée.
+    // une boucle de cartes refusées (verrous du tournoi et du match) reste bornée
+    // — pour un joueur, près de son plafond de choix, pas à celui de l'arbitrage.
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9_006, roles: [] }));
     jest.mocked(pickMatchMap).mockRejectedValue(new Error("INVALID_MAP_PICK"));
-    for (let call = 0; call < MAP_PICK_ATTEMPT_RULE.limit; call += 1) {
+    for (let call = 0; call < MAP_PICK_PLAYER_ATTEMPT_RULE.limit; call += 1) {
       await mapPickPut(put({ slot: 1, map: "Nope" }), match("42"));
     }
     jest.mocked(pickMatchMap).mockClear();
@@ -238,6 +244,27 @@ describe("PUT /api/matches/[matchId]/map-pick", () => {
 
     expect(res.status).toBe(429);
     expect(pickMatchMap).not.toHaveBeenCalled();
+  });
+
+  it("PUT_staffRefusedPicksBeyondPlayerAttemptCap_stillPicks", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9_007, roles: ["ARBITRE"] }));
+    jest.mocked(pickMatchMap).mockRejectedValue(new Error("INVALID_MAP_PICK"));
+    for (let call = 0; call < MAP_PICK_PLAYER_ATTEMPT_RULE.limit; call += 1) {
+      await mapPickPut(put({ slot: 1, map: "Nope" }), match("42"));
+    }
+    jest.mocked(pickMatchMap).mockResolvedValue();
+
+    expect((await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"))).status).toBe(200);
+  });
+
+  it("PUT_staffRefusedPicksBeyondAttemptCap_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9_008, roles: ["ARBITRE"] }));
+    jest.mocked(pickMatchMap).mockRejectedValue(new Error("INVALID_MAP_PICK"));
+    for (let call = 0; call < MAP_PICK_ATTEMPT_RULE.limit; call += 1) {
+      await mapPickPut(put({ slot: 1, map: "Nope" }), match("42"));
+    }
+
+    expect((await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"))).status).toBe(429);
   });
 
   it("PUT_unexpectedFailure_keepsItsPlace", async () => {

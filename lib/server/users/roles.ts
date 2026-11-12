@@ -117,8 +117,10 @@ export async function setUserRoles(
     assertExpectedRoles(expected, previous);
 
     // Rien à changer : ni écriture, ni flux fermés (un enregistrement identique
-    // reconnectait pour rien tous les flux du compte).
-    unchanged = sameRoles(previous, sanitized);
+    // reconnectait pour rien tous les flux du compte). Une ligne héritée qui
+    // porte `ADMIN` dans son JSON se réécrit toujours : `ADMIN` ne vit que dans
+    // `is_admin`, et l'enregistrement est ce qui la remet en forme.
+    unchanged = sameRoles(previous, sanitized) && !sanitizePlatformRoles(targetRow.platform_roles_json).includes("ADMIN");
     if (!unchanged) {
       await connection.execute<ResultSetHeader>(
         `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,

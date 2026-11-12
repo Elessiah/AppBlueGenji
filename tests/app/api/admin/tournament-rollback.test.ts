@@ -239,3 +239,47 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     expect(String(jest.mocked(sendBotLog).mock.calls[0]?.[0])).toContain("tournoi rouvert");
   });
 });
+
+/**
+ * Revue de sécurité #598 : un corps refusé (trop lourd, d'un autre type) valait
+ * « sans stade » — le geste sans retour partait sans son garde-fou.
+ */
+describe("POST /api/admin/tournaments/[id]/rollback — corps refusé", () => {
+  const raw = (body: string, contentType: string) =>
+    POST(
+      new Request("http://localhost/api/admin/tournaments/7/rollback", {
+        method: "POST",
+        headers: { "Content-Type": contentType },
+        body,
+      }),
+      params("7"),
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockResolvedValue(rolledBack);
+  });
+
+  it("POST_bodyOverLimit_returns413WithoutRollback", async () => {
+    const response = await raw(JSON.stringify({ expectedStage: "0:4", pad: "x".repeat(300 * 1024) }), "application/json");
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(rollbackCurrentRound).not.toHaveBeenCalled();
+  });
+
+  it("POST_textPlainBody_returns415WithoutRollback", async () => {
+    const response = await raw('{"expectedStage":"0:4"}', "text/plain");
+
+    expect(response.status).toBe(415);
+    expect(rollbackCurrentRound).not.toHaveBeenCalled();
+  });
+
+  it("POST_invalidJsonBody_rollsBackWithoutExpectedStage", async () => {
+    const response = await raw("{nope", "application/json");
+
+    expect(response.status).toBe(200);
+    expect(rollbackCurrentRound).toHaveBeenCalledWith(7, { expectedStage: undefined });
+  });
+});

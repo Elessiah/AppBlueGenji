@@ -205,4 +205,29 @@ describe("middleware — matcher des requêtes d'action", () => {
 
     expect(response.status).toBe(404);
   });
+
+  // Revue de sécurité #598 : un `GET` venu par cette seule entrée (fichier,
+  // préchargement) ressort tel quel, sans nonce ni politique.
+  it("middleware_getStaticFileWithNextAction_passesThroughWithoutCsp", () => {
+    const response = middleware(new NextRequest("https://127.0.0.1:3000/logo.png", { headers: { "next-action": "x" } }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("middleware_prefetchWithNextAction_passesThroughWithoutCsp", () => {
+    const response = middleware(
+      new NextRequest("https://127.0.0.1:3000/regles", {
+        headers: { "next-action": "x", "next-router-prefetch": "1" },
+      }),
+    );
+
+    expect(response.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("middleware_getPageWithNextAction_stillGetsCsp", () => {
+    const response = middleware(new NextRequest("https://127.0.0.1:3000/regles", { headers: { "next-action": "x" } }));
+
+    expect(response.headers.get("content-security-policy")).not.toBeNull();
+  });
 });

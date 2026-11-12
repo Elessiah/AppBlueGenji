@@ -275,6 +275,19 @@ describe("setUserRoles — open tournament streams", () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  // Revue de sécurité #598 : une ligne héritée (`ADMIN` dans le JSON, `is_admin = 0`)
+  // n'était plus remise en forme par un enregistrement qui garde ses rôles.
+  it("setUserRoles_legacyAdminInJsonSameRoles_rewritesRow", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ADMIN"]' }]);
+
+    await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+    const [, params] = connection.execute.mock.calls[1] as [string, unknown[]];
+    expect(params).toEqual([1, "[]", 7]);
+  });
+
   it("closes the streams on a role grant too, so the viewer context is recomputed", async () => {
     lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
     const close = jest.fn();

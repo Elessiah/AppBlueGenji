@@ -4,7 +4,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { formatRoundRolledBackLog } from "@/lib/shared/bot-logs";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
@@ -42,8 +42,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   // Corps facultatif : un client qui n'en envoie pas (ou en envoie un illisible)
-  // s'en remet au stade que la base désignera.
-  const expectedStage = await readExpectedStage(request);
+  // s'en remet au stade que la base désignera. Un corps trop lourd (413) ou d'un
+  // autre type que JSON (415) est refusé : le prendre pour « sans stade »
+  // lancerait ce geste sans retour sans son garde-fou de concurrence.
+  const read = await readExpectedStage(request);
+  if ("refusal" in read) return read.refusal;
+  const { expectedStage } = read;
 
   try {
     const rolledBack = await rollbackCurrentRound(tournamentId, { expectedStage });
@@ -98,15 +102,15 @@ const MAX_STAGE_KEY_LENGTH = 32;
  *
  * Tolérant par construction : ni corps, ni JSON valide, ni chaîne plausible ne
  * sont des erreurs — le geste retombe alors sur ce que la base désigne, ce qui
- * est exactement le comportement d'avant le garde-fou.
+ * est exactement le comportement d'avant le garde-fou. Seuls un corps trop
+ * lourd ou d'un autre type rendent leur refus (413, 415).
  */
-async function readExpectedStage(request: Request): Promise<string | undefined> {
-  try {
-    const body = (await readJsonBody(request)) as { expectedStage?: unknown };
-    const stage = body?.expectedStage;
-    if (typeof stage !== "string") return undefined;
-    return stage.length > 0 && stage.length <= MAX_STAGE_KEY_LENGTH ? stage : undefined;
-  } catch {
-    return undefined;
-  }
+async function readExpectedStage(
+  request: Request,
+): Promise<{ expectedStage: string | undefined } | { refusal: Response }> {
+  const read = await readJsonBodyOrFallback(request, {});
+  if ("refusal" in read) return read;
+  const stage = (read.body as { expectedStage?: unknown }).expectedStage;
+  if (typeof stage !== "string") return { expectedStage: undefined };
+  return { expectedStage: stage.length > 0 && stage.length <= MAX_STAGE_KEY_LENGTH ? stage : undefined };
 }

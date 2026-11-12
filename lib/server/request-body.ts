@@ -204,7 +204,8 @@ export function bodyReadRefusal(error: unknown): string | null {
  * propre code —, mais un refus qui a **son propre statut** n'est plus avalé :
  * un corps trop lourd rend 413 `PAYLOAD_TOO_LARGE`, un corps non vide d'un
  * autre type que JSON 415 `UNSUPPORTED_CONTENT_TYPE` (au lieu d'un 400 qui
- * accusait un champ). Un corps vide sans `Content-Type` reste `fallback`.
+ * accusait un champ). Un corps vide sans `Content-Type` reste `fallback`, tout
+ * comme un JSON qui n'est pas un objet.
  */
 export async function readJsonBodyOrFallback<T>(
   req: Request,
@@ -212,7 +213,12 @@ export async function readJsonBodyOrFallback<T>(
   maxBytes: number = JSON_BODY_MAX_BYTES,
 ): Promise<{ body: unknown } | { refusal: Response }> {
   try {
-    return { body: await readJsonBody(req, maxBytes) };
+    const body: unknown = await readJsonBody(req, maxBytes);
+    // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) vaut
+    // `fallback`, comme un JSON invalide : les routes lisent des champs du
+    // corps, et `null.slot` rendrait un 500 brut hors de leur `try`.
+    if (typeof body !== "object" || body === null || Array.isArray(body)) return { body: fallback };
+    return { body };
   } catch (error) {
     const code = bodyReadRefusal(error);
     if (code === null || (code === UNSUPPORTED_CONTENT_TYPE && !declaresForeignBody(req))) return { body: fallback };

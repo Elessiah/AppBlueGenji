@@ -30,10 +30,11 @@ describe("POST /round-maps/flush — body", () => {
     expect(flushRoundMapsNotice).toHaveBeenCalledWith(7, ["0:UPPER:2", "1:LOWER:3"]);
   });
 
-  it("flush_oversizedBody_returns400WithoutFlushing", async () => {
+  it("flush_oversizedBody_returns413PayloadTooLargeWithoutFlushing", async () => {
     const response = await flushPost(post(`{"rounds":[],"pad":"${"x".repeat(40_000)}"}`), context);
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
     expect(flushRoundMapsNotice).not.toHaveBeenCalled();
   });
 
@@ -79,5 +80,22 @@ describe("POST /round-maps/flush — body", () => {
     const rounds = Array.from({ length: ROUND_MAPS_FLUSH_ROUNDS_MAX + 1 }, (_, index) => `0:UPPER:${index + 1}`);
 
     expect((await flushPost(withRounds(rounds), context)).status).toBe(400);
+  });
+});
+
+/** Revue de sécurité #598 : lecture bornée et typée, comme les autres corps JSON. */
+describe("POST /round-maps/flush — type et forme du corps", () => {
+  it("flush_textPlainBody_returns415WithoutFlushing", async () => {
+    const response = await flushPost(
+      new Request("http://localhost/api/x", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: '{"rounds":[]}',
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(415);
+    expect(flushRoundMapsNotice).not.toHaveBeenCalled();
   });
 });

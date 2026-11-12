@@ -355,3 +355,56 @@ describe("settleDeletedSoloEntries — relevé des candidats", () => {
     expect(SETTLE_BATCH_SIZE).toBe(200);
   });
 });
+
+/**
+ * Revue de sécurité #598 : chaque appel tient la connexion de son verrou nommé
+ * pendant que le forfait en emprunte d'autres — lancés ensemble, ils pouvaient
+ * occuper tout le pool. Les appels d'un processus passent donc un à un.
+ */
+describe("forfeitSoloEntriesAfterCommit — un appel à la fois", () => {
+  it("forfeitSoloEntriesAfterCommit_concurrentCalls_runOneByOne", async () => {
+    fakeDb({ format: "SURVIVAL" });
+    let releaseFirst: () => void = () => undefined;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(withNamedLock).mockImplementationOnce(async (_pool, _name, _timeout, run) => {
+      await firstHeld;
+      return run({} as PoolConnection);
+    });
+
+    const first = forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }]);
+    const second = forfeitSoloEntriesAfterCommit([{ tournamentId: 5, teamId: 50 }]);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(withNamedLock).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(withNamedLock).mock.calls[1][1]).toBe("bg_solo_forfeit_50");
+  });
+
+  it("forfeitSoloEntriesAfterCommit_getDatabaseRejects_resolvesZeroLoggingCodeOnly", async () => {
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("Access denied for user 'root'@'10.0.0.1'"));
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }])).resolves.toBe(0);
+
+    expect(withNamedLock).not.toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("root");
+    log.mockRestore();
+  });
+
+  it("forfeitSoloEntriesAfterCommit_previousCallFailed_nextStillRuns", async () => {
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("DB_DOWN"));
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const failed = forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }]);
+    fakeDb({ format: "SURVIVAL" });
+
+    const next = forfeitSoloEntriesAfterCommit([{ tournamentId: 5, teamId: 50 }]);
+
+    await expect(failed).resolves.toBe(0);
+    await expect(next).resolves.toBe(1);
+    log.mockRestore();
+  });
+});

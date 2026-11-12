@@ -186,6 +186,18 @@ export const MAP_PICK_ATTEMPT_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/**
+ * Le même borne pour un joueur (sans `tournaments`) : son plafond de choix
+ * acceptés est `MAP_PICK_WRITE_RULE` (120), et ses refus ne doivent pas lui
+ * ouvrir les 900 appels de l'arbitrage — une boucle de cartes refusées, chacune
+ * sous le verrou du tournoi, concurrencerait la saisie des scores.
+ */
+export const MAP_PICK_PLAYER_ATTEMPT_RULE: RateLimitRule = {
+  name: "map-pick-player-attempt",
+  limit: 180,
+  windowMs: 5 * 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",

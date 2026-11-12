@@ -2,36 +2,31 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { flushRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice";
+import { readOptionalJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
 import { ROUND_MAPS_FLUSH_ROUNDS_MAX } from "@/lib/shared/round-maps";
 
-/** 1024 clés de 31 caractères au plus, guillemets et virgules compris : au-delà, le corps n'est pas lu. */
-const BODY_MAX_CHARS = 40_000;
+/** 1024 clés de 31 caractères (ASCII) au plus, guillemets et virgules compris : au-delà, le corps n'est pas lu. */
+const BODY_MAX_BYTES = 40_000;
 const ROUND_KEY_PATTERN = /^\d{1,9}:[A-Z_]{1,16}:\d{1,4}$/;
 
 /**
  * Manches que l'écran déclare avoir écrites (corps `{ rounds: string[] }`) :
- * `undefined` sans corps ni liste (ancien client : tout part), `null` si la
- * liste est mal formée.
+ * `undefined` sans corps ni liste (ancien client : tout part), un refus si la
+ * liste est mal formée (`INVALID_ROUNDS`), le corps trop lourd (413) ou d'un
+ * autre type que JSON (415). La lecture est bornée **avant** d'être gardée en
+ * mémoire (`readOptionalJsonBody`).
  */
-async function ownRoundsOf(req: Request): Promise<string[] | null | undefined> {
-  // Pas de corps du tout : ancien client, tout part. Un corps illisible n'est pas « pas de corps ».
-  const raw = await req.text().catch(() => null);
-  if (raw === null) return null;
-  if (raw.trim() === "") return undefined;
-  if (raw.length > BODY_MAX_CHARS) return null;
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof body !== "object" || body === null) return null;
+async function ownRoundsOf(req: Request): Promise<{ rounds: string[] | undefined } | { refusal: string }> {
+  const read = await readOptionalJsonBody(req, "INVALID_ROUNDS", BODY_MAX_BYTES);
+  if ("refusal" in read) return read;
+  const body = read.body;
+  if (typeof body !== "object" || body === null) return { refusal: "INVALID_ROUNDS" };
   const { rounds } = body as { rounds?: unknown };
-  if (rounds === undefined) return undefined;
-  if (!Array.isArray(rounds) || rounds.length > ROUND_MAPS_FLUSH_ROUNDS_MAX) return null;
-  if (!rounds.every((key) => typeof key === "string" && ROUND_KEY_PATTERN.test(key))) return null;
-  return rounds as string[];
+  if (rounds === undefined) return { rounds: undefined };
+  if (!Array.isArray(rounds) || rounds.length > ROUND_MAPS_FLUSH_ROUNDS_MAX) return { refusal: "INVALID_ROUNDS" };
+  if (!rounds.every((key) => typeof key === "string" && ROUND_KEY_PATTERN.test(key))) return { refusal: "INVALID_ROUNDS" };
+  return { rounds: rounds as string[] };
 }
 
 /**
@@ -47,10 +42,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
   const tournamentId = parseMatchIdParam((await context.params).id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
-  const ownRounds = await ownRoundsOf(req);
-  if (ownRounds === null) return fail("INVALID_ROUNDS", 400);
+  const own = await ownRoundsOf(req);
+  if ("refusal" in own) return fail(own.refusal, 400);
   try {
-    return ok({ sent: await flushRoundMapsNotice(tournamentId, ownRounds) });
+    return ok({ sent: await flushRoundMapsNotice(tournamentId, own.rounds) });
   } catch {
     return fail("ROUND_MAPS_FAILED", 500);
   }

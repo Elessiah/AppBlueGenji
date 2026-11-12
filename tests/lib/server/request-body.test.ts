@@ -351,3 +351,24 @@ describe("readJsonBodyOrFallback", () => {
     await expect(refusal.json()).resolves.toEqual({ error: PAYLOAD_TOO_LARGE });
   });
 });
+
+/** Revue de sécurité #598 : un JSON qui n'est pas un objet rendait `null.slot` (500 brut). */
+describe("readJsonBodyOrFallback — JSON qui n'est pas un objet", () => {
+  it("readJsonBodyOrFallback_jsonNull_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("null"), { fallback: true })).resolves.toEqual({
+      body: { fallback: true },
+    });
+  });
+
+  it("readJsonBodyOrFallback_jsonNumber_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("42"), {})).resolves.toEqual({ body: {} });
+  });
+
+  it("readJsonBodyOrFallback_jsonString_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest('"x"'), {})).resolves.toEqual({ body: {} });
+  });
+
+  it("readJsonBodyOrFallback_jsonArray_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("[1]"), null)).resolves.toEqual({ body: null });
+  });
+});

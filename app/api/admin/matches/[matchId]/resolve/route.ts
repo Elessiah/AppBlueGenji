@@ -2,7 +2,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { adminResolveMatch, type AdminResolveEntry } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 import type { StaffActor } from "@/lib/shared/log-privacy";
@@ -16,7 +17,11 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const matchId_ = Number(matchId);
   if (!Number.isInteger(matchId_) || matchId_ <= 0) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await readJsonBody(req)) as {
+  // Corps illisible : `{}`, que la validation refuse sous son code ; un corps
+  // trop lourd (413) ou d'un autre type (415) rend son refus, jamais un 500.
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as {
     team1Score?: unknown;
     team2Score?: unknown;
     forfeitTeamId?: unknown;
@@ -56,9 +61,11 @@ async function resolve(matchId: number, entry: AdminResolveEntry, actor: StaffAc
     await adminResolveMatch(matchId, entry, { id: actor.id, pseudo: actor.pseudo });
     return ok({});
   } catch (e) {
-    const msg = (e as Error).message;
+    // Le texte d'un pilote (valeur en double, requête) n'atteint ni la réponse
+    // ni pm2 : réduit à son code (`serviceErrorCode`).
+    const msg = serviceErrorCode(e, "ADMIN_RESOLVE_FAILED");
     const status = MAP_LIST_ERROR_CODES.has(msg) ? 400 : RESOLVE_ERROR_STATUS.get(msg);
-    return fail(msg || "ADMIN_RESOLVE_FAILED", status ?? 500);
+    return fail(msg, status ?? 500);
   }
 }
 

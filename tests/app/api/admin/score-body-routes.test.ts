@@ -129,3 +129,49 @@ describe("codes propres à chaque route", () => {
     expect(await errorOf(res)).toBe("INVALID_REQUEST");
   });
 });
+
+/**
+ * Revue de sécurité #598 : la lecture du corps était hors de tout `try` — un
+ * corps trop lourd, d'un autre type ou `null` rendait le 500 brut de Next — et
+ * le texte d'un pilote partait à pm2 tel quel.
+ */
+describe("lecture bornée du corps et échecs imprévus", () => {
+  const raw = (method: string, body: string, contentType = "application/json") =>
+    new Request("http://localhost/api/admin/matches/42/x", { method, headers: { "content-type": contentType }, body });
+
+  it("resolve_nullBody_returns400ValidationCode", async () => {
+    const res = await resolveRoute(raw("POST", "null"), params);
+
+    expect(res.status).toBe(400);
+    expect(adminResolveMatch).not.toHaveBeenCalled();
+  });
+
+  it("resolve_textPlainBody_returns415", async () => {
+    const res = await resolveRoute(raw("POST", '{"maps":[]}', "text/plain"), params);
+
+    expect(res.status).toBe(415);
+    expect(await errorOf(res)).toBe("UNSUPPORTED_CONTENT_TYPE");
+  });
+
+  it("scores_bodyOverLimit_returns413", async () => {
+    const res = await scoresRoute(raw("PATCH", JSON.stringify({ pad: "x".repeat(300 * 1024) })), params);
+
+    expect(res.status).toBe(413);
+    expect(await errorOf(res)).toBe("PAYLOAD_TOO_LARGE");
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  it("resolve_driverDuplicateEntry_returns500AdminResolveFailedCodeOnly", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(adminResolveMatch)
+      .mockRejectedValueOnce(Object.assign(new Error("Duplicate entry 'a@b.fr' for key 'uniq'"), { code: "ER_DUP_ENTRY" }));
+
+    const res = await resolveRoute(req("POST", { maps: mapsFor(2, 0) }), params);
+
+    expect(res.status).toBe(500);
+    expect(await errorOf(res)).toBe("ADMIN_RESOLVE_FAILED");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("a@b.fr");
+    log.mockRestore();
+  });
+});

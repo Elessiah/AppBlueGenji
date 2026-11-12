@@ -1,6 +1,7 @@
 import {
   enforceRateLimit,
   MAP_PICK_ATTEMPT_RULE,
+  MAP_PICK_PLAYER_ATTEMPT_RULE,
   MAP_PICK_STAFF_WRITE_RULE,
   MAP_PICK_WRITE_RULE,
   reserveRateLimit,
@@ -28,7 +29,7 @@ const STATUSES: Readonly<Record<string, number>> = {
  * Plafonné par compte (`MAP_PICK_WRITE_RULE`, plus haut pour l'arbitrage :
  * `MAP_PICK_STAFF_WRITE_RULE` ; 429 `TOO_MANY_REQUESTS`), un choix refusé
  * rendant sa place ; tous les appels, refus compris, restent bornés par
- * `MAP_PICK_ATTEMPT_RULE`. Un
+ * `MAP_PICK_ATTEMPT_RULE` (`MAP_PICK_PLAYER_ATTEMPT_RULE` pour un joueur). Un
  * match absent rend 404 et un match d'autrui 403 : l'identifiant d'un match
  * n'est pas un secret (l'instantané public de son tournoi le porte).
  */
@@ -39,10 +40,9 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const throttled = enforceRateLimit(MAP_PICK_ATTEMPT_RULE, user.id);
-  if (throttled) return throttled;
-
   const staff = can(user, "tournaments");
+  const throttled = enforceRateLimit(staff ? MAP_PICK_ATTEMPT_RULE : MAP_PICK_PLAYER_ATTEMPT_RULE, user.id);
+  if (throttled) return throttled;
   const reservation = reserveRateLimit(staff ? MAP_PICK_STAFF_WRITE_RULE : MAP_PICK_WRITE_RULE, user.id);
   if (reservation.refused) return reservation.refused;
 
