@@ -58,6 +58,15 @@ describe("selfRolesErrorMessage", () => {
     expect(selfRolesErrorMessage("CANNOT_REMOVE_OWN_ADMIN", EN_PROFILE)).toBe("You can't remove your own administrator role.");
   });
 
+  it("selfRolesErrorMessage_concurrentUpdateRetry_returnsFrAndEnSentence", () => {
+    expect(selfRolesErrorMessage("CONCURRENT_UPDATE_RETRY", FR_PROFILE_TEXT)).toBe(
+      "Une autre modification de ton compte est passée au même moment : rien n'a été enregistré. Réessaie.",
+    );
+    expect(selfRolesErrorMessage("CONCURRENT_UPDATE_RETRY", EN_PROFILE)).toBe(
+      "Another change to your account went through at the same moment: nothing was saved. Try again.",
+    );
+  });
+
   it("selfRolesErrorMessage_unknownCode_returnsFallbackNeverRawCode", () => {
     expect(selfRolesErrorMessage("ROLES_UPDATE_FAILED", FR_PROFILE_TEXT)).toBe("La mise à jour de tes rôles a échoué.");
     expect(selfRolesErrorMessage("constructor", EN_PROFILE)).toBe("Updating your roles failed.");
@@ -211,5 +220,13 @@ describe("SelfRolesField — administration retirée pendant la session", () => 
     expect(page).toMatch(/isAdmin: false, roles: prev\.roles\.filter\(\(role\) => role !== "ADMIN"\)/);
     expect(page).toMatch(/dropOwnAdmin = useCallback\([\s\S]*?focusMainContent\(\);/);
     expect(page).toContain("onAdminLost={dropOwnAdmin}");
+  });
+});
+
+describe("SelfRolesField — rôles changés par un autre administrateur", () => {
+  it("selfRolesField_rolesChanged_refreshesRouter", () => {
+    // Les permissions changées valent aussi pour la barre de navigation, tenue par la session.
+    const field = readFileSync(join(process.cwd(), "app/(secured)/profil/_components/SelfRolesField.tsx"), "utf8");
+    expect(field).toMatch(/if \(code === "ROLES_CHANGED"\) \{[\s\S]*?await reloadSavedRoles\(\);[\s\S]*?router\.refresh\(\);[\s\S]*?return true;/);
   });
 });

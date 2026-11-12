@@ -179,13 +179,43 @@ describe("POST /api/admin/users/[id]/roles", () => {
 
   it("post_serviceThrowsUnknownError_returns500WithGenericCode", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(service.setUserRoles).mockRejectedValue(new Error("ER_LOCK_DEADLOCK: Deadlock found"));
+    jest.mocked(service.setUserRoles).mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.3:3306"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "ROLES_UPDATE_FAILED" });
     expect(service.publishRolesChange).not.toHaveBeenCalled();
+  });
+
+  it("post_serviceThrowsUnknownError_logsCodeOnly", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    const driverError = Object.assign(new Error("Duplicate entry 'Test_Pseudo' for key 'pseudo'"), {
+      code: "ER_DUP_ENTRY",
+      sqlMessage: "Duplicate entry 'Test_Pseudo' for key 'pseudo'",
+    });
+    jest.mocked(service.setUserRoles).mockRejectedValue(driverError);
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+
+    expect(error).toHaveBeenCalledWith("[roles] enregistrement impossible : ER_DUP_ENTRY");
+  });
+
+  it("post_serviceDeadlock_returns409ConcurrentUpdateRetry", async () => {
+    // La ligne du compte est lue `FOR UPDATE` : deux enregistrements simultanés
+    // peuvent s'interbloquer, ce qui se réessaie.
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest
+      .mocked(service.setUserRoles)
+      .mockRejectedValue(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }));
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 
   it("rejects a non-array roles payload with 400", async () => {

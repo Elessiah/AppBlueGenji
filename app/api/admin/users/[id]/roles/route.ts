@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { publishRolesChange, setOwnPlatformRoles, setUserRoles, type RolesSaveResult } from "@/lib/server/users/roles";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureReason, unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { can, isPlatformRole, type PlatformRole } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 
@@ -97,9 +97,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     // l'écriture — sur son compte comme sur celui d'un autre : le geste n'est
     // plus permis, il se refuse comme tel.
     if (msg === "NOT_ADMIN") return fail("FORBIDDEN", 403);
-    return Object.hasOwn(SERVICE_ERROR_STATUS, msg)
-      ? fail(msg, SERVICE_ERROR_STATUS[msg])
-      : fail("ROLES_UPDATE_FAILED", 500);
+    if (Object.hasOwn(SERVICE_ERROR_STATUS, msg)) return fail(msg, SERVICE_ERROR_STATUS[msg]);
+    // Imprévu : la ligne pm2 garde le code ; un interblocage ou un délai de
+    // verrou sur la ligne du compte (lue `FOR UPDATE`) rend 409 « réessaie ».
+    return fail(unexpectedFailureCode(e, "ROLES_UPDATE_FAILED", "[roles] enregistrement impossible"), 500);
   }
   publishAfterCommit({ id: user.id, pseudo: user.pseudo }, targetId, saved);
   return ok({ roles: saved.roles });

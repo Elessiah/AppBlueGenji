@@ -36,6 +36,7 @@ const SELF_ROLES_ERROR_CODES = [
   "INVALID_PAYLOAD",
   "USER_NOT_FOUND",
   "ROLES_CHANGED",
+  "CONCURRENT_UPDATE_RETRY",
 ] as const;
 type SelfRolesErrorCode = (typeof SELF_ROLES_ERROR_CODES)[number];
 
@@ -173,6 +174,9 @@ export function SelfRolesField({
         // rôles enregistrés sont relus pour que les cases les montrent.
         setPending(null);
         await reloadSavedRoles();
+        // Les permissions changées par l'autre administrateur valent aussi
+        // pour la barre de navigation, tenue par la session.
+        router.refresh();
         return true;
       }
       if (DEFINITIVE_REFUSALS.has(code)) {

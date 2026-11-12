@@ -203,6 +203,7 @@
       "INVALID_PAYLOAD": "La sélection de rôles est invalide.",
       "USER_NOT_FOUND": "Ton compte est introuvable.",
       "ROLES_CHANGED": "Tes rôles ont changé entre-temps : vérifie-les avant d'enregistrer.",
+      "CONCURRENT_UPDATE_RETRY": "Une autre modification de ton compte est passée au même moment : rien n'a été enregistré. Réessaie.",
       "fallback": "La mise à jour de tes rôles a échoué."
     },
     "nothingToSave": "Aucun rôle n'a changé : coche ou décoche un rôle avant d'enregistrer."
