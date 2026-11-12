@@ -69,7 +69,9 @@ application/x-www-form-urlencoded` + `Next-Action` -> 500).
 
 - `middleware.ts` (`isServerActionCall`) : tout `POST` portant `Next-Action`
   est refusé en 404 sans corps, avant tout rendu — le bruit « Server Reference
-  ID » disparaît avec lui.
+  ID » disparaît avec lui. Une entrée du `matcher` (`has` : en-tête
+  `next-action`) y fait passer **tout** chemin, préchargements et fichiers
+  `.png`/`.txt`/`.xml` compris, que la première entrée écarte.
 - `app/not-found.tsx` s'enveloppe de `EnsureToastProvider` (`components/ui/toast.tsx`) :
   fournisseur ajouté seulement s'il n'y en a pas au-dessus, et sur cette seule
   page (pas dans `PublicPageShell`, partagé). `useToast` reste strict, un oubli

@@ -330,5 +330,11 @@ export const config = {
     },
     "/api/:path*",
     "/:prefix([eE][nN])/:path*",
+    // Tout chemin portant `Next-Action`, préchargements et fichiers en
+    // .png/.txt/.xml… compris, que la première entrée écarte : un `POST` forgé
+    // y échappait au 404 de `isServerActionCall` (et le bruit « Server
+    // Reference ID » revenait dans pm2). Un `GET` qui porte l'en-tête suit le
+    // chemin commun, sans autre effet.
+    { source: "/:path*", has: [{ type: "header", key: "next-action" }] },
   ],
 };
