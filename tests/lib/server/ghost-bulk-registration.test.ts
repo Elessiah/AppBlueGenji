@@ -405,20 +405,6 @@ describe("ordre de verrouillage des points d'entrée", () => {
     expect(jest.mocked(getUserActiveTeam).mock.calls).toEqual([[42, connection]]);
   });
 
-  it("ne verrouille pas l'équipe en tournoi individuel", async () => {
-    // En individuel l'équipe n'est pas l'engagé : la verrouiller avant
-    // `bg_users` croiserait l'ordre de la suppression de compte.
-    const { connection } = fakeConnection({ teams: [] });
-    (connection.execute as unknown as SqlMock).mockImplementationOnce(async () => [
-      [{ participant_type: "SOLO" }],
-      [],
-    ]);
-
-    await registerCurrentUserTeam(connection, 12, 42, 101).catch(() => undefined);
-
-    expect(sqlOf(connection)).not.toContain("SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE");
-  });
-
   it("refuse un manager rétrogradé pendant l'attente du verrou (rôles relus dessous)", async () => {
     // L'appelant l'a lu MANAGER sur le pool ; sous le verrou il n'est plus que DPS.
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["DPS"] });

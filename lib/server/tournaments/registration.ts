@@ -60,7 +60,8 @@ async function registerTeam(
   byStaff: boolean,
 ): Promise<void> {
   // Plancher du tronc commun : les deux points d'entrée verrouillent déjà, plus
-  // tôt qu'ici (voir `lockTournamentRow`). Le reprendre ne coûte rien — la
+  // tôt qu'ici (`lockTournamentRow` pour un lot, lecture verrouillante du type
+  // de participant pour un joueur). Le reprendre ne coûte rien — la
   // transaction tient déjà la ligne — et garantit qu'un appelant ajouté demain
   // ne compte jamais un effectif sans verrou.
   await lockTournamentRow(connection, tournamentId);
@@ -209,6 +210,15 @@ export async function registerCurrentUserTeam(
     [tournamentId],
   );
   const lockedSolo = lockRows.length > 0 && isSoloTournament(toParticipantType(lockRows[0].participant_type));
+
+  // En individuel, la ligne du joueur (celle que `ensureSoloEntry` verrouille)
+  // est prise **avant la première lecture ordinaire**, même ordre tournoi →
+  // compte : figé plus tôt, l'instantané ne verrait pas l'entrée solo qu'une
+  // inscription simultanée du même joueur (à un autre tournoi) vient de
+  // créer — la relecture après le conflit d'unicité reviendrait vide.
+  if (lockedSolo) {
+    await connection.execute(`SELECT id FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
+  }
 
   // Puis la ligne de cette équipe (ordre tournoi → équipe, celui de
   // `registerTeamsByIds`), **toujours avant la première lecture ordinaire** :

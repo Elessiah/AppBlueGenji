@@ -221,8 +221,13 @@ effectif et passent toutes les deux — l'unicité `(tournament_id, team_id)`
 protège du doublon, pas du dépassement d'effectif.
 
 Il est pris en **toute première instruction** de la transaction, par chacun des
-deux points d'entrée (`registerCurrentUserTeam`, `registerTeamsByIds`), et non
-par le seul tronc commun. La nuance porte tout : sous `REPEATABLE READ`, c'est
+deux points d'entrée (`registerCurrentUserTeam` par une lecture verrouillante
+du type de participant, `registerTeamsByIds` par `lockTournamentRow`), et non
+par le seul tronc commun. L'inscription d'un joueur prend ensuite, toujours
+avant la première lecture ordinaire, la ligne de son équipe en tournoi par
+équipes (lue sur le pool par l'appelant, avant d'emprunter la connexion), ou sa
+ligne `bg_users` en individuel — jamais l'équipe, qui n'y est pas l'engagé et
+croiserait l'ordre compte → équipe de la suppression de compte. La nuance porte tout : sous `REPEATABLE READ`, c'est
 la première lecture **ordinaire** qui fige l'instantané, et une lecture
 verrouillante n'en crée pas. Un `loadTournamentRow` placé avant le verrou — ne
 serait-ce que pour connaître le type de participant — fige donc le monde *avant*

@@ -122,7 +122,8 @@ bien la suppression passe la première et l'inscription ne trouve plus personne
 inscrite (`listSoloRegistrationTournamentIds`), puis ouvre la transaction par
 `lockTournamentRow` sur chacun, dans l'ordre des identifiants, **avant** le
 verrou du compte : c'est l'ordre de l'inscription solo
-(`registerCurrentUserTeam` puis `ensureSoloEntry`), donc pas d'interblocage.
+(`registerCurrentUserTeam` prend le tournoi puis la ligne `bg_users`, jamais
+l'équipe en individuel), donc pas d'interblocage.
 Une inscription apparue entre le relevé et les verrous porte sur un tournoi non
 tenu : elle n'est pas retirée et le compte est anonymisé (conservateur). Le
 retrait supprime la ligne `bg_tournament_registrations`, renumérote les têtes de
