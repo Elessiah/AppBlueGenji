@@ -17,10 +17,9 @@
  *   dès qu'elle dépasse la borne : un envoi fragmenté (`Transfer-Encoding:
  *   chunked`), qui n'annonce aucune taille, ne passe pas davantage.
  *
- * Le refus est une exception `PAYLOAD_TOO_LARGE` : les routes qui avalaient
- * déjà un corps illisible (`.catch(() => ({}))`) l'avalent de la même façon, et
- * le traitent comme un corps vide — ce qui est exactement ce qu'on veut d'un
- * corps qu'on a refusé de lire.
+ * Le refus est une exception `PAYLOAD_TOO_LARGE` (413) ; les routes qui
+ * tiennent un corps illisible pour vide passent par `readJsonBodyOrFallback`,
+ * qui rend ce refus — et celui d'un corps non JSON (415) — au lieu de l'avaler.
  */
 import { enforceRateLimit, IMAGE_UPLOAD_RULE } from "@/lib/server/api-guard";
 import { fail } from "@/lib/server/http";

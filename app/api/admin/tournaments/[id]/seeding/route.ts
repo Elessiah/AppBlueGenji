@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { loadSeedingBoard, reorderSeeding } from "@/lib/server/tournaments/seeding";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
@@ -67,6 +68,6 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
     if (SEEDING_LOCK_CODES.has(message)) return fail(message, 409);
     if (message === "INVALID_SEED_ORDER") return fail(message, 400);
-    return fail(message || "SEEDING_REORDER_FAILED", 500);
+    return fail(serviceErrorCode(error, "SEEDING_REORDER_FAILED"), 500);
   }
 }

@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { deleteTeamLogoForReport, deleteUserAvatarForReport } from "@/lib/server/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Supprime **sans délai** l'image (logo d'équipe ou avatar de joueur) d'une
@@ -39,7 +40,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (["TEAM_NOT_TARGETED", "TEAM_HAS_NO_LOGO", "USER_NOT_TARGETED", "USER_HAS_NO_AVATAR"].includes(message)) {
       return fail(message, 409);
     }
-    console.error("[moderation] suppression de l'image impossible", error);
-    return fail("TEAM_LOGO_REMOVE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "TEAM_LOGO_REMOVE_FAILED", "[moderation] suppression de l'image impossible"), 500);
   }
 }

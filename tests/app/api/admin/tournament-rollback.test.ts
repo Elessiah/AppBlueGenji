@@ -162,14 +162,31 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   it("masque une panne du moteur derrière un code du domaine", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(rollbackCurrentRound).mockRejectedValue(
-      new Error("Deadlock found when trying to get lock"),
+      Object.assign(new Error("Table 'bg.bg_matches' doesn't exist"), { code: "ER_NO_SUCH_TABLE" }),
     );
-    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await rollback("7");
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "ROLLBACK_FAILED" });
+    // ERREUR.txt (revue sécurité #541) : pm2 ne garde que le code, jamais le texte du pilote.
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("ER_NO_SUCH_TABLE"));
+    expect(String(logged.mock.calls[0][0])).not.toContain("bg_matches");
+  });
+
+  // ERREUR.txt (revue sécurité EF-35) : une contention se dit « réessaie » (409), pas une panne.
+  it("rend une contention en 409 CONCURRENT_UPDATE_RETRY", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockRejectedValue(
+      Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }),
+    );
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const res = await rollback("7");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 
   it("journalise le geste et le stade défait, l'auteur dans pm2 seulement", async () => {

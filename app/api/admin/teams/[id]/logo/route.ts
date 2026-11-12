@@ -9,6 +9,7 @@ import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { can } from "@/lib/shared/permissions";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { discordInline } from "@/lib/shared/discord-text";
+import { failureReason, unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Retire le logo d'une équipe, pour la modération (permission `moderation`) :
@@ -47,7 +48,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
       // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire
       // un retrait déjà effectif.
-      console.error("[moderation] fichier du logo non effacé", error);
+      console.error(`[moderation] fichier du logo non effacé : ${failureReason(error)}`);
     });
     publishStaffAction(`🧹 Logo de l'équipe « ${discordInline(teamName)} » retiré par le staff (modération).`, {
       id: user.id,
@@ -61,7 +62,6 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     const message = (error as Error).message;
     if (message === "TEAM_NOT_FOUND") return fail(message, 404);
     if (message === "TEAM_HAS_NO_LOGO") return fail(message, 409);
-    console.error("[moderation] retrait du logo impossible", error);
-    return fail("TEAM_LOGO_REMOVE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "TEAM_LOGO_REMOVE_FAILED", "[moderation] retrait du logo impossible"), 500);
   }
 }

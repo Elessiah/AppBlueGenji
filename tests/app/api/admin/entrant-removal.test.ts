@@ -168,7 +168,7 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     // journal du serveur, pas dans un toast français.
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(removeTournamentEntrant).mockRejectedValue(
-      new Error("Deadlock found when trying to get lock"),
+      Object.assign(new Error("Duplicate entry 'Nova' for key 'name'"), { code: "ER_DUP_ENTRY" }),
     );
     const logged = jest.spyOn(console, "error").mockImplementation(() => {});
 
@@ -176,6 +176,21 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "ENTRANT_REMOVAL_FAILED" });
-    expect(logged).toHaveBeenCalled();
+    // Le journal garde le code, jamais la valeur en double que cite le pilote.
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("ER_DUP_ENTRY"));
+    expect(String(logged.mock.calls[0][0])).not.toContain("Nova");
+  });
+
+  it("rend une contention en 409 CONCURRENT_UPDATE_RETRY", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(removeTournamentEntrant).mockRejectedValue(
+      Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }),
+    );
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await remove("7", "102");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 });

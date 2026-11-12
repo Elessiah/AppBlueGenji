@@ -76,6 +76,7 @@ import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction } from "./transaction";
 import { nullableId } from "@/lib/shared/nullable-id";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -655,7 +656,7 @@ export async function queueDeferredNoRefereeAlerts(candidates: readonly NoRefere
   try {
     await retryOnDeadlock(() => inTransaction((connection) => queueNoRefereeAlerts(connection, candidates)));
   } catch (error) {
-    console.error("[match-launch] alerte « sans arbitre » non réservée", error);
+    console.error(`[match-launch] alerte « sans arbitre » non réservée : ${failureReason(error)}`);
   }
 }
 
@@ -1840,7 +1841,7 @@ async function announceRoundSelfManagement(
       { tournamentId: match.tournament.id, category: removedReferee ? "staff-removal" : "referees" },
     );
   } catch (error) {
-    console.error("[referee] autogestion de manche non annoncée", error);
+    console.error(`[referee] autogestion de manche non annoncée : ${failureReason(error)}`);
   }
 }
 

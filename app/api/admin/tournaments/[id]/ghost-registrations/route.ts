@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { listGhostTeams } from "@/lib/server/ghost-teams-service";
 import { registerGhostTeams } from "@/lib/server/tournaments-service";
 import { parseGhostBatch, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
@@ -81,6 +82,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     ) {
       return fail(message, 409, details);
     }
-    return fail(message || "GHOST_REGISTRATION_FAILED", 500);
+    return fail(serviceErrorCode(error, "GHOST_REGISTRATION_FAILED"), 500);
   }
 }

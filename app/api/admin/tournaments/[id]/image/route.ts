@@ -10,6 +10,7 @@ import { checkTournamentImageSettings } from "@/lib/shared/tournament-image";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 import { readImageUploadForm, readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Illustration ou logo d'un tournoi (`lib/shared/tournament-image.ts`).
@@ -56,8 +57,7 @@ function mapFailure(error: unknown, fallback: string): Response {
   if (IMAGE_INPUT_ERRORS.has(message)) return fail(message, 400);
   // Une erreur inattendue (sharp, disque, base) ne part pas telle quelle : son
   // message peut nommer un chemin ou une table.
-  console.error("[tournament-image]", error);
-  return fail(fallback, 500);
+  return fail(unexpectedFailureCode(error, fallback, "[tournament-image]"), 500);
 }
 
 export async function POST(req: Request, context: RouteContext) {

@@ -1,5 +1,6 @@
 import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { setMatchLiveConfig, setMatchOnAir, StreamLinkError } from "@/lib/server/tournaments/live-streams";
 import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournaments/live-access";
 import { isMatchLiveTrigger, parseOrganisationLink, type MatchLiveTrigger } from "@/lib/shared/live-streams";
@@ -53,7 +54,7 @@ function mapLiveError(error: unknown) {
   }
   const status = LIVE_ERROR_STATUSES.get(message);
   if (status !== undefined) return fail(message, status);
-  return fail(message || "MATCH_LIVE_UPDATE_FAILED", 500);
+  return fail(serviceErrorCode(error, "MATCH_LIVE_UPDATE_FAILED"), 500);
 }
 
 type MatchLiveBody = {

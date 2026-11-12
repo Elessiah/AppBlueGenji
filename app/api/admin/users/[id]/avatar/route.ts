@@ -7,6 +7,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Retire l'avatar d'un joueur, pour la modération (permission `moderation`) —
@@ -58,7 +59,6 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     const message = (error as Error).message;
     if (message === "USER_NOT_FOUND") return fail(message, 404);
     if (message === "USER_HAS_NO_AVATAR") return fail(message, 409);
-    console.error("[moderation] retrait de l'avatar impossible", error);
-    return fail("USER_AVATAR_REMOVE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "USER_AVATAR_REMOVE_FAILED", "[moderation] retrait de l'avatar impossible"), 500);
   }
 }

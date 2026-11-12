@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { setTournamentLiveUrl } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
@@ -38,6 +39,6 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
     if (message === "INVALID_STREAM_URL") return fail(message, 400);
-    return fail(message || "TOURNAMENT_LIVE_UPDATE_FAILED", 500);
+    return fail(serviceErrorCode(error, "TOURNAMENT_LIVE_UPDATE_FAILED"), 500);
   }
 }

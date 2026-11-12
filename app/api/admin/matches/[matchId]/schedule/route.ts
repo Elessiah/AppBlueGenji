@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/server/http";
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { can } from "@/lib/shared/permissions";
 import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -52,9 +53,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     const message = (error as Error).message;
     if (message === "MATCH_NOT_FOUND") return fail(message, 404);
     if (message === "INVALID_MATCH_START_AT") return fail(message, 400);
-    // Une panne inattendue (SQL, interblocage rejoué en vain) ne sort qu'en
-    // code : son texte reste dans pm2.
-    console.error("[match-schedule] mise à jour en échec", error);
-    return fail("MATCH_SCHEDULE_UPDATE_FAILED", 500);
+    // Une panne inattendue ne sort qu'en code, une contention en 409 ;
+    // pm2 n'en garde que le code (`unexpectedFailureCode`).
+    return fail(unexpectedFailureCode(error, "MATCH_SCHEDULE_UPDATE_FAILED", "[match-schedule] mise à jour en échec"), 500);
   }
 }

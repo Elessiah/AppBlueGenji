@@ -5,6 +5,7 @@ import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { formatRoundRolledBackLog } from "@/lib/shared/bot-logs";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Efface le dernier stade joué du tournoi et le ramène à l'instant qui le
@@ -78,8 +79,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     // Même précaution que la suppression et le lancement anticipé : le texte
     // d'une erreur mysql2 est anglais et parle du moteur. Il reste au journal du
     // serveur, où il sert à quelque chose.
-    console.error(`[tournaments] retour en arrière du tournoi ${tournamentId} échoué :`, error);
-    return fail("ROLLBACK_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "ROLLBACK_FAILED", `[tournaments] retour en arrière du tournoi ${tournamentId} échoué`), 500);
   }
 }
 

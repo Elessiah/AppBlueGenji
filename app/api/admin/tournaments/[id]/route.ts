@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { deleteTournament } from "@/lib/server/tournaments-service";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { formatTournamentDeletedLog } from "@/lib/shared/bot-logs";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Supprime définitivement un tournoi et tout ce qui lui appartient (matchs,
@@ -47,7 +48,6 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     // afficherait « Deadlock found when trying to get lock » dans une interface
     // entièrement en français, et exposerait le moteur. Il reste dans les
     // journaux du serveur, où il sert à quelque chose.
-    console.error(`[tournaments] suppression du tournoi ${tournamentId} échouée :`, error);
-    return fail("TOURNAMENT_DELETE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "TOURNAMENT_DELETE_FAILED", `[tournaments] suppression du tournoi ${tournamentId} échouée`), 500);
   }
 }

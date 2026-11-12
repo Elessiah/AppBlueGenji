@@ -1,7 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { isContentionError } from "@/lib/server/mysql-errors";
-import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
 import { formatForfeitCancelledLog } from "@/lib/shared/bot-logs";
@@ -57,21 +56,16 @@ export async function DELETE(
     // Contention persistante (interblocage, ligne changée depuis l'instantané
     // sous MariaDB, verrou venu trop tard) à chaque rejeu : un refus
     // « réessaie », pas une panne. Code fixe — jamais le texte du moteur.
-    if (isContentionError(error)) {
-      console.warn(
-        `[tournaments] annulation de l'abandon de ${teamId} au tournoi ${tournamentId} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`,
+    // Le texte d'une erreur mysql2 reste hors de la réponse et le journal n'en
+    // garde que le code (`unexpectedFailureCode`).
+    return fail(
+      unexpectedFailureCode(
         error,
-      );
-      return fail(CONCURRENT_UPDATE_RETRY, 409);
-    }
-
-    // Le texte d'une erreur mysql2 est anglais et parle du moteur : il reste au
-    // journal du serveur.
-    console.error(
-      `[tournaments] annulation de l'abandon de ${teamId} au tournoi ${tournamentId} échouée :`,
-      error,
+        "FORFEIT_CANCEL_FAILED",
+        `[tournaments] annulation de l'abandon de ${teamId} au tournoi ${tournamentId}`,
+      ),
+      500,
     );
-    return fail("FORFEIT_CANCEL_FAILED", 500);
   }
 }
 

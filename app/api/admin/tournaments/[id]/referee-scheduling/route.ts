@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { setRefereeScheduling } from "@/lib/server/tournaments/referee-scheduling";
@@ -53,6 +54,6 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
     if (message === "TOURNAMENT_FINISHED") return fail(message, 409);
-    return fail(message || "REFEREE_SCHEDULING_UPDATE_FAILED", 500);
+    return fail(serviceErrorCode(error, "REFEREE_SCHEDULING_UPDATE_FAILED"), 500);
   }
 }

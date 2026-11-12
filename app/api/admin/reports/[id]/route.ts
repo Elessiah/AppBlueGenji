@@ -4,6 +4,7 @@ import { applyReportAction } from "@/lib/server/content-reports";
 import { isReportAction } from "@/lib/shared/content-reports";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Geste du panneau sur un signalement : prendre en charge, remettre en
@@ -38,7 +39,6 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const message = (error as Error).message;
     if (message === "REPORT_NOT_FOUND") return fail(message, 404);
     if (message === "REPORT_ACTION_NOT_ALLOWED") return fail(message, 409);
-    console.error("[reports] geste impossible", error);
-    return fail("REPORT_ACTION_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "REPORT_ACTION_FAILED", "[reports] geste impossible"), 500);
   }
 }

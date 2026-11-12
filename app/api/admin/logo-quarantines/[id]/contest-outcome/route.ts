@@ -4,6 +4,7 @@ import { recordContestOutcome } from "@/lib/server/logo-quarantine";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { isContestOutcome } from "@/lib/shared/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Écrit l'issue de la contestation d'une image modérée (décision D22) :
@@ -40,7 +41,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const message = (error as Error).message;
     if (message === "QUARANTINE_NOT_FOUND") return fail(message, 404);
     if (message === "QUARANTINE_CLOSED" || message === "QUARANTINE_STILL_HIDDEN") return fail(message, 409);
-    console.error("[moderation] issue de la contestation non écrite", error);
-    return fail("CONTEST_OUTCOME_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "CONTEST_OUTCOME_FAILED", "[moderation] issue de la contestation non écrite"), 500);
   }
 }
