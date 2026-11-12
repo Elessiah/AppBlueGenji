@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { recordContestOutcome } from "@/lib/server/logo-quarantine";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { isContestOutcome } from "@/lib/shared/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
 
@@ -24,7 +24,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const quarantineId = Number(id);
   if (!Number.isSafeInteger(quarantineId) || quarantineId <= 0) return fail("QUARANTINE_NOT_FOUND", 404);
 
-  const body = (await readJsonBody(req).catch(() => null)) as { outcome?: unknown } | null;
+  const read = await readJsonBodyOrFallback(req, null);
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { outcome?: unknown } | null;
   const outcome = body?.outcome;
   if (!isContestOutcome(outcome)) return fail("INVALID_CONTEST_OUTCOME", 400);
 

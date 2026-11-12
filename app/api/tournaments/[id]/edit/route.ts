@@ -8,7 +8,7 @@ import {
 import { ALL_TOURNAMENT_FIELDS } from "@/lib/shared/tournament-edit";
 import { can } from "@/lib/shared/permissions";
 import { NextResponse } from "next/server";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
@@ -54,7 +54,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const checked = await guard(id);
   if (checked.error) return checked.error;
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as Record<string, unknown>;
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as Record<string, unknown>;
 
   // Liste blanche : le corps ne peut porter que des champs éditables connus.
   // Recopier le corps tel quel laisserait un client écrire n'importe quelle

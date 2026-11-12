@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { setRefereeScheduling } from "@/lib/server/tournaments/referee-scheduling";
 import { discordInline } from "@/lib/shared/discord-text";
@@ -26,7 +26,9 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { enabled?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { enabled?: unknown };
   if (typeof body.enabled !== "boolean") return fail("INVALID_REFEREE_SCHEDULING", 400);
 
   try {

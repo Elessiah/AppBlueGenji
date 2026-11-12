@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { isPositiveId, launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { loadRefereePanel } from "@/lib/server/tournaments/referee-panel";
@@ -56,7 +56,9 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { userId?: unknown; expectedUserId?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { userId?: unknown; expectedUserId?: unknown };
   const refereeId = body.userId ?? null;
   if (refereeId !== null && !isPositiveId(refereeId)) return fail("INVALID_USER_ID", 400);
   const expected = body.expectedUserId;

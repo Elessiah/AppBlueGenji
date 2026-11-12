@@ -91,7 +91,11 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — corps et refus"
 
   it("refuse un corps illisible ou non JSON sans rien écrire", async () => {
     expect((await PUT(req("{", "application/json"), params("7"))).status).toBe(400);
-    expect((await PUT(req("enabled=true", "text/plain"), params("7"))).status).toBe(400);
+    // ERREUR.txt (revue #506) : un corps d'un autre type n'est plus avalé en
+    // corps vide (400 d'un champ) — il rend son propre refus, 415.
+    const foreign = await PUT(req("enabled=true", "text/plain"), params("7"));
+    expect(foreign.status).toBe(415);
+    await expect(foreign.json()).resolves.toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
     expect(setRefereeScheduling).not.toHaveBeenCalled();
   });
 

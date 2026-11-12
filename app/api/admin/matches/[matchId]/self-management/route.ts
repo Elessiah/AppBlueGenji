@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { setMatchSelfManaged } from "@/lib/server/tournaments/match-launch";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
@@ -24,7 +24,9 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { enabled?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { enabled?: unknown };
   if (typeof body.enabled !== "boolean") return fail("INVALID_SELF_MANAGEMENT", 400);
 
   try {

@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { managesTeam, recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { TERMS_VERSION, TERMS_VERSION_MISMATCH } from "@/lib/shared/terms-of-use";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 
 /**
  * Acceptation des conditions d'utilisation par un compte connecté — la fenêtre
@@ -18,7 +18,9 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { version?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { version?: unknown };
   if (body.version !== TERMS_VERSION) return fail(TERMS_VERSION_MISMATCH, 409);
 
   const context = (await managesTeam(user.id)) ? "TEAM_MANAGEMENT" : "SIGNED_IN";

@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { notifyUserAvatarRemoved, removeModeratedAvatarFile } from "@/lib/server/logo-quarantine";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
@@ -33,7 +33,9 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
 
   // Hors signalement, le motif saisi est le seul fait que le message puisse
   // exposer au joueur (DSA, art. 17.3.b) : il est exigé, avant toute écriture.
-  const reason = validateModerationReasonBody(await readJsonBody(req).catch(() => null));
+  const read = await readJsonBodyOrFallback(req, null);
+  if ("refusal" in read) return read.refusal;
+  const reason = validateModerationReasonBody(read.body);
   if (!reason.ok) return fail(reason.error, 400);
 
   try {

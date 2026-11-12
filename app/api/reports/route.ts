@@ -4,7 +4,7 @@ import { fail, ok } from "@/lib/server/http";
 import { createReport } from "@/lib/server/content-reports";
 import { validateReportSubmission } from "@/lib/shared/content-reports";
 import { can } from "@/lib/shared/permissions";
-import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
+import { SMALL_JSON_BODY_MAX_BYTES, readJsonBodyOrFallback } from "@/lib/server/request-body";
 
 /**
  * Signalement d'un problème à l'association, **ouvert à tous** : un titulaire
@@ -17,7 +17,9 @@ import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-bo
 export async function POST(req: Request) {
   const user = await getCurrentUser().catch(() => null);
 
-  const body = await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES).catch(() => null);
+  const read = await readJsonBodyOrFallback(req, null, SMALL_JSON_BODY_MAX_BYTES);
+  if ("refusal" in read) return read.refusal;
+  const body = read.body;
   const validation = validateReportSubmission(body);
   if (!validation.ok) return fail(validation.error, 400);
 

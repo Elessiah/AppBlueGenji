@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { applyReportAction } from "@/lib/server/content-reports";
 import { isReportAction } from "@/lib/shared/content-reports";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 
 /**
  * Geste du panneau sur un signalement : prendre en charge, remettre en
@@ -21,7 +21,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const reportId = Number(id);
   if (!Number.isSafeInteger(reportId) || reportId <= 0) return fail("INVALID_REPORT_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { action?: unknown; note?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { action?: unknown; note?: unknown };
   if (!isReportAction(body.action)) return fail("INVALID_REPORT_ACTION", 400);
 
   try {

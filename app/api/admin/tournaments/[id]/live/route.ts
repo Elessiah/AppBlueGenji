@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setTournamentLiveUrl } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
@@ -23,7 +23,9 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { liveUrl?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { liveUrl?: unknown };
   if (body.liveUrl !== null && body.liveUrl !== undefined && typeof body.liveUrl !== "string") {
     return fail("INVALID_STREAM_URL", 400);
   }

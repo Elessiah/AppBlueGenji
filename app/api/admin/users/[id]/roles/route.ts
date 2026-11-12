@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { publishRolesChange, setOwnPlatformRoles, setUserRoles } from "@/lib/server/users/roles";
 import { can, isPlatformRole } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 
 /** Refus du service rendus tels quels, avec leur statut. */
 const SERVICE_ERROR_STATUS: Readonly<Record<string, number>> = {
@@ -51,7 +51,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   // `can()` : c'est elle que l'écriture conditionne (`setOwnPlatformRoles`).
   if (self && !user.isAdmin) return fail("CANNOT_MODIFY_SELF", 400);
 
-  const body = (await readJsonBody(req).catch(() => null)) as { roles?: unknown } | null;
+  const read = await readJsonBodyOrFallback(req, null);
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { roles?: unknown } | null;
   if (!Array.isArray(body?.roles) || !body.roles.every(isPlatformRole)) {
     return fail("INVALID_PAYLOAD", 400);
   }

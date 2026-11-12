@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { setRefereeObjection, type RefereeObjectionResult } from "@/lib/server/tournaments/referee-objection";
 import { isPositiveId, launchFailure } from "@/lib/server/tournaments/match-launch-routes";
@@ -44,7 +44,9 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
   const refereeId = /^[1-9]\d{0,14}$/.test(rawId) ? Number(rawId) : Number.NaN;
   if (!isPositiveId(refereeId)) return fail("INVALID_USER_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { upheld?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { upheld?: unknown };
   if (typeof body.upheld !== "boolean") return fail("INVALID_REFEREE_OBJECTION", 400);
   const upheld = body.upheld;
 

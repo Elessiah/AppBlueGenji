@@ -198,6 +198,29 @@ export function bodyReadRefusal(error: unknown): string | null {
   return error.message === PAYLOAD_TOO_LARGE || error.message === UNSUPPORTED_CONTENT_TYPE ? error.message : null;
 }
 
+/**
+ * Corps JSON des routes qui tenaient un corps illisible pour vide
+ * (`readJsonBody(req).catch(() => ({}))`) : un corps vide ou un JSON invalide
+ * vaut toujours `fallback` — la validation de la route le refuse sous son
+ * propre code —, mais un refus qui a **son propre statut** n'est plus avalé :
+ * un corps trop lourd rend 413 `PAYLOAD_TOO_LARGE`, un corps non vide d'un
+ * autre type que JSON 415 `UNSUPPORTED_CONTENT_TYPE` (au lieu d'un 400 qui
+ * accusait un champ). Un corps vide sans `Content-Type` reste `fallback`.
+ */
+export async function readJsonBodyOrFallback<T>(
+  req: Request,
+  fallback: T,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: unknown } | { refusal: Response }> {
+  try {
+    return { body: await readJsonBody(req, maxBytes) };
+  } catch (error) {
+    const code = bodyReadRefusal(error);
+    if (code === null || (code === UNSUPPORTED_CONTENT_TYPE && !declaresForeignBody(req))) return { body: fallback };
+    return { refusal: fail(code, 400) };
+  }
+}
+
 /** Vrai si l'erreur est le refus d'un corps trop lourd. */
 export function isPayloadTooLarge(error: unknown): boolean {
   return error instanceof Error && error.message === PAYLOAD_TOO_LARGE;

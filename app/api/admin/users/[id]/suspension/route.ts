@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { liftSuspension, suspendAccount } from "@/lib/server/account-suspensions";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { validateSuspensionInput } from "@/lib/shared/account-suspension";
 import { can } from "@/lib/shared/permissions";
 
@@ -38,7 +38,9 @@ export async function POST(req: Request, context: Context) {
   const userId = await resolveTarget(context);
   if (userId === null) return fail("INVALID_USER_ID", 400);
 
-  const body = await readJsonBody(req).catch(() => ({}));
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body;
   const input = validateSuspensionInput(body);
   if (!input.ok) return fail(input.error, 400);
 

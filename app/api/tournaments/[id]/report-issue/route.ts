@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { enforceRateLimit, ISSUE_REPORT_DAILY_RULE, ISSUE_REPORT_RULE } from "@/lib/server/api-guard";
 import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 
 /**
  * Signale un problème au staff depuis la page d'un tournoi.
@@ -33,7 +33,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   // autre refus (`write-visibility.ts`).
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as {
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as {
     message?: unknown;
     matchId?: unknown;
   };

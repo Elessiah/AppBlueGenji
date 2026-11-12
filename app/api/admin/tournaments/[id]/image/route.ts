@@ -8,7 +8,7 @@ import {
 import { can } from "@/lib/shared/permissions";
 import { checkTournamentImageSettings } from "@/lib/shared/tournament-image";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
-import { readImageUploadForm, readJsonBody } from "@/lib/server/request-body";
+import { readImageUploadForm, readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
@@ -94,7 +94,9 @@ export async function PATCH(req: Request, context: RouteContext) {
   const auth = await authorize(context);
   if (auth instanceof Response) return auth;
 
-  const body = (await readJsonBody(req).catch(() => null)) as Record<string, unknown> | null;
+  const read = await readJsonBodyOrFallback(req, null);
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as Record<string, unknown> | null;
   if (body === null || typeof body !== "object") return fail("INVALID_IMAGE_FIT", 400);
 
   // Au PATCH, les trois champs sont **exigés**, et typés : `checkTournamentImageSettings`
