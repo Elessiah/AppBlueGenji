@@ -11,8 +11,19 @@ describe("inviteRolesFromBody", () => {
     expect(inviteRolesFromBody(["TANK", "MANAGER"])).toEqual(["TANK", "MANAGER"]);
   });
 
-  it("écarte ce qui n'est pas une chaîne", () => {
-    expect(inviteRolesFromBody(["TANK", 3, null, { r: 1 }])).toEqual(["TANK"]);
+  it("inviteRolesFromBody_nonStringItem_throwsInvalidRoles", () => {
+    // Filtré en silence, ["TANK", 3] devenait une invitation en TANK seul —
+    // et [3] une invitation sans rôle que personne n'avait choisie.
+    expect(() => inviteRolesFromBody(["TANK", 3, null, { r: 1 }])).toThrow("INVALID_ROLES");
+    expect(() => inviteRolesFromBody([3])).toThrow("INVALID_ROLES");
+  });
+
+  it("inviteRolesFromBody_unknownCode_throwsInvalidRoles", () => {
+    expect(() => inviteRolesFromBody(["X"])).toThrow("INVALID_ROLES");
+  });
+
+  it("inviteRolesFromBody_emptyList_returnsEmpty", () => {
+    expect(inviteRolesFromBody([])).toEqual([]);
   });
 
   it.each([["une chaîne", "DPS"], ["un nombre", 4], ["un objet", { roles: ["DPS"] }]])(
@@ -39,7 +50,20 @@ describe("rolesListFromBody", () => {
     expect(rolesListFromBody([])).toEqual([]);
   });
 
-  it("rolesListFromBody_mixedValues_keepsStringsOnly", () => {
-    expect(rolesListFromBody(["DPS", 1, "PILOTE"])).toEqual(["DPS", "PILOTE"]);
+  it("rolesListFromBody_everyKnownCode_returnsList", () => {
+    const all = ["OWNER", "MANAGER", "CAPITAINE", "COACH", "TANK", "DPS", "HEAL"];
+    expect(rolesListFromBody(all)).toEqual(all);
+  });
+
+  it.each([
+    ["unknownCode", ["PILOTE"]],
+    ["numberItem", [3]],
+    ["mixedValues", ["DPS", 1, "PILOTE"]],
+    ["nullItem", ["DPS", null]],
+    ["lowercaseCode", ["dps"]],
+  ])("rolesListFromBody_%s_throwsInvalidRoles", (_label, raw) => {
+    // Filtrés en silence, ces éléments laissaient une liste vide — et une
+    // liste vide, permise depuis D71, effaçait les rôles du membre.
+    expect(() => rolesListFromBody(raw)).toThrow("INVALID_ROLES");
   });
 });

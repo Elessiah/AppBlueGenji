@@ -192,10 +192,26 @@ async function findPendingInvitation(
  * Rôles portés par une invitation, tels qu'ils seront posés à l'arrivée du
  * joueur. Sans liste (`NULL` : demande d'adhésion, ou invitation émise avant la
  * colonne), `null` : `acceptIntoTeam` pose alors `DPS`, le défaut d'origine.
- * Une liste vide (`[]`) est une invitation **sans rôle**, voulue (D71).
+ * Une liste vide (`[]`) est une invitation **sans rôle**, voulue (D71). Une
+ * liste **non vide** dont aucun code n'est connu (rôle retiré depuis, valeur
+ * écrite à la main) n'est pas ce choix-là : elle garde le défaut, `null`.
  */
-function invitationRoles(raw: unknown): TeamRole[] | null {
-  return raw == null ? null : parseRoles(raw);
+export function invitationRoles(raw: unknown): TeamRole[] | null {
+  if (raw == null) return null;
+  const roles = parseRoles(raw);
+  return roles.length === 0 && !isEmptyRoleList(raw) ? null : roles;
+}
+
+/** La valeur stockée est-elle une liste **vide** (`[]`, ou le texte `"[]"`) ? */
+function isEmptyRoleList(raw: unknown): boolean {
+  if (Array.isArray(raw)) return raw.length === 0;
+  if (typeof raw !== "string") return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**

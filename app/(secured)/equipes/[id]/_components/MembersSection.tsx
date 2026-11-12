@@ -19,6 +19,7 @@ import { InviteRolesDialog } from "./InviteRolesDialog";
 import { MyRolesBlock } from "./MyRolesBlock";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
+import { invitationOutcome } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 const INVITE_FIELD_IDS = { pseudo: "team-invite-pseudo" } as const;
@@ -63,6 +64,7 @@ export function MembersSection({
   const { addMember, removeMember, updateRoles, updateOwnRoles, cancelInvitation } = useMemberManagement(
     teamId,
     refreshAll,
+    onChanged,
   );
 
   const sortedMembers = sortTeamMembers(members);
@@ -88,8 +90,9 @@ export function MembersSection({
     });
     // Refus : la saisie reste, pour corriger une faute de frappe sans tout
     // retaper.
-    if (ok) setMemberPseudo("");
-    if (ok || pseudoRefused) setInviteTarget(null);
+    const outcome = invitationOutcome(ok, pseudoRefused);
+    if (outcome.clearPseudo) setMemberPseudo("");
+    if (outcome.closeDialog) setInviteTarget(null);
     return ok;
   };
 

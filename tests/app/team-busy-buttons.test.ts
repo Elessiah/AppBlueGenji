@@ -56,7 +56,7 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
   });
 
   it("RolesDialog_submitWhilePending_ignoredByHandler", () => {
-    expect(source("app/(secured)/equipes/[id]/_components/RolesDialog.tsx")).toMatch(/if \(unchanged \|\| pending\) return;/);
+    expect(source("app/(secured)/equipes/[id]/_components/RolesDialog.tsx")).toMatch(/if \(toSave === null \|\| pending\) return;/);
   });
 
   it("teamModuleCss_ariaDisabledButton_isDimmedAndNotAllowed", () => {

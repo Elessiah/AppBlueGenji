@@ -723,7 +723,9 @@ d'existence. Même règle, même 404. Le compteur public de la vitrine
   lui-même en individuel (`NOT_TEAM_MATCH_LEADER` → 403). Reporter 0-3 contre
   soi est un forfait, et un report seul finit par faire foi : le geste n'est
   pas ouvert à une simple place au roster. Le capitaine en est, parce qu'il
-  lance la rencontre en jeu et doit pouvoir en dire le résultat ; il reste
+  mène l'équipe dans la rencontre et doit pouvoir en dire le résultat (le
+  check-in, hôte et réglages de la partie, va au propriétaire et aux
+  managers) ; il reste
   exclu du forfait sur la manche et de l'abandon, qui engagent l'équipe hors
   de tout match joué ;
 - ✅ **cet engagé est l'une des deux équipes du match** — sinon `NOT_IN_MATCH`.

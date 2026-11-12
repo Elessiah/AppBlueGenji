@@ -140,7 +140,7 @@
   },
   "myRoles": {
     "title": "My roles",
-    "hint": "Your game roles show on the team page and on your player card. Captain, manager and owner are given by the team's management.",
+    "hint": "Your game roles show on the team page and on your player card. Captain and manager are given by the team's management; ownership is transferred.",
     "leadingLabel": "Roles given by the management",
     "noLeading": "None",
     "gameLegend": "My game roles",
@@ -174,13 +174,13 @@
         "team": "Logo, invitations and join requests, removals, members' roles (except the owner's), tournament registrations.",
         "matches": "“Ready”, score entry and confirmation, match forfeit, withdrawing from a tournament, clearing the team voice channel.",
         "messages": "Match notices, join requests, check-in for self-managed matches, score to confirm.",
-        "hint": "Given by the owner or a manager. Only the name, tag, description, transfer and disbanding are out of reach."
+        "hint": "Given by the owner or a manager. Out of reach: the name, tag, description, transfer, disbanding, as well as the owner's roles and removing the owner."
       },
       "CAPITAINE": {
         "team": "Their own game roles only.",
         "matches": "“Ready”, score entry and confirmation, clearing the team voice channel; first contact shown for the match.",
         "messages": "Match notices, score to confirm.",
-        "hint": "Given by the owner or a manager. The captain starts the game in-game and reports the result, but can't commit the team: no forfeit, withdrawal or registration."
+        "hint": "Given by the owner or a manager. The captain declares the team ready and reports the result without committing the team (no forfeit, withdrawal or registration); the check-in for a self-managed match (game host, settings) goes to the owner and managers."
       },
       "COACH": {
         "team": "Their own game roles only.",

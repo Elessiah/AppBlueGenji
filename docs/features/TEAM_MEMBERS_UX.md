@@ -15,25 +15,37 @@ siens : rien n'était enregistré. Les deux gestes sont désormais séparés.
   rattaché au champ (`useFieldErrors`) et notifié ; autre refus : la modale
   reste ouverte avec sa sélection.
 - Serveur : `inviteRolesFromBody` — absent → défaut `DPS` (anciens appelants),
-  liste (même vide) → assainie, `OWNER` retiré, malformé → `INVALID_ROLES` (400).
-  Une invitation stockée sans colonne de rôles (antérieure) arrive toujours en
-  `DPS` (`arrivalRoles(claim, null)`).
+  liste (même vide) de codes connus → `OWNER` retiré ; pas un tableau, ou un
+  élément qui n'est pas un code de rôle connu (`"PILOTE"`, `3`) → `INVALID_ROLES`
+  (400), jamais filtré en silence. Une invitation stockée sans colonne de rôles
+  (antérieure), ou dont la liste non vide ne porte aucun code connu (rôle retiré
+  depuis), arrive toujours en `DPS` (`invitationRoles` → `null`) ; seule une
+  liste vide stockée (`[]`) fait arriver sans rôle.
+- Décisions de la modale (fermer, vider le champ) : `invitationOutcome`
+  (`app/(secured)/equipes/[id]/_lib/member-roles.ts`).
 
 ## « Mes rôles »
 
 - `MyRolesBlock`, montré à tout membre : rôles de direction en pastilles (lecture
-  seule), cases `COACH`, `TANK`, `DPS`, `HEAL` (`SELF_ASSIGNABLE_ROLES`),
+  seule), cases `COACH`, `TANK`, `DPS`, `HEAL` (`SELF_ASSIGNABLE_ROLES`, règle
+  d'autorisation dans `lib/shared/team-roles.ts`, à côté de
+  `hasTeamManagementRole` — un rôle de direction est tout autre rôle,
+  `isLeadingRole`),
   « Enregistrer mes rôles » (`aria-disabled` tant que rien ne change), et
   « Ce que fait chaque rôle » (`RoleGuideDialog`, tableau en lecture).
 - `PUT /api/teams/[id]/my-roles` `{ roles: string[] }` → `updateOwnGameRoles`
   (`lib/server/teams/roster.ts`) : soi seul, sous `withTeamRosterLock`,
   conditions acceptées ; un rôle hors jeu → `ROLE_NOT_SELF_ASSIGNABLE` (400),
   hors roster → `NOT_A_MEMBER` (403), conditions → 409. Les rôles de direction
-  restent tels quels (`withOwnGameRoles`). Liste absente → `INVALID_ROLES`
-  (`rolesListFromBody`), jamais lue comme « aucun rôle ».
+  restent tels quels (`withOwnGameRoles`). Liste absente ou portant un code
+  inconnu → `INVALID_ROLES` (`rolesListFromBody`), jamais lue comme « aucun
+  rôle ». Réponse : `{ roles }` (rôles enregistrés), pas la fiche ; le client
+  relit la fiche seule — les invitations en attente ne changent pas d'un rôle de
+  jeu (`useMemberManagement`, `onOwnRolesChanged`).
 - La gestion garde la modale « Rôles » sur les autres membres
-  (`updateTeamMemberRoles`, `OWNER`/`MANAGER`, un manager ne touche pas au
-  propriétaire). Une sélection vide y est désormais permise (`MISSING_ROLE`
+  (`updateTeamMemberRoles`, `hasTeamManagementRole`, un manager ne touche pas au
+  propriétaire). Même liste exigée de codes connus : un code inconnu ne vide plus
+  les rôles du membre. Une sélection vide y est désormais permise (`MISSING_ROLE`
   retiré) ; le propriétaire garde toujours `OWNER`.
 
 ## Tableau des rôles (`RoleTable`)

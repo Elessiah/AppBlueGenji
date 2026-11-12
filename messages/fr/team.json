@@ -140,7 +140,7 @@
   },
   "myRoles": {
     "title": "Mes rôles",
-    "hint": "Tes rôles de jeu s'affichent sur la fiche de l'équipe et sur ta carte de joueur. Capitaine, manager et propriétaire sont donnés par la gestion de l'équipe.",
+    "hint": "Tes rôles de jeu s'affichent sur la fiche de l'équipe et sur ta carte de joueur. Capitaine et manager sont donnés par la gestion de l'équipe ; la propriété se transfère.",
     "leadingLabel": "Rôles donnés par la gestion",
     "noLeading": "Aucun",
     "gameLegend": "Mes rôles de jeu",
@@ -174,13 +174,13 @@
         "team": "Logo, invitations et demandes d'adhésion, exclusions, rôles des membres (sauf ceux du propriétaire), inscriptions aux tournois.",
         "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
         "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
-        "hint": "Donné par le propriétaire ou un manager. Seuls le nom, le sigle, la description, le transfert et la dissolution lui échappent."
+        "hint": "Donné par le propriétaire ou un manager. Lui échappent : le nom, le sigle, la description, le transfert, la dissolution, ainsi que les rôles du propriétaire et son exclusion."
       },
       "CAPITAINE": {
         "team": "Ses propres rôles de jeu seulement.",
         "matches": "« Prêt », saisie et confirmation du score, vider le salon vocal de l'équipe ; premier contact présenté pour le match.",
         "messages": "Annonces de match, score à confirmer.",
-        "hint": "Donné par le propriétaire ou un manager. Il lance la partie en jeu et en donne le résultat, sans pouvoir engager l'équipe : ni forfait, ni abandon, ni inscription."
+        "hint": "Donné par le propriétaire ou un manager. Il déclare l'équipe prête et donne le résultat, sans l'engager (ni forfait, ni abandon, ni inscription) ; le check-in d'un match en autogestion (hôte, réglages de la partie) va au propriétaire et aux managers."
       },
       "COACH": {
         "team": "Ses propres rôles de jeu seulement.",

@@ -1,3 +1,4 @@
+import { TEAM_ROLES } from "@/lib/shared/constants";
 import type { TeamRole } from "@/lib/shared/types";
 
 /**
@@ -7,10 +8,11 @@ import type { TeamRole } from "@/lib/shared/types";
  * - **absents** (`undefined`, `null`) → `undefined`, que `inviteToTeam` lit
  *   comme le défaut d'origine (`DPS`) — un appelant qui ne connaît pas le champ
  *   garde le comportement d'avant ;
- * - **une liste** → ses chaînes, que le service assainit (codes inconnus et
- *   `OWNER` retirés). Vide, elle est permise : une invitation **sans rôle**
+ * - **une liste** de codes connus → telle quelle, que le service assainit
+ *   (`OWNER` retiré). Vide, elle est permise : une invitation **sans rôle**
  *   (décision D71), le joueur choisira ses rôles de jeu lui-même ;
- * - **autre chose** → refus `INVALID_ROLES` : une valeur malformée n'est ni une
+ * - **autre chose** (pas un tableau, ou un élément qui n'est pas un code de
+ *   rôle connu) → refus `INVALID_ROLES` : une valeur malformée n'est ni une
  *   absence ni un choix, et la lire comme l'un ou l'autre ferait arriver le
  *   joueur en DPS, ou sans rôle, sans que personne ne l'ait voulu.
  *
@@ -23,8 +25,10 @@ export function inviteRolesFromBody(raw: unknown): TeamRole[] | undefined {
 
 /**
  * Liste de rôles **exigée** dans un corps de requête (rôles d'un membre, ses
- * propres rôles de jeu) : un tableau, dont les chaînes sont gardées — le
- * service assainit ou refuse les codes. Absente ou malformée → `INVALID_ROLES`.
+ * propres rôles de jeu) : un tableau de codes de rôle connus (`TEAM_ROLES`).
+ * Absente, malformée, ou portant un élément inconnu (`"PILOTE"`, `3`) →
+ * `INVALID_ROLES`. Filtrer en silence ces éléments rendait une liste vide — et
+ * une liste vide, désormais permise, **effaçait** les rôles du membre.
  * Avant, une liste absente valait une liste vide, que le refus `MISSING_ROLE`
  * arrêtait ; une liste vide étant désormais permise (D71), l'absence ne doit
  * plus effacer les rôles d'un membre.
@@ -33,7 +37,12 @@ export function inviteRolesFromBody(raw: unknown): TeamRole[] | undefined {
  */
 export function rolesListFromBody(raw: unknown): TeamRole[] {
   if (!Array.isArray(raw)) throw new Error("INVALID_ROLES");
-  return raw.filter((role): role is TeamRole => typeof role === "string");
+  if (!raw.every(isKnownRole)) throw new Error("INVALID_ROLES");
+  return raw;
+}
+
+function isKnownRole(role: unknown): role is TeamRole {
+  return typeof role === "string" && TEAM_ROLES.includes(role as TeamRole);
 }
 
 /**

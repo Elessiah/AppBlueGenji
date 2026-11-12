@@ -331,6 +331,24 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     expect(rolesOf(42)).toEqual(["DPS"]);
   });
 
+  it("respondToInvitation_storedListOfUnknownCodesOnly_landsDps", async () => {
+    // Un rôle retiré depuis (ou une valeur écrite à la main) n'est pas le
+    // choix « sans rôle » de D71 : le défaut d'origine tient.
+    const inv = invite({ roles_json: ["PILOTE"] });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["DPS"]);
+  });
+
+  it("respondToInvitation_storedEmptyList_landsWithoutRole", async () => {
+    const inv = invite({ roles_json: [] });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual([]);
+  });
+
   it("une demande acceptée par la gestion fait arriver le joueur en DPS", async () => {
     const inv = invite({ kind: "REQUEST" });
     await respondToInvitation(1, inv.id, true);

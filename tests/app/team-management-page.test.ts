@@ -79,7 +79,8 @@ describe("roster et invitation", () => {
   });
 
   it("ne vide le formulaire d'invitation que sur un succès", () => {
-    expect(members).toMatch(/const ok = await addMember[\s\S]*if \(ok\) setMemberPseudo\(""\)/);
+    // La décision elle-même : `invitationOutcome` (team-member-roles-logic.test.ts).
+    expect(members).toMatch(/const ok = await addMember[\s\S]*invitationOutcome\(ok, pseudoRefused\)[\s\S]*if \(outcome\.clearPseudo\) setMemberPseudo\(""\)/);
   });
 
   it("lève la coupe du bloc qui porte l'autocomplétion", () => {

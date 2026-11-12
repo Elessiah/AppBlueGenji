@@ -1,10 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TeamRole } from "@/lib/shared/types";
 import {
-  ASSIGNABLE_LEADING_ROLES,
   MANAGER_ASSIGNABLE_ROLES,
-  SELF_ASSIGNABLE_ROLES,
-  withOwnGameRoles,
   TEAM_ROLE_LABELS,
   TEAM_ROLE_ORDER,
   formatTeamRoles,
@@ -13,7 +10,7 @@ import {
   teamRoleFamily,
   teamRoleLabel,
 } from "@/lib/shared/team-role-display";
-import { TEAM_MANAGEMENT_ROLES } from "@/lib/shared/team-roles";
+import { SELF_ASSIGNABLE_ROLES, TEAM_MANAGEMENT_ROLES, isLeadingRole, withOwnGameRoles } from "@/lib/shared/team-roles";
 
 const ALL_ROLES: TeamRole[] = ["COACH", "TANK", "DPS", "HEAL", "CAPITAINE", "MANAGER", "OWNER"];
 
@@ -46,15 +43,14 @@ describe("familles de rôles", () => {
 
   it("n'offre jamais OWNER à la saisie : il se transfère", () => {
     expect(SELF_ASSIGNABLE_ROLES).not.toContain("OWNER");
-    expect(ASSIGNABLE_LEADING_ROLES).not.toContain("OWNER");
     expect(MANAGER_ASSIGNABLE_ROLES).not.toContain("OWNER");
   });
 
-  it("propose tous les autres rôles, chacun dans un seul groupe", () => {
-    const offered = [...SELF_ASSIGNABLE_ROLES, ...ASSIGNABLE_LEADING_ROLES];
-    expect(new Set(offered).size).toBe(offered.length);
-    expect([...offered].sort()).toEqual(ALL_ROLES.filter((r) => r !== "OWNER").sort());
-    expect([...MANAGER_ASSIGNABLE_ROLES].sort()).toEqual([...offered].sort());
+  it("partage les rôles en deux groupes : de jeu (soi-même) et de direction (la gestion)", () => {
+    const leading = ALL_ROLES.filter(isLeadingRole);
+    expect([...leading].sort()).toEqual(["CAPITAINE", "MANAGER", "OWNER"]);
+    for (const role of ALL_ROLES) expect(isLeadingRole(role)).toBe(!SELF_ASSIGNABLE_ROLES.includes(role));
+    expect([...MANAGER_ASSIGNABLE_ROLES].sort()).toEqual(ALL_ROLES.filter((r) => r !== "OWNER").sort());
   });
 
   it("ne laisse aucun rôle de gestion ni le capitaine parmi les rôles qu'un membre se donne", () => {
@@ -116,6 +112,10 @@ describe("withOwnGameRoles — « Mes rôles »", () => {
 
   it("withOwnGameRoles_emptyChoice_dropsOnlyGameRoles", () => {
     expect(withOwnGameRoles(["OWNER", "COACH", "TANK"], [])).toEqual(["OWNER"]);
+  });
+
+  it("withOwnGameRoles_duplicatedLeadingRole_keptOnce", () => {
+    expect(withOwnGameRoles(["MANAGER", "MANAGER", "DPS"], ["HEAL"])).toEqual(["MANAGER", "HEAL"]);
   });
 
   it("withOwnGameRoles_leadingRoleChosen_ignored", () => {

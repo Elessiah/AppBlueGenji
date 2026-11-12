@@ -4,10 +4,12 @@ import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { Coche } from "@/components/Coche";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
-import { SELF_ASSIGNABLE_ROLES, teamRoleLabel } from "@/lib/shared/team-role-display";
+import { teamRoleLabel } from "@/lib/shared/team-role-display";
+import { SELF_ASSIGNABLE_ROLES, isLeadingRole } from "@/lib/shared/team-roles";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { RolePills } from "./RolePills";
 import { RoleGuideDialog } from "./RoleGuideDialog";
+import { ownGameRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 interface MyRolesBlockProps {
@@ -16,9 +18,6 @@ interface MyRolesBlockProps {
   /** Enregistre ses rôles de jeu ; rend `true` sur un succès. */
   onSave: (gameRoles: TeamRole[]) => Promise<boolean>;
 }
-
-const sameRoles = (a: readonly TeamRole[], b: readonly TeamRole[]) =>
-  a.length === b.length && a.every((role) => b.includes(role));
 
 /**
  * « Mes rôles » : le lecteur, membre de l'équipe, choisit **ses propres** rôles
@@ -29,19 +28,20 @@ const sameRoles = (a: readonly TeamRole[], b: readonly TeamRole[]) =>
 export function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
   const { t, locale } = useTeamPageText();
   const saved = SELF_ASSIGNABLE_ROLES.filter((role) => roles.includes(role));
-  const leading = roles.filter((role) => !SELF_ASSIGNABLE_ROLES.includes(role));
+  const leading = roles.filter(isLeadingRole);
   const [selected, setSelected] = useState<TeamRole[]>(saved);
   const [pending, setPending] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
-  const unchanged = sameRoles(selected, saved);
+  const toSave = ownGameRolesToSave(saved, selected);
+  const unchanged = toSave === null;
 
   const toggle = (role: TeamRole) =>
     setSelected((current) => (current.includes(role) ? current.filter((r) => r !== role) : [...current, role]));
 
   const save = async () => {
-    if (unchanged || pending) return;
+    if (toSave === null || pending) return;
     setPending(true);
-    await onSave(SELF_ASSIGNABLE_ROLES.filter((role) => selected.includes(role)));
+    await onSave(toSave);
     setPending(false);
   };
 

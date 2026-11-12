@@ -6,6 +6,7 @@ import { MANAGER_ASSIGNABLE_ROLES } from "@/lib/shared/team-role-display";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { TeamDialog } from "./TeamDialog";
 import { RoleTable } from "./RoleTable";
+import { memberRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 export interface RolesDialogTarget {
@@ -30,8 +31,8 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
   const [pending, setPending] = useState(false);
   const { t } = useTeamPageText();
 
-  const unchanged =
-    selected.length === target.selected.length && selected.every((role) => target.selected.includes(role));
+  const toSave = memberRolesToSave(target.selected, selected);
+  const unchanged = toSave === null;
   // Se retirer soi-même le rôle de manager, c'est perdre la main sur l'équipe
   // au clic suivant : ça se fait, mais ça se dit avant.
   const dropsOwnManagement =
@@ -43,9 +44,9 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
   const save = async () => {
     // Une sélection vide est permise : un membre peut n'avoir aucun rôle
     // (décision D71, il choisit lui-même ses rôles de jeu).
-    if (unchanged || pending) return;
+    if (toSave === null || pending) return;
     setPending(true);
-    const ok = await onSave(selected);
+    const ok = await onSave(toSave);
     // Refus : la modale reste ouverte avec la sélection, pour corriger.
     if (!ok) setPending(false);
   };

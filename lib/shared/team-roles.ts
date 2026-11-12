@@ -37,3 +37,30 @@ export function hasTeamManagementRole(roles: readonly TeamRole[] | null | undefi
   if (!roles) return false;
   return roles.some((role) => TEAM_MANAGEMENT_ROLES.includes(role));
 }
+
+/**
+ * Rôles de **jeu** qu'un membre se donne lui-même (« Mes rôles »,
+ * `PUT /api/teams/[id]/my-roles`, décision D71) : une place dans le roster,
+ * aucun droit. Règle d'autorisation, et non d'affichage : c'est elle que le
+ * serveur fait respecter (`updateOwnGameRoles`) — tout autre rôle (`OWNER`,
+ * `MANAGER`, `CAPITAINE`) est un rôle de direction, posé par la gestion seule.
+ */
+export const SELF_ASSIGNABLE_ROLES: readonly TeamRole[] = ["COACH", "TANK", "DPS", "HEAL"];
+
+/** Rôle de direction : tout rôle qu'un membre ne peut pas se donner lui-même. */
+export function isLeadingRole(role: TeamRole): boolean {
+  return !SELF_ASSIGNABLE_ROLES.includes(role);
+}
+
+/**
+ * Rôles d'un membre après qu'il a choisi ses **rôles de jeu** : ses rôles de
+ * direction restent ceux qu'il a (dans leur ordre), seuls les rôles de
+ * {@link SELF_ASSIGNABLE_ROLES} sont remplacés par `chosen`, dans l'ordre de
+ * cette liste. Un code hors de cette liste dans `chosen` est ignoré — le
+ * serveur le refuse avant.
+ */
+export function withOwnGameRoles(current: readonly TeamRole[], chosen: readonly TeamRole[]): TeamRole[] {
+  const kept = Array.from(new Set(current.filter(isLeadingRole)));
+  const game = SELF_ASSIGNABLE_ROLES.filter((role) => chosen.includes(role));
+  return [...kept, ...game];
+}

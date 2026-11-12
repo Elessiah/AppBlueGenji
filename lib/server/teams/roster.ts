@@ -4,7 +4,8 @@ import { parseRoles } from "@/lib/server/serialization";
 import type { TeamRole } from "@/lib/shared/types";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { sanitizeRoles } from "@/lib/server/users/roles";
-import { SELF_ASSIGNABLE_ROLES, withOwnGameRoles } from "@/lib/shared/team-role-display";
+import { SELF_ASSIGNABLE_ROLES, hasTeamManagementRole, withOwnGameRoles } from "@/lib/shared/team-roles";
+import { sortTeamRoles } from "@/lib/shared/team-role-display";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
@@ -106,9 +107,8 @@ export async function updateTeamMemberRoles(
   const scope = await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
+    if (!hasTeamManagementRole(requesterRoles)) throw new Error("FORBIDDEN");
     const requesterIsOwner = requesterRoles.includes("OWNER");
-    const requesterIsManager = requesterRoles.includes("MANAGER");
-    if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
     await assertTermsAccepted(requesterId, connection);
 
     const targetRoles = await lockMemberRoles(connection, teamId, memberUserId);
@@ -171,7 +171,7 @@ export async function updateOwnGameRoles(userId: number, teamId: number, roles: 
     const current = await lockMemberRoles(connection, teamId, userId);
     if (!current) throw new Error("NOT_A_MEMBER");
     await assertTermsAccepted(userId, connection);
-    const finalRoles = withOwnGameRoles(current, roles as TeamRole[]);
+    const finalRoles = sortTeamRoles(withOwnGameRoles(current, roles as TeamRole[]));
     await writeActiveMembership(connection, "roles_json = ?", [JSON.stringify(finalRoles)], teamId, userId);
     return finalRoles;
   });
@@ -190,9 +190,7 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
   const scope = await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
-    const requesterIsOwner = requesterRoles.includes("OWNER");
-    const requesterIsManager = requesterRoles.includes("MANAGER");
-    if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+    if (!hasTeamManagementRole(requesterRoles)) throw new Error("FORBIDDEN");
     await assertTermsAccepted(requesterId, connection);
 
     if (memberUserId === requesterId) {
