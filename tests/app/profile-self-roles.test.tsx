@@ -202,3 +202,13 @@ describe("Coche — aria-disabled", () => {
     expect(/<label[^>]*>/.exec(html)?.[0]).toContain("cursor:pointer");
   });
 });
+
+describe("SelfRolesField — administration retirée pendant la session", () => {
+  it("selfRolesField_forbiddenRefusal_tellsPageAdminWasLost", () => {
+    const field = readFileSync(join(process.cwd(), "app/(secured)/profil/_components/SelfRolesField.tsx"), "utf8");
+    expect(field).toMatch(/if \(code === "FORBIDDEN" \|\| code === "CANNOT_MODIFY_SELF"\) onAdminLost\?\.\(\);/);
+    const page = readFileSync(join(process.cwd(), "app/(secured)/profil/page.tsx"), "utf8");
+    expect(page).toMatch(/setData\(\(prev\) => \(prev \? \{ \.\.\.prev, isAdmin: false \} : prev\)\)/);
+    expect(page).toContain("onAdminLost={dropOwnAdmin}");
+  });
+});

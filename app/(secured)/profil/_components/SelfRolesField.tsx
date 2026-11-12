@@ -74,10 +74,13 @@ export function SelfRolesField({
   userId,
   roles,
   onSaved,
+  onAdminLost,
 }: Readonly<{
   userId: number;
   roles: readonly PlatformRole[];
   onSaved: (roles: PlatformRole[]) => void;
+  /** L'administration n'est plus (403) : la page retire la section sans attendre une relecture. */
+  onAdminLost?: () => void;
 }>): React.ReactElement {
   const text = useProfileText();
   const { t } = text;
@@ -150,6 +153,10 @@ export function SelfRolesField({
         setPending(null);
         // Les cases cochées ne valent plus rien : retour aux rôles enregistrés.
         setSelected([...roles]);
+        // Plus administrateur : « Mes rôles » n'a plus d'objet. Le profil est
+        // tenu par la page (pas par la session que `refresh` relit) : elle le
+        // corrige elle-même.
+        if (code === "FORBIDDEN" || code === "CANNOT_MODIFY_SELF") onAdminLost?.();
         router.refresh();
         return true;
       }
@@ -255,17 +262,19 @@ export function SelfRolesSection({
   userId,
   roles,
   onSaved,
+  onAdminLost,
 }: Readonly<{
   section: Section;
   isAdmin: boolean;
   userId: number;
   roles: readonly PlatformRole[];
   onSaved: (roles: PlatformRole[]) => void;
+  onAdminLost?: () => void;
 }>): React.ReactElement | null {
   if (!isAdmin) return null;
   return (
     <ProfileSection section={section}>
-      <SelfRolesField userId={userId} roles={roles} onSaved={onSaved} />
+      <SelfRolesField userId={userId} roles={roles} onSaved={onSaved} onAdminLost={onAdminLost} />
     </ProfileSection>
   );
 }

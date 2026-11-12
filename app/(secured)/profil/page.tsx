@@ -815,6 +815,10 @@ export default function ProfilePage() {
   const saveOwnRoles = useCallback((roles: FullProfileResponse["roles"]) => {
     setData((prev) => (prev ? { ...prev, roles } : prev));
   }, []);
+  /** Administration retirée pendant la session : « Mes rôles » disparaît. */
+  const dropOwnAdmin = useCallback(() => {
+    setData((prev) => (prev ? { ...prev, isAdmin: false } : prev));
+  }, []);
 
   if (!data) {
     return (
@@ -1269,6 +1273,7 @@ export default function ProfilePage() {
         userId={data.profile.id}
         roles={data.roles}
         onSaved={saveOwnRoles}
+        onAdminLost={dropOwnAdmin}
       />
 
       <ProfileSection section={sectionById.statistiques}>

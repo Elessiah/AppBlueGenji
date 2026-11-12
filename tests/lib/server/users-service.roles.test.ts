@@ -320,13 +320,31 @@ describe("setOwnPlatformRoles (ADMIN-SELF-ROLES)", () => {
   it("setOwnPlatformRoles_demotedConcurrently_throwsNotAdminAndKeepsStreams", async () => {
     // Un autre administrateur a retiré `is_admin` entre la lecture de la
     // session et l'écriture : la condition ne trouve plus la ligne.
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]));
+    await mockDb(
+      jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([[{ is_deleted: 0 }]]),
+    );
     const close = jest.fn();
     registerSessionStream(1, "hash-a", close);
 
     await expect(setOwnPlatformRoles(1, ["ADMIN", "CASTER"])).rejects.toThrow("NOT_ADMIN");
 
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("setOwnPlatformRoles_accountDeletedConcurrently_throwsUserNotFound", async () => {
+    // Le compte a été supprimé pendant la requête : « Tu n'es plus
+    // administrateur » serait faux.
+    await mockDb(
+      jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([[{ is_deleted: 1 }]]),
+    );
+
+    await expect(setOwnPlatformRoles(1, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");
+  });
+
+  it("setOwnPlatformRoles_rowGone_throwsUserNotFound", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([[]]));
+
+    await expect(setOwnPlatformRoles(1, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");
   });
 
   it("setOwnPlatformRoles_duplicatesAndUnknownValues_normalizesBeforeWrite", async () => {
