@@ -57,6 +57,7 @@ describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
     expect(retention).toContain("momentanément injoignable");
     expect(retention).toContain("30 jours au plus");
     expect(retention).toContain("n'est plus réessayé");
+    expect(retention).toContain("comme celui qu'un nouvel avis remplace");
   });
 
   it("botPrivacyPolicy_exclusionNotice_englishMatchesTheEntry", () => {
@@ -66,6 +67,7 @@ describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
     expect(retention).toContain("temporarily unreachable");
     expect(retention).toContain("30 days at most");
     expect(retention).toContain("is no longer retried");
+    expect(retention).toContain("as is one replaced by a new notice");
   });
 
   it("botPrivacyPolicy_previousNoticeNotDeletable_frenchDoesNotPromiseASingleNotice", () => {
@@ -73,14 +75,20 @@ describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
     const notice = policyTexts(PRIVACY_POLICY.fr).find((text) => text.startsWith("Identifiants de l'utilisateur exclu"));
 
     expect(notice).not.toContain("remplace le précédent, supprimé.");
-    expect(notice).toContain("supprimé avant l'envoi quand Discord le permet (sinon par la purge de nuit, section 03 ; un avis que Discord refuse de supprimer reste)");
+    expect(notice).toContain("supprimé avant l'envoi quand Discord le permet.");
+    expect(notice).toContain("l'identifiant de l'exclu et celui de l'ancien avis sont gardés pour que la purge de nuit réessaie de le supprimer, 30 jours au plus");
+    expect(notice).toContain("aucun nouvel avis ne part ce jour-là et l'ancien reste");
+    expect(notice).toContain("Un avis que Discord refuse de supprimer reste.");
   });
 
   it("botPrivacyPolicy_previousNoticeNotDeletable_englishDoesNotPromiseASingleNotice", () => {
     const notice = policyTexts(PRIVACY_POLICY.en).find((text) => text.startsWith("IDs of the excluded user"));
 
     expect(notice).not.toContain("replaces the previous one, which is deleted.");
-    expect(notice).toContain("deleted before sending when Discord allows it (otherwise by the nightly purge, section 03; a notice that Discord refuses to delete remains)");
+    expect(notice).toContain("deleted before sending when Discord allows it.");
+    expect(notice).toContain("the ID of the excluded user and that of the previous notice are kept so that the nightly purge retries deleting it, for 30 days at most");
+    expect(notice).toContain("no new notice is sent that day and the previous one stays");
+    expect(notice).toContain("A notice that Discord refuses to delete remains.");
   });
 });
 

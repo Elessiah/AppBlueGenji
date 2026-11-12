@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -95,6 +95,24 @@ function mockDb(rows: unknown[][]): SqlMock {
  * la réservation. Les tests qui éprouvent l'échec le remplacent.
  */
 const DELIVERED = { sent: 1, unresolved: [], failed: [] };
+
+/**
+ * Requêtes « figées » des tests de lenteur : rendues (vides) à la fin de chaque test,
+ * pour que le compte de résolutions en cours du module ne garde rien d'un test à l'autre.
+ */
+const hungQueries: (() => void)[] = [];
+
+/** Une requête qui ne revient qu'à la fin du test. */
+function hungQuery(): Promise<unknown> {
+  return new Promise((resolve) => {
+    hungQueries.push(() => resolve([[]]));
+  });
+}
+
+afterEach(async () => {
+  for (const settle of hungQueries.splice(0)) settle();
+  await new Promise((resolve) => setImmediate(resolve));
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -1060,7 +1078,7 @@ describe("tour du journal et vidage avant alerte", () => {
   it("flushBotLogs_alertAndSlowLogLineSamePass_alertSentWithoutWaitingForTheLine", async () => {
     const connection = fakeConnection();
     const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-      params?.[0] === 12 ? new Promise(() => undefined) : Promise.resolve([[MATCH_ROW]]),
+      params?.[0] === 12 ? hungQuery() : Promise.resolve([[MATCH_ROW]]),
     );
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
@@ -1077,7 +1095,7 @@ describe("tour du journal et vidage avant alerte", () => {
     jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
     try {
       const connection = fakeConnection();
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => new Promise(() => undefined));
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => hungQuery());
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
       queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
@@ -1110,10 +1128,10 @@ describe("tour du journal et vidage avant alerte", () => {
       await flushed();
       await flushed();
       // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé
-      // (hors bornes de résolution, `BOT_LOG_RESOLVE_TIMEOUT_MS` et délai d'abandon, une par entrée).
-      const turnTimers = timers.mock.calls.filter(
-        ([, delay]) => delay !== BOT_LOG_RESOLVE_TIMEOUT_MS && delay !== BOT_LOG_RESOLVE_ABANDON_MS,
-      );
+      // (hors bornes de résolution, `BOT_LOG_RESOLVE_TIMEOUT_MS`, une par entrée ; aucun délai
+      // d'abandon pour une résolution qui revient à temps).
+      const turnTimers = timers.mock.calls.filter(([, delay]) => delay !== BOT_LOG_RESOLVE_TIMEOUT_MS);
+      expect(timers.mock.calls.some(([, delay]) => delay === BOT_LOG_RESOLVE_ABANDON_MS)).toBe(false);
       expect(turnTimers).toHaveLength(1);
     } finally {
       timers.mockRestore();

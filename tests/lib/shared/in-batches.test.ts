@@ -384,27 +384,27 @@ describe("createInFlightGate", () => {
     gate.tryEnter();
 
     expect(gate.tryEnter()).toBeNull();
-    first?.();
+    first?.leave();
     expect(gate.tryEnter()).not.toBeNull();
   });
 
   it("createInFlightGate_leaveCalledTwice_countsOnce", () => {
     const gate = createInFlightGate(2, 60_000);
-    const leave = gate.tryEnter();
+    const ticket = gate.tryEnter();
     gate.tryEnter();
 
-    leave?.();
-    leave?.();
+    ticket?.leave();
+    ticket?.leave();
 
     expect(gate.count).toBe(1);
   });
 
-  it("createInFlightGate_workNeverReturns_forgottenAfterAbandonDelay", async () => {
+  it("createInFlightGate_expiredWorkNeverReturns_forgottenAfterAbandonDelay", async () => {
     jest.useFakeTimers();
     try {
       const forgotten = jest.fn();
       const gate = createInFlightGate(1, 60_000, forgotten);
-      gate.tryEnter();
+      gate.tryEnter()?.expire();
 
       await jest.advanceTimersByTimeAsync(59_999);
       expect(gate.tryEnter()).toBeNull();
@@ -412,6 +412,24 @@ describe("createInFlightGate", () => {
 
       expect(forgotten).toHaveBeenCalledTimes(1);
       expect(gate.count).toBe(0);
+      expect(gate.forgotten).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("createInFlightGate_notExpired_neverForgottenAndNoTimer", async () => {
+    jest.useFakeTimers();
+    try {
+      const forgotten = jest.fn();
+      const gate = createInFlightGate(1, 60_000, forgotten);
+      gate.tryEnter();
+
+      await jest.advanceTimersByTimeAsync(10 * 60_000);
+
+      expect(forgotten).not.toHaveBeenCalled();
+      expect(gate.count).toBe(1);
+      expect(jest.getTimerCount()).toBe(0);
     } finally {
       jest.useRealTimers();
     }
@@ -422,12 +440,48 @@ describe("createInFlightGate", () => {
     try {
       const forgotten = jest.fn();
       const gate = createInFlightGate(1, 60_000, forgotten);
-      gate.tryEnter()?.();
+      const ticket = gate.tryEnter();
+      ticket?.expire();
+      ticket?.leave();
 
       await jest.advanceTimersByTimeAsync(60_000);
 
       expect(forgotten).not.toHaveBeenCalled();
       expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("createInFlightGate_forgottenWorkStillUnsettled_countsTowardUnsettledMax", async () => {
+    jest.useFakeTimers();
+    try {
+      const gate = createInFlightGate(1, 60_000, undefined, 2);
+      gate.tryEnter()?.expire();
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      const second = gate.tryEnter();
+
+      expect(second).not.toBeNull();
+      expect(gate.tryEnter()).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("createInFlightGate_forgottenWorkFinallyReturns_freesItsUnsettledPlace", async () => {
+    jest.useFakeTimers();
+    try {
+      const gate = createInFlightGate(1, 60_000, undefined, 1);
+      const hung = gate.tryEnter();
+      hung?.expire();
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(gate.tryEnter()).toBeNull();
+
+      hung?.leave();
+
+      expect(gate.forgotten).toBe(0);
+      expect(gate.tryEnter()).not.toBeNull();
     } finally {
       jest.useRealTimers();
     }

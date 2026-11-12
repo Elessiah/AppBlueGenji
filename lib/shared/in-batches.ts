@@ -178,51 +178,83 @@ export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: n
 
 /**
  * Compte borné de travaux **en cours**, y compris ceux qu'un délai a abandonnés sans
- * que leur requête soit revenue. Un travail compté au-delà de `abandonAfterMs` est
- * oublié quand même (`onForgotten`) : une requête qui ne revient jamais (connexion à
- * moitié ouverte) ne retient pas une place jusqu'au redémarrage du processus.
+ * que leur requête soit revenue. Un travail dont l'horloge d'abandon a été lancée
+ * (`expire`, au délai de l'appelant) et qui reste compté au-delà de `abandonAfterMs`
+ * est oublié (`onForgotten`) : il ne prend plus de place parmi les `max`, et une requête
+ * qui tarde (connexion à moitié ouverte) ne retient pas tout jusqu'au redémarrage. Mais
+ * il tient encore sa connexion : il reste compté dans le plafond `unsettledMax` des
+ * travaux non revenus (comptés + oubliés) jusqu'à son vrai retour — un abandon ne fait
+ * jamais dépasser ce plafond.
  */
 export type InFlightGate = {
   /**
-   * Compte un travail s'il reste une place.
-   * @returns La fonction qui le décompte (sans effet après le premier appel), ou `null` si tout est pris.
+   * Compte un travail s'il reste une place (parmi `max` et sous le plafond `unsettledMax`).
+   * @returns Le ticket du travail, ou `null` si tout est pris.
    */
-  tryEnter(): (() => void) | null;
-  /** Travaux comptés en ce moment. */
+  tryEnter(): InFlightTicket | null;
+  /** Travaux comptés en ce moment (oubliés exclus). */
   readonly count: number;
+  /** Travaux oubliés dont le retour n'est pas encore arrivé. */
+  readonly forgotten: number;
+};
+
+/** Ticket d'un travail compté par un {@link InFlightGate}. */
+export type InFlightTicket = {
+  /** Le travail est revenu (sans effet après le premier appel). */
+  leave(): void;
+  /** Le délai de l'appelant est passé : lance l'horloge d'abandon (une fois). */
+  expire(): void;
 };
 
 /**
  * Crée un {@link InFlightGate}.
  *
  * @param max Travaux comptés en même temps, au plus.
- * @param abandonAfterMs Durée au-delà de laquelle un travail encore compté est oublié.
+ * @param abandonAfterMs Durée, après `expire`, au-delà de laquelle un travail encore compté est oublié.
  * @param onForgotten Appelé quand un travail est oublié ainsi (journal).
+ * @param unsettledMax Travaux non revenus (comptés + oubliés), au plus.
  * @returns Le compte.
  */
-export function createInFlightGate(max: number, abandonAfterMs: number, onForgotten: () => void = () => undefined): InFlightGate {
+export function createInFlightGate(
+  max: number,
+  abandonAfterMs: number,
+  onForgotten: () => void = () => undefined,
+  unsettledMax: number = Number.POSITIVE_INFINITY,
+): InFlightGate {
   let count = 0;
+  let forgotten = 0;
   return {
     get count() {
       return count;
     },
+    get forgotten() {
+      return forgotten;
+    },
     tryEnter() {
-      if (count >= max) return null;
+      if (count >= max || count + forgotten >= unsettledMax) return null;
       count += 1;
-      let left = false;
-      const leave = (): void => {
-        if (left) return;
-        left = true;
-        count -= 1;
-        clearTimeout(timer);
+      let state: "counted" | "forgotten" | "left" = "counted";
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      return {
+        leave() {
+          if (state === "left") return;
+          if (state === "counted") count -= 1;
+          else forgotten -= 1;
+          state = "left";
+          clearTimeout(timer);
+        },
+        expire() {
+          if (state !== "counted" || timer !== undefined) return;
+          timer = setTimeout(() => {
+            if (state !== "counted") return;
+            state = "forgotten";
+            count -= 1;
+            forgotten += 1;
+            onForgotten();
+          }, abandonAfterMs);
+          if (typeof timer === "object" && timer !== null && "unref" in timer) timer.unref();
+        },
       };
-      const timer = setTimeout(() => {
-        if (left) return;
-        leave();
-        onForgotten();
-      }, abandonAfterMs);
-      if (typeof timer === "object" && timer !== null && "unref" in timer) timer.unref();
-      return leave;
     },
   };
 }

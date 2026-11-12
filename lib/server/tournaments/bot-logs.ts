@@ -1087,14 +1087,15 @@ export const ROUND_ALERT_READ_CONCURRENCY = 3;
  * passages confondus (chaque commit lance le sien, lignes et alertes tournent
  * ensemble). Chacune tient au plus {@link ROUND_ALERT_READ_CONCURRENCY} lectures,
  * et les résolutions abandonnées au délai mais encore en cours sont comptées en plus
- * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) : (4 + 1) × 3 = 15 connexions au pire pour
+ * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}), et celles qu'un abandon a oubliées aussi, jusqu'à
+ * leur retour ({@link BOT_LOG_RESOLVE_UNSETTLED_MAX}) : 5 × 3 = 15 connexions au pire pour
  * les **lectures de résolution**, et au moins dix des 25 du pool restent aux requêtes
  * des joueurs quand la base ralentit, quel que soit le nombre de vidages qui se
  * chevauchent — `bot-logs.test.ts` le vérifie sur les constantes. La remise qui suit
  * (réservations rendues, vidage avant alerte) prend au plus une connexion à la fois
  * par vidage et reste hors de cette borne.
  */
-export const BOT_LOG_RESOLVE_SLOTS = 4;
+export const BOT_LOG_RESOLVE_SLOTS = 3;
 
 /**
  * Résolutions **en cours** en même temps, au plus, y compris celles que le délai
@@ -1102,9 +1103,18 @@ export const BOT_LOG_RESOLVE_SLOTS = 4;
  * elles rendent leur place du limiteur mais continuent de tenir leurs connexions.
  * Passé ce nombre, toute résolution est refusée sans rien lire (ligne ignorée,
  * réservation d'alerte rendue et rejouée au balayage suivant) — une base figée ne
- * reçoit pas six requêtes de plus toutes les 30 s.
+ * reçoit pas de nouvelles requêtes toutes les 30 s.
  */
 export const BOT_LOG_RESOLVE_INFLIGHT_MAX = BOT_LOG_RESOLVE_SLOTS + 1;
+
+/**
+ * Résolutions dont la requête n'est pas revenue, au plus, **oubliées comprises**
+ * ({@link BOT_LOG_RESOLVE_ABANDON_MS}) : une résolution oubliée rend sa place parmi
+ * {@link BOT_LOG_RESOLVE_INFLIGHT_MAX} mais tient encore sa connexion, elle compte ici
+ * jusqu'à son vrai retour (une connexion morte finit par lever une erreur, et la place
+ * revient). Un abandon ne fait donc jamais dépasser la part du pool réservée aux résolutions.
+ */
+export const BOT_LOG_RESOLVE_UNSETTLED_MAX = BOT_LOG_RESOLVE_INFLIGHT_MAX + 1;
 
 /**
  * Lignes de journal en attente d'une place, au plus : au-delà, une ligne de plus est
@@ -1123,49 +1133,81 @@ const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS, BOT_LOG_RESOLVE_QUEUE_M
 
 /**
  * Durée au-delà de laquelle une résolution abandonnée dont la requête n'est toujours pas
- * revenue cesse d'être comptée ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) : une connexion à
- * moitié ouverte (coupure réseau) ne bloque pas tout le journal et toutes les alertes
- * jusqu'au redémarrage. Bien au-delà du délai d'une résolution, et l'oubli est journalisé.
+ * revenue cesse d'être comptée ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}), compté à partir du
+ * délai de la résolution : une connexion à moitié ouverte (coupure réseau) ne bloque pas
+ * tout le journal et toutes les alertes jusqu'au redémarrage, dans la limite de
+ * {@link BOT_LOG_RESOLVE_UNSETTLED_MAX}. Bien au-delà du délai d'une résolution, et
+ * l'oubli est journalisé.
  */
 export const BOT_LOG_RESOLVE_ABANDON_MS = 5 * 60_000;
 
 /** Délai entre deux lignes de journal « résolution refusée » (une panne ne remplit pas pm2). */
 const SHED_LOG_COOLDOWN_MS = 60_000;
 
+/** Journal « résolution refusée » d'un compte : une ligne par minute au plus, le reste compté. */
+type ShedLog = { pending: number; lastAt: number; timer?: ReturnType<typeof setTimeout> };
+
+/** Journaux de refus, un par compte (celui du module, ou celui d'un test). */
+const shedLogs = new WeakMap<InFlightGate, ShedLog>();
+
+/** Écrit le compte des refus en attente, s'il y en a. */
+function writeShedLine(log: ShedLog, now: number): void {
+  if (log.pending === 0) return;
+  console.error(`[bot-logs] BOT_LOG_RESOLUTION_SHED (${log.pending})`);
+  log.pending = 0;
+  log.lastAt = now;
+}
+
+/**
+ * Note une résolution refusée faute de place : une ligne au journal par minute, au plus,
+ * avec le compte ; les refus tus pendant la minute sont écrits à sa fin, jamais perdus.
+ *
+ * @param gate Compte qui a refusé (chaque compte a son propre rythme).
+ */
+function noteShedResolution(gate: InFlightGate): void {
+  let log = shedLogs.get(gate);
+  if (!log) {
+    log = { pending: 0, lastAt: Number.NEGATIVE_INFINITY };
+    shedLogs.set(gate, log);
+  }
+  const current = log;
+  current.pending += 1;
+  const now = Date.now();
+  const wait = current.lastAt + SHED_LOG_COOLDOWN_MS - now;
+  if (wait <= 0) {
+    writeShedLine(current, now);
+    return;
+  }
+  if (current.timer !== undefined) return;
+  current.timer = setTimeout(() => {
+    current.timer = undefined;
+    writeShedLine(current, Date.now());
+  }, wait);
+  if (typeof current.timer === "object" && current.timer !== null && "unref" in current.timer) current.timer.unref();
+}
+
+/**
+ * Crée un compte de résolutions en cours, aux bornes du module : {@link resolveBotLogs}
+ * prend celui du module, un test le sien.
+ *
+ * @param onForgotten Appelé quand une résolution est oubliée (journal).
+ * @returns Un compte vide.
+ */
+export function createResolveGate(onForgotten: () => void = () => undefined): InFlightGate {
+  return createInFlightGate(BOT_LOG_RESOLVE_INFLIGHT_MAX, BOT_LOG_RESOLVE_ABANDON_MS, onForgotten, BOT_LOG_RESOLVE_UNSETTLED_MAX);
+}
+
 /**
  * Compte des résolutions commencées dont la requête n'est pas revenue (abandonnées au
- * délai ou non), pour tout le module.
+ * délai ou non, oubliées comprises), pour tout le module.
  */
-const resolveGate = createInFlightGate(BOT_LOG_RESOLVE_INFLIGHT_MAX, BOT_LOG_RESOLVE_ABANDON_MS, () => {
+const resolveGate = createResolveGate(() => {
   console.error("[bot-logs] BOT_LOG_RESOLUTION_FORGOTTEN");
 });
 
-let lastShedLogAt = Number.NEGATIVE_INFINITY;
-let shedSinceLog = 0;
-
-/** Note une résolution refusée faute de place : une ligne au journal par minute, au plus, avec le compte. */
-function noteShedResolution(): void {
-  shedSinceLog += 1;
-  const now = Date.now();
-  if (now - lastShedLogAt < SHED_LOG_COOLDOWN_MS) return;
-  console.error(`[bot-logs] BOT_LOG_RESOLUTION_SHED (${shedSinceLog})`);
-  lastShedLogAt = now;
-  shedSinceLog = 0;
-}
-
-/**
- * Crée un compte de résolutions en cours, propre à l'appelant (tests) : {@link resolveBotLogs}
- * le reçoit en paramètre au lieu du compte du module.
- *
- * @returns Un compte vide, aux mêmes bornes que celui du module.
- */
-export function createResolveGate(): InFlightGate {
-  return createInFlightGate(BOT_LOG_RESOLVE_INFLIGHT_MAX, BOT_LOG_RESOLVE_ABANDON_MS);
-}
-
 /**
  * Durée au-delà de laquelle une résolution rend sa place ({@link withDeadline}) : une
- * requête qui ne revient jamais (connexion morte) ne bloque pas, à six, tout le
+ * requête qui ne revient jamais (connexion morte) ne bloque pas, à elle seule, une place du
  * journal et toutes les alertes du site jusqu'à son redémarrage. Une résolution
  * normale prend quelques millisecondes. Son résultat tardif est perdu : pour une
  * alerte, la réservation est rendue comme pour toute alerte non remise et le
@@ -1243,24 +1285,31 @@ export async function resolveBotLogs(
  * Une résolution, bornée à {@link BOT_LOG_RESOLVE_TIMEOUT_MS}. Au délai, son signal
  * est levé (une alerte de manche ne lance plus de lecture) ; si sa requête court
  * encore, elle reste comptée en cours ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) jusqu'à son
- * retour, ou au plus {@link BOT_LOG_RESOLVE_ABANDON_MS}. Une résolution refusée faute de
- * place est journalisée (code seul, une ligne par minute au plus).
+ * retour, ou au plus {@link BOT_LOG_RESOLVE_ABANDON_MS} après le délai ; oubliée, elle
+ * compte encore dans {@link BOT_LOG_RESOLVE_UNSETTLED_MAX} jusqu'à son retour. L'horloge
+ * d'abandon n'est lancée qu'au délai : une résolution normale ne pose qu'un minuteur.
+ * Une résolution refusée faute de place est journalisée (code seul, une ligne par minute au plus).
  */
 function resolveWithinDeadline(
   entry: PendingBotLog,
   reads: MatchReads,
   gate: InFlightGate,
 ): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
-  const leave = gate.tryEnter();
-  if (!leave) {
-    noteShedResolution();
+  const ticket = gate.tryEnter();
+  if (!ticket) {
+    noteShedResolution(gate);
     return Promise.resolve(null);
   }
-  return withDeadline((signal) => {
+  const leave = (): void => ticket.leave();
+  const running = withDeadline((signal) => {
     const work = resolveOne(entry, reads, signal);
     work.then(leave, leave);
     return work;
   }, BOT_LOG_RESOLVE_TIMEOUT_MS);
+  running.catch((error: unknown) => {
+    if (error instanceof Error && error.name === "TimeoutError") ticket.expire();
+  });
+  return running;
 }
 
 type TournamentLogRow = RowDataPacket & {

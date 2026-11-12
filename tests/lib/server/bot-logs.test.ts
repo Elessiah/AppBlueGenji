@@ -10,6 +10,7 @@ import {
   BOT_LOG_RESOLVE_ABANDON_MS,
   BOT_LOG_RESOLVE_INFLIGHT_MAX,
   BOT_LOG_RESOLVE_SLOTS,
+  BOT_LOG_RESOLVE_UNSETTLED_MAX,
   createResolveGate,
   BOT_LOG_RESOLVE_TIMEOUT_MS,
   discardBotLogs,
@@ -486,7 +487,7 @@ describe("resolveBotLogs", () => {
     expect(messages).toEqual([]);
   });
 
-  it("resolveBotLogs_moreEntriesThanConcurrency_neverMoreThanFourQueriesInFlight", async () => {
+  it("resolveBotLogs_moreEntriesThanConcurrency_neverMoreThanSlotsQueriesInFlight", async () => {
     const { state, drain } = heldQueries(() => [TOURNAMENT_ROW]);
     const entries = Array.from({ length: 10 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
@@ -495,7 +496,7 @@ describe("resolveBotLogs", () => {
 
     expect(await resolving).toHaveLength(10);
     expect(BOT_LOG_RESOLVE_CONCURRENCY).toBe(4);
-    expect(state.maxInFlight).toBe(4);
+    expect(state.maxInFlight).toBe(3);
   });
 
   it("resolveBotLogs_sameCallSameMatch_readsOnce", async () => {
@@ -514,17 +515,17 @@ describe("resolveBotLogs", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("resolveBotLogs_concurrentCallsBeyondSlots_atMostFourResolutionsInFlight", async () => {
+  it("resolveBotLogs_concurrentCallsBeyondSlots_atMostThreeResolutionsInFlight", async () => {
     const { state, drain } = heldQueries(() => [TOURNAMENT_ROW]);
     const batch = () => Array.from({ length: 4 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
-    // Trois vidages qui se chevauchent : chacun prendrait 4 places à lui seul.
+    // Trois vidages qui se chevauchent : chacun prendrait 4 lectures à lui seul.
     const resolving = Promise.all([resolveBotLogs(batch()), resolveBotLogs(batch()), resolveBotLogs(batch())]);
     await drain();
     const lines = await resolving;
 
-    expect(BOT_LOG_RESOLVE_SLOTS).toBe(4);
-    expect(state.maxInFlight).toBe(4);
+    expect(BOT_LOG_RESOLVE_SLOTS).toBe(3);
+    expect(state.maxInFlight).toBe(3);
     expect(lines.flat()).toHaveLength(12);
   });
 
@@ -580,7 +581,7 @@ describe("resolveBotLogs", () => {
     const { execute, drain } = heldQueries((params) => (Number(params?.[0]) === 31 ? [OPEN_MATCH_ROW] : [TOURNAMENT_ROW]));
     const batch = () => Array.from({ length: 4 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
-    // Huit lignes de journal : quatre en cours, quatre en attente ; l'alerte arrive après elles.
+    // Huit lignes de journal : trois en cours, cinq en attente ; l'alerte arrive après elles.
     const lines = Promise.all([resolveBotLogs(batch()), resolveBotLogs(batch())]);
     await new Promise((resolve) => setImmediate(resolve));
     const alert = resolveBotLogs([{ kind: "score_conflict", matchId: 31 }]);
@@ -599,9 +600,9 @@ describe("resolveBotLogs", () => {
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
-      // Quatre résolutions qui ne reviendront jamais : toutes les places du module.
+      // Trois résolutions qui ne reviendront jamais : toutes les places du limiteur.
       const gate = createResolveGate();
-      const hanging = Promise.all([resolveBotLogs(stuck(2), new Map(), gate), resolveBotLogs(stuck(2), new Map(), gate)]);
+      const hanging = Promise.all([resolveBotLogs(stuck(2), new Map(), gate), resolveBotLogs(stuck(1), new Map(), gate)]);
       const later = resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }], new Map(), gate);
       await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS - 1);
       expect(execute).not.toHaveBeenCalledWith(expect.anything(), [13]);
@@ -764,8 +765,10 @@ describe("resolveBotLogs resource bounds", () => {
   it("resolveBotLogs_poolConstants_lookupsNeverExceedPool", () => {
     // Pool de 25 (`lib/server/database.ts`) : résolutions en cours (places + figées) × lectures de manche.
     // Au moins dix connexions restent aux requêtes des joueurs quand la base ralentit.
-    expect(BOT_LOG_RESOLVE_INFLIGHT_MAX * ROUND_ALERT_READ_CONCURRENCY).toBeLessThanOrEqual(25 - 10);
+    // Les résolutions oubliées tiennent encore leur connexion : le plafond les compte.
+    expect(BOT_LOG_RESOLVE_UNSETTLED_MAX * ROUND_ALERT_READ_CONCURRENCY).toBeLessThanOrEqual(25 - 10);
     expect(BOT_LOG_RESOLVE_INFLIGHT_MAX).toBeGreaterThanOrEqual(BOT_LOG_RESOLVE_SLOTS);
+    expect(BOT_LOG_RESOLVE_UNSETTLED_MAX).toBeGreaterThan(BOT_LOG_RESOLVE_INFLIGHT_MAX);
   });
 
   it("resolveBotLogs_hangingResolutionsUpToMaxMinusOne_laterOnesAreShedBeyondInFlightMax", async () => {
@@ -782,7 +785,7 @@ describe("resolveBotLogs resource bounds", () => {
       await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS);
       await hanging;
 
-      // Quatre requêtes toujours en vol : une seule résolution de plus est lancée, l'autre est refusée.
+      // Trois requêtes toujours en vol : une seule résolution de plus est lancée, l'autre est refusée.
       const lines = await resolveBotLogs(
         [
           { kind: "tournament_started", tournamentId: 13 },
@@ -813,7 +816,7 @@ describe("resolveBotLogs resource bounds", () => {
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = Array.from({ length: BOT_LOG_RESOLVE_INFLIGHT_MAX }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
       const hanging = resolveBotLogs(stuck, new Map(), gate);
-      // Cinq résolutions pour quatre places : la cinquième part au premier délai, échoue au second.
+      // Quatre résolutions pour trois places : la quatrième part au premier délai, échoue au second.
       await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS * 2);
       await hanging;
       expect(await resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }], new Map(), gate)).toHaveLength(0);
@@ -822,6 +825,68 @@ describe("resolveBotLogs resource bounds", () => {
 
       expect(gate.count).toBe(0);
       expect(await resolveBotLogs([{ kind: "tournament_started", tournamentId: 13 }], new Map(), gate)).toHaveLength(1);
+    } finally {
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it("resolveBotLogs_hungResolutionsForgotten_unsettledCeilingStillHolds", async () => {
+    // Oubliées, les requêtes figées tiennent encore leurs connexions : une seule résolution
+    // de plus part (plafond des non revenues), pas toute une nouvelle vague.
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const gate = createResolveGate();
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => new Promise(() => undefined));
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
+      const hanging = resolveBotLogs(stuck(BOT_LOG_RESOLVE_INFLIGHT_MAX), new Map(), gate);
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS * 2);
+      await hanging;
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_ABANDON_MS);
+      expect(gate.forgotten).toBe(BOT_LOG_RESOLVE_INFLIGHT_MAX);
+      const callsBefore = execute.mock.calls.length;
+
+      const again = resolveBotLogs(stuck(3), new Map(), gate);
+      await jest.advanceTimersByTimeAsync(BOT_LOG_RESOLVE_TIMEOUT_MS);
+      await again;
+
+      expect(execute.mock.calls.length - callsBefore).toBe(BOT_LOG_RESOLVE_UNSETTLED_MAX - BOT_LOG_RESOLVE_INFLIGHT_MAX);
+    } finally {
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it("resolveBotLogs_normalResolution_setsNoAbandonTimer", async () => {
+    mockDbByParams({ 12: [TOURNAMENT_ROW] });
+    const timers = jest.spyOn(globalThis, "setTimeout");
+    try {
+      await resolveBotLogs([{ kind: "tournament_started", tournamentId: 12 }], new Map(), createResolveGate());
+
+      expect(timers.mock.calls.filter(([, delay]) => delay === BOT_LOG_RESOLVE_ABANDON_MS)).toHaveLength(0);
+    } finally {
+      timers.mockRestore();
+    }
+  });
+
+  it("resolveBotLogs_shedTwiceWithinAMinute_trailingCountWrittenAtMinuteEnd", async () => {
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const gate = createResolveGate();
+      for (let taken = 0; taken < BOT_LOG_RESOLVE_INFLIGHT_MAX; taken += 1) gate.tryEnter();
+      const shedLines = () => errors.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("[bot-logs] BOT_LOG_RESOLUTION_SHED"));
+
+      await resolveBotLogs([{ kind: "tournament_started", tournamentId: 12 }], new Map(), gate);
+      await resolveBotLogs([{ kind: "tournament_started", tournamentId: 12 }], new Map(), gate);
+      await resolveBotLogs([{ kind: "tournament_started", tournamentId: 12 }], new Map(), gate);
+      expect(shedLines()).toEqual(["[bot-logs] BOT_LOG_RESOLUTION_SHED (1)"]);
+
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      expect(shedLines()).toEqual(["[bot-logs] BOT_LOG_RESOLUTION_SHED (1)", "[bot-logs] BOT_LOG_RESOLUTION_SHED (2)"]);
     } finally {
       errors.mockRestore();
       jest.useRealTimers();
