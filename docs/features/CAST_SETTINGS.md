@@ -245,7 +245,8 @@ n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
 serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
 le lancement — `castBeforeLaunch`, qui ne compte pas le lancement d'un appariement
-d'avant — remplit la condition du cast) : parti ou tu, il laisse le mode
+d'avant (`launchedForCurrentPairing`, règle partagée avec le panneau de
+l'arbitre et le verrou de lancement) — remplit la condition du cast) : parti ou tu, il laisse le mode
 sans maître, et le retrouve dès qu'il est montré de nouveau — sauf si le mode a
 changé entre-temps (effacé, ou repris par le caster qui le change). Une fois
 le match lancé, un caster inéligible reste montré et garde le mode. Un maître montré garde
