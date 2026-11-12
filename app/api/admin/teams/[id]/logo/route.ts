@@ -2,13 +2,14 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { notifyTeamLogoRemoved } from "@/lib/server/logo-quarantine";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { can } from "@/lib/shared/permissions";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { discordInline } from "@/lib/shared/discord-text";
+import { failureReason, unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Retire le logo d'une équipe, pour la modération (permission `moderation`) :
@@ -34,7 +35,9 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
 
   // Hors signalement, le motif saisi est le seul fait que le message puisse
   // exposer à l'équipe (DSA, art. 17.3.b) : il est exigé, avant toute écriture.
-  const reason = validateModerationReasonBody(await readJsonBody(req).catch(() => null));
+  const read = await readJsonBodyOrFallback(req, null);
+  if ("refusal" in read) return read.refusal;
+  const reason = validateModerationReasonBody(read.body);
   if (!reason.ok) return fail(reason.error, 400);
 
   try {
@@ -45,7 +48,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
       // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire
       // un retrait déjà effectif.
-      console.error("[moderation] fichier du logo non effacé", error);
+      console.error(`[moderation] fichier du logo non effacé : ${failureReason(error)}`);
     });
     publishStaffAction(`🧹 Logo de l'équipe « ${discordInline(teamName)} » retiré par le staff (modération).`, {
       id: user.id,
@@ -59,7 +62,6 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     const message = (error as Error).message;
     if (message === "TEAM_NOT_FOUND") return fail(message, 404);
     if (message === "TEAM_HAS_NO_LOGO") return fail(message, 409);
-    console.error("[moderation] retrait du logo impossible", error);
-    return fail("TEAM_LOGO_REMOVE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "TEAM_LOGO_REMOVE_FAILED", "[moderation] retrait du logo impossible"), 500);
   }
 }

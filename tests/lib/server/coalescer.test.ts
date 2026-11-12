@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCoalescer, createKeyedChain, flushAllCoalescers, trackAnnouncement } from "@/lib/server/coalescer";
+import {
+  createCoalescer,
+  createKeyedChain,
+  FLUSH_ALL_BATCH,
+  flushAllCoalescers,
+  trackAnnouncement,
+} from "@/lib/server/coalescer";
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -471,5 +477,74 @@ describe("createCoalescer — deliverQueues", () => {
     release();
     await Promise.all([first, second]);
     expect(deliver).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("flushAll — lots bornés et échéance", () => {
+  it("flushAll_moreKeysThanBatch_startsNextBatchOnlyAfterFirstSettles", async () => {
+    const releases: (() => void)[] = [];
+    const deliver = jest.fn(
+      (_first: number, _last: number) =>
+        new Promise<void>((resolve) => {
+          releases.push(resolve);
+        }),
+    );
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    for (let key = 0; key <= FLUSH_ALL_BATCH; key += 1) coalescer.add(`k${key}`, key);
+
+    const flushed = coalescer.flushAll();
+    await Promise.resolve();
+
+    expect(deliver).toHaveBeenCalledTimes(FLUSH_ALL_BATCH);
+    for (const release of releases.splice(0)) release();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(deliver).toHaveBeenCalledTimes(FLUSH_ALL_BATCH + 1);
+    for (const release of releases.splice(0)) release();
+    await flushed;
+  });
+
+  it("flushAll_deadlinePassed_startsNothing", async () => {
+    const { deliver, coalescer } = setup();
+    coalescer.add("a", 1);
+
+    await coalescer.flushAll(Date.now() - 1);
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(coalescer.pending()).toBe(1);
+    coalescer.reset();
+  });
+
+  it("flushAllCoalescers_twoCoalescersWithFullBatches_neverExceedsBatchInFlight", async () => {
+    // Le plafond vaut pour tout l'arrêt : deux regroupeurs pleins ne lancent pas 2 × FLUSH_ALL_BATCH envois.
+    const releases: (() => void)[] = [];
+    const deliver = jest.fn(
+      (_first: number, _last: number) =>
+        new Promise<void>((resolve) => {
+          releases.push(resolve);
+        }),
+    );
+    const first = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    const second = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    for (let key = 0; key < FLUSH_ALL_BATCH; key += 1) {
+      first.add(`a${key}`, key);
+      second.add(`b${key}`, key);
+    }
+
+    const flushed = flushAllCoalescers();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(deliver).toHaveBeenCalledTimes(FLUSH_ALL_BATCH);
+    for (const release of releases.splice(0)) release();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(deliver).toHaveBeenCalledTimes(2 * FLUSH_ALL_BATCH);
+    for (const release of releases.splice(0)) release();
+    await flushed;
+  });
+
+  it("flushAllCoalescers_deadlinePassed_doesNotWaitForTrackedAnnouncement", async () => {
+    const never = new Promise<void>(() => undefined);
+    trackAnnouncement(never);
+
+    await expect(flushAllCoalescers(Date.now() - 1)).resolves.toBeUndefined();
   });
 });

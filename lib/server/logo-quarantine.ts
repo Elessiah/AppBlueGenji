@@ -29,6 +29,7 @@
  * purge) ne connaissent, elles, que ce qui est réellement commun aux deux.
  */
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
+import { failureReason } from "@/lib/server/failure-reason";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import {
@@ -170,7 +171,7 @@ export async function removeModeratedAvatarFile(
   // bloquée dans tous les cas ; un fichier gardé — donc encore servi — est dit
   // dans pm2, pour qu'un exploitant retire l'autre usage.
   const stillUsed = await isUploadReferenced(avatarUrl).catch((error: unknown) => {
-    console.error("[moderation] usages de l'avatar supprimé non relus, fichier gardé", error);
+    console.error("[moderation] usages de l'avatar supprimé non relus, fichier gardé", failureReason(error));
     return true;
   });
   if (stillUsed) {
@@ -218,6 +219,8 @@ type MemberRecipientRow = RowDataPacket & {
   discord_id: string | null;
   discord_pseudo: string | null;
   discord_verified_at: Date | string | null;
+  /** Lue avec la ligne : `notifyUsers` n'a pas à la relire. */
+  locale: unknown;
 };
 
 /**
@@ -228,7 +231,7 @@ type MemberRecipientRow = RowDataPacket & {
 async function teamMemberRecipients(teamId: number): Promise<NotificationRecipient[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<MemberRecipientRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
      WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0`,
@@ -241,7 +244,7 @@ async function teamMemberRecipients(teamId: number): Promise<NotificationRecipie
 async function userRecipient(userId: number): Promise<NotificationRecipient[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<MemberRecipientRow[]>(
-    `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at FROM bg_users
+    `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at, locale FROM bg_users
      WHERE id = ? AND is_deleted = 0`,
     [userId],
   );
@@ -301,7 +304,7 @@ async function reportGrounds(reportId: number | null): Promise<ModerationGrounds
     );
     return moderationGroundsFor(rows[0]?.category ?? null);
   } catch (error) {
-    console.error("[moderation] fondement de la décision non relu", error);
+    console.error("[moderation] fondement de la décision non relu", failureReason(error));
     return moderationGroundsFor(null);
   }
 }
@@ -329,7 +332,7 @@ export function notifyTeamLogoRemoved(
         push: (locale) => moderationPush({ kind: "REMOVED", teamName, teamId, reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", error));
+    .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", failureReason(error)));
 }
 
 /**
@@ -350,7 +353,7 @@ export function notifyUserAvatarRemoved(userId: number, reportId: number | null,
         push: (locale) => moderationPush({ kind: "REMOVED", reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", error));
+    .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", failureReason(error)));
 }
 
 /**
@@ -423,7 +426,7 @@ export async function deleteTeamLogoForReport(
   const files = shared ? null : logoFileLocations(logoUrl, teamId);
   if (files) {
     await unlinkIfPresent(files.live).catch((error) => {
-      console.error("[moderation] fichier du logo non effacé", error);
+      console.error("[moderation] fichier du logo non effacé", failureReason(error));
     });
   }
 
@@ -638,7 +641,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
         push: (locale) => moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] équipe non prévenue du masquage", error));
+    .catch((error) => console.error("[moderation] équipe non prévenue du masquage", failureReason(error)));
 
   return {
     id: quarantineId,
@@ -733,7 +736,7 @@ export async function hideUserAvatarForReport(
         push: (locale) => moderationPush({ kind: "HIDDEN", reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] joueur non prévenu du masquage", error));
+    .catch((error) => console.error("[moderation] joueur non prévenu du masquage", failureReason(error)));
 
   return {
     id: quarantineId,
@@ -948,7 +951,7 @@ function announceRefusedRestoreOutcome(row: QuarantineRow, actor: ReportPerson):
   try {
     announceContestOutcome(row, "OVERTURNED", actor);
   } catch (error) {
-    console.error("[moderation] issue de la contestation non journalisée", error);
+    console.error("[moderation] issue de la contestation non journalisée", failureReason(error));
   }
 }
 
@@ -1149,7 +1152,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
             moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }, locale),
         }),
       )
-      .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
+      .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", failureReason(error)));
   } else {
     // Rétabli à son adresse d'origine, déjà vue de tous. Si le joueur a masqué
     // son avatar pendant la quarantaine, la bascule n'a rien pu renommer
@@ -1163,7 +1166,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
       try {
         await rotate(Number(row.target_id));
       } catch (error) {
-        console.error("[moderation] avatar rétabli non renommé", error);
+        console.error("[moderation] avatar rétabli non renommé", failureReason(error));
       }
     }
     publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
@@ -1178,7 +1181,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
           push: (locale) => moderationPush({ kind: "RESTORED", reportId: null }, locale),
         }),
       )
-      .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", error));
+      .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", failureReason(error)));
   }
 }
 
@@ -1283,7 +1286,7 @@ async function removePurgedFileAndAnnounce(row: QuarantineRow, actor: ReportPers
     // L'empreinte d'un avatar supprimé est déjà bloquée (ou non, selon
     // l'issue) dans la transaction ci-dessus (D6, D22, D23).
     await unlinkIfPresent(files.quarantined).catch((error) => {
-      console.error("[moderation] fichier en quarantaine non effacé", error);
+      console.error("[moderation] fichier en quarantaine non effacé", failureReason(error));
     });
   }
 

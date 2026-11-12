@@ -91,7 +91,11 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — corps et refus"
 
   it("refuse un corps illisible ou non JSON sans rien écrire", async () => {
     expect((await PUT(req("{", "application/json"), params("7"))).status).toBe(400);
-    expect((await PUT(req("enabled=true", "text/plain"), params("7"))).status).toBe(400);
+    // ERREUR.txt (revue #506) : un corps d'un autre type n'est plus avalé en
+    // corps vide (400 d'un champ) — il rend son propre refus, 415.
+    const foreign = await PUT(req("enabled=true", "text/plain"), params("7"));
+    expect(foreign.status).toBe(415);
+    await expect(foreign.json()).resolves.toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
     expect(setRefereeScheduling).not.toHaveBeenCalled();
   });
 
@@ -120,7 +124,18 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — corps et refus"
     jest.mocked(setRefereeScheduling).mockRejectedValueOnce(new Error("Table 'bg.x' doesn't exist"));
     const res = await PUT(req({ enabled: true }), params("7"));
     expect(res.status).toBe(500);
-    expect((await res.json()).error).toBe("INTERNAL_ERROR");
+    // Le code de repli de la route (ERREUR.txt, revue sécurité EF-35), jamais le texte.
+    expect((await res.json()).error).toBe("REFEREE_SCHEDULING_UPDATE_FAILED");
+  });
+
+  it("rend une contention en 409 CONCURRENT_UPDATE_RETRY", async () => {
+    jest.mocked(setRefereeScheduling).mockRejectedValueOnce(
+      Object.assign(new Error("Lock wait timeout exceeded"), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 }),
+    );
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const res = await PUT(req({ enabled: true }), params("7"));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("CONCURRENT_UPDATE_RETRY");
   });
 });
 

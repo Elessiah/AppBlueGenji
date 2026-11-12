@@ -1,7 +1,14 @@
-import { enforceRateLimit, MAP_PICK_WRITE_RULE } from "@/lib/server/api-guard";
+import {
+  enforceRateLimit,
+  MAP_PICK_ATTEMPT_RULE,
+  MAP_PICK_PLAYER_ATTEMPT_RULE,
+  MAP_PICK_STAFF_WRITE_RULE,
+  MAP_PICK_WRITE_RULE,
+  reserveRateLimit,
+} from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { pickMatchMap } from "@/lib/server/tournaments/round-maps";
 import { can } from "@/lib/shared/permissions";
@@ -19,7 +26,10 @@ const STATUSES: Readonly<Record<string, number>> = {
  * (`docs/features/ROUND_MAPS.md`). Corps : `{ slot: number, map: string | null }`.
  * L'arbitrage (`tournaments`) le peut toujours ; sur un match en autogestion,
  * les joueurs d'une des deux équipes qui déclarent son « Prêt » aussi.
- * Plafonné par compte (`MAP_PICK_WRITE_RULE`, 429 `TOO_MANY_REQUESTS`). Un
+ * Plafonné par compte (`MAP_PICK_WRITE_RULE`, plus haut pour l'arbitrage :
+ * `MAP_PICK_STAFF_WRITE_RULE` ; 429 `TOO_MANY_REQUESTS`), un choix refusé
+ * rendant sa place ; tous les appels, refus compris, restent bornés par
+ * `MAP_PICK_ATTEMPT_RULE` (`MAP_PICK_PLAYER_ATTEMPT_RULE` pour un joueur). Un
  * match absent rend 404 et un match d'autrui 403 : l'identifiant d'un match
  * n'est pas un secret (l'instantané public de son tournoi le porte).
  */
@@ -30,14 +40,24 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const throttled = enforceRateLimit(MAP_PICK_WRITE_RULE, user.id);
+  const staff = can(user, "tournaments");
+  const throttled = enforceRateLimit(staff ? MAP_PICK_ATTEMPT_RULE : MAP_PICK_PLAYER_ATTEMPT_RULE, user.id);
   if (throttled) return throttled;
+  const reservation = reserveRateLimit(staff ? MAP_PICK_STAFF_WRITE_RULE : MAP_PICK_WRITE_RULE, user.id);
+  if (reservation.refused) return reservation.refused;
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { slot?: unknown; map?: unknown };
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) {
+    reservation.refund();
+    return read.refusal;
+  }
+  const body = read.body as { slot?: unknown; map?: unknown };
   try {
-    await pickMatchMap(matchId, { userId: user.id, staff: can(user, "tournaments") }, body.slot, body.map ?? null);
+    await pickMatchMap(matchId, { userId: user.id, staff }, body.slot, body.map ?? null);
     return ok({});
   } catch (error) {
+    // Refus métier (carte refusée, match d'autrui ou clos) : rien n'a été écrit.
+    if (error instanceof Error && Object.hasOwn(STATUSES, error.message)) reservation.refund();
     return launchFailure(error, STATUSES, "MAP_PICK_FAILED");
   }
 }

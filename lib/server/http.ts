@@ -64,7 +64,19 @@ export function fail<T extends object = Record<string, never>>(
 
   const code = publicErrorCode(message, status);
   if (code !== message) {
-    console.error(`[api] message d'erreur non public remplacé par ${code} (${status}) :`, message);
+    console.error(`[api] message d'erreur non public remplacé par ${code} (${status}) :`, maskLoggedMessage(message));
   }
   return NextResponse.json({ ...details, error: code } as ApiError & Partial<T>, { status });
+}
+
+/**
+ * Message brut réduit pour pm2 : le texte d'un pilote cite entre guillemets la
+ * valeur en cause (« Duplicate entry 'x@y' for key … ») — une donnée
+ * personnelle possible. Chaque passage cité est masqué jusqu'au guillemet qui
+ * le ferme (suivi d'une espace, d'une ponctuation ou de la fin : une
+ * apostrophe dans la valeur ne la coupe pas) ; le reste
+ * (forme de l'erreur, utile au diagnostic) est gardé, borné à 160 caractères.
+ */
+export function maskLoggedMessage(message: string): string {
+  return message.replace(/(['"`])[\s\S]*?\1(?=[\s,.;:)\]]|$)/g, "$1…$1").slice(0, 160);
 }

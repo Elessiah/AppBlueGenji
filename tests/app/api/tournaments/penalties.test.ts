@@ -182,7 +182,7 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
     expect(await res.json()).toMatchObject({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 
-  // Revue sécurité #542 (cycle 3) : le journal garde l'erreur du moteur.
+  // Revue sécurité #542 (cycle 3) : le journal garde le code du moteur (jamais son message).
   it("DELETE_contention_logsEngineError", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -191,7 +191,7 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
 
     await DELETE(deleteReq(), deleteParams);
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("écriture concurrente"), timeout);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("écriture concurrente"), "ER_LOCK_WAIT_TIMEOUT");
   });
 
   it("l'arbitrage retire la sanction", async () => {

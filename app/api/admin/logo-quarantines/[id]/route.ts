@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { purgeQuarantinedLogo } from "@/lib/server/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Supprime définitivement un logo en quarantaine, avant son échéance — la
@@ -23,7 +24,6 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     const message = (error as Error).message;
     if (message === "QUARANTINE_NOT_FOUND") return fail(message, 404);
     if (message === "QUARANTINE_CLOSED") return fail(message, 409);
-    console.error("[moderation] suppression du logo en quarantaine impossible", error);
-    return fail("LOGO_PURGE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "LOGO_PURGE_FAILED", "[moderation] suppression du logo en quarantaine impossible"), 500);
   }
 }

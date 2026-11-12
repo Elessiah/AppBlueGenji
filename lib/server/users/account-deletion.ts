@@ -4,12 +4,12 @@ import {
   type AccountDeletionPlan,
   accountDeletionPlan,
   type AccountTrace,
-  isReactivationWindowOpen,
   type SoloRegistrationFact,
   type StoredDate,
   withdrawableSoloRegistrations,
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
+import { deletionDueSql, windowFlag } from "@/lib/server/users/reactivation-window";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
 import { unlink } from "node:fs/promises";
 import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
@@ -25,6 +25,7 @@ import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Suppression de son compte par le joueur : ce qu'elle emportera (le plan,
@@ -443,17 +444,21 @@ export function afterCommit(step: () => void, failure: string): void {
   try {
     step();
   } catch (error) {
-    console.error(`[account-deletion] ${failure} :`, error);
+    console.error(`[account-deletion] ${failure} :`, failureReason(error));
   }
 }
 
-/** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
-function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDate } | undefined): boolean {
+/**
+ * La suppression définitive est due : demande relevée il y a trente jours ou
+ * plus, compte toujours en attente. L'échéance vient de la base
+ * (`deletionDueSql`, contre son `NOW()`), comme le relevé des comptes échus.
+ */
+function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDate; deletion_due: unknown } | undefined): boolean {
   return (
     row !== undefined &&
     Number(row.is_deleted) === 1 &&
     row.deletion_requested_at !== null &&
-    !isReactivationWindowOpen(row.deletion_requested_at)
+    windowFlag(row.deletion_due)
   );
 }
 
@@ -520,6 +525,7 @@ type LockedAccount = RowDataPacket & {
   created_at: string;
   is_deleted: 0 | 1;
   deletion_requested_at: StoredDate;
+  deletion_due: unknown;
 };
 
 /**
@@ -540,7 +546,8 @@ async function lockAccountForDeletion(
   expectedCreatedAt: string | undefined,
 ): Promise<LockedAccount | null> {
   const [locked] = await connection.execute<LockedAccount[]>(
-    `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
+    `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at, ${deletionDueSql()} AS deletion_due
+       FROM bg_users WHERE id = ? FOR UPDATE`,
     [userId],
   );
   const account = locked[0];

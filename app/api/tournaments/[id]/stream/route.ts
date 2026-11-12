@@ -11,6 +11,7 @@
  * quel que soit le nombre de spectateurs.
  */
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import { failureReason } from "@/lib/server/failure-reason";
 import { fail } from "@/lib/server/http";
 import {
   registerSessionStream,
@@ -412,7 +413,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           // `controller.error()` est un no-op silencieux sur un flux déjà fermé —
           // le client croirait à une fermeture propre, et rien ne resterait dans
           // les journaux d'une panne pourtant systématique.
-          console.error(`[tournaments/${tournamentId}/stream] ouverture impossible`, error);
+          console.error(`[tournaments/${tournamentId}/stream] ouverture impossible`, failureReason(error));
           try {
             controller.error(error);
           } catch {

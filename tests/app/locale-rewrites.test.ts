@@ -43,7 +43,7 @@ const english = { [LOCALE_HEADER]: "en" };
  * Compilation du `matcher` par `next build` — exportée par Next, absente de
  * ses déclarations de types.
  */
-type CompiledMatcher = { regexp: string; missing?: unknown[] };
+type CompiledMatcher = { regexp: string; has?: { type: string; key: string }[]; missing?: unknown[] };
 const { getMiddlewareMatchers } = pageStaticInfo as unknown as {
   getMiddlewareMatchers: (matcher: unknown, nextConfig: object) => CompiledMatcher[];
 };
@@ -176,5 +176,58 @@ describe("middleware — derrière le mandataire TLS", () => {
     const response = proxied("https://127.0.0.1:3000/en/regles");
     const locale = response.headers.get(`x-middleware-request-${LOCALE_HEADER}`) ?? "";
     expect(rewrite("/en/regles", { [LOCALE_HEADER]: locale })).toBe("/regles");
+  });
+});
+
+/** ERREUR.txt (revue #563) : un `POST` + `Next-Action` forgé ne contourne plus le 404 du middleware. */
+describe("middleware — matcher des requêtes d'action", () => {
+  const compiled = getMiddlewareMatchers(config.matcher, {}).map((matcher) => ({
+    regexp: new RegExp(matcher.regexp),
+    has: matcher.has ?? [],
+    missing: matcher.missing ?? [],
+  }));
+  const actionMatcher = compiled.find((matcher) => matcher.has.some((rule) => rule.key === "next-action"));
+
+  it("matcher_nextActionEntry_coversStaticFilePaths", () => {
+    expect(actionMatcher?.regexp.test("/robots.txt")).toBe(true);
+    expect(actionMatcher?.regexp.test("/logo.png")).toBe(true);
+  });
+
+  it("matcher_nextActionEntry_keptForPrefetches", () => {
+    // Aucun `missing` : un préchargement qui porte l'en-tête passe aussi par le middleware.
+    expect(actionMatcher?.missing).toEqual([]);
+  });
+
+  it("middleware_forgedActionOnStaticPath_returns404", () => {
+    const response = middleware(
+      new NextRequest("https://127.0.0.1:3000/robots.txt", { method: "POST", headers: { "next-action": "x" } }),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  // Revue de sécurité #598 : un `GET` venu par cette seule entrée (fichier,
+  // préchargement) ressort tel quel, sans nonce ni politique.
+  it("middleware_getStaticFileWithNextAction_passesThroughWithoutCsp", () => {
+    const response = middleware(new NextRequest("https://127.0.0.1:3000/logo.png", { headers: { "next-action": "x" } }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("middleware_prefetchWithNextAction_passesThroughWithoutCsp", () => {
+    const response = middleware(
+      new NextRequest("https://127.0.0.1:3000/regles", {
+        headers: { "next-action": "x", "next-router-prefetch": "1" },
+      }),
+    );
+
+    expect(response.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("middleware_getPageWithNextAction_stillGetsCsp", () => {
+    const response = middleware(new NextRequest("https://127.0.0.1:3000/regles", { headers: { "next-action": "x" } }));
+
+    expect(response.headers.get("content-security-policy")).not.toBeNull();
   });
 });

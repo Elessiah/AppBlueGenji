@@ -154,9 +154,10 @@ lui-même).
   quelle, une IPv6 réduite à son `/64` (une IPv4 encapsulée redevient IPv4),
   **port retiré** (`1.2.3.4:51234`, `[v6]:port`) : un hôte qui tourne dans son
   préfixe, ou change de port à chaque connexion, reste un seul client. Le seau
-  à jetons plein de clés (`maxKeys`) évince d'abord les seaux pleins, puis les
-  **plus pleins** (jamais tout : vider le seau rendrait ses jetons à celui qui le
-  sature) ;
+  à jetons plein de clés (`maxKeys`) évince d'abord les seaux pleins, puis 10 %
+  des places parmi les seaux **au moins à moitié pleins**, à défaut les moins
+  récemment pris — deux parcours, sans tri (jamais tout : vider le seau rendrait
+  ses jetons à celui qui le sature) ;
 - la réponse publique est **mutualisée** par tournoi
   (`lib/server/spectator-snapshot.ts`, `cached`) : au plus une reconstruction
   par durée de vie (15 s au calme, ×1 à ×10 selon la charge, plafonnée à

@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { failureReason, isErrorCode, serviceErrorCode } from "@/lib/server/failure-reason";
+import { failureReason, isErrorCode, serviceErrorCode, unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 
 describe("failureReason", () => {
@@ -119,5 +119,36 @@ describe("serviceErrorCode", () => {
 
     expect(serviceErrorCode(timeout, "THING_CREATE_FAILED")).toBe(CONCURRENT_UPDATE_RETRY);
     warned.mockRestore();
+  });
+});
+
+describe("unexpectedFailureCode", () => {
+  it("unexpectedFailureCode_contention_returnsConcurrentUpdateRetryAndWarnsCodeOnly", () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const deadlock = Object.assign(new Error("Deadlock found on row of Test_Pseudo"), {
+      code: "ER_LOCK_DEADLOCK",
+      errno: 1213,
+    });
+
+    expect(unexpectedFailureCode(deadlock, "THING_FAILED", "[thing]")).toBe(CONCURRENT_UPDATE_RETRY);
+
+    expect(warned).toHaveBeenCalledWith(
+      `[thing] : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} (ER_LOCK_DEADLOCK)`,
+    );
+    expect(logged).not.toHaveBeenCalled();
+    warned.mockRestore();
+    logged.mockRestore();
+  });
+
+  it("unexpectedFailureCode_otherError_returnsFallbackAndLogsCodeOnly", () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(unexpectedFailureCode(new Error("disk full at /srv/Test_Pseudo"), "THING_FAILED", "[thing]")).toBe(
+      "THING_FAILED",
+    );
+
+    expect(logged).toHaveBeenCalledWith("[thing] : Error");
+    logged.mockRestore();
   });
 });

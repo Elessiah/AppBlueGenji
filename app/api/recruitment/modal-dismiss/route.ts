@@ -10,6 +10,7 @@ import {
   RECRUITMENT_MODAL_OFF_MAX_AGE,
   RECRUITMENT_MODAL_OFF_VALUE,
 } from "@/lib/shared/recruitment";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Repose le cookie du navigateur par `Set-Cookie`, quelle que soit l'issue :
@@ -70,7 +71,7 @@ export async function POST() {
     // mise en page est éteint lui aussi, le compte ne recevra pas le choix —
     // un code à part, pour que le toast ne promette que ce navigateur.
     if (isUnknownColumnError(error)) return withOptOutCookie(fail(RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE, 503));
-    console.error("[recruitment] POST modal-dismiss failed:", error);
+    console.error("[recruitment] POST modal-dismiss failed:", failureReason(error));
     return withOptOutCookie(fail("RECRUITMENT_MODAL_DISMISS_FAILED", 500));
   }
 }
@@ -93,7 +94,7 @@ export async function DELETE() {
     return withoutOptOutCookie(ok({ account: true }));
   } catch (error) {
     if (isUnknownColumnError(error)) return fail(RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE, 503);
-    console.error("[recruitment] DELETE modal-dismiss failed:", error);
+    console.error("[recruitment] DELETE modal-dismiss failed:", failureReason(error));
     return fail("RECRUITMENT_MODAL_RESTORE_FAILED", 500);
   }
 }

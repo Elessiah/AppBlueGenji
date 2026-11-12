@@ -7,15 +7,9 @@ import {
   revocationMark,
   revokedSince,
 } from "@/lib/server/session-streams";
-import { type SqlQuery, type SqlMock, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
-
-/** `setOwnPlatformRoles` : une instruction seule, sur le pool. */
-async function mockDb(execute: SqlMock) {
-  const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-}
 
 /**
  * `setUserRoles` : la cible lue sur le pool (`targetRows`), puis une
@@ -33,7 +27,9 @@ async function mockTransaction(targetRows: object[] = [{ id: 7 }]) {
 }
 
 const ACTOR_ADMIN = { id: 3, is_admin: 1 };
-const TARGET = { id: 7, is_admin: 0 };
+const TARGET = { id: 7, is_admin: 0, platform_roles_json: "[]" };
+/** Une cible qui détient un rôle : la vider change quelque chose. */
+const ARBITRE_TARGET = { id: 7, is_admin: 0, platform_roles_json: '["ARBITRE"]' };
 
 /** Verrou des deux lignes, puis l'écriture. */
 function lockedThenWritten(connection: ReturnType<typeof connectionMock>, rows: object[]) {
@@ -55,11 +51,11 @@ describe("setUserRoles", () => {
 
     const result = await setUserRoles(7, ["ARBITRE"], 3);
 
-    expect(result).toEqual(["ARBITRE"]);
+    expect(result).toEqual({ roles: ["ARBITRE"], previous: [] });
     expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
     const [lockSql, lockParams] = connection.execute.mock.calls[0] as [string, unknown[]];
     expect(lockSql).toBe(
-      "SELECT id, is_admin FROM bg_users WHERE id IN (?, ?) AND is_deleted = 0 ORDER BY id FOR UPDATE",
+      "SELECT id, is_admin, platform_roles_json FROM bg_users WHERE id IN (?, ?) AND is_deleted = 0 ORDER BY id FOR UPDATE",
     );
     expect(lockParams).toEqual([3, 7]);
     const [updateSql, updateParams] = connection.execute.mock.calls[1] as [string, unknown[]];
@@ -76,7 +72,7 @@ describe("setUserRoles", () => {
 
     const result = await setUserRoles(7, ["ADMIN", "ARBITRE"], 3);
 
-    expect(result).toEqual(["ADMIN", "ARBITRE"]);
+    expect(result.roles).toEqual(["ADMIN", "ARBITRE"]);
     const [, params] = connection.execute.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([1, JSON.stringify(["ARBITRE"]), 7]);
   });
@@ -88,14 +84,14 @@ describe("setUserRoles", () => {
     // @ts-expect-error — testing sanitization of untyped input
     const result = await setUserRoles(7, ["RECRUTEUR", "RECRUTEUR", "NOPE", "ARBITRE"], 3);
 
-    expect(result).toEqual(["ARBITRE", "RECRUTEUR"]);
+    expect(result.roles).toEqual(["ARBITRE", "RECRUTEUR"]);
     const [, params] = connection.execute.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([0, JSON.stringify(["ARBITRE", "RECRUTEUR"]), 7]);
   });
 
   it("setUserRoles_emptySelection_revokesEverything", async () => {
     const connection = await mockTransaction();
-    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(connection, [ACTOR_ADMIN, ARBITRE_TARGET]);
 
     await setUserRoles(7, [], 3);
 
@@ -194,7 +190,7 @@ describe("setUserRoles — failures leave nothing behind", () => {
   it("setUserRoles_updateFails_rollsBackReleasesAndRethrows", async () => {
     const connection = await mockTransaction();
     connection.execute
-      .mockResolvedValueOnce([[ACTOR_ADMIN, TARGET]])
+      .mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]])
       .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
     const close = jest.fn();
     registerSessionStream(7, "hash-a", close);
@@ -210,7 +206,7 @@ describe("setUserRoles — failures leave nothing behind", () => {
   it("setUserRoles_rollbackFails_keepsOriginalErrorAndDestroysConnection", async () => {
     const connection = await mockTransaction();
     connection.execute
-      .mockResolvedValueOnce([[ACTOR_ADMIN, TARGET]])
+      .mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]])
       .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
     connection.rollback.mockRejectedValueOnce(new Error("connection lost"));
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -225,7 +221,7 @@ describe("setUserRoles — failures leave nothing behind", () => {
 
   it("setUserRoles_commitFails_rollsBackAndRethrows", async () => {
     const connection = await mockTransaction();
-    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(connection, [ACTOR_ADMIN, ARBITRE_TARGET]);
     connection.commit.mockRejectedValueOnce(new Error("COMMIT_FAILED"));
     const close = jest.fn();
     registerSessionStream(7, "hash-a", close);
@@ -248,7 +244,7 @@ describe("setUserRoles — open tournament streams", () => {
   });
 
   it("closes every open stream of the target user once the roles are written", async () => {
-    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, ARBITRE_TARGET]);
     const closeA = jest.fn();
     const closeB = jest.fn();
     const closeOther = jest.fn();
@@ -264,6 +260,34 @@ describe("setUserRoles — open tournament streams", () => {
     expect(registeredStreamCount()).toBe(1);
   });
 
+  it("setUserRoles_sameRolesAsStored_commitsWithoutWriteNorClosingStreams", async () => {
+    const connection = await mockTransaction();
+    connection.execute.mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]]);
+    const close = jest.fn();
+    registerSessionStream(7, "hash-a", close);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result).toEqual({ roles: ["ARBITRE"], previous: ["ARBITRE"] });
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(1);
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  // Revue de sécurité #598 : une ligne héritée (`ADMIN` dans le JSON, `is_admin = 0`)
+  // n'était plus remise en forme par un enregistrement qui garde ses rôles.
+  it("setUserRoles_legacyAdminInJsonSameRoles_rewritesRow", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ADMIN"]' }]);
+
+    await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+    const [, params] = connection.execute.mock.calls[1] as [string, unknown[]];
+    expect(params).toEqual([1, "[]", 7]);
+  });
+
   it("closes the streams on a role grant too, so the viewer context is recomputed", async () => {
     lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
     const close = jest.fn();
@@ -275,7 +299,7 @@ describe("setUserRoles — open tournament streams", () => {
   });
 
   it("refuses a stream that read the session before the write, not one opened after", async () => {
-    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, ARBITRE_TARGET]);
     const mark = revocationMark();
 
     await setUserRoles(7, [], 3);
@@ -286,6 +310,69 @@ describe("setUserRoles — open tournament streams", () => {
   });
 });
 
+describe("setUserRoles — roles read under the lock (expected roles)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetSessionStreams();
+  });
+  afterEach(() => {
+    resetSessionStreams();
+  });
+
+  it("setUserRoles_storedRoles_returnsThemAsPrevious", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: '["CASTER"]' }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result.previous).toEqual(["ADMIN", "CASTER"]);
+  });
+
+  it("setUserRoles_expectedMatchesStored_writes", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+
+    await setUserRoles(7, ["ARBITRE"], 3, ["CASTER"]);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("setUserRoles_expectedSameRolesInOtherOrder_writes", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: '["CASTER","ARBITRE"]' }]);
+
+    await setUserRoles(7, [], 3, ["ARBITRE", "CASTER", "ADMIN"]);
+
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("setUserRoles_expectedDiffersFromStored_throwsRolesChangedWithoutWriting", async () => {
+    // Un autre réglage a abouti depuis l'ouverture de la fiche : l'écraser
+    // sans le dire, c'était la dernière écriture gagnante.
+    const connection = await mockTransaction();
+    connection.execute.mockResolvedValueOnce([[ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ARBITRE"]' }]]);
+    const close = jest.fn();
+    registerSessionStream(7, "hash-a", close);
+
+    await expect(setUserRoles(7, ["CASTER"], 3, [])).rejects.toThrow("ROLES_CHANGED");
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+});
+
+/** `setOwnPlatformRoles` : sa ligne verrouillée, puis l'écriture, sur une connexion. */
+async function mockOwnTransaction(row: object | null) {
+  const connection = await mockTransaction();
+  connection.execute.mockResolvedValueOnce([row ? [row] : []]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+  return connection;
+}
+
+const OWN_ADMIN = { is_admin: 1, is_deleted: 0, platform_roles_json: '["CASTER"]' };
+
 describe("setOwnPlatformRoles (ADMIN-SELF-ROLES)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -295,74 +382,92 @@ describe("setOwnPlatformRoles (ADMIN-SELF-ROLES)", () => {
     resetSessionStreams();
   });
 
-  it("setOwnPlatformRoles_adminKeptWithScopedRoles_writesOnlyScopedJsonUnderIsAdminGuard", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
+  it("setOwnPlatformRoles_adminKeptWithScopedRoles_locksOwnRowFirstThenWritesOnlyScopedJson", async () => {
+    const connection = await mockOwnTransaction(OWN_ADMIN);
 
     const result = await setOwnPlatformRoles(1, ["ADMIN", "ARBITRE"]);
 
-    expect(result).toEqual(["ADMIN", "ARBITRE"]);
-    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(result).toEqual({ roles: ["ADMIN", "ARBITRE"], previous: ["ADMIN", "CASTER"] });
+    const [lockSql, lockParams] = connection.execute.mock.calls[0] as [string, unknown[]];
+    expect(lockSql).toBe("SELECT is_admin, is_deleted, platform_roles_json FROM bg_users WHERE id = ? FOR UPDATE");
+    expect(lockParams).toEqual([1]);
+    const [sql, params] = connection.execute.mock.calls[1] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_users SET platform_roles_json = \? WHERE id = \? AND is_deleted = 0 AND is_admin = 1/);
     expect(sql).not.toMatch(/SET is_admin/);
     expect(params).toEqual([JSON.stringify(["ARBITRE"]), 1]);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
   it("setOwnPlatformRoles_selectionWithoutAdmin_throwsCannotRemoveOwnAdminWithoutQuery", async () => {
-    const execute = jest.fn<SqlQuery>();
-    await mockDb(execute);
+    const connection = await mockTransaction();
 
     await expect(setOwnPlatformRoles(1, ["ARBITRE"])).rejects.toThrow("CANNOT_REMOVE_OWN_ADMIN");
 
-    expect(execute).not.toHaveBeenCalled();
+    expect(connection.execute).not.toHaveBeenCalled();
+    expect(connection.getConnection).not.toHaveBeenCalled();
   });
 
-  it("setOwnPlatformRoles_demotedConcurrently_throwsNotAdminAndKeepsStreams", async () => {
+  it("setOwnPlatformRoles_demotedConcurrently_throwsNotAdminWithoutWritingAndKeepsStreams", async () => {
     // Un autre administrateur a retiré `is_admin` entre la lecture de la
-    // session et l'écriture : la condition ne trouve plus la ligne.
-    await mockDb(
-      jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([[{ is_deleted: 0 }]]),
-    );
+    // session et l'écriture : la ligne verrouillée le dit.
+    const connection = await mockOwnTransaction({ ...OWN_ADMIN, is_admin: 0 });
     const close = jest.fn();
     registerSessionStream(1, "hash-a", close);
 
     await expect(setOwnPlatformRoles(1, ["ADMIN", "CASTER"])).rejects.toThrow("NOT_ADMIN");
 
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(close).not.toHaveBeenCalled();
   });
 
   it("setOwnPlatformRoles_accountDeletedConcurrently_throwsUserNotFound", async () => {
-    // Le compte a été supprimé pendant la requête : « Tu n'es plus
-    // administrateur » serait faux.
-    await mockDb(
-      jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([[{ is_deleted: 1 }]]),
-    );
+    // « Tu n'es plus administrateur » serait faux pour un compte supprimé.
+    await mockOwnTransaction({ ...OWN_ADMIN, is_deleted: 1 });
 
     await expect(setOwnPlatformRoles(1, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");
   });
 
   it("setOwnPlatformRoles_rowGone_throwsUserNotFound", async () => {
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([[]]));
+    await mockOwnTransaction(null);
 
     await expect(setOwnPlatformRoles(1, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");
   });
 
+  it("setOwnPlatformRoles_expectedDiffersFromStored_throwsRolesChangedWithoutWriting", async () => {
+    const connection = await mockOwnTransaction(OWN_ADMIN);
+
+    await expect(setOwnPlatformRoles(1, ["ADMIN", "ARBITRE"], ["ADMIN"])).rejects.toThrow("ROLES_CHANGED");
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+  });
+
+  it("setOwnPlatformRoles_expectedMatchesStored_writes", async () => {
+    const connection = await mockOwnTransaction(OWN_ADMIN);
+
+    await setOwnPlatformRoles(1, ["ADMIN"], ["CASTER", "ADMIN"]);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
   it("setOwnPlatformRoles_duplicatesAndUnknownValues_normalizesBeforeWrite", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
+    const connection = await mockOwnTransaction(OWN_ADMIN);
 
     // @ts-expect-error — testing sanitization of untyped input
     const result = await setOwnPlatformRoles(1, ["RECRUTEUR", "ADMIN", "RECRUTEUR", "NOPE"]);
 
-    expect(result).toEqual(["ADMIN", "RECRUTEUR"]);
-    const [, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(result.roles).toEqual(["ADMIN", "RECRUTEUR"]);
+    const [, params] = connection.execute.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([JSON.stringify(["RECRUTEUR"]), 1]);
   });
 
   it("setOwnPlatformRoles_success_keepsStreamsOpen", async () => {
     // Un administrateur tient toutes les permissions : ses flux de tournoi
     // n'ont rien à recalculer, aucun n'est fermé.
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]));
+    await mockOwnTransaction(OWN_ADMIN);
     const own = jest.fn();
     registerSessionStream(1, "hash-a", own);
 
@@ -373,19 +478,21 @@ describe("setOwnPlatformRoles (ADMIN-SELF-ROLES)", () => {
 });
 
 describe("rolesChangeAuditLine", () => {
-  it("rolesChangeAuditLine_otherAccount_namesTargetIdAndSavedRoles", () => {
-    expect(rolesChangeAuditLine(7, ["ARBITRE", "RECRUTEUR"], false)).toBe(
-      "🛡️ Rôles de plateforme du compte #7 enregistrés : Arbitre, Recruteur.",
+  it("rolesChangeAuditLine_otherAccount_namesTargetGrantedRemovedAndSaved", () => {
+    expect(rolesChangeAuditLine(7, { roles: ["ARBITRE", "RECRUTEUR"], previous: ["CASTER", "RECRUTEUR"] }, false)).toBe(
+      "🛡️ Rôles de plateforme du compte #7 — accordés : Arbitre ; retirés : Caster ; enregistrés : Arbitre, Recruteur.",
     );
   });
 
   it("rolesChangeAuditLine_ownAccount_saysOwnAccount", () => {
-    expect(rolesChangeAuditLine(1, ["ADMIN", "CASTER"], true)).toBe(
-      "🛡️ Rôles de plateforme de son propre compte (#1) enregistrés : Administrateur, Caster.",
+    expect(rolesChangeAuditLine(1, { roles: ["ADMIN", "CASTER"], previous: ["ADMIN"] }, true)).toBe(
+      "🛡️ Rôles de plateforme de son propre compte (#1) — accordés : Caster ; retirés : aucun ; enregistrés : Administrateur, Caster.",
     );
   });
 
-  it("rolesChangeAuditLine_noRoles_saysAucun", () => {
-    expect(rolesChangeAuditLine(7, [], false)).toBe("🛡️ Rôles de plateforme du compte #7 enregistrés : aucun.");
+  it("rolesChangeAuditLine_everythingRemoved_saysAucunForGrantedAndSaved", () => {
+    expect(rolesChangeAuditLine(7, { roles: [], previous: ["ARBITRE"] }, false)).toBe(
+      "🛡️ Rôles de plateforme du compte #7 — accordés : aucun ; retirés : Arbitre ; enregistrés : aucun.",
+    );
   });
 });

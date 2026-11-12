@@ -27,6 +27,7 @@ import {
   replayAccountReactivation,
 } from "@/lib/server/users/account-reactivation";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { withWindowFlags } from "../../helpers/reactivation-window-double";
 
 /*
  * Réactivation d'un compte en attente de suppression (E4) : ticket haché,
@@ -39,7 +40,8 @@ const RECENT = new Date(Date.now() - 2 * 24 * 3600 * 1000);
 const EXPIRED = new Date(Date.now() - 31 * 24 * 3600 * 1000);
 
 function poolExecute(rows: unknown[]) {
-  const execute = jest.fn<SqlQuery>().mockResolvedValue([rows, []]);
+  // La base calcule la fenêtre (D67) : la double l'émule d'après la date relue.
+  const execute = jest.fn<SqlQuery>().mockImplementation(async (sql: string) => [withWindowFlags(sql, rows), []]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
@@ -63,7 +65,7 @@ function transaction(options: {
     if (sql.includes("FOR UPDATE")) {
       const failure = options.lockErrors?.shift();
       if (failure) throw failure;
-      return [options.locked ? [options.locked] : [], []];
+      return [options.locked ? withWindowFlags(sql, [options.locked]) : [], []];
     }
     if (sql.startsWith("UPDATE bg_users")) return [{ affectedRows: options.affectedRows ?? 1 }, []];
     if (sql.startsWith("DELETE FROM bg_account_reactivation_tickets")) return [{ affectedRows: options.ticketDeleted ?? 1 }, []];

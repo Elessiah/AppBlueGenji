@@ -1,5 +1,5 @@
 import { describe, it, expect, jest } from "@jest/globals";
-import { ok, fail } from "@/lib/server/http";
+import { ok, fail, maskLoggedMessage } from "@/lib/server/http";
 
 describe("http", () => {
   describe("ok", () => {
@@ -94,11 +94,9 @@ describe("http", () => {
         expect(response.status).toBe(500);
         expect(JSON.parse(text)).toEqual({ error: "INTERNAL_ERROR" });
         expect(text).not.toContain("bluegenji");
-        // Le message reste lisible côté serveur, pour le diagnostic.
-        expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringContaining("INTERNAL_ERROR"),
-          "Table 'bluegenji.bg_users' doesn't exist",
-        );
+        // La forme du message reste lisible côté serveur, pour le diagnostic ;
+        // la valeur citée (nom de base, valeur en double…) est masquée.
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("INTERNAL_ERROR"), "Table '…' doesn't exist");
         errorSpy.mockRestore();
       });
 
@@ -153,5 +151,36 @@ describe("http", () => {
         expect(body.error).toBe("REAL");
       });
     });
+  });
+});
+
+/** Revue de sécurité #598 : `fail()` écrivait à pm2 la valeur citée par le pilote. */
+describe("maskLoggedMessage", () => {
+  it("maskLoggedMessage_duplicateEntry_masksQuotedValues", () => {
+    expect(maskLoggedMessage("Duplicate entry 'a@b.fr' for key 'uniq'")).toBe("Duplicate entry '…' for key '…'");
+  });
+
+  it("maskLoggedMessage_apostropheInsideValue_masksWholeValue", () => {
+    const masked = maskLoggedMessage("Duplicate entry 'o'brien@x.fr' for key 'uniq'");
+
+    expect(masked).not.toContain("brien");
+    expect(masked).toBe("Duplicate entry '…' for key '…'");
+  });
+
+  it("maskLoggedMessage_noQuotes_keepsText", () => {
+    expect(maskLoggedMessage("connect ECONNREFUSED")).toBe("connect ECONNREFUSED");
+  });
+
+  it("maskLoggedMessage_longMessage_boundTo160Chars", () => {
+    expect(maskLoggedMessage("x".repeat(300))).toHaveLength(160);
+  });
+
+  it("fail_duplicateEntryMessage_logsMaskedForm", () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    fail("Duplicate entry 'a@b.fr' for key 'uniq'", 500);
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("INTERNAL_ERROR"), "Duplicate entry '…' for key '…'");
+    errorSpy.mockRestore();
   });
 });

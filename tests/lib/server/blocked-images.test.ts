@@ -368,7 +368,7 @@ describe("blockImageHashesSafely", () => {
     await expect(blockImageHashesSafely(["abc"])).resolves.toBeUndefined();
 
     expect(execute).toHaveBeenCalledTimes(2);
-    expect(logged).toHaveBeenCalledWith(expect.stringContaining("abc"), expect.any(Error));
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("abc"), "Error");
     logged.mockRestore();
   });
 

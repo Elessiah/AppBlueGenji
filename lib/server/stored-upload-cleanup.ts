@@ -3,6 +3,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { isStoredUploadIn, toDiskUploadPath, toServedUploadUrl, type UploadFolder } from "@/lib/shared/uploads";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Effacer du disque un fichier téléversé **qui n'appartient plus à personne**.
@@ -106,7 +107,7 @@ export async function deleteUnreferencedUpload(
     await deleteStoredImage(toDiskUploadPath(url));
     return true;
   } catch (error) {
-    console.error(`[uploads] fichier ${folder}/ non effacé`, error);
+    console.error(`[uploads] fichier ${folder}/ non effacé`, failureReason(error));
     return false;
   }
 }

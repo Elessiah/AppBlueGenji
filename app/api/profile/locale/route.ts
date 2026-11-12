@@ -4,6 +4,7 @@ import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-bo
 import { INVALID_LOCALE, recordAccountLocale } from "@/lib/server/users/account-locale";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isLocale } from "@/lib/shared/locales";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Choix explicite de la langue du compte, depuis « Mon profil » (lot 9-3) :
@@ -31,7 +32,7 @@ export async function PUT(req: Request) {
     if (!(await recordAccountLocale(user.id, locale))) return fail(ACCOUNT_DELETED_ERROR, 409);
     return ok({ locale });
   } catch (error) {
-    console.error("[profile] PUT locale failed:", error);
+    console.error("[profile] PUT locale failed:", failureReason(error));
     return fail("PROFILE_UPDATE_FAILED", 400);
   }
 }

@@ -5,6 +5,10 @@ jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/seeding");
+jest.mock("@/lib/server/named-lock", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/named-lock")>("@/lib/server/named-lock"),
+  withNamedLock: jest.fn(),
+}));
 jest.mock("@/lib/server/tournaments-service", () => ({
   forfeitDeletedEntryMatch: jest.fn(),
   forfeitTournamentTeam: jest.fn(),
@@ -13,12 +17,15 @@ jest.mock("@/lib/server/tournaments-service", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { forfeitDeletedEntryMatch, forfeitTournamentTeam } from "@/lib/server/tournaments-service";
+import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
+import type { PoolConnection } from "mysql2/promise";
 import {
   forfeitSoloEntriesAfterCommit,
   forfeitUnplayedSoloEntry,
   SETTLE_BATCH_SIZE,
   settleDeletedSoloEntries,
   soloEntryNeverPlayedSql,
+  soloForfeitLockName,
 } from "@/lib/server/users/deleted-solo-entries";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -64,9 +71,17 @@ function fakeDb(options: Options) {
 /** L'abandon d'une suppression : une seule ligne au journal, et relu sous verrou. */
 const DELETION_FORFEIT = expect.objectContaining({ skipForfeitLog: true, stillDue: expect.any(Function) });
 
+/** Verrou nommé libre : la tâche tourne aussitôt. */
+function lockFree() {
+  jest
+    .mocked(withNamedLock)
+    .mockImplementation(async (_pool, _name, _timeout, run) => run({} as PoolConnection));
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(sendBotLog).mockReturnValue(undefined);
+  lockFree();
 });
 
 describe("forfeitUnplayedSoloEntry", () => {
@@ -213,6 +228,63 @@ describe("forfeitSoloEntriesAfterCommit", () => {
   });
 });
 
+describe("forfeitSoloEntriesAfterCommit — verrou nommé de l'entrée", () => {
+  it("forfeitSoloEntriesAfterCommit_entry_takesItsNamedLockWithoutWaiting", async () => {
+    fakeDb({ format: "SURVIVAL" });
+
+    await forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }]);
+
+    expect(withNamedLock).toHaveBeenCalledWith(expect.anything(), "bg_solo_forfeit_40", 0, expect.any(Function));
+  });
+
+  it("soloForfeitLockName_teamId_namesTheEntry", () => {
+    expect(soloForfeitLockName(40)).toBe("bg_solo_forfeit_40");
+  });
+
+  it("forfeitSoloEntriesAfterCommit_lockHeldElsewhere_skipsEntryWithoutForfeitNorLine", async () => {
+    // La demande et le passage horaire sur la même entrée : un seul forfaite et écrit.
+    fakeDb({ format: "SURVIVAL" });
+    jest.mocked(withNamedLock).mockRejectedValueOnce(new NamedLockUnavailableError("bg_solo_forfeit_40", 0));
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }])).toBe(0);
+
+    expect(forfeitTournamentTeam).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("forfeitSoloEntriesAfterCommit_firstLockHeld_nextEntryStillForfeited", async () => {
+    fakeDb({ format: "SURVIVAL" });
+    jest.mocked(withNamedLock).mockRejectedValueOnce(new NamedLockUnavailableError("bg_solo_forfeit_40", 0));
+
+    expect(
+      await forfeitSoloEntriesAfterCommit([
+        { tournamentId: 4, teamId: 40 },
+        { tournamentId: 5, teamId: 41 },
+      ]),
+    ).toBe(1);
+
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(5, 41, null, undefined, DELETION_FORFEIT);
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("forfeitSoloEntriesAfterCommit_forfeitDone_lineWrittenBeforeLockReleased", async () => {
+    fakeDb({ format: "SURVIVAL" });
+    let linesWhileLocked = -1;
+    jest.mocked(withNamedLock).mockImplementation(async (_pool, _name, _timeout, run) => {
+      const result = await run({} as PoolConnection);
+      linesWhileLocked = jest.mocked(sendBotLog).mock.calls.length;
+      return result;
+    });
+
+    await forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }]);
+
+    expect(linesWhileLocked).toBe(1);
+  });
+});
+
 describe("settleDeletedSoloEntries", () => {
   it("settleDeletedSoloEntries_noCandidates_zero", async () => {
     fakeDb({ candidates: [] });
@@ -281,5 +353,58 @@ describe("settleDeletedSoloEntries — relevé des candidats", () => {
     expect(sql).toContain("om.status IN ('PENDING', 'READY')");
     expect(sql).toContain(`LIMIT ${SETTLE_BATCH_SIZE}`);
     expect(SETTLE_BATCH_SIZE).toBe(200);
+  });
+});
+
+/**
+ * Revue de sécurité #598 : chaque appel tient la connexion de son verrou nommé
+ * pendant que le forfait en emprunte d'autres — lancés ensemble, ils pouvaient
+ * occuper tout le pool. Les appels d'un processus passent donc un à un.
+ */
+describe("forfeitSoloEntriesAfterCommit — un appel à la fois", () => {
+  it("forfeitSoloEntriesAfterCommit_concurrentCalls_runOneByOne", async () => {
+    fakeDb({ format: "SURVIVAL" });
+    let releaseFirst: () => void = () => undefined;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(withNamedLock).mockImplementationOnce(async (_pool, _name, _timeout, run) => {
+      await firstHeld;
+      return run({} as PoolConnection);
+    });
+
+    const first = forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }]);
+    const second = forfeitSoloEntriesAfterCommit([{ tournamentId: 5, teamId: 50 }]);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(withNamedLock).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(withNamedLock).mock.calls[1][1]).toBe("bg_solo_forfeit_50");
+  });
+
+  it("forfeitSoloEntriesAfterCommit_getDatabaseRejects_resolvesZeroLoggingCodeOnly", async () => {
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("Access denied for user 'root'@'10.0.0.1'"));
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }])).resolves.toBe(0);
+
+    expect(withNamedLock).not.toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("root");
+    log.mockRestore();
+  });
+
+  it("forfeitSoloEntriesAfterCommit_previousCallFailed_nextStillRuns", async () => {
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("DB_DOWN"));
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const failed = forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }]);
+    fakeDb({ format: "SURVIVAL" });
+
+    const next = forfeitSoloEntriesAfterCommit([{ tournamentId: 5, teamId: 50 }]);
+
+    await expect(failed).resolves.toBe(0);
+    await expect(next).resolves.toBe(1);
+    log.mockRestore();
   });
 });

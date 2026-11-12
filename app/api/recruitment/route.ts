@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { serviceErrorCode } from "@/lib/server/failure-reason";
+import { serviceErrorCode, failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createRecruitmentAd, listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { can } from "@/lib/shared/permissions";
@@ -13,7 +13,7 @@ export async function GET() {
     const ads = await listRecruitmentAds(can(user, "recruitment"));
     return Response.json({ ads });
   } catch (error) {
-    console.error("Failed to fetch recruitment ads:", error);
+    console.error("Failed to fetch recruitment ads:", failureReason(error));
     return Response.json({ ads: [] }, { status: 500 });
   }
 }

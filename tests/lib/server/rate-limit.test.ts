@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import {
   chargeRateLimit,
   checkRateLimit,
@@ -205,6 +205,23 @@ describe("rate-limit — seau à jetons", () => {
     expect(takeTokenBucket(BUCKET, "k", 1_000).allowed).toBe(true);
   });
 
+  it("takeTokenBucket_refusedKeyStillHammering_survivesEviction", () => {
+    // Clé saturante insérée la première, puis neuf seaux à moins de moitié : la
+    // place se libère par les moins récemment touchés. Refusée juste avant, la
+    // clé saturante est récente — évincée, elle retrouverait ses jetons.
+    const rule: TokenBucketRule = { name: "bucket-evict-refused", capacity: 4, refillMs: 1_000_000, maxKeys: 10 };
+    for (let i = 0; i < 4; i += 1) takeTokenBucket(rule, "attacker", 0);
+    for (let key = 0; key < 9; key += 1) {
+      for (let i = 0; i < 3; i += 1) takeTokenBucket(rule, `legit-${key}`, 0);
+    }
+    takeTokenBucket(rule, "attacker", 0);
+
+    takeTokenBucket(rule, "new-key", 0);
+
+    expect(takeTokenBucket(rule, "attacker", 0).allowed).toBe(false);
+    expect(tokensLeft(rule, "legit-0", 0)).toBe(4);
+  });
+
   it("rend un jeton remboursé, jamais au-delà de la capacité", () => {
     takeTokenBucket(BUCKET, "k", 0);
     refundTokenBucket(BUCKET, "k", 0);
@@ -265,5 +282,55 @@ describe("rateLimitWindowOf", () => {
 
   it("rateLimitWindowOf_unknownKey_returnsNull", () => {
     expect(rateLimitWindowOf(RULE, "nobody", 5_000)).toBeNull();
+  });
+});
+
+describe("takeTokenBucket — éviction sans tri", () => {
+  beforeEach(() => {
+    resetRateLimit();
+  });
+
+  it("takeTokenBucket_saturatedWithHalfFullBuckets_evictsTenPercentOfHalfFullKeepsDrainedOnes", () => {
+    const rule: TokenBucketRule = { name: "evict-half", capacity: 10, refillMs: 60_000, maxKeys: 20 };
+    for (let i = 0; i < 10; i += 1) takeTokenBucket(rule, "drained", 0);
+    for (let i = 0; i < 19; i += 1) takeTokenBucket(rule, `k${i}`, 0);
+
+    takeTokenBucket(rule, "fresh", 0);
+
+    // Deux places libérées (10 % de 20), prises parmi les seaux à moitié pleins,
+    // dans l'ordre ; le seau épuisé garde sa dette. (`tokensLeft` prend un
+    // jeton : les clés évincées se lisent en dernier.)
+    expect(tokensLeft(rule, "k2", 0)).toBe(9);
+    expect(takeTokenBucket(rule, "drained", 0).allowed).toBe(false);
+    expect(tokensLeft(rule, "k0", 0)).toBe(10);
+    expect(tokensLeft(rule, "k1", 0)).toBe(10);
+  });
+
+  it("takeTokenBucket_noHalfFullBucket_evictsLeastRecentlyTaken", () => {
+    const rule: TokenBucketRule = { name: "evict-lru", capacity: 2, refillMs: 60_000, maxKeys: 3 };
+    for (const key of ["a", "b", "c"]) {
+      takeTokenBucket(rule, key, 0);
+      takeTokenBucket(rule, key, 0);
+    }
+    // Tous épuisés : aucun n'est à moitié plein, le moins récemment pris (« a ») part.
+    expect(takeTokenBucket(rule, "d", 0).allowed).toBe(true);
+
+    expect(tokensLeft(rule, "b", 0)).toBe(0);
+    expect(tokensLeft(rule, "c", 0)).toBe(0);
+    expect(tokensLeft(rule, "a", 0)).toBe(2);
+  });
+
+  it("takeTokenBucket_retakenKey_movesToEndOfEvictionOrder", () => {
+    const rule: TokenBucketRule = { name: "evict-order", capacity: 3, refillMs: 60_000, maxKeys: 2 };
+    takeTokenBucket(rule, "a", 0);
+    takeTokenBucket(rule, "a", 0);
+    takeTokenBucket(rule, "b", 0);
+    takeTokenBucket(rule, "b", 0);
+    takeTokenBucket(rule, "a", 0); // « a » redevient le plus récent
+
+    takeTokenBucket(rule, "c", 0);
+
+    expect(tokensLeft(rule, "a", 0)).toBe(0);
+    expect(tokensLeft(rule, "b", 0)).toBe(3);
   });
 });

@@ -420,7 +420,9 @@ pas publié le texte (redémarrage) — les textes légaux le disent. Même chos
 Ils ne sont pas **retirés** de la réponse : c'est le seul moyen de retrouver un
 adversaire d'un tournoi passé, et la ligne ne porte plus rien de personnel.
 `listPlayers` rend donc `isDeleted`, et le filtre est côté client comme les
-autres de cet écran.
+autres de cet écran. Seul un compte supprimé **sans fiche** (D13 : rien joué,
+`loadProfilelessPlayerIds`) est retiré dès le serveur : il n'a pas
+d'adversaire à retrouver, et son nom menait à une fiche introuvable.
 
 La carte d'un compte anonymisé est **en retrait** et porte la mention « Compte
 supprimé ». Le retrait est posé sur les décorations une par une, jamais sur la
@@ -604,6 +606,17 @@ pseudo). La fiche joueur répond 404 même s'il a joué, et il compte parmi les
 joueurs sans fiche (`profileless-players`). Les sessions sont supprimées dans
 la transaction.
 
+**Une seule horloge, celle de la base (D67).** La demande s'écrit
+`deletion_requested_at = NOW()` et chaque décision « fenêtre ouverte / échue »
+se prend en SQL contre ce même `NOW()` (`lib/server/users/reactivation-window.ts` :
+`reactivationWindowOpenSql` — écran de réactivation, ticket, réactivation sous
+verrou — et `deletionDueSql` — relevé horaire et relecture sous le verrou de
+la finalisation). Node et MariaDB n'ont plus à partager un fuseau pour
+s'accorder sur l'échéance. Seul le **rejeu** du journal écrit une date (celle
+d'origine, brute quand le journal la garde) et juge sa fenêtre sur l'instant
+ISO du journal (`isReactivationWindowOpen`, hors ligne) ; l'échéance montrée
+(`finalAt`) reste l'instant de la demande + 30 jours.
+
 ### Anonyme dès la demande (décision du 2026-11-04)
 
 > `lib/server/users/account-deletion-hold.ts`, table `bg_account_deletion_holds`.
@@ -724,6 +737,8 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   de transaction changent de main (`WHERE … AND id IN (…)`) : un tournoi confié
   entre le relevé et l'écriture reste à l'organisateur. Personne :
   rien ne change ; le compte est anonyme dès la demande, puis anonymisé au jour 30.
+  Le repreneur se cherche **avant** les verrous (balayage de `bg_users`) ; la
+  transaction ne le relit que par sa clé, et ne rebalaie que s'il ne convient plus.
 - **E1 — inscriptions solo.** Celles d'un tournoi pas encore commencé, sans
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
@@ -753,6 +768,9 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est
   repris par `settleDeletedSoloEntries`, relancé chaque heure avant les
   suppressions définitives (et au rattrapage de démarrage).
+  Chaque entrée se forfaite derrière son verrou nommé (`bg_solo_forfeit_<id>`,
+  sans attente) : la demande et le passage horaire lancés ensemble ne posent
+  pas deux forfaits, ni deux lignes au journal — le second passe son tour.
 - Casts et arbitrages à venir retirés, invitations du compte annulées.
 - Après le commit, chaque tournoi de l'entrée solo est rediffusé (son nom
   d'engagé vient de passer au pseudo d'emprunt) ; la réactivation rediffuse les

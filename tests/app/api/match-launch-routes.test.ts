@@ -26,7 +26,11 @@ import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
 import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
-import { castOrganisationLinkRefusal, parseCastSettings } from "@/lib/server/tournaments/match-launch-routes";
+import {
+  castOrganisationLinkRefusal,
+  launchFailure,
+  parseCastSettings,
+} from "@/lib/server/tournaments/match-launch-routes";
 import { authUser } from "../../helpers/auth-user";
 
 const player = authUser({ id: 2, roles: [] });
@@ -565,5 +569,33 @@ describe("castOrganisationLinkRefusal / parseCastSettings — décision D7 du 20
 
   it("parseCastSettings_organisationLinkPresent_neverSetsOrigin", () => {
     expect(parseCastSettings({ battletag: "Voix#1234", organisationLink: true })).toEqual({ battletag: "Voix#1234" });
+  });
+});
+
+/** Revue de sécurité #598 : l'erreur d'un pilote partait entière à pm2 (requête, valeur en double). */
+describe("launchFailure", () => {
+  it("launchFailure_driverError_logsCodeOnly", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const error = Object.assign(new Error("Duplicate entry 'a@b.fr' for key 'uniq'"), {
+      code: "ER_DUP_ENTRY",
+      sql: "INSERT INTO bg_users (email) VALUES ('a@b.fr')",
+    });
+
+    const response = launchFailure(error, {}, "MAP_PICK_FAILED");
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "MAP_PICK_FAILED" });
+    expect(log).toHaveBeenCalledWith("[match-launch] échec", "ER_DUP_ENTRY");
+    log.mockRestore();
+  });
+
+  it("launchFailure_nonError_returnsFallback500", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = launchFailure(null, { MATCH_NOT_FOUND: 404 }, "MAP_PICK_FAILED");
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "MAP_PICK_FAILED" });
+    log.mockRestore();
   });
 });

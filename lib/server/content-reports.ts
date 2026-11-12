@@ -13,6 +13,7 @@
  * suivant — aucun signalement effacé ne « revient » durablement.
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "@/lib/server/database";
 import { pushLeadershipAlert } from "@/lib/server/bot-integration";
 import { staffAlertDm } from "@/lib/server/staff-alert-dm";
@@ -383,7 +384,7 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
   });
   alertLeadership(receivedInLastHour, message, reportId, false);
   void notifyReportTargets(reportId, submission.category, targets, viewer.userId).catch((error) => {
-    console.error("[reports] personnes visées non prévenues", error);
+    console.error("[reports] personnes visées non prévenues", failureReason(error));
   });
   void purgeExpiredReports().catch(() => undefined);
 
@@ -624,7 +625,7 @@ async function planUserNotices(
   plan: TargetNoticePlan,
 ): Promise<void> {
   const [rows] = await connection.execute<RecipientRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale
        FROM bg_users u
        WHERE u.is_deleted = 0 AND u.id IN (${userIds.map(() => "?").join(", ")})`,
     userIds,
@@ -647,7 +648,7 @@ async function planTeamNotices(
   plan: TargetNoticePlan,
 ): Promise<void> {
   const [rows] = await connection.execute<(RecipientRow & { team_id: number })[]>(
-    `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale
        FROM bg_team_members tm
        JOIN bg_users u ON u.id = tm.user_id
        WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
@@ -1324,7 +1325,7 @@ export function schedulePurgeExpiredReports(now: number = Date.now()): void {
   // Les logos d'abord : un logo supprimé à l'échéance libère son signalement,
   // que la purge suivante peut alors effacer.
   void purgeDueQuarantines()
-    .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", error))
+    .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", failureReason(error)))
     .then(() => purgeExpiredReports())
-    .catch((error) => console.error("[reports] purge impossible", error));
+    .catch((error) => console.error("[reports] purge impossible", failureReason(error)));
 }

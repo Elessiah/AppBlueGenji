@@ -63,11 +63,15 @@ export async function loadTakenAnonymousPseudos(runner: Runner, userId: number):
  * gardes d'écriture exige que seule l'écriture qui pose le drapeau en soit
  * dispensée), puis l'entrée solo renommée. Rend `false` si le compte n'était
  * plus vivant.
+ *
+ * `requestedAt` `null` : la demande est datée par la base (`NOW()`, D67) —
+ * l'horloge contre laquelle sa fenêtre se juge ensuite. Seul le rejeu du
+ * journal passe une date, celle d'origine (brute quand le journal la garde).
  */
 export async function holdAccountIdentity(
   connection: PoolConnection,
   userId: number,
-  requestedAt: Date | string,
+  requestedAt: Date | string | null,
 ): Promise<boolean> {
   const [rows] = await connection.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
     `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
@@ -90,9 +94,9 @@ export async function holdAccountIdentity(
     try {
       const [result] = await connection.execute<ResultSetHeader>(
         `UPDATE bg_users
-            SET pseudo = ?, avatar_url = NULL, is_deleted = 1, deletion_requested_at = ?
+            SET pseudo = ?, avatar_url = NULL, is_deleted = 1, deletion_requested_at = ${requestedAt === null ? "NOW()" : "?"}
           WHERE id = ? AND is_deleted = 0`,
-        [pseudo, requestedAt, userId],
+        requestedAt === null ? [pseudo, userId] : [pseudo, requestedAt, userId],
       );
       if (Number(result.affectedRows) !== 1) return false;
       break;

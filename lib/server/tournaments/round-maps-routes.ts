@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
 
@@ -27,7 +27,9 @@ export async function roundMapsStaffPut<T>(
   const tournamentId = parseMatchIdParam((await context.params).id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
 
-  const raw = await readJsonBody(req).catch(() => ({}));
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const raw = read.body;
   const body: RoundMapsBody = typeof raw === "object" && raw !== null ? (raw as RoundMapsBody) : {};
   try {
     return ok(await run(tournamentId, body));

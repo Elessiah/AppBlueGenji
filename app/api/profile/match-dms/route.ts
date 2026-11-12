@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 import { INVALID_MATCH_DM_PREFERENCE, recordMatchDmPreference } from "@/lib/server/users/match-dm-preference";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Messages privés Discord de match, depuis « Mon profil » :
@@ -26,7 +27,7 @@ export async function PUT(req: Request) {
     if (!(await recordMatchDmPreference(user.id, enabled))) return fail(ACCOUNT_DELETED_ERROR, 409);
     return ok({ enabled });
   } catch (error) {
-    console.error("[profile] PUT match-dms failed:", error);
+    console.error("[profile] PUT match-dms failed:", failureReason(error));
     return fail("PROFILE_UPDATE_FAILED", 400);
   }
 }

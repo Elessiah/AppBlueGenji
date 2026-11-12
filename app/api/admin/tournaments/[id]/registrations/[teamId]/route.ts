@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { publishStaffAction } from "@/lib/server/staff-audit";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { removeTournamentEntrant } from "@/lib/server/tournaments/registration-removal";
 import { formatEntrantRemovedLog } from "@/lib/shared/bot-logs";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
@@ -75,12 +76,11 @@ export async function DELETE(
     if (Object.hasOwn(ENTRANT_REMOVAL_BLOCK_MESSAGES, message)) return fail(message, 409);
 
     // Même précaution que la suppression et le retour en arrière : le texte
-    // d'une erreur mysql2 est anglais et parle du moteur. Il reste au journal du
-    // serveur, où il sert à quelque chose.
-    console.error(
-      `[tournaments] retrait de l'engagé ${teamId} du tournoi ${tournamentId} échoué :`,
-      error,
+    // d'une erreur mysql2 reste hors de la réponse, et le journal n'en garde
+    // que le code (`unexpectedFailureCode`) ; une contention rend 409.
+    return fail(
+      unexpectedFailureCode(error, "ENTRANT_REMOVAL_FAILED", `[tournaments] retrait de l'engagé ${teamId} du tournoi ${tournamentId} échoué`),
+      500,
     );
-    return fail("ENTRANT_REMOVAL_FAILED", 500);
   }
 }

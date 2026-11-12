@@ -180,7 +180,12 @@ Détail, données et apparence : `PODIUM_TIERS.md`.
 **Compte supprimé sans fiche (D13)** : `PlayerLink` et `EntrantLink` (entrée
 solo) rendent le nom en texte quand le compte supprimé n'a joué aucun match —
 sa fiche répond 404. La liste vient du layout racine
-(`ProfilelessPlayersProvider`, `useHasPlayerPage`) → `ACCOUNT_DELETION.md`.
+(`ProfilelessPlayersProvider`, `useHasPlayerPage`) → `ACCOUNT_DELETION.md` La modération passe aussi par
+`PlayerLink` (`ModerationPlayerLink`, nouvel onglet par `newTabLabel`, texte lu
+au lecteur d'écran) ; la cible joueur de `ReportTargetCard` n'a de lien que si
+le compte est vivant (`exists`), un compte supprimé y restant un nom (D69 : pas
+de fiche pour le staff). Hors `PlayerLink`, `GET /api/teams/[id]`
+qui rend un 404 nu `TEAM_NOT_FOUND` (sans `soloUserId`) pour l'entrée solo d'un tel compte.
 
 **Nom invisible** : un nom ancien fait seulement de caractères invisibles
 (laissé tel quel par `cleanStoredNames`) rendait un lien sans texte, donc sans

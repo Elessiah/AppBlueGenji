@@ -59,7 +59,8 @@ passe par un regroupeur (`lib/server/coalescer.ts`) par tournoi — une ligne
 après 60 s sans nouveau geste, au plus tard 5 min après le premier. Un autre
 geste sur le même tournoi fait d'abord partir la rafale en attente (le journal
 garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journal
-(`flushAllCoalescers`, `bot-log-shutdown.ts`), comme les lignes de tournoi et
+(`flushAllCoalescers`, `bot-log-shutdown.ts` — huit clés à la fois,
+`FLUSH_ALL_BATCH`, plus aucun lot neuf passée la moitié du délai d'arrêt), comme les lignes de tournoi et
 de match déjà parties qui lisent encore la base (`trackAnnouncement`). Les
 lignes d'un même tournoi, et celles d'un même match, s'enchaînent
 (`createKeyedChain`) : la suivante attend la précédente, sans retenir les autres

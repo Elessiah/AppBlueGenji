@@ -175,14 +175,15 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest
       .mocked(setMatchStartAt)
-      .mockRejectedValue(new Error("Deadlock found when trying to get lock; try restarting transaction"));
+      .mockRejectedValue(new Error("Unknown column 'start_at' in 'field list'"));
     const res = await PUT(req({ startAt: "2026-08-29T18:30:00Z" }), params("42"));
     expect(res.status).toBe(500);
     const body = JSON.stringify(await res.json());
     expect(body).toContain("MATCH_SCHEDULE_UPDATE_FAILED");
-    expect(body).not.toContain("Deadlock");
-    // Le texte reste dans pm2.
-    expect(logged).toHaveBeenCalled();
+    expect(body).not.toContain("start_at");
+    // pm2 n'en garde que la nature (ERREUR.txt, revue sécurité #541), jamais le texte.
+    expect(logged).toHaveBeenCalledWith("[match-schedule] mise à jour en échec : Error");
+    expect(String(logged.mock.calls[0][0])).not.toContain("start_at");
     logged.mockRestore();
   });
 });

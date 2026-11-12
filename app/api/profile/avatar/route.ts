@@ -7,6 +7,7 @@ import { isImageUploadError } from "@/lib/shared/image-upload-errors";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 import { readImageUploadForm } from "@/lib/server/request-body";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Le ménage du fichier orphelin : un **résidu**, jamais un échec.
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
     // message interne, gardé au journal du serveur.
     const message = (error as Error).message;
     if (isImageUploadError(message)) return fail(message, 400);
-    console.error("[profile] avatar upload failed:", error);
+    console.error("[profile] avatar upload failed:", failureReason(error));
     return fail("AVATAR_UPLOAD_FAILED", 400);
   }
 }

@@ -17,6 +17,7 @@
  * gardé n'écrit rien et ne parcourt pas la mémoire des invitations.
  */
 import { CERTIFICATION_PROMPT_OFF_RULE, enforceRateLimit } from "@/lib/server/api-guard";
+import { failureReason } from "@/lib/server/failure-reason";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
   } catch (error) {
     // Colonne absente : le choix ne peut pas être gardé (la modale se rouvrira).
     if (isUnknownColumnError(error)) return fail("CERTIFICATION_PROMPT_UNAVAILABLE", 503);
-    console.error("[tournaments] POST certification-prompt failed:", error);
+    console.error("[tournaments] POST certification-prompt failed:", failureReason(error));
     return fail("CERTIFICATION_PROMPT_FAILED", 500);
   }
 }

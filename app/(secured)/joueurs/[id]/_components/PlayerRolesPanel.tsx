@@ -40,7 +40,7 @@ export function PlayerRolesPanel({
   roles: PlatformRole[] | undefined;
   onSaved: () => Promise<void> | void;
 }>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const staffLang = useStaffLang();
   const toastLang = staffLang ? { lang: staffLang } : undefined;
   const [rolesBusy, setRolesBusy] = useState(false);
@@ -64,15 +64,28 @@ export function PlayerRolesPanel({
       const res = await fetch(`/api/admin/users/${userId}/roles`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ roles: selectedRoles }),
+        // Les rôles affichés : si un autre réglage a abouti depuis, la route
+        // refuse (`ROLES_CHANGED`) au lieu de l'effacer sans le dire.
+        body: JSON.stringify({ roles: selectedRoles, expectedRoles: roles }),
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
       showSuccess("Rôles mis à jour.", toastLang);
       await onSaved();
       return true;
     } catch (e) {
-      showError(rolesErrorMessage((e as Error).message), toastLang);
+      const code = (e as Error).message;
+      showError(rolesErrorMessage(code), toastLang);
+      if (code === "ROLES_CHANGED") {
+        // La fiche relit les rôles enregistrés (la sélection s'y resynchronise)
+        // et la confirmation, qui annonçait un écart périmé, se ferme.
+        try {
+          await onSaved();
+        } catch {
+          // Relecture impossible : la notification a dit de relire la fiche.
+        }
+        return true;
+      }
       return false;
     } finally {
       setRolesBusy(false);
@@ -80,9 +93,12 @@ export function PlayerRolesPanel({
   };
 
   const requestSave = () => {
+    // Sans les rôles enregistrés, rien ne permet de détecter un réglage concurrent.
+    if (!roles) return;
     const change = diffPlatformRoles(roles ?? [], selectedRoles);
     if (roleChangeNeedsConfirmation(change)) setPendingChange(change);
-    else void saveRoles();
+    // Aucune case changée : rien à enregistrer (ni requête, ni ligne au journal du staff).
+    else showInfo("Aucun rôle n'a changé : rien à enregistrer.", toastLang);
   };
 
   return (
@@ -121,7 +137,7 @@ export function PlayerRolesPanel({
           type="button"
           className="btn"
           style={{ padding: "9px 18px", fontSize: 13 }}
-          disabled={rolesBusy}
+          disabled={rolesBusy || !roles}
           aria-busy={rolesBusy}
           aria-label={`Enregistrer les rôles de ${pseudo}`}
           onClick={requestSave}

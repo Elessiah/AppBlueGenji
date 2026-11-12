@@ -8,6 +8,7 @@ import { loadAllPlayerRecords } from "@/lib/server/stats-service";
 import { cachedStats } from "@/lib/server/stats-cache";
 import type { DirectoryPlayer, PublicUserProfile } from "@/lib/shared/types";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
+import { loadProfilelessPlayerIds } from "./profileless-players";
 
 /*
  * Profil public d'un joueur et annuaire des joueurs, sous les réglages de
@@ -150,7 +151,12 @@ async function readDirectoryRows(db: Pool): Promise<UserRow[]> {
 
 export async function listPlayers(viewerId: number): Promise<DirectoryPlayer[]> {
   const db = await getDatabase();
-  const rows = await readDirectoryRows(db);
+  // Un compte supprimé **sans fiche** (D13 : rien joué) n'a rien à montrer :
+  // l'annuaire ne le liste plus — son id et son pseudo d'emprunt menaient à
+  // une fiche introuvable. Liste mutualisée (`loadProfilelessPlayerIds`).
+  const [allRows, profileless] = await Promise.all([readDirectoryRows(db), loadProfilelessPlayerIds()]);
+  const withoutPage = new Set(profileless);
+  const rows = allRows.filter((row) => !(Number(row.is_deleted) === 1 && withoutPage.has(Number(row.id))));
 
   // `isDeleted` voyage jusqu'à l'annuaire, qui masque ces comptes par défaut :
   // un compte anonymisé n'est plus personne, mais sa ligne reste nécessaire à

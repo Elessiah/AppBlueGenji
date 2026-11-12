@@ -8,6 +8,7 @@ import {
   readFormDataBody,
   readImageUploadForm,
   readJsonBody,
+  readJsonBodyOrFallback,
   readOptionalJsonBody,
   readOptionalJsonObject,
 } from "@/lib/server/request-body";
@@ -315,5 +316,59 @@ describe("readOptionalJsonObject — corps facultatif en objet", () => {
     await expect(readOptionalJsonObject(json('"' + "x".repeat(64) + '"'), "REFUS", 16)).resolves.toEqual({
       refusal: PAYLOAD_TOO_LARGE,
     });
+  });
+});
+
+describe("readJsonBodyOrFallback", () => {
+  it("readJsonBodyOrFallback_validJson_returnsBody", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest('{"a":1}'), {})).resolves.toEqual({ body: { a: 1 } });
+  });
+
+  it("readJsonBodyOrFallback_invalidJson_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("{nope"), null)).resolves.toEqual({ body: null });
+  });
+
+  it("readJsonBodyOrFallback_emptyBodyWithoutContentType_returnsFallback", async () => {
+    const req = new Request("http://localhost/api/test", { method: "POST" });
+
+    await expect(readJsonBodyOrFallback(req, {})).resolves.toEqual({ body: {} });
+  });
+
+  it("readJsonBodyOrFallback_foreignContentType_refuses415UnsupportedContentType", async () => {
+    const read = await readJsonBodyOrFallback(jsonRequest("a=1", "application/x-www-form-urlencoded"), {});
+
+    expect("refusal" in read).toBe(true);
+    const refusal = (read as { refusal: Response }).refusal;
+    expect(refusal.status).toBe(415);
+    await expect(refusal.json()).resolves.toEqual({ error: UNSUPPORTED_CONTENT_TYPE });
+  });
+
+  it("readJsonBodyOrFallback_bodyOverLimit_refuses413PayloadTooLarge", async () => {
+    const read = await readJsonBodyOrFallback(jsonRequest('"' + "x".repeat(64) + '"'), {}, 16);
+
+    const refusal = (read as { refusal: Response }).refusal;
+    expect(refusal.status).toBe(413);
+    await expect(refusal.json()).resolves.toEqual({ error: PAYLOAD_TOO_LARGE });
+  });
+});
+
+/** Revue de sécurité #598 : un JSON qui n'est pas un objet rendait `null.slot` (500 brut). */
+describe("readJsonBodyOrFallback — JSON qui n'est pas un objet", () => {
+  it("readJsonBodyOrFallback_jsonNull_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("null"), { fallback: true })).resolves.toEqual({
+      body: { fallback: true },
+    });
+  });
+
+  it("readJsonBodyOrFallback_jsonNumber_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("42"), {})).resolves.toEqual({ body: {} });
+  });
+
+  it("readJsonBodyOrFallback_jsonString_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest('"x"'), {})).resolves.toEqual({ body: {} });
+  });
+
+  it("readJsonBodyOrFallback_jsonArray_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("[1]"), null)).resolves.toEqual({ body: null });
   });
 });

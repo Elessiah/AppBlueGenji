@@ -1,4 +1,5 @@
 import { isSchemaNoOpError } from "@/lib/server/mysql-errors";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Ce qu'on fait d'une migration qui a échoué : la **dire**, jamais l'avaler, et
@@ -29,6 +30,6 @@ export function reportSchemaFailure(error: unknown, statement: string): void {
   if (isSchemaNoOpError(error, statement)) return;
   console.error(
     `[migrations] « ${statement} » a échoué — le schéma reste en arrière du code.`,
-    error,
+    failureReason(error),
   );
 }

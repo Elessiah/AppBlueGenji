@@ -16,6 +16,7 @@ import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categor
 import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
+import { ModerationPlayerLink } from "./ModerationPlayerLink";
 import { ReportTargetCard } from "./ReportTargetCard";
 import { StatusPill } from "./StatusPill";
 import styles from "../reports.module.css";
@@ -177,6 +178,7 @@ export function ReportDetail({
             {report.pagePath && !leadsToApi(report.pagePath) ? (
               <Link href={report.pagePath} target="_blank" rel="noreferrer" className={styles.inlineLink}>
                 {report.pagePath}
+                <span className="sr-only"> (nouvel onglet)</span>
               </Link>
             ) : (
               (report.pagePath ?? "—")
@@ -238,14 +240,7 @@ export function ReportDetail({
           <dt>Compte</dt>
           <dd>
             {report.reporter ? (
-              <Link
-                href={`/joueurs/${report.reporter.userId}`}
-                target="_blank"
-                rel="noreferrer"
-                className={styles.inlineLink}
-              >
-                {report.reporter.pseudo}
-              </Link>
+              <ModerationPlayerLink userId={report.reporter.userId} pseudo={report.reporter.pseudo} />
             ) : (
               "Visiteur sans compte"
             )}
@@ -297,14 +292,7 @@ export function ReportDetail({
                     <span aria-hidden="true">⚖</span> n° {contest.id} · {formatDateTime(contest.createdAt)}
                   </span>
                   {contest.author ? (
-                    <Link
-                      href={`/joueurs/${contest.author.userId}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={styles.inlineLink}
-                    >
-                      {contest.author.pseudo}
-                    </Link>
+                    <ModerationPlayerLink userId={contest.author.userId} pseudo={contest.author.pseudo} />
                   ) : (
                     <span>Compte supprimé</span>
                   )}

@@ -105,8 +105,27 @@ describe("POST /api/reports", () => {
   });
 
   it("refuse un corps illisible en 400", async () => {
-    const res = await submitReport(new Request("http://localhost/api/reports", { method: "POST", body: "{" }));
+    const res = await submitReport(
+      new Request("http://localhost/api/reports", { method: "POST", headers: { "content-type": "application/json" }, body: "{" }),
+    );
     expect(res.status).toBe(400);
+  });
+
+  // ERREUR.txt (revue #506) : un corps d'un autre type que JSON rend 415, et
+  // un corps trop lourd 413 — plus le 400 d'un champ manquant.
+  it("refuse un corps non JSON en 415 et un corps trop lourd en 413", async () => {
+    const foreign = await submitReport(new Request("http://localhost/api/reports", { method: "POST", body: "{" }));
+    expect(foreign.status).toBe(415);
+    const heavy = await submitReport(
+      new Request("http://localhost/api/reports", {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": String(64 * 1024) },
+        body: "{}",
+      }),
+    );
+    expect(heavy.status).toBe(413);
+    await expect(heavy.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(createReport).not.toHaveBeenCalled();
   });
 
   it(`plafonne à ${REPORT_SUBMIT_RULE.limit} envois par IP sans compte`, async () => {

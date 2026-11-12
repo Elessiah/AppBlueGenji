@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { advanceTournamentNow } from "@/lib/server/tournaments/advance";
 import { can } from "@/lib/shared/permissions";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * « Avancer le tournoi » : fait franchir au tournoi l'étape suivante de son
@@ -52,7 +53,6 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
     // Même précaution que la suppression : le texte d'une erreur mysql2 est
     // anglais et parle du moteur. Il reste au journal du serveur.
-    console.error(`[tournaments] avancée anticipée du tournoi ${tournamentId} échouée :`, error);
-    return fail("TOURNAMENT_ADVANCE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "TOURNAMENT_ADVANCE_FAILED", `[tournaments] avancée anticipée du tournoi ${tournamentId} échouée`), 500);
   }
 }

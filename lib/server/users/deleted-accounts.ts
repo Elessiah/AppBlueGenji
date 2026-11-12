@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
-import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
+import { deletionDueSql } from "./reactivation-window";
 import { unlink } from "node:fs/promises";
 import {
   accountTraceSql,
@@ -17,6 +17,7 @@ import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /** Ce que le rattrapage des comptes supprimés a fait. */
 export type DeletedAccountsReconciliation = {
@@ -97,7 +98,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   const solo = await settleDeletedSoloEntries().catch((error: unknown) => {
     console.error(
       "[deleted-accounts] Inscriptions solo des comptes supprimés reportées :",
-      error instanceof Error ? error.message : error,
+      failureReason(error),
     );
     return { withdrawn: 0, forfeited: 0 };
   });
@@ -135,7 +136,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   } catch (error) {
     console.error(
       "[deleted-accounts] Effacement des acceptations des conditions reporté au prochain démarrage :",
-      error instanceof Error ? error.message : error,
+      failureReason(error),
     );
   }
 
@@ -212,7 +213,7 @@ async function reconcileOneAccount(
     outcome.failed += 1;
     console.error(
       `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
-      error instanceof Error ? error.message : error,
+      failureReason(error),
     );
   } finally {
     connection?.release();
@@ -223,9 +224,10 @@ async function reconcileOneAccount(
 const failedFinalizations = new Map<number, number>();
 const FAILED_FINALIZATION_BACKOFF_MS = 6 * 60 * 60 * 1000;
 /**
- * Compte « dû » pour SQL mais pas encore pour l'horloge de Node : écarté le
- * temps d'un passage seulement (le passage est horaire) — il ne doit pas être
- * finalisé des heures après l'échéance annoncée pour un écart d'horloge.
+ * Compte relevé « dû » mais laissé par la relecture sous verrou (réactivé, ou
+ * suppression faite ailleurs, entre le relevé et le verrou) : écarté le temps
+ * d'un passage seulement (le passage est horaire). Relevé et relecture jugent
+ * l'échéance contre le même `NOW()` de la base (D67).
  */
 const IDLE_FINALIZATION_BACKOFF_MS = 90 * 60 * 1000;
 
@@ -250,8 +252,7 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
   const [due] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users
       WHERE is_deleted = 1
-        AND deletion_requested_at IS NOT NULL
-        AND deletion_requested_at <= NOW() - INTERVAL ${Number(ACCOUNT_REACTIVATION_DAYS)} DAY
+        AND ${deletionDueSql()}
         ${skipped.length > 0 ? `AND id NOT IN (${skipped.map(() => "?").join(", ")})` : ""}
       ORDER BY id
       LIMIT 100`,
@@ -264,15 +265,15 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
     .catch((error: unknown) =>
       console.error(
         "[deleted-accounts] Purge des tickets de réactivation échus reportée :",
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       ),
     );
   const outcome = { finalized: 0, failed: 0 };
   for (const row of due) {
     try {
       if ((await finalizeAccountDeletion(Number(row.id))) !== null) outcome.finalized += 1;
-      // Dû pour SQL (`NOW()`), pas encore pour l'horloge de Node relue sous le
-      // verrou (fuseaux différents), ou réactivé à l'instant : rien n'est fait.
+      // Relevé dû, mais réactivé ou traité ailleurs à l'instant (la relecture
+      // sous verrou juge contre le même `NOW()`, D67) : rien n'est fait.
       // Écarté un passage lui aussi, sans quoi cent comptes de ce genre
       // occuperaient chaque heure les cent places du relevé.
       else failedFinalizations.set(Number(row.id), Date.now() + IDLE_FINALIZATION_BACKOFF_MS);
@@ -281,7 +282,7 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
       failedFinalizations.set(Number(row.id), Date.now() + FAILED_FINALIZATION_BACKOFF_MS);
       console.error(
         `[deleted-accounts] Suppression définitive du compte #${Number(row.id)} reportée :`,
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     }
   }

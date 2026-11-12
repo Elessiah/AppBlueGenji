@@ -202,7 +202,10 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
 
     await cancel("7", "102");
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("écriture concurrente"), checkread);
+    // Le code seul, jamais l'objet (ni son message localisé) : ERREUR.txt, revue sécurité #541.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("écriture concurrente"));
+    expect(String(warn.mock.calls[0][0])).toContain("ER_CHECKREAD");
+    expect(String(warn.mock.calls[0][0])).not.toContain("enregistrement");
   });
 
   it("rend un instantané périmé de MariaDB (1020) en refus « réessaie »", async () => {

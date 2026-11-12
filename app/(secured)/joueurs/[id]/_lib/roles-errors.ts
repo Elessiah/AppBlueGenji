@@ -9,6 +9,8 @@ const ROLES_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   USER_NOT_FOUND: "Ce compte est introuvable.",
   CANNOT_MODIFY_SELF: "Tu ne peux pas modifier tes propres rôles.",
   INVALID_PAYLOAD: "La sélection de rôles est invalide.",
+  ROLES_CHANGED: "Les rôles de ce compte ont changé entre-temps : relis-les avant d'enregistrer.",
+  CONCURRENT_UPDATE_RETRY: "Une autre modification de ce compte est passée au même moment : rien n'a été enregistré. Réessaie.",
 };
 
 export function rolesErrorMessage(code: string): string {

@@ -35,6 +35,8 @@ const SELF_ROLES_ERROR_CODES = [
   "CANNOT_REMOVE_OWN_ADMIN",
   "INVALID_PAYLOAD",
   "USER_NOT_FOUND",
+  "ROLES_CHANGED",
+  "CONCURRENT_UPDATE_RETRY",
 ] as const;
 type SelfRolesErrorCode = (typeof SELF_ROLES_ERROR_CODES)[number];
 
@@ -85,7 +87,7 @@ export function SelfRolesField({
   const text = useProfileText();
   const { t } = text;
   const router = useLocaleRouter();
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(SELF_ROLES_FIELD_ERRORS, { admin: ADMIN_FIELD_ID });
   const [selected, setSelected] = useState<PlatformRole[]>(() => [...roles]);
   const [busy, setBusy] = useState(false);
@@ -119,6 +121,23 @@ export function SelfRolesField({
     setSelected((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
   };
 
+  /**
+   * Relit ses rôles enregistrés (`/api/profile`) après un `ROLES_CHANGED` : la
+   * page les reçoit (`onSaved`), les cases s'y resynchronisent. Plus
+   * administrateur entre-temps : la section se retire.
+   */
+  const reloadSavedRoles = async (): Promise<void> => {
+    try {
+      const res = await fetch("/api/profile", { cache: "no-store" });
+      if (!res.ok) return;
+      const payload = (await res.json()) as { isAdmin?: boolean; roles?: PlatformRole[] };
+      if (payload.isAdmin === false) onAdminLost?.();
+      else if (Array.isArray(payload.roles)) onSaved(payload.roles);
+    } catch {
+      // Relecture impossible : la notification a dit de relire, la page le fera au rechargement.
+    }
+  };
+
   const save = async (): Promise<boolean> => {
     setBusy(true);
     fieldErrors.clear();
@@ -126,7 +145,9 @@ export function SelfRolesField({
       const res = await fetch(`/api/admin/users/${userId}/roles`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ roles: selected }),
+        // Les rôles affichés : un autre administrateur qui les a changés depuis
+        // fait refuser l'envoi (`ROLES_CHANGED`) au lieu d'être effacé.
+        body: JSON.stringify({ roles: selected, expectedRoles: roles }),
       });
       const payload = (await res.json().catch(() => ({}))) as { roles?: PlatformRole[]; error?: string };
       if (!res.ok) {
@@ -148,6 +169,16 @@ export function SelfRolesField({
       const message = e instanceof CodedError ? e.message : t("platformRoles.errors.fallback");
       const code = errorCode(e) ?? "ROLES_UPDATE_FAILED";
       showError(message);
+      if (code === "ROLES_CHANGED") {
+        // La confirmation annonçait un écart périmé : elle se ferme, et les
+        // rôles enregistrés sont relus pour que les cases les montrent.
+        setPending(null);
+        await reloadSavedRoles();
+        // Les permissions changées par l'autre administrateur valent aussi
+        // pour la barre de navigation, tenue par la session.
+        router.refresh();
+        return true;
+      }
       if (DEFINITIVE_REFUSALS.has(code)) {
         // Rien ne sert de rester sur une confirmation qui ne peut plus aboutir.
         setPending(null);
@@ -227,7 +258,7 @@ export function SelfRolesField({
           onClick={() => {
             if (busy) return;
             if (!dirty) {
-              showError(t("platformRoles.nothingToSave"));
+              showInfo(t("platformRoles.nothingToSave"));
               return;
             }
             setPending(change);

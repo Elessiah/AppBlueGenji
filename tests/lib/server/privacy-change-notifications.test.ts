@@ -40,6 +40,7 @@ type Candidate = {
   created_at: string;
   google_linked: 0 | 1;
   live_staff: 0 | 1;
+  locale?: string | null;
 };
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
@@ -135,6 +136,18 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(second.length).toBeGreaterThan(0);
     for (const change of second) expect(message).toContain(change.title);
     for (const change of first) expect(message).not.toContain(change.title);
+  });
+
+  it("dispatchPrivacyChangeNotifications_localeReadWithCandidates_noSecondAccountRead", async () => {
+    // La langue vient avec la ligne : `notifyUsers` ne relit pas `bg_users`.
+    const calls = fakeDb({ candidates: [candidate({ locale: "en" })] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))?.sql).toContain("u.locale");
+    expect(calls.some((c) => c.sql.startsWith("SELECT id, locale FROM bg_users"))).toBe(false);
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toMatch(/privacy/i);
   });
 
   it("filtre en base : compte vivant, joignable, antérieur, ni accepté ni prévenu", async () => {

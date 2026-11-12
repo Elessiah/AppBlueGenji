@@ -42,6 +42,7 @@ export const LEGACY_SUSPENSION_NOTICE_PATH = "/connexion";
  */
 export function middleware(request: NextRequest) {
   if (isServerActionCall(request)) return new NextResponse(null, { status: 404 });
+  if (matchedOnlyForServerAction(request)) return NextResponse.next();
   if (request.nextUrl.pathname.startsWith("/api/")) return guardApiRequest(request);
 
   const { locale, path, prefixed } = splitLocalePrefix(request.nextUrl.pathname);
@@ -144,6 +145,28 @@ export function middleware(request: NextRequest) {
  */
 function isServerActionCall(request: NextRequest): boolean {
   return request.method === "POST" && request.headers.has("next-action");
+}
+
+/** Chemins que la première entrée du `matcher` écarte (fichiers, images). */
+const UNRENDERED_PATH = /^\/(?:_next\/static|_next\/image|favicon\.ico)|\.(?:png|jpg|jpeg|gif|webp|svg|ico|txt|xml|webmanifest)$/;
+
+/**
+ * Requête qui n'a atteint le middleware que par l'entrée `Next-Action` du
+ * `matcher` sans être un appel de Server Action (pas un `POST`) : un fichier,
+ * une image ou un préchargement que les autres entrées écartent. Elle ressort
+ * telle qu'elle est entrée — sans nonce, politique ni cookie : sans cela,
+ * n'importe quel client faisait faire tout le chemin des pages à chaque
+ * fichier en ajoutant l'en-tête.
+ */
+function matchedOnlyForServerAction(request: NextRequest): boolean {
+  if (!request.headers.has("next-action")) return false;
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api/") || /^\/en(?:\/|$)/i.test(pathname)) return false;
+  return (
+    UNRENDERED_PATH.test(pathname) ||
+    request.headers.has("next-router-prefetch") ||
+    request.headers.get("purpose") === "prefetch"
+  );
 }
 
 /**
@@ -330,5 +353,11 @@ export const config = {
     },
     "/api/:path*",
     "/:prefix([eE][nN])/:path*",
+    // Tout chemin portant `Next-Action`, préchargements et fichiers en
+    // .png/.txt/.xml… compris, que la première entrée écarte : un `POST` forgé
+    // y échappait au 404 de `isServerActionCall` (et le bruit « Server
+    // Reference ID » revenait dans pm2). Un `GET` qui n'est venu que par elle
+    // ressort tel quel (`matchedOnlyForServerAction`).
+    { source: "/:path*", has: [{ type: "header", key: "next-action" }] },
   ],
 };

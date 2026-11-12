@@ -52,7 +52,7 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
     // lots, mais ne tiennent que la moitié du délai : des lectures lentes ne
     // doivent pas priver les lots déjà en attente de leur envoi.
     const coalesced = Promise.all([
-      flushAllCoalescers().catch(() => undefined),
+      flushAllCoalescers(Date.now() + timeoutMs / 2).catch(() => undefined),
       // Les passages encore en train de résoudre leurs lignes les posent au lot
       // avant le vidage ; la limite de la moitié du délai les borne aussi.
       shutdownGlobal.__bgBotLogOrder?.catch(() => undefined),

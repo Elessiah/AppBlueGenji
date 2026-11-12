@@ -4,6 +4,14 @@ import { clearCache } from "@/lib/server/cache";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/users/profileless-players");
+
+import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
+
+// Aucun compte sans fiche, sauf mention contraire : `beforeEach` de chaque bloc le rétablit.
+beforeEach(() => {
+  jest.mocked(loadProfilelessPlayerIds).mockResolvedValue([]);
+});
 
 async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
@@ -160,6 +168,26 @@ describe("listPlayers — comptes anonymisés", () => {
     // (fiche), ni date d'inscription.
     const [deleted] = await runList([userRow({ id: 8, is_deleted: 1, pseudo: "compte_supprime_8" })], 999);
     expect(deleted).toMatchObject({ isDeleted: true, id: null, createdAt: null, pseudo: "compte_supprime_8" });
+  });
+
+  it("listPlayers_deletedAccountWithoutPage_leftOutOfDirectory", async () => {
+    // D13 : un compte supprimé qui n'a rien joué n'a pas de fiche ; l'annuaire
+    // ne le liste plus (id et pseudo d'emprunt menaient à une page introuvable).
+    jest.mocked(loadProfilelessPlayerIds).mockResolvedValue([8]);
+
+    const rows = await runList([userRow(), userRow({ id: 8, is_deleted: 1, pseudo: "compte_supprime_8" })], 999);
+
+    expect(rows.map((row) => row.pseudo)).toEqual(["Player"]);
+  });
+
+  it("listPlayers_liveAccountListedAsProfileless_keptInDirectory", async () => {
+    // La liste mise en cache peut dater d'avant une réactivation : seul un
+    // compte encore supprimé en est écarté.
+    jest.mocked(loadProfilelessPlayerIds).mockResolvedValue([7]);
+
+    const rows = await runList([userRow()], 999);
+
+    expect(rows).toHaveLength(1);
   });
 
   it("listPlayers_activeRow_keepsIdAndCreationDate", async () => {

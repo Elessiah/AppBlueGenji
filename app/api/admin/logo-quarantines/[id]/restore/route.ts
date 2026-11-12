@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { restoreReportedImage } from "@/lib/server/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /** Rétablit une image masquée (logo d'équipe ou avatar de joueur) : la contestation a abouti. */
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,6 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     ) {
       return fail(message, 409);
     }
-    console.error("[moderation] rétablissement de l'image impossible", error);
-    return fail("LOGO_RESTORE_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "LOGO_RESTORE_FAILED", "[moderation] rétablissement de l'image impossible"), 500);
   }
 }

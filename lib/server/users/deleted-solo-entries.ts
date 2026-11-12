@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
 import { toParticipantType } from "@/lib/shared/participants";
@@ -8,6 +9,7 @@ import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./account-deletion";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Les inscriptions solo d'un compte dont la suppression est demandée (ou faite)
@@ -260,8 +262,19 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
       { tournamentId, category: "registrations" },
     );
   } catch (error) {
-    console.error("[account-deletion] ligne de journal du retrait non écrite", error);
+    console.error("[account-deletion] ligne de journal du retrait non écrite", failureReason(error));
   }
+}
+
+/**
+ * Verrou nommé d'une entrée solo pendant son forfait : le forfait d'une demande
+ * et le passage horaire, lancés ensemble sur la même entrée, posaient chacun un
+ * forfait d'arbre différent et écrivaient chacun leur ligne Discord. Sans
+ * attente : celui qui trouve le verrou pris laisse l'autre finir, et le passage
+ * suivant reprend ce qui resterait.
+ */
+export function soloForfeitLockName(teamId: number): string {
+  return `bg_solo_forfeit_${teamId}`;
 }
 
 /**
@@ -271,23 +284,52 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
  * de la demande, et par le passage horaire (`settleDeletedSoloEntries`), qui
  * reprend tout échec. `silent` (rejeu d'une demande après restauration) : sans
  * ligne au journal Discord, le forfait ayant déjà été annoncé.
+ *
+ * Les appels d'un même processus passent **un à un** : chacun tient une
+ * connexion du pool (celle du verrou nommé) pendant que le forfait en emprunte
+ * d'autres ; lancés en nombre (demandes simultanées, passage horaire), ils
+ * pouvaient occuper tout le pool à attendre une connexion qu'aucun ne rendait.
  */
-export async function forfeitSoloEntriesAfterCommit(
+export function forfeitSoloEntriesAfterCommit(
   entries: readonly DeletionWithdrawal[],
   options: { silent?: boolean } = {},
 ): Promise<number> {
+  const run = forfeitQueue.then(() => forfeitEntriesOneByOne(entries, options));
+  forfeitQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** File des forfaits du processus (voir {@link forfeitSoloEntriesAfterCommit}). */
+let forfeitQueue: Promise<unknown> = Promise.resolve();
+
+async function forfeitEntriesOneByOne(
+  entries: readonly DeletionWithdrawal[],
+  options: { silent?: boolean },
+): Promise<number> {
+  if (entries.length === 0) return 0;
   let forfeited = 0;
+  let db: Awaited<ReturnType<typeof getDatabase>>;
+  try {
+    db = await getDatabase();
+  } catch (error) {
+    console.error("[account-deletion] forfaits reportés, base injoignable :", failureReason(error));
+    return 0;
+  }
   for (const entry of entries) {
     try {
-      const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
-      if (forfeits > 0) {
-        forfeited += 1;
-        if (!options.silent) await logDeletionWithdrawal(entry.tournamentId, true);
-      }
+      const forfeits = await withNamedLock(db, soloForfeitLockName(entry.teamId), 0, async () => {
+        const count = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
+        // Écrite sous le verrou : l'appelant concurrent ne peut pas l'écrire aussi.
+        if (count > 0 && !options.silent) await logDeletionWithdrawal(entry.tournamentId, true);
+        return count;
+      });
+      if (forfeits > 0) forfeited += 1;
     } catch (error) {
+      // Déjà en cours ailleurs : l'autre appelant forfaite et journalise.
+      if (error instanceof NamedLockUnavailableError) continue;
       console.error(
         `[account-deletion] forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     }
   }
@@ -339,7 +381,7 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
     } catch (error) {
       console.error(
         `[deleted-accounts] Inscriptions solo du compte #${userId} reportées au prochain passage :`,
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     }
   }

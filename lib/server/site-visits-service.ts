@@ -28,6 +28,7 @@
  * (`lib/server/bot-integration.ts`), qui le sert à la commande `/stats-site`.
  */
 import { createHash } from "node:crypto";
+import { failureReason } from "@/lib/server/failure-reason";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
 import { toIso } from "./serialization";
@@ -270,7 +271,7 @@ async function rememberVisitor(visitorKey: string, authenticated: number): Promi
       [visitorKey, authenticated],
     );
   } catch (error) {
-    console.error("[site-visits] Empreinte du visiteur non retenue pour le total.", error);
+    console.error("[site-visits] Empreinte du visiteur non retenue pour le total.", failureReason(error));
   }
 }
 
@@ -295,7 +296,7 @@ export function maintainSiteVisitRetention(now: number = Date.now()): void {
   if (now - lastRetentionMaintenanceAt < RETENTION_MAINTENANCE_INTERVAL_MS) return;
   lastRetentionMaintenanceAt = now;
   void rollUpExpiredSiteVisits().catch((error: unknown) => {
-    console.error("[site-visits] Entretien des durées de conservation impossible.", error);
+    console.error("[site-visits] Entretien des durées de conservation impossible.", failureReason(error));
   });
 }
 
@@ -482,7 +483,7 @@ export async function syncSiteVisitStatsToBot(force = false): Promise<boolean> {
   // prive pas le bot de ses chiffres — le détail restant est simplement plus
   // long, et le prochain passage repliera.
   await rollUpExpiredSiteVisits().catch((error: unknown) => {
-    console.error("[site-visits] Repli des visites anciennes impossible.", error);
+    console.error("[site-visits] Repli des visites anciennes impossible.", failureReason(error));
   });
 
   const stats = await getSiteVisitStats();

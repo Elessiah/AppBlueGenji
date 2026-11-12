@@ -126,7 +126,7 @@ async function queryCandidates(
     )
     .join(" OR ");
   const [rows] = await db.query<CandidateRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.created_at,
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale, u.created_at,
             u.google_sub IS NOT NULL AS google_linked, ${liveStaff ? LIVE_STAFF_SQL : "0"} AS live_staff
        FROM bg_users u
       WHERE u.is_deleted = 0

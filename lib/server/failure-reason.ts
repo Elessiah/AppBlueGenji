@@ -49,3 +49,20 @@ export function serviceErrorCode(error: unknown, fallback: string): string {
   console.error(`[api] ${fallback} : ${failureReason(error)}`);
   return fallback;
 }
+
+/**
+ * Code d'un échec **imprévu** d'une route (après ses refus connus) : une
+ * contention passagère (`isContentionError`) en `CONCURRENT_UPDATE_RETRY`, que
+ * `fail()` rend en 409 (« réessaie »), sinon toujours `fallback`. La ligne de
+ * pm2 garde l'étiquette de la route mais réduit l'erreur à son code
+ * ({@link failureReason}) : l'objet entier y portait `sql`, `sqlMessage` (la
+ * valeur en double d'un `ER_DUP_ENTRY`) et la pile.
+ */
+export function unexpectedFailureCode(error: unknown, fallback: string, label: string): string {
+  if (isContentionError(error)) {
+    console.warn(`${label} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} (${failureReason(error)})`);
+    return CONCURRENT_UPDATE_RETRY;
+  }
+  console.error(`${label} : ${failureReason(error)}`);
+  return fallback;
+}

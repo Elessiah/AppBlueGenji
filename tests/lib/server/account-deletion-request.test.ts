@@ -107,6 +107,8 @@ type Options = {
   /** Les tournois organisés relus dans la transaction, s'ils diffèrent du relevé d'avant. */
   organizedLater?: number[];
   organizerSuccessor?: number | null;
+  /** Le repreneur relu par sa clé sous verrou ne convient plus (suspendu entre-temps). */
+  hintGone?: boolean;
   failOn?: string;
   /** `deletion_requested_at` relue après l'écriture, telle que la base la rend (D21). */
   storedRequestedAt?: string;
@@ -122,7 +124,8 @@ function livingMembers(options: Options) {
     .map((m) => ({ id: m.user_id, suspended: suspended.includes(m.user_id) ? 1 : 0 }));
 }
 
-function organizerRows(options: Options) {
+function organizerRows(options: Options, sql: string) {
+  if (options.hintGone && sql.includes("AND u.id = ?")) return [];
   return options.organizerSuccessor ? [{ id: options.organizerSuccessor }] : [];
 }
 
@@ -191,7 +194,7 @@ function fakeDb(options: Options) {
     if (read) return [read];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
     if (q.startsWith("SELECT u.id, EXISTS (")) return [livingMembers(options)];
-    if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
+    if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options, q)];
     if (isActiveRegistrationRead(q)) return [options.activeTournament ? [{ tournament_id: 8 }] : []];
     if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) return [organizedRows(options, queries)];
     return [{ affectedRows: 1 }];
@@ -286,8 +289,9 @@ describe("requestAccountDeletion — le compte", () => {
     await requestAccountDeletion(7);
 
     // Le compte passe en attente et devient anonyme dans la même écriture
-    // (`holdAccountIdentity`, sur la transaction).
-    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, expect.any(Date));
+    // (`holdAccountIdentity`, sur la transaction), datée par la base (`null` :
+    // `NOW()`, D67) — l'horloge contre laquelle sa fenêtre se juge ensuite.
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, null);
     expect(queries.some((q) => q.sql === "DELETE FROM bg_user_sessions WHERE user_id = ?")).toBe(true);
     expect(connection.commit).toHaveBeenCalled();
     expect(closeUserStreams).toHaveBeenCalledWith(7);
@@ -304,6 +308,27 @@ describe("requestAccountDeletion — le compte", () => {
     );
   });
 
+  // D67 : l'échéance annoncée et le journal suivent la date écrite par la base,
+  // dont l'horloge juge la fenêtre — pas l'horloge de Node.
+  it("requestAccountDeletion_storedDate_finalAtAndJournalFollowDatabaseDate", async () => {
+    fakeDb({ storedRequestedAt: "2026-11-10 09:15:00" });
+    const stored = new Date("2026-11-10 09:15:00");
+
+    const outcome = await requestAccountDeletion(7);
+
+    expect(outcome.finalAt).toBe(new Date(stored.getTime() + 30 * 24 * 3600 * 1000).toISOString());
+    expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ deletedAt: stored.toISOString() }));
+  });
+
+  it("requestAccountDeletion_storedDateUnparsable_fallsBackToRequestedAt", async () => {
+    fakeDb({ storedRequestedAt: "not a date" });
+    const original = new Date("2026-11-01T08:15:00Z");
+
+    const outcome = await requestAccountDeletion(7, { requestedAt: original });
+
+    expect(outcome.finalAt).toBe("2026-12-01T08:15:00.000Z");
+  });
+
   it("requestAccountDeletion_storedDateUnreadable_journalsWithoutRawDate", async () => {
     fakeDb({});
 
@@ -318,6 +343,29 @@ describe("requestAccountDeletion — le compte", () => {
     await requestAccountDeletion(7, { requestedAt: new Date("2026-11-10T08:15:00Z"), requestedAtRaw: "2026-11-10 09:15:00" });
 
     expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, "2026-11-10 09:15:00");
+  });
+
+  // D67 : un rejeu sans date brute (journal d'avant D21) garde la date
+  // d'origine — jamais `NOW()`, qui rouvrirait trente jours.
+  it("requestAccountDeletion_replayWithoutRawDate_holdsJournalDateNotNow", async () => {
+    fakeDb({});
+    const original = new Date("2026-11-01T08:15:00Z");
+
+    await requestAccountDeletion(7, { requestedAt: original });
+
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, original);
+  });
+
+  // D67 : l'échéance rendue au client suit l'instant de la demande, journal et
+  // réponse partageant la même date d'origine au rejeu.
+  it("requestAccountDeletion_replay_finalAtThirtyDaysAfterOriginalRequest", async () => {
+    fakeDb({});
+    const original = new Date("2026-11-01T08:15:00Z");
+
+    const outcome = await requestAccountDeletion(7, { requestedAt: original });
+
+    expect(outcome.finalAt).toBe("2026-12-01T08:15:00.000Z");
+    expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ deletedAt: original.toISOString() }));
   });
 
   // D30 : la demande du joueur ne bloque aucune image — seul ce que la
@@ -953,6 +1001,56 @@ describe("requestAccountDeletion — tournois organisés", () => {
     await requestAccountDeletion(7);
 
     expect(queries.some((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id"))).toBe(false);
+  });
+
+  it("requestAccountDeletion_organizerWithoutSuccessor_doesNotRescanUsersUnderLocks", async () => {
+    const { queries } = fakeDb({ organized: [11], organizerSuccessor: null });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))).toHaveLength(1);
+  });
+
+  it("requestAccountDeletion_organizer_scansSuccessorBeforeLocksThenRereadsItByKey", async () => {
+    // Le balayage de `bg_users` ne tient plus les verrous de la demande.
+    const { queries, connection } = fakeDb({ organized: [11], organizerSuccessor: 21 });
+    connection.beginTransaction.mockImplementation(async () => {
+      queries.push({ sql: "BEGIN", params: [] });
+    });
+
+    await requestAccountDeletion(7);
+
+    const begin = queries.findIndex((q) => q.sql === "BEGIN");
+    const lookups = queries
+      .map((q, index) => ({ ...q, index }))
+      .filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"));
+    expect(lookups).toHaveLength(2);
+    expect(lookups[0].index).toBeLessThan(begin);
+    expect(lookups[0].params).toEqual([7]);
+    expect(lookups[1].index).toBeGreaterThan(begin);
+    expect(lookups[1].sql).toContain("AND u.id = ?");
+    expect(lookups[1].params).toEqual([7, 21]);
+  });
+
+  it("requestAccountDeletion_hintNoLongerEligible_rescansUnderLock", async () => {
+    // Le candidat relu par sa clé a été suspendu entre-temps : le balayage se rejoue sous verrou.
+    const { queries } = fakeDb({ organized: [11], organizerSuccessor: 21, hintGone: true });
+
+    await requestAccountDeletion(7);
+
+    const lookups = queries.filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"));
+    expect(lookups).toHaveLength(3);
+    expect(lookups[2].sql).not.toContain("AND u.id = ?");
+    const handover = queries.find((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id = ?"));
+    expect(handover?.params).toEqual([21, 7, 11]);
+  });
+
+  it("requestAccountDeletion_notAnOrganizer_noSuccessorLookup", async () => {
+    const { queries } = fakeDb({ organized: [] });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))).toBe(false);
   });
 
   it("findOrganizerSuccessor_query_prefersRoleHoldersThenOldest", async () => {

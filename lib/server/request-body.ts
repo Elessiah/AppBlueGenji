@@ -17,10 +17,9 @@
  *   dès qu'elle dépasse la borne : un envoi fragmenté (`Transfer-Encoding:
  *   chunked`), qui n'annonce aucune taille, ne passe pas davantage.
  *
- * Le refus est une exception `PAYLOAD_TOO_LARGE` : les routes qui avalaient
- * déjà un corps illisible (`.catch(() => ({}))`) l'avalent de la même façon, et
- * le traitent comme un corps vide — ce qui est exactement ce qu'on veut d'un
- * corps qu'on a refusé de lire.
+ * Le refus est une exception `PAYLOAD_TOO_LARGE` (413) ; les routes qui
+ * tiennent un corps illisible pour vide passent par `readJsonBodyOrFallback`,
+ * qui rend ce refus — et celui d'un corps non JSON (415) — au lieu de l'avaler.
  */
 import { enforceRateLimit, IMAGE_UPLOAD_RULE } from "@/lib/server/api-guard";
 import { fail } from "@/lib/server/http";
@@ -196,6 +195,35 @@ export async function readOptionalJsonObject(
 export function bodyReadRefusal(error: unknown): string | null {
   if (!(error instanceof Error)) return null;
   return error.message === PAYLOAD_TOO_LARGE || error.message === UNSUPPORTED_CONTENT_TYPE ? error.message : null;
+}
+
+/**
+ * Corps JSON des routes qui tenaient un corps illisible pour vide
+ * (`readJsonBody(req).catch(() => ({}))`) : un corps vide ou un JSON invalide
+ * vaut toujours `fallback` — la validation de la route le refuse sous son
+ * propre code —, mais un refus qui a **son propre statut** n'est plus avalé :
+ * un corps trop lourd rend 413 `PAYLOAD_TOO_LARGE`, un corps non vide d'un
+ * autre type que JSON 415 `UNSUPPORTED_CONTENT_TYPE` (au lieu d'un 400 qui
+ * accusait un champ). Un corps vide sans `Content-Type` reste `fallback`, tout
+ * comme un JSON qui n'est pas un objet.
+ */
+export async function readJsonBodyOrFallback<T>(
+  req: Request,
+  fallback: T,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: unknown } | { refusal: Response }> {
+  try {
+    const body: unknown = await readJsonBody(req, maxBytes);
+    // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) vaut
+    // `fallback`, comme un JSON invalide : les routes lisent des champs du
+    // corps, et `null.slot` rendrait un 500 brut hors de leur `try`.
+    if (typeof body !== "object" || body === null || Array.isArray(body)) return { body: fallback };
+    return { body };
+  } catch (error) {
+    const code = bodyReadRefusal(error);
+    if (code === null || (code === UNSUPPORTED_CONTENT_TYPE && !declaresForeignBody(req))) return { body: fallback };
+    return { refusal: fail(code, 400) };
+  }
 }
 
 /** Vrai si l'erreur est le refus d'un corps trop lourd. */

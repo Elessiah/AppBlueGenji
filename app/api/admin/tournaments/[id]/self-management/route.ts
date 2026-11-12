@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { setRoundSelfManaged } from "@/lib/server/tournaments/match-launch";
 import { isPositiveId, launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
@@ -25,7 +25,9 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   const tournamentId = parseMatchIdParam((await context.params).id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as {
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as {
     phaseId?: unknown;
     roundNumber?: unknown;
     bracket?: unknown;

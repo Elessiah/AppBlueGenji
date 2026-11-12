@@ -34,9 +34,10 @@ export interface Coalescer<T> {
    * s'annonce déjà : un geste qui ne se regroupe pas part ainsi **après** la
    * rafale qu'il suit, jamais avant. */
   flush(key: string): Promise<void>;
-  /** Annonce tout de suite toutes les rafales en attente ; se résout une fois
-   * les annonces parties (ou échouées). */
-  flushAll(): Promise<void>;
+  /** Annonce tout de suite toutes les rafales en attente, {@link FLUSH_ALL_BATCH}
+   * clés à la fois ; se résout une fois les annonces parties (ou échouées). Passé
+   * `deadlineAt` (instant en ms), aucun nouveau lot ne part. */
+  flushAll(deadlineAt?: number): Promise<void>;
   /** Abandonne les rafales sans les annoncer. Réservé aux tests. */
   reset(): void;
 }
@@ -49,6 +50,13 @@ export interface Coalescer<T> {
  */
 const registryState = globalThis as typeof globalThis & { __bgCoalescerRegistry?: Set<Coalescer<unknown>> };
 const registry = (registryState.__bgCoalescerRegistry ??= new Set<Coalescer<unknown>>());
+
+/**
+ * Clés annoncées ensemble à l'arrêt : sans plafond, toutes partaient d'un coup
+ * (`Promise.all`), au risque de la limite de débit de Discord, et l'arrêt
+ * attendait la plus lente de toutes.
+ */
+export const FLUSH_ALL_BATCH = 8;
 
 export function createCoalescer<T>(options: {
   windowMs: number;
@@ -145,8 +153,12 @@ export function createCoalescer<T>(options: {
       await inFlight.get(key);
     },
     flush: (key) => settle(key),
-    async flushAll() {
-      await Promise.all([...new Set([...bursts.keys(), ...inFlight.keys()])].map((key) => settle(key)));
+    async flushAll(deadlineAt = Number.POSITIVE_INFINITY) {
+      const keys = [...new Set([...bursts.keys(), ...inFlight.keys()])];
+      for (let index = 0; index < keys.length; index += FLUSH_ALL_BATCH) {
+        if (Date.now() >= deadlineAt) return;
+        await Promise.all(keys.slice(index, index + FLUSH_ALL_BATCH).map((key) => settle(key)));
+      }
     },
     reset() {
       for (const burst of bursts.values()) clearTimeout(burst.timer);
@@ -158,12 +170,18 @@ export function createCoalescer<T>(options: {
   return coalescer;
 }
 
-/** Annonce les rafales de tous les regroupeurs (arrêt du serveur). Ne lève jamais. */
-export async function flushAllCoalescers(): Promise<void> {
-  await Promise.all([...registry].map((coalescer) => coalescer.flushAll()));
+/**
+ * Annonce les rafales de tous les regroupeurs (arrêt du serveur), par lots
+ * bornés, au plus {@link FLUSH_ALL_BATCH} envois à la fois en tout ; passé `deadlineAt`, plus rien de neuf ne part et l'attente des
+ * annonces chaînées s'arrête. Ne lève jamais.
+ */
+export async function flushAllCoalescers(deadlineAt = Number.POSITIVE_INFINITY): Promise<void> {
+  // Un regroupeur après l'autre : le plafond de {@link FLUSH_ALL_BATCH} vaut
+  // pour tout l'arrêt, pas par regroupeur (8 × N envois simultanés sinon).
+  for (const coalescer of registry) await coalescer.flushAll(deadlineAt);
   // Puis les annonces chaînées hors rafale (`trackAnnouncement`), y compris
   // celles qui ne partaient qu'après une rafale qu'on vient d'annoncer.
-  while (announcements.size > 0) await Promise.allSettled([...announcements]);
+  while (announcements.size > 0 && Date.now() < deadlineAt) await Promise.allSettled([...announcements]);
 }
 
 const announcementState = globalThis as typeof globalThis & { __bgPendingAnnouncements?: Set<Promise<void>> };

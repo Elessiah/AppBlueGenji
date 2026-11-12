@@ -114,17 +114,61 @@ function resolveFailureCode(error: unknown): string {
     : "BOT_INTERNAL_UNREACHABLE";
 }
 
-/** Forme d'un code du bot (`VOICE_CHANNEL_NOT_TRACKED`) : jamais une phrase ni un nom. */
-const BOT_ERROR_CODE = /^[A-Z0-9_]{1,64}$/;
+/**
+ * Forme d'un code du bot (`VOICE_CHANNEL_NOT_TRACKED`) : des mots en capitales
+ * **joints par `_`**, 64 caractères au plus — jamais une phrase ni un nom. Un
+ * mot seul en capitales (« ÉQUIPE », un pseudo crié) renvoyé par un relais ne
+ * passe plus pour un code ; les seuls codes d'un mot que le bot émette sont
+ * nommés à part.
+ */
+const BOT_ERROR_CODE = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/;
+const BOT_SINGLE_WORD_CODES: ReadonlySet<string> = new Set(["UNAUTHORIZED", "FORBIDDEN"]);
+
+/** Plafond du corps d'erreur lu : un code tient en quelques dizaines d'octets. */
+export const BOT_ERROR_BODY_MAX_BYTES = 4096;
+
+/** Vrai pour un code d'erreur du bot, faux pour tout autre texte. */
+export function isBotErrorCode(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 64 &&
+    (BOT_ERROR_CODE.test(value) || BOT_SINGLE_WORD_CODES.has(value))
+  );
+}
+
+/**
+ * Le corps d'une réponse, `maxBytes` au plus : au-delà (ou corps illisible),
+ * `null` sans lire la suite — `response.json()` lisait tout, sans plafond.
+ */
+async function readBoundedText(response: Response, maxBytes: number): Promise<string | null> {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
 
 async function safeReadError(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as { error?: unknown } | null;
+    const text = await readBoundedText(response, BOT_ERROR_BODY_MAX_BYTES);
+    const payload = text ? (JSON.parse(text) as { error?: unknown } | null) : null;
     // Un code est une chaîne en capitales : tout autre « error » (objet, nombre, phrase
     // d'un relais qui pourrait citer un salon ou un membre) ne sort pas tel quel.
-    if (typeof payload?.error === "string" && BOT_ERROR_CODE.test(payload.error)) {
-      return payload.error;
-    }
+    if (isBotErrorCode(payload?.error)) return payload.error;
   } catch {
     // Corps illisible (page HTML d'un proxy, texte libre) : jamais recopié comme code.
   }

@@ -17,6 +17,7 @@
  * modale que chez lui.
  */
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 
@@ -167,7 +168,7 @@ export function healRecruitmentModalOff(
       healColumnMissing = true;
       return;
     }
-    console.error("[recruitment] recruitment modal opt-out catch-up failed:", error);
+    console.error("[recruitment] recruitment modal opt-out catch-up failed:", failureReason(error));
   });
   return true;
 }

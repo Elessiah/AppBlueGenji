@@ -1,4 +1,5 @@
 ﻿import { type AuthUser, clearSession, expireSessionCookies, getCurrentUser } from "@/lib/server/auth";
+import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { getFullProfile } from "@/lib/server/users/full-profile";
@@ -85,7 +86,7 @@ export async function PATCH(req: Request) {
     // message est **interne** — il nomme une colonne, une fonction, un jeton —
     // et partait tel quel dans le corps de la réponse. Il reste au journal du
     // serveur ; le client reçoit le code générique, que l'écran traduit.
-    console.error("[profile] PATCH failed:", error);
+    console.error("[profile] PATCH failed:", failureReason(error));
     return fail("PROFILE_UPDATE_FAILED", 400);
   }
 }
@@ -108,7 +109,7 @@ export async function DELETE() {
     // reste au journal, le client reçoit le code générique.
     const message = (error as Error).message;
     if (ACCOUNT_DELETION_REFUSALS.has(message)) return fail(message, 400);
-    console.error("[profile] DELETE failed:", error);
+    console.error("[profile] DELETE failed:", failureReason(error));
     return fail("ACCOUNT_DELETE_FAILED", 400);
   }
   // La suppression est faite (les sessions du compte sont parties avec sa
@@ -118,7 +119,7 @@ export async function DELETE() {
   try {
     await clearSession();
   } catch (error) {
-    console.error("[profile] DELETE: session cleanup failed after deletion:", error);
+    console.error("[profile] DELETE: session cleanup failed after deletion:", failureReason(error));
     // Le cookie part quand même (`__Host-bg_session` : « supprimé à la déconnexion »,
     // dit /rgpd) — seule l'écriture en base a échoué.
     await expireSessionCookies();

@@ -16,6 +16,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "@/lib/server/ranking-cache";
 import { accountTraceSql } from "./account-deletion";
 
@@ -57,7 +58,7 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
   try {
     return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}profileless-players`, computeProfilelessPlayerIds);
   } catch (error) {
-    console.error("[profileless-players] lecture impossible", error);
+    console.error(`[profileless-players] lecture impossible : ${failureReason(error)}`);
     return [];
   }
 }

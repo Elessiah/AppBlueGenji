@@ -2,7 +2,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
@@ -16,7 +17,11 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   const matchId_ = Number(matchId);
   if (!Number.isInteger(matchId_) || matchId_ <= 0) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await readJsonBody(req)) as {
+  // Corps illisible : `{}`, que la validation refuse sous son code ; un corps
+  // trop lourd (413) ou d'un autre type (415) rend son refus, jamais un 500.
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as {
     forfeitTeamId?: unknown;
     doubleForfeit?: unknown;
     maps?: unknown;
@@ -44,9 +49,11 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
     announceStaffMatchAction(matchId_, "SCORES_SAVED", "STAFF", { withoutMatch: autoValidationPaused });
     return ok({ autoValidationPaused });
   } catch (e) {
-    const msg = (e as Error).message;
+    // Le texte d'un pilote (valeur en double, requête) n'atteint ni la réponse
+    // ni pm2 : réduit à son code (`serviceErrorCode`).
+    const msg = serviceErrorCode(e, "ADMIN_SAVE_SCORES_FAILED");
     const status = MAP_LIST_ERROR_CODES.has(msg) ? 400 : SAVE_SCORES_ERROR_STATUS.get(msg);
-    return fail(msg || "ADMIN_SAVE_SCORES_FAILED", status ?? 500);
+    return fail(msg, status ?? 500);
   }
 }
 

@@ -1,9 +1,10 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { recordContestOutcome } from "@/lib/server/logo-quarantine";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { isContestOutcome } from "@/lib/shared/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Écrit l'issue de la contestation d'une image modérée (décision D22) :
@@ -24,7 +25,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const quarantineId = Number(id);
   if (!Number.isSafeInteger(quarantineId) || quarantineId <= 0) return fail("QUARANTINE_NOT_FOUND", 404);
 
-  const body = (await readJsonBody(req).catch(() => null)) as { outcome?: unknown } | null;
+  const read = await readJsonBodyOrFallback(req, null);
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as { outcome?: unknown } | null;
   const outcome = body?.outcome;
   if (!isContestOutcome(outcome)) return fail("INVALID_CONTEST_OUTCOME", 400);
 
@@ -38,7 +41,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const message = (error as Error).message;
     if (message === "QUARANTINE_NOT_FOUND") return fail(message, 404);
     if (message === "QUARANTINE_CLOSED" || message === "QUARANTINE_STILL_HIDDEN") return fail(message, 409);
-    console.error("[moderation] issue de la contestation non écrite", error);
-    return fail("CONTEST_OUTCOME_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "CONTEST_OUTCOME_FAILED", "[moderation] issue de la contestation non écrite"), 500);
   }
 }

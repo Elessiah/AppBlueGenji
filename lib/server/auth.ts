@@ -1,4 +1,5 @@
 ﻿import crypto from "node:crypto";
+import { failureReason } from "@/lib/server/failure-reason";
 import { requestCache } from "@/lib/server/request-cache";
 import { cookies } from "next/headers";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
@@ -225,14 +226,14 @@ async function carryRecruitmentModalOff(
   try {
     if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
   } catch (error) {
-    console.error("[auth] recruitment modal opt-out carry-over failed:", error);
+    console.error("[auth] recruitment modal opt-out carry-over failed:", failureReason(error));
     return;
   }
   // Compte jamais décidé seulement : un « réafficher » fait dans « Mon
   // profil » n'est pas recouvert par le vieux cookie d'un autre navigateur.
   const write = carryRecruitmentModalOffFromBrowser(userId).then(
     () => undefined,
-    (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", error),
+    (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", failureReason(error)),
   );
   // Attente bornée : une ligne de compte verrouillée (attente de verrou
   // jusqu'à `innodb_lock_wait_timeout`) ne fait pas patienter la connexion ;

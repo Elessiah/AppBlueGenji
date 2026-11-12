@@ -1,4 +1,5 @@
 import { fail } from "@/lib/server/http";
+import { failureReason } from "@/lib/server/failure-reason";
 import { isContentionError } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { isMatchLiveTrigger, parseOrganisationLink } from "@/lib/shared/live-streams";
@@ -20,8 +21,8 @@ export function launchFailure(
   statuses: Readonly<Record<string, number>>,
   fallback: string,
 ) {
-  const message = (error as Error).message;
-  const status = statuses[message];
+  const message = error instanceof Error ? error.message : "";
+  const status = Object.hasOwn(statuses, message) ? statuses[message] : undefined;
   if (status) return fail(message, status);
   // Interblocage ou contention passagère (`ER_CHECKREAD`, délai de verrou) à
   // chaque rejeu : un conflit « réessaie », pas une panne — même règle que la
@@ -29,7 +30,8 @@ export function launchFailure(
   if (isContentionError(error)) {
     return fail(CONCURRENT_UPDATE_RETRY, 409);
   }
-  console.error("[match-launch] échec", error);
+  // Code seul : l'erreur d'un pilote porte sa requête et la valeur en cause.
+  console.error("[match-launch] échec", failureReason(error));
   return fail(fallback, 500);
 }
 

@@ -4,6 +4,7 @@ import { isContentionError } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { liftEndurancePenalty } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Retire une pénalité d'endurance : le rejeu rend les points et défait ce que
@@ -36,7 +37,7 @@ export async function DELETE(
     // Lecture bornée des manches (5 s) ou rejeu épuisé : « réessaie », par le
     // code de l'erreur — un message localisé (`lc_messages`) ne s'y lit pas.
     if (isContentionError(error)) {
-      console.warn(`[tournaments] retrait de la pénalité ${penalty} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`, error);
+      console.warn(`[tournaments] retrait de la pénalité ${penalty} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`, failureReason(error));
       return fail(CONCURRENT_UPDATE_RETRY, 409);
     }
     const message = (error as Error).message;

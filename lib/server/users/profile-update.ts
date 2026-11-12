@@ -12,6 +12,7 @@ import { forgetRefereeNamesOf } from "@/lib/server/tournaments/referee-names";
 import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Modification de son profil par le joueur : pseudo, tags de jeu et réglages
@@ -401,7 +402,7 @@ export async function updateOwnProfile(
     try {
       await rotateHiddenAvatarFile(userId);
     } catch (error) {
-      console.error("[avatar-rotation] renommage impossible", error);
+      console.error("[avatar-rotation] renommage impossible", failureReason(error));
     }
   }
 }

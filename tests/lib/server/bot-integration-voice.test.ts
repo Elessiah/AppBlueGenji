@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { clearVoiceChannel, ensureVoiceChannel, releaseVoiceChannel, releaseVoiceChannelByKey } from "@/lib/server/bot-integration";
+import {
+  BOT_ERROR_BODY_MAX_BYTES,
+  clearVoiceChannel,
+  ensureVoiceChannel,
+  isBotErrorCode,
+  releaseVoiceChannel,
+  releaseVoiceChannelByKey,
+} from "@/lib/server/bot-integration";
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -230,4 +237,46 @@ describe("bot-integration — salons vocaux, coupe-circuit", () => {
     for (let call = 0; call < 4; call++) await bot.releaseVoiceChannel("123456789012345678");
     expect(bot.isBotCircuitOpen()).toBe(false);
   });
+});
+
+describe("isBotErrorCode", () => {
+  it("isBotErrorCode_underscoreJoinedCode_true", () => {
+    expect(isBotErrorCode("VOICE_CHANNEL_NOT_TRACKED")).toBe(true);
+  });
+
+  it("isBotErrorCode_knownSingleWordCode_true", () => {
+    expect(isBotErrorCode("UNAUTHORIZED")).toBe(true);
+  });
+
+  it("isBotErrorCode_unknownSingleCapitalWord_false", () => {
+    // Un mot crié par un relais (un nom d'équipe, un pseudo) n'est pas un code.
+    expect(isBotErrorCode("KERYA")).toBe(false);
+  });
+
+  it("isBotErrorCode_code64Chars_true", () => {
+    expect(isBotErrorCode(`A_${"B".repeat(62)}`)).toBe(true);
+  });
+
+  it("isBotErrorCode_code65Chars_false", () => {
+    expect(isBotErrorCode(`A_${"B".repeat(63)}`)).toBe(false);
+  });
+
+  it("isBotErrorCode_lowercaseOrTrailingUnderscore_false", () => {
+    expect(isBotErrorCode("voice_gone")).toBe(false);
+    expect(isBotErrorCode("VOICE_")).toBe(false);
+  });
+});
+
+describe("safeReadError — corps borné", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("releaseVoiceChannel_errorBodyOverLimit_returnsRequestFailedWithoutParsing", async () => {
+    const padding = "x".repeat(BOT_ERROR_BODY_MAX_BYTES);
+    const oversized = json(500, { error: "VOICE_CHANNEL_NOT_TRACKED", padding });
+
+    await expect(freshRelease("id", oversized)).resolves.toEqual(REQUEST_FAILED);
+  });
+
 });

@@ -1,9 +1,10 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { liftSuspension, suspendAccount } from "@/lib/server/account-suspensions";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { validateSuspensionInput } from "@/lib/shared/account-suspension";
 import { can } from "@/lib/shared/permissions";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 
 /**
  * Suspension d'un compte par la modération (permission `moderation`) —
@@ -38,7 +39,9 @@ export async function POST(req: Request, context: Context) {
   const userId = await resolveTarget(context);
   if (userId === null) return fail("INVALID_USER_ID", 400);
 
-  const body = await readJsonBody(req).catch(() => ({}));
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body;
   const input = validateSuspensionInput(body);
   if (!input.ok) return fail(input.error, 400);
 
@@ -48,8 +51,7 @@ export async function POST(req: Request, context: Context) {
   } catch (error) {
     const message = (error as Error).message;
     if (Object.hasOwn(REFUSALS, message)) return fail(message, REFUSALS[message]);
-    console.error("[moderation] suspension impossible", error);
-    return fail("SUSPENSION_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "SUSPENSION_FAILED", "[moderation] suspension impossible"), 500);
   }
 }
 
@@ -67,7 +69,6 @@ export async function DELETE(_: Request, context: Context) {
   } catch (error) {
     const message = (error as Error).message;
     if (Object.hasOwn(REFUSALS, message)) return fail(message, REFUSALS[message]);
-    console.error("[moderation] levée de suspension impossible", error);
-    return fail("SUSPENSION_LIFT_FAILED", 500);
+    return fail(unexpectedFailureCode(error, "SUSPENSION_LIFT_FAILED", "[moderation] levée de suspension impossible"), 500);
   }
 }

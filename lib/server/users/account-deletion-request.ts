@@ -57,6 +57,7 @@ import {
   logDeletionWithdrawal,
   withdrawSoloRegistrationsOn,
 } from "./deleted-solo-entries";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Demande de suppression de son compte (décisions E1, E3, E4, E5 —
@@ -268,10 +269,14 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
  * Le compte vivant le plus ancien, autre que `userId`, qui tient la permission
  * `tournaments` (rôle, sinon administrateur). Un compte suspendu ne se connecte
  * pas : il ne reprend rien.
+ *
+ * `onlyId` : relit ce seul candidat (clé primaire), sous les verrous de la
+ * demande — le balayage complet de `bg_users` se fait avant eux.
  */
 async function findOrganizerSuccessor(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
+  onlyId?: number,
 ): Promise<number | null> {
   const byRole = rolesGranting("tournaments")
     .map((role) => `JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
@@ -281,7 +286,7 @@ async function findOrganizerSuccessor(
     `SELECT u.id
        FROM bg_users u
       WHERE u.is_deleted = 0
-        AND u.id <> ?
+        AND u.id <> ?${onlyId === undefined ? "" : " AND u.id = ?"}
         AND (u.is_admin = 1 OR ${roleSql})
         AND NOT EXISTS (
           SELECT 1 FROM bg_account_suspensions s
@@ -289,7 +294,7 @@ async function findOrganizerSuccessor(
         )
       ORDER BY (${roleSql}) DESC, u.created_at, u.id
       LIMIT 1`,
-    [userId],
+    onlyId === undefined ? [userId] : [userId, onlyId],
   );
   return rows.length > 0 ? Number(rows[0].id) : null;
 }
@@ -311,15 +316,23 @@ async function listOrganizedTournamentIds(
  * rend les tournois touchés. Seuls ceux déjà verrouillés (`lockedIds`, lus
  * avant la transaction) changent de main : un tournoi confié entre-temps reste
  * à l'organisateur, plutôt que d'être écrit sans son verrou.
+ * `successorHint`, trouvé avant les verrous, n'est que relu par sa clé : le
+ * balayage ne se rejoue ici que s'il ne convient plus (supprimé, suspendu,
+ * rôle retiré entre-temps).
  */
 async function handOverOrganizedTournaments(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
   lockedIds: ReadonlySet<number>,
+  successorHint: number | null,
 ): Promise<number[]> {
   const organized = (await listOrganizedTournamentIds(connection, userId)).filter((id) => lockedIds.has(id));
   if (organized.length === 0) return [];
-  const successor = await findOrganizerSuccessor(connection, userId);
+  // Aucun candidat avant les verrous : le balayage complet ne se rejoue pas
+  // sous eux (décision requise). Un candidat périmé seul déclenche un nouveau balayage.
+  if (successorHint === null) return [];
+  const successor =
+    (await findOrganizerSuccessor(connection, userId, successorHint)) ?? (await findOrganizerSuccessor(connection, userId));
   // Personne à qui les confier : rien ne change (décision requise), et le
   // compte sera anonymisé et non effacé, l'organisateur le retenant.
   if (successor === null) return [];
@@ -384,7 +397,7 @@ async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAcco
   try {
     return await listLiveAnnouncementsForDeletionLog(userId);
   } catch (error) {
-    console.error("[account-deletion] annonces #live du compte non relues", error);
+    console.error("[account-deletion] annonces #live du compte non relues", failureReason(error));
     return null;
   }
 }
@@ -444,7 +457,7 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     });
     for (const line of formatAccountDeletionFollowUpLogs(liveAnnouncements)) sendBotLog(line, { category: "signups" });
   } catch (error) {
-    console.error("[account-deletion] alerte de suppression non écrite", error);
+    console.error("[account-deletion] alerte de suppression non écrite", failureReason(error));
   }
   for (const entry of withdrawn) await logDeletionWithdrawal(entry.tournamentId, false);
   // Les forfaits (une transaction d'arbitrage par match, plusieurs tournois
@@ -540,11 +553,15 @@ export async function requestAccountDeletion(
     // inscription à un tournoi en cours ou terminé ne se retire pas, et son
     // verrou ferait attendre un tournoi en cours pour rien.
     soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
+    const organizedIds = await listOrganizedTournamentIds(db, userId);
     const soloTournaments = mergeTournamentIds(
       await listSoloRegistrationTournamentIds(db, userId, true),
-      await listOrganizedTournamentIds(db, userId),
+      organizedIds,
       await listCastTournamentIds(db, userId),
     );
+    // Le repreneur se cherche hors verrous (balayage de `bg_users`) ; la
+    // transaction ne fait que le relire par sa clé.
+    const successorHint = organizedIds.length > 0 ? await findOrganizerSuccessor(db, userId) : null;
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -581,7 +598,12 @@ export async function requestAccountDeletion(
       for (const teamId of await listActiveTeamIds(connection, userId)) {
         departures.push(await leaveTeamOn(connection, teamId, userId));
       }
-      organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
+      organizedHandedOver = await handOverOrganizedTournaments(
+        connection,
+        userId,
+        new Set(soloTournaments),
+        successorHint,
+      );
       // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
       // leur cast jusqu'à la suppression définitive.
       // Ses arbitrages de matchs non joués sont annoncés au staff, et un match
@@ -608,8 +630,9 @@ export async function requestAccountDeletion(
       // réactivation (`account-deletion-hold.ts`).
       // Le rejeu d'une ligne qui porte la date brute de sa demande (D21) la
       // réécrit telle quelle : convertie depuis l'ISO, elle suivrait le fuseau
-      // du shell du rejeu.
-      if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? requestedAt))) {
+      // du shell du rejeu. Une demande ordinaire est datée par la base
+      // (`NOW()`, D67), dont l'horloge juge ensuite sa fenêtre.
+      if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? options.requestedAt ?? null))) {
         throw new Error("USER_NOT_FOUND");
       }
       // Un ticket de réactivation resté d'une demande précédente (connexion
@@ -636,7 +659,7 @@ export async function requestAccountDeletion(
       try {
         flushBotLogs(connection);
       } catch (error) {
-        console.error("[account-deletion] annonces non envoyées", error);
+        console.error("[account-deletion] annonces non envoyées", failureReason(error));
       }
       return plan;
     } catch (error) {
@@ -654,10 +677,14 @@ export async function requestAccountDeletion(
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
   // réactivation la retire ; la suppression définitive écrit la sienne.
+  // La date que la base a écrite (`NOW()`, D67) et dont elle juge la fenêtre :
+  // l'échéance annoncée et le journal la suivent, pas l'horloge de Node.
+  const storedAt = requestedAtRaw === undefined ? null : new Date(requestedAtRaw);
+  const stampedAt = storedAt !== null && Number.isFinite(storedAt.getTime()) ? storedAt : requestedAt;
   await recordAccountDeletion({
     userId,
     accountCreatedAt,
-    deletedAt: requestedAt.toISOString(),
+    deletedAt: stampedAt.toISOString(),
     pending: true,
     ...(requestedAtRaw === undefined ? {} : { requestedAt: requestedAtRaw }),
   });
@@ -672,5 +699,5 @@ export async function requestAccountDeletion(
     replay: options.accountCreatedAt !== undefined,
   });
 
-  return { ...plan, finalAt: reactivationDeadline(requestedAt).toISOString() };
+  return { ...plan, finalAt: reactivationDeadline(stampedAt).toISOString() };
 }

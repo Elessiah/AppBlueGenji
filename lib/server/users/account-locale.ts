@@ -24,6 +24,7 @@
  * (`account-erasure.ts`), exportée avec les données du compte.
  */
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/shared/locales";
 
 /** Code de refus d'une langue inconnue (`PUT /api/profile/locale`). */
@@ -50,7 +51,7 @@ export async function recordLoginLocale(userId: number, locale: Locale): Promise
   try {
     await recordAccountLocale(userId, locale);
   } catch (error) {
-    console.error("[account-locale] langue de connexion non enregistrée", error);
+    console.error("[account-locale] langue de connexion non enregistrée", failureReason(error));
   }
 }
 

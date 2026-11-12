@@ -21,6 +21,7 @@ import { closeUserStreams } from "@/lib/server/session-streams";
 import { finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { finalizeDueAccountDeletions } from "@/lib/server/users/deleted-accounts";
 import { fakePool } from "../../helpers/sql-double";
+import { withWindowFlags } from "../../helpers/reactivation-window-double";
 
 /*
  * Suppression définitive au jour 30 (E4) ; l'avatar en quarantaine part avec
@@ -78,11 +79,12 @@ function fakeDb(options: {
     if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
       return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
     }
-    if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 1 AND deletion_requested_at IS NOT NULL")) {
+    if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 1 AND (deletion_requested_at IS NOT NULL")) {
       return [(options.due ?? []).map((id) => ({ id }))];
     }
-    if (q.includes("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users")) {
-      return [options.locked ? [{ avatar_url: null, discord_id: null, created_at: "2026-01-02 03:04:05", ...options.locked }] : []];
+    if (q.includes("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at,")) {
+      // L'échéance vient de la base (D67) : la double l'émule d'après la date relue.
+      return [options.locked ? withWindowFlags(q, [{ avatar_url: null, discord_id: null, created_at: "2026-01-02 03:04:05", ...options.locked }]) : []];
     }
     if (q.includes("AS played")) return [[{ played: options.played ?? 0, organized: 0, owned: 0 }]];
     const avatarRows = heldAvatarRows(q, options);
@@ -292,7 +294,7 @@ describe("finalizeDueAccountDeletions", () => {
     expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 0, failed: 1 });
     await finalizeDueAccountDeletions();
 
-    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("SELECT id FROM bg_users"));
     expect(dueCalls[0][1]).not.toContain(4242);
     expect(String(dueCalls[1][0])).toContain("id NOT IN (");
     expect(dueCalls[1][1]).toContain(4242);
@@ -306,7 +308,7 @@ describe("finalizeDueAccountDeletions", () => {
     expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 0, failed: 0 });
     await finalizeDueAccountDeletions();
 
-    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("SELECT id FROM bg_users"));
     expect(dueCalls[0][1]).not.toContain(5151);
     expect(dueCalls[1][1]).toContain(5151);
   });
@@ -321,7 +323,7 @@ describe("finalizeDueAccountDeletions", () => {
       jest.setSystemTime(new Date("2026-11-10T11:31:00Z"));
       await finalizeDueAccountDeletions();
 
-      const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+      const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("SELECT id FROM bg_users"));
       expect(dueCalls[1][1]).not.toContain(7171);
     } finally {
       jest.useRealTimers();
@@ -334,7 +336,7 @@ describe("finalizeDueAccountDeletions", () => {
     expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 1, failed: 0 });
     await finalizeDueAccountDeletions();
 
-    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("SELECT id FROM bg_users"));
     expect(dueCalls[1][1]).not.toContain(6161);
   });
 

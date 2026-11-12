@@ -16,6 +16,7 @@
  * classement est celui de la page (`state:all:all`).
  */
 import type { RowDataPacket } from "mysql2/promise";
+import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
@@ -62,7 +63,7 @@ export async function findShareTeam(teamId: number): Promise<ShareTeamRow | null
   try {
     return (await cachedRanking(`${RANKING_LIST_KEY_PREFIX}share-teams`, computeShareTeams)).get(teamId) ?? null;
   } catch (error) {
-    console.error("[share-team] lecture impossible", error);
+    console.error("[share-team] lecture impossible", failureReason(error));
     return null;
   }
 }

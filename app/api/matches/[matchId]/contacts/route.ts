@@ -3,6 +3,7 @@ import { enforceRateLimit, MATCH_CONTACTS_READ_RULE } from "@/lib/server/api-gua
 import { fail, ok } from "@/lib/server/http";
 import { loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
 import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Contacts d'un match pour le bouton « Contacts » de sa carte
@@ -32,7 +33,7 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
     if (!launch) return fail("MATCH_CONTACTS_UNAVAILABLE", 404);
     return ok({ launch });
   } catch (error) {
-    console.error("[match-launch] lecture des contacts impossible", error);
+    console.error("[match-launch] lecture des contacts impossible", failureReason(error));
     return fail("MATCH_CONTACTS_READ_FAILED", 500);
   }
 }

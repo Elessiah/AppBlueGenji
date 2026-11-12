@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { applyEndurancePenalty } from "@/lib/server/tournaments-service";
 import { checkEndurancePenalty } from "@/lib/shared/endurance-penalty";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 
 /**
  * Inflige une pénalité de points d'endurance à un engagé (mode « BlueGenji
@@ -24,7 +24,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as {
+  const read = await readJsonBodyOrFallback(req, {});
+  if ("refusal" in read) return read.refusal;
+  const body = read.body as {
     teamId?: unknown;
     points?: unknown;
     reason?: unknown;

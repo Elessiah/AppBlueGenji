@@ -5,6 +5,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Change l'adresse du fichier d'un avatar qu'on vient de **masquer**.
@@ -214,7 +215,7 @@ async function purgeHeldAvatarCopies(heldUrl: string, original: Buffer, detach: 
     await purge;
     return;
   }
-  void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", error));
+  void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", failureReason(error)));
 }
 
 /**
@@ -299,7 +300,7 @@ export async function purgeOptimizedCopies(source: Buffer): Promise<number> {
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.error("[avatar-rotation] cache de l'optimiseur non purgé", error);
+      console.error("[avatar-rotation] cache de l'optimiseur non purgé", failureReason(error));
     }
   }
   return purged;
@@ -310,7 +311,7 @@ export async function purgeAllOptimizedCopies(): Promise<void> {
   try {
     await rm(optimizedImageCacheDirectory(), { recursive: true, force: true });
   } catch (error) {
-    console.error("[avatar-rotation] cache de l'optimiseur non vidé", error);
+    console.error("[avatar-rotation] cache de l'optimiseur non vidé", failureReason(error));
   }
 }
 

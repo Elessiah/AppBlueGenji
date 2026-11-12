@@ -87,6 +87,7 @@ export function ReportTargetCard({
         )}
         <div className={styles.targetText}>
           <span className={styles.targetType}>{REPORT_TARGET_LABELS[target.type].one}</span>
+          {/* Un compte supprimé (sans fiche ou non, D13) n'est jamais « existant » : le nom n'y est qu'un nom. */}
           {target.exists ? (
             <Link href={reportTargetHref(target)} target="_blank" rel="noreferrer" className={styles.inlineLink}>
               <span className={styles.targetName}>{target.label}</span>
