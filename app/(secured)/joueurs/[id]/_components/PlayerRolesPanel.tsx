@@ -66,7 +66,7 @@ export function PlayerRolesPanel({
         headers: { "content-type": "application/json" },
         // Les rôles affichés : si un autre réglage a abouti depuis, la route
         // refuse (`ROLES_CHANGED`) au lieu de l'effacer sans le dire.
-        body: JSON.stringify(roles ? { roles: selectedRoles, expectedRoles: roles } : { roles: selectedRoles }),
+        body: JSON.stringify({ roles: selectedRoles, expectedRoles: roles }),
       });
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
@@ -79,7 +79,11 @@ export function PlayerRolesPanel({
       if (code === "ROLES_CHANGED") {
         // La fiche relit les rôles enregistrés (la sélection s'y resynchronise)
         // et la confirmation, qui annonçait un écart périmé, se ferme.
-        await onSaved();
+        try {
+          await onSaved();
+        } catch {
+          // Relecture impossible : la notification a dit de relire la fiche.
+        }
         return true;
       }
       return false;
@@ -89,11 +93,12 @@ export function PlayerRolesPanel({
   };
 
   const requestSave = () => {
+    // Sans les rôles enregistrés, rien ne permet de détecter un réglage concurrent.
+    if (!roles) return;
     const change = diffPlatformRoles(roles ?? [], selectedRoles);
     if (roleChangeNeedsConfirmation(change)) setPendingChange(change);
     // Aucune case changée : rien à enregistrer (ni requête, ni ligne au journal du staff).
-    else if (roles) showInfo("Aucun rôle n'a changé : rien à enregistrer.", toastLang);
-    else void saveRoles();
+    else showInfo("Aucun rôle n'a changé : rien à enregistrer.", toastLang);
   };
 
   return (
@@ -132,7 +137,7 @@ export function PlayerRolesPanel({
           type="button"
           className="btn"
           style={{ padding: "9px 18px", fontSize: 13 }}
-          disabled={rolesBusy}
+          disabled={rolesBusy || !roles}
           aria-busy={rolesBusy}
           aria-label={`Enregistrer les rôles de ${pseudo}`}
           onClick={requestSave}

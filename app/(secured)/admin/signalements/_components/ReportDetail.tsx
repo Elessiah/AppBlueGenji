@@ -178,6 +178,7 @@ export function ReportDetail({
             {report.pagePath && !leadsToApi(report.pagePath) ? (
               <Link href={report.pagePath} target="_blank" rel="noreferrer" className={styles.inlineLink}>
                 {report.pagePath}
+                <span className="sr-only"> (nouvel onglet)</span>
               </Link>
             ) : (
               (report.pagePath ?? "—")

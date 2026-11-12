@@ -87,7 +87,7 @@ export function SelfRolesField({
   const text = useProfileText();
   const { t } = text;
   const router = useLocaleRouter();
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(SELF_ROLES_FIELD_ERRORS, { admin: ADMIN_FIELD_ID });
   const [selected, setSelected] = useState<PlatformRole[]>(() => [...roles]);
   const [busy, setBusy] = useState(false);
@@ -258,7 +258,7 @@ export function SelfRolesField({
           onClick={() => {
             if (busy) return;
             if (!dirty) {
-              showError(t("platformRoles.nothingToSave"));
+              showInfo(t("platformRoles.nothingToSave"));
               return;
             }
             setPending(change);
