@@ -317,8 +317,9 @@ async function completeLink(
   }
   // Rattachement (Battle.net : BattleTag vérifié ; Discord) : l'invitation à
   // certifier retenue pour ce compte — et pour ses coéquipiers — ne vaut plus
-  // (`CERTIFICATION_PROMPT.md`).
-  await forgetCertificationPromptsAround(user.id);
+  // (`CERTIFICATION_PROMPT.md`). Sans l'attendre : le compte est oublié
+  // sur-le-champ, ses coéquipiers après la relecture de son équipe.
+  void forgetCertificationPromptsAround(user.id);
 
   const url = new URL(localeHref(PROFILE_PATH, locale), base);
   url.searchParams.set("connected", OAUTH_PROVIDER_SLUGS[provider]);

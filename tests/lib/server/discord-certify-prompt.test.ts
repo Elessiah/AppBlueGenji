@@ -195,9 +195,9 @@ describe("invitation de la fiche tournoi oubliée quand elle ne vaut plus (EF-04
     const verification = source("lib/server/discord-verification.ts");
     // Tag écrit vérifié (code par message privé) et certification en un clic :
     // le compte, et ses coéquipiers (« équipe sans contact », invitation du meneur).
-    expect(verification).toMatch(/throw new Error\("DISCORD_ID_MISMATCH"\);\s*\}\s*(\/\/[^\n]*\n\s*)+await forgetCertificationPromptsAround\(userId\);/);
-    expect(verification).toMatch(/if \(Number\(result\.affectedRows\) > 0\) \{\s*(\/\/[^\n]*\n\s*)+await forgetCertificationPromptsAround\(userId\);\s*return \{ status: "VERIFIED", tag: expected \};/);
+    expect(verification).toMatch(/throw new Error\("DISCORD_ID_MISMATCH"\);\s*\}\s*(\/\/[^\n]*\n\s*)+void forgetCertificationPromptsAround\(userId\);/);
+    expect(verification).toMatch(/if \(Number\(result\.affectedRows\) > 0\) \{\s*(\/\/[^\n]*\n\s*)+void forgetCertificationPromptsAround\(userId\);\s*return \{ status: "VERIFIED", tag: expected \};/);
     // Rattachement réussi seulement : après le retour d'échec.
-    expect(source("lib/server/oauth-flow.ts")).toMatch(/return linkFailure\([^;]*;\s*\}\s*(\/\/[^\n]*\n\s*)+await forgetCertificationPromptsAround\(user\.id\);/);
+    expect(source("lib/server/oauth-flow.ts")).toMatch(/return linkFailure\([^;]*;\s*\}\s*(\/\/[^\n]*\n\s*)+void forgetCertificationPromptsAround\(user\.id\);/);
   });
 });

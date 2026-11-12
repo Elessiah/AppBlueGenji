@@ -183,8 +183,10 @@ async function writeVerifiedTag(userId: number, discordId: string, tag: string):
     throw new Error("DISCORD_ID_MISMATCH");
   }
   // Certifié : l'invitation de la fiche tournoi retenue pour ce compte — et
-  // celles de ses coéquipiers, « équipe sans contact » — ne valent plus.
-  await forgetCertificationPromptsAround(userId);
+  // celles de ses coéquipiers, « équipe sans contact » — ne valent plus. Le
+  // compte est oublié sur-le-champ ; ses coéquipiers sans attendre la relecture
+  // de son équipe (l'oubli ne rejette jamais).
+  void forgetCertificationPromptsAround(userId);
 }
 
 
@@ -242,7 +244,7 @@ export async function certifyLinkedDiscordTag(
     if (Number(result.affectedRows) > 0) {
       // Certifié : l'invitation de la fiche tournoi retenue pour ce compte — et
       // celles de ses coéquipiers — ne valent plus.
-      await forgetCertificationPromptsAround(userId);
+      void forgetCertificationPromptsAround(userId);
       return { status: "VERIFIED", tag: expected };
     }
   }
