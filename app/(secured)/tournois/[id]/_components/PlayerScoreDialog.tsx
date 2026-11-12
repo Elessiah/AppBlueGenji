@@ -252,8 +252,10 @@ function MapDifferenceList({
 }: Readonly<{ differences: ReadonlyArray<MapDifference>; opponentName: string; mapNames?: ReadonlyArray<string | null> }>) {
   const text = useDialogsText();
   const { t } = text;
+  if (differences.length === 0) return null;
   return (
-    <ul className={styles.diffList}>
+    // `role="list"` : `list-style: none` retire la sémantique de liste sous Safari.
+    <ul className={styles.diffList} role="list">
       {differences.map((difference) => {
         const name = mapNames?.[difference.mapNumber - 1] ?? null;
         const label = name
@@ -262,13 +264,14 @@ function MapDifferenceList({
         const kinds = difference.kinds.map((kind) => t(`score.player.diff.kind.${kind}`)).join(", ");
         return (
           <li key={difference.mapNumber}>
-            <span className={styles.diffMap}>{label}</span> — {kinds}
-            <br />
-            {t("score.player.diff.values", {
-              mine: mapValueText(text, difference.mine),
-              opponent: opponentName,
-              theirs: mapValueText(text, difference.theirs),
-            })}
+            <span className={styles.diffMap}>{label}</span> <span>{t("score.player.diff.kinds", { kinds })}</span>
+            <span className={styles.diffValues}>
+              {t("score.player.diff.values", {
+                mine: mapValueText(text, difference.mine),
+                opponent: opponentName,
+                theirs: mapValueText(text, difference.theirs),
+              })}
+            </span>
           </li>
         );
       })}
@@ -298,6 +301,41 @@ function sendingOpensDispute(
   // compare lui-même le détail, et une saisie identique y confirmerait.
   if (opponentDetailKnown(view.theirs)) return !form.confirmsAsIs;
   return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;
+}
+
+/** Phrase annoncée à l'arrivée de la déclaration adverse ; vide sans arrivée. */
+export function arrivalAnnouncement(
+  text: TournamentDialogsText,
+  state: { sameScoreArrived: boolean; offerConfirmTheirs: boolean; differenceCount: number },
+  opponentName: string,
+): string {
+  if (state.sameScoreArrived) return text.t("score.player.sameScoreArrived");
+  const differs = state.offerConfirmTheirs && state.differenceCount > 0;
+  return differs ? text.t("score.player.diff.announce", { opponent: opponentName }) : "";
+}
+
+/** Titre de la zone de comparaison : les écarts, ou à défaut la déclaration adverse. */
+export function diffZoneTitle(
+  text: TournamentDialogsText,
+  differs: boolean,
+  opponentName: string,
+  theirs: MatchScoreReport | null,
+): string {
+  if (differs) return text.t("score.player.diff.title", { opponent: opponentName });
+  return text.t("score.player.diff.titleTheirs", { opponent: opponentName, score: theirs ? scoreText(theirs) : "" });
+}
+
+/**
+ * Arrivée de la déclaration adverse pendant la saisie : annoncée dans une
+ * région toujours montée, vide puis remplie (un bandeau monté déjà rempli
+ * n'est pas lu), sans prendre le focus.
+ */
+function ArrivalStatus({ message }: Readonly<{ message: string }>) {
+  return (
+    <output className="sr-only" aria-live="polite">
+      {message}
+    </output>
+  );
 }
 
 /**
@@ -646,6 +684,7 @@ export function PlayerScoreDialog({
 
   // « Confirmer le score », pas « Confirmer » seul : le forfait déclaré a son
   // propre « Confirmer le forfait de … » dans la même modale.
+  const arrivalMessage = arrivalAnnouncement(text, { sameScoreArrived, offerConfirmTheirs, differenceCount: differences.length }, opponentName);
   const submitLabel = confirmsAsIs ? t("score.player.confirm") : t("score.player.send");
   let blocker: string | null = null;
   if (unchangedMine) blocker = t("score.player.alreadySent", { opponent: opponentName });
@@ -796,35 +835,33 @@ export function PlayerScoreDialog({
 
           {/* Déclaration adverse arrivée pendant la saisie, identique : un clic
               sur « Confirmer le score » clôt le match — jamais d'office. */}
-          {sameScoreArrived && (
-            <output className={`${styles.stored} ${styles.notice}`}>{t("score.player.sameScoreArrived")}</output>
-          )}
+          {sameScoreArrived && <p className={`${styles.stored} ${styles.notice}`}>{t("score.player.sameScoreArrived")}</p>}
 
           {/* Saisie qui diffère de la déclaration adverse : ce qui diffère, map
               par map, et la déclaration adverse à confirmer d'un clic plutôt
               que de tout ressaisir. */}
           {offerConfirmTheirs && (
-            <div className={styles.diffZone}>
-              {differences.length > 0 && (
-                <>
-                  <InfoHintRow>
-                    <p className={mapStyles.proposalTitle}>{t("score.player.diff.title", { opponent: opponentName })}</p>
-                    <InfoHint id="player-score-diff-help" subject={t("score.player.diff.hintSubject")}>
-                      <p>{t("score.player.diff.hint", { opponent: opponentName })}</p>
-                    </InfoHint>
-                  </InfoHintRow>
-                  <MapDifferenceList differences={differences} opponentName={opponentName} mapNames={mapNames} />
-                </>
-              )}
+            <fieldset className={styles.diffZone} aria-labelledby="player-score-diff-title">
+              <InfoHintRow>
+                <p id="player-score-diff-title" className={mapStyles.proposalTitle}>
+                  {diffZoneTitle(text, differences.length > 0, opponentName, theirs)}
+                </p>
+                <InfoHint id="player-score-diff-help" subject={t("score.player.diff.hintSubject")}>
+                  <p>{t("score.player.diff.hint", { opponent: opponentName })}</p>
+                </InfoHint>
+              </InfoHintRow>
+              <MapDifferenceList differences={differences} opponentName={opponentName} mapNames={mapNames} />
               <button
                 type="button"
                 className={`btn ghost ${styles.confirmTheirs}`}
                 onClick={confirmTheirs}
                 aria-disabled={submitting || undefined}
+                aria-busy={submitting || undefined}
+                aria-describedby="player-score-diff-title"
               >
-                {t("score.player.confirmTheirs")}
+                {submitting ? t("score.sending") : t("score.player.confirmTheirs")}
               </button>
-            </div>
+            </fieldset>
           )}
 
           {canEnterScore && showBlocker && (
@@ -863,6 +900,7 @@ export function PlayerScoreDialog({
               </button>
             )}
             <SendingStatus active={submitting} />
+            <ArrivalStatus message={arrivalMessage} />
           </div>
         </form>
       </div>
@@ -881,6 +919,7 @@ export function PlayerScoreDialog({
           }}
         >
           <p>{t("score.player.dispute.body", { opponent: opponentName })}</p>
+          <MapDifferenceList differences={differences} opponentName={opponentName} mapNames={mapNames} />
         </ConfirmActionDialog>
       )}
     </div>,

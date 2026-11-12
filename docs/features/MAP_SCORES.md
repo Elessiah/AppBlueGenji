@@ -450,6 +450,17 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 | Interface | `_components/MapScoreList.tsx`, `MatchMapDetails.tsx`, `MapDetailsDialog.tsx`, `MapResultList.tsx`, `PlayerScoreDialog.tsx`, `AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts`, `_hooks/useProposalMaps.ts` |
 | Relecture d'un match | `app/api/tournaments/[id]/matches/[matchId]/proposals/route.ts`, `getViewerMatchProposals` (`tournaments/index.ts`) |
 
+### Accessibilité de la comparaison
+
+L'arrivée est annoncée dans une région `aria-live="polite"` **toujours montée**
+(`ArrivalStatus`, vide puis remplie : un bandeau monté déjà rempli n'est pas lu),
+sans toucher au focus. La zone de comparaison est un `<fieldset>` nommé par son
+titre (qui dit les écarts, ou la déclaration adverse quand aucun écart n'est
+montré) ; « Confirmer la déclaration adverse » s'y rattache et prend
+`aria-busy` / « Envoi… » en vol. Chaque écart tient sur deux lignes (map et nature
+de l'écart, puis les deux versions) ; la confirmation du litige rappelle ces
+écarts. Même vocabulaire partout : « Envoyer le score ».
+
 ## Tests
 
 `tests/lib/shared/match-maps.test.ts`, `tests/lib/server/match-maps.test.ts`,
@@ -461,4 +472,5 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 `tournaments-service.matches.test.ts` (dont `PROPOSAL_ARRIVED`) ;
 `tests/lib/shared/player-score-report.test.ts` (`mapListDifferences`,
 `entryComparison`) ; `tests/app/tournament-actions-i18n.test.tsx` (bandeau,
-comparaison, confirmation du litige, FR + EN).
+comparaison, confirmation du litige, FR + EN) ;
+`tests/tournois/score-arrival-announcement.test.ts` (annonce, titre de la zone).

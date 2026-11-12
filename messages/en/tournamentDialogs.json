@@ -150,7 +150,7 @@
       "confirmTheirs": "Confirm the opponent's report",
       "diff": {
         "title": "What differs from {opponent}'s report",
-        "hint": "“Confirm the opponent's report” closes the match on {opponent}'s version. Keeping yours opens a dispute: score entry is locked for both opponents, and a referee settles it.",
+        "hint": "“Confirm the opponent's report” closes the match on {opponent}'s version. Sending your own score instead opens a dispute: score entry is locked for both opponents, and a referee settles it.",
         "hintSubject": "opponent's report",
         "map": "Map {number}",
         "mapNamed": "Map {number} ({name})",
@@ -164,12 +164,15 @@
         "values": "you: {mine}; {opponent}: {theirs}",
         "mapValue": "{score} · {code}",
         "noCode": "no code",
-        "absent": "none"
+        "absent": "none",
+        "titleTheirs": "{opponent}'s report: {score}",
+        "kinds": "differs: {kinds}",
+        "announce": "{opponent} reported a different version from yours: compare the differences, then choose."
       },
       "dispute": {
         "title": "Open a dispute?",
         "body": "Your entry differs from {opponent}'s report. Sending it opens a dispute: score entry is locked for both opponents, forfeit included, and a referee is alerted to settle the match.",
-        "confirm": "Send my version",
+        "confirm": "Send the score",
         "pending": "Sending…"
       }
     },

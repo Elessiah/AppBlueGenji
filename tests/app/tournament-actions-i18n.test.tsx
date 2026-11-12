@@ -785,7 +785,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
     expect(source).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
     expect(source).toContain("if (submitting || nothingEntered || unchangedMine) return;");
-    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
+    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(3);
     // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
     for (const selector of ['.forfeit[aria-disabled="true"]', '.link[aria-disabled="true"]', '.actions :global(.btn[aria-disabled="true"])']) {
@@ -820,6 +820,14 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain("<ConfirmActionDialog");
     expect(source).toContain('t("score.player.dispute.body", { opponent: opponentName })');
     expect(source).toContain('<InfoHint id="player-score-diff-help"');
+    // Arrivée annoncée dans une région toujours montée, zone de comparaison étiquetée, liste sémantique.
+    expect(source).toContain("<ArrivalStatus message={arrivalMessage} />");
+    expect(source).toContain('<fieldset className={styles.diffZone} aria-labelledby="player-score-diff-title">');
+    expect(source).toContain('<ul className={styles.diffList} role="list">');
+    expect(source).toContain('aria-describedby="player-score-diff-title"');
+    expect(source).toContain('{submitting ? t("score.sending") : t("score.player.confirmTheirs")}');
+    // Le litige confirmé rappelle les écarts.
+    expect(source).toMatch(/<ConfirmActionDialog[\s\S]*<MapDifferenceList differences=\{differences\}/);
     expect(source).not.toMatch(/window\.confirm/);
   });
 
@@ -848,8 +856,15 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(Object.keys(en.diff.kind)).toEqual(Object.keys(fr.diff.kind));
     expect(Object.keys(en.dispute)).toEqual(Object.keys(fr.dispute));
     expect(en.dispute.body).toContain("referee");
+    // Même vocabulaire sur l'indice, le bouton principal et la confirmation du litige.
+    expect(fr.dispute.confirm).toBe(fr.send);
+    expect(en.dispute.confirm).toBe(en.send);
+    expect(fr.diff.hint).toContain("Envoyer ton score");
+    expect(Object.keys(en.diff)).toEqual(Object.keys(fr.diff));
+    expect(fr.diff.titleTheirs).toContain("{score}");
+    expect(en.diff.titleTheirs).toContain("{score}");
     expect(fr.dispute.body).toContain("arbitre");
-    expect(enTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^The opponent reported a different version/);
+    expect(enTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^Your opponent submitted a different report/);
     expect(frTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^L'adversaire a déclaré une version différente/);
   });
 
