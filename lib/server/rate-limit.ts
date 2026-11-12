@@ -218,11 +218,12 @@ function tokenState(rule: TokenBucketRule, tokens: number): { allowed: boolean; 
 function makeRoomForTokenKey(rule: TokenBucketRule, bucket: Map<string, Tokens>, now: number): void {
   const maxKeys = rule.maxKeys ?? DEFAULT_MAX_KEYS;
   if (bucket.size < maxKeys) return;
+  const target = bucket.size - Math.max(1, Math.ceil(maxKeys / 10));
   for (const [trackedKey, tracked] of bucket) {
+    if (bucket.size <= target) return;
     if (tokensAt(rule, tracked, now) >= rule.capacity) bucket.delete(trackedKey);
   }
   if (bucket.size < maxKeys) return;
-  const target = bucket.size - Math.max(1, Math.ceil(maxKeys / 10));
   for (const [trackedKey, tracked] of bucket) {
     if (bucket.size <= target) return;
     if (tokensAt(rule, tracked, now) >= rule.capacity / 2) bucket.delete(trackedKey);

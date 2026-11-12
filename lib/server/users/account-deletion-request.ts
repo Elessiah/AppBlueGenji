@@ -328,9 +328,11 @@ async function handOverOrganizedTournaments(
 ): Promise<number[]> {
   const organized = (await listOrganizedTournamentIds(connection, userId)).filter((id) => lockedIds.has(id));
   if (organized.length === 0) return [];
+  // Aucun candidat avant les verrous : le balayage complet ne se rejoue pas
+  // sous eux (décision requise). Un candidat périmé seul déclenche un nouveau balayage.
+  if (successorHint === null) return [];
   const successor =
-    (successorHint === null ? null : await findOrganizerSuccessor(connection, userId, successorHint)) ??
-    (await findOrganizerSuccessor(connection, userId));
+    (await findOrganizerSuccessor(connection, userId, successorHint)) ?? (await findOrganizerSuccessor(connection, userId));
   // Personne à qui les confier : rien ne change (décision requise), et le
   // compte sera anonymisé et non effacé, l'organisateur le retenant.
   if (successor === null) return [];

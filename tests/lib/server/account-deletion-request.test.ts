@@ -1003,6 +1003,14 @@ describe("requestAccountDeletion — tournois organisés", () => {
     expect(queries.some((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id"))).toBe(false);
   });
 
+  it("requestAccountDeletion_organizerWithoutSuccessor_doesNotRescanUsersUnderLocks", async () => {
+    const { queries } = fakeDb({ organized: [11], organizerSuccessor: null });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))).toHaveLength(1);
+  });
+
   it("requestAccountDeletion_organizer_scansSuccessorBeforeLocksThenRereadsItByKey", async () => {
     // Le balayage de `bg_users` ne tient plus les verrous de la demande.
     const { queries, connection } = fakeDb({ organized: [11], organizerSuccessor: 21 });

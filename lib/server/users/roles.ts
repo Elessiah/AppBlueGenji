@@ -80,6 +80,7 @@ export async function setUserRoles(
   if (target.length === 0) throw new Error("USER_NOT_FOUND");
   const connection = await db.getConnection();
   let previous: PlatformRole[];
+  let unchanged = false;
   try {
     await connection.beginTransaction();
     // L'**auteur** doit être encore administrateur au moment d'écrire : la
@@ -115,10 +116,15 @@ export async function setUserRoles(
     previous = storedRoles(targetRow);
     assertExpectedRoles(expected, previous);
 
-    await connection.execute<ResultSetHeader>(
-      `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
-      [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
-    );
+    // Rien à changer : ni écriture, ni flux fermés (un enregistrement identique
+    // reconnectait pour rien tous les flux du compte).
+    unchanged = sameRoles(previous, sanitized);
+    if (!unchanged) {
+      await connection.execute<ResultSetHeader>(
+        `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
+        [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
+      );
+    }
     await connection.commit();
   } catch (error) {
     // Un `ROLLBACK` raté (connexion tombée) détruit la connexion au retour
@@ -134,7 +140,7 @@ export async function setUserRoles(
   // rôle retiré tant que l'onglet restait ouvert. Le fermer fait reconnecter
   // le client, et la route recalcule le contexte du lecteur sur les rôles
   // enregistrés — retrait comme ajout (`session-streams.ts`).
-  closeUserStreams(targetUserId);
+  if (!unchanged) closeUserStreams(targetUserId);
 
   return { roles: sanitized, previous };
 }

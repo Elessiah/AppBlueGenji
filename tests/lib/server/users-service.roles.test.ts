@@ -28,6 +28,8 @@ async function mockTransaction(targetRows: object[] = [{ id: 7 }]) {
 
 const ACTOR_ADMIN = { id: 3, is_admin: 1 };
 const TARGET = { id: 7, is_admin: 0, platform_roles_json: "[]" };
+/** Une cible qui détient un rôle : la vider change quelque chose. */
+const ARBITRE_TARGET = { id: 7, is_admin: 0, platform_roles_json: '["ARBITRE"]' };
 
 /** Verrou des deux lignes, puis l'écriture. */
 function lockedThenWritten(connection: ReturnType<typeof connectionMock>, rows: object[]) {
@@ -89,7 +91,7 @@ describe("setUserRoles", () => {
 
   it("setUserRoles_emptySelection_revokesEverything", async () => {
     const connection = await mockTransaction();
-    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(connection, [ACTOR_ADMIN, ARBITRE_TARGET]);
 
     await setUserRoles(7, [], 3);
 
@@ -188,7 +190,7 @@ describe("setUserRoles — failures leave nothing behind", () => {
   it("setUserRoles_updateFails_rollsBackReleasesAndRethrows", async () => {
     const connection = await mockTransaction();
     connection.execute
-      .mockResolvedValueOnce([[ACTOR_ADMIN, TARGET]])
+      .mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]])
       .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
     const close = jest.fn();
     registerSessionStream(7, "hash-a", close);
@@ -204,7 +206,7 @@ describe("setUserRoles — failures leave nothing behind", () => {
   it("setUserRoles_rollbackFails_keepsOriginalErrorAndDestroysConnection", async () => {
     const connection = await mockTransaction();
     connection.execute
-      .mockResolvedValueOnce([[ACTOR_ADMIN, TARGET]])
+      .mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]])
       .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
     connection.rollback.mockRejectedValueOnce(new Error("connection lost"));
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -219,7 +221,7 @@ describe("setUserRoles — failures leave nothing behind", () => {
 
   it("setUserRoles_commitFails_rollsBackAndRethrows", async () => {
     const connection = await mockTransaction();
-    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(connection, [ACTOR_ADMIN, ARBITRE_TARGET]);
     connection.commit.mockRejectedValueOnce(new Error("COMMIT_FAILED"));
     const close = jest.fn();
     registerSessionStream(7, "hash-a", close);
@@ -242,7 +244,7 @@ describe("setUserRoles — open tournament streams", () => {
   });
 
   it("closes every open stream of the target user once the roles are written", async () => {
-    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, ARBITRE_TARGET]);
     const closeA = jest.fn();
     const closeB = jest.fn();
     const closeOther = jest.fn();
@@ -258,6 +260,21 @@ describe("setUserRoles — open tournament streams", () => {
     expect(registeredStreamCount()).toBe(1);
   });
 
+  it("setUserRoles_sameRolesAsStored_commitsWithoutWriteNorClosingStreams", async () => {
+    const connection = await mockTransaction();
+    connection.execute.mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]]);
+    const close = jest.fn();
+    registerSessionStream(7, "hash-a", close);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result).toEqual({ roles: ["ARBITRE"], previous: ["ARBITRE"] });
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(1);
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it("closes the streams on a role grant too, so the viewer context is recomputed", async () => {
     lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
     const close = jest.fn();
@@ -269,7 +286,7 @@ describe("setUserRoles — open tournament streams", () => {
   });
 
   it("refuses a stream that read the session before the write, not one opened after", async () => {
-    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, TARGET]);
+    lockedThenWritten(await mockTransaction(), [ACTOR_ADMIN, ARBITRE_TARGET]);
     const mark = revocationMark();
 
     await setUserRoles(7, [], 3);
