@@ -62,6 +62,11 @@ export interface EntityLinkProps {
    * le dégradé (`PODIUM_TIERS.md`).
    */
   truncate?: boolean | 2;
+  /**
+   * Ouvre la fiche dans un nouvel onglet (outils de modération) ; le texte
+   * donné, lu seulement par un lecteur d'écran (« (nouvel onglet) »), le dit.
+   */
+  newTabLabel?: string;
 }
 
 /**
@@ -91,6 +96,7 @@ export function EntityLink({
   podium,
   truncate = false,
   linked = true,
+  newTabLabel,
   ...rest
 }: Readonly<EntityLinkProps & {
   href: string;
@@ -114,9 +120,11 @@ export function EntityLink({
       </span>
     );
   }
+  const newTab = newTabLabel === undefined ? {} : { target: "_blank", rel: "noreferrer" };
   return (
-    <LocaleLink href={href} className={joinClasses("entity-link", extra)} {...marks} {...rest}>
+    <LocaleLink href={href} className={joinClasses("entity-link", extra)} {...marks} {...newTab} {...rest}>
       {name}
+      {newTabLabel !== undefined && <span className="sr-only"> {newTabLabel}</span>}
     </LocaleLink>
   );
 }
