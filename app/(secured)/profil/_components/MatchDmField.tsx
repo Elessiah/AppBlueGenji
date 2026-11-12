@@ -26,8 +26,9 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
  * s'affiche et part à la suite (`runQueuedSaves`), jamais perdu.
  *
  * `discordReachable` : le compte a un tag Discord **certifié** — seul un tel
- * compte reçoit ces messages (`toNotificationRecipient`, portée `certified`,
- * contre le spam). À `false`, une ligne le dit et mène à la certification
+ * compte reçoit les messages de match (`toNotificationRecipient`, portée
+ * `certified`, contre le spam) ; ceux d'équipe partent aussi à un compte
+ * Discord lié (`teamInviteNoticeRecipient`). À `false`, une ligne le dit et mène à la certification
  * (section Discord, `#discord`) ; `null` (état pas encore lu) : rien.
  *
  * `onChoice` : ce que montre la case (choix du joueur, valeur retenue, fiche

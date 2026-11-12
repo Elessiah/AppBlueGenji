@@ -1937,7 +1937,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Délai : une même équipe ne t'écrit toujours qu'une fois par sorte de message toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, mais seul un message réellement parti compte désormais — une invitation restée muette (compte suspendu, plafond atteint) ne retient plus la suivante. Ce délai est compté en mémoire : un redémarrage du site, ou plus de mille messages dans ce délai, peut en laisser partir un de plus.`,
       `Ancienne équipe : tu ne reçois toujours l'invitation que de ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes au plus en ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, mais une équipe dont tu as été membre n'entre plus dans ce compte. Pour le savoir, le site relit, à chaque invitation ou reprise, si tu as fait partie de l'équipe qui t'invite (l'historique des équipes qu'il garde déjà).`,
       `Plafond du site : au-delà de ${TEAM_NOTICE_DMS_HOURLY_CAP} invitations, reprises ou propriétés annoncées par message privé en une heure, tous comptes confondus, l'avis ne part qu'en notification push ; l'invitation reste dans « Mon profil ».`,
-      "Base légale : ces messages reposent sur l'intérêt légitime de l'association à la constitution des équipes (registre, T03) ; tu peux t'y opposer depuis la section « Exercer vos droits » de la politique. C'était déjà le cas : la politique le dit maintenant, près des messages privés de match.",
+      "Base légale : ces messages reposent sur l'intérêt légitime de l'association à la constitution des équipes (registre, T03). C'était déjà le cas : la politique le dit maintenant, près des messages privés de match. Pour t'y opposer, décoche « Messages privés Discord de mes matchs et de mes équipes » dans « Mon profil » (voir l'entrée suivante).",
     ],
     links: [
       { href: "/rgpd#messages-d-equipe", label: "Lire le paragraphe « Messages privés Discord d'équipe »" },
@@ -1956,7 +1956,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "La case « Messages privés Discord de mes matchs » de « Mon profil » devient « Messages privés Discord de mes matchs et de mes équipes » : décochée, elle coupe aussi les messages privés Discord d'équipe (invitation, reprise d'équipe fantôme proposée, propriété transférée, demande d'adhésion à une équipe que tu gères).",
     details: [
       "Ce qui change : avant chaque message privé d'équipe, le site relit ce choix ; case décochée, seule la notification push part, avec ses propres réglages. Si tu avais déjà décoché la case, tes messages privés d'équipe s'arrêtent aussi. Chaque message privé d'équipe se termine désormais par le lien de ce réglage.",
-      "Ce qui ne change pas : rien de nouveau n'est collecté ; c'est le même choix, gardé le temps du compte (obligation légale : c'est ce qui permet de continuer d'honorer ton opposition) et repris dans l'export de tes données. Ces messages reposent toujours sur l'intérêt légitime de l'association à la constitution des équipes (registre, T03) ; la section « Exercer vos droits » de la politique reste ouverte.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; c'est le même choix, gardé le temps du compte (obligation légale : c'est ce qui permet de continuer d'honorer ton opposition) et repris dans l'export de tes données. Ces messages reposent toujours sur l'intérêt légitime de l'association à la constitution des équipes (registre, T03).",
     ],
     links: [
       { href: "/profil#notifications", label: "Ouvrir le réglage dans « Mon profil »" },

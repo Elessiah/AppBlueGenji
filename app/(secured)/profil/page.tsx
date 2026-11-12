@@ -1218,8 +1218,8 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
         {data?.accountLocale ? <AccountLocaleField initial={data.accountLocale} /> : null}
-        {/* Un compte sans tag Discord certifié ne reçoit aucun de ces
-            messages : la case le dit (`matchDmReachable`, profil chargé en
+        {/* Un compte sans tag Discord certifié ne reçoit aucun message de
+            match (ceux d'équipe : Discord lié suffit) : la case le dit (`matchDmReachable`, profil chargé en
             repli de l'état Discord ; `null` tant qu'aucun des deux n'est lu). */}
         <MatchDmField
           initial={data?.matchDmEnabled}

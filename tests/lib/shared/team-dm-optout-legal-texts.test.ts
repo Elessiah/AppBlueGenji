@@ -3,7 +3,8 @@ import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register";
-import { DONNEES_PROFIL } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL, DROITS } from "@/lib/shared/rgpd-policy";
+import { DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -35,6 +36,22 @@ describe("entrée PRIVACY_CHANGES du réglage des messages d'équipe", () => {
     expect(fr).toContain("seule la notification push part");
     expect(en).toContain("If you had already unticked the box, your team direct messages stop too.");
     expect(en).toContain("only the push notification is sent");
+  });
+
+  it("privacyChange_teamDmOptOut_noLongerPointsToExerciseRightsFrAndEn", () => {
+    // /rgpd § messages-d-equipe ne mène plus qu'à la case de « Mon profil ».
+    expect(entryFr?.details.join(" ")).not.toContain("Exercer vos droits");
+    expect(entryEn?.details.join(" ")).not.toContain("Exercising your rights");
+  });
+
+  it("privacyChange_teamNoticeCaps_objectionThroughProfileBoxFrAndEn", () => {
+    const id = "2026-11-avis-d-equipe-plafonds-et-base";
+    const fr = PRIVACY_CHANGES.find((c) => c.id === id)?.details.join(" ") ?? "";
+    const en = PRIVACY_CHANGES_EN[id]?.details.join(" ") ?? "";
+    expect(fr).toContain("Pour t'y opposer, décoche « Messages privés Discord de mes matchs et de mes équipes » dans « Mon profil »");
+    expect(fr).not.toContain("Exercer vos droits");
+    expect(en).toContain("To object, untick “Discord direct messages about my matches and teams” in “My profile”");
+    expect(en).not.toContain("Exercising your rights");
   });
 });
 
@@ -73,5 +90,21 @@ describe("politique et registre", () => {
     expect(fr).toContain("auxquels chacun s'oppose par le même interrupteur de « Mon profil »");
     expect(en).toContain("the same box turns off their team direct messages");
     expect(en).toContain("which anyone objects to with the same switch in “My profile”");
+  });
+
+  it("botPrivacyPolicy_teamDms_formingTeamsPurposeAndNoRequestRouteFrAndEn", () => {
+    const fr = JSON.stringify(PRIVACY_POLICY.fr);
+    const en = JSON.stringify(PRIVACY_POLICY.en);
+    expect(fr).toContain("intérêt légitime (constitution des équipes, registre du site T03) pour les messages privés d'équipe");
+    expect(fr).toContain("auxquels chacun s'oppose par le même interrupteur de « Mon profil » ; exécution du service");
+    expect(en).toContain("legitimate interest (forming teams, the website's register T03) for team direct messages");
+    expect(en).toContain("which anyone objects to with the same switch in “My profile”; performance of the service");
+  });
+
+  it("droitsOpposition_teamDmList_parenthesisedSoTheAsideStaysPairedFrAndEn", () => {
+    const fr = DROITS.find((d) => d.title === "Droit d'opposition")?.text ?? "";
+    const en = DROITS_EN.find((d) => d.title === "Right to object")?.text ?? "";
+    expect(fr).toContain("demande d'adhésion à une équipe que vous gérez) — ces messages se coupent directement");
+    expect(en).toContain("request to join a team you manage) — these messages are turned off directly");
   });
 });
