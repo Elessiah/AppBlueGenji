@@ -322,6 +322,7 @@
   },
   "matchPage": {
     "backToTournament": "Back to the tournament",
+    "backToNamedTournament": "Back to the tournament {name}",
     "firstMap": "First map",
     "firstMapUnset": "Not chosen yet",
     "opponentsPending": "Opponents to come",

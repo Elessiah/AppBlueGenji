@@ -20,6 +20,7 @@ import { VOICE_CHANNEL_CAPACITY, type MatchVoiceInfo, type MatchVoiceSideState }
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   connectionReader,
+  type LaunchSide,
   type MatchLaunchInfo,
   type MatchLaunchPhase,
 } from "@/lib/shared/match-launch";
@@ -66,6 +67,7 @@ import {
   type VoiceClearViewer,
 } from "../_lib/match-voice-view";
 import { EntrantName, type EntrantLogoSize } from "./EntrantName";
+import { EntrantLink } from "../_lib/entrant-link";
 import { MatchCardActions } from "./MatchCardActions";
 import { LaunchPhaseBadge, hasLaunchPhaseBadge } from "./MatchLaunchStrip";
 import { MapResultList } from "./MapResultList";
@@ -732,12 +734,22 @@ function ConnectionSection({
             phase={launch.phase}
             onCopy={onCopy}
             linkNames
+            renderName={connectionSideName}
             laterText={laterText}
           />
         ))}
       </div>
     </section>
   );
+}
+
+/**
+ * Nom d'une engagée de la section « Infos de connexion » : comme partout sur
+ * un écran de tournoi, par `EntrantLink` (entrée solo vers la fiche du joueur,
+ * compte sans fiche sans lien), pas par le choix propre de `SideCard`.
+ */
+function connectionSideName(side: LaunchSide) {
+  return <EntrantLink teamId={side.teamId}>{side.name}</EntrantLink>;
 }
 
 /** Libellé d'un salon (« Salon vocal : ouvert », « bientôt ouvert », « indisponible ») — jamais son nombre de présents. */
@@ -1150,8 +1162,14 @@ function MatchPageContent({
     <>
       <div className={styles.topbar}>
         {/* Le retour du site (`← Retour` de la fiche, même style) : un vrai lien
-            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`). */}
-        <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
+            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`).
+            Son nom accessible dit la destination (le nom du tournoi n'est plus
+            écrit que dans la ligne méta) ; pas de `<nav>` : un seul lien. */}
+        <LocaleLink
+          href={tournamentMatchHref(detail.card.id, match.id, spectator)}
+          className={`${styles.back} tap-target`}
+          aria-label={t("matchPage.backToNamedTournament", { name: visibleText(detail.card.name) })}
+        >
           <span aria-hidden="true">←</span> {t("matchPage.backToTournament")}
         </LocaleLink>
         {status}

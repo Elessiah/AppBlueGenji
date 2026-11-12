@@ -8,7 +8,7 @@
  * seule de ce qui est exposé : ces fiches ne font que le montrer.
  */
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import {
@@ -171,6 +171,7 @@ export function SideCard({
   onCopy,
   linkNames = false,
   laterText,
+  renderName,
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
@@ -190,6 +191,12 @@ export function SideCard({
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
    */
   linkNames?: boolean;
+  /**
+   * Rendu du nom cliquable fourni par l'écran de tournoi (`EntrantLink`, qui
+   * connaît les entrées solo et les comptes sans fiche) ; sans lui, le choix
+   * `TeamLink` / `PlayerLink` de `SideName`. Lu seulement avec `linkNames`.
+   */
+  renderName?: (side: LaunchSide) => ReactNode;
 }>) {
   const { t } = useLaunchText();
   return (
@@ -204,7 +211,7 @@ export function SideCard({
           )}
         </span>
         <span className={styles.sideName}>
-          {linkNames ? <SideName side={side} /> : side.name}
+          {linkNames ? (renderName?.(side) ?? <SideName side={side} />) : side.name}
         </span>
         <ReadyChip ready={side.ready} phase={phase} />
       </div>

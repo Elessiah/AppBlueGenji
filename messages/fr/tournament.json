@@ -322,6 +322,7 @@
   },
   "matchPage": {
     "backToTournament": "Retour au tournoi",
+    "backToNamedTournament": "Retour au tournoi {name}",
     "firstMap": "Première map",
     "firstMapUnset": "Pas encore choisie",
     "opponentsPending": "Adversaires à venir",
