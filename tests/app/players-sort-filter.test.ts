@@ -110,7 +110,7 @@ describe("PlayersList — branchements des filtres inertes", () => {
   const source = readSource("app/(secured)/joueurs/PlayersList.tsx");
 
   it("annonce la remise du rôle par un toast neutre", () => {
-    expect(source).toContain('if (statusChoiceResetsRole(roleFilter, next)) showInfo(t("list.roleReset"));');
+    expect(source).toContain('if (statusChoiceResetsRole(roleFilter, next)) showInfo(t("list.roleReset"), { once: true });');
   });
 
   it("rattache la raison aux puces de rôle et à la bascule inertes", () => {
@@ -124,7 +124,7 @@ describe("PlayersList — branchements des filtres inertes", () => {
     const css = readSource("app/(secured)/_shared/annuaire.module.css");
     const row = css.slice(css.indexOf(".statusRow {"), css.indexOf("}", css.indexOf(".statusRow {")));
     expect(row).toContain("overflow-x: clip;");
-    expect(css).toMatch(/\.statusOpts::before \{\s*content: "·" \/ "";\s*position: absolute;/);
+    expect(css).toMatch(/\.statusOpts::before \{\s*content: "·";\s*content: "·" \/ "";\s*position: absolute;/);
     expect(css).not.toContain(".statusSep");
     expect(source).not.toContain("statusSep");
   });

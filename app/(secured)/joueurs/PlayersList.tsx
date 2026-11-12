@@ -129,7 +129,7 @@ export default function PlayersList() {
   // Un filtre « sans roster » rend les rôles sans objet (ils viennent de
   // l'équipe) : le filtre de rôle revient à « Tous » au lieu de vider la liste.
   const chooseStatus = (next: PlayerStatusFilter) => {
-    if (statusChoiceResetsRole(roleFilter, next)) showInfo(t("list.roleReset"));
+    if (statusChoiceResetsRole(roleFilter, next)) showInfo(t("list.roleReset"), { once: true });
     setStatusFilter(next);
     setRoleFilter((role) => roleAfterStatusChoice(role, next));
   };

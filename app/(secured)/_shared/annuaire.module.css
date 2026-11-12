@@ -265,6 +265,7 @@
   align-items: center;
 }
 .statusOpts::before {
+  content: "·";
   content: "·" / "";
   position: absolute;
   top: 50%;

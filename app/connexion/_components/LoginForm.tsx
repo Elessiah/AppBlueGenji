@@ -396,19 +396,19 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                     La région `status` est toujours montée (une région live créée
                     avec son contenu n'est pas annoncée) et le champ la cite. */}
                 <div /* NOSONAR S6819 — région live montée d'avance autour d'un paragraphe à lien ; `<output>` est une valeur de formulaire */ role="status">
-                {inviteAfterRefusal && (
-                  <p id={LOGIN_INVITE_ID} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
-                    {richNodes(
-                      text.rich("page.inviteAfterRefusal", {}, {
-                        join: (children) => (
-                          <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
-                            {richNodes(children)}
-                          </a>
-                        ),
-                      }),
-                    )}
-                  </p>
-                )}
+                  {inviteAfterRefusal && (
+                    <p id={LOGIN_INVITE_ID} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
+                      {richNodes(
+                        text.rich("page.inviteAfterRefusal", {}, {
+                          join: (children) => (
+                            <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+                              {richNodes(children)}
+                            </a>
+                          ),
+                        }),
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
               <CyberButton
