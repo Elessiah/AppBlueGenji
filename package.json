@@ -1,7 +1,7 @@
 {
   "name": "blue-genji",
   "type": "module",
-  "version": "1.89.6",
+  "version": "1.89.7",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
