@@ -8,6 +8,7 @@ import {
   PUSH_TOPIC_KEYS,
   buildPushPayload,
   canReceivePushTopic,
+  clipPushText,
   decodeBase64Url,
   isAllowedPushEndpoint,
   isIosUserAgent,
@@ -331,5 +332,27 @@ describe("isSameServerKey", () => {
   it("ne conclut rien sans clé lisible", () => {
     expect(isSameServerKey(null, key.toString("base64url"))).toBe(true);
     expect(isSameServerKey(buffer(key), "!!")).toBe(true);
+  });
+});
+
+describe("clipPushText", () => {
+  it("clipPushText_nonBreakingSpaceAroundQuotedName_keptAsIs", () => {
+    expect(clipPushText("L'équipe «\u00a0Glace\u00a0» t'invite", 100)).toBe("L'équipe «\u00a0Glace\u00a0» t'invite");
+  });
+
+  it("clipPushText_narrowNoBreakSpace_keptAsIs", () => {
+    expect(clipPushText("Score\u202f: 2", 100)).toBe("Score\u202f: 2");
+  });
+
+  it("clipPushText_breakingSpacesRun_foldedToOneSpace", () => {
+    expect(clipPushText("  a \t\n b  ", 100)).toBe("a b");
+  });
+
+  it("clipPushText_keepLines_foldsEachLineAndDropsEmptyOnes", () => {
+    expect(clipPushText(" a  b \n\n c\u00a0d ", 100, true)).toBe("a b\nc\u00a0d");
+  });
+
+  it("clipPushText_overMax_cutWithEllipsis", () => {
+    expect(clipPushText("abcdef", 4)).toBe("abc…");
   });
 });

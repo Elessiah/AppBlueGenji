@@ -304,3 +304,19 @@ describe("stripMarkdown", () => {
     expect(stripMarkdown("**a** `b` > c _d_ https://x.test/y")).toBe("a b c d");
   });
 });
+
+describe("noms affichés dans les push (visibleText)", () => {
+  it("teamJoinRequestPush_fullwidthTeamName_normalisedLikeOnScreen", () => {
+    const content = teamJoinRequestPush({ teamId: 5, teamName: "\uff27\uff4c\uff41\uff43\uff45" });
+
+    expect(content.body).toContain("Glace");
+    expect(content.body).not.toContain("\uff27");
+  });
+
+  it("tournamentStartPush_invisibleCharactersInName_removed", () => {
+    const content = tournamentStartPush({ tournamentId: 7, tournamentName: "Co\u200bupe\u202e" });
+
+    expect(content.body).toContain("Coupe");
+    expect(content.body).not.toMatch(/[\u200b\u202e]/);
+  });
+});

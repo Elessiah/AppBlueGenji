@@ -76,8 +76,8 @@ export const PUSH_TOPICS = {
     audience: null,
   },
   TEAM_INVITATION: {
-    label: "Invitations d'équipe",
-    description: "Une équipe t'invite à la rejoindre, le staff te propose de reprendre une équipe, ou la propriété de ton équipe t'est transférée.",
+    label: "Invitations et propriété d'équipe",
+    description: "Une équipe t'invite à la rejoindre, le staff te propose de reprendre une équipe, ou la propriété de ton équipe t'est transférée. Ne coupe que la notification : le message privé Discord part quand même.",
     audience: null,
   },
   CONTENT_REPORT: {
@@ -223,6 +223,18 @@ export const PUSH_BODY_MAX = 240;
 export const PUSH_TAG_MAX = 64;
 
 /**
+ * Espaces **sécables** (retours à la ligne compris) : les insécables U+00A0 et
+ * U+202F restent, ils tiennent un guillemet français à son nom.
+ */
+const BREAKING_SPACES = /[^\S\u00a0\u202f]+/g;
+const EDGE_BREAKING_SPACES = /^[^\S\u00a0\u202f]+|[^\S\u00a0\u202f]+$/g;
+
+/** Une suite d'espaces sécables devient une espace ; les bords sont rognés, insécables gardées. */
+function foldSpaces(line: string): string {
+  return line.replace(BREAKING_SPACES, " ").replace(EDGE_BREAKING_SPACES, "");
+}
+
+/**
  * Replie les espaces et borne le texte (par caractère : un emoji n'est jamais
  * coupé). `keepLines` garde les retours à la ligne d'un corps écrit en lignes
  * (le programme d'arbitrage) — chaque ligne repliée, les lignes vides ôtées.
@@ -231,10 +243,10 @@ export function clipPushText(text: string, max: number, keepLines = false): stri
   const clean = keepLines
     ? text
         .split("\n")
-        .map((line) => line.replace(/\s+/g, " ").trim())
+        .map(foldSpaces)
         .filter(Boolean)
         .join("\n")
-    : text.replace(/\s+/g, " ").trim();
+    : foldSpaces(text);
   const chars = Array.from(clean);
   return chars.length <= max ? clean : `${chars.slice(0, max - 1).join("")}…`;
 }

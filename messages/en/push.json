@@ -29,8 +29,8 @@
       "description": "A player asks to join a team you manage."
     },
     "TEAM_INVITATION": {
-      "label": "Team invitations",
-      "description": "A team invites you to join it, the staff offers you to take over a team, or the ownership of your team is transferred to you."
+      "label": "Team invitations and ownership",
+      "description": "A team invites you to join it, the staff offers you to take over a team, or the ownership of your team is transferred to you. Turns off the notification only: the Discord direct message is still sent."
     },
     "CONTENT_REPORT": {
       "label": "Reports about you",
