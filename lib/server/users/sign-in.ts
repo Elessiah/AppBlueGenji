@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { BLIZZARD_BATTLETAG_SET_SQL } from "@/lib/server/battletag-origin";
+import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import { ensureUniquePseudo } from "@/lib/server/auth";
 import { normalizePseudo } from "@/lib/server/serialization";
@@ -413,10 +414,13 @@ export async function createOrGetBlizzardUser(
     // exposée que le tag Discord (aucune certification, et l'anonymisation
     // force `visible_overwatch` à 0), mais c'est la même chose : une
     // coordonnée personnelle qui repousse sur un compte vidé.
-    await db.execute(
+    const [written] = await db.execute<ResultSetHeader>(
       `UPDATE bg_users SET ${BLIZZARD_BATTLETAG_SET_SQL} WHERE id = ? AND is_deleted = 0`,
       [tag, tag, userId],
     );
+    // BattleTag réécrit ou bascule tapé ↔ vérifié : comme `completeLink`, les
+    // invitations à certifier du compte et de ses coéquipiers s'oublient.
+    if (Number(written.changedRows ?? 0) > 0) void forgetCertificationPromptsAround(userId);
     await settleTermsAfterLogin(userId, false, consent);
     return userId;
   }

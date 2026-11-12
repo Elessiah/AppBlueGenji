@@ -48,6 +48,7 @@ import {
 } from "@/lib/server/users/sign-in";
 import { normalizeBattletag, normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
 import { BLIZZARD_BATTLETAG_SET_SQL, battletagFromBlizzard } from "@/lib/server/battletag-origin";
+import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import {
   buildAccountConnections,
   checkConnectionUnlink,
@@ -408,7 +409,12 @@ export async function unlinkOAuthIdentity(userId: number, provider: OAuthProvide
         AND (${otherDoors})`,
     [userId],
   );
-  if (Number(result.affectedRows) > 0) return;
+  if (Number(result.affectedRows) > 0) {
+    // Discord ou Battle.net détaché : la certification du compte tombe, et les
+    // invitations « équipe sans contact » de ses coéquipiers avec elle.
+    if (provider !== "GOOGLE") void forgetCertificationPromptsAround(userId);
+    return;
+  }
 
   const row = await loadIdentityRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");

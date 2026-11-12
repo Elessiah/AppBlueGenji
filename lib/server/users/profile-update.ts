@@ -10,6 +10,7 @@ import { normalizePseudo } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { forgetRefereeNamesOf } from "@/lib/server/tournaments/referee-names";
+import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
 
@@ -361,6 +362,15 @@ export async function updateOwnProfile(
   // bien « la ligne vivante n'existe plus ». On sort avant la synchronisation
   // de l'entrée solo, qui republierait l'identité qu'on vient de refuser.
   if (result.affectedRows === 0) throw new Error(ACCOUNT_DELETED_ERROR);
+
+  // Un tag Discord ou un BattleTag changé peut faire perdre (ou gagner) sa
+  // certification au compte : ses invitations « équipe sans contact », et
+  // celles de ses coéquipiers, s'oublient tout de suite plutôt qu'à
+  // l'expiration de l'entrée. `changedRows` : seulement si la ligne a bougé.
+  // Sans attendre — l'oubli ne rejette jamais.
+  if ((touchesDiscordTag || touchesBattletag) && Number(result.changedRows ?? 0) > 0) {
+    void forgetCertificationPromptsAround(userId);
+  }
 
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
