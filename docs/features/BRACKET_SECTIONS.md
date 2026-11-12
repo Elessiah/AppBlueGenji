@@ -62,7 +62,10 @@ n'a pas de badge.
   montage, pour ne pas perturber la lecture lors des mises à jour live.
 - Un **clic sur un badge « Qualifié en X »** déclenche un défilement à la demande
   (mécanisme `ScrollRequest { matchId, nonce }`) vers le match d'arrivée, après avoir
-  ouvert le volet qui le contient.
+  ouvert le volet qui le contient. La case atteinte porte un **contour** coloré
+  `ARRIVAL_HALO_MS` (2,4 s) — distinct de l'anneau « ★ Votre match ». Quand l'arrivée
+  est une case **à pourvoir** (identifiant négatif), le nom accessible du badge le dit
+  (`bracket.goToSlotLabel`, FR et EN, choisi par `qualifyBadgeLabelKey`).
 
 ## 🎨 Distinction des tableaux
 

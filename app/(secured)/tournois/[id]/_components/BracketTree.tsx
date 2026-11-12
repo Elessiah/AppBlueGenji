@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, Fragment, useEffect, useRef } from "react";
+import { CSSProperties, Fragment, useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
@@ -32,6 +32,17 @@ function ghostSide(side: ProjectedSide | undefined) {
 
 /** Requête de défilement vers un match (le nonce force le re-déclenchement à chaque clic). */
 export type ScrollRequest = { matchId: number; nonce: number };
+
+/** Durée du halo posé sur la case atteinte par un badge « Qualifié en X ». */
+export const ARRIVAL_HALO_MS = 2_400;
+
+/**
+ * Nom accessible du badge « Qualifié en X » : une case **à pourvoir**
+ * (identifiant négatif) n'a pas encore de match à rejoindre.
+ */
+export function qualifyBadgeLabelKey(destId: number): "bracket.goToMatchLabel" | "bracket.goToSlotLabel" {
+  return destId < 0 ? "bracket.goToSlotLabel" : "bracket.goToMatchLabel";
+}
 
 /**
  * Un créneau de l'arbre : une rencontre posée, ou la **place** d'une rencontre
@@ -153,9 +164,19 @@ export function BracketTree({
 
   // Défilement à la demande (clic sur un badge) : se déclenche à chaque nouveau nonce
   // si le match de destination est rendu dans cette section.
+  // La case atteinte porte un halo un court instant : arrivée sur une case à
+  // pourvoir, parmi d'autres cartes vides identiques, le geste paraissait sans effet.
+  const [arrivedId, setArrivedId] = useState<number | null>(null);
   useEffect(() => {
     if (!scrollRequest) return;
-    return scrollToMatch(scrollRequest.matchId);
+    const cancelScroll = scrollToMatch(scrollRequest.matchId);
+    if (!cancelScroll) return;
+    setArrivedId(scrollRequest.matchId);
+    const timer = window.setTimeout(() => setArrivedId(null), ARRIVAL_HALO_MS);
+    return () => {
+      cancelScroll();
+      window.clearTimeout(timer);
+    };
   }, [scrollRequest]);
 
   /** Cible du trait sortant d'un créneau : lien de bracket, ou règle du mode. */
@@ -254,6 +275,7 @@ export function BracketTree({
     // La marque « ★ Votre match » ne vise qu'une rencontre, et un créneau à
     // pourvoir porte un identifiant négatif : il ne peut donc jamais la porter.
     const isTarget = slot.id === scrollTargetMatchId;
+    const arrived = slot.id === arrivedId;
     return (
       <div
         // Le sous-titre nomme la carte pour un lecteur d'écran : sans groupe, la
@@ -273,7 +295,9 @@ export function BracketTree({
             alignItems: "center",
             borderRadius: 8,
             ...(isTarget ? { boxShadow: `0 0 0 2px ${accentColor}, 0 0 14px ${accentColor}` } : {}),
+            ...(arrived ? { outline: `2px solid ${accentColor}`, outlineOffset: 3 } : {}),
           }}
+          data-arrived={arrived ? "true" : undefined}
         >
           {slotCard(slot, entrants)}
         </div>
@@ -501,7 +525,7 @@ export function BracketTree({
                         type="button"
                         onClick={() => onQualifyClick!(sourceMatch)}
                         title={t("bracket.goToMatchTitle", { label: qualifyLabel ?? "" })}
-                        aria-label={t("bracket.goToMatchLabel", { label: qualifyLabel ?? "" })}
+                        aria-label={t(qualifyBadgeLabelKey(dest), { label: qualifyLabel ?? "" })}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-1)")}
                         style={badgeStyle}
