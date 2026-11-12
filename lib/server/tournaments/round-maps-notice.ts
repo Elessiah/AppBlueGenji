@@ -22,15 +22,20 @@
  * entre la lecture et la revendication (`changes` a bougé) garde sa ligne et
  * repart pour une nouvelle fenêtre au lieu d'être perdue.
  */
+import { createHash } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { flushBotLogBatch, sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
+import { isMissingTableError, isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import {
   ROUND_MAPS_NOTICE_KEYS_MAX,
   ROUND_MAPS_NOTICE_LISTED,
   ROUND_MAPS_NOTICE_WINDOW_SECONDS,
+  parseStoredSlots,
+  parseStoredTiebreak,
 } from "@/lib/shared/round-maps";
 
 /**
@@ -38,7 +43,28 @@ import {
  * départage** a changé — l'annonce le dit, au lieu de laisser croire que les
  * cartes du tour ont bougé.
  */
-export type NoticeRound = { phaseId: number; bracket: string; roundNumber: number; tiebreak?: true };
+export type NoticeRound = {
+  phaseId: number;
+  bracket: string;
+  roundNumber: number;
+  tiebreak?: true;
+  /**
+   * Empreinte du réglage **avant** le premier changement de la fenêtre
+   * ({@link roundMapsFingerprint} : cartes du tour, ou map de départage). À
+   * l'envoi, un tour revenu à cette empreinte n'est pas annoncé : changé puis
+   * remis à l'identique, il n'a pas été « modifié ». Absente : le tour est annoncé.
+   */
+  before?: string;
+};
+
+/**
+ * Empreinte courte d'un réglage (cartes d'un tour, map de départage) : 12
+ * caractères hexadécimaux, assez pour distinguer deux réglages d'un même tour
+ * sans grossir `rounds_json` (colonne `TEXT`).
+ */
+export function roundMapsFingerprint(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex").slice(0, 12);
+}
 
 type NoticeRow = RowDataPacket & {
   tournament_id: number;
@@ -89,14 +115,22 @@ function parseStored(raw: unknown): unknown[] {
 }
 
 function parsePending(raw: unknown): NoticeRound[] {
-  return parseStored(raw).filter(
-    (entry): entry is NoticeRound =>
-      typeof entry === "object" &&
-      entry !== null &&
-      typeof (entry as NoticeRound).bracket === "string" &&
-      Number.isInteger((entry as NoticeRound).roundNumber) &&
-      Number.isInteger((entry as NoticeRound).phaseId),
-  );
+  return parseStored(raw)
+    .filter(
+      (entry): entry is NoticeRound =>
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as NoticeRound).bracket === "string" &&
+        Number.isInteger((entry as NoticeRound).roundNumber) &&
+        Number.isInteger((entry as NoticeRound).phaseId),
+    )
+    .map((entry) => ({
+      phaseId: entry.phaseId,
+      bracket: entry.bracket,
+      roundNumber: entry.roundNumber,
+      ...(entry.tiebreak === true ? { tiebreak: true as const } : {}),
+      ...(typeof entry.before === "string" ? { before: entry.before } : {}),
+    }));
 }
 
 /** Nombre de manches comptées sans être retenues (`ROUND_MAPS_NOTICE_KEYS_MAX`). */
@@ -133,6 +167,30 @@ export async function queueRoundMapsNotice(
   options: { tiebreak?: boolean } = {},
 ): Promise<void> {
   if (rounds.length === 0) return;
+  // Point de sauvegarde : une annonce impossible à mettre en attente (table
+  // absente, attente de verrou dépassée) ne fait pas échouer l'enregistrement
+  // des cartes — seule l'annonce est perdue, et pm2 le dit. Un interblocage ou
+  // un refus de l'instantané, qui se rejouent (`retryOnDeadlock`), remontent.
+  await connection.query("SAVEPOINT round_maps_notice");
+  try {
+    await writePendingNotice(connection, tournamentId, rounds, options);
+  } catch (error) {
+    if (isTransactionAborted(error) || isSnapshotConflict(error)) throw error;
+    try {
+      await connection.query("ROLLBACK TO SAVEPOINT round_maps_notice");
+    } catch {
+      throw error;
+    }
+    console.error("[round-maps] annonce des cartes non mise en attente", failureReason(error));
+  }
+}
+
+async function writePendingNotice(
+  connection: PoolConnection,
+  tournamentId: number,
+  rounds: readonly NoticeRound[],
+  options: { tiebreak?: boolean },
+): Promise<void> {
   await connection.execute(
     `INSERT INTO bg_round_maps_notices (tournament_id, rounds_json, changes, send_after)
      VALUES (?, '[]', 1, DATE_ADD(NOW(), INTERVAL ? SECOND))
@@ -153,12 +211,16 @@ export async function queueRoundMapsNotice(
       bracket: round.bracket,
       roundNumber: round.roundNumber,
       ...(options.tiebreak ? { tiebreak: true as const } : {}),
+      ...(round.before === undefined ? {} : { before: round.before }),
     };
     const key = pendingKey(entry);
+    // Une manche déjà en attente garde son entrée : l'empreinte d'avant la
+    // fenêtre, pas celle d'un état intermédiaire.
+    if (merged.has(key)) continue;
     // Plafond : une manche de plus n'est que comptée (jamais « Data too long »).
     // Compte approché : faute de clé retenue, une manche réglée deux fois
     // au-delà du plafond compte deux fois.
-    if (!merged.has(key) && merged.size >= ROUND_MAPS_NOTICE_KEYS_MAX) more += 1;
+    if (merged.size >= ROUND_MAPS_NOTICE_KEYS_MAX) more += 1;
     else merged.set(key, entry);
   }
   const pending: (NoticeRound | Overflow)[] = [...merged.values()];
@@ -245,21 +307,70 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
       continue;
     }
     if (result.affectedRows !== 1) continue; // un autre l'a prise, ou un changement a rouvert la fenêtre
-    const rounds = withoutCoveredTiebreaks(parsePending(row.rounds_json));
-    if (rounds.length === 0) continue;
+    const tournamentId = Number(row.tournament_id);
+    const rounds = withoutCoveredTiebreaks(await stillChanged(db, tournamentId, parsePending(row.rounds_json)));
+    const more = parseOverflow(row.rounds_json);
+    if (rounds.length === 0 && more === 0) continue;
     const roundLabels = await labelRounds(db, row, rounds);
     sendBotLog(
       formatRoundMapsSummaryLog({
         tournament: { id: Number(row.tournament_id), name: row.name },
         roundLabels,
         listed: ROUND_MAPS_NOTICE_LISTED,
-        more: parseOverflow(row.rounds_json),
+        more,
       }),
-      { tournamentId: Number(row.tournament_id), category: "maps" },
+      { tournamentId, category: "maps" },
     );
+    // La ligne est revendiquée (supprimée) : le résumé, déjà le regroupement de
+    // la fenêtre, ne reste pas 5 à 10 min dans le lot en mémoire, où un arrêt
+    // du processus le perdrait sans reprise. Sans l'attendre.
+    void flushBotLogBatch({ tournamentId, category: "maps" }).catch(() => undefined);
     sent += 1;
   }
   return sent;
+}
+
+type RoundMapsRow = RowDataPacket & {
+  phase_id: number;
+  bracket: string;
+  round_number: number;
+  slots_json: string | null;
+  tiebreak_map: string | null;
+};
+
+/**
+ * Les manches dont le réglage diffère encore de celui d'avant la fenêtre
+ * (`before`) ; une manche sans empreinte est gardée. Une lecture par tournoi.
+ * Lecture impossible : toutes gardées (mieux vaut une ligne de trop qu'une perdue).
+ */
+async function stillChanged(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  tournamentId: number,
+  rounds: readonly NoticeRound[],
+): Promise<NoticeRound[]> {
+  if (!rounds.some((round) => round.before !== undefined)) return [...rounds];
+  let rows: RoundMapsRow[];
+  try {
+    [rows] = await db.execute<RoundMapsRow[]>(
+      `SELECT phase_id, bracket, round_number, slots_json, tiebreak_map
+         FROM bg_tournament_round_maps WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+  } catch (error) {
+    console.error("[round-maps] réglages des manches illisibles, annonce entière", failureReason(error));
+    return [...rounds];
+  }
+  const current = new Map(
+    rows.map((row) => [`${Number(row.phase_id)}:${row.bracket}:${Number(row.round_number)}`, row]),
+  );
+  return rounds.filter((round) => {
+    if (round.before === undefined) return true;
+    const row = current.get(roundKey(round));
+    const now = round.tiebreak
+      ? roundMapsFingerprint(parseStoredTiebreak(row?.tiebreak_map))
+      : roundMapsFingerprint(parseStoredSlots(row?.slots_json));
+    return now !== round.before;
+  });
 }
 
 const NOTICE_SELECT = `SELECT n.tournament_id, n.rounds_json, n.changes, t.name, t.format
@@ -285,7 +396,9 @@ export async function dispatchDueRoundMapsNotices(rerun = false): Promise<number
       const [rows] = await db.execute<NoticeRow[]>(`${NOTICE_SELECT} WHERE n.send_after <= NOW()`);
       return await sendClaimed(rows);
     } catch (error) {
-      console.error("[round-maps] annonces en échec", error);
+      // Table pas encore créée (base neuve) : rien à annoncer, pas une ligne
+      // pm2 à chaque balayage.
+      if (!isMissingTableError(error)) console.error("[round-maps] annonces en échec", failureReason(error));
       return 0;
     }
   })();
@@ -353,29 +466,63 @@ async function flushNow(tournamentId: number, ownRounds?: readonly string[]): Pr
         })
       : rows;
     sent = (await sendClaimed(claimable)) > 0;
-    // L'écran fermé demande un envoi immédiat : le résumé ne reste pas dans le
-    // lot du journal du tournoi (`LOG_BATCHING.md`), qui part avec lui.
-    // Sans l'attendre : personne n'a besoin de son aboutissement, et un bot lent
-    // ne retient ni l'appelant ni la réservation de `lastFlushAt`.
-    if (sent) void flushBotLogBatch({ tournamentId, category: "maps" }).catch(() => undefined);
+    // L'écran fermé demande un envoi immédiat : le résumé est déjà parti de son
+    // lot (`sendClaimed`) ; les lignes de carte de l'arbitrage (première carte,
+    // carte choisie), rangées sous `referees`, le suivent au lieu d'attendre
+    // 5 à 10 min. Sans l'attendre : un bot lent ne retient ni l'appelant ni la
+    // réservation de `lastFlushAt`.
+    if (sent) void flushBotLogBatch({ tournamentId, category: "referees" }).catch(() => undefined);
     return sent;
   } finally {
     if (!sent && lastFlushAt.get(tournamentId) === now) lastFlushAt.delete(tournamentId);
   }
 }
 
+/** Échéances à venir (ms), croissantes : une par fenêtre relancée, tous tournois confondus. */
+let deadlines: number[] = [];
+/** Échéance que vise le minuteur armé. */
+let timerAt = 0;
+/** Deux échéances plus proches que cela n'en font qu'une (un balayage les sert toutes deux). */
+const DEADLINE_MERGE_MS = 1000;
+/** Échéances retenues au plus : au-delà, la dernière est repoussée (le trafic fait le reste). */
+const DEADLINES_MAX = 100;
+
 /**
  * Accélérateur : un minuteur de processus passe au balayage juste après la
  * fenêtre. Perdu au redémarrage sans conséquence — la base garde l'annonce.
+ *
+ * Une échéance **par fenêtre** : le minuteur vise la plus proche, puis se
+ * réarme sur la suivante. Un minuteur unique, annulé à chaque enregistrement,
+ * faisait attendre l'annonce d'un tournoi tant qu'un autre tournoi était réglé.
  */
-export function scheduleRoundMapsNotice(): void {
+export function scheduleRoundMapsNotice(now: number = Date.now()): void {
+  const at = now + (ROUND_MAPS_NOTICE_WINDOW_SECONDS + 2) * 1000;
+  // Toutes les fenêtres ont la même durée : `at` est la plus lointaine.
+  const last = deadlines.at(-1);
+  if (last === undefined || at - last >= DEADLINE_MERGE_MS) {
+    if (deadlines.length >= DEADLINES_MAX) deadlines[deadlines.length - 1] = at;
+    else deadlines.push(at);
+  }
+  armTimer();
+}
+
+function armTimer(): void {
+  const next = deadlines[0];
+  if (next === undefined) return;
+  if (timer && timerAt <= next) return;
   if (timer) clearTimeout(timer);
-  timer = setTimeout(() => {
-    timer = null;
-    lastSweepAt = 0;
-    void dispatchDueRoundMapsNotices(true);
-  }, (ROUND_MAPS_NOTICE_WINDOW_SECONDS + 2) * 1000);
+  timerAt = next;
+  timer = setTimeout(onDeadline, Math.max(next - Date.now(), 0));
   timer.unref?.();
+}
+
+function onDeadline(): void {
+  timer = null;
+  const now = Date.now();
+  deadlines = deadlines.filter((at) => at > now);
+  lastSweepAt = 0;
+  void dispatchDueRoundMapsNotices(true);
+  armTimer();
 }
 
 /** Remet l'état du processus à zéro. Réservé aux tests. */
@@ -387,4 +534,6 @@ export function resetRoundMapsNoticeState(): void {
   sweepAgain = false;
   if (timer) clearTimeout(timer);
   timer = null;
+  timerAt = 0;
+  deadlines = [];
 }

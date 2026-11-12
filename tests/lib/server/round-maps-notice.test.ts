@@ -10,6 +10,8 @@ import {
   flushRoundMapsNotice,
   queueRoundMapsNotice,
   resetRoundMapsNoticeState,
+  roundMapsFingerprint,
+  scheduleRoundMapsNotice,
 } from "@/lib/server/tournaments/round-maps-notice";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -150,11 +152,11 @@ describe("dispatchDueRoundMapsNotices", () => {
     expect(message).toContain("par le staff");
   });
 
-  it("dispatchDueRoundMapsNotices_dueRow_queuesTheSummaryInItsTournamentBatch", async () => {
+  it("dispatchDueRoundMapsNotices_dueRow_flushesTheMapsBatchAtOnce", async () => {
     pool([dueRow([R2])]);
     await dispatchDueRoundMapsNotices();
     expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
-    expect(flushBotLogBatch).not.toHaveBeenCalled();
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7, category: "maps" });
   });
 
   it("dispatchDueRoundMapsNotices_severalBrackets_listsUpperThenLowerThenGrandThenThirdPlace", async () => {
@@ -315,6 +317,12 @@ describe("flushRoundMapsNotice", () => {
     expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7, category: "maps" });
   });
 
+  it("flushRoundMapsNotice_summarySent_alsoFlushesTheRefereesBatch", async () => {
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7, category: "referees" });
+  });
+
   it("flushRoundMapsNotice_logBatchFlushNeverEnds_stillResolves", async () => {
     pool([dueRow([R2])]);
     jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
@@ -464,5 +472,163 @@ describe("formatRoundMapsSummaryLog", () => {
     const log = formatRoundMapsSummaryLog({ tournament, roundLabels: labels, listed: 8 });
     expect(log).toContain("M8 et 2 autres (10 manches)");
     expect(log).not.toContain("M9,");
+  });
+});
+
+describe("queueRoundMapsNotice — point de sauvegarde", () => {
+  const sqlError = (code: string, errno: number) => Object.assign(new Error(code), { code, errno });
+
+  it("queueRoundMapsNotice_firstSave_opensASavepointBeforeWriting", async () => {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValue([[], []]);
+    connection.query.mockResolvedValue([[], []]);
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [R2]);
+
+    expect(connection.query.mock.calls[0][0]).toBe("SAVEPOINT round_maps_notice");
+  });
+
+  it("queueRoundMapsNotice_lockWaitTimeout_rollsBackToTheSavepointAndResolves", async () => {
+    const connection = connectionMock();
+    connection.execute.mockRejectedValue(sqlError("ER_LOCK_WAIT_TIMEOUT", 1205));
+    connection.query.mockResolvedValue([[], []]);
+
+    await expect(queueRoundMapsNotice(fakeConnection(connection), 7, [R2])).resolves.toBeUndefined();
+
+    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual([
+      "SAVEPOINT round_maps_notice",
+      "ROLLBACK TO SAVEPOINT round_maps_notice",
+    ]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("queueRoundMapsNotice_deadlock_rethrowsForTheReplay", async () => {
+    const connection = connectionMock();
+    const deadlock = sqlError("ER_LOCK_DEADLOCK", 1213);
+    connection.execute.mockRejectedValue(deadlock);
+    connection.query.mockResolvedValue([[], []]);
+
+    await expect(queueRoundMapsNotice(fakeConnection(connection), 7, [R2])).rejects.toBe(deadlock);
+
+    expect(connection.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("queueRoundMapsNotice_rollbackFails_rethrowsTheOriginalError", async () => {
+    const connection = connectionMock();
+    const timeout = sqlError("ER_LOCK_WAIT_TIMEOUT", 1205);
+    connection.execute.mockRejectedValue(timeout);
+    connection.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("SAVEPOINT does not exist"));
+
+    await expect(queueRoundMapsNotice(fakeConnection(connection), 7, [R2])).rejects.toBe(timeout);
+  });
+
+  it("queueRoundMapsNotice_roundAlreadyPending_keepsItsFirstFingerprint", async () => {
+    const connection = connectionMock();
+    connection.query.mockResolvedValue([[], []]);
+    connection.execute.mockImplementation(async (sql) =>
+      /^\s*SELECT/.test(sql) ? [[{ rounds_json: JSON.stringify([{ ...R2, before: "aaaaaaaaaaaa" }]) }], []] : [{}, []],
+    );
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [{ ...R2, before: "bbbbbbbbbbbb" }]);
+
+    const [, params] = connection.execute.mock.calls[2];
+    expect(JSON.parse(String((params as unknown[])[0]))).toEqual([{ ...R2, before: "aaaaaaaaaaaa" }]);
+  });
+});
+
+describe("dispatchDueRoundMapsNotices — tours revenus à l'identique", () => {
+  const MAPS = [["Ilios"]];
+
+  function poolWithMaps(select: unknown[], maps: unknown[] | Error) {
+    execute = jest.fn<SqlQuery>(async (sql) => {
+      if (/FROM bg_tournament_round_maps/.test(sql)) {
+        if (maps instanceof Error) throw maps;
+        return [maps, []];
+      }
+      return /^\s*SELECT/.test(sql) ? [select, []] : [{ affectedRows: 1 }, []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  }
+
+  const mapsRow = (slots: unknown, tiebreak: string | null = null) => ({
+    phase_id: 0,
+    bracket: "UPPER",
+    round_number: 2,
+    slots_json: JSON.stringify(slots),
+    tiebreak_map: tiebreak,
+  });
+
+  it("dispatchDueRoundMapsNotices_roundBackToItsBeforeState_sendsNothing", async () => {
+    poolWithMaps([dueRow([{ ...R2, before: roundMapsFingerprint(MAPS) }])], [mapsRow(MAPS)]);
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueRoundMapsNotices_roundStillChanged_sendsIt", async () => {
+    poolWithMaps([dueRow([{ ...R2, before: roundMapsFingerprint([]) }])], [mapsRow(MAPS)]);
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchDueRoundMapsNotices_tiebreakBackToNone_sendsNothing", async () => {
+    poolWithMaps([dueRow([{ ...R2, tiebreak: true, before: roundMapsFingerprint(null) }])], []);
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueRoundMapsNotices_roundMapsUnreadable_sendsEveryRound", async () => {
+    poolWithMaps([dueRow([{ ...R2, before: roundMapsFingerprint(MAPS) }])], new Error("boom"));
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
+  });
+
+  it("dispatchDueRoundMapsNotices_missingTable_logsNothing", async () => {
+    execute = jest.fn<SqlQuery>(async () => {
+      throw Object.assign(new Error("Table doesn't exist"), { code: "ER_NO_SUCH_TABLE", errno: 1146 });
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
+
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("scheduleRoundMapsNotice", () => {
+  const sweeps = () => execute.mock.calls.filter(([sql]) => /send_after <= NOW\(\)/.test(sql)).length;
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: 1_000_000 });
+    pool([]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("scheduleRoundMapsNotice_otherTournamentSavedLater_firstDeadlineStillFires", async () => {
+    scheduleRoundMapsNotice();
+    await jest.advanceTimersByTimeAsync(30_000);
+    scheduleRoundMapsNotice();
+
+    await jest.advanceTimersByTimeAsync(32_000);
+
+    expect(sweeps()).toBe(1);
+  });
+
+  it("scheduleRoundMapsNotice_twoDeadlines_sweepsAtEach", async () => {
+    scheduleRoundMapsNotice();
+    await jest.advanceTimersByTimeAsync(30_000);
+    scheduleRoundMapsNotice();
+
+    await jest.advanceTimersByTimeAsync(62_000);
+
+    expect(sweeps()).toBe(2);
   });
 });

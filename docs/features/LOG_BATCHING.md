@@ -172,10 +172,11 @@ concerné : le bot y gère lui-même la trace.
 L'annonce des cartes (`ROUND_MAPS.md`) garde sa fusion en base (une ligne par
 tournoi, les manches modifiées réunies, 60 s de silence) : elle seule sait
 fusionner deux réglages de la même manche et survivre à un redémarrage. Sa
-ligne résumée entre ensuite dans le lot `maps` du tournoi (catégorie `maps`), comme toute autre. La
-fermeture de l'écran (`POST …/round-maps/flush`) envoie le résumé **et** le lot
-`maps` du tournoi tout de suite (`flushBotLogBatch({ tournamentId, category })` ;
-sans catégorie, tous les lots du tournoi partent).
+ligne résumée est déjà le regroupement : `sendClaimed` vide le lot `maps` du
+tournoi aussitôt après l'avoir posée, sans attendre 5 minutes de plus. La
+fermeture de l'écran (`POST …/round-maps/flush`) vide en plus le lot
+`referees` du tournoi (`flushBotLogBatch({ tournamentId, category })` ; sans
+catégorie, tous les lots du tournoi partent).
 
 ## Tests
 

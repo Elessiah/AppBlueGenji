@@ -27,6 +27,7 @@ import {
 } from "@/lib/server/tournaments/round-maps";
 import { briefTiebreakMap, type LobbyBriefRow } from "@/lib/server/tournaments/lobby-brief";
 import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
+import { roundMapsFingerprint } from "@/lib/server/tournaments/round-maps-notice";
 import { connectionMock, fakeConnection, fakePool, type SqlMock } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
 
@@ -200,8 +201,9 @@ describe("setRoundMaps", () => {
     // Aucune ligne Discord à l'enregistrement : la manche est mise en attente.
     expect(sendBotLog).not.toHaveBeenCalled();
     expect(writes(/INSERT INTO bg_round_maps_notices/).map(([, params]) => params)).toEqual([[7, 60]]);
+    // L'empreinte du réglage d'avant (aucune carte) : un retour à l'identique ne sera pas annoncé.
     expect(writes(/UPDATE bg_round_maps_notices SET rounds_json/).map(([, params]) => params)).toEqual([
-      ['[{"phaseId":0,"bracket":"UPPER","roundNumber":2}]', 7],
+      [JSON.stringify([{ ...ROUND, before: roundMapsFingerprint([]) }]), 7],
     ]);
   });
 
@@ -291,8 +293,8 @@ describe("setRoundsMaps", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
     const [notice] = writes(/UPDATE bg_round_maps_notices SET rounds_json/);
     expect(JSON.parse(String((notice[1] as unknown[])[0]))).toEqual([
-      { phaseId: 0, bracket: "UPPER", roundNumber: 2 },
-      { phaseId: 0, bracket: "UPPER", roundNumber: 3 },
+      { phaseId: 0, bracket: "UPPER", roundNumber: 2, before: roundMapsFingerprint([]) },
+      { phaseId: 0, bracket: "UPPER", roundNumber: 3, before: roundMapsFingerprint([]) },
     ]);
   });
 
@@ -723,6 +725,20 @@ describe("setRoundTiebreak", () => {
     expect(insert[0]).toMatch(/ON DUPLICATE KEY UPDATE tiebreak_map = VALUES\(tiebreak_map\)/);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
     expect(writes(/INSERT INTO bg_round_maps_notices/)).toHaveLength(1);
+  });
+
+  it("setRoundTiebreak_changed_storesTheFingerprintOfThePreviousMap", async () => {
+    route(connection.execute, [
+      { pattern: /FOR UPDATE/, rows: [TOURNAMENT] },
+      { pattern: /SELECT format, match_format_type/, rows: [BO3_ROW] },
+    ]);
+
+    await setRoundTiebreak(7, ROUND, "Busan");
+
+    const [notice] = writes(/UPDATE bg_round_maps_notices SET rounds_json/);
+    expect(JSON.parse(String((notice[1] as unknown[])[0]))).toEqual([
+      { ...ROUND, tiebreak: true, before: roundMapsFingerprint(null) },
+    ]);
   });
 
   it("setRoundTiebreak_locksTournamentFirst", async () => {
