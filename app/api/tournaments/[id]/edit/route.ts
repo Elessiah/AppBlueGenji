@@ -77,23 +77,28 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     announceStaffTournamentAction(checked.id, "EDITED", patch.name === undefined ? { name } : { previousName, name });
     return ok({ success: true });
   } catch (error) {
-    const message = (error as Error).message;
-
-    if (message.startsWith("FIELD_NOT_EDITABLE:")) {
-      return NextResponse.json(
-        { error: "FIELD_NOT_EDITABLE", field: message.slice("FIELD_NOT_EDITABLE:".length) },
-        { status: 409 },
-      );
-    }
-    if (message === "TOURNAMENT_LOCKED") return fail(message, 409);
-    if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
-    if (message.startsWith("INVALID_") || message.startsWith("MISSING_") ||
-        message === "MAX_TEAMS_CANNOT_DECREASE" ||
-        message === "REGISTRATION_CLOSE_IN_PAST" ||
-        message === "DOUBLE_MUST_BE_LAST_PHASE") {
-      return fail(message, 400);
-    }
-
-    return fail("TOURNAMENT_UPDATE_FAILED", 500);
+    return updateFailureResponse(error);
   }
+}
+
+/** Rend le refus d'une modification sous son code (409, 404, 400), le reste en 500. */
+function updateFailureResponse(error: unknown): Response {
+  const message = (error as Error).message;
+
+  if (message.startsWith("FIELD_NOT_EDITABLE:")) {
+    return NextResponse.json(
+      { error: "FIELD_NOT_EDITABLE", field: message.slice("FIELD_NOT_EDITABLE:".length) },
+      { status: 409 },
+    );
+  }
+  if (message === "TOURNAMENT_LOCKED") return fail(message, 409);
+  if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
+  if (message.startsWith("INVALID_") || message.startsWith("MISSING_") ||
+      message === "MAX_TEAMS_CANNOT_DECREASE" ||
+      message === "REGISTRATION_CLOSE_IN_PAST" ||
+      message === "DOUBLE_MUST_BE_LAST_PHASE") {
+    return fail(message, 400);
+  }
+
+  return fail("TOURNAMENT_UPDATE_FAILED", 500);
 }
