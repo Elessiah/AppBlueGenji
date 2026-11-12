@@ -10,6 +10,7 @@ import {
   infoHintReaction,
   infoHintRefocusAfterEscape,
   isInteractivePointerTarget,
+  pointerMoved,
   topOpenModal,
 } from "@/lib/shared/info-hint";
 import s from "./info-hint.module.css";
@@ -29,10 +30,12 @@ import s from "./info-hint.module.css";
  * lecteur d'écran l'entend, l'œil voit le « i ». Une erreur de champ ne s'y
  * met jamais (`FieldErrorText`).
  *
- * Se referme par Échap (écouté sur `document` tant qu'il est ouvert, focus
- * rendu au bouton s'il n'est pas sur un champ), par un clic ailleurs — un
- * autre « i » compris, et au toucher le relâchement sur du texte, que Safari
- * iOS ne transmet pas en `click` —, par un second clic sur le bouton.
+ * Se referme par Échap (écouté en capture sur `document` tant qu'il est
+ * ouvert, focus rendu au bouton s'il n'est pas sur un champ ; un contrôle
+ * focalisé qui se sert d'Échap le garde), par un clic ailleurs — un autre « i »
+ * compris, et au toucher le relâchement d'un tap sur du texte, que Safari iOS
+ * ne transmet pas en `click` (un glissé ne compte pas) —, par un second clic
+ * sur le bouton.
  *
  * Le parent pose le libellé et ce composant dans une rangée qui passe à la
  * ligne (`InfoHintRow`) : l'explication y prend toute la largeur, sous eux.
@@ -71,32 +74,47 @@ export function InfoHint({
     // Safari iOS n'envoie pas `click` au `document` pour un élément non
     // cliquable (texte, fond) : le relâchement referme, sauf sur un contrôle,
     // qui referme à son `click`. Un défilement tactile finit en `pointercancel`.
+    // Un glissé court (stylet, doigt qui n'a pas lancé de défilement) n'est pas
+    // un tap : l'appui est noté pour mesurer le déplacement au relâchement.
+    let pressedAt: { x: number; y: number } | null = null;
+    const onPointerDown = (event: PointerEvent) => {
+      pressedAt = { x: event.clientX, y: event.clientY };
+    };
     const onPointerUp = (event: PointerEvent) => {
+      const start = pressedAt;
+      pressedAt = null;
       // Un clic de souris referme au `click` : le relâchement qui finit une
       // sélection de texte à la souris ne doit pas replier le panneau.
       if (event.pointerType === "mouse" || !isOutside(event)) return;
       const interactive = isInteractivePointerTarget(event.target as Element | null);
-      if (infoHintReaction({ kind: "outsidePointerUp", interactive }) === "close") setOpen(false);
+      const moved = pointerMoved(start, { x: event.clientX, y: event.clientY });
+      if (infoHintReaction({ kind: "outsidePointerUp", interactive, moved }) === "close") setOpen(false);
     };
     // Échap écouté sur `document` tant que l'explication est ouverte : le focus
     // peut être ailleurs (texte cliqué, champ voisin atteint par Tab) sans que
     // la touche cesse de la replier. Une modale ouverte **par-dessus** garde la
     // sienne ; une modale qui porte le « i » laisse la touche passer
-    // (`escapeBelongsElsewhere`, `data-escape-owner`).
+    // (`escapeBelongsElsewhere`, `data-escape-owner`). Un contrôle focalisé qui
+    // se sert d'Échap le garde (`infoHintOwnsEscape`). Écouté en **capture** :
+    // une fois prise, la touche n'atteint plus les autres couches à l'écoute du
+    // document (menu du compte).
     const onKeyDown = (event: KeyboardEvent) => {
       if (infoHintReaction({ kind: "key", key: event.key }) !== "closeAndFocus") return;
-      if (!infoHintOwnsEscape(rootRef.current, topOpenModal(document))) return;
+      const active = document.activeElement;
+      if (!infoHintOwnsEscape(rootRef.current, topOpenModal(document), active === document.body ? null : active)) return;
       event.stopPropagation();
       setOpen(false);
       if (infoHintRefocusAfterEscape(rootRef.current, document.activeElement, document.body)) buttonRef.current?.focus();
     };
     document.addEventListener("click", onClick);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("pointerup", onPointerUp);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("click", onClick);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("pointerup", onPointerUp);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onKeyDown, true);
     };
   }, [open]);
 

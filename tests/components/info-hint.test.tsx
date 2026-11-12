@@ -336,6 +336,29 @@ describe("InfoHint — gestes", () => {
     expect(documentListeners.pointerup ?? []).toHaveLength(0);
   });
 
+  it("au toucher, un glissé hors du panneau ne le replie pas ; un tap, si", () => {
+    let view = render();
+    click(view.button);
+    view = render();
+    const NodeClass = globals.Node as new () => object;
+    const text = Object.assign(new NodeClass(), { closest: () => null });
+    fakeRefs(view);
+    documentListeners.pointerdown[0]({ clientX: 10, clientY: 10 });
+    documentListeners.pointerup[0]({ target: text, pointerType: "pen", clientX: 10, clientY: 40 });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(true);
+    documentListeners.pointerdown[0]({ clientX: 10, clientY: 10 });
+    documentListeners.pointerup[0]({ target: text, pointerType: "pen", clientX: 12, clientY: 12 });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(false);
+  });
+
+  it("écoute Échap en capture : pris, il n'atteint plus le menu du compte", () => {
+    const source = readSource("components/ui/info-hint.tsx");
+    expect(source).toContain('document.addEventListener("keydown", onKeyDown, true);');
+    expect(source).toContain('document.removeEventListener("keydown", onKeyDown, true);');
+  });
+
   it("se referme au clic ailleurs, pas au clic dedans, et n'écoute que pendant qu'il est ouvert", () => {
     let view = render();
     expect(documentListeners.click ?? []).toHaveLength(0);

@@ -70,13 +70,23 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
     vide pas son formulaire, et le « i » se replie. Le focus revient au bouton
     seulement s'il était sur `body`, le conteneur de la modale ou dans le « i »
     (`infoHintRefocusAfterEscape`), jamais arraché à un champ voisin.
+  - Focus **dans** le « i » : la touche est la sienne, quelle que soit la modale
+    relevée en dernier dans le DOM. Focus sur un contrôle qui se sert lui-même
+    d'Échap (`isEscapeConsumer` : `combobox` ouvert, recherche, menu, liste
+    d'options) : le « i » la lui laisse. L'écoute est posée **en capture** :
+    prise, la touche n'atteint plus les autres couches à l'écoute du document
+    (menu du compte).
   - Le clic ailleurs ferme au `click`, pas à l'appui : replier l'explication à
     l'appui ferait remonter le contrôle visé sous le pointeur, et le relâchement
     tomberait à côté (clic perdu). Exception : une cible **non interactive**
     (texte, fond) — Safari iOS n'envoie aucun `click` au `document` pour elle —
     ferme au `pointerup` (`isInteractivePointerTarget` ; un contrôle attend son
-    `click`, un défilement tactile finit en `pointercancel`). Cliquer un autre
-    « i » est un clic ailleurs.
+    `click`, un défilement tactile finit en `pointercancel`). Un **glissé** au
+    stylet ou au doigt (plus de `POINTER_TAP_SLOP` = 10 px entre appui et
+    relâchement, `pointerMoved`) n'est pas un tap et ne replie rien. Sont
+    interactifs les contrôles natifs, les rôles de widgets ARIA (onglet,
+    interrupteur, radio, option, `combobox`…) et tout `tabindex` ≥ 0 — pas un
+    conteneur `tabindex="-1"`. Cliquer un autre « i » est un clic ailleurs.
   - Le clic donne le focus au bouton (Safari, macOS et iOS, ne le fait pas de
     lui-même).
 - **Langue du nom du bouton** : celle de l'élément ambiant le plus proche qui
