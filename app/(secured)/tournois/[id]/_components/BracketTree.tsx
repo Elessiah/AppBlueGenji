@@ -176,6 +176,7 @@ export function BracketTree({
     return () => {
       cancelScroll();
       window.clearTimeout(timer);
+      setArrivedId(null);
     };
   }, [scrollRequest]);
 

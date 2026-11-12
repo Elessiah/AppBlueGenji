@@ -53,6 +53,8 @@ describe("halo d'arrivée", () => {
     expect(TREE).toContain("setArrivedId(scrollRequest.matchId);");
     expect(TREE).toContain("window.setTimeout(() => setArrivedId(null), ARRIVAL_HALO_MS)");
     expect(TREE).toContain("window.clearTimeout(timer);");
+    // Le nettoyage retire aussi le halo : une demande qui disparaît ne le laisse pas collé.
+    expect(TREE).toMatch(/window\.clearTimeout\(timer\);\s+setArrivedId\(null\);/);
   });
 
   it("pas de halo quand la cible n'est pas rendue dans cette section", () => {

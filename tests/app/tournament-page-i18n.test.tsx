@@ -695,6 +695,7 @@ describe("français inchangé — les messages égalent les tables d'origine", (
   it("compteurs anglais à 1 : singulier (manches prévues, joueurs, maps, cadence)", () => {
     expect(EN.t("endurance.outLegendRounds", { count: 1 })).toBe(" in the 1 planned round");
     expect(EN.t("endurance.outLegendRounds", { count: 8 })).toBe(" in the 8 planned rounds");
+    expect(FR_ENDURANCE_TEXT.t("endurance.outLegendRounds", { count: 1 })).toBe(" dans l'unique manche prévue");
     expect(outLegendText(EN.t, 8)).toBe("“Out of contention”: the entrant still has pool left, but no chance of reaching the playoffs anymore in the 8 planned rounds.");
     expect(outLegendText(FR_ENDURANCE_TEXT.t, 8)).toBe("« Hors course » : l'engagé garde du capital, mais n'a plus aucune chance d'atteindre les play-offs dans les 8 manches prévues.");
     expect(outLegendText(EN.t, null)).toBe("“Out of contention”: the entrant still has pool left, but no chance of reaching the playoffs anymore.");

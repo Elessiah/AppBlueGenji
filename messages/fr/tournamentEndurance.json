@@ -12,7 +12,7 @@
     "penaltyBadgeSr": " ({points} point(s) retiré(s) par pénalité)",
     "cellPenalty": "dont −{points} de pénalité",
     "outLegend": "« Hors course » : l'engagé garde du capital, mais n'a plus aucune chance d'atteindre les play-offs",
-    "outLegendRounds": " dans les {count} manches prévues",
+    "outLegendRounds": " dans {count, plural, one {l'unique manche prévue} other {les # manches prévues}}",
     "outHintLabel": "Que veut dire « hors course » ?",
     "outHintSubject": "hors course",
     "penaltiesTitle": "PÉNALITÉS D'ARBITRAGE",
