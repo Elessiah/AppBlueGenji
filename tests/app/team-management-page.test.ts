@@ -79,7 +79,8 @@ describe("roster et invitation", () => {
   });
 
   it("ne vide le formulaire d'invitation que sur un succès", () => {
-    expect(members).toMatch(/const ok = await addMember[\s\S]*if \(ok\) \{\s*setMemberPseudo\(""\)/);
+    // La décision elle-même : `invitationOutcome` (team-member-roles-logic.test.ts).
+    expect(members).toMatch(/const ok = await addMember[\s\S]*invitationOutcome\(ok, pseudoRefused\)[\s\S]*if \(outcome\.clearPseudo\) setMemberPseudo\(""\)/);
   });
 
   it("lève la coupe du bloc qui porte l'autocomplétion", () => {
@@ -289,11 +290,12 @@ describe("correctifs de la première revue", () => {
     expect(stripComments(block(".choiceList"))).not.toMatch(/overflow|max-height/);
   });
 
-  it("un refus de rôles se dit en notification, pas en ligne", () => {
-    const roles = stripComments(read("_components", "RolesDialog.tsx"));
-    const members = stripComments(read("_components", "MembersSection.tsx"));
-    for (const src of [roles, members]) {
-      expect(src).toContain('showError(teamErrorMessage("MISSING_ROLE"))');
+  it("n'exige plus aucun rôle : ni refus local, ni message en ligne", () => {
+    // Inviter sans rôle, ou retirer tous les rôles de jeu, est permis : le
+    // joueur choisit lui-même les siens (« Mes rôles »).
+    for (const file of ["RolesDialog.tsx", "MembersSection.tsx", "InviteRolesDialog.tsx", "MyRolesBlock.tsx"]) {
+      const src = stripComments(read("_components", file));
+      expect(src).not.toContain("MISSING_ROLE");
       expect(src).not.toContain('role="status"');
     }
   });

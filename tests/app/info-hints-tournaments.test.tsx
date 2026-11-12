@@ -115,7 +115,7 @@ function visibleLines(
     "planning.descriptionOff": tournament.planning.descriptionOff,
     "contacts.intro": dialogs.contacts.intro.replace(/<\/?strong>/g, ""),
     "settings.dangerGhostHelp": team.settings.dangerGhostHelp,
-    "roles.managerHelp": team.roles.managerHelp,
+    "roleGuide.noticesLine": team.roleGuide.noticesLine,
     "concerned.lead": reports.concerned.lead,
   };
 }

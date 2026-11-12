@@ -203,9 +203,9 @@ describe("tables des formulaires — pseudo d'un joueur et certification Discord
   });
 
   it("le pseudo ne se signale pas pour un refus qu'aucune saisie ne lève", () => {
-    // Droits, réseau, équipe dissoute, rôles manquants : un autre pseudo n'y
+    // Droits, réseau, équipe dissoute, rôles invalides : un autre pseudo n'y
     // changerait rien.
-    for (const code of ["FORBIDDEN", "NETWORK_ERROR", "TEAM_DELETED", "NOT_A_GHOST_TEAM", "MISSING_ROLE"]) {
+    for (const code of ["FORBIDDEN", "NETWORK_ERROR", "TEAM_DELETED", "NOT_A_GHOST_TEAM", "INVALID_ROLES"]) {
       expect(fieldForError(code, PLAYER_PSEUDO_FIELD_ERRORS)).toBeNull();
     }
   });

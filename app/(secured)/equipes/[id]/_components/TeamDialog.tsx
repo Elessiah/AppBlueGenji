@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { isCheckboxEnter } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 interface TeamDialogProps {
@@ -15,6 +16,8 @@ interface TeamDialogProps {
   /** Présent : le panneau est un formulaire, Entrée le soumet. */
   onSubmit?: () => void;
   tone?: "default" | "danger";
+  /** Panneau large : la modale porte le tableau des rôles (`RoleTable`). */
+  wide?: boolean;
   children: ReactNode;
   footer: ReactNode;
 }
@@ -44,6 +47,7 @@ export function TeamDialog({
   busy = false,
   onSubmit,
   tone = "default",
+  wide = false,
   children,
   footer,
 }: Readonly<TeamDialogProps>) {
@@ -73,7 +77,7 @@ export function TeamDialog({
     "aria-modal": true,
     "aria-labelledby": titleId,
     tabIndex: -1,
-    className: styles.dialog,
+    className: wide ? `${styles.dialog} ${styles.dialogWide}` : styles.dialog,
     "data-tone": tone,
   };
 
@@ -87,6 +91,10 @@ export function TeamDialog({
         <form
           {...panelProps}
           ref={dialogRef as unknown as React.Ref<HTMLFormElement>}
+          onKeyDown={(event: KeyboardEvent) => {
+            // Entrée sur une case ne l'envoie pas (soumission implicite).
+            if (isCheckboxEnter(event.key, event.target)) event.preventDefault();
+          }}
           onSubmit={(event: FormEvent) => {
             event.preventDefault();
             if (!busy) onSubmit();

@@ -1,9 +1,10 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamJoinRequest, TeamRole, TeamSentInvitation } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users/roles";
 import { arrivalRoles, teamJoinRefusal } from "@/lib/shared/team-join";
+import { hasTeamManagementRole, isLeadingRole } from "@/lib/shared/team-roles";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
@@ -69,18 +70,25 @@ async function userHasActiveTeam(userId: number): Promise<boolean> {
  * (`NOT_A_GHOST_TEAM`) plutôt que de faire entrer le joueur dans une équipe
  * réelle qui ne l'a pas invité.
  *
- * @param roles rôles posés à l'arrivée ; vide (demande, invitation d'avant la
- *   colonne) → `DPS`, le défaut d'origine. `OWNER` n'est posé que par une
- *   reprise de fantôme.
+ * @param roles rôles posés à l'arrivée ; `null` (demande, invitation d'avant
+ *   la colonne) → `DPS`, le défaut d'origine ; une liste vide → aucun rôle
+ *   (invitation sans rôle, D71). `OWNER` n'est posé que par une reprise de
+ *   fantôme.
+ * @param grantorId qui donne ces rôles : l'auteur de l'invitation, ou la
+ *   gestion qui accepte une demande en invitant ; `null` si son compte a été
+ *   supprimé. Ses droits sont **relus sous le verrou de l'équipe**
+ *   ({@link grantableArrivalRoles}) : un rôle de direction ne passe que s'il
+ *   gère encore l'équipe à l'arrivée du joueur.
  */
 async function acceptIntoTeam(
   invitationId: number,
   teamId: number,
   userId: number,
-  roles: TeamRole[],
+  roles: TeamRole[] | null,
+  grantorId: number | null,
 ): Promise<void> {
   const claim = isGhostClaimRoles(roles);
-  const payload = arrivalRoles(claim, sanitizeRoles(roles));
+  const requested = arrivalRoles(claim, roles === null ? null : sanitizeRoles(roles));
 
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -112,6 +120,7 @@ async function acceptIntoTeam(
     );
     const refusal = teamJoinRefusal(teams[0], claim);
     if (refusal) throw new Error(refusal);
+    const payload = claim ? requested : await grantableArrivalRoles(connection, teamId, grantorId, requested);
 
     const [claimed] = await connection.execute<ResultSetHeader>(
       `UPDATE bg_team_invitations
@@ -169,53 +178,109 @@ async function acceptIntoTeam(
   if (claim && everRegistered) invalidateTeamIdentityViews();
 }
 
+/**
+ * Rôles d'arrivée que `grantorId` peut **encore** donner. Une invitation
+ * portant `MANAGER` ou `CAPITAINE` restait valable après que son auteur avait
+ * été rétrogradé ou exclu : le joueur l'acceptait plus tard et arrivait avec
+ * des droits que la propriété venait de retirer — de même qu'une rétrogradation
+ * glissée entre le contrôle de `inviteToTeam` et l'écriture de l'invitation.
+ * Les droits de l'auteur sont donc relus à l'arrivée, sous le verrou partagé de
+ * l'équipe déjà pris par `acceptIntoTeam` (rétrogradation et exclusion prennent
+ * cette ligne en exclusif : elles sont vues, commitées, ou attendent). S'il ne
+ * gère plus l'équipe (ou si son compte n'existe plus), seuls les rôles de jeu
+ * passent ; le joueur entre quand même — l'invitation reste l'acte de l'équipe.
+ * Requête sur une seule table, sans jointure (MariaDB).
+ */
+async function grantableArrivalRoles(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+  grantorId: number | null,
+  requested: TeamRole[],
+): Promise<TeamRole[]> {
+  if (!requested.some(isLeadingRole)) return requested;
+  if (grantorId !== null) {
+    const [rows] = await connection.execute<(RowDataPacket & { roles_json: string })[]>(
+      `SELECT roles_json FROM bg_team_members
+       WHERE team_id = ? AND user_id = ? AND left_at IS NULL
+       LIMIT 1 LOCK IN SHARE MODE`,
+      [teamId, grantorId],
+    );
+    if (rows.length > 0 && hasTeamManagementRole(parseRoles(rows[0].roles_json))) return requested;
+  }
+  return requested.filter((role) => !isLeadingRole(role));
+}
+
+/** Qui donne les rôles d'une invitation : son auteur ; une demande n'en donne aucun. */
+function invitationGrantor(inv: { kind: "INVITE" | "REQUEST"; created_by: number | null }): number | null {
+  return inv.kind === "INVITE" && inv.created_by !== null ? Number(inv.created_by) : null;
+}
+
 async function findPendingInvitation(
   teamId: number,
   userId: number,
-): Promise<{ id: number; kind: "INVITE" | "REQUEST"; roles: TeamRole[] } | null> {
+): Promise<{ id: number; kind: "INVITE" | "REQUEST"; roles: TeamRole[] | null; createdBy: number | null } | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<
-    (RowDataPacket & { id: number; kind: "INVITE" | "REQUEST"; roles_json: unknown })[]
+    (RowDataPacket & { id: number; kind: "INVITE" | "REQUEST"; roles_json: unknown; created_by: number | null })[]
   >(
-    `SELECT id, kind, roles_json FROM bg_team_invitations
+    `SELECT id, kind, roles_json, created_by FROM bg_team_invitations
      WHERE team_id = ? AND user_id = ? AND status = 'PENDING'
      ORDER BY created_at DESC LIMIT 1`,
     [teamId, userId],
   );
   return rows.length === 0
     ? null
-    : { id: Number(rows[0].id), kind: rows[0].kind, roles: invitationRoles(rows[0].roles_json) };
+    : {
+        id: Number(rows[0].id),
+        kind: rows[0].kind,
+        roles: invitationRoles(rows[0].roles_json),
+        createdBy: rows[0].created_by === null ? null : Number(rows[0].created_by),
+      };
 }
 
 /**
  * Rôles portés par une invitation, tels qu'ils seront posés à l'arrivée du
- * joueur. Une invitation sans rôle (demande d'adhésion, ou invitation émise
- * avant la colonne) rend une liste vide : `acceptIntoTeam` pose alors `DPS`,
- * le défaut d'origine.
+ * joueur. Sans liste (`NULL` : demande d'adhésion, ou invitation émise avant la
+ * colonne), `null` : `acceptIntoTeam` pose alors `DPS`, le défaut d'origine.
+ * Une liste vide (`[]`) est une invitation **sans rôle**, voulue (D71). Une
+ * liste **non vide** dont aucun code n'est connu (rôle retiré depuis, valeur
+ * écrite à la main) n'est pas ce choix-là : elle garde le défaut, `null`.
  */
-function invitationRoles(raw: unknown): TeamRole[] {
-  return raw == null ? [] : parseRoles(raw);
+export function invitationRoles(raw: unknown): TeamRole[] | null {
+  if (raw == null) return null;
+  const roles = parseRoles(raw);
+  return roles.length === 0 && !isEmptyRoleList(raw) ? null : roles;
+}
+
+/** La valeur stockée est-elle une liste **vide** (`[]`, ou le texte `"[]"`) ? */
+function isEmptyRoleList(raw: unknown): boolean {
+  if (Array.isArray(raw)) return raw.length === 0;
+  if (typeof raw !== "string") return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * L'invitation est-elle la **reprise d'une équipe fantôme** ? Seule
  * `claimGhostTeam` pose `OWNER` sur une invitation : c'est sa marque.
  */
-function isGhostClaimRoles(roles: readonly TeamRole[]): boolean {
-  return roles.includes("OWNER");
+function isGhostClaimRoles(roles: readonly TeamRole[] | null): boolean {
+  return roles?.includes("OWNER") ?? false;
 }
 
 /**
  * Rôles demandés à l'invitation : ceux que la gestion peut distribuer, jamais
- * `OWNER` (il se transfère). Absents, ils valent le défaut d'origine ; présents
- * mais vides, c'est un refus — même règle que `updateTeamMemberRoles`, un membre
- * sans rôle n'existant pas.
+ * `OWNER` (il se transfère). Absents, ils valent le défaut d'origine (`DPS`,
+ * pour un appelant qui ignore le champ) ; une liste vide est permise (D71) :
+ * le joueur arrive sans rôle et choisit ses rôles de jeu lui-même.
  */
 function resolveInviteRoles(roles: readonly TeamRole[] | undefined): TeamRole[] {
   if (roles === undefined) return ["DPS"];
-  const filtered = sanitizeRoles([...roles]).filter((role) => role !== "OWNER");
-  if (filtered.length === 0) throw new Error("MISSING_ROLE");
-  return filtered;
+  return sanitizeRoles([...roles]).filter((role) => role !== "OWNER");
 }
 
 /**
@@ -239,7 +304,7 @@ export async function inviteToTeam(
 
   const existing = await findPendingInvitation(teamId, userId);
   if (existing?.kind === "REQUEST") {
-    await acceptIntoTeam(existing.id, teamId, userId, inviteRoles);
+    await acceptIntoTeam(existing.id, teamId, userId, inviteRoles, requesterId);
     return "JOINED";
   }
   if (existing?.kind === "INVITE") throw new Error("ALREADY_INVITED");
@@ -291,14 +356,14 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
   const existing = await findPendingInvitation(teamId, userId);
   if (teams[0].is_ghost === 1) {
     if (existing?.kind === "INVITE" && isGhostClaimRoles(existing.roles)) {
-      await acceptIntoTeam(existing.id, teamId, userId, existing.roles);
+      await acceptIntoTeam(existing.id, teamId, userId, existing.roles, existing.createdBy);
       return "JOINED";
     }
     throw new Error("TEAM_NOT_JOINABLE");
   }
 
   if (existing?.kind === "INVITE") {
-    await acceptIntoTeam(existing.id, teamId, userId, existing.roles);
+    await acceptIntoTeam(existing.id, teamId, userId, existing.roles, existing.createdBy);
     return "JOINED";
   }
   if (existing?.kind === "REQUEST") throw new Error("ALREADY_REQUESTED");
@@ -328,8 +393,17 @@ export async function respondToInvitation(
   accept: boolean,
 ): Promise<void> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { team_id: number; user_id: number; kind: "INVITE" | "REQUEST"; status: string; roles_json: unknown })[]>(
-    `SELECT team_id, user_id, kind, status, roles_json FROM bg_team_invitations WHERE id = ? LIMIT 1`,
+  const [rows] = await db.execute<
+    (RowDataPacket & {
+      team_id: number;
+      user_id: number;
+      kind: "INVITE" | "REQUEST";
+      status: string;
+      roles_json: unknown;
+      created_by: number | null;
+    })[]
+  >(
+    `SELECT team_id, user_id, kind, status, roles_json, created_by FROM bg_team_invitations WHERE id = ? LIMIT 1`,
     [invitationId],
   );
   if (rows.length === 0) throw new Error("INVITATION_NOT_FOUND");
@@ -359,8 +433,8 @@ export async function respondToInvitation(
   }
 
   if (await userHasActiveTeam(Number(inv.user_id))) throw new Error("USER_ALREADY_IN_TEAM");
-  // Une demande (REQUEST) ne porte aucun rôle : `acceptIntoTeam` pose DPS.
-  await acceptIntoTeam(invitationId, Number(inv.team_id), Number(inv.user_id), invitationRoles(inv.roles_json));
+  // Une demande (REQUEST) ne porte aucune liste (`NULL`) : `acceptIntoTeam` pose DPS.
+  await acceptIntoTeam(invitationId, Number(inv.team_id), Number(inv.user_id), invitationRoles(inv.roles_json), invitationGrantor(inv));
 }
 
 /** Invitations (INVITE) en attente adressées au joueur. */
@@ -450,9 +524,9 @@ export async function listTeamPendingInvitations(
     if (r.kind === "REQUEST") {
       requests.push(base);
     } else {
-      const roles = invitationRoles(r.roles_json);
-      // Invitation d'avant la colonne : le joueur arrivera en DPS, on le dit.
-      invitations.push({ ...base, roles: roles.length === 0 ? (["DPS"] as TeamRole[]) : roles });
+      // Invitation d'avant la colonne (`NULL`) : le joueur arrivera en DPS, on
+      // le dit. Une liste vide est une invitation sans rôle (D71).
+      invitations.push({ ...base, roles: invitationRoles(r.roles_json) ?? (["DPS"] as TeamRole[]) });
     }
   }
   return { requests, invitations };

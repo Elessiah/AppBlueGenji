@@ -10,7 +10,10 @@
  * Trois familles, et la ligne de partage est celle de `team-roles.ts` :
  * - **propriétaire** (`OWNER`) — jamais attribuable : il se transfère ;
  * - **gestion** (`MANAGER`) — donne la main sur l'équipe (roster, inscriptions) ;
- * - **jeu** (les cinq autres) — une place dans le roster, aucun pouvoir.
+ * - **jeu** (les cinq autres) — une place dans le roster, aucun pouvoir sur
+ *   l'équipe (`CAPITAINE` mène toutefois les matchs, et se pose par la gestion
+ *   comme `MANAGER`). Qui peut se donner quoi est une règle d'autorisation :
+ *   elle vit dans `team-roles.ts` (`SELF_ASSIGNABLE_ROLES`), pas ici.
  *
  * Module **pur** : aucun rendu, aucune base — les listes et l'ordre se testent
  * seuls, et le serveur peut s'y référer sans rien importer du client.
@@ -43,19 +46,8 @@ export const TEAM_ROLE_ORDER: readonly TeamRole[] = [
   "HEAL",
 ];
 
-/** Rôles de jeu attribuables : une place dans le roster, aucun droit. */
-export const ASSIGNABLE_GAME_ROLES: readonly TeamRole[] = ["CAPITAINE", "COACH", "TANK", "DPS", "HEAL"];
-
-/**
- * Rôles de gestion attribuables. `OWNER` n'y figure pas : il ne se coche pas,
- * il se **transfère** (une équipe a exactement un propriétaire).
- */
-export const ASSIGNABLE_MANAGEMENT_ROLES: readonly TeamRole[] = TEAM_MANAGEMENT_ROLES.filter(
-  (role) => role !== "OWNER",
-);
-
-/** Rôles proposés par défaut à l'invitation : ceux que le serveur posait seul. */
-export const DEFAULT_INVITE_ROLES: readonly TeamRole[] = ["DPS"];
+/** Tout ce que la gestion peut cocher (invitation, modale « Rôles »), dans l'ordre d'affichage. */
+export const MANAGER_ASSIGNABLE_ROLES: readonly TeamRole[] = TEAM_ROLE_ORDER.filter((role) => role !== "OWNER");
 
 export type TeamRoleFamily = "owner" | "management" | "game";
 

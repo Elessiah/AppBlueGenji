@@ -22,7 +22,7 @@ export const TEAM_INVITE_ERROR_STATUS: TeamErrorStatusTable = new Map([
   ["USER_NOT_FOUND", 404],
   ["USER_ALREADY_IN_TEAM", 409],
   ["ALREADY_INVITED", 409],
-  ["MISSING_ROLE", 400],
+  ["INVALID_ROLES", 400],
   ...[...JOIN_CONFLICTS].map((code) => [code, 409] as const),
 ]);
 
@@ -30,7 +30,18 @@ export const TEAM_INVITE_ERROR_STATUS: TeamErrorStatusTable = new Map([
 export const TEAM_MEMBER_ROLES_ERROR_STATUS: TeamErrorStatusTable = new Map([
   ...MANAGEMENT_REFUSALS,
   ["MEMBER_NOT_FOUND", 404],
-  ["MISSING_ROLE", 400],
+  ["INVALID_ROLES", 400],
+]);
+
+/**
+ * Un membre choisit ses propres rôles de jeu (`PUT …/my-roles`). Pas membre :
+ * 403, comme tout geste sur une équipe dont on ne fait pas partie.
+ */
+export const TEAM_OWN_ROLES_ERROR_STATUS: TeamErrorStatusTable = new Map([
+  ["NOT_A_MEMBER", 403],
+  [TERMS_ACCEPTANCE_REQUIRED, 409],
+  ["INVALID_ROLES", 400],
+  ["ROLE_NOT_SELF_ASSIGNABLE", 400],
 ]);
 
 /** Retrait d'un membre (`DELETE …/members`). */

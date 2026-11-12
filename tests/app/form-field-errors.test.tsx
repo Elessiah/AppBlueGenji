@@ -83,7 +83,10 @@ describe("formulaires — erreurs rattachées aux champs", () => {
 
   it.each(WIRED_FORMS.map((form) => [form.file]))("%s garde la notification", (file) => {
     // Le rattachement au champ s'ajoute à la convention, il ne la remplace pas.
-    const src = code(file);
+    // L'invitation notifie depuis le hook des gestes, qu'elle appelle.
+    const src = file.endsWith("MembersSection.tsx")
+      ? code("app/(secured)/equipes/[id]/_hooks/useMemberManagement.ts")
+      : code(file);
     expect(src).toMatch(/showError\(/);
   });
 
@@ -159,7 +162,7 @@ describe("pseudo d'un joueur — liste de suggestions et focus ramené", () => {
     const hook = code("app/(secured)/equipes/[id]/_hooks/useMemberManagement.ts");
     expect(hook).toMatch(/onRefused\?\.\(code, message\)/);
     expect(code("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toContain(
-      "addMember(memberPseudo.trim(), memberRoles, fieldErrors.report)",
+      "pseudoRefused = fieldErrors.report(code, message)",
     );
   });
 });

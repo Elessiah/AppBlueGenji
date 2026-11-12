@@ -12,9 +12,13 @@ describe("arrivalRoles", () => {
     expect(arrivalRoles(false, ["TANK", "OWNER", "CAPITAINE"])).toEqual(["TANK", "CAPITAINE"]);
   });
 
-  it("retombe sur DPS quand il ne reste aucun rôle", () => {
-    expect(arrivalRoles(false, [])).toEqual(["DPS"]);
-    expect(arrivalRoles(false, ["OWNER"])).toEqual(["DPS"]);
+  it("arrive sans rôle quand l'invitation n'en porte aucun (D71)", () => {
+    expect(arrivalRoles(false, [])).toEqual([]);
+    expect(arrivalRoles(false, ["OWNER"])).toEqual([]);
+  });
+
+  it("retombe sur DPS pour une invitation d'avant les rôles (colonne vide)", () => {
+    expect(arrivalRoles(false, null)).toEqual(["DPS"]);
   });
 });
 

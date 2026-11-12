@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
-import { useToast } from "@/components/ui/toast";
-import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
+import { MANAGER_ASSIGNABLE_ROLES } from "@/lib/shared/team-role-display";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { TeamDialog } from "./TeamDialog";
-import { RolePicker } from "./RolePicker";
+import { RoleTable } from "./RoleTable";
+import { memberRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
 
 export interface RolesDialogTarget {
@@ -29,13 +29,10 @@ interface RolesDialogProps {
 export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogProps>) {
   const [selected, setSelected] = useState(target.selected);
   const [pending, setPending] = useState(false);
-  const { showError } = useToast();
   const { t } = useTeamPageText();
-  const teamErrorMessage = useTeamErrorMessage();
 
-  const unchanged =
-    selected.length === target.selected.length && selected.every((role) => target.selected.includes(role));
-  const empty = selected.length === 0;
+  const toSave = memberRolesToSave(target.selected, selected);
+  const unchanged = toSave === null;
   // Se retirer soi-même le rôle de manager, c'est perdre la main sur l'équipe
   // au clic suivant : ça se fait, mais ça se dit avant.
   const dropsOwnManagement =
@@ -45,15 +42,11 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
     !selected.includes("MANAGER");
 
   const save = async () => {
-    if (unchanged || pending) return;
-    // Le refus se dit en notification, comme tout message d'erreur du site —
-    // et non par un bouton grisé sans explication.
-    if (empty) {
-      showError(teamErrorMessage("MISSING_ROLE"));
-      return;
-    }
+    // Une sélection vide est permise : un membre peut n'avoir aucun rôle
+    // (décision D71, il choisit lui-même ses rôles de jeu).
+    if (toSave === null || pending) return;
     setPending(true);
-    const ok = await onSave(selected);
+    const ok = await onSave(toSave);
     // Refus : la modale reste ouverte avec la sélection, pour corriger.
     if (!ok) setPending(false);
   };
@@ -64,6 +57,7 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
       onClose={onClose}
       busy={pending}
       onSubmit={save}
+      wide
       footer={
         <>
           <button
@@ -89,7 +83,7 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
       {target.isOwner ? (
         <p>{t("roles.ownerNotice")}</p>
       ) : null}
-      <RolePicker selected={selected} onChange={setSelected} />
+      <RoleTable selected={selected} onChange={setSelected} checkable={MANAGER_ASSIGNABLE_ROLES} />
       {dropsOwnManagement ? (
         <p className={styles.help}>{t("roles.dropsManagement")}</p>
       ) : null}

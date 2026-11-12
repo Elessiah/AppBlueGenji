@@ -292,9 +292,9 @@ export async function getUserIdByPseudo(pseudo: string): Promise<number | null> 
  * Ne garde d'une liste de rôles d'équipe que les valeurs connues, dédupliquées.
  *
  * **Aucun repli** : une entrée vide ou entièrement invalide rend une liste
- * vide, et c'est à l'appelant de dire ce qu'il en fait — `MISSING_ROLE` quand
- * on modifie un membre existant, `DPS` quand on en accueille un nouveau. La
- * fonction repliait jusqu'ici sur `["OWNER"]`, ce que ses appelants
+ * vide, et c'est à l'appelant de dire ce qu'il en fait — aucun rôle (permis)
+ * quand on modifie un membre existant, `DPS` pour une invitation d'avant les
+ * rôles. La fonction repliait jusqu'ici sur `["OWNER"]`, ce que ses appelants
  * annulaient aussitôt en filtrant ce rôle : le repli n'a donc jamais rien
  * accordé, mais il attendait le premier appelant qui oublierait le filtre pour
  * faire d'un corps de requête vide une prise de propriété.

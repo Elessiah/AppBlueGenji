@@ -21,17 +21,26 @@ export type RefusalListener = (code: string, message: string) => void;
  * perdue, et le formulaire d'invitation se vidait sur un pseudo mal tapé — qu'il
  * fallait alors ressaisir pour le corriger.
  */
-export function useMemberManagement(teamId: number, onChanged: () => void) {
+export function useMemberManagement(
+  teamId: number,
+  onChanged: () => void,
+  /**
+   * Relecture après un changement de rôles (les siens, ou ceux d'un membre) :
+   * la fiche seule — les invitations en attente ne bougent pas d'un rôle.
+   * Par défaut, `onChanged`.
+   */
+  onRolesChanged: () => void = onChanged,
+) {
   const { showError, showSuccess } = useToast();
   const { t } = useTeamPageText();
   const teamErrorMessage = useTeamErrorMessage();
 
   const run = useCallback(
-    async (action: () => Promise<string>, onRefused?: RefusalListener): Promise<boolean> => {
+    async (action: () => Promise<string>, onRefused?: RefusalListener, refresh: () => void = onChanged): Promise<boolean> => {
       try {
         const message = await action();
         showSuccess(message);
-        onChanged();
+        refresh();
         return true;
       } catch (e) {
         const code = (e as Error).message;
@@ -73,8 +82,18 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
       run(async () => {
         await teamApi(`/api/teams/${teamId}/members`, jsonRequest("PATCH", { userId, roles }), "TEAM_MEMBER_UPDATE_FAILED");
         return t("members.rolesUpdated");
-      }),
-    [run, teamId, t],
+      }, undefined, onRolesChanged),
+    [run, teamId, t, onRolesChanged],
+  );
+
+  /** « Mes rôles » : le lecteur choisit ses propres rôles de jeu (D71). */
+  const updateOwnRoles = useCallback(
+    (roles: TeamRole[]) =>
+      run(async () => {
+        await teamApi(`/api/teams/${teamId}/my-roles`, jsonRequest("PUT", { roles }), "TEAM_OWN_ROLES_FAILED");
+        return t("myRoles.saved");
+      }, undefined, onRolesChanged),
+    [run, teamId, t, onRolesChanged],
   );
 
   const cancelInvitation = useCallback(
@@ -86,5 +105,5 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
     [run, t],
   );
 
-  return { addMember, removeMember, updateRoles, cancelInvitation };
+  return { addMember, removeMember, updateRoles, updateOwnRoles, cancelInvitation };
 }

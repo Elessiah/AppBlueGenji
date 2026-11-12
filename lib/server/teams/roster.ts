@@ -4,10 +4,20 @@ import { parseRoles } from "@/lib/server/serialization";
 import type { TeamRole } from "@/lib/shared/types";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { sanitizeRoles } from "@/lib/server/users/roles";
+import { SELF_ASSIGNABLE_ROLES, hasTeamManagementRole, withOwnGameRoles } from "@/lib/shared/team-roles";
+import { sortTeamRoles } from "@/lib/shared/team-role-display";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
-import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
+import {
+  findActiveMemberRowId,
+  lockMemberRoles,
+  lockMemberRowById,
+  withMemberRowLock,
+  withTeamRosterLock,
+  writeActiveMembership,
+  writeMemberRowRoles,
+} from "./access";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 
 /**
@@ -105,9 +115,8 @@ export async function updateTeamMemberRoles(
   const scope = await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
+    if (!hasTeamManagementRole(requesterRoles)) throw new Error("FORBIDDEN");
     const requesterIsOwner = requesterRoles.includes("OWNER");
-    const requesterIsManager = requesterRoles.includes("MANAGER");
-    if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
     await assertTermsAccepted(requesterId, connection);
 
     const targetRoles = await lockMemberRoles(connection, teamId, memberUserId);
@@ -118,10 +127,10 @@ export async function updateTeamMemberRoles(
       throw new Error("FORBIDDEN");
     }
 
+    // Une liste vide est permise : un membre peut n'avoir aucun rôle (il arrive
+    // ainsi d'une invitation sans rôle, et choisit lui-même ses rôles de jeu —
+    // décision D71). Le propriétaire garde toujours `OWNER`.
     const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
-    if (filteredRoles.length === 0) {
-      throw new Error("MISSING_ROLE");
-    }
 
     const finalRoles = targetIsOwner
       ? (["OWNER", ...filteredRoles] as TeamRole[])
@@ -143,6 +152,55 @@ export async function updateTeamMemberRoles(
 }
 
 /**
+ * Un membre choisit **ses propres rôles de jeu** (`COACH`, `TANK`, `DPS`,
+ * `HEAL` — {@link SELF_ASSIGNABLE_ROLES}, décision D71). Ouvert à tout membre
+ * en cours de l'équipe, pour lui seul ; ses rôles de direction (`OWNER`,
+ * `MANAGER`, `CAPITAINE`) restent ceux que la gestion lui a donnés — aucun
+ * chemin ne s'en sert pour se hisser.
+ *
+ * L'appartenance se juge **d'abord** ({@link findActiveMemberRowId}, sans
+ * verrou) : un compte hors de l'équipe reçoit `NOT_A_MEMBER` quel que soit le
+ * corps, sans ouvrir de transaction. Puis un code de direction ou inconnu dans
+ * `roles` est **refusé** (`ROLE_NOT_SELF_ASSIGNABLE`) plutôt qu'ignoré : un
+ * client qui croirait pouvoir se nommer capitaine doit l'apprendre. Enfin, sous
+ * le verrou de **sa ligne de membre** seulement, prise par sa clé primaire
+ * (`withMemberRowLock`, `lockMemberRowById`) : relus avant, les rôles de
+ * direction réécrits par une modale de la gestion au même instant seraient
+ * perdus, mais la ligne de l'équipe, elle, n'a pas à attendre un choix
+ * cosmétique.
+ *
+ * Aucun flux n'est rafraîchi : un rôle de jeu ne change ni les gestes du
+ * lecteur (`canDeclareTeamReady`, `hasTeamManagementRole` ne lisent que des
+ * rôles de direction) ni l'invitation à certifier — aucun champ de
+ * `TournamentViewerContext` ni de l'instantané ne lit `COACH`, `TANK`, `DPS`
+ * ou `HEAL`. La fiche d'équipe n'a pas de flux : ses autres lecteurs la
+ * relisent à leur prochain chargement, comme après tout geste du roster.
+ *
+ * @returns les rôles enregistrés.
+ * @throws NOT_A_MEMBER, ROLE_NOT_SELF_ASSIGNABLE, TERMS_ACCEPTANCE_REQUIRED
+ */
+export async function updateOwnGameRoles(userId: number, teamId: number, roles: readonly string[]): Promise<TeamRole[]> {
+  const memberRowId = await findActiveMemberRowId(teamId, userId);
+  if (memberRowId === null) throw new Error("NOT_A_MEMBER");
+  if (roles.some((role) => !SELF_ASSIGNABLE_ROLES.includes(role as TeamRole))) {
+    throw new Error("ROLE_NOT_SELF_ASSIGNABLE");
+  }
+  // Dédoublonné avant tout verrou : au plus `SELF_ASSIGNABLE_ROLES.length` codes.
+  const chosen = Array.from(new Set(roles)) as TeamRole[];
+  return withMemberRowLock(async (connection) => {
+    const current = await lockMemberRowById(connection, memberRowId);
+    if (!current) throw new Error("NOT_A_MEMBER");
+    await assertTermsAccepted(userId, connection);
+    const finalRoles = sortTeamRoles(withOwnGameRoles(current, chosen));
+    // Rien à changer : pas d'écriture (un double clic, un onglet périmé).
+    if (JSON.stringify(finalRoles) !== JSON.stringify(current)) {
+      if (!(await writeMemberRowRoles(connection, memberRowId, finalRoles))) throw new Error("NOT_A_MEMBER");
+    }
+    return finalRoles;
+  });
+}
+
+/**
  * Exclut (kick) un membre. Autorisé aux rôles de gestion (OWNER ou MANAGER).
  * Le propriétaire ne peut pas être exclu, et nul ne peut s'exclure soi-même
  * via ce chemin (utiliser `leaveTeam`).
@@ -155,9 +213,7 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
   const scope = await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
-    const requesterIsOwner = requesterRoles.includes("OWNER");
-    const requesterIsManager = requesterRoles.includes("MANAGER");
-    if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+    if (!hasTeamManagementRole(requesterRoles)) throw new Error("FORBIDDEN");
     await assertTermsAccepted(requesterId, connection);
 
     if (memberUserId === requesterId) {
@@ -291,8 +347,10 @@ export async function transferTeamOwnership(
       if (targetDeleted) throw new Error("MEMBER_ACCOUNT_DELETED");
 
       const newOwnerRoles: TeamRole[] = ["OWNER", ...targetRoles.filter((r) => r !== "OWNER")];
-      const oldOwnerRemaining = requesterRoles.filter((r) => r !== "OWNER");
-      const oldOwnerRoles: TeamRole[] = oldOwnerRemaining.length === 0 ? ["DPS"] : oldOwnerRemaining;
+      // Sans autre rôle, l'ancien propriétaire reste sans rôle : un membre peut
+      // n'en avoir aucun et choisit ses rôles de jeu lui-même (D71) — lui poser
+      // `DPS` lui donnait un rôle que personne n'a choisi.
+      const oldOwnerRoles: TeamRole[] = requesterRoles.filter((r) => r !== "OWNER");
 
       await writeActiveMembership(
         connection,

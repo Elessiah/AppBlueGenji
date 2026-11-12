@@ -51,7 +51,7 @@ import { TeamHistory } from "@/app/(secured)/equipes/[id]/_components/TeamHistor
 import { MembersSection } from "@/app/(secured)/equipes/[id]/_components/MembersSection";
 import { MembershipActions } from "@/app/(secured)/equipes/[id]/_components/MembershipActions";
 import { TeamSettings } from "@/app/(secured)/equipes/[id]/_components/TeamSettings";
-import { RolePicker } from "@/app/(secured)/equipes/[id]/_components/RolePicker";
+import { RoleTable } from "@/app/(secured)/equipes/[id]/_components/RoleTable";
 import { ModerationLogoBar } from "@/app/(secured)/equipes/[id]/_components/ModerationLogoBar";
 import { rolesErrorMessage } from "@/app/(secured)/joueurs/[id]/_lib/roles-errors";
 import { SecuredLoading } from "@/app/(secured)/_shared/SecuredLoading";
@@ -75,7 +75,7 @@ import { formatMessage } from "@/lib/shared/message-format";
 import { rankingPointsHint, RANKING_POINTS_LABEL, RANKING_UNRANKED_SHORT } from "@/lib/shared/ranking";
 import { scopedText } from "@/lib/shared/scoped-text";
 import { statsPanelMessages } from "@/lib/shared/stats-text";
-import { TEAM_ROLE_LABELS, teamRoleLabel, formatTeamRoles } from "@/lib/shared/team-role-display";
+import { MANAGER_ASSIGNABLE_ROLES, TEAM_ROLE_LABELS, teamRoleLabel, formatTeamRoles } from "@/lib/shared/team-role-display";
 import { teamTagErrorMessage } from "@/lib/shared/team-tag";
 import { LOGO_RIGHTS_LABEL, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
 import { PLAYER_ROSTER_STATUS_LABEL } from "@/lib/shared/player-roster-status";
@@ -402,7 +402,7 @@ describe("anglais", () => {
         />
         <TeamSettings team={team} onChanged={() => undefined} />
         <TeamSettings team={{ ...team, managedAsGhost: true }} onChanged={() => undefined} />
-        <RolePicker selected={["DPS"]} onChange={() => undefined} />
+        <RoleTable selected={["DPS"]} onChange={() => undefined} checkable={MANAGER_ASSIGNABLE_ROLES} />
       </>,
     );
     expect(html).toContain("Tournament history");

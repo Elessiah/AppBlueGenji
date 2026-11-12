@@ -66,12 +66,38 @@ export async function withTeamRosterLock<T>(
   work: (connection: PoolConnection) => Promise<T>,
   lockUserId?: (connection: PoolConnection) => Promise<void>,
 ): Promise<T> {
+  return inRosterTransaction(async (connection) => {
+    if (lockUserId) await lockUserId(connection);
+    await connection.execute(`SELECT id FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+    return work(connection);
+  });
+}
+
+/**
+ * Transaction d'une écriture qui ne touche qu'**une ligne de membre** (« Mes
+ * rôles »), sans prendre la ligne de l'équipe : la verrouiller en exclusif pour
+ * un choix cosmétique de son propre membre faisait attendre l'inscription à un
+ * tournoi, la dissolution et les gestes de la gestion derrière chaque
+ * enregistrement. Le verrou de la **ligne du membre**, prise **par sa clé
+ * primaire** en première instruction de `work` (`lockMemberRowById`), suffit : tout geste qui réécrit
+ * ses rôles, ou le fait partir (départ, exclusion, dissolution, transfert), la
+ * verrouille aussi, sous le verrou de l'équipe — l'ordre équipe puis membre
+ * reste celui des autres, et celui-ci n'en prend qu'un : pas d'interblocage.
+ */
+export async function withMemberRowLock<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  return inRosterTransaction(work);
+}
+
+/**
+ * Transaction commune aux gestes du roster ({@link withTeamRosterLock},
+ * {@link withMemberRowLock}) : une seule copie du début, de la validation, de
+ * l'annulation et de la restitution de la connexion.
+ */
+async function inRosterTransaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    if (lockUserId) await lockUserId(connection);
-    await connection.execute(`SELECT id FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
     const result = await work(connection);
     await connection.commit();
     return result;
@@ -138,6 +164,59 @@ export async function lockMemberRoles(
   );
   if (rows.length === 0) return null;
   return parseRoles(rows[0].roles_json);
+}
+
+/**
+ * Identifiant de la ligne d'appartenance en cours de `userId` dans `teamId`,
+ * lu **sans verrou** sur le pool, ou `null`. Un non-membre est ainsi refusé
+ * sans ouvrir de transaction : une lecture verrouillante par l'index de
+ * l'équipe aurait pris, le temps de son annulation, des verrous d'intervalle
+ * qui font attendre l'arrivée d'un joueur dans cette équipe (`INSERT` de
+ * `acceptIntoTeam`) — et n'importe quel compte peut viser n'importe quelle
+ * équipe.
+ */
+export async function findActiveMemberRowId(teamId: number, userId: number): Promise<number | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_team_members WHERE team_id = ? AND user_id = ? AND left_at IS NULL LIMIT 1`,
+    [teamId, userId],
+  );
+  return rows.length === 0 ? null : Number(rows[0].id);
+}
+
+/**
+ * Verrouille une ligne d'appartenance **par sa clé primaire** (verrou de
+ * l'enregistrement seul, sans intervalle) et rend ses rôles, ou `null` si elle
+ * n'est plus en cours (départ, exclusion, dissolution commités entre-temps).
+ * Requête sur une seule table, sans jointure (MariaDB).
+ */
+export async function lockMemberRowById(
+  connection: Pick<PoolConnection, "execute">,
+  memberRowId: number,
+): Promise<TeamRole[] | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { roles_json: string })[]>(
+    `SELECT roles_json FROM bg_team_members WHERE id = ? AND left_at IS NULL FOR UPDATE`,
+    [memberRowId],
+  );
+  if (rows.length === 0) return null;
+  return parseRoles(rows[0].roles_json);
+}
+
+/**
+ * Réécrit les rôles d'une ligne d'appartenance en cours désignée par sa clé
+ * primaire (même verrou que {@link lockMemberRowById}) ; `false` si elle n'est
+ * plus en cours.
+ */
+export async function writeMemberRowRoles(
+  connection: Pick<PoolConnection, "execute">,
+  memberRowId: number,
+  roles: readonly TeamRole[],
+): Promise<boolean> {
+  const [result] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_team_members SET roles_json = ? WHERE id = ? AND left_at IS NULL`,
+    [JSON.stringify(roles), memberRowId],
+  );
+  return Number(result.affectedRows) === 1;
 }
 
 /**

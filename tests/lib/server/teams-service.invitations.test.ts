@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type { TeamRole } from "@/lib/shared/types";
 
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
@@ -48,6 +49,8 @@ type Invitation = {
   kind: "INVITE" | "REQUEST";
   status: "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED";
   roles_json: string[] | null;
+  /** Auteur (`NULL` : compte supprimé) — ses droits sont relus à l'arrivée. */
+  created_by: number | null;
   created_at: Date;
 };
 
@@ -127,12 +130,12 @@ function readMembers(text: string, params: unknown[], members: State["members"])
 }
 
 function readInvitationsAndTeams(text: string, params: unknown[]): unknown {
-  if (/SELECT id, kind, roles_json FROM bg_team_invitations/.test(text)) {
+  if (/SELECT id, kind, roles_json, created_by FROM bg_team_invitations/.test(text)) {
     const [teamId, userId] = params as number[];
     const inv = state.invitations
       .filter((i) => i.team_id === teamId && i.user_id === userId && i.status === "PENDING")
       .at(-1);
-    return [inv ? [{ id: inv.id, kind: inv.kind, roles_json: inv.roles_json }] : []];
+    return [inv ? [{ id: inv.id, kind: inv.kind, roles_json: inv.roles_json, created_by: inv.created_by }] : []];
   }
   if (/FROM bg_team_invitations WHERE id = \?/.test(text)) {
     const [id] = params as number[];
@@ -163,7 +166,7 @@ function readInvitationsAndTeams(text: string, params: unknown[]): unknown {
 function insertRow(text: string, params: unknown[]): unknown {
   if (/INSERT INTO bg_team_invitations/.test(text)) {
     const kind = /'INVITE'/.test(text) ? "INVITE" : "REQUEST";
-    const [teamId, userId, , roles] = params as [number, number, number, string | undefined];
+    const [teamId, userId, createdBy, roles] = params as [number, number, number, string | undefined];
     state.invitations.push({
       id: nextId++,
       team_id: teamId,
@@ -171,6 +174,7 @@ function insertRow(text: string, params: unknown[]): unknown {
       kind,
       status: "PENDING",
       roles_json: roles ? JSON.parse(roles) : null,
+      created_by: createdBy,
       created_at: new Date("2026-09-23T10:00:00Z"),
     });
     return [{ affectedRows: 1 }];
@@ -244,6 +248,7 @@ const invite = (overrides: Partial<Invitation> = {}): Invitation => {
     kind: "INVITE",
     status: "PENDING",
     roles_json: null,
+    created_by: 1,
     created_at: new Date("2026-09-22T10:00:00Z"),
     ...overrides,
   };
@@ -269,13 +274,13 @@ describe("inviteToTeam — les rôles choisis voyagent avec l'invitation", () =>
     expect(state.invitations[0].roles_json).toEqual(["HEAL"]);
   });
 
-  it.each([
+  it.each<[string, string[]]>([
     ["vide", []],
     ["réduite à OWNER", ["OWNER"]],
     ["faite de codes inconnus", ["PILOTE"]],
-  ])("refuse une liste %s : un membre sans rôle n'existe pas", async (_label, roles) => {
-    await expect(inviteToTeam(1, 7, "Nova", roles as never)).rejects.toThrow("MISSING_ROLE");
-    expect(state.invitations).toHaveLength(0);
+  ])("invite sans rôle sur une liste %s (D71), jamais en DPS d'office", async (_label, roles) => {
+    await expect(inviteToTeam(1, 7, "Nova", roles as TeamRole[])).resolves.toBe("INVITED");
+    expect(state.invitations[0].roles_json).toEqual([]);
   });
 
   it("refuse avant tout un demandeur qui ne gère pas l'équipe", async () => {
@@ -328,6 +333,24 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     const inv = invite({ roles_json: null });
     await respondToInvitation(42, inv.id, true);
     expect(rolesOf(42)).toEqual(["DPS"]);
+  });
+
+  it("respondToInvitation_storedListOfUnknownCodesOnly_landsDps", async () => {
+    // Un rôle retiré depuis (ou une valeur écrite à la main) n'est pas le
+    // choix « sans rôle » de D71 : le défaut d'origine tient.
+    const inv = invite({ roles_json: ["PILOTE"] });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["DPS"]);
+  });
+
+  it("respondToInvitation_storedEmptyList_landsWithoutRole", async () => {
+    const inv = invite({ roles_json: [] });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual([]);
   });
 
   it("une demande acceptée par la gestion fait arriver le joueur en DPS", async () => {
@@ -407,6 +430,82 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     await respondToInvitation(42, inv.id, false);
     expect(inv.status).toBe("DECLINED");
     expect(rolesOf(42)).toBeUndefined();
+  });
+});
+
+describe("arrivée du joueur — l'auteur doit encore pouvoir donner les rôles de direction", () => {
+  const MANAGER_ID = 5;
+
+  it("respondToInvitation_inviterStillManager_keepsLeadingRoles", async () => {
+    state.members.push({ team_id: 7, user_id: MANAGER_ID, roles: ["MANAGER"] });
+    const inv = invite({ roles_json: ["MANAGER", "TANK"], created_by: MANAGER_ID });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["MANAGER", "TANK"]);
+  });
+
+  it("respondToInvitation_inviterDemoted_stripsLeadingRoles", async () => {
+    state.members.push({ team_id: 7, user_id: MANAGER_ID, roles: ["DPS"] });
+    const inv = invite({ roles_json: ["MANAGER", "CAPITAINE", "TANK"], created_by: MANAGER_ID });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["TANK"]);
+    expect(inv.status).toBe("ACCEPTED");
+  });
+
+  it("respondToInvitation_inviterLeftTeam_stripsLeadingRoles", async () => {
+    const inv = invite({ roles_json: ["MANAGER", "HEAL"], created_by: MANAGER_ID });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["HEAL"]);
+  });
+
+  it("respondToInvitation_inviterAccountDeleted_stripsLeadingRoles", async () => {
+    const inv = invite({ roles_json: ["CAPITAINE", "DPS"], created_by: null });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["DPS"]);
+  });
+
+  it("respondToInvitation_gameRolesOnly_skipsGrantorCheck", async () => {
+    const inv = invite({ roles_json: ["TANK"], created_by: null });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["TANK"]);
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /LOCK IN SHARE MODE/.test(sql) && /bg_team_members/.test(sql))).toBe(false);
+  });
+
+  it("respondToInvitation_leadingRoles_readsGrantorUnderSharedLock", async () => {
+    state.members.push({ team_id: 7, user_id: MANAGER_ID, roles: ["MANAGER"] });
+    const inv = invite({ roles_json: ["MANAGER"], created_by: MANAGER_ID });
+
+    await respondToInvitation(42, inv.id, true);
+
+    const read = connection.execute.mock.calls.find(([sql]) => /FROM bg_team_members[\s\S]*LOCK IN SHARE MODE/.test(String(sql)));
+    expect(read?.[1]).toEqual([7, MANAGER_ID]);
+  });
+
+  it("requestToJoinTeam_pendingInviteFromDemotedManager_stripsLeadingRoles", async () => {
+    state.members.push({ team_id: 7, user_id: MANAGER_ID, roles: ["COACH"] });
+    invite({ roles_json: ["MANAGER", "COACH"], created_by: MANAGER_ID });
+
+    await expect(requestToJoinTeam(42, 7)).resolves.toBe("JOINED");
+
+    expect(rolesOf(42)).toEqual(["COACH"]);
+  });
+
+  it("inviteToTeam_requestPendingAndInviterManager_keepsLeadingRoles", async () => {
+    invite({ kind: "REQUEST", created_by: 42 });
+
+    await expect(inviteToTeam(1, 7, "Nova", ["CAPITAINE"])).resolves.toBe("JOINED");
+
+    expect(rolesOf(42)).toEqual(["CAPITAINE"]);
   });
 });
 

@@ -31,7 +31,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
   const candidates = sortTeamMembers(members.filter((m) => !m.roles.includes("OWNER") && !m.isDeleted));
   const owner = members.find((m) => m.roles.includes("OWNER"));
   const target = candidates.find((m) => m.userId === targetId) ?? null;
-  // Ce que garde l'ancien propriétaire : ses autres rôles, ou DPS s'il n'en
+  // Ce que garde l'ancien propriétaire : ses autres rôles, aucun s'il n'en
   // avait aucun (`transferTeamOwnership`). Sans MANAGER, il perd la gestion.
   const ownerKeepsManagement = owner?.roles.includes("MANAGER") ?? false;
 

@@ -7,13 +7,18 @@ import type { TeamRole } from "@/lib/shared/types";
 
 /**
  * Rôles posés à l'arrivée : `OWNER` seul pour une reprise de fantôme, sinon
- * les rôles assainis sans `OWNER` — et `DPS`, le défaut d'origine, s'il n'en
- * reste aucun (demande, invitation d'avant la colonne).
+ * les rôles assainis sans `OWNER`.
+ *
+ * `null` — l'invitation ne porte **aucune** liste (demande d'adhésion,
+ * invitation d'avant la colonne) — vaut `DPS`, le défaut d'origine. Une liste
+ * **vide** est un choix de la gestion (décision D71 : inviter sans rôle est
+ * permis, le joueur choisira ses rôles de jeu lui-même) : le joueur arrive sans
+ * rôle.
  */
-export function arrivalRoles(claim: boolean, sanitized: readonly TeamRole[]): TeamRole[] {
+export function arrivalRoles(claim: boolean, sanitized: readonly TeamRole[] | null): TeamRole[] {
   if (claim) return ["OWNER"];
-  const filtered = sanitized.filter((role) => role !== "OWNER");
-  return filtered.length === 0 ? ["DPS"] : filtered;
+  if (sanitized === null) return ["DPS"];
+  return sanitized.filter((role) => role !== "OWNER");
 }
 
 /** Ce que l'arrivée lit de l'équipe visée, relue sous verrou. */

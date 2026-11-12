@@ -9,7 +9,9 @@ jest.mock("@/lib/server/session-streams", () => ({ reconnectUserStreams: jest.fn
 import { getDatabase } from "@/lib/server/database";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { canManageTeam } from "@/lib/server/teams/access";
-import { leaveTeam, removeTeamMember, updateTeamMemberRoles } from "@/lib/server/teams/roster";
+import { leaveTeam, removeTeamMember, updateOwnGameRoles, updateTeamMemberRoles } from "@/lib/server/teams/roster";
+import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
+import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import type { TeamRole } from "@/lib/shared/types";
 import { connectionMock, fakePool } from "../../helpers/sql-double";
 
@@ -52,6 +54,15 @@ let connection: ReturnType<typeof connectionMock>;
  */
 function useDatabase(roster: Record<number, TeamRole[]> = ROSTER, affectedRows = 1) {
   execute = jest.fn<Execute>(async (sql, params = []) => {
+    // « Mes rôles » : ligne d'appartenance trouvée sur le pool, puis verrouillée
+    // et réécrite par sa clé primaire — ici, l'identifiant du compte.
+    if (/SELECT id FROM bg_team_members WHERE team_id = \? AND user_id = \?/.test(sql)) {
+      return [roster[Number(params[1])] ? [{ id: Number(params[1]) }] : [], []];
+    }
+    if (/SELECT roles_json FROM bg_team_members WHERE id = \? AND left_at IS NULL FOR UPDATE/.test(sql)) {
+      const roles = roster[Number(params[0])];
+      return [roles ? [{ roles_json: JSON.stringify(roles) }] : [], []];
+    }
     if (/SELECT roles_json\s+FROM bg_team_members/.test(sql)) {
       const roles = roster[Number(params[1])];
       return [roles ? [{ roles_json: JSON.stringify(roles) }] : [], []];
@@ -164,11 +175,15 @@ describe("updateTeamMemberRoles", () => {
   it.each([
     ["aucun rôle", [] as TeamRole[]],
     ["OWNER seul, qui est retiré", ["OWNER"] as TeamRole[]],
-  ])("refuse %s", async (_label, roles) => {
-    await expect(updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, roles)).rejects.toThrow(
-      "MISSING_ROLE",
-    );
-    expect(updates()).toHaveLength(0);
+  ])("laisse un membre sans rôle : %s", async (_label, roles) => {
+    // D71 : un membre peut n'avoir aucun rôle ; il choisit ses rôles de jeu.
+    await updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, roles);
+    expect(updates()[0][1]).toEqual([JSON.stringify([]), TEAM_ID, DPS_ID]);
+  });
+
+  it("garde OWNER au propriétaire même si on lui retire tout", async () => {
+    await updateTeamMemberRoles(OWNER_ID, TEAM_ID, OWNER_ID, []);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["OWNER"]), TEAM_ID, OWNER_ID]);
   });
 
   it("rend MEMBER_NOT_FOUND si la cible est partie entre la lecture et l'écriture", async () => {
@@ -310,5 +325,95 @@ describe("gestes du roster — sous transaction et sous verrou (§3.1)", () => {
     await expect(updateTeamMemberRoles(MANAGER_ID, TEAM_ID, DPS_ID, ["HEAL"])).rejects.toThrow("FORBIDDEN");
     await expect(leaveTeam(DPS_ID, TEAM_ID)).rejects.toThrow("OWNER_MUST_TRANSFER");
     expect(updates()).toHaveLength(0);
+  });
+});
+
+describe("updateOwnGameRoles — « Mes rôles »", () => {
+  it("updateOwnGameRoles_gameRolesOnly_keepsLeadingRolesAndWritesSorted", async () => {
+    await expect(updateOwnGameRoles(CAPTAIN_ID, TEAM_ID, ["DPS", "TANK"])).resolves.toEqual(["CAPITAINE", "TANK", "DPS"]);
+    expect(updates()).toHaveLength(1);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["CAPITAINE", "TANK", "DPS"]), CAPTAIN_ID]);
+  });
+
+  it("updateOwnGameRoles_emptyList_dropsGameRolesOnly", async () => {
+    await updateOwnGameRoles(OWNER_ID, TEAM_ID, []);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["OWNER"]), OWNER_ID]);
+  });
+
+  it.each([["MANAGER"], ["CAPITAINE"], ["OWNER"]])(
+    "updateOwnGameRoles_leadingRole%s_throwsRoleNotSelfAssignable",
+    async (role) => {
+      await expect(updateOwnGameRoles(DPS_ID, TEAM_ID, ["DPS", role])).rejects.toThrow("ROLE_NOT_SELF_ASSIGNABLE");
+      expect(updates()).toHaveLength(0);
+    },
+  );
+
+  it("updateOwnGameRoles_unknownCode_throwsRoleNotSelfAssignable", async () => {
+    await expect(updateOwnGameRoles(DPS_ID, TEAM_ID, ["PILOTE"])).rejects.toThrow("ROLE_NOT_SELF_ASSIGNABLE");
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("updateOwnGameRoles_notMember_throwsNotAMember", async () => {
+    await expect(updateOwnGameRoles(OUTSIDER_ID, TEAM_ID, ["DPS"])).rejects.toThrow("NOT_A_MEMBER");
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("updateOwnGameRoles_termsNotAccepted_throwsTermsRequired", async () => {
+    jest.mocked(assertTermsAccepted).mockRejectedValueOnce(new Error(TERMS_ACCEPTANCE_REQUIRED));
+    await expect(updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK"])).rejects.toThrow(TERMS_ACCEPTANCE_REQUIRED);
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("updateOwnGameRoles_duplicatedCodes_writesDedupedRoles", async () => {
+    await updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK", "TANK", "HEAL", "TANK"]);
+    expect(updates()).toHaveLength(1);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["TANK", "HEAL"]), DPS_ID]);
+  });
+
+  it("updateOwnGameRoles_unchangedRoles_skipsWriteAndReturnsRoles", async () => {
+    await expect(updateOwnGameRoles(CAPTAIN_ID, TEAM_ID, ["HEAL"])).resolves.toEqual(["CAPITAINE", "HEAL"]);
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("updateOwnGameRoles_anyCall_locksMemberRowNotTeamRow", async () => {
+    await updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK"]);
+    const sqls = execute.mock.calls.map(([sql]) => sql);
+    expect(sqls.some((sql) => /FROM bg_teams WHERE id = \? FOR UPDATE/.test(sql))).toBe(false);
+    expect(sqls.some((sql) => /FROM bg_team_members[\s\S]*FOR UPDATE/.test(sql))).toBe(true);
+  });
+
+  it("updateOwnGameRoles_notMemberWithLeadingRole_throwsNotAMemberBeforeRoleCheck", async () => {
+    await expect(updateOwnGameRoles(OUTSIDER_ID, TEAM_ID, ["MANAGER"])).rejects.toThrow("NOT_A_MEMBER");
+  });
+
+  it("updateOwnGameRoles_notMember_opensNoTransaction", async () => {
+    await expect(updateOwnGameRoles(OUTSIDER_ID, TEAM_ID, ["DPS"])).rejects.toThrow("NOT_A_MEMBER");
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+  });
+
+  it("updateOwnGameRoles_member_locksRowByPrimaryKey", async () => {
+    await updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK"]);
+    const lock = execute.mock.calls.find(([sql]) => /FROM bg_team_members[\s\S]*FOR UPDATE/.test(sql));
+    expect(lock?.[0]).toMatch(/WHERE id = \? AND left_at IS NULL FOR UPDATE/);
+    expect(lock?.[1]).toEqual([DPS_ID]);
+  });
+
+  it("updateOwnGameRoles_rowLeftBeforeLock_throwsNotAMember", async () => {
+    const lockedRead = /WHERE id = \? AND left_at IS NULL FOR UPDATE/;
+    const base = execute.getMockImplementation();
+    execute.mockImplementation(async (sql, params) => (lockedRead.test(sql) ? [[], []] : base!(sql, params)));
+    await expect(updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK"])).rejects.toThrow("NOT_A_MEMBER");
+    expect(updates()).toHaveLength(0);
+  });
+
+  it("updateOwnGameRoles_writeMatchesNoRow_throwsNotAMember", async () => {
+    useDatabase(ROSTER, 0);
+    await expect(updateOwnGameRoles(DPS_ID, TEAM_ID, ["TANK"])).rejects.toThrow("NOT_A_MEMBER");
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("updateOwnGameRoles_member_writesOnlyTheirOwnRow", async () => {
+    await updateOwnGameRoles(DPS_ID, TEAM_ID, ["HEAL"]);
+    expect(updates()[0][1]).toEqual([JSON.stringify(["HEAL"]), DPS_ID]);
   });
 });

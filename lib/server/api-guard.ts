@@ -384,6 +384,20 @@ export const CERTIFICATION_PROMPT_OFF_RULE: RateLimitRule = {
 };
 
 /**
+ * « Mes rôles » (`PUT /api/teams/[id]/my-roles`), par compte. Chaque appel lit
+ * l'appartenance puis, pour un membre, ouvre une transaction et verrouille sa
+ * ligne : sans plafond, un script en boucle (sur son équipe ou sur n'importe
+ * quel identifiant) occupait le pool. Un membre enregistre ses rôles quelques
+ * fois ; trente enregistrements en cinq minutes ne gênent personne.
+ * Décompté d'une seule instruction ({@link enforceRateLimit}).
+ */
+export const TEAM_OWN_ROLES_WRITE_RULE: RateLimitRule = {
+  name: "team-own-roles-write",
+  limit: 30,
+  windowMs: 5 * 60_000,
+};
+
+/**
  * Ouvertures du flux temps réel, par utilisateur.
  *
  * Distinct du plafond de flux *simultanés* (`MAX_STREAMS_PER_USER`) : celui-ci
