@@ -30,7 +30,7 @@
     },
     "TEAM_INVITATION": {
       "label": "Team invitations and ownership",
-      "description": "A team invites you to join it, the staff offers you to take over a team, or the ownership of your team is transferred to you. Turns off the notification only: the Discord direct message is still sent."
+      "description": "A team invites you to join it, the staff offers you to take over a team, or the ownership of your team is transferred to you. Turns off the notification only: the Discord direct message, when one can be sent to you, still goes out."
     },
     "CONTENT_REPORT": {
       "label": "Reports about you",

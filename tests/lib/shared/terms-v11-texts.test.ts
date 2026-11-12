@@ -237,7 +237,9 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
   const en = PRIVACY_CHANGES_EN[V11_ID];
 
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(V11_ID);
+    // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595).
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(V11_ID);
+    expect(PRIVACY_CHANGES.at(-1)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();
   });
@@ -268,9 +270,12 @@ describe("documents du bot — D47 et reprise d'équipe", () => {
     expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
   });
 
-  it("botPrivacyPolicy_teamTakeover_saysItCitesAnAdminFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne ; information sur les données");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which only name the team — a takeover mentions “an admin”, naming no one; data-protection notice");
+  // D4 (#595) : la reprise ne cite plus « un admin » — la politique du bot ne le dit plus.
+  it("botPrivacyPolicy_teamTakeover_namesTheTeamOnlyFrAndEn", () => {
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("qui ne nomment que l'équipe, jamais personne ; information sur les données");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which only name the team, never anyone; data-protection notice");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).not.toContain("un admin");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).not.toContain("an admin");
   });
 });
 
@@ -403,9 +408,12 @@ describe("revue juridique v11 — textes alignés", () => {
     expect(v11En.details.join(" ")).toContain("is only read by the other parties to the match (both its teams, its casters)");
   });
 
-  it("rgpdPages_pushParagraph_takeoverSaysAnAdminFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("jamais celui de qui invite, propose ou transfère ; une reprise dit « un admin », sans nommer personne)");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("never who invites, offers or transfers; a takeover says “an admin”, naming no one)");
+  // D4 (#595) : la reprise ne cite plus « un admin ».
+  it("rgpdPages_pushParagraph_takeoverNamesTheTeamOnlyFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("(le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("(the team&apos;s name only, never who invites, offers or transfers), and of what");
+    expect(readSource("app/rgpd/page.tsx")).not.toContain("« un admin »");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).not.toContain("“an admin”");
   });
 
   it("termsV11_voiceDeletionError_botRetriesThenModerationFrAndEn", () => {

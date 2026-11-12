@@ -77,7 +77,7 @@ export const PUSH_TOPICS = {
   },
   TEAM_INVITATION: {
     label: "Invitations et propriété d'équipe",
-    description: "Une équipe t'invite à la rejoindre, le staff te propose de reprendre une équipe, ou la propriété de ton équipe t'est transférée. Ne coupe que la notification : le message privé Discord part quand même.",
+    description: "Une équipe t'invite à la rejoindre, le staff te propose de reprendre une équipe, ou la propriété de ton équipe t'est transférée. Ne coupe que la notification : le message privé Discord, s'il peut t'être envoyé, part quand même.",
     audience: null,
   },
   CONTENT_REPORT: {

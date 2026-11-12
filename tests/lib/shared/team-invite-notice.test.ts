@@ -364,7 +364,8 @@ describe("sujet TEAM_INVITATION", () => {
   });
 
   it("pushTopics_teamInvitation_saysTheDirectMessageStillGoes", () => {
-    expect(frPush.topics.TEAM_INVITATION.description).toContain("le message privé Discord part quand même");
-    expect(enPush.topics.TEAM_INVITATION.description).toContain("the Discord direct message is still sent");
+    // Seulement s'il peut partir (compte Discord rattaché ou tag certifié, plafonds) : jamais promis sans condition.
+    expect(frPush.topics.TEAM_INVITATION.description).toContain("le message privé Discord, s'il peut t'être envoyé, part quand même");
+    expect(enPush.topics.TEAM_INVITATION.description).toContain("the Discord direct message, when one can be sent to you, still goes out");
   });
 });
