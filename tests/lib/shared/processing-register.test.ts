@@ -167,15 +167,15 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(byRef("T16").recipients.join(" ")).toMatch(/si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte \(pseudo public compris en tournoi individuel\) peut parvenir au salon d'alertes de modération du serveur/);
     // LEGAL-OPTOUT-BASIS : garder le choix des messages de match relève d'une obligation légale
     // (honorer l'opposition), plus de « l'intérêt légitime du joueur » (art. 6.1.f vise le responsable ou un tiers).
-    expect(t04.legalBasis).toMatch(/obligation légale \(RGPD, art\. 6\.1\.c\) pour la conservation de son choix des messages privés de match \(le garder est ce qui permet de continuer d'honorer son opposition, art\. 21 et 12\)/);
+    expect(t04.legalBasis).toMatch(/obligation légale \(RGPD, art\. 6\.1\.c\) pour la conservation de son choix des messages privés de match et d'équipe \(le garder est ce qui permet de continuer d'honorer son opposition, art\. 21 et 12\)/);
     expect(t04.legalBasis).not.toMatch(/celui du joueur|intérêt légitime du joueur/);
     // Les messages eux-mêmes restent d'intérêt légitime.
     expect(t04.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match/);
-    expect(t04.dataSubjects).toContain("Tout titulaire de compte, pour son choix des messages privés de match");
+    expect(t04.dataSubjects).toContain("Tout titulaire de compte, pour son choix des messages privés de match et d'équipe");
     expect(byRef("T08").recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association, qui lisent l'annonce des matchs diffusés dans le salon #live/);
     expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);
-    expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
-    expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
+    expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs et de ses équipes/);
+    expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match et d'équipe : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
     expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; membre d.une équipe engagée, joueur d.un tournoi individuel : nouveau match ; propriétaire ou manager d'une engagée, joueur d'un tournoi individuel : check-in d'un match en autogestion ; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);

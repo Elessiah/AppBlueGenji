@@ -237,8 +237,8 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
   const en = PRIVACY_CHANGES_EN[V11_ID];
 
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
-    // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595) et des avis d'équipe (TEAMS-LOT).
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(V11_ID);
+    // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595), des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(V11_ID);
     expect(PRIVACY_CHANGES.at(-1)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();

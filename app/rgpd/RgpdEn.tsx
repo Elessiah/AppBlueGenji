@@ -922,7 +922,7 @@ export function RgpdEn({
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
             are based on the association&apos;s{" "}
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
-            unticking “Discord direct messages about my matches” in{" "}
+            unticking “Discord direct messages about my matches and teams” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications
             keep their own settings. The site keeps this choice for the lifetime of the account, under a{" "}
             <strong>legal obligation</strong> (that is what lets it keep honouring your objection — this keeping is therefore not subject to the right to object); it appears in the
@@ -961,9 +961,10 @@ export function RgpdEn({
             count); beyond {TEAM_NOTICE_DMS_HOURLY_CAP} invitations, takeovers or ownerships announced per hour for
             the whole site, the notice is sent as a push notification only. The invitation itself stays in{" "}
             <EnglishLegalLink href="/profil#invitations">My profile</EnglishLegalLink>. These messages are based on
-            the association&apos;s <strong>legitimate interest</strong> in forming teams, to which you may object
-            (section <a href="#exercer-vos-droits">“Exercising your rights”</a>;{" "}
-            <LocaleLink href="/rgpd/registre#t03">register, T03</LocaleLink>).
+            the association&apos;s <strong>legitimate interest</strong> in forming teams; you can object at any time
+            by unticking “Discord direct messages about my matches and teams” in{" "}
+            <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — push notifications keep
+            their own settings (<LocaleLink href="/rgpd/registre#t03">register, T03</LocaleLink>).
           </p>
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,

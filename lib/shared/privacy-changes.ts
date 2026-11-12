@@ -1944,6 +1944,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd/registre#t03", label: "Lire le traitement T03 du registre" },
     ],
   },
+  {
+    // TEAM-DM-OPTOUT (décision de l'utilisateur D68) : la case des messages
+    // privés de match coupe aussi les messages privés d'équipe — l'opposition
+    // (art. 21) devient un réglage. Pour tous les comptes ; datée du lendemain
+    // de la nuit de déploiement.
+    id: "2026-11-messages-d-equipe-reglage-du-profil",
+    publishedAt: "2026-11-13",
+    title: "Messages privés d'équipe : une case pour les couper",
+    summary:
+      "La case « Messages privés Discord de mes matchs » de « Mon profil » devient « Messages privés Discord de mes matchs et de mes équipes » : décochée, elle coupe aussi les messages privés Discord d'équipe (invitation, reprise d'équipe fantôme proposée, propriété transférée, demande d'adhésion à une équipe que tu gères).",
+    details: [
+      "Ce qui change : avant chaque message privé d'équipe, le site relit ce choix ; case décochée, seule la notification push part, avec ses propres réglages. Si tu avais déjà décoché la case, tes messages privés d'équipe s'arrêtent aussi. Chaque message privé d'équipe se termine désormais par le lien de ce réglage.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; c'est le même choix, gardé le temps du compte (obligation légale : c'est ce qui permet de continuer d'honorer ton opposition) et repris dans l'export de tes données. Ces messages reposent toujours sur l'intérêt légitime de l'association à la constitution des équipes (registre, T03) ; la section « Exercer vos droits » de la politique reste ouverte.",
+    ],
+    links: [
+      { href: "/profil#notifications", label: "Ouvrir le réglage dans « Mon profil »" },
+      { href: "/rgpd#messages-d-equipe", label: "Lire le paragraphe « Messages privés Discord d'équipe »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

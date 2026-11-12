@@ -1032,6 +1032,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Legal basis: these messages are based on the association's legitimate interest in forming teams (register, T03); you can object through the “Exercising your rights” section of the policy. This was already the case: the policy now says so, next to the match direct messages.",
     ],
   },
+  "2026-11-messages-d-equipe-reglage-du-profil": {
+    linkLabels: ["Open the setting in “My profile”", "Read the “Team Discord direct messages” paragraph"],
+    title: "Team direct messages: a box to turn them off",
+    summary:
+      "The “Discord direct messages about my matches” box in “My profile” becomes “Discord direct messages about my matches and teams”: unticked, it also turns off team Discord direct messages (invitation, offered ghost team takeover, transferred ownership, request to join a team you manage).",
+    details: [
+      "What changes: before each team direct message, the site reads this choice again; with the box unticked, only the push notification is sent, with its own settings. If you had already unticked the box, your team direct messages stop too. Each team direct message now ends with the link to this setting.",
+      "What does not change: nothing new is collected; it is the same choice, kept for the lifetime of the account (legal obligation: that is what lets the site keep honouring your objection) and included in the export of your data. These messages are still based on the association's legitimate interest in forming teams (register, T03); the “Exercising your rights” section of the policy remains open.",
+    ],
+  },
 };
 
 /**
