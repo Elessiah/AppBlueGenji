@@ -173,6 +173,19 @@ export const MAP_PICK_STAFF_WRITE_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/**
+ * Tous les appels de `PUT /api/matches/[id]/map-pick`, refusés compris, par
+ * compte : les refus rendant leur place aux deux plafonds ci-dessus, celui-ci
+ * borne la boucle de choix refusés (chacun relit le match, et une carte
+ * refusée prend le verrou du tournoi et du match). Au-dessus de
+ * `MAP_PICK_STAFF_WRITE_RULE` : l'arbitrage qui corrige un tour n'y bute pas.
+ */
+export const MAP_PICK_ATTEMPT_RULE: RateLimitRule = {
+  name: "map-pick-attempt",
+  limit: 900,
+  windowMs: 5 * 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",
