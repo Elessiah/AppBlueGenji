@@ -463,7 +463,7 @@ export function EnduranceRankingViews({
   const next = index < views.length - 1 ? views[index + 1] : null;
 
   return (
-    <div ref={rootRef} style={{ marginBottom: 8 }}>
+    <div ref={rootRef} style={{ marginBottom: 8 }} data-bar-stuck={hasBar && stuck ? "" : undefined}>
       {hasBar && <div ref={sentinelRef} aria-hidden="true" className={styles.sentinel} />}
       {hasBar && (
         <div ref={barRef} className={`${styles.bar} ${stuck ? styles.barStuck : ""}`}>

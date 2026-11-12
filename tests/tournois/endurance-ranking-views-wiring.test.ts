@@ -335,7 +335,10 @@ describe("EnduranceRankingViews — repères et noms accessibles", () => {
     expect(RANKING).toContain("typeof ResizeObserver");
     expect(RANKING).toContain("typeof IntersectionObserver");
     expect(RANKING).toContain('"--endurance-bar-h"');
-    expect(RANKING_CSS).toMatch(/\.fadable :is\([^)]*\) \{\s*scroll-margin-top: var\(--endurance-bar-h, 0px\);/);
+    // Barre collée seulement : non collée, la marge ferait sur-défiler la ligne.
+    expect(RANKING_CSS).toMatch(/\[data-bar-stuck\] \.fadable :is\([^)]*\) \{\s*scroll-margin-top: var\(--endurance-bar-h, 0px\);/);
+    expect(RANKING_CSS).not.toMatch(/^\.fadable :is\([^)]*\) \{\s*scroll-margin-top/m);
+    expect(RANKING).toContain('data-bar-stuck={hasBar && stuck ? "" : undefined}');
     expect(RANKING_CSS).toMatch(/\.tabs \{[^}]*padding-block: 3px;/);
     expect(RANKING_CSS).toMatch(/@media \(max-width: 720px\) \{[^@]*\.barStuck \.viewSub \{\s*display: none;/);
   });
