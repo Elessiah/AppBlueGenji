@@ -420,7 +420,9 @@ pas publié le texte (redémarrage) — les textes légaux le disent. Même chos
 Ils ne sont pas **retirés** de la réponse : c'est le seul moyen de retrouver un
 adversaire d'un tournoi passé, et la ligne ne porte plus rien de personnel.
 `listPlayers` rend donc `isDeleted`, et le filtre est côté client comme les
-autres de cet écran.
+autres de cet écran. Seul un compte supprimé **sans fiche** (D13 : rien joué,
+`loadProfilelessPlayerIds`) est retiré dès le serveur : il n'a pas
+d'adversaire à retrouver, et son nom menait à une fiche introuvable.
 
 La carte d'un compte anonymisé est **en retrait** et porte la mention « Compte
 supprimé ». Le retrait est posé sur les décorations une par une, jamais sur la
