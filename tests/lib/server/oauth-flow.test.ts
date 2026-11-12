@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/tournaments/certification-prompt", () => ({ forgetCertificationPromptsAround: jest.fn(async () => undefined) }));
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/oauth-state");
 jest.mock("@/lib/server/account-identities");

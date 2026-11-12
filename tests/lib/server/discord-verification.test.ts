@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/tournaments/certification-prompt", () => ({ forgetCertificationPromptsAround: jest.fn(async () => undefined) }));
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 // `normalizeDiscordHandle` (`users/tag-normalization`) reste **la vraie** :
