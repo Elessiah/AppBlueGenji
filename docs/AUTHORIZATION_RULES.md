@@ -585,7 +585,12 @@ Règles structurelles qui tiennent quel que soit le rôle :
   lui-même, vers un membre existant, et jamais vers soi-même — ni vers un
   compte **supprimé** (`MEMBER_ACCOUNT_DELETED`) : l'anonymisation ne détache pas
   de l'équipe, et l'équipe n'aurait plus personne capable de la conduire.
-- Un membre doit garder au moins un rôle (`MISSING_ROLE`).
+- Un membre peut n'avoir **aucun** rôle (invitation sans rôle, rôles retirés) ;
+  il choisit lui-même ses rôles de jeu (`COACH`, `TANK`, `DPS`, `HEAL`) par
+  `PUT /api/teams/[id]/my-roles` (`updateOwnGameRoles` : soi seul, rôles de jeu
+  seuls — `ROLE_NOT_SELF_ASSIGNABLE` sinon, `NOT_A_MEMBER` hors roster ; ses
+  rôles de direction ne bougent pas). `MANAGER` et `CAPITAINE` restent donnés
+  par l'`OWNER` ou un `MANAGER` (`TEAM_MEMBERS_UX.md`).
 - Un utilisateur n'appartient qu'à **une** équipe active à la fois
   (`USER_ALREADY_IN_TEAM`) — contrôlé à la création, à l'invitation, à la
   demande d'adhésion et à l'acceptation. L'acceptation est **atomique**

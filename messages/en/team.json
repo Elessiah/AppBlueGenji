@@ -105,7 +105,6 @@
     "pseudoPlaceholder": "Start typing a username…",
     "inviteHelp": "Only players without a team are suggested. The player joins the team on accepting the invitation — right away if they had asked to join.",
     "invite": "Invite",
-    "sending": "Sending…",
     "pendingTitle": "Pending invitations ({count})",
     "proposedRoles": "Roles offered to {pseudo}",
     "sentOn": "sent on {date}",
@@ -124,9 +123,6 @@
   },
   "roles": {
     "pillsLabel": "Roles",
-    "gameRoles": "Game roles",
-    "management": "Team management",
-    "managerHelp": "A manager handles members and their roles, the logo and registrations. The name, tag, description and disbanding stay with the owner.",
     "myRoles": "My roles",
     "rolesOf": "{pseudo}'s roles",
     "cancel": "Cancel",
@@ -134,6 +130,83 @@
     "saving": "Saving…",
     "ownerNotice": "The owner role can't be ticked here: transfer it from the team settings.",
     "dropsManagement": "Without the manager role, you'll no longer be able to manage the team's roster."
+  },
+  "inviteDialog": {
+    "title": "Invite {pseudo}",
+    "intro": "Tick the roles to give them when they join. None is required: they'll pick their game roles themselves.",
+    "confirm": "Send the invitation",
+    "sending": "Sending…",
+    "cancel": "Cancel"
+  },
+  "myRoles": {
+    "title": "My roles",
+    "hint": "Your game roles show on the team page and on your player card. Captain, manager and owner are given by the team's management.",
+    "leadingLabel": "Roles given by the management",
+    "noLeading": "None",
+    "gameLegend": "My game roles",
+    "save": "Save my roles",
+    "saving": "Saving…",
+    "saved": "Your game roles are saved.",
+    "guideButton": "What each role does"
+  },
+  "roleGuide": {
+    "title": "What each role does",
+    "tableLabel": "Team roles and what they allow",
+    "close": "Close",
+    "transferOnly": "Transferred",
+    "column": {
+      "role": "Role",
+      "team": "On the team",
+      "matches": "In matches",
+      "messages": "Messages received"
+    },
+    "noticesTitle": "Match notices",
+    "noticesLine": "Every member receives the team's match notices.",
+    "noticesHint": "New match, times and reminders: Discord direct message (certified tag, box ticked in “My profile”) and push; match start and tournament start: push only. Check-in and join requests follow the same direct-message rule, score to confirm goes out as a push.",
+    "roles": {
+      "OWNER": {
+        "team": "Everything: name, tag, description, logo, members, roles, registrations. The only one who can transfer ownership or disband the team.",
+        "matches": "“Ready”, score entry and confirmation, match forfeit, withdrawing from a tournament, clearing the team voice channel.",
+        "messages": "Match notices, join requests, check-in for self-managed matches, score to confirm.",
+        "hint": "One per team: it can't be ticked, it's transferred from the team settings. The owner can't leave the team or be removed before transferring it."
+      },
+      "MANAGER": {
+        "team": "Logo, invitations and join requests, removals, members' roles (except the owner's), tournament registrations.",
+        "matches": "“Ready”, score entry and confirmation, match forfeit, withdrawing from a tournament, clearing the team voice channel.",
+        "messages": "Match notices, join requests, check-in for self-managed matches, score to confirm.",
+        "hint": "Given by the owner or a manager. Only the name, tag, description, transfer and disbanding are out of reach."
+      },
+      "CAPITAINE": {
+        "team": "Their own game roles only.",
+        "matches": "“Ready”, score entry and confirmation, clearing the team voice channel; first contact shown for the match.",
+        "messages": "Match notices, score to confirm.",
+        "hint": "Given by the owner or a manager. The captain starts the game in-game and reports the result, but can't commit the team: no forfeit, withdrawal or registration."
+      },
+      "COACH": {
+        "team": "Their own game roles only.",
+        "matches": "No reserved action.",
+        "messages": "Match notices.",
+        "hint": "Each member adds or removes it in “My roles”; the owner and managers can too. It grants no extra right."
+      },
+      "TANK": {
+        "team": "Their own game roles only.",
+        "matches": "No reserved action.",
+        "messages": "Match notices.",
+        "hint": "Game role, shown on the team page and the player card. Each member picks it in “My roles”; the owner and managers can too."
+      },
+      "DPS": {
+        "team": "Their own game roles only.",
+        "matches": "No reserved action.",
+        "messages": "Match notices.",
+        "hint": "Game role, shown on the team page and the player card. Each member picks it in “My roles”; the owner and managers can too."
+      },
+      "HEAL": {
+        "team": "Their own game roles only.",
+        "matches": "No reserved action.",
+        "messages": "Match notices.",
+        "hint": "Game role, shown on the team page and the player card. Each member picks it in “My roles”; the owner and managers can too."
+      }
+    }
   },
   "transfer": {
     "title": "Transfer ownership",

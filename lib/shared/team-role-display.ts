@@ -10,7 +10,9 @@
  * Trois familles, et la ligne de partage est celle de `team-roles.ts` :
  * - **propriétaire** (`OWNER`) — jamais attribuable : il se transfère ;
  * - **gestion** (`MANAGER`) — donne la main sur l'équipe (roster, inscriptions) ;
- * - **jeu** (les cinq autres) — une place dans le roster, aucun pouvoir.
+ * - **jeu** (les cinq autres) — une place dans le roster, aucun pouvoir sur
+ *   l'équipe (`CAPITAINE` mène toutefois les matchs, et se pose par la gestion
+ *   comme `MANAGER` : {@link ASSIGNABLE_LEADING_ROLES}).
  *
  * Module **pur** : aucun rendu, aucune base — les listes et l'ordre se testent
  * seuls, et le serveur peut s'y référer sans rien importer du client.
@@ -43,19 +45,35 @@ export const TEAM_ROLE_ORDER: readonly TeamRole[] = [
   "HEAL",
 ];
 
-/** Rôles de jeu attribuables : une place dans le roster, aucun droit. */
-export const ASSIGNABLE_GAME_ROLES: readonly TeamRole[] = ["CAPITAINE", "COACH", "TANK", "DPS", "HEAL"];
+/**
+ * Rôles de jeu : une place dans le roster, aucun droit. Chaque membre se les
+ * donne **lui-même** (« Mes rôles », `PUT /api/teams/[id]/my-roles`, décision
+ * D71) ; le propriétaire et les managers peuvent aussi les poser.
+ */
+export const SELF_ASSIGNABLE_ROLES: readonly TeamRole[] = ["COACH", "TANK", "DPS", "HEAL"];
 
 /**
- * Rôles de gestion attribuables. `OWNER` n'y figure pas : il ne se coche pas,
- * il se **transfère** (une équipe a exactement un propriétaire).
+ * Rôles de direction attribuables, posés par la gestion seulement (propriétaire
+ * ou manager) : `MANAGER` donne la main sur l'équipe, `CAPITAINE` mène les
+ * matchs. `OWNER` n'y figure pas : il ne se coche pas, il se **transfère** (une
+ * équipe a exactement un propriétaire).
  */
-export const ASSIGNABLE_MANAGEMENT_ROLES: readonly TeamRole[] = TEAM_MANAGEMENT_ROLES.filter(
-  (role) => role !== "OWNER",
-);
+export const ASSIGNABLE_LEADING_ROLES: readonly TeamRole[] = ["MANAGER", "CAPITAINE"];
 
-/** Rôles proposés par défaut à l'invitation : ceux que le serveur posait seul. */
-export const DEFAULT_INVITE_ROLES: readonly TeamRole[] = ["DPS"];
+/** Tout ce que la gestion peut cocher (invitation, modale « Rôles »), dans l'ordre d'affichage. */
+export const MANAGER_ASSIGNABLE_ROLES: readonly TeamRole[] = TEAM_ROLE_ORDER.filter((role) => role !== "OWNER");
+
+/**
+ * Rôles d'un membre après qu'il a choisi ses **rôles de jeu** : ses rôles de
+ * direction (`OWNER`, `MANAGER`, `CAPITAINE`) restent ceux qu'il a, seuls les
+ * rôles de {@link SELF_ASSIGNABLE_ROLES} sont remplacés par `chosen`. Un code
+ * hors de cette liste dans `chosen` est ignoré — le serveur le refuse avant.
+ */
+export function withOwnGameRoles(current: readonly TeamRole[], chosen: readonly TeamRole[]): TeamRole[] {
+  const kept = current.filter((role) => !SELF_ASSIGNABLE_ROLES.includes(role));
+  const game = SELF_ASSIGNABLE_ROLES.filter((role) => chosen.includes(role));
+  return sortTeamRoles([...kept, ...game]);
+}
 
 export type TeamRoleFamily = "owner" | "management" | "game";
 

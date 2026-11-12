@@ -1,9 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TeamRole } from "@/lib/shared/types";
 import {
-  ASSIGNABLE_GAME_ROLES,
-  ASSIGNABLE_MANAGEMENT_ROLES,
-  DEFAULT_INVITE_ROLES,
+  ASSIGNABLE_LEADING_ROLES,
+  MANAGER_ASSIGNABLE_ROLES,
+  SELF_ASSIGNABLE_ROLES,
+  withOwnGameRoles,
   TEAM_ROLE_LABELS,
   TEAM_ROLE_ORDER,
   formatTeamRoles,
@@ -44,25 +45,26 @@ describe("familles de rôles", () => {
   });
 
   it("n'offre jamais OWNER à la saisie : il se transfère", () => {
-    expect(ASSIGNABLE_GAME_ROLES).not.toContain("OWNER");
-    expect(ASSIGNABLE_MANAGEMENT_ROLES).not.toContain("OWNER");
+    expect(SELF_ASSIGNABLE_ROLES).not.toContain("OWNER");
+    expect(ASSIGNABLE_LEADING_ROLES).not.toContain("OWNER");
+    expect(MANAGER_ASSIGNABLE_ROLES).not.toContain("OWNER");
   });
 
   it("propose tous les autres rôles, chacun dans un seul groupe", () => {
-    const offered = [...ASSIGNABLE_GAME_ROLES, ...ASSIGNABLE_MANAGEMENT_ROLES];
+    const offered = [...SELF_ASSIGNABLE_ROLES, ...ASSIGNABLE_LEADING_ROLES];
     expect(new Set(offered).size).toBe(offered.length);
     expect([...offered].sort()).toEqual(ALL_ROLES.filter((r) => r !== "OWNER").sort());
+    expect([...MANAGER_ASSIGNABLE_ROLES].sort()).toEqual([...offered].sort());
   });
 
-  it("tire la gestion du module d'autorisation, pas d'une seconde liste", () => {
-    // Un rôle de gestion ajouté à `team-roles.ts` doit apparaître dans le bon
-    // groupe sans qu'on pense à ce fichier.
-    expect([...ASSIGNABLE_MANAGEMENT_ROLES]).toEqual(TEAM_MANAGEMENT_ROLES.filter((r) => r !== "OWNER"));
-    expect(ASSIGNABLE_GAME_ROLES.some((r) => TEAM_MANAGEMENT_ROLES.includes(r))).toBe(false);
+  it("ne laisse aucun rôle de gestion ni le capitaine parmi les rôles qu'un membre se donne", () => {
+    for (const role of [...TEAM_MANAGEMENT_ROLES, "CAPITAINE" as TeamRole]) {
+      expect(SELF_ASSIGNABLE_ROLES).not.toContain(role);
+    }
   });
 
-  it("invite en DPS par défaut, comme le serveur le faisait seul", () => {
-    expect(DEFAULT_INVITE_ROLES).toEqual(["DPS"]);
+  it("range ce que la gestion coche dans l'ordre d'affichage", () => {
+    expect([...MANAGER_ASSIGNABLE_ROLES]).toEqual(TEAM_ROLE_ORDER.filter((r) => r !== "OWNER"));
   });
 });
 
@@ -104,5 +106,19 @@ describe("sortTeamMembers", () => {
     const list = [m("b", "DPS"), m("a", "OWNER")];
     sortTeamMembers(list);
     expect(list.map((x) => x.pseudo)).toEqual(["b", "a"]);
+  });
+});
+
+describe("withOwnGameRoles — « Mes rôles »", () => {
+  it("withOwnGameRoles_gameRolesChosen_keepsLeadingRolesInDisplayOrder", () => {
+    expect(withOwnGameRoles(["CAPITAINE", "HEAL"], ["DPS", "TANK"])).toEqual(["CAPITAINE", "TANK", "DPS"]);
+  });
+
+  it("withOwnGameRoles_emptyChoice_dropsOnlyGameRoles", () => {
+    expect(withOwnGameRoles(["OWNER", "COACH", "TANK"], [])).toEqual(["OWNER"]);
+  });
+
+  it("withOwnGameRoles_leadingRoleChosen_ignored", () => {
+    expect(withOwnGameRoles(["COACH"], ["MANAGER", "OWNER", "DPS"])).toEqual(["DPS"]);
   });
 });

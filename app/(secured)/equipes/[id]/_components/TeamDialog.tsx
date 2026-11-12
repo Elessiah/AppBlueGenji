@@ -15,6 +15,8 @@ interface TeamDialogProps {
   /** Présent : le panneau est un formulaire, Entrée le soumet. */
   onSubmit?: () => void;
   tone?: "default" | "danger";
+  /** Panneau large : la modale porte le tableau des rôles (`RoleTable`). */
+  wide?: boolean;
   children: ReactNode;
   footer: ReactNode;
 }
@@ -44,6 +46,7 @@ export function TeamDialog({
   busy = false,
   onSubmit,
   tone = "default",
+  wide = false,
   children,
   footer,
 }: Readonly<TeamDialogProps>) {
@@ -73,7 +76,7 @@ export function TeamDialog({
     "aria-modal": true,
     "aria-labelledby": titleId,
     tabIndex: -1,
-    className: styles.dialog,
+    className: wide ? `${styles.dialog} ${styles.dialogWide}` : styles.dialog,
     "data-tone": tone,
   };
 

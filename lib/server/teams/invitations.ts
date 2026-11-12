@@ -69,18 +69,19 @@ async function userHasActiveTeam(userId: number): Promise<boolean> {
  * (`NOT_A_GHOST_TEAM`) plutôt que de faire entrer le joueur dans une équipe
  * réelle qui ne l'a pas invité.
  *
- * @param roles rôles posés à l'arrivée ; vide (demande, invitation d'avant la
- *   colonne) → `DPS`, le défaut d'origine. `OWNER` n'est posé que par une
- *   reprise de fantôme.
+ * @param roles rôles posés à l'arrivée ; `null` (demande, invitation d'avant
+ *   la colonne) → `DPS`, le défaut d'origine ; une liste vide → aucun rôle
+ *   (invitation sans rôle, D71). `OWNER` n'est posé que par une reprise de
+ *   fantôme.
  */
 async function acceptIntoTeam(
   invitationId: number,
   teamId: number,
   userId: number,
-  roles: TeamRole[],
+  roles: TeamRole[] | null,
 ): Promise<void> {
   const claim = isGhostClaimRoles(roles);
-  const payload = arrivalRoles(claim, sanitizeRoles(roles));
+  const payload = arrivalRoles(claim, roles === null ? null : sanitizeRoles(roles));
 
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -172,7 +173,7 @@ async function acceptIntoTeam(
 async function findPendingInvitation(
   teamId: number,
   userId: number,
-): Promise<{ id: number; kind: "INVITE" | "REQUEST"; roles: TeamRole[] } | null> {
+): Promise<{ id: number; kind: "INVITE" | "REQUEST"; roles: TeamRole[] | null } | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<
     (RowDataPacket & { id: number; kind: "INVITE" | "REQUEST"; roles_json: unknown })[]
@@ -189,33 +190,31 @@ async function findPendingInvitation(
 
 /**
  * Rôles portés par une invitation, tels qu'ils seront posés à l'arrivée du
- * joueur. Une invitation sans rôle (demande d'adhésion, ou invitation émise
- * avant la colonne) rend une liste vide : `acceptIntoTeam` pose alors `DPS`,
- * le défaut d'origine.
+ * joueur. Sans liste (`NULL` : demande d'adhésion, ou invitation émise avant la
+ * colonne), `null` : `acceptIntoTeam` pose alors `DPS`, le défaut d'origine.
+ * Une liste vide (`[]`) est une invitation **sans rôle**, voulue (D71).
  */
-function invitationRoles(raw: unknown): TeamRole[] {
-  return raw == null ? [] : parseRoles(raw);
+function invitationRoles(raw: unknown): TeamRole[] | null {
+  return raw == null ? null : parseRoles(raw);
 }
 
 /**
  * L'invitation est-elle la **reprise d'une équipe fantôme** ? Seule
  * `claimGhostTeam` pose `OWNER` sur une invitation : c'est sa marque.
  */
-function isGhostClaimRoles(roles: readonly TeamRole[]): boolean {
-  return roles.includes("OWNER");
+function isGhostClaimRoles(roles: readonly TeamRole[] | null): boolean {
+  return roles?.includes("OWNER") ?? false;
 }
 
 /**
  * Rôles demandés à l'invitation : ceux que la gestion peut distribuer, jamais
- * `OWNER` (il se transfère). Absents, ils valent le défaut d'origine ; présents
- * mais vides, c'est un refus — même règle que `updateTeamMemberRoles`, un membre
- * sans rôle n'existant pas.
+ * `OWNER` (il se transfère). Absents, ils valent le défaut d'origine (`DPS`,
+ * pour un appelant qui ignore le champ) ; une liste vide est permise (D71) :
+ * le joueur arrive sans rôle et choisit ses rôles de jeu lui-même.
  */
 function resolveInviteRoles(roles: readonly TeamRole[] | undefined): TeamRole[] {
   if (roles === undefined) return ["DPS"];
-  const filtered = sanitizeRoles([...roles]).filter((role) => role !== "OWNER");
-  if (filtered.length === 0) throw new Error("MISSING_ROLE");
-  return filtered;
+  return sanitizeRoles([...roles]).filter((role) => role !== "OWNER");
 }
 
 /**
@@ -359,7 +358,7 @@ export async function respondToInvitation(
   }
 
   if (await userHasActiveTeam(Number(inv.user_id))) throw new Error("USER_ALREADY_IN_TEAM");
-  // Une demande (REQUEST) ne porte aucun rôle : `acceptIntoTeam` pose DPS.
+  // Une demande (REQUEST) ne porte aucune liste (`NULL`) : `acceptIntoTeam` pose DPS.
   await acceptIntoTeam(invitationId, Number(inv.team_id), Number(inv.user_id), invitationRoles(inv.roles_json));
 }
 
@@ -450,9 +449,9 @@ export async function listTeamPendingInvitations(
     if (r.kind === "REQUEST") {
       requests.push(base);
     } else {
-      const roles = invitationRoles(r.roles_json);
-      // Invitation d'avant la colonne : le joueur arrivera en DPS, on le dit.
-      invitations.push({ ...base, roles: roles.length === 0 ? (["DPS"] as TeamRole[]) : roles });
+      // Invitation d'avant la colonne (`NULL`) : le joueur arrivera en DPS, on
+      // le dit. Une liste vide est une invitation sans rôle (D71).
+      invitations.push({ ...base, roles: invitationRoles(r.roles_json) ?? (["DPS"] as TeamRole[]) });
     }
   }
   return { requests, invitations };

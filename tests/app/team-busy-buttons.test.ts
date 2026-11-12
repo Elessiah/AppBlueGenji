@@ -46,7 +46,12 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
 
   it("MembersSection_inviteWhileInviting_staysFocusable", () => {
     const code = source("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
-    expect(code).toMatch(/aria-disabled=\{!canInvite \|\| undefined\}\s+aria-busy=\{inviting \|\| undefined\}/);
+    // L'envoi vit dans la modale des rôles (`InviteRolesDialog`) : le bouton
+    // de la page ne fait que l'ouvrir, sans attente à montrer.
+    expect(code).toMatch(/aria-disabled=\{!canInvite \|\| undefined\}/);
+    const dialog = source("app/(secured)/equipes/[id]/_components/InviteRolesDialog.tsx");
+    expect(dialog).toMatch(/aria-disabled=\{pending \|\| undefined\}\s+aria-busy=\{pending \|\| undefined\}/);
+    expect(dialog).toMatch(/if \(pending\) return;/);
     expect(code).not.toMatch(/\sdisabled=\{!canInvite\}/);
   });
 

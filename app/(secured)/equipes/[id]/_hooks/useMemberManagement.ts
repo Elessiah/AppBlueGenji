@@ -77,6 +77,16 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
     [run, teamId, t],
   );
 
+  /** « Mes rôles » : le lecteur choisit ses propres rôles de jeu (D71). */
+  const updateOwnRoles = useCallback(
+    (roles: TeamRole[]) =>
+      run(async () => {
+        await teamApi(`/api/teams/${teamId}/my-roles`, jsonRequest("PUT", { roles }), "TEAM_OWN_ROLES_FAILED");
+        return t("myRoles.saved");
+      }),
+    [run, teamId, t],
+  );
+
   const cancelInvitation = useCallback(
     (invitationId: number, pseudo: string) =>
       run(async () => {
@@ -86,5 +96,5 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
     [run, t],
   );
 
-  return { addMember, removeMember, updateRoles, cancelInvitation };
+  return { addMember, removeMember, updateRoles, updateOwnRoles, cancelInvitation };
 }

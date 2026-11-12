@@ -33,7 +33,8 @@ describe("tables de statuts des routes d'équipe", () => {
     expect(TEAM_INVITE_ERROR_STATUS.get(TERMS_ACCEPTANCE_REQUIRED)).toBe(409);
     expect(TEAM_INVITE_ERROR_STATUS.get("USER_ALREADY_IN_TEAM")).toBe(409);
     expect(TEAM_INVITE_ERROR_STATUS.get("ALREADY_INVITED")).toBe(409);
-    expect(TEAM_INVITE_ERROR_STATUS.get("MISSING_ROLE")).toBe(400);
+    expect(TEAM_INVITE_ERROR_STATUS.get("INVALID_ROLES")).toBe(400);
+    expect(TEAM_INVITE_ERROR_STATUS.has("MISSING_ROLE")).toBe(false);
     for (const code of JOIN_CONFLICTS) expect(TEAM_INVITE_ERROR_STATUS.get(code)).toBe(409);
   });
 

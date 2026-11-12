@@ -8,14 +8,31 @@ import type { TeamRole } from "@/lib/shared/types";
  *   comme le défaut d'origine (`DPS`) — un appelant qui ne connaît pas le champ
  *   garde le comportement d'avant ;
  * - **une liste** → ses chaînes, que le service assainit (codes inconnus et
- *   `OWNER` retirés) ;
- * - **autre chose** → une liste vide, donc un refus `MISSING_ROLE` : une valeur
- *   malformée n'est pas une absence, et la lire comme telle ferait arriver le
- *   joueur en DPS sans que personne ne l'ait choisi.
+ *   `OWNER` retirés). Vide, elle est permise : une invitation **sans rôle**
+ *   (décision D71), le joueur choisira ses rôles de jeu lui-même ;
+ * - **autre chose** → refus `INVALID_ROLES` : une valeur malformée n'est ni une
+ *   absence ni un choix, et la lire comme l'un ou l'autre ferait arriver le
+ *   joueur en DPS, ou sans rôle, sans que personne ne l'ait voulu.
+ *
+ * @throws INVALID_ROLES
  */
 export function inviteRolesFromBody(raw: unknown): TeamRole[] | undefined {
   if (raw === undefined || raw === null) return undefined;
-  if (!Array.isArray(raw)) return [];
+  return rolesListFromBody(raw);
+}
+
+/**
+ * Liste de rôles **exigée** dans un corps de requête (rôles d'un membre, ses
+ * propres rôles de jeu) : un tableau, dont les chaînes sont gardées — le
+ * service assainit ou refuse les codes. Absente ou malformée → `INVALID_ROLES`.
+ * Avant, une liste absente valait une liste vide, que le refus `MISSING_ROLE`
+ * arrêtait ; une liste vide étant désormais permise (D71), l'absence ne doit
+ * plus effacer les rôles d'un membre.
+ *
+ * @throws INVALID_ROLES
+ */
+export function rolesListFromBody(raw: unknown): TeamRole[] {
+  if (!Array.isArray(raw)) throw new Error("INVALID_ROLES");
   return raw.filter((role): role is TeamRole => typeof role === "string");
 }
 

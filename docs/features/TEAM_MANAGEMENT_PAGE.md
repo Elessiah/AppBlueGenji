@@ -72,12 +72,13 @@ gestion, puis pseudo).
   (★ propriétaire, ⚙ gestion) — la couleur ne porte jamais seule le sens. Toute
   la section équipes (annuaire, fiche, statistiques) est en violet néon, plus
   en orange (`DESIGN_SYSTEM.md` § Palette « néon froid »).
-- Choisis par `RolePicker`, en deux groupes : « Rôles de jeu » et « Gestion de
-  l'équipe ». `MANAGER` se cochait comme `TANK`, alors qu'il donne la main sur
-  l'équipe ; son effet est écrit sous lui. `OWNER` ne se coche jamais.
-- La modale des rôles désactive « Enregistrer » tant que rien n'a changé ou que
-  la sélection est vide, et prévient avant qu'un manager ne se retire à lui-même
-  le rôle qui lui donne la main.
+- Choisis dans un **tableau de tous les rôles** (`RoleTable`), ce que chacun
+  permet sous les yeux — modale des rôles, modale d'invitation, « Ce que fait
+  chaque rôle » ; chaque membre choisit **ses propres** rôles de jeu dans
+  « Mes rôles » (`TEAM_MEMBERS_UX.md`). `OWNER` ne se coche jamais.
+- La modale des rôles désactive « Enregistrer » tant que rien n'a changé (une
+  sélection vide est permise : un membre peut n'avoir aucun rôle), et prévient
+  avant qu'un manager ne se retire à lui-même le rôle qui lui donne la main.
 
 ## Invitations
 
@@ -87,7 +88,8 @@ gestion, puis pseudo).
   (`bg_team_invitations.roles_json`) et sont posés à l'arrivée, quel que soit le
   chemin (le joueur accepte, ou l'invitation croise une demande déjà en
   attente). `inviteRolesFromBody` distingue *absent* (défaut DPS, pour les
-  appelants qui ignorent le champ) de *malformé* (refus `MISSING_ROLE`).
+  appelants qui ignorent le champ) de *malformé* (refus `INVALID_ROLES`) ; une
+  liste vide invite **sans rôle** (`TEAM_MEMBERS_UX.md`).
 - **Invitations en attente** listées sous le formulaire, avec « Retirer »
   (`DELETE /api/invitations/[id]`, `cancelInvitation`). Réinviter après une erreur
   de pseudo ne rendait que `ALREADY_INVITED`, sans moyen de voir ni d'annuler.
@@ -151,7 +153,7 @@ Tout refus passe par `app/(secured)/equipes/_lib/team-errors.ts`
 (`teamErrorMessage`, et `membershipErrorMessage` pour les gestes que le joueur fait
 pour lui-même — seul `USER_ALREADY_IN_TEAM` y change de sujet). La gestion
 affichait encore les codes bruts (`ALREADY_INVITED`, `CANNOT_KICK_OWNER`,
-`MISSING_ROLE`, `FORBIDDEN`, `TEAM_NOT_FOUND`…). `_lib/team-api.ts` convertit en
+`FORBIDDEN`, `TEAM_NOT_FOUND`…). `_lib/team-api.ts` convertit en
 code une réponse non JSON et une coupure réseau (`NETWORK_ERROR`), qui sortaient
 en « Unexpected token '<' » ou « Failed to fetch ».
 

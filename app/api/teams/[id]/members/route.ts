@@ -1,11 +1,10 @@
-﻿import type { TeamRole } from "@/lib/shared/types";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TEAM_INVITE_ERROR_STATUS, TEAM_MEMBER_REMOVE_ERROR_STATUS, TEAM_MEMBER_ROLES_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { getTeamDetail } from "@/lib/server/teams/detail";
 import { inviteToTeam } from "@/lib/server/teams/invitations";
 import { removeTeamMember, updateTeamMemberRoles } from "@/lib/server/teams/roster";
-import { inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { inviteRolesFromBody, rolesListFromBody } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -44,12 +43,14 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const body = (await readJsonBody(req)) as { userId?: number; roles?: TeamRole[] };
+    const body = (await readJsonBody(req)) as { userId?: number; roles?: unknown };
     if (!body.userId || !Number.isInteger(body.userId)) {
       return fail("MISSING_USER_ID", 400);
     }
 
-    await updateTeamMemberRoles(user.id, teamId, body.userId, body.roles ?? []);
+    // Liste exigée : une liste vide est permise (membre sans rôle, D71), une
+    // liste absente ne doit donc plus valoir « aucun rôle » (`INVALID_ROLES`).
+    await updateTeamMemberRoles(user.id, teamId, body.userId, rolesListFromBody(body.roles));
     const detail = await getTeamDetail(teamId, user.id);
     return ok(detail);
   } catch (error) {

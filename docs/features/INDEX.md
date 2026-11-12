@@ -21,7 +21,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster ; option du tournoi (éteinte par défaut) et bouton « Contacts » de la carte.
 - `MATCH_VOICE.md` — Salons vocaux d'équipe : option du tournoi (éteinte par défaut), salons Discord de 5 places ouverts 15 min avant le match, sans effet sur son lancement, état « Salon vocal : ouvert » (ni qui s'y trouve, ni combien : rien n'est compté).
 - `MATCH_REFEREE.md` — Arbitre désigné d'un match (4e « Prêt », nommé aux seules parties du match), autogestion par match ou par manche, première carte, hôte à gauche et premier ban ; avertissement « sans arbitre » au staff, jamais d'autogestion d'office ; opposition d'un arbitre retenue par le staff (retrait de ses matchs non terminés, arbitrage fermé).
-- `MATCH_LOBBY_BRIEF.md` — Check-in du match : 15 min avant le coup d'envoi (à défaut d'horaire, à l'ouverture du salon), à **tous les joueurs** des deux engagées en DM + push `MATCH_LOBBY_BRIEF` — vocal d'équipe et salon de check-in, gauche/hôte et droite, qui crée la partie, paramètres de partie, déroulé des maps, cast et lien du live, saisie des scores, rôle @Arbitre ; sans BattleTag, tag Discord ni pseudo. Les paramètres de partie figurent aussi sur la page du match.
+- `MATCH_LOBBY_BRIEF.md` — Check-in d'un match en autogestion : 15 min avant le coup d'envoi (à défaut d'horaire, à l'ouverture du salon), au propriétaire et aux managers des deux engagées en DM + push `MATCH_LOBBY_BRIEF` — vocal d'équipe et salon de check-in, gauche/hôte et droite, qui crée la partie, paramètres de partie, déroulé des maps, cast et lien du live, saisie des scores, rôle @Arbitre ; sans BattleTag, tag Discord ni pseudo. Les paramètres de partie figurent aussi sur la page du match.
 - `ROUND_MAPS.md` — Cartes par tour du tournoi (une carte = imposée, plusieurs = pool choisi par l'arbitrage ou l'équipe en autogestion ; liste Overwatch, tours à venir, copie vers tous les tours, verrou d'échelle sur la carte du match et réinitialisation) et règles de ban du tournoi, réglables à tout moment par le staff.
 - `NEW_MATCH_NOTICE.md` — Annonce d'un nouveau match (deux engagées connues, première manche comprise ; horaire déjà posé inclus, sans « Match programmé » en double) à tous les membres des deux équipes : DM de match + push `NEW_MATCH`, adversaire, horaire, lien du match ; balayage après commit, une fois par place et affiche.
 - `CAST_NOTICES.md` — Casts : journal anonyme du staff (inscription, reprise, retrait) et avis au caster retiré (DM + push `CAST_RELEASED`, avec le motif).
@@ -97,6 +97,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 ## Équipes
 
 - `TEAM_MANAGEMENT_PAGE.md` — Fiche d'équipe en mode gestion, invitations, rôles.
+- `TEAM_MEMBERS_UX.md` — Membres d'une équipe : invitation en deux temps (pseudo, puis modale des rôles, aucun coché), « Mes rôles » (chaque membre choisit ses rôles de jeu), tableau de tous les rôles avec ce que chacun permet.
 - `TEAM_TAG.md` — Sigle d'équipe unique, facultatif.
 - `TEAM_DIRECTORY_LOGOS.md` — Logos dans l'annuaire `/equipes`.
 - `TEAM_JOIN_REQUEST_NOTIFICATION.md` — Demande d'adhésion annoncée à la gestion sur Discord.

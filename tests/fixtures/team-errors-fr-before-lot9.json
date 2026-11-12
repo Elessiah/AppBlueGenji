@@ -21,7 +21,6 @@
     "ALREADY_INVITED": "Ce joueur a déjà une invitation en attente de ton équipe.",
     "MISSING_USER_ID": "Ce membre est introuvable. Recharge la page.",
     "MEMBER_NOT_FOUND": "Ce joueur ne fait plus partie de l'équipe.",
-    "MISSING_ROLE": "Choisis au moins un rôle.",
     "CANNOT_KICK_OWNER": "Le propriétaire ne peut pas être exclu de son équipe.",
     "OWNER_CANNOT_LEAVE": "Tu ne peux pas t'exclure toi-même : utilise « Quitter l'équipe ».",
     "INVALID_TEAM_NAME": "Le nom de l'équipe doit compter de 3 à 60 caractères.",

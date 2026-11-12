@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type { TeamRole } from "@/lib/shared/types";
 
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
@@ -269,13 +270,13 @@ describe("inviteToTeam — les rôles choisis voyagent avec l'invitation", () =>
     expect(state.invitations[0].roles_json).toEqual(["HEAL"]);
   });
 
-  it.each([
+  it.each<[string, string[]]>([
     ["vide", []],
     ["réduite à OWNER", ["OWNER"]],
     ["faite de codes inconnus", ["PILOTE"]],
-  ])("refuse une liste %s : un membre sans rôle n'existe pas", async (_label, roles) => {
-    await expect(inviteToTeam(1, 7, "Nova", roles as never)).rejects.toThrow("MISSING_ROLE");
-    expect(state.invitations).toHaveLength(0);
+  ])("invite sans rôle sur une liste %s (D71), jamais en DPS d'office", async (_label, roles) => {
+    await expect(inviteToTeam(1, 7, "Nova", roles as TeamRole[])).resolves.toBe("INVITED");
+    expect(state.invitations[0].roles_json).toEqual([]);
   });
 
   it("refuse avant tout un demandeur qui ne gère pas l'équipe", async () => {

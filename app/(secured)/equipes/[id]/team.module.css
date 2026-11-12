@@ -300,25 +300,34 @@
 
 /* ── Formulaire d'invitation ───────────────────────────── */
 
-.inviteGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: 16px;
+/* Le pseudo seul : les rôles se choisissent dans la modale qui suit
+   (`InviteRolesDialog`). Borné, pour ne pas étirer le champ sur toute la
+   largeur du bloc. */
+.inviteRow {
+  max-width: 520px;
 }
 
-@media (max-width: 720px) {
-  .inviteGrid {
-    grid-template-columns: 1fr;
-  }
-}
+/* ── Mes rôles ─────────────────────────────────────────── */
 
-/* ── Sélecteur de rôles ────────────────────────────────── */
-
-.rolePicker {
+.myRoles {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
+
+.myRolesLeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.myRolesLabel {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* ── Groupe de cases de rôles ──────────────────────────── */
 
 .roleGroup {
   border: none;
@@ -550,6 +559,12 @@
   outline: none;
 }
 
+/* Modale qui porte le tableau des rôles (`RoleTable`) : quatre colonnes ne
+   tiennent pas dans 460 px. */
+.dialogWide {
+  max-width: 820px;
+}
+
 .dialog[data-tone="danger"] {
   border-color: rgba(255, 90, 110, 0.45);
 }
@@ -694,4 +709,90 @@
   padding: 0;
   display: grid;
   gap: 8px;
+}
+
+/* ── Tableau des rôles (`RoleTable`) ───────────────────── */
+
+.roleTableWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.roleTable {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.roleTableRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.roleTableHeader {
+  border-top: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(var(--blue-500-rgb), 0.03);
+}
+
+.roleTableRole {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.roleTableNote {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* Libellé de cellule (`data-label`), montré seulement quand la ligne s'empile. */
+.roleTableRow [data-label]::before {
+  content: none;
+}
+
+/* Repli à la largeur de la **fenêtre** sous laquelle la modale de 820 px ne
+   laisse plus de quoi lire quatre colonnes (`RESPONSIVE_TABLES.md` : le
+   `.table-row` global replie à 920 px, réglage pensé pour une page). L'en-tête
+   reste lisible par les lecteurs d'écran ; le `data-label` n'est qu'un
+   libellé visuel. */
+@media (max-width: 680px) {
+  .roleTableHeader {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .roleTableRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  /* En-tête masqué : la première ligne ne double pas le cadre du tableau. */
+  [role="rowgroup"]:last-child > .roleTableRow:first-child {
+    border-top: none;
+  }
+
+  .roleTableRow [data-label]::before {
+    content: attr(data-label) " · ";
+    color: var(--cyan-400);
+    font-weight: 600;
+  }
 }

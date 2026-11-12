@@ -6,7 +6,7 @@
  * lisait `USER_ALREADY_IN_TEAM` en capitales. La **gestion** de l'équipe avait
  * gardé le défaut : exclure, inviter, changer les rôles, renommer, changer le
  * logo, transférer, attribuer ou dissoudre affichaient toujours le jeton
- * (`ALREADY_INVITED`, `CANNOT_KICK_OWNER`, `MISSING_ROLE`, `FORBIDDEN`…). Tout
+ * (`ALREADY_INVITED`, `CANNOT_KICK_OWNER`, `FORBIDDEN`…). Tout
  * passe désormais par ce registre : une seule page, un seul vocabulaire.
  *
  * Depuis le lot 9 de la traduction, les phrases vivent dans l'espace

@@ -6,18 +6,17 @@ import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
 import { shownEntityName } from "@/lib/shared/entity-fallback-name";
 import type { TeamMember, TeamRole, TeamSentInvitation } from "@/lib/shared/types";
-import { DEFAULT_INVITE_ROLES, sortTeamMembers } from "@/lib/shared/team-role-display";
-import { useToast } from "@/components/ui/toast";
+import { sortTeamMembers } from "@/lib/shared/team-role-display";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { useMemberManagement } from "../_hooks/useMemberManagement";
 import { RolesDialog, type RolesDialogTarget } from "./RolesDialog";
 import { RolePills } from "./RolePills";
-import { RolePicker } from "./RolePicker";
+import { InviteRolesDialog } from "./InviteRolesDialog";
+import { MyRolesBlock } from "./MyRolesBlock";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
 import styles from "../team.module.css";
@@ -47,47 +46,51 @@ export function MembersSection({
   onInvitationsChanged,
 }: Readonly<MembersSectionProps>) {
   const [memberPseudo, setMemberPseudo] = useState("");
-  const [memberRoles, setMemberRoles] = useState<TeamRole[]>([...DEFAULT_INVITE_ROLES]);
-  const [inviting, setInviting] = useState(false);
+  /** Pseudo dont la modale des rôles d'invitation est ouverte. */
+  const [inviteTarget, setInviteTarget] = useState<string | null>(null);
   const [rolesTarget, setRolesTarget] = useState<RolesDialogTarget | null>(null);
   const [kickTarget, setKickTarget] = useState<TeamMember | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const { showError } = useToast();
   const { t, locale } = useTeamPageText();
   // Un pseudo ancien fait de caractères invisibles se lit « Joueur #id » partout, noms accessibles compris.
   const playerName = (pseudo: string, userId: number) => shownEntityName(pseudo, "player", userId, locale);
-  const teamErrorMessage = useTeamErrorMessage();
   const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, INVITE_FIELD_IDS);
 
   const refreshAll = () => {
     onChanged();
     onInvitationsChanged();
   };
-  const { addMember, removeMember, updateRoles, cancelInvitation } = useMemberManagement(teamId, refreshAll);
+  const { addMember, removeMember, updateRoles, updateOwnRoles, cancelInvitation } = useMemberManagement(
+    teamId,
+    refreshAll,
+  );
 
   const sortedMembers = sortTeamMembers(members);
-  const canInvite = memberPseudo.trim().length > 0 && !inviting;
+  const viewerMember = members.find((member) => member.userId === viewerUserId) ?? null;
+  const canInvite = memberPseudo.trim().length > 0 && inviteTarget === null;
 
-  const invite = async (event: FormEvent) => {
+  // Premier temps : le pseudo seul. Les rôles se choisissent dans la modale
+  // (`InviteRolesDialog`) — inline, on les prenait pour les siens.
+  const invite = (event: FormEvent) => {
     event.preventDefault();
     if (!canInvite) return;
     fieldErrors.clear();
-    // Refus dit en notification, pas par un bouton grisé muet.
-    if (memberRoles.length === 0) {
-      showError(teamErrorMessage("MISSING_ROLE"));
-      return;
-    }
-    setInviting(true);
-    // Un pseudo refusé (introuvable, déjà invité…) est signalé sur le champ,
-    // qui reprend le focus sans rouvrir ses suggestions.
-    const ok = await addMember(memberPseudo.trim(), memberRoles, fieldErrors.report);
-    setInviting(false);
+    setInviteTarget(memberPseudo.trim());
+  };
+
+  const sendInvitation = async (pseudo: string, roles: TeamRole[]): Promise<boolean> => {
+    let pseudoRefused = false;
+    // Un pseudo refusé (introuvable, déjà invité…) est signalé sur le champ :
+    // la modale se ferme pour le montrer, et le champ reprend le focus sans
+    // rouvrir ses suggestions. Les autres refus gardent la modale ouverte.
+    const ok = await addMember(pseudo, roles, (code, message) => {
+      pseudoRefused = fieldErrors.report(code, message);
+    });
     // Refus : la saisie reste, pour corriger une faute de frappe sans tout
     // retaper.
-    if (ok) {
-      setMemberPseudo("");
-      setMemberRoles([...DEFAULT_INVITE_ROLES]);
-    }
+    if (ok) setMemberPseudo("");
+    if (ok || pseudoRefused) setInviteTarget(null);
+    return ok;
   };
 
   const withdraw = async (invitation: TeamSentInvitation) => {
@@ -203,12 +206,22 @@ export function MembersSection({
           </div>
         )}
 
+        {viewerMember ? (
+          <MyRolesBlock
+            // Rôles changés ailleurs (modale de la gestion) : le bloc repart
+            // de ceux qui sont enregistrés.
+            key={viewerMember.roles.toString()}
+            roles={viewerMember.roles}
+            onSave={updateOwnRoles}
+          />
+        ) : null}
+
         {canManage ? (
           <form onSubmit={invite} className={styles.divider} aria-labelledby="team-invite-title">
             <h3 id="team-invite-title" className={styles.subTitle}>
               {t("members.inviteTitle")}
             </h3>
-            <div className={styles.inviteGrid}>
+            <div className={styles.inviteRow}>
               <div className="field">
                 {/* Qui est proposé et quand le joueur rejoint : derrière le « i »,
                     toujours cité par le champ (INFO_HINTS.md). */}
@@ -231,19 +244,17 @@ export function MembersSection({
                 />
                 <FieldErrorText fieldId={INVITE_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
               </div>
-              <RolePicker selected={memberRoles} onChange={setMemberRoles} />
             </div>
             <div className={styles.formFooter}>
-              {/* Jamais `disabled` : pendant l'envoi comme après (champ vidé), le
+              {/* Jamais `disabled` : champ vide comme modale ouverte, le
                   bouton garde le focus clavier (`aria-disabled`) ; le
                   gestionnaire ignore tout envoi hors `canInvite`. */}
               <button
                 type="submit"
                 className={`btn ${styles.primaryButton}`}
                 aria-disabled={!canInvite || undefined}
-                aria-busy={inviting || undefined}
               >
-                {inviting ? t("members.sending") : t("members.invite")}
+                {t("members.invite")}
               </button>
             </div>
           </form>
@@ -278,6 +289,14 @@ export function MembersSection({
           </div>
         ) : null}
       </section>
+
+      {inviteTarget === null ? null : (
+        <InviteRolesDialog
+          pseudo={inviteTarget}
+          onClose={() => setInviteTarget(null)}
+          onConfirm={(roles) => sendInvitation(inviteTarget, roles)}
+        />
+      )}
 
       {rolesTarget ? (
         <RolesDialog

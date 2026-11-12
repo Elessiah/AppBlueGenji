@@ -105,7 +105,6 @@
     "pseudoPlaceholder": "Commence à taper un pseudo…",
     "inviteHelp": "Seuls les joueurs sans équipe sont proposés. Le joueur rejoint l'équipe en acceptant l'invitation — tout de suite s'il l'avait demandé.",
     "invite": "Inviter",
-    "sending": "Envoi…",
     "pendingTitle": "Invitations en attente ({count})",
     "proposedRoles": "Rôles proposés à {pseudo}",
     "sentOn": "envoyée le {date}",
@@ -124,9 +123,6 @@
   },
   "roles": {
     "pillsLabel": "Rôles",
-    "gameRoles": "Rôles de jeu",
-    "management": "Gestion de l'équipe",
-    "managerHelp": "Un manager gère les membres et leurs rôles, le logo et les inscriptions. Nom, sigle, description et dissolution restent au propriétaire.",
     "myRoles": "Mes rôles",
     "rolesOf": "Rôles de {pseudo}",
     "cancel": "Annuler",
@@ -134,6 +130,83 @@
     "saving": "Enregistrement…",
     "ownerNotice": "Le rôle de propriétaire ne se coche pas : il se transfère, depuis les paramètres de l'équipe.",
     "dropsManagement": "Sans le rôle de manager, tu ne pourras plus gérer le roster de l'équipe."
+  },
+  "inviteDialog": {
+    "title": "Inviter {pseudo}",
+    "intro": "Coche les rôles à lui donner à son arrivée. Aucun n'est obligatoire : il choisira lui-même ses rôles de jeu.",
+    "confirm": "Envoyer l'invitation",
+    "sending": "Envoi…",
+    "cancel": "Annuler"
+  },
+  "myRoles": {
+    "title": "Mes rôles",
+    "hint": "Tes rôles de jeu s'affichent sur la fiche de l'équipe et sur ta carte de joueur. Capitaine, manager et propriétaire sont donnés par la gestion de l'équipe.",
+    "leadingLabel": "Rôles donnés par la gestion",
+    "noLeading": "Aucun",
+    "gameLegend": "Mes rôles de jeu",
+    "save": "Enregistrer mes rôles",
+    "saving": "Enregistrement…",
+    "saved": "Tes rôles de jeu sont enregistrés.",
+    "guideButton": "Ce que fait chaque rôle"
+  },
+  "roleGuide": {
+    "title": "Ce que fait chaque rôle",
+    "tableLabel": "Rôles d'équipe et ce qu'ils permettent",
+    "close": "Fermer",
+    "transferOnly": "Se transfère",
+    "column": {
+      "role": "Rôle",
+      "team": "Sur l'équipe",
+      "matches": "En match",
+      "messages": "Messages reçus"
+    },
+    "noticesTitle": "Annonces de match",
+    "noticesLine": "Tout membre reçoit les annonces de match de l'équipe.",
+    "noticesHint": "Nouveau match, horaires et rappels : message privé Discord (tag certifié, case cochée dans « Mon profil ») et push ; départ du match et coup d'envoi : push seulement. Le check-in et les demandes d'adhésion suivent la même règle de message privé, le score à confirmer part en push.",
+    "roles": {
+      "OWNER": {
+        "team": "Tout : nom, sigle, description, logo, membres, rôles, inscriptions. Seul à transférer la propriété ou dissoudre l'équipe.",
+        "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
+        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
+        "hint": "Un seul par équipe : il ne se coche pas, il se transfère depuis les paramètres de l'équipe. Il ne peut ni quitter l'équipe ni en être exclu avant de l'avoir transféré."
+      },
+      "MANAGER": {
+        "team": "Logo, invitations et demandes d'adhésion, exclusions, rôles des membres (sauf ceux du propriétaire), inscriptions aux tournois.",
+        "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
+        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
+        "hint": "Donné par le propriétaire ou un manager. Seuls le nom, le sigle, la description, le transfert et la dissolution lui échappent."
+      },
+      "CAPITAINE": {
+        "team": "Ses propres rôles de jeu seulement.",
+        "matches": "« Prêt », saisie et confirmation du score, vider le salon vocal de l'équipe ; premier contact présenté pour le match.",
+        "messages": "Annonces de match, score à confirmer.",
+        "hint": "Donné par le propriétaire ou un manager. Il lance la partie en jeu et en donne le résultat, sans pouvoir engager l'équipe : ni forfait, ni abandon, ni inscription."
+      },
+      "COACH": {
+        "team": "Ses propres rôles de jeu seulement.",
+        "matches": "Aucun geste réservé.",
+        "messages": "Annonces de match.",
+        "hint": "Chaque membre se le donne ou se le retire dans « Mes rôles » ; le propriétaire et les managers aussi. Il n'ajoute aucun droit."
+      },
+      "TANK": {
+        "team": "Ses propres rôles de jeu seulement.",
+        "matches": "Aucun geste réservé.",
+        "messages": "Annonces de match.",
+        "hint": "Rôle de jeu, affiché sur la fiche de l'équipe et la carte du joueur. Chaque membre le choisit dans « Mes rôles » ; le propriétaire et les managers aussi."
+      },
+      "DPS": {
+        "team": "Ses propres rôles de jeu seulement.",
+        "matches": "Aucun geste réservé.",
+        "messages": "Annonces de match.",
+        "hint": "Rôle de jeu, affiché sur la fiche de l'équipe et la carte du joueur. Chaque membre le choisit dans « Mes rôles » ; le propriétaire et les managers aussi."
+      },
+      "HEAL": {
+        "team": "Ses propres rôles de jeu seulement.",
+        "matches": "Aucun geste réservé.",
+        "messages": "Annonces de match.",
+        "hint": "Rôle de jeu, affiché sur la fiche de l'équipe et la carte du joueur. Chaque membre le choisit dans « Mes rôles » ; le propriétaire et les managers aussi."
+      }
+    }
   },
   "transfer": {
     "title": "Transférer la propriété",

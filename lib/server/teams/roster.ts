@@ -4,6 +4,7 @@ import { parseRoles } from "@/lib/server/serialization";
 import type { TeamRole } from "@/lib/shared/types";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { sanitizeRoles } from "@/lib/server/users/roles";
+import { SELF_ASSIGNABLE_ROLES, withOwnGameRoles } from "@/lib/shared/team-role-display";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
@@ -118,10 +119,10 @@ export async function updateTeamMemberRoles(
       throw new Error("FORBIDDEN");
     }
 
+    // Une liste vide est permise : un membre peut n'avoir aucun rôle (il arrive
+    // ainsi d'une invitation sans rôle, et choisit lui-même ses rôles de jeu —
+    // décision D71). Le propriétaire garde toujours `OWNER`.
     const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
-    if (filteredRoles.length === 0) {
-      throw new Error("MISSING_ROLE");
-    }
 
     const finalRoles = targetIsOwner
       ? (["OWNER", ...filteredRoles] as TeamRole[])
@@ -140,6 +141,40 @@ export async function updateTeamMemberRoles(
   // gestes de gestion) jusqu'à sa reconnexion, un promu ne la recevait pas — et
   // ses coéquipiers, celle d'une « équipe sans contact » qui n'en est plus une.
   refreshTeamViewers(teamId, scope.userIds, scope.tournamentIds);
+}
+
+/**
+ * Un membre choisit **ses propres rôles de jeu** (`COACH`, `TANK`, `DPS`,
+ * `HEAL` — {@link SELF_ASSIGNABLE_ROLES}, décision D71). Ouvert à tout membre
+ * en cours de l'équipe, pour lui seul ; ses rôles de direction (`OWNER`,
+ * `MANAGER`, `CAPITAINE`) restent ceux que la gestion lui a donnés — aucun
+ * chemin ne s'en sert pour se hisser.
+ *
+ * Un code de direction ou inconnu dans `roles` est **refusé**
+ * (`ROLE_NOT_SELF_ASSIGNABLE`) plutôt qu'ignoré : un client qui croirait
+ * pouvoir se nommer capitaine doit l'apprendre. Sous le verrou de l'équipe,
+ * comme tout geste sur le roster : relus avant, les rôles de direction
+ * réécrits par une modale de la gestion au même instant seraient perdus.
+ *
+ * Aucun flux n'est rafraîchi : un rôle de jeu ne change ni les gestes du
+ * lecteur (`canDeclareTeamReady`, `hasTeamManagementRole` ne lisent que des
+ * rôles de direction) ni l'invitation à certifier.
+ *
+ * @returns les rôles enregistrés.
+ * @throws ROLE_NOT_SELF_ASSIGNABLE, NOT_A_MEMBER, TERMS_ACCEPTANCE_REQUIRED
+ */
+export async function updateOwnGameRoles(userId: number, teamId: number, roles: readonly string[]): Promise<TeamRole[]> {
+  if (roles.some((role) => !SELF_ASSIGNABLE_ROLES.includes(role as TeamRole))) {
+    throw new Error("ROLE_NOT_SELF_ASSIGNABLE");
+  }
+  return withTeamRosterLock(teamId, async (connection) => {
+    const current = await lockMemberRoles(connection, teamId, userId);
+    if (!current) throw new Error("NOT_A_MEMBER");
+    await assertTermsAccepted(userId, connection);
+    const finalRoles = withOwnGameRoles(current, roles as TeamRole[]);
+    await writeActiveMembership(connection, "roles_json = ?", [JSON.stringify(finalRoles)], teamId, userId);
+    return finalRoles;
+  });
 }
 
 /**

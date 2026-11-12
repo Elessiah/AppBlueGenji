@@ -219,7 +219,7 @@ describe("§3.1 — `sanitizeRoles` n'invente jamais de rôle", () => {
   it("ne retire pas `OWNER` : c'est aux appelants de le filtrer", () => {
     // La fonction normalise, elle n'arbitre pas. Les deux appelants qui
     // écrivent des rôles retirent `OWNER` juste après, chacun pour sa raison
-    // (`MISSING_ROLE` d'un côté, repli `DPS` de l'autre).
+    // (invitation sans rôle permise d'un côté, repli `DPS` de l'autre).
     expect(sanitizeRoles(["OWNER", "TANK"])).toEqual(["OWNER", "TANK"]);
   });
 });
