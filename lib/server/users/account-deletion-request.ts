@@ -608,8 +608,9 @@ export async function requestAccountDeletion(
       // réactivation (`account-deletion-hold.ts`).
       // Le rejeu d'une ligne qui porte la date brute de sa demande (D21) la
       // réécrit telle quelle : convertie depuis l'ISO, elle suivrait le fuseau
-      // du shell du rejeu.
-      if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? requestedAt))) {
+      // du shell du rejeu. Une demande ordinaire est datée par la base
+      // (`NOW()`, D67), dont l'horloge juge ensuite sa fenêtre.
+      if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? options.requestedAt ?? null))) {
         throw new Error("USER_NOT_FOUND");
       }
       // Un ticket de réactivation resté d'une demande précédente (connexion

@@ -152,7 +152,7 @@ function fakeDb(
     if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
       return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
     }
-    if (q.includes("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users")) {
+    if (q.includes("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at,")) {
       return [
         options.missing ? [] : [{ avatar_url: avatarUrl, discord_id: options.discordId ?? null, created_at: "2026-01-02 03:04:05" }],
       ];

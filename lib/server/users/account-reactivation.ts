@@ -6,7 +6,6 @@ import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import {
   ACCOUNT_DELETED_ERROR,
   ACCOUNT_PENDING_DELETION_CODE,
-  isReactivationWindowOpen,
   REACTIVATION_TICKET_MINUTES,
   reactivationDeadline,
   type StoredDate,
@@ -17,6 +16,7 @@ import { reactivationUndoes, type AccountDeletionEntry } from "@/lib/shared/acco
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { type RestoredIdentity, restoreAccountIdentity } from "./account-deletion-hold";
+import { reactivationWindowOpenSql, windowFlag } from "./reactivation-window";
 
 /*
  * Réactivation d'un compte dont la suppression est demandée (E4,
@@ -67,10 +67,13 @@ function hashTicket(token: string): string {
 /** L'état de suppression d'un compte : `null` s'il est vivant, inconnu ou déjà supprimé définitivement. */
 export async function readPendingDeletion(userId: number): Promise<{ requestedAt: string; windowOpen: boolean } | null> {
   const db = await getDatabase();
-  let rows: (RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[];
+  type PendingRow = RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate; window_open: unknown };
+  let rows: PendingRow[];
   try {
-    [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
-      `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`,
+    // La fenêtre se juge contre l'horloge de la base (D67), celle qui a daté la demande.
+    [rows] = await db.execute<PendingRow[]>(
+      `SELECT is_deleted, deletion_requested_at, ${reactivationWindowOpenSql()} AS window_open
+         FROM bg_users WHERE id = ? LIMIT 1`,
       [userId],
     );
   } catch (error) {
@@ -84,7 +87,7 @@ export async function readPendingDeletion(userId: number): Promise<{ requestedAt
   if (!row || Number(row.is_deleted) !== 1 || row.deletion_requested_at === null) return null;
   return {
     requestedAt: new Date(row.deletion_requested_at).toISOString(),
-    windowOpen: isReactivationWindowOpen(row.deletion_requested_at),
+    windowOpen: windowFlag(row.window_open),
   };
 }
 
@@ -112,8 +115,8 @@ export async function peekReactivationTicket(
 ): Promise<{ userId: number; finalAt: string } | null> {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { user_id: number; deletion_requested_at: StoredDate })[]>(
-    `SELECT k.user_id, u.deletion_requested_at
+  const [rows] = await db.execute<(RowDataPacket & { user_id: number; deletion_requested_at: StoredDate; window_open: unknown })[]>(
+    `SELECT k.user_id, u.deletion_requested_at, ${reactivationWindowOpenSql("u.deletion_requested_at")} AS window_open
        FROM bg_account_reactivation_tickets k
        JOIN bg_users u ON u.id = k.user_id AND u.is_deleted = 1
       WHERE k.token_hash = ? AND k.expires_at > NOW()
@@ -121,7 +124,7 @@ export async function peekReactivationTicket(
     [hashTicket(token)],
   );
   const row = rows[0];
-  if (!row || row.deletion_requested_at === null || !isReactivationWindowOpen(row.deletion_requested_at)) return null;
+  if (!row || row.deletion_requested_at === null || !windowFlag(row.window_open)) return null;
   return { userId: Number(row.user_id), finalAt: reactivationDeadline(row.deletion_requested_at).toISOString() };
 }
 
@@ -212,8 +215,10 @@ export async function reactivateAccount(
         is_deleted: 0 | 1;
         deletion_requested_at: StoredDate;
         created_at: string;
+        window_open: unknown;
       })[]>(
-        `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+        `SELECT is_deleted, deletion_requested_at, created_at, ${reactivationWindowOpenSql()} AS window_open
+           FROM bg_users WHERE id = ? FOR UPDATE`,
         [userId],
       );
       // Servi une fois, quoi qu'il advienne de la suite — et réservé par cette
@@ -232,7 +237,7 @@ export async function reactivateAccount(
         !row ||
         Number(row.is_deleted) !== 1 ||
         row.deletion_requested_at === null ||
-        !isReactivationWindowOpen(row.deletion_requested_at)
+        !windowFlag(row.window_open)
       ) {
         await connection.commit();
         return null;

@@ -604,6 +604,17 @@ pseudo). La fiche joueur répond 404 même s'il a joué, et il compte parmi les
 joueurs sans fiche (`profileless-players`). Les sessions sont supprimées dans
 la transaction.
 
+**Une seule horloge, celle de la base (D67).** La demande s'écrit
+`deletion_requested_at = NOW()` et chaque décision « fenêtre ouverte / échue »
+se prend en SQL contre ce même `NOW()` (`lib/server/users/reactivation-window.ts` :
+`reactivationWindowOpenSql` — écran de réactivation, ticket, réactivation sous
+verrou — et `deletionDueSql` — relevé horaire et relecture sous le verrou de
+la finalisation). Node et MariaDB n'ont plus à partager un fuseau pour
+s'accorder sur l'échéance. Seul le **rejeu** du journal écrit une date (celle
+d'origine, brute quand le journal la garde) et juge sa fenêtre sur l'instant
+ISO du journal (`isReactivationWindowOpen`, hors ligne) ; l'échéance montrée
+(`finalAt`) reste l'instant de la demande + 30 jours.
+
 ### Anonyme dès la demande (décision du 2026-11-04)
 
 > `lib/server/users/account-deletion-hold.ts`, table `bg_account_deletion_holds`.

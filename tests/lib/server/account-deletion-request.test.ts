@@ -286,8 +286,9 @@ describe("requestAccountDeletion — le compte", () => {
     await requestAccountDeletion(7);
 
     // Le compte passe en attente et devient anonyme dans la même écriture
-    // (`holdAccountIdentity`, sur la transaction).
-    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, expect.any(Date));
+    // (`holdAccountIdentity`, sur la transaction), datée par la base (`null` :
+    // `NOW()`, D67) — l'horloge contre laquelle sa fenêtre se juge ensuite.
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, null);
     expect(queries.some((q) => q.sql === "DELETE FROM bg_user_sessions WHERE user_id = ?")).toBe(true);
     expect(connection.commit).toHaveBeenCalled();
     expect(closeUserStreams).toHaveBeenCalledWith(7);
@@ -318,6 +319,29 @@ describe("requestAccountDeletion — le compte", () => {
     await requestAccountDeletion(7, { requestedAt: new Date("2026-11-10T08:15:00Z"), requestedAtRaw: "2026-11-10 09:15:00" });
 
     expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, "2026-11-10 09:15:00");
+  });
+
+  // D67 : un rejeu sans date brute (journal d'avant D21) garde la date
+  // d'origine — jamais `NOW()`, qui rouvrirait trente jours.
+  it("requestAccountDeletion_replayWithoutRawDate_holdsJournalDateNotNow", async () => {
+    fakeDb({});
+    const original = new Date("2026-11-01T08:15:00Z");
+
+    await requestAccountDeletion(7, { requestedAt: original });
+
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, original);
+  });
+
+  // D67 : l'échéance rendue au client suit l'instant de la demande, journal et
+  // réponse partageant la même date d'origine au rejeu.
+  it("requestAccountDeletion_replay_finalAtThirtyDaysAfterOriginalRequest", async () => {
+    fakeDb({});
+    const original = new Date("2026-11-01T08:15:00Z");
+
+    const outcome = await requestAccountDeletion(7, { requestedAt: original });
+
+    expect(outcome.finalAt).toBe("2026-12-01T08:15:00.000Z");
+    expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ deletedAt: original.toISOString() }));
   });
 
   // D30 : la demande du joueur ne bloque aucune image — seul ce que la
