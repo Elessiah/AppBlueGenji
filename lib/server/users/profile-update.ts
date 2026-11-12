@@ -8,7 +8,6 @@ import { battletagFromBlizzard, verifiedBattletagSql } from "@/lib/server/battle
 import { DISCORD_TAG_LOCKED, isDiscordTagLocked } from "@/lib/shared/discord-tag-lock";
 import { normalizePseudo } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
-import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { forgetRefereeNamesOf } from "@/lib/server/tournaments/referee-names";
 import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
@@ -379,11 +378,10 @@ export async function updateOwnProfile(
   if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
   }
-  // Le bandeau et le mini-arbre de la vitrine, mis en cache sans compte,
-  // nomment l'entrée solo à son pseudo : l'ancien y resterait jusqu'à une
-  // minute après le renommage — comme pour une équipe renommée.
+  // Le bandeau et le mini-arbre de la vitrine nomment l'entrée solo à son
+  // pseudo : `syncSoloEntryIdentity` les vide elle-même, seulement si l'entrée
+  // a changé (un formulaire renvoie le pseudo à chaque enregistrement).
   if (patch.pseudo) {
-    invalidateLandingTeamViews();
     // Un arbitre renommé : son ancien pseudo n'est plus servi du cache des
     // pseudos d'arbitre (la version de l'instantané, elle, n'a pas bougé) —
     // seulement s'il arbitre un match dont le nom se montre. Sans attendre :

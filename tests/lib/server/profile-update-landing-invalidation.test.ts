@@ -33,15 +33,15 @@ describe("updateOwnProfile — vues de la vitrine", () => {
     jest.mocked(syncSoloEntryIdentity).mockResolvedValue(undefined);
   });
 
-  it("updateOwnProfile_pseudoChanged_invalidatesLandingTeamViewsAfterSoloSync", async () => {
+  it("updateOwnProfile_pseudoChanged_leavesLandingInvalidationToSoloSync", async () => {
     mockDb(matched);
 
     await updateOwnProfile(42, { pseudo: "Nova" });
 
-    expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(syncSoloEntryIdentity).mock.invocationCallOrder[0]).toBeLessThan(
-      jest.mocked(invalidateLandingTeamViews).mock.invocationCallOrder[0],
-    );
+    // `syncSoloEntryIdentity` vide les vues elle-même, seulement si l'entrée a
+    // changé : l'appelant ne les vide plus une seconde fois.
+    expect(syncSoloEntryIdentity).toHaveBeenCalledWith(42);
+    expect(invalidateLandingTeamViews).not.toHaveBeenCalled();
   });
 
   it("updateOwnProfile_pseudoChanged_forgetsCachedRefereeNamesOfThisUser", async () => {
