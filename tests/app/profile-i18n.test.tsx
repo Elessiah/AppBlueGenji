@@ -520,8 +520,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("interrupteur des messages privés de match : libellé et aide en anglais, case liée à son aide", () => {
     const on = inEnglish(<MatchDmField initial />);
     expect(on).toContain("Discord direct messages about my matches and teams");
-    // D68 : la même case coupe les messages privés d'équipe.
-    expect(on).toContain("It also messages you about your teams");
+    // La même case coupe les messages privés d'équipe.
+    expect(on).toContain("As well as for your teams");
     expect(on).toContain("On by default");
     expect(on).toContain("messages you get as a referee don&#x27;t depend on it");
     expect(on).toContain("when a match leaves your schedule");
@@ -568,7 +568,8 @@ describe("langue du compte (lot 9-3)", () => {
     expect(fr.label).toBe("Messages privés Discord de mes matchs et de mes équipes");
     expect(fr.hint).toMatch(/Activés par défaut/);
     expect(fr.hint).toMatch(/les notifications push et les messages reçus comme arbitre n'en dépendent pas/);
-    expect(fr.hint).toMatch(/Il t'écrit aussi pour tes équipes : invitation d'une équipe, reprise d'une équipe fantôme que le staff te propose, propriété d'une équipe qui t'est transférée et demande d'adhésion à une équipe que tu gères. Décochée, la case les coupe tous/);
+    expect(fr.hint).toMatch(/Ainsi que pour tes équipes \(invitation, reprise d'une équipe fantôme, propriété transférée, demande d'adhésion\)\. Décochée, la case coupe tout/);
+    expect((await import("@/messages/en/profile.json")).default.matchDms.hint).toMatch(/As well as for your teams \(invitation, ghost-team takeover, transferred ownership, join request\)\. Unticked, the box turns everything off/);
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     expect(fr.hint).toMatch(/quand un match quitte ton programme/);

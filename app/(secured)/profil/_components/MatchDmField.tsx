@@ -16,7 +16,7 @@ const UNREACHABLE_ID = "profile-match-dms-unreachable";
 /**
  * Messages privés Discord de match et d'équipe (`bg_users.match_dm_enabled`) : le droit
  * d'opposition du joueur aux messages que le bot lui envoie pour ses matchs
- * et ses équipes — invitation, reprise, propriété, demande d'adhésion, décision D68
+ * et ses équipes — invitation, reprise, propriété, demande d'adhésion
  * (`lib/server/users/match-dm-preference.ts`). Les notifications push gardent
  * leurs réglages par sujet, juste au-dessus.
  *
