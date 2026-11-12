@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import type { APIRequestContext, Browser, BrowserContext } from "@playwright/test";
 import { request as playwrightRequest } from "@playwright/test";
 import { TERMS_VERSION } from "../../lib/shared/terms-of-use";
+import { sessionCookieName } from "../../lib/shared/auth-cookies";
 
 /**
  * Fixture du parcours joueur (`e2e/player-journey.spec.ts`).
@@ -12,7 +13,7 @@ import { TERMS_VERSION } from "../../lib/shared/terms-of-use";
  * propre session — c'est tout l'objet du parcours (l'un propose un score,
  * l'autre le confirme). Le bypass `DEV_AUTH_USER_ID` n'offre qu'une identité
  * par serveur ; la fixture ouvre donc de vraies sessions, en posant la ligne
- * `bg_user_sessions` et le cookie `bg_session` comme le ferait une connexion
+ * `bg_user_sessions` et le cookie de session comme le ferait une connexion
  * (`lib/server/auth.ts`).
  *
  * Tout le reste passe **par l'API**, comme un utilisateur : création des
@@ -85,11 +86,21 @@ async function createUser(
   return { id, token };
 }
 
+/**
+ * Nom du cookie de session que sert `baseURL` : `__Host-bg_session` derrière
+ * https (une build de production, `E2E_BASE_URL`), le nom nu ailleurs — sans
+ * quoi les parcours tourneraient déconnectés contre la production.
+ */
+export function journeySessionCookie(baseURL: string): { name: string; secure: boolean } {
+  const secure = new URL(baseURL).protocol === "https:";
+  return { name: sessionCookieName(secure), secure };
+}
+
 /** Client HTTP authentifié par la session donnée. */
 export async function apiAs(baseURL: string, token: string): Promise<APIRequestContext> {
   return playwrightRequest.newContext({
     baseURL,
-    extraHTTPHeaders: { cookie: `bg_session=${token}` },
+    extraHTTPHeaders: { cookie: `${journeySessionCookie(baseURL).name}=${token}` },
   });
 }
 
@@ -100,9 +111,11 @@ export async function browserAs(
   token: string,
 ): Promise<BrowserContext> {
   const context = await browser.newContext({ baseURL });
-  const { hostname } = new URL(baseURL);
+  const { name, secure } = journeySessionCookie(baseURL);
+  // `url` plutôt que `domain` : un cookie `__Host-` est refusé s'il porte un
+  // `Domain` (il est rattaché à l'hôte exact, `Path=/`, `Secure`).
   await context.addCookies([
-    { name: "bg_session", value: token, domain: hostname, path: "/", httpOnly: true, sameSite: "Lax" },
+    { name, value: token, url: new URL("/", baseURL).toString(), httpOnly: true, secure, sameSite: "Lax" },
   ]);
   return context;
 }
