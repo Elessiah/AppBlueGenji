@@ -103,6 +103,25 @@ export function confirmTheirsSend(
 }
 
 /**
+ * Corps du report : la déclaration adverse confirmée telle quelle, ou une
+ * version envoyée avec la déclaration adverse que la modale montrait. L'instant
+ * confirmé est celui **capturé au geste** (`send.seenAt`), jamais relu de la
+ * vue : une déclaration retirée entre-temps ferait sinon d'une confirmation
+ * une première proposition — le serveur la refuse (`PROPOSAL_STALE`).
+ */
+export function reportBody(send: {
+  maps: ReadonlyArray<MatchMapInput>;
+  confirmTheirs: boolean;
+  seenAt: string | null;
+}): string {
+  return JSON.stringify(
+    send.confirmTheirs && send.seenAt !== null
+      ? { maps: send.maps, confirm: { reportedAt: send.seenAt } }
+      : { maps: send.maps, seenOpponentReportAt: send.seenAt },
+  );
+}
+
+/**
  * Un envoi accepté a-t-il **clos** le match ? Oui pour une confirmation, ou
  * quand le serveur le dit (`completed: true` — versions concordantes) ; toute
  * autre réponse (champ absent, autre type) reste « en attente de l'adversaire ».

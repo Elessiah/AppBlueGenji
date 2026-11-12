@@ -31,6 +31,7 @@ import { isMyTeamTeam1, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
   playerReportInitialMaps,
   confirmTheirsSend,
+  reportBody,
   enteredScoreRelation,
   entryComparison,
   opponentDetailKnown,
@@ -217,20 +218,6 @@ const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set([
   "MATCH_ALREADY_COMPLETED",
 ]);
 
-/**
- * Corps du report : la déclaration adverse confirmée telle quelle, ou une
- * version envoyée avec la déclaration adverse que la modale montrait.
- */
-function reportBody(
-  send: { maps: ReadonlyArray<MatchMapInput>; confirmTheirs: boolean; seenAt: string | null },
-  theirs: MatchScoreReport | null | undefined,
-): string {
-  return JSON.stringify(
-    send.confirmTheirs && theirs
-      ? { maps: send.maps, confirm: { reportedAt: theirs.reportedAt } }
-      : { maps: send.maps, seenOpponentReportAt: send.seenAt },
-  );
-}
 
 
 /** Une map d'un côté de la comparaison : « 2 – 1 · CODE », ou « aucune ». */
@@ -510,6 +497,13 @@ export function PlayerScoreDialog({
     // la confirmation n'a plus d'objet.
     if (!opensDispute) setDisputeSeenAt(null);
   }, [opensDispute]);
+  const theirReportedAt = view?.theirs?.reportedAt ?? null;
+  useEffect(() => {
+    // Déclaration adverse changée pendant la confirmation : les différences
+    // montrées ne sont plus celles qu'elle confirmait (et le serveur refuserait
+    // l'instant vu) — elle se retire, la modale montre la nouvelle comparaison.
+    setDisputeSeenAt((seenAt) => (seenAt !== null && seenAt !== theirReportedAt ? null : seenAt));
+  }, [theirReportedAt]);
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -560,7 +554,7 @@ export function PlayerScoreDialog({
           // dit quelle déclaration adverse la modale montrait : une autre,
           // contraire, est refusée (`PROPOSAL_ARRIVED`) plutôt que d'ouvrir un
           // litige à l'aveugle.
-          body: reportBody(send, view?.theirs),
+          body: reportBody(send),
         },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string; completed?: boolean };

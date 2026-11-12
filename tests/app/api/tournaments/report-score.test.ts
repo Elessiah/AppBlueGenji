@@ -9,6 +9,8 @@ import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { SCORE_REPORT_WRITE_RULE } from "@/lib/server/api-guard";
 
 const params = { params: Promise.resolve({ id: "7", matchId: "42" }) };
 
@@ -27,6 +29,7 @@ function req(body: unknown = { maps: MAPS }) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetRateLimit();
   jest.mocked(canActOnTournament).mockResolvedValue(true);
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 2 }));
 });
@@ -205,5 +208,29 @@ describe("POST .../report — déclaration adverse vue par la modale (MAP_SCORES
 
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toMatchObject({ error: "PROPOSAL_ARRIVED" });
+  });
+});
+
+describe("POST .../report — plafond par compte (SCORE_REPORT_WRITE_RULE)", () => {
+  it("POST_rateLimitExceeded_returns429BeforeService", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+    for (let i = 0; i < SCORE_REPORT_WRITE_RULE.limit; i += 1) await POST(req(), params);
+    jest.mocked(reportMatchScore).mockClear();
+
+    const res = await POST(req(), params);
+
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toMatchObject({ error: "TOO_MANY_REQUESTS" });
+    expect(reportMatchScore).not.toHaveBeenCalled();
+  });
+
+  it("POST_rateLimitPerAccount_otherUserNotThrottled", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
+    for (let i = 0; i < SCORE_REPORT_WRITE_RULE.limit; i += 1) await POST(req(), params);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3 }));
+
+    const res = await POST(req(), params);
+
+    expect(res.status).toBe(200);
   });
 });

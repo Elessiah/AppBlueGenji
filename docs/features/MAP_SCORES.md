@@ -273,7 +273,10 @@ montré.
   dépôt, ou aucun report adverse → chemin ordinaire ; autre dépôt et version
   **concordante** → le match se clôt (rien à craindre, détail adverse déjà lu
   réutilisé par `reportsConcord`) ; autre dépôt et version **différente** →
-  `409 PROPOSAL_ARRIVED`, rien d'écrit. La modale relit alors le contexte du
+  `409 PROPOSAL_ARRIVED`, rien d'écrit — sauf report adverse **sans détail**
+  (déposé avant les scores map par map) : rien n'a jamais été à montrer, le
+  refus bouclerait ; l'envoi suit le chemin ordinaire (`reportsConcord`).
+  La modale relit alors le contexte du
   lecteur et montre la comparaison ; « maintenir » renvoie cette fois le bon
   dépôt et ouvre le litige. « Confirmer » (`confirm`) garde sa propre garde
   (`PROPOSAL_STALE`) et ignore ce champ. Un appel interne sans ce paramètre
@@ -282,7 +285,9 @@ montré.
   report s'écrit `GREATEST(NOW(), ancien + 1 s)` (`reportedAtAssignment`), si
   bien qu'une retouche dans la même seconde change quand même l'instant que
   les deux gardes comparent. L'avance sur l'horloge reste bornée (une seconde
-  par retouche dans la même seconde, recalée sur `NOW()` ensuite) et aucun
+  par retouche dans la même seconde, recalée sur `NOW()` ensuite ; vingt
+  reports par minute et par compte au plus, `SCORE_REPORT_WRITE_RULE`, refus
+  compris → `429`) et aucun
   délai n'en dépend (échéances calculées depuis `NOW()`).
 - **Réponse.** `200 { success, completed }` : `completed` dit que l'envoi a
   clos le match (versions concordantes) — la modale annonce alors « score

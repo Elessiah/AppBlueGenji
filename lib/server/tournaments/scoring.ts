@@ -7,7 +7,7 @@ import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-laun
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { SCORE_LOCKED_DISPUTE, isScoreDisputed, reportPresent } from "@/lib/shared/score-dispute";
 import { toIso } from "@/lib/server/serialization";
-import { MatchRow } from "./_internal";
+import { MatchRow, reportInstant } from "./_internal";
 import { MATCH_RESULT_SET_SQL } from "./score-report-sql";
 import { pushTeamToTarget } from "./target-slot";
 import {
@@ -337,7 +337,9 @@ export type ProposalConfirmation = { reportedAt: string };
  *
  * Avance bornée : l'instant ne dépasse l'horloge que d'une seconde par
  * retouche **dans la même seconde** (envois sérialisés par le verrou du
- * match), et se recale sur `NOW()` dès que l'horloge l'a rattrapé. Aucun délai
+ * match), et se recale sur `NOW()` dès que l'horloge l'a rattrapé ; le plafond
+ * des reports (`SCORE_REPORT_WRITE_RULE`, vingt par minute et par compte) la
+ * borne à une vingtaine de secondes, même en boucle. Aucun délai
  * n'en dépend — l'échéance de validation d'office part de `NOW()`
  * (`scoreDeadlineAssignment`), la date de jeu du plus **ancien** report.
  *
@@ -351,13 +353,29 @@ function reportedAtAssignment(side: "team1" | "team2"): string {
 }
 
 /**
- * Instant de dépôt de la proposition adverse, tel que la modale le lit
- * (`mapScoreReport` : `""` pour un report sans instant) — une seule forme pour
- * les deux gardes, sans quoi un report à l'instant nul ne s'accorderait jamais
- * avec ce que la modale renvoie.
+ * La proposition adverse, vue de l'engagée qui reporte : son score, le score
+ * qu'elle prête au lecteur, son instant de dépôt sous la forme que la modale
+ * lit ({@link reportInstant}), et la source de son détail. Seul choix du côté
+ * adverse pour les deux gardes ({@link assertProposalUnchanged},
+ * {@link assertOpponentReportSeen}).
  */
-function opponentReportInstant(match: MatchRow, isTeam1Reporter: boolean): string {
-  return toIso((isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at) ?? null) ?? "";
+function opponentReport(
+  match: MatchRow,
+  isTeam1Reporter: boolean,
+): { score: MatchRow["team1_report_score"]; opponentScore: MatchRow["team1_report_opponent_score"]; instant: string; source: "TEAM1" | "TEAM2" } {
+  return isTeam1Reporter
+    ? {
+        score: match.team2_report_score,
+        opponentScore: match.team2_report_opponent_score,
+        instant: reportInstant(match.team2_reported_at),
+        source: "TEAM2",
+      }
+    : {
+        score: match.team1_report_score,
+        opponentScore: match.team1_report_opponent_score,
+        instant: reportInstant(match.team1_reported_at),
+        source: "TEAM1",
+      };
 }
 
 /**
@@ -374,11 +392,11 @@ async function assertProposalUnchanged(
   maps: ReadonlyArray<MatchMapInput>,
   confirm: ProposalConfirmation,
 ): Promise<ReadonlyArray<MatchMapInput>> {
-  const score = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
-  if (score === null || score === undefined || opponentReportInstant(match, isTeam1Reporter) !== confirm.reportedAt) {
+  const theirs = opponentReport(match, isTeam1Reporter);
+  if (theirs.score === null || theirs.score === undefined || theirs.instant !== confirm.reportedAt) {
     throw new Error("PROPOSAL_STALE");
   }
-  const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), theirs.source);
   if (!sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
   return theirMaps;
 }
@@ -411,14 +429,18 @@ async function assertOpponentReportSeen(
   seen: SeenOpponentReport,
 ): Promise<ReadonlyArray<MatchMapInput> | undefined> {
   if (seen === undefined) return undefined;
-  const theirScore = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
-  if (!reportPresent(theirScore)) return undefined;
-  if (opponentReportInstant(match, isTeam1Reporter) === seen) return undefined;
-  const theirOpponentScore = isTeam1Reporter ? match.team2_report_opponent_score : match.team1_report_opponent_score;
+  const theirs = opponentReport(match, isTeam1Reporter);
+  if (!reportPresent(theirs.score)) return undefined;
+  if (theirs.instant === seen) return undefined;
   const scoresAgree =
-    Number(theirScore) === mine.opponentScore && Number(theirOpponentScore) === mine.myScore;
+    Number(theirs.score) === mine.opponentScore && Number(theirs.opponentScore) === mine.myScore;
   if (!scoresAgree) throw new Error("PROPOSAL_ARRIVED");
-  const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
+  const theirMaps = await loadMatchMaps(connection, Number(match.id), theirs.source);
+  // Report adverse **sans détail** (déposé avant les scores map par map) : la
+  // modale n'a jamais rien eu à en montrer, et ne l'aura jamais — refuser
+  // bouclerait sans fin (chaque relecture renvoie `null`). L'envoi suit le
+  // chemin d'avant : comparé par `reportsConcord`, litige s'il diffère.
+  if (theirMaps.length === 0) return undefined;
   if (!sameMapLists(mine.maps, theirMaps)) throw new Error("PROPOSAL_ARRIVED");
   return theirMaps;
 }

@@ -815,7 +815,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain('t("score.player.sameScoreArrived")');
     expect(source).toContain('t("score.player.confirmTheirs")');
     // Un simple envoi dit la déclaration adverse vue ; « Envoyer ma version » passe par une confirmation.
-    expect(source).toContain("{ maps: send.maps, seenOpponentReportAt: send.seenAt }");
+    expect(source).toContain("body: reportBody(send),");
     expect(source).toContain("if (opensDispute && seenAt !== null) {");
     expect(source).toContain("<ConfirmActionDialog");
     expect(source).toContain('t("score.player.dispute.body", { opponent: opponentName })');

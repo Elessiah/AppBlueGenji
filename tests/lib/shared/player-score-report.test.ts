@@ -5,6 +5,7 @@ import {
   entryComparison,
   mapListDifferences,
   opponentDetailKnown,
+  reportBody,
   reportClosedMatch,
   seenOpponentReportAt,
   pendingReportNotice,
@@ -419,5 +420,27 @@ describe("déclaration adverse vue, confirmée, close (MAP_SCORES.md — modale 
     expect(reportClosedMatch(false, { success: true })).toBe(false);
     expect(reportClosedMatch(false, { completed: "true" })).toBe(false);
     expect(reportClosedMatch(false, null)).toBe(false);
+  });
+});
+
+describe("reportBody (MAP_SCORES.md)", () => {
+  const maps: MatchMapInput[] = [{ replayCode: "ABC123", team1Score: 2, team2Score: 1 }];
+
+  it("reportBody_confirmTheirsWithSeenAt_sendsConfirmWithCapturedInstant", () => {
+    const body = reportBody({ maps, confirmTheirs: true, seenAt: "2026-10-05T20:00:00.000Z" });
+
+    expect(JSON.parse(body)).toEqual({ maps, confirm: { reportedAt: "2026-10-05T20:00:00.000Z" } });
+  });
+
+  it("reportBody_confirmTheirsSeenNull_sendsPlainBodyWithNullSeen", () => {
+    const body = reportBody({ maps, confirmTheirs: true, seenAt: null });
+
+    expect(JSON.parse(body)).toEqual({ maps, seenOpponentReportAt: null });
+  });
+
+  it("reportBody_plainSend_sendsSeenOpponentReportAt", () => {
+    const body = reportBody({ maps, confirmTheirs: false, seenAt: "2026-10-05T20:00:00.000Z" });
+
+    expect(JSON.parse(body)).toEqual({ maps, seenOpponentReportAt: "2026-10-05T20:00:00.000Z" });
   });
 });

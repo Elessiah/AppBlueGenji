@@ -642,6 +642,18 @@ describe("tournaments-service: match state machine", () => {
         expect(writes(calls)).toHaveLength(0);
       });
 
+      it("reportMatchScore_seenNullSameScoreOpponentWithoutMaps_opensDisputeInsteadOfProposalArrived", async () => {
+        // Report adverse déposé avant les scores map par map : aucun détail à
+        // montrer, jamais — refuser bouclerait (`MAP_SCORES.md`).
+        const { connection, calls } = reportConnection(pendingTeam2, []);
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, null)).resolves.toBe(false);
+
+        expect(writes(calls)[0].params.slice(0, 2)).toEqual([3, 1]);
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
       it("reportMatchScore_confirmEmptyInstantOnNullReportedAt_closesMatch", async () => {
         const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
 

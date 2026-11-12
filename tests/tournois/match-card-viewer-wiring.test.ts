@@ -78,7 +78,7 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
     // Le message d'envoi parle depuis l'engagé : la conversion passe par le
     // module pur, jamais par une inversion recopiée.
     expect(PLAYER_DIALOG).toContain("toReporterScores(myTeamIsTeam1,");
-    expect(PLAYER_DIALOG).toContain("? { maps: send.maps, confirm: { reportedAt: theirs.reportedAt } }");
+    expect(PLAYER_DIALOG).toContain("body: reportBody(send),");
     expect(PLAYER_DIALOG).toContain("void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt });");
   });
 

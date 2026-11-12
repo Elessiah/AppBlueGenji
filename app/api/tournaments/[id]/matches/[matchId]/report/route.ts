@@ -1,4 +1,5 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, SCORE_REPORT_WRITE_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
@@ -8,6 +9,11 @@ import { MAP_LIST_ERROR_CODES, parseMapListBody } from "@/lib/shared/match-maps"
 export async function POST(req: Request, context: { params: Promise<{ id: string; matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+
+  // Chaque envoi, refusé compris, prend le verrou du match : une boucle le
+  // tiendrait contre l'adversaire et l'arbitrage (`SCORE_REPORT_WRITE_RULE`).
+  const throttled = enforceRateLimit(SCORE_REPORT_WRITE_RULE, user.id);
+  if (throttled) return throttled;
 
   const { id, matchId: rawMatchId } = await context.params;
   const tournamentId = Number(id);

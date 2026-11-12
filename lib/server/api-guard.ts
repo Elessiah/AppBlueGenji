@@ -198,6 +198,20 @@ export const MAP_PICK_PLAYER_ATTEMPT_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/**
+ * Reports de score d'un engagé (`POST …/matches/[matchId]/report`), refus
+ * compris, par compte. Chaque envoi prend le verrou du match et relit le
+ * détail adverse ; une équipe n'en fait que quelques-uns par match (saisie,
+ * retouche, confirmation). Le plafond borne aussi l'avance de l'instant de
+ * dépôt sur l'horloge (une seconde par retouche dans la même seconde,
+ * `reportedAtAssignment`) à une vingtaine de secondes.
+ */
+export const SCORE_REPORT_WRITE_RULE: RateLimitRule = {
+  name: "score-report-write",
+  limit: 20,
+  windowMs: 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",
