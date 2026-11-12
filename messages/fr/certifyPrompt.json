@@ -49,7 +49,8 @@
     "link": {
       "label": "Liaison de ton compte Discord",
       "without": "Aucun",
-      "with": "Le code reçu en message privé le lie, si ce Discord n'est pas déjà lié à un autre compte : tu pourras te connecter par Discord"
+      "with": "Le code reçu en message privé le lie : tu pourras te connecter par Discord",
+      "withException": "Aucune liaison si ce Discord est déjà lié à un autre compte : il reste à ce compte-là."
     }
   },
   "undo": "Retirer ton tag ou changer de pseudo Discord retire la certification.",
