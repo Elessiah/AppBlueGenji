@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { reserveTeamIdentityWrite } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { TEAM_LOGO_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
+import { TEAM_LOGO_ERROR_STATUS, isRightsRefusal, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, isGhostTeam } from "@/lib/server/teams/access";
 import { updateTeamLogo } from "@/lib/server/teams/identity";
@@ -14,6 +14,44 @@ import {
   LOGO_RIGHTS_NOT_CERTIFIED,
 } from "@/lib/shared/terms-of-use";
 import { readImageUploadForm } from "@/lib/server/request-body";
+
+type LogoWriter = { userId: number; teamId: number; managesGhostTeams: boolean };
+
+/**
+ * Écrit le fichier puis le désigne sous verrou. Rend la place du plafond sur
+ * tout échec, sauf un refus de droits (un compte sans qualité reste plafonné) ;
+ * un fichier neuf que l'écriture n'a pas adopté part.
+ */
+async function storeAndApplyLogo(
+  writer: LogoWriter,
+  file: File,
+  crop: Parameters<typeof processAndStoreImage>[3],
+  refund: () => void,
+): Promise<{ servedUrl: string; previousLogoUrl: string | null }> {
+  let diskPath: string;
+  try {
+    diskPath = await processAndStoreImage(file, "team-logo", writer.teamId, crop);
+  } catch (error) {
+    refund();
+    throw error;
+  }
+  const servedUrl = toServedUploadUrl(diskPath);
+  try {
+    // L'ancien logo est celui que l'écriture a remplacé, relu sous son verrou.
+    const { previousLogoUrl } = await updateTeamLogo(writer.userId, writer.teamId, servedUrl, writer.managesGhostTeams);
+    return { servedUrl, previousLogoUrl };
+  } catch (error) {
+    if (!isRightsRefusal(error)) refund();
+    // Refusé entre-temps (rôle retiré, course) : le fichier neuf ne désigne
+    // rien, il part.
+    try {
+      await deleteStoredImage(diskPath);
+    } catch {
+      // Résidu sur le disque, que rien ne désigne : le refus d'origine prime.
+    }
+    throw error;
+  }
+}
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -53,29 +91,12 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (form.get(LOGO_RIGHTS_FIELD) !== "1") return refused(fail(LOGO_RIGHTS_NOT_CERTIFIED, 400));
 
   try {
-    let diskPath: string;
-    try {
-      diskPath = await processAndStoreImage(file, "team-logo", teamId, crop.crop);
-    } catch (error) {
-      reservation.refund();
-      throw error;
-    }
-    const servedUrl = toServedUploadUrl(diskPath);
-    // L'ancien logo est celui que l'écriture a remplacé, relu sous son verrou.
-    let previousLogoUrl: string | null;
-    try {
-      ({ previousLogoUrl } = await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams));
-    } catch (error) {
-      reservation.refund();
-      // Refusé entre-temps (rôle retiré, course) : le fichier neuf ne désigne
-      // rien, il part.
-      try {
-        await deleteStoredImage(diskPath);
-      } catch {
-        // Résidu sur le disque, que rien ne désigne : le refus d'origine prime.
-      }
-      throw error;
-    }
+    const { servedUrl, previousLogoUrl } = await storeAndApplyLogo(
+      { userId: user.id, teamId, managesGhostTeams },
+      file,
+      crop.crop,
+      reservation.refund,
+    );
     // L'ancien fichier part s'il vit dans `teams/` et que plus aucune ligne ne
     // le désigne — un logo partagé par une autre équipe lui reste (même règle
     // que la dissolution).
@@ -104,8 +125,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     try {
       ({ previousLogoUrl } = await updateTeamLogo(user.id, teamId, null, managesGhostTeams));
     } catch (error) {
-      // Refusé (droit manquant, équipe dissoute) : rien n'a été écrit.
-      reservation.refund();
+      // Refusé : rien n'a été écrit. Un refus de droit garde sa place (un
+      // compte sans qualité qui boucle reste plafonné).
+      if (!isRightsRefusal(error)) reservation.refund();
       throw error;
     }
     await deleteUnreferencedUpload(previousLogoUrl, "teams");

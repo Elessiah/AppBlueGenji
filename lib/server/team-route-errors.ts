@@ -66,6 +66,16 @@ export function teamErrorStatus(table: TeamErrorStatusTable, message: string): n
   return table.get(message) ?? 400;
 }
 
+/**
+ * Refus de droit (`FORBIDDEN`) : l'auteur n'a pas qualité pour agir sur
+ * l'équipe. Une écriture d'identité ainsi refusée garde sa place au plafond
+ * (`reserveTeamIdentityWrite`) — un compte qui boucle sur les équipes des autres
+ * reste borné —, quand un refus métier (nom pris, fichier invalide) la rend.
+ */
+export function isRightsRefusal(error: unknown): boolean {
+  return error instanceof Error && error.message === "FORBIDDEN";
+}
+
 /** Identifiant d'équipe lu dans le segment d'URL, `null` s'il n'est pas un entier positif. */
 export function parseTeamId(raw: string): number | null {
   const teamId = Number(raw);

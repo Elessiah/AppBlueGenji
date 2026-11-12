@@ -231,13 +231,13 @@ export function MembersSection({
               <RolePicker selected={memberRoles} onChange={setMemberRoles} />
             </div>
             <div className={styles.formFooter}>
-              {/* Pendant l'envoi, le bouton reste focalisable (`aria-disabled`) :
-                  le gestionnaire ignore déjà un second envoi (`canInvite`). */}
+              {/* Jamais `disabled` : pendant l'envoi comme après (champ vidé), le
+                  bouton garde le focus clavier (`aria-disabled`) ; le
+                  gestionnaire ignore tout envoi hors `canInvite`. */}
               <button
                 type="submit"
                 className={`btn ${styles.primaryButton}`}
-                disabled={memberPseudo.trim().length === 0}
-                aria-disabled={inviting || undefined}
+                aria-disabled={!canInvite || undefined}
                 aria-busy={inviting || undefined}
               >
                 {inviting ? t("members.sending") : t("members.invite")}

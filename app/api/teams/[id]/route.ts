@@ -15,6 +15,7 @@ import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
 import { INVALID_TEAM_FIELDS, teamFieldsAreText } from "@/lib/shared/team-name";
 import { readJsonBody } from "@/lib/server/request-body";
+import { isRightsRefusal } from "@/lib/server/team-route-errors";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -75,7 +76,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       );
     } catch (error) {
       // `updateTeamMeta` ne lève qu'avant son commit (ce qui suit ne lève pas).
-      reservation.refund();
+      // Un refus de droit, lui, garde sa place : un compte sans qualité qui
+      // boucle sur les équipes des autres reste plafonné.
+      if (!isRightsRefusal(error)) reservation.refund();
       throw error;
     }
 

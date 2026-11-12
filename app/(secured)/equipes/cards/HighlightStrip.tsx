@@ -34,46 +34,50 @@ function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
 
   return (
     <div className={s.strip}>
-      {top.map((team) => (
-        <div key={team.id} className={s.card} data-rank={team.rank}>
-          <LocaleLink
-            href={`/equipes/${team.id}`}
-            className={s.cardOverlay}
-            aria-label={t("card.viewTeam", { name: shownEntityName(team.name, "team", team.id, locale) })}
-          />
-          <div className={s.rank}>{String(team.rank).padStart(2, "0")}</div>
-          <div>
-            <div className={s.name}>
-              <TeamPodiumName teamId={team.id}>{shownEntityName(team.name, "team", team.id, locale)}</TeamPodiumName>
+      {top.map((team) => {
+        // Un ancien nom fait seulement d'invisibles s'affiche « Équipe #id ».
+        const name = shownEntityName(team.name, "team", team.id, locale);
+        return (
+          <div key={team.id} className={s.card} data-rank={team.rank}>
+            <LocaleLink
+              href={`/equipes/${team.id}`}
+              className={s.cardOverlay}
+              aria-label={t("card.viewTeam", { name })}
+            />
+            <div className={s.rank}>{String(team.rank).padStart(2, "0")}</div>
+            <div>
+              <div className={s.name}>
+                <TeamPodiumName teamId={team.id}>{name}</TeamPodiumName>
+              </div>
+              <div className={s.meta}>
+                {richNodes(
+                  text.rich(team.draws > 0 ? "card.recordDraws" : "card.record", {
+                    wins: team.wins,
+                    losses: team.losses,
+                    draws: team.draws,
+                  }, {
+                    loss: (chunks) => <span className="result-loss">{chunks}</span>,
+                  }),
+                )}
+                {team.region ? ` · ${team.region}` : ""}
+              </div>
             </div>
-            <div className={s.meta}>
-              {richNodes(
-                text.rich(team.draws > 0 ? "card.recordDraws" : "card.record", {
-                  wins: team.wins,
-                  losses: team.losses,
-                  draws: team.draws,
-                }, {
-                  loss: (chunks) => <span className="result-loss">{chunks}</span>,
-                }),
-              )}
-              {team.region ? ` · ${team.region}` : ""}
+            {/* Le podium ne garde que des équipes classées (garde ci-dessus). */}
+            <div
+              className={s.ptsBlock}
+              title={`${t("points.label")} · ${teamPointsHint(text, true, team.points)}`}
+            >
+              <div className={s.pts}>{team.points}</div>
+              {/* Même règle que sur la carte : le mot complet est lu, l'abréviation
+                  est vue. Un `aria-label` posé ici ne serait pas exposé. */}
+              <div className={s.ptsLbl}>
+                <span aria-hidden="true">{t("card.ptsShort")}</span>
+                <span className="sr-only">{t("points.label")}</span>
+              </div>
             </div>
           </div>
-          {/* Le podium ne garde que des équipes classées (garde ci-dessus). */}
-          <div
-            className={s.ptsBlock}
-            title={`${t("points.label")} · ${teamPointsHint(text, true, team.points)}`}
-          >
-            <div className={s.pts}>{team.points}</div>
-            {/* Même règle que sur la carte : le mot complet est lu, l'abréviation
-                est vue. Un `aria-label` posé ici ne serait pas exposé. */}
-            <div className={s.ptsLbl}>
-              <span aria-hidden="true">{t("card.ptsShort")}</span>
-              <span className="sr-only">{t("points.label")}</span>
-            </div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

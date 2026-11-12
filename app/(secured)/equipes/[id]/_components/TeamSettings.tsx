@@ -307,13 +307,13 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
             {t("settings.discard")}
           </button>
         ) : null}
-        {/* Pendant l'envoi, le bouton reste focalisable (`aria-disabled`) : le
-            gestionnaire ignore déjà un second envoi (`canSave`). */}
+        {/* Jamais `disabled` : pendant l'envoi comme après (formulaire redevenu
+            propre), le bouton garde le focus clavier (`aria-disabled`) ; le
+            gestionnaire ignore tout envoi hors `canSave`. */}
         <button
           type="submit"
           className={`btn ${styles.primaryButton}`}
-          disabled={!dirty || !nameCheck.ok || !tagCheck.ok}
-          aria-disabled={saving || undefined}
+          aria-disabled={!canSave || undefined}
           aria-busy={saving || undefined}
         >
           {saving ? t("settings.saving") : t("settings.save")}

@@ -41,7 +41,7 @@ describe("TeamSettings — propriétaire", () => {
     expect(html).toContain('value="GLC"');
     expect(html).toContain("Une équipe.");
     expect(html).not.toContain("Annuler les modifications");
-    expect(html).toMatch(/<button type="submit"[^>]*disabled=""[^>]*>Enregistrer<\/button>/);
+    expect(html).toMatch(/<button type="submit"[^>]*aria-disabled="true"[^>]*>Enregistrer<\/button>/);
   });
 
   it("propose d'ajouter un logo, sans le retirer", () => {

@@ -71,7 +71,7 @@ export async function notifyTeamInvite(
     // recréée ne repart pas de zéro (compte par auteur), et un joueur n'est
     // pas relancé par équipe après équipe (compte par destinataire). Les
     // reprises proposées par le staff (invitation portant `OWNER`) ne comptent pas.
-    const [counts] = await db.execute<(RowDataPacket & {
+    const [[counts], formerMember] = await Promise.all([db.execute<(RowDataPacket & {
       any_player: number | string;
       by_actor: number | string;
       teams_to_player: number | string;
@@ -83,18 +83,18 @@ export async function notifyTeamInvite(
        WHERE (i.team_id = ? OR i.created_by = ? OR i.user_id = ?)
          AND i.kind = 'INVITE' AND COALESCE(JSON_CONTAINS(i.roles_json, '"OWNER"'), 0) = 0 AND ${windowSql}`,
       [teamId, actorId, userId, teamId, actorId, userId],
-    );
+    ), wasTeamMember(db, teamId, userId)]);
     const budget = {
       toAnyPlayer: Number(counts[0]?.any_player ?? 0),
       byActor: Number(counts[0]?.by_actor ?? 0),
       teamsToThisPlayer: Number(counts[0]?.teams_to_player ?? 0),
-      formerMember: await wasTeamMember(teamId, userId),
+      formerMember,
     };
     if (!withinTeamInviteNoticeBudget(budget)) return;
   } else if (kind === "GHOST_CLAIM") {
     // Un compte staff ne fait pas écrire à tout le site, un joueur ne reçoit
     // pas fantôme après fantôme (mêmes plafonds qu'une invitation).
-    const [offers] = await db.execute<(RowDataPacket & {
+    const [[offers], formerMember] = await Promise.all([db.execute<(RowDataPacket & {
       by_actor: number | string;
       teams_to_player: number | string;
     })[]>(
@@ -104,11 +104,11 @@ export async function notifyTeamInvite(
        WHERE (i.user_id = ? OR i.created_by = ?)
          AND i.kind = 'INVITE' AND COALESCE(JSON_CONTAINS(i.roles_json, '"OWNER"'), 0) = 1 AND ${windowSql}`,
       [actorId, userId, userId, actorId],
-    );
+    ), wasTeamMember(db, teamId, userId)]);
     const budget = {
       byActor: Number(offers[0]?.by_actor ?? 0),
       teamsToThisPlayer: Number(offers[0]?.teams_to_player ?? 0),
-      formerMember: await wasTeamMember(teamId, userId),
+      formerMember,
     };
     if (!withinGhostClaimNoticeBudget(budget)) return;
   }
@@ -162,8 +162,11 @@ export async function notifyTeamInvite(
  * Le joueur a-t-il déjà été membre de l'équipe (appartenance passée ou en
  * cours) ? Son ancienne équipe qui le rappelle échappe au plafond par joueur.
  */
-async function wasTeamMember(teamId: number, userId: number): Promise<boolean> {
-  const db = await getDatabase();
+async function wasTeamMember(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  teamId: number,
+  userId: number,
+): Promise<boolean> {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT 1 AS former_member FROM bg_team_members WHERE team_id = ? AND user_id = ? LIMIT 1`,
     [teamId, userId],

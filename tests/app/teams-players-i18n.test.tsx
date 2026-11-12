@@ -619,6 +619,17 @@ describe("revue UI/UX", () => {
     expect(html).toContain(">Team #12<");
   });
 
+  it("carte d'équipe : nom invisible sans sigle, repli « ? » et non tiré du libellé traduit", () => {
+    const html = renderToStaticMarkup(<TeamCard team={listTeam({ id: 12, name: "\u200B\u2060", tag: null })} />);
+    expect(html).not.toContain("ÉQU");
+    expect(html).toMatch(/>\?(?: · [^<]*)?</);
+  });
+
+  it("carte d'équipe : initiale de l'emblème = première lettre visible", () => {
+    const html = renderToStaticMarkup(<TeamCard team={listTeam({ id: 12, name: "\u200BAlpha", logoUrl: null })} />);
+    expect(html).toMatch(/aria-hidden="true">A</);
+  });
+
   it("podium d'équipes : nom invisible remplacé par « Équipe #id »", () => {
     const html = renderToStaticMarkup(
       <HighlightStrip

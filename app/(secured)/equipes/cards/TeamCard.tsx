@@ -11,6 +11,8 @@ import { formatMonthYear } from "@/lib/shared/dates";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { shownEntityName } from "@/lib/shared/entity-fallback-name";
+import { avatarInitial } from "@/lib/shared/avatar";
+import { visibleText } from "@/lib/shared/visible-text";
 import { useTeamsText } from "@/components/i18n/teams-text";
 import { teamPointsHint } from "../_lib/team-points";
 import s from "./TeamCard.module.css";
@@ -81,7 +83,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
               className={s.sigilLogo}
             />
           ) : (
-            name[0].toUpperCase()
+            avatarInitial(visibleText(name))
           )}
         </div>
         <div className={s.headText}>
@@ -94,7 +96,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
             )}
           </div>
           <div className={s.tag}>
-            {displayTeamTag(team.tag, name)}
+            {displayTeamTag(team.tag, team.name)}
             {team.region && ` · ${team.region}`}
           </div>
         </div>

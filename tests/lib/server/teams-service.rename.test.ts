@@ -11,6 +11,7 @@ import { getDatabase } from "@/lib/server/database";
 import { type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
+import * as rankingCache from "@/lib/server/ranking-cache";
 
 /**
  * Renommer une équipe : mêmes bornes qu'à la création, unicité dite en
@@ -202,6 +203,28 @@ describe("updateTeamMeta — vues de l'accueil", () => {
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
 
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("updateTeamMeta_invalidationThrowsAfterCommit_resolvesAndLogs", async () => {
+    // Le renommage est commité : la route ne doit ni rendre la place de son
+    // plafond ni répondre en erreur.
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(locked("Ancien Nom"))
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce(registered);
+    jest.spyOn(rankingCache, "invalidateTeamIdentityViews").mockImplementationOnce(() => {
+      throw new Error("cache en panne");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(updateTeamMeta(1, 7, { name: "Nouveau Nom" })).resolves.toBeUndefined();
+
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toBe("[teams] vues d'identité non vidées");
+    error.mockRestore();
   });
 
   it("updateTeamMeta_unchangedNameResent_keepsLandingLeaderboard", async () => {

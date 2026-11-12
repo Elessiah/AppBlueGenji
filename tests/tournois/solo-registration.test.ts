@@ -124,8 +124,10 @@ describe("registerCurrentUserTeam", () => {
 
     await registerCurrentUserTeam(connection, 5, 3);
 
-    // Aucune équipe requise : c'est tout l'intérêt du mode individuel.
-    expect(getUserActiveTeam).not.toHaveBeenCalled();
+    // Aucune équipe requise : c'est tout l'intérêt du mode individuel. Son
+    // équipe éventuelle n'est lue qu'avant le verrou, pour la verrouiller —
+    // jamais résolue dans la transaction comme engagé.
+    expect(getUserActiveTeam).not.toHaveBeenCalledWith(3, connection);
     expect(ensureSoloEntry).toHaveBeenCalledWith(connection, 3);
     expect(inserts[0][1]).toEqual([5, 88, 1]);
   });
@@ -295,7 +297,7 @@ describe("qualité pour engager son équipe", () => {
 
     await registerCurrentUserTeam(connection, 5, 3);
 
-    expect(getUserActiveTeam).not.toHaveBeenCalled();
+    expect(getUserActiveTeam).not.toHaveBeenCalledWith(3, connection);
     expect(inserts).toHaveLength(1);
   });
 

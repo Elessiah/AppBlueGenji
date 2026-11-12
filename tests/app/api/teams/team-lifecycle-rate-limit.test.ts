@@ -188,6 +188,17 @@ describe("PATCH /api/teams/[id] — plafond des écritures d'identité", () => {
     expect(res.status).toBe(200);
   });
 
+  it("PATCH_forbiddenRefusals_keepTheirPlace", async () => {
+    // Un compte sans qualité qui boucle sur l'équipe d'un autre reste plafonné.
+    jest.mocked(updateTeamMeta).mockRejectedValue(new Error("FORBIDDEN"));
+    for (let i = 0; i < TEAM_IDENTITY_WRITE_RULE.limit; i += 1) expect((await rename()).status).toBe(403);
+    jest.mocked(updateTeamMeta).mockResolvedValue(undefined);
+
+    const res = await rename();
+
+    expect(res.status).toBe(429);
+  });
+
   it("PATCH_invalidFields_doNotUseUpTheLimit", async () => {
     const invalid = () =>
       patchTeamRoute(

@@ -36,18 +36,18 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
     expect(source(path)).toMatch(/aria-busy=\{(?:pending|loading|busy|logoBusy|saving|inviting|cancellingId === invitation\.id) \|\| undefined\}/);
   });
 
-  // Enregistrer les réglages et inviter : la condition d'envoi (`canSave`,
-  // `canInvite`) comprend la requête en cours ; le `disabled` du bouton, non.
+  // Enregistrer les réglages et inviter : jamais `disabled`, ni pendant
+  // l'envoi ni après (formulaire redevenu propre) — le focus reste sur le bouton.
   it("TeamSettings_saveWhileSaving_staysFocusable", () => {
     const code = source("app/(secured)/equipes/[id]/_components/TeamSettings.tsx");
-    expect(code).toMatch(/disabled=\{!dirty \|\| !nameCheck\.ok \|\| !tagCheck\.ok\}\s+aria-disabled=\{saving \|\| undefined\}\s+aria-busy=\{saving \|\| undefined\}/);
-    expect(code).not.toMatch(/disabled=\{!canSave\}/);
+    expect(code).toMatch(/aria-disabled=\{!canSave \|\| undefined\}\s+aria-busy=\{saving \|\| undefined\}/);
+    expect(code).not.toMatch(/\sdisabled=\{!canSave\}/);
   });
 
   it("MembersSection_inviteWhileInviting_staysFocusable", () => {
     const code = source("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
-    expect(code).toMatch(/aria-disabled=\{inviting \|\| undefined\}\s+aria-busy=\{inviting \|\| undefined\}/);
-    expect(code).not.toMatch(/disabled=\{!canInvite\}/);
+    expect(code).toMatch(/aria-disabled=\{!canInvite \|\| undefined\}\s+aria-busy=\{inviting \|\| undefined\}/);
+    expect(code).not.toMatch(/\sdisabled=\{!canInvite\}/);
   });
 
   it("RolesDialog_submitWhilePending_ignoredByHandler", () => {

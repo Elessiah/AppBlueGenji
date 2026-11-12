@@ -10,6 +10,7 @@ import {
 import { checkTeamName, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
+import { failureReason } from "@/lib/server/failure-reason";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { assertCanActOnTeam, lockMemberRoles, teamEverRegistered, userCanManageTeam, userOwnsTeam } from "./access";
 
@@ -160,7 +161,20 @@ export async function updateTeamMeta(
   // (podium, cartes d'aperçu) : sans cela, l'ancien nom y restait jusqu'à 60 s.
   // Une équipe jamais inscrite n'y figure pas (aucun match, aucun rang) : la
   // renommer en boucle ne vide plus rien.
-  if (renamed && everRegistered) invalidateTeamIdentityViews();
+  if (renamed && everRegistered) invalidateIdentityViewsAfterCommit();
+}
+
+/**
+ * Vide les vues d'identité **après** un commit, sans jamais lever : l'écriture
+ * est faite, la route ne doit ni rendre la place de son plafond ni effacer le
+ * fichier que la ligne désigne désormais.
+ */
+function invalidateIdentityViewsAfterCommit(): void {
+  try {
+    invalidateTeamIdentityViews();
+  } catch (error) {
+    console.error("[teams] vues d'identité non vidées", failureReason(error));
+  }
 }
 
 /**
@@ -284,7 +298,7 @@ export async function updateTeamLogo(
   // seulement s'il a changé : retirer un logo absent ne coûte rien aux visiteurs,
   // et seulement pour une équipe déjà inscrite à un tournoi — aucune de ces
   // vues ne montre une équipe qui n'a jamais joué.
-  if (previousLogoUrl !== logoPath && everRegistered) invalidateTeamIdentityViews();
+  if (previousLogoUrl !== logoPath && everRegistered) invalidateIdentityViewsAfterCommit();
   return { previousLogoUrl };
 }
 

@@ -191,10 +191,31 @@ export async function registerCurrentUserTeam(
   tournamentId: number,
   userId: number,
 ): Promise<void> {
+  // L'équipe du joueur, lue **sur le pool et avant tout verrou** : aucun verrou
+  // n'est encore tenu (pas de convoi sur le pool, voir plus bas), et la
+  // transaction n'a encore rien lu — son instantané n'est pas figé.
+  const candidate = await getUserActiveTeam(userId);
+
   // Avant la lecture ci-dessous, et non après : c'est elle qui figerait
   // l'instantané `REPEATABLE READ` de la transaction, et le comptage d'effectif
   // de `registerTeam` compterait alors un monde d'avant l'attente du verrou.
   await lockTournamentRow(connection, tournamentId);
+
+  // Puis la ligne de cette équipe (ordre tournoi → équipe, celui de
+  // `registerTeamsByIds`), **toujours avant la première lecture ordinaire** :
+  // les gestes d'effectif (`withTeamRosterLock` : rôles, départ, exclusion),
+  // la dissolution et les écritures d'identité tiennent ce verrou. Une fois
+  // obtenu, l'instantané se fige après eux : rôles, effectif et conditions
+  // d'inscription se lisent à jour, et `teamEverRegistered`, lu sous ce même
+  // verrou, voit l'inscription.
+  let candidateDeleted = false;
+  if (candidate) {
+    const [teamRows] = await connection.execute<(RowDataPacket & { deleted_at: Date | string | null })[]>(
+      `SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE`,
+      [candidate.teamId],
+    );
+    candidateDeleted = teamRows.length === 0 || (teamRows[0].deleted_at ?? null) !== null;
+  }
 
   const tournament = await loadTournamentRow(connection, tournamentId);
   if (!tournament) {
@@ -220,27 +241,18 @@ export async function registerCurrentUserTeam(
   }
 
   const activeTeam = await getUserActiveTeam(userId, connection);
-  if (!activeTeam) {
-    throw new Error("NO_ACTIVE_TEAM");
-  }
-  // La ligne de l'équipe, verrouillée après celle du tournoi (l'ordre de
-  // `registerTeamsByIds`) : une dissolution ou une écriture d'identité
-  // (`withTeamRosterLock`, `updateTeamMeta`) attend la fin de l'inscription, et
-  // `teamEverRegistered`, lu sous ce même verrou, la voit. Lecture verrouillante,
-  // donc à jour : l'appartenance lue plus haut vient de l'instantané, figé avant
-  // qu'une dissolution concurrente ne commite — une équipe dissoute entre-temps
-  // n'entre pas.
-  const [teamRows] = await connection.execute<(RowDataPacket & { deleted_at: Date | string | null })[]>(
-    `SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE`,
-    [activeTeam.teamId],
-  );
-  if (teamRows.length === 0 || (teamRows[0].deleted_at ?? null) !== null) {
+  // Relue dans l'instantané figé sous le verrou : c'est l'équipe verrouillée,
+  // toujours vivante. Un joueur qui a changé d'équipe entre la lecture sur le
+  // pool et le verrou (course rare) n'engage rien — son nouvel effectif n'est
+  // pas sous verrou ; un nouvel essai l'engage.
+  if (!activeTeam || candidateDeleted || activeTeam.teamId !== candidate?.teamId) {
     throw new Error("NO_ACTIVE_TEAM");
   }
 
-  // Les rôles sont relus **dans la transaction**, sur la ligne d'appartenance
-  // que `getUserActiveTeam` vient de lire : le droit d'engager se juge à
-  // l'instant de l'écriture, pas à celui où la page a été rendue.
+  // Les rôles sont relus **dans la transaction**, sous le verrou de l'équipe :
+  // un manager rétrogradé ou exclu pendant l'attente du verrou n'engage plus
+  // l'équipe — le droit se juge à l'instant de l'écriture, pas à celui où la
+  // page a été rendue.
   if (!hasTeamManagementRole(activeTeam.roles)) {
     throw new Error("NOT_TEAM_MANAGER");
   }
