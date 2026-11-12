@@ -219,6 +219,8 @@ type MemberRecipientRow = RowDataPacket & {
   discord_id: string | null;
   discord_pseudo: string | null;
   discord_verified_at: Date | string | null;
+  /** Lue avec la ligne : `notifyUsers` n'a pas à la relire. */
+  locale: unknown;
 };
 
 /**
@@ -229,7 +231,7 @@ type MemberRecipientRow = RowDataPacket & {
 async function teamMemberRecipients(teamId: number): Promise<NotificationRecipient[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<MemberRecipientRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
      WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0`,
@@ -242,7 +244,7 @@ async function teamMemberRecipients(teamId: number): Promise<NotificationRecipie
 async function userRecipient(userId: number): Promise<NotificationRecipient[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<MemberRecipientRow[]>(
-    `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at FROM bg_users
+    `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at, locale FROM bg_users
      WHERE id = ? AND is_deleted = 0`,
     [userId],
   );

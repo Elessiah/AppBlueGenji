@@ -625,7 +625,7 @@ async function planUserNotices(
   plan: TargetNoticePlan,
 ): Promise<void> {
   const [rows] = await connection.execute<RecipientRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale
        FROM bg_users u
        WHERE u.is_deleted = 0 AND u.id IN (${userIds.map(() => "?").join(", ")})`,
     userIds,
@@ -648,7 +648,7 @@ async function planTeamNotices(
   plan: TargetNoticePlan,
 ): Promise<void> {
   const [rows] = await connection.execute<(RecipientRow & { team_id: number })[]>(
-    `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale
        FROM bg_team_members tm
        JOIN bg_users u ON u.id = tm.user_id
        WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
