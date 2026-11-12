@@ -265,10 +265,10 @@ describe("BattleTag masqué — arbitre désigné", () => {
       const fr = load("fr", ns).audience.battletag;
       const en = load("en", ns).audience.battletag;
       expect(fr.asReferee).toBe(
-        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage des matchs Overwatch, qui demande celui de Battle.net) ;",
+        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; détacher Battle.net ou effacer ton BattleTag te retirerait l'arbitrage des matchs Overwatch, qui demande celui de Battle.net) ;",
       );
       expect(en.asReferee).toBe(
-        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played — both its teams only while the match is being played if you also cast it (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing of Overwatch matches, which requires the one from Battle.net);",
+        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played — both its teams only while the match is being played if you also cast it (you can withdraw from a match at any time; unlinking Battle.net or erasing your BattleTag would remove your refereeing of Overwatch matches, which requires the one from Battle.net);",
       );
       expect(Object.keys(fr)).toEqual(["title", "match", "asCaster", "asReferee", "launch", "footer"]);
       expect(Object.keys(en)).toEqual(Object.keys(fr));
