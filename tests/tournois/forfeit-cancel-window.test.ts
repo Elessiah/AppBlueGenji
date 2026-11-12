@@ -126,6 +126,18 @@ describe("lastInputRoundOf", () => {
 
     expect(lastInputRoundOf(matches, 0)).toBe(2);
   });
+
+  it("lastInputRoundOf_completedDoubleForfeit_counts", () => {
+    const matches = [matchRow({ ...blank, round_number: 3, double_forfeit: 1, status: "COMPLETED" })];
+
+    expect(lastInputRoundOf(matches, 0)).toBe(3);
+  });
+
+  it("lastInputRoundOf_forfeitWithoutScore_counts", () => {
+    const matches = [matchRow({ ...blank, round_number: 2, forfeit_team_id: 1 })];
+
+    expect(lastInputRoundOf(matches, 0)).toBe(2);
+  });
 });
 
 describe("mapParticipantError — refus d'annulation d'un abandon", () => {

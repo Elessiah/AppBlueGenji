@@ -11,6 +11,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { HAS_SCORE_INPUT_SQL } from "./bg-survie/round-progress";
 import type { MatchRow } from "./_internal";
+import { hasScoreInput } from "@/lib/shared/match-lock";
 
 /** Ce qu'il faut d'un match pour juger s'il porte une saisie. */
 export type ScoreInputMatchRow = Pick<
@@ -29,19 +30,29 @@ export type ScoreInputMatchRow = Pick<
   | "team2_reported_at"
 >;
 
-/** Même règle que `HAS_SCORE_INPUT_SQL`, sur une ligne déjà chargée. */
+/**
+ * Même règle que `HAS_SCORE_INPUT_SQL`, sur une ligne déjà chargée : la ligne
+ * se lit par le prédicat partagé `hasScoreInput` (`lib/shared/match-lock`),
+ * seul endroit qui dit ce qu'est une saisie — le double forfait ne compte que
+ * clos, une proposition compte dès sa date de report, comme la requête.
+ */
 function rowHasScoreInput(row: ScoreInputMatchRow): boolean {
-  if (row.team1_id === null || row.team2_id === null) return false;
-  return (
-    row.team1_score !== null ||
-    row.team2_score !== null ||
-    row.winner_team_id !== null ||
-    row.forfeit_team_id !== null ||
-    (Number(row.double_forfeit ?? 0) === 1 && row.status === "COMPLETED") ||
-    row.status === "AWAITING_CONFIRMATION" ||
-    row.team1_reported_at !== null ||
-    row.team2_reported_at !== null
-  );
+  return hasScoreInput({
+    id: 0,
+    roundNumber: Number(row.round_number),
+    team1Id: row.team1_id,
+    team2Id: row.team2_id,
+    team1Score: row.team1_score,
+    team2Score: row.team2_score,
+    winnerTeamId: row.winner_team_id,
+    forfeitTeamId: row.forfeit_team_id,
+    doubleForfeit: Number(row.double_forfeit ?? 0) === 1 && row.status === "COMPLETED",
+    decided: row.status === "COMPLETED",
+    hasPendingReport:
+      row.status === "AWAITING_CONFIRMATION" || row.team1_reported_at !== null || row.team2_reported_at !== null,
+    nextWinnerMatchId: null,
+    nextLoserMatchId: null,
+  });
 }
 
 /**
