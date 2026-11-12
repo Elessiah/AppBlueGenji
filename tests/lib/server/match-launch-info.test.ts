@@ -1695,8 +1695,8 @@ describe("loadViewerMatchContacts — arbitre désigné qui caste aussi le match
 });
 
 describe("listViewerMatchLaunches — noms nettoyés des fiches de contact", () => {
-  const RLO = "‮";
-  const ZWSP = "​";
+  const RLO = "\u202E";
+  const ZWSP = "\u200B";
 
   it("shownName_invisiblesAndDirectionControls_areRemoved", () => {
     expect(shownName(`Al${RLO}pha${ZWSP}`)).toBe("Alpha");
