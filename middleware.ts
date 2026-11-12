@@ -108,7 +108,17 @@ export function middleware(request: NextRequest) {
   // (`lib/shared/auth-cookies.ts`) : plus lus en production, ils resteraient
   // sinon trente jours sur l'appareil. L'effacement reprend `Secure` et
   // `Path=/` de leur pose, sans quoi le navigateur ne le leur appliquerait pas.
-  for (const name of legacyAuthCookieNames()) {
+  //
+  // Sur un **document** servi en **https** seulement : un cookie nu planté pour
+  // le domaine parent par un sous-domaine (que l'effacement sans `Domain` ne
+  // retire pas) recevait sinon un `Set-Cookie` à chaque préchargement ; et un
+  // `next start` local en http (`NODE_ENV=production`) effaçait le
+  // `bg_session` en service du `npm run dev` voisin, un cookie n'étant pas
+  // cloisonné par port. Derrière nginx, `X-Forwarded-Proto` donne le protocole.
+  // À retirer après le 2026-11-28 (trente jours après le déploiement du
+  // préfixe : plus aucun ancien cookie de session en vie).
+  const clearsLegacyAuth = request.nextUrl.protocol === "https:" && isDocumentRequest(request);
+  for (const name of clearsLegacyAuth ? legacyAuthCookieNames() : []) {
     if (request.cookies.has(name)) {
       response.cookies.set(name, "", { path: "/", maxAge: 0, secure: true, httpOnly: true, sameSite: "lax" });
     }

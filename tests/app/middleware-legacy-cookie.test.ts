@@ -84,6 +84,22 @@ describe("middleware — cookies d'authentification d'avant le préfixe __Host-"
     expect(middleware(request("__Host-bg_session=abc")).headers.get("set-cookie")).toBeNull();
   });
 
+  it("middleware_productionOverHttp_keepsBareSessionCookie", () => {
+    inProduction();
+    const response = middleware(new NextRequest("http://127.0.0.1:3001/tournois", { headers: { cookie: "bg_session=abc" } }));
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("middleware_productionPrefetch_keepsBareSessionCookie", () => {
+    inProduction();
+    const response = middleware(
+      new NextRequest("https://bluegenji.test/tournois", {
+        headers: { cookie: "bg_session=abc", "sec-fetch-dest": "empty" },
+      }),
+    );
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("middleware_production_clearsLegacyAlongsideSuspensionLegacyPath", () => {
     inProduction();
     const response = middleware(
