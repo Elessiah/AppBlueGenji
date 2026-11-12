@@ -251,15 +251,18 @@ montré.
 - **Saisie différente** (détail adverse connu) : la liste des différences map
   par map (`mapListDifferences` : vainqueur, score, code de replay, map absente
   d'un côté — mêmes règles que `sameMapLists`), un « i » qui explique le choix,
-  et « Confirmer la déclaration adverse » — qui reprend ses maps dans le
-  formulaire et les confirme d'un clic. Ce bouton s'offre aussi pour une saisie
+  et « Confirmer la déclaration adverse » — qui envoie ses maps telles quelles
+  d'un clic, **sans toucher la saisie** (refusé, l'envoi laisse la version du
+  lecteur intacte). Ce bouton s'offre aussi pour une saisie
   encore incomplète (`entryComparison`).
 - **Maintenir sa version** : « Envoyer le score » ouvre une confirmation
   (`ConfirmActionDialog` : litige, saisie verrouillée, arbitre alerté), puis
   l'envoi passe par le chemin ordinaire du désaccord.
 - **Modale périmée — contrat serveur.** Tout envoi simple porte
   `seenOpponentReportAt` : l'instant de dépôt de la déclaration adverse que la
-  modale montrait (`null` : aucune ; **absent vaut `null`**). Sous le verrou du
+  modale montrait (`null` : aucune, ou son détail pas encore lu — une saisie
+  comparée au seul score ne vaut pas « vue », `seenOpponentReportAt()` ;
+  **absent vaut `null`** ; un report sans instant se lit `""` des deux côtés). Sous le verrou du
   match (table seule, première lecture verrouillante — MariaDB),
   `assertOpponentReportSeen` compare avec le report adverse en base : même
   dépôt, ou aucun report adverse → chemin ordinaire ; autre dépôt et version
@@ -270,6 +273,13 @@ montré.
   dépôt et ouvre le litige. « Confirmer » (`confirm`) garde sa propre garde
   (`PROPOSAL_STALE`) et ignore ce champ. Un appel interne sans ce paramètre
   (`undefined`) n'est pas contrôlé.
+- **Un dépôt, un instant.** `teamN_reported_at` est à la seconde : chaque
+  report s'écrit `GREATEST(NOW(), ancien + 1 s)` (`reportedAtAssignment`), si
+  bien qu'une retouche dans la même seconde change quand même l'instant que
+  les deux gardes comparent.
+- **Réponse.** `200 { success, completed }` : `completed` dit que l'envoi a
+  clos le match (versions concordantes) — la modale annonce alors « score
+  confirmé », pas « en attente de l'adversaire ».
 
 **Lisibilité de la saisie.** Le compteur « Maps jouées (n/N) » annonce le format
 (BO3 → 3) ; les maps nulles rejouables au-delà sont dites dans l'aide et ne

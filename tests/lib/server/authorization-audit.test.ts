@@ -151,7 +151,7 @@ describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé"
     // exactement le report qu'il faut laisser passer — c'est lui qui la clôt.
     const { conn, writes } = fakeConnection({ status: "AWAITING_CONFIRMATION" });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).resolves.toBe(false);
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 
@@ -185,14 +185,14 @@ describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé"
     // C'est l'état des matchs en cours au déploiement de la règle.
     const { conn } = fakeConnection({ status: "AWAITING_CONFIRMATION", launched_at: null });
 
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).resolves.toBe(false);
   });
 
   it("laisse passer le report d'une rencontre encore ouverte", async () => {
     // Le garde-fou ne doit pas se refermer sur le cas nominal.
     const { conn, writes } = fakeConnection();
 
-    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).resolves.toBeUndefined();
+    await expect(reportMatchScore(conn, 1, 10, 42, mapsFor(2, 2))).resolves.toBe(false);
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
   });
 });

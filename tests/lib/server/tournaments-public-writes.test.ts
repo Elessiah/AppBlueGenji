@@ -427,9 +427,10 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
   it("rejoue un report annulé par un interblocage, et seulement celui-là (MAP_SCORES.md)", async () => {
     poolExecute.mockResolvedValue([[{ state: "RUNNING" }], undefined]);
     const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
-    jest.mocked(reportMatchScore).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(undefined);
+    jest.mocked(reportMatchScore).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(true);
 
-    await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
+    // Le rejeu validé dit si le match est clos.
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).resolves.toEqual({ completed: true });
     expect(reportMatchScore).toHaveBeenCalledTimes(2);
 
     jest.mocked(reportMatchScore).mockReset();
@@ -483,7 +484,7 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
       .mockResolvedValueOnce([[{ state: "RUNNING" }], undefined])
       .mockRejectedValueOnce(new Error("DB_DOWN"));
 
-    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).resolves.toBeUndefined();
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).resolves.toHaveProperty("completed");
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
 

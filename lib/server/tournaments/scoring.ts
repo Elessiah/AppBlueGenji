@@ -334,6 +334,27 @@ export type ProposalConfirmation = { reportedAt: string };
  * verrouillée ; le détail adverse est relu sous verrou (la dernière version),
  * et rendu pour que la comparaison des deux reports ne le relise pas.
  */
+/**
+ * Nouvel instant de dépôt d'un report : maintenant, et **toujours plus tard**
+ * que le dépôt qu'il remplace. La colonne est à la seconde : une retouche dans
+ * la même seconde garderait sinon le même instant, et les gardes qui
+ * l'identifient (`assertProposalUnchanged`, `assertOpponentReportSeen`)
+ * prendraient la nouvelle version pour celle que l'adversaire a lue.
+ */
+function reportedAtAssignment(side: "team1" | "team2"): string {
+  return `GREATEST(NOW(), COALESCE(DATE_ADD(${side}_reported_at, INTERVAL 1 SECOND), NOW()))`;
+}
+
+/**
+ * Instant de dépôt de la proposition adverse, tel que la modale le lit
+ * (`mapScoreReport` : `""` pour un report sans instant) — une seule forme pour
+ * les deux gardes, sans quoi un report à l'instant nul ne s'accorderait jamais
+ * avec ce que la modale renvoie.
+ */
+function opponentReportInstant(match: MatchRow, isTeam1Reporter: boolean): string {
+  return toIso((isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at) ?? null) ?? "";
+}
+
 async function assertProposalUnchanged(
   connection: PoolConnection,
   match: MatchRow,
@@ -341,9 +362,8 @@ async function assertProposalUnchanged(
   maps: ReadonlyArray<MatchMapInput>,
   confirm: ProposalConfirmation,
 ): Promise<ReadonlyArray<MatchMapInput>> {
-  const reportedAt = isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at;
   const score = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
-  if (score === null || score === undefined || toIso(reportedAt ?? null) !== confirm.reportedAt) {
+  if (score === null || score === undefined || opponentReportInstant(match, isTeam1Reporter) !== confirm.reportedAt) {
     throw new Error("PROPOSAL_STALE");
   }
   const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
@@ -381,8 +401,7 @@ async function assertOpponentReportSeen(
   if (seen === undefined) return undefined;
   const theirScore = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
   if (!reportPresent(theirScore)) return undefined;
-  const theirReportedAt = toIso((isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at) ?? null);
-  if (theirReportedAt === seen) return undefined;
+  if (opponentReportInstant(match, isTeam1Reporter) === seen) return undefined;
   const theirOpponentScore = isTeam1Reporter ? match.team2_report_opponent_score : match.team1_report_opponent_score;
   const scoresAgree =
     Number(theirScore) === mine.opponentScore && Number(theirOpponentScore) === mine.myScore;
@@ -408,6 +427,11 @@ function reporterView(
     : { myScore: team2, opponentScore: team1, reporterSource: "TEAM2" };
 }
 
+/**
+ * Enregistre le report d'un engagé (maps, puis score dérivé). Rend `true`
+ * quand cet envoi clôt le match (les deux reports concordent), `false` s'il
+ * attend l'adversaire ou ouvre un litige.
+ */
 export async function reportMatchScore(
   connection: PoolConnection,
   tournamentId: number,
@@ -416,7 +440,7 @@ export async function reportMatchScore(
   maps: ReadonlyArray<MatchMapInput>,
   confirm?: ProposalConfirmation,
   seenOpponentReport?: SeenOpponentReport,
-): Promise<void> {
+): Promise<boolean> {
   const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
   const [matches] = await connection.execute<MatchRow[]>(
@@ -535,7 +559,7 @@ export async function reportMatchScore(
       `UPDATE bg_matches
        SET team1_report_score = ?,
            team1_report_opponent_score = ?,
-           team1_reported_at = NOW(),
+           team1_reported_at = ${reportedAtAssignment("team1")},
            ${scoreDeadlineAssignment("team2")},
            status = 'AWAITING_CONFIRMATION'${pauseResetAssignment(match)}
        WHERE id = ?`,
@@ -557,7 +581,7 @@ export async function reportMatchScore(
       `UPDATE bg_matches
        SET team2_report_score = ?,
            team2_report_opponent_score = ?,
-           team2_reported_at = NOW(),
+           team2_reported_at = ${reportedAtAssignment("team2")},
            ${scoreDeadlineAssignment("team1")},
            status = 'AWAITING_CONFIRMATION'${pauseResetAssignment(match)}
        WHERE id = ?`,
@@ -605,6 +629,9 @@ export async function reportMatchScore(
   );
 
   const updated = updatedRows[0];
+  // Les deux reports concordent : le match est clos par cet envoi — la modale
+  // dit « confirmé » plutôt que « en attente de l'adversaire ».
+  let completed = false;
 
   if (
     updated.team1_report_score !== null &&
@@ -631,6 +658,7 @@ export async function reportMatchScore(
         winnerTeamId,
         loserTeamId,
       });
+      completed = true;
     } else {
       await connection.execute(`UPDATE bg_matches SET status = 'AWAITING_CONFIRMATION' WHERE id = ?`, [
         matchId,
@@ -651,4 +679,5 @@ export async function reportMatchScore(
   }
 
   await tryAutoResolveByes(connection, tournamentId);
+  return completed;
 }

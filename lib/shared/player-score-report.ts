@@ -14,7 +14,7 @@
  */
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
-import { normalizeReplayCode, sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
+import { mapWinnerSide, normalizeReplayCode, sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
 import { autoValidateTimeText } from "./score-dispute";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
@@ -80,11 +80,6 @@ export interface MapDifference {
   kinds: MapDifferenceKind[];
 }
 
-function mapSide(map: MatchMapInput): 1 | 2 | 0 {
-  if (map.team1Score > map.team2Score) return 1;
-  return map.team2Score > map.team1Score ? 2 : 0;
-}
-
 /**
  * Différences, map par map, entre la saisie du lecteur et la déclaration
  * adverse (`MAP_SCORES.md` — « Proposition adverse arrivée pendant la
@@ -105,7 +100,7 @@ export function mapListDifferences(
     if (a === null) kinds.push("MISSING_MINE");
     else if (b === null) kinds.push("MISSING_THEIRS");
     else {
-      if (mapSide(a) !== mapSide(b)) kinds.push("WINNER");
+      if (mapWinnerSide(a) !== mapWinnerSide(b)) kinds.push("WINNER");
       else if (a.team1Score !== b.team1Score || a.team2Score !== b.team2Score) kinds.push("SCORE");
       if (normalizeReplayCode(a.replayCode) !== normalizeReplayCode(b.replayCode)) kinds.push("REPLAY_CODE");
     }

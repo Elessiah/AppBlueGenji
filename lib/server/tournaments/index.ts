@@ -1507,15 +1507,18 @@ export async function reportMatchScorePublic(
   maps: ReadonlyArray<MatchMapInput>,
   confirm?: ProposalConfirmation,
   seenOpponentReport?: SeenOpponentReport,
-): Promise<void> {
+): Promise<{ completed: boolean }> {
   // Deux reports simultanés sur des matchs voisins peuvent s'interbloquer sur
   // `bg_match_maps` : InnoDB annule l'un, qui est rejoué tel quel plutôt que de
-  // rendre un 500 à l'équipe.
+  // rendre un 500 à l'équipe. Chaque essai réécrit `completed` : seul le
+  // dernier, validé, dit si le match est clos.
+  let completed = false;
   await retryOnDeadlock(() =>
-    runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-      reportMatchScore(connection, tournamentId, matchId, userId, maps, confirm, seenOpponentReport),
-    ),
+    runPlayerMatchWrite(tournamentId, matchId, async (connection) => {
+      completed = await reportMatchScore(connection, tournamentId, matchId, userId, maps, confirm, seenOpponentReport);
+    }),
   );
+  return { completed };
 }
 
 /**

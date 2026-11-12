@@ -240,6 +240,11 @@ describe("mapListDifferences (déclaration adverse arrivée pendant la saisie, M
     expect(mapListDifferences([map(1, 1)], [map(2, 1)])[0].kinds).toEqual(["WINNER"]);
   });
 
+  it("mapListDifferences_unreadScoreAgainstDraw_sameRuleAsMapWinnerSide", () => {
+    // Score illisible et map nulle : ni l'un ni l'autre ne désigne de vainqueur (`mapWinnerSide`).
+    expect(mapListDifferences([map(Number.NaN, 1)], [map(1, 1)])[0].kinds).toEqual(["SCORE"]);
+  });
+
   it("mapListDifferences_sameWinnerOtherScore_reportsScore", () => {
     expect(mapListDifferences([map(3, 1)], [map(2, 1)])[0].kinds).toEqual(["SCORE"]);
   });

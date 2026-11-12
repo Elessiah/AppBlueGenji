@@ -228,6 +228,17 @@ function reportBody(
   );
 }
 
+/**
+ * Ce que la modale dit avoir vu de la déclaration adverse : son instant de
+ * dépôt **une fois son détail lu** — score et maps sous les yeux. Détail
+ * encore en lecture ou illisible, la saisie n'a pu être comparée qu'au score :
+ * `null`, et le serveur refuse (`PROPOSAL_ARRIVED`) une version qui en diffère
+ * par les maps plutôt que d'ouvrir un litige à l'aveugle.
+ */
+export function seenOpponentReportAt(theirs: MatchScoreReport | null | undefined): string | null {
+  return theirs && (theirs.maps ?? []).length > 0 ? theirs.reportedAt : null;
+}
+
 /** Les seules colonnes d'une map, telles que la route les attend. */
 function plainMaps(maps: ReadonlyArray<MatchMapInput>): MatchMapInput[] {
   return maps.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score }));
@@ -518,13 +529,16 @@ export function PlayerScoreDialog({
           body: reportBody(send, view?.theirs),
         },
       );
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; completed?: boolean };
       if (!response.ok) {
         refusedCode = payload.error ?? null;
         throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       }
+      // `completed` : la version envoyée concordait avec la déclaration adverse
+      // (modale périmée, ou arrivée identique) — le match est clos, pas « en
+      // attente de l'adversaire ».
       showSuccess(
-        send.confirmTheirs
+        send.confirmTheirs || payload.completed === true
           ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
           : t("score.player.submitted", {
               team1,
@@ -552,13 +566,14 @@ export function PlayerScoreDialog({
     }
   };
 
-  /** La déclaration adverse, reprise dans le formulaire et confirmée d'un clic. */
+  /**
+   * La déclaration adverse confirmée d'un clic. La saisie n'est **pas**
+   * remplacée : refusé (déclaration changée entre-temps, réseau coupé), l'envoi
+   * laisse au lecteur sa propre version intacte ; accepté, la modale se ferme.
+   */
   const confirmTheirs = () => {
     if (submitting || !theirs || theirMaps.length === 0) return;
-    const theirPlain = plainMaps(theirMaps);
-    fieldErrors.clear();
-    setRows(progressiveMapRows(matchFormat, game, theirPlain));
-    void submitScore({ maps: theirPlain, confirmTheirs: true, seenAt: theirs.reportedAt });
+    void submitScore({ maps: plainMaps(theirMaps), confirmTheirs: true, seenAt: theirs.reportedAt });
   };
 
   const submitForfeit = async () => {
@@ -603,7 +618,7 @@ export function PlayerScoreDialog({
       setDisputeSeenAt(view.theirs.reportedAt);
       return;
     }
-    void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt: view?.theirs?.reportedAt ?? null });
+    void submitScore({ maps, confirmTheirs: confirmsAsIs, seenAt: seenOpponentReportAt(view?.theirs) });
   };
 
   // État du cycle, en une phrase : c'est ce que le formulaire d'avant ne disait

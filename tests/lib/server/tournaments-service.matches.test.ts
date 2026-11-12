@@ -574,6 +574,67 @@ describe("tournaments-service: match state machine", () => {
         expect(completion(calls)).toBeUndefined();
       });
 
+      it("reportMatchScore_concordantReports_returnsTrue", async () => {
+        const { connection } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), undefined, depositedAt.toISOString()),
+        ).resolves.toBe(true);
+      });
+
+      it("reportMatchScore_disputeOpened_returnsFalse", async () => {
+        const { connection } = reportConnection(pendingTeam2, mapsFor(3, 1));
+
+        await expect(
+          reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, depositedAt.toISOString()),
+        ).resolves.toBe(false);
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_firstReport_returnsFalse", async () => {
+        const { connection } = reportConnection();
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null)).resolves.toBe(false);
+      });
+
+      it("reportMatchScore_opponentReportWithoutInstant_seenEmptyString_opensDispute", async () => {
+        // Report adverse sans instant : la modale le lit `""` (`mapScoreReport`) et le renvoie tel quel.
+        const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, "");
+
+        expect(completion(calls)).toBeUndefined();
+        expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+      });
+
+      it("reportMatchScore_opponentReportWithoutInstant_seenNull_throwsProposalArrived", async () => {
+        const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
+
+        await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null)).rejects.toThrow(
+          "PROPOSAL_ARRIVED",
+        );
+        expect(writes(calls)).toHaveLength(0);
+      });
+
+      it("reportMatchScore_confirmEmptyInstantOnNullReportedAt_closesMatch", async () => {
+        const { connection, calls } = reportConnection({ ...pendingTeam2, team2_reported_at: null }, mapsFor(3, 1));
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1), { reportedAt: "" });
+
+        expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+      });
+
+      it("reportMatchScore_reportWrite_stampsStrictlyLaterInstant", async () => {
+        const { connection, calls } = reportConnection();
+
+        await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0), undefined, null);
+
+        // Une retouche dans la même seconde change quand même l'instant de dépôt.
+        expect(writes(calls)[0].sql).toContain(
+          "team1_reported_at = GREATEST(NOW(), COALESCE(DATE_ADD(team1_reported_at, INTERVAL 1 SECOND), NOW()))",
+        );
+      });
+
       it("reportMatchScore_confirmWithSeenNull_confirmPathWins", async () => {
         const { connection, calls } = reportConnection(pendingTeam2, mapsFor(3, 1));
 

@@ -43,9 +43,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const seen = parseSeenOpponentReport(body.seenOpponentReportAt);
     if (seen === false) return fail("INVALID_REQUEST", 400);
 
-    await reportMatchScore(tournamentId, matchId, user.id, maps, confirm, seen);
+    // `completed` : l'envoi a clos le match (versions concordantes) — la modale
+    // le dit, plutôt que « en attente de l'adversaire ».
+    const { completed } = await reportMatchScore(tournamentId, matchId, user.id, maps, confirm, seen);
 
-    return ok({ success: true });
+    return ok({ success: true, completed });
   } catch (error) {
     const message = (error as Error).message;
     const status = MAP_LIST_ERROR_CODES.has(message) ? 400 : REPORT_ERROR_STATUS.get(message);

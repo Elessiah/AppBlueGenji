@@ -45,7 +45,7 @@ describe("POST .../report — match pas encore lancé", () => {
   });
 
   it("accepte un report sur un match lancé", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
     expect((await POST(req(), params)).status).toBe(200);
     // Codes normalisés (majuscules) avant d'atteindre le service.
     expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, [
@@ -53,11 +53,21 @@ describe("POST .../report — match pas encore lancé", () => {
       { replayCode: "DEF456", team1Score: 1, team2Score: 1 },
     ], undefined, null);
   });
+
+  it("dit si l'envoi a clos le match (versions concordantes) ou s'il attend l'adversaire", async () => {
+    jest.mocked(reportMatchScore).mockResolvedValueOnce({ completed: true });
+    const closed = await POST(req(), params);
+    expect(closed.status).toBe(200);
+    expect(await closed.json()).toEqual({ success: true, completed: true });
+
+    jest.mocked(reportMatchScore).mockResolvedValueOnce({ completed: false });
+    expect(await (await POST(req(), params)).json()).toEqual({ success: true, completed: false });
+  });
 });
 
 describe("POST .../report — « Confirmer » la proposition adverse (MAP_SCORES.md)", () => {
   it("transmet l'instant de dépôt confirmé au service", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
     const res = await POST(req({ maps: MAPS, confirm: { reportedAt: "2026-10-05T20:00:00.000Z" } }), params);
     expect(res.status).toBe(200);
     expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, expect.any(Array), {
@@ -148,7 +158,7 @@ describe("tournoi non publié", () => {
 
 describe("POST .../report — déclaration adverse vue par la modale (MAP_SCORES.md)", () => {
   it("POST_seenOpponentReportAtString_passedToService", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
 
     const res = await POST(req({ maps: MAPS, seenOpponentReportAt: "2026-10-05T20:00:00.000Z" }), params);
 
@@ -157,7 +167,7 @@ describe("POST .../report — déclaration adverse vue par la modale (MAP_SCORES
   });
 
   it("POST_seenOpponentReportAt40Chars_accepted", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
 
     const res = await POST(req({ maps: MAPS, seenOpponentReportAt: "x".repeat(40) }), params);
 
@@ -181,7 +191,7 @@ describe("POST .../report — déclaration adverse vue par la modale (MAP_SCORES
   });
 
   it("POST_seenOpponentReportAtExplicitNull_passesNull", async () => {
-    jest.mocked(reportMatchScore).mockResolvedValue();
+    jest.mocked(reportMatchScore).mockResolvedValue({ completed: false });
 
     await POST(req({ maps: MAPS, seenOpponentReportAt: null }), params);
 

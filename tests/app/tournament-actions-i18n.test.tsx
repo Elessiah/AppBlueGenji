@@ -92,7 +92,7 @@ import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { MatchScheduleDialog } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PlayerScoreDialog } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
+import { PlayerScoreDialog, seenOpponentReportAt } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { RemoveEntrantDialog } from "@/app/(secured)/tournois/[id]/_components/RemoveEntrantDialog";
 import { RollbackRoundDialog } from "@/app/(secured)/tournois/[id]/_components/RollbackRoundDialog";
@@ -823,6 +823,38 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).not.toMatch(/window\.confirm/);
   });
 
+  describe("seenOpponentReportAt (déclaration adverse vue, MAP_SCORES.md)", () => {
+    const map = { mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 1 };
+
+    it("seenOpponentReportAt_detailKnown_returnsReportedAt", () => {
+      expect(seenOpponentReportAt({ team1Score: 2, team2Score: 1, maps: [map], reportedAt: "2026-05-05T10:00:00.000Z" })).toBe(
+        "2026-05-05T10:00:00.000Z",
+      );
+    });
+
+    it("seenOpponentReportAt_detailNotLoaded_returnsNull", () => {
+      expect(seenOpponentReportAt({ team1Score: 2, team2Score: 1, maps: [], reportedAt: "2026-05-05T10:00:00.000Z" })).toBeNull();
+    });
+
+    it("seenOpponentReportAt_noOpponent_returnsNull", () => {
+      expect(seenOpponentReportAt(null)).toBeNull();
+      expect(seenOpponentReportAt(undefined)).toBeNull();
+    });
+  });
+
+  it("confirmTheirs_doesNotReplaceRows", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    const body = source.slice(source.indexOf("const confirmTheirs = () => {"), source.indexOf("const submitForfeit"));
+    expect(body).toContain("void submitScore({ maps: plainMaps(theirMaps), confirmTheirs: true, seenAt: theirs.reportedAt });");
+    expect(body).not.toContain("setRows(");
+  });
+
+  it("submitScore_completedPayload_showsConfirmedToast", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    expect(source).toContain("send.confirmTheirs || payload.completed === true");
+    expect(source).toContain("seenAt: seenOpponentReportAt(view?.theirs)");
+  });
+
   it("score (engagé) : textes de la déclaration adverse en français et en anglais", () => {
     const fr = frDialogs.score.player;
     const en = enDialogs.score.player;
@@ -834,8 +866,8 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(Object.keys(en.dispute)).toEqual(Object.keys(fr.dispute));
     expect(en.dispute.body).toContain("referee");
     expect(fr.dispute.body).toContain("arbitre");
-    expect(enTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^The opponent reported a different score/);
-    expect(frTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^L'adversaire a déclaré un score différent/);
+    expect(enTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^The opponent reported a different version/);
+    expect(frTournamentErrors.codes.PROPOSAL_ARRIVED).toMatch(/^L'adversaire a déclaré une version différente/);
   });
 
   it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
