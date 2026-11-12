@@ -20,6 +20,7 @@ import {
 } from "../_lib/endurance-sections";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
+import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 import { FR_ENDURANCE_TEXT } from "../_lib/endurance-text";
 import { ENGLISH_ENDURANCE } from "../_lib/view-loaders";
 import { INTL_LOCALE } from "@/lib/shared/locales";
@@ -93,6 +94,15 @@ interface EnduranceViewProps {
  * distinguent plus l'un de l'autre. La casse est décidée par la feuille de
  * style, pas écrite dans le texte.
  */
+/**
+ * Explication de « hors course », lue derrière le « i » de chaque vue du
+ * classement — avec le nombre de manches prévues quand il est fixé.
+ */
+export function outLegendText(t: TournamentPageText["t"], maxRounds: number | null): string {
+  const rounds = maxRounds === null ? "" : t("endurance.outLegendRounds", { count: maxRounds });
+  return `${t("endurance.outLegend")}${rounds}.`;
+}
+
 function BoardHeading({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <h3 className={`mono ${styles.boardHeading}`}>{children}</h3>
@@ -441,14 +451,7 @@ export function EnduranceView({
         renderActions={renderActions}
         showActions={showActions}
         wideActions={showPenaltyAction}
-        outLegend={
-          showOutLegend ? (
-            <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
-              {t("endurance.outLegend")}
-              {endurance.maxRounds === null ? "" : t("endurance.outLegendRounds", { count: endurance.maxRounds })}
-            </p>
-          ) : null
-        }
+        outLegend={showOutLegend ? outLegendText(t, endurance.maxRounds) : null}
         actionsLegend={
           endurance.standings.some(isFrozenRow) ? (
             <FrozenForfeitLegend

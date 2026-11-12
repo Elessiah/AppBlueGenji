@@ -97,6 +97,14 @@ describe("gestes de chaque rôle — toujours atteignables", () => {
   });
 });
 
+describe("EnduranceRankingViews — « hors course » expliqué dans chaque vue", () => {
+  it("le « i » de « hors course » n'est pas réservé au panneau Général", () => {
+    expect(RANKING).toContain("{outLegend && (");
+    expect(RANKING).not.toContain("isGeneral && ((withActions && actionsLegend) || outLegend)");
+    expect(RANKING).toContain('<InfoHint id={`${baseId}-out-hint`} subject={t("endurance.outHintSubject")}>');
+  });
+});
+
 describe("EnduranceRankingViews — gestes réservés au Général", () => {
   it("n'affiche la colonne d'action que dans la vue « Général »", () => {
     expect(RANKING).toContain('const isGeneral = view.kind === "GENERAL"');
