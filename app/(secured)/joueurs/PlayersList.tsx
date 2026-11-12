@@ -6,8 +6,8 @@ import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import {
   filterPlayers,
   roleAfterStatusChoice,
-  sortLocaleOf,
   sortPlayers,
+  statusChoiceResetsRole,
   statusFilterAllowsRoles,
   deletedToggleState,
   type PlayerSortKey,
@@ -32,8 +32,11 @@ const ACCENT_RGB = "90, 200, 255";
 
 type RoleFilter = "all" | "DPS" | "TANK" | "HEAL" | "COACH";
 
+const ROLES_INERT_ID = "players-roles-inert";
+const DELETED_INERT_ID = "players-deleted-inert";
+
 export default function PlayersList() {
-  const { showError } = useToast();
+  const { showError, showInfo } = useToast();
   const text = usePlayersText();
   const { t } = text;
   // Bandeau mémoïsé (`Ticker`) : ses libellés gardent leur référence d'une
@@ -104,13 +107,12 @@ export default function PlayersList() {
     return key;
   }, [searchKeys]);
   // Trié une fois par liste et par ordre choisi ; la recherche ne fait ensuite
-  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2). La
-  // langue ne compte que pour les tris qui comparent des pseudos (« Pseudo »,
-  // et « Plus récents » à égalité) : changer de langue ne retrie pas « Tournois ».
+  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2). Tous
+  // les tris départagent par pseudo, dans la langue de la page.
   // Tri et filtres : fonctions pures de `player-directory.ts`, testées hors du composant.
-  const sortLocale = sortLocaleOf(sort, text.locale);
+  const sortLocale = text.locale;
   const sorted = useMemo(
-    () => sortPlayers(listed, sort, sortLocale ?? "fr"),
+    () => sortPlayers(listed, sort, sortLocale),
     [listed, sort, sortLocale],
   );
   const rolesAllowed = statusFilterAllowsRoles(statusFilter);
@@ -128,6 +130,7 @@ export default function PlayersList() {
   // Un filtre « sans roster » rend les rôles sans objet (ils viennent de
   // l'équipe) : le filtre de rôle revient à « Tous » au lieu de vider la liste.
   const chooseStatus = (next: PlayerStatusFilter) => {
+    if (statusChoiceResetsRole(roleFilter, next)) showInfo(t("list.roleReset"));
     setStatusFilter(next);
     setRoleFilter((role) => roleAfterStatusChoice(role, next));
   };
@@ -236,6 +239,8 @@ export default function PlayersList() {
                   // Sous « Free agents » / « Sans équipe », les rôles (venus de
                   // l'équipe) ne filtrent rien : puces inertes, « Tous » excepté.
                   aria-disabled={!rolesAllowed && k !== "all" ? true : undefined}
+                  // La raison du refus, rattachée à la puce inerte (lue par un lecteur d'écran).
+                  aria-describedby={!rolesAllowed && k !== "all" ? ROLES_INERT_ID : undefined}
                   onClick={() => {
                     if (rolesAllowed || k === "all") setRoleFilter(k);
                   }}
@@ -250,7 +255,6 @@ export default function PlayersList() {
             {/* Trois pastilles de statut : la rangée passe à la ligne sur mobile. */}
             <div className={s.statusRow}>
               <span>{t("list.count", { count: filtered.length })}</span>
-              <span className={s.statusSep} aria-hidden="true">·</span>
               <div className={s.statusOpts}>
                 {(
                   ["all", "free", "unaffiliated"] as const
@@ -300,6 +304,7 @@ export default function PlayersList() {
                   // « Free agents » / « Sans équipe » écartent déjà les comptes
                   // supprimés : la case ne changerait rien, elle est inerte.
                   aria-disabled={deletedToggleInert ? true : undefined}
+                  aria-describedby={deletedToggleInert ? DELETED_INERT_ID : undefined}
                   aria-label={t("list.showDeleted", { count: deletedCount })}
                   title={t("list.showDeleted", { count: deletedCount })}
                   onClick={() => {
@@ -309,6 +314,13 @@ export default function PlayersList() {
                   <UserX size={14} aria-hidden="true" />
                 </button>
               )}
+              {/* Raisons des contrôles inertes, lues par `aria-describedby` seulement. */}
+              <span id={ROLES_INERT_ID} hidden>
+                {t("list.rolesInert")}
+              </span>
+              <span id={DELETED_INERT_ID} hidden>
+                {t("list.deletedInert")}
+              </span>
             </div>
           </div>
         </div>

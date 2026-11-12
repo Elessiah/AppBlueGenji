@@ -1,3 +1,4 @@
+import { readSource } from "../helpers/read-source";
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -7,7 +8,7 @@ import {
   filterPlayers,
   matchesPlayerStatusFilter,
   roleAfterStatusChoice,
-  sortLocaleOf,
+  statusChoiceResetsRole,
   sortPlayers,
   statusFilterAllowsRoles,
   statusFilterExcludesDeleted,
@@ -93,6 +94,49 @@ describe("deletedToggleState", () => {
   });
 });
 
+describe("statusChoiceResetsRole", () => {
+  it("statusChoiceResetsRole_roleChosenThenRosterlessStatus_true", () => {
+    expect(statusChoiceResetsRole<PlayerRole>("DPS", "free")).toBe(true);
+    expect(statusChoiceResetsRole<PlayerRole>("COACH", "unaffiliated")).toBe(true);
+  });
+
+  it("statusChoiceResetsRole_noRoleOrAllStatus_false", () => {
+    expect(statusChoiceResetsRole<PlayerRole>("all", "free")).toBe(false);
+    expect(statusChoiceResetsRole<PlayerRole>("TANK", "all")).toBe(false);
+  });
+});
+
+describe("PlayersList — branchements des filtres inertes", () => {
+  const source = readSource("app/(secured)/joueurs/PlayersList.tsx");
+
+  it("annonce la remise du rôle par un toast neutre", () => {
+    expect(source).toContain('if (statusChoiceResetsRole(roleFilter, next)) showInfo(t("list.roleReset"));');
+  });
+
+  it("rattache la raison aux puces de rôle et à la bascule inertes", () => {
+    expect(source).toContain("aria-describedby={!rolesAllowed && k !== \"all\" ? ROLES_INERT_ID : undefined}");
+    expect(source).toContain("aria-describedby={deletedToggleInert ? DELETED_INERT_ID : undefined}");
+    expect(source).toMatch(/<span id=\{ROLES_INERT_ID\} hidden>\s*\{t\("list.rolesInert"\)\}/);
+    expect(source).toMatch(/<span id=\{DELETED_INERT_ID\} hidden>\s*\{t\("list.deletedInert"\)\}/);
+  });
+
+  it("le « · » de la rangée de statut est rogné au retour à la ligne, jamais pendant en fin de ligne", () => {
+    const css = readSource("app/(secured)/_shared/annuaire.module.css");
+    const row = css.slice(css.indexOf(".statusRow {"), css.indexOf("}", css.indexOf(".statusRow {")));
+    expect(row).toContain("overflow-x: clip;");
+    expect(css).toMatch(/\.statusOpts::before \{\s*content: "·" \/ "";\s*position: absolute;/);
+    expect(css).not.toContain(".statusSep");
+    expect(source).not.toContain("statusSep");
+  });
+
+  it("les textes existent en français et en anglais", () => {
+    for (const locale of ["fr", "en"]) {
+      const list = (JSON.parse(readSource(`messages/${locale}/players.json`)) as { list: Record<string, unknown> }).list;
+      for (const key of ["roleReset", "rolesInert", "deletedInert"]) expect(typeof list[key]).toBe("string");
+    }
+  });
+});
+
 describe("roleAfterStatusChoice", () => {
   it("roleAfterStatusChoice_rosterlessStatus_resetsRoleToAll", () => {
     expect(roleAfterStatusChoice<PlayerRole>("DPS", "free")).toBe("all");
@@ -142,17 +186,6 @@ describe("compareNewestFirst", () => {
   });
 });
 
-describe("sortLocaleOf", () => {
-  it("sortLocaleOf_tournaments_returnsNull", () => {
-    expect(sortLocaleOf("tournaments", "en")).toBeNull();
-  });
-
-  it("sortLocaleOf_pseudoOrCreated_returnsPageLanguage", () => {
-    expect(sortLocaleOf("pseudo", "en")).toBe("en");
-    expect(sortLocaleOf("created", "fr")).toBe("fr");
-  });
-});
-
 describe("sortPlayers", () => {
   const a = publicUserProfile({ id: 1, pseudo: "émile", tournamentsCount: 1, createdAt: "2026-02-01T00:00:00.000Z" });
   const b = publicUserProfile({ id: 2, pseudo: "Zed", tournamentsCount: 5, createdAt: "2026-03-01T00:00:00.000Z" });
@@ -164,6 +197,14 @@ describe("sortPlayers", () => {
 
   it("sortPlayers_tournaments_mostPlayedFirstAndMissingCountLast", () => {
     expect(ids(sortPlayers([c, a, b], "tournaments", "fr"))).toEqual([2, 1, 3]);
+  });
+
+  it("sortPlayers_tournamentsTie_tieBreaksByPseudoInPageLanguage", () => {
+    const zoe = publicUserProfile({ id: 7, pseudo: "Zoé", tournamentsCount: 0 });
+    const emile = publicUserProfile({ id: 8, pseudo: "Émile", tournamentsCount: 0 });
+    const alex = publicUserProfile({ id: 9, pseudo: "alex", tournamentsCount: 0 });
+    const star = publicUserProfile({ id: 10, pseudo: "Yann", tournamentsCount: 3 });
+    expect(ids(sortPlayers([zoe, emile, star, alex], "tournaments", "fr"))).toEqual([10, 9, 8, 7]);
   });
 
   it("sortPlayers_created_newestFirst", () => {

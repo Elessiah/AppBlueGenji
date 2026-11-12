@@ -28,6 +28,9 @@
     "count": "{count, plural, one {# joueur} other {# joueurs}}",
     "statusHint": "« Sans équipe » liste tous les joueurs sans équipe, y compris ceux qui ne sont pas ouverts aux propositions — seuls les « Free agents » le sont. Les rôles venant de l'équipe, leur filtre est désactivé sous ces deux filtres.",
     "statusHintSubject": "Filtres de statut",
+    "roleReset": "Filtre de rôle remis sur « Tous » : les rôles viennent de l'équipe.",
+    "rolesInert": "Sans effet sous « Free agents » et « Sans équipe » : les rôles viennent de l'équipe.",
+    "deletedInert": "Sans effet sous « Free agents » et « Sans équipe », qui écartent déjà les comptes supprimés.",
     "statusFilter": {
       "all": "TOUS",
       "free": "FREE AGENTS",
