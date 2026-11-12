@@ -145,6 +145,17 @@ export function createLimiter(size: number, maxWaiting: number = Number.POSITIVE
 }
 
 /**
+ * Rejet de {@link withDeadline} passé le délai. Reconnu par `instanceof`, jamais par son
+ * nom : un appelant qui lance une horloge d'abandon au délai ne dépend pas d'un texte.
+ */
+export class DeadlineError extends Error {
+  constructor(ms: number) {
+    super(`délai de ${ms} ms dépassé`);
+    this.name = "TimeoutError";
+  }
+}
+
+/**
  * Lance `task` et rejette si elle ne s'est pas réglée en `ms` : qui l'attend (et la
  * place d'un {@link createLimiter} qu'elle tient) n'attend pas une requête qui ne
  * reviendra jamais. Au délai, le signal passé à `task` est levé : la tâche, qui le
@@ -153,7 +164,7 @@ export function createLimiter(size: number, maxWaiting: number = Number.POSITIVE
  *
  * @param task Travail à borner, qui reçoit le signal d'abandon.
  * @param ms Délai (ms).
- * @returns Le résultat de `task`, ou un rejet `TimeoutError` passé le délai.
+ * @returns Le résultat de `task`, ou un rejet {@link DeadlineError} passé le délai.
  */
 export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: number): Promise<R> {
   const controller = new AbortController();
@@ -166,9 +177,7 @@ export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: n
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       controller.abort();
-      const error = new Error(`délai de ${ms} ms dépassé`);
-      error.name = "TimeoutError";
-      reject(error);
+      reject(new DeadlineError(ms));
     }, ms);
     // Côté serveur, la borne seule ne retient pas le processus (arrêt, fin des tests).
     if (typeof timer === "object" && timer !== null && "unref" in timer) timer.unref();
@@ -189,6 +198,7 @@ export function withDeadline<R>(task: (signal: AbortSignal) => Promise<R>, ms: n
 export type InFlightGate = {
   /**
    * Compte un travail s'il reste une place (parmi `max` et sous le plafond `unsettledMax`).
+   * Un refus est signalé à `onShed` (journal).
    * @returns Le ticket du travail, ou `null` si tout est pris.
    */
   tryEnter(): InFlightTicket | null;
@@ -213,6 +223,7 @@ export type InFlightTicket = {
  * @param abandonAfterMs Durée, après `expire`, au-delà de laquelle un travail encore compté est oublié.
  * @param onForgotten Appelé quand un travail est oublié ainsi (journal).
  * @param unsettledMax Travaux non revenus (comptés + oubliés), au plus.
+ * @param onShed Appelé à chaque travail refusé faute de place (journal).
  * @returns Le compte.
  */
 export function createInFlightGate(
@@ -220,6 +231,7 @@ export function createInFlightGate(
   abandonAfterMs: number,
   onForgotten: () => void = () => undefined,
   unsettledMax: number = Number.POSITIVE_INFINITY,
+  onShed: () => void = () => undefined,
 ): InFlightGate {
   let count = 0;
   let forgotten = 0;
@@ -231,7 +243,10 @@ export function createInFlightGate(
       return forgotten;
     },
     tryEnter() {
-      if (count >= max || count + forgotten >= unsettledMax) return null;
+      if (count >= max || count + forgotten >= unsettledMax) {
+        onShed();
+        return null;
+      }
       count += 1;
       let state: "counted" | "forgotten" | "left" = "counted";
       let timer: ReturnType<typeof setTimeout> | undefined;

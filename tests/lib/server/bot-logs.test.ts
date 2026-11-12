@@ -6,6 +6,7 @@ jest.mock("@/lib/server/bot-integration");
 import type { PoolConnection } from "mysql2/promise";
 import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
+  BOT_LOG_AFTER_FLUSH_SLOTS,
   BOT_LOG_RESOLVE_CONCURRENCY,
   BOT_LOG_RESOLVE_ABANDON_MS,
   BOT_LOG_RESOLVE_INFLIGHT_MAX,
@@ -26,7 +27,17 @@ import {
 } from "@/lib/server/tournaments/bot-logs";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
-import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlMock, type SqlQuery, fakePool } from "../../helpers/sql-double";
+
+/** Paramètres d'une requête simulée, en liste (vide si la requête n'en a pas). */
+function paramList(params: unknown): unknown[] {
+  return Array.isArray(params) ? params : [];
+}
+
+/** Premier paramètre d'une requête simulée (l'identifiant lu). */
+function param(params: unknown): unknown {
+  return paramList(params)[0];
+}
 
 /** Une connexion ne sert ici que de clé : la file est indexée par identité. */
 function fakeConnection(): PoolConnection {
@@ -68,11 +79,11 @@ const MATCH_ROW = {
  * entrées à plusieurs lectures passent par {@link mockDbByParams}.
  */
 function mockDb(rows: unknown[][]): SqlMock {
-  const execute = jest.fn<() => Promise<unknown>>();
+  const execute = jest.fn<SqlQuery>();
   for (const result of rows) execute.mockResolvedValueOnce([result]);
   execute.mockResolvedValue([[]]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-  return execute as unknown as SqlMock;
+  return execute;
 }
 
 /**
@@ -80,18 +91,18 @@ function mockDb(rows: unknown[][]): SqlMock {
  * soit l'ordre des appels : sûr sous résolution concurrente.
  */
 function mockDbByParams(rowsById: Record<number, unknown[]>): SqlMock {
-  const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) => [
-    rowsById[Number(params?.[0])] ?? [],
+  const execute = jest.fn<SqlQuery>(async (_sql, params) => [
+    rowsById[Number(param(params))] ?? [],
   ]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-  return execute as unknown as SqlMock;
+  return execute;
 }
 
 /** Requêtes en attente, relâchées à la main ; retient le plus grand nombre en vol. */
-function heldQueries(answer: (params?: unknown[]) => unknown[]) {
+function heldQueries(answer: (params: unknown) => unknown[]) {
   const pending: (() => void)[] = [];
   const state = { maxInFlight: 0 };
-  const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(
+  const execute = jest.fn<SqlQuery>(
     (_sql, params) =>
       new Promise((resolve) => {
         pending.push(() => resolve([answer(params)]));
@@ -193,8 +204,8 @@ describe("file par transaction", () => {
 
   it("flushBotLogs_twoCommits_secondLinesWaitForTheFirstCommitsLines", async () => {
     let releaseTournament: () => void = () => undefined;
-    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-      params?.[0] === 12
+    const execute = jest.fn<SqlQuery>((_sql, params) =>
+      param(params) === 12
         ? new Promise((resolve) => {
             releaseTournament = () => resolve([[TOURNAMENT_ROW]]);
           })
@@ -244,8 +255,8 @@ describe("file par transaction", () => {
 
   it("markResultValidatedByStaff_queueFull_validationStillLogged", async () => {
     const connection = fakeConnection();
-    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) =>
-      params?.includes(31) ? [[MATCH_ROW]] : [[]],
+    const execute = jest.fn<SqlQuery>(async (_sql, params) =>
+      paramList(params).includes(31) ? [[MATCH_ROW]] : [[]],
     );
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     for (let teamId = 1; teamId <= MAX_PENDING_PER_TRANSACTION; teamId += 1) {
@@ -550,7 +561,7 @@ describe("resolveBotLogs", () => {
   });
 
   it("resolveBotLogs_failedReadInSharedMap_laterCallRetries", async () => {
-    const execute = jest.fn<() => Promise<unknown>>();
+    const execute = jest.fn<SqlQuery>();
     execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
     execute.mockResolvedValue([[OPEN_MATCH_ROW]]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
@@ -578,7 +589,7 @@ describe("resolveBotLogs", () => {
   });
 
   it("resolveBotLogs_refereeEntryQueuedBehindLogLines_resolvesFirst", async () => {
-    const { execute, drain } = heldQueries((params) => (Number(params?.[0]) === 31 ? [OPEN_MATCH_ROW] : [TOURNAMENT_ROW]));
+    const { execute, drain } = heldQueries((params) => (Number(param(params)) === 31 ? [OPEN_MATCH_ROW] : [TOURNAMENT_ROW]));
     const batch = () => Array.from({ length: 4 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
 
     // Huit lignes de journal : trois en cours, cinq en attente ; l'alerte arrive après elles.
@@ -594,8 +605,8 @@ describe("resolveBotLogs", () => {
   it("resolveBotLogs_resolutionsHangPastTimeout_releaseTheirSlots", async () => {
     jest.useFakeTimers();
     try {
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-        Number(params?.[0]) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
+      const execute = jest.fn<SqlQuery>((_sql, params) =>
+        Number(param(params)) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
       );
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
@@ -617,7 +628,7 @@ describe("resolveBotLogs", () => {
   });
 
   it("resolveBotLogs_roundAlertWithManyMatches_readsAtMostThreeAtOnce", async () => {
-    const { state, drain } = heldQueries((params) => [{ ...OPEN_MATCH_ROW, id: Number(params?.[0]) }]);
+    const { state, drain } = heldQueries((params) => [{ ...OPEN_MATCH_ROW, id: Number(param(params)) }]);
     const roundMatchIds = [31, 32, 33, 34, 35, 36];
 
     const resolving = resolveBotLogs([
@@ -652,8 +663,8 @@ describe("resolveBotLogs", () => {
 
   it("resolveBotLogs_laterEntryResolvesFirst_keepsEntryOrder", async () => {
     let releaseFirst: () => void = () => undefined;
-    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-      params?.[0] === 12
+    const execute = jest.fn<SqlQuery>((_sql, params) =>
+      param(params) === 12
         ? new Promise((resolve) => {
             releaseFirst = () => resolve([[TOURNAMENT_ROW]]);
           })
@@ -682,7 +693,7 @@ describe("resolveBotLogs", () => {
   });
 
   it("perd la ligne fautive, pas les suivantes", async () => {
-    const execute = jest.fn<() => Promise<unknown>>();
+    const execute = jest.fn<SqlQuery>();
     execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
     execute.mockResolvedValueOnce([[TOURNAMENT_ROW]]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
@@ -766,7 +777,8 @@ describe("resolveBotLogs resource bounds", () => {
     // Pool de 25 (`lib/server/database.ts`) : résolutions en cours (places + figées) × lectures de manche.
     // Au moins dix connexions restent aux requêtes des joueurs quand la base ralentit.
     // Les résolutions oubliées tiennent encore leur connexion : le plafond les compte.
-    expect(BOT_LOG_RESOLVE_UNSETTLED_MAX * ROUND_ALERT_READ_CONCURRENCY).toBeLessThanOrEqual(25 - 10);
+    // Avec les écritures d'après remise, au moins huit connexions restent aux joueurs.
+    expect(BOT_LOG_RESOLVE_UNSETTLED_MAX * ROUND_ALERT_READ_CONCURRENCY + BOT_LOG_AFTER_FLUSH_SLOTS).toBeLessThanOrEqual(25 - 8);
     expect(BOT_LOG_RESOLVE_INFLIGHT_MAX).toBeGreaterThanOrEqual(BOT_LOG_RESOLVE_SLOTS);
     expect(BOT_LOG_RESOLVE_UNSETTLED_MAX).toBeGreaterThan(BOT_LOG_RESOLVE_INFLIGHT_MAX);
   });
@@ -776,8 +788,8 @@ describe("resolveBotLogs resource bounds", () => {
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       const gate = createResolveGate();
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-        Number(params?.[0]) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
+      const execute = jest.fn<SqlQuery>((_sql, params) =>
+        Number(param(params)) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
       );
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = Array.from({ length: BOT_LOG_RESOLVE_INFLIGHT_MAX - 1 }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
@@ -796,7 +808,7 @@ describe("resolveBotLogs resource bounds", () => {
       );
 
       expect(lines).toHaveLength(1);
-      expect(execute.mock.calls.filter(([, params]) => Number(params?.[0]) === 13)).toHaveLength(1);
+      expect(execute.mock.calls.filter(([, params]) => Number(param(params)) === 13)).toHaveLength(1);
       expect(errors.mock.calls.some(([line]) => String(line).startsWith("[bot-logs] BOT_LOG_RESOLUTION_SHED"))).toBe(true);
     } finally {
       errors.mockRestore();
@@ -810,8 +822,8 @@ describe("resolveBotLogs resource bounds", () => {
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       const gate = createResolveGate();
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
-        Number(params?.[0]) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
+      const execute = jest.fn<SqlQuery>((_sql, params) =>
+        Number(param(params)) === 13 ? Promise.resolve([[{ ...TOURNAMENT_ROW, id: 13 }]]) : new Promise(() => undefined),
       );
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = Array.from({ length: BOT_LOG_RESOLVE_INFLIGHT_MAX }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
@@ -838,7 +850,7 @@ describe("resolveBotLogs resource bounds", () => {
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       const gate = createResolveGate();
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => new Promise(() => undefined));
+      const execute = jest.fn<SqlQuery>(() => new Promise(() => undefined));
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
       const stuck = (count: number) => Array.from({ length: count }, () => ({ kind: "tournament_started" as const, tournamentId: 12 }));
       const hanging = resolveBotLogs(stuck(BOT_LOG_RESOLVE_INFLIGHT_MAX), new Map(), gate);
@@ -857,6 +869,30 @@ describe("resolveBotLogs resource bounds", () => {
       errors.mockRestore();
       jest.useRealTimers();
     }
+  });
+
+  it("resolveBotLogs_oneReadFailsOtherHung_ticketHeldUntilBothSettle", async () => {
+    // La lecture du tournoi échoue vite, celle de l'engagé tient sa connexion : la
+    // résolution reste comptée jusqu'au retour des deux.
+    const gate = createResolveGate();
+    let releaseEntrant: () => void = () => undefined;
+    const execute = jest.fn<SqlQuery>((sql) =>
+      String(sql).includes("FROM bg_teams WHERE id")
+        ? new Promise((resolve) => {
+            releaseEntrant = () => resolve([[{ name: "Les Renards" }]]);
+          })
+        : Promise.reject(new Error("ECONNRESET")),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const resolving = resolveBotLogs([{ kind: "registration", tournamentId: 12, teamId: 7, byStaff: false }], new Map(), gate);
+    for (let turn = 0; turn < 5; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+    const countWhileHung = gate.count;
+    releaseEntrant();
+
+    expect(await resolving).toEqual([]);
+    expect(countWhileHung).toBe(1);
+    expect(gate.count).toBe(0);
   });
 
   it("resolveBotLogs_normalResolution_setsNoAbandonTimer", async () => {
@@ -896,10 +932,10 @@ describe("resolveBotLogs resource bounds", () => {
   it("resolveBotLogs_roundAlertTimesOut_startsNoMoreMatchReads", async () => {
     jest.useFakeTimers();
     try {
-      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(
+      const execute = jest.fn<SqlQuery>(
         (_sql, params) =>
           new Promise((resolve) => {
-            setTimeout(() => resolve([[{ ...OPEN_MATCH_ROW, id: Number(params?.[0]) }]]), BOT_LOG_RESOLVE_TIMEOUT_MS + 10_000);
+            setTimeout(() => resolve([[{ ...OPEN_MATCH_ROW, id: Number(param(params)) }]]), BOT_LOG_RESOLVE_TIMEOUT_MS + 10_000);
           }),
       );
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
@@ -918,9 +954,9 @@ describe("resolveBotLogs resource bounds", () => {
   });
 
   it("resolveBotLogs_roundAlertReadFails_stopsReadingTheRestOfTheRound", async () => {
-    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) => {
-      if (Number(params?.[0]) === 31) throw new Error("ER_CON_COUNT_ERROR");
-      return [[{ ...OPEN_MATCH_ROW, id: Number(params?.[0]) }]];
+    const execute = jest.fn<SqlQuery>(async (_sql, params) => {
+      if (Number(param(params)) === 31) throw new Error("ER_CON_COUNT_ERROR");
+      return [[{ ...OPEN_MATCH_ROW, id: Number(param(params)) }]];
     });
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 

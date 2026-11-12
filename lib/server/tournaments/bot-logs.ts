@@ -81,7 +81,7 @@ import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { createInFlightGate, createLimiter, mapInBatches, withDeadline, type InFlightGate } from "@/lib/shared/in-batches";
+import { DeadlineError, createInFlightGate, createLimiter, mapInBatches, withDeadline, type InFlightGate } from "@/lib/shared/in-batches";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -869,13 +869,15 @@ const CLEAR_ALERTS_CHUNK = 200;
 
 async function clearRefereeAlertsOnPool(matchIds: ReadonlySet<number>): Promise<void> {
   if (matchIds.size === 0) return;
-  try {
-    const db = await getDatabase();
-    for (const chunk of chunkIds([...matchIds], CLEAR_ALERTS_CHUNK)) {
-      await db.execute(`DELETE FROM bg_referee_alerts WHERE match_id IN (${sqlPlaceholders(chunk.length)})`, chunk);
-    }
-  } catch {
-    // Meilleur effort.
+  for (const chunk of chunkIds([...matchIds], CLEAR_ALERTS_CHUNK)) {
+    await afterFlushSlot(async () => {
+      try {
+        const db = await getDatabase();
+        await db.execute(`DELETE FROM bg_referee_alerts WHERE match_id IN (${sqlPlaceholders(chunk.length)})`, chunk);
+      } catch {
+        // Meilleur effort.
+      }
+    });
   }
 }
 
@@ -1061,13 +1063,28 @@ async function releaseRoundClaims(connection: PoolConnection, claimIds: readonly
  * manche sans escalade, ce qui est l'état d'avant.
  */
 async function releaseRefereeAlertOnPool(claimId: number): Promise<void> {
-  try {
-    const db = await getDatabase();
-    await db.execute(RELEASE_ALERT_SQL, [claimId]);
-  } catch {
-    // Meilleur effort.
-  }
+  await afterFlushSlot(async () => {
+    try {
+      const db = await getDatabase();
+      await db.execute(RELEASE_ALERT_SQL, [claimId]);
+    } catch {
+      // Meilleur effort.
+    }
+  });
 }
+
+/**
+ * Écritures d'après remise (réservations rendues, réservations des manches tranchées
+ * effacées) en même temps, au plus, pour **tout le module** : chaque vidage en fait une à
+ * la fois, mais les vidages qui se chevauchent (une base lente, un commit après l'autre)
+ * en feraient autant que de vidages. Avec les lectures de résolution
+ * ({@link BOT_LOG_RESOLVE_UNSETTLED_MAX} × {@link ROUND_ALERT_READ_CONCURRENCY}), au plus
+ * 17 des 25 connexions du pool vont au journal du bot.
+ */
+export const BOT_LOG_AFTER_FLUSH_SLOTS = 2;
+
+/** Borne partagée de {@link BOT_LOG_AFTER_FLUSH_SLOTS}. */
+const afterFlushSlot = createLimiter(BOT_LOG_AFTER_FLUSH_SLOTS);
 
 /**
  * Entrées résolues en même temps par **un** appel de `resolveBotLogs` : assez pour
@@ -1089,11 +1106,10 @@ export const ROUND_ALERT_READ_CONCURRENCY = 3;
  * et les résolutions abandonnées au délai mais encore en cours sont comptées en plus
  * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}), et celles qu'un abandon a oubliées aussi, jusqu'à
  * leur retour ({@link BOT_LOG_RESOLVE_UNSETTLED_MAX}) : 5 × 3 = 15 connexions au pire pour
- * les **lectures de résolution**, et au moins dix des 25 du pool restent aux requêtes
- * des joueurs quand la base ralentit, quel que soit le nombre de vidages qui se
- * chevauchent — `bot-logs.test.ts` le vérifie sur les constantes. La remise qui suit
- * (réservations rendues, vidage avant alerte) prend au plus une connexion à la fois
- * par vidage et reste hors de cette borne.
+ * les **lectures de résolution**, plus {@link BOT_LOG_AFTER_FLUSH_SLOTS} pour les écritures
+ * d'après remise (réservations rendues ou effacées) : au moins huit des 25 du pool restent
+ * aux requêtes des joueurs quand la base ralentit, quel que soit le nombre de vidages qui
+ * se chevauchent — `bot-logs.test.ts` le vérifie sur les constantes.
  */
 export const BOT_LOG_RESOLVE_SLOTS = 3;
 
@@ -1111,8 +1127,13 @@ export const BOT_LOG_RESOLVE_INFLIGHT_MAX = BOT_LOG_RESOLVE_SLOTS + 1;
  * Résolutions dont la requête n'est pas revenue, au plus, **oubliées comprises**
  * ({@link BOT_LOG_RESOLVE_ABANDON_MS}) : une résolution oubliée rend sa place parmi
  * {@link BOT_LOG_RESOLVE_INFLIGHT_MAX} mais tient encore sa connexion, elle compte ici
- * jusqu'à son vrai retour (une connexion morte finit par lever une erreur, et la place
- * revient). Un abandon ne fait donc jamais dépasser la part du pool réservée aux résolutions.
+ * jusqu'à son vrai retour (une connexion morte lève une erreur en une douzaine de minutes
+ * au plus, sondes TCP du pool `DB_KEEPALIVE_INITIAL_DELAY_MS`, et la place revient). Un
+ * abandon ne fait donc jamais dépasser la part du pool réservée aux résolutions ; en
+ * retour, cinq résolutions bloquées arrêtent journal et alertes jusqu'au retour de l'une
+ * d'elles (refus journalisés). Le plafond compte des résolutions, pas des connexions :
+ * plusieurs résolutions qui attendent une même lecture partagée ({@link MatchReads}) y
+ * comptent chacune — plus tôt atteint, jamais dépassé.
  */
 export const BOT_LOG_RESOLVE_UNSETTLED_MAX = BOT_LOG_RESOLVE_INFLIGHT_MAX + 1;
 
@@ -1134,10 +1155,10 @@ const resolveSlot = createLimiter(BOT_LOG_RESOLVE_SLOTS, BOT_LOG_RESOLVE_QUEUE_M
 /**
  * Durée au-delà de laquelle une résolution abandonnée dont la requête n'est toujours pas
  * revenue cesse d'être comptée ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}), compté à partir du
- * délai de la résolution : une connexion à moitié ouverte (coupure réseau) ne bloque pas
- * tout le journal et toutes les alertes jusqu'au redémarrage, dans la limite de
- * {@link BOT_LOG_RESOLVE_UNSETTLED_MAX}. Bien au-delà du délai d'une résolution, et
- * l'oubli est journalisé.
+ * délai de la résolution : une requête lente ne tient pas une des places comptées
+ * au-delà, dans la limite de {@link BOT_LOG_RESOLVE_UNSETTLED_MAX} (qu'elle continue
+ * d'occuper jusqu'à son retour). Bien au-delà du délai d'une résolution, et l'oubli est
+ * journalisé.
  */
 export const BOT_LOG_RESOLVE_ABANDON_MS = 5 * 60_000;
 
@@ -1146,9 +1167,6 @@ const SHED_LOG_COOLDOWN_MS = 60_000;
 
 /** Journal « résolution refusée » d'un compte : une ligne par minute au plus, le reste compté. */
 type ShedLog = { pending: number; lastAt: number; timer?: ReturnType<typeof setTimeout> };
-
-/** Journaux de refus, un par compte (celui du module, ou celui d'un test). */
-const shedLogs = new WeakMap<InFlightGate, ShedLog>();
 
 /** Écrit le compte des refus en attente, s'il y en a. */
 function writeShedLine(log: ShedLog, now: number): void {
@@ -1159,31 +1177,29 @@ function writeShedLine(log: ShedLog, now: number): void {
 }
 
 /**
- * Note une résolution refusée faute de place : une ligne au journal par minute, au plus,
- * avec le compte ; les refus tus pendant la minute sont écrits à sa fin, jamais perdus.
+ * Journal des résolutions refusées faute de place, propre à un compte (passé à
+ * `createInFlightGate` comme `onShed`) : une ligne au journal par minute, au plus, avec
+ * le compte ; les refus tus pendant la minute sont écrits à sa fin, jamais perdus.
  *
- * @param gate Compte qui a refusé (chaque compte a son propre rythme).
+ * @returns La fonction à appeler à chaque refus.
  */
-function noteShedResolution(gate: InFlightGate): void {
-  let log = shedLogs.get(gate);
-  if (!log) {
-    log = { pending: 0, lastAt: Number.NEGATIVE_INFINITY };
-    shedLogs.set(gate, log);
-  }
-  const current = log;
-  current.pending += 1;
-  const now = Date.now();
-  const wait = current.lastAt + SHED_LOG_COOLDOWN_MS - now;
-  if (wait <= 0) {
-    writeShedLine(current, now);
-    return;
-  }
-  if (current.timer !== undefined) return;
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
-    writeShedLine(current, Date.now());
-  }, wait);
-  if (typeof current.timer === "object" && current.timer !== null && "unref" in current.timer) current.timer.unref();
+function createShedLogger(): () => void {
+  const log: ShedLog = { pending: 0, lastAt: Number.NEGATIVE_INFINITY };
+  return () => {
+    log.pending += 1;
+    const now = Date.now();
+    const wait = log.lastAt + SHED_LOG_COOLDOWN_MS - now;
+    if (wait <= 0) {
+      writeShedLine(log, now);
+      return;
+    }
+    if (log.timer !== undefined) return;
+    log.timer = setTimeout(() => {
+      log.timer = undefined;
+      writeShedLine(log, Date.now());
+    }, wait);
+    if (typeof log.timer === "object" && log.timer !== null && "unref" in log.timer) log.timer.unref();
+  };
 }
 
 /**
@@ -1194,7 +1210,13 @@ function noteShedResolution(gate: InFlightGate): void {
  * @returns Un compte vide.
  */
 export function createResolveGate(onForgotten: () => void = () => undefined): InFlightGate {
-  return createInFlightGate(BOT_LOG_RESOLVE_INFLIGHT_MAX, BOT_LOG_RESOLVE_ABANDON_MS, onForgotten, BOT_LOG_RESOLVE_UNSETTLED_MAX);
+  return createInFlightGate(
+    BOT_LOG_RESOLVE_INFLIGHT_MAX,
+    BOT_LOG_RESOLVE_ABANDON_MS,
+    onForgotten,
+    BOT_LOG_RESOLVE_UNSETTLED_MAX,
+    createShedLogger(),
+  );
 }
 
 /**
@@ -1295,11 +1317,9 @@ function resolveWithinDeadline(
   reads: MatchReads,
   gate: InFlightGate,
 ): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
+  // Un refus est journalisé par le compte lui-même (`onShed`).
   const ticket = gate.tryEnter();
-  if (!ticket) {
-    noteShedResolution(gate);
-    return Promise.resolve(null);
-  }
+  if (!ticket) return Promise.resolve(null);
   const leave = (): void => ticket.leave();
   const running = withDeadline((signal) => {
     const work = resolveOne(entry, reads, signal);
@@ -1307,7 +1327,7 @@ function resolveWithinDeadline(
     return work;
   }, BOT_LOG_RESOLVE_TIMEOUT_MS);
   running.catch((error: unknown) => {
-    if (error instanceof Error && error.name === "TimeoutError") ticket.expire();
+    if (error instanceof DeadlineError) ticket.expire();
   });
   return running;
 }
@@ -1484,13 +1504,26 @@ async function resolveTournamentCreatedLog(
   return message;
 }
 
+/**
+ * Lit un tournoi et un engagé en même temps, et ne rend la main (résultat ou première
+ * erreur) qu'une fois **les deux** requêtes revenues : une résolution reste comptée
+ * ({@link BOT_LOG_RESOLVE_INFLIGHT_MAX}) tant qu'une de ses lectures tient une connexion,
+ * même si l'autre a déjà échoué.
+ */
+async function loadTournamentAndEntrant(
+  tournamentId: number,
+  teamId: number,
+): Promise<[TournamentLogRow | null, string | null]> {
+  const [tournament, entrantName] = await Promise.allSettled([loadTournament(tournamentId), loadEntrantName(teamId)]);
+  if (tournament.status === "rejected") throw tournament.reason;
+  if (entrantName.status === "rejected") throw entrantName.reason;
+  return [tournament.value, entrantName.value];
+}
+
 async function resolveRegistrationLog(
   entry: Extract<PendingBotLog, { kind: "registration" }>,
 ): Promise<string | null> {
-  const [tournament, entrantName] = await Promise.all([
-    loadTournament(entry.tournamentId),
-    loadEntrantName(entry.teamId),
-  ]);
+  const [tournament, entrantName] = await loadTournamentAndEntrant(entry.tournamentId, entry.teamId);
   if (!tournament || !entrantName) return null;
   return formatRegistrationLog({
     tournament: { id: Number(tournament.id), name: tournament.name },
@@ -1504,10 +1537,7 @@ async function resolveRegistrationLog(
 async function resolveForfeitLog(
   entry: Extract<PendingBotLog, { kind: "forfeit" }>,
 ): Promise<string | null> {
-  const [tournament, entrantName] = await Promise.all([
-    loadTournament(entry.tournamentId),
-    loadEntrantName(entry.teamId),
-  ]);
+  const [tournament, entrantName] = await loadTournamentAndEntrant(entry.tournamentId, entry.teamId);
   if (!tournament || !entrantName) return null;
   return formatForfeitLog({
     tournament: { id: Number(tournament.id), name: tournament.name },
@@ -1704,10 +1734,7 @@ async function resolveTournamentUnderfilledLog(
 async function resolveEndurancePenaltyLog(
   entry: Extract<PendingBotLog, { kind: "endurance_penalty" }>,
 ): Promise<string | null> {
-  const [tournament, entrantName] = await Promise.all([
-    loadTournament(entry.tournamentId),
-    loadEntrantName(entry.teamId),
-  ]);
+  const [tournament, entrantName] = await loadTournamentAndEntrant(entry.tournamentId, entry.teamId);
   if (!tournament || !entrantName) return null;
   return formatEndurancePenaltyLog({
     tournament: { id: Number(tournament.id), name: tournament.name },
@@ -1720,10 +1747,7 @@ async function resolveEndurancePenaltyLog(
 async function resolveEndurancePenaltyLiftedLog(
   entry: Extract<PendingBotLog, { kind: "endurance_penalty_lifted" }>,
 ): Promise<string | null> {
-  const [tournament, entrantName] = await Promise.all([
-    loadTournament(entry.tournamentId),
-    loadEntrantName(entry.teamId),
-  ]);
+  const [tournament, entrantName] = await loadTournamentAndEntrant(entry.tournamentId, entry.teamId);
   if (!tournament || !entrantName) return null;
   return formatEndurancePenaltyLiftedLog({
     tournament: { id: Number(tournament.id), name: tournament.name },

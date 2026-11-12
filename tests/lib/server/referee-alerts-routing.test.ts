@@ -10,6 +10,7 @@ import {
   flushBotLogs,
   ALERT_FLUSH_WAIT_MS,
   BOT_LOG_ORDER_WAIT_MS,
+  BOT_LOG_AFTER_FLUSH_SLOTS,
   BOT_LOG_RESOLVE_ABANDON_MS,
   BOT_LOG_RESOLVE_TIMEOUT_MS,
   markMatchResolved,
@@ -26,7 +27,7 @@ import {
   sendBotLog,
 } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
-import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlMock, type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 
 /**
@@ -351,6 +352,30 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
       .map((call) => ({ sql: String(call[0]), params: (call[1] ?? []) as unknown[] }))
       .filter((call) => call.sql.trim().startsWith("DELETE"));
   }
+
+  // Base lente : des vidages qui se chevauchent ne rendent pas chacun leurs réservations
+  // en même temps — la borne du module garde le pool aux joueurs.
+  it("releaseRefereeAlerts_overlappingFlushes_atMostTwoWritesInFlight", async () => {
+    let hold = true;
+    const execute = jest.fn<SqlQuery>((sql) => (hold && String(sql).trim().startsWith("DELETE") ? hungQuery() : Promise.resolve([[]])));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    for (let claimId = 1; claimId <= 5; claimId += 1) {
+      const connection = fakeConnection();
+      queueBotLog(connection, { kind: "score_report_stalled", matchId: 30 + claimId, claimId });
+      flushBotLogs(connection);
+    }
+    for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+
+    const inFlight = writes(execute).length;
+    // Remise à plat : les écritures en attente passent, la borne du module est rendue vide.
+    hold = false;
+    for (const settle of hungQueries.splice(0)) settle();
+    for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve));
+
+    expect(inFlight).toBe(BOT_LOG_AFTER_FLUSH_SLOTS);
+    expect(writes(execute)).toHaveLength(5);
+  });
 
   // Bot injoignable : la réservation posée en base doit être rendue, sinon la
   // manche reste bloquée et plus aucun balayage ne réessaiera.

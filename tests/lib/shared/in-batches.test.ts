@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createInFlightGate, createLimiter, inBatches, LimiterFullError, mapInBatches, URGENT_STREAK_MAX, withDeadline } from "@/lib/shared/in-batches";
+import { createInFlightGate, createLimiter, DeadlineError, inBatches, LimiterFullError, mapInBatches, URGENT_STREAK_MAX, withDeadline } from "@/lib/shared/in-batches";
 
 describe("inBatches", () => {
   it("traite chaque élément, jamais plus de `size` à la fois", async () => {
@@ -485,5 +485,39 @@ describe("createInFlightGate", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe("security cycle 3", () => {
+  it("withDeadline_timeout_rejectsWithDeadlineError", async () => {
+    // L'appelant reconnaît le délai par sa classe, jamais par un nom écrit à la main.
+    jest.useFakeTimers();
+    try {
+      const bounded = withDeadline(() => new Promise<string>(() => undefined), 1_000);
+      const outcome = expect(bounded).rejects.toBeInstanceOf(DeadlineError);
+
+      await jest.advanceTimersByTimeAsync(1_000);
+
+      await outcome;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("createInFlightGate_refused_callsOnShed", () => {
+    const onShed = jest.fn();
+    const gate = createInFlightGate(1, 60_000, undefined, undefined, onShed);
+    gate.tryEnter();
+
+    expect(gate.tryEnter()).toBeNull();
+    expect(onShed).toHaveBeenCalledTimes(1);
+  });
+
+  it("createInFlightGate_admitted_doesNotCallOnShed", () => {
+    const onShed = jest.fn();
+    const gate = createInFlightGate(1, 60_000, undefined, undefined, onShed);
+
+    expect(gate.tryEnter()).not.toBeNull();
+    expect(onShed).not.toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ jest.mock("@/lib/server/migration-lock", () => ({
   withMigrationLock: jest.fn(),
 }));
 
-import { getDatabase } from "@/lib/server/database";
+import { DB_KEEPALIVE_INITIAL_DELAY_MS, getDatabase } from "@/lib/server/database";
 
 const ENV = { DB_HOST: "db.test", DB_USER: "app", DB_PASSWORD: randomUUID(), DB_DATABASE: "bluegenji" };
 const saved: Record<string, string | undefined> = {};
@@ -48,6 +48,11 @@ describe("getDatabase", () => {
     expect(createPool).toHaveBeenCalledWith(
       expect.objectContaining({ host: "db.test", user: "app", database: "bluegenji", charset: "utf8mb4" }),
     );
+    // Sondes TCP dès 30 s : une connexion à moitié ouverte finit par lever une erreur.
+    expect(createPool).toHaveBeenCalledWith(
+      expect.objectContaining({ enableKeepAlive: true, keepAliveInitialDelay: DB_KEEPALIVE_INITIAL_DELAY_MS }),
+    );
+    expect(DB_KEEPALIVE_INITIAL_DELAY_MS).toBe(30_000);
     // La porte des migrations est franchie à chaque appel (elle seule mémorise).
     expect(runGate).toHaveBeenCalledTimes(2);
   });
