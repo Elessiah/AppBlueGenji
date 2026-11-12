@@ -136,7 +136,7 @@ describe("loadTournamentContacts", () => {
   // Revue de sécurité #594 : même nettoyage que la fenêtre de lancement
   // (`UNTRUSTED_NAMES.md`) — un nom ancien peut encore porter une commande de direction.
   it("loadTournamentContacts_bidiAndInvisibleInNames_returnsStrippedNames", async () => {
-    fakeDb([{ team_id: 10, team_name: "Dra‮gon", user_id: 1, pseudo: "No​va⁦", discord_tag: "nova" }]);
+    fakeDb([{ team_id: 10, team_name: "Dra\u202Egon", user_id: 1, pseudo: "No\u200Bva\u2066", discord_tag: "nova" }]);
 
     expect(await loadTournamentContacts(5)).toEqual([
       { teamId: 10, teamName: "Dragon", reachable: true, members: [{ userId: 1, pseudo: "Nova", discordTag: "nova" }] },
@@ -144,7 +144,7 @@ describe("loadTournamentContacts", () => {
   });
 
   it("loadTournamentContacts_namesOnlyInvisible_returnsDash", async () => {
-    fakeDb([{ team_id: 10, team_name: "‮​", user_id: 1, pseudo: "⁦", discord_tag: null }]);
+    fakeDb([{ team_id: 10, team_name: "\u202E\u200B", user_id: 1, pseudo: "\u2066", discord_tag: null }]);
 
     expect(await loadTournamentContacts(5)).toEqual([
       { teamId: 10, teamName: "—", reachable: false, members: [{ userId: 1, pseudo: "—", discordTag: null }] },
