@@ -4,6 +4,7 @@ import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
@@ -149,7 +150,7 @@ export async function blockImageHashesSafely(hashes: readonly string[], options:
       if (attempt === BLOCK_ATTEMPTS) {
         console.error(
           `[moderation] empreintes à bloquer à la main (bg_blocked_image_hashes) : ${hashes.join(", ")}`,
-          error,
+          failureReason(error),
         );
       }
     }

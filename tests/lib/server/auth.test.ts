@@ -248,7 +248,7 @@ describe("auth", () => {
         await expect(session).resolves.toBeUndefined();
         failUpdate?.(new Error("Lock wait timeout exceeded"));
         await jest.advanceTimersByTimeAsync(0);
-        expect(spy).toHaveBeenCalledWith("[auth] recruitment modal opt-out carry-over failed:", expect.any(Error));
+        expect(spy).toHaveBeenCalledWith("[auth] recruitment modal opt-out carry-over failed:", "Error");
       } finally {
         jest.useRealTimers();
         spy.mockRestore();

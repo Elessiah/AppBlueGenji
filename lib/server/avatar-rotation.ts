@@ -215,7 +215,7 @@ async function purgeHeldAvatarCopies(heldUrl: string, original: Buffer, detach: 
     await purge;
     return;
   }
-  void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", error));
+  void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", failureReason(error)));
 }
 
 /**

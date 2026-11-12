@@ -10,6 +10,7 @@ import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notificat
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { cancelPendingTeamInvitations, ghostAdminOverride, teamEverRegistered, userCanManageTeam } from "./access";
 import { refreshTeamViewers, teamViewerScope, type TeamViewerScope } from "./roster";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /*
  * Entrées dans une équipe : invitations envoyées par la gestion, demandes
@@ -311,7 +312,7 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
   // la demande n'existait que pour qui pensait à ouvrir la fiche. Jamais
   // attendu — la demande est enregistrée, le message n'est qu'un avertissement.
   void notifyTeamJoinRequest(teamId, userId).catch((error) =>
-    console.error("[teams] gestion non prévenue d'une demande d'adhésion", error),
+    console.error("[teams] gestion non prévenue d'une demande d'adhésion", failureReason(error)),
   );
   return "REQUESTED";
 }

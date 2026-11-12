@@ -11,6 +11,7 @@ import {
   reactivateAccount,
   reactivationCookieName,
 } from "@/lib/server/users/account-reactivation";
+import { failureReason } from "@/lib/server/failure-reason";
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
     // (`reactivated: true` : l'écran annonce aussi la réactivation).
     reactivated = await reactivateAccount(token);
   } catch (error) {
-    console.error("[auth] réactivation impossible", error instanceof Error ? error.message : error);
+    console.error("[auth] réactivation impossible", failureReason(error));
     return fail("REACTIVATION_FAILED", 500);
   }
   clearTicketCookie(cookieStore);
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     }
     // Le compte est réactivé et le ticket servi : dire un échec enverrait le
     // joueur réessayer un ticket « expiré ». Il lui reste à se connecter.
-    console.error("[auth] session non ouverte après réactivation", error instanceof Error ? error.message : error);
+    console.error("[auth] session non ouverte après réactivation", failureReason(error));
     return fail(REACTIVATED_LOGIN_REQUIRED, 503, { reactivated: true, pseudoChanged });
   }
   return ok({ reactivated: true, pseudoChanged });
@@ -87,7 +88,7 @@ export async function DELETE(req: Request) {
   try {
     await discardReactivationTicket(token);
   } catch (error) {
-    console.error("[auth] ticket de réactivation non retiré", error instanceof Error ? error.message : error);
+    console.error("[auth] ticket de réactivation non retiré", failureReason(error));
   }
   return ok({ discarded: true });
 }

@@ -38,8 +38,55 @@ const sources = [join(ROOT, "lib", "server"), join(ROOT, "app", "api")]
   .map((path) => relative(ROOT, path))
   .filter((path) => !NOT_YET_SWEPT.some((prefix) => path.startsWith(prefix)));
 
-/** `console.error("…", error);` — l'objet d'erreur passé tel quel en dernier argument. */
-const RAW_ERROR_LOG = /console\.(?:error|warn)\([^;]*,\s*(?:error|err|e)\s*\);/;
+/** `source` à longueur égale, le contenu de ses chaînes effacé : leurs virgules et parenthèses ne comptent pas. */
+function maskStrings(source: string): string {
+  return source.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, (literal) =>
+    literal[0] + " ".repeat(literal.length - 2) + literal[0],
+  );
+}
+
+/**
+ * Les arguments (texte d'origine) d'un appel `console.error(` / `console.warn(`
+ * dont la parenthèse ouvrante est à `open`, coupés aux virgules de premier
+ * niveau. Un appel sur plusieurs lignes, ou passé dans une flèche
+ * (`.catch((error) => console.error("…", error))`), se lit comme les autres.
+ */
+function callArguments(source: string, masked: string, open: number): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let start = open + 1;
+  for (let index = open; index < masked.length; index += 1) {
+    const char = masked[index];
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    const closes = depth === 0;
+    if (closes || (char === "," && depth === 1)) {
+      args.push(source.slice(start, index));
+      start = index + 1;
+    }
+    if (closes) return args;
+  }
+  return args;
+}
+
+/**
+ * Un argument qui livre l'erreur elle-même : la variable d'erreur nue, son
+ * `.message` ou sa `.stack` (texte du pilote, valeur en double citée), ou sa
+ * conversion en texte.
+ */
+const RAW_ERROR_ARGUMENT = /^\s*(?:error|err|e|reason|cause)\s*$|\.(?:message|stack)\b|String\(\s*(?:error|err|e|reason)\s*\)/;
+
+/** Les appels d'échec de `source` qui passent l'erreur brute (après leur étiquette). */
+function rawErrorLogs(source: string): string[] {
+  const offenders: string[] = [];
+  const masked = maskStrings(source);
+  for (const match of source.matchAll(/console\.(?:error|warn)\(/g)) {
+    const args = callArguments(source, masked, (match.index ?? 0) + match[0].length - 1);
+    const interpolated = /\$\{\s*(?:error|err|e)\s*\}|\$\{[^}]*\.message\b/.test(args[0] ?? "");
+    if (interpolated || args.slice(1).some((arg) => RAW_ERROR_ARGUMENT.test(arg))) offenders.push(args.join(",").trim());
+  }
+  return offenders;
+}
 
 describe("journaux d'échec : un code, jamais l'objet d'erreur", () => {
   it("sources_sweptFolders_found", () => {
@@ -48,14 +95,28 @@ describe("journaux d'échec : un code, jamais l'objet d'erreur", () => {
   });
 
   it("sources_noRawErrorObjectLogged", () => {
-    const offenders = sources.filter((path) => RAW_ERROR_LOG.test(readFileSync(join(ROOT, path), "utf8")));
+    const offenders = sources.filter((path) => rawErrorLogs(readFileSync(join(ROOT, path), "utf8")).length > 0);
 
     expect(offenders).toEqual([]);
   });
 
-  it("rawErrorLogPattern_matchesRawAndIgnoresCodeOnly", () => {
-    expect(RAW_ERROR_LOG.test(`console.error("[x] échec", error);`)).toBe(true);
-    expect(RAW_ERROR_LOG.test(`console.warn("[x] échec", err);`)).toBe(true);
-    expect(RAW_ERROR_LOG.test(`console.error("[x] échec", failureReason(error));`)).toBe(false);
+  it("rawErrorLogs_rawForms_detected", () => {
+    expect(rawErrorLogs(`console.error("[x] échec", error);`)).toHaveLength(1);
+    expect(rawErrorLogs(`console.warn("[x] échec", err);`)).toHaveLength(1);
+    expect(rawErrorLogs(`p.catch((error) => console.error("[x] échec", error));`)).toHaveLength(1);
+    expect(rawErrorLogs(`console.error(
+  "[x] échec",
+  error,
+);`)).toHaveLength(1);
+    expect(rawErrorLogs(`console.error("[x]", error instanceof Error ? error.message : error);`)).toHaveLength(1);
+    expect(rawErrorLogs(`console.error("[x]", (error as Error).message);`)).toHaveLength(1);
+    expect(rawErrorLogs("console.error(`[x] ${error}`);")).toHaveLength(1);
+  });
+
+  it("rawErrorLogs_codeOnly_ignored", () => {
+    expect(rawErrorLogs(`console.error("[x] échec", failureReason(error));`)).toEqual([]);
+    expect(rawErrorLogs("console.error(`[x] échec : ${failureReason(error)}`);")).toEqual([]);
+    expect(rawErrorLogs(`console.error("[x] « (a, b) » échec, code", failureReason(e));`)).toEqual([]);
+    expect(rawErrorLogs(`console.warn("[x] reporté", tournamentId);`)).toEqual([]);
   });
 });

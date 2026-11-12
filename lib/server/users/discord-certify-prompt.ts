@@ -21,6 +21,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { forgetCertificationPromptsOf } from "@/lib/server/tournaments/certification-prompt-cache";
 import { certifyPromptFor, type CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
+import { failureReason } from "@/lib/server/failure-reason";
 
 type PromptRow = RowDataPacket & {
   discord_id: string | null;
@@ -70,7 +71,7 @@ export async function loadDiscordCertifyPrompt(
       // Jamais attendue : la réponse (`null`) n'en dépend pas, et la page
       // (mise en page racine) n'a pas à payer un aller-retour de plus.
       void markDiscordCertifyPromptSeen(userId, tokenHash).catch((error: unknown) =>
-        console.error("[discord-certify-prompt] marque non levée", error),
+        console.error("[discord-certify-prompt] marque non levée", failureReason(error)),
       );
       return null;
     }
@@ -123,6 +124,6 @@ export async function recordDiscordCertifyPromptOff(userId: number): Promise<boo
   // marque restée (il filtre sur `discord_certify_prompt_dismissed_at`).
   await db
     .execute(`UPDATE bg_user_sessions SET certify_prompt_due = 0 WHERE user_id = ? AND certify_prompt_due = 1`, [userId])
-    .catch((error: unknown) => console.error("[discord-certify-prompt] sessions non levées", error));
+    .catch((error: unknown) => console.error("[discord-certify-prompt] sessions non levées", failureReason(error)));
   return true;
 }

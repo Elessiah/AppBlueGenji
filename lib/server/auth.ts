@@ -233,7 +233,7 @@ async function carryRecruitmentModalOff(
   // profil » n'est pas recouvert par le vieux cookie d'un autre navigateur.
   const write = carryRecruitmentModalOffFromBrowser(userId).then(
     () => undefined,
-    (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", error),
+    (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", failureReason(error)),
   );
   // Attente bornée : une ligne de compte verrouillée (attente de verrou
   // jusqu'à `innodb_lock_wait_timeout`) ne fait pas patienter la connexion ;

@@ -245,7 +245,7 @@ export async function suspendAccount(
         push: (locale) => suspensionPush("SUSPENDED", locale),
       }),
     )
-    .catch((error) => console.error("[moderation] joueur non prévenu de sa suspension", error));
+    .catch((error) => console.error("[moderation] joueur non prévenu de sa suspension", failureReason(error)));
   return view;
 }
 
@@ -279,6 +279,6 @@ export async function liftSuspension(targetUserId: number, actor: StaffActor): P
         push: (locale) => suspensionPush("LIFTED", locale),
       }),
     )
-    .catch((error) => console.error("[moderation] joueur non prévenu de la levée", error));
+    .catch((error) => console.error("[moderation] joueur non prévenu de la levée", failureReason(error)));
   return active.id;
 }

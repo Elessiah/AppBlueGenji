@@ -160,7 +160,7 @@ function scheduleDueAccountDeletions(now: number = Date.now()): void {
     .catch((error: unknown) => {
       console.error(
         "[deleted-accounts] Passage horaire impossible :",
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     });
 }
@@ -186,7 +186,7 @@ export async function runDueAccountDeletionsExclusively(): Promise<void> {
       } catch (error) {
         console.error(
           "[deleted-accounts] Forfaits des comptes supprimés reportés :",
-          error instanceof Error ? error.message : error,
+          failureReason(error),
         );
       }
       try {
@@ -198,7 +198,7 @@ export async function runDueAccountDeletionsExclusively(): Promise<void> {
       } catch (error) {
         console.error(
           "[deleted-accounts] Suppressions définitives impossibles :",
-          error instanceof Error ? error.message : error,
+          failureReason(error),
         );
       }
     });
@@ -276,7 +276,7 @@ function scheduleDeletedAccountsReconciliation(): void {
     .catch((error: unknown) => {
       console.error(
         "[deleted-accounts] Rattrapage des comptes supprimés impossible :",
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     });
 }

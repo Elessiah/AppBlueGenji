@@ -140,7 +140,7 @@ describe("recordDiscordCertifyPromptOff — « Ne plus voir »", () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
     expect(await recordDiscordCertifyPromptOff(7)).toBe(true);
     expect(execute).toHaveBeenCalledTimes(2);
-    expect(log).toHaveBeenCalledWith("[discord-certify-prompt] sessions non levées", expect.any(Error));
+    expect(log).toHaveBeenCalledWith("[discord-certify-prompt] sessions non levées", "Error");
     log.mockRestore();
   });
 

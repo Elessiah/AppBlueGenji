@@ -332,7 +332,7 @@ export function notifyTeamLogoRemoved(
         push: (locale) => moderationPush({ kind: "REMOVED", teamName, teamId, reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", error));
+    .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", failureReason(error)));
 }
 
 /**
@@ -353,7 +353,7 @@ export function notifyUserAvatarRemoved(userId: number, reportId: number | null,
         push: (locale) => moderationPush({ kind: "REMOVED", reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", error));
+    .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", failureReason(error)));
 }
 
 /**
@@ -641,7 +641,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
         push: (locale) => moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] équipe non prévenue du masquage", error));
+    .catch((error) => console.error("[moderation] équipe non prévenue du masquage", failureReason(error)));
 
   return {
     id: quarantineId,
@@ -736,7 +736,7 @@ export async function hideUserAvatarForReport(
         push: (locale) => moderationPush({ kind: "HIDDEN", reportId }, locale),
       }),
     )
-    .catch((error) => console.error("[moderation] joueur non prévenu du masquage", error));
+    .catch((error) => console.error("[moderation] joueur non prévenu du masquage", failureReason(error)));
 
   return {
     id: quarantineId,
@@ -1152,7 +1152,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
             moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }, locale),
         }),
       )
-      .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
+      .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", failureReason(error)));
   } else {
     // Rétabli à son adresse d'origine, déjà vue de tous. Si le joueur a masqué
     // son avatar pendant la quarantaine, la bascule n'a rien pu renommer
@@ -1181,7 +1181,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
           push: (locale) => moderationPush({ kind: "RESTORED", reportId: null }, locale),
         }),
       )
-      .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", error));
+      .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", failureReason(error)));
   }
 }
 

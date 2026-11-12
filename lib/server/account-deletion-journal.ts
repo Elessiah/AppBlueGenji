@@ -152,7 +152,7 @@ export function recordAccountDeletion(
     console.error(
       `[account-deletion-journal] suppression du compte #${entry.userId} non consignée (${filePath}) — ` +
         "elle ne serait pas rejouée après restauration d'une sauvegarde antérieure :",
-      error,
+      failureReason(error),
     );
   });
 }
@@ -189,7 +189,7 @@ export function recordAccountReactivation(
   return written.catch((error: unknown) => {
     console.error(
       `[account-deletion-journal] réactivation du compte #${key.userId} non consignée (${filePath}) :`,
-      error,
+      failureReason(error),
     );
   });
 }

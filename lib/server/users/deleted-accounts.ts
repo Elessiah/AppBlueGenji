@@ -17,6 +17,7 @@ import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /** Ce que le rattrapage des comptes supprimés a fait. */
 export type DeletedAccountsReconciliation = {
@@ -97,7 +98,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   const solo = await settleDeletedSoloEntries().catch((error: unknown) => {
     console.error(
       "[deleted-accounts] Inscriptions solo des comptes supprimés reportées :",
-      error instanceof Error ? error.message : error,
+      failureReason(error),
     );
     return { withdrawn: 0, forfeited: 0 };
   });
@@ -135,7 +136,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   } catch (error) {
     console.error(
       "[deleted-accounts] Effacement des acceptations des conditions reporté au prochain démarrage :",
-      error instanceof Error ? error.message : error,
+      failureReason(error),
     );
   }
 
@@ -212,7 +213,7 @@ async function reconcileOneAccount(
     outcome.failed += 1;
     console.error(
       `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
-      error instanceof Error ? error.message : error,
+      failureReason(error),
     );
   } finally {
     connection?.release();
@@ -264,7 +265,7 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
     .catch((error: unknown) =>
       console.error(
         "[deleted-accounts] Purge des tickets de réactivation échus reportée :",
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       ),
     );
   const outcome = { finalized: 0, failed: 0 };
@@ -281,7 +282,7 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
       failedFinalizations.set(Number(row.id), Date.now() + FAILED_FINALIZATION_BACKOFF_MS);
       console.error(
         `[deleted-accounts] Suppression définitive du compte #${Number(row.id)} reportée :`,
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     }
   }

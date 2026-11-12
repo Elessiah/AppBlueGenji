@@ -1325,7 +1325,7 @@ export function schedulePurgeExpiredReports(now: number = Date.now()): void {
   // Les logos d'abord : un logo supprimé à l'échéance libère son signalement,
   // que la purge suivante peut alors effacer.
   void purgeDueQuarantines()
-    .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", error))
+    .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", failureReason(error)))
     .then(() => purgeExpiredReports())
-    .catch((error) => console.error("[reports] purge impossible", error));
+    .catch((error) => console.error("[reports] purge impossible", failureReason(error)));
 }

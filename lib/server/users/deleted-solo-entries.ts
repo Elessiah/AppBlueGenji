@@ -305,7 +305,7 @@ export async function forfeitSoloEntriesAfterCommit(
       if (error instanceof NamedLockUnavailableError) continue;
       console.error(
         `[account-deletion] forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     }
   }
@@ -357,7 +357,7 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
     } catch (error) {
       console.error(
         `[deleted-accounts] Inscriptions solo du compte #${userId} reportées au prochain passage :`,
-        error instanceof Error ? error.message : error,
+        failureReason(error),
       );
     }
   }

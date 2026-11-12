@@ -8,6 +8,7 @@ import {
   connectionLogIp,
   type ConnectionLogEvent,
 } from "@/lib/shared/connection-logs";
+import { failureReason } from "@/lib/server/failure-reason";
 
 /**
  * Écriture du journal des données de connexion (`bg_connection_logs`), et sa
@@ -55,7 +56,7 @@ export async function recordConnection(userId: number, event: ConnectionLogEvent
       [userId, event, ip],
     );
   } catch (error) {
-    console.error(`[connection-logs] écriture impossible (compte #${userId}) :`, (error as Error).message);
+    console.error(`[connection-logs] écriture impossible (compte #${userId}) :`, failureReason(error));
   }
   // À part de l'écriture : une insertion qui échoue ne doit pas arrêter la
   // purge. Elle suit aussi le trafic de la liste des tournois
@@ -63,7 +64,7 @@ export async function recordConnection(userId: number, event: ConnectionLogEvent
   try {
     await purgeExpiredConnectionLogs();
   } catch (error) {
-    console.error("[connection-logs] purge impossible :", (error as Error).message);
+    console.error("[connection-logs] purge impossible :", failureReason(error));
   }
 }
 
