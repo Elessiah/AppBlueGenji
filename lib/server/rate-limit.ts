@@ -210,7 +210,7 @@ function tokenState(rule: TokenBucketRule, tokens: number): { allowed: boolean; 
  * dizaine de pour cent des places, jamais tout : vider le seau rendrait ses
  * jetons à chaque réseau, celui qui le sature compris. Les évincés sont les
  * seaux **au moins à moitié pleins** (les moins chers à remettre à neuf), pris
- * dans l'ordre de la `Map` — celui de la dernière prise, chaque prise
+ * dans l'ordre de la `Map` — celui du dernier essai, chaque prise ou refus
  * réinsérant sa clé en fin — et, s'il n'y en a pas assez, les moins récemment
  * touchés. Deux parcours linéaires, sans tri : un tri O(n log n) par clé neuve
  * était un coût CPU déclenchable par rotation d'adresses.
@@ -240,9 +240,19 @@ export function takeTokenBucket(
   now: number = Date.now(),
 ): { allowed: boolean; remaining: number; retryAfterMs: number } {
   const bucket = tokenBucketOf(rule);
-  const tokens = tokensAt(rule, bucket.get(key), now);
-  if (tokens < 1) return tokenState(rule, tokens);
-  if (bucket.has(key)) bucket.delete(key);
+  const tracked = bucket.get(key);
+  const tokens = tokensAt(rule, tracked, now);
+  if (tokens < 1) {
+    // Refusée, la clé passe aussi en fin (état inchangé) : celle qui insiste
+    // au plafond reste la plus récemment touchée, évincée en dernier — sinon
+    // elle dériverait en tête et l'éviction lui rendrait ses jetons.
+    if (tracked) {
+      bucket.delete(key);
+      bucket.set(key, tracked);
+    }
+    return tokenState(rule, tokens);
+  }
+  if (tracked) bucket.delete(key);
   else makeRoomForTokenKey(rule, bucket, now);
   // Réinsérée en fin : l'ordre de la `Map` reste celui de la dernière prise.
   bucket.set(key, { tokens: tokens - 1, updatedAt: now });

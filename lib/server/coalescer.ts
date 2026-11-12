@@ -172,11 +172,13 @@ export function createCoalescer<T>(options: {
 
 /**
  * Annonce les rafales de tous les regroupeurs (arrêt du serveur), par lots
- * bornés ; passé `deadlineAt`, plus rien de neuf ne part et l'attente des
+ * bornés, au plus {@link FLUSH_ALL_BATCH} envois à la fois en tout ; passé `deadlineAt`, plus rien de neuf ne part et l'attente des
  * annonces chaînées s'arrête. Ne lève jamais.
  */
 export async function flushAllCoalescers(deadlineAt = Number.POSITIVE_INFINITY): Promise<void> {
-  await Promise.all([...registry].map((coalescer) => coalescer.flushAll(deadlineAt)));
+  // Un regroupeur après l'autre : le plafond de {@link FLUSH_ALL_BATCH} vaut
+  // pour tout l'arrêt, pas par regroupeur (8 × N envois simultanés sinon).
+  for (const coalescer of registry) await coalescer.flushAll(deadlineAt);
   // Puis les annonces chaînées hors rafale (`trackAnnouncement`), y compris
   // celles qui ne partaient qu'après une rafale qu'on vient d'annoncer.
   while (announcements.size > 0 && Date.now() < deadlineAt) await Promise.allSettled([...announcements]);

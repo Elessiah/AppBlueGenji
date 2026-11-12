@@ -514,6 +514,33 @@ describe("flushAll — lots bornés et échéance", () => {
     coalescer.reset();
   });
 
+  it("flushAllCoalescers_twoCoalescersWithFullBatches_neverExceedsBatchInFlight", async () => {
+    // Le plafond vaut pour tout l'arrêt : deux regroupeurs pleins ne lancent pas 2 × FLUSH_ALL_BATCH envois.
+    const releases: (() => void)[] = [];
+    const deliver = jest.fn(
+      (_first: number, _last: number) =>
+        new Promise<void>((resolve) => {
+          releases.push(resolve);
+        }),
+    );
+    const first = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    const second = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    for (let key = 0; key < FLUSH_ALL_BATCH; key += 1) {
+      first.add(`a${key}`, key);
+      second.add(`b${key}`, key);
+    }
+
+    const flushed = flushAllCoalescers();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(deliver).toHaveBeenCalledTimes(FLUSH_ALL_BATCH);
+    for (const release of releases.splice(0)) release();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(deliver).toHaveBeenCalledTimes(2 * FLUSH_ALL_BATCH);
+    for (const release of releases.splice(0)) release();
+    await flushed;
+  });
+
   it("flushAllCoalescers_deadlinePassed_doesNotWaitForTrackedAnnouncement", async () => {
     const never = new Promise<void>(() => undefined);
     trackAnnouncement(never);

@@ -205,6 +205,23 @@ describe("rate-limit — seau à jetons", () => {
     expect(takeTokenBucket(BUCKET, "k", 1_000).allowed).toBe(true);
   });
 
+  it("takeTokenBucket_refusedKeyStillHammering_survivesEviction", () => {
+    // Clé saturante insérée la première, puis neuf seaux à moins de moitié : la
+    // place se libère par les moins récemment touchés. Refusée juste avant, la
+    // clé saturante est récente — évincée, elle retrouverait ses jetons.
+    const rule: TokenBucketRule = { name: "bucket-evict-refused", capacity: 4, refillMs: 1_000_000, maxKeys: 10 };
+    for (let i = 0; i < 4; i += 1) takeTokenBucket(rule, "attacker", 0);
+    for (let key = 0; key < 9; key += 1) {
+      for (let i = 0; i < 3; i += 1) takeTokenBucket(rule, `legit-${key}`, 0);
+    }
+    takeTokenBucket(rule, "attacker", 0);
+
+    takeTokenBucket(rule, "new-key", 0);
+
+    expect(takeTokenBucket(rule, "attacker", 0).allowed).toBe(false);
+    expect(tokensLeft(rule, "legit-0", 0)).toBe(4);
+  });
+
   it("rend un jeton remboursé, jamais au-delà de la capacité", () => {
     takeTokenBucket(BUCKET, "k", 0);
     refundTokenBucket(BUCKET, "k", 0);
