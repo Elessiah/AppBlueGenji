@@ -22,6 +22,12 @@ type ToastType = "error" | "success" | "info";
  */
 export interface ToastOptions {
   lang?: string;
+  /**
+   * N'ajoute rien si la même notification (même texte, même type) est déjà
+   * affichée : un geste répété en rafale (sélection pleine d'un graphique) ne
+   * doit pas empiler le même message, ni le faire relire par un lecteur d'écran.
+   */
+  once?: boolean;
 }
 
 interface Toast {
@@ -35,6 +41,15 @@ interface ToastContextValue {
   showError: (message: string, options?: ToastOptions) => void;
   showSuccess: (message: string, options?: ToastOptions) => void;
   showInfo: (message: string, options?: ToastOptions) => void;
+}
+
+/**
+ * Pile après l'ajout d'une notification ; avec `once`, la pile reste telle
+ * quelle si le même texte du même type y est déjà.
+ */
+export function withToast<T extends { message: string; type: ToastType }>(prev: T[], toast: T, once: boolean): T[] {
+  if (once && prev.some((shown) => shown.message === toast.message && shown.type === toast.type)) return prev;
+  return [...prev, toast];
 }
 
 /** Durée d'affichage d'une notification, décompte suspendu exclu. */
@@ -59,21 +74,18 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
-  const add = useCallback((message: string, type: ToastType, lang?: string) => {
+  const add = useCallback((message: string, type: ToastType, options?: ToastOptions) => {
     const id = ++nextId.current;
-    setToasts((prev) => [...prev, { id, message, type, lang }]);
+    setToasts((prev) => withToast(prev, { id, message, type, lang: options?.lang }, options?.once === true));
   }, []);
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const showError = useCallback((message: string, options?: ToastOptions) => add(message, "error", options?.lang), [add]);
-  const showSuccess = useCallback(
-    (message: string, options?: ToastOptions) => add(message, "success", options?.lang),
-    [add],
-  );
-  const showInfo = useCallback((message: string, options?: ToastOptions) => add(message, "info", options?.lang), [add]);
+  const showError = useCallback((message: string, options?: ToastOptions) => add(message, "error", options), [add]);
+  const showSuccess = useCallback((message: string, options?: ToastOptions) => add(message, "success", options), [add]);
+  const showInfo = useCallback((message: string, options?: ToastOptions) => add(message, "info", options), [add]);
   // Valeur stable : un objet neuf à chaque rendu du fournisseur — donc à chaque
   // notification ajoutée *et* retirée — re-rendait tous les consommateurs de
   // `useToast`, fiche d'un tournoi et tout son plateau compris.

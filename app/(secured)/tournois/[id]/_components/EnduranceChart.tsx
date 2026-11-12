@@ -243,7 +243,12 @@ export function EnduranceChart({
   // Chaque poussée du flux apporte de nouveaux objets, même quand rien de ce
   // que lit le graphique n'a bougé : sans changement de contenu, on garde les
   // précédents (séries, ordre, légende et tableau ne se refont pas).
-  const inputKey = enduranceChartInputKey(pushedEndurance, pushedMatches);
+  // La clé elle-même ne se recalcule qu'à l'arrivée de nouveaux objets, pas à
+  // chaque survol ou focus (~800 `join` pour 64 engagés × 12 manches).
+  const inputKey = useMemo(
+    () => enduranceChartInputKey(pushedEndurance, pushedMatches),
+    [pushedEndurance, pushedMatches],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps -- la clé de contenu remplace les objets poussés.
   const { endurance, matches } = useMemo(() => ({ endurance: pushedEndurance, matches: pushedMatches }), [inputKey]);
 
@@ -280,7 +285,8 @@ export function EnduranceChart({
       const next = togglePick(pickRef.current.mode, pickRef.current.picked, teamId);
       setMode(next.mode);
       setPicked(next.picked);
-      if (next.full) showError(t(`endurance.chartPickMax${kind}`, { max: ENDURANCE_CHART_PICK_MAX }));
+      // Sélection pleine : un tap de plus ne réempile pas le même message.
+      if (next.full) showError(t(`endurance.chartPickMax${kind}`, { max: ENDURANCE_CHART_PICK_MAX }), { once: true });
     },
     [showError, t, kind],
   );
@@ -428,8 +434,9 @@ export function EnduranceChart({
     );
   }, [geometry, shown, lastRound, threshold, rounds, endurance.startPoints, endurance.playoffSize, t]);
 
-  // Légende : suit la manche, le mode, la sélection et les couleurs. Le survol
-  // ne reconstruit que les deux lignes concernées (lignes mémoïsées).
+  // Légende : suit la manche, le mode, la sélection et les couleurs. Un survol
+  // refait la liste des éléments (64 objets, sans coût mesurable), mais React
+  // ne re-rend que les deux `LegendRow` dont `isHover` change (lignes mémoïsées).
   const legend = useMemo(
     () => (
       <ScrollArea orientation="y" ariaLabel={t(`endurance.chartLegend${kind}`)} className={styles.legend}>
