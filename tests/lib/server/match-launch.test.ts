@@ -1578,6 +1578,12 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
       refereeId: REFEREE,
       reason: "INELIGIBLE",
     });
+    // La reprise suit le retrait dans la même catégorie de journal.
+    expect(queueRefereeChange).toHaveBeenLastCalledWith(expect.anything(), {
+      kind: "TAKEN",
+      matchId: 42,
+      afterRemoval: true,
+    });
   });
 
   it("refuse sans la permission `tournaments`, sans identité certifiée, ou à un joueur du match", async () => {

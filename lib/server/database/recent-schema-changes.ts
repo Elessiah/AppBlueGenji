@@ -558,6 +558,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // `id` n'existe plus et l'erreur est tolérée.
     `ALTER TABLE bg_match_reminders DROP COLUMN id, DROP INDEX uniq_bg_match_reminders,
        ADD PRIMARY KEY (match_id, offset_key)`,
+    // VOICE-NOTIFS-LOT — le plafond des avis d'invitation compte par auteur
+    // (`created_by`) : index nommé, qui prend le relais de l'index implicite
+    // de la clé étrangère `fk_bg_team_inv_creator` (même colonne).
+    `ALTER TABLE bg_team_invitations ADD INDEX idx_bg_team_inv_creator (created_by)`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

@@ -104,6 +104,8 @@ describe("refereeLogChange / refereeReleaseNotice", () => {
 describe("refereeLogCategory — un retrait alerte, le reste reste une trace", () => {
   it.each<[RefereeChange, string]>([
     [{ kind: "TAKEN", matchId: 1 }, "referees"],
+    // Reprise d'un match retiré à un arbitre inéligible : suit son retrait, même catégorie.
+    [{ kind: "TAKEN", matchId: 1, afterRemoval: true }, "staff-removal"],
     [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: null }, "referees"],
     // Remplacement : le créneau est repourvu dans la même transaction, simple trace.
     [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5 }, "referees"],
@@ -317,6 +319,29 @@ describe("avis à l'arbitre remplacé par lui-même, annonces d'une manche (EF-3
     expect(peak).toBe(1);
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("flushRefereeChanges_removalThenTakeover_logsTheRemovalFirst", async () => {
+    let reads = 0;
+    const execute = jest.fn<SqlQuery>(async () => {
+      reads += 1;
+      // La première lecture est la plus lente : en parallèle, la reprise partirait avant le retrait.
+      if (reads === 1) for (let tick = 0; tick < 3; tick += 1) await settle();
+      return [[matchRow()], []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const connection = fakeConnection({});
+    queueRefereeChange(connection, { kind: "AUTO_RELEASED", matchId: 42, refereeId: REFEREE, reason: "INELIGIBLE" });
+    queueRefereeChange(connection, { kind: "TAKEN", matchId: 42, afterRemoval: true });
+
+    flushRefereeChanges(connection);
+    for (let tick = 0; tick < 12; tick += 1) await settle();
+
+    const calls = jest.mocked(sendBotLog).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0]).not.toContain("un arbitre prend le match");
+    expect(calls[1][0]).toContain("un arbitre prend le match");
+    expect(calls[1][1]).toMatchObject({ category: "staff-removal" });
   });
 
   it("announceRefereeChanges_emptyList_readsNothing", async () => {

@@ -42,7 +42,7 @@ ait un producteur côté serveur.
 | `TOURNAMENT_START` | Coup d'envoi d'un tournoi où l'on est engagé | Non |
 | `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand une mise à jour du tournoi (correction de score, retour en arrière, ronde réappariée, plateau refait avant le départ, finales BG Survie réécrites) sort l'engagée de la manche, puis rappels H-24 et H-10 — ce dernier avec le lien du check-in, porté par l'annonce quand la manche est programmée moins de 10 h avant (les rappels J-7 et H-1 sont retirés) ; le push qui porte le check-in ouvre l'invitation au toucher (`/check-in`, redirection vers `CHECK_IN_INVITE_URL`). Un seul sujet pour les deux rappels : le check-in fait partie des rappels de match | Oui |
 | `TEAM_JOIN_REQUEST` | Demande d'adhésion (gestion de l'équipe) | Oui |
-| `TEAM_INVITATION` (« Invitations d'équipe ») | Invitation d'une équipe (au plus une par équipe et par joueur en 24 h, 10 joueurs par équipe), reprise d'une fantôme proposée par le staff, propriété de son équipe transférée — au joueur visé, jamais à l'auteur du geste ni à un compte suspendu ; nom de l'équipe seul (`TEAM_INVITATION_NOTIFICATION.md`) | Oui |
+| `TEAM_INVITATION` (« Invitations et propriété d'équipe ») | Invitation d'une équipe (au plus une par équipe et par joueur en 24 h, 10 joueurs par équipe), reprise d'une fantôme proposée par le staff, propriété de son équipe transférée — au joueur visé, jamais à l'auteur du geste ni à un compte suspendu ; nom de l'équipe seul (`TEAM_INVITATION_NOTIFICATION.md`) | Oui |
 | `CONTENT_REPORT` | Signalement qui vise le compte ou son équipe | Oui |
 | `MODERATION` | Avatar ou logo masqué, supprimé, rétabli | Oui |
 | `PRIVACY_CHANGE` | Changement du traitement des données | Oui |
@@ -53,6 +53,16 @@ ait un producteur côté serveur.
 | `CAST_RELEASED` (« Cast retiré ») | L'inscription du caster sur un match est retirée par le staff, d'office (conditions du cast plus remplies, équipe entrée dans le match) ou reprise par un autre caster, avec le motif ; jamais quand il se retire lui-même (`CAST_NOTICES.md`) (`live`) | Oui (message privé de match, tag certifié, coupé par l'interrupteur de « Mon profil ») ; ligne anonyme au journal Discord |
 | `STAFF_REPORT` | Signalement ou contestation reçu (`moderation`) | Oui (direction) |
 | `REFEREE_RELEASED` (« Arbitrage retiré ») | L'arbitrage d'un match est retiré à l'arbitre désigné par le staff, confié à un autre, passé en autogestion, ou retiré d'office (conditions plus remplies, il devient joueur du match avant son lancement), avec le motif ; jamais quand il se retire lui-même (`MATCH_REFEREE.md`) (`tournaments`) | Non (push seul) ; ligne anonyme au journal Discord |
+
+Tout nom saisi (équipe, tournoi) passe dans un rédacteur de `push-messages.ts`
+par `shown()` (`visibleText` : NFKC, invisibles et commandes de direction
+retirés), la forme du message privé. `clipPushText` resserre les espaces
+sécables mais garde les insécables (U+00A0, U+202F) de la typographie
+française.
+Le message privé Discord aux arbitres (`refereeAlertPush`, `issueReportPush`
+en anglais) passe `discordInline` à la place (paramètre `name`) : un second
+`visibleText` retirerait ses espaces de largeur nulle et réarmerait mentions
+et adresses nues (`UNTRUSTED_NAMES.md`).
 
 Un compte **sans** moyen Discord est désormais un destinataire : il peut avoir
 un appareil abonné. Le message privé, lui, garde ses règles (`proven` : un

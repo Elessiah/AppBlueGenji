@@ -532,11 +532,11 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
   });
 
   // Conditions v9 (ERASURE-D2, décision T2 du 2026-11-03) : l'article 01 cite
-  // les messages d'équipe remis en privé, et la reprise ne nomme qu'« un admin ».
+  // les messages d'équipe remis en privé ; la reprise ne nomme que l'équipe (D4, #595).
   it("terms_article01_listsTeamNoticesUnderTermsV9FrAndEn", () => {
     const article01 = (lang: "fr" | "en") => JSON.stringify(TERMS_OF_SERVICE[lang].sections[0]);
-    expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne) et informations sur les données.");
-    expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team — a takeover mentions “an admin”, naming no one) and data-protection notices.");
+    expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe, jamais personne) et informations sur les données.");
+    expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team, never anyone) and data-protection notices.");
     expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
   });
 

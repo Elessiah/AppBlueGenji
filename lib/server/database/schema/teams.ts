@@ -77,6 +77,7 @@ export async function createTeamTables(db: Pool): Promise<void> {
       responded_at DATETIME NULL,
       INDEX idx_bg_team_inv_team (team_id),
       INDEX idx_bg_team_inv_user (user_id),
+      INDEX idx_bg_team_inv_creator (created_by),
       INDEX idx_bg_team_inv_status (status),
       CONSTRAINT fk_bg_team_inv_team FOREIGN KEY (team_id)
         REFERENCES bg_teams(id) ON DELETE CASCADE,

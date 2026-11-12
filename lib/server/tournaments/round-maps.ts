@@ -42,7 +42,7 @@ import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
 import { loadRoundSlots } from "./round-map-slots";
-import { queueRoundMapsNotice, scheduleRoundMapsNotice } from "./round-maps-notice";
+import { queueRoundMapsNotice, roundMapsFingerprint, scheduleRoundMapsNotice } from "./round-maps-notice";
 import { inTransaction, transact } from "./transaction";
 
 /** Une manche : phase (0 sans phases), tableau, numéro (`lib/shared/round-maps.ts`). */
@@ -205,15 +205,18 @@ export function parseRoundKeys(raw: unknown): RoundKey[] {
 /** Ce qu'une écriture de cartes a retenu (`setRoundsMaps`). */
 export type RoundsMapsResult = { slots: string[][]; skipped: number };
 
-/** Écrit (ou retire) le réglage d'une manche ; `false` s'il ne change rien. */
+/**
+ * Écrit (ou retire) le réglage d'une manche ; rend le réglage d'avant, `null`
+ * s'il ne change rien.
+ */
 async function writeRoundSlots(
   connection: PoolConnection,
   tournamentId: number,
   round: RoundKey,
   slots: string[][],
-): Promise<boolean> {
+): Promise<string[][] | null> {
   const before = await loadRoundSlots(connection, tournamentId, round);
-  if (JSON.stringify(before) === JSON.stringify(slots)) return false;
+  if (JSON.stringify(before) === JSON.stringify(slots)) return null;
   if (slots.length === 0) {
     // Une map de départage réglée garde la ligne : seules ses cartes partent.
     await connection.execute(
@@ -234,7 +237,7 @@ async function writeRoundSlots(
       [tournamentId, round.phaseId, round.bracket, round.roundNumber, JSON.stringify(slots)],
     );
   }
-  return true;
+  return before;
 }
 
 /**
@@ -267,9 +270,10 @@ export async function setRoundsMaps(
     // poser des cartes, seulement sur les tours du tournoi.
     const targets = slots.length === 0 ? rounds : await roundsOfTournament(connection, tournament, rounds);
     if (targets.length === 0) throw new Error("INVALID_ROUND");
-    const changedRounds: RoundKey[] = [];
+    const changedRounds: (RoundKey & { before: string })[] = [];
     for (const round of targets) {
-      if (await writeRoundSlots(connection, tournamentId, round, slots)) changedRounds.push(round);
+      const before = await writeRoundSlots(connection, tournamentId, round, slots);
+      if (before !== null) changedRounds.push({ ...round, before: roundMapsFingerprint(before) });
     }
     // L'annonce Discord ne part pas ici : elle est mise en attente dans la
     // transaction et une seule ligne résume la série (`./round-maps-notice`).
@@ -354,7 +358,8 @@ export async function setRoundTiebreak(tournamentId: number, round: RoundKey, ra
         WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
       [tournamentId, round.phaseId, round.bracket, round.roundNumber],
     );
-    if (parseStoredTiebreak(rows[0]?.tiebreak_map) === map) return false;
+    const before = parseStoredTiebreak(rows[0]?.tiebreak_map);
+    if (before === map) return false;
     if (map === null) {
       await connection.execute(
         `UPDATE bg_tournament_round_maps SET tiebreak_map = NULL
@@ -375,7 +380,9 @@ export async function setRoundTiebreak(tournamentId: number, round: RoundKey, ra
         [tournamentId, round.phaseId, round.bracket, round.roundNumber, map],
       );
     }
-    await queueRoundMapsNotice(connection, tournamentId, [round], { tiebreak: true });
+    await queueRoundMapsNotice(connection, tournamentId, [{ ...round, before: roundMapsFingerprint(before) }], {
+      tiebreak: true,
+    });
     return true;
   }));
   if (changed) {

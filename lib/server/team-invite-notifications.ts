@@ -11,7 +11,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
-import { notifyUsers } from "@/lib/server/notify";
+import { notifyUsers, type NotificationReport } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { teamInvitationPush } from "@/lib/shared/push-messages";
@@ -87,14 +87,28 @@ export async function notifyTeamInvite(
     };
     if (!withinTeamInviteNoticeBudget(budget)) return;
   } else if (kind === "GHOST_CLAIM") {
-    // Une proposition retirée puis refaite n'écrit pas deux fois au joueur.
-    const [offers] = await db.execute<(RowDataPacket & { offers: number | string })[]>(
-      `SELECT COUNT(*) AS offers FROM bg_team_invitations
-       WHERE team_id = ? AND user_id = ? AND kind = 'INVITE'
-         AND COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 1 AND ${windowSql}`,
-      [teamId, userId],
+    // Une proposition retirée puis refaite n'écrit pas deux fois au joueur ; un
+    // compte staff ne fait pas écrire à tout le site, un joueur ne reçoit pas
+    // fantôme après fantôme (mêmes plafonds qu'une invitation).
+    const [offers] = await db.execute<(RowDataPacket & {
+      this_player: number | string | null;
+      by_actor: number | string;
+      teams_to_player: number | string;
+    })[]>(
+      `SELECT SUM(team_id = ? AND user_id = ?) AS this_player,
+              COUNT(DISTINCT CASE WHEN created_by = ? THEN user_id END) AS by_actor,
+              COUNT(DISTINCT CASE WHEN user_id = ? THEN team_id END) AS teams_to_player
+       FROM bg_team_invitations
+       WHERE (user_id = ? OR created_by = ?)
+         AND kind = 'INVITE' AND COALESCE(JSON_CONTAINS(roles_json, '"OWNER"'), 0) = 1 AND ${windowSql}`,
+      [teamId, userId, actorId, userId, userId, actorId],
     );
-    if (!withinGhostClaimNoticeBudget(Number(offers[0]?.offers ?? 0))) return;
+    const budget = {
+      toThisPlayer: Number(offers[0]?.this_player ?? 0),
+      byActor: Number(offers[0]?.by_actor ?? 0),
+      teamsToThisPlayer: Number(offers[0]?.teams_to_player ?? 0),
+    };
+    if (!withinGhostClaimNoticeBudget(budget)) return;
   }
   const [teams] = await db.execute<TeamRow[]>(
     `SELECT name, is_ghost, solo_user_id, deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,
@@ -128,19 +142,94 @@ export async function notifyTeamInvite(
     deleted: team.deleted_at !== null,
   };
   if (!shouldNotifyTeamInvite({ kind, actorId, account, team: teamInfo })) return;
-
-  const url = `${siteCanonicalBase()}${teamInviteNoticePath(kind, teamId)}`;
-  const report = await notifyUsers([teamInviteNoticeRecipient(account)], {
-    topic: "TEAM_INVITATION",
-    discord: {
-      message: (locale) => formatTeamInviteNotice({ kind, teamName: team.name, url }, locale),
-      context: "team-invitation",
-    },
-    push: (locale) => teamInvitationPush({ kind, teamId, teamName: team.name }, locale),
-  });
+  // Propriété : aucune ligne ne garde les transferts — deux propriétaires qui
+  // se renvoient l'équipe font écrire une fois par fenêtre, pas à chaque geste.
+  // Réservé une fois l'avis décidé : un compte suspendu ne consomme rien.
+  const claimedAt = Date.now();
+  if (kind === "OWNERSHIP" && !claimOwnershipNoticeSlot(teamId, userId, claimedAt)) return;
+  const report = await sendTeamInviteNotice(kind, teamId, account, team.name, claimedAt);
   if (report.discord === null && report.discordUnreachedUserIds.length > 0) {
     console.warn(`[teams] bot injoignable : message privé d'équipe non remis (${kind})`);
   }
+}
+
+/**
+ * Envoie l'avis (push et message privé). Propriété : rien de remis (bot tombé,
+ * aucun appareil) ou erreur, la place réservée est rendue — le prochain
+ * transfert dans la fenêtre pourra prévenir.
+ */
+async function sendTeamInviteNotice(
+  kind: TeamInviteNoticeKind,
+  teamId: number,
+  account: Parameters<typeof teamInviteNoticeRecipient>[0],
+  teamName: string,
+  claimedAt: number,
+): Promise<NotificationReport> {
+  const url = `${siteCanonicalBase()}${teamInviteNoticePath(kind, teamId)}`;
+  const recipient = teamInviteNoticeRecipient(account);
+  const release = () => {
+    if (kind === "OWNERSHIP") releaseOwnershipNoticeSlot(teamId, recipient.userId, claimedAt);
+  };
+  let report: NotificationReport;
+  try {
+    report = await notifyUsers([recipient], {
+      topic: "TEAM_INVITATION",
+      discord: {
+        message: (locale) => formatTeamInviteNotice({ kind, teamName, url }, locale),
+        context: "team-invitation",
+      },
+      push: (locale) => teamInvitationPush({ kind, teamId, teamName }, locale),
+    });
+  } catch (error) {
+    release();
+    throw error;
+  }
+  if ((report.discord?.sent ?? 0) === 0 && report.pushed === 0) release();
+  return report;
+}
+
+/**
+ * Dernier avis de propriété par équipe et destinataire (`teamId:userId` → ms),
+ * en mémoire : une équipe renvoyée de main en main n'écrit qu'une fois par
+ * `TEAM_INVITE_NOTICE_COOLDOWN_HOURS` au même joueur (revue sécurité #544). Un
+ * redémarrage l'oublie — au pire un avis de plus, à un membre de l'équipe.
+ */
+const ownershipNotices = new Map<string, number>();
+/** Au-delà, les avis les plus anciens sont oubliés : la mémoire reste bornée. */
+const OWNERSHIP_NOTICE_MEMORY = 1000;
+
+/**
+ * Réserve l'avis de propriété de `userId` pour `teamId` : `false` si un avis
+ * est déjà parti dans la fenêtre. Réservé avant l'envoi, comme la ligne
+ * d'invitation : deux transferts simultanés n'écrivent qu'une fois.
+ */
+export function claimOwnershipNoticeSlot(teamId: number, userId: number, now: number = Date.now()): boolean {
+  const key = `${teamId}:${userId}`;
+  const windowMs = TEAM_INVITE_NOTICE_COOLDOWN_HOURS * 3_600_000;
+  const last = ownershipNotices.get(key);
+  if (last !== undefined && now - last < windowMs) return false;
+  ownershipNotices.delete(key);
+  ownershipNotices.set(key, now);
+  for (const [oldKey, at] of ownershipNotices) {
+    if (ownershipNotices.size <= OWNERSHIP_NOTICE_MEMORY && now - at < windowMs) break;
+    ownershipNotices.delete(oldKey);
+  }
+  return true;
+}
+
+/**
+ * Rend la place réservée par {@link claimOwnershipNoticeSlot} quand rien n'a
+ * été remis — seulement si elle porte encore cette réservation (un avis plus
+ * récent garde la sienne).
+ */
+export function releaseOwnershipNoticeSlot(teamId: number, userId: number, claimedAt: number): void {
+  const key = `${teamId}:${userId}`;
+  if (ownershipNotices.get(key) === claimedAt) ownershipNotices.delete(key);
+}
+
+/** Tests : oublie les avis de propriété réservés. */
+export function resetOwnershipNoticeSlots(): void {
+  ownershipNotices.clear();
 }
 
 /**

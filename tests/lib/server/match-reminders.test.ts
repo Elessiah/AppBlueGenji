@@ -10,13 +10,14 @@ import {
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
+  MATCH_DM_RETRY_DELAY_MS,
   pendingRefereeDigest,
   resetMatchReminderThrottle,
   type MatchNotice,
 } from "@/lib/server/tournaments/match-reminders";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers, usersReachableByPush } from "@/lib/server/push-subscriptions";
-import { fakePool } from "../../helpers/sql-double";
+import { fakePool, type SqlMock, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 
@@ -122,6 +123,8 @@ function executeDouble(options: {
   current?: Date | null;
   /** Engagées actuelles de la manche (par défaut celles de l'envoi). */
   poster?: [number | null, number | null];
+  /** État actuel de la manche (relu par la reprise des messages privés). */
+  status?: string;
 }) {
   return jest.fn(async (sql: string, params?: unknown[]) => {
     if (sql.startsWith("SELECT m.start_at AS match_start_at")) {
@@ -133,6 +136,7 @@ function executeDouble(options: {
             match_start_at: options.current === undefined ? START : options.current,
             match_team1_id: team1,
             match_team2_id: team2,
+            status: options.status ?? "READY",
             ...told,
           },
         ],
@@ -344,6 +348,190 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       ([sql]) => sql.startsWith("DELETE") || sql.startsWith("UPDATE"),
     );
     expect(writes).toEqual([]);
+  });
+
+  /** Les reprises de messages privés programmées pendant l'appel (minuteur capturé, pas lancé). */
+  function captureDmRetries(): (() => void)[] {
+    const retries: (() => void)[] = [];
+    const realSetTimeout = setTimeout;
+    jest.spyOn(global, "setTimeout").mockImplementation(((callback: () => void, delay?: number) => {
+      if (delay === MATCH_DM_RETRY_DELAY_MS) {
+        retries.push(callback);
+        return { unref: () => undefined } as unknown as ReturnType<typeof setTimeout>;
+      }
+      return realSetTimeout(callback, delay);
+    }) as typeof setTimeout);
+    return retries;
+  }
+
+  it("dispatchDueMatchReminders_botDownForOneSide_retriesItsDmOnceWithoutPush", async () => {
+    await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) =>
+      message.includes("**Team Nova** contre") ? null : { sent: 2, unresolved: [], failed: [] },
+    );
+    const retries = captureDmRetries();
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    expect(retries).toHaveLength(1);
+    jest.mocked(pushDiscordDirectMessages).mockClear();
+    jest.mocked(pushToUsers).mockClear();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    await matchAtRetry({});
+
+    retries[0]();
+    for (let tick = 0; tick < 30; tick += 1) await Promise.resolve();
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const [message, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("**Team Nova** contre");
+    expect(recipients.map((r) => r.label)).toEqual(["Nova"]);
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  /** Envoi où le bot perd l'appel de Team Nova ; rend la reprise capturée, bot revenu. */
+  async function dispatchWithLostSide(): Promise<() => void> {
+    await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) =>
+      message.includes("**Team Nova** contre") ? null : { sent: 2, unresolved: [], failed: [] },
+    );
+    const retries = captureDmRetries();
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    expect(retries).toHaveLength(1);
+    jest.mocked(pushDiscordDirectMessages).mockReset();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    return retries[0];
+  }
+
+  /**
+   * La manche et ses joueurs tels que la reprise les relit : membres actuels
+   * des engagées (`bg_team_members`) et comptes (`bg_users`, comptes
+   * supprimés absents).
+   */
+  async function matchAtRetry(
+    options: Parameters<typeof executeDouble>[0],
+    recipients: Recipient[] = RECIPIENTS,
+  ): Promise<SqlMock> {
+    const query = jest.fn<SqlQuery>(async (sql, params) => {
+      if (sql.includes("bg_team_members")) return [recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))];
+      const ids = new Set(Array.isArray(params) ? params : []);
+      return [recipients.filter((r) => ids.has(r.id)).map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))];
+    });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble(options) }));
+    return query;
+  }
+
+  /** Les comptes ont-ils été relus (la reprise a atteint sa décision) ? */
+  function usersReread(query: SqlMock): boolean {
+    return query.mock.calls.some(([sql]) => sql.includes("FROM bg_users"));
+  }
+
+  async function runRetry(retry: () => void): Promise<void> {
+    retry();
+    for (let tick = 0; tick < 30; tick += 1) await Promise.resolve();
+  }
+
+  it("dispatchDueMatchReminders_matchRescheduledBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({ current: new Date("2026-09-10T19:00:00Z") });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_matchPlayedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({ status: "COMPLETED" });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_teamReplacedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({ poster: [101, 999] });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_matchUnchangedAtRetry_retrySends", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({});
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchDueMatchReminders_recipientOptedOutBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    const query = await matchAtRetry({}, [RECIPIENTS[0], RECIPIENTS[1], { ...RECIPIENTS[2], match_dm_enabled: 0 }]);
+
+    await runRetry(retry);
+
+    expect(usersReread(query)).toBe(true);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_tagUncertifiedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    const query = await matchAtRetry({}, [RECIPIENTS[0], RECIPIENTS[1], { ...RECIPIENTS[2], discord_verified_at: null }]);
+
+    await runRetry(retry);
+
+    expect(usersReread(query)).toBe(true);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_recipientLeftTeamBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    const query = await matchAtRetry({}, [RECIPIENTS[0], RECIPIENTS[1]]);
+
+    await runRetry(retry);
+
+    // Plus membre : personne à relire, la reprise s'arrête après les membres.
+    expect(query.mock.calls.some(([sql]) => sql.includes("bg_team_members"))).toBe(true);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_accountDeletedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    // Toujours membre, mais le compte n'est plus lu (`is_deleted = 0` filtre).
+    const query = jest.fn<SqlQuery>(async (sql) =>
+      sql.includes("bg_team_members") ? [[{ team_id: 102, user_id: 3 }]] : [[]],
+    );
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble({}) }));
+
+    await runRetry(retry);
+
+    expect(usersReread(query)).toBe(true);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_nothingDelivered_schedulesNoDmRetry", async () => {
+    await mockDb({});
+    jest.mocked(pushToUsers).mockResolvedValue(0);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
+    const retries = captureDmRetries();
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+
+    expect(retries).toHaveLength(0);
+  });
+
+  it("dispatchDueMatchReminders_everyDmDelivered_schedulesNoDmRetry", async () => {
+    await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    const retries = captureDmRetries();
+
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+
+    expect(retries).toHaveLength(0);
   });
 
   it("n'envoie rien quand l'horaire a changé depuis la lecture du balayage", async () => {

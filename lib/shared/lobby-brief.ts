@@ -112,19 +112,20 @@ export const LOBBY_BRIEF_LEAD_MINUTES = 15;
  *
  * La liste et son ordre viennent de `GAME_SETTINGS` (`lib/shared/match-page.ts`),
  * que la page du match rend par ses propres clés : une seule liste, deux
- * rendus, tenus ensemble par un test. Ils ne dépendent ni du jeu, ni du
+ * rendus, aux **mêmes libellés** que `matchPage.gameSettings.*` (tenus égaux
+ * par un test : le joueur lit les mêmes mots dans le message et sur la page). Ils ne dépendent ni du jeu, ni du
  * tournoi, ni de la manche : aucune colonne, aucun écran.
  */
 export const GAME_SETTINGS_TEXT: Readonly<Record<Locale, Readonly<Record<GameSetting, string>>>> = {
   fr: {
-    competitive: "Mode compétitif",
-    killcamOff: "Pas de killcam",
-    pauseOnDisconnect: "Pause à la déconnexion",
+    competitive: "Paramètres compétitifs",
+    killcamOff: "Killcam désactivée",
+    pauseOnDisconnect: "Pause lors de la déconnexion d'un joueur",
   },
   en: {
-    competitive: "Competitive mode",
-    killcamOff: "No killcam",
-    pauseOnDisconnect: "Pause on disconnect",
+    competitive: "Competitive settings",
+    killcamOff: "Killcam disabled",
+    pauseOnDisconnect: "Pause when a player disconnects",
   },
 };
 

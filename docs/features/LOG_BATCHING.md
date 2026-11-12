@@ -92,7 +92,7 @@ fixe, jamais un nom ni un `#id` de joueur ; il compte dans la limite de
 | `referees` | Arbitrage | désignations et retraits (`referee-notices.ts`), autogestion d'une manche (`match-launch.ts`), objection, planification par l'arbitrage | `log` |
 | `referee-digest` | Matchs à arbitrer | relevé des matchs à venir sans arbitre (`referee-digest.ts`) | `alert` |
 | `referee-self-action` | Arbitrage à vérifier | un membre du staff a tranché (ou mis en pause, forfait…) un match qu'il joue (`dispute-self-resolution.ts`) : les autres vérifient | `alert` |
-| `staff-removal` | Retrait d'arbitre ou de caster | un arbitre ou un caster retiré d'un match qui reste sans lui : retrait volontaire ou par le staff, retrait d'office, autogestion qui écarte l'arbitre, opposition retenue (`referee-notices.ts`, `cast-notices.ts`, `match-launch.ts`, route d'opposition). Les désignations et inscriptions restent en `referees` / `casts`, même quand elles remplacent un titulaire (créneau repourvu dans la même transaction) | `alert` |
+| `staff-removal` | Retrait d'arbitre ou de caster | un arbitre ou un caster retiré d'un match qui reste sans lui : retrait volontaire ou par le staff, retrait d'office, autogestion qui écarte l'arbitre, opposition retenue (`referee-notices.ts`, `cast-notices.ts`, `match-launch.ts`, route d'opposition). Les désignations et inscriptions restent en `referees` / `casts`, même quand elles remplacent un titulaire (créneau repourvu dans la même transaction) — sauf la reprise d'un match par l'arbitre qui en écarte un titulaire devenu inéligible (`TAKEN` + `afterRemoval`) : sa ligne suit celle du retrait dans le même lot, l'alerte dit d'emblée que le créneau est repourvu | `alert` |
 | `casts` | Casts | `cast-notices.ts` | `log` |
 | `results` | Résultats | résultat d'un match, pénalités d'endurance (`bot-logs.ts`) | `log` |
 | `tournament` | Tournoi | création, lancement, fin, tournoi sous-rempli (`bot-logs.ts`) | `log` |
@@ -172,10 +172,11 @@ concerné : le bot y gère lui-même la trace.
 L'annonce des cartes (`ROUND_MAPS.md`) garde sa fusion en base (une ligne par
 tournoi, les manches modifiées réunies, 60 s de silence) : elle seule sait
 fusionner deux réglages de la même manche et survivre à un redémarrage. Sa
-ligne résumée entre ensuite dans le lot `maps` du tournoi (catégorie `maps`), comme toute autre. La
-fermeture de l'écran (`POST …/round-maps/flush`) envoie le résumé **et** le lot
-`maps` du tournoi tout de suite (`flushBotLogBatch({ tournamentId, category })` ;
-sans catégorie, tous les lots du tournoi partent).
+ligne résumée est déjà le regroupement : `sendClaimed` vide le lot `maps` du
+tournoi aussitôt après l'avoir posée, sans attendre 5 minutes de plus. La
+fermeture de l'écran (`POST …/round-maps/flush`) vide en plus le lot
+`referees` du tournoi (`flushBotLogBatch({ tournamentId, category })` ; sans
+catégorie, tous les lots du tournoi partent).
 
 ## Tests
 

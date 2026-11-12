@@ -88,12 +88,30 @@ export function withinTeamInviteNoticeBudget(input: TeamInviteNoticeBudget): boo
   );
 }
 
+/** Ce que la base compte des reprises proposées dans la fenêtre, celle-ci comprise. */
+export type GhostClaimNoticeBudget = {
+  /** Propositions de cette fantôme à ce joueur. */
+  toThisPlayer: number;
+  /** Joueurs distincts à qui l'auteur a proposé une reprise, toutes fantômes confondues. */
+  byActor: number;
+  /** Fantômes distinctes proposées à ce joueur. */
+  teamsToThisPlayer: number;
+};
+
 /**
  * Borne d'une reprise proposée par le staff : une fois par équipe et par
- * joueur dans la fenêtre (proposition retirée puis refaite comprise).
+ * joueur dans la fenêtre (proposition retirée puis refaite comprise), et les
+ * mêmes plafonds qu'une invitation — un compte staff ne fait pas écrire à plus
+ * de {@link TEAM_INVITE_NOTICES_DAILY_CAP} joueurs, un joueur ne reçoit pas
+ * plus de {@link TEAM_INVITE_NOTICES_PER_PLAYER_CAP} reprises (revue sécurité
+ * #544). Au-delà, la proposition reste visible sur « Mon profil ».
  */
-export function withinGhostClaimNoticeBudget(offersToThisPlayer: number): boolean {
-  return offersToThisPlayer <= 1;
+export function withinGhostClaimNoticeBudget(input: GhostClaimNoticeBudget): boolean {
+  return (
+    input.toThisPlayer <= 1 &&
+    input.byActor <= TEAM_INVITE_NOTICES_DAILY_CAP &&
+    input.teamsToThisPlayer <= TEAM_INVITE_NOTICES_PER_PLAYER_CAP
+  );
 }
 
 /** Le compte visé, tel que le service le lit. */
@@ -153,8 +171,8 @@ export function teamInviteNoticeRecipient(account: TeamInviteNoticeAccount): {
 /**
  * Le message privé. **Aucun pseudo de joueur ni `#id`** — ni de qui invite, ni
  * de qui transfère : seul le nom de l'équipe (`discordInline`), public. Une
- * reprise ne dit que « un admin » (décision de l'utilisateur, 2026-11-03), le nom
- * de l'équipe en lien masqué vers « Mon profil » : `discordInline` en échappe
+ * reprise ne nomme que l'équipe — ni « un admin », ni personne (décision D4 de
+ * l'utilisateur, 2026-11-09) —, son nom en lien masqué vers « Mon profil » : `discordInline` en échappe
  * crochets et parenthèses, il ne peut ni fermer le lien ni en forger un autre.
  *
  * @param input.url adresse absolue du site, en français ; passée à l'anglais ici (`localizedSiteUrl`).
@@ -170,7 +188,7 @@ export function formatTeamInviteNotice(
       case "INVITE":
         return `📨 BlueGenji — The team “${team}” invites you to join it. Accept or decline from your profile: ${url}`;
       case "GHOST_CLAIM":
-        return `📨 BlueGenji — An admin offers you to take over the team [${team}](${url})`;
+        return `📨 BlueGenji — You can take over the team [${team}](${url}). Accept or decline from your profile.`;
       case "OWNERSHIP":
         return `👑 BlueGenji — Ownership of your team “${team}” has just been transferred to you. You now manage its name, tag and members: ${url}`;
     }
@@ -179,7 +197,7 @@ export function formatTeamInviteNotice(
     case "INVITE":
       return `📨 BlueGenji — L'équipe « ${team} » t'invite à la rejoindre. Accepte ou refuse depuis ton profil : ${url}`;
     case "GHOST_CLAIM":
-      return `📨 BlueGenji — Un admin te propose de reprendre l'équipe [${team}](${url})`;
+      return `📨 BlueGenji — Tu peux reprendre l'équipe [${team}](${url}). Accepte ou refuse depuis ton profil.`;
     case "OWNERSHIP":
       return `👑 BlueGenji — La propriété de ton équipe « ${team} » vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres : ${url}`;
   }

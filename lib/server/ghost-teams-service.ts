@@ -136,15 +136,17 @@ export async function claimGhostTeam(
     );
 
     await connection.commit();
-    // Après le commit seulement : une proposition défaite n'annonce rien.
-    notifyTeamInviteInBackground("GHOST_CLAIM", teamId, newOwnerUserId, createdBy);
-    return "INVITED";
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
     connection.release();
   }
+  // Après le commit seulement, **hors** du `try` : une proposition défaite
+  // n'annonce rien, et une levée de l'avis ne déclencherait pas un rollback
+  // après commit (ni un refus pour une proposition enregistrée).
+  notifyTeamInviteInBackground("GHOST_CLAIM", teamId, newOwnerUserId, createdBy);
+  return "INVITED";
 }
 
 /**

@@ -47,12 +47,28 @@ import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 import { castReleasedHref, castReleaseReasonKey, type CastReleasedMatch } from "./cast-notices";
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
-import { withoutInvisibles } from "./visible-text";
+import { visibleText, withoutInvisibles } from "./visible-text";
 import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
 const TEXT: Readonly<Record<Locale, PushText>> = { fr: scopedText("fr", frPush), en: scopedText("en", enPush) };
+/**
+ * Nom saisi (équipe, tournoi) tel qu'une notification le montre : NFKC, sans
+ * contrôle, invisible ni commande de direction, espaces resserrés
+ * (`visibleText`, `UNTRUSTED_NAMES.md`) — la forme du message privé
+ * (`discordInline`). Un nom ancien gardant U+202E retournerait sinon la ligne
+ * entière. **Tout** rédacteur passe ses noms par ici.
+ */
+function shown(name: string): string {
+  return visibleText(name);
+}
+
+/** {@link shown}, ou `fallback` (« TBD ») pour une place encore vide. */
+function shownOr(name: string | null, fallback: string): string {
+  return name === null ? fallback : shown(name);
+}
+
 const CATEGORY_LABELS: Readonly<Record<Locale, Readonly<Record<ReportCategory, { label: string }>>>> = {
   fr: frReports.categories,
   en: enReports.categories,
@@ -78,7 +94,7 @@ function pairing(side: MatchSide, text: PushText): string {
     ? text.t("pairingSolo")
     : // Sans contrôle ni commande de direction : un nom ancien gardant U+202E
       // (laissé par `cleanStoredNames`) retournerait sinon la ligne entière.
-      text.t("pairing", { team: withoutInvisibles(side.teamName), opponent: withoutInvisibles(side.opponentName) });
+      text.t("pairing", { team: shown(side.teamName), opponent: shown(side.opponentName) });
 }
 
 /** Étiquette d'un match : les notifications d'un même match se remplacent. */
@@ -94,7 +110,7 @@ function matchTag(matchId: number): string {
  */
 export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
-  const values = { pairing: pairing(side, text), tournament: withoutInvisibles(side.tournamentName) };
+  const values = { pairing: pairing(side, text), tournament: shown(side.tournamentName) };
   return {
     title: phase === "LOBBY" ? text.t("matchStart.titleLobby") : text.t("matchStart.titleLaunched"),
     body: phase === "LOBBY" ? text.t("matchStart.bodyLobby", values) : text.t("matchStart.bodyLaunched", values),
@@ -114,11 +130,11 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   // Les places et l'ordre des bans du message privé (`lobbyBriefNames`) ; les
   // noms d'équipe entre guillemets, comme dans le message privé : un nom qui
   // contient « · » ne se confond pas avec le séparateur.
-  // Sans contrôle ni commande de direction (`withoutInvisibles`) : un nom
+  // Sans contrôle ni commande de direction (`shown`) : un nom
   // ancien gardant U+202E retournerait sinon la ligne. En individuel,
   // `lobbyBriefNames` écrit « toi » / « ton adversaire ».
   // Les guillemets d'un nom deviennent des « " » droits : ils ne ferment pas la citation.
-  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: neutralizeQuotes(withoutInvisibles(name)) });
+  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: neutralizeQuotes(shown(name)) });
   const names = lobbyBriefNames(side, locale, quote);
   // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
   // engagées ; le « 1er ban » se pose sur le côté que la règle du tournoi
@@ -276,7 +292,7 @@ export function matchReminderPush(
   const body = scheduleBody(
     {
       pairing: pairing(side, text),
-      tournament: side.tournamentName,
+      tournament: shown(side.tournamentName),
       round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
       startAt: side.startAt,
     },
@@ -317,7 +333,7 @@ export function newMatchPush(side: NewMatchSide, locale: Locale = DEFAULT_LOCALE
   const text = TEXT[locale];
   const values = {
     pairing: pairing(side, text),
-    tournament: withoutInvisibles(side.tournamentName),
+    tournament: shown(side.tournamentName),
     round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
   };
   const unscheduledKey = side.solo ? "newMatch.bodyUnscheduledSolo" : "newMatch.bodyUnscheduled";
@@ -343,7 +359,7 @@ export function matchScheduleClearedPush(side: ScheduledMatchSide, locale: Local
     title: text.t("matchReminder.titleCleared"),
     body: text.t("matchReminder.bodyCleared", {
       pairing: pairing(side, text),
-      tournament: side.tournamentName,
+      tournament: shown(side.tournamentName),
       round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
       previous: pushMatchStart(side.startAt, locale),
     }),
@@ -363,7 +379,7 @@ export function matchWithdrawnPush(side: ScheduledMatchSide, locale: Locale = DE
     title: text.t("matchReminder.titleWithdrawn"),
     body: text.t("matchReminder.bodyWithdrawn", {
       pairing: pairing(side, text),
-      tournament: side.tournamentName,
+      tournament: shown(side.tournamentName),
       round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
       previous: pushMatchStart(side.startAt, locale),
     }),
@@ -401,7 +417,7 @@ function staffPairing(input: StaffScheduleInput, text: PushText): string {
   const tbd = text.t("matchScheduled.tbd");
   return input.solo
     ? text.t("matchScheduled.pairingSolo")
-    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+    : text.t("pairing", { team: shownOr(input.team1Name, tbd), opponent: shownOr(input.team2Name, tbd) });
 }
 
 export function matchScheduledStaffPush(
@@ -416,7 +432,7 @@ export function matchScheduledStaffPush(
     body: scheduleBody(
       {
         pairing: pairingText,
-        tournament: input.tournamentName,
+        tournament: shown(input.tournamentName),
         round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
         startAt: input.startAt,
       },
@@ -443,7 +459,7 @@ export function matchScheduleClearedStaffPush(input: StaffScheduleInput, locale:
     body: text.t("matchScheduled.bodyCleared", {
       previous: pushMatchStart(input.startAt, locale),
       pairing: staffPairing(input, text),
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
     url: localeHref(
@@ -586,8 +602,8 @@ function digestLines(matches: readonly RefereeDigestMatch[], text: PushText, loc
       continue;
     }
     if (lines.length === REFEREE_DIGEST_PUSH_LINES) break;
-    const pairing = match.solo ? null : text.t("pairing", { team: match.team1Name, opponent: match.team2Name });
-    lines.push({ start, tournamentId: match.tournamentId, tournament: match.tournamentName, round, pairing, count: 1 });
+    const pairing = match.solo ? null : text.t("pairing", { team: shown(match.team1Name), opponent: shown(match.team2Name) });
+    lines.push({ start, tournamentId: match.tournamentId, tournament: shown(match.tournamentName), round, pairing, count: 1 });
   }
   return lines.map((line) => ({
     count: line.count,
@@ -639,8 +655,8 @@ export function scoreToConfirmPush(
     // après un « Enregistrer » d'arbitre) : ne pas promettre une validation
     // qui n'aura pas lieu (`SCORE_DISPUTE_LOCK.md`).
     body: text.t(side.autoValidationPaused ? "scoreToConfirm.bodyPaused" : "scoreToConfirm.body", {
-      opponent: side.solo ? text.t("scoreToConfirm.soloOpponent") : side.opponentName,
-      tournament: side.tournamentName,
+      opponent: side.solo ? text.t("scoreToConfirm.soloOpponent") : shown(side.opponentName),
+      tournament: shown(side.tournamentName),
     }),
     url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-score`,
@@ -659,7 +675,7 @@ export function scoreAutoValidatedPush(
   const text = TEXT[locale];
   return {
     title: text.t("scoreAutoValidated.title"),
-    body: text.t("scoreAutoValidated.body", { tournament: input.tournamentName }),
+    body: text.t("scoreAutoValidated.body", { tournament: shown(input.tournamentName) }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
     tag: `${matchTag(input.matchId)}-score`,
   };
@@ -673,7 +689,7 @@ export function tournamentStartPush(
   const text = TEXT[locale];
   return {
     title: text.t("tournamentStart.title"),
-    body: text.t("tournamentStart.body", { tournament: input.tournamentName }),
+    body: text.t("tournamentStart.body", { tournament: shown(input.tournamentName) }),
     url: localeHref(`/tournois/${input.tournamentId}`, locale),
     tag: `tournament-${input.tournamentId}-start`,
   };
@@ -684,7 +700,7 @@ export function teamJoinRequestPush(input: { teamId: number; teamName: string },
   const text = TEXT[locale];
   return {
     title: text.t("teamJoinRequest.title"),
-    body: text.t("teamJoinRequest.body", { team: input.teamName }),
+    body: text.t("teamJoinRequest.body", { team: shown(input.teamName) }),
     url: localeHref(`/equipes/${input.teamId}`, locale),
     tag: `team-${input.teamId}-join`,
   };
@@ -697,6 +713,16 @@ export function teamJoinRequestPush(input: { teamId: number; teamName: string },
  * seul — jamais celui de qui invite ou transfère.
  */
 export type TeamInvitationPushKind = TeamInviteNoticeKind;
+
+/**
+ * Suffixe d'étiquette par genre : une reprise proposée ne remplace pas une
+ * invitation de la même équipe encore affichée (ni l'inverse).
+ */
+const TEAM_INVITATION_TAGS = {
+  INVITE: "invite",
+  GHOST_CLAIM: "ghost",
+  OWNERSHIP: "owner",
+} as const satisfies Record<TeamInvitationPushKind, string>;
 
 const TEAM_INVITATION_KEYS = {
   INVITE: "teamInvitation",
@@ -716,9 +742,10 @@ export function teamInvitationPush(
   const t = TEXT[locale];
   return {
     title: t.t(`${text}.title`),
-    body: t.t(`${text}.body`, { team: withoutInvisibles(input.teamName) }),
+    // Entre guillemets, comme le message privé : ceux du nom deviennent droits.
+    body: t.t(`${text}.body`, { team: neutralizeQuotes(shown(input.teamName)) }),
     url: localeHref(teamInviteNoticePath(input.kind, input.teamId), locale),
-    tag: `team-${input.teamId}-${input.kind === "OWNERSHIP" ? "owner" : "invite"}`,
+    tag: `team-${input.teamId}-${TEAM_INVITATION_TAGS[input.kind]}`,
   };
 }
 
@@ -754,7 +781,7 @@ export function moderationPush(
 ): PushContent {
   const text = TEXT[locale];
   const decision = input.teamName
-    ? text.t(`moderation.logo.${input.kind}`, { team: input.teamName })
+    ? text.t(`moderation.logo.${input.kind}`, { team: shown(input.teamName) })
     : text.t(`moderation.avatar.${input.kind}`);
   const fallback = input.teamId ? `/equipes/${input.teamId}` : "/profil";
   return {
@@ -839,6 +866,11 @@ export type RefereeAlertMatch = {
  * n'est jamais lu dans la ligne, dont une URL peut venir d'un nom de tournoi
  * ou d'équipe — même ramenée à un chemin du site, elle mènerait où l'auteur
  * du nom l'a voulu (`/connexion?redirect=…`, une route d'API…).
+ *
+ * `name` met en forme le nom du tournoi : {@link shown} par défaut ; le
+ * message privé Discord passe `discordInline` — ses espaces de largeur nulle
+ * (mentions, adresses nues) ne doivent pas être retirées par un second
+ * `visibleText` (`UNTRUSTED_NAMES.md`).
  */
 export function refereeAlertPush(
   message: string,
@@ -846,6 +878,7 @@ export function refereeAlertPush(
   locale: Locale = DEFAULT_LOCALE,
   kind: RefereeAlertKind = "other",
   match: RefereeAlertMatch | null = null,
+  name: (value: string) => string = shown,
 ): PushContent {
   const text = TEXT[locale];
   const url = localeHref(match ? tournamentMatchHref(match.tournamentId, match.matchId) : "/tournois", locale);
@@ -853,7 +886,7 @@ export function refereeAlertPush(
   if (locale === "fr") body = stripMarkdown(message);
   else if (match) {
     body = text.t(`refereeAlert.${kind}Match`, {
-      tournament: match.tournamentName,
+      tournament: name(match.tournamentName),
       round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
       count: match.matchCount ?? 1,
     });
@@ -869,20 +902,24 @@ export function refereeAlertPush(
   };
 }
 
-/** Problème signalé par un engagé pendant un match (`issue-reports.ts`). */
+/**
+ * Problème signalé par un engagé pendant un match (`issue-reports.ts`).
+ * `name` : comme {@link refereeAlertPush}.
+ */
 export function issueReportPush(
   input: { tournamentId: number; tournamentName: string; match: { id: number; bracket: string; roundNumber: number; swiss?: boolean } | null },
   locale: Locale = DEFAULT_LOCALE,
+  name: (value: string) => string = shown,
 ): PushContent {
   const text = TEXT[locale];
   return {
     title: text.t("refereeAlert.title"),
     body: input.match
       ? text.t("issueReport.bodyRound", {
-          tournament: input.tournamentName,
+          tournament: name(input.tournamentName),
           round: pushRoundLabel(input.match.bracket, input.match.roundNumber, locale, input.match.swiss),
         })
-      : text.t("issueReport.body", { tournament: input.tournamentName }),
+      : text.t("issueReport.body", { tournament: name(input.tournamentName) }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.match?.id ?? null), locale),
     tag: `issue-${input.tournamentId}-${input.match?.id ?? 0}`,
   };
@@ -911,7 +948,7 @@ export type SelfResolvedDispute = RefereeAlertMatch & {
 export function selfResolvedOutcomeText(
   input: Pick<SelfResolvedDispute, "team1Name" | "team2Name" | "solo" | "outcome">,
   locale: Locale = DEFAULT_LOCALE,
-  name: (value: string) => string = (value) => value,
+  name: (value: string) => string = shown,
 ): string {
   const text = TEXT[locale];
   const { outcome } = input;
@@ -935,7 +972,7 @@ export function selfResolvedDisputePush(input: SelfResolvedDispute, locale: Loca
   return {
     title: text.t("selfResolved.title"),
     body: text.t("selfResolved.body", {
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
       outcome: selfResolvedOutcomeText(input, locale),
     }),
@@ -953,7 +990,7 @@ export function selfCorrectedResultPush(input: SelfResolvedDispute, locale: Loca
   return {
     title: text.t("selfCorrected.title"),
     body: text.t("selfCorrected.body", {
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
       outcome: selfResolvedOutcomeText(input, locale),
     }),
@@ -972,7 +1009,7 @@ export function selfImposedForfeitPush(input: SelfResolvedDispute, locale: Local
   return {
     title: text.t("selfForfeit.title"),
     body: text.t("selfForfeit.body", {
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
       outcome: selfResolvedOutcomeText(input, locale),
     }),
@@ -991,7 +1028,7 @@ export function selfPausedValidationPush(input: RefereeAlertMatch, locale: Local
   return {
     title: text.t("selfPaused.title"),
     body: text.t("selfPaused.body", {
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
@@ -1010,13 +1047,13 @@ export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFA
   const tbd = text.t("matchScheduled.tbd");
   const pairingText = input.solo
     ? text.t("castReleased.pairingSolo")
-    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+    : text.t("pairing", { team: shownOr(input.team1Name, tbd), opponent: shownOr(input.team2Name, tbd) });
   return {
     title: text.t("castReleased.title"),
     body: text.t("castReleased.body", {
       reason: text.t(`castReleased.reason.${castReleaseReasonKey(input)}`),
       pairing: pairingText,
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
     url: localeHref(castReleasedHref(input), locale),
@@ -1048,13 +1085,13 @@ export function refereeReleasedPush(input: RefereeReleasedMatch, locale: Locale 
   const tbd = text.t("matchScheduled.tbd");
   const pairingText = input.solo
     ? text.t("castReleased.pairingSolo")
-    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+    : text.t("pairing", { team: shownOr(input.team1Name, tbd), opponent: shownOr(input.team2Name, tbd) });
   return {
     title: text.t("refereeReleased.title"),
     body: text.t("refereeReleased.body", {
       reason: text.t(`refereeReleased.reason.${input.reason}`),
       pairing: pairingText,
-      tournament: input.tournamentName,
+      tournament: shown(input.tournamentName),
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),

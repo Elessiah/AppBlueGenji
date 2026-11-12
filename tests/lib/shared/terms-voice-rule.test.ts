@@ -140,7 +140,7 @@ describe("/regles — règle commune « Salons vocaux d'équipe »", () => {
 
 describe("notification de reprise d'équipe fantôme", () => {
   it("pushMessage_ghostTeamClaim_fr_usesTu", () => {
-    expect(frPush.ghostTeamClaim.body).toBe("Un admin te propose de reprendre l'équipe {team}.");
+    expect(frPush.ghostTeamClaim.body).toBe("Tu peux reprendre l'équipe «\u00a0{team}\u00a0». Accepte ou refuse depuis ton profil.");
   });
 });
 

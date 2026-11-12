@@ -246,7 +246,16 @@ le balayage ne réannonce pas l'horaire tenu ; une date déjà passée, annoncé
 `dispatchPlannedSend` réserve `TOLD` **avant** d'envoyer une annonce ou un
 rappel (un arbitre qui corrige sa saisie dans la seconde la lit déjà, et
 reçoit « reprogrammé »), puis la rend si rien n'a **abouti** (aucun message
-privé remis, aucun appareil atteint — bot injoignable sans appareil abonné). Une manche programmée avant
+privé remis, aucun appareil atteint — bot injoignable sans appareil abonné). Un rappel remis en partie (le bot
+tombe entre l'envoi français et l'envoi anglais d'une engagée) garde `TOLD` et
+reprogramme, `MATCH_DM_RETRY_DELAY_MS` (2 min) plus tard, le seul message privé
+des joueurs non atteints (`notifyUsers` avec `discordOnly` : pas de second
+push), après avoir relu la manche : jouée, reprogrammée, horaire retiré ou
+engagée remplacée entre-temps, la reprise se tait (un avis plus récent a déjà
+dit vrai) ; elle relit aussi ses destinataires (`retryRecipients`) : un joueur
+qui a quitté l'engagée, supprimé son compte, perdu la certification de son tag
+ou s'est opposé aux messages privés de match pendant l'attente n'est pas
+repris ; sinon elle redit si le salon de check-in est ouvert à son instant. Une manche programmée avant
 l'arrivée de `TOLD` a ses preuves héritées recopiées en `TOLD` au démarrage
 (voir « Passage à `TOLD` ») : `TOLD` est la seule source. Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une

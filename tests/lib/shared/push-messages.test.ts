@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
+import { discordInline } from "@/lib/shared/discord-text";
 import {
   contentReportPush,
+  issueReportPush,
   matchReminderPush,
   matchScheduleClearedPush,
   matchScheduledStaffPush,
@@ -302,5 +304,54 @@ describe("rédacteurs", () => {
 describe("stripMarkdown", () => {
   it("retire gras, code, citations et liens", () => {
     expect(stripMarkdown("**a** `b` > c _d_ https://x.test/y")).toBe("a b c d");
+  });
+});
+
+describe("noms affichés dans les push (visibleText)", () => {
+  it("teamJoinRequestPush_fullwidthTeamName_normalisedLikeOnScreen", () => {
+    const content = teamJoinRequestPush({ teamId: 5, teamName: "\uff27\uff4c\uff41\uff43\uff45" });
+
+    expect(content.body).toContain("Glace");
+    expect(content.body).not.toContain("\uff27");
+  });
+
+  it("tournamentStartPush_invisibleCharactersInName_removed", () => {
+    const content = tournamentStartPush({ tournamentId: 7, tournamentName: "Co\u200bupe\u202e" });
+
+    expect(content.body).toContain("Coupe");
+    expect(content.body).not.toMatch(/[\u200b\u202e]/);
+  });
+});
+
+describe("nom de tournoi du message privé aux arbitres (discordInline)", () => {
+  const HOSTILE = "Cup @everyone free-nitro.gg";
+  const ALERT_MATCH = { tournamentId: 7, tournamentName: HOSTILE, matchId: 31, bracket: "UPPER", roundNumber: 2 };
+
+  it("refereeAlertPush_englishWithDiscordFormatter_keepsZeroWidthBreaks", () => {
+    const content = refereeAlertPush("ligne", "k", "en", "other", ALERT_MATCH, discordInline);
+
+    expect(content.body).toContain("@\u200beveryone");
+    expect(content.body).toContain("nitro.\u200bgg");
+  });
+
+  it("refereeAlertPush_defaultFormatter_stripsInvisibles", () => {
+    const content = refereeAlertPush("ligne", "k", "en", "other", { ...ALERT_MATCH, tournamentName: "Coupe\u202e" });
+
+    expect(content.body).toContain("Coupe");
+    expect(content.body).not.toContain("\u202e");
+  });
+
+  it("issueReportPush_englishWithDiscordFormatter_keepsZeroWidthBreaks", () => {
+    const content = issueReportPush({ tournamentId: 7, tournamentName: HOSTILE, match: null }, "en", discordInline);
+
+    expect(content.body).toContain("@\u200beveryone");
+    expect(content.body).toContain("nitro.\u200bgg");
+  });
+
+  it("issueReportPush_roundWithDiscordFormatter_keepsZeroWidthBreaks", () => {
+    const match = { id: 31, bracket: "UPPER", roundNumber: 2 };
+    const content = issueReportPush({ tournamentId: 7, tournamentName: HOSTILE, match }, "en", discordInline);
+
+    expect(content.body).toContain("@\u200beveryone");
   });
 });
