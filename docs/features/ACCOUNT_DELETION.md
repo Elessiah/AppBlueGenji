@@ -766,6 +766,9 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est
   repris par `settleDeletedSoloEntries`, relancé chaque heure avant les
   suppressions définitives (et au rattrapage de démarrage).
+  Chaque entrée se forfaite derrière son verrou nommé (`bg_solo_forfeit_<id>`,
+  sans attente) : la demande et le passage horaire lancés ensemble ne posent
+  pas deux forfaits, ni deux lignes au journal — le second passe son tour.
 - Casts et arbitrages à venir retirés, invitations du compte annulées.
 - Après le commit, chaque tournoi de l'entrée solo est rediffusé (son nom
   d'engagé vient de passer au pseudo d'emprunt) ; la réactivation rediffuse les

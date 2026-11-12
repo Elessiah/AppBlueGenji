@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
 import { toParticipantType } from "@/lib/shared/participants";
@@ -265,6 +266,17 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
 }
 
 /**
+ * Verrou nommé d'une entrée solo pendant son forfait : le forfait d'une demande
+ * et le passage horaire, lancés ensemble sur la même entrée, posaient chacun un
+ * forfait d'arbre différent et écrivaient chacun leur ligne Discord. Sans
+ * attente : celui qui trouve le verrou pris laisse l'autre finir, et le passage
+ * suivant reprend ce qui resterait.
+ */
+export function soloForfeitLockName(teamId: number): string {
+  return `bg_solo_forfeit_${teamId}`;
+}
+
+/**
  * Forfait de chaque entrée, une à une et au meilleur effort : un échec est dit
  * et reporté au prochain passage, sans empêcher les suivantes. Jamais levé.
  * Rend le nombre de tournois où un forfait a été posé. Appelé après le commit
@@ -277,14 +289,19 @@ export async function forfeitSoloEntriesAfterCommit(
   options: { silent?: boolean } = {},
 ): Promise<number> {
   let forfeited = 0;
+  const db = await getDatabase();
   for (const entry of entries) {
     try {
-      const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
-      if (forfeits > 0) {
-        forfeited += 1;
-        if (!options.silent) await logDeletionWithdrawal(entry.tournamentId, true);
-      }
+      const forfeits = await withNamedLock(db, soloForfeitLockName(entry.teamId), 0, async () => {
+        const count = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
+        // Écrite sous le verrou : l'appelant concurrent ne peut pas l'écrire aussi.
+        if (count > 0 && !options.silent) await logDeletionWithdrawal(entry.tournamentId, true);
+        return count;
+      });
+      if (forfeits > 0) forfeited += 1;
     } catch (error) {
+      // Déjà en cours ailleurs : l'autre appelant forfaite et journalise.
+      if (error instanceof NamedLockUnavailableError) continue;
       console.error(
         `[account-deletion] forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
         error instanceof Error ? error.message : error,
