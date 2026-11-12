@@ -49,7 +49,7 @@
     "BOT_INTERNAL_UNAUTHORIZED": "Discord login unavailable (invalid internal token). You can use Google instead.",
     "DISCORD_DM_FAILED": "Could not send you the code by direct message: the bot has to share a server with you, and your direct messages must be open there. Join the BlueGenji server, or use the Discord button.",
     "DISCORD_USER_NOT_FOUND": "Tag not found: the bot has to share a server with you. Join the BlueGenji server, or use the Discord button.",
-    "CONCURRENT_UPDATE_RETRY": "Another request went through at the same moment: nothing was saved. Try again.",
+    "CONCURRENT_UPDATE_RETRY": "Another request went through at the same moment: you were not signed in. Try again, with a new code if this one is refused.",
     "FAILED_TO_SEND_CODE": "The code could not be sent. Try again in a moment.",
     "INVALID_DISCORD_HANDLE": "Enter your Discord tag or your ID.",
     "INVALID_DISCORD_ID": "Invalid Discord ID.",

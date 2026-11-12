@@ -25,6 +25,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import type { TournamentState } from "@/lib/shared/types";
+import { shownEntrantName } from "@/lib/shared/visible-text";
 
 /**
  * État du tournoi, pour la seule question que la route ait à lui poser : ce
@@ -113,7 +114,9 @@ export async function loadTournamentContacts(
     const teamId = Number(row.team_id);
     let group = groups.get(teamId);
     if (!group) {
-      group = { teamId, teamName: row.team_name, reachable: false, members: [] };
+      // Noms nettoyés comme sur la fenêtre de lancement (`UNTRUSTED_NAMES.md`) :
+      // un nom ancien peut encore porter invisibles ou commandes de direction.
+      group = { teamId, teamName: shownEntrantName(row.team_name) ?? "—", reachable: false, members: [] };
       groups.set(teamId, group);
     }
     // La jointure gauche rend une ligne sans joueur pour une fantôme : l'engagé
@@ -121,7 +124,7 @@ export async function loadTournamentContacts(
     if (row.user_id === null) continue;
     group.members.push({
       userId: Number(row.user_id),
-      pseudo: row.pseudo ?? "",
+      pseudo: shownEntrantName(row.pseudo) ?? "—",
       discordTag: row.discord_tag,
     });
     if (row.discord_tag) group.reachable = true;
