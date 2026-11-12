@@ -146,7 +146,7 @@ d'avoir eu lieu (corps ou fichier invalide, nom ou sigle pris, droit
 manquant) : seule une écriture faite compte. Un renommage ou un logo
 changé ne vide les vues d'identité (`invalidateTeamIdentityViews`) que pour une
 équipe déjà inscrite à un tournoi (`teamEverRegistered`, lu sous le verrou de
-l'équipe, que l'inscription d'un joueur prend aussi après celui du tournoi) ; même règle pour une fantôme reprise. `updateTeamMeta` verrouille la
+l'équipe, que l'inscription d'un joueur en tournoi par équipes prend aussi après celui du tournoi — équipe lue sur le pool avant d'emprunter la connexion de la transaction, jamais pendant ; jamais en tournoi individuel, où l'équipe n'est pas l'engagé) ; même règle pour une fantôme reprise. `updateTeamMeta` verrouille la
 ligne de l'équipe en première instruction, y relit le nom actuel et y rejuge le
 droit (propriétaire, ou fantôme pour le staff). L'ancien logo s'efface par
 `deleteUnreferencedUpload(…, "teams")` : seulement s'il vit dans `teams/` et

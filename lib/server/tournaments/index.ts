@@ -933,12 +933,16 @@ function tournamentListFilter(
 }
 
 export async function registerCurrentUserTeam(tournamentId: number, userId: number): Promise<void> {
+  // L'équipe du joueur, lue sur le pool **avant** d'emprunter la connexion de
+  // la transaction : aucune place n'est encore retenue, et l'instantané de la
+  // transaction n'est pas figé. Elle y est verrouillée puis relue.
+  const candidate = await getUserActiveTeam(userId);
   const db = await getDatabase();
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
-    await registerTeamInternal(connection, tournamentId, userId);
+    await registerTeamInternal(connection, tournamentId, userId, candidate?.teamId ?? null);
     await connection.commit();
     flushBotLogs(connection);
 

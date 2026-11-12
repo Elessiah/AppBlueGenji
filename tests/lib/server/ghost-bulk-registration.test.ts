@@ -375,7 +375,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
     });
     const { connection } = fakeConnection({ teams: [] });
 
-    await registerCurrentUserTeam(connection, 12, 42);
+    await registerCurrentUserTeam(connection, 12, 42, 101);
 
     expect(firstStatement(connection)).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
   });
@@ -386,7 +386,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
     const { connection } = fakeConnection({ teams: [] });
 
-    await registerCurrentUserTeam(connection, 12, 42);
+    await registerCurrentUserTeam(connection, 12, 42, 101);
 
     const sql = sqlOf(connection);
     const teamLock = sql.indexOf("SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE");
@@ -396,34 +396,44 @@ describe("ordre de verrouillage des points d'entrée", () => {
     expect(call[1]).toEqual([101]);
   });
 
-  it("lit l'équipe du joueur sur le pool avant tout verrou, puis la relit dans la transaction", async () => {
+  it("ne lit l'équipe du joueur que sur la connexion de la transaction (jamais une seconde place du pool)", async () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
     const { connection } = fakeConnection({ teams: [] });
 
-    await registerCurrentUserTeam(connection, 12, 42);
+    await registerCurrentUserTeam(connection, 12, 42, 101);
 
-    expect(jest.mocked(getUserActiveTeam).mock.calls).toEqual([[42], [42, connection]]);
+    expect(jest.mocked(getUserActiveTeam).mock.calls).toEqual([[42, connection]]);
+  });
+
+  it("ne verrouille pas l'équipe en tournoi individuel", async () => {
+    // En individuel l'équipe n'est pas l'engagé : la verrouiller avant
+    // `bg_users` croiserait l'ordre de la suppression de compte.
+    const { connection } = fakeConnection({ teams: [] });
+    (connection.execute as unknown as SqlMock).mockImplementationOnce(async () => [
+      [{ participant_type: "SOLO" }],
+      [],
+    ]);
+
+    await registerCurrentUserTeam(connection, 12, 42, 101).catch(() => undefined);
+
+    expect(sqlOf(connection)).not.toContain("SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE");
   });
 
   it("refuse un manager rétrogradé pendant l'attente du verrou (rôles relus dessous)", async () => {
-    jest
-      .mocked(getUserActiveTeam)
-      .mockResolvedValueOnce({ teamId: 101, teamName: "Équipe", roles: ["MANAGER"] })
-      .mockResolvedValueOnce({ teamId: 101, teamName: "Équipe", roles: ["DPS"] });
+    // L'appelant l'a lu MANAGER sur le pool ; sous le verrou il n'est plus que DPS.
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["DPS"] });
     const { connection, inserted } = fakeConnection({ teams: [] });
 
-    await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("NOT_TEAM_MANAGER");
+    await expect(registerCurrentUserTeam(connection, 12, 42, 101)).rejects.toThrow("NOT_TEAM_MANAGER");
     expect(inserted).toEqual([]);
   });
 
   it("refuse un joueur passé dans une autre équipe entre la lecture et le verrou", async () => {
-    jest
-      .mocked(getUserActiveTeam)
-      .mockResolvedValueOnce({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] })
-      .mockResolvedValueOnce({ teamId: 202, teamName: "Autre", roles: ["OWNER"] });
+    // Lu dans l'équipe 101 sur le pool, il est dans la 202 sous le verrou.
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 202, teamName: "Autre", roles: ["OWNER"] });
     const { connection, inserted } = fakeConnection({ teams: [] });
 
-    await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("NO_ACTIVE_TEAM");
+    await expect(registerCurrentUserTeam(connection, 12, 42, 101)).rejects.toThrow("NO_ACTIVE_TEAM");
     expect(inserted).toEqual([]);
   });
 
@@ -431,7 +441,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 101, teamName: "Équipe", roles: ["OWNER"] });
     const { connection, inserted } = fakeConnection({ teams: [], activeTeamDeletedAt: "2026-11-12 10:00:00" });
 
-    await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("NO_ACTIVE_TEAM");
+    await expect(registerCurrentUserTeam(connection, 12, 42, 101)).rejects.toThrow("NO_ACTIVE_TEAM");
     expect(inserted).toEqual([]);
   });
 
@@ -446,7 +456,7 @@ describe("ordre de verrouillage des points d'entrée", () => {
     });
     const { connection } = fakeConnection({ teams: [] });
 
-    await registerCurrentUserTeam(connection, 12, 42);
+    await registerCurrentUserTeam(connection, 12, 42, 101);
 
     expect(getUserActiveTeam).toHaveBeenCalledWith(42, connection);
   });

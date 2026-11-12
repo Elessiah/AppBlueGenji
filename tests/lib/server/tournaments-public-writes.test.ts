@@ -10,6 +10,7 @@ jest.mock("@/lib/server/tournaments/finalization");
 jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/player-pushes");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/player-forfeit");
 jest.mock("@/lib/server/tournaments/deleted-entry-forfeit");
 jest.mock("@/lib/server/tournaments/admin");
@@ -52,6 +53,7 @@ import {
   resolveUserEntrant,
 } from "@/lib/server/tournaments/registration";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "@/lib/server/tournaments/bot-logs";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { finalizeTournamentIfDone, resolveExpiredScoreReports } from "@/lib/server/tournaments/finalization";
@@ -351,11 +353,23 @@ describe("createTournament", () => {
 
 describe("inscriptions", () => {
   it("inscrit l'équipe du joueur puis publie après le commit", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 77, teamName: "Équipe", roles: ["OWNER"] });
+
     await registerCurrentUserTeam(5, 12);
 
-    expect(registerTeamInternal).toHaveBeenCalledWith(expect.anything(), 5, 12);
+    expect(registerTeamInternal).toHaveBeenCalledWith(expect.anything(), 5, 12, 77);
     expectCommitted();
     expect(order(jest.mocked(publishUpdatedEvent))).toBeGreaterThan(order(connection.commit));
+  });
+
+  it("lit l'équipe du joueur sur le pool avant d'emprunter la connexion de la transaction", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue(null);
+
+    await registerCurrentUserTeam(5, 12);
+
+    expect(getUserActiveTeam).toHaveBeenCalledWith(12);
+    expect(order(jest.mocked(getUserActiveTeam))).toBeLessThan(order(connection.beginTransaction));
+    expect(registerTeamInternal).toHaveBeenCalledWith(expect.anything(), 5, 12, null);
   });
 
   it("défait l'inscription refusée et la laisse remonter", async () => {

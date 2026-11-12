@@ -1,7 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
-import { isSoloTournament } from "@/lib/shared/participants";
+import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
@@ -190,16 +190,25 @@ export async function registerCurrentUserTeam(
   connection: PoolConnection,
   tournamentId: number,
   userId: number,
+  candidateTeamId: number | null,
 ): Promise<void> {
-  // L'équipe du joueur, lue **sur le pool et avant tout verrou** : aucun verrou
-  // n'est encore tenu (pas de convoi sur le pool, voir plus bas), et la
-  // transaction n'a encore rien lu — son instantané n'est pas figé.
-  const candidate = await getUserActiveTeam(userId);
-
-  // Avant la lecture ci-dessous, et non après : c'est elle qui figerait
-  // l'instantané `REPEATABLE READ` de la transaction, et le comptage d'effectif
-  // de `registerTeam` compterait alors un monde d'avant l'attente du verrou.
-  await lockTournamentRow(connection, tournamentId);
+  // `candidateTeamId` : l'équipe active du joueur, lue par l'appelant **sur le
+  // pool, avant d'emprunter la connexion de la transaction** — la lire ici, sur
+  // une seconde place du pool, ferait attendre chaque inscription d'une place
+  // que les autres inscriptions ne rendent pas (25 clics simultanés suffisent à
+  // geler le site) ; la lire sur `connection` figerait l'instantané
+  // `REPEATABLE READ` avant les verrous ci-dessous.
+  //
+  // Verrou du tournoi en lecture verrouillante (aucun instantané figé) : elle
+  // dit aussi le type de participant, pour ne verrouiller l'équipe qu'en
+  // tournoi par équipes — en individuel, l'équipe n'est pas l'engagé, et la
+  // verrouiller avant `bg_users` (`ensureSoloEntry`) croiserait l'ordre de la
+  // suppression de compte (`bg_users` → équipe).
+  const [lockRows] = await connection.execute<(RowDataPacket & { participant_type: string | null })[]>(
+    `SELECT participant_type FROM bg_tournaments WHERE id = ? FOR UPDATE`,
+    [tournamentId],
+  );
+  const lockedSolo = lockRows.length > 0 && isSoloTournament(toParticipantType(lockRows[0].participant_type));
 
   // Puis la ligne de cette équipe (ordre tournoi → équipe, celui de
   // `registerTeamsByIds`), **toujours avant la première lecture ordinaire** :
@@ -209,10 +218,10 @@ export async function registerCurrentUserTeam(
   // d'inscription se lisent à jour, et `teamEverRegistered`, lu sous ce même
   // verrou, voit l'inscription.
   let candidateDeleted = false;
-  if (candidate) {
+  if (candidateTeamId !== null && !lockedSolo) {
     const [teamRows] = await connection.execute<(RowDataPacket & { deleted_at: Date | string | null })[]>(
       `SELECT deleted_at FROM bg_teams WHERE id = ? FOR UPDATE`,
-      [candidate.teamId],
+      [candidateTeamId],
     );
     candidateDeleted = teamRows.length === 0 || (teamRows[0].deleted_at ?? null) !== null;
   }
@@ -245,7 +254,7 @@ export async function registerCurrentUserTeam(
   // toujours vivante. Un joueur qui a changé d'équipe entre la lecture sur le
   // pool et le verrou (course rare) n'engage rien — son nouvel effectif n'est
   // pas sous verrou ; un nouvel essai l'engage.
-  if (!activeTeam || candidateDeleted || activeTeam.teamId !== candidate?.teamId) {
+  if (!activeTeam || candidateDeleted || activeTeam.teamId !== candidateTeamId) {
     throw new Error("NO_ACTIVE_TEAM");
   }
 

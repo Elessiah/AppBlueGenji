@@ -107,7 +107,7 @@ describe("registerCurrentUserTeam", () => {
     });
     const { connection, inserts } = fakeConnection({ registered: 3 });
 
-    await registerCurrentUserTeam(connection, 5, 3);
+    await registerCurrentUserTeam(connection, 5, 3, 12);
 
     expect(ensureSoloEntry).not.toHaveBeenCalled();
     expect(inserts).toHaveLength(1);
@@ -122,12 +122,10 @@ describe("registerCurrentUserTeam", () => {
     jest.mocked(ensureSoloEntry).mockResolvedValue(88);
     const { connection, inserts } = fakeConnection();
 
-    await registerCurrentUserTeam(connection, 5, 3);
+    await registerCurrentUserTeam(connection, 5, 3, 12);
 
-    // Aucune équipe requise : c'est tout l'intérêt du mode individuel. Son
-    // équipe éventuelle n'est lue qu'avant le verrou, pour la verrouiller —
-    // jamais résolue dans la transaction comme engagé.
-    expect(getUserActiveTeam).not.toHaveBeenCalledWith(3, connection);
+    // Aucune équipe requise : c'est tout l'intérêt du mode individuel.
+    expect(getUserActiveTeam).not.toHaveBeenCalled();
     expect(ensureSoloEntry).toHaveBeenCalledWith(connection, 3);
     expect(inserts[0][1]).toEqual([5, 88, 1]);
   });
@@ -136,7 +134,7 @@ describe("registerCurrentUserTeam", () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue(null);
     const { connection, inserts } = fakeConnection();
 
-    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("NO_ACTIVE_TEAM");
+    await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("NO_ACTIVE_TEAM");
     expect(inserts).toHaveLength(0);
   });
 
@@ -144,7 +142,7 @@ describe("registerCurrentUserTeam", () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(null);
     const { connection } = fakeConnection();
 
-    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+    await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
     expect(ensureSoloEntry).not.toHaveBeenCalled();
   });
 
@@ -155,7 +153,7 @@ describe("registerCurrentUserTeam", () => {
     jest.mocked(ensureSoloEntry).mockResolvedValue(88);
     const { connection, inserts } = fakeConnection({ already: 1 });
 
-    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("ALREADY_REGISTERED");
+    await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("ALREADY_REGISTERED");
     expect(inserts).toHaveLength(0);
   });
 
@@ -166,7 +164,7 @@ describe("registerCurrentUserTeam", () => {
     jest.mocked(ensureSoloEntry).mockResolvedValue(88);
     const { connection, inserts } = fakeConnection({ registered: 4 });
 
-    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("TOURNAMENT_FULL");
+    await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("TOURNAMENT_FULL");
     expect(inserts).toHaveLength(0);
   });
 
@@ -177,7 +175,7 @@ describe("registerCurrentUserTeam", () => {
     jest.mocked(ensureSoloEntry).mockResolvedValue(88);
     const { connection } = fakeConnection();
 
-    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("REGISTRATION_CLOSED");
+    await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("REGISTRATION_CLOSED");
   });
 });
 
@@ -252,7 +250,7 @@ describe("qualité pour engager son équipe", () => {
     });
     const { connection, inserts } = fakeConnection();
 
-    await registerCurrentUserTeam(connection, 5, 3);
+    await registerCurrentUserTeam(connection, 5, 3, 12);
     expect(inserts).toHaveLength(1);
   });
 
@@ -264,7 +262,7 @@ describe("qualité pour engager son équipe", () => {
     });
     const { connection, inserts } = fakeConnection();
 
-    await registerCurrentUserTeam(connection, 5, 3);
+    await registerCurrentUserTeam(connection, 5, 3, 12);
     expect(inserts).toHaveLength(1);
   });
 
@@ -274,7 +272,7 @@ describe("qualité pour engager son équipe", () => {
       jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 12, teamName: "Équipe", roles });
       const { connection, inserts } = fakeConnection();
 
-      await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("NOT_TEAM_MANAGER");
+      await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("NOT_TEAM_MANAGER");
       expect(inserts).toHaveLength(0);
     },
   );
@@ -285,7 +283,7 @@ describe("qualité pour engager son équipe", () => {
 
     // Deux refus distincts : l'un dit de rejoindre une équipe, l'autre de
     // s'adresser à celui qui la dirige.
-    await expect(registerCurrentUserTeam(connection, 5, 3)).rejects.toThrow("NO_ACTIVE_TEAM");
+    await expect(registerCurrentUserTeam(connection, 5, 3, 12)).rejects.toThrow("NO_ACTIVE_TEAM");
   });
 
   it("ne s'applique pas au tournoi individuel : le joueur n'engage que lui-même", async () => {
@@ -295,9 +293,9 @@ describe("qualité pour engager son équipe", () => {
     jest.mocked(ensureSoloEntry).mockResolvedValue(88);
     const { connection, inserts } = fakeConnection();
 
-    await registerCurrentUserTeam(connection, 5, 3);
+    await registerCurrentUserTeam(connection, 5, 3, 12);
 
-    expect(getUserActiveTeam).not.toHaveBeenCalledWith(3, connection);
+    expect(getUserActiveTeam).not.toHaveBeenCalled();
     expect(inserts).toHaveLength(1);
   });
 

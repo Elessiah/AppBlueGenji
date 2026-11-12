@@ -148,7 +148,7 @@ describe("inscription", () => {
       roles: ["OWNER"],
     });
 
-    await registerCurrentUserTeam(registrationConnection(), 12, 42);
+    await registerCurrentUserTeam(registrationConnection(), 12, 42, 101);
 
     expect(queued()).toEqual([
       { kind: "registration", tournamentId: 12, teamId: 101, byStaff: false },
@@ -181,7 +181,7 @@ describe("inscription", () => {
       roles: ["OWNER"],
     });
 
-    await expect(registerCurrentUserTeam(connection, 12, 42)).rejects.toThrow("ALREADY_REGISTERED");
+    await expect(registerCurrentUserTeam(connection, 12, 42, 101)).rejects.toThrow("ALREADY_REGISTERED");
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 });
