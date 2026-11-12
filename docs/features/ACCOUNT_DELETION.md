@@ -737,6 +737,8 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   de transaction changent de main (`WHERE … AND id IN (…)`) : un tournoi confié
   entre le relevé et l'écriture reste à l'organisateur. Personne :
   rien ne change ; le compte est anonyme dès la demande, puis anonymisé au jour 30.
+  Le repreneur se cherche **avant** les verrous (balayage de `bg_users`) ; la
+  transaction ne le relit que par sa clé, et ne rebalaie que s'il ne convient plus.
 - **E1 — inscriptions solo.** Celles d'un tournoi pas encore commencé, sans
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le

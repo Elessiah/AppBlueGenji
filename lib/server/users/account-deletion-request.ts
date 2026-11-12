@@ -268,10 +268,14 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
  * Le compte vivant le plus ancien, autre que `userId`, qui tient la permission
  * `tournaments` (rôle, sinon administrateur). Un compte suspendu ne se connecte
  * pas : il ne reprend rien.
+ *
+ * `onlyId` : relit ce seul candidat (clé primaire), sous les verrous de la
+ * demande — le balayage complet de `bg_users` se fait avant eux.
  */
 async function findOrganizerSuccessor(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
+  onlyId?: number,
 ): Promise<number | null> {
   const byRole = rolesGranting("tournaments")
     .map((role) => `JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
@@ -281,7 +285,7 @@ async function findOrganizerSuccessor(
     `SELECT u.id
        FROM bg_users u
       WHERE u.is_deleted = 0
-        AND u.id <> ?
+        AND u.id <> ?${onlyId === undefined ? "" : " AND u.id = ?"}
         AND (u.is_admin = 1 OR ${roleSql})
         AND NOT EXISTS (
           SELECT 1 FROM bg_account_suspensions s
@@ -289,7 +293,7 @@ async function findOrganizerSuccessor(
         )
       ORDER BY (${roleSql}) DESC, u.created_at, u.id
       LIMIT 1`,
-    [userId],
+    onlyId === undefined ? [userId] : [userId, onlyId],
   );
   return rows.length > 0 ? Number(rows[0].id) : null;
 }
@@ -311,15 +315,21 @@ async function listOrganizedTournamentIds(
  * rend les tournois touchés. Seuls ceux déjà verrouillés (`lockedIds`, lus
  * avant la transaction) changent de main : un tournoi confié entre-temps reste
  * à l'organisateur, plutôt que d'être écrit sans son verrou.
+ * `successorHint`, trouvé avant les verrous, n'est que relu par sa clé : le
+ * balayage ne se rejoue ici que s'il ne convient plus (supprimé, suspendu,
+ * rôle retiré entre-temps).
  */
 async function handOverOrganizedTournaments(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
   lockedIds: ReadonlySet<number>,
+  successorHint: number | null,
 ): Promise<number[]> {
   const organized = (await listOrganizedTournamentIds(connection, userId)).filter((id) => lockedIds.has(id));
   if (organized.length === 0) return [];
-  const successor = await findOrganizerSuccessor(connection, userId);
+  const successor =
+    (successorHint === null ? null : await findOrganizerSuccessor(connection, userId, successorHint)) ??
+    (await findOrganizerSuccessor(connection, userId));
   // Personne à qui les confier : rien ne change (décision requise), et le
   // compte sera anonymisé et non effacé, l'organisateur le retenant.
   if (successor === null) return [];
@@ -540,11 +550,15 @@ export async function requestAccountDeletion(
     // inscription à un tournoi en cours ou terminé ne se retire pas, et son
     // verrou ferait attendre un tournoi en cours pour rien.
     soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
+    const organizedIds = await listOrganizedTournamentIds(db, userId);
     const soloTournaments = mergeTournamentIds(
       await listSoloRegistrationTournamentIds(db, userId, true),
-      await listOrganizedTournamentIds(db, userId),
+      organizedIds,
       await listCastTournamentIds(db, userId),
     );
+    // Le repreneur se cherche hors verrous (balayage de `bg_users`) ; la
+    // transaction ne fait que le relire par sa clé.
+    const successorHint = organizedIds.length > 0 ? await findOrganizerSuccessor(db, userId) : null;
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -581,7 +595,12 @@ export async function requestAccountDeletion(
       for (const teamId of await listActiveTeamIds(connection, userId)) {
         departures.push(await leaveTeamOn(connection, teamId, userId));
       }
-      organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
+      organizedHandedOver = await handOverOrganizedTournaments(
+        connection,
+        userId,
+        new Set(soloTournaments),
+        successorHint,
+      );
       // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
       // leur cast jusqu'à la suppression définitive.
       // Ses arbitrages de matchs non joués sont annoncés au staff, et un match

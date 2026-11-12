@@ -107,6 +107,8 @@ type Options = {
   /** Les tournois organisés relus dans la transaction, s'ils diffèrent du relevé d'avant. */
   organizedLater?: number[];
   organizerSuccessor?: number | null;
+  /** Le repreneur relu par sa clé sous verrou ne convient plus (suspendu entre-temps). */
+  hintGone?: boolean;
   failOn?: string;
   /** `deletion_requested_at` relue après l'écriture, telle que la base la rend (D21). */
   storedRequestedAt?: string;
@@ -122,7 +124,8 @@ function livingMembers(options: Options) {
     .map((m) => ({ id: m.user_id, suspended: suspended.includes(m.user_id) ? 1 : 0 }));
 }
 
-function organizerRows(options: Options) {
+function organizerRows(options: Options, sql: string) {
+  if (options.hintGone && sql.includes("AND u.id = ?")) return [];
   return options.organizerSuccessor ? [{ id: options.organizerSuccessor }] : [];
 }
 
@@ -191,7 +194,7 @@ function fakeDb(options: Options) {
     if (read) return [read];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
     if (q.startsWith("SELECT u.id, EXISTS (")) return [livingMembers(options)];
-    if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
+    if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options, q)];
     if (isActiveRegistrationRead(q)) return [options.activeTournament ? [{ tournament_id: 8 }] : []];
     if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) return [organizedRows(options, queries)];
     return [{ affectedRows: 1 }];
@@ -977,6 +980,48 @@ describe("requestAccountDeletion — tournois organisés", () => {
     await requestAccountDeletion(7);
 
     expect(queries.some((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id"))).toBe(false);
+  });
+
+  it("requestAccountDeletion_organizer_scansSuccessorBeforeLocksThenRereadsItByKey", async () => {
+    // Le balayage de `bg_users` ne tient plus les verrous de la demande.
+    const { queries, connection } = fakeDb({ organized: [11], organizerSuccessor: 21 });
+    connection.beginTransaction.mockImplementation(async () => {
+      queries.push({ sql: "BEGIN", params: [] });
+    });
+
+    await requestAccountDeletion(7);
+
+    const begin = queries.findIndex((q) => q.sql === "BEGIN");
+    const lookups = queries
+      .map((q, index) => ({ ...q, index }))
+      .filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"));
+    expect(lookups).toHaveLength(2);
+    expect(lookups[0].index).toBeLessThan(begin);
+    expect(lookups[0].params).toEqual([7]);
+    expect(lookups[1].index).toBeGreaterThan(begin);
+    expect(lookups[1].sql).toContain("AND u.id = ?");
+    expect(lookups[1].params).toEqual([7, 21]);
+  });
+
+  it("requestAccountDeletion_hintNoLongerEligible_rescansUnderLock", async () => {
+    // Le candidat relu par sa clé a été suspendu entre-temps : le balayage se rejoue sous verrou.
+    const { queries } = fakeDb({ organized: [11], organizerSuccessor: 21, hintGone: true });
+
+    await requestAccountDeletion(7);
+
+    const lookups = queries.filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"));
+    expect(lookups).toHaveLength(3);
+    expect(lookups[2].sql).not.toContain("AND u.id = ?");
+    const handover = queries.find((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id = ?"));
+    expect(handover?.params).toEqual([21, 7, 11]);
+  });
+
+  it("requestAccountDeletion_notAnOrganizer_noSuccessorLookup", async () => {
+    const { queries } = fakeDb({ organized: [] });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))).toBe(false);
   });
 
   it("findOrganizerSuccessor_query_prefersRoleHoldersThenOldest", async () => {
