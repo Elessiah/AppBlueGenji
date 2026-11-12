@@ -1164,7 +1164,7 @@ function RgpdFr({
           <p id="salons-vocaux">
             <strong>Salons vocaux d&apos;équipe.</strong> Dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe »
             (éteinte par défaut), le bot Discord de l&apos;association ouvre, à partir de {VOICE_CHANNEL_LEAD_MINUTES} minutes avant l&apos;heure d&apos;un
-            match (au premier passage du site dans ce délai, le tournoi en cours et publié, le match programmé et prêt, ou dont le score attend sa confirmation, ses deux équipes connues), un salon vocal de {VOICE_CHANNEL_CAPACITY} places pour chacune de ses deux
+            match (au premier passage du site dans ce délai, le tournoi en cours et publié, le match programmé, prêt ou dont le score attend sa confirmation, ses deux équipes connues), un salon vocal de {VOICE_CHANNEL_CAPACITY} places pour chacune de ses deux
             équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel, dont le nom serait un pseudo, ni pour un
             match contre une équipe fantôme. Le lancement du match n&apos;en dépend pas : il se lance comme dans tout autre tournoi. Pour savoir si un salon est vide, le bot tient
             en mémoire, en permanence (option allumée ou non), sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d&apos;arrivée et de boost, exclusion temporaire), des membres du serveur Discord de

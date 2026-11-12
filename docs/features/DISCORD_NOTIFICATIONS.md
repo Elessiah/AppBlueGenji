@@ -252,7 +252,10 @@ reprogramme, `MATCH_DM_RETRY_DELAY_MS` (2 min) plus tard, le seul message privé
 des joueurs non atteints (`notifyUsers` avec `discordOnly` : pas de second
 push), après avoir relu la manche : jouée, reprogrammée, horaire retiré ou
 engagée remplacée entre-temps, la reprise se tait (un avis plus récent a déjà
-dit vrai) ; sinon elle redit si le salon de check-in est ouvert à son instant. Une manche programmée avant
+dit vrai) ; elle relit aussi ses destinataires (`retryRecipients`) : un joueur
+qui a quitté l'engagée, supprimé son compte, perdu la certification de son tag
+ou s'est opposé aux messages privés de match pendant l'attente n'est pas
+repris ; sinon elle redit si le salon de check-in est ouvert à son instant. Une manche programmée avant
 l'arrivée de `TOLD` a ses preuves héritées recopiées en `TOLD` au démarrage
 (voir « Passage à `TOLD` ») : `TOLD` est la seule source. Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une
