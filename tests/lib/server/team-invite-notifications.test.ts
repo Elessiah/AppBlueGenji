@@ -10,6 +10,7 @@ import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
 import {
   claimOwnershipNoticeSlot,
+  releaseOwnershipNoticeSlot,
   notifyTeamInvite,
   notifyTeamInviteInBackground,
   resetOwnershipNoticeSlots,
@@ -226,6 +227,28 @@ describe("notifyTeamInvite", () => {
     expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 
+  it("notifyTeamInvite_ownershipNothingDelivered_nextTransferNotifiesAgain", async () => {
+    mockDb();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValueOnce(null);
+    jest.mocked(pushToUsers).mockResolvedValueOnce(0);
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it("notifyTeamInvite_ownershipDeliveryThrows_slotReleased", async () => {
+    mockDb();
+    jest.mocked(pushToUsers).mockRejectedValueOnce(new Error("push en panne"));
+    await expect(notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID)).rejects.toThrow("push en panne");
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushToUsers).toHaveBeenCalledTimes(2);
+  });
+
   it("notifyTeamInvite_ownershipSuspendedAccount_consumesNoSlot", async () => {
     mockDb({ account: accountRow({ suspended: 1 }) });
     await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
@@ -326,6 +349,16 @@ describe("claimOwnershipNoticeSlot", () => {
     claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
 
     expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, WINDOW_MS)).toBe(true);
+  });
+
+  it("releaseOwnershipNoticeSlot_newerClaim_keepsIt", () => {
+    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+    releaseOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+    claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 5);
+
+    releaseOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 0);
+
+    expect(claimOwnershipNoticeSlot(TEAM_ID, PLAYER_ID, 6)).toBe(false);
   });
 
   it("claimOwnershipNoticeSlot_otherTeam_granted", () => {

@@ -228,11 +228,11 @@ export const PUSH_TAG_MAX = 64;
  * le lint refuse `[^\S…]` (`\s` moins ces deux-là).
  */
 const BREAKING_SPACES = /[\t\n\v\f\r \u1680\u2000-\u200a\u2028\u2029\u205f\u3000\ufeff]+/g;
-const EDGE_BREAKING_SPACES = /^[\t\n\v\f\r \u1680\u2000-\u200a\u2028\u2029\u205f\u3000\ufeff]+|[\t\n\v\f\r \u1680\u2000-\u200a\u2028\u2029\u205f\u3000\ufeff]+$/g;
 
 /** Une suite d'espaces sécables devient une espace ; les bords sont rognés, insécables gardées. */
 function foldSpaces(line: string): string {
-  return line.replace(BREAKING_SPACES, " ").replace(EDGE_BREAKING_SPACES, "");
+  // Repliées, les espaces sécables d'un bord ne sont plus qu'une : la rogner suffit.
+  return line.replace(BREAKING_SPACES, " ").replace(/^ | $/g, "");
 }
 
 /**
@@ -245,7 +245,8 @@ export function clipPushText(text: string, max: number, keepLines = false): stri
     ? text
         .split("\n")
         .map(foldSpaces)
-        .filter(Boolean)
+        // Une ligne faite d'insécables seules est vide à l'écran : écartée.
+        .filter((line) => line.trim() !== "")
         .join("\n")
     : foldSpaces(text);
   const chars = Array.from(clean);

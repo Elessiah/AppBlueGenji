@@ -53,8 +53,9 @@ avertissement. Une invitation qui valide une demande déjà en attente
   réservation en mémoire (`claimOwnershipNoticeSlot`, clé équipe + joueur,
   1 000 entrées au plus) limite l'avis à une fois par fenêtre — deux
   propriétaires qui se renvoient l'équipe n'écrivent pas à chaque geste. Elle
-  se prend une fois l'avis décidé (un compte suspendu n'en consomme pas) ; un
-  redémarrage l'oublie (au pire un avis de plus).
+  se prend une fois l'avis décidé (un compte suspendu n'en consomme pas) et se
+  rend si rien n'a été remis (bot tombé sans appareil, ou erreur :
+  `releaseOwnershipNoticeSlot`) ; un redémarrage l'oublie (au pire un avis de plus).
 - `claimGhostTeam` envoie l'avis **après** sa transaction et son `finally` : un
   rédacteur qui lève ne peut pas défaire la reprise validée.
 - Les comptes portent sur les **lignes écrites** (l'invitation qui vient

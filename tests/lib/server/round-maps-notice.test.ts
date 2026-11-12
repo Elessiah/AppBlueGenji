@@ -467,6 +467,14 @@ describe("formatRoundMapsSummaryLog", () => {
     expect(log).toContain("M1, M2 et 3 autres (5 manches)");
   });
 
+  it("formatRoundMapsSummaryLog_noListedRoundOnlyOverflow_countOnly", () => {
+    const log = formatRoundMapsSummaryLog({ tournament, roundLabels: [], listed: 8, more: 3 });
+
+    expect(log).toContain("Cartes de manche modifiées");
+    expect(log).toContain(" : 3 manches, par le staff");
+    expect(log).not.toContain(" et ");
+  });
+
   it("formatRoundMapsSummaryLog_moreThanListed_countsTheRest", () => {
     const labels = Array.from({ length: 10 }, (_, index) => `M${index + 1}`);
     const log = formatRoundMapsSummaryLog({ tournament, roundLabels: labels, listed: 8 });

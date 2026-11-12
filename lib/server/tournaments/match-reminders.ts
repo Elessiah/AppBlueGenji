@@ -268,7 +268,10 @@ type ToldStateRow = RowDataPacket & {
 };
 
 /** La manche relue a toujours les engagées de l'envoi. */
-function samePoster(state: ToldStateRow, match: ScheduledMatch): boolean {
+function samePoster(
+  state: Pick<ToldStateRow, "match_team1_id" | "match_team2_id">,
+  match: ScheduledMatch,
+): boolean {
   return (
     Number(state.match_team1_id) === Number(match.team1_id) && Number(state.match_team2_id) === Number(match.team2_id)
   );
@@ -598,15 +601,60 @@ async function sendToSide(
     retry:
       unreached.size === 0
         ? null
-        : { recipients: recipients.filter((recipient) => unreached.has(recipient.userId)), notification },
+        : {
+            recipients: recipients.filter((recipient) => unreached.has(recipient.userId)),
+            notification,
+            match,
+            sentStart: clearedStartAt ? null : new Date(match.start_at),
+            // Le salon a pu ouvrir pendant l'attente : la reprise le dit.
+            refresh: () => {
+              context.checkInOpen = checkIn && isCheckInOpen(startAt, new Date());
+            },
+          },
   };
 }
+
+/** Reprise des messages privés non remis d'une engagée. */
+type DmRetry = {
+  recipients: NotificationRecipient[];
+  notification: UserNotification;
+  match: ScheduledMatch;
+  /** Horaire que le message annonce ; `null` pour un avis de retrait. */
+  sentStart: Date | null;
+  /** Recalcule ce qui dépend de l'instant d'envoi (check-in ouvert). */
+  refresh: () => void;
+};
 
 /** Bilan d'un envoi à une engagée (`sendToSide`). */
 type SideOutcome = {
   delivered: boolean;
-  retry: { recipients: NotificationRecipient[]; notification: UserNotification } | null;
+  retry: DmRetry | null;
 };
+
+type RetryStateRow = RowDataPacket & {
+  match_start_at: MaybeInstant;
+  match_team1_id: number | null;
+  match_team2_id: number | null;
+  status: string | null;
+};
+
+/**
+ * La reprise dit-elle encore vrai ? La manche existe, n'est pas jouée, garde
+ * ses engagées et l'horaire du message (ou n'en a toujours aucun pour un avis
+ * de retrait). Sinon un avis plus récent a déjà été remis : la reprise se tait
+ * plutôt que de laisser un horaire périmé en dernier message.
+ */
+async function retryStillCurrent(retry: DmRetry): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<RetryStateRow[]>(
+    `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id, m.status
+       FROM bg_matches m WHERE m.id = ? LIMIT 1`,
+    [Number(retry.match.id)],
+  );
+  const state = rows[0];
+  if (!state || (state.status && isPlayedMatchStatus(state.status))) return false;
+  return sameInstant(state.match_start_at, retry.sentStart) && samePoster(state, retry.match);
+}
 
 /** Délai avant la reprise des messages privés non remis : le bot a le temps de revenir. */
 export const MATCH_DM_RETRY_DELAY_MS = 120_000;
@@ -617,15 +665,23 @@ export const MATCH_DM_RETRY_DELAY_MS = 120_000;
  * balayage ne le retentera pas. Sans cela, un bot tombé entre l'appel français
  * et l'appel anglais d'une engagée laissait ses joueurs anglophones sans
  * message ni nouvel essai (revue sécurité #469). Le push, lui, est déjà parti :
- * il ne sonne pas une seconde fois. En mémoire : un redémarrage dans
- * l'intervalle la perd (meilleur effort, comme l'envoi).
+ * il ne sonne pas une seconde fois. La manche est relue avant : jouée,
+ * reprogrammée ou réaffichée entre-temps, la reprise se tait (`retryStillCurrent`).
+ * En mémoire : un redémarrage dans l'intervalle la perd (meilleur effort,
+ * comme l'envoi).
  */
-function scheduleDmRetry(retries: readonly NonNullable<SideOutcome["retry"]>[]): void {
+function scheduleDmRetry(retries: readonly DmRetry[]): void {
   if (retries.length === 0) return;
   const timer = setTimeout(() => {
-    for (const { recipients, notification } of retries) {
-      void notifyUsers(recipients, { ...notification, discordOnly: true })
+    for (const retry of retries) {
+      void retryStillCurrent(retry)
+        .then((current) => {
+          if (!current) return null;
+          retry.refresh();
+          return notifyUsers(retry.recipients, { ...retry.notification, discordOnly: true });
+        })
         .then((report) => {
+          if (!report) return;
           if (report.discordUnreachedUserIds.length > 0) {
             console.warn(
               `[match-reminders] bot injoignable à la reprise : ${report.discordUnreachedUserIds.length} message(s) privé(s) perdu(s)`,

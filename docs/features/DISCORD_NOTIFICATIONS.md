@@ -250,7 +250,9 @@ privé remis, aucun appareil atteint — bot injoignable sans appareil abonné).
 tombe entre l'envoi français et l'envoi anglais d'une engagée) garde `TOLD` et
 reprogramme, `MATCH_DM_RETRY_DELAY_MS` (2 min) plus tard, le seul message privé
 des joueurs non atteints (`notifyUsers` avec `discordOnly` : pas de second
-push). Une manche programmée avant
+push), après avoir relu la manche : jouée, reprogrammée, horaire retiré ou
+engagée remplacée entre-temps, la reprise se tait (un avis plus récent a déjà
+dit vrai) ; sinon elle redit si le salon de check-in est ouvert à son instant. Une manche programmée avant
 l'arrivée de `TOLD` a ses preuves héritées recopiées en `TOLD` au démarrage
 (voir « Passage à `TOLD` ») : `TOLD` est la seule source. Ni `SEEN` (le balayage la pose aussi en silence) ni
 la ligne d'un palier (réservée avant l'envoi, consommée sans message par une

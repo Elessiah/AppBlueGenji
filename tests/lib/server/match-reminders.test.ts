@@ -123,6 +123,8 @@ function executeDouble(options: {
   current?: Date | null;
   /** Engagées actuelles de la manche (par défaut celles de l'envoi). */
   poster?: [number | null, number | null];
+  /** État actuel de la manche (relu par la reprise des messages privés). */
+  status?: string;
 }) {
   return jest.fn(async (sql: string, params?: unknown[]) => {
     if (sql.startsWith("SELECT m.start_at AS match_start_at")) {
@@ -134,6 +136,7 @@ function executeDouble(options: {
             match_start_at: options.current === undefined ? START : options.current,
             match_team1_id: team1,
             match_team2_id: team2,
+            status: options.status ?? "READY",
             ...told,
           },
         ],
@@ -382,6 +385,67 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(message).toContain("**Team Nova** contre");
     expect(recipients.map((r) => r.label)).toEqual(["Nova"]);
     expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  /** Envoi où le bot perd l'appel de Team Nova ; rend la reprise capturée, bot revenu. */
+  async function dispatchWithLostSide(): Promise<() => void> {
+    await mockDb({});
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) =>
+      message.includes("**Team Nova** contre") ? null : { sent: 2, unresolved: [], failed: [] },
+    );
+    const retries = captureDmRetries();
+    await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE);
+    expect(retries).toHaveLength(1);
+    jest.mocked(pushDiscordDirectMessages).mockReset();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    return retries[0];
+  }
+
+  /** La manche telle que la reprise la relit. */
+  async function matchAtRetry(options: Parameters<typeof executeDouble>[0]): Promise<void> {
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn(), execute: executeDouble(options) }));
+  }
+
+  async function runRetry(retry: () => void): Promise<void> {
+    retry();
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+  }
+
+  it("dispatchDueMatchReminders_matchRescheduledBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({ current: new Date("2026-09-10T19:00:00Z") });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_matchPlayedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({ status: "COMPLETED" });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_teamReplacedBeforeRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({ poster: [101, 999] });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_matchUnchangedAtRetry_retrySends", async () => {
+    const retry = await dispatchWithLostSide();
+    await matchAtRetry({});
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
   });
 
   it("dispatchDueMatchReminders_nothingDelivered_schedulesNoDmRetry", async () => {

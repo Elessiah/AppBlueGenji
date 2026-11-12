@@ -894,8 +894,14 @@ export function formatRoundMapsSummaryLog(context: {
   const count = context.roundLabels.length + (context.more ?? 0);
   const rest = count - shown.length;
   const others = rest > 1 ? "autres" : "autre";
+  const total = `${count} manche${count > 1 ? "s" : ""}`;
+  // Aucune manche nommée (seules restent celles comptées au-delà du plafond) :
+  // le nombre seul, sans « : et N autres ».
+  if (shown.length === 0) {
+    return `${lead("🗺️", "Cartes de manche modifiées", context.tournament)} : ${total}, par ${ANONYMOUS_STAFF_LABEL}.`;
+  }
   const names = rest > 0 ? `${shown.join(", ")} et ${rest} ${others}` : shown.join(", ");
-  return `${lead("🗺️", "Cartes de manche modifiées", context.tournament)} : ${names} (${count} manche${count > 1 ? "s" : ""}), par ${ANONYMOUS_STAFF_LABEL}.`;
+  return `${lead("🗺️", "Cartes de manche modifiées", context.tournament)} : ${names} (${total}), par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /** Règles de ban et de choix des cartes d'un tournoi modifiées. */

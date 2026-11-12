@@ -348,6 +348,10 @@ describe("clipPushText", () => {
     expect(clipPushText("  a \t\n b  ", 100)).toBe("a b");
   });
 
+  it("clipPushText_keepLinesNbspOnlyLine_dropped", () => {
+    expect(clipPushText("a\n\u00a0\nb", 100, true)).toBe("a\nb");
+  });
+
   it("clipPushText_keepLines_foldsEachLineAndDropsEmptyOnes", () => {
     expect(clipPushText(" a  b \n\n c\u00a0d ", 100, true)).toBe("a b\nc\u00a0d");
   });
