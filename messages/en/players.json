@@ -98,7 +98,7 @@
     "viewTeam": "Open {name}'s page",
     "noTeamTitle": "This player isn't in any team",
     "noTeam": "No team",
-    "deletedNotice": "This player deleted their account. Their personal information has been erased and their username replaced with a placeholder one; their results remain, because they also belong to the teams they faced.",
+    "deletedNotice": "This player deleted their account. Their personal information has been erased and their username replaced with a borrowed one; their results remain, because they also belong to the teams they faced.",
     "statsTitle": "Statistics",
     "infoTitle": "Information",
     "battletag": "Overwatch BattleTag",
