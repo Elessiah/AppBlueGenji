@@ -261,7 +261,7 @@ const NOTICE_CASES: NoticeCase[] = [
 
 describe("formatTeamInviteNotice", () => {
   it.each(NOTICE_CASES)("$name", ({ kind, locale, url, expected }) => {
-    expect(formatTeamInviteNotice({ kind, teamName: "Les Glaciers", url }, locale).split("\n")[0]).toBe(expected);
+    expect(formatTeamInviteNotice({ kind, teamName: "Les Glaciers", url, settingsUrl: null }, locale).split("\n")[0]).toBe(expected);
   });
 
   it("formatTeamInviteNotice_withSettingsUrl_appendsOptOutLineFrAndEn", () => {
@@ -276,7 +276,7 @@ describe("formatTeamInviteNotice", () => {
   });
 
   it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_bracketsCannotCloseTheLink", (locale) => {
-    const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "x](https://evil.test) [y", url: PROFILE_URL }, locale);
+    const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "x](https://evil.test) [y", url: PROFILE_URL, settingsUrl: null }, locale);
     // Crochets et parenthèses du nom échappés : un seul lien actif, vers le profil.
     expect(text).toContain(String.raw`x\]`);
     expect(text).toContain(String.raw`\[y`);
@@ -286,14 +286,14 @@ describe("formatTeamInviteNotice", () => {
   });
 
   it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_namesNoPerson", (locale) => {
-    const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url: PROFILE_URL }, locale);
+    const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url: PROFILE_URL, settingsUrl: null }, locale);
     // Décision D4 : le nom de l'équipe seul, ni « un admin » ni personne.
     expect(text).toMatch(locale === "fr" ? /^📨 BlueGenji — Tu peux reprendre l'équipe \[Les Glaciers\]/ : /^📨 BlueGenji — You can take over the team \[Les Glaciers\]/);
     expect(text).not.toMatch(/admin/i);
   });
 
   it("formatTeamInviteNotice_mentionInTeamName_neutralized", () => {
-    const text = formatTeamInviteNotice({ kind: "INVITE", teamName: "@everyone <@123>", url: PROFILE_URL }, "fr");
+    const text = formatTeamInviteNotice({ kind: "INVITE", teamName: "@everyone <@123>", url: PROFILE_URL, settingsUrl: null }, "fr");
 
     expect(text).not.toContain("@everyone");
     expect(text).not.toContain("<@123>");

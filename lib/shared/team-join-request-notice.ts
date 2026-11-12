@@ -103,7 +103,7 @@ export function shouldNotifyTeamJoinRequest(input: { toThisTeam: number; toAnyTe
  * lit sur la fiche de l'équipe, où mène le lien, derrière une connexion.
  */
 export function formatTeamJoinRequestNotice(
-  input: { teamName: string; url: string; settingsUrl?: string | null },
+  input: { teamName: string; url: string; settingsUrl: string | null },
   locale: Locale = "fr",
 ): string {
   return `${teamJoinRequestNoticeBody(input, locale)}\n${matchDmOptOutLine(input.settingsUrl, locale)}`;

@@ -21,6 +21,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 
 /** Code de refus d'une valeur qui n'est pas un booléen (`PUT /api/profile/match-dms`). */
@@ -58,7 +59,7 @@ export async function recordMatchDmPreference(userId: number, enabled: boolean):
  * notifications push, réglées par sujet. Pour les messages privés d'équipe,
  * dont les destinataires sont lus hors de `loadNotificationRecipients`.
  *
- * Colonne absente (migration en échec) : personne n'a pu s'y opposer, rien
+ * Colonne `match_dm_enabled` absente (migration en échec) : personne n'a pu s'y opposer, rien
  * n'est retiré. Toute autre erreur de lecture retire le canal Discord à tous :
  * dans le doute, une opposition n'est jamais enjambée (art. 21) — le push part.
  */
@@ -76,8 +77,12 @@ export async function withoutOptedOutDiscord<R extends { userId: number; discord
     );
     optedOut = new Set(rows.map((row) => Number(row.id)));
   } catch (error) {
-    if (isUnknownColumnError(error)) return [...recipients];
-    console.warn("[notify] réglage des messages privés illisible : envoi Discord retenu");
+    // Seule l'absence de cette colonne-ci vaut « personne n'a pu s'y opposer » :
+    // une autre colonne inconnue reste une lecture en échec, donc fermée.
+    if (isUnknownColumnError(error) && /match_dm_enabled/.test(String((error as { message?: unknown }).message ?? ""))) {
+      return [...recipients];
+    }
+    console.error("[notify] réglage des messages privés illisible : envoi Discord retenu", failureReason(error));
     optedOut = new Set(ids);
   }
   return recipients.map((recipient) =>

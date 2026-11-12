@@ -11,7 +11,8 @@ import { withoutOptedOutDiscord } from "@/lib/server/users/match-dm-preference";
 import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import { teamJoinRequestPush } from "@/lib/shared/push-messages";
 import { parseRoles } from "@/lib/server/serialization";
-import { siteCanonicalBase } from "@/lib/server/site-url";
+import { siteCanonicalBase, siteUrl } from "@/lib/server/site-url";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import {
   TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS,
   formatTeamJoinRequestNotice,
@@ -64,7 +65,9 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
     `SELECT u.id, u.pseudo, tm.roles_json, u.discord_id, u.discord_pseudo, u.discord_verified_at
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
-     WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?`,
+     WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?
+       AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
+                       WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
     [teamId, requesterId],
   );
   // Messages privés coupés dans « Mon profil » (D68) : le push seul.
@@ -81,7 +84,8 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   if (recipients.length === 0) return;
 
   const url = `${siteCanonicalBase()}/equipes/${teamId}`;
-  const settingsUrl = `${siteCanonicalBase()}${MATCH_DM_SETTINGS_PATH}`;
+  // Racine inconnue : la phrase sans lien plutôt qu'un lien vers localhost.
+  const settingsUrl = siteUrl(MATCH_DM_SETTINGS_PATH);
   await notifyUsers(recipients, {
     topic: "TEAM_JOIN_REQUEST",
     discord: { message: (locale) => formatTeamJoinRequestNotice({ teamName: teams[0].name, url, settingsUrl }, locale), context: "team-join-request" },

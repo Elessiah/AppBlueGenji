@@ -274,17 +274,32 @@ describe("withoutOptedOutDiscord — messages privés d'équipe (D68)", () => {
     expect(await withoutOptedOutDiscord([KIRO, AYLA])).toEqual([KIRO, AYLA]);
   });
 
-  it("withoutOptedOutDiscord_otherReadError_discordRemovedForAll", async () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    const query = jest.fn<SqlQuery>().mockRejectedValue(new Error("connection lost"));
+  it("withoutOptedOutDiscord_otherReadError_discordRemovedForAllAndReasonLogged", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const lost = Object.assign(new Error("connection lost"), { code: "PROTOCOL_CONNECTION_LOST" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(lost);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
 
     const recipients = await withoutOptedOutDiscord([KIRO, AYLA]);
 
     expect(recipients).toEqual([{ userId: 1, discord: null }, { userId: 2, discord: null }]);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).not.toMatch(/Kiro|Ayla/);
-    warn.mockRestore();
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][1]).toBe("PROTOCOL_CONNECTION_LOST");
+    expect(error.mock.calls[0].map(String).join(" ")).not.toMatch(/Kiro|Ayla/);
+    error.mockRestore();
+  });
+
+  it("withoutOptedOutDiscord_unknownOtherColumn_discordRemovedForAll", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const otherColumn = Object.assign(new Error("Unknown column 'is_deleted' in 'where clause'"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(otherColumn);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await withoutOptedOutDiscord([KIRO, AYLA]);
+
+    expect(recipients).toEqual([{ userId: 1, discord: null }, { userId: 2, discord: null }]);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 
   it("withoutOptedOutDiscord_duplicateIds_queriedOnce", async () => {

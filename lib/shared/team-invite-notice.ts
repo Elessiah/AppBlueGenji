@@ -194,7 +194,7 @@ export function teamInviteNoticeRecipient(account: TeamInviteNoticeAccount): {
  * @param input.url adresse absolue du site, en français ; passée à l'anglais ici (`localizedSiteUrl`).
  */
 export function formatTeamInviteNotice(
-  input: { kind: TeamInviteNoticeKind; teamName: string; url: string; settingsUrl?: string | null },
+  input: { kind: TeamInviteNoticeKind; teamName: string; url: string; settingsUrl: string | null },
   locale: Locale = "fr",
 ): string {
   return `${teamInviteNoticeBody(input, locale)}\n${matchDmOptOutLine(input.settingsUrl, locale)}`;

@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/push-subscriptions");
-jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
+jest.mock("@/lib/server/site-url", () => ({
+  siteCanonicalBase: () => "https://site.test",
+  siteUrl: jest.fn((path: string) => `https://site.test${path}`),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
+import { siteUrl } from "@/lib/server/site-url";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP } from "@/lib/shared/team-join-request-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -84,6 +88,29 @@ describe("notifyTeamJoinRequest", () => {
     expect(recipients.map((r) => r.label)).toEqual(["Manager"]);
     expect(message).toContain("<https://site.test/profil#notifications>");
     expect(jest.mocked(pushToUsers).mock.calls[0][0]).toEqual([1, 2]);
+  });
+
+  it("notifyTeamJoinRequest_managersQuery_excludesActiveSuspensions", async () => {
+    const execute = mockDb({ members: [row()] });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [membersSql] = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_team_members"))!;
+    expect(membersSql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus");
+    expect(membersSql).toContain("sus.lifted_at IS NULL");
+  });
+
+  it("notifyTeamJoinRequest_siteRootUnknown_optOutLineWithoutLink", async () => {
+    mockDb({ members: [row()] });
+    jest.mocked(siteUrl).mockReturnValueOnce(null);
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    // Langue du compte inconnue ici : message bilingue, chaque moitié sans lien.
+    expect(message).toContain("Tu peux couper ces messages privés dans « Mon profil », section Notifications, sur le site.");
+    expect(message).toContain("You can turn off these direct messages in “My profile”, Notifications section, on the site.");
+    expect(message).not.toContain("localhost");
   });
 
   it("se tait sur une demande redéposée dans la fenêtre", async () => {

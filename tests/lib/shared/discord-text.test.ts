@@ -117,7 +117,7 @@ describe("rédacteurs Discord", () => {
   });
 
   it("l'avis de demande d'adhésion neutralise le nom de l'équipe", () => {
-    const notice = formatTeamJoinRequestNotice({ teamName: "@everyone", url: "https://bluegenji-esport.fr/equipes/1" });
+    const notice = formatTeamJoinRequestNotice({ teamName: "@everyone", url: "https://bluegenji-esport.fr/equipes/1", settingsUrl: null });
     expect(hasLiveMention(notice)).toBe(false);
   });
 

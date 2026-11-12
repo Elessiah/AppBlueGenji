@@ -175,11 +175,11 @@ describe("messages privés de modération", () => {
   });
 
   it("demande d'adhésion à une équipe : le nom d'équipe neutralisé, jamais le demandeur", () => {
-    const en = formatTeamJoinRequestNotice({ teamName: TEAM, url: `${SITE}/equipes/les-loups` }, "en");
+    const en = formatTeamJoinRequestNotice({ teamName: TEAM, url: `${SITE}/equipes/les-loups`, settingsUrl: null }, "en");
     expect(en).toContain(`A player is asking to join your team “${discordInline(TEAM)}”.`);
     // La fiche d'équipe n'est pas encore traduite : le lien reste celui de la page française.
     expect(en).toContain(`page: ${SITE}/equipes/les-loups`);
-    expect(formatTeamJoinRequestNotice({ teamName: TEAM, url: `${SITE}/equipes/les-loups` })).toContain("Un joueur demande");
+    expect(formatTeamJoinRequestNotice({ teamName: TEAM, url: `${SITE}/equipes/les-loups`, settingsUrl: null })).toContain("Un joueur demande");
   });
 
   const purgeAfter = new Date("2027-04-26T10:00:00.000Z");
