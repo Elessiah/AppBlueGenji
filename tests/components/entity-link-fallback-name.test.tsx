@@ -12,7 +12,7 @@ import { AppLocaleProvider } from "@/components/i18n/locale-context";
  * Un nom fait seulement d'invisibles rendait un lien sans texte, donc sans nom
  * accessible : le lien affiche « Équipe #id » / « Joueur #id ».
  */
-const INVISIBLE = "​⁠";
+const INVISIBLE = "\u200B\u2060";
 
 describe("TeamLink / PlayerLink — nom invisible", () => {
   it("TeamLink_invisibleName_rendersTeamNumber", () => {

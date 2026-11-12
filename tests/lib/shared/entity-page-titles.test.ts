@@ -31,7 +31,7 @@ describe("teamPageTitle", () => {
   });
 
   it("teamPageTitle_invisibleOnlyName_returnsGenericTitle", () => {
-    expect(teamPageTitle({ name: "​‍‮" })).toBe(TEAM_PAGE_FALLBACK_TITLE);
+    expect(teamPageTitle({ name: "\u200B\u200D\u202E" })).toBe(TEAM_PAGE_FALLBACK_TITLE);
   });
 
   it("rogne les espaces du nom", () => {

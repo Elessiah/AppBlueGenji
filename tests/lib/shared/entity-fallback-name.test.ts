@@ -6,7 +6,7 @@ import { hasVisibleName, shownEntityName } from "@/lib/shared/entity-fallback-na
  * `cleanStoredNames`) rendait un lien ou un titre sans texte : il s'affiche
  * « Équipe #id » / « Joueur #id » dans la langue de la page.
  */
-const INVISIBLE = "​⁠‮";
+const INVISIBLE = "\u200B\u2060\u202E";
 
 describe("hasVisibleName", () => {
   it("hasVisibleName_ordinaryName_returnsTrue", () => {
