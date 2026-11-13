@@ -2,7 +2,6 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { SCORE_ENTRY_CLOSED_PHASES, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams";
 import { canEditReplay } from "@/lib/shared/match-replay";
-import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
 import {
@@ -19,7 +18,7 @@ import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text
 import { useSpectatorView } from "@/components/spectator-view";
 import { usePlayerScore } from "./player-score-context";
 import { useIssueReport } from "./issue-report-context";
-import { useLiveControls } from "./live-context";
+import { useLiveControls, useViewerRefereesMatch } from "./live-context";
 import { useOnMatchPage } from "./match-page-context";
 import { singlePendingReport } from "./score-form";
 import { launchStripControls, type LaunchStripControls } from "./launch-strip";
@@ -96,8 +95,10 @@ export function useMatchCardModel(
     canManage,
     canSchedule,
     viewerUserId,
-    refereeNames,
   } = useLiveControls();
+  // Lu à part (`useViewerRefereesMatch`) : une relecture des pseudos ne
+  // redessine que les cartes dont la réponse change.
+  const viewerReferees = useViewerRefereesMatch(match);
   // Phase de lancement, calculée **une fois par carte** et transmise aux deux
   // bandeaux : chacun posait sinon sa propre minuterie sur l'heure de départ —
   // trois `setTimeout` par match programmé, sur un plateau qui en compte 254.
@@ -147,7 +148,7 @@ export function useMatchCardModel(
   // deux, le bouton ne mènerait qu'à des refus. L'arbitre désigné du match
   // (médiateur) y est admis pour **ce** match (`mayConfigureMatchLive`).
   const showLiveConfig =
-    canConfigureLive(match) && ((canSchedule && canManage) || viewerRefereesMatch(match, refereeNames));
+    canConfigureLive(match) && ((canSchedule && canManage) || viewerReferees);
   // Toutes les actions, rangées par `MatchCardActions` : une principale
   // visible, le reste derrière « Plus d'actions » (`MATCH_CARD_LAYOUT.md`).
   const actions = matchCardActionList(

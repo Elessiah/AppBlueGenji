@@ -7,7 +7,6 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { PLATFORM_LABELS, isMatchCastable, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { liveTriggerViewer, viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
-import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import type { BracketMatch } from "@/lib/shared/types";
 import {
   castClaimBody,
@@ -17,7 +16,7 @@ import {
   type CastClaimChoice,
 } from "../_lib/cast-claim";
 import { useActionsText } from "../_lib/actions-text";
-import { useLiveControls } from "../_lib/live-context";
+import { useLiveControls, useViewerRefereesMatch } from "../_lib/live-context";
 import { useTournamentGame } from "../_lib/match-format-context";
 import {
   CastBattletagField,
@@ -78,12 +77,13 @@ export function CastClaimDialog({
 }>) {
   const { t, locale } = useActionsText();
   const controls = useLiveControls();
+  const referee = useViewerRefereesMatch(match);
   // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
   // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas. Le
   // lecteur s'inscrit : il est jugé en caster du match.
   const triggerLocked = !viewerMayChangeLiveTrigger(
     match,
-    liveTriggerViewer(controls, viewerRefereesMatch(match, controls.refereeNames)),
+    liveTriggerViewer(controls, referee),
     true,
   );
   const game = useTournamentGame();

@@ -235,11 +235,13 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // `resolveViewerEntrant`, partagé avec la relecture des propositions d'un
     // match (ERREUR.txt EF-15) : le contexte du lecteur n'en passe aucune (sa
     // lecture d'équipe ouvre sa propre requête), la relecture d'un match passe
-    // la sienne (une seule place du pool, revue perf #542).
+    // la sienne (une seule place du pool, revue perf #542). Un porteur de `live`
+    // ou de `tournaments` lit engagé et identité sur une seule connexion (EF-60).
     expect(index).toMatch(/if \(!isSoloTournament\(snapshot\.card\.participantType\)\) \{\s*const activeTeam = await getUserActiveTeam\(userId, connection\);/);
     expect(index).toContain("await resolveViewerEntrant({ card: tournament }, userId, connection)");
     expect(index).toContain("const myTeamId = connection ? await resolve(connection) : await withConnection(resolve);");
-    expect(index).toContain("const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);");
+    expect(index).toContain("...(await resolveViewerEntrant(snapshot, userId)),");
+    expect(index).toMatch(/canManageLive \|\| canManage\s*\? await withConnection\(async \(connection\) => \{\s*const entrant = await resolveViewerEntrant\(snapshot, userId, connection\);/);
   });
 });
 describe("compteur de visites — déduplication dans l'onglet", () => {
@@ -257,20 +259,50 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
   it("refreshRefereeNames_failedRead_reopensSameMissingSet", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
     expect(body).toContain('if (namesAttemptRef.current === missing) namesAttemptRef.current = "";');
-    expect(body).toMatch(/if \(!response\.ok\) \{\s*retryLater\(\);\s*return;\s*\}/);
-    expect(body).toMatch(/catch \{[^}]*retryLater\(\);\s*\}/);
+    expect(body).toMatch(/if \(!response\.ok\) \{\s*retryLater\(refereeNamesRetryDelay\(response\.headers\.get\("retry-after"\)\)\);\s*return;\s*\}/);
+    expect(body).toContain("if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null));");
   });
 
-  it("refreshRefereeNames_lateResponse_commitsOnlyWhenNamesImprove", () => {
+  it("refreshRefereeNames_lateResponse_mergesOnlyMissingNames", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
-    const guard = body.indexOf("if (!refereeNamesImprove(current.detail.matches, current.detail.refereeNames, names)) return;");
+    const merge = body.indexOf("const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, names);");
 
-    expect(guard).toBeGreaterThan(-1);
-    expect(guard).toBeLessThan(body.indexOf("commit("));
+    expect(merge).toBeGreaterThan(-1);
+    expect(merge).toBeLessThan(body.indexOf("commit("));
+    expect(body).toContain("if (merged.stale) retryLater(refereeNamesRetryDelay(null));");
+    expect(body).toContain("if (merged.names !== null) commit(");
+  });
+
+  it("refreshRefereeNames_readInFlightOrScheduled_startsNothing", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toContain("if (namesTimerRef.current !== null || namesAbortRef.current !== null) return;");
+    expect(body).toContain("signal: controller.signal");
+    expect(body).toContain("Math.max(spread, namesRetryAtRef.current - Date.now())");
+  });
+
+  it("refreshRefereeNames_nobodyWatching_defersUntilPowerChange", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toMatch(/if \(nobodyWatches\(\)\) \{\s*namesDeferredRef\.current = true;\s*return;\s*\}/);
+    expect(hook).toContain("if (namesDeferredRef.current && !nobodyWatches()) refreshRefereeNames();");
+  });
+
+  it("refreshRefereeNames_tournamentChange_abortsAndResets", () => {
+    expect(hook).toMatch(/namesAbortRef\.current\?\.abort\(\);[\s\S]*?\[tournamentId\]/);
+  });
+
+  it("load_restCommit_clearsPendingNamesTimer", () => {
+    const load = hook.slice(hook.indexOf("commit({ tier: stateRef.current.tier, detail });"));
+    expect(load.slice(0, 500)).toContain("clearTimeout(namesTimerRef.current)");
+  });
+
+  it("stalePreview_reread_thenRefreshesNames", () => {
+    expect(hook).toContain("if (stalePreview) void load(true, true).then(() => refreshRefereeNames());");
   });
 
   it("refereeKey_secret_survivesModuleReevaluation", () => {
     const names = read("lib/server/tournaments/referee-names.ts");
-    expect(names).toContain("holder.__bgRefereeKeySecret ??= randomBytes(32);");
+    expect(names).toContain("holder.__bgRefereeKeySecret ??= refereeKeySecret();");
   });
 });

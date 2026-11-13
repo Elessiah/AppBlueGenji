@@ -96,9 +96,44 @@ export function shouldRetryReread(failures: number): boolean {
  */
 export const REFEREE_READY_REREAD_MS = 10_000;
 
-/** Relever la modale pour suivre le « Prêt » de l'arbitre ? En lancement, arbitre présenté et pas encore prêt. */
+/**
+ * Relever la modale pour suivre le « Prêt » de l'arbitre ? En lancement,
+ * arbitre présenté et pas encore prêt — sauf pour l'arbitre lui-même, qui
+ * connaît son propre « Prêt » (son geste relit la modale).
+ */
 export function refereeReadyRereadDue(launch: MatchLaunchInfo | null): boolean {
-  return launch !== null && launch.phase === "LOBBY" && launch.referee !== null && !launch.referee.ready;
+  return (
+    launch !== null &&
+    launch.phase === "LOBBY" &&
+    launch.referee !== null &&
+    !launch.referee.ready &&
+    !launch.viewer.isReferee
+  );
+}
+
+/**
+ * Plafond de la relève quand le lancement n'a pas d'heure de lancement d'office
+ * connue : une demi-heure de relectures, pas une boucle sans fin.
+ */
+export const REFEREE_READY_REREAD_MAX = 180;
+
+/**
+ * Ce que fait un battement de la relève : `stop` à l'heure du lancement
+ * d'office (`autoLaunchAt` : le match part, l'instantané fera relire la
+ * modale) ou au plafond de relectures ; `skip` tant qu'une relecture ratée
+ * attend sa reprise (échecs, `Retry-After`) — la chaîne de reprise s'en
+ * charge ; `read` sinon.
+ */
+export function refereeReadyRereadStep(input: {
+  now: number;
+  autoLaunchAt: string | null;
+  reads: number;
+  backingOff: boolean;
+}): "stop" | "skip" | "read" {
+  const stopAt = input.autoLaunchAt === null ? Number.NaN : Date.parse(input.autoLaunchAt);
+  if (Number.isFinite(stopAt) ? input.now >= stopAt : input.reads >= REFEREE_READY_REREAD_MAX) return "stop";
+  if (input.backingOff) return "skip";
+  return "read";
 }
 
 /** Plus longue attente que `setTimeout` accepte (≈ 24,8 jours). */
@@ -297,6 +332,10 @@ export function useMatchContacts(
     setRereadFailures(0);
     setReadKey((key) => key + 1);
   };
+  // Une relecture ratée attend sa reprise (échecs comptés, `Retry-After`) :
+  // la relève de l'arbitre ne la double pas. Lu par le minuteur, sans le relancer.
+  const backingOffRef = useRef(false);
+  backingOffRef.current = rereadFailures > 0 || rereadWait > 0;
   useEffect(() => {
     if (!launch) {
       // Lecture coupée : l'empreinte suit la carte, sans quoi la lecture
@@ -324,11 +363,24 @@ export function useMatchContacts(
   const { clocks } = useClientPower();
   // Jamais lecture coupée : la relève poserait deux états toutes les 10 s sans rien lire.
   const followReferee = enabled && clocks && refereeReadyRereadDue(launch);
+  const followUntil = launch?.autoLaunchAt ?? null;
   useEffect(() => {
     if (!followReferee) return;
-    const timer = setInterval(rereadNow, REFEREE_READY_REREAD_MS);
+    let reads = 0;
+    const timer = setInterval(() => {
+      const step = refereeReadyRereadStep({
+        now: Date.now(),
+        autoLaunchAt: followUntil,
+        reads,
+        backingOff: backingOffRef.current,
+      });
+      if (step === "stop") clearInterval(timer);
+      if (step !== "read") return;
+      reads += 1;
+      rereadNow();
+    }, REFEREE_READY_REREAD_MS);
     return () => clearInterval(timer);
-  }, [followReferee]);
+  }, [followReferee, followUntil]);
 
   // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
   useEffect(() => {
@@ -370,6 +422,7 @@ export function useMatchContacts(
         }
         setServerDate(read.serverDate);
         setRereadFailures(0);
+        setRereadWait(0);
         setState({ kind: "ready", launch: read.launch });
       } catch {
         if (!alive) return;

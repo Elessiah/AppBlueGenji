@@ -35,6 +35,7 @@ import { parseCastBattletagInput } from "@/lib/shared/cast-settings";
 import {
   groupNoRefereeAlerts,
   normalizeFirstMap,
+  refereeBlockReason,
   refereeDecision,
   type NoRefereeCandidate,
 } from "@/lib/shared/match-referee";
@@ -794,19 +795,46 @@ export async function loadCasterIdentity(
   return casterIdentityOf(rows[0]);
 }
 
+/** Identité d'un lecteur dont on n'a rien lu : aucun refus ne s'y lève. */
+const NO_CASTER_IDENTITY: CasterIdentity = { discordVerified: false, blizzardLinked: false };
+
 /**
- * Ce qui empêche un lecteur de s'inscrire comme caster, `null` s'il le peut.
- * L'identité n'est lue que quand elle peut changer la réponse : sans la
- * permission `live`, le refus est acquis.
+ * Ce que le contexte du lecteur tire de son identité, **en une lecture** sur la
+ * connexion déjà tenue (`connection`) : son refus de caster (`castBlock`,
+ * permission `live`) et s'il remplit la condition d'arbitrage
+ * (`refereeEligible`, permission `tournaments` + identité, `refereeBlockReason`).
+ * L'identité n'est lue que si l'une des deux permissions peut la rendre utile
+ * (sans elles, `connection` peut être `null` : rien n'est lu).
  */
-export async function loadViewerCastBlock(
+export async function loadViewerIdentityBlocks(
+  connection: PoolConnection | null,
   userId: number,
-  hasLivePermission: boolean,
+  rights: { hasLivePermission: boolean; hasTournamentsPermission: boolean },
   game: TournamentGame,
-): Promise<CastBlock | null> {
-  if (!hasLivePermission) return castBlockReason(false, { discordVerified: false, blizzardLinked: false }, game);
+): Promise<{ castBlock: CastBlock | null; refereeEligible: boolean }> {
+  const { hasLivePermission, hasTournamentsPermission } = rights;
+  const identity =
+    connection !== null && (hasLivePermission || hasTournamentsPermission)
+      ? await loadCasterIdentity(connection, userId)
+      : NO_CASTER_IDENTITY;
+  return {
+    castBlock: castBlockReason(hasLivePermission, identity, game),
+    refereeEligible: refereeBlockReason(hasTournamentsPermission, identity, game) === null,
+  };
+}
+
+/**
+ * Le lecteur remplit-il **en ce moment** la condition d'arbitrage du jeu
+ * (`refereeBlockReason`) ? Sans la permission `tournaments`, non sans rien lire.
+ */
+export async function loadViewerRefereeEligible(
+  userId: number,
+  hasTournamentsPermission: boolean,
+  game: TournamentGame,
+): Promise<boolean> {
+  if (!hasTournamentsPermission) return false;
   const identity = await withConnection((connection) => loadCasterIdentity(connection, userId));
-  return castBlockReason(true, identity, game);
+  return refereeBlockReason(true, identity, game) === null;
 }
 
 /**

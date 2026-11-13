@@ -17,8 +17,15 @@ jest.mock("@/components/ui/toast", () => ({
   useToast: () => ({ showError: () => undefined, showSuccess: () => undefined }),
 }));
 jest.mock("@/app/(secured)/_shared/BgCanvas", () => ({ BgCanvas: () => null }));
-// La page lit le droit staff sur le serveur (`getCurrentUser`) : un lecteur sans droit.
-jest.mock("@/lib/server/auth", () => ({ getCurrentUser: async () => null }));
+// La page lit le droit staff sur le serveur (`getCurrentUser`) : un membre connecté sans droit.
+jest.mock("@/lib/server/auth", () => ({
+  getCurrentUser: async () => jest.requireActual<typeof import("../helpers/auth-user")>("../helpers/auth-user").authUser({ id: 3 }),
+}));
+// Chargement complet (`"1"`) ou requête du routeur : l'anglais n'est sérialisé qu'au premier.
+let mockDocumentLoad = "1";
+jest.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-bg-document": mockDocumentLoad }),
+}));
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
@@ -87,6 +94,7 @@ afterAll(() => {
 });
 beforeEach(() => {
   mockLocale = "en";
+  mockDocumentLoad = "1";
 });
 
 const DATES = {
@@ -146,6 +154,14 @@ describe("mise en page — dictionnaire du navigateur", () => {
       ["cards", "labels", "list", "matchFormat", "participants", "rulesHelp", "ticker", "tickerControls"],
     );
     expect(JSON.stringify(client).length).toBeLessThan(10_000);
+  });
+
+  it("sous /en, une requête du routeur ne sérialise rien : l'anglais vient de son morceau", async () => {
+    mockDocumentLoad = "0";
+
+    const page = await TournamentsPage();
+
+    expect((page.props as { messages?: unknown }).messages).toBeUndefined();
   });
 
   it("en français, rien n'est passé : le texte est celui du paquet", async () => {

@@ -22,7 +22,7 @@ BOT_INTERNAL_URL=http://127.0.0.1:4400  # optional
 BOT_INTERNAL_TOKEN=  # must match bot's INTERNAL_API_TOKEN
 DEV_AUTH_USER_ID=  # optional — bypass auth in dev (see `docs/features/DEV_AUTH_BYPASS.md`)
 BOT_DOCS_PATH=  # optional — chemin du projet blueGenjiBot (défaut: ../blueGenjiBot)
-VISIT_HASH_SALT=  # recommandé — sel des empreintes de visiteur (défaut: BOT_INTERNAL_TOKEN)
+VISIT_HASH_SALT=  # recommandé — sel des empreintes de visiteur (défaut: BOT_INTERNAL_TOKEN) ; dérive aussi le secret des empreintes d'arbitre (`refereeKeySecret`)
 TRUSTED_PROXY_HOPS=1  # optional — proxys de confiance devant l'app (X-Forwarded-For)
 TRUSTED_PROXY_REAL_IP=false  # optional — n'accepter `X-Real-IP` que si le proxy le pose seul
 VAPID_PUBLIC_KEY=  # optional — notifications push (`npm run push:keys`) ; absent = push éteint

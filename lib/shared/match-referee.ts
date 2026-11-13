@@ -275,30 +275,47 @@ export function refereeNamesAttempt(missing: string, attempted: string): { read:
   return { read: missing !== attempted, attempted };
 }
 
-/** Nombre de désignations montrées dont le pseudo manque dans `names`. */
-function missingRefereeNamesCount(
+/**
+ * Fusionne une liste de pseudos relue dans celle qu'on a : chaque désignation
+ * montrée encore sans pseudo que la réponse **résout** (même empreinte, pseudo
+ * ou marque `mine`) prend l'entrée relue ; le reste est gardé tel quel. Une
+ * réponse en retard (lue avant une désignation plus récente, ou doublée par le
+ * contexte d'une reconnexion) n'écrase donc jamais une liste plus à jour, et
+ * une réponse qui résout un **autre** sous-ensemble n'est pas perdue.
+ *
+ * `names` : la liste fusionnée, `null` si la réponse ne résout rien.
+ * `stale` : la réponse connaît une désignation manquante sous une **autre**
+ * empreinte — le serveur retardait : la relecture est à refaire plus tard.
+ */
+export function mergeRefereeNames<T extends RefereeNameEntry>(
   matches: readonly RefereeNamedMatch[],
-  names: readonly RefereeNameEntry[],
-): number {
-  let missing = 0;
+  current: readonly T[],
+  incoming: readonly T[],
+): { names: T[] | null; stale: boolean } {
+  const added: T[] = [];
+  let stale = false;
   for (const match of matches) {
-    if (refereeNameMissing(match, names)) missing += 1;
+    if (!refereeNameMissing(match, current)) continue;
+    const found = incoming.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+    if (found && (found.pseudo !== "" || found.mine === true)) added.push(found);
+    else if (incoming.some((name) => name.matchId === match.id && name.refereeKey !== match.refereeKey)) stale = true;
   }
-  return missing;
+  if (added.length === 0) return { names: null, stale };
+  const replaced = new Set(added.map((name) => name.matchId));
+  return { names: [...current.filter((name) => !replaced.has(name.matchId)), ...added], stale };
 }
 
+/** Plus courte attente avant de relire les pseudos après un échec (429, 5xx, réseau, réponse en retard). */
+export const REFEREE_NAMES_RETRY_MS = 10_000;
+
 /**
- * Une liste de pseudos relue **améliore**-t-elle celle qu'on a ? Vrai quand
- * elle laisse moins de désignations montrées sans pseudo. Une réponse en
- * retard (lue avant une désignation plus récente, ou doublée par le contexte
- * d'une reconnexion) n'écrase ainsi jamais une liste plus à jour.
+ * Attente avant de relire les pseudos après un échec : l'en-tête `Retry-After`
+ * (secondes) d'un refus de quota, jamais moins de {@link REFEREE_NAMES_RETRY_MS}.
  */
-export function refereeNamesImprove(
-  matches: readonly RefereeNamedMatch[],
-  current: readonly RefereeNameEntry[],
-  incoming: readonly RefereeNameEntry[],
-): boolean {
-  return missingRefereeNamesCount(matches, incoming) < missingRefereeNamesCount(matches, current);
+export function refereeNamesRetryDelay(retryAfter: string | null): number {
+  const seconds = retryAfter === null ? Number.NaN : Number(retryAfter);
+  const asked = Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : 0;
+  return Math.max(REFEREE_NAMES_RETRY_MS, asked);
 }
 
 /** Liste de pseudos d'arbitre reçue d'une réponse (forme contrôlée), `null` si elle n'en est pas une. */

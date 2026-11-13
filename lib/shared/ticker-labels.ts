@@ -17,6 +17,19 @@ export const FR_TICKER_LABELS: TickerControls = {
   pauseShort: "Pause",
 };
 
+/**
+ * L'anglais des cinq libellés, recopié de `messages/en/landing.json` (même
+ * contrôle) : l'anglais de la liste des tournois, chargé à part
+ * (`englishTournamentsList`), n'emporte pas le dictionnaire de l'accueil.
+ */
+export const EN_TICKER_LABELS: TickerControls = {
+  label: "News feed",
+  resume: "Resume the scrolling banner",
+  pause: "Pause the scrolling banner",
+  resumeShort: "Resume",
+  pauseShort: "Pause",
+};
+
 /** Les cinq libellés du bandeau, pris dans l'espace `landing.ticker` d'une langue. */
 export function tickerControls(ticker: Messages["landing"]["ticker"]): TickerControls {
   return { label: ticker.label, resume: ticker.resume, pause: ticker.pause, resumeShort: ticker.resumeShort, pauseShort: ticker.pauseShort };

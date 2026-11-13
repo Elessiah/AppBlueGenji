@@ -40,7 +40,10 @@ beforeEach(() => {
 
 describe("refereeNames du contexte du lecteur", () => {
   it("getTournamentViewerContext_refereeNamesRead_namesServed", async () => {
-    jest.mocked(loadRefereeNames).mockResolvedValue([{ matchId: 40, refereeKey: "k", pseudo: "Arbitre" }]);
+    jest.mocked(loadRefereeNames).mockResolvedValue({
+      names: [{ matchId: 40, refereeKey: "k", pseudo: "Arbitre" }],
+      designations: [{ matchId: 40, refereeKey: "k", pseudo: "Arbitre", refereeUserId: 3 }],
+    });
 
     const context = await getTournamentViewerContext(snapshot, 7);
 
@@ -57,5 +60,61 @@ describe("refereeNames du contexte du lecteur", () => {
     expect(context.viewerUserId).toBe(7);
     expect(consoleError).toHaveBeenCalledTimes(1);
     consoleError.mockRestore();
+  });
+
+  it("getTournamentViewerContext_namesRead_startsBeforeViewerReads", async () => {
+    let namesStartedFirst = false;
+    jest.mocked(loadRefereeNames).mockResolvedValue({ names: [], designations: [] });
+    jest.mocked(withConnection).mockImplementation((fn) => {
+      namesStartedFirst ||= jest.mocked(loadRefereeNames).mock.calls.length > 0;
+      return fn(fakeConnection({ execute: async () => [[], []] }));
+    });
+
+    // Un porteur de `tournaments` : engagé et identité lus sur une connexion.
+    await getTournamentViewerContext(snapshot, 7, { canManage: true });
+
+    expect(withConnection).toHaveBeenCalled();
+    expect(namesStartedFirst).toBe(true);
+  });
+
+  it("getTournamentViewerContext_memberWithoutRightsInTeamTournament_reservesNoConnection", async () => {
+    jest.mocked(loadRefereeNames).mockResolvedValue({ names: [], designations: [] });
+
+    const context = await getTournamentViewerContext(snapshot, 7);
+
+    expect(withConnection).not.toHaveBeenCalled();
+    expect(context.castBlock).toBe("NOT_CASTER");
+  });
+
+  const DESIGNATED = {
+    names: [],
+    designations: [{ matchId: 40, refereeKey: "k", pseudo: "", refereeUserId: 7 }],
+  };
+
+  it("getTournamentViewerContext_designatedViewerWithoutTournamentsPermission_notMarkedMine", async () => {
+    jest.mocked(loadRefereeNames).mockResolvedValue(DESIGNATED);
+
+    const context = await getTournamentViewerContext(snapshot, 7);
+
+    expect(context.refereeNames).toEqual([]);
+  });
+
+  it("getTournamentViewerContext_designatedEligibleViewer_marksMine", async () => {
+    jest.mocked(loadRefereeNames).mockResolvedValue(DESIGNATED);
+    const identity = {
+      discord_verified_at: new Date("2026-01-01T00:00:00Z"),
+      discord_pseudo: "arbitre",
+      blizzard_sub: "sub",
+      overwatch_battletag: "Arbitre#1",
+      overwatch_battletag_typed: 0,
+      is_deleted: 0,
+    };
+    jest.mocked(withConnection).mockImplementation((fn) =>
+      fn(fakeConnection({ execute: async () => [[identity], []], query: async () => [[], []] })),
+    );
+
+    const context = await getTournamentViewerContext(snapshot, 7, { canManage: true });
+
+    expect(context.refereeNames).toEqual([{ matchId: 40, refereeKey: "k", pseudo: "", mine: true }]);
   });
 });

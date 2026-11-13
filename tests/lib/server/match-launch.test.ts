@@ -22,7 +22,8 @@ import {
   assignMatchReferee,
   claimMatchCast,
   forceLaunchMatch,
-  loadViewerCastBlock,
+  loadViewerIdentityBlocks,
+  loadViewerRefereeEligible,
   maintainMatchLaunches,
   releaseIneligibleCast,
   queueDeferredNoRefereeAlerts,
@@ -1356,14 +1357,85 @@ describe("maintainMatchLaunches", () => {
   });
 });
 
-describe("loadViewerCastBlock", () => {
-  it("refuse sans la permission, sans même lire l'identité", async () => {
-    await expect(loadViewerCastBlock(CASTER, false, "OW")).resolves.toBe("NOT_CASTER");
+describe("loadViewerIdentityBlocks", () => {
+  const IDENTIFIED = {
+    discord_verified_at: STAMP,
+    discord_pseudo: "caster",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Caster#1",
+    is_deleted: 0,
+  };
+
+  function countingConnection() {
+    const reads: string[] = [];
+    const base = executeFor(state);
+    const connection = fakeConnection({
+      execute: async (sql: string, params: unknown[] = []) => {
+        reads.push(sql);
+        return base(sql, params);
+      },
+    });
+    return { connection, reads };
+  }
+
+  it("loadViewerIdentityBlocks_noPermission_refusesWithoutReadingIdentity", async () => {
+    const { connection, reads } = countingConnection();
+
+    const actual = await loadViewerIdentityBlocks(connection, CASTER, { hasLivePermission: false, hasTournamentsPermission: false }, "OW");
+
+    expect(actual).toEqual({ castBlock: "NOT_CASTER", refereeEligible: false });
+    expect(reads).toEqual([]);
+  });
+
+  it("loadViewerIdentityBlocks_livePermissionNoIdentity_returnsIdentityRequired", async () => {
+    const { connection } = countingConnection();
+
+    const actual = await loadViewerIdentityBlocks(connection, CASTER, { hasLivePermission: true, hasTournamentsPermission: false }, "OW");
+
+    expect(actual).toEqual({ castBlock: "CASTER_IDENTITY_REQUIRED", refereeEligible: false });
+  });
+
+  it("loadViewerIdentityBlocks_bothPermissionsFullIdentity_readsIdentityOnceOnGivenConnection", async () => {
+    state.users[CASTER] = IDENTIFIED;
+    const { connection, reads } = countingConnection();
+
+    const actual = await loadViewerIdentityBlocks(connection, CASTER, { hasLivePermission: true, hasTournamentsPermission: true }, "OW");
+
+    expect(actual).toEqual({ castBlock: null, refereeEligible: true });
+    expect(reads).toHaveLength(1);
     expect(withConnection).not.toHaveBeenCalled();
   });
 
-  it("lit l'identité avec la permission", async () => {
-    await expect(loadViewerCastBlock(CASTER, true, "OW")).resolves.toBe("CASTER_IDENTITY_REQUIRED");
+  it("loadViewerIdentityBlocks_tournamentsPermissionOnly_eligibleRefereeButNotCaster", async () => {
+    state.users[CASTER] = IDENTIFIED;
+    const { connection } = countingConnection();
+
+    const actual = await loadViewerIdentityBlocks(connection, CASTER, { hasLivePermission: false, hasTournamentsPermission: true }, "OW");
+
+    expect(actual).toEqual({ castBlock: "NOT_CASTER", refereeEligible: true });
+  });
+
+  it("loadViewerIdentityBlocks_marvelRivalsWithoutCertifiedDiscord_notEligibleReferee", async () => {
+    state.users[CASTER] = { ...IDENTIFIED, discord_verified_at: null };
+    const { connection } = countingConnection();
+
+    const actual = await loadViewerIdentityBlocks(connection, CASTER, { hasLivePermission: false, hasTournamentsPermission: true }, "MR");
+
+    expect(actual.refereeEligible).toBe(false);
+  });
+});
+
+describe("loadViewerRefereeEligible", () => {
+  it("loadViewerRefereeEligible_noPermission_returnsFalseWithoutRead", async () => {
+    await expect(loadViewerRefereeEligible(CASTER, false, "OW")).resolves.toBe(false);
+    expect(withConnection).not.toHaveBeenCalled();
+  });
+
+  it("loadViewerRefereeEligible_permissionWithoutIdentity_returnsFalse", async () => {
+    await expect(loadViewerRefereeEligible(CASTER, true, "OW")).resolves.toBe(false);
+  });
+
+  it("loadViewerRefereeEligible_permissionWithIdentity_returnsTrue", async () => {
     state.users[CASTER] = {
       discord_verified_at: STAMP,
       discord_pseudo: "caster",
@@ -1371,7 +1443,8 @@ describe("loadViewerCastBlock", () => {
       overwatch_battletag: "Caster#1",
       is_deleted: 0,
     };
-    await expect(loadViewerCastBlock(CASTER, true, "OW")).resolves.toBeNull();
+
+    await expect(loadViewerRefereeEligible(CASTER, true, "OW")).resolves.toBe(true);
   });
 });
 

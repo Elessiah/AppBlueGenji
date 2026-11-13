@@ -65,12 +65,12 @@ beforeEach(() => {
   roundState = { open: 1, self_managed: 0, refereed: 0 };
   busyReferees = [];
   execute = jest.fn<SqlQuery>(async (sql) => {
-    if (sql.includes("COUNT(*) AS open")) return [[roundState], []];
+    // Une seule lecture de la manche : compteurs et cartes (`slots_json`, sous-requête).
+    if (sql.includes("COUNT(*) AS open")) return [[{ ...roundState, slots_json: roundSlotsJson }], []];
     if (sql.includes("SELECT DISTINCT referee_user_id")) return [busyReferees.map((referee_user_id) => ({ referee_user_id })), []];
     if (sql.includes("FROM bg_matches")) return [match ? [match] : [], []];
     if (sql.includes("FROM bg_users")) return [users, []];
     if (sql.includes("FROM bg_team_members")) return [players.map((user_id) => ({ user_id })), []];
-    if (sql.includes("FROM bg_tournament_round_maps")) return [roundSlotsJson === null ? [] : [{ slots_json: roundSlotsJson }], []];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection({ execute })));
@@ -114,7 +114,9 @@ describe("loadRefereePanel", () => {
     const panel = await loadRefereePanel(42, VIEWER);
     expect(panel?.roundSlots).toEqual([["Ilios"], ["Busan", "Nepal"]]);
     const roundQuery = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_tournament_round_maps"));
-    expect(roundQuery?.[1]).toEqual([7, 0, "UPPER", 2]);
+    expect(roundQuery?.[0]).toContain("COUNT(*) AS open");
+    expect(execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_tournament_round_maps"))).toHaveLength(1);
+    expect(roundQuery?.[1]).toEqual([7, 0, "UPPER", 2, 7, 0, "UPPER", 2]);
   });
 
   it("loadRefereePanel_roundWithoutMaps_returnsNoSlot", async () => {
@@ -263,7 +265,7 @@ describe("loadRefereePanel", () => {
     expect(panel?.round).toEqual({ phaseId: 0, roundNumber: 2, bracket: "UPPER", open: 4, selfManaged: 1, refereed: 2 });
     const [sql, params] = execute.mock.calls.find(([query]) => query.includes("COUNT(*) AS open")) ?? ["", []];
     expect(sql).toContain("status <> 'COMPLETED' AND is_bye = 0");
-    expect(params).toEqual([7, 0, 2, "UPPER"]);
+    expect(params).toEqual([7, 0, "UPPER", 2, 7, 0, "UPPER", 2]);
   });
 
   it("loadRefereePanel_roundStateNullSums_zero", async () => {

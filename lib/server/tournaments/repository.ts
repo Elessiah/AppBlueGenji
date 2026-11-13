@@ -352,6 +352,7 @@ export async function getMatchRows(
       m.self_managed,
       m.first_map,
       m.map_picks,
+      ru.pseudo AS referee_pseudo,
       ru.discord_verified_at AS referee_discord_verified_at,
       ru.discord_pseudo AS referee_discord_pseudo,
       ru.blizzard_sub AS referee_blizzard_sub,
