@@ -125,8 +125,19 @@ function executeDouble(options: {
   poster?: [number | null, number | null];
   /** État actuel de la manche (relu par la reprise des messages privés). */
   status?: string;
+  /** Option « Check-in des matchs » relue à l'envoi et à la reprise (absente : celle du passage). */
+  checkIn?: { flag: number; resumedAt?: Date | null };
+  /** La relecture de l'option échoue. */
+  checkInReadFails?: boolean;
 }) {
+  const checkInColumns = options.checkIn
+    ? { match_check_in: options.checkIn.flag, match_check_in_resumed_at: options.checkIn.resumedAt ?? null }
+    : {};
   return jest.fn(async (sql: string, params?: unknown[]) => {
+    if (sql.startsWith("SELECT match_check_in, match_check_in_resumed_at FROM bg_tournaments")) {
+      if (options.checkInReadFails) throw new Error("base injoignable");
+      return [options.checkIn ? [checkInColumns] : []];
+    }
     if (sql.startsWith("SELECT m.start_at AS match_start_at")) {
       const told = options.told === undefined ? { told_id: null, start_at: null } : { told_id: 1, start_at: options.told };
       const [team1, team2] = options.poster ?? [101, 102];
@@ -137,6 +148,7 @@ function executeDouble(options: {
             match_team1_id: team1,
             match_team2_id: team2,
             status: options.status ?? "READY",
+            ...checkInColumns,
             ...told,
           },
         ],
@@ -465,6 +477,62 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     await runRetry(retry);
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  /** Comme `dispatchWithLostSide`, mais pour l'envoi de `at` (manche et marques de `options`). */
+  async function dispatchWithLostSideAt(at: Date, options: Parameters<typeof mockDb>[0]): Promise<() => void> {
+    await mockDb(options);
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) =>
+      message.includes("**Team Nova** contre") ? null : { sent: 2, unresolved: [], failed: [] },
+    );
+    const retries = captureDmRetries();
+    await dispatchDueMatchReminders(at);
+    expect(retries).toHaveLength(1);
+    jest.mocked(pushDiscordDirectMessages).mockReset();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    return retries[0];
+  }
+
+  it("dispatchDueMatchReminders_checkInTurnedOffBeforeTenHourRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    await matchAtRetry({ checkIn: { flag: 0 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInStillOnAtTenHourRetry_retrySendsInvite", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).toContain("https://discord.gg/Sgdh3p4VhC");
+  });
+
+  it("dispatchDueMatchReminders_checkInTurnedOffBeforeAnnouncementRetry_retryDropsCheckIn", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [] });
+    await matchAtRetry({ checkIn: { flag: 0 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const [message] = sentMessages();
+    expect(message).toContain("**Match programmé**");
+    expect(message).not.toContain("check-in");
+    expect(message).not.toContain("https://discord.gg/Sgdh3p4VhC");
+  });
+
+  it("dispatchDueMatchReminders_checkInTurnedOffBeforeEarlyAnnouncementRetry_retryPromisesNoTenHourReminder", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), { sent: [] });
+    await matchAtRetry({ checkIn: { flag: 0 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).not.toContain("Prochain rappel : 10 heures");
   });
 
   it("dispatchDueMatchReminders_recipientOptedOutBeforeRetry_retryStaysSilent", async () => {
@@ -1764,16 +1832,78 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     }
   });
 
-  it("dispatchDueMatchReminders_resumedAfterTenHourWindowOpened_staysSilent", async () => {
-    const { execute } = await mockDb({
+  it("dispatchDueMatchReminders_resumedAfterTenHourWindowOpenedButNotPreClaimed_sendsReminder", async () => {
+    // Manche connue après la remise en marche (aucune marque posée par `setMatchCheckIn`) :
+    // rien n'était dû pendant l'arrêt, le rappel 10 h part.
+    await mockDb({ matches: [resumedAt("2026-09-10T09:00:00Z")], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) expect(message).toContain(INVITE);
+  });
+
+  it("dispatchDueMatchReminders_tenHourMarkPreClaimedAtResume_staysSilent", async () => {
+    // La remise en marche a réservé le palier dû pendant l'arrêt : la manche n'est plus lue.
+    await mockDb({
       matches: [resumedAt("2026-09-10T09:00:00Z")],
-      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 31, offset_key: "PT10H" }],
     });
 
     expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
 
-    expect(claimedKeys(execute)).toEqual(["PT10H"]);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  /** Le balayage lit l'option allumée ; `checkIn` : sa valeur relue juste avant l'envoi. */
+  async function mockDbWithFreshCheckIn(
+    sent: { match_id: number; offset_key: string }[],
+    checkIn: Parameters<typeof executeDouble>[0]["checkIn"],
+    extra: Parameters<typeof executeDouble>[0] = {},
+  ) {
+    const db = await mockDb({ sent });
+    const execute = executeDouble({ checkIn, ...extra });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: db.query, execute }));
+    return { query: db.query, execute };
+  }
+
+  it("dispatchDueMatchReminders_checkInTurnedOffAfterSweepRead_tenHourReminderSilent", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([...SEEN, { match_id: 31, offset_key: "P1D" }], { flag: 0 });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    // Palier gardé réservé : rallumer l'option ne le fait pas partir après coup.
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInTurnedOffAfterSweepRead_announcementDropsCheckIn", async () => {
+    await mockDbWithFreshCheckIn([], { flag: 0 });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain(INVITE);
+    }
+  });
+
+  it("dispatchDueMatchReminders_checkInRereadFails_releasesClaimsAndSendsNothing", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([...SEEN, { match_id: 31, offset_key: "P1D" }], undefined, {
+      checkInReadFails: true,
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE"))
+      .map(([, params]) => params[1]);
+    expect(releases).toEqual(["PT10H"]);
+    error.mockRestore();
   });
 
   it("dispatchDueMatchReminders_resumedBeforeTenHourWindowOpened_sendsReminder", async () => {

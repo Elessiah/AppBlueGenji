@@ -570,10 +570,12 @@ check-in avec le lien du serveur où le salon de check-in ouvre un quart d'heure
 avant le coup d'envoi ; et, en même temps, rappeler aux arbitres les matchs,
 les heures et les équipes.
 
-**Joueurs — palier `PT10H`.** Option « Check-in des matchs » décochée (ou
-rallumée après l'ouverture du palier) : le palier est réservé sans message,
-et les annonces ne portent ni `checkInLine()` ni « Prochain rappel : 10 heures
-avant » (`MATCH_CHECK_IN_SETTING.md`). Sinon, Mêmes destinataires et canaux que le rappel 24 h
+**Joueurs — palier `PT10H`.** Option « Check-in des matchs » décochée (relue
+juste avant l'envoi, et à la reprise des messages privés) : le palier est
+réservé sans message, et les annonces ne portent ni `checkInLine()` ni
+« Prochain rappel : 10 heures avant » ; rallumée, les paliers ouverts pendant
+l'arrêt sont réservés sans message par la remise en marche
+(`MATCH_CHECK_IN_SETTING.md`). Sinon, mêmes destinataires et canaux que le rappel 24 h
 (message privé Discord et push `MATCH_REMINDER` dans la langue de
 chacun, engagées solo comprises — « Ton match »). Le message ajoute
 `checkInLine()` : « Check-in : le salon de check-in ouvre 15 minutes avant le

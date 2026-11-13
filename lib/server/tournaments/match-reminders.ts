@@ -106,6 +106,33 @@ function checkInSettingOf(match: ScheduledMatch): MatchCheckInSetting {
   return readMatchCheckIn(match.match_check_in, match.match_check_in_resumed_at);
 }
 
+/** Colonnes de l'option, relues juste avant un envoi (absentes : la lecture du passage vaut). */
+type CheckInStateRow = RowDataPacket & {
+  match_check_in?: number | null;
+  match_check_in_resumed_at?: MaybeInstant;
+};
+
+/**
+ * La manche avec l'option de son tournoi **relue à l'envoi** : une ronde
+ * suisse part par lots, minutes après la lecture du passage, et l'option a pu
+ * changer entre-temps. Tournoi introuvable : la lecture du passage vaut.
+ */
+async function withFreshCheckIn(match: ScheduledMatch): Promise<ScheduledMatch> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<CheckInStateRow[]>(
+    `SELECT match_check_in, match_check_in_resumed_at FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [Number(match.tournament_id)],
+  );
+  const row = Array.isArray(rows) ? rows[0] : undefined;
+  if (!row || row.match_check_in === undefined) return match;
+  return { ...match, match_check_in: row.match_check_in, match_check_in_resumed_at: row.match_check_in_resumed_at ?? null };
+}
+
+/** Un rappel 10 h que l'option fait taire. */
+function checkInReminderMuted(send: Pick<PlannedSend, "match" | "offset">): boolean {
+  return send.offset?.key === CHECK_IN_REMINDER_KEY && !checkInSettingOf(send.match).enabled;
+}
+
 /** Paliers qu'une annonce peut promettre : sans check-in, jamais le rappel 10 h. */
 function promisedOffsets(remaining: readonly MatchReminderOffset[], checkInOn: boolean): MatchReminderOffset[] {
   return checkInOn ? [...remaining] : remaining.filter((offset) => offset.key !== CHECK_IN_REMINDER_KEY);
@@ -518,10 +545,11 @@ async function planMatchSends(
 
 /**
  * Régime normal de {@link planMatchSends} : réserve le palier dont la fenêtre
- * est ouverte. Check-in des matchs éteint, ou rallumé après l'ouverture du
- * palier 10 h : ce rappel est réservé **sans message**
- * (`MATCH_CHECK_IN_SETTING.md`) — la manche n'est plus relue, et rallumer
- * l'option ne le fait pas partir après coup.
+ * est ouverte. Check-in des matchs éteint : ce rappel est réservé **sans
+ * message** (`MATCH_CHECK_IN_SETTING.md`) — la manche n'est plus relue, et
+ * rallumer l'option ne le fait pas partir après coup. Ceux dont la fenêtre
+ * s'est ouverte pendant l'arrêt sont réservés par la remise en marche même
+ * (`setMatchCheckIn`) : une manche connue ou programmée ensuite garde le sien.
  */
 async function planDueReminders(match: ScheduledMatch, now: Date, alreadySent: Set<string>): Promise<PlannedSend[]> {
   // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
@@ -534,20 +562,10 @@ async function planDueReminders(match: ScheduledMatch, now: Date, alreadySent: S
   const planned: PlannedSend[] = [];
   for (const offset of due) {
     if (!(await claimDatedMark(match, offset.key))) continue;
-    if (silencedCheckInReminder(match, offset)) continue;
+    if (checkInReminderMuted({ match, offset })) continue;
     planned.push({ match, offset, remaining: [], claimed: [offset.key], now, plannedAt: Date.now() });
   }
   return planned;
-}
-
-/** Le rappel 10 h d'une manche dont le tournoi n'a pas (ou n'avait pas, à son ouverture) de check-in. */
-function silencedCheckInReminder(match: ScheduledMatch, offset: MatchReminderOffset): boolean {
-  return offset.key === CHECK_IN_REMINDER_KEY && !checkInSendable(checkInSettingOf(match), offsetOpensAt(match, offset));
-}
-
-/** Ouverture de la fenêtre d'un palier : l'instant où son rappel est dû. */
-function offsetOpensAt(match: ScheduledMatch, offset: MatchReminderOffset): Date {
-  return new Date(new Date(match.start_at).getTime() - offset.minutesBefore * 60_000);
 }
 
 /** Une engagée de la manche, face à l'autre. */
@@ -581,7 +599,7 @@ async function sendToSide(
       : !remaining.some((pending) => pending.key === CHECK_IN_REMINDER_KEY);
   }
   // Sans check-in, l'annonce ne promet pas de rappel 10 h (il ne partira pas).
-  const promised = promisedOffsets(remaining, checkInOn);
+  let promised = promisedOffsets(remaining, checkInOn);
   // À l'instant de l'envoi, pas du début du passage : un lot parti après
   // l'ouverture du salon ne doit plus dire qu'il « ouvre 15 minutes avant ».
   const checkInOpen = checkIn && isCheckInOpen(startAt, sentAt({ now, plannedAt }));
@@ -650,9 +668,15 @@ async function sendToSide(
             notification,
             match,
             sentStart: clearedStartAt ? null : new Date(match.start_at),
-            // Le salon a pu ouvrir pendant l'attente : la reprise le dit.
-            refresh: () => {
-              context.checkInOpen = checkIn && isCheckInOpen(startAt, new Date());
+            checkInReminder: offset?.key === CHECK_IN_REMINDER_KEY,
+            // Le salon a pu ouvrir pendant l'attente : la reprise le dit. Et
+            // l'option, relue, a pu s'éteindre : la reprise ne parle plus du
+            // check-in, ni du rappel 10 h.
+            refresh: (setting) => {
+              const stillOn = checkInSendable(setting, new Date());
+              context.checkIn = checkIn && stillOn;
+              context.checkInOpen = context.checkIn && isCheckInOpen(startAt, new Date());
+              if (!stillOn) promised = promisedOffsets(remaining, false);
             },
           },
   };
@@ -667,8 +691,10 @@ type DmRetry = {
   match: ScheduledMatch;
   /** Horaire que le message annonce ; `null` pour un avis de retrait. */
   sentStart: Date | null;
-  /** Recalcule ce qui dépend de l'instant d'envoi (check-in ouvert). */
-  refresh: () => void;
+  /** Le message est le rappel 10 h (il se tait si l'option s'est éteinte). */
+  checkInReminder: boolean;
+  /** Recalcule ce qui dépend de l'instant d'envoi (check-in ouvert) et de l'option relue. */
+  refresh: (setting: MatchCheckInSetting) => void;
 };
 
 /** Bilan d'un envoi à une engagée (`sendToSide`). */
@@ -682,24 +708,37 @@ type RetryStateRow = RowDataPacket & {
   match_team1_id: number | null;
   match_team2_id: number | null;
   status: string | null;
+  match_check_in?: number | null;
+  match_check_in_resumed_at?: MaybeInstant;
 };
 
 /**
  * La reprise dit-elle encore vrai ? La manche existe, n'est pas jouée, garde
  * ses engagées et l'horaire du message (ou n'en a toujours aucun pour un avis
  * de retrait). Sinon un avis plus récent a déjà été remis : la reprise se tait
- * plutôt que de laisser un horaire périmé en dernier message.
+ * plutôt que de laisser un horaire périmé en dernier message. L'option
+ * « Check-in des matchs » est relue aussi : éteinte, un rappel 10 h ne se
+ * reprend pas.
+ *
+ * @returns L'option relue, ou `null` si la reprise se tait.
  */
-async function retryStillCurrent(retry: DmRetry): Promise<boolean> {
+async function retryStillCurrent(retry: DmRetry): Promise<MatchCheckInSetting | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<RetryStateRow[]>(
-    `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id, m.status
-       FROM bg_matches m WHERE m.id = ? LIMIT 1`,
+    `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id, m.status,
+            t.match_check_in, t.match_check_in_resumed_at
+       FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1`,
     [Number(retry.match.id)],
   );
   const state = rows[0];
-  if (!state || (state.status && isPlayedMatchStatus(state.status))) return false;
-  return sameInstant(state.match_start_at, retry.sentStart) && samePoster(state, retry.match);
+  if (!state || (state.status && isPlayedMatchStatus(state.status))) return null;
+  if (!sameInstant(state.match_start_at, retry.sentStart) || !samePoster(state, retry.match)) return null;
+  const setting =
+    state.match_check_in === undefined
+      ? checkInSettingOf(retry.match)
+      : readMatchCheckIn(state.match_check_in, state.match_check_in_resumed_at);
+  if (retry.checkInReminder && !checkInSendable(setting, new Date())) return null;
+  return setting;
 }
 
 /**
@@ -734,11 +773,11 @@ function scheduleDmRetry(retries: readonly DmRetry[]): void {
   const timer = setTimeout(() => {
     for (const retry of retries) {
       void retryStillCurrent(retry)
-        .then(async (current) => {
-          if (!current) return null;
+        .then(async (setting) => {
+          if (!setting) return null;
           const recipients = await retryRecipients(retry);
           if (recipients.length === 0) return null;
-          retry.refresh();
+          retry.refresh(setting);
           return notifyUsers(recipients, { ...retry.notification, discordOnly: true });
         })
         .then((report) => {
@@ -762,9 +801,20 @@ function scheduleDmRetry(retries: readonly DmRetry[]): void {
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
-  send: PlannedSend,
+  planned: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
 ): Promise<number> {
+  // L'option « Check-in des matchs » se lit à l'envoi, pas au début du passage.
+  let send: PlannedSend;
+  try {
+    send = { ...planned, match: await withFreshCheckIn(planned.match) };
+  } catch (error) {
+    // Rien n'est parti : les marques sont rendues, le passage suivant retente.
+    await releaseClaims(planned);
+    throw error;
+  }
+  // Éteinte entre-temps : le rappel 10 h, déjà réservé, se tait (comme au passage).
+  if (checkInReminderMuted(send)) return 0;
   const { match, clearedStartAt } = send;
   // Un horaire parti le dit en base, avec l'horaire envoyé : une date posée
   // plus tard se lira « reprogrammée, au lieu du … », une date effacée

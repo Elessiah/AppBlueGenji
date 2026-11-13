@@ -106,6 +106,27 @@ describe("PUT /api/admin/tournaments/[id]/match-check-in", () => {
     expect(announceStaffTournamentAction).not.toHaveBeenCalled();
   });
 
+  it("put_oversizedBody_returns413WithoutService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const res = await PUT(putReq({ enabled: false, padding: "x".repeat(300 * 1024) }), params("7"));
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe("PAYLOAD_TOO_LARGE");
+    expect(setMatchCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("put_foreignContentType_returns415WithoutService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const req = new Request("http://localhost/api/admin/tournaments/7/match-check-in", {
+      method: "PUT",
+      headers: { "content-type": "text/plain" },
+      body: "enabled=false",
+    });
+    const res = await PUT(req, params("7"));
+    expect(res.status).toBe(415);
+    expect((await res.json()).error).toBe("UNSUPPORTED_CONTENT_TYPE");
+    expect(setMatchCheckIn).not.toHaveBeenCalled();
+  });
+
   it("put_serviceThrows_returns500", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(setMatchCheckIn).mockRejectedValue(new Error("boom"));

@@ -13,6 +13,7 @@
  * dont l'instant dû est antérieur à la remise en marche (`resumedAt`) ne part
  * pas — seuls ceux dus ensuite partent.
  */
+import { canToggleRefereeScheduling } from "./match-planning";
 import type { TournamentState } from "./types";
 
 /** L'option telle que la base la porte. */
@@ -47,8 +48,10 @@ export function checkInSendable(setting: MatchCheckInSetting, dueAt: Date): bool
 
 /**
  * L'option se bascule à tout moment jusqu'à la clôture, tournoi en cours
- * compris : un tournoi terminé n'a plus de match à prévenir.
+ * compris : un tournoi terminé n'a plus de match à prévenir. Même règle que
+ * la planification par l'arbitrage, dont le formulaire tire le verrou de la
+ * case : une seule source, pour que l'écran et l'API ne divergent pas.
  */
 export function canToggleMatchCheckIn(state: TournamentState): boolean {
-  return state !== "FINISHED";
+  return canToggleRefereeScheduling(state);
 }

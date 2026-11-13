@@ -168,13 +168,13 @@
       "OWNER": {
         "team": "Everything: name, tag, description, logo, members, roles, registrations. The only one who can transfer ownership or disband the team.",
         "matches": "“Ready”, score entry and confirmation, match forfeit, withdrawing from a tournament, clearing the team voice channel.",
-        "messages": "Match notices, join requests, check-in for self-managed matches, score to confirm.",
+        "messages": "Match notices, join requests, check-in for self-managed matches (if the tournament has one), score to confirm.",
         "hint": "One per team: it can't be ticked, it's transferred from the team settings. The owner can't leave the team or be removed before transferring it."
       },
       "MANAGER": {
         "team": "Logo, invitations and join requests, removals, members' roles (except the owner's), tournament registrations.",
         "matches": "“Ready”, score entry and confirmation, match forfeit, withdrawing from a tournament, clearing the team voice channel.",
-        "messages": "Match notices, join requests, check-in for self-managed matches, score to confirm.",
+        "messages": "Match notices, join requests, check-in for self-managed matches (if the tournament has one), score to confirm.",
         "hint": "Given by the owner or a manager. Out of reach: the name, tag, description, transfer, disbanding, as well as the owner's roles and removing the owner."
       },
       "CAPITAINE": {

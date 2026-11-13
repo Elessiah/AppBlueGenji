@@ -168,13 +168,13 @@
       "OWNER": {
         "team": "Tout : nom, sigle, description, logo, membres, rôles, inscriptions. Seul à transférer la propriété ou dissoudre l'équipe.",
         "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
-        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
+        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion (si le tournoi en a un), score à confirmer.",
         "hint": "Un seul par équipe : il ne se coche pas, il se transfère depuis les paramètres de l'équipe. Il ne peut ni quitter l'équipe ni en être exclu avant de l'avoir transféré."
       },
       "MANAGER": {
         "team": "Logo, invitations et demandes d'adhésion, exclusions, rôles des membres (sauf ceux du propriétaire), inscriptions aux tournois.",
         "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
-        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
+        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion (si le tournoi en a un), score à confirmer.",
         "hint": "Donné par le propriétaire ou un manager. Lui échappent : le nom, le sigle, la description, le transfert, la dissolution, ainsi que les rôles du propriétaire et son exclusion."
       },
       "CAPITAINE": {

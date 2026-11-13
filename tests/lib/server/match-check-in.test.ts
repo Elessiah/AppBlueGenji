@@ -63,10 +63,30 @@ describe("setMatchCheckIn", () => {
     );
   });
 
+  it("setMatchCheckIn_turnOn_silencesOpenedTenHourRemindersOfAnnouncedMatches", async () => {
+    const connection = connectionWith({ state: "RUNNING", match_check_in: 0 });
+    await setMatchCheckIn(7, true, now);
+    const insert = connection.execute.mock.calls.find(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_reminders"));
+    expect(insert).toBeDefined();
+    const [sql, params] = insert as [string, unknown[]];
+    // Seules les manches déjà annoncées (marque d'observation), à venir dans les 10 h, non jouées.
+    expect(sql).toContain("JOIN bg_match_reminders seen ON seen.match_id = m.id AND seen.offset_key = ?");
+    expect(sql).toContain("m.start_at > ? AND m.start_at <= ?");
+    expect(sql).toContain("m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL");
+    expect(sql).toContain("m.status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')");
+    expect(params).toEqual(["PT10H", "SEEN", 7, now, new Date("2026-11-14T07:00:00Z")]);
+  });
+
+  it("setMatchCheckIn_turnOff_reservesNoReminder", async () => {
+    const connection = connectionWith({ state: "RUNNING", match_check_in: 1 });
+    await setMatchCheckIn(7, false, now);
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("INSERT"))).toBe(false);
+  });
+
   it("setMatchCheckIn_sameValue_unchangedWithoutWriteNorEvent", async () => {
     const connection = connectionWith({ state: "REGISTRATION", match_check_in: 1 });
     await expect(setMatchCheckIn(7, true, now)).resolves.toEqual({ tournamentId: 7, enabled: true, changed: false });
-    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE"))).toBe(false);
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE") || sql.startsWith("INSERT"))).toBe(false);
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 });

@@ -24,9 +24,12 @@ information de check-in : ni instantané ni REST à câbler.
 
 Comme la planification et les salons vocaux, la case n'est **ni verrouillée ni
 restreinte** : modifiable à la création et à l'édition, tournoi en cours
-compris, jusqu'à `FINISHED` (`canToggleMatchCheckIn`), par le staff qui a la
+compris, jusqu'à `FINISHED` (`canToggleMatchCheckIn`, même règle que
+`canToggleRefereeScheduling` dont le formulaire tire le verrou), par le staff qui a la
 permission `tournaments`. À l'édition elle part par sa route propre,
-`PUT /api/admin/tournaments/[id]/match-check-in` (`{ enabled }`, limite
+`PUT /api/admin/tournaments/[id]/match-check-in` (déroulé commun avec les
+salons vocaux : `putTournamentToggle`, `lib/server/tournament-toggle-route.ts` ;
+carte commune `SettingToggleCard`) (`{ enabled }`, limite
 `MATCH_CHECK_IN_TOGGLE_RULE`, codes `INVALID_TOURNAMENT_ID`,
 `INVALID_MATCH_CHECK_IN`, `TOURNAMENT_NOT_FOUND` 404, `TOURNAMENT_FINISHED`
 409, `MATCH_CHECK_IN_UPDATE_FAILED` 500), envoyée à chaque enregistrement avec
@@ -48,15 +51,34 @@ Un message de check-in ne part que si l'option est allumée **et** que son
 
 - **check-in du match** : garde `CHECK_IN_ON_SQL` dans `BRIEF_DUE_SQL`, donc
   dans la lecture **et** dans la réservation ; échéance = le plus tôt de
-  H-15 et de l'ouverture du salon ;
-- **rappel 10 h** : échéance = ouverture du palier (H-10). Éteint, ou rallumé
-  après cette ouverture, le palier est **réservé sans message** : la manche
-  n'est plus relue, et rallumer l'option ne le fait pas partir après coup ;
+  H-15 et de l'ouverture du salon — celle-ci seulement si elle vaut pour
+  l'appariement actuel (`launch_pairing`) : un salon d'un appariement remplacé
+  ne fait pas taire le nouveau ;
+- **rappel 10 h** : éteint, le palier est **réservé sans message** (la manche
+  n'est plus relue, et rallumer l'option ne le fait pas partir après coup).
+  Rallumer réserve aussi sans message, dans la même transaction, le palier
+  des manches **déjà annoncées** (marque `SEEN`), non jouées, dont le coup
+  d'envoi tombe dans les 10 h : lui était dû pendant l'arrêt. Une manche
+  connue ou programmée après la reprise garde son rappel, même si sa fenêtre
+  est déjà ouverte ;
 - **annonces** : jugées à l'instant de l'envoi ; éteint, ni ligne de check-in
   ni palier 10 h promis (`promisedOffsets`).
 
+L'option est **relue juste avant chaque envoi** (`withFreshCheckIn`) : une
+ronde suisse part par lots, et l'option a pu changer depuis la lecture du
+passage ; éteinte entre-temps, un rappel 10 h déjà réservé se tait. La reprise
+des messages privés non remis (deux minutes plus tard) la relit aussi :
+éteinte, un rappel 10 h ne se reprend pas, et une annonce reprise perd sa ligne
+de check-in et la promesse du rappel 10 h.
+
 Rallumer l'option n'envoie donc **aucune salve** : seuls les messages dont
 l'échéance vient après la reprise partent.
+
+## Textes qui en parlent
+
+L'aide des messages privés de match (« Mon profil », `profile.json`) dit que le
+check-in et le rappel 10 h manquent dans un tournoi sans check-in ; les rôles
+d'équipe (`team.json`) disent « si le tournoi en a un ». FR et EN.
 
 ## Données de test et RGPD
 
@@ -66,6 +88,8 @@ entrée `PRIVACY_CHANGES`, ni registre ; les descriptions des sujets push
 `MATCH_LOBBY_BRIEF` et `MATCH_REMINDER` disent l'exception.
 
 Tests : `match-check-in.test.ts` (partagé et serveur), `match-check-in-route.test.ts`,
-`match-reminders.test.ts` (bloc « Check-in des matchs »), `lobby-brief.test.ts`
-(`dueSql_checkInOff_notDueInReadNorClaim`), `tournaments-validation.test.ts`,
+`match-reminders.test.ts` (bloc « Check-in des matchs » et reprises),
+`lobby-brief.test.ts` (`dueSql_checkInOff_notDueInReadNorClaim`,
+`dueSql_checkInResumed_ignoresLobbyOpenedForReplacedPairing`),
+`setting-toggle-card.test.tsx`, `tournaments-validation.test.ts`,
 `tournament-forms-i18n.test.tsx`, `database-schema.test.ts`.

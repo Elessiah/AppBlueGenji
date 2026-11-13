@@ -116,7 +116,7 @@
     "INVALID_ENDURANCE_EARLY_EXIT": "Valeur invalide pour la sortie anticipée « hors course » : cochez ou décochez la case.",
     "INVALID_LAUNCH_PHASE": "Valeur invalide pour la phase de lancement des matchs : cochez ou décochez la case.",
     "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe : cochez ou décochez la case.",
-    "INVALID_MATCH_CHECK_IN": "Valeur invalide pour le check-in des matchs : coche ou décoche la case.",
+    "INVALID_MATCH_CHECK_IN": "Valeur invalide pour le check-in des matchs : cochez ou décochez la case.",
     "INVALID_TEAM_ID": "Équipe invalide.",
     "VOICE_CHANNEL_NOT_OPEN": "Ce salon vocal n'est pas ouvert : rien à vider.",
     "VOICE_CLEAR_UNAVAILABLE": "Le bot Discord n'a pas pu vider le salon. Réessaie dans une minute.",

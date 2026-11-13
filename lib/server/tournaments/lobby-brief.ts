@@ -357,6 +357,25 @@ const BRIEF_FROM = `FROM bg_matches m
          AND rm.bracket = m.bracket AND rm.round_number = m.round_number
        ${seedJoins("m")}`;
 
+/** Ouverture du salon, si elle vaut pour l'appariement actuel du match. */
+const CURRENT_LOBBY_OPENED_SQL = `CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.lobby_opened_at END`;
+
+/**
+ * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
+ * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
+ * rien ne part. Rallumée, le check-in d'un match ne part que si son **premier
+ * repère** — 15 minutes avant l'horaire, ou l'ouverture du salon s'il vient
+ * plus tôt ou faute d'horaire — tombe après la remise en marche : ce qui était
+ * dû pendant qu'elle était éteinte n'est pas rattrapé d'un coup. Le salon ne
+ * compte que s'il a été ouvert pour l'appariement actuel (`launch_pairing`) :
+ * celui d'un appariement remplacé ne fait pas taire le nouveau.
+ */
+const CHECK_IN_ON_SQL = `t.match_check_in = 1
+        AND (t.match_check_in_resumed_at IS NULL
+             OR LEAST(COALESCE(m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE, ${CURRENT_LOBBY_OPENED_SQL}),
+                      COALESCE(${CURRENT_LOBBY_OPENED_SQL}, m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE))
+                >= t.match_check_in_resumed_at)`;
+
 /**
  * Un match dû : jouable, pas un bye, sans score, et **dans son quart d'heure**
  * — par son horaire (`LOBBY_BRIEF_LEAD_MINUTES`, borné par
@@ -381,20 +400,6 @@ const BRIEF_FROM = `FROM bg_matches m
  * Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
  * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
-/**
- * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
- * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
- * rien ne part. Rallumée, le check-in d'un match ne part que si son **premier
- * repère** — 15 minutes avant l'horaire, ou l'ouverture du salon s'il vient
- * plus tôt ou faute d'horaire — tombe après la remise en marche : ce qui était
- * dû pendant qu'elle était éteinte n'est pas rattrapé d'un coup.
- */
-const CHECK_IN_ON_SQL = `t.match_check_in = 1
-        AND (t.match_check_in_resumed_at IS NULL
-             OR LEAST(COALESCE(m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE, m.lobby_opened_at),
-                      COALESCE(m.lobby_opened_at, m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE))
-                >= t.match_check_in_resumed_at)`;
-
 const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
         AND m.self_managed = 1 AND m.referee_user_id IS NULL
         AND t.start_visibility_at <= NOW()

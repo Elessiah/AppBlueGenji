@@ -93,7 +93,7 @@
     "INVALID_TEAM": "Identifiant d'engagé invalide.",
     "INVALID_TEAM_IDS": "Sélection illisible : recharge la page et recommence.",
     "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe : cochez ou décochez la case.",
-    "INVALID_MATCH_CHECK_IN": "Valeur invalide pour le check-in des matchs : coche ou décoche la case.",
+    "INVALID_MATCH_CHECK_IN": "Valeur invalide pour le check-in des matchs : cochez ou décochez la case.",
     "INVALID_TIEBREAK_MAP": "Nom de map de départage invalide (64 caractères au plus).",
     "INVALID_TOURNAMENT_ID": "Identifiant de tournoi invalide.",
     "ISSUE_REPORT_FAILED": "Erreur lors de l'envoi du signalement.",

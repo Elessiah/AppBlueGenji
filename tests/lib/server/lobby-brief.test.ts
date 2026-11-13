@@ -341,6 +341,20 @@ describe("dispatchLobbyBriefs", () => {
     }
   });
 
+  it("dueSql_checkInResumed_ignoresLobbyOpenedForReplacedPairing", async () => {
+    const { query, execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    // Un salon ouvert pour un appariement remplacé ne fait pas taire le check-in du nouveau.
+    const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    const guarded = "CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.lobby_opened_at END";
+    for (const sql of [read, claim]) {
+      const resume = sql.slice(sql.indexOf("t.match_check_in_resumed_at IS NULL"), sql.indexOf(">= t.match_check_in_resumed_at"));
+      expect(resume.split(guarded)).toHaveLength(3);
+      expect(resume.replaceAll(guarded, "")).not.toContain("m.lobby_opened_at");
+    }
+  });
+
   it("dueSql_matchNotAnnouncedCast_streamUrlNull", async () => {
     const { query } = mockDb([]);
     await dispatchLobbyBriefs();
