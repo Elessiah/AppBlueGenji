@@ -515,7 +515,7 @@ describe("checkMapList — format Duel / Arcade", () => {
 
   it("mapListViolationMessage_mapPointsInvalid_namesTheTarget", () => {
     expect(mapListViolationMessage("MAP_POINTS_INVALID", BO1, "OW", 5)).toBe(
-      "Carte au premier à 5 points : le vainqueur en marque exactement 5, l'autre de 0 à 4.",
+      "Map au premier à 5 points : le vainqueur en marque exactement 5, l'autre de 0 à 4.",
     );
   });
 

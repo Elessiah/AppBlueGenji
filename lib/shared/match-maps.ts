@@ -369,8 +369,8 @@ export function mapListViolationMessage(
       return `Score de map manquant ou invalide : un entier entre 0 et ${MAP_SCORE_MAX} (0 – 0 pour une map nulle).`;
     case "MAP_POINTS_INVALID":
       return pointTarget
-        ? `Carte au premier à ${pointTarget} points : le vainqueur en marque exactement ${pointTarget}, l'autre de 0 à ${pointTarget - 1}.`
-        : "Points de la carte invalides.";
+        ? `Map au premier à ${pointTarget} points : le vainqueur en marque exactement ${pointTarget}, l'autre de 0 à ${pointTarget - 1}.`
+        : "Points de la map invalides.";
     case "MAP_AFTER_DECISION":
       return "Cette map suit la fin du match : le résultat était déjà acquis.";
     case "MAP_LIST_INCOMPLETE":

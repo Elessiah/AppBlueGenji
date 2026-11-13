@@ -40,7 +40,7 @@
     "MAP_REPLAY_CODE_INVALID": "Code de replay invalide.",
     "MAP_REPLAY_CODE_DUPLICATE": "Le même code de replay figure sur deux maps.",
     "MAP_SCORE_INVALID": "Score de map invalide.",
-    "MAP_POINTS_INVALID": "Points de carte invalides pour le format Duel / Arcade : le vainqueur marque exactement le nombre de points fixé, l'autre moins.",
+    "MAP_POINTS_INVALID": "Points de map invalides pour le format Duel / Arcade : le vainqueur marque exactement le nombre de points fixé, l'autre moins.",
     "MAP_POINTS_LOCKED": "Points par carte figés : un score a déjà été saisi sur un match concerné.",
     "MAP_POINTS_DISABLED": "Le format Duel / Arcade n'est pas activé sur ce tournoi : active-le dans ses réglages avant de régler les points d'un tour.",
     "INVALID_MAP_POINT_TARGET": "Points par carte invalides : un entier entre 1 et 99.",

@@ -222,7 +222,15 @@ export function MapScoreList({
     // Tout refus se lève : un code en double, une map de trop ou un match
     // inachevé se corrigent souvent sur un **autre** champ que celui désigné.
     fieldErrors.clear();
-    change(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
+    const next = maps.map((map, i) => (i === index ? { ...map, ...patch } : map));
+    change(next);
+    // Format Duel / Arcade : « N – N » est la seule saisie que les plafonds des
+    // deux champs laissent passer sans être juste — dite à la frappe, sur le
+    // champ modifié, plutôt qu'à l'envoi seulement.
+    const row = next[index];
+    if (pointTarget !== null && (field === "team1Score" || field === "team2Score") && row.team1Score === pointTarget && row.team2Score === pointTarget) {
+      fieldErrors.flag(mapFieldKey(index, field), t("score.maps.violation.points", { points: pointTarget, max: pointTarget - 1 }));
+    }
   };
   // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au
   // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon au
@@ -263,7 +271,6 @@ export function MapScoreList({
         <InfoHintRow inline>
           <p id={hintId} className={styles.hint}>
             {replayCodeHintText(text, game)}
-            {pointTarget === null ? "" : ` ${t("score.maps.duelHint", { points: pointTarget })}`}
           </p>
           <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
             <p>

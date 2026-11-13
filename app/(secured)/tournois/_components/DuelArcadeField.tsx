@@ -54,8 +54,15 @@ export function DuelArcadeField({
   const errorFieldId = checked ? MAP_POINT_TARGET_FIELD_ID : DUEL_ARCADE_FIELD_ID;
   // Décochée, la case ne reçoit que le refus (le texte d'aide des points
   // décrit un champ absent) : sa description ne change qu'avec une erreur.
-  const checkboxDescribedBy =
-    checked || !error ? DUEL_ARCADE_MORE_ID : `${fieldErrorId(DUEL_ARCADE_FIELD_ID)} ${DUEL_ARCADE_MORE_ID}`;
+  // Figée, la phrase qui le dit décrit aussi la case (sinon rien n'explique
+  // pourquoi elle est désactivée).
+  const checkboxDescribedBy = [
+    checked || !error ? null : fieldErrorId(DUEL_ARCADE_FIELD_ID),
+    locked ? MAP_POINT_TARGET_HINT_ID : null,
+    DUEL_ARCADE_MORE_ID,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <div style={FULL_WIDTH}>
       <div className="checkbox-card" style={{ ...CHECKBOX_CARD_LAYOUT, ...checkboxCardChrome(checked, locked) }}>
@@ -81,6 +88,7 @@ export function DuelArcadeField({
             </label>
             <InfoHint id={DUEL_ARCADE_MORE_ID} subject={t("form.duelArcade.label")}>
               <p>{t("form.duelArcade.description")}</p>
+              <p>{t("form.duelArcade.scope")}</p>
             </InfoHint>
           </InfoHintRow>
           {checked && (
@@ -99,8 +107,9 @@ export function DuelArcadeField({
             </div>
           )}
           <FieldErrorText fieldId={errorFieldId} message={error} />
-          <p id={MAP_POINT_TARGET_HINT_ID} style={{ ...HINT, margin: "4px 0 0" }}>
-            {locked ? t("form.duelArcade.locked") : t("form.duelArcade.scope")}
+          {/* Toujours rendu (le champ des points le cite), visible seulement figé. */}
+          <p id={MAP_POINT_TARGET_HINT_ID} hidden={!locked} style={{ ...HINT, margin: "4px 0 0" }}>
+            {locked ? t("form.duelArcade.locked") : ""}
           </p>
         </div>
       </div>

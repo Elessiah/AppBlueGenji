@@ -25,7 +25,6 @@
       "added": "Map {index} added: fill it in.",
       "legend": "Maps played",
       "drawHint": "A drawn map gives a point to no one.",
-      "duelHint": "Duel / Arcade format: each map is won by the first to {points} points.",
       "duelRules": "The winner of a map scores exactly {points} points, the other 0 to {max}: no drawn map.",
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",

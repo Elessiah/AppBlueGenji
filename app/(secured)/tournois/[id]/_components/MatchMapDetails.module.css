@@ -106,9 +106,3 @@
   outline-offset: 2px;
 }
 
-/* Format Duel / Arcade : la règle de la carte, au-dessus de la liste. */
-.pointTarget {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--ink-mute);
-}

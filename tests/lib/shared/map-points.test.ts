@@ -12,6 +12,7 @@ import {
   mapPointsLine,
   parseStoredMapPointTarget,
   roundPointTargetOf,
+  roundPointsLocked,
 } from "@/lib/shared/map-points";
 
 /** Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : règles pures. */
@@ -215,5 +216,34 @@ describe("shownMatchScore", () => {
     const actual = shownMatchScore({ team1Score: 2, team2Score: null });
 
     expect(actual).toEqual({ team1: 2, team2: null });
+  });
+});
+
+describe("roundPointsLocked", () => {
+  const clean = { phaseId: 0, bracket: "UPPER", roundNumber: 2, team1Score: null, team2Score: null, team1Report: null, team2Report: null, maps: [] };
+
+  it("roundPointsLocked_noMatches_returnsFalse", () => {
+    expect(roundPointsLocked([], ROUND)).toBe(false);
+  });
+
+  it("roundPointsLocked_cleanMatchInRound_returnsFalse", () => {
+    expect(roundPointsLocked([clean], ROUND)).toBe(false);
+  });
+
+  it("roundPointsLocked_scoredMatchInRound_returnsTrue", () => {
+    expect(roundPointsLocked([{ ...clean, team1Score: 1, team2Score: 0 }], ROUND)).toBe(true);
+  });
+
+  it("roundPointsLocked_reportOnlyInRound_returnsTrue", () => {
+    expect(roundPointsLocked([{ ...clean, team2Report: { team1Score: 1 } }], ROUND)).toBe(true);
+  });
+
+  it("roundPointsLocked_mapsOnlyInRound_returnsTrue", () => {
+    expect(roundPointsLocked([{ ...clean, maps: [{}] }], ROUND)).toBe(true);
+  });
+
+  it("roundPointsLocked_scoreInOtherRound_returnsFalse", () => {
+    const scored = { ...clean, team1Score: 1, team2Score: 0 };
+    expect(roundPointsLocked([{ ...scored, roundNumber: 3 }, { ...scored, bracket: "LOWER" }, { ...scored, phaseId: 9 }], ROUND)).toBe(false);
   });
 });

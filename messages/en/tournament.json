@@ -260,8 +260,6 @@
     "maps": {
       "summary": "Map details ({count})",
       "summaryLabel": "Map details ({count}): {match}",
-      "summaryDuel": "Points: {points}",
-      "summaryDuelLabel": "Points: {points} — map details, {match}",
       "firstTo": "First to {points}",
       "pointTarget": "Each map is won by the first to {points} points.",
       "title": "Map details",

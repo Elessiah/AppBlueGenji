@@ -95,7 +95,8 @@ describe("détail map par map — focus et interblocages", () => {
     const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
     expect(details).toContain("if (!hasMaps && !open) return null;");
     expect(details).toContain("document.getElementById(matchAnchorId(match.id))?.focus()");
-    expect(details).toContain(': text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versus });');
+    expect(details).toContain('text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versus });');
+    expect(details).not.toContain("summaryDuel");
     expect(details).toContain("aria-label={summaryLabel}");
   });
 
@@ -550,14 +551,41 @@ describe("format Duel / Arcade — refus des points rattaché à un champ rendu"
 
   it("DuelArcadeField_uncheckedWithoutError_describedOnlyByMoreInfo", () => {
     const field = readSource("app/(secured)/tournois/_components/DuelArcadeField.tsx");
-    expect(field).toContain(
-      "checked || !error ? DUEL_ARCADE_MORE_ID : `${fieldErrorId(DUEL_ARCADE_FIELD_ID)} ${DUEL_ARCADE_MORE_ID}`",
-    );
+    expect(field).toContain("checked || !error ? null : fieldErrorId(DUEL_ARCADE_FIELD_ID),");
+    expect(field).toContain("locked ? MAP_POINT_TARGET_HINT_ID : null,");
     expect(field).not.toContain('[aria["aria-describedby"], DUEL_ARCADE_MORE_ID]');
   });
 
   it("TournamentForm_duelOff_pointsRefusalTargetsTheCheckbox", () => {
     const form = readSource("app/(secured)/tournois/_components/TournamentForm.tsx");
     expect(form).toContain("values.duelArcade ? FIELD_IDS : { ...FIELD_IDS, mapPointTarget: DUEL_ARCADE_FIELD_ID }");
+  });
+});
+
+describe("format Duel / Arcade — revue UI cycle 1", () => {
+  it("RoundPointsForm_locked_disablesInputAndButtonsAndSaysWhy", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx");
+    expect(dialog).toContain("locked={roundPointsLocked(detail.matches, round)}");
+    expect(dialog).toContain("disabled={locked}");
+    expect(dialog).toContain("aria-disabled={busy || locked || !dirty || undefined}");
+    expect(dialog).toContain('t("dialog.pointsLocked")');
+  });
+
+  it("DuelArcadeField_scopeBehindInfoHint_lockedHintOnlyWhenLocked", () => {
+    const field = readSource("app/(secured)/tournois/_components/DuelArcadeField.tsx");
+    expect(field).toContain('<p>{t("form.duelArcade.scope")}</p>');
+    expect(field).toContain("hidden={!locked}");
+  });
+
+  it("MapScoreList_tieAtTarget_flaggedWhileTyping", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
+    expect(list).toContain("row.team1Score === pointTarget && row.team2Score === pointTarget");
+    expect(list).not.toContain("score.maps.duelHint");
+  });
+
+  it("MapResultList_pointTarget_inListNameNotParagraph", () => {
+    const list = readSource("app/(secured)/tournois/[id]/_components/MapResultList.tsx");
+    expect(list).not.toContain("styles.pointTarget");
+    expect(list).toContain('t("match.maps.pointTarget"');
   });
 });

@@ -8,7 +8,6 @@ import { orReload } from "@/lib/shared/lazy-component";
 import styles from "./MatchMapDetails.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { versusText } from "@/lib/shared/tournament-page-text";
-import { mapPointsLine } from "@/lib/shared/map-points";
 
 /**
  * La modale (`createPortal`, `useDialogBehavior({ open: true, onClose })`) vit
@@ -44,14 +43,11 @@ export function MatchMapDetails({
   const team2 = match.team2Name ?? text.t("match.team2");
 
   const pointTarget = match.mapPointTarget ?? null;
-  const points = pointTarget === null ? null : mapPointsLine(match.maps);
   const versus = versusText(text, team1, team2);
-  const summary = points
-    ? text.t("match.maps.summaryDuel", { points })
-    : text.t("match.maps.summary", { count: String(match.maps.length) });
-  const summaryLabel = points
-    ? text.t("match.maps.summaryDuelLabel", { points, match: versus })
-    : text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versus });
+  // Même bouton en Duel / Arcade : le détail des points est dans la modale (une
+  // chaîne de scores par carte débordait de la carte d'un BO5, à 375 px).
+  const summary = text.t("match.maps.summary", { count: String(match.maps.length) });
+  const summaryLabel = text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versus });
 
   const close = () => {
     setOpen(false);

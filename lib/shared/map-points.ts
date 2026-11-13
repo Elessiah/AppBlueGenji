@@ -157,3 +157,35 @@ export function shownMatchScore(match: {
   const shown = match.displayScore ?? null;
   return shown ? { team1: shown.team1, team2: shown.team2 } : { team1: match.team1Score, team2: match.team2Score };
 }
+
+/**
+ * Un match du tour porte-t-il déjà un score (retenu, proposé ou en cartes) ?
+ * Lecture **de l'écran** du verrou `MAP_POINTS_LOCKED` du serveur
+ * (`assertMapPointsUnlocked`) : elle grise le champ avant l'envoi, le serveur
+ * reste seul juge.
+ */
+export function roundPointsLocked(
+  matches: ReadonlyArray<{
+    phaseId: number;
+    bracket: string;
+    roundNumber: number;
+    team1Score: number | null;
+    team2Score: number | null;
+    team1Report: unknown;
+    team2Report: unknown;
+    maps: ReadonlyArray<unknown>;
+  }>,
+  round: RoundKey,
+): boolean {
+  return matches.some(
+    (match) =>
+      match.phaseId === round.phaseId &&
+      match.bracket === round.bracket &&
+      match.roundNumber === round.roundNumber &&
+      (match.team1Score !== null ||
+        match.team2Score !== null ||
+        Boolean(match.team1Report) ||
+        Boolean(match.team2Report) ||
+        match.maps.length > 0),
+  );
+}

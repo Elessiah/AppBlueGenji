@@ -212,7 +212,7 @@ function theirsPendingStatus(
   theirs: MatchScoreReport,
   reader: { canReport: boolean; detailLoading: boolean; format?: MatchFormat | null },
 ): string {
-  const values = { opponent: names.opponentName, score: scoreText(theirs, reader.format ?? null), mine: names.myName };
+  const values = { opponent: names.opponentName, score: scoreText(theirs, null), mine: names.myName };
   // Qui ne peut pas reporter ne reçoit jamais le détail (`matchProposals`) :
   // rien à confirmer ni à ressaisir de son côté, et rien à dire du détail.
   if (!reader.canReport) return text.t("score.player.theirs.readOnly", values);

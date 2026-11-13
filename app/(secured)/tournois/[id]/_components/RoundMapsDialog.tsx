@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
-import { MAP_POINT_TARGET_MAX, MAP_POINT_TARGET_MIN, roundPointTargetOf } from "@/lib/shared/map-points";
+import { MAP_POINT_TARGET_MAX, MAP_POINT_TARGET_MIN, roundPointsLocked, roundPointTargetOf } from "@/lib/shared/map-points";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -549,12 +549,15 @@ function RoundPointsForm({
   round,
   tournamentTarget,
   saved,
+  locked,
   busy,
   run,
   onDirtyChange,
 }: Readonly<{
   tournamentId: number;
   round: RoundKey;
+  /** Un match du tour porte déjà un score : les points sont figés (`roundPointsLocked`). */
+  locked: boolean;
   /** Points du tournoi, que le tour suit sans réglage propre. */
   tournamentTarget: number;
   /** Points propres au tour (`null` = il suit le tournoi). */
@@ -568,6 +571,7 @@ function RoundPointsForm({
   const ids = useId();
   const inputId = `${ids}-points`;
   const statusId = `${ids}-points-status`;
+  const lockedId = `${ids}-points-locked`;
   const effective = saved ?? tournamentTarget;
   const [value, setValue] = useState(effective);
   const fieldErrors = useFieldErrors(POINTS_FIELD_ERRORS, { points: inputId });
@@ -595,7 +599,7 @@ function RoundPointsForm({
 
   const save = (event: FormEvent) => {
     event.preventDefault();
-    if (busy || !dirty) return;
+    if (busy || locked || !dirty) return;
     // Le nombre du tournoi saisi sur le tour : le tour le suit, aucun réglage propre à garder.
     void send(value === tournamentTarget ? null : value, t("dialog.pointsSaved"));
   };
@@ -618,7 +622,8 @@ function RoundPointsForm({
             value={value}
             onValueChange={setValue}
             onEdit={() => fieldErrors.clear()}
-            {...fieldErrors.aria("points", statusId)}
+            disabled={locked}
+            {...fieldErrors.aria("points", statusId, locked && lockedId)}
           />
           <FieldErrorText fieldId={inputId} message={fieldErrors.message("points")} />
           <p id={statusId} className={styles.muted}>
@@ -626,21 +631,26 @@ function RoundPointsForm({
               ? t("dialog.pointsInherited", { points: tournamentTarget })
               : t("dialog.pointsOwn", { points: saved, tournament: tournamentTarget })}
           </p>
+          {locked && (
+            <p id={lockedId} className={styles.muted}>
+              {t("dialog.pointsLocked")}
+            </p>
+          )}
         </div>
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           <button
             type="button"
             className="btn ghost"
-            aria-disabled={busy || saved === null || undefined}
+            aria-disabled={busy || locked || saved === null || undefined}
             onClick={() => {
-              if (busy || saved === null) return;
+              if (busy || locked || saved === null) return;
               void send(null, t("dialog.pointsRemoved"));
             }}
           >
             {t("dialog.pointsRemove")}
           </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || undefined}>
+          <button type="submit" className="btn ghost" aria-disabled={busy || locked || !dirty || undefined}>
             {t("dialog.pointsSave")}
           </button>
         </div>
@@ -1319,6 +1329,7 @@ export function RoundMapsDialog({
             round={round}
             tournamentTarget={detail.card.mapPointTarget}
             saved={roundPointTargetOf(rules.pointTargets, round)}
+            locked={roundPointsLocked(detail.matches, round)}
             busy={busy}
             run={run}
             onDirtyChange={setPointsDirty}

@@ -260,10 +260,8 @@
     "maps": {
       "summary": "Détail des maps ({count})",
       "summaryLabel": "Détail des maps ({count}) : {match}",
-      "summaryDuel": "Points : {points}",
-      "summaryDuelLabel": "Points : {points} — détail des maps, {match}",
       "firstTo": "Premier à {points}",
-      "pointTarget": "Chaque carte se gagne au premier à {points} points.",
+      "pointTarget": "Chaque map se gagne au premier à {points} points.",
       "title": "Détail des maps",
       "vs": "{team1} vs {team2}",
       "listLabel": "Maps du match",

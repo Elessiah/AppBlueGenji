@@ -18,7 +18,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
  * ne les transmet de toute façon pas (`spectatorSnapshot`).
  *
  * Format Duel / Arcade (`pointTarget`) : le score de chaque carte est en
- * points, et une ligne d'en-tête dit la règle (« premier à 5 »).
+ * points ; la règle (« premier à 5 ») est dite par le nom de la liste.
  */
 export function MapResultList({
   maps,
@@ -48,10 +48,7 @@ export function MapResultList({
 
   return (
     <>
-      {pointTarget !== null && (
-        <p className={styles.pointTarget}>{t("match.maps.pointTarget", { points: String(pointTarget) })}</p>
-      )}
-      <ol className={styles.list} aria-label={label}>
+      <ol className={styles.list} aria-label={pointTarget === null ? label : `${label} — ${t("match.maps.pointTarget", { points: String(pointTarget) })}`}>
         {maps.map((map) => {
           const side = mapWinnerSide(map);
           let outcome = t("match.maps.drawn");
