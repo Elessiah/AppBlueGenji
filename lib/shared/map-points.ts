@@ -81,13 +81,31 @@ export function normalizeMapPointTargets(raw: unknown): (number | null)[] {
     if (!isValidMapPointTarget(value)) throw new Error("INVALID_MAP_POINT_TARGET");
     return value;
   });
-  return trimTrailingNulls(targets);
+  return trimMapPointTargets(targets);
 }
 
-function trimTrailingNulls(targets: (number | null)[]): (number | null)[] {
+/** Les `null` de fin retirés : la forme stockée d'un réglage carte par carte. */
+export function trimMapPointTargets(targets: ReadonlyArray<number | null>): (number | null)[] {
   let end = targets.length;
   while (end > 0 && targets[end - 1] === null) end -= 1;
   return targets.slice(0, end);
+}
+
+/** Deux réglages carte par carte sont-ils les mêmes ? */
+export function sameMapPointTargets(a: ReadonlyArray<number | null>, b: ReadonlyArray<number | null>): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/**
+ * Réglage carte par carte ramené aux cartes qu'un match du tour joue au plus
+ * (`maxMaps`, `null` en score libre : rien n'est coupé) : une carte au-delà
+ * n'est jamais jouée, son réglage n'a rien à dire.
+ */
+export function clipMapPointTargets(
+  targets: ReadonlyArray<number | null>,
+  maxMaps: number | null,
+): (number | null)[] {
+  return trimMapPointTargets(maxMaps === null ? targets : targets.slice(0, Math.max(0, maxMaps)));
 }
 
 /** Lecture tolérante de `map_point_targets` (JSON) : liste vide pour tout ce qui est illisible. */
@@ -96,7 +114,7 @@ export function parseStoredMapPointTargets(raw: unknown): (number | null)[] {
   try {
     const parsed: unknown = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (!Array.isArray(parsed)) return [];
-    return trimTrailingNulls(
+    return trimMapPointTargets(
       parsed.slice(0, ROUND_MAP_SLOTS_MAX).map((value: unknown) => parseStoredMapPointTarget(value)),
     );
   } catch {

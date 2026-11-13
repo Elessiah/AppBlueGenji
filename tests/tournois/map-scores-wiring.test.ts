@@ -212,7 +212,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("l'infobulle d'un bouton actionnable sur une map refusée dit ce refus, pas « score incomplet »", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
     expect(hook).toContain("const resolve = checkMapList(format, game, maps, { decisive: true, ...mapRules });");
-    expect(hook).toContain("resolve: isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error,");
+    expect(hook).toContain("const resolveError = isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error;");
   });
 
   it("un forfait ou une saisie fermée taisent les refus de map : la liste est masquée et ses maps ne partent pas", () => {
@@ -336,7 +336,7 @@ describe("détail map par map — lecteur sans droit de report", () => {
 describe("détail map par map — ligne vierge ajoutée et refus corrigé ailleurs", () => {
   it("un refus qui désigne la ligne vierge qu'on vient d'ajouter se tait, dans les deux modales", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),");
+    expect(hook).toContain("onBlankRow: !refusalOnTouchedRow(shown, maps),");
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).toContain("return maps.some(isMapTouched) && refusalOnTouchedRow(check, maps);");
     expect(player).toContain("const touched = refusalWorthShowing(check, maps);");
@@ -434,7 +434,7 @@ describe("détail map par map — blocages qui ne tiennent pas aux maps", () => 
     for (const blocker of ["ALREADY_DECIDED", "DOUBLE_FORFEIT", "NOT_IN_LAUNCH"]) {
       expect(hook).toContain(`"${blocker}",`);
     }
-    expect(hook).toContain("save: isStructuralBlocker(decision.saveBlocker) ? null : save.error,");
+    expect(hook).toContain("const saveError = isStructuralBlocker(decision.saveBlocker) ? null : save.error;");
   });
 });
 
@@ -587,5 +587,21 @@ describe("format Duel / Arcade — revue UI cycle 1", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapResultList.tsx");
     expect(list).not.toContain("styles.pointTarget");
     expect(list).toContain('t("match.maps.pointTarget"');
+  });
+});
+
+describe("Duel / Arcade carte par carte — refus cité et règle changée en cours de saisie", () => {
+  it("useScoreForm_structuralResolveBlocker_citesTheSaveRefusalMap", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+
+    expect(hook).toContain("const shown = resolveError || !saveError ? resolve : save;");
+    expect(hook).toContain("pointTarget: refusalPointTarget(shown, mapRules),");
+  });
+
+  it("PlayerScoreDialog_pointRulesChanged_regrowsRows", () => {
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+
+    expect(player).toContain("const regrown = progressiveMapRows(matchFormat, game, current.current, pointRules);");
+    expect(player).toContain("}, [pointsKey]);");
   });
 });

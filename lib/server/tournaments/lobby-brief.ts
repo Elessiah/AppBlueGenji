@@ -53,7 +53,13 @@
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
  */
-import { effectiveMapPointTargets, parseStoredMapPointTarget, parseStoredMapPointTargets } from "@/lib/shared/map-points";
+import {
+  clipMapPointTargets,
+  effectiveMapPointTargets,
+  hasPerMapTargets,
+  parseStoredMapPointTarget,
+  parseStoredMapPointTargets,
+} from "@/lib/shared/map-points";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -83,7 +89,7 @@ import {
   parseStoredTiebreak,
   resolveMatchMaps,
 } from "@/lib/shared/round-maps";
-import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
+import { roundAllowsTiebreak, roundMaxMaps, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { streamUrlCandidatesSql } from "./match-casters";
 import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
@@ -266,9 +272,25 @@ export function briefPointTarget(row: LobbyBriefRow): number | null {
   return tournament === null ? null : (parseStoredMapPointTarget(row.round_point_target) ?? tournament);
 }
 
-/** Points réglés carte par carte sur le tour, effectifs (la carte, sinon {@link briefPointTarget}). */
+/** Cartes au plus d'un match de ce tour (`roundMaxMaps`), `null` en score libre ou format inconnu. */
+export function briefMaxMaps(row: LobbyBriefRow): number | null {
+  if (!row.tournament_format) return null;
+  return roundMaxMaps(tiebreakTournamentFromRow({ ...row, format: row.tournament_format }, null), Number(row.round_number));
+}
+
+/**
+ * Points réglés carte par carte sur le tour, effectifs (la carte, sinon
+ * {@link briefPointTarget}), limités aux cartes que le match joue ; `null`
+ * quand toutes les cartes ont le même N (la page du match dit alors un seul
+ * « premier à N », `hasPerMapTargets`).
+ */
 export function briefPointTargets(row: LobbyBriefRow): number[] | null {
-  return effectiveMapPointTargets(briefPointTarget(row), parseStoredMapPointTargets(row.round_point_targets));
+  const target = briefPointTarget(row);
+  const perMap = effectiveMapPointTargets(
+    target,
+    clipMapPointTargets(parseStoredMapPointTargets(row.round_point_targets), briefMaxMaps(row)),
+  );
+  return hasPerMapTargets(target, perMap) ? perMap : null;
 }
 
 /**
@@ -477,6 +499,7 @@ export function lobbyBriefSides(
     tiebreakMap: briefTiebreakMap(row),
     pointTarget: briefPointTarget(row),
     pointTargets: briefPointTargets(row),
+    maxMaps: briefMaxMaps(row),
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
     // Le bot n'ouvre de salon vocal que pour un match suivi (`MATCH_VOICE.md`) :

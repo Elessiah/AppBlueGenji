@@ -364,12 +364,17 @@ function mapRefusals(
   // Un geste interdit pour une autre raison que les maps (résultat déjà
   // tranché, double forfait, saisie fermée) le reste : le refus de map ne
   // rouvre pas le bouton, et c'est cette raison-là qui s'affiche.
+  const saveError = isStructuralBlocker(decision.saveBlocker) ? null : save.error;
+  const resolveError = isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error;
+  // Le refus **affiché** : celui de la validation s'il tient encore, sinon
+  // celui de l'enregistrement — ligne et N cités viennent du même contrôle.
+  const shown = resolveError || !saveError ? resolve : save;
   return {
-    save: isStructuralBlocker(decision.saveBlocker) ? null : save.error,
-    resolve: isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error,
+    save: saveError,
+    resolve: resolveError,
     // Le refus affiché désigne une ligne vierge, qu'on vient d'ajouter : il se tait.
-    onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),
-    pointTarget: refusalPointTarget(resolve.error ? resolve : save, mapRules),
+    onBlankRow: !refusalOnTouchedRow(shown, maps),
+    pointTarget: refusalPointTarget(shown, mapRules),
   };
 }
 

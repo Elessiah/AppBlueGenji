@@ -965,6 +965,22 @@ describe("attachPointTargets", () => {
     expect(match.mapPointTargets).toBeNull();
   });
 
+  it("attachPointTargets_maxMapsBelowStored_clipsPerMap", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
+
+    attachPointTargets([match], 5, [], [{ ...ROUND_ONE, targets: [null, 3, 7] }], () => 2);
+
+    expect(match.mapPointTargets).toEqual([5, 3]);
+  });
+
+  it("attachPointTargets_onlyMapsBeyondFormat_leavesFieldNull", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
+
+    attachPointTargets([match], 5, [], [{ ...ROUND_ONE, targets: [null, 3] }], () => 1);
+
+    expect(match.mapPointTargets).toBeNull();
+  });
+
   it("attachPointTargets_formatOff_setsNothing", () => {
     const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
 

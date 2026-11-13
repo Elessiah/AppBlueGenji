@@ -461,6 +461,21 @@ export function PlayerScoreDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
+  // Points par carte changés par le staff pendant que la modale est ouverte :
+  // les lignes repoussent selon la nouvelle règle (carte gagnée au nouveau N),
+  // sans compter pour une saisie si le lecteur n'avait rien touché.
+  const pointsKey = `${pointTarget ?? ""}|${pointTargets?.join(",") ?? ""}`;
+  const appliedPoints = useRef(pointsKey);
+  useEffect(() => {
+    if (appliedPoints.current === pointsKey) return;
+    appliedPoints.current = pointsKey;
+    const regrown = progressiveMapRows(matchFormat, game, current.current, pointRules);
+    if (JSON.stringify(current.current) === JSON.stringify(baseline.current)) baseline.current = regrown;
+    setRows(regrown);
+    // `pointsKey` résume `pointRules`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointsKey]);
+
   const check = checkMapList(matchFormat, game, maps, { decisive: true, ...pointRules });
   // Rien de saisi : la ligne vierge d'ouverture n'est pas une proposition.
   const nothingEntered = !maps.some(isMapTouched);

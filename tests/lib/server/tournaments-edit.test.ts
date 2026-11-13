@@ -504,6 +504,37 @@ describe("updateTournament — format Duel / Arcade", () => {
     expect(jest.mocked(queueRoundMapsNotice)).not.toHaveBeenCalled();
   });
 
+  it("updateTournament_matchFormatShortened_trimsMapTargets", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5, match_format_type: "BO", match_format_value: 3 });
+    roundMapRowsToReturn = [
+      { phase_id: 0, bracket: "UPPER", round_number: 1, map_point_target: null, map_point_targets: "[5,3,7]" },
+    ];
+
+    await updateTournament(1, { matchFormat: { type: "BO", value: 1, maxMaps: null, drawsAllowed: false } });
+
+    const trimmed = executed.filter((q) => /UPDATE bg_tournament_round_maps SET map_point_targets = \?/.test(q.sql));
+    expect(trimmed.map((q) => q.params)).toEqual([["[5]", 1, 0, "UPPER", 1]]);
+    expect(jest.mocked(queueRoundMapsNotice)).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      [expect.objectContaining({ phaseId: 0, bracket: "UPPER", roundNumber: 1 })],
+      { points: true },
+    );
+    expect(jest.mocked(scheduleRoundMapsNotice)).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTournament_matchFormatChangedTargetsFit_writesNothing", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5, match_format_type: "BO", match_format_value: 3 });
+    roundMapRowsToReturn = [
+      { phase_id: 0, bracket: "UPPER", round_number: 1, map_point_target: null, map_point_targets: "[5,3]" },
+    ];
+
+    await updateTournament(1, { matchFormat: { type: "BO", value: 5, maxMaps: null, drawsAllowed: false } });
+
+    expect(executed.some((q) => /UPDATE bg_tournament_round_maps|DELETE FROM bg_tournament_round_maps/.test(q.sql))).toBe(false);
+    expect(jest.mocked(queueRoundMapsNotice)).not.toHaveBeenCalled();
+  });
+
   it("updateTournament_multiPhasesReplaced_prunesOldPhaseTargets", async () => {
     rowToReturn = hiddenRow({ format: "MULTI", map_point_target: 5 });
     phaseRowsToReturn = [{ id: 12, format: "SINGLE", has_third_place_match: 0 }];

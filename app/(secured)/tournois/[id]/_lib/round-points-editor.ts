@@ -5,48 +5,45 @@
  * (`normalizeMapPointTargets`) ; ceci ne règle que l'écran.
  *
  * Chaque carte du tour a son champ, prérempli de son N effectif (la carte,
- * sinon le tour, sinon le tournoi). Une carte laissée — ou ramenée — au nombre
- * du tour le **suit** (`null`) : rien n'est stocké pour elle, et elle suivra un
- * nouveau nombre du tour.
+ * sinon le tour, sinon le tournoi). Une carte jamais réglée, ou **ramenée** à
+ * la main au nombre du tour, le **suit** (`null`) : rien n'est stocké pour
+ * elle, et elle suivra un nouveau nombre du tour. Une carte réglée garde son N,
+ * même quand le tour vient à valoir le même nombre.
  */
 import { ROUND_MAP_SLOTS_MAX } from "@/lib/shared/round-maps";
+import {
+  clipMapPointTargets,
+  isValidMapPointTarget,
+  sameMapPointTargets,
+  trimMapPointTargets,
+} from "@/lib/shared/map-points";
+
+export { sameMapPointTargets, trimMapPointTargets };
 
 /** Valeur d'une carte à l'écran : son propre N, ou `null` (elle suit le tour). */
 export type MapPointDraft = number | null;
 
-/** Les `null` de fin retirés : la forme stockée (`normalizeMapPointTargets`). */
-export function trimMapPointTargets(targets: ReadonlyArray<MapPointDraft>): MapPointDraft[] {
-  let end = targets.length;
-  while (end > 0 && targets[end - 1] === null) end -= 1;
-  return targets.slice(0, end);
-}
-
 /**
  * Cartes montrées : autant que le format du tour en joue (`roundMaxMaps`, sans
- * dépasser {@link ROUND_MAP_SLOTS_MAX} ; score libre : ce plafond), et au moins
- * autant que de cartes déjà réglées (un format raccourci depuis ne cache pas
- * un réglage resté). `0` sur un tour à une seule carte sans réglage : le nombre
- * du tour dit déjà tout.
+ * dépasser {@link ROUND_MAP_SLOTS_MAX} ; score libre : ce plafond). `0` sur un
+ * tour à une seule carte : le nombre du tour dit déjà tout.
  */
-export function mapPointRowCount(maxMaps: number | null, saved: ReadonlyArray<MapPointDraft>): number {
-  const byFormat = Math.min(maxMaps ?? ROUND_MAP_SLOTS_MAX, ROUND_MAP_SLOTS_MAX);
-  const rows = Math.max(byFormat, saved.length);
-  return rows <= 1 && saved.length === 0 ? 0 : rows;
+export function mapPointRowCount(maxMaps: number | null): number {
+  const rows = Math.min(maxMaps ?? ROUND_MAP_SLOTS_MAX, ROUND_MAP_SLOTS_MAX);
+  return rows <= 1 ? 0 : rows;
 }
 
 /**
- * Brouillon d'ouverture : les cartes réglées, `null` partout ailleurs ; une
- * carte dont le N vaut celui du tour le suit.
+ * Réglage enregistré, tel que l'écran le règle : limité aux cartes montrées
+ * (un réglage resté au-delà d'un format raccourci n'est jamais joué ni servi).
  */
-export function mapPointDrafts(
-  saved: ReadonlyArray<MapPointDraft>,
-  roundTarget: number,
-  rows: number,
-): MapPointDraft[] {
-  return Array.from({ length: rows }, (_, index) => {
-    const value = saved[index] ?? null;
-    return value === roundTarget ? null : value;
-  });
+export function shownSavedMapPointTargets(saved: ReadonlyArray<MapPointDraft>, rows: number): MapPointDraft[] {
+  return clipMapPointTargets(saved, rows);
+}
+
+/** Brouillon d'ouverture : les cartes réglées, `null` (elles suivent le tour) partout ailleurs. */
+export function mapPointDrafts(saved: ReadonlyArray<MapPointDraft>, rows: number): MapPointDraft[] {
+  return Array.from({ length: rows }, (_, index) => saved[index] ?? null);
 }
 
 /** Une carte saisie : ramenée au nombre du tour, elle le suit. */
@@ -62,12 +59,25 @@ export function editMapPointDraft(
   });
 }
 
-/** Ce qui part au serveur (`mapTargets`) : cartes au nombre du tour remises à `null`, `null` de fin retirés. */
-export function mapPointTargetsToSend(drafts: ReadonlyArray<MapPointDraft>, roundTarget: number): MapPointDraft[] {
-  return trimMapPointTargets(drafts.map((value) => (value === roundTarget ? null : value)));
+/** Ce qui part au serveur (`mapTargets`) : `null` de fin retirés. */
+export function mapPointTargetsToSend(drafts: ReadonlyArray<MapPointDraft>): MapPointDraft[] {
+  return trimMapPointTargets(drafts);
 }
 
-/** Deux listes stockées sont-elles les mêmes ? */
-export function sameMapPointTargets(a: ReadonlyArray<MapPointDraft>, b: ReadonlyArray<MapPointDraft>): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
+/** Champ d'une carte (`map-0` = carte 1), clé de `useFieldErrors`. */
+export type MapPointField = "points" | `map-${number}`;
+
+/**
+ * Champ à désigner pour un refus `INVALID_MAP_POINT_TARGET` (le serveur ne rend
+ * qu'un code) : la première carte hors bornes, sinon la dernière carte que le
+ * format joue (réglage trop long), sinon le nombre du tour.
+ */
+export function invalidPointField(
+  mapTargets: ReadonlyArray<MapPointDraft>,
+  rows: number,
+): MapPointField {
+  const bad = mapTargets.findIndex((value) => value !== null && !isValidMapPointTarget(value));
+  if (bad >= 0) return `map-${bad}`;
+  if (mapTargets.length > rows && rows > 0) return `map-${rows - 1}`;
+  return "points";
 }

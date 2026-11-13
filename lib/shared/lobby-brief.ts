@@ -83,6 +83,8 @@ export type LobbyBriefSide = {
   pointTarget?: number | null;
   /** N effectif des cartes réglées une à une (carte 1 en tête), absent sans réglage carte par carte. */
   pointTargets?: number[] | null;
+  /** Cartes au plus du match (`roundMaxMaps`), `null` en score libre : sans carte « suivante » quand toutes sont réglées. */
+  maxMaps?: number | null;
   nextBan: NextBanRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;

@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
   assertMapPointsUnlocked,
   loadMatchPointRules,
-  loadMatchPointTarget,
   matchRoundKey,
 } from "@/lib/server/tournaments/map-points";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -50,39 +49,39 @@ describe("matchRoundKey", () => {
   });
 });
 
-describe("loadMatchPointTarget", () => {
-  it("loadMatchPointTarget_formatOff_returnsNullWithoutQuery", async () => {
-    const actual = await loadMatchPointTarget(fakeConnection(connection), 7, null, ROUND);
+describe("loadMatchPointRules (N du match)", () => {
+  it("loadMatchPointRules_formatOff_returnsNullWithoutQuery", async () => {
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, null, ROUND);
 
-    expect(actual).toBeNull();
+    expect(actual).toEqual({ pointTarget: null, pointTargets: null });
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("loadMatchPointTarget_roundOverride_returnsOverride", async () => {
+  it("loadMatchPointRules_roundOverride_returnsOverride", async () => {
     route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] }]);
 
-    const actual = await loadMatchPointTarget(fakeConnection(connection), 7, 5, ROUND);
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
 
-    expect(actual).toBe(3);
+    expect(actual.pointTarget).toBe(3);
     expect(connection.execute.mock.calls[0][1]).toEqual([7, 0, "UPPER", 2]);
   });
 
-  it("loadMatchPointTarget_roundOverride_readsWithLockInShareMode", async () => {
+  it("loadMatchPointRules_roundOverride_readsWithLockInShareMode", async () => {
     route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] }]);
 
-    await loadMatchPointTarget(fakeConnection(connection), 7, 5, ROUND);
+    await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
 
     const [sql] = connection.execute.mock.calls[0];
     expect(sql).toMatch(/LIMIT 1\s+LOCK IN SHARE MODE$/);
     expect(sql).not.toMatch(/FOR SHARE/);
   });
 
-  it("loadMatchPointTarget_noRoundRow_returnsTournamentTarget", async () => {
+  it("loadMatchPointRules_noRoundRow_returnsTournamentTarget", async () => {
     route([]);
 
-    const actual = await loadMatchPointTarget(fakeConnection(connection), 7, "5", ROUND);
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, "5", ROUND);
 
-    expect(actual).toBe(5);
+    expect(actual.pointTarget).toBe(5);
   });
 });
 

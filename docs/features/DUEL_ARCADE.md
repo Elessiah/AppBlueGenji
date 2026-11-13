@@ -39,17 +39,24 @@ Duels 1v1 en arcade (Widowmaker, « premier à 5 ») : chaque carte se gagne au
 - **Carte par carte** (DUEL-MAP-POINTS) : sous le nombre du tour, la même
   fenêtre montre « Carte par carte » (EN « Map by map »), un `<NumberInput>`
   (1–99) par carte que le format du tour joue (`roundMaxMaps`, 9 au plus ; score
-  libre : 9 ; rien sur un tour à une seule carte sans réglage), avec
+  libre : 9 ; rien sur un tour à une seule carte), avec
   `<InfoHint>` sur l'ordre des valeurs par défaut. Chaque champ est prérempli
-  du N **effectif** de la carte ; une carte laissée — ou ramenée — au nombre du
-  tour le **suit** (« suit le tour », rien n'est stocké pour elle). Stocké dans
+  du N **effectif** de la carte ; une carte jamais réglée, ou **ramenée à la
+  main** au nombre du tour, le **suit** (« suit le tour », rien n'est stocké
+  pour elle) ; une carte réglée garde son N même si le tour vient à valoir le
+  même nombre. Un refus `INVALID_MAP_POINT_TARGET` est rattaché au champ de la
+  carte fautive (`invalidPointField`), sinon à celui du tour. Stocké dans
   `bg_tournament_round_maps.map_point_targets` (`VARCHAR(128) NULL`, JSON
   `[null,3,7]` : carte 1 en tête, `null` = suit le tour, `null` de fin retirés,
   `NULL` = aucun réglage) — une colonne plutôt que `slots_json`, pour régler les
   points d'un tour sans cartes imposées et ne rien changer aux lecteurs des
   cartes. Même route, corps `{ …, target, mapTargets }` (`mapTargets` absent =
   inchangé, `[]` = tout retirer ; `normalizeMapPointTargets`, 9 entrées au
-  plus, sinon `INVALID_MAP_POINT_TARGET`). « Revenir aux points du tournoi »
+  plus et pas plus que les cartes du format du tour, sinon
+  `INVALID_MAP_POINT_TARGET`). Une édition qui raccourcit le format de match
+  (BO3 → BO1) coupe les réglages des cartes qu'il ne joue plus
+  (`pruneRoundPointTargets`, annoncé au journal) ; instantané et check-in
+  ignorent de toute façon une carte au-delà du format (`clipMapPointTargets`). « Revenir aux points du tournoi »
   retire le nombre du tour et ceux des cartes. Même verrou, même journal
   (l'empreinte `roundPointsFingerprint` couvre tour et cartes), audit pm2 avec
   les deux listes.
@@ -140,7 +147,9 @@ chaque carte : 5–3 contre 5–2 est un écart.
   Arcade : chaque carte se gagne au premier à N points. » (N du tour, sinon du
   tournoi ; FR et EN), sous les cartes ; carte par carte : « carte 1 au premier
   à 5, carte 2 au premier à 3, puis premier à 5 pour les suivantes. »
-  (`briefPointTargets`).
+  (`briefPointTargets`) — sans « puis … pour les suivantes » quand toutes les
+  cartes du format sont réglées, et une seule ligne quand elles valent toutes
+  le N du match (`hasPerMapTargets`, comme la page du match).
 - Discord (journal « Match terminé ») : « (points : 5–3) » après le score, des
   chiffres seulement, aucun pseudo ; rien sur un forfait.
 

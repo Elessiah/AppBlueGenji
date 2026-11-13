@@ -865,6 +865,18 @@ describe("briefPointTargets", () => {
     expect(actual).toEqual([7, 3]);
   });
 
+  it("briefPointTargets_storedBeyondMaxMaps_clipped", () => {
+    const actual = briefPointTargets(
+      briefRow({ tournament_point_target: 5, match_format_value: 1, round_point_targets: "[3,7,9]" }),
+    );
+
+    expect(actual).toEqual([3]);
+  });
+
+  it("briefPointTargets_allEqualRound_returnsNull", () => {
+    expect(briefPointTargets(briefRow({ tournament_point_target: 5, round_point_targets: "[5,5]" }))).toBeNull();
+  });
+
   it("briefPointTargets_formatOff_returnsNull", () => {
     expect(briefPointTargets(briefRow({ tournament_point_target: null, round_point_targets: "[3]" }))).toBeNull();
   });
@@ -1228,6 +1240,31 @@ describe("setRoundPointTarget — points carte par carte", () => {
     expect(insert[0]).toMatch(/map_point_targets = VALUES\(map_point_targets\)/);
     expect(insert[1]).toEqual([7, 0, "UPPER", 2, null, "[null,3]"]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("setRoundPointTarget_mapTargetsLongerThanFormat_throwsInvalidMapPointTarget", async () => {
+    const bo3 = { ...DUEL, match_format_type: "BO", match_format_value: 3 };
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [bo3] },
+      { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
+    ]);
+
+    await expect(setRoundPointTarget(7, ROUND, null, [5, 3, 7, 9])).rejects.toThrow("INVALID_MAP_POINT_TARGET");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
+  it("setRoundPointTarget_mapTargetsAtFormatLength_saves", async () => {
+    const bo3 = { ...DUEL, match_format_type: "BO", match_format_value: 3 };
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [bo3] },
+      { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
+    ]);
+
+    const actual = await setRoundPointTarget(7, ROUND, null, [5, 3, 7]);
+
+    expect(actual.mapTargets).toEqual([5, 3, 7]);
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(1);
   });
 
   it("setRoundPointTarget_mapTargetsOmitted_keepsStoredListUnchanged", async () => {

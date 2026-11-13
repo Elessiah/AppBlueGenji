@@ -34,13 +34,14 @@ import {
   type RoundTiebreak,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
-import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
+import { roundAllowsTiebreak, roundMaxMaps, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import {
   bracketFitsFormat,
   isValidMapPointTarget,
   normalizeMapPointTargets,
   parseStoredMapPointTarget,
   parseStoredMapPointTargets,
+  sameMapPointTargets,
   serializeMapPointTargets,
   type RoundMapPointTargets,
   type RoundPointTarget,
@@ -164,6 +165,12 @@ type TournamentRow = RowDataPacket & MapRulesColumns & {
   state?: string | null;
   map_point_target?: number | null;
   has_third_place_match?: number | boolean | null;
+  match_format_type?: unknown;
+  match_format_value?: unknown;
+  match_format_max_maps?: unknown;
+  match_format_draws?: unknown;
+  endurance_playoff_format_type?: unknown;
+  endurance_playoff_format_value?: unknown;
 };
 
 /**
@@ -172,7 +179,9 @@ type TournamentRow = RowDataPacket & MapRulesColumns & {
  */
 async function lockTournament(connection: PoolConnection, tournamentId: number): Promise<TournamentRow> {
   const [rows] = await connection.execute<TournamentRow[]>(
-    `SELECT id, name, format, state, first_ban_rule, next_ban_rule, next_pick_rule, map_point_target, has_third_place_match
+    `SELECT id, name, format, state, first_ban_rule, next_ban_rule, next_pick_rule, map_point_target, has_third_place_match,
+            match_format_type, match_format_value, match_format_max_maps, match_format_draws,
+            endurance_playoff_format_type, endurance_playoff_format_value
        FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
     [tournamentId],
   );
@@ -264,6 +273,36 @@ async function roundFitsTournament(
   );
   const maxRound = built[0]?.max_round;
   return maxRound === null || maxRound === undefined || round.roundNumber <= Number(maxRound);
+}
+
+/**
+ * Poser des points sur un tour : format allumé, tournoi pas terminé, tour que
+ * le tournoi joue, et aucun réglage pour une carte que le format du tour ne
+ * joue jamais (BO3 : 3 cartes au plus).
+ * @throws `MAP_POINTS_DISABLED` | `MAP_POINTS_FINISHED` | `INVALID_ROUND` | `INVALID_MAP_POINT_TARGET`
+ */
+async function assertRoundPointsPosable(
+  connection: PoolConnection,
+  tournament: TournamentRow,
+  round: RoundKey,
+  requestedMaps: readonly (number | null)[] | null,
+  duelOn: boolean,
+): Promise<void> {
+  if (!duelOn) throw new Error("MAP_POINTS_DISABLED");
+  if (tournament.state === "FINISHED") throw new Error("MAP_POINTS_FINISHED");
+  if (!(await roundFitsTournament(connection, tournament, round))) throw new Error("INVALID_ROUND");
+  const maxMaps = roundMaxMapsOf(tournament, round);
+  if (requestedMaps !== null && maxMaps !== null && requestedMaps.length > maxMaps) {
+    throw new Error("INVALID_MAP_POINT_TARGET");
+  }
+}
+
+/** Cartes au plus d'un match du tour sous le format du tournoi verrouillé (`roundMaxMaps`). */
+function roundMaxMapsOf(tournament: TournamentRow, round: RoundKey): number | null {
+  return roundMaxMaps(
+    tiebreakTournamentFromRow({ ...tournament, format: tournament.format as TournamentFormat }, null),
+    round.roundNumber,
+  );
 }
 
 /** Tours au plus d'une copie « à tous les tours » (partagé avec l'écran, qui découpe). */
@@ -491,10 +530,6 @@ export type RoundPointTargetChange = {
   changed: boolean;
 };
 
-function sameTargets(a: ReadonlyArray<number | null>, b: ReadonlyArray<number | null>): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
 /**
  * Pose (ou retire, `null`) les **points par carte propres à un tour**, en
  * format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : ils remplacent ceux
@@ -540,12 +575,8 @@ export async function setRoundPointTarget(
     // Poser : un réglage est posé (tour ou carte) ; garder un réglage resté
     // tel quel en retirant l'autre ne « pose » rien de neuf.
     const poses = target !== null || (requestedMaps !== null && requestedMaps.length > 0);
-    if (poses) {
-      if (!duelOn) throw new Error("MAP_POINTS_DISABLED");
-      if (tournament.state === "FINISHED") throw new Error("MAP_POINTS_FINISHED");
-      if (!(await roundFitsTournament(connection, tournament, round))) throw new Error("INVALID_ROUND");
-    }
-    if (before === target && sameTargets(mapsBefore, mapTargets)) {
+    if (poses) await assertRoundPointsPosable(connection, tournament, round, requestedMaps, duelOn);
+    if (before === target && sameMapPointTargets(mapsBefore, mapTargets)) {
       return { before, mapsBefore, mapTargets, changed: false };
     }
     // Format éteint, le réglage du tour ne joue plus : le retirer ne change

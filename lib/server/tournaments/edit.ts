@@ -35,7 +35,14 @@ import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 import { assertMapPointsUnlocked } from "./map-points";
 import { queueRoundMapsNotice, roundPointsFingerprint, scheduleRoundMapsNotice } from "./round-maps-notice";
-import { bracketFitsFormat, parseStoredMapPointTarget, parseStoredMapPointTargets } from "@/lib/shared/map-points";
+import {
+  bracketFitsFormat,
+  clipMapPointTargets,
+  parseStoredMapPointTarget,
+  parseStoredMapPointTargets,
+  serializeMapPointTargets,
+} from "@/lib/shared/map-points";
+import { roundMaxMaps } from "@/lib/shared/round-plan";
 
 /** Valeurs éditables d'un tournoi. Dates en ISO, comme partout côté client. */
 export type EditableTournamentValues = {
@@ -284,9 +291,17 @@ async function assertPointTargetChangeAllowed(
 async function pruneRoundPointTargets(
   connection: PoolConnection,
   tournamentId: number,
-  change: { turnedOff: boolean; structureChanged: boolean; format: TournamentFormat; hasThirdPlaceMatch: boolean },
+  change: {
+    turnedOff: boolean;
+    structureChanged: boolean;
+    matchFormatChanged: boolean;
+    format: TournamentFormat;
+    hasThirdPlaceMatch: boolean;
+    /** Cartes au plus d'un match du tour `roundNumber` sous le format édité (`roundMaxMaps`). */
+    maxMaps: (roundNumber: number) => number | null;
+  },
 ): Promise<boolean> {
-  if (!change.turnedOff && !change.structureChanged) return false;
+  if (!change.turnedOff && !change.structureChanged && !change.matchFormatChanged) return false;
   const [rows] = await connection.execute<
     (RowDataPacket & {
       phase_id: number;
@@ -301,6 +316,7 @@ async function pruneRoundPointTargets(
     [tournamentId],
   );
   let doomed = rows;
+  let shortened: { row: (typeof rows)[number]; targets: (number | null)[] }[] = [];
   if (change.turnedOff) {
     await connection.execute(
       `UPDATE bg_tournament_round_maps SET map_point_target = NULL, map_point_targets = NULL
@@ -308,16 +324,16 @@ async function pruneRoundPointTargets(
       [tournamentId],
     );
   } else {
-    const fits = await roundFitter(connection, tournamentId, change.format, change.hasThirdPlaceMatch);
+    const fits = change.structureChanged
+      ? await roundFitter(connection, tournamentId, change.format, change.hasThirdPlaceMatch)
+      : () => true;
     doomed = rows.filter((row) => !fits(Number(row.phase_id), String(row.bracket)));
-    if (doomed.length === 0) return false;
-    // Une seule instruction pour tous les tours caducs : le verrou du tournoi
-    // n'attend pas R allers-retours.
-    await connection.execute(
-      `UPDATE bg_tournament_round_maps SET map_point_target = NULL, map_point_targets = NULL
-        WHERE tournament_id = ? AND (${doomed.map(() => "(phase_id = ? AND bracket = ? AND round_number = ?)").join(" OR ")})`,
-      [tournamentId, ...doomed.flatMap((row) => [row.phase_id, row.bracket, row.round_number])],
+    shortened = shortenedMapTargets(
+      rows.filter((row) => fits(Number(row.phase_id), String(row.bracket))),
+      change.maxMaps,
     );
+    if (doomed.length === 0 && shortened.length === 0) return false;
+    await writePrunedRoundTargets(connection, tournamentId, doomed, shortened);
   }
   await connection.execute(
     `DELETE FROM bg_tournament_round_maps
@@ -325,10 +341,11 @@ async function pruneRoundPointTargets(
         AND map_point_targets IS NULL`,
     [tournamentId],
   );
+  const announced = [...doomed, ...shortened.map((item) => item.row)];
   await queueRoundMapsNotice(
     connection,
     tournamentId,
-    doomed.map((row) => ({
+    announced.map((row) => ({
       phaseId: Number(row.phase_id),
       bracket: String(row.bracket),
       roundNumber: Number(row.round_number),
@@ -339,21 +356,69 @@ async function pruneRoundPointTargets(
     })),
     { points: true },
   );
-  return doomed.length > 0;
+  return announced.length > 0;
+}
+
+type RoundKeyRow = { phase_id: number; bracket: string; round_number: number };
+
+/** Écrit l'élagage : réglages des tours caducs retirés, réglages carte par carte raccourcis. */
+async function writePrunedRoundTargets(
+  connection: PoolConnection,
+  tournamentId: number,
+  doomed: readonly RoundKeyRow[],
+  shortened: readonly { row: RoundKeyRow; targets: (number | null)[] }[],
+): Promise<void> {
+  // Une seule instruction pour tous les tours caducs : le verrou du tournoi
+  // n'attend pas R allers-retours.
+  if (doomed.length > 0) {
+    await connection.execute(
+      `UPDATE bg_tournament_round_maps SET map_point_target = NULL, map_point_targets = NULL
+        WHERE tournament_id = ? AND (${doomed.map(() => "(phase_id = ? AND bracket = ? AND round_number = ?)").join(" OR ")})`,
+      [tournamentId, ...doomed.flatMap((row) => [row.phase_id, row.bracket, row.round_number])],
+    );
+  }
+  for (const { row, targets } of shortened) {
+    await connection.execute(
+      `UPDATE bg_tournament_round_maps SET map_point_targets = ?
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
+      [serializeMapPointTargets(targets), tournamentId, row.phase_id, row.bracket, row.round_number],
+    );
+  }
+}
+
+/**
+ * Un format de match raccourci (BO3 → BO1) : les cartes qu'il ne joue plus
+ * perdent leur réglage propre, sans quoi chaque écran le citerait encore.
+ */
+function shortenedMapTargets<R extends { round_number: number; map_point_targets?: string | null }>(
+  rows: readonly R[],
+  maxMaps: (roundNumber: number) => number | null,
+): { row: R; targets: (number | null)[] }[] {
+  return rows.flatMap((row) => {
+    const stored = parseStoredMapPointTargets(row.map_point_targets);
+    const kept = clipMapPointTargets(stored, maxMaps(Number(row.round_number)));
+    return kept.length === stored.length ? [] : [{ row, targets: kept }];
+  });
 }
 
 /** Ce que l'édition change pour les points propres aux tours (`pruneRoundPointTargets`). */
 function roundPointsChange(
   patch: Partial<EditableTournamentValues>,
   current: { mapPointTarget: number | null },
-  valid: Pick<ValidatedTournamentInput, "mapPointTarget" | "format" | "hasThirdPlaceMatch">,
+  valid: Pick<
+    ValidatedTournamentInput,
+    "mapPointTarget" | "format" | "hasThirdPlaceMatch" | "matchFormat" | "endurancePlayoffFormat"
+  >,
 ): Parameters<typeof pruneRoundPointTargets>[2] {
   return {
     turnedOff: valid.mapPointTarget === null && current.mapPointTarget !== null,
     structureChanged:
       patch.format !== undefined || patch.phases !== undefined || patch.hasThirdPlaceMatch !== undefined,
+    matchFormatChanged:
+      patch.format !== undefined || patch.matchFormat !== undefined || patch.endurancePlayoffFormat !== undefined,
     format: valid.format,
     hasThirdPlaceMatch: valid.hasThirdPlaceMatch,
+    maxMaps: (roundNumber) => roundMaxMaps(valid, roundNumber),
   };
 }
 

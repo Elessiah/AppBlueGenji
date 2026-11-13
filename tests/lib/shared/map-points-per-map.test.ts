@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   MAP_POINT_TARGET_MAX,
   MAP_POINT_TARGET_MIN,
+  clipMapPointTargets,
   effectiveMapPointTargets,
   hasPerMapTargets,
   mapPointTargetAt,
@@ -21,10 +22,12 @@ import type { MatchFormat } from "@/lib/shared/match-format";
 import type { RoundKey } from "@/lib/shared/round-maps";
 import {
   editMapPointDraft,
+  invalidPointField,
   mapPointDrafts,
   mapPointRowCount,
   mapPointTargetsToSend,
   sameMapPointTargets,
+  shownSavedMapPointTargets,
 } from "@/app/(secured)/tournois/[id]/_lib/round-points-editor";
 
 /**
@@ -246,35 +249,51 @@ describe("progressiveMapRows — points par carte", () => {
   });
 });
 
+describe("clipMapPointTargets", () => {
+  it("clipMapPointTargets_freeScore_keepsAllTrimmed", () => {
+    expect(clipMapPointTargets([3, null, 7, null], null)).toEqual([3, null, 7]);
+  });
+
+  it("clipMapPointTargets_longerThanMax_cutsAndTrims", () => {
+    expect(clipMapPointTargets([3, 7, null, 9], 2)).toEqual([3, 7]);
+  });
+
+  it("clipMapPointTargets_onlyBeyondMax_returnsEmpty", () => {
+    expect(clipMapPointTargets([null, null, 9], 2)).toEqual([]);
+  });
+
+  it("clipMapPointTargets_maxAtLength_unchanged", () => {
+    expect(clipMapPointTargets([3, 7], 2)).toEqual([3, 7]);
+  });
+});
+
 describe("mapPointRowCount", () => {
   it("mapPointRowCount_bo3_returnsThree", () => {
-    expect(mapPointRowCount(3, [])).toBe(3);
+    expect(mapPointRowCount(3)).toBe(3);
   });
 
   it("mapPointRowCount_freeScore_returnsNine", () => {
-    expect(mapPointRowCount(null, [])).toBe(9);
+    expect(mapPointRowCount(null)).toBe(9);
   });
 
   it("mapPointRowCount_aboveCap_returnsNine", () => {
-    expect(mapPointRowCount(12, [])).toBe(9);
+    expect(mapPointRowCount(12)).toBe(9);
   });
 
-  it("mapPointRowCount_singleMapNothingSaved_returnsZero", () => {
-    expect(mapPointRowCount(1, [])).toBe(0);
+  it("mapPointRowCount_singleMap_returnsZero", () => {
+    expect(mapPointRowCount(1)).toBe(0);
   });
+});
 
-  it("mapPointRowCount_singleMapWithSaved_returnsOne", () => {
-    expect(mapPointRowCount(1, [3])).toBe(1);
-  });
-
-  it("mapPointRowCount_savedLongerThanFormat_keepsSavedLength", () => {
-    expect(mapPointRowCount(3, [1, 2, 3, 4, 5])).toBe(5);
+describe("shownSavedMapPointTargets", () => {
+  it("shownSavedMapPointTargets_savedLongerThanRows_clipped", () => {
+    expect(shownSavedMapPointTargets([5, 3, 7, 9], 3)).toEqual([5, 3, 7]);
   });
 });
 
 describe("mapPointDrafts", () => {
-  it("mapPointDrafts_savedEqualToRound_followsRoundAndPads", () => {
-    expect(mapPointDrafts([5, 3], 5, 3)).toEqual([null, 3, null]);
+  it("mapPointDrafts_savedEqualToRound_keepsExplicitValueAndPads", () => {
+    expect(mapPointDrafts([7, 3], 3)).toEqual([7, 3, null]);
   });
 });
 
@@ -289,8 +308,28 @@ describe("editMapPointDraft", () => {
 });
 
 describe("mapPointTargetsToSend", () => {
-  it("mapPointTargetsToSend_roundValuesAndTrailingNulls_trimmed", () => {
-    expect(mapPointTargetsToSend([5, 3, 5, null], 5)).toEqual([null, 3]);
+  it("mapPointTargetsToSend_trailingNulls_trimmed", () => {
+    expect(mapPointTargetsToSend([null, 3, null, null])).toEqual([null, 3]);
+  });
+
+  // Une carte réglée à 7 garde son 7 quand le tour vaut aussi 7 : elle ne
+  // devient pas une carte qui suit le tour.
+  it("mapPointTargetsToSend_explicitEqualToRound_kept", () => {
+    expect(mapPointTargetsToSend([null, 7, null])).toEqual([null, 7]);
+  });
+});
+
+describe("invalidPointField", () => {
+  it("invalidPointField_outOfBoundsMap_pointsThatMap", () => {
+    expect(invalidPointField([3, MAP_POINT_TARGET_MAX + 1], 3)).toBe("map-1");
+  });
+
+  it("invalidPointField_tooLongForFormat_pointsLastShownMap", () => {
+    expect(invalidPointField([3, 5, 7, 9], 3)).toBe("map-2");
+  });
+
+  it("invalidPointField_allValid_pointsRoundField", () => {
+    expect(invalidPointField([3, 5], 3)).toBe("points");
   });
 });
 

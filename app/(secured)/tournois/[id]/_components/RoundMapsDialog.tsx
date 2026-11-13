@@ -66,11 +66,14 @@ import {
 import { useRoundMapsText, type RoundMapsText } from "../_lib/round-maps-text";
 import {
   editMapPointDraft,
+  invalidPointField,
   mapPointDrafts,
   mapPointRowCount,
   mapPointTargetsToSend,
   sameMapPointTargets,
+  shownSavedMapPointTargets,
   type MapPointDraft,
+  type MapPointField,
 } from "../_lib/round-points-editor";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import styles from "./RoundMapsDialog.module.css";
@@ -544,13 +547,16 @@ function TiebreakForm({
   );
 }
 
-/** Refus du serveur rattachés au champ des points du tour. */
+/**
+ * Refus du serveur rattachés au champ des points du tour ; `INVALID_MAP_POINT_TARGET`
+ * va à la carte fautive quand elle se retrouve (`invalidPointField`).
+ */
 const POINTS_FIELD_ERRORS = {
   INVALID_MAP_POINT_TARGET: "points",
   MAP_POINTS_LOCKED: "points",
   MAP_POINTS_DISABLED: "points",
   MAP_POINTS_FINISHED: "points",
-} as const satisfies Record<string, "points">;
+} as const satisfies Record<string, MapPointField>;
 
 /**
  * Points par carte propres à un tour, en format Duel / Arcade
@@ -596,14 +602,19 @@ function RoundPointsForm({
   const statusId = `${ids}-points-status`;
   const lockedId = `${ids}-points-locked`;
   const effective = saved ?? tournamentTarget;
-  const rows = mapPointRowCount(maxMaps, savedMaps);
-  const savedSend = mapPointTargetsToSend(savedMaps, effective);
+  const rows = mapPointRowCount(maxMaps);
+  const savedSend = shownSavedMapPointTargets(savedMaps, rows);
   const [value, setValue] = useState(effective);
-  const [drafts, setDrafts] = useState<MapPointDraft[]>(() => mapPointDrafts(savedMaps, effective, rows));
-  const fieldErrors = useFieldErrors(POINTS_FIELD_ERRORS, { points: inputId });
+  const [drafts, setDrafts] = useState<MapPointDraft[]>(() => mapPointDrafts(savedSend, rows));
+  const fieldIds = useMemo(() => {
+    const entries: Record<MapPointField, string> = { points: inputId };
+    for (let index = 0; index < rows; index += 1) entries[`map-${index}`] = `${ids}-points-map-${index}`;
+    return entries;
+  }, [ids, inputId, rows]);
+  const fieldErrors = useFieldErrors<MapPointField>(POINTS_FIELD_ERRORS, fieldIds);
   // Brouillon aligné sur le nombre de cartes du format (un flux peut le changer).
   const shownDrafts = Array.from({ length: rows }, (_, index) => drafts[index] ?? null);
-  const sendMaps = mapPointTargetsToSend(shownDrafts, value);
+  const sendMaps = mapPointTargetsToSend(shownDrafts);
   // Suit le serveur tant que la saisie n'a pas bougé depuis le dernier alignement.
   const serverKey = `${effective}|${savedSend.join(",")}`;
   const synced = useRef({ key: serverKey, effective, maps: savedSend });
@@ -613,10 +624,10 @@ function RoundPointsForm({
     synced.current = { key: serverKey, effective, maps: savedSend };
     setValue((current) => (current === before.effective ? effective : current));
     setDrafts((current) => {
-      const untouched = sameMapPointTargets(mapPointTargetsToSend(current, before.effective), before.maps);
-      return untouched ? mapPointDrafts(savedMaps, effective, rows) : current;
+      const untouched = sameMapPointTargets(mapPointTargetsToSend(current), before.maps);
+      return untouched ? mapPointDrafts(savedSend, rows) : current;
     });
-    // `serverKey` résume `effective` et `savedMaps`.
+    // `serverKey` résume `effective` et `savedSend`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverKey]);
   const dirty = value !== effective || !sameMapPointTargets(sendMaps, savedSend);
@@ -629,12 +640,15 @@ function RoundPointsForm({
     run(
       async () => {
         await putJson(`/api/admin/tournaments/${tournamentId}/round-points`, { ...round, target, mapTargets });
-        const roundTarget = target ?? tournamentTarget;
-        setValue(roundTarget);
-        setDrafts(mapPointDrafts(mapTargets, roundTarget, rows));
+        setValue(target ?? tournamentTarget);
+        setDrafts(mapPointDrafts(mapTargets, rows));
         showSuccess(success);
       },
-      (code, text) => fieldErrors.report(code, text),
+      (code, text) => {
+        // Le serveur ne dit pas quelle carte : la même règle, rejouée ici, la retrouve.
+        if (code === "INVALID_MAP_POINT_TARGET") fieldErrors.flag(invalidPointField(mapTargets, rows), text);
+        else fieldErrors.report(code, text);
+      },
     );
 
   const save = (event: FormEvent) => {
@@ -688,7 +702,8 @@ function RoundPointsForm({
             </legend>
             <ol className={styles.pointMapList}>
               {shownDrafts.map((draft, index) => {
-                const mapInputId = `${ids}-points-map-${index}`;
+                const field: MapPointField = `map-${index}`;
+                const mapInputId = fieldIds[field];
                 const followsId = `${mapInputId}-follows`;
                 return (
                   <li key={mapInputId} className={`field ${styles.pointMap}`}>
@@ -700,8 +715,9 @@ function RoundPointsForm({
                       value={draft ?? value}
                       onValueChange={(next) => setDrafts(editMapPointDraft(shownDrafts, index, next, value))}
                       onEdit={() => fieldErrors.clear()}
-                      aria-describedby={draft === null ? followsId : undefined}
+                      {...fieldErrors.aria(field, draft === null && followsId)}
                     />
+                    <FieldErrorText fieldId={mapInputId} message={fieldErrors.message(field)} />
                     <span id={followsId} className={styles.muted}>
                       {draft === null ? t("dialog.pointsMapFollows") : ""}
                     </span>

@@ -25,6 +25,7 @@
  * score périmé.
  */
 import {
+  clipMapPointTargets,
   effectiveMapPointTargets,
   singleMapDisplayScore,
   type RoundMapPointTargets,
@@ -72,7 +73,7 @@ import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
 import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
-import { applicableTiebreaks } from "@/lib/shared/round-plan";
+import { applicableTiebreaks, roundMaxMaps } from "@/lib/shared/round-plan";
 import { forgetLiveRefereeNames, withoutRefereeKeys } from "./referee-names";
 import { loadTournamentVoiceInfos } from "./match-voice";
 
@@ -420,6 +421,8 @@ export function attachPointTargets(
   tournamentTarget: number | null | undefined,
   roundTargets: ReadonlyArray<RoundPointTarget> | null | undefined,
   roundMapTargets?: ReadonlyArray<RoundMapPointTargets> | null,
+  /** Cartes au plus d'un match du tour (`roundMaxMaps`) : un réglage au-delà n'est pas servi. */
+  maxMaps: (roundNumber: number) => number | null = () => null,
 ): void {
   if (tournamentTarget == null) return;
   // Un index des réglages de tour, bâti une fois : une recherche linéaire par
@@ -431,7 +434,10 @@ export function attachPointTargets(
   for (const match of matches) {
     const id = roundKeyId(match);
     match.mapPointTarget = byRound.get(id) ?? tournamentTarget;
-    const perMap = effectiveMapPointTargets(match.mapPointTarget, mapsByRound.get(id));
+    const perMap = effectiveMapPointTargets(
+      match.mapPointTarget,
+      clipMapPointTargets(mapsByRound.get(id) ?? [], maxMaps(match.roundNumber)),
+    );
     // Champ omis sans réglage carte par carte (le cas courant).
     if (perMap) match.mapPointTargets = perMap;
   }
@@ -627,7 +633,9 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       ), mapRules),
       await loadMapsByMatch(connection, matchIds),
     );
-    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets, mapRules.mapPointTargets);
+    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets, mapRules.mapPointTargets, (roundNumber) =>
+      roundMaxMaps(card, roundNumber),
+    );
     attachDisplayScores(mappedMatches, card);
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
     // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).

@@ -66,6 +66,26 @@ describe("formatLobbyBriefDm", () => {
     expect(actual).toContain("Duel / Arcade format: map 1 first to 5, map 2 first to 3, then first to 5 for the next ones.");
   });
 
+  it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL);
+
+    expect(actual).toContain("Format Duel / Arcade : carte 1 au premier à 5, carte 2 au premier à 3, carte 3 au premier à 7.");
+    expect(actual).not.toContain("pour les suivantes");
+  });
+
+  it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL, "en");
+
+    expect(actual).toContain("Duel / Arcade format: map 1 first to 5, map 2 first to 3, map 3 first to 7.");
+    expect(actual).not.toContain("for the next ones");
+  });
+
+  it("formatLobbyBriefDm_perMapAllEqualRound_keepsSingleLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 5] }), URL)).toContain(
+      "chaque carte se gagne au premier à 5 points.",
+    );
+  });
+
   it("formatLobbyBriefDm_emptyPerMapTargets_keepsSingleLine", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [] }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
   });

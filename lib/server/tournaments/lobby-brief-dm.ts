@@ -27,6 +27,7 @@ import type { Locale } from "@/lib/shared/locales";
 import { pushRoundLabel } from "@/lib/shared/push-messages";
 import { GAME_SETTINGS } from "@/lib/shared/match-page";
 import type { NextBanRule } from "@/lib/shared/round-maps";
+import { hasPerMapTargets } from "@/lib/shared/map-points";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 function quoted(value: string, locale: Locale): string {
@@ -93,7 +94,7 @@ type TournamentText = {
   tiebreak: string;
   pointTarget: (points: number) => string;
   /** Points réglés carte par carte (`pointTargets`) ; `rest` = N des cartes suivantes. */
-  pointTargetsPerMap: (targets: ReadonlyArray<number>, rest: number) => string;
+  pointTargetsPerMap: (targets: ReadonlyArray<number>, rest: number | null) => string;
   /** Lignes du cast. */
   live: (url: string) => string;
   inviteCasters: string;
@@ -148,7 +149,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     pointTargetsPerMap: (targets, rest) =>
       "Format Duel / Arcade : " +
       targets.map((points, index) => `carte ${index + 1} au premier à ${points}`).join(", ") +
-      `, puis premier à ${rest} pour les suivantes.`,
+      (rest === null ? "." : `, puis premier à ${rest} pour les suivantes.`),
     live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invite les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Préviens les casters inscrits (leurs contacts sont sur la page du match).",
@@ -197,7 +198,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     pointTargetsPerMap: (targets, rest) =>
       "Duel / Arcade format: " +
       targets.map((points, index) => `map ${index + 1} first to ${points}`).join(", ") +
-      `, then first to ${rest} for the next ones.`,
+      (rest === null ? "." : `, then first to ${rest} for the next ones.`),
     live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",
@@ -310,8 +311,10 @@ const MAPS_BUDGET_STEP = 30;
 function pointTargetLines(side: LobbyBriefSide, text: Pick<TournamentText, "pointTarget" | "pointTargetsPerMap">): string[] {
   if (!side.pointTarget) return [];
   const perMap = side.pointTargets ?? [];
-  if (perMap.length === 0) return [`* ${text.pointTarget(side.pointTarget)}`];
-  return [`* ${text.pointTargetsPerMap(perMap, side.pointTarget)}`];
+  if (!hasPerMapTargets(side.pointTarget, perMap)) return [`* ${text.pointTarget(side.pointTarget)}`];
+  // Toutes les cartes du match réglées : aucune ne suit le match (même règle que la page du match).
+  const coversAll = side.maxMaps != null && perMap.length >= side.maxMaps;
+  return [`* ${text.pointTargetsPerMap(perMap, coversAll ? null : side.pointTarget)}`];
 }
 
 function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale, mapsBudget: number): string {

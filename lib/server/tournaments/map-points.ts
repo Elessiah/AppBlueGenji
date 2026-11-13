@@ -17,6 +17,14 @@ export function matchRoundKey(match: { phase_id?: number | null; bracket: string
   return { phaseId: Number(match.phase_id ?? 0), bracket: match.bracket, roundNumber: Number(match.round_number) };
 }
 
+/** Points d'un match : N du match (tour, sinon tournoi) et N effectif carte par carte. */
+export type MatchPointRules = {
+  /** N du tour, sinon du tournoi ; `null` : format éteint. */
+  pointTarget: number | null;
+  /** N effectif des cartes réglées une à une (carte 1 en tête), `null` sans réglage carte par carte. */
+  pointTargets: number[] | null;
+};
+
 /**
  * Points qui gagnent une carte d'un match de la manche `round`, le N du
  * tournoi étant déjà lu (`tournamentTarget`) : rien à relire quand le format
@@ -38,28 +46,10 @@ export function matchRoundKey(match: { phase_id?: number | null; bracket: string
  * voisine (cartes, départage, points) pendant la saisie. Ces écritures du staff
  * passent toutes par `retryOnDeadlock` ; une lecture simple, elle, jugerait le
  * score sur un réglage périmé (`REPEATABLE READ`), ce qu'aucun rejeu ne répare.
- */
-export async function loadMatchPointTarget(
-  connection: PoolConnection,
-  tournamentId: number,
-  tournamentTarget: unknown,
-  round: RoundKey,
-): Promise<number | null> {
-  return (await loadMatchPointRules(connection, tournamentId, tournamentTarget, round)).pointTarget;
-}
-
-/** Points d'un match : N du match (tour, sinon tournoi) et N effectif carte par carte. */
-export type MatchPointRules = {
-  /** N du tour, sinon du tournoi ; `null` : format éteint. */
-  pointTarget: number | null;
-  /** N effectif des cartes réglées une à une (carte 1 en tête), `null` sans réglage carte par carte. */
-  pointTargets: number[] | null;
-};
-
-/**
- * Comme {@link loadMatchPointTarget}, avec en plus les points réglés **carte
- * par carte** sur le tour (`map_point_targets`) : même ligne, même lecture
- * verrouillante. Ordre de résolution d'une carte : la carte, le tour, le tournoi.
+ *
+ * Rend en plus les points réglés **carte par carte** sur le tour
+ * (`map_point_targets`) : même ligne, même lecture verrouillante. Ordre de
+ * résolution d'une carte : la carte, le tour, le tournoi.
  */
 export async function loadMatchPointRules(
   connection: PoolConnection,
