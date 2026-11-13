@@ -67,7 +67,7 @@ import {
   type MatchStreamRow,
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { lockTournamentRow } from "./registration";
+import { lockTournamentRow, lockTournamentRowShared } from "./registration";
 import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { activeMemberSql } from "./match-players";
 import { announceRefereeChange, announceRefereeChanges, queueRefereeChange, type RefereeChange } from "./referee-notices";
@@ -76,7 +76,7 @@ import { noRefereeAlertKey, queueRefereeAlert, queueRoundNoRefereeAlert } from "
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
-import { inTransaction } from "./transaction";
+import { inTransaction, transact } from "./transaction";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { failureReason } from "@/lib/server/failure-reason";
 
@@ -1905,10 +1905,12 @@ function assertFirstMapSettable(row: FirstMapRow | undefined): asserts row is Fi
  * **Échelle** (`ROUND_MAPS.md`) : dès que la manche du match porte des cartes
  * réglées au tour, la saisie par match est fermée (`ROUND_MAPS_SET`) — une carte
  * de pool se choisit par `pickMatchMap`, et réinitialiser la manche rouvre la
- * saisie. Le tournoi est verrouillé en première instruction (`lockTournamentRow`,
- * comme `setRoundMaps`) : la saisie ne passe pas à côté d'un réglage posé au même
- * instant. Le match est lu avant, hors transaction (lecture autonome), pour
- * connaître son tournoi ; tout est relu sous verrou.
+ * saisie. Le tournoi est verrouillé en première instruction, en **partagé**
+ * (`lockTournamentRowShared`, comme `pickMatchMap`) : la saisie ne passe pas à
+ * côté d'un réglage posé au même instant (verrou exclusif de `setRoundMaps`),
+ * sans attendre la première carte d'un autre match. Le match est lu avant, hors
+ * transaction (lecture autonome) et sur la même connexion, pour connaître son
+ * tournoi ; tout est relu sous verrou.
  *
  * Une exemption n'a pas de carte : refusée (`MATCH_NOT_LAUNCHABLE`) comme par
  * tout autre geste d'arbitrage (`assertRefereeable`).
@@ -1918,30 +1920,36 @@ function assertFirstMapSettable(row: FirstMapRow | undefined): asserts row is Fi
  */
 export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promise<void> {
   const typed = normalizeFirstMap(rawMap);
-  const pre = await withConnection(async (connection) => {
-    const [rows] = await connection.execute<FirstMapRow[]>(FIRST_MAP_SELECT, [matchId]);
-    return rows[0];
-  });
-  assertFirstMapSettable(pre);
-  const ownerId = Number(pre.tournament_id);
   // Rejouée sur interblocage : le verrou tournoi puis match croise les
-  // écritures d'arbitrage qui prennent le match puis le tournoi.
+  // écritures d'arbitrage qui prennent le match puis le tournoi. **Une**
+  // connexion par essai : la lecture du tournoi du match se fait avant la
+  // transaction (lecture autonome, aucune image figée avant le verrou), sur
+  // la connexion qui la porte ensuite.
   const tournamentId = await retryOnDeadlock(() =>
-    inTransaction(async (connection) => {
-      await lockTournamentRow(connection, ownerId);
-      const [rows] = await connection.execute<FirstMapRow[]>(`${FIRST_MAP_SELECT} FOR UPDATE`, [matchId]);
-      const row = rows[0];
-      assertFirstMapSettable(row);
-      const slots = await loadRoundSlots(connection, ownerId, {
-        phaseId: Number(row.phase_id),
-        bracket: String(row.bracket),
-        roundNumber: Number(row.round_number),
+    withConnection(async (connection) => {
+      const [pre] = await connection.execute<FirstMapRow[]>(FIRST_MAP_SELECT, [matchId]);
+      assertFirstMapSettable(pre[0]);
+      const ownerId = Number(pre[0].tournament_id);
+      return transact(connection, async () => {
+        // Verrou **partagé** du tournoi, comme un choix dans le pool
+        // (`pickMatchMap`) : il attend un remplacement des cartes du tour
+        // (verrou exclusif) sans mettre en file les premières cartes des
+        // autres matchs.
+        await lockTournamentRowShared(connection, ownerId);
+        const [rows] = await connection.execute<FirstMapRow[]>(`${FIRST_MAP_SELECT} FOR UPDATE`, [matchId]);
+        const row = rows[0];
+        assertFirstMapSettable(row);
+        const slots = await loadRoundSlots(connection, ownerId, {
+          phaseId: Number(row.phase_id),
+          bracket: String(row.bracket),
+          roundNumber: Number(row.round_number),
+        });
+        if (slots.length > 0) throw new Error("ROUND_MAPS_SET");
+        if ((row.first_map ?? null) === typed) return null;
+        await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [typed, matchId]);
+        queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: typed !== null });
+        return ownerId;
       });
-      if (slots.length > 0) throw new Error("ROUND_MAPS_SET");
-      if ((row.first_map ?? null) === typed) return null;
-      await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [typed, matchId]);
-      queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: typed !== null });
-      return ownerId;
     }),
   );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);

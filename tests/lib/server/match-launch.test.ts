@@ -1958,7 +1958,28 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     );
     await setMatchFirstMap(42, "Ilios");
     const begin = statements.indexOf("BEGIN");
-    expect(statements[begin + 1]).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
+    // Verrou partagé : les premières cartes de deux matchs ne s'attendent pas.
+    expect(statements[begin + 1]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 LOCK IN SHARE MODE/);
+    // Une seule connexion : la lecture du tournoi précède la transaction sur la même.
+    expect(withConnection).toHaveBeenCalledTimes(1);
+    expect(statements.slice(0, begin).some((sql) => sql.startsWith("SELECT tournament_id, status"))).toBe(true);
+  });
+
+  it("setMatchFirstMap_tournamentGoneUnderLock_throwsTournamentNotFound", async () => {
+    const base = executeFor(state);
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) =>
+            /LOCK IN SHARE MODE/.test(sql) ? [[], []] : base(sql, params),
+          beginTransaction: async () => undefined,
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+    expect(state.match?.first_map).toBeNull();
   });
 
   it("retire d'office un arbitre devenu inéligible avant le lancement, jamais après", async () => {

@@ -46,6 +46,7 @@ import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { releaseWithServerLockWait, withShortLockWait } from "./lock-wait";
 import { resolveMatchParty } from "./match-launch";
+import { lockTournamentRowShared } from "./registration";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
 import { loadRoundSlots } from "./round-map-slots";
@@ -170,19 +171,6 @@ async function lockTournament(connection: PoolConnection, tournamentId: number):
   return rows[0];
 }
 
-/**
- * Verrou **partagé** du tournoi, pour un choix dans un pool : il attend un
- * `setRoundsMaps` en cours (verrou exclusif) et le retient le temps du choix,
- * sans mettre en file les choix des autres matchs entre eux. Écriture
- * MariaDB (`LOCK IN SHARE MODE`, requête sans jointure — `CLAUDE.md`).
- */
-async function lockTournamentShared(connection: PoolConnection, tournamentId: number): Promise<void> {
-  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
-    [tournamentId],
-  );
-  if (!rows[0]) throw new Error("TOURNAMENT_NOT_FOUND");
-}
 
 /** Formats dont l'arbre entier est créé au lancement (ou à l'ouverture de la phase). */
 const WHOLE_BRACKET_FORMATS: ReadonlySet<string> = new Set(["SINGLE", "DOUBLE"]);
@@ -742,7 +730,7 @@ export async function pickMatchMap(
         // (remplacement du pool, avancement) ne garde pas la connexion jusqu'à
         // `innodb_lock_wait_timeout` — passé le délai court, `ER_LOCK_WAIT_TIMEOUT`
         // rend 409 `CONCURRENT_UPDATE_RETRY` (`launchFailure`).
-        await withShortLockWait(connection, () => lockTournamentShared(connection, ownerId));
+        await withShortLockWait(connection, () => lockTournamentRowShared(connection, ownerId));
         const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
         const row = rows[0];
         if (!row) throw new Error("MATCH_NOT_FOUND");
