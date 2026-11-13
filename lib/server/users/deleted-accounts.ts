@@ -96,7 +96,9 @@ export async function reconcileStaleFullScan(
   if (last !== undefined && now - last < DELETED_ACCOUNTS_FULL_SCAN_HOURS * 3_600_000) return null;
   const db = await getDatabase();
   if (await fullScanIsFresh(db)) return null;
-  return reconcileDeletedAccounts({ skipSolo: true });
+  // Le marqueur vient d'être lu : le rattrapage ne le relit pas (une seconde
+  // lecture pourrait le contredire et brûler la tentative du jour).
+  return reconcileDeletedAccounts({ skipSolo: true, fullScan: true });
 }
 
 /** Un relevé complet a-t-il été mené à bout dans la journée ? Lecture impossible : non (on refait). */
@@ -155,7 +157,7 @@ async function markFullScan(db: Awaited<ReturnType<typeof getDatabase>>): Promis
  * redécide déjà le mode sur la base restaurée, avec la règle du jour.
  */
 export async function reconcileDeletedAccounts(
-  options: { skipSolo?: boolean } = {},
+  options: { skipSolo?: boolean; fullScan?: boolean } = {},
 ): Promise<DeletedAccountsReconciliation> {
   const db = await getDatabase();
   // E2 d'abord : une inscription solo retirée peut rendre le compte effaçable
@@ -178,7 +180,7 @@ export async function reconcileDeletedAccounts(
   // si l'historique qui le retenait disparaît (tournoi supprimé), et la règle
   // du jour est déjà appliquée à chaque suppression. Les autres démarrages ne
   // relèvent que les marques bon marché de l'ancienne règle.
-  const fullScan = !(await fullScanIsFresh(db));
+  const fullScan = options.fullScan === true || !(await fullScanIsFresh(db));
   if (fullScan) fullScanState.__bgDeletedAccountsFullScanAt = Date.now();
   const leavesNothing = fullScan
     ? `

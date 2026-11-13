@@ -23,8 +23,7 @@ import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
-import { syncTournamentState } from "@/lib/server/tournaments/state";
-import { startDueTournaments } from "./tournament-start-sync";
+import { startDueTournaments, syncOpenSoloTournamentsOn } from "./tournament-start-sync";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
@@ -278,9 +277,6 @@ export async function listNamingTournamentIds(
   userId: number,
   leftTeamIds: readonly number[] = [],
 ): Promise<number[]> {
-  const justLeft = leftTeamIds.length > 0 ? `
-         UNION
-         SELECT r.tournament_id FROM bg_tournament_registrations r WHERE r.team_id IN (${leftTeamIds.map(() => "?").join(", ")})` : "";
   const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
     `SELECT n.tournament_id
        FROM (
@@ -297,13 +293,26 @@ export async function listNamingTournamentIds(
          UNION
          SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
          UNION
-         SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?${justLeft}
+         SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
        ) n
        JOIN bg_tournaments t ON t.id = n.tournament_id AND t.state <> 'FINISHED' AND t.finished_at IS NULL
       ORDER BY n.tournament_id`,
-    [userId, userId, userId, userId, userId, userId, ...leftTeamIds],
+    [userId, userId, userId, userId, userId, userId],
   );
-  return rows.map((row) => Number(row.tournament_id));
+  const ids = rows.map((row) => Number(row.tournament_id));
+  // Les équipes que la demande vient de quitter : une requête de forme fixe par
+  // équipe (quelques-unes au plus), plutôt qu'un `IN (?, …)` dont chaque
+  // longueur ajouterait une instruction préparée au cache.
+  for (const teamId of new Set(leftTeamIds)) {
+    const [left] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
+      `SELECT r.tournament_id FROM bg_tournament_registrations r
+         JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state <> 'FINISHED' AND t.finished_at IS NULL
+        WHERE r.team_id = ?`,
+      [teamId],
+    );
+    for (const row of left) ids.push(Number(row.tournament_id));
+  }
+  return leftTeamIds.length === 0 ? ids : mergeTournamentIds(ids);
 }
 
 /** Plusieurs listes de tournois en une, sans doublon, par id croissant : l'ordre de prise des verrous. */
@@ -710,19 +719,14 @@ async function deleteAccountNow(
       // tournoi dont l'heure de début est passée sans synchronisation passe en
       // cours ici, et son inscription retient la ligne (anonymisation) au lieu
       // d'être retirée d'un plateau déjà tiré. Ses lignes de journal partent
-      // avec le commit. Seuls ceux dont l'état a changé sont rediffusés (comme
-      // `syncOpenSoloTournamentsOn`, que ce module ne peut importer sans cycle).
+      // avec le commit. Seuls ceux dont l'état a changé sont rediffusés
+      // (`syncOpenSoloTournamentsOn`, partagé avec la demande).
       // Pas au rejeu d'une restauration (`replay`, dit par l'appelant), comme à la
       // demande : synchroniser lancerait des tournois pendant la remise en
       // état. Un tournoi dont l'heure est passée garde alors l'inscription
       // (la fenêtre de retrait la refuse) ; la passe horaire le lancera puis
       // forfaitera l'entrée, une fois le site rouvert.
-      const changed: number[] = [];
-      if (!replay) {
-        for (const tournamentId of openSoloTournaments) {
-          if ((await syncTournamentState(connection, tournamentId)).stateChanged) changed.push(tournamentId);
-        }
-      }
+      const changed = replay ? [] : await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
       // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
       // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
       const hold = await readDeletionHold(connection, userId, true);

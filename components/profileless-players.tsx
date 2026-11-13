@@ -48,7 +48,15 @@ export function ProfilelessPlayersProvider({
   const set = useMemo(() => new Set(current), [current]);
   return (
     <ProfilelessPlayersContext.Provider value={set}>
-      {refresh ? <ProfilelessRefresh onIds={(next) => setFresh({ from: ids, ids: next })} /> : null}
+      {refresh ? (
+        <ProfilelessRefresh
+          onIds={(next) => {
+            // Liste inchangée : rien n'est posé, les liens ne se re-rendent pas.
+            if (sameIds(next, current)) return;
+            setFresh({ from: ids, ids: next });
+          }}
+        />
+      ) : null}
       {children}
     </ProfilelessPlayersContext.Provider>
   );
@@ -114,4 +122,12 @@ function ProfilelessRefresh({ onIds }: Readonly<{ onIds: (ids: number[]) => void
 export function useHasPlayerPage(userId: number | undefined): boolean {
   const profileless = useContext(ProfilelessPlayersContext);
   return userId === undefined || !profileless.has(userId);
+}
+
+/** Deux listes d'identifiants identiques, dans le même ordre. */
+export function sameIds(a: readonly number[], b: readonly number[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return false;
+  return true;
 }

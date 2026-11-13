@@ -59,12 +59,28 @@ describe("listNamingTournamentIds", () => {
   // Revue standard cycle 2 : l'équipe que la demande vient de quitter nomme
   // encore le compte dans ses tournois pas commencés.
   it("listNamingTournamentIds_leftTeamIds_addsRegistrationsOfLeftTeams", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ tournament_id: 9 }], undefined])
+      .mockResolvedValueOnce([[{ tournament_id: 4 }, { tournament_id: 9 }], undefined])
+      .mockResolvedValueOnce([[{ tournament_id: 2 }], undefined]);
+
+    const ids = await listNamingTournamentIds(fakePool({ execute }), 7, [21, 22]);
+
+    expect(ids).toEqual([2, 4, 9]);
+    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7, 7, 7, 7]);
+    expect(execute.mock.calls[1][1]).toEqual([21]);
+    expect(execute.mock.calls[2][1]).toEqual([22]);
+  });
+
+  // Revue sécurité cycle 1 : une instruction de forme fixe, quel que soit le nombre d'équipes.
+  it("listNamingTournamentIds_leftTeamIds_sameStatementTextPerTeam", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
 
     await listNamingTournamentIds(fakePool({ execute }), 7, [21, 22]);
 
-    const [sql, params] = execute.mock.calls[0];
-    expect(sql.replace(/\s+/g, " ")).toContain("FROM bg_tournament_registrations r WHERE r.team_id IN (?, ?)");
-    expect(params).toEqual([7, 7, 7, 7, 7, 7, 21, 22]);
+    expect(execute.mock.calls[1][0]).toBe(execute.mock.calls[2][0]);
+    expect(execute.mock.calls[1][0].replace(/\s+/g, " ")).toContain("WHERE r.team_id = ?");
+    expect(execute.mock.calls[0][0]).not.toContain("IN (");
   });
 });

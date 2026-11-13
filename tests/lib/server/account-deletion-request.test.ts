@@ -49,6 +49,7 @@ jest.mock("@/lib/server/users/deleted-solo-entries", () => ({
   withdrawSoloRegistrationsOn: jest.fn(),
 }));
 
+import { readSource } from "../../helpers/read-source";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { holdAccountIdentity } from "@/lib/server/users/account-deletion-hold";
@@ -1287,6 +1288,40 @@ describe("requestAccountDeletion — EF-62 (aperçu confirmé, tournois synchron
     await requestAccountDeletion(7);
 
     expect(listNamingTournamentIds).toHaveBeenCalledWith(expect.anything(), 7, [3]);
+  });
+});
+
+describe("requestAccountDeletion — EF-62 revue sécurité cycle 1", () => {
+  it("requestAccountDeletion_previewFails_proceedsWithoutComparison", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadAccountTrace).mockRejectedValueOnce(new Error("DB_DOWN"));
+    fakeDb({});
+
+    const outcome = await requestAccountDeletion(7, { confirmedReason: "TOURNAMENTS" });
+
+    expect(outcome).toHaveProperty("finalAt");
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  it("requestAccountDeletion_previewFoundSuccessor_noSecondScanBeforeLocks", async () => {
+    jest.mocked(loadAccountTrace).mockResolvedValue({ ...NO_TRACE, organizedTournaments: true });
+    const { queries } = fakeDb({ organized: [11], organizerSuccessor: 21 });
+
+    await requestAccountDeletion(7, { confirmedReason: null });
+
+    const fullScans = queries.filter((q) => q.sql.startsWith("SELECT u.id FROM bg_users u") && !q.sql.includes("AND u.id = ?"));
+    expect(fullScans).toHaveLength(1);
+  });
+
+  it("requestAccountDeletion_traceRead_beforeFollowUps", () => {
+    const source = readSource("lib/server/users/account-deletion-request.ts");
+    const body = source.slice(source.indexOf("export async function requestAccountDeletion("));
+
+    expect(body.indexOf("accountDeletionPlan(await loadAccountTrace(db, userId))")).toBeGreaterThan(0);
+    expect(body.indexOf("accountDeletionPlan(await loadAccountTrace(db, userId))")).toBeLessThan(
+      body.indexOf("await afterDeletionRequest(userId, {"),
+    );
   });
 });
 

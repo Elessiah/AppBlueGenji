@@ -34,11 +34,14 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
   // Trié ici aussi, sans se fier au seul `ORDER BY` : la recherche
   // dichotomique (`sortedIdsInclude`) en dépend.
   const ids = rows.map((row) => Number(row.id)).sort((a, b) => a - b);
-  if (ids.length <= PROFILELESS_PLAYERS_MAX) return ids;
-  console.warn(
-    `[profileless-players] ${ids.length} comptes sans fiche : liste tronquée à ${PROFILELESS_PLAYERS_MAX}.`,
-  );
-  return ids.slice(0, PROFILELESS_PLAYERS_MAX);
+  // Gardée entière côté serveur (fiche, annuaire, accueil) ; seule la copie
+  // envoyée au navigateur est tronquée (`loadProfilelessPlayerIdsForClient`).
+  if (ids.length > PROFILELESS_PLAYERS_MAX) {
+    console.warn(
+      `[profileless-players] ${ids.length} comptes sans fiche : liste envoyée au navigateur tronquée à ${PROFILELESS_PLAYERS_MAX}.`,
+    );
+  }
+  return ids;
 }
 
 /**
@@ -50,13 +53,17 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
  * laisse sa fiche, sous pseudo d'emprunt, au plus cette même durée.
  */
 export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
+// Cache d'un seul processus : le site tourne en un processus pm2
+// (`REALTIME_REFRESH.md`, flux SSE en mémoire), où chaque invalidation porte.
+// Passer à plusieurs instances demanderait d'y diffuser l'invalidation.
 
 /**
- * Au-delà, la liste est tronquée (les plus récents d'abord retranchés) : elle
- * voyage dans la charge de **chaque** page d'un visiteur connecté, et nul ne
- * l'élague. Un lien au-delà mène au pire à une fiche 404, comme sur une panne
- * de lecture ; un avertissement le dit, pour qu'on revoie la forme de la liste
- * avant d'y arriver.
+ * Au-delà, la copie envoyée au navigateur est tronquée (les plus récents
+ * d'abord retranchés) : elle voyage dans la charge de **chaque** page d'un
+ * visiteur connecté. Un lien au-delà mène au pire à une fiche 404, comme sur
+ * une panne de lecture ; un avertissement le dit, pour qu'on revoie la forme
+ * de la liste avant d'y arriver. Les décisions du serveur (la fiche elle-même,
+ * l'annuaire) lisent la liste entière : la troncature ne rouvre aucune fiche.
  */
 export const PROFILELESS_PLAYERS_MAX = 20_000;
 
@@ -93,6 +100,16 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
     }
     return [];
   }
+}
+
+/**
+ * La liste telle qu'elle part au navigateur (mise en page racine, relecture
+ * `/api/players/profileless`) : tronquée à {@link PROFILELESS_PLAYERS_MAX}.
+ * Ne lève jamais.
+ */
+export async function loadProfilelessPlayerIdsForClient(): Promise<number[]> {
+  const ids = await loadProfilelessPlayerIds();
+  return ids.length <= PROFILELESS_PLAYERS_MAX ? ids : ids.slice(0, PROFILELESS_PLAYERS_MAX);
 }
 
 /** Levée pendant le délai de grâce qui suit une panne de lecture (rien n'est relancé). */

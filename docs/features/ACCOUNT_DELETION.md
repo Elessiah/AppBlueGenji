@@ -1222,7 +1222,7 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
   le cache ; pendant `PROFILELESS_FAILURE_BACKOFF_MS` (15 s) la dernière liste
   connue (conservée une heure) est servie, ou rien n'est demandé (une ligne de
   journal par panne). Plafond `PROFILELESS_PLAYERS_MAX` (20 000, avertissement
-  au-delà : un lien en trop mène à une 404). La clé de cache est déclarée en tête
+  au-delà, copie du navigateur seulement : un lien en trop mène à une 404). La clé de cache est déclarée en tête
   de `ranking-cache.ts`. Côté client, un essai en échec attend
   `PROFILELESS_RETRY_MS` (15 s) au lieu de repartir à chaque page.
 - **Coup d'envoi tardif** : `startDueTournaments` (`tournament-start-sync.ts`)
@@ -1241,3 +1241,26 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
   et par processus.
 - **Demande et réactivation** : le relevé des tournois qui nomment le compte part
   en parallèle de la suite ; la réactivation lit ses deux listes ensemble.
+
+## Revue sécurité (EF-62, cycle 1)
+
+- **Plafond de la liste sans fiche** : seule la copie envoyée au navigateur
+  (`loadProfilelessPlayerIdsForClient` : mise en page racine,
+  `/api/players/profileless`) est tronquée à `PROFILELESS_PLAYERS_MAX` ; la
+  fiche, l'annuaire, l'accueil et la redirection d'équipe solo lisent la liste
+  entière — la troncature ne rouvre aucune fiche. Cache d'un seul processus
+  (le site tourne en un processus pm2).
+- **Motif rendu par la demande** : les traces se relisent après le commit et le
+  journal mais **avant** les suites, dont les forfaits en tâche de fond
+  compteraient comme des matchs joués.
+- **Aperçu confirmé** : une panne de sa relecture ne suspend pas la demande (la
+  comparaison est sautée) ; le repreneur qu'il a trouvé sert d'indice à la
+  transaction (un seul balayage de `bg_users`).
+- `syncOpenSoloTournamentsOn` vit dans `tournament-start-sync.ts`, partagé par
+  la demande et la suppression définitive ; `listNamingTournamentIds` lit les
+  équipes quittées par une requête de forme fixe par équipe ; le relevé complet
+  horaire ne relit pas son marqueur ; une relecture client identique ne
+  re-rend pas les liens (`sameIds`).
+- La liste compte aussi les comptes en attente (leur fiche répond 404 pendant
+  les trente jours) : la question de son exposition reste une décision ouverte
+  dans `ERREUR.txt`.

@@ -70,4 +70,13 @@ describe("reconcileStaleFullScan", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
   });
+  // Revue sécurité cycle 1 : le marqueur n'est lu qu'une fois par relevé.
+  it("reconcileStaleFullScan_markerStale_readsMarkerOnce", async () => {
+    const execute = mockDb(false);
+
+    await reconcileStaleFullScan();
+
+    const markerReads = execute.mock.calls.filter(([q]) => String(q).includes("SELECT 1 FROM bg_settings"));
+    expect(markerReads).toHaveLength(1);
+  });
 });

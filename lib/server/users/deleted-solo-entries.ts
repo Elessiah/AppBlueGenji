@@ -7,11 +7,10 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { soloRegistrationsWithdrawnOnRequest, type SoloRegistrationFact } from "@/lib/shared/account-deletion";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { withdrawRegistrationOn } from "@/lib/server/tournaments/registration-removal";
-import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./account-deletion";
-import { startDueTournaments } from "./tournament-start-sync";
+import { startDueTournaments, syncOpenSoloTournamentsOn } from "./tournament-start-sync";
 import { failureReason } from "@/lib/server/failure-reason";
 
 /*
@@ -114,29 +113,8 @@ export function resetSettleIdleForTests(): void {
 /** Une inscription retirée par la suppression du compte. */
 export type DeletionWithdrawal = { tournamentId: number; teamId: number };
 
-/**
- * Remet à l'heure, sur la transaction de l'appelant (qui tient déjà leur ligne,
- * et celle du compte), les tournois pas encore commencés de l'entrée solo
- * (`syncTournamentState`). Sans cela, un tournoi dont l'heure de début est
- * passée sans que personne ait ouvert sa page restait `UPCOMING` ou
- * `REGISTRATION` en base : son inscription n'était ni retirée (la fenêtre de
- * retrait la refusait, le coup d'envoi étant passé) ni forfaitée (le tournoi
- * n'était pas `RUNNING`), et elle retenait la ligne au jour 30. Synchronisé, il
- * passe en cours, ses matchs naissent, et l'entrée est forfaitée comme dans
- * tout tournoi en cours. Les lignes de journal que la synchronisation réserve
- * partent avec le commit de l'appelant (`flushBotLogs`). Rend les tournois
- * dont l'état a changé : leurs lecteurs sont à prévenir après le commit.
- */
-export async function syncOpenSoloTournamentsOn(
-  connection: PoolConnection,
-  tournamentIds: readonly number[],
-): Promise<number[]> {
-  const changed: number[] = [];
-  for (const tournamentId of tournamentIds) {
-    if ((await syncTournamentState(connection, tournamentId)).stateChanged) changed.push(tournamentId);
-  }
-  return changed;
-}
+/** Partagé avec la suppression définitive (`tournament-start-sync.ts`). */
+export { syncOpenSoloTournamentsOn };
 
 /**
  * Retire, sur la transaction de l'appelant (qui tient déjà la ligne de chacun

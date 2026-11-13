@@ -361,6 +361,17 @@ async function handOverOrganizedTournaments(
  * repose la question sous verrou.
  */
 export async function getAccountDeletionRequestPlan(userId: number): Promise<AccountDeletionPlan> {
+  return (await previewDeletionRequest(userId)).plan;
+}
+
+/**
+ * L'aperçu, et le repreneur qu'il a trouvé (`null` si aucun, `undefined` si
+ * le compte n'organise rien) : la demande confirmée le reprend comme indice
+ * plutôt que de rebalayer `bg_users`.
+ */
+async function previewDeletionRequest(
+  userId: number,
+): Promise<{ plan: AccountDeletionPlan; successor: number | null | undefined }> {
   const db = await getDatabase();
   const trace = await loadAccountTrace(db, userId);
   const registrations = trace.soloRegistrations ? await loadSoloRegistrations(db, userId) : [];
@@ -368,13 +379,14 @@ export async function getAccountDeletionRequestPlan(userId: number): Promise<Acc
     registrations,
     new Set(registrations.map((registration) => registration.tournamentId)),
   );
-  const organized = trace.organizedTournaments && (await findOrganizerSuccessor(db, userId)) === null;
-  return accountDeletionPlan({
+  const successor = trace.organizedTournaments ? await findOrganizerSuccessor(db, userId) : undefined;
+  const plan = accountDeletionPlan({
     ...trace,
     soloRegistrations: registrations.length > withdrawn.length,
-    organizedTournaments: organized,
+    organizedTournaments: trace.organizedTournaments && successor === null,
     ownedTeams: false,
   });
+  return { plan, successor };
 }
 
 /** Ce que la demande a changé, à diffuser une fois la transaction validée. */
@@ -574,9 +586,22 @@ export async function requestAccountDeletion(
   } = {},
 ): Promise<AccountDeletionRequestOutcome> {
   let confirmedPlan: AccountDeletionPlan | null = null;
+  // Repreneur trouvé par l'aperçu : réutilisé comme indice (relu sous verrou).
+  let previewSuccessor: number | null = null;
   if (options.confirmedReason !== undefined) {
-    confirmedPlan = await getAccountDeletionRequestPlan(userId);
-    if (confirmedPlan.reason !== options.confirmedReason) throw new Error(ACCOUNT_DELETION_PLAN_CHANGED);
+    // Une panne de cette relecture ne suspend pas la demande (supprimer son
+    // compte est un droit) : la comparaison est sautée, la demande suit.
+    let preview: Awaited<ReturnType<typeof previewDeletionRequest>> | null = null;
+    try {
+      preview = await previewDeletionRequest(userId);
+    } catch (error) {
+      console.error("[account-deletion] aperçu non relu avant la demande", failureReason(error));
+    }
+    if (preview !== null) {
+      if (preview.plan.reason !== options.confirmedReason) throw new Error(ACCOUNT_DELETION_PLAN_CHANGED);
+      confirmedPlan = preview.plan;
+      previewSuccessor = preview.successor ?? null;
+    }
   }
   const db = await getDatabase();
   let soloEntryTournaments: number[] = [];
@@ -611,7 +636,9 @@ export async function requestAccountDeletion(
     );
     // Le repreneur se cherche hors verrous (balayage de `bg_users`) ; la
     // transaction ne fait que le relire par sa clé.
-    const successorHint = organizedIds.length > 0 ? await findOrganizerSuccessor(db, userId) : null;
+    // Celui de l'aperçu confirmé, s'il en a trouvé un, évite un second balayage.
+    let successorHint: number | null = null;
+    if (organizedIds.length > 0) successorHint = previewSuccessor ?? (await findOrganizerSuccessor(db, userId));
     // Le coup d'envoi tardif d'un tournoi se donne avant la transaction, sous le
     // seul verrou du tournoi : dedans, il le ferait sous celui du compte
     // (`startDueTournaments`). La synchronisation plus bas reste le filet.
@@ -649,6 +676,8 @@ export async function requestAccountDeletion(
       // Pas au rejeu d'une restauration : synchroniser lancerait des tournois
       // et posterait leurs annonces pendant la remise en état (la passe
       // horaire s'en charge une fois le site rouvert).
+      // Les tournois remis à l'heure n'ont pas à être retenus : tous ceux de
+      // l'entrée solo sont rediffusés après le commit (`soloTournaments`).
       if (!replay) {
         await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
       }
@@ -749,6 +778,18 @@ export async function requestAccountDeletion(
     pending: true,
     ...(requestedAtRaw === undefined ? {} : { requestedAt: requestedAtRaw }),
   });
+  // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues
+  // après le commit et le journal, hors des verrous de tournois et d'équipes,
+  // mais **avant** les suites — les forfaits qu'elles lancent en tâche de fond
+  // compteraient comme des matchs joués, et le motif rendu dépendrait de leur
+  // vitesse. Une panne ici ne change pas la demande faite en échec : le plan
+  // confirmé la remplace, ou l'écran garde son aperçu.
+  let plan: Partial<AccountDeletionPlan> = confirmedPlan ?? {};
+  try {
+    plan = accountDeletionPlan(await loadAccountTrace(db, userId));
+  } catch (error) {
+    console.error("[account-deletion] traces non relues après la demande", failureReason(error));
+  }
   await afterDeletionRequest(userId, {
     withdrawn,
     forfeitable,
@@ -760,16 +801,5 @@ export async function requestAccountDeletion(
     replay,
   });
 
-  // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues
-  // après le commit, le journal et les suites, hors des verrous de tournois et
-  // d'équipes. Le compte est déjà en attente, rien de ce qu'elles relèvent ne
-  // bouge plus de son fait. Une panne ici ne change pas la demande faite en
-  // échec : le plan confirmé la remplace, ou l'écran garde son aperçu.
-  let plan: Partial<AccountDeletionPlan> = confirmedPlan ?? {};
-  try {
-    plan = accountDeletionPlan(await loadAccountTrace(db, userId));
-  } catch (error) {
-    console.error("[account-deletion] traces non relues après la demande", failureReason(error));
-  }
   return { ...plan, finalAt: reactivationDeadline(stampedAt).toISOString() };
 }

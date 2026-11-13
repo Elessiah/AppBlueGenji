@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
-import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_PLAYERS_MAX, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
+import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, loadProfilelessPlayerIdsForClient, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_PLAYERS_MAX, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
@@ -285,7 +285,7 @@ describe("branchements D13", () => {
 
   it("layout_signedInVisitor_providesProfilelessPlayers", () => {
     const layout = readSource("app/layout.tsx");
-    expect(layout).toContain("user ? loadProfilelessPlayerIds() : Promise.resolve(NO_PROFILELESS_PLAYERS)");
+    expect(layout).toContain("user ? loadProfilelessPlayerIdsForClient() : Promise.resolve(NO_PROFILELESS_PLAYERS)");
     expect(layout).toContain("<ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>");
   });
 });
@@ -342,15 +342,32 @@ describe("loadProfilelessPlayerIds — panne de lecture (EF-62, revue performanc
     now.mockRestore();
   });
 
-  it("loadProfilelessPlayerIds_overCap_truncatedWithWarning", async () => {
+  // Revue sécurité EF-62 cycle 1 : seule la copie du navigateur est tronquée.
+  it("loadProfilelessPlayerIds_overCap_keepsFullListAndWarns", async () => {
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
     mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
 
     const ids = await loadProfilelessPlayerIds();
 
+    expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX + 3);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadProfilelessPlayerIdsForClient_overCap_truncatedToMax", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
+
+    const ids = await loadProfilelessPlayerIdsForClient();
+
     expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX);
     expect(ids[ids.length - 1]).toBe(PROFILELESS_PLAYERS_MAX);
-    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("anonymizedAccountHasNoPage_idBeyondClientCap_returnsTrue", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
+
+    expect(await anonymizedAccountHasNoPage(PROFILELESS_PLAYERS_MAX + 2)).toBe(true);
   });
 
   it("anonymizedAccountHasNoPage_duringBackoff_readsTheAccountAloneWithoutLogSpam", async () => {

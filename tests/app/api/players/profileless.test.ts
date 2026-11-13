@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { GET } from "@/app/api/players/profileless/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit } from "@/lib/server/api-guard";
-import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
+import { loadProfilelessPlayerIdsForClient } from "@/lib/server/users/profileless-players";
 import { authUser } from "../../../helpers/auth-user";
 
 /** Relecture des comptes sans fiche à la navigation client (EF-62) : connecté seulement. */
@@ -19,7 +19,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(enforceRateLimit).mockReturnValue(null);
-  jest.mocked(loadProfilelessPlayerIds).mockResolvedValue([3, 8]);
+  jest.mocked(loadProfilelessPlayerIdsForClient).mockResolvedValue([3, 8]);
 });
 
 describe("GET /api/players/profileless", () => {
@@ -29,7 +29,7 @@ describe("GET /api/players/profileless", () => {
     const res = await GET();
 
     expect(res.status).toBe(401);
-    expect(loadProfilelessPlayerIds).not.toHaveBeenCalled();
+    expect(loadProfilelessPlayerIdsForClient).not.toHaveBeenCalled();
   });
 
   it("GET_signedIn_returnsIds", async () => {
@@ -45,6 +45,6 @@ describe("GET /api/players/profileless", () => {
     const res = await GET();
 
     expect(res.status).toBe(429);
-    expect(loadProfilelessPlayerIds).not.toHaveBeenCalled();
+    expect(loadProfilelessPlayerIdsForClient).not.toHaveBeenCalled();
   });
 });
