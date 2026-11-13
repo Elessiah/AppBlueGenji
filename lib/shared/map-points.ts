@@ -15,6 +15,7 @@
  */
 import { roundKeyId, type RoundKey } from "./round-maps";
 import { matchWinsRequired, type MatchFormat } from "./match-format";
+import type { PhaseFormat, TournamentFormat } from "./types";
 
 /** Bornes de N, partagées par le formulaire et le garde-fou serveur. */
 export const MAP_POINT_TARGET_MIN = 1;
@@ -56,6 +57,20 @@ export function effectiveMapPointTarget(
 ): number | null {
   if (tournamentTarget === null || tournamentTarget === undefined) return null;
   return roundPointTargetOf(roundTargets, round) ?? tournamentTarget;
+}
+
+/**
+ * Tableau (`bracket`) qu'un format peut jouer : `UPPER` partout, `LOWER` et
+ * `GRAND` en double élimination seulement, la petite finale (`THIRD_PLACE`) en
+ * élimination simple et dans l'arbre final de BlueGenji Survie. Garde-fou de la
+ * pose des points d'un tour : une clé que le format ne jouera jamais n'est
+ * pas écrite (ligne orpheline portée par chaque instantané).
+ */
+export function bracketFitsFormat(format: TournamentFormat | PhaseFormat, bracket: string): boolean {
+  if (bracket === "UPPER") return true;
+  if (bracket === "LOWER" || bracket === "GRAND") return format === "DOUBLE";
+  if (bracket === "THIRD_PLACE") return format === "SINGLE" || format === "BG_SURVIE";
+  return false;
 }
 
 /** N réglé sur un tour (`null` = il suit le tournoi). */
@@ -122,4 +137,19 @@ export function singleMapDisplayScore(
   if (match.maps.length !== 1) return null;
   const [map] = match.maps;
   return { team1: map.team1Score, team2: map.team2Score };
+}
+
+/**
+ * Score d'un match **tel qu'un écran le cite** : celui de la carte sur un match
+ * à une seule carte (`displayScore` de l'instantané, 5–3), sinon celui du match.
+ * Écrit une fois pour l'arbre, la modale d'arbitrage et le retour en arrière :
+ * le même match ne se lit pas 5–3 ici et 1–0 là.
+ */
+export function shownMatchScore(match: {
+  team1Score: number | null;
+  team2Score: number | null;
+  displayScore?: DisplayScore | null;
+}): { team1: number | null; team2: number | null } {
+  const shown = match.displayScore ?? null;
+  return shown ? { team1: shown.team1, team2: shown.team2 } : { team1: match.team1Score, team2: match.team2Score };
 }

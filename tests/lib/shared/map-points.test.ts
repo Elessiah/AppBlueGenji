@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  bracketFitsFormat,
+  shownMatchScore,
   singleMapDisplayScore,
   DEFAULT_MAP_POINT_TARGET,
   MAP_POINT_TARGET_MAX,
@@ -160,5 +162,53 @@ describe("singleMapDisplayScore", () => {
 
   it("singleMapDisplayScore_noScorePosted_returnsNull", () => {
     expect(singleMapDisplayScore({ ...played, team1Score: null, team2Score: null }, BO1)).toBeNull();
+  });
+});
+
+describe("bracketFitsFormat", () => {
+  it("bracketFitsFormat_upperAnyFormat_true", () => {
+    expect(bracketFitsFormat("SWISS", "UPPER")).toBe(true);
+  });
+
+  it("bracketFitsFormat_lowerInDouble_true", () => {
+    expect(bracketFitsFormat("DOUBLE", "LOWER")).toBe(true);
+  });
+
+  it("bracketFitsFormat_grandInDouble_true", () => {
+    expect(bracketFitsFormat("DOUBLE", "GRAND")).toBe(true);
+  });
+
+  it("bracketFitsFormat_lowerOutsideDouble_false", () => {
+    expect(bracketFitsFormat("SINGLE", "LOWER")).toBe(false);
+  });
+
+  it("bracketFitsFormat_thirdPlaceInSingle_true", () => {
+    expect(bracketFitsFormat("SINGLE", "THIRD_PLACE")).toBe(true);
+  });
+
+  it("bracketFitsFormat_thirdPlaceInBgSurvie_true", () => {
+    expect(bracketFitsFormat("BG_SURVIE", "THIRD_PLACE")).toBe(true);
+  });
+
+  it("bracketFitsFormat_thirdPlaceInDouble_false", () => {
+    expect(bracketFitsFormat("DOUBLE", "THIRD_PLACE")).toBe(false);
+  });
+
+  it("bracketFitsFormat_unknownBracket_false", () => {
+    expect(bracketFitsFormat("DOUBLE", "SIDE")).toBe(false);
+  });
+});
+
+describe("shownMatchScore", () => {
+  it("shownMatchScore_withDisplayScore_returnsMapScore", () => {
+    const actual = shownMatchScore({ team1Score: 1, team2Score: 0, displayScore: { team1: 5, team2: 3 } });
+
+    expect(actual).toEqual({ team1: 5, team2: 3 });
+  });
+
+  it("shownMatchScore_withoutDisplayScore_returnsMatchScore", () => {
+    const actual = shownMatchScore({ team1Score: 2, team2Score: null });
+
+    expect(actual).toEqual({ team1: 2, team2: null });
   });
 });

@@ -328,7 +328,7 @@ describe("détail map par map — lecteur sans droit de report", () => {
     const fn = dialog.slice(dialog.indexOf("function theirsPendingStatus("));
     expect(fn.indexOf("if (!reader.canReport) return")).toBeGreaterThan(0);
     expect(fn.indexOf("if (!reader.canReport) return")).toBeLessThan(fn.indexOf('"score.player.theirs.withoutMaps"'));
-    expect(dialog).toContain("theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading })");
+    expect(dialog).toMatch(/theirsPendingStatus\(text, \{ opponentName, myName \}, view\.theirs!, \{\s*canReport: canReportScore,\s*detailLoading,/);
   });
 });
 
@@ -537,5 +537,19 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
     expect(form).not.toContain("JSON.stringify(matchFormat)");
     expect(form).toContain("rules !== synced.rules");
     expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
+  });
+});
+
+describe("format Duel / Arcade — refus des points rattaché à un champ rendu", () => {
+  it("DuelArcadeField_unchecked_errorAttachedToTheCheckbox", () => {
+    const field = readSource("app/(secured)/tournois/_components/DuelArcadeField.tsx");
+    expect(field).toContain("const errorFieldId = checked ? MAP_POINT_TARGET_FIELD_ID : DUEL_ARCADE_FIELD_ID;");
+    expect(field).toContain("<FieldErrorText fieldId={errorFieldId} message={error} />");
+    expect(field).toContain('aria-invalid={checked ? undefined : aria["aria-invalid"]}');
+  });
+
+  it("TournamentForm_duelOff_pointsRefusalTargetsTheCheckbox", () => {
+    const form = readSource("app/(secured)/tournois/_components/TournamentForm.tsx");
+    expect(form).toContain("values.duelArcade ? FIELD_IDS : { ...FIELD_IDS, mapPointTarget: DUEL_ARCADE_FIELD_ID }");
   });
 });

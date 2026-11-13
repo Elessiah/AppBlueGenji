@@ -252,12 +252,6 @@ export async function loadEditableTournament(
 }
 
 /**
- * Applique un patch d'édition. Rend le nom du tournoi **d'avant** et celui
- * qu'il vient d'écrire, lus sous le verrou de la ligne : le journal du staff
- * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
- * suit avant que sa ligne parte.
- */
-/**
  * Points par carte changés : refusé si un match du tournoi porte déjà un score
  * (`MAP_POINTS_LOCKED`) — garde-fou, la fenêtre d'édition se ferme en principe
  * avant le premier match (`docs/features/DUEL_ARCADE.md`).
@@ -271,6 +265,38 @@ async function assertPointTargetChangeAllowed(
   if (after !== before) await assertMapPointsUnlocked(connection, tournamentId, null);
 }
 
+/**
+ * Format Duel / Arcade éteint : les points propres aux tours partent avec lui.
+ * Gardés, ils resurgiraient sans que l'écran des cartes les montre (il ne les
+ * règle que format allumé) le jour où le format serait rallumé avec un autre
+ * N. Le contrôle `MAP_POINTS_LOCKED` sur tout le tournoi a déjà eu lieu, sous
+ * le verrou du tournoi. Une ligne qui ne portait que ces points disparaît.
+ */
+async function clearRoundPointTargetsIfTurnedOff(
+  connection: PoolConnection,
+  tournamentId: number,
+  before: number | null,
+  after: number | null,
+): Promise<void> {
+  if (after !== null || before === null) return;
+  await connection.execute(
+    `UPDATE bg_tournament_round_maps SET map_point_target = NULL
+      WHERE tournament_id = ? AND map_point_target IS NOT NULL`,
+    [tournamentId],
+  );
+  await connection.execute(
+    `DELETE FROM bg_tournament_round_maps
+      WHERE tournament_id = ? AND slots_json = '[]' AND tiebreak_map IS NULL AND map_point_target IS NULL`,
+    [tournamentId],
+  );
+}
+
+/**
+ * Applique un patch d'édition. Rend le nom du tournoi **d'avant** et celui
+ * qu'il vient d'écrire, lus sous le verrou de la ligne : le journal du staff
+ * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
+ * suit avant que sa ligne parte.
+ */
 export async function updateTournament(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
@@ -372,6 +398,7 @@ export async function updateTournament(
         tournamentId,
       ],
     );
+    await clearRoundPointTargetsIfTurnedOff(connection, tournamentId, current.mapPointTarget, valid.mapPointTarget);
 
     // Les phases ne sont reposées à neuf que si le patch les concerne — soit
     // directement, soit par un changement de format qui les rend caduques.

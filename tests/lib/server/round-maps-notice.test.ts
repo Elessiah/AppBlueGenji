@@ -133,6 +133,14 @@ describe("queueRoundMapsNotice", () => {
     expect(storedRounds(connection)).toEqual([...full, { more: 3 }]);
   });
 
+  it("queueRoundMapsNotice_pointsOnly_flaggedAndKeptApartFromMapsAndTiebreak", async () => {
+    const connection = queueWith([{ rounds_json: JSON.stringify([R2, { ...R2, tiebreak: true }]) }]);
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [R2], { points: true });
+
+    expect(storedRounds(connection)).toEqual([R2, { ...R2, tiebreak: true }, { ...R2, points: true }]);
+  });
+
   it("queueRoundMapsNotice_tiebreakOnly_flaggedAndKeptApartFromTheRoundMaps", async () => {
     const connection = queueWith([{ rounds_json: JSON.stringify([R2]) }]);
 
@@ -204,6 +212,24 @@ describe("dispatchDueRoundMapsNotices", () => {
     const line = String(jest.mocked(sendBotLog).mock.calls[0][0]);
     expect(line).toContain("(2 manches)");
     expect(line).toContain("(map de départage)");
+  });
+
+  it("dispatchDueRoundMapsNotices_pointsOnlyChange_saysPointsPerMap", async () => {
+    pool([dueRow([{ ...R2, points: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("(points par carte)");
+  });
+
+  it("dispatchDueRoundMapsNotices_mapsAndPointsOfSameRound_bothListed", async () => {
+    pool([dueRow([R2, { ...R2, points: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    const line = String(jest.mocked(sendBotLog).mock.calls[0][0]);
+    expect(line).toContain("(2 manches)");
+    expect(line).toContain("(points par carte)");
   });
 
   it("dispatchDueRoundMapsNotices_storedOverflow_countedInTheSummary", async () => {
@@ -589,6 +615,20 @@ describe("dispatchDueRoundMapsNotices — tours revenus à l'identique", () => {
     await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
 
     expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueRoundMapsNotices_pointsBackToTheirBeforeValue_sendsNothing", async () => {
+    poolWithMaps([dueRow([{ ...R2, points: true, before: roundMapsFingerprint(5) }])], [{ ...mapsRow([]), map_point_target: 5 }]);
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueRoundMapsNotices_pointsStillChanged_sendsIt", async () => {
+    poolWithMaps([dueRow([{ ...R2, points: true, before: roundMapsFingerprint(null) }])], [{ ...mapsRow([]), map_point_target: 7 }]);
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
   });
 
   it("dispatchDueRoundMapsNotices_roundMapsUnreadable_sendsEveryRound", async () => {

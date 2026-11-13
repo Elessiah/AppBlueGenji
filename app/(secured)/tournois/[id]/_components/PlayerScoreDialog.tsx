@@ -13,7 +13,8 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { forfeitMapCount } from "@/lib/shared/match-format";
+import { forfeitMapCount, type MatchFormat } from "@/lib/shared/match-format";
+import { singleMapDisplayScore } from "@/lib/shared/map-points";
 import {
   checkMapList,
   mapFieldKey,
@@ -95,20 +96,35 @@ function reportsSignature(match: BracketMatch): string {
   return `${match.id}|${one(match.team1Report)}|${one(match.team2Report)}`;
 }
 
-function scoreText(report: MatchScoreReport): string {
-  return `${report.team1Score} – ${report.team2Score}`;
+/**
+ * Score d'une proposition tel que la modale le cite : celui de la carte (5 – 3)
+ * sur un match à une carte dont le détail est lu, comme l'arbre le montre
+ * (`singleMapDisplayScore`, `MAP_SCORES.md`) ; sinon celui du match (2 – 1).
+ */
+export function scoreText(report: MatchScoreReport, format: MatchFormat | null = null): string {
+  const single = singleMapDisplayScore({ ...report, forfeitTeamId: null }, format);
+  const shown = single ?? { team1: report.team1Score, team2: report.team2Score };
+  return `${shown.team1} – ${shown.team2}`;
 }
 
 /**
  * Phrase du désaccord. À score égal, ce sont les maps qui diffèrent (codes de
  * replay ou scores de map, `MAP_SCORES.md`) : le dire, sans quoi « toi : 2 – 1,
- * eux : 2 – 1 » n'expliquerait rien.
+ * eux : 2 – 1 » n'expliquerait rien. Sur un match à une carte, le score cité
+ * est celui de la carte (`scoreText`) : « 5 – 3 contre 5 – 4 » dit l'écart.
  */
-function conflictText(text: TournamentDialogsText, mine: MatchScoreReport, theirs: MatchScoreReport, opponentName: string): string {
-  const sameScore = mine.team1Score === theirs.team1Score && mine.team2Score === theirs.team2Score;
-  return sameScore
-    ? text.t("score.player.conflictMaps", { score: scoreText(mine), opponent: opponentName })
-    : text.t("score.player.conflictScores", { mine: scoreText(mine), opponent: opponentName, theirs: scoreText(theirs) });
+export function conflictText(
+  text: TournamentDialogsText,
+  mine: MatchScoreReport,
+  theirs: MatchScoreReport,
+  opponentName: string,
+  format: MatchFormat | null = null,
+): string {
+  const mineText = scoreText(mine, format);
+  const theirsText = scoreText(theirs, format);
+  return mineText === theirsText
+    ? text.t("score.player.conflictMaps", { score: mineText, opponent: opponentName })
+    : text.t("score.player.conflictScores", { mine: mineText, opponent: opponentName, theirs: theirsText });
 }
 
 
@@ -186,9 +202,9 @@ function theirsPendingStatus(
   text: TournamentDialogsText,
   names: { opponentName: string; myName: string },
   theirs: MatchScoreReport,
-  reader: { canReport: boolean; detailLoading: boolean },
+  reader: { canReport: boolean; detailLoading: boolean; format?: MatchFormat | null },
 ): string {
-  const values = { opponent: names.opponentName, score: scoreText(theirs), mine: names.myName };
+  const values = { opponent: names.opponentName, score: scoreText(theirs, reader.format ?? null), mine: names.myName };
   // Qui ne peut pas reporter ne reçoit jamais le détail (`matchProposals`) :
   // rien à confirmer ni à ressaisir de son côté, et rien à dire du détail.
   if (!reader.canReport) return text.t("score.player.theirs.readOnly", values);
@@ -307,9 +323,10 @@ export function diffZoneTitle(
   differs: boolean,
   opponentName: string,
   theirs: MatchScoreReport | null,
+  format: MatchFormat | null = null,
 ): string {
   if (differs) return text.t("score.player.diff.title", { opponent: opponentName });
-  return text.t("score.player.diff.titleTheirs", { opponent: opponentName, score: theirs ? scoreText(theirs) : "" });
+  return text.t("score.player.diff.titleTheirs", { opponent: opponentName, score: theirs ? scoreText(theirs, format) : "" });
 }
 
 /**
@@ -661,12 +678,16 @@ export function PlayerScoreDialog({
     if (!view) return null;
     switch (view.phase) {
       case "MINE_PENDING": {
-        const mine = { score: scoreText(view.mine!), opponent: opponentName };
+        const mine = { score: scoreText(view.mine!, matchFormat), opponent: opponentName };
         if (autoValidationPaused) return `${t("score.player.minePending", mine)} ${t("score.player.autoValidatePaused")}`;
         return deadline ? t("score.player.minePendingDeadline", { ...mine, deadline }) : t("score.player.minePending", mine);
       }
       case "THEIRS_PENDING": {
-        const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+        const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, {
+          canReport: canReportScore,
+          detailLoading,
+          format: matchFormat,
+        });
         if (autoValidationPaused) return `${pending} ${t("score.player.autoValidatePaused")}`;
         return deadline ? `${pending} ${t("score.player.autoValidateAt", { deadline })}` : pending;
       }
@@ -674,7 +695,7 @@ export function PlayerScoreDialog({
       // par le flux s'annonce une fois, où que soit le focus — la région est
       // déjà montée (une proposition l'avait remplie).
       case "CONFLICT": {
-        const conflict = `${conflictText(text, view.mine!, view.theirs!, opponentName)} ${t("score.player.locked")}`;
+        const conflict = `${conflictText(text, view.mine!, view.theirs!, opponentName, matchFormat)} ${t("score.player.locked")}`;
         // Détail des propositions encore en lecture : les deux blocs de maps
         // n'ont rien à montrer — le dire, et dire quoi faire s'il n'arrive pas.
         return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;
@@ -849,7 +870,7 @@ export function PlayerScoreDialog({
             <fieldset className={styles.diffZone} aria-labelledby="player-score-diff-title">
               <InfoHintRow>
                 <p id="player-score-diff-title" className={mapStyles.proposalTitle}>
-                  {diffZoneTitle(text, differences.length > 0, opponentName, theirs)}
+                  {diffZoneTitle(text, differences.length > 0, opponentName, theirs, matchFormat)}
                 </p>
                 <InfoHint id="player-score-diff-help" subject={t("score.player.diff.hintSubject")}>
                   <p>{t("score.player.diff.hint", { opponent: opponentName })}</p>

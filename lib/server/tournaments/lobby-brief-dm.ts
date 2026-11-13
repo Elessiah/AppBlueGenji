@@ -91,6 +91,7 @@ type TournamentText = {
   firstBan: (first: string, then: string) => string;
   nextBans: Readonly<Record<NextBanRule, string>>;
   tiebreak: string;
+  pointTarget: (points: number) => string;
   /** Lignes du cast. */
   live: (url: string) => string;
   inviteCasters: string;
@@ -141,6 +142,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
         "Cartes suivantes : l'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
     },
     tiebreak: "Map de départage (jouée seulement si la série est à égalité après les maps régulières) : ",
+    pointTarget: (points) => `Format Duel / Arcade : chaque carte se gagne au premier à ${points} points.`,
     live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invite les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Préviens les casters inscrits (leurs contacts sont sur la page du match).",
@@ -185,6 +187,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
       WINNER: "Next maps: the team that won the previous map bans first; on a draw, same order as on the previous map.",
     },
     tiebreak: "Tiebreak map (played only if the series is level after the regular maps): ",
+    pointTarget: (points) => `Duel / Arcade format: each map is won by the first to ${points} points.`,
     live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",
@@ -331,6 +334,7 @@ function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Loc
     `* ${text.firstBan(names.ban, names.banNext)}`,
     `* ${text.nextBans[side.nextBan]}`,
     ...(side.tiebreakMap ? [`* ${text.tiebreak}${quote(side.tiebreakMap)}`] : []),
+    ...(side.pointTarget ? [`* ${text.pointTarget(side.pointTarget)}`] : []),
     ...(side.cast ? castBlock(side, locale) : []),
     "",
     text.scores,

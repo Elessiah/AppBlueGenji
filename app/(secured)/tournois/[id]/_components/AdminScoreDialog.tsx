@@ -1,6 +1,7 @@
 "use client";
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { shownMatchScore } from "@/lib/shared/map-points";
 import { useShownEntrantName } from "./EntrantName";
 import { matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
@@ -92,7 +93,9 @@ function storedResultLabel(text: TournamentDialogsText, match: BracketMatch, tea
   }
   if (match.team1Score === null && match.team2Score === null) return null;
 
-  const score = `${match.team1Score ?? 0} – ${match.team2Score ?? 0}`;
+  // Match sur une carte : le score de la carte, comme l'arbre (`shownMatchScore`).
+  const shown = shownMatchScore(match);
+  const score = `${shown.team1 ?? 0} – ${shown.team2 ?? 0}`;
   // Un nul est un résultat, pas une saisie en attente : le dire « non tranché »
   // enverrait l'arbitrage chercher un vainqueur qu'il n'y a pas.
   if (isMatchDrawn(match)) return t("score.admin.stored.draw", { score });

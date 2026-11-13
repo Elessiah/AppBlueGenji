@@ -175,7 +175,8 @@ messages Discord. Vu de l'engagée du destinataire :
   `resolveMatchMaps` : imposée, ou « à choisir parmi … »), sinon la seule
   première carte (« pas encore fixée » à défaut) ; puis l'ordre des bans de la
   carte 1 (l'équipe qui n'héberge pas d'abord, règle du tournoi), la règle des
-  cartes suivantes, et la map de départage s'il y en a une. Le bloc est borné
+  cartes suivantes, la map de départage s'il y en a une, et en format Duel / Arcade
+  les points qui gagnent une carte (`briefPointTarget`, `DUEL_ARCADE.md`). Le bloc est borné
   par `MAPS_LINE_MAX` (420) : au-delà, il s'arrête à un créneau entier et
   renvoie à la page du match — un message de plus de 2 000 caractères ne
   serait pas remis par Discord. Si des noms longs (équipes, tournoi, lien de

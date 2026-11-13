@@ -439,6 +439,25 @@ describe("updateTournament — format Duel / Arcade", () => {
     await expect(updateTournament(1, { mapPointTarget: 0 })).rejects.toThrow("INVALID_MAP_POINT_TARGET");
   });
 
+  it("updateTournament_duelTurnedOff_clearsRoundTargets", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5 });
+
+    await updateTournament(1, { mapPointTarget: null });
+
+    const clear = executed.find((q) => /UPDATE bg_tournament_round_maps SET map_point_target = NULL/.test(q.sql));
+    expect(clear!.params).toEqual([1]);
+    const remove = executed.find((q) => /DELETE FROM bg_tournament_round_maps/.test(q.sql));
+    expect(remove!.sql).toMatch(/slots_json = '\[\]' AND tiebreak_map IS NULL AND map_point_target IS NULL/);
+  });
+
+  it("updateTournament_duelKept_leavesRoundTargets", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5 });
+
+    await updateTournament(1, { mapPointTarget: 7 });
+
+    expect(executed.some((q) => /bg_tournament_round_maps/.test(q.sql))).toBe(false);
+  });
+
   it("loadEditableTournament_storedTarget_readsIt", async () => {
     rowToReturn = hiddenRow({ map_point_target: 5 });
 

@@ -38,7 +38,10 @@ export function DuelArcadeField({
   checked: boolean;
   target: number;
   locked: boolean;
-  /** `aria-describedby` / `aria-invalid` du champ des points (`useFieldErrors`). */
+  /**
+   * `aria-describedby` / `aria-invalid` du champ des points (`useFieldErrors`) ;
+   * décochée, ceux de la case, qui porte alors le refus.
+   */
   aria: FieldAria;
   error: string | null;
   onCheckedChange: (checked: boolean) => void;
@@ -46,6 +49,12 @@ export function DuelArcadeField({
   onTargetEdit: () => void;
 }>) {
   const { t } = useFormText();
+  // Décochée, le champ des points n'existe pas : un refus des points
+  // (`MAP_POINTS_LOCKED` en décochant sous un score) se rattache à la case.
+  const errorFieldId = checked ? MAP_POINT_TARGET_FIELD_ID : DUEL_ARCADE_FIELD_ID;
+  const checkboxDescribedBy = checked
+    ? DUEL_ARCADE_MORE_ID
+    : [aria["aria-describedby"], DUEL_ARCADE_MORE_ID].filter(Boolean).join(" ");
   return (
     <div style={FULL_WIDTH}>
       <div className="checkbox-card" style={{ ...CHECKBOX_CARD_LAYOUT, ...checkboxCardChrome(checked, locked) }}>
@@ -56,7 +65,8 @@ export function DuelArcadeField({
           disabled={locked}
           onChange={(e) => onCheckedChange(e.target.checked)}
           aria-labelledby="duel-arcade-label"
-          aria-describedby={DUEL_ARCADE_MORE_ID}
+          aria-describedby={checkboxDescribedBy}
+          aria-invalid={checked ? undefined : aria["aria-invalid"]}
           className="checkbox-card-input"
         />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -87,7 +97,7 @@ export function DuelArcadeField({
               />
             </div>
           )}
-          <FieldErrorText fieldId={MAP_POINT_TARGET_FIELD_ID} message={error} />
+          <FieldErrorText fieldId={errorFieldId} message={error} />
           <p id={MAP_POINT_TARGET_HINT_ID} style={{ ...HINT, margin: "4px 0 0" }}>
             {locked ? t("form.duelArcade.locked") : t("form.duelArcade.scope")}
           </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState, type ReactNode } from "react";
+import { shownMatchScore } from "@/lib/shared/map-points";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { richNodes } from "@/components/i18n/shell-text";
@@ -51,7 +52,9 @@ function scoreLabel(text: TournamentDialogsText, match: BracketMatch): string {
   // score saisi » cacherait qu'un résultat va être effacé.
   if (isMatchDoubleForfeit(match)) return text.t("rollback.doubleForfeit");
   if (match.team1Score === null && match.team2Score === null) return text.t("rollback.noScore");
-  const score = `${match.team1Score ?? "—"} – ${match.team2Score ?? "—"}`;
+  // Match sur une carte : le score de la carte, comme l'arbre (`shownMatchScore`).
+  const shown = shownMatchScore(match);
+  const score = `${shown.team1 ?? "—"} – ${shown.team2 ?? "—"}`;
   if (match.forfeitTeamId !== null) return text.t("rollback.forfeit", { score });
   if (isMatchDrawn(match)) return text.t("rollback.draw", { score });
   return score;

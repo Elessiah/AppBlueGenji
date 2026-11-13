@@ -16,6 +16,17 @@ export function matchRoundKey(match: { phase_id?: number | null; bracket: string
  * Points qui gagnent une carte d'un match de la manche `round`, le N du
  * tournoi étant déjà lu (`tournamentTarget`) : rien à relire quand le format
  * est éteint, sinon le réglage propre au tour s'il en a un.
+ *
+ * Le réglage du tour se lit en **lecture verrouillante** (`LOCK IN SHARE MODE`,
+ * syntaxe admise par MariaDB) : il reste modifiable en plein tournoi
+ * (`setRoundPointTarget`), et une saisie dont la transaction a déjà figé son
+ * image (lecture simple plus tôt, `REPEATABLE READ`) jugerait sinon le score
+ * sur l'ancienne valeur après avoir attendu le verrou du match — puis
+ * l'enregistrerait sous la nouvelle. La lecture verrouillante voit la valeur
+ * commitée ; l'ordre inverse (match puis réglage, contre tournoi puis matchs
+ * pour `setRoundPointTarget`) peut s'interbloquer, ce que `retryOnDeadlock`
+ * rejoue sur tous les chemins de saisie. Le N du tournoi, lui, n'est plus
+ * modifiable une fois des matchs créés (fenêtre `LOCKED`).
  */
 export async function loadMatchPointTarget(
   connection: PoolConnection,
@@ -27,7 +38,8 @@ export async function loadMatchPointTarget(
   if (target === null) return null;
   const [rows] = await connection.execute<(RowDataPacket & { map_point_target: number | null })[]>(
     `SELECT map_point_target FROM bg_tournament_round_maps
-      WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
+      WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1
+      LOCK IN SHARE MODE`,
     [tournamentId, round.phaseId, round.bracket, round.roundNumber],
   );
   const own = parseStoredMapPointTarget(rows[0]?.map_point_target);

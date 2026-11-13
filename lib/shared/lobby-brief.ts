@@ -76,6 +76,11 @@ export type LobbyBriefSide = {
   maps: ResolvedMapSlot[];
   /** Map de départage du tour (play-offs à format défini), `null` sans réglage. */
   tiebreakMap?: string | null;
+  /**
+   * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
+   * une carte de ce match (réglage du tour, sinon du tournoi), `null` format éteint.
+   */
+  pointTarget?: number | null;
   nextBan: NextBanRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;

@@ -1,4 +1,5 @@
 import type { BracketMatch } from "@/lib/shared/types";
+import { shownMatchScore } from "@/lib/shared/map-points";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /** Ce que la carte d'un match (`MatchRow`) affiche pour l'une de ses deux lignes. */
@@ -41,9 +42,6 @@ export function matchSideViews(
       emptyLabel: (roundNumber === 1 || roundNumber >= PLAYOFF_ROUND_OFFSET) && ownId === null && otherId !== null ? "BYE" : "TBD",
     };
   };
-  const shown = match.displayScore ?? null;
-  return [
-    side(match.team1Id, match.team2Id, shown ? shown.team1 : match.team1Score),
-    side(match.team2Id, match.team1Id, shown ? shown.team2 : match.team2Score),
-  ];
+  const shown = shownMatchScore(match);
+  return [side(match.team1Id, match.team2Id, shown.team1), side(match.team2Id, match.team1Id, shown.team2)];
 }

@@ -30,7 +30,15 @@ Duels 1v1 en arcade (Widowmaker, « premier à 5 ») : chaque carte se gagne au
   tournoi) ; une ligne qui ne porte que ces points a `slots_json = '[]'` et
   n'est jamais effacée par un vidage de cartes ou de départage. Route
   `PUT /api/admin/tournaments/[id]/round-points` (`{ phaseId, bracket,
-  roundNumber, target }`, `null` = suit le tournoi).
+  roundNumber, target }`, `null` = suit le tournoi). Poser exige un tour que
+  le tournoi peut jouer : phase du tournoi, et tableau de son format
+  (`bracketFitsFormat` : `LOWER` / `GRAND` en double élimination seulement,
+  `THIRD_PLACE` en élimination simple et BlueGenji Survie) — sinon
+  `INVALID_ROUND`. Le changement part au journal du staff, regroupé avec les
+  cartes de manche (« Manche 2 (points par carte) », `round-maps-notice.ts`).
+- **Format éteint** sur le tournoi : les points propres aux tours sont
+  effacés dans la même transaction (`updateTournament`) — ils ne resurgissent
+  pas au rallumage, l'écran des cartes ne les montrant que format allumé.
 - N effectif d'un match : `effectiveMapPointTarget` = celui du tour, sinon celui
   du tournoi, et rien si le format est éteint sur le tournoi.
 
@@ -40,6 +48,13 @@ Changer N (tournoi ou tour) est refusé (`MAP_POINTS_LOCKED`, 409) dès qu'un
 match concerné porte un score, une proposition ou des cartes saisies
 (`assertMapPointsUnlocked`, sous le verrou du tournoi puis des matchs, requêtes
 sans jointure — MariaDB).
+
+Les saisies lisent le réglage du tour en **lecture verrouillante**
+(`loadMatchPointTarget`, `LOCK IN SHARE MODE`) : un report qui attendait le
+verrou du match pendant qu'un arbitre changeait les points du tour juge le
+score sur la valeur commitée, jamais sur l'image figée plus tôt dans sa
+transaction. L'interblocage possible (match puis réglage, contre tournoi puis
+matchs) est rejoué par `retryOnDeadlock`.
 
 ### Refus (code seul)
 
@@ -72,6 +87,13 @@ chaque carte : 5–3 contre 5–2 est un écart.
 - Match en BO1 / FT1 : l'arbre et la carte du match montrent les points de
   la carte (5–3), pas 1–0 (`displayScore`, `MAP_SCORES.md` § Affichage) ;
   classements et départages comptent toujours 1–0.
+- Modale de score d'un engagé : sur un match à une carte, l'attente, la
+  déclaration adverse et le litige citent les points (« toi : 5 – 3, eux :
+  5 – 4 », `scoreText`). La ligne « score enregistré » de l'arbitrage et le
+  retour en arrière d'un tour lisent le même score affiché (`shownMatchScore`).
+- Check-in du match (message privé, `MATCH_LOBBY_BRIEF.md`) : « Format Duel /
+  Arcade : chaque carte se gagne au premier à N points. » (N du tour, sinon du
+  tournoi ; FR et EN), sous les cartes.
 - Discord (journal « Match terminé ») : « (points : 5–3) » après le score, des
   chiffres seulement, aucun pseudo ; rien sur un forfait.
 
@@ -97,4 +119,8 @@ chaque carte : 5–3 contre 5–2 est un écart.
 `tests/lib/server/match-format-report.test.ts`, `admin-score-guards.test.ts`,
 `tournaments-edit.test.ts`, `tournaments-validation.test.ts`,
 `tests/lib/server/bot-logs-map-points.test.ts`, `tests/lib/shared/bot-logs.test.ts`,
-`tests/lib/shared/tournament-settings.test.ts`, `tests/tournois/tournament-form.test.ts`.
+`tests/lib/shared/tournament-settings.test.ts`, `tests/tournois/tournament-form.test.ts`,
+`tests/lib/server/round-maps-notice.test.ts` (annonce des points),
+`tests/lib/shared/round-tiebreak.test.ts` (ligne du check-in),
+`tests/tournois/score-arrival-announcement.test.ts` (points cités par la modale),
+`tests/tournois/map-scores-wiring.test.ts` (refus rattaché à la case).
