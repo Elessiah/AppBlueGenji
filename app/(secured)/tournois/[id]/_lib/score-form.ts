@@ -393,3 +393,18 @@ export function scoreFormSyncOutcome(change: {
     rulesConflict: change.rulesChanged,
   };
 }
+
+/**
+ * L'avis « le format de la manche a changé » est-il encore vrai ? La saisie a
+ * été tapée sous la règle `enteredUnder` (`null` : aucun changement de règle
+ * pendant la saisie) : il se tait quand la règle y revient, ou quand les
+ * lignes gardées passent la règle courante (corrigées à la main, ou forfait :
+ * aucune map ne part) — sinon il accuserait des maps qui ne seraient plus refusées.
+ */
+export function rulesConflictShown(entry: {
+  enteredUnder: string | null;
+  rules: string;
+  mapsRefusedNow: boolean;
+}): boolean {
+  return entry.enteredUnder !== null && entry.enteredUnder !== entry.rules && entry.mapsRefusedNow;
+}

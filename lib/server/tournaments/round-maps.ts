@@ -35,7 +35,7 @@ import {
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
 import {
-  builtBracketKey,
+  indexBuiltRounds,
   isWholeBracketFormat,
   roundAllowsTiebreak,
   roundWithinBuiltBracket,
@@ -240,9 +240,11 @@ async function roundsFittingTournament(
       GROUP BY phase_id, bracket`,
     [Number(tournament.id), ...wholePhaseIds],
   );
-  const index = new Map(
+  const index = indexBuiltRounds(
     built.flatMap((row) =>
-      row.max_round === null ? [] : [[builtBracketKey(Number(row.phase_id), String(row.bracket)), Number(row.max_round)] as const],
+      row.max_round === null
+        ? []
+        : [{ phaseId: Number(row.phase_id), bracket: String(row.bracket), roundNumber: Number(row.max_round) }],
     ),
   );
   // Même règle que l'instantané (`withoutUnbuiltRounds`) : un réglage accepté ici y reste visible.

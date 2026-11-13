@@ -212,7 +212,10 @@ La seconde équipe ne ressaisit rien :
   sur la version à jour : apportée par le flux quand il est ouvert (l'écriture
   qui a causé le refus y passe, contexte du lecteur compris), relue en REST
   seulement flux coupé (`refreshUnlessLive`) — de même pour un litige verrouillé
-  ou un match déjà clos.
+  ou un match déjà clos. Le détail map par map, que le flux ne porte jamais, se
+  relit dans tous les cas par la route légère du match s'il manque encore
+  (`reload` de `useProposalMaps`) : des relectures épuisées ne laissent pas le
+  joueur renvoyer en vain les mêmes maps.
 - **Détail introuvable** (resté illisible après trois relectures) : la modale
   s'ouvre vide et la phrase d'état dit d'actualiser la page pour confirmer, au
   lieu de « Confirme-le » ; un score saisi à la place est une contre-proposition.

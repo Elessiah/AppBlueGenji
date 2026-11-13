@@ -203,10 +203,12 @@ describe("withoutUnbuiltRounds", () => {
     expect(kept).toEqual([lowerFour]);
   });
 
-  it("withoutUnbuiltRounds_bracketWithoutMatchInBuiltPhase_keepsItsRounds", () => {
+  // Revue standard EF-61 cycle 2 : l'arbre d'une phase se crée d'un coup — un
+  // tableau sans match (petite finale retirée) n'aura jamais de tour.
+  it("withoutUnbuiltRounds_bracketWithoutMatchInBuiltPhase_dropsItsRounds", () => {
     const third: RoundKey = { phaseId: 0, bracket: "THIRD_PLACE", roundNumber: 1 };
-    const kept = withoutUnbuiltRounds([third], { format: "SINGLE", phases: null }, indexBuiltRounds([upper(1), upper(2)]));
-    expect(kept).toEqual([third]);
+    const kept = withoutUnbuiltRounds([third, upper(2)], { format: "SINGLE", phases: null }, indexBuiltRounds([upper(1), upper(2)]));
+    expect(kept).toEqual([upper(2)]);
   });
 
   it("withoutUnbuiltRounds_swiss_keepsFutureRounds", () => {
@@ -237,6 +239,14 @@ describe("withoutUnbuiltRounds", () => {
   });
 });
 
+describe("indexBuiltRounds", () => {
+  it("indexBuiltRounds_rounds_recordsBracketMaxAndPhases", () => {
+    const index = indexBuiltRounds([upper(1), upper(3), upper(2), upper(1, 12)]);
+    expect(index.brackets).toEqual(new Map([["0:UPPER", 3], ["12:UPPER", 1]]));
+    expect(index.phases).toEqual(new Set([0, 12]));
+  });
+});
+
 describe("roundWithinBuiltBracket", () => {
   it("roundWithinBuiltBracket_roundAtBuiltMax_returnsTrue", () => {
     expect(roundWithinBuiltBracket(upper(3), "SINGLE", indexBuiltRounds([upper(1), upper(3)]))).toBe(true);
@@ -244,6 +254,10 @@ describe("roundWithinBuiltBracket", () => {
 
   it("roundWithinBuiltBracket_roundOverBuiltMax_returnsFalse", () => {
     expect(roundWithinBuiltBracket(upper(4), "DOUBLE", indexBuiltRounds([upper(3)]))).toBe(false);
+  });
+
+  it("roundWithinBuiltBracket_phaseWithoutMatch_returnsTrue", () => {
+    expect(roundWithinBuiltBracket(upper(4, 12), "SINGLE", indexBuiltRounds([upper(1, 11)]))).toBe(true);
   });
 
   it("roundWithinBuiltBracket_unknownFormat_returnsTrue", () => {

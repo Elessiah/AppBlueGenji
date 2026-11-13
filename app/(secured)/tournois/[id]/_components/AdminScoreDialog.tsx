@@ -285,7 +285,9 @@ function ScoreConflictNotice({
   if (!form.conflict && !form.rulesConflict) return null;
   return (
     <div className={styles.conflict} role="alert">
-      {text.t(form.conflict ? "score.admin.conflict" : "score.admin.rulesChanged")}
+      {/* Les deux à la fois : chacun dit sa raison, aucun ne masque l'autre. */}
+      {form.conflict && <p className={styles.conflictText}>{text.t("score.admin.conflict")}</p>}
+      {form.rulesConflict && <p className={styles.conflictText}>{text.t("score.admin.rulesChanged")}</p>}
       {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
       <button
         type="button"
@@ -431,6 +433,11 @@ export function AdminScoreDialog({
   useEffect(() => {
     setConfirmingCorrection(null);
   }, [storedSignature]);
+  // De même quand le format de la manche change sous une saisie gardée : la
+  // confirmation masquerait l'avis, et l'envoi serait refusé sans explication.
+  useEffect(() => {
+    if (form.rulesConflict) setConfirmingCorrection(null);
+  }, [form.rulesConflict]);
 
   const perform = async (action: "save" | "resolve"): Promise<boolean> => {
     const ok = await form.submit(action);

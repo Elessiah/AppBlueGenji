@@ -294,34 +294,46 @@ export function builtBracketKey(phaseId: number, bracket: string): string {
   return `${phaseId}:${bracket}`;
 }
 
-/** Plus haut tour créé de chaque tableau (clé {@link builtBracketKey}). */
-export type BuiltRoundIndex = ReadonlyMap<string, number>;
+/**
+ * Tours créés : plus haut tour de chaque tableau (clé {@link builtBracketKey})
+ * et phases dont l'arbre existe (au moins un match).
+ */
+export type BuiltRoundIndex = {
+  readonly brackets: ReadonlyMap<string, number>;
+  readonly phases: ReadonlySet<number>;
+};
 
 /** Index des tours créés, à bâtir **une** fois par lecture des matchs. */
 export function indexBuiltRounds(built: readonly RoundKey[]): BuiltRoundIndex {
-  const index = new Map<string, number>();
+  const brackets = new Map<string, number>();
+  const phases = new Set<number>();
   for (const round of built) {
     const key = builtBracketKey(round.phaseId, round.bracket);
-    index.set(key, Math.max(index.get(key) ?? 0, round.roundNumber));
+    brackets.set(key, Math.max(brackets.get(key) ?? 0, round.roundNumber));
+    phases.add(round.phaseId);
   }
-  return index;
+  return { brackets, phases };
 }
 
 /**
  * Règle **unique** du « tour jamais créé », partagée par le serveur (pose d'un
- * réglage, `roundsFittingTournament`) et l'instantané (`withoutUnbuiltRounds`) :
- * en élimination (`isWholeBracketFormat`), un tour au-delà du plus haut tour
- * créé de son tableau n'existera pas ; un tableau sans aucun match (arbre pas
- * encore créé) garde tous ses tours. Hors élimination, tout tour compte.
+ * réglage, `roundsFittingTournament`), l'instantané (`withoutUnbuiltRounds`) et
+ * la purge à la création de l'arbre (`purgeUnbuiltRoundSettings`) : en
+ * élimination (`isWholeBracketFormat`), l'arbre d'une phase se crée **d'un
+ * coup**, tous tableaux compris — une fois la phase créée, un tour au-delà du
+ * plus haut tour de son tableau, ou d'un tableau sans aucun match (petite
+ * finale retirée, repêchage d'un arbre à deux), n'existera pas. Phase sans
+ * aucun match (arbre pas encore créé) : tous ses tours comptent. Hors
+ * élimination, tout tour compte.
  */
 export function roundWithinBuiltBracket(
   round: RoundKey,
   format: TournamentFormat | PhaseFormat | null | undefined,
   index: BuiltRoundIndex,
 ): boolean {
-  if (!isWholeBracketFormat(format)) return true;
-  const maxRound = index.get(builtBracketKey(round.phaseId, round.bracket));
-  return maxRound === undefined || round.roundNumber <= maxRound;
+  if (!isWholeBracketFormat(format) || !index.phases.has(round.phaseId)) return true;
+  const maxRound = index.brackets.get(builtBracketKey(round.phaseId, round.bracket));
+  return maxRound !== undefined && round.roundNumber <= maxRound;
 }
 
 /**

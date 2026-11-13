@@ -7,6 +7,20 @@ const sheet = readFileSync(
   "utf8",
 );
 
+const dialog = readFileSync(
+  path.join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "_components", "PlayerScoreDialog.tsx"),
+  "utf8",
+);
+
+describe("PlayerScoreDialog — relecture après un refus", () => {
+  it("PlayerScoreDialog_refusal_reloadsProposalsAndRefreshes", () => {
+    expect(dialog).toContain("reload: reloadProposals } = useProposalMaps(");
+    expect(dialog).toMatch(/const refreshAfterRefusal = \(\) => \{\s*reloadProposals\(\);\s*void Promise\.resolve\(onRefresh\(\)\)/);
+    expect(dialog.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\) refreshAfterRefusal\(\);/g)).toHaveLength(2);
+    expect(dialog).not.toContain("REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh())");
+  });
+});
+
 describe("TournamentSheet — relecture après un refus du report d'équipe", () => {
   it("TournamentSheet_playerScoreRefusal_refreshesOnlyWhenStreamDown", () => {
     expect(sheet).toContain(

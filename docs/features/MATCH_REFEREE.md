@@ -342,9 +342,10 @@ règle a changé avec l'arbitre hôte.
   joué à l'envoi n'est ni listé ni compté. Les avis d'un même match partent
   dans l'ordre ; un choix de carte dans un pool ouvre une rafale (première
   ligne aussitôt, une ligne de fin comptée, `ROUND_MAPS.md`) que tout autre
-  changement du match ferme d'abord. Le récapitulatif d'une opposition
-  (`queueDeferredNoRefereeAlerts`) est mis en file avant les avis de retrait,
-  sans faire attendre la réponse.
+  changement du match ferme d'abord. Après une opposition, les alertes « sans
+  arbitre » des matchs retirés (`queueDeferredNoRefereeAlerts`) sont mises en
+  file d'abord ; l'avis récapitulatif à l'arbitre (`announceObjectionReleases`)
+  part ensuite, sans faire attendre la réponse.
 - **Drapeau `contactsPending`** (`LaunchReferee`, `MATCH_LAUNCH.md`) : un caster
   du match apprend avant le départ qu'un contact de l'arbitre lui sera ouvert
   (un bit, jamais le contact). Accepté : il le lit au coup d'envoi de toute

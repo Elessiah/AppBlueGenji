@@ -191,9 +191,14 @@ Match avec arbitre désigné : l'ordre du premier ban ne suit pas
 - Un tour ne se règle (cartes, départage, points) que s'il existe : en
   élimination (`SINGLE`, `DOUBLE`), dans la limite des tours **construits** de
   son tableau (`roundWithinBuiltBracket`, règle partagée par l'écran,
-  l'instantané et le serveur — un tableau sans match garde tout son plan). La
-  création d'un tableau purge les réglages posés au-delà de ses tours réels
-  (`purgeUnbuiltRoundSettings`). « Appliquer à tous » relit seulement les tours
+  l'instantané et le serveur). L'arbre d'une phase se crée d'un coup : tant
+  qu'elle n'a aucun match, tout son plan compte ; ensuite, un tableau sans match
+  (petite finale retirée, repêchage d'un arbre à deux) n'a plus de tour. La
+  création de l'arbre purge les réglages posés hors de ses tours réels
+  (`purgeUnbuiltRoundSettings`) : sinon ils reprendraient effet sans bruit sur
+  un arbre plus grand régénéré. Choix assumé : après un retour en inscriptions,
+  un réglage purgé ne revient pas, le staff le repose (la fenêtre montre de
+  nouveau tout le plan tant que l'arbre n'est pas recréé). « Appliquer à tous » relit seulement les tours
   visés et écrit par paquets de `ROUND_MAPS_UPSERT_CHUNK` (64) lignes.
 - Un choix verrouille le tournoi avant de relire le match et son pool, comme
   `setRoundMaps` : il ne se valide pas contre un pool remplacé au même instant.

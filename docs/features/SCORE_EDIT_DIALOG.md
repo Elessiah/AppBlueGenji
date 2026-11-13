@@ -121,7 +121,10 @@ de ce que le lecteur a fait :
   gardée, le bandeau le dit (« Le format de la manche a changé… »,
   `score.admin.rulesChanged`, FR/EN) et le même bouton reconstruit les lignes
   au nouveau format (`scoreFormSyncOutcome`, `rulesConflict`) — sans cela
-  l'envoi était refusé (`MAP_*`) sans explication.
+  l'envoi était refusé (`MAP_*`) sans explication. L'avis se tait quand le
+  format revient à celui de la saisie ou que les lignes passent la règle
+  courante (`rulesConflictShown`) ; il ferme la confirmation de correction, et
+  s'affiche avec l'avis de résultat changé quand les deux se cumulent.
 
 Le changement d'identifiant reste couvert par la même comparaison : ouvrir le
 dialogue sur un second match repart de son propre score, jamais de celui du

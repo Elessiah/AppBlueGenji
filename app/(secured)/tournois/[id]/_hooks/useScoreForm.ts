@@ -7,6 +7,7 @@ import {
   decideScoreForm,
   initialAdminMaps,
   pendingProposalSignature,
+  rulesConflictShown,
   sameScoreFormState,
   scoreFormSyncOutcome,
   scoresFromMaps,
@@ -127,7 +128,9 @@ export function useScoreForm(
     mapsBaseline: openingRows(),
   }));
   const [conflict, setConflict] = useState(false);
-  const [rulesConflict, setRulesConflict] = useState(false);
+  // Règle (`rulesKey`) sous laquelle la saisie gardée a été tapée, posée au
+  // premier changement de règle qui la laisse en place ; `null` sinon.
+  const [rulesEnteredUnder, setRulesEnteredUnder] = useState<string | null>(null);
 
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
@@ -150,10 +153,11 @@ export function useScoreForm(
       setMaps(nextMaps);
       options.onMapsReset?.();
       setConflict(false);
-      setRulesConflict(false);
+      setRulesEnteredUnder(null);
     } else {
       if (outcome.conflict) setConflict(true);
-      if (outcome.rulesConflict) setRulesConflict(true);
+      // La première règle compte : BO3 → BO5 → BO3 retombe sur celle de la saisie.
+      if (outcome.rulesConflict) setRulesEnteredUnder((current) => current ?? synced.rules);
     }
   }
 
@@ -166,7 +170,7 @@ export function useScoreForm(
     setMaps(nextMaps);
     options.onMapsReset?.();
     setConflict(false);
-    setRulesConflict(false);
+    setRulesEnteredUnder(null);
   };
 
   /**
@@ -302,8 +306,15 @@ export function useScoreForm(
     decision,
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,
-    /** Le format de la manche (ou le jeu) a changé pendant qu'une saisie était en cours. */
-    rulesConflict,
+    /**
+     * Le format de la manche (ou le jeu) a changé pendant la saisie, et les
+     * maps gardées seraient refusées par la règle courante (`rulesConflictShown`).
+     */
+    rulesConflict: rulesConflictShown({
+      enteredUnder: rulesEnteredUnder,
+      rules,
+      mapsRefusedNow: mapsSent && savedMapsRefused(matchFormat, game, sentMaps, mapRules),
+    }),
     adoptStoredResult,
     adoptReport,
     /**
@@ -330,6 +341,16 @@ export function useScoreForm(
      */
     refuseMapsBefore: (action: "save" | "resolve") => mapsSent && refuseMaps(action === "resolve"),
   };
+}
+
+/** Les maps qui partiraient sont-elles refusées par la règle courante, même à l'enregistrement ? */
+function savedMapsRefused(
+  format: MatchFormat | null,
+  game: TournamentGame | null | undefined,
+  maps: ReadonlyArray<MatchMapInput>,
+  mapRules: MapEntryRules,
+): boolean {
+  return checkMapList(format, game, maps, { decisive: false, ...mapRules }).error !== null;
 }
 
 const STRUCTURAL_BLOCKERS: ReadonlySet<ScoreFormBlocker> = new Set<ScoreFormBlocker>([

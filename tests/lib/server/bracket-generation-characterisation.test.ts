@@ -301,16 +301,16 @@ describe("createBracketIfMissing — relevé exact des écritures", () => {
 });
 
 const GENERATOR_GOLDEN: Record<string, string> = {
-  "simple neuf": '{"finished":false,"created":true} 7/7/e39e235781c97773',
-  "double neuf": '{"finished":false,"created":true} 14/35/19f05d3862c05ead',
+  "simple neuf": '{"finished":false,"created":true} 7/7/80e359b14700a41b',
+  "double neuf": '{"finished":false,"created":true} 14/35/20f07ccd4a426022',
   "déjà là": '{"finished":false,"created":false} 0/0/e3b0c44298fc1c14',
-  "taille périmée": '{"finished":false,"created":true} 7/8/7c594cac58974e31',
+  "taille périmée": '{"finished":false,"created":true} 7/8/062e5f29d4da0176',
   "une seule inscrite": '{"finished":true,"created":false} 0/2/bd0dd5dd9e266542',
   "aucune inscrite": '{"finished":true,"created":false} 0/1/6ec4105d9fbbd52d',
   "une inscrite, taille périmée": '{"finished":true,"created":false} 0/3/232b80c5f1cc3eeb',
-  "phase neuve en double": '{"finished":false,"created":true} 14/37/26764224262e743a',
+  "phase neuve en double": '{"finished":false,"created":true} 14/37/b86707daf0f58d46',
   "phase déjà là": '{"finished":false,"created":false} 0/1/6e3da75b312bfcdb',
-  "phase périmée, petite finale imposée": '{"finished":false,"created":true} 8/14/e9dc3542dcf8a618',
-  "phase sans petite finale sur un tournoi qui en a": '{"finished":false,"created":true} 3/5/30e55ac6d47764b5',
+  "phase périmée, petite finale imposée": '{"finished":false,"created":true} 8/14/e085940720a7a5e5',
+  "phase sans petite finale sur un tournoi qui en a": '{"finished":false,"created":true} 3/5/6cfb3fc2aac9636b',
   "phase réduite à une qualifiée, plateau périmé": '{"finished":false,"created":false} 0/2/1467bc8ffa91d0d8',
 };
