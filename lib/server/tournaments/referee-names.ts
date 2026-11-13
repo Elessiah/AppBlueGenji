@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Pseudo de l'arbitre désigné d'un match, **pour les membres connectés**
  * (décision 52, `docs/features/MATCH_REFEREE.md` § « Ce que chacun voit »).
@@ -274,7 +275,7 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
     });
     for (const tournamentId of tournamentIds) invalidateCachedPrefix(`${REFEREE_NAMES_CACHE_PREFIX}${tournamentId}:`);
   } catch (error) {
-    console.error("[referee-names] lecture des matchs arbitrés impossible", error);
+    console.error("[referee-names] lecture des matchs arbitrés impossible", failureReason(error));
     forgetRefereeNames();
     return;
   }
@@ -284,14 +285,14 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
   try {
     ({ publishMatchUpdatedEvent: publish } = await import("./notifications"));
   } catch (error) {
-    console.error("[referee-names] republication des tournois arbitrés impossible", error);
+    console.error("[referee-names] republication des tournois arbitrés impossible", failureReason(error));
     return;
   }
   const publishBatch = (from: number) => {
     try {
       for (const tournamentId of tournamentIds.slice(from, from + REFEREE_RENAME_MAX_TOURNAMENTS)) publish(tournamentId);
     } catch (error) {
-      console.error("[referee-names] republication des tournois arbitrés impossible", error);
+      console.error("[referee-names] republication des tournois arbitrés impossible", failureReason(error));
     }
     const next = from + REFEREE_RENAME_MAX_TOURNAMENTS;
     if (next < tournamentIds.length) setTimeout(() => publishBatch(next), REFEREE_RENAME_BATCH_DELAY_MS).unref?.();

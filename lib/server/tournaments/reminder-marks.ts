@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Marques de rappel d'une manche (`bg_match_reminders` : observation, palier,
  * horaire reçu — `./match-reminders`).
@@ -81,7 +82,7 @@ export async function releaseDatedMarks(
     );
   } catch (error) {
     // La marque attendra le changement d'horaire suivant ; pm2 le dit.
-    if (!isMissingTableError(error)) console.error("[match-reminders] marque non rendue", error);
+    if (!isMissingTableError(error)) console.error("[match-reminders] marque non rendue", failureReason(error));
   }
 }
 
@@ -160,7 +161,7 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
   }
   // Marque illisible : on pousse quand même (sans marque, le retrait ne sera
   // simplement pas poussé), et pm2 le dit — une fois.
-  console.error("[match-schedule] horaire poussé aux arbitres non retenu", failure);
+  console.error("[match-schedule] horaire poussé aux arbitres non retenu", failureReason(failure));
   return { kind: "unmarked" };
 }
 
@@ -294,7 +295,7 @@ async function writeStaffMark(sql: string, params: (number | string | Date)[]): 
     const db = await getDatabase();
     await db.execute(sql, params);
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non oublié", error);
+    if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non oublié", failureReason(error));
   }
 }
 

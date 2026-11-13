@@ -319,7 +319,7 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
       // Une revendication refusée (ligne tenue par un enregistrement en cours,
       // conflit d'instantané) ne retient pas les annonces des autres tournois :
       // la ligne reste, le balayage suivant la reprend.
-      console.error("[round-maps] annonce non revendiquée, reprise au prochain balayage", error);
+      console.error("[round-maps] annonce non revendiquée, reprise au prochain balayage", failureReason(error));
       continue;
     }
     if (result.affectedRows !== 1) continue; // un autre l'a prise, ou un changement a rouvert la fenêtre

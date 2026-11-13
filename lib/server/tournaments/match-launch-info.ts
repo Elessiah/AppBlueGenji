@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Lecture de la modale de lancement : les matchs du lecteur — joueur d'une des
  * deux engagées ou un de leurs casters — qui approchent de leur heure, sont en
@@ -408,7 +409,7 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
       // lecture, dont la transaction la validerait) — la lecture échoue, la
       // connexion est détruite au retour (`withConnection`).
       if (error instanceof UnsettledConnectionError) throw error;
-      console.error("[match-launch] entretien impossible", error);
+      console.error("[match-launch] entretien impossible", failureReason(error));
     }
   }
   return due.size > 0;
@@ -1000,7 +1001,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     try {
       await releaseIneligibleCast(cast.matchId, cast.casterId);
     } catch (error) {
-      console.error("[match-launch] retrait d'un caster non éligible impossible", error);
+      console.error("[match-launch] retrait d'un caster non éligible impossible", failureReason(error));
     }
   }
   const undecided: NoRefereeCandidate[] = [];
@@ -1009,7 +1010,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       if (entry.objection) await releaseObjectingReferee(entry.matchId, entry.refereeId, undecided);
       else await releaseIneligibleReferee(entry.matchId, entry.refereeId, undecided);
     } catch (error) {
-      console.error("[match-launch] retrait d'un arbitre non éligible impossible", error);
+      console.error("[match-launch] retrait d'un arbitre non éligible impossible", failureReason(error));
     }
   }
   // Les matchs partis sans arbitre sont signalés ensemble, par manche.

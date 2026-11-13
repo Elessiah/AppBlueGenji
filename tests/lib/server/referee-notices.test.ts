@@ -248,7 +248,7 @@ describe("announceRefereeChange et file d'après commit", () => {
     jest.mocked(getDatabase).mockRejectedValue(new Error("DB_DOWN"));
     expect(() => announceRefereeChange({ kind: "TAKEN", matchId: 42 })).not.toThrow();
     await settle();
-    expect(error).toHaveBeenCalledWith("[referee] changement d'arbitrage non annoncé", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[referee] changement d'arbitrage non annoncé", expect.any(String));
     error.mockRestore();
   });
 

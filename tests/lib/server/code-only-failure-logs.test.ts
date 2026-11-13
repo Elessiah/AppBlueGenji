@@ -8,8 +8,7 @@ import { join, relative, sep } from "node:path";
  * la valeur en double d'un `ER_DUP_ENTRY` (un pseudo, un courriel), alors que le
  * registre (T05) et /rgpd décrivent ces lignes comme le geste et le numéro.
  *
- * Balayage des sources déjà passées à la règle. Restent hors balayage : le
- * moteur de tournoi (`lib/server/tournaments/`, entrée d'ERREUR.txt), le seed
+ * Balayage des sources déjà passées à la règle. Restent hors balayage : le seed
  * et les scripts d'exploitation lancés à la main, dont la sortie va au
  * terminal de l'exploitant.
  */
@@ -24,7 +23,6 @@ function walk(dir: string): string[] {
 }
 
 const NOT_YET_SWEPT = [
-  `lib${sep}server${sep}tournaments${sep}`,
   `lib${sep}server${sep}seed`,
   `lib${sep}server${sep}database${sep}schema${sep}`,
   `lib${sep}server${sep}backfill-avatars.ts`,

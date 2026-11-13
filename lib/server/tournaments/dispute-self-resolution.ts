@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Arbitre qui tranche **son propre** litige, ou qui suspend la validation
  * d'office d'un report seul sur un match qu'il joue
@@ -235,11 +236,11 @@ async function alertSelfAction(
     // Avant la réponse de `actorPlaysMatch`, rien ne dit que l'auteur joue : la
     // ligne ne doit pas l'en accuser.
     if (!plays) {
-      console.error(`[staff-audit] vérification « arbitre qui joue » interrompue (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
+      console.error(`[staff-audit] vérification « arbitre qui joue » interrompue (${kind}) — match #${match.matchId}, auteur #${actor.id}`, failureReason(error));
       return false;
     }
     const missing = logged ? "push non envoyé" : "ni journalisée ni envoyée";
-    console.error(`[staff-audit] alerte d'arbitre qui joue ${missing} (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
+    console.error(`[staff-audit] alerte d'arbitre qui joue ${missing} (${kind}) — match #${match.matchId}, auteur #${actor.id}`, failureReason(error));
     return false;
   }
 }

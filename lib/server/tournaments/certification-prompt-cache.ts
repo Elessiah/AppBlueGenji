@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Mémoire courte des invitations à certifier calculées, par lecteur
  * (utilisateur, équipe, rôle, jeu) — `docs/features/CERTIFICATION_PROMPT.md`.
@@ -245,7 +246,7 @@ function logCertificationPromptFailure(at: number, error: unknown): void {
     return;
   }
   const silenced = silencedFailures > 0 ? ` (${silencedFailures} autres tus)` : "";
-  console.error(`[tournaments] invitation à certifier indisponible${silenced} :`, error);
+  console.error(`[tournaments] invitation à certifier indisponible${silenced} :`, failureReason(error));
   lastFailureLogAt = at;
   silencedFailures = 0;
 }

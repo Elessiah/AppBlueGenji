@@ -345,7 +345,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     expect(error).toHaveBeenCalledTimes(1);
     const logged = error.mock.calls[0][1];
     expect(logged).not.toBe(deadlock);
-    expect((logged as Error).message).toBe("STAFF_MARK_MOVED");
+    expect(logged).toBe("STAFF_MARK_MOVED");
     error.mockRestore();
   });
 

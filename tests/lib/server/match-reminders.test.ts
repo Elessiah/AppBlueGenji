@@ -1598,7 +1598,7 @@ describe("dispatchDueMatchReminders — rappel de check-in (10 h)", () => {
     expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
 
     expect(dispatchRefereeDigest).toHaveBeenCalledWith(FIVE_HOURS_BEFORE);
-    expect(error).toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[match-reminders] programme d'arbitrage en échec", expect.any(String));
   });
 
   it("lance le programme d'arbitrage de front : il n'attend pas les envois aux joueurs", async () => {

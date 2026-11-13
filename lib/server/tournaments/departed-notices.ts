@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Avis aux engagées **retirées** d'une manche dont elles tenaient l'horaire,
  * quand le tournoi change sous elles : correction de score (`./target-slot.ts`
@@ -455,11 +456,11 @@ export function flushDepartedNotices(connection: PoolConnection): void {
   const removals = state?.staffRemovals ?? [];
   if (removals.length > 0) {
     void announceDeletedMatchesToStaff(removals).catch((error: unknown) => {
-      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", error);
+      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", failureReason(error));
     });
   }
   if (notices.length === 0) return;
   void announceEntrantsWithdrawn(notices).catch((error: unknown) => {
-    if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", error);
+    if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", failureReason(error));
   });
 }

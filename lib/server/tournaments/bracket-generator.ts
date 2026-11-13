@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { nextPowerOfTwo } from "@/lib/server/serialization";
@@ -64,7 +65,7 @@ async function forgetLobbyBriefMarks(
     await connection.execute(`DELETE FROM bg_lobby_brief_marks WHERE ${where}`, params);
   } catch (error) {
     if (await isTransactionAbortedOn(connection, error)) throw error;
-    console.error(`[lobby-brief] marques du plateau ${params.join(":")} non effacées`, error);
+    console.error(`[lobby-brief] marques du plateau ${params.join(":")} non effacées`, failureReason(error));
   }
 }
 

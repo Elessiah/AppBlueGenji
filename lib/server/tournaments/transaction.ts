@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Transaction d'un geste de match ou de tournoi (lancement, arbitrage, cartes
  * par tour) : journal du staff, alertes d'arbitrage et avis de cast et
@@ -34,7 +35,7 @@ export async function transact<T>(connection: PoolConnection, run: (connection: 
   try {
     flushBotLogs(connection);
   } catch (error) {
-    console.error("[transaction] journal non vidé après le commit :", error);
+    console.error("[transaction] journal non vidé après le commit :", failureReason(error));
     // Ce qui reste en attente ne doit pas partir avec la transaction suivante
     // de cette connexion, rendue au pool.
     try {

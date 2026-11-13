@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { englishRegisterText } from "../../helpers/register-english-text";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import enProfile from "@/messages/en/profile.json";
 import frProfile from "@/messages/fr/profile.json";
@@ -291,14 +292,12 @@ describe("BattleTag masqué — arbitre désigné", () => {
   it("aucun texte vivant ne borne plus la fenêtre de lancement aux équipes et aux casters (FR et EN)", () => {
     const living = [
       "lib/shared/processing-register.ts",
-      "lib/shared/processing-register-en.ts",
       "lib/shared/rgpd-policy.ts",
       "lib/shared/rgpd-policy-en.ts",
       "lib/shared/identity-sharing.ts",
       ...namespaces.flatMap((ns) => [`messages/fr/${ns}.json`, `messages/en/${ns}.json`]),
     ];
-    for (const file of living) {
-      const text = readSource(file);
+    for (const text of [...living.map((file) => readSource(file)), englishRegisterText()]) {
       expect(text).not.toMatch(/ne s'ouvre qu'aux (deux )?équipes et aux casters/);
       expect(text).not.toMatch(/only opens for (both|the) teams and the casters/);
     }

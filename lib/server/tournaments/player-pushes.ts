@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Notifications des joueurs nées du moteur de tournoi : départ d'un match,
  * score à confirmer, coup d'envoi d'un tournoi.
@@ -183,7 +184,7 @@ export async function readMatchCasters(
       ]),
     );
   } catch (error) {
-    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", error);
+    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", failureReason(error));
     return new Map();
   }
 }
@@ -298,7 +299,7 @@ const sweeps = throttledSweep({
     return runMatchStartSweep();
   },
   onError: (error) => {
-    if (!isMissingTableError(error)) console.error("[push] départs de match non annoncés", error);
+    if (!isMissingTableError(error)) console.error("[push] départs de match non annoncés", failureReason(error));
   },
 });
 
@@ -386,7 +387,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
       false,
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] score à confirmer non annoncé", error);
+    if (!isMissingTableError(error)) console.error("[push] score à confirmer non annoncé", failureReason(error));
     return 0;
   }
 }
@@ -452,7 +453,7 @@ export async function notifyScoreAutoValidated(
       false,
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] validation d'office non annoncée", error);
+    if (!isMissingTableError(error)) console.error("[push] validation d'office non annoncée", failureReason(error));
     return 0;
   }
 }
@@ -483,7 +484,7 @@ export async function notifyTournamentStart(tournamentId: number): Promise<numbe
       false,
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] coup d'envoi non annoncé", error);
+    if (!isMissingTableError(error)) console.error("[push] coup d'envoi non annoncé", failureReason(error));
     return 0;
   }
 }

@@ -9,7 +9,17 @@
 import { ALL_TRANSFER_RECIPIENTS } from "@/lib/shared/processing-register";
 import * as registerEn from "@/lib/shared/processing-register-en";
 
+/**
+ * Chaque export anglais du registre, et `transferBasisEn` appelé destinataire
+ * par destinataire : une branche que n'atteindrait qu'un sous-ensemble de
+ * destinataires ne reste pas hors de portée des gardes de texte.
+ */
 export function englishRegisterText(): string {
   const { registerControllerEn, transferBasisEn, ...texts } = registerEn;
-  return JSON.stringify([texts, registerControllerEn(), transferBasisEn(ALL_TRANSFER_RECIPIENTS)]);
+  return JSON.stringify([
+    texts,
+    registerControllerEn(),
+    transferBasisEn(ALL_TRANSFER_RECIPIENTS),
+    ...ALL_TRANSFER_RECIPIENTS.map((recipient) => transferBasisEn([recipient])),
+  ]);
 }

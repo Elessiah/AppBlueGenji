@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Annonce des lives sur Discord : au **début** d'un match diffusé, le bot poste
  * dans le salon #live du serveur BlueGenji le message de la soirée (`@everyone`
@@ -421,7 +422,7 @@ async function forgetEveningSend(
     await db.execute(`UPDATE bg_live_announcements SET refused = 1 WHERE ${claims.sql}`, claims.params);
   } catch (error) {
     // Au pire, le match suivant de la soirée part sans notification.
-    console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, error);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, failureReason(error));
   }
 }
 
@@ -437,7 +438,7 @@ async function closeEvening(evening: LiveEvening, rows: readonly LiveCandidateRo
     await db.execute(`UPDATE bg_live_evenings SET closed = 1 WHERE id = ?`, [Number(evening.id)]);
   } catch (error) {
     // Le match suivant retentera la modification, que le bot refusera de même.
-    console.error(`[live-announce] soirée ${Number(evening.id)} : fermeture non enregistrée`, error);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : fermeture non enregistrée`, failureReason(error));
   }
   await forgetEveningSend(evening, rows, false);
 }
@@ -477,7 +478,7 @@ async function rememberEveningMessage(
     ]);
   } catch (error) {
     // Le prochain match de la soirée partira dans un nouveau message.
-    console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, error);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, failureReason(error));
   }
 }
 
@@ -540,7 +541,7 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
     return true;
   } catch (error) {
     const lost = rows.length > 1 ? "annonces non réessayées" : "annonce non réessayée";
-    console.error(`[live-announce] ${label} : réservation non rendue, ${lost}`, error);
+    console.error(`[live-announce] ${label} : réservation non rendue, ${lost}`, failureReason(error));
     return false;
   }
 }
@@ -602,7 +603,7 @@ function warnOnce(kind: string, message: string, error?: unknown): void {
   lastWarnAt.set(kind, now);
   const text = `${message} (avertissement répété au plus une fois par heure)`;
   if (error === undefined) console.warn(text);
-  else console.error(text, error);
+  else console.error(text, failureReason(error));
 }
 
 /** Longueur maximale de la liste d'identifiants dans l'étiquette envoyée au bot (200 caractères en tout). */
@@ -1056,7 +1057,7 @@ function scheduleRefresh(): void {
   refreshTimer = setTimeout(() => {
     refreshTimer = null;
     void exclusive(() => refreshLiveEvenings()).catch((error: unknown) => {
-      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", error);
+      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", failureReason(error));
       retryRefresh();
     });
   }, LIVE_EVENING_REFRESH_DELAY_MS);
@@ -1414,7 +1415,7 @@ function rearmPendingRetries(): void {
  */
 export async function dispatchLiveAnnouncements(): Promise<number> {
   purgeEndedEvenings().catch((error: unknown) => {
-    if (!isMissingTableError(error)) console.error("[live-announce] purge des soirées finies impossible", error);
+    if (!isMissingTableError(error)) console.error("[live-announce] purge des soirées finies impossible", failureReason(error));
   });
   if (!liveAnnouncementsEnabled()) {
     // En production, une variable oubliée au déploiement se lit dans pm2.
@@ -1442,7 +1443,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
     return 0;
   }
   pendingSweep = exclusive(() => runLiveAnnouncementSweep()).catch((error: unknown) => {
-    if (!isMissingTableError(error)) console.error("[live-announce] balayage en échec", error);
+    if (!isMissingTableError(error)) console.error("[live-announce] balayage en échec", failureReason(error));
     return 0;
   });
   try {

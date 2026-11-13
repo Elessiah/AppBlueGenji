@@ -787,7 +787,7 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
 
     expect(discard).toHaveBeenCalledWith(connection);
     expect(flush).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith("[match-launch] entretien impossible", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[match-launch] entretien impossible", expect.any(String));
     flush.mockRestore();
     discard.mockRestore();
     error.mockRestore();

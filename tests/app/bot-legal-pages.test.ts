@@ -64,6 +64,20 @@ describe("bot legal content is fully bilingual", () => {
     frNums.forEach((num, i) => expect(num).toBe(String(i + 1).padStart(2, "0")));
   });
 
+  it.each(DOCS)("%s cross-references name sections that exist, in both languages", (_name, doc) => {
+    // Les deux langues partagent `numberedSections` : l'égalité des numéros est vraie par
+    // construction ; ce qui peut se désaligner, ce sont les renvois « section 0n » écrits dans le texte.
+    for (const lang of [doc.fr, doc.en]) {
+      const nums = new Set(lang.sections.map((s) => s.num));
+      const texts = lang.sections.flatMap((s) =>
+        s.blocks.flatMap((block) => [block.text ?? "", ...(block.items ?? [])]),
+      );
+      for (const text of [lang.intro, ...texts]) {
+        for (const match of text.matchAll(/sections? (0\d|1\d)/gi)) expect(nums).toContain(match[1]);
+      }
+    }
+  });
+
   it.each(DOCS)("%s never ships an empty section or block", (_name, doc) => {
     for (const lang of [doc.fr, doc.en]) {
       expect(lang.title.trim().length).toBeGreaterThan(0);

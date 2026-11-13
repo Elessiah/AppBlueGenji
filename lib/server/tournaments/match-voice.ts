@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Salons vocaux d'équipe des matchs (`docs/features/MATCH_VOICE.md`).
  *
@@ -1028,7 +1029,7 @@ async function runSweep(touched: Set<number>, forced: boolean): Promise<void> {
       if (due || open) releaseDown = await releaseChannels(touched);
     } catch (error) {
       // Les deux erreurs atteignent pm2 : celle de la création n'est pas perdue derrière celle du rendu.
-      if (ask.failure) console.error("[match-voice] création ou revérification en échec", ask.failure.error);
+      if (ask.failure) console.error("[match-voice] création ou revérification en échec", failureReason(ask.failure.error));
       throw error;
     }
     if (ask.down || releaseDown) noteBotDown(backoff);
@@ -1037,7 +1038,7 @@ async function runSweep(touched: Set<number>, forced: boolean): Promise<void> {
     // La minimisation ne dépend ni du bot ni d'une étape en échec ; après la publication, qu'elle ne retarde pas.
     for (const tournamentId of touched) publishMatchUpdatedEvent(tournamentId);
     touched.clear();
-    await purgeReleasedRows().catch((error: unknown) => console.error("[match-voice] purge en échec", error));
+    await purgeReleasedRows().catch((error: unknown) => console.error("[match-voice] purge en échec", failureReason(error)));
   }
 }
 
@@ -1066,7 +1067,7 @@ export function dispatchMatchVoiceChannels(rerun = false): Promise<void> {
       } while (sweep.again);
       sweep.again = false;
     } catch (error) {
-      console.error("[match-voice] balayage en échec", error);
+      console.error("[match-voice] balayage en échec", failureReason(error));
     } finally {
       sweep.lastAt = Date.now();
       sweep.pending = null;

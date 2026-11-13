@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Ce que le site dit quand l'arbitre désigné ou l'organisation d'un match
  * change (`docs/features/MATCH_REFEREE.md`) — sur le modèle des avis de cast
@@ -200,7 +201,7 @@ export type RefereeAnnounceOptions = { log?: boolean };
 
 /** Annonce un changement d'arbitrage, sans attendre ; ne lève jamais. */
 export function announceRefereeChange(change: RefereeChange, options: RefereeAnnounceOptions = {}): void {
-  void deliverRefereeChange(change, options).catch((error) => console.error("[referee] changement d'arbitrage non annoncé", error));
+  void deliverRefereeChange(change, options).catch((error) => console.error("[referee] changement d'arbitrage non annoncé", failureReason(error)));
 }
 
 /**
@@ -214,7 +215,7 @@ export function announceRefereeChanges(changes: readonly RefereeChange[], option
   void (async () => {
     for (const change of changes) {
       await deliverRefereeChange(change, options).catch((error) =>
-        console.error("[referee] changement d'arbitrage non annoncé", error),
+        console.error("[referee] changement d'arbitrage non annoncé", failureReason(error)),
       );
     }
   })();

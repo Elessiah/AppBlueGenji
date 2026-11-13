@@ -51,7 +51,7 @@ describe("retryOnDeadlock", () => {
     await expect(retryOnDeadlock(write)).rejects.toThrow("Failed to read auto-increment value");
 
     expect(write).toHaveBeenCalledTimes(1);
-    expect(error).toHaveBeenCalledWith("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", waited);
+    expect(error).toHaveBeenCalledWith("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", expect.any(String));
     now.mockRestore();
     error.mockRestore();
   });

@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Programme d'arbitrage : « en même temps » que le rappel de 10 h aux joueurs
  * (demande de l'association, 2026-10-09), les arbitres reçoivent **un** message
@@ -117,7 +118,7 @@ async function releaseDigestMarks(rows: readonly DigestRow[]): Promise<void> {
       ],
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[referee-digest] marques non rendues", error);
+    if (!isMissingTableError(error)) console.error("[referee-digest] marques non rendues", failureReason(error));
   }
 }
 
@@ -166,7 +167,7 @@ async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
     );
     byId = new Map(current.map((row) => [Number(row.id), row]));
   } catch (error) {
-    console.error("[referee-digest] relecture avant envoi en échec", error);
+    console.error("[referee-digest] relecture avant envoi en échec", failureReason(error));
     return [...rows];
   }
   const kept: DigestRow[] = [];
@@ -226,7 +227,7 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
       // programme suivant).
       if (await claimDatedMark(row, REFEREE_DIGEST_KEY)) won.add(Number(row.id));
     } catch (error) {
-      console.error("[referee-digest] réservation en échec", error);
+      console.error("[referee-digest] réservation en échec", failureReason(error));
     }
   });
   // L'ordre du coup d'envoi, quel que soit l'ordre des réservations ; puis

@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Opposition d'un arbitre retenue par le staff (`docs/features/MATCH_REFEREE.md`,
  * décision 42b du 2026-10-28) : l'arbitre s'oppose (formulaire de signalement,
@@ -98,7 +99,7 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
   } catch (error) {
     // L'opposition est déjà écrite : compter l'échec, pour que la route trace
     // le geste (auteur dans pm2) avant de répondre 500, plutôt que lever.
-    console.error("[referee-objection] matchs non terminés illisibles :", error);
+    console.error("[referee-objection] matchs non terminés illisibles :", failureReason(error));
     return { released: 0, failed: 1 };
   }
   let released = 0;
@@ -113,7 +114,7 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
       // Sans numéro de match : pm2 porte déjà « Arbitre : #id » (route), et
       // les journaux du serveur ne relient pas un arbitre qui s'oppose à des
       // matchs précis (/rgpd, registre T05 : auteur, identifiant, nombre).
-      console.error("[referee-objection] retrait d'un match impossible :", error);
+      console.error("[referee-objection] retrait d'un match impossible :", failureReason(error));
     }
   }
   await queueDeferredNoRefereeAlerts(undecided);
