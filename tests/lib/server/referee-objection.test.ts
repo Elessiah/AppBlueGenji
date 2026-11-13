@@ -243,6 +243,16 @@ describe("setRefereeObjection — annonces regroupées", () => {
     expect(announceObjectionReleases).toHaveBeenCalledWith(REFEREE, 2, [7]);
   });
 
+  it("setRefereeObjection_slowRecapPush_answersWithoutWaitingForIt", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
+    releaseInto();
+    jest.mocked(announceObjectionReleases).mockReturnValueOnce(new Promise<void>(() => undefined));
+
+    await expect(setRefereeObjection(REFEREE, true)).resolves.toBeDefined();
+
+    expect(queueDeferredNoRefereeAlerts).toHaveBeenCalledTimes(1);
+  });
+
   it("setRefereeObjection_nothingReleased_noPublish", async () => {
     execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
     jest.mocked(releaseObjectingReferee).mockResolvedValueOnce(false);

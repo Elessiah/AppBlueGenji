@@ -339,7 +339,16 @@ règle a changé avec l'arbitre hôte.
   puis verrouille ses matchs par clé primaire (identifiants lus d'abord, sans
   verrou : aucun intervalle d'index pris aux autres manches), et ses avis
   partent l'un après l'autre (`announceRefereeChanges`). Un match listé déjà
-  joué à l'envoi n'est ni listé ni compté.
+  joué à l'envoi n'est ni listé ni compté. Les avis d'un même match partent
+  dans l'ordre ; un choix de carte dans un pool ouvre une rafale (première
+  ligne aussitôt, une ligne de fin comptée, `ROUND_MAPS.md`) que tout autre
+  changement du match ferme d'abord. Le récapitulatif d'une opposition
+  (`queueDeferredNoRefereeAlerts`) est mis en file avant les avis de retrait,
+  sans faire attendre la réponse.
+- **Drapeau `contactsPending`** (`LaunchReferee`, `MATCH_LAUNCH.md`) : un caster
+  du match apprend avant le départ qu'un contact de l'arbitre lui sera ouvert
+  (un bit, jamais le contact). Accepté : il le lit au coup d'envoi de toute
+  façon, comme la note d'attente du caster (`casterContactsPending`).
 - **Avis à l'arbitre retiré** par un autre que lui : sujet push
   `REFEREE_RELEASED` (audience `tournaments`), **push seul**, jamais de message
   privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `OBJECTION`, `INELIGIBLE`,

@@ -122,7 +122,8 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
     }
   }
   for (const tournamentId of batch.tournamentIds) publishMatchUpdatedEvent(tournamentId);
-  await announceObjectionReleases(refereeId, released, [...batch.tournamentIds]);
   await queueDeferredNoRefereeAlerts(undecided);
+  // L'avis récapitulatif part sans retenir la réponse du staff (il ne lève jamais).
+  void announceObjectionReleases(refereeId, released, [...batch.tournamentIds]);
   return { released, failed };
 }
