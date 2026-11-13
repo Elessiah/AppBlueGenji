@@ -97,6 +97,7 @@ import {
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
   TEAM_NOTICE_DMS_HOURLY_CAP,
 } from "@/lib/shared/team-invite-notice";
+import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
 /**
@@ -341,12 +342,12 @@ function RgpdFr({
                   <span className={styles.badge}>{d.base}</span>
                   {/* Portées qui se suivent sous la même base : une seule pastille (`groupedExtraBases`). */}
                   {groupedExtraBases(d.extraBases).map((group) => (
-                    <span key={group.scopes.join("|")} className={styles.extraBase}>
+                    <div key={group.scopes.join("|")} className={styles.extraBase}>
                       {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
                           « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
                       {group.base === d.base ? "y compris : " : <><span className={styles.badge}>{group.base}</span> </>}
-                      {group.scopes.join(" ; ")}
-                    </span>
+                      <ExtraScopes scopes={group.scopes} />
+                    </div>
                   ))}
                 </DataCell>
                 <DataCell column={3}>{d.duree}</DataCell>

@@ -81,6 +81,7 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
 /** Column headings of the data table, repeated by each mobile card. */
@@ -109,11 +110,11 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {/* Scopes in a row under the same basis: one badge (`groupedExtraBases`, cf. page FR). */}
         {groupedExtraBases(entry.extraBases).map((group) => (
-          <span key={group.scopes.join("|")} className={styles.extraBase}>
+          <div key={group.scopes.join("|")} className={styles.extraBase}>
             {/* Même base que la principale : pas de second badge identique, mais « including » (cf. page FR). */}
             {group.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[group.base]}</span> </>}
-            {group.scopes.join("; ")}
-          </span>
+            <ExtraScopes scopes={group.scopes} />
+          </div>
         ))}
       </DataCell>
       <DataCell column={3}>
