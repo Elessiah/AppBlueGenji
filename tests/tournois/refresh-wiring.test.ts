@@ -258,22 +258,22 @@ describe("compteur de visites — déduplication dans l'onglet", () => {
 describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)", () => {
   it("refreshRefereeNames_failedRead_reopensSameMissingSet", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
-    expect(body).toContain('if (namesAttemptRef.current === missing) namesAttemptRef.current = "";');
-    expect(body).toContain('retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")), transient);');
+    expect(body).toContain('if (names.attempt === missing) names.attempt = "";');
+    expect(body).toMatch(/if \(refereeNamesFailureRetries\(response\.status\)\) \{\s*retryLater\(refereeNamesRetryDelay\(response\.headers\.get\("retry-after"\)\), true\);/);
     expect(body).toContain("if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);");
   });
 
   it("refreshRefereeNames_otherMissingSet_ignoresEarlierBackoffAndExhaustedRetries", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
-    expect(body).toContain("if (missing !== namesRetryKeyRef.current) {");
-    expect(body).toContain("namesRetryAtRef.current = 0;");
-    expect(body).toContain("namesRetriesRef.current = 0;");
-    expect(body).toContain("namesRetryKeyRef.current = missing;");
+    expect(body).toContain("if (missing !== names.retryKey) {");
+    expect(body).toContain("names.retryAt = 0;");
+    expect(body).toContain("names.retries = 0;");
+    expect(body).toContain("names.retryKey = missing;");
   });
 
   it("refreshRefereeNames_lateResponse_mergesOnlyMissingNames", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
-    const merge = body.indexOf("const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, names);");
+    const merge = body.indexOf("const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, incoming);");
 
     expect(merge).toBeGreaterThan(-1);
     expect(merge).toBeLessThan(body.indexOf("commit("));
@@ -284,46 +284,41 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
   it("refreshRefereeNames_readScheduled_startsNothing", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
 
-    expect(body).toContain("if (namesTimerRef.current !== null) return;");
+    expect(body).toContain("if (names.timer !== null) return;");
     expect(body).toContain("signal: controller.signal");
-    expect(body).toContain("Math.max(spread, namesRetryAtRef.current - Date.now())");
+    expect(body).toContain("Math.max(spread, names.retryAt - Date.now())");
   });
 
   it("refreshRefereeNames_nobodyWatching_defersUntilPowerChange", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
 
-    expect(body).toMatch(/if \(nobodyWatches\(\)\) \{\s*namesDeferredRef\.current = true;\s*return;\s*\}/);
-    expect(hook).toContain("if (namesDeferredRef.current && !nobodyWatches()) refreshRefereeNames();");
+    expect(body).toMatch(/if \(nobodyWatches\(\)\) \{\s*names\.deferred = true;\s*return;\s*\}/);
+    expect(hook).toContain("if (names.deferred && !nobodyWatches()) refreshRefereeNames();");
   });
 
   it("refreshRefereeNames_callDuringInFlightRead_rerunsWhenItEnds", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
 
-    expect(body).toMatch(/if \(namesAbortRef\.current !== null\) \{\s*namesPendingRef\.current = true;\s*return;\s*\}/);
-    expect(body).toMatch(/if \(namesAbortRef\.current === controller\) \{\s*namesAbortRef\.current = null;\s*if \(namesPendingRef\.current\) \{\s*namesPendingRef\.current = false;\s*refreshNamesRef\.current\(\);/);
+    expect(body).toMatch(/if \(names\.abort !== null\) \{\s*names\.pending = true;\s*return;\s*\}/);
+    expect(body).toMatch(/if \(names\.abort === controller\) \{\s*names\.abort = null;\s*if \(names\.pending\) \{\s*names\.pending = false;\s*refreshNamesRef\.current\(\);/);
     expect(hook).toContain("refreshNamesRef.current = refreshRefereeNames;");
   });
 
   it("refreshRefereeNames_failedRead_autoRetriesOnlyTransientAndBounded", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
 
-    expect(body).toContain("const transient = response.status === 429 || response.status >= 500;");
-    expect(body).toMatch(/if \(auto && namesRetriesRef\.current < REFEREE_NAMES_AUTO_RETRIES\) \{\s*namesRetriesRef\.current \+= 1;\s*namesPendingRef\.current = true;/);
-    expect(body).toContain("else namesRetriesRef.current = 0;");
+    expect(body).toMatch(/if \(auto && names\.retries < REFEREE_NAMES_AUTO_RETRIES\) \{\s*names\.retries \+= 1;\s*names\.pending = true;/);
+    expect(body).toContain("else names.retries = 0;");
     expect(hook).toContain("const REFEREE_NAMES_AUTO_RETRIES = 6;");
   });
 
-  it("refreshRefereeNames_tournamentChange_resetsPendingAndRetries", () => {
-    expect(hook).toMatch(/namesPendingRef\.current = false;\s*namesRetriesRef\.current = 0;\s*\},\s*\[tournamentId\]/);
+  it("refreshRefereeNames_tournamentChange_resetsWholeReader", () => {
+    expect(hook).toContain("useEffect(() => () => resetRefereeNamesReader(names), [tournamentId, names]);");
   });
 
-  it("refreshRefereeNames_tournamentChange_abortsAndResets", () => {
-    expect(hook).toMatch(/namesAbortRef\.current\?\.abort\(\);[\s\S]*?\[tournamentId\]/);
-  });
-
-  it("load_restCommit_clearsPendingNamesTimer", () => {
+  it("load_restCommit_cancelsPendingNamesReadAndRereadsIfStillMissing", () => {
     const load = hook.slice(hook.indexOf("commit({ tier: stateRef.current.tier, detail });"));
-    expect(load.slice(0, 500)).toContain("clearTimeout(namesTimerRef.current)");
+    expect(load.slice(0, 600)).toContain("if (cancelScheduledNamesRead(names)) refreshNamesRef.current();");
   });
 
   it("stalePreview_reread_thenRefreshesNames", () => {

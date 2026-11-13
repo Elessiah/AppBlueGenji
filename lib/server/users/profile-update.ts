@@ -124,6 +124,28 @@ function forgetPromptsOnIdentityChange(userId: number, touchesIdentity: boolean,
   if (touchesIdentity && Number(result.changedRows ?? 0) > 0) void forgetCertificationPromptsAround(userId);
 }
 
+/**
+ * État d'avant l'écriture, lu seulement s'il sert : l'avatar visible qu'on
+ * masque (son fichier change d'adresse) et le pseudo vraiment changé (seul un
+ * renommage republie les tournois arbitrés).
+ */
+async function readProfileBefore(
+  db: Pool,
+  userId: number,
+  hidesAvatar: boolean,
+  nextPseudo: string | null,
+): Promise<{ hidesVisibleAvatar: boolean; renamed: boolean }> {
+  if (!hidesAvatar && !nextPseudo) return { hidesVisibleAvatar: false, renamed: false };
+  const [before] = await db.execute<(RowDataPacket & { visible_avatar: 0 | 1; pseudo: string })[]>(
+    `SELECT visible_avatar, pseudo FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  return {
+    hidesVisibleAvatar: hidesAvatar && before[0]?.visible_avatar === 1,
+    renamed: nextPseudo !== null && nextPseudo !== "" && before[0]?.pseudo !== nextPseudo,
+  };
+}
+
 export async function updateOwnProfile(
   userId: number,
   patch: {
@@ -275,14 +297,11 @@ export async function updateOwnProfile(
   // Masquer un avatar **visible** en change aussi le fichier d'adresse (plus
   // bas) : on relit donc l'état d'avant, seule la bascule doit renommer — le
   // formulaire renvoie le réglage à chaque sauvegarde.
-  let hidesVisibleAvatar = false;
-  if (patch.visibility?.avatar === false) {
-    const [before] = await db.execute<(RowDataPacket & { visible_avatar: 0 | 1 })[]>(
-      `SELECT visible_avatar FROM bg_users WHERE id = ? LIMIT 1`,
-      [userId],
-    );
-    hidesVisibleAvatar = before[0]?.visible_avatar === 1;
-  }
+  //
+  // Même relecture pour le pseudo : seul un **vrai** renommage republie les
+  // tournois que le compte arbitre (`forgetRefereeNamesOf`) — sans quoi chaque
+  // enregistrement d'un arbitre (avatar, visibilité…) les republierait tous.
+  const { hidesVisibleAvatar, renamed } = await readProfileBefore(db, userId, patch.visibility?.avatar === false, nextPseudo);
   let result: ResultSetHeader;
   try {
     [result] = await db.execute<ResultSetHeader>(
@@ -385,7 +404,7 @@ export async function updateOwnProfile(
   // Le bandeau et le mini-arbre de la vitrine nomment l'entrée solo à son
   // pseudo : `syncSoloEntryIdentity` les vide elle-même, seulement si l'entrée
   // a changé (un formulaire renvoie le pseudo à chaque enregistrement).
-  if (patch.pseudo) {
+  if (renamed) {
     // Un arbitre renommé : son ancien pseudo n'est plus servi du cache des
     // pseudos d'arbitre (la version de l'instantané, elle, n'a pas bougé) —
     // seulement s'il arbitre un match dont le nom se montre. Sans attendre :

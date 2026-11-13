@@ -167,9 +167,9 @@ export type MatchRow = RowDataPacket & {
   self_managed?: number | null;
   first_map?: string | null;
   map_picks?: string | null;
-  /** Condition d'arbitrage de l'arbitre désigné (`refereeEligibilitySql`). */
   /** Pseudo de l'arbitre désigné, tel qu'en base : il entre dans l'empreinte (`refereeKey`). */
   referee_pseudo?: string | null;
+  /** Condition d'arbitrage de l'arbitre désigné (`refereeKeptColumns`). */
   referee_discord_verified_at?: Date | null;
   referee_discord_pseudo?: string | null;
   referee_blizzard_sub?: string | null;

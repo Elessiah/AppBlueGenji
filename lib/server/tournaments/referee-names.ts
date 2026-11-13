@@ -25,7 +25,7 @@ import { visibleText } from "@/lib/shared/visible-text";
 import { showsRefereeName } from "@/lib/shared/match-referee";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { MatchRefereeName, MatchStatus, TournamentCard, TournamentGame, TournamentSnapshot } from "@/lib/shared/types";
-import { refereeEligibilityBlock, type CastEligibilityFields } from "./cast-eligibility";
+import { refereeEligibilityBlock, refereeKeptColumns, type CastEligibilityFields } from "./cast-eligibility";
 import { playsMatchSql } from "./match-players";
 
 /**
@@ -50,11 +50,16 @@ export function refereeKeySecret(env: NodeJS.ProcessEnv = process.env): Buffer {
 
 /**
  * Secret tenu sur `globalThis` : une seconde évaluation du module (rechargement
- * à chaud, double bundle) garde celui des empreintes déjà mises en cache.
+ * à chaud, double bundle) garde celui des empreintes déjà mises en cache. Tiré
+ * à la **première empreinte**, pas à l'évaluation du module : `next build`, qui
+ * charge le module sans rien servir, ne signale pas un secret manquant. Le
+ * repli aléatoire est propre au processus — le site tourne en un seul.
  */
 const holder = globalThis as typeof globalThis & { __bgRefereeKeySecret?: Buffer };
-holder.__bgRefereeKeySecret ??= refereeKeySecret();
-const KEY_SECRET = holder.__bgRefereeKeySecret;
+function keySecret(): Buffer {
+  holder.__bgRefereeKeySecret ??= refereeKeySecret();
+  return holder.__bgRefereeKeySecret;
+}
 
 /** Longueur de l'empreinte (base64url) : 96 bits, assez pour ne jamais se répéter sur un plateau. */
 const REFEREE_KEY_LENGTH = 16;
@@ -65,7 +70,7 @@ const REFEREE_KEY_LENGTH = 16;
  * la version de l'instantané, et les membres relisent son nouveau pseudo.
  */
 export function refereeKey(matchId: number, refereeUserId: number, pseudo: string): string {
-  return createHmac("sha256", KEY_SECRET)
+  return createHmac("sha256", keySecret())
     .update(`${matchId}:${refereeUserId}:${pseudo}`)
     .digest("base64url")
     .slice(0, REFEREE_KEY_LENGTH);
@@ -225,13 +230,21 @@ export function forgetRefereeNames(): void {
 }
 
 /**
- * Plus de tournois republiés pour un seul renommage : un arbitre en a une
+ * Tournois republiés **d'un coup** pour un seul renommage : un arbitre en a une
  * poignée en cours ; au-delà (compte hors norme), les plus récents passent
- * d'abord et le reste attend l'expiration du cache (30 s) — jamais une rafale
- * sans borne d'événements, de recalculs d'instantané et de contextes de lecteur.
- * Un tournoi terminé ne nomme personne : il n'est pas republié.
+ * d'abord et le reste suit par lots espacés de {@link REFEREE_RENAME_BATCH_DELAY_MS}
+ * — jamais une rafale d'événements, de recalculs d'instantané et de contextes
+ * de lecteur. Sans republication, un tournoi garderait l'empreinte de l'ancien
+ * pseudo et ne nommerait plus son arbitre. Un tournoi terminé ne nomme
+ * personne : il n'est pas republié.
  */
 export const REFEREE_RENAME_MAX_TOURNAMENTS = 50;
+
+/** Écart entre deux lots de republication d'un renommage. */
+export const REFEREE_RENAME_BATCH_DELAY_MS = 5_000;
+
+/** Plafond absolu des tournois lus pour un renommage (dix lots). */
+const REFEREE_RENAME_READ_LIMIT = REFEREE_RENAME_MAX_TOURNAMENTS * 10;
 
 /**
  * Un compte s'est renommé : les tournois où il arbitre un match non joué (dont
@@ -239,8 +252,8 @@ export const REFEREE_RENAME_MAX_TOURNAMENTS = 50;
  * confirmation comprise) oublient leurs pseudos **et republient leur
  * instantané** — l'empreinte, qui porte le pseudo, change, et les membres déjà
  * connectés relisent le nouveau. Un joueur qui se renomme
- * ne touche rien. Une lecture indexée (`idx_bg_matches_referee`), bornée
- * à {@link REFEREE_RENAME_MAX_TOURNAMENTS} tournois ; si elle
+ * ne touche rien. Une lecture indexée (`idx_bg_matches_referee`), republiée
+ * par lots de {@link REFEREE_RENAME_MAX_TOURNAMENTS} tournois ; si elle
  * échoue, tout le cache des pseudos est oublié — un ancien pseudo n'est jamais
  * servi faute de l'avoir lue. Ne lève jamais.
  */
@@ -254,7 +267,7 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
            JOIN bg_tournaments t ON t.id = m.tournament_id
           WHERE m.referee_user_id = ? AND m.status <> 'COMPLETED' AND t.state <> 'FINISHED'
           ORDER BY m.tournament_id DESC
-          LIMIT ${REFEREE_RENAME_MAX_TOURNAMENTS}`,
+          LIMIT ${REFEREE_RENAME_READ_LIMIT}`,
         [userId],
       );
       return found.map((row) => Number(row.tournament_id));
@@ -267,12 +280,23 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
   }
   if (tournamentIds.length === 0) return;
   // Import différé : `notifications` → `snapshot` → ce module.
+  let publish: (tournamentId: number) => void;
   try {
-    const { publishMatchUpdatedEvent } = await import("./notifications");
-    for (const tournamentId of tournamentIds) publishMatchUpdatedEvent(tournamentId);
+    ({ publishMatchUpdatedEvent: publish } = await import("./notifications"));
   } catch (error) {
     console.error("[referee-names] republication des tournois arbitrés impossible", error);
+    return;
   }
+  const publishBatch = (from: number) => {
+    try {
+      for (const tournamentId of tournamentIds.slice(from, from + REFEREE_RENAME_MAX_TOURNAMENTS)) publish(tournamentId);
+    } catch (error) {
+      console.error("[referee-names] republication des tournois arbitrés impossible", error);
+    }
+    const next = from + REFEREE_RENAME_MAX_TOURNAMENTS;
+    if (next < tournamentIds.length) setTimeout(() => publishBatch(next), REFEREE_RENAME_BATCH_DELAY_MS).unref?.();
+  };
+  publishBatch(0);
 }
 
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };
@@ -343,16 +367,7 @@ export async function loadLiveRefereeNames(card: Pick<TournamentCard, "id" | "ga
     const rows = await withConnection(async (connection) => {
       const [result] = await connection.query<LiveRefereeRow[]>(
         `SELECT m.id, m.status, m.team1_id, m.team2_id, m.launch_pairing, m.launched_at, m.referee_user_id,
-                ru.pseudo AS referee_pseudo,
-                ru.discord_verified_at AS referee_discord_verified_at,
-                ru.discord_pseudo AS referee_discord_pseudo,
-                ru.blizzard_sub AS referee_blizzard_sub,
-                ru.overwatch_battletag AS referee_overwatch_battletag,
-                ru.overwatch_battletag_typed AS referee_overwatch_battletag_typed,
-                ru.is_deleted AS referee_is_deleted,
-                ru.is_admin AS referee_is_admin,
-                ru.platform_roles_json AS referee_platform_roles_json,
-                ru.referee_objection_at AS referee_objection_at,
+                ${refereeKeptColumns("ru")},
                 ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "r")} AS referee_plays_match
            FROM bg_matches m
            JOIN bg_users ru ON ru.id = m.referee_user_id

@@ -16,6 +16,7 @@ import {
   markViewerReferee,
   refereeKey,
   refereeKeySecret,
+  REFEREE_RENAME_BATCH_DELAY_MS,
   viewerDesignated,
   withoutRefereeKeys,
   type RefereeNamesRead,
@@ -364,9 +365,42 @@ describe("forgetRefereeNamesOf", () => {
     await forgetRefereeNamesOf(4);
 
     expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("m.referee_user_id = ? AND m.status <> 'COMPLETED' AND t.state <> 'FINISHED'"), [4]);
-    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("LIMIT 50"), [4]);
+    expect(connection.query).toHaveBeenCalledWith(expect.stringMatching(/LIMIT 500$/), [4]);
     expect(jest.mocked(invalidateCachedPrefix).mock.calls).toEqual([["referee-names:7:"], ["referee-names:9:"]]);
     expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([[7], [9]]);
+  });
+
+  it("forgetRefereeNamesOf_moreThanOneBatch_publishesFirst50NowAndTheRestAfterDelay", async () => {
+    jest.useFakeTimers();
+    const ids = Array.from({ length: 60 }, (_, index) => 100 - index);
+    connection.query.mockResolvedValue([ids.map((id) => ({ tournament_id: id }))]);
+
+    await forgetRefereeNamesOf(4);
+    const publishedAtOnce = jest.mocked(publishMatchUpdatedEvent).mock.calls.length;
+    jest.advanceTimersByTime(REFEREE_RENAME_BATCH_DELAY_MS);
+    jest.useRealTimers();
+
+    expect(publishedAtOnce).toBe(50);
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls.slice(50)).toEqual(ids.slice(50).map((id) => [id]));
+    expect(invalidateCachedPrefix).toHaveBeenCalledTimes(60);
+  });
+
+  it("forgetRefereeNamesOf_publishThrows_logsAndStillPublishesNextBatch", async () => {
+    jest.useFakeTimers();
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const ids = Array.from({ length: 51 }, (_, index) => index + 1);
+    connection.query.mockResolvedValue([ids.map((id) => ({ tournament_id: id }))]);
+    jest.mocked(publishMatchUpdatedEvent).mockImplementationOnce(() => {
+      throw new Error("listener");
+    });
+
+    await forgetRefereeNamesOf(4);
+    jest.advanceTimersByTime(REFEREE_RENAME_BATCH_DELAY_MS);
+    jest.useRealTimers();
+
+    expect(errorLog).toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).toHaveBeenLastCalledWith(51);
+    errorLog.mockRestore();
   });
 
   it("forgetRefereeNamesOf_refereesNothingShown_keepsCacheAndPublishesNothing", async () => {

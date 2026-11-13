@@ -39,6 +39,12 @@ import {
   refereeNamesAttempt,
   refereeNamesRetryDelay,
 } from "@/lib/shared/match-referee";
+import {
+  cancelScheduledNamesRead,
+  createRefereeNamesReader,
+  refereeNamesFailureRetries,
+  resetRefereeNamesReader,
+} from "../_lib/referee-names-reader";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -191,21 +197,10 @@ export function useTournamentLive(tournamentId: number) {
   );
 
   /**
-   * Relecture des pseudos d'arbitre (`refreshRefereeNames`) : dernier ensemble
-   * d'empreintes manquantes essayé, minuteur d'étalement, lecture en vol (annulée
-   * au changement de tournoi), instant avant lequel aucune reprise ne part après
-   * un échec, relecture différée tant que personne ne regarde, relecture à
-   * relancer à la fin de celle en vol (demandée pendant, ou reprise d'un échec)
-   * et nombre de reprises d'office d'affilée.
+   * Relecture des pseudos d'arbitre (`refreshRefereeNames`) : tout son état
+   * dans un seul objet (`_lib/referee-names-reader.ts`), remis à zéro d'un geste.
    */
-  const namesAttemptRef = useRef("");
-  const namesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const namesAbortRef = useRef<AbortController | null>(null);
-  const namesRetryAtRef = useRef(0);
-  const namesRetryKeyRef = useRef("");
-  const namesDeferredRef = useRef(false);
-  const namesPendingRef = useRef(false);
-  const namesRetriesRef = useRef(0);
+  const [names] = useState(createRefereeNamesReader);
   const refreshNamesRef = useRef<() => void>(() => undefined);
 
   /**
@@ -244,20 +239,18 @@ export function useTournamentLive(tournamentId: number) {
             }
           : payload;
         commit({ tier: stateRef.current.tier, detail });
-        // Les pseudos sont venus avec le contexte : une relecture légère encore
-        // en attente n'apprendrait rien de plus (l'essai reste posé — le même
-        // ensemble manquant ne la relance pas).
-        if (namesTimerRef.current !== null) {
-          clearTimeout(namesTimerRef.current);
-          namesTimerRef.current = null;
-        }
+        // Les pseudos viennent avec le contexte : la relecture légère encore en
+        // attente est annulée et son essai oublié — si le contexte ne les a pas
+        // apportés (lecture des pseudos en échec côté serveur), l'ensemble
+        // encore manquant se relit.
+        if (cancelScheduledNamesRead(names)) refreshNamesRef.current();
         return null;
       } catch (e) {
         if (!silent) showError(mapError((e as Error).message, errorsText));
         return null;
       }
     },
-    [tournamentId, commit, showError, errorsText],
+    [tournamentId, commit, showError, errorsText, names],
   );
 
   /**
@@ -329,46 +322,46 @@ export function useTournamentLive(tournamentId: number) {
     const missing = missingRefereeNamesKey(detail.matches, detail.refereeNames);
     // Plus rien ne manque : l'essai est oublié (`refereeNamesAttempt`), minuteur
     // en attente ou non — sa relecture compare sa propre clé.
-    const attempt = refereeNamesAttempt(missing, namesAttemptRef.current);
+    const attempt = refereeNamesAttempt(missing, names.attempt);
     if (!attempt.read) {
-      namesAttemptRef.current = attempt.attempted;
+      names.attempt = attempt.attempted;
       return;
     }
     // Un autre ensemble d'empreintes que celui qui a échoué : ni son attente ni
     // ses reprises épuisées ne le concernent.
-    if (missing !== namesRetryKeyRef.current) {
-      namesRetryAtRef.current = 0;
-      namesRetriesRef.current = 0;
+    if (missing !== names.retryKey) {
+      names.retryAt = 0;
+      names.retries = 0;
     }
-    if (namesTimerRef.current !== null) return;
-    if (namesAbortRef.current !== null) {
-      namesPendingRef.current = true;
+    if (names.timer !== null) return;
+    if (names.abort !== null) {
+      names.pending = true;
       return;
     }
     if (nobodyWatches()) {
-      namesDeferredRef.current = true;
+      names.deferred = true;
       return;
     }
-    namesDeferredRef.current = false;
-    namesAttemptRef.current = missing;
+    names.deferred = false;
+    names.attempt = missing;
     const forTournament = detail.card.id;
     // Une lecture ratée rouvre le même ensemble, mais pas avant l'attente :
     // la reprise part d'elle-même à la fin de cette lecture (bornée), sinon le
     // prochain instantané (ou le retour sur l'onglet) retentera.
     const retryLater = (delayMs: number, auto: boolean) => {
-      namesRetryAtRef.current = Date.now() + delayMs;
-      namesRetryKeyRef.current = missing;
-      if (namesAttemptRef.current === missing) namesAttemptRef.current = "";
-      if (auto && namesRetriesRef.current < REFEREE_NAMES_AUTO_RETRIES) {
-        namesRetriesRef.current += 1;
-        namesPendingRef.current = true;
+      names.retryAt = Date.now() + delayMs;
+      names.retryKey = missing;
+      if (names.attempt === missing) names.attempt = "";
+      if (auto && names.retries < REFEREE_NAMES_AUTO_RETRIES) {
+        names.retries += 1;
+        names.pending = true;
       }
     };
     const spread = Math.random() * REFEREE_NAMES_SPREAD_MS; // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
-    namesTimerRef.current = setTimeout(() => {
-      namesTimerRef.current = null;
+    names.timer = setTimeout(() => {
+      names.timer = null;
       const controller = new AbortController();
-      namesAbortRef.current = controller;
+      names.abort = controller;
       void (async () => {
         try {
           const response = await fetch(`/api/tournaments/${forTournament}/referee-names`, {
@@ -376,21 +369,24 @@ export function useTournamentLive(tournamentId: number) {
             signal: controller.signal,
           });
           if (!response.ok) {
-            // Seuls un refus de quota et une panne passagère se reprennent d'office.
-            const transient = response.status === 429 || response.status >= 500;
-            retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")), transient);
+            // Seuls un refus de quota et une panne passagère se reprennent ; un
+            // 401, 403 ou 404 laisse l'essai posé : rien ne se relit avant un
+            // autre ensemble manquant.
+            if (refereeNamesFailureRetries(response.status)) {
+              retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")), true);
+            }
             return;
           }
           const payload = (await response.json()) as { refereeNames?: unknown };
-          const names = parseRefereeNames(payload.refereeNames);
+          const incoming = parseRefereeNames(payload.refereeNames);
           const current = stateRef.current;
-          if (names === null || !current.detail || current.detail.card.id !== forTournament) return;
+          if (incoming === null || !current.detail || current.detail.card.id !== forTournament) return;
           // Seules les désignations encore sans pseudo prennent la réponse : une
           // réponse en retard n'écrase pas plus à jour, et une qui en résout un
           // autre sous-ensemble n'est pas perdue.
-          const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, names);
+          const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, incoming);
           if (merged.stale) retryLater(refereeNamesRetryDelay(null), true);
-          else namesRetriesRef.current = 0;
+          else names.retries = 0;
           if (merged.names !== null) commit({ ...current, detail: { ...current.detail, refereeNames: merged.names } });
         } catch {
           // Lecture annulée (autre tournoi) : rien à reprendre. Réseau coupé :
@@ -398,17 +394,17 @@ export function useTournamentLive(tournamentId: number) {
           if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);
         } finally {
           // Annulée (autre tournoi) : la référence est déjà vidée, rien ne repart.
-          if (namesAbortRef.current === controller) {
-            namesAbortRef.current = null;
-            if (namesPendingRef.current) {
-              namesPendingRef.current = false;
+          if (names.abort === controller) {
+            names.abort = null;
+            if (names.pending) {
+              names.pending = false;
               refreshNamesRef.current();
             }
           }
         }
       })();
-    }, Math.max(spread, namesRetryAtRef.current - Date.now()));
-  }, [commit]);
+    }, Math.max(spread, names.retryAt - Date.now()));
+  }, [commit, names]);
 
   useEffect(() => {
     refreshNamesRef.current = refreshRefereeNames;
@@ -418,26 +414,12 @@ export function useTournamentLive(tournamentId: number) {
   useEffect(
     () =>
       subscribeClientPower(() => {
-        if (namesDeferredRef.current && !nobodyWatches()) refreshRefereeNames();
+        if (names.deferred && !nobodyWatches()) refreshRefereeNames();
       }),
-    [refreshRefereeNames],
+    [refreshRefereeNames, names],
   );
 
-  useEffect(
-    () => () => {
-      if (namesTimerRef.current !== null) clearTimeout(namesTimerRef.current);
-      namesTimerRef.current = null;
-      namesAbortRef.current?.abort();
-      namesAbortRef.current = null;
-      namesAttemptRef.current = "";
-      namesRetryAtRef.current = 0;
-      namesRetryKeyRef.current = "";
-      namesDeferredRef.current = false;
-      namesPendingRef.current = false;
-      namesRetriesRef.current = 0;
-    },
-    [tournamentId],
-  );
+  useEffect(() => () => resetRefereeNamesReader(names), [tournamentId, names]);
 
   /**
    * Message du flux : intégré tout de suite, puis — pour qui en a un — aperçu

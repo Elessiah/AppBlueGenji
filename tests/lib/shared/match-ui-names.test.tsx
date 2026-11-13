@@ -101,6 +101,15 @@ describe("missingRefereeNamesKey — l'arbitre reconnu de lui seul", () => {
     expect(missingRefereeNamesKey([shown(5, "k5")], [{ matchId: 5, refereeKey: "k5", pseudo: "", mine: true }])).toBe("");
   });
 
+  it("missingRefereeNamesKey_duplicateEntriesSameDesignation_firstWins", () => {
+    const names = [
+      { matchId: 5, refereeKey: "k5", pseudo: "" },
+      { matchId: 5, refereeKey: "k5", pseudo: "Nova" },
+    ];
+
+    expect(missingRefereeNamesKey([shown(5, "k5")], names)).toBe("5:k5");
+  });
+
   it("missingRefereeNamesKey_emptyPseudoNotMine_missing", () => {
     expect(missingRefereeNamesKey([shown(5, "k5")], [{ matchId: 5, refereeKey: "k5", pseudo: "" }])).toBe("5:k5");
   });

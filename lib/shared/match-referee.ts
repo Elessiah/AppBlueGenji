@@ -241,11 +241,32 @@ export function missingRefereeNamesKey(
   matches: readonly RefereeNamedMatch[],
   names: readonly RefereeNameEntry[],
 ): string {
+  const byKey = indexRefereeNames(names);
   const missing: string[] = [];
   for (const match of matches) {
-    if (refereeNameMissing(match, names)) missing.push(`${match.id}:${match.refereeKey}`);
+    if (refereeNameMissing(match, byKey)) missing.push(`${match.id}:${match.refereeKey}`);
   }
   return missing.join(",");
+}
+
+/** Clé d'une désignation : le match et son empreinte (un match sans empreinte n'égale aucune entrée). */
+function designationKey(matchId: number, refereeKey: string | null): string {
+  return refereeKey === null ? `${matchId}!` : `${matchId}#${refereeKey}`;
+}
+
+/**
+ * Index des entrées par désignation (`designationKey`) : une lecture en temps
+ * constant par match, au lieu d'un parcours de la liste — un plateau de
+ * centaines de matchs relit chaque réponse sans coût quadratique. En cas de
+ * doublon, la première entrée l'emporte (comme le `find` d'avant).
+ */
+function indexRefereeNames<T extends RefereeNameEntry>(names: readonly T[]): Map<string, T> {
+  const byKey = new Map<string, T>();
+  for (const name of names) {
+    const key = designationKey(name.matchId, name.refereeKey);
+    if (!byKey.has(key)) byKey.set(key, name);
+  }
+  return byKey;
 }
 
 /**
@@ -253,9 +274,9 @@ export function missingRefereeNamesKey(
  * l'arbitre lui-même (`mine`, posée même quand son pseudo n'est pas lisible —
  * `markViewerReferee` : la relire n'apprendrait rien de plus).
  */
-function refereeNameMissing(match: RefereeNamedMatch, names: readonly RefereeNameEntry[]): boolean {
+function refereeNameMissing(match: RefereeNamedMatch, byKey: ReadonlyMap<string, RefereeNameEntry>): boolean {
   if (!showsRefereeName(match)) return false;
-  const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+  const entry = byKey.get(designationKey(match.id, match.refereeKey));
   return entry === undefined || (entry.pseudo === "" && entry.mine !== true);
 }
 
@@ -312,11 +333,15 @@ export function mergeRefereeNames<T extends RefereeNameEntry>(
   const added: T[] = [];
   const dropped = new Set<number>();
   let stale = false;
+  const incomingByKey = indexRefereeNames(incoming);
+  const currentByKey = indexRefereeNames(current);
+  const incomingKeys = refereeKeysByMatch(incoming);
   for (const match of matches) {
-    const found = incoming.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
-    const otherKey = incoming.some((name) => name.matchId === match.id && name.refereeKey !== match.refereeKey);
-    if (!refereeNameMissing(match, current)) {
-      const held = current.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+    const key = designationKey(match.id, match.refereeKey);
+    const found = incomingByKey.get(key);
+    const otherKey = knownUnderOtherKey(incomingKeys, match);
+    if (!refereeNameMissing(match, currentByKey)) {
+      const held = currentByKey.get(key);
       const change = refereeMarkChange(held, found, otherKey);
       if (change === "drop") dropped.add(match.id);
       else if (change !== null) added.push(change);
@@ -328,6 +353,25 @@ export function mergeRefereeNames<T extends RefereeNameEntry>(
   if (added.length === 0 && dropped.size === 0) return { names: null, stale };
   for (const name of added) dropped.add(name.matchId);
   return { names: [...current.filter((name) => !dropped.has(name.matchId)), ...added], stale };
+}
+
+/** Empreintes qu'une liste connaît, par match. */
+function refereeKeysByMatch(names: readonly RefereeNameEntry[]): Map<number, Set<string>> {
+  const byMatch = new Map<number, Set<string>>();
+  for (const name of names) {
+    const keys = byMatch.get(name.matchId) ?? new Set<string>();
+    keys.add(name.refereeKey);
+    byMatch.set(name.matchId, keys);
+  }
+  return byMatch;
+}
+
+/** La liste connaît-elle ce match sous une **autre** empreinte que la sienne ? */
+function knownUnderOtherKey(byMatch: ReadonlyMap<number, ReadonlySet<string>>, match: RefereeNamedMatch): boolean {
+  const known = byMatch.get(match.id);
+  if (known === undefined) return false;
+  for (const refereeKey of known) if (refereeKey !== match.refereeKey) return true;
+  return false;
 }
 
 /** Plus courte attente avant de relire les pseudos après un échec (429, 5xx, réseau, réponse en retard). */

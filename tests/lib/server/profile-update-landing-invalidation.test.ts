@@ -27,6 +27,17 @@ function mockDb(update: () => Promise<unknown>) {
 
 const matched = async () => [{ affectedRows: 1 }];
 
+/** Comme `mockDb`, la relecture d'avant l'écriture rendant le pseudo en base. */
+function mockDbWithStoredPseudo(pseudo: string) {
+  const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>();
+  execute.mockImplementation(async (sql: string) => {
+    if (/^\s*UPDATE/.test(sql)) return matched();
+    if (sql.includes("SELECT visible_avatar, pseudo")) return [[{ visible_avatar: 1, pseudo }]];
+    return [[]];
+  });
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+}
+
 describe("updateOwnProfile — vues de la vitrine", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -50,6 +61,30 @@ describe("updateOwnProfile — vues de la vitrine", () => {
     await updateOwnProfile(42, { pseudo: "Nova" });
 
     expect(forgetRefereeNamesOf).toHaveBeenCalledTimes(1);
+    expect(forgetRefereeNamesOf).toHaveBeenCalledWith(42);
+  });
+
+  it("updateOwnProfile_samePseudoAsStored_keepsCachedRefereeNames", async () => {
+    mockDbWithStoredPseudo("Nova");
+
+    await updateOwnProfile(42, { pseudo: "Nova" });
+
+    expect(forgetRefereeNamesOf).not.toHaveBeenCalled();
+  });
+
+  it("updateOwnProfile_storedPseudoDiffers_forgetsRefereeNamesOfThisUser", async () => {
+    mockDbWithStoredPseudo("Ancien");
+
+    await updateOwnProfile(42, { pseudo: "Nova" });
+
+    expect(forgetRefereeNamesOf).toHaveBeenCalledWith(42);
+  });
+
+  it("updateOwnProfile_caseOnlyRename_forgetsRefereeNames", async () => {
+    mockDbWithStoredPseudo("nova");
+
+    await updateOwnProfile(42, { pseudo: "Nova" });
+
     expect(forgetRefereeNamesOf).toHaveBeenCalledWith(42);
   });
 

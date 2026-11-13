@@ -195,16 +195,20 @@ règle a changé avec l'arbitre hôte.
   opaque `refereeKey` (HMAC sur `matchId:userId:pseudo`, 16 caractères,
   `referee-names.ts`, sous un secret **stable** dérivé de `VISIT_HASH_SALT`
   ou, à défaut, de `BOT_INTERNAL_TOKEN` — `refereeKeySecret` : un
-  redémarrage ne change pas la version des instantanés arbitrés ; aléatoire
-  sans l'un ni l'autre, avec un avertissement en production), `null` sans arbitre
+  redémarrage ne change pas la version des instantanés arbitrés ; tiré à la
+  première empreinte, aléatoire et propre au processus sans l'un ni l'autre,
+  avec un avertissement en production), `null` sans arbitre
   éligible, pour un match terminé (`COMPLETED`) et, dans un tournoi terminé,
   pour tout match resté non joué (`withoutRefereeKeys` ne vide que les
   empreintes où `showsRefereeName` est vrai — un match resté non joué ne
   nomme pas son arbitre indéfiniment). Le pseudo entre dans l'empreinte : un
-  arbitre qui se renomme (`forgetRefereeNamesOf`) change la version et fait
+  arbitre qui se renomme **vraiment** (pseudo en base différent, relu avant
+  l'écriture : un enregistrement du profil sans renommage ne republie rien ;
+  `forgetRefereeNamesOf`) change la version et fait
   republier les tournois **non terminés** où il arbitre un match non joué (en attente de
-  confirmation comprise : son empreinte change aussi ; au plus
-  `REFEREE_RENAME_MAX_TOURNAMENTS` = 50, les plus récents d'abord), les membres
+  confirmation comprise : son empreinte change aussi ; par lots de
+  `REFEREE_RENAME_MAX_TOURNAMENTS` = 50 espacés de 5 s, les plus récents
+  d'abord, 500 au plus), les membres
   connectés relisent son nouveau pseudo. L'empreinte d'un score en
   attente de confirmation reste (relève de la fenêtre « Contacts » quand
   l'arbitre change, même dans un tournoi terminé), mais le pseudo aux membres ne se montre que pour
@@ -245,8 +249,12 @@ règle a changé avec l'arbitre hôte.
   réponse en retard, repart d'elle-même après `Retry-After` ou 10 s, 60 s au plus
   (`refereeNamesRetryDelay`), six fois d'affilée au plus **par ensemble
   d'empreintes manquantes** (une autre désignation ne subit ni l'attente ni
-  l'épuisement de la précédente) ; une relecture REST qui apporte les pseudos
-  annule celle en attente. `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
+  l'épuisement de la précédente) ; un 401, 403 ou 404 ne se reprend pas (le
+  même ensemble ne se relit plus). Une relecture REST annule celle en attente
+  et oublie son essai : si elle n'a pas apporté les pseudos, l'ensemble
+  encore manquant se relit. L'état de cette relecture tient dans un seul objet
+  (`_lib/referee-names-reader.ts`), remis à zéro d'un geste au changement de
+  tournoi. `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
   aux matchs qui les montrent** (`pruneRefereeNames` : le pseudo d'un match
   dont le score vient d'être déclaré quitte l'état du client sans attendre la
   reconnexion ; l'essai de relecture est oublié dès que plus rien ne manque,
