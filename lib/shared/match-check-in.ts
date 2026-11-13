@@ -9,11 +9,11 @@
  * « Nouveau match », départ de match) ne change pas, ni les salons Discord.
  *
  * L'option se lit **à l'envoi** : la basculer en plein tournoi vaut pour tout
- * ce qui n'est pas encore parti. Rallumée, elle ne rattrape rien : un message
- * dont l'instant dû est antérieur à la remise en marche (`resumedAt`) ne part
- * pas — seuls ceux dus ensuite partent.
+ * ce qui n'est pas encore parti. Rallumée, elle ne rattrape rien de ce qui
+ * était dû pendant l'arrêt (entre `match_check_in_paused_at` et la remise en
+ * marche `resumedAt` : `lobby-brief`, `setMatchCheckIn`).
  */
-import { canToggleRefereeScheduling } from "./match-planning";
+import { canToggleLiveTournamentOption } from "./tournament-state";
 import type { TournamentState } from "./types";
 
 /** L'option telle que la base la porte. */
@@ -48,10 +48,10 @@ export function checkInSendable(setting: MatchCheckInSetting, dueAt: Date): bool
 
 /**
  * L'option se bascule à tout moment jusqu'à la clôture, tournoi en cours
- * compris : un tournoi terminé n'a plus de match à prévenir. Même règle que
- * la planification par l'arbitrage, dont le formulaire tire le verrou de la
- * case : une seule source, pour que l'écran et l'API ne divergent pas.
+ * compris : un tournoi terminé n'a plus de match à prévenir (règle commune des
+ * options d'organisation, `canToggleLiveTournamentOption`). L'écran et l'API
+ * lisent tous deux cette fonction : ils ne divergent pas.
  */
 export function canToggleMatchCheckIn(state: TournamentState): boolean {
-  return canToggleRefereeScheduling(state);
+  return canToggleLiveTournamentOption(state);
 }

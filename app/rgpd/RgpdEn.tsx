@@ -909,12 +909,12 @@ export function RgpdEn({
           <p id="messages-de-match">
             <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in your account&apos;s
             language, when
-            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
+            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before; 24 h only in a tournament without check-in),
             when you are removed from a match, when a new match
             awaits you (both opponents of a match of your team or of your solo tournament have just become known, first
             round included: opponent, time if already set — with no “Match scheduled” on top — and the match page link, once per match and pairing) and, if you cast, when your caster registration for a match is removed
             by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
-            a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision), 15 minutes before it kicks off — or when its lobby opens,
+            a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision, nor in a tournament without check-in), 15 minutes before it kicks off — or when its lobby opens,
             if that comes earlier or the match has no time —, once per match, the match check-in (joining your team&apos;s voice channel — in a tournament with the “Team voice channels” option, for a match that has a time, never in a solo tournament nor against a ghost team — and the check-in channel, team on the left — the host — and on the right, game settings, map order and
             ban order, sorting the players by role if the match is cast, self-management, the match&apos;s stream link when it is public,
             the reminder to enter the scores and who to report a problem to), with the team names, the tournament, the round and the link to the match page, without any BattleTag,

@@ -361,20 +361,27 @@ const BRIEF_FROM = `FROM bg_matches m
 const CURRENT_LOBBY_OPENED_SQL = `CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.lobby_opened_at END`;
 
 /**
- * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
- * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
- * rien ne part. Rallumée, le check-in d'un match ne part que si son **premier
- * repère** — 15 minutes avant l'horaire, ou l'ouverture du salon s'il vient
- * plus tôt ou faute d'horaire — tombe après la remise en marche : ce qui était
- * dû pendant qu'elle était éteinte n'est pas rattrapé d'un coup. Le salon ne
+ * Premier repère du check-in d'un match : 15 minutes avant l'horaire, ou
+ * l'ouverture du salon si elle vient plus tôt ou faute d'horaire. Le salon ne
  * compte que s'il a été ouvert pour l'appariement actuel (`launch_pairing`) :
  * celui d'un appariement remplacé ne fait pas taire le nouveau.
  */
+const BRIEF_FIRST_DUE_SQL = `LEAST(COALESCE(m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE, ${CURRENT_LOBBY_OPENED_SQL}),
+                      COALESCE(${CURRENT_LOBBY_OPENED_SQL}, m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE))`;
+
+/**
+ * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
+ * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
+ * rien ne part. Rallumée, le check-in d'un match ne part pas si son premier
+ * repère ({@link BRIEF_FIRST_DUE_SQL}) tombe **pendant l'arrêt** — entre le
+ * dernier arrêt (`match_check_in_paused_at`, faute de quoi depuis toujours) et
+ * la remise en marche : ce qui était dû pendant qu'elle était éteinte n'est pas
+ * rattrapé d'un coup, ce qui était dû avant l'arrêt part encore dans sa fenêtre.
+ */
 const CHECK_IN_ON_SQL = `t.match_check_in = 1
         AND (t.match_check_in_resumed_at IS NULL
-             OR LEAST(COALESCE(m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE, ${CURRENT_LOBBY_OPENED_SQL}),
-                      COALESCE(${CURRENT_LOBBY_OPENED_SQL}, m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE))
-                >= t.match_check_in_resumed_at)`;
+             OR ${BRIEF_FIRST_DUE_SQL} >= t.match_check_in_resumed_at
+             OR ${BRIEF_FIRST_DUE_SQL} < t.match_check_in_paused_at)`;
 
 /**
  * Un match dû : jouable, pas un bye, sans score, et **dans son quart d'heure**

@@ -337,7 +337,18 @@ describe("dispatchLobbyBriefs", () => {
     const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
     for (const sql of [read, claim]) {
       expect(sql).toContain("AND t.match_check_in = 1 AND (t.match_check_in_resumed_at IS NULL OR LEAST(");
-      expect(sql).toContain(">= t.match_check_in_resumed_at)");
+      expect(sql).toContain(">= t.match_check_in_resumed_at OR");
+    }
+  });
+
+  it("dueSql_checkInResumed_dueBeforePauseStillSent", async () => {
+    const { query, execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    // Seul ce qui était dû pendant l'arrêt se tait : un check-in dû avant l'arrêt part encore.
+    const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    for (const sql of [read, claim]) {
+      expect(sql).toMatch(/OR LEAST\(.*\) < t\.match_check_in_paused_at\)/);
     }
   });
 

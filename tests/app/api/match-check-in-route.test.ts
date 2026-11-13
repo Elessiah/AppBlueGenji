@@ -134,4 +134,17 @@ describe("PUT /api/admin/tournaments/[id]/match-check-in", () => {
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe("MATCH_CHECK_IN_UPDATE_FAILED");
   });
+
+  it("put_contention_returns409RetryCode", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest
+      .mocked(setMatchCheckIn)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }));
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const response = await PUT(putReq({ enabled: true }), params("7"));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "CONCURRENT_UPDATE_RETRY" });
+    expect(announceStaffTournamentAction).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });

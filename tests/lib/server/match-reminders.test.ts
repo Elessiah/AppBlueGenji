@@ -535,6 +535,20 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(sentMessages()[0]).not.toContain("Prochain rappel : 10 heures");
   });
 
+  it("dispatchDueMatchReminders_announcementSentOffRetriedOn_promisesTenHourReminder", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), {
+      matches: [{ ...MATCH, match_check_in: 0, match_check_in_resumed_at: null }],
+      sent: [],
+    });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    // Rallumée pendant l'attente : le rappel 10 h partira, la reprise le promet.
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).toContain("Prochain rappel : 10 heures");
+  });
+
   it("dispatchDueMatchReminders_recipientOptedOutBeforeRetry_retryStaysSilent", async () => {
     const retry = await dispatchWithLostSide();
     const query = await matchAtRetry({}, [RECIPIENTS[0], RECIPIENTS[1], { ...RECIPIENTS[2], match_dm_enabled: 0 }]);
@@ -1347,6 +1361,23 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
   });
 });
 
+describe("announceMatchScheduleCleared — option « Check-in des matchs » sans effet", () => {
+  it("announceMatchScheduleCleared_checkInRereadWouldFail_noticeStillSent", async () => {
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
+    const execute = executeDouble({ told: START, current: null, checkInReadFails: true });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
+
+    expect(await announceMatchScheduleCleared(notice({ start_at: null }), "2026-09-10T18:00:00.000Z")).toBe(2);
+
+    // Un avis de retrait ne parle pas du check-in : l'option n'est pas relue.
+    expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("SELECT match_check_in"))).toBe(false);
+  });
+});
+
 describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () => {
   // Après la correction : Les Renards (101) sont sortis ; Orion (109) a pris leur place.
   const CURRENT = {
@@ -1904,6 +1935,21 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
       .map(([, params]) => params[1]);
     expect(releases).toEqual(["PT10H"]);
     error.mockRestore();
+  });
+
+  it("dispatchDueMatchReminders_sameTournamentTwoTenHourReminders_rereadsCheckInOnce", async () => {
+    const second = { ...MATCH, id: 32 };
+    const sent = [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 32, offset_key: "SEEN" }, { match_id: 32, offset_key: "P1D" }];
+    const db = await mockDb({ matches: [MATCH, second], sent });
+    const execute = executeDouble({ checkIn: { flag: 1 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: db.query, execute }));
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(4);
+
+    // Une relecture de l'option sert aux envois du même tournoi dans le passage.
+    const rereads = (execute.mock.calls as unknown as [string][]).filter(([sql]) => sql.startsWith("SELECT match_check_in"));
+    expect(rereads).toHaveLength(1);
   });
 
   it("dispatchDueMatchReminders_resumedBeforeTenHourWindowOpened_sendsReminder", async () => {

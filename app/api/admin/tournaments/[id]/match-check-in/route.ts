@@ -1,5 +1,5 @@
 import { MATCH_CHECK_IN_TOGGLE_RULE } from "@/lib/server/api-guard";
-import { putTournamentToggle } from "@/lib/server/tournament-toggle-route";
+import { putTournamentToggle, staffToggleLog } from "@/lib/server/tournament-toggle-route";
 import { setMatchCheckIn } from "@/lib/server/tournaments/match-check-in";
 
 /**
@@ -17,7 +17,6 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     invalidCode: "INVALID_MATCH_CHECK_IN",
     failedCode: "MATCH_CHECK_IN_UPDATE_FAILED",
     apply: (tournamentId, enabled) => setMatchCheckIn(tournamentId, enabled),
-    logOn: "MATCH_CHECK_IN_ON",
-    logOff: "MATCH_CHECK_IN_OFF",
+    announce: staffToggleLog("MATCH_CHECK_IN_ON", "MATCH_CHECK_IN_OFF"),
   });
 }

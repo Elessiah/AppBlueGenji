@@ -664,13 +664,13 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
     expect(frBrief).toContain("15 minutes avant son coup d'envoi");
     expect(frBrief).toContain("ou à l'ouverture de son salon si elle vient plus tôt ou si le match n'a pas d'horaire");
     // Autogestion seulement, une seule fois, aux gérants (CAST-FOLLOWUP, décision du 2026-11-05).
-    expect(frBrief).toContain("pour un match en autogestion seulement (aucun pour un match arbitré ou sans décision d'arbitrage)");
+    expect(frBrief).toContain("pour un match en autogestion seulement (aucun pour un match arbitré ou sans décision d'arbitrage, ni dans un tournoi sans check-in)");
     expect(frBrief).toContain("une seule fois par match et par engagée (ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient");
     expect(frBrief).toContain("à ceux qui gèrent chacune de ses engagées (propriétaire et managers d'une équipe, joueur d'une entrée solo");
     expect(frBrief).not.toContain("tous les joueurs");
     expect(frBrief).toContain("sans BattleTag, tag Discord ni pseudo de joueur");
     expect(enBrief).toContain("15 minutes before it kicks off");
-    expect(enBrief).toContain("for a self-managed match only (none for a refereed match or one with no refereeing decision)");
+    expect(enBrief).toContain("for a self-managed match only (none for a refereed match or one with no refereeing decision, nor in a tournament without check-in)");
     expect(enBrief).toContain("once per match and per entrant (neither a change of time, nor a cancelled launch, nor a re-pairing sends it again");
     expect(enBrief).toContain("to those who manage each of its entrants (owner and managers of a team, the player of a solo entry");
     expect(enBrief).not.toContain("every player");

@@ -1,5 +1,5 @@
 import { TEAM_VOICE_TOGGLE_RULE } from "@/lib/server/api-guard";
-import { putTournamentToggle } from "@/lib/server/tournament-toggle-route";
+import { putTournamentToggle, staffToggleLog } from "@/lib/server/tournament-toggle-route";
 import { setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
 
 /**
@@ -19,7 +19,6 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     invalidCode: "INVALID_TEAM_VOICE_CHANNELS",
     failedCode: "TEAM_VOICE_CHANNELS_UPDATE_FAILED",
     apply: (tournamentId, enabled) => setTeamVoiceChannels(tournamentId, enabled),
-    logOn: "TEAM_VOICE_ON",
-    logOff: "TEAM_VOICE_OFF",
+    announce: staffToggleLog("TEAM_VOICE_ON", "TEAM_VOICE_OFF"),
   });
 }

@@ -20,6 +20,7 @@
  * Voir `docs/features/MATCH_PLANNING.md`.
  */
 import { matchLaunchPhase, type MatchLaunchPhase } from "./match-launch";
+import { canToggleLiveTournamentOption } from "./tournament-state";
 import type { BracketMatch, TournamentState } from "./types";
 
 /**
@@ -29,7 +30,7 @@ import type { BracketMatch, TournamentState } from "./types";
  * ne décrirait plus rien.
  */
 export function canToggleRefereeScheduling(state: TournamentState): boolean {
-  return state !== "FINISHED";
+  return canToggleLiveTournamentOption(state);
 }
 
 /** Libellé d'une phase de lancement, pour la carte de match et l'arbitrage. */

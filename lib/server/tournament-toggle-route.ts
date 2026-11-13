@@ -1,5 +1,6 @@
-import { getCurrentUser } from "@/lib/server/auth";
+import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { enforceRateLimit } from "@/lib/server/api-guard";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import type { RateLimitRule } from "@/lib/server/rate-limit";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
@@ -10,34 +11,47 @@ import { can } from "@/lib/shared/permissions";
 /** Ce qu'une bascule rend : la valeur obtenue, et si elle a réellement changé. */
 export type TournamentToggleResult = { enabled: boolean; changed: boolean };
 
-/** Ce qui est propre à une option basculée (débit, codes, service, journal). */
-export type TournamentToggleSpec = {
+/** Ce qui est propre à une option basculée (débit, codes, service, journal, réponse). */
+export type TournamentToggleSpec<T extends TournamentToggleResult> = {
   rule: RateLimitRule;
   /** Corps sans booléen strict `enabled` (400). */
   invalidCode: string;
-  /** Échec imprévu du service (500). */
+  /** Échec imprévu du service (500 ; une contention passagère rend 409 `CONCURRENT_UPDATE_RETRY`). */
   failedCode: string;
-  apply: (tournamentId: number, enabled: boolean) => Promise<TournamentToggleResult>;
-  logOn: StaffTournamentAction;
-  logOff: StaffTournamentAction;
+  apply: (tournamentId: number, enabled: boolean) => Promise<T>;
+  /** Journal d'un **vrai** changement (jamais d'une requête qui ne change rien). */
+  announce: (result: T, tournamentId: number, user: AuthUser) => void;
+  /** Champs propres à l'option, ajoutés à `{ enabled, changed }`. */
+  extra?: (result: T) => Record<string, unknown>;
 };
 
 /**
+ * Journal d'une option au fil des actions du staff (`STAFF_ACTION_LOGS.md`) :
+ * une action pour l'allumage, une pour l'arrêt, auteur anonyme sur Discord.
+ */
+export function staffToggleLog(
+  logOn: StaffTournamentAction,
+  logOff: StaffTournamentAction,
+): (result: TournamentToggleResult, tournamentId: number) => void {
+  return (result, tournamentId) => announceStaffTournamentAction(tournamentId, result.enabled ? logOn : logOff);
+}
+
+/**
  * `PUT` d'une option de tournoi qui se bascule à tout moment jusqu'à la
- * clôture (salons vocaux d'équipe, check-in des matchs). Corps :
- * `{ enabled: boolean }` — un booléen strict.
+ * clôture (planification par l'arbitrage, salons vocaux d'équipe, check-in des
+ * matchs). Corps : `{ enabled: boolean }` — un booléen strict.
  *
  * Déroulé, dans cet ordre : session (401 `UNAUTHORIZED`), permission
  * `tournaments` (403 `FORBIDDEN`), débit par compte (429), identifiant
  * (400 `INVALID_TOURNAMENT_ID`), corps, puis le service : tournoi introuvable
- * (404 `TOURNAMENT_NOT_FOUND`), terminé (409 `TOURNAMENT_FINISHED`), autre
- * échec (500, code de l'option). Journalisé seulement s'il change la valeur,
- * auteur anonyme sur Discord (`STAFF_ACTION_LOGS.md`).
+ * (404 `TOURNAMENT_NOT_FOUND`), terminé (409 `TOURNAMENT_FINISHED`), contention
+ * passagère (409 `CONCURRENT_UPDATE_RETRY`), code du site levé par le service,
+ * autre échec (500, code de l'option). Journalisé seulement s'il change la valeur.
  */
-export async function putTournamentToggle(
+export async function putTournamentToggle<T extends TournamentToggleResult>(
   req: Request,
   context: { params: Promise<{ id: string }> },
-  spec: TournamentToggleSpec,
+  spec: TournamentToggleSpec<T>,
 ): Promise<Response> {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -56,14 +70,15 @@ export async function putTournamentToggle(
   const body = read.body as { enabled?: unknown };
   if (typeof body.enabled !== "boolean") return fail(spec.invalidCode, 400);
 
+  let result: T;
   try {
-    const result = await spec.apply(tournamentId, body.enabled);
-    if (result.changed) announceStaffTournamentAction(tournamentId, result.enabled ? spec.logOn : spec.logOff);
-    return ok({ enabled: result.enabled, changed: result.changed });
+    result = await spec.apply(tournamentId, body.enabled);
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
     if (message === "TOURNAMENT_FINISHED") return fail(message, 409);
-    return fail(spec.failedCode, 500);
+    return fail(serviceErrorCode(error, spec.failedCode), 500);
   }
+  if (result.changed) spec.announce(result, tournamentId, user);
+  return ok({ ...spec.extra?.(result), enabled: result.enabled, changed: result.changed });
 }

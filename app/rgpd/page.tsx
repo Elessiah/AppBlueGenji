@@ -1093,12 +1093,12 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match, quand un
+            rappels (24 h et 10 h avant ; 24 h seulement dans un tournoi sans check-in), quand vous êtes retiré d&apos;un match, quand un
             nouveau match vous attend (les deux adversaires d&apos;un match de votre équipe ou de votre tournoi individuel
             viennent d&apos;être connus, première manche comprise : adversaire, horaire s&apos;il est déjà
             posé — sans « Match programmé » en plus — et lien de la page du match, une seule fois par match et par affiche) et, si vous castez, quand votre
             inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, pour un match en autogestion seulement
-            (aucun pour un match arbitré ou sans décision d&apos;arbitrage), 15 minutes avant son coup d&apos;envoi
+            (aucun pour un match arbitré ou sans décision d&apos;arbitrage, ni dans un tournoi sans check-in), 15 minutes avant son coup d&apos;envoi
             — ou à l&apos;ouverture de son salon si elle vient plus tôt ou si le match n&apos;a pas d&apos;horaire —, une seule fois par match, le check-in du match
             (rejoindre le salon vocal de votre équipe — dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe », pour un match
             qui a un horaire, jamais en tournoi individuel ni contre une équipe fantôme — et le salon de check-in, équipe à gauche — l&apos;hôte — et à droite, paramètres de partie, déroulé

@@ -40,39 +40,57 @@ publie l'événement de mise à jour et le journal staff
 
 ## Lu à l'envoi, sans rattrapage
 
-Stockage : `bg_tournaments.match_check_in TINYINT(1) NOT NULL DEFAULT 1` et
-`match_check_in_resumed_at DATETIME NULL` (dans le `CREATE TABLE` et dans
-`RECENT_SCHEMA_CHANGES`). Rallumer l'option pose `match_check_in_resumed_at`
-(heure du processus, comme `start_at`) ; l'éteindre ne touche que le drapeau.
-
-Un message de check-in ne part que si l'option est allumée **et** que son
-échéance n'est pas antérieure à la reprise (`checkInSendable`,
-`lib/shared/match-check-in.ts`) :
+Stockage : `bg_tournaments.match_check_in TINYINT(1) NOT NULL DEFAULT 1`,
+`match_check_in_paused_at DATETIME NULL` et `match_check_in_resumed_at DATETIME NULL`
+(dans le `CREATE TABLE` et dans `RECENT_SCHEMA_CHANGES`). Éteindre l'option
+pose `match_check_in_paused_at`, la rallumer `match_check_in_resumed_at`
+(heure du processus, comme `start_at`). Seul ce qui était dû **pendant
+l'arrêt** — entre ces deux instants, ou avant la reprise faute d'arrêt daté
+(tournoi créé sans check-in) — se tait ; ce qui était dû avant l'arrêt, et
+que le balayage (lancé par les visites) n'avait pas encore pris, part encore.
 
 - **check-in du match** : garde `CHECK_IN_ON_SQL` dans `BRIEF_DUE_SQL`, donc
-  dans la lecture **et** dans la réservation ; échéance = le plus tôt de
-  H-15 et de l'ouverture du salon — celle-ci seulement si elle vaut pour
-  l'appariement actuel (`launch_pairing`) : un salon d'un appariement remplacé
-  ne fait pas taire le nouveau ;
+  dans la lecture **et** dans la réservation ; échéance (`BRIEF_FIRST_DUE_SQL`)
+  = le plus tôt de H-15 et de l'ouverture du salon — celle-ci seulement si elle
+  vaut pour l'appariement actuel (`launch_pairing`) : un salon d'un appariement
+  remplacé ne fait pas taire le nouveau. Ne part pas si l'échéance tombe entre
+  l'arrêt et la reprise ;
 - **rappel 10 h** : éteint, le palier est **réservé sans message** (la manche
   n'est plus relue, et rallumer l'option ne le fait pas partir après coup).
-  Rallumer réserve aussi sans message, dans la même transaction, le palier
-  des manches **déjà annoncées** (marque `SEEN`), non jouées, dont le coup
-  d'envoi tombe dans les 10 h : lui était dû pendant l'arrêt. Une manche
-  connue ou programmée après la reprise garde son rappel, même si sa fenêtre
-  est déjà ouverte ;
+  Rallumer réserve aussi sans message, dans la même transaction (rejouée sur
+  un interblocage), le palier des manches **déjà annoncées** (marque `SEEN`)
+  dont le coup d'envoi tombe dans les 10 h **et** au moins 10 h après l'arrêt :
+  leur fenêtre s'est ouverte pendant l'arrêt. Ni statut ni engagées n'y
+  filtrent : une manche au score refusé, rendue jouable ensuite, reste tue.
+  Une manche connue ou programmée après la reprise garde son rappel, même si sa
+  fenêtre est déjà ouverte ;
 - **annonces** : jugées à l'instant de l'envoi ; éteint, ni ligne de check-in
   ni palier 10 h promis (`promisedOffsets`).
 
-L'option est **relue juste avant chaque envoi** (`withFreshCheckIn`) : une
-ronde suisse part par lots, et l'option a pu changer depuis la lecture du
-passage ; éteinte entre-temps, un rappel 10 h déjà réservé se tait. La reprise
-des messages privés non remis (deux minutes plus tard) la relit aussi :
-éteinte, un rappel 10 h ne se reprend pas, et une annonce reprise perd sa ligne
-de check-in et la promesse du rappel 10 h.
+L'option est **relue juste avant chaque envoi qui en dépend** (rappel 10 h,
+annonce d'horaire ; jamais un avis de retrait ni le rappel 24 h) : une ronde
+suisse part par lots, et l'option a pu changer depuis la lecture du passage ;
+éteinte entre-temps, un rappel 10 h déjà réservé se tait. Une relecture sert
+une seconde aux autres envois du même tournoi dans le passage
+(`createCheckInReader`). La reprise des messages privés non remis (deux
+minutes plus tard) la relit aussi : éteinte, un rappel 10 h ne se reprend pas ;
+une annonce reprise dit la ligne de check-in et promet le rappel 10 h selon ce
+que l'option vaut **à la reprise** (perdus si elle s'est éteinte, rendus si elle
+s'est rallumée).
 
-Rallumer l'option n'envoie donc **aucune salve** : seuls les messages dont
-l'échéance vient après la reprise partent.
+Rallumer l'option n'envoie donc **aucune salve** : rien de ce qui était dû
+pendant l'arrêt ne part.
+
+## Bascule commune
+
+Les trois options basculables jusqu'à la clôture (planification par
+l'arbitrage, salons vocaux d'équipe, check-in des matchs) partagent la règle
+`canToggleLiveTournamentOption` (`lib/shared/tournament-state.ts`) et le
+déroulé `putTournamentToggle` (`lib/server/tournament-toggle-route.ts` :
+session, permission `tournaments`, débit par compte — `REFEREE_SCHEDULING_TOGGLE_RULE`,
+`TEAM_VOICE_TOGGLE_RULE`, `MATCH_CHECK_IN_TOGGLE_RULE` —, identifiant, corps,
+contention rendue en 409 `CONCURRENT_UPDATE_RETRY`) ; chaque route fournit son
+journal (`announce`) et, pour la planification, `movedToPlanning` (`extra`).
 
 ## Textes qui en parlent
 
@@ -83,9 +101,11 @@ d'équipe (`team.json`) disent « si le tournoi en a un ». FR et EN.
 ## Données de test et RGPD
 
 Seed : « Live Horaire (heure à venir) » a l'option éteinte. RGPD : rien de
-nouveau n'est collecté ni lu, l'option ne fait que retirer des envois — ni
-entrée `PRIVACY_CHANGES`, ni registre ; les descriptions des sujets push
-`MATCH_LOBBY_BRIEF` et `MATCH_REMINDER` disent l'exception.
+nouveau n'est collecté ni lu, l'option ne fait que retirer des envois — pas
+d'entrée `PRIVACY_CHANGES` ; le registre (T04) et `/rgpd` (FR et EN) disent
+que le check-in et le rappel 10 h ne partent pas dans un tournoi sans
+check-in, comme les descriptions des sujets push `MATCH_LOBBY_BRIEF` et
+`MATCH_REMINDER`.
 
 Tests : `match-check-in.test.ts` (partagé et serveur), `match-check-in-route.test.ts`,
 `match-reminders.test.ts` (bloc « Check-in des matchs » et reprises),

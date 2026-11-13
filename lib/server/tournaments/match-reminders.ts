@@ -65,7 +65,7 @@ import {
 } from "@/lib/shared/discord-notifications";
 import { inBatches } from "@/lib/shared/in-batches";
 import { checkInSendable, readMatchCheckIn, type MatchCheckInSetting } from "@/lib/shared/match-check-in";
-import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
+import { PLAYED_MATCH_STATUS_SQL, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { siteUrl } from "@/lib/server/site-url";
 import { tournamentPageUrl } from "./app-url";
 import { onPoster, toPoster, type PosterRow } from "./match-poster";
@@ -106,26 +106,69 @@ function checkInSettingOf(match: ScheduledMatch): MatchCheckInSetting {
   return readMatchCheckIn(match.match_check_in, match.match_check_in_resumed_at);
 }
 
-/** Colonnes de l'option, relues juste avant un envoi (absentes : la lecture du passage vaut). */
+/** Colonnes de l'option, relues juste avant un envoi. */
 type CheckInStateRow = RowDataPacket & {
-  match_check_in?: number | null;
-  match_check_in_resumed_at?: MaybeInstant;
+  match_check_in: number | null;
+  match_check_in_resumed_at: MaybeInstant;
 };
+
+/**
+ * Durée pendant laquelle une relecture de l'option sert aux autres envois du
+ * même tournoi dans un passage : les envois partent quelques-uns à la fois
+ * (`inBatches`), une ronde suisse de 32 manches ne relit donc pas 32 fois la
+ * même ligne, et un passage de plusieurs minutes relit tout de même l'option.
+ */
+const CHECK_IN_REREAD_TTL_MS = 1_000;
+
+/** Relit l'option d'un tournoi (ligne absente : tournoi supprimé). */
+type CheckInReader = (tournamentId: number) => Promise<CheckInStateRow | undefined>;
+
+/**
+ * Lecteur de l'option propre à un passage : une relecture de moins d'une
+ * seconde sert aux envois suivants du même tournoi ; une relecture en échec
+ * ne sert à personne (le suivant relit).
+ */
+function createCheckInReader(): CheckInReader {
+  const recent = new Map<number, { at: number; row: Promise<CheckInStateRow | undefined> }>();
+  return (tournamentId) => {
+    const hit = recent.get(tournamentId);
+    if (hit && Date.now() - hit.at < CHECK_IN_REREAD_TTL_MS) return hit.row;
+    const row = getDatabase()
+      .then((db) =>
+        db.execute<CheckInStateRow[]>(
+          `SELECT match_check_in, match_check_in_resumed_at FROM bg_tournaments WHERE id = ? LIMIT 1`,
+          [tournamentId],
+        ),
+      )
+      .then(([rows]) => rows[0]);
+    recent.set(tournamentId, { at: Date.now(), row });
+    row.catch(() => {
+      if (recent.get(tournamentId)?.row === row) recent.delete(tournamentId);
+    });
+    return row;
+  };
+}
+
+/**
+ * L'envoi dépend-il de l'option ? Le rappel 10 h (il se tait sans check-in)
+ * et une annonce d'horaire (ligne du check-in, rappel 10 h promis) ; ni un
+ * avis de retrait, ni le rappel 24 h.
+ */
+function dependsOnCheckIn(send: Pick<PlannedSend, "offset" | "clearedStartAt">): boolean {
+  if (send.clearedStartAt) return false;
+  return !send.offset || send.offset.key === CHECK_IN_REMINDER_KEY;
+}
 
 /**
  * La manche avec l'option de son tournoi **relue à l'envoi** : une ronde
  * suisse part par lots, minutes après la lecture du passage, et l'option a pu
- * changer entre-temps. Tournoi introuvable : la lecture du passage vaut.
+ * changer entre-temps. Tournoi introuvable (supprimé pendant le passage) : la
+ * lecture du passage vaut.
  */
-async function withFreshCheckIn(match: ScheduledMatch): Promise<ScheduledMatch> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<CheckInStateRow[]>(
-    `SELECT match_check_in, match_check_in_resumed_at FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [Number(match.tournament_id)],
-  );
-  const row = Array.isArray(rows) ? rows[0] : undefined;
-  if (!row || row.match_check_in === undefined) return match;
-  return { ...match, match_check_in: row.match_check_in, match_check_in_resumed_at: row.match_check_in_resumed_at ?? null };
+async function withFreshCheckIn(match: ScheduledMatch, readCheckIn: CheckInReader): Promise<ScheduledMatch> {
+  const row = await readCheckIn(Number(match.tournament_id));
+  if (!row) return match;
+  return { ...match, match_check_in: row.match_check_in, match_check_in_resumed_at: row.match_check_in_resumed_at };
 }
 
 /** Un rappel 10 h que l'option fait taire. */
@@ -591,13 +634,14 @@ async function sendToSide(
   // Le check-in : le rappel de 10 h, ou l'annonce qui a consommé son palier
   // (manche programmée moins de 10 h avant) — jamais un avis de retrait, ni
   // rien quand le tournoi n'a pas de check-in (option lue à l'envoi).
-  const checkInOn = checkInSendable(checkInSettingOf(match), sentAt({ now, plannedAt }));
-  let checkIn = false;
-  if (!clearedStartAt && checkInOn) {
-    checkIn = offset
+  const checkInLine = (checkInOn: boolean): boolean => {
+    if (clearedStartAt || !checkInOn) return false;
+    return offset
       ? offset.key === CHECK_IN_REMINDER_KEY
       : !remaining.some((pending) => pending.key === CHECK_IN_REMINDER_KEY);
-  }
+  };
+  const checkInOn = checkInSendable(checkInSettingOf(match), sentAt({ now, plannedAt }));
+  const checkIn = checkInLine(checkInOn);
   // Sans check-in, l'annonce ne promet pas de rappel 10 h (il ne partira pas).
   let promised = promisedOffsets(remaining, checkInOn);
   // À l'instant de l'envoi, pas du début du passage : un lot parti après
@@ -670,13 +714,13 @@ async function sendToSide(
             sentStart: clearedStartAt ? null : new Date(match.start_at),
             checkInReminder: offset?.key === CHECK_IN_REMINDER_KEY,
             // Le salon a pu ouvrir pendant l'attente : la reprise le dit. Et
-            // l'option, relue, a pu s'éteindre : la reprise ne parle plus du
-            // check-in, ni du rappel 10 h.
+            // l'option, relue, a pu changer : la reprise parle du check-in et
+            // promet le rappel 10 h selon ce qu'elle vaut maintenant.
             refresh: (setting) => {
-              const stillOn = checkInSendable(setting, new Date());
-              context.checkIn = checkIn && stillOn;
+              const onNow = checkInSendable(setting, new Date());
+              context.checkIn = checkInLine(onNow);
               context.checkInOpen = context.checkIn && isCheckInOpen(startAt, new Date());
-              if (!stillOn) promised = promisedOffsets(remaining, false);
+              promised = promisedOffsets(remaining, onNow);
             },
           },
   };
@@ -708,8 +752,8 @@ type RetryStateRow = RowDataPacket & {
   match_team1_id: number | null;
   match_team2_id: number | null;
   status: string | null;
-  match_check_in?: number | null;
-  match_check_in_resumed_at?: MaybeInstant;
+  match_check_in: number | null;
+  match_check_in_resumed_at: MaybeInstant;
 };
 
 /**
@@ -733,10 +777,7 @@ async function retryStillCurrent(retry: DmRetry): Promise<MatchCheckInSetting | 
   const state = rows[0];
   if (!state || (state.status && isPlayedMatchStatus(state.status))) return null;
   if (!sameInstant(state.match_start_at, retry.sentStart) || !samePoster(state, retry.match)) return null;
-  const setting =
-    state.match_check_in === undefined
-      ? checkInSettingOf(retry.match)
-      : readMatchCheckIn(state.match_check_in, state.match_check_in_resumed_at);
+  const setting = readMatchCheckIn(state.match_check_in, state.match_check_in_resumed_at);
   if (retry.checkInReminder && !checkInSendable(setting, new Date())) return null;
   return setting;
 }
@@ -798,16 +839,21 @@ function scheduleDmRetry(retries: readonly DmRetry[]): void {
  * Envoie un envoi retenu aux deux engagées de la manche, **en même temps** :
  * chacune attend le bot puis ses appareils, rien ne lie l'une à l'autre.
  *
+ * @param readCheckIn Relecture de l'option « Check-in des matchs » (celle du
+ *                    passage, partagée par ses envois ; par défaut une relecture
+ *                    propre à cet envoi).
  * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
  */
 async function dispatchPlannedSend(
   planned: PlannedSend,
   recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
+  readCheckIn: CheckInReader = createCheckInReader(),
 ): Promise<number> {
-  // L'option « Check-in des matchs » se lit à l'envoi, pas au début du passage.
-  let send: PlannedSend;
+  // L'option « Check-in des matchs » se lit à l'envoi, pas au début du passage
+  // — seulement pour un envoi qui en dépend.
+  let send: PlannedSend = planned;
   try {
-    send = { ...planned, match: await withFreshCheckIn(planned.match) };
+    if (dependsOnCheckIn(planned)) send = { ...planned, match: await withFreshCheckIn(planned.match, readCheckIn) };
   } catch (error) {
     // Rien n'est parti : les marques sont rendues, le passage suivant retente.
     await releaseClaims(planned);
@@ -885,7 +931,7 @@ const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_num
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status NOT IN (${PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ")})
+      WHERE m.status NOT IN (${PLAYED_MATCH_STATUS_SQL})
         AND t.state <> 'FINISHED'
         AND m.start_at IS NOT NULL
         AND m.start_at > ?`;
@@ -1284,13 +1330,14 @@ async function runSweep(now: Date): Promise<number> {
   // coup toutes les manches. Les réservations, déjà prises, interdisent le
   // doublon quel que soit l'ordre.
   let dispatched = 0;
+  const readCheckIn = createCheckInReader();
   await inBatches(planned, SWEEP_CONCURRENCY, async (send) => {
     // Un envoi qui échoue ne retient pas les autres : leurs réservations sont
     // déjà prises, et un passage interrompu les perdrait pour de bon.
     try {
       // Lu après l'attente : `dispatched += await …` lirait le compteur avant,
       // et perdrait les envois concurrents du même lot.
-      const sent = await dispatchPlannedSend(send, recipientsByTeam);
+      const sent = await dispatchPlannedSend(send, recipientsByTeam, readCheckIn);
       dispatched += sent;
     } catch (error) {
       console.error("[match-reminders] envoi de rappel en échec", error);
