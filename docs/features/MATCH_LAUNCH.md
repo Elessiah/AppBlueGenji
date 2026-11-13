@@ -314,6 +314,10 @@ L'entretien lancé par la lecture de la modale (`maintainIfDue`) rejoue la
 transaction d'un tournoi sur interblocage (`retryOnDeadlock`) : la relecture
 d'éligibilité verrouille le compte après le match, à l'inverse de la
 suppression de compte, et la passe n'est plus perdue jusqu'au balayage suivant.
+Chaque candidat est relu sous verrou de sa seule ligne ; le contexte (tournoi,
+fantômes) vient de la lecture des candidats, même instantané, tant que la ligne
+verrouillée garde ses deux engagées — sinon il est relu (`lockLaunchMatch`,
+`known`).
 
 L'ouverture du salon (`lobby_opened_at`) déclenche aussi, après coup, le
 **check-in du match** quand il n'a pas d'horaire — avec un horaire, il est

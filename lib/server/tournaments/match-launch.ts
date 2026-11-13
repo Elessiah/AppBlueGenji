@@ -390,11 +390,18 @@ function refereePlayCounts(base: LaunchMatchBaseRow): boolean {
  * le verrou (`snapshotBeforeLock` : l'entretien des lancements et l'autogestion
  * d'une manche lisent d'abord leurs candidats), seule la lecture verrouillante
  * est *courante* et elle est gardée.
+ *
+ * `known` : la ligne du même match déjà lue **dans cette transaction** par une
+ * lecture ordinaire (l'entretien lit ses candidats avec tournoi et équipes
+ * joints). Son contexte vient du même instantané que la lecture ci-dessous :
+ * il la remplace tant que l'appariement relu sous verrou est le sien — un
+ * aller-retour de moins par candidat, sous verrou.
  */
 async function lockLaunchMatch(
   connection: PoolConnection,
   matchId: number,
   snapshotBeforeLock = false,
+  known?: LaunchMatchBaseRow,
 ): Promise<LaunchMatchRow | null> {
   const [rows] = await connection.execute<LaunchMatchBaseRow[]>(
     `SELECT ${LAUNCH_MATCH_OWN_COLUMNS} FROM bg_matches m WHERE m.id = ? LIMIT 1 FOR UPDATE`,
@@ -403,16 +410,40 @@ async function lockLaunchMatch(
   const base = rows[0];
   if (!base) return null;
 
-  const [context] = await connection.execute<
-    (RowDataPacket & {
-      tournament_state: string | null;
-      tournament_game: TournamentGame | null;
-      referee_scheduling: number | null;
-      match_launch_phase: number | null;
-      team1_is_ghost: number | null;
-      team2_is_ghost: number | null;
-    })[]
-  >(
+  const context = sameLaunchContext(known, base) ? known : (await readLaunchContext(connection, base))[0];
+  // Même effet que l'ancienne jointure interne : un match dont le tournoi a
+  // disparu n'est pas un match à lancer.
+  const tournamentState = context?.tournament_state ?? null;
+  if (!context || tournamentState === null) return null;
+  return finishLaunchRow(connection, matchId, base, context, tournamentState, snapshotBeforeLock);
+}
+
+/** Tournoi et engagées de la ligne : ceux d'une lecture ordinaire, hors verrou. */
+type LaunchContextRow = RowDataPacket & {
+  tournament_state: string | null;
+  tournament_game: TournamentGame | null;
+  referee_scheduling: number | null;
+  match_launch_phase: number | null;
+  team1_is_ghost: number | null;
+  team2_is_ghost: number | null;
+};
+
+/** La ligne déjà lue décrit-elle le même match, au même appariement, que la ligne verrouillée ? */
+function sameLaunchContext(
+  known: LaunchMatchBaseRow | undefined,
+  base: LaunchMatchBaseRow,
+): known is LaunchMatchBaseRow {
+  return (
+    known !== undefined &&
+    Number(known.id) === Number(base.id) &&
+    Number(known.tournament_id) === Number(base.tournament_id) &&
+    nullableId(known.team1_id) === nullableId(base.team1_id) &&
+    nullableId(known.team2_id) === nullableId(base.team2_id)
+  );
+}
+
+async function readLaunchContext(connection: PoolConnection, base: LaunchMatchBaseRow): Promise<LaunchContextRow[]> {
+  const [context] = await connection.execute<LaunchContextRow[]>(
     `SELECT
        (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
        (SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game,
@@ -429,14 +460,21 @@ async function lockLaunchMatch(
       nullableId(base.team2_id),
     ],
   );
-  // Même effet que l'ancienne jointure interne : un match dont le tournoi a
-  // disparu n'est pas un match à lancer.
-  const tournamentState = context[0]?.tournament_state ?? null;
-  if (tournamentState === null) return null;
+  return context;
+}
+
+async function finishLaunchRow(
+  connection: PoolConnection,
+  matchId: number,
+  base: LaunchMatchBaseRow,
+  context: Pick<LaunchContextRow, "tournament_game" | "referee_scheduling" | "match_launch_phase" | "team1_is_ghost" | "team2_is_ghost">,
+  tournamentState: string,
+  snapshotBeforeLock: boolean,
+): Promise<LaunchMatchRow> {
   // Le jeu, lu ici et jamais ailleurs : la condition de cast et d'arbitrage en
   // dépend (Battle.net en Overwatch seulement). Posé **avant** de juger
   // l'arbitre ; un jeu illisible retombe sur Overwatch, la règle la plus stricte.
-  base.tournament_game = context[0]?.tournament_game ?? "OW";
+  base.tournament_game = context.tournament_game ?? "OW";
   // Avant le départ, un arbitre qui joue désormais le match (roster rejoint
   // sans changer d'appariement) ne compte plus : sinon le lancement attendrait
   // un « Prêt » d'arbitre qu'il ne peut plus donner (il clique en joueur).
@@ -467,10 +505,10 @@ async function lockLaunchMatch(
     refereeStanding,
   });
   row.tournament_state = tournamentState;
-  row.referee_scheduling = context[0]?.referee_scheduling ?? 0;
-  row.match_launch_phase = context[0]?.match_launch_phase ?? 0;
-  row.team1_is_ghost = context[0]?.team1_is_ghost ?? null;
-  row.team2_is_ghost = context[0]?.team2_is_ghost ?? null;
+  row.referee_scheduling = context.referee_scheduling ?? 0;
+  row.match_launch_phase = context.match_launch_phase ?? 0;
+  row.team1_is_ghost = context.team1_is_ghost ?? null;
+  row.team2_is_ghost = context.team2_is_ghost ?? null;
   return row;
 }
 
@@ -1460,7 +1498,7 @@ export async function maintainMatchLaunches(
     // passe, comme un lancement d'office sans délai. Diffusions, annonces et
     // notifications, qui lisent `launched_at`, partent ainsi à l'identique.
     if (!enteredLaunch(candidate, now)) continue;
-    const row = await lockLaunchMatch(connection, Number(candidate.id), true);
+    const row = await lockLaunchMatch(connection, Number(candidate.id), true, candidate);
     if (row?.status !== "READY" || !enteredLaunch(row, now)) continue;
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
     const adopted = await adoptCurrentPairing(connection, row);

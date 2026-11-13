@@ -1340,10 +1340,44 @@ describe("maintainMatchLaunches", () => {
       // La ligne du match, puis ses casters : chaque table verrouillée seule.
       expect(lock).toMatch(/FROM bg_matches m WHERE m\.id = \?|FROM bg_match_casters WHERE match_id = \?/);
     }
-    // Le contexte (état du tournoi, fantômes) est relu sans verrou.
-    const context = queries.find((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"));
-    expect(context).toBeDefined();
-    expect(context).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
+  });
+
+  it("maintainMatchLaunches_samePairingUnderLock_reusesCandidateContext", async () => {
+    const queries: string[] = [];
+    const base = executeFor(state);
+
+    await maintainMatchLaunches(
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          queries.push(sql.replace(/\s+/g, " ").trim());
+          return base(sql, params);
+        },
+      }),
+      7,
+    );
+
+    expect(queries.some((q) => /FROM bg_matches m WHERE m\.id = \? LIMIT 1 FOR UPDATE/.test(q))).toBe(true);
+    expect(queries.some((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"))).toBe(false);
+  });
+
+  it("maintainMatchLaunches_pairingChangedUnderLock_readsContextUnlocked", async () => {
+    const queries: string[] = [];
+    const base = executeFor(state);
+
+    await maintainMatchLaunches(
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          queries.push(sql.replace(/\s+/g, " ").trim());
+          if (sql.includes("FOR UPDATE") && state.match) state.match = { ...state.match, team2_id: 30 };
+          return base(sql, params);
+        },
+      }),
+      7,
+    );
+
+    const contexts = queries.filter((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"));
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
   });
 
   it("parcourt les candidats dans un ordre fixe, pour verrouiller sans interblocage", async () => {
