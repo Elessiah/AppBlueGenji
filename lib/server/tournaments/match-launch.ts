@@ -11,6 +11,7 @@
  * Voir `docs/features/MATCH_LAUNCH.md`.
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { cached } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import {
@@ -833,9 +834,17 @@ export async function loadViewerRefereeEligible(
   game: TournamentGame,
 ): Promise<boolean> {
   if (!hasTournamentsPermission) return false;
-  const identity = await withConnection((connection) => loadCasterIdentity(connection, userId));
-  return refereeBlockReason(true, identity, game) === null;
+  // Gardée quelques secondes par lecteur et jeu : un arbitre aux onglets
+  // multiples qui relit ses pseudos ne relit pas son identité à chaque appel
+  // (la condition d'arbitrage se relit au contexte suivant, jamais décidée ici).
+  return cached(`referee-eligible:${userId}:${game}`, VIEWER_REFEREE_ELIGIBLE_TTL_MS, async () => {
+    const identity = await withConnection((connection) => loadCasterIdentity(connection, userId));
+    return refereeBlockReason(true, identity, game) === null;
+  });
 }
+
+/** Durée de garde de {@link loadViewerRefereeEligible}. */
+const VIEWER_REFEREE_ELIGIBLE_TTL_MS = 10_000;
 
 /**
  * Où un caster s'inscrit : **co-cast** d'un stream existant du match

@@ -213,8 +213,20 @@ describe("refereeNamesRetryDelay", () => {
     expect(refereeNamesRetryDelay("2")).toBe(10_000);
   });
 
+  it("refereeNamesRetryDelay_hugeRetryAfter_cappedAtOneMinute", () => {
+    expect(refereeNamesRetryDelay("3600")).toBe(60_000);
+  });
+
+  it("refereeNamesRetryDelay_httpDate_followsTheDate", () => {
+    const now = Date.parse("2026-10-21T07:27:00Z");
+    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 07:27:30 GMT", now)).toBe(30_000);
+    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 07:27:03 GMT", now)).toBe(10_000);
+    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 09:00:00 GMT", now)).toBe(60_000);
+  });
+
   it("refereeNamesRetryDelay_unreadableOrNegativeHeader_returnsTenSeconds", () => {
-    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 07:28:00 GMT")).toBe(10_000);
+    expect(refereeNamesRetryDelay("pas une date")).toBe(10_000);
+    expect(refereeNamesRetryDelay("")).toBe(10_000);
     expect(refereeNamesRetryDelay("-5")).toBe(10_000);
   });
 });

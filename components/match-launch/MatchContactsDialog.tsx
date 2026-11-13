@@ -347,7 +347,9 @@ export function useMatchContacts(
   // Une relecture ratée attend sa reprise (échecs comptés, `Retry-After`) :
   // la relève de l'arbitre ne la double pas. Lu par le minuteur, sans le relancer.
   const backingOffRef = useRef(false);
-  backingOffRef.current = rereadFailures > 0 || rereadWait > 0;
+  useEffect(() => {
+    backingOffRef.current = rereadFailures > 0 || rereadWait > 0;
+  }, [rereadFailures, rereadWait]);
   // Écart de l'horloge du poste sur celle du serveur, relevé à chaque lecture
   // réussie : la relève s'arrête à l'heure de lancement d'office du serveur.
   const clockSkewRef = useRef(0);
@@ -379,19 +381,24 @@ export function useMatchContacts(
   // Jamais lecture coupée : la relève poserait deux états toutes les 10 s sans rien lire.
   const followReferee = enabled && clocks && refereeReadyRereadDue(launch);
   const followUntil = launch?.autoLaunchAt ?? null;
+  // Relevés faits : compté hors de l'effet, que l'onglet masqué puis revu ou une
+  // mise à jour du lancement relance — le plafond tient pour toute la modale.
+  const followReadsRef = useRef(0);
+  useEffect(() => {
+    followReadsRef.current = 0;
+  }, [matchId]);
   useEffect(() => {
     if (!followReferee) return;
-    let reads = 0;
     const timer = setInterval(() => {
       const step = refereeReadyRereadStep({
         now: Date.now() + clockSkewRef.current,
         autoLaunchAt: followUntil,
-        reads,
+        reads: followReadsRef.current,
         backingOff: backingOffRef.current,
       });
       if (step === "stop") clearInterval(timer);
       if (step !== "read") return;
-      reads += 1;
+      followReadsRef.current += 1;
       rereadNow();
     }, REFEREE_READY_REREAD_MS);
     return () => clearInterval(timer);

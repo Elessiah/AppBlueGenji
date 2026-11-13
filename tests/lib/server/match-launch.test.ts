@@ -9,6 +9,7 @@ jest.mock("@/lib/server/tournaments/staff-action-logs");
 import type { PoolConnection } from "mysql2/promise";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 import { withConnection } from "@/lib/server/database";
+import { invalidateCachedPrefix } from "@/lib/server/cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import {
   announceCastChange,
@@ -486,6 +487,7 @@ let state: World;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  invalidateCachedPrefix("referee-eligible:");
   state = world();
   jest
     .mocked(withConnection)
@@ -1445,6 +1447,21 @@ describe("loadViewerRefereeEligible", () => {
     };
 
     await expect(loadViewerRefereeEligible(CASTER, true, "OW")).resolves.toBe(true);
+  });
+
+  it("loadViewerRefereeEligible_repeatedCalls_readIdentityOnce", async () => {
+    state.users[CASTER] = {
+      discord_verified_at: STAMP,
+      discord_pseudo: "caster",
+      blizzard_sub: "sub",
+      overwatch_battletag: "Caster#1",
+      is_deleted: 0,
+    };
+
+    await loadViewerRefereeEligible(CASTER, true, "OW");
+    await loadViewerRefereeEligible(CASTER, true, "OW");
+
+    expect(withConnection).toHaveBeenCalledTimes(1);
   });
 });
 

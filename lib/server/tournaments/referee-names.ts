@@ -225,12 +225,22 @@ export function forgetRefereeNames(): void {
 }
 
 /**
+ * Plus de tournois republiés pour un seul renommage : un arbitre en a une
+ * poignée en cours ; au-delà (compte hors norme), les plus récents passent
+ * d'abord et le reste attend l'expiration du cache (30 s) — jamais une rafale
+ * sans borne d'événements, de recalculs d'instantané et de contextes de lecteur.
+ * Un tournoi terminé ne nomme personne : il n'est pas republié.
+ */
+export const REFEREE_RENAME_MAX_TOURNAMENTS = 50;
+
+/**
  * Un compte s'est renommé : les tournois où il arbitre un match non joué (dont
  * l'instantané porte l'empreinte — `refereeKey` hors `COMPLETED`, en attente de
  * confirmation comprise) oublient leurs pseudos **et republient leur
  * instantané** — l'empreinte, qui porte le pseudo, change, et les membres déjà
  * connectés relisent le nouveau. Un joueur qui se renomme
- * ne touche rien. Une lecture indexée (`idx_bg_matches_referee`) ; si elle
+ * ne touche rien. Une lecture indexée (`idx_bg_matches_referee`), bornée
+ * à {@link REFEREE_RENAME_MAX_TOURNAMENTS} tournois ; si elle
  * échoue, tout le cache des pseudos est oublié — un ancien pseudo n'est jamais
  * servi faute de l'avoir lue. Ne lève jamais.
  */
@@ -239,7 +249,12 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
   try {
     tournamentIds = await withConnection(async (connection) => {
       const [found] = await connection.query<RowDataPacket[]>(
-        `SELECT DISTINCT tournament_id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED'`,
+        `SELECT DISTINCT m.tournament_id
+           FROM bg_matches m
+           JOIN bg_tournaments t ON t.id = m.tournament_id
+          WHERE m.referee_user_id = ? AND m.status <> 'COMPLETED' AND t.state <> 'FINISHED'
+          ORDER BY m.tournament_id DESC
+          LIMIT ${REFEREE_RENAME_MAX_TOURNAMENTS}`,
         [userId],
       );
       return found.map((row) => Number(row.tournament_id));

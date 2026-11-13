@@ -202,6 +202,7 @@ export function useTournamentLive(tournamentId: number) {
   const namesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const namesAbortRef = useRef<AbortController | null>(null);
   const namesRetryAtRef = useRef(0);
+  const namesRetryKeyRef = useRef("");
   const namesDeferredRef = useRef(false);
   const namesPendingRef = useRef(false);
   const namesRetriesRef = useRef(0);
@@ -333,6 +334,12 @@ export function useTournamentLive(tournamentId: number) {
       namesAttemptRef.current = attempt.attempted;
       return;
     }
+    // Un autre ensemble d'empreintes que celui qui a échoué : ni son attente ni
+    // ses reprises épuisées ne le concernent.
+    if (missing !== namesRetryKeyRef.current) {
+      namesRetryAtRef.current = 0;
+      namesRetriesRef.current = 0;
+    }
     if (namesTimerRef.current !== null) return;
     if (namesAbortRef.current !== null) {
       namesPendingRef.current = true;
@@ -350,6 +357,7 @@ export function useTournamentLive(tournamentId: number) {
     // prochain instantané (ou le retour sur l'onglet) retentera.
     const retryLater = (delayMs: number, auto: boolean) => {
       namesRetryAtRef.current = Date.now() + delayMs;
+      namesRetryKeyRef.current = missing;
       if (namesAttemptRef.current === missing) namesAttemptRef.current = "";
       if (auto && namesRetriesRef.current < REFEREE_NAMES_AUTO_RETRIES) {
         namesRetriesRef.current += 1;
@@ -423,6 +431,7 @@ export function useTournamentLive(tournamentId: number) {
       namesAbortRef.current = null;
       namesAttemptRef.current = "";
       namesRetryAtRef.current = 0;
+      namesRetryKeyRef.current = "";
       namesDeferredRef.current = false;
       namesPendingRef.current = false;
       namesRetriesRef.current = 0;

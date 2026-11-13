@@ -363,7 +363,8 @@ describe("forgetRefereeNamesOf", () => {
 
     await forgetRefereeNamesOf(4);
 
-    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("referee_user_id = ? AND status <> 'COMPLETED'"), [4]);
+    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("m.referee_user_id = ? AND m.status <> 'COMPLETED' AND t.state <> 'FINISHED'"), [4]);
+    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("LIMIT 50"), [4]);
     expect(jest.mocked(invalidateCachedPrefix).mock.calls).toEqual([["referee-names:7:"], ["referee-names:9:"]]);
     expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([[7], [9]]);
   });

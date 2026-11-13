@@ -450,6 +450,20 @@ describe("useMatchContacts — lecture coupée (`enabled` à faux)", () => {
     expect(body).toContain("if (!enabled || !launch) return;");
   });
 
+  it("useMatchContacts_followReads_countedInRefSurvivingEffectRestarts", () => {
+    expect(body).toContain("const followReadsRef = useRef(0);");
+    expect(body).toContain("reads: followReadsRef.current,");
+    expect(body).toContain("followReadsRef.current += 1;");
+    expect(body).not.toContain("let reads = 0;");
+  });
+
+  it("useMatchContacts_backingOff_refUpdatedInEffectNotDuringRender", () => {
+    const assignAt = body.indexOf("backingOffRef.current = rereadFailures > 0 || rereadWait > 0;");
+    expect(assignAt).toBeGreaterThan(-1);
+    expect(body.slice(assignAt - 40, assignAt)).toContain("useEffect(() => {");
+    expect(body).toContain("}, [rereadFailures, rereadWait]);");
+  });
+
   it("useMatchContacts_readOff_fingerprintFollowsCard", () => {
     // Lecture coupée : l'empreinte suit la carte, la lecture rouverte ne relit pas aussitôt.
     expect(body).toMatch(/if \(!launch\) \{[^}]*?if \(!enabled\) previousCard\.current = card;\s*return;\s*\}/);

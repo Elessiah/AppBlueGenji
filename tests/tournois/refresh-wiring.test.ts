@@ -263,6 +263,14 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
     expect(body).toContain("if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);");
   });
 
+  it("refreshRefereeNames_otherMissingSet_ignoresEarlierBackoffAndExhaustedRetries", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+    expect(body).toContain("if (missing !== namesRetryKeyRef.current) {");
+    expect(body).toContain("namesRetryAtRef.current = 0;");
+    expect(body).toContain("namesRetriesRef.current = 0;");
+    expect(body).toContain("namesRetryKeyRef.current = missing;");
+  });
+
   it("refreshRefereeNames_lateResponse_mergesOnlyMissingNames", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
     const merge = body.indexOf("const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, names);");

@@ -18,7 +18,7 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 
 | Colonne | Rôle |
 | --- | --- |
-| `referee_user_id` | arbitre désigné, `NULL` sinon ; clé étrangère `ON DELETE SET NULL`, index `idx_bg_matches_referee` |
+| `referee_user_id` | arbitre désigné, `NULL` sinon ; clé étrangère `ON DELETE SET NULL`, index `idx_bg_matches_referee` et `idx_bg_matches_tournament_referee (tournament_id, referee_user_id, status)` (lecture directe des pseudos d'un tournoi) |
 | `referee_ready_at` | son « Prêt », remis à zéro à chaque désignation et quand un report (ou la planification par arbitre) fait quitter le lancement au match |
 | `self_managed` | autogestion (`0`/`1`), exclusive de l'arbitre |
 | `first_map` | première carte saisie par le staff (64 caractères, `visibleText`) |
@@ -202,8 +202,9 @@ règle a changé avec l'arbitre hôte.
   empreintes où `showsRefereeName` est vrai — un match resté non joué ne
   nomme pas son arbitre indéfiniment). Le pseudo entre dans l'empreinte : un
   arbitre qui se renomme (`forgetRefereeNamesOf`) change la version et fait
-  republier les tournois où il arbitre un match non joué (en attente de
-  confirmation comprise : son empreinte change aussi), les membres
+  republier les tournois **non terminés** où il arbitre un match non joué (en attente de
+  confirmation comprise : son empreinte change aussi ; au plus
+  `REFEREE_RENAME_MAX_TOURNAMENTS` = 50, les plus récents d'abord), les membres
   connectés relisent son nouveau pseudo. L'empreinte d'un score en
   attente de confirmation reste (relève de la fenêtre « Contacts » quand
   l'arbitre change, même dans un tournoi terminé), mais le pseudo aux membres ne se montre que pour
@@ -235,13 +236,16 @@ règle a changé avec l'arbitre hôte.
   de `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur
   2 s ; la route lit la carte visible et une requête dédiée,
   `loadLiveRefereeNames`, cache jusqu'à la prochaine écriture du tournoi —
-  jamais l'instantané entier). Cette relecture attend que l'onglet soit
+  jamais l'instantané entier ; l'éligibilité du lecteur y est gardée 10 s par
+  lecteur et jeu, `loadViewerRefereeEligible`). Cette relecture attend que l'onglet soit
   regardé, s'annule au changement de tournoi, n'en lance pas une seconde en
   vol (une demande arrivée pendant repart à sa fin), ne garde que les pseudos
   encore manquants — et la marque `mine` changée sous la même empreinte —
   (`mergeRefereeNames`) et, après un échec passager (429, 5xx, réseau) ou une
-  réponse en retard, repart d'elle-même après `Retry-After` ou 10 s
-  (`refereeNamesRetryDelay`), six fois d'affilée au plus ; une relecture REST qui apporte les pseudos
+  réponse en retard, repart d'elle-même après `Retry-After` ou 10 s, 60 s au plus
+  (`refereeNamesRetryDelay`), six fois d'affilée au plus **par ensemble
+  d'empreintes manquantes** (une autre désignation ne subit ni l'attente ni
+  l'épuisement de la précédente) ; une relecture REST qui apporte les pseudos
   annule celle en attente. `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
   aux matchs qui les montrent** (`pruneRefereeNames` : le pseudo d'un match
   dont le score vient d'être déclaré quitte l'état du client sans attendre la

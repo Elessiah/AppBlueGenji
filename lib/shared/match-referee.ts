@@ -333,14 +333,25 @@ export function mergeRefereeNames<T extends RefereeNameEntry>(
 /** Plus courte attente avant de relire les pseudos après un échec (429, 5xx, réseau, réponse en retard). */
 export const REFEREE_NAMES_RETRY_MS = 10_000;
 
+/** Plus longue attente suivie : un `Retry-After` démesuré (proxy) ne gèle pas les pseudos des arbitres. */
+export const REFEREE_NAMES_RETRY_MAX_MS = 60_000;
+
 /**
  * Attente avant de relire les pseudos après un échec : l'en-tête `Retry-After`
- * (secondes) d'un refus de quota, jamais moins de {@link REFEREE_NAMES_RETRY_MS}.
+ * d'un refus de quota — secondes ou date HTTP —, jamais moins de
+ * {@link REFEREE_NAMES_RETRY_MS} ni plus de {@link REFEREE_NAMES_RETRY_MAX_MS}.
  */
-export function refereeNamesRetryDelay(retryAfter: string | null): number {
-  const seconds = retryAfter === null ? Number.NaN : Number(retryAfter);
-  const asked = Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : 0;
-  return Math.max(REFEREE_NAMES_RETRY_MS, asked);
+export function refereeNamesRetryDelay(retryAfter: string | null, now: number = Date.now()): number {
+  let asked = 0;
+  if (retryAfter !== null && retryAfter.trim() !== "") {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) asked = seconds > 0 ? seconds * 1_000 : 0;
+    else {
+      const date = Date.parse(retryAfter);
+      asked = Number.isFinite(date) ? Math.max(0, date - now) : 0;
+    }
+  }
+  return Math.min(REFEREE_NAMES_RETRY_MAX_MS, Math.max(REFEREE_NAMES_RETRY_MS, asked));
 }
 
 /** Liste de pseudos d'arbitre reçue d'une réponse (forme contrôlée), `null` si elle n'en est pas une. */

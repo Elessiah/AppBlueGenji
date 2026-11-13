@@ -116,7 +116,9 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     const byId = new Map(staff.map((row) => [Number(row.id), row]));
     const players = await loadMatchPlayerIds(connection, match);
     // État de la manche et ses cartes, sur la même clé de manche : **une**
-    // requête (l'agrégat rend toujours une ligne, cartes absentes = `NULL`).
+    // requête (l'agrégat rend toujours une ligne, cartes absentes = `NULL`) ;
+    // la clé de manche est unique (`uq_bg_round_maps_round`) : la sous-requête
+    // ne rend jamais deux lignes, `LIMIT 1` ne fait que le dire.
     const roundKey = [match.tournament_id, match.phase_id, match.bracket, match.round_number];
     const [roundStateRows] = await connection.execute<RoundStateRow[]>(
       `SELECT COUNT(*) AS open,
