@@ -268,3 +268,26 @@ describe("copie vers des tours que le tournoi ne porte plus (REFEREE-LOT-1)", ()
     expect(text("en").dialog.roundsSkipped).toContain("that no longer exists");
   });
 });
+
+describe("RoundMapsDialog per-map points fields wiring", () => {
+  const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx"), "utf8");
+
+  it("pointMapsFieldset_saveInFlight_disabledLikeLocked", () => {
+    expect(source).toContain("disabled={locked || busy}");
+  });
+
+  it("perMapInput_edit_clearsOnlyItsOwnFieldError", () => {
+    expect(source).toContain("onEdit={() => onClearError(index)}");
+    expect(source).toContain("clearFieldError(`map-${index}`)");
+  });
+
+  it("perMapRow_isMemoizedWithStableCallbacks", () => {
+    expect(source).toContain("const MapPointRow = memo(function MapPointRow");
+    expect(source).toContain("const editMap = useCallback(");
+    expect(source).toContain("const shownDrafts = useMemo(");
+  });
+
+  it("perMapLegend_flexLivesInInnerSpan_notOnLegend", () => {
+    expect(source).toContain("styles.pointMapsLegend");
+  });
+});

@@ -11,6 +11,7 @@ import {
   queueRoundMapsNotice,
   resetRoundMapsNoticeState,
   roundMapsFingerprint,
+  roundPointsFingerprint,
   scheduleRoundMapsNotice,
 } from "@/lib/server/tournaments/round-maps-notice";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
@@ -690,5 +691,19 @@ describe("scheduleRoundMapsNotice", () => {
 
     expect(sweeps()).toBe(1);
     expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe("roundPointsFingerprint", () => {
+  it("roundPointsFingerprint_noMapTargets_equalsRoundTargetFingerprint", () => {
+    expect(roundPointsFingerprint(3, [])).toBe(roundMapsFingerprint(3));
+  });
+
+  it("roundPointsFingerprint_mapTargets_differsFromRoundOnly", () => {
+    expect(roundPointsFingerprint(3, [null, 4])).not.toBe(roundMapsFingerprint(3));
+  });
+
+  it("roundPointsFingerprint_differentMapTargets_differ", () => {
+    expect(roundPointsFingerprint(3, [4])).not.toBe(roundPointsFingerprint(3, [5]));
   });
 });

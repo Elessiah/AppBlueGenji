@@ -30,7 +30,7 @@ import type { ReactNode } from "react";
 import { MatchPageScope } from "@/app/(secured)/tournois/[id]/_lib/match-page-context";
 import { MatchFormatProvider } from "@/app/(secured)/tournois/[id]/_lib/match-format-context";
 import type { MatchFormat } from "@/lib/shared/match-format";
-import { MatchPage } from "@/app/(secured)/tournois/[id]/_components/MatchPage";
+import { MatchPage, pointTargetFacts } from "@/app/(secured)/tournois/[id]/_components/MatchPage";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { SpectatorViewProvider } from "@/components/spectator-view";
@@ -1103,4 +1103,34 @@ describe("page d'un match — mise en page (CSS)", () => {
 
   // Les faits du bandeau (hôte, carte, arbitre, casters) ont quitté la carte
   // (`docs/features/MATCH_CARD_LAYOUT.md`) : plus de classe `.fact` à border.
+});
+
+describe("pointTargetFacts", () => {
+  const TEXT = {
+    firstTo: (points: string) => `premier à ${points}`,
+    mapFirstTo: (map: string, points: string) => `Map ${map} : premier à ${points}`,
+    othersFirstTo: (points: string) => `Maps suivantes : premier à ${points}.`,
+  };
+
+  it("pointTargetFacts_formatOff_returnsNoFact", () => {
+    expect(pointTargetFacts({ mapPointTarget: null, mapPointTargets: null }, "Points", TEXT)).toEqual([]);
+  });
+
+  it("pointTargetFacts_uniformTargets_returnsSingleValue", () => {
+    expect(pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 5] }, "Points", TEXT)).toEqual([
+      { id: "pointTarget", label: "Points", value: "premier à 5" },
+    ]);
+  });
+
+  it("pointTargetFacts_perMapTargets_listsEachMapWithDetail", () => {
+    const [fact] = pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 3] }, "Points", TEXT);
+    expect(fact.detail).toBe("Maps suivantes : premier à 5.");
+    expect(renderToStaticMarkup(<>{fact.value}</>)).toMatch(/Map 1 : premier à 5<\/span><span>Map 2 : premier à 3/);
+  });
+
+  it("pointTargetFacts_everyMapOfFormatSet_omitsFollowingMapsDetail", () => {
+    const [fact] = pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 3, 7] }, "Points", TEXT, { type: "BO", value: 3 });
+    expect(fact.detail).toBeUndefined();
+    expect(renderToStaticMarkup(<>{fact.value}</>)).toContain("Map 3 : premier à 7");
+  });
 });

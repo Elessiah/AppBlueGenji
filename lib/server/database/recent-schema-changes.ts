@@ -570,6 +570,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // par tour (`docs/features/DUEL_ARCADE.md`).
     `ALTER TABLE bg_tournaments ADD COLUMN map_point_target TINYINT UNSIGNED NULL AFTER match_format_draws`,
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN map_point_target TINYINT UNSIGNED NULL AFTER tiebreak_map`,
+    // DUEL-MAP-POINTS — points par carte réglés carte par carte sur un tour
+    // (JSON, `docs/features/DUEL_ARCADE.md`).
+    `ALTER TABLE bg_tournament_round_maps ADD COLUMN map_point_targets VARCHAR(128) NULL AFTER map_point_target`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

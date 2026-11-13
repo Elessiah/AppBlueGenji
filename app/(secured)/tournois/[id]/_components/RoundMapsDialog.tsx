@@ -15,13 +15,22 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
-import { MAP_POINT_TARGET_MAX, MAP_POINT_TARGET_MIN, roundPointsLocked, roundPointTargetOf } from "@/lib/shared/map-points";
+import {
+  clipMapPointTargets,
+  MAP_POINT_TARGET_MAX,
+  MAP_POINT_TARGET_MIN,
+  roundMapPointTargetsOf,
+  roundPointsLocked,
+  roundPointTargetOf,
+  sameMapPointTargets,
+  trimMapPointTargets,
+} from "@/lib/shared/map-points";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
-import { fieldErrorId, type FieldAria } from "@/lib/shared/field-errors";
+import { fieldAria, fieldErrorId, type FieldAria } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { filterOverwatchMaps } from "@/lib/shared/overwatch-maps";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -68,6 +77,14 @@ import {
   storedRoundsSignature,
 } from "../_lib/round-maps-editor";
 import { useRoundMapsText, type RoundMapsText } from "../_lib/round-maps-text";
+import {
+  editMapPointDraft,
+  invalidPointField,
+  mapPointDrafts,
+  mapPointRowCount,
+  type MapPointDraft,
+  type MapPointField,
+} from "../_lib/round-points-editor";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import styles from "./RoundMapsDialog.module.css";
 
@@ -551,26 +568,83 @@ function TiebreakForm({
   );
 }
 
-/** Refus du serveur rattachés au champ des points du tour. */
+/**
+ * Refus du serveur rattachés au champ des points du tour ; `INVALID_MAP_POINT_TARGET`
+ * va à la carte fautive quand elle se retrouve (`invalidPointField`).
+ */
 const POINTS_FIELD_ERRORS = {
   INVALID_MAP_POINT_TARGET: "points",
   MAP_POINTS_LOCKED: "points",
   MAP_POINTS_DISABLED: "points",
   MAP_POINTS_FINISHED: "points",
-} as const satisfies Record<string, "points">;
+} as const satisfies Record<string, MapPointField>;
+
+/**
+ * Une carte de « Carte par carte » : mémoïsée, taper dans l'une ne redessine
+ * pas les autres (jusqu'à 9 champs, dialogue ouvert pendant le direct).
+ */
+const MapPointRow = memo(function MapPointRow({
+  index,
+  inputId,
+  label,
+  followsText,
+  draft,
+  fallback,
+  message,
+  onEdit,
+  onClearError,
+}: Readonly<{
+  index: number;
+  inputId: string;
+  label: string;
+  followsText: string;
+  /** N propre à la carte, `null` : elle suit le tour. */
+  draft: MapPointDraft;
+  /** N du tour, montré quand la carte le suit. */
+  fallback: number;
+  message: string | null;
+  onEdit: (index: number, next: number) => void;
+  onClearError: (index: number) => void;
+}>) {
+  const followsId = `${inputId}-follows`;
+  return (
+    <li className={`field ${styles.pointMap}`}>
+      <label htmlFor={inputId}>{label}</label>
+      <NumberInput
+        id={inputId}
+        min={MAP_POINT_TARGET_MIN}
+        max={MAP_POINT_TARGET_MAX}
+        value={draft ?? fallback}
+        onValueChange={(next) => onEdit(index, next)}
+        onEdit={() => onClearError(index)}
+        {...fieldAria(inputId, message !== null, draft === null && followsId)}
+      />
+      <FieldErrorText fieldId={inputId} message={message} />
+      {draft === null && (
+        <span id={followsId} className={styles.muted}>
+          {followsText}
+        </span>
+      )}
+    </li>
+  );
+});
 
 /**
  * Points par carte propres à un tour, en format Duel / Arcade
- * (`docs/features/DUEL_ARCADE.md`) : « Enregistrer » pose le nombre du tour,
- * « Revenir aux points du tournoi » le retire. Montré seulement quand le
- * format est allumé sur le tournoi. Suit le serveur tant que le champ n'a pas
- * été modifié.
+ * (`docs/features/DUEL_ARCADE.md`) : « Enregistrer » pose le nombre du tour et
+ * celui de chaque carte (« Carte par carte », préremplies de leur N effectif :
+ * la carte, sinon le tour, sinon le tournoi — une carte laissée au nombre du
+ * tour le suit), « Revenir aux points du tournoi » retire tout. Montré
+ * seulement quand le format est allumé sur le tournoi. Suit le serveur tant
+ * que rien n'a été modifié.
  */
 function RoundPointsForm({
   tournamentId,
   round,
   tournamentTarget,
   saved,
+  savedMaps,
+  maxMaps,
   locked,
   busy,
   run,
@@ -584,6 +658,10 @@ function RoundPointsForm({
   tournamentTarget: number;
   /** Points propres au tour (`null` = il suit le tournoi). */
   saved: number | null;
+  /** Points propres à chaque carte du tour (`null` = la carte suit le tour). */
+  savedMaps: readonly (number | null)[];
+  /** Cartes que le format du tour joue au plus (`roundMaxMaps`, `null` en score libre). */
+  maxMaps: number | null;
   busy: boolean;
   run: RunTask;
   onDirtyChange: (dirty: boolean) => void;
@@ -595,36 +673,83 @@ function RoundPointsForm({
   const statusId = `${ids}-points-status`;
   const lockedId = `${ids}-points-locked`;
   const effective = saved ?? tournamentTarget;
+  const rows = mapPointRowCount(maxMaps);
+  // `savedMaps` arrive neufs à chaque instantané : l'identité ne suit que le contenu.
+  const savedMapsKey = savedMaps.join(",");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const savedSend = useMemo(() => clipMapPointTargets(savedMaps, rows), [savedMapsKey, rows]);
   const [value, setValue] = useState(effective);
-  const fieldErrors = useFieldErrors(POINTS_FIELD_ERRORS, { points: inputId });
-  const synced = useRef(effective);
+  const [drafts, setDrafts] = useState<MapPointDraft[]>(() => mapPointDrafts(savedSend, rows));
+  const fieldIds = useMemo(() => {
+    const entries: Record<MapPointField, string> = { points: inputId };
+    for (let index = 0; index < rows; index += 1) entries[`map-${index}`] = `${ids}-points-map-${index}`;
+    return entries;
+  }, [ids, inputId, rows]);
+  const fieldErrors = useFieldErrors<MapPointField>(POINTS_FIELD_ERRORS, fieldIds);
+  // Brouillon aligné sur le nombre de cartes du format (un flux peut le changer).
+  const shownDrafts = useMemo(
+    () => Array.from({ length: rows }, (_, index) => drafts[index] ?? null),
+    [drafts, rows],
+  );
+  const sendMaps = useMemo(() => trimMapPointTargets(shownDrafts), [shownDrafts]);
+  // Suit le serveur tant que la saisie n'a pas bougé depuis le dernier alignement.
+  const serverKey = `${effective}|${savedSend.join(",")}`;
+  const synced = useRef({ key: serverKey, effective, maps: savedSend });
   useEffect(() => {
     const before = synced.current;
-    synced.current = effective;
-    setValue((current) => (current === before ? effective : current));
-  }, [effective]);
-  const dirty = value !== effective;
+    if (before.key === serverKey) return;
+    synced.current = { key: serverKey, effective, maps: savedSend };
+    setValue((current) => (current === before.effective ? effective : current));
+    setDrafts((current) => {
+      const untouched = sameMapPointTargets(trimMapPointTargets(current), before.maps);
+      return untouched ? mapPointDrafts(savedSend, rows) : current;
+    });
+    // `serverKey` résume `effective` et `savedSend`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverKey]);
+  const dirty = value !== effective || !sameMapPointTargets(sendMaps, savedSend);
+  // Stables : seule la carte saisie se redessine (`MapPointRow` mémoïsée).
+  const editMap = useCallback(
+    (index: number, next: number) =>
+      setDrafts((current) =>
+        editMapPointDraft(
+          Array.from({ length: rows }, (_, i) => current[i] ?? null),
+          index,
+          next,
+          value,
+        ),
+      ),
+    [rows, value],
+  );
+  const { clear: clearFieldError } = fieldErrors;
+  const clearMapError = useCallback((index: number) => clearFieldError(`map-${index}`), [clearFieldError]);
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
   }, [dirty, onDirtyChange]);
 
-  const send = (target: number | null, success: string) =>
+  const send = (target: number | null, mapTargets: MapPointDraft[], success: string) =>
     run(
       async () => {
-        await putJson(`/api/admin/tournaments/${tournamentId}/round-points`, { ...round, target });
+        await putJson(`/api/admin/tournaments/${tournamentId}/round-points`, { ...round, target, mapTargets });
         setValue(target ?? tournamentTarget);
+        setDrafts(mapPointDrafts(mapTargets, rows));
         showSuccess(success);
       },
-      (code, text) => fieldErrors.report(code, text),
+      (code, text) => {
+        // Le serveur ne dit pas quelle carte : la même règle, rejouée ici, la retrouve.
+        if (code === "INVALID_MAP_POINT_TARGET") fieldErrors.flag(invalidPointField(mapTargets, rows, target), text);
+        else fieldErrors.report(code, text);
+      },
     );
 
   const save = (event: FormEvent) => {
     event.preventDefault();
     if (busy || locked || !dirty) return;
     // Le nombre du tournoi saisi sur le tour : le tour le suit, aucun réglage propre à garder.
-    void send(value === tournamentTarget ? null : value, t("dialog.pointsSaved"));
+    void send(value === tournamentTarget ? null : value, sendMaps, t("dialog.pointsSaved"));
   };
+  const hasOwn = saved !== null || savedMaps.length > 0;
 
   return (
     <form onSubmit={save} aria-busy={busy}>
@@ -659,15 +784,43 @@ function RoundPointsForm({
             </p>
           )}
         </div>
+        {rows > 0 && (
+          <fieldset className={styles.pointMaps} disabled={locked || busy}>
+            <legend className={styles.pointMapsLegend}>
+              <span className={styles.labelRow}>
+                <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
+                <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
+                  {t("dialog.pointsPerMapHint")}
+                </InfoHint>
+              </span>
+            </legend>
+            <ol className={styles.pointMapList}>
+              {shownDrafts.map((draft, index) => (
+                <MapPointRow
+                  key={fieldIds[`map-${index}`]}
+                  index={index}
+                  inputId={fieldIds[`map-${index}`]}
+                  label={t("dialog.pointsMapLabel", { index: index + 1 })}
+                  followsText={t("dialog.pointsMapFollows")}
+                  draft={draft}
+                  fallback={value}
+                  message={fieldErrors.message(`map-${index}`)}
+                  onEdit={editMap}
+                  onClearError={clearMapError}
+                />
+              ))}
+            </ol>
+          </fieldset>
+        )}
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           <button
             type="button"
             className="btn ghost"
-            aria-disabled={busy || locked || saved === null || undefined}
+            aria-disabled={busy || locked || !hasOwn || undefined}
             onClick={() => {
-              if (busy || locked || saved === null) return;
-              void send(null, t("dialog.pointsRemoved"));
+              if (busy || locked || !hasOwn) return;
+              void send(null, [], t("dialog.pointsRemoved"));
             }}
           >
             {t("dialog.pointsRemove")}
@@ -1364,6 +1517,8 @@ export function RoundMapsDialog({
             round={round}
             tournamentTarget={detail.card.mapPointTarget}
             saved={roundPointTargetOf(rules.pointTargets, round)}
+            savedMaps={roundMapPointTargetsOf(rules.mapPointTargets, round)}
+            maxMaps={maxMaps}
             locked={pointsLocked}
             busy={busy}
             run={run}

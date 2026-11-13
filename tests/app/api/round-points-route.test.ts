@@ -130,28 +130,28 @@ describe("PUT /api/admin/tournaments/[id]/round-points", () => {
 
   it("put_validTarget_returnsStoredTarget", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 3, before: null, changed: true });
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 3, before: null, mapTargets: [], mapTargetsBefore: [], changed: true });
 
     const actual = await PUT(put({ ...ROUND, target: 3 }), tournament("7"));
 
     expect(actual.status).toBe(200);
-    await expect(actual.json()).resolves.toEqual({ target: 3 });
-    expect(setRoundPointTarget).toHaveBeenCalledWith(7, ROUND, 3);
+    await expect(actual.json()).resolves.toEqual({ target: 3, mapTargets: [] });
+    expect(setRoundPointTarget).toHaveBeenCalledWith(7, ROUND, 3, undefined);
   });
 
   it("put_nullTarget_passesNullToClearTheOverride", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: null, before: 3, changed: true });
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: null, before: 3, mapTargets: [], mapTargetsBefore: [], changed: true });
 
     const actual = await PUT(put({ ...ROUND, target: null }), tournament("7"));
 
     expect(actual.status).toBe(200);
-    expect(setRoundPointTarget).toHaveBeenCalledWith(7, ROUND, null);
+    expect(setRoundPointTarget).toHaveBeenCalledWith(7, ROUND, null, undefined);
   });
 
   it("put_changed_auditsTheStaffMemberInPm2", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 7, before: null, changed: true });
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 7, before: null, mapTargets: [], mapTargetsBefore: [], changed: true });
 
     await PUT(put({ ...ROUND, target: 7 }), tournament("7"));
 
@@ -161,9 +161,42 @@ describe("PUT /api/admin/tournaments/[id]/round-points", () => {
     );
   });
 
+  it("put_mapTargets_passesThemAndReturnsStoredList", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 5, before: 5, mapTargets: [null, 3], mapTargetsBefore: [], changed: true });
+
+    const actual = await PUT(put({ ...ROUND, target: 5, mapTargets: [null, 3] }), tournament("7"));
+
+    expect(actual.status).toBe(200);
+    await expect(actual.json()).resolves.toEqual({ target: 5, mapTargets: [null, 3] });
+    expect(setRoundPointTarget).toHaveBeenCalledWith(7, ROUND, 5, [null, 3]);
+  });
+
+  it("put_invalidMapTargets_returns400InvalidMapPointTarget", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundPointTarget).mockRejectedValue(new Error("INVALID_MAP_POINT_TARGET"));
+
+    const actual = await PUT(put({ ...ROUND, target: 5, mapTargets: [0] }), tournament("7"));
+
+    expect(actual.status).toBe(400);
+    await expect(actual.json()).resolves.toEqual({ error: "INVALID_MAP_POINT_TARGET" });
+  });
+
+  it("put_mapTargetsChanged_auditsBothMapLists", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 5, before: 5, mapTargets: [null, 3], mapTargetsBefore: [4], changed: true });
+
+    await PUT(put({ ...ROUND, target: 5, mapTargets: [null, 3] }), tournament("7"));
+
+    expect(auditStaffAction).toHaveBeenCalledWith(
+      "🎯 Points par carte du tournoi #7, phase 0 UPPER tour 2 : 5 [cartes 4] → 5 [cartes -, 3]",
+      { id: arbitre.id, pseudo: arbitre.pseudo },
+    );
+  });
+
   it("put_unchanged_writesNoAudit", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 3, before: 3, changed: false });
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 3, before: 3, mapTargets: [], mapTargetsBefore: [], changed: false });
 
     const actual = await PUT(put({ ...ROUND, target: 3 }), tournament("7"));
 

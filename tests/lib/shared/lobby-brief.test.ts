@@ -53,6 +53,59 @@ describe("formatLobbyBriefDm", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 1 }), URL, "en")).toContain("each map is won by the first to 1 point.");
   });
 
+  it("formatLobbyBriefDm_perMapTargets_listsEachMapFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL);
+
+    expect(actual).toContain("Format Duel / Arcade : Map 1 au premier à 5 points, Map 2 au premier à 3 points, puis premier à 5 points pour les suivantes.");
+    expect(actual).not.toContain("chaque carte se gagne");
+  });
+
+  it("formatLobbyBriefDm_perMapTargets_listsEachMapEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL, "en");
+
+    expect(actual).toContain("Duel / Arcade format: Map 1 first to 5 points, Map 2 first to 3 points, then first to 5 points for the next ones.");
+  });
+
+  it("formatLobbyBriefDm_perMapSinglePoint_singularFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [1, 7] }), URL);
+
+    expect(actual).toContain("Map 1 au premier à 1 point, Map 2 au premier à 7 points, puis premier à 5 points pour les suivantes.");
+  });
+
+  it("formatLobbyBriefDm_perMapSinglePoint_singularEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [1, 7] }), URL, "en");
+
+    expect(actual).toContain("Map 1 first to 1 point, Map 2 first to 7 points, then first to 5 points for the next ones.");
+  });
+
+  it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL);
+
+    expect(actual).toContain("Format Duel / Arcade : Map 1 au premier à 5 points, Map 2 au premier à 3 points, Map 3 au premier à 7 points.");
+    expect(actual).not.toContain("pour les suivantes");
+  });
+
+  it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL, "en");
+
+    expect(actual).toContain("Duel / Arcade format: Map 1 first to 5 points, Map 2 first to 3 points, Map 3 first to 7 points.");
+    expect(actual).not.toContain("for the next ones");
+  });
+
+  it("formatLobbyBriefDm_perMapAllEqualRound_keepsSingleLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 5] }), URL)).toContain(
+      "chaque carte se gagne au premier à 5 points.",
+    );
+  });
+
+  it("formatLobbyBriefDm_emptyPerMapTargets_keepsSingleLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [] }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
+  });
+
+  it("formatLobbyBriefDm_perMapWithoutPointTarget_omitsLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: null, pointTargets: [3] }), URL)).not.toContain("Duel / Arcade");
+  });
+
   it("formatLobbyBriefDm_pointTargetSeveral_pluralFrAndEn", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
     expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL, "en")).toContain("each map is won by the first to 5 points.");
