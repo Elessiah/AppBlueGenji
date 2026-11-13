@@ -49,7 +49,6 @@ import {
   loadCastEligibility,
   loadCastBlocks,
   loadEligibleCasterIds,
-  loadRefereeEligibility,
   loadRefereeStanding,
   refereeObjectionUpheld,
   type CasterIdentityRow,
@@ -1532,14 +1531,16 @@ function assertOpenMatch(row: { status: string; is_bye: number } | undefined): v
 async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, refereeId: number): Promise<void> {
   // Lecture verrouillée : une suppression du compte en cours (verrou exclusif
   // sur sa ligne) est attendue puis lue, sans quoi l'arbitre désigné serait le
-  // compte anonymisé, sur un match que son retrait n'avait pas vu.
-  const block = await loadRefereeEligibility(connection, refereeId, row.tournament_game, true);
-  if (block) throw new Error(block);
-  // Opposition retenue : plus aucun arbitrage. Lecture verrouillée (partagée)
-  // sur la ligne du compte : retenir l'opposition l'écrit en exclusif, donc ou
-  // bien elle attend que ce geste soit validé et son balayage le voit, ou bien
-  // ce geste attend qu'elle le soit et la lit (`referee-objection.ts`).
-  if (await refereeObjectionUpheld(connection, refereeId, true)) throw new Error("REFEREE_OBJECTION");
+  // compte anonymisé, sur un match que son retrait n'avait pas vu. Condition
+  // et opposition dans **la même** lecture (`loadRefereeStanding`).
+  const standing = await loadRefereeStanding(connection, refereeId, row.tournament_game, true);
+  if (standing.block) throw new Error(standing.block);
+  // Opposition retenue : plus aucun arbitrage. La lecture verrouillée
+  // (partagée) de la ligne du compte la sérialise : retenir l'opposition
+  // l'écrit en exclusif, donc ou bien elle attend que ce geste soit validé et
+  // son balayage le voit, ou bien ce geste attend qu'elle le soit et la lit
+  // (`referee-objection.ts`).
+  if (standing.objection) throw new Error("REFEREE_OBJECTION");
   if (await resolveTeamParty(connection, row, refereeId)) throw new Error("REFEREE_IS_PLAYER");
   const casterReadyAt = row.casters.find((caster) => caster.userId === refereeId)?.readyAt ?? null;
   await connection.execute(
@@ -2039,31 +2040,55 @@ export async function relaunchAfterRefereeWithdrawal(
  * rien ne change, de même si l'opposition a été levée entre-temps. Un match qui n'attendait plus que lui part ; l'arbitre est
  * prévenu (motif `OBJECTION`), le journal dit « retiré par le staff ».
  *
+ * `batch` (balayage d'une opposition, `referee-objection.ts`) : ni avis ni
+ * `match_updated` ici — le tournoi du match retiré y est ajouté après
+ * validation, l'appelant rediffuse chaque tournoi **une** fois et envoie un avis
+ * récapitulatif (`announceObjectionReleases`).
+ *
  * @returns vrai si l'arbitre a été retiré.
  */
 export async function releaseObjectingReferee(
   matchId: number,
   refereeId: number,
   undecided?: NoRefereeCandidate[],
+  batch?: { tournamentIds: Set<number> },
 ): Promise<boolean> {
   // Comme `releaseIneligibleReferee` : remis à l'appelant après validation seulement.
   let launched: NoRefereeCandidate[] = [];
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       launched = [];
-      const row = await lockLaunchMatch(connection, matchId);
+      // Verrou **allégé** : la seule ligne du match, sans le contexte complet
+      // de `lockLaunchMatch` (condition de l'arbitre, équipes, casters) —
+      // inutile pour un retrait, et relu par `launchIfAllReady` une fois
+      // l'arbitre ôté, s'il y a lieu de lancer. Même ordre de verrous que
+      // `lockLaunchMatch` puis `writeReferee` : match, puis compte.
+      const [rows] = await connection.execute<
+        (RowDataPacket & { tournament_id: number; status: string; referee_user_id: number | null })[]
+      >(`SELECT m.tournament_id, m.status, m.referee_user_id FROM bg_matches m WHERE m.id = ? LIMIT 1 FOR UPDATE`, [matchId]);
+      const row = rows[0];
       if (!row || nullableId(row.referee_user_id) !== refereeId || row.status === "COMPLETED") return null;
-      // Relue sous le verrou du match (même ordre que `writeReferee` : match
-      // puis compte) : levée entre-temps, l'opposition ne retire plus rien.
+      // Relue sous le verrou du match : levée entre-temps, l'opposition ne
+      // retire plus rien.
       if (!(await refereeObjectionUpheld(connection, refereeId, true))) return null;
-      await clearMatchReferee(connection, row, matchId, undecided ? launched : undefined);
-      queueRefereeChange(connection, { kind: "OBJECTION_RELEASED", matchId, refereeId });
+      const [tournament] = await connection.execute<(RowDataPacket & { state: string })[]>(
+        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+        [row.tournament_id],
+      );
+      await clearMatchReferee(
+        connection,
+        { tournament_state: tournament[0]?.state ?? "" },
+        matchId,
+        undecided ? launched : undefined,
+      );
+      if (!batch) queueRefereeChange(connection, { kind: "OBJECTION_RELEASED", matchId, refereeId });
       return Number(row.tournament_id);
     }),
   );
   undecided?.push(...launched);
   if (tournamentId === null) return false;
-  publishMatchUpdatedEvent(tournamentId);
+  if (batch) batch.tournamentIds.add(tournamentId);
+  else publishMatchUpdatedEvent(tournamentId);
   return true;
 }
 

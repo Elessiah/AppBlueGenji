@@ -194,5 +194,9 @@
       "INELIGIBLE": "you no longer meet the refereeing requirements",
       "JOINED_TEAM": "you now play this match"
     }
+  },
+  "refereeObjectionReleased": {
+    "title": "Refereeing removed",
+    "body": "You no longer referee {count, plural, one {# match} other {# matches}}: the staff upheld your objection to being shown to the parties to your matches."
   }
 }

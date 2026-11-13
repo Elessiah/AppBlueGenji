@@ -1692,8 +1692,21 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     state.match = matchState();
     state.issued = [];
     await takeMatchReferee(42, REFEREE);
-    const eligibilityRead = state.issued.find((sql) => sql.includes("platform_roles_json FROM bg_users"));
-    expect(eligibilityRead).toMatch(/WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+    const lockedRead = state.issued.find(
+      (sql) => sql.includes("FROM bg_users") && sql.endsWith("LOCK IN SHARE MODE"),
+    );
+    expect(lockedRead).toMatch(/referee_objection_at FROM bg_users WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+  });
+
+  it("takeMatchReferee_anyTake_readsConditionAndObjectionInOneLockedRead", async () => {
+    state.match = matchState();
+    state.issued = [];
+    await takeMatchReferee(42, REFEREE);
+    const lockedUserReads = state.issued.filter(
+      (sql) => sql.includes("FROM bg_users") && sql.endsWith("LOCK IN SHARE MODE"),
+    );
+    expect(lockedUserReads).toHaveLength(1);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
   });
 
   it("takeMatchReferee_accountDeleted_refusesAndSetsNoReferee", async () => {
@@ -2135,6 +2148,45 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
       refereeId: REFEREE,
     });
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("releaseObjectingReferee_unfinishedMatch_locksMatchRowAloneBeforeRelease", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
+    state.issued = [];
+
+    await releaseObjectingReferee(42, REFEREE);
+
+    const release = state.issued.findIndex((sql) => sql.startsWith("UPDATE bg_matches SET referee_user_id = NULL"));
+    const beforeRelease = state.issued.slice(0, release);
+    // Verrou allégé : ni contexte du lancement, ni condition d'arbitrage, ni casters avant le retrait.
+    expect(beforeRelease.some((sql) => sql.includes("AS tournament_state"))).toBe(false);
+    expect(beforeRelease.some((sql) => sql.includes("platform_roles_json"))).toBe(false);
+    expect(beforeRelease.some((sql) => sql.includes("FROM bg_match_casters"))).toBe(false);
+  });
+
+  it("releaseObjectingReferee_withBatch_collectsTournamentWithoutNoticeOrPublish", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    const batch = { tournamentIds: new Set<number>() };
+
+    const released = await releaseObjectingReferee(42, REFEREE, [], batch);
+
+    expect(released).toBe(true);
+    expect([...batch.tournamentIds]).toEqual([7]);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("releaseObjectingReferee_tournamentNotRunning_clearsWithoutLaunching", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, tournament_state: "FINISHED", team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(true);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(state.match?.launched_at).toBeNull();
   });
 
   it("releaseObjectingReferee_launchedMatch_stillReleases", async () => {

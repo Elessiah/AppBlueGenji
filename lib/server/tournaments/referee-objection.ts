@@ -29,6 +29,8 @@ import { getDatabase } from "@/lib/server/database";
 import { loadRefereePermission } from "./cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "./match-launch";
 import { forgetRefereeNames } from "./referee-names";
+import { announceObjectionReleases } from "./referee-notices";
+import { publishMatchUpdatedEvent } from "./notifications";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 
 /**
@@ -105,9 +107,12 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
   let failed = 0;
   // Les matchs qui partent sans arbitre sont signalés ensemble, par manche.
   const undecided: NoRefereeCandidate[] = [];
+  // Regroupés par tournoi : un `match_updated` par tournoi touché et un avis
+  // récapitulatif à l'arbitre, au lieu d'un de chaque par match retiré.
+  const batch = { tournamentIds: new Set<number>() };
   for (const match of matches) {
     try {
-      if (await releaseObjectingReferee(Number(match.id), refereeId, undecided)) released += 1;
+      if (await releaseObjectingReferee(Number(match.id), refereeId, undecided, batch)) released += 1;
     } catch (error) {
       failed += 1;
       // Sans numéro de match : pm2 porte déjà « Arbitre : #id » (route), et
@@ -116,6 +121,8 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
       console.error("[referee-objection] retrait d'un match impossible :", error);
     }
   }
+  for (const tournamentId of batch.tournamentIds) publishMatchUpdatedEvent(tournamentId);
+  await announceObjectionReleases(refereeId, released, [...batch.tournamentIds]);
   await queueDeferredNoRefereeAlerts(undecided);
   return { released, failed };
 }

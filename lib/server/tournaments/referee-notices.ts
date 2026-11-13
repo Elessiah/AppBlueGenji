@@ -20,7 +20,7 @@ import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatRefereeChangeLog, type RefereeLogChange } from "@/lib/shared/bot-logs";
-import { refereeReleasedPush, type RefereeReleaseReason } from "@/lib/shared/push-messages";
+import { refereeObjectionReleasedPush, refereeReleasedPush, type RefereeReleaseReason } from "@/lib/shared/push-messages";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
 /** Un changement d'arbitrage ou d'organisation, constaté sous verrou. */
@@ -193,6 +193,29 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
         locale,
       ),
   });
+}
+
+/**
+ * Avis **récapitulatif** du balayage d'une opposition retenue
+ * (`referee-objection.ts`) : un seul push pour les `count` matchs retirés, au
+ * lieu d'un par match. Aucune ligne de journal (comme un `OBJECTION_RELEASED`
+ * de ce balayage, la ligne anonyme de la route suffit). Ne lève jamais.
+ */
+export async function announceObjectionReleases(
+  refereeId: number,
+  count: number,
+  tournamentIds: readonly number[],
+): Promise<void> {
+  if (count === 0) return;
+  try {
+    const recipients = await loadNotificationRecipients([refereeId], "certified");
+    await notifyUsers(recipients, {
+      topic: "REFEREE_RELEASED",
+      push: (locale) => refereeObjectionReleasedPush({ count, tournamentIds }, locale),
+    });
+  } catch (error) {
+    console.error("[referee] retraits sur opposition non annoncés", error);
+  }
 }
 
 /** Options d'une annonce : `log: false` tait la ligne du journal (geste groupé). */

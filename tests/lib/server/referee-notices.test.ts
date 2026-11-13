@@ -9,6 +9,7 @@ import { getDatabase } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import {
+  announceObjectionReleases,
   announceRefereeChange,
   deliverRefereeChange,
   discardRefereeChanges,
@@ -349,5 +350,30 @@ describe("avis à l'arbitre remplacé par lui-même, annonces d'une manche (EF-3
     await settle();
 
     expect(getDatabase).not.toHaveBeenCalled();
+  });
+});
+
+describe("announceObjectionReleases", () => {
+  it("announceObjectionReleases_count_sendsOneRefereeReleasedPush", async () => {
+    await announceObjectionReleases(REFEREE, 3, [7]);
+
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([REFEREE], "certified");
+    const sent = notification();
+    expect(sent.topic).toBe("REFEREE_RELEASED");
+    expect(resolvePush(sent.push).body).toContain("3 matchs");
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("announceObjectionReleases_zero_sendsNothing", async () => {
+    await announceObjectionReleases(REFEREE, 0, []);
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceObjectionReleases_notifyFails_doesNotThrow", async () => {
+    jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("push down"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(announceObjectionReleases(REFEREE, 2, [7])).resolves.toBeUndefined();
   });
 });

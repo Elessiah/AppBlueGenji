@@ -103,11 +103,16 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   la levée vaut pour tout compte qui en porte une ;
 - retenue : l'arbitre est retiré de **tous** ses matchs non terminés (tout
   statut sauf `COMPLETED`, score en attente de confirmation compris), lancés
-  compris (`releaseObjectingReferee`, un match par transaction sous
-  `lockLaunchMatch`, un match qui n'attendait que lui part) ; avis push
-  `REFEREE_RELEASED` motif `OBJECTION`, **aucune** ligne Discord par match
-  (nommer les matchs juste avant la ligne de l'opposition désignerait leur
-  arbitre) ; les matchs terminés gardent leur arbitre ; le staff en désigne un autre ;
+  compris (`releaseObjectingReferee`, un match par transaction sous un verrou
+  **allégé** — la seule ligne du match, puis l'opposition relue ; le contexte
+  complet n'est relu par `launchIfAllReady` que si le tournoi est en cours —,
+  un match qui n'attendait que lui part) ; **un** avis push récapitulatif
+  `REFEREE_RELEASED` (« Tu n'arbitres plus N matchs », `refereeObjectionReleasedPush`,
+  vers le tournoi s'il n'y en a qu'un, la liste sinon) et **un** `match_updated`
+  par tournoi touché, au lieu d'un de chaque par match ; **aucune** ligne
+  Discord par match (nommer les matchs juste avant la ligne de l'opposition
+  désignerait leur arbitre) ; les matchs terminés gardent leur arbitre ; le
+  staff en désigne un autre ;
 - tant qu'elle tient : ni « Je prends ce match » ni désignation
   (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee` et sur une
   re-désignation du même arbitre), absent des candidats, bouton « Arbitrer ce
@@ -131,7 +136,8 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   strict.
 
 Concurrence : l'écriture de l'opposition est une instruction seule (verrou
-exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition en
+exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition — avec la
+condition d'arbitrage, dans la même lecture (`loadRefereeStanding(…, true)`) — en
 `LOCK IN SHARE MODE` sous le verrou du match. Une prise concurrente passe donc
 avant (et le balayage, lancé après l'écriture, voit le match) ou après (et
 elle est refusée). Une transaction par match plutôt qu'une pour tous : ses

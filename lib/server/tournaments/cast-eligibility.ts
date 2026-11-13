@@ -247,23 +247,27 @@ export type RefereeStanding = { block: RefereeBlock | null; objection: boolean }
 /**
  * Condition d'arbitrage **et** opposition retenue de `userId`, en une seule
  * lecture de sa ligne (`lockLaunchMatch` lisait les deux séparément à chaque
- * verrou). Sans la colonne `referee_objection_at` (base pas encore migrée),
- * repli sur la seule condition, sans opposition — comme `refereeObjectionUpheld`.
+ * verrou ; `writeReferee` aussi, deux fois par désignation). Sans la colonne
+ * `referee_objection_at` (base pas encore migrée), repli sur la seule
+ * condition, sans opposition — comme `refereeObjectionUpheld`. `lock` : lecture
+ * verrouillée en partage, celle d'une désignation (`loadRefereeEligibility`,
+ * `refereeObjectionUpheld`).
  */
 export async function loadRefereeStanding(
   executor: Executor,
   userId: number,
   game: TournamentGame,
+  lock = false,
 ): Promise<RefereeStanding> {
   try {
     const [rows] = await executor.execute<(CastEligibilityRow & { referee_objection_at: Date | string | null })[]>(
-      `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1`,
+      `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
       [userId],
     );
     return { block: refereeEligibilityBlock(rows[0], game), objection: (rows[0]?.referee_objection_at ?? null) !== null };
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
-    return { block: await loadRefereeEligibility(executor, userId, game), objection: false };
+    return { block: await loadRefereeEligibility(executor, userId, game, lock), objection: false };
   }
 }
 

@@ -199,6 +199,11 @@ function connectionFor(world: World): PoolConnection {
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
       return [candidateContextRows(world, params), []];
     }
+    if (sql.startsWith("SELECT state FROM bg_tournaments WHERE id = ?")) {
+      // Retrait allégé d'un arbitre sous opposition : l'état du tournoi, seul.
+      const owner = world.candidates.find((c) => c.tournament_id === Number(params[0]));
+      return [owner ? [{ state: owner.tournament_state }] : [], []];
+    }
     if (sql.includes("WHERE m.tournament_id = ?")) {
       // Entretien : candidats au lancement du tournoi.
       return [world.candidates.filter((c) => c.launched_at === null), []];
