@@ -3,13 +3,13 @@ import type { TournamentGame, TournamentState } from "@/lib/shared/types";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
 import { refereeKeptColumns } from "./cast-eligibility";
-import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import { forfeitMapCount, matchMaxMaps, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 import { AUTO_VALIDATION_PAUSED_SQL } from "./score-report-sql";
-import { loadMatchPointTarget } from "./map-points";
-import type { RoundKey } from "@/lib/shared/round-maps";
+import { loadMatchPointRules } from "./map-points";
+import { ROUND_MAP_SLOTS_MAX, type RoundKey } from "@/lib/shared/round-maps";
 
 /**
  * Format de match applicable à une manche (`null` = saisie libre).
@@ -50,7 +50,8 @@ export async function loadTournamentMatchFormat(
  *
  * `pointTarget` : points qui gagnent une carte en format Duel / Arcade
  * (`docs/features/DUEL_ARCADE.md`) pour la manche `roundKey` — réglage du tour,
- * sinon du tournoi, `null` format éteint (ou sans `roundKey`).
+ * sinon du tournoi, `null` format éteint (ou sans `roundKey`) ; `pointTargets` :
+ * N effectif des cartes réglées une à une sur le tour (`null` sans réglage).
  */
 export async function loadTournamentMatchRules(
   connection: PoolConnection,
@@ -62,6 +63,7 @@ export async function loadTournamentMatchRules(
   game: TournamentGame | null;
   refereeScheduling: boolean;
   pointTarget: number | null;
+  pointTargets: number[] | null;
 }> {
   const [rows] = await connection.execute<
     (RowDataPacket & {
@@ -89,7 +91,7 @@ export async function loadTournamentMatchRules(
   );
 
   const row = rows[0];
-  if (!row) return { format: null, game: null, refereeScheduling: false, pointTarget: null };
+  if (!row) return { format: null, game: null, refereeScheduling: false, pointTarget: null, pointTargets: null };
 
   const qualification = parseMatchFormat(
     row.match_format_type,
@@ -105,10 +107,12 @@ export async function loadTournamentMatchRules(
     round,
   );
   const game = row.game === "OW" || row.game === "MR" ? row.game : null;
-  const pointTarget = roundKey
-    ? await loadMatchPointTarget(connection, tournamentId, row.map_point_target, roundKey)
-    : null;
-  return { format, game, refereeScheduling: Number(row.referee_scheduling ?? 0) === 1, pointTarget };
+  // Même borne que `roundMaxMaps` (instantané, brief) : le format de ce match.
+  const maxMaps = format ? Math.min(ROUND_MAP_SLOTS_MAX, matchMaxMaps(format)) : null;
+  const points = roundKey
+    ? await loadMatchPointRules(connection, tournamentId, row.map_point_target, roundKey, maxMaps)
+    : { pointTarget: null, pointTargets: null };
+  return { format, game, refereeScheduling: Number(row.referee_scheduling ?? 0) === 1, ...points };
 }
 
 /**

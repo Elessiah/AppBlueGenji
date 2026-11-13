@@ -656,6 +656,13 @@ export type BracketMatch = {
    */
   mapPointTarget?: number | null;
   /**
+   * Format Duel / Arcade réglé **carte par carte** sur le tour
+   * (`mapRules.mapPointTargets`) : N effectif de chaque carte réglée, carte 1 en
+   * tête (une carte au-delà suit `mapPointTarget` — `mapPointTargetAt`). Absent
+   * quand aucune carte n'a de réglage propre. Servi par les deux portes.
+   */
+  mapPointTargets?: number[] | null;
+  /**
    * Match joué sur une seule carte (BO1 / FT1) : score de cette carte (5–3),
    * que l'arbre et la carte du match montrent au lieu de 1–0
    * (`singleMapDisplayScore`). `null` / absent : le score du match. Affichage

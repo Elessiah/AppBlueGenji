@@ -332,6 +332,10 @@ export const TOURNAMENTS: TournamentDef[] = [
   // carte au premier à 5 points. Aucun match joué : le premier tour attend un
   // report (« 5 – 3 »), refusé hors de la règle.
   { name: "Duel Arcade Widow (premier à 5)", game: "OW", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 4, maxTeams: 4, daysOffset: -1, playWaves: 0, teamOffset: 24, matchFormat: { type: "BO", value: 1 }, mapPointTarget: 5 },
+  // Points réglés carte par carte (DUEL-MAP-POINTS) : BO3 au premier à 5, dont
+  // le premier tour joue la carte 2 au premier à 3 et la décisive au premier à 7
+  // (`lib/server/seed/point-targets.ts`). Aucun match joué.
+  { name: "Duel Arcade BO3 (points par carte)", game: "OW", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 4, maxTeams: 4, daysOffset: -1, playWaves: 0, teamOffset: 20, matchFormat: { type: "BO", value: 3 }, mapPointTarget: 5 },
 
   // ---- MULTI : tournois multi-phases -------------------------------------------
   {

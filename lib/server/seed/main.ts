@@ -12,6 +12,7 @@ import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "./cases";
 import { clearDatabase } from "./cleanup";
 import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./lock";
 import { applyMatchLaunchCases, applyNewMatchNoticeCases, applyTiebreakCases } from "./match-states";
+import { applyMapPointTargetCases } from "./point-targets";
 import {
   FICTIONAL_ABOUT_STATS,
   FICTIONAL_BUREAU,
@@ -130,6 +131,7 @@ async function seed(db: Pool): Promise<void> {
     specialUserIds.get("Arbitre") ?? null,
   );
   await applyTiebreakCases(db);
+  await applyMapPointTargetCases(db);
   await applyNewMatchNoticeCases(db);
   await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
   await acceptTermsForSeededAccounts(db);

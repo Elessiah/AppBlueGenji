@@ -21,6 +21,7 @@ export function MapDetailsDialog({
   team1Name,
   team2Name,
   pointTarget = null,
+  pointTargets = null,
   onClose,
 }: Readonly<{
   matchId: number;
@@ -29,6 +30,8 @@ export function MapDetailsDialog({
   team2Name: string;
   /** Points par carte du format Duel / Arcade (`null` = éteint). */
   pointTarget?: number | null;
+  /** N effectif carte par carte (`BracketMatch.mapPointTargets`). */
+  pointTargets?: ReadonlyArray<number> | null;
   onClose: () => void;
 }>) {
   const dialogRef = useDialogBehavior({ open: true, onClose });
@@ -60,6 +63,7 @@ export function MapDetailsDialog({
           team2Name={team2Name}
           label={t("match.maps.listLabel")}
           pointTarget={pointTarget}
+          pointTargets={pointTargets}
         />
         <div className={dialogStyles.actions}>
           <button type="button" className={`${dialogStyles.link} ${dialogStyles.close}`} onClick={onClose}>

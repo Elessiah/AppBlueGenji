@@ -219,7 +219,7 @@ Match avec arbitre désigné : l'ordre du premier ban ne suit pas
 |---|---|---|
 | `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` ou `{rounds: [{phaseId, bracket, roundNumber}…], slots}` (1 à 128 tours, `ROUND_MAPS_BULK_MAX` ; `slots: []` retire ; numéro de 1 à `ROUND_NUMBER_MAX` = 2000 ; cartes posées seulement sur un tour **de ce** tournoi — phase 0 sans phases, sinon une de ses phases, vérifiée sous verrou ; les autres clés d'une copie sont écartées et **comptées** dans `skipped` de la réponse `{ slots, skipped }` (l'écran affiche alors une notification neutre « sauf sur N tours qui n'existent plus » au lieu du succès entier), `INVALID_ROUND` si aucune ne reste ; une ancienne ligne au-delà de la borne (permise avant #514) est purgée au démarrage (`RECENT_SCHEMA_CHANGES`) ; retirer est permis sur toute clé, pour qu'une ligne restée d'une phase supprimée puisse partir) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
 | `PUT /api/admin/tournaments/[id]/round-tiebreak` `{phaseId, bracket, roundNumber, map}` (`map: null` ou vide retire ; poser exige un tour **de ce** tournoi et éligible, format relu sous `lockTournamentRow` en première instruction ; retirer est permis sur toute clé) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_TOURNAMENT_ID` / `INVALID_ROUND` / `INVALID_TIEBREAK_MAP` / `TIEBREAK_NOT_ALLOWED`, 404 `TOURNAMENT_NOT_FOUND`, 500 `ROUND_TIEBREAK_FAILED` |
-| `PUT /api/admin/tournaments/[id]/round-points` `{phaseId, bracket, roundNumber, target}` (points par carte du tour, format Duel / Arcade, `null` = suit le tournoi ; `DUEL_ARCADE.md`) | `can(user, "tournaments")` | 401, 403, 400 `INVALID_ROUND` / `INVALID_MAP_POINT_TARGET` / `MAP_POINTS_DISABLED`, 404, 409 `MAP_POINTS_LOCKED`, 500 `ROUND_POINTS_FAILED` |
+| `PUT /api/admin/tournaments/[id]/round-points` `{phaseId, bracket, roundNumber, target, mapTargets?}` (points par carte du tour, format Duel / Arcade, `null` = suit le tournoi ; `mapTargets` = N carte par carte, `null` = suit le tour, absent = inchangé ; `DUEL_ARCADE.md`) | `can(user, "tournaments")` | 401, 403, 400 `INVALID_ROUND` / `INVALID_MAP_POINT_TARGET` / `MAP_POINTS_DISABLED`, 404, 409 `MAP_POINTS_LOCKED`, 500 `ROUND_POINTS_FAILED` |
 | `PUT /api/admin/tournaments/[id]/map-rules` `{firstBan, nextBan, nextPick}` | `can(user, "tournaments")` | 401, 403, 400 `INVALID_MAP_RULES`, 404 |
 | `PUT /api/admin/matches/[matchId]/first-map` (existante) | `can(user, "tournaments")` | en plus : 409 `ROUND_MAPS_SET` quand le tour a des cartes |
 | `PUT /api/matches/[matchId]/map-pick` `{slot, map \| null}` | staff, ou équipe du match en autogestion | 401, 400 `INVALID_MAP_PICK`, 403 `NOT_MAP_PICKER`, 404, 409 `MATCH_ALREADY_COMPLETED` / `CONCURRENT_UPDATE_RETRY`, 429 `TOO_MANY_REQUESTS` (`MAP_PICK_WRITE_RULE` : 120 par compte en 5 min ; arbitrage `MAP_PICK_STAFF_WRITE_RULE` : 600 ; un choix refusé rend sa place ; tous les appels, refus compris, bornés par `MAP_PICK_ATTEMPT_RULE` : 900 pour l'arbitrage, `MAP_PICK_PLAYER_ATTEMPT_RULE` : 180 pour un joueur) |
@@ -334,7 +334,9 @@ round_number)`, `CASCADE` avec le tournoi) ; colonnes `bg_tournaments.first_ban_
 `bg_tournament_round_maps.tiebreak_map` (`VARCHAR(64) NULL`, dans le `CREATE TABLE`
 et dans `RECENT_SCHEMA_CHANGES`), `bg_tournament_round_maps.map_point_target`
 (`TINYINT UNSIGNED NULL`, points par carte du tour — une ligne qui ne porte qu'eux
-n'est jamais effacée par un vidage de cartes ou de départage, `DUEL_ARCADE.md`) (`DATABASE_SCHEMA.md`).
+n'est jamais effacée par un vidage de cartes ou de départage, `DUEL_ARCADE.md`),
+`bg_tournament_round_maps.map_point_targets` (`VARCHAR(128) NULL`, JSON des points
+carte par carte du tour, même garde) (`DATABASE_SCHEMA.md`).
 
 ## Seed
 

@@ -32,6 +32,7 @@ jest.mock("@/lib/server/tournaments/match-casters");
 jest.mock("@/lib/server/tournaments/round-maps");
 
 import {
+  attachPointTargets,
   castersOnReadStreams,
   castersOnUnreadStream,
   getTournamentSnapshot,
@@ -67,6 +68,7 @@ import { dispatchMatchStartNotices } from "@/lib/server/tournaments/player-pushe
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
 import { fakePool } from "../../helpers/sql-double";
+import { bracketMatch } from "../../helpers/bracket-match";
 import { ACTIONABLE_EXPIRED_REPORT_SQL } from "@/lib/server/tournaments/score-report-sql";
 import type { RowOverrides } from "../../helpers/row-overrides";
 import {
@@ -939,5 +941,74 @@ describe("getTournamentSnapshot — score affiché d'un match sur une seule cart
     const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
 
     expect(match.displayScore).toBeUndefined();
+  });
+});
+
+describe("attachPointTargets", () => {
+  const ROUND_ONE = { phaseId: 0, bracket: "UPPER" as const, roundNumber: 1 };
+
+  it("attachPointTargets_perMapRound_setsEffectiveTargetsPerMap", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
+
+    attachPointTargets([match], 5, [], [{ ...ROUND_ONE, targets: [null, 3, 7] }]);
+
+    expect(match.mapPointTarget).toBe(5);
+    expect(match.mapPointTargets).toEqual([5, 3, 7]);
+  });
+
+  it("attachPointTargets_perMapOnOtherRound_leavesFieldNull", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 2 });
+
+    attachPointTargets([match], 5, [{ ...ROUND_ONE, roundNumber: 2, target: 4 }], [{ ...ROUND_ONE, targets: [3] }]);
+
+    expect(match.mapPointTarget).toBe(4);
+    expect(match.mapPointTargets).toBeNull();
+  });
+
+  it("attachPointTargets_maxMapsBelowStored_clipsPerMap", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
+
+    attachPointTargets([match], 5, [], [{ ...ROUND_ONE, targets: [null, 3, 7] }], () => 2);
+
+    expect(match.mapPointTargets).toEqual([5, 3]);
+  });
+
+  it("attachPointTargets_onlyMapsBeyondFormat_leavesFieldNull", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
+
+    attachPointTargets([match], 5, [], [{ ...ROUND_ONE, targets: [null, 3] }], () => 1);
+
+    expect(match.mapPointTargets).toBeNull();
+  });
+
+  it("attachPointTargets_noPerMapSettings_neverResolvesMaxMaps", () => {
+    const matches = [1, 2, 3].map((roundNumber) => bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber }));
+    const maxMaps = jest.fn<(roundNumber: number) => number | null>(() => 3);
+
+    attachPointTargets(matches, 5, [], [], maxMaps);
+
+    expect(maxMaps).not.toHaveBeenCalled();
+    expect(matches.map((match) => match.mapPointTarget)).toEqual([5, 5, 5]);
+  });
+
+  it("attachPointTargets_manyMatchesOneRound_resolvesOnceAndSharesArray", () => {
+    const matches = [1, 2, 3].map(() => bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 }));
+    const maxMaps = jest.fn<(roundNumber: number) => number | null>(() => 3);
+
+    attachPointTargets(matches, 5, [], [{ ...ROUND_ONE, targets: [null, 3] }], maxMaps);
+
+    expect(maxMaps).toHaveBeenCalledTimes(1);
+    expect(matches[0].mapPointTargets).toEqual([5, 3]);
+    expect(matches[1].mapPointTargets).toBe(matches[0].mapPointTargets);
+    expect(matches[2].mapPointTargets).toBe(matches[0].mapPointTargets);
+  });
+
+  it("attachPointTargets_formatOff_setsNothing", () => {
+    const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
+
+    attachPointTargets([match], null, [], [{ ...ROUND_ONE, targets: [3] }]);
+
+    expect(match.mapPointTarget).toBeNull();
+    expect(match.mapPointTargets).toBeNull();
   });
 });
