@@ -271,6 +271,36 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
   );
 }
 
+/**
+ * Bandeau d'une saisie dépassée : résultat enregistré par un tiers, ou format
+ * de la manche changé (`rulesConflict`) — « Reprendre » repart du match à jour.
+ */
+function ScoreConflictNotice({
+  text,
+  form,
+}: Readonly<{
+  text: TournamentDialogsText;
+  form: Pick<ReturnType<typeof useScoreForm>, "conflict" | "rulesConflict" | "adoptStoredResult" | "submitting">;
+}>) {
+  if (!form.conflict && !form.rulesConflict) return null;
+  return (
+    <div className={styles.conflict} role="alert">
+      {/* Les deux à la fois : chacun dit sa raison, aucun ne masque l'autre. */}
+      {form.conflict && <p className={styles.conflictText}>{text.t("score.admin.conflict")}</p>}
+      {form.rulesConflict && <p className={styles.conflictText}>{text.t("score.admin.rulesChanged")}</p>}
+      {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
+      <button
+        type="button"
+        className={styles.conflictAction}
+        onClick={form.adoptStoredResult}
+        disabled={form.submitting}
+      >
+        {text.t("score.admin.adoptStored")}
+      </button>
+    </div>
+  );
+}
+
 export function AdminScoreDialog({
   match: liveMatch,
   proposals = NO_PROPOSALS,
@@ -403,6 +433,11 @@ export function AdminScoreDialog({
   useEffect(() => {
     setConfirmingCorrection(null);
   }, [storedSignature]);
+  // De même quand le format de la manche change sous une saisie gardée : la
+  // confirmation masquerait l'avis, et l'envoi serait refusé sans explication.
+  useEffect(() => {
+    if (form.rulesConflict) setConfirmingCorrection(null);
+  }, [form.rulesConflict]);
 
   const perform = async (action: "save" | "resolve"): Promise<boolean> => {
     const ok = await form.submit(action);
@@ -559,20 +594,7 @@ export function AdminScoreDialog({
             </div>
           )}
 
-          {form.conflict && (
-            <div className={styles.conflict} role="alert">
-              {t("score.admin.conflict")}
-              {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
-              <button
-                type="button"
-                className={styles.conflictAction}
-                onClick={form.adoptStoredResult}
-                disabled={form.submitting}
-              >
-                {t("score.admin.adoptStored")}
-              </button>
-            </div>
-          )}
+          <ScoreConflictNotice text={text} form={form} />
 
           {/* La règle chiffrée sous les champs plutôt qu'en `title` de la
               pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier

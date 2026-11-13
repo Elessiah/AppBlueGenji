@@ -1,12 +1,15 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   chartAnimationFrame,
   chartLine,
+  chartLineAt,
+  chartLinePath,
   chartRoundMs,
+  lineDash,
   type ChartGeometry,
-  type ChartLine,
+  type ChartLinePath,
   type EnduranceChartSeries,
 } from "../_lib/endurance-chart";
 import styles from "./EnduranceChart.module.css";
@@ -36,7 +39,20 @@ type Props = Readonly<{
   onToggle: (teamId: number) => void;
 }>;
 
-function Head({ line, stroke, forfeitLabel }: Readonly<{ line: ChartLine; stroke: string; forfeitLabel: string }>) {
+/** Ce que la tête lit d'une courbe : sa position et son état (`chartLine` ou `chartLineAt`). */
+type HeadLine = { head: { x: number; y: number }; hollow: boolean; forfeit: boolean };
+
+/** Tracé d'une courbe gardé d'un rendu à l'autre (`EnduranceChartLines`). */
+type CachedPath = { item: EnduranceChartSeries; shown: number; geometry: ChartGeometry; path: ChartLinePath };
+
+/** L'engagé d'une zone de survol (`data-team-id`), `null` hors d'une zone. */
+function hitTeamId(target: EventTarget | null): number | null {
+  if (!(target instanceof Element)) return null;
+  const id = target.closest("[data-team-id]")?.getAttribute("data-team-id");
+  return id ? Number(id) : null;
+}
+
+function Head({ line, stroke, forfeitLabel }: Readonly<{ line: HeadLine; stroke: string; forfeitLabel: string }>) {
   return (
     <>
       <circle
@@ -173,22 +189,78 @@ export const EnduranceChartLines = memo(function EnduranceChartLines({
   // Progression jamais au-delà de la manche affichée (retour en arrière).
   const drawn = Math.min(progress, shown);
 
+  // Tracés entiers et longueurs cumulées, une fois par courbe et par manche
+  // affichée : chaque image ne fait plus que dévoiler une longueur
+  // (`stroke-dasharray`) et placer la tête — aucun tracé reconstruit.
+  // Mémoire **par courbe** (clé : l'engagé) : un instantané qui ne change
+  // qu'une courbe ne recalcule qu'elle, pas les 64 du mode « Tous ». Une
+  // entrée ne vaut que pour sa série, sa manche affichée et sa géométrie.
+  const pathCache = useRef(new Map<number, CachedPath>());
+  const paths = useMemo(() => {
+    const previous = pathCache.current;
+    const next = new Map<number, CachedPath>();
+    const built = entries.map((entry) => {
+      const cached = previous.get(entry.item.teamId);
+      const fresh = cached !== undefined && cached.item === entry.item && cached.shown === shown && cached.geometry === geometry;
+      const path = fresh ? cached.path : chartLinePath(entry.item, shown, geometry);
+      next.set(entry.item.teamId, { item: entry.item, shown, geometry, path });
+      return { entry, path };
+    });
+    pathCache.current = next;
+    return built;
+  }, [entries, shown, geometry]);
+
+  // Survol et clic délégués au groupe (`data-team-id` des zones de survol) :
+  // aucun gestionnaire recréé par courbe à chaque image.
+  const handleOver = useCallback(
+    (event: MouseEvent<SVGGElement>) => {
+      const teamId = hitTeamId(event.target);
+      if (teamId !== null) onHover(teamId);
+    },
+    [onHover],
+  );
+  const handleOut = useCallback(
+    (event: MouseEvent<SVGGElement>) => {
+      // Quitte la courbe survolée seulement : vers une autre zone, `onHover` suit.
+      const from = hitTeamId(event.target);
+      if (from !== null && hitTeamId(event.relatedTarget) !== from) onLeave();
+    },
+    [onLeave],
+  );
+  const handleClick = useCallback(
+    (event: MouseEvent<SVGGElement>) => {
+      const teamId = hitTeamId(event.target);
+      if (teamId !== null) onToggle(teamId);
+    },
+    [onToggle],
+  );
+
   return (
     <>
-      <g className={styles.lines} data-hovering={hover === null ? undefined : ""}>
-        {entries.map(({ item, color, hit }) => {
-          const line = chartLine(item, shown, drawn, geometry);
+      <g
+        className={styles.lines}
+        data-hovering={hover === null ? undefined : ""}
+        onMouseOver={handleOver}
+        onMouseOut={handleOut}
+        onClick={handleClick}
+      >
+        {paths.map(({ entry: { item, color, hit }, path }) => {
+          const frame = chartLineAt(path, drawn);
           return (
             <g key={item.teamId} className={styles.curve}>
-              <path d={line.d} className={styles.line} style={{ stroke: color, strokeWidth: 2.25 }} />
-              <Head line={line} stroke={color} forfeitLabel={forfeitLabel} />
               <path
-                d={hit}
-                className={styles.hit}
-                onMouseEnter={() => onHover(item.teamId)}
-                onMouseLeave={onLeave}
-                onClick={() => onToggle(item.teamId)}
+                d={path.d}
+                className={styles.line}
+                style={{
+                  stroke: color,
+                  strokeWidth: 2.25,
+                  strokeDasharray: lineDash(frame),
+                  // Rien de dévoilé : pas de point laissé par l'extrémité arrondie.
+                  strokeOpacity: frame.visible !== null && frame.visible <= 0 && frame.total > 0 ? 0 : undefined,
+                }}
               />
+              <Head line={frame} stroke={color} forfeitLabel={forfeitLabel} />
+              <path d={hit} className={styles.hit} data-team-id={item.teamId} />
             </g>
           );
         })}

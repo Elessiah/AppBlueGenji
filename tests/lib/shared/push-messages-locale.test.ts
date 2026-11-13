@@ -12,6 +12,7 @@ import {
   privacyChangePush,
   pushRoundLabel,
   refereeAlertPush,
+  refereeObjectionReleasedPush,
   refereeReleasedPush,
   scoreToConfirmPush,
   staffReportPush,
@@ -264,5 +265,24 @@ describe("refereeReleasedPush — opposition retenue (REFEREE-OBJECTION)", () =>
 
   it("refereeReleasedPush_objectionReason_namesObjectionEn", () => {
     expect(refereeReleasedPush(match, "en").body).toContain("You no longer referee this match: the staff upheld your objection to being shown to the parties to your matches.");
+  });
+});
+
+describe("refereeObjectionReleasedPush — récapitulatif d'une opposition retenue", () => {
+  it("refereeObjectionReleasedPush_oneTournament_linksToTournament", () => {
+    const push = refereeObjectionReleasedPush({ count: 3, tournamentIds: [7] }, "fr");
+    expect(push.title).toBe("Arbitrage retiré");
+    expect(push.body).toBe(
+      "Tu n'arbitres plus 3 matchs : le staff a retenu ton opposition à être présenté aux parties de tes matchs.",
+    );
+    expect(push.url).toBe("/tournois/7");
+  });
+
+  it("refereeObjectionReleasedPush_severalTournamentsEnglish_linksToList", () => {
+    const push = refereeObjectionReleasedPush({ count: 1, tournamentIds: [7, 8] }, "en");
+    expect(push.body).toBe(
+      "You no longer referee 1 match: the staff upheld your objection to being shown to the parties to your matches.",
+    );
+    expect(push.url).toBe("/en/tournois");
   });
 });

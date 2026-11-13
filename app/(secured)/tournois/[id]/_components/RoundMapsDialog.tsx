@@ -1,6 +1,16 @@
 "use client";
 
-import { memo, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
@@ -89,21 +99,31 @@ function useStableRounds(detail: TournamentDetail): RoundKey[] {
   return stable.current;
 }
 
-/** Libellé d'un tour : phase, tableau (hors tableau principal), numéro ; play-offs à part. */
+/**
+ * Libellé d'un tour : phase, tableau (hors tableau principal), numéro ;
+ * play-offs à part. Fonction stable tant que le format, les phases et la
+ * langue ne changent pas : les libellés de la liste des tours n'en sont pas
+ * recalculés à chaque rendu.
+ */
 function useRoundLabel(detail: TournamentDetail, t: RoundMapsText["t"]) {
   const pageText = useTournamentPageText();
-  return (round: RoundKey) => {
-    const playoff = detail.card.format === "BG_SURVIE" && round.roundNumber >= PLAYOFF_ROUND_OFFSET;
-    return [
-      detail.phases?.find((phase) => phase.id === round.phaseId)?.name ?? null,
-      round.bracket === "UPPER" ? null : pageText.t(`page.bracketLabels.${round.bracket as BracketType}`),
-      playoff
-        ? t("dialog.playoffRoundN", { number: round.roundNumber - PLAYOFF_ROUND_OFFSET + 1 })
-        : t("dialog.roundN", { number: round.roundNumber }),
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  };
+  const format = detail.card.format;
+  const phases = detail.phases;
+  return useCallback(
+    (round: RoundKey) => {
+      const playoff = format === "BG_SURVIE" && round.roundNumber >= PLAYOFF_ROUND_OFFSET;
+      return [
+        phases?.find((phase) => phase.id === round.phaseId)?.name ?? null,
+        round.bracket === "UPPER" ? null : pageText.t(`page.bracketLabels.${round.bracket as BracketType}`),
+        playoff
+          ? t("dialog.playoffRoundN", { number: round.roundNumber - PLAYOFF_ROUND_OFFSET + 1 })
+          : t("dialog.roundN", { number: round.roundNumber }),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    },
+    [format, phases, pageText, t],
+  );
 }
 
 /**
@@ -189,7 +209,8 @@ function MapPicker({
   const ids = useId();
   const [query, setQuery] = useState("");
   const [custom, setCustom] = useState("");
-  const groups = overwatch ? filterOverwatchMaps(query) : [];
+  // Recherche refaite au seul changement de la saisie, pas à chaque rendu du créneau.
+  const groups = useMemo(() => (overwatch ? filterOverwatchMaps(query) : []), [overwatch, query]);
   // La liste vient de s'ouvrir : le focus va à son premier champ, il ne reste
   // pas sur le bouton qui la déclenche (ni sur une « Ajouter une carte » démontée).
   useEffect(() => {
@@ -930,13 +951,24 @@ export function RoundMapsDialog({
   // section (focus sur le body, texte perdu) : elle reste, grisée, avec son message.
   const { showTiebreak, staleTiebreaks } = useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed);
 
-  const optionLabel = (key: RoundKey) => {
-    const config = roundMapsOf(rules.rounds, key);
-    const tiebreak = roundTiebreakOf(rules.tiebreaks, key) === null ? "" : ` · ${t("dialog.summaryTiebreak")}`;
-    if (!config) return `${roundLabel(key)} · ${t("dialog.summaryNone")}${tiebreak}`;
-    const { maps, pools } = roundMapsSummary(config.slots);
-    return `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}${tiebreak}`;
-  };
+  // Libellés de la liste des tours (et de la copie), calculés une fois par
+  // changement des tours ou de leurs réglages, pas à chaque frappe.
+  const summaryLabel = useCallback(
+    (key: RoundKey) => {
+      const config = roundMapsOf(rules.rounds, key);
+      const tiebreak = roundTiebreakOf(rules.tiebreaks, key) === null ? "" : ` · ${t("dialog.summaryTiebreak")}`;
+      if (!config) return `${roundLabel(key)} · ${t("dialog.summaryNone")}${tiebreak}`;
+      const { maps, pools } = roundMapsSummary(config.slots);
+      return `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}${tiebreak}`;
+    },
+    [rules.rounds, rules.tiebreaks, roundLabel, t],
+  );
+  const optionLabels = useMemo(
+    () => new Map(rounds.map((key) => [roundKeyId(key), summaryLabel(key)] as const)),
+    [rounds, summaryLabel],
+  );
+  // Un tour hors de la liste mémorisée garde son résumé (« aucune », « N cartes »).
+  const optionLabel = (key: RoundKey) => optionLabels.get(roundKeyId(key)) ?? summaryLabel(key);
 
   /** Applique l'édition au créneau ; `false` si elle est refusée (notification, saisie conservée). */
   const editSlot = (index: number, edit: (slot: readonly string[]) => SlotEdit): boolean => {

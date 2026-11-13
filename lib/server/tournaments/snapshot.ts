@@ -67,7 +67,7 @@ import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
 import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
-import { applicableTiebreaks } from "@/lib/shared/round-plan";
+import { applicableTiebreaks, indexBuiltRounds, withoutUnbuiltRounds } from "@/lib/shared/round-plan";
 import { forgetLiveRefereeNames, withoutRefereeKeys } from "./referee-names";
 import { loadTournamentVoiceInfos } from "./match-voice";
 
@@ -588,7 +588,26 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const { streamsByMatch, castersByMatch } = await loadCastersAndStreams(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
-    const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
+    const loadedMapRules = await loadMapRules(connection, tournamentId, tournament);
+    // Les réglages des tours que le tournoi ne jouera jamais (plan
+    // dimensionné sur la capacité avant le départ) ne partent pas dans chaque
+    // instantané (`withoutUnbuiltRounds`) ; l'index des tours créés est bâti une fois.
+    const builtIndex = indexBuiltRounds(
+      matches.map((row) => ({
+        phaseId: Number(row.phase_id ?? 0),
+        bracket: String(row.bracket),
+        roundNumber: Number(row.round_number),
+      })),
+    );
+    const planScope = { format: card.format, phases: phasesDetail?.phases ?? null };
+    const storedMapRules = {
+      ...loadedMapRules,
+      rounds: withoutUnbuiltRounds(loadedMapRules.rounds, planScope, builtIndex),
+      tiebreaks: withoutUnbuiltRounds(loadedMapRules.tiebreaks, planScope, builtIndex),
+      ...(loadedMapRules.pointTargets
+        ? { pointTargets: withoutUnbuiltRounds(loadedMapRules.pointTargets, planScope, builtIndex) }
+        : {}),
+    };
     // Map de départage : celles des seuls tours éligibles (play-offs à format
     // défini) — un réglage resté d'un format changé depuis n'est pas montré.
     const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {
