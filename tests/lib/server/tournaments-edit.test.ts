@@ -512,8 +512,8 @@ describe("updateTournament — format Duel / Arcade", () => {
 
     await updateTournament(1, { matchFormat: { type: "BO", value: 1, maxMaps: null, drawsAllowed: false } });
 
-    const trimmed = executed.filter((q) => /UPDATE bg_tournament_round_maps SET map_point_targets = \?/.test(q.sql));
-    expect(trimmed.map((q) => q.params)).toEqual([["[5]", 1, 0, "UPPER", 1]]);
+    const trimmed = executed.filter((q) => /UPDATE bg_tournament_round_maps\s+SET map_point_targets = CASE/.test(q.sql));
+    expect(trimmed.map((q) => q.params)).toEqual([[0, "UPPER", 1, "[5]", 1, 0, "UPPER", 1]]);
     expect(jest.mocked(queueRoundMapsNotice)).toHaveBeenCalledWith(
       expect.anything(),
       1,
@@ -521,6 +521,35 @@ describe("updateTournament — format Duel / Arcade", () => {
       { points: true },
     );
     expect(jest.mocked(scheduleRoundMapsNotice)).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTournament_severalRoundsShortened_writesOneCaseUpdate", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5, match_format_type: "BO", match_format_value: 3 });
+    roundMapRowsToReturn = [
+      { phase_id: 0, bracket: "UPPER", round_number: 1, map_point_target: null, map_point_targets: "[5,3,7]" },
+      { phase_id: 0, bracket: "UPPER", round_number: 2, map_point_target: null, map_point_targets: "[null,4,6]" },
+    ];
+
+    await updateTournament(1, { matchFormat: { type: "BO", value: 1, maxMaps: null, drawsAllowed: false } });
+
+    const trimmed = executed.filter((q) => /SET map_point_targets = CASE/.test(q.sql));
+    expect(trimmed).toHaveLength(1);
+    expect(trimmed[0].params).toEqual([0, "UPPER", 1, "[5]", 0, "UPPER", 2, null, 1, 0, "UPPER", 1, 0, "UPPER", 2]);
+  });
+
+  it("updateTournament_sameMatchFormatResent_scansNoRound", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5, match_format_type: "BO", match_format_value: 3 });
+    roundMapRowsToReturn = [
+      { phase_id: 0, bracket: "UPPER", round_number: 1, map_point_target: null, map_point_targets: "[5,3,7]" },
+    ];
+
+    await updateTournament(1, {
+      format: "SINGLE",
+      matchFormat: { type: "BO", value: 3, maxMaps: null, drawsAllowed: false },
+    });
+
+    expect(executed.some((q) => /map_point_targets IS NOT NULL/.test(q.sql))).toBe(false);
+    expect(jest.mocked(queueRoundMapsNotice)).not.toHaveBeenCalled();
   });
 
   it("updateTournament_matchFormatChangedTargetsFit_writesNothing", async () => {

@@ -604,4 +604,12 @@ describe("Duel / Arcade carte par carte — refus cité et règle changée en co
     expect(player).toContain("const regrown = progressiveMapRows(matchFormat, game, current.current, pointRules);");
     expect(player).toContain("}, [pointsKey]);");
   });
+
+  it("PlayerScoreDialog_pointRules_stableIdentityAndNoJsonCompare", () => {
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+
+    expect(player).toContain("const pointRules = useMemo(() => ({ pointTarget, pointTargets }), [pointsKey]);");
+    expect(player).toContain("sameRows(current.current, baseline.current)");
+    expect(player).not.toContain("JSON.stringify(current.current)");
+  });
 });

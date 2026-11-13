@@ -431,14 +431,24 @@ export function attachPointTargets(
   for (const entry of roundTargets ?? []) byRound.set(roundKeyId(entry), entry.target);
   const mapsByRound = new Map<string, (number | null)[]>();
   for (const entry of roundMapTargets ?? []) mapsByRound.set(roundKeyId(entry), entry.targets);
+  // Résolution carte par carte : une fois par tour réglé (les matchs d'un tour
+  // partagent N et nombre de cartes), jamais sans réglage — le cas courant.
+  const resolved = new Map<string, number[] | null>();
   for (const match of matches) {
     const id = roundKeyId(match);
     match.mapPointTarget = byRound.get(id) ?? tournamentTarget;
-    const perMap = effectiveMapPointTargets(
-      match.mapPointTarget,
-      clipMapPointTargets(mapsByRound.get(id) ?? [], maxMaps(match.roundNumber)),
-    );
-    // Champ omis sans réglage carte par carte (le cas courant).
+    const configured = mapsByRound.get(id);
+    if (!configured) continue;
+    let perMap = resolved.get(id);
+    if (perMap === undefined) {
+      perMap = effectiveMapPointTargets(
+        match.mapPointTarget,
+        clipMapPointTargets(configured, maxMaps(match.roundNumber)),
+      );
+      resolved.set(id, perMap);
+    }
+    // Champ omis sans réglage carte par carte (le cas courant) ; un seul tableau
+    // partagé par les matchs du tour.
     if (perMap) match.mapPointTargets = perMap;
   }
 }

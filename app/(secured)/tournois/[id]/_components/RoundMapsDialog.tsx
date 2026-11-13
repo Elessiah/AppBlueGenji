@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
@@ -17,7 +17,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
-import { fieldErrorId, type FieldAria } from "@/lib/shared/field-errors";
+import { fieldAria, fieldErrorId, type FieldAria } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { filterOverwatchMaps } from "@/lib/shared/overwatch-maps";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -559,6 +559,56 @@ const POINTS_FIELD_ERRORS = {
 } as const satisfies Record<string, MapPointField>;
 
 /**
+ * Une carte de « Carte par carte » : mémoïsée, taper dans l'une ne redessine
+ * pas les autres (jusqu'à 9 champs, dialogue ouvert pendant le direct).
+ */
+const MapPointRow = memo(function MapPointRow({
+  index,
+  inputId,
+  label,
+  followsText,
+  draft,
+  fallback,
+  message,
+  onEdit,
+  onClearError,
+}: Readonly<{
+  index: number;
+  inputId: string;
+  label: string;
+  followsText: string;
+  /** N propre à la carte, `null` : elle suit le tour. */
+  draft: MapPointDraft;
+  /** N du tour, montré quand la carte le suit. */
+  fallback: number;
+  message: string | null;
+  onEdit: (index: number, next: number) => void;
+  onClearError: (index: number) => void;
+}>) {
+  const followsId = `${inputId}-follows`;
+  return (
+    <li className={`field ${styles.pointMap}`}>
+      <label htmlFor={inputId}>{label}</label>
+      <NumberInput
+        id={inputId}
+        min={MAP_POINT_TARGET_MIN}
+        max={MAP_POINT_TARGET_MAX}
+        value={draft ?? fallback}
+        onValueChange={(next) => onEdit(index, next)}
+        onEdit={() => onClearError(index)}
+        {...fieldAria(inputId, message !== null, draft === null && followsId)}
+      />
+      <FieldErrorText fieldId={inputId} message={message} />
+      {draft === null && (
+        <span id={followsId} className={styles.muted}>
+          {followsText}
+        </span>
+      )}
+    </li>
+  );
+});
+
+/**
  * Points par carte propres à un tour, en format Duel / Arcade
  * (`docs/features/DUEL_ARCADE.md`) : « Enregistrer » pose le nombre du tour et
  * celui de chaque carte (« Carte par carte », préremplies de leur N effectif :
@@ -603,7 +653,10 @@ function RoundPointsForm({
   const lockedId = `${ids}-points-locked`;
   const effective = saved ?? tournamentTarget;
   const rows = mapPointRowCount(maxMaps);
-  const savedSend = shownSavedMapPointTargets(savedMaps, rows);
+  // `savedMaps` arrive neufs à chaque instantané : l'identité ne suit que le contenu.
+  const savedMapsKey = savedMaps.join(",");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const savedSend = useMemo(() => shownSavedMapPointTargets(savedMaps, rows), [savedMapsKey, rows]);
   const [value, setValue] = useState(effective);
   const [drafts, setDrafts] = useState<MapPointDraft[]>(() => mapPointDrafts(savedSend, rows));
   const fieldIds = useMemo(() => {
@@ -613,8 +666,11 @@ function RoundPointsForm({
   }, [ids, inputId, rows]);
   const fieldErrors = useFieldErrors<MapPointField>(POINTS_FIELD_ERRORS, fieldIds);
   // Brouillon aligné sur le nombre de cartes du format (un flux peut le changer).
-  const shownDrafts = Array.from({ length: rows }, (_, index) => drafts[index] ?? null);
-  const sendMaps = mapPointTargetsToSend(shownDrafts);
+  const shownDrafts = useMemo(
+    () => Array.from({ length: rows }, (_, index) => drafts[index] ?? null),
+    [drafts, rows],
+  );
+  const sendMaps = useMemo(() => mapPointTargetsToSend(shownDrafts), [shownDrafts]);
   // Suit le serveur tant que la saisie n'a pas bougé depuis le dernier alignement.
   const serverKey = `${effective}|${savedSend.join(",")}`;
   const synced = useRef({ key: serverKey, effective, maps: savedSend });
@@ -631,6 +687,21 @@ function RoundPointsForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverKey]);
   const dirty = value !== effective || !sameMapPointTargets(sendMaps, savedSend);
+  // Stables : seule la carte saisie se redessine (`MapPointRow` mémoïsée).
+  const editMap = useCallback(
+    (index: number, next: number) =>
+      setDrafts((current) =>
+        editMapPointDraft(
+          Array.from({ length: rows }, (_, i) => current[i] ?? null),
+          index,
+          next,
+          value,
+        ),
+      ),
+    [rows, value],
+  );
+  const { clear: clearFieldError } = fieldErrors;
+  const clearMapError = useCallback((index: number) => clearFieldError(`map-${index}`), [clearFieldError]);
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
@@ -703,31 +774,20 @@ function RoundPointsForm({
               </span>
             </legend>
             <ol className={styles.pointMapList}>
-              {shownDrafts.map((draft, index) => {
-                const field: MapPointField = `map-${index}`;
-                const mapInputId = fieldIds[field];
-                const followsId = `${mapInputId}-follows`;
-                return (
-                  <li key={mapInputId} className={`field ${styles.pointMap}`}>
-                    <label htmlFor={mapInputId}>{t("dialog.pointsMapLabel", { index: index + 1 })}</label>
-                    <NumberInput
-                      id={mapInputId}
-                      min={MAP_POINT_TARGET_MIN}
-                      max={MAP_POINT_TARGET_MAX}
-                      value={draft ?? value}
-                      onValueChange={(next) => setDrafts(editMapPointDraft(shownDrafts, index, next, value))}
-                      onEdit={() => fieldErrors.clear(field)}
-                      {...fieldErrors.aria(field, draft === null && followsId)}
-                    />
-                    <FieldErrorText fieldId={mapInputId} message={fieldErrors.message(field)} />
-                    {draft === null && (
-                      <span id={followsId} className={styles.muted}>
-                        {t("dialog.pointsMapFollows")}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
+              {shownDrafts.map((draft, index) => (
+                <MapPointRow
+                  key={fieldIds[`map-${index}`]}
+                  index={index}
+                  inputId={fieldIds[`map-${index}`]}
+                  label={t("dialog.pointsMapLabel", { index: index + 1 })}
+                  followsText={t("dialog.pointsMapFollows")}
+                  draft={draft}
+                  fallback={value}
+                  message={fieldErrors.message(`map-${index}`)}
+                  onEdit={editMap}
+                  onClearError={clearMapError}
+                />
+              ))}
             </ol>
           </fieldset>
         )}

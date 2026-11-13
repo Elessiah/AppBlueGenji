@@ -981,6 +981,28 @@ describe("attachPointTargets", () => {
     expect(match.mapPointTargets).toBeNull();
   });
 
+  it("attachPointTargets_noPerMapSettings_neverResolvesMaxMaps", () => {
+    const matches = [1, 2, 3].map((roundNumber) => bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber }));
+    const maxMaps = jest.fn<(roundNumber: number) => number | null>(() => 3);
+
+    attachPointTargets(matches, 5, [], [], maxMaps);
+
+    expect(maxMaps).not.toHaveBeenCalled();
+    expect(matches.map((match) => match.mapPointTarget)).toEqual([5, 5, 5]);
+  });
+
+  it("attachPointTargets_manyMatchesOneRound_resolvesOnceAndSharesArray", () => {
+    const matches = [1, 2, 3].map(() => bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 }));
+    const maxMaps = jest.fn<(roundNumber: number) => number | null>(() => 3);
+
+    attachPointTargets(matches, 5, [], [{ ...ROUND_ONE, targets: [null, 3] }], maxMaps);
+
+    expect(maxMaps).toHaveBeenCalledTimes(1);
+    expect(matches[0].mapPointTargets).toEqual([5, 3]);
+    expect(matches[1].mapPointTargets).toBe(matches[0].mapPointTargets);
+    expect(matches[2].mapPointTargets).toBe(matches[0].mapPointTargets);
+  });
+
   it("attachPointTargets_formatOff_setsNothing", () => {
     const match = bracketMatch({ phaseId: 0, bracket: "UPPER", roundNumber: 1 });
 

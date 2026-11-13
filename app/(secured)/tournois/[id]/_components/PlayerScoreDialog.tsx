@@ -90,6 +90,18 @@ interface PlayerScoreDialogProps {
   onOwnSettle?: (settling: boolean) => void;
 }
 
+/** Mêmes lignes à l'identique (code tel que saisi compris), sans sérialiser les deux listes. */
+function sameRows(a: ReadonlyArray<MatchMapInput>, b: ReadonlyArray<MatchMapInput>): boolean {
+  return (
+    a === b ||
+    (a.length === b.length &&
+      a.every(
+        (map, i) =>
+          map.replayCode === b[i].replayCode && map.team1Score === b[i].team1Score && map.team2Score === b[i].team2Score,
+      ))
+  );
+}
+
 /** Empreinte des propositions en attente : ce que le flux peut changer sous la saisie. */
 function reportsSignature(match: BracketMatch): string {
   const one = (r: MatchScoreReport | null) =>
@@ -416,7 +428,11 @@ export function PlayerScoreDialog({
   // carte quand le tour en règle une à une (`mapPointTargets`).
   const pointTarget = match.mapPointTarget ?? null;
   const pointTargets = match.mapPointTargets ?? null;
-  const pointRules = { pointTarget, pointTargets };
+  // Identité stable tant que la règle ne change pas : un instantané qui ne la
+  // touche pas ne relance ni la validation ni la repousse des lignes.
+  const pointsKey = `${pointTarget ?? ""}|${pointTargets?.join(",") ?? ""}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pointRules = useMemo(() => ({ pointTarget, pointTargets }), [pointsKey]);
   // Saisie **map par map** (`docs/features/MAP_SCORES.md`) : le score du match
   // se dérive des maps, chacune avec son code de replay.
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`) ; ce qui
@@ -444,7 +460,7 @@ export function PlayerScoreDialog({
   useEffect(() => {
     const nextView = playerReportView(match, myTeamId);
     const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(nextView), pointRules);
-    const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
+    const typing = !sameRows(current.current, baseline.current);
     if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
       // aux anciennes valeurs ne valent plus.
@@ -464,13 +480,12 @@ export function PlayerScoreDialog({
   // Points par carte changés par le staff pendant que la modale est ouverte :
   // les lignes repoussent selon la nouvelle règle (carte gagnée au nouveau N),
   // sans compter pour une saisie si le lecteur n'avait rien touché.
-  const pointsKey = `${pointTarget ?? ""}|${pointTargets?.join(",") ?? ""}`;
   const appliedPoints = useRef(pointsKey);
   useEffect(() => {
     if (appliedPoints.current === pointsKey) return;
     appliedPoints.current = pointsKey;
     const regrown = progressiveMapRows(matchFormat, game, current.current, pointRules);
-    if (JSON.stringify(current.current) === JSON.stringify(baseline.current)) baseline.current = regrown;
+    if (sameRows(current.current, baseline.current)) baseline.current = regrown;
     setRows(regrown);
     // `pointsKey` résume `pointRules`.
     // eslint-disable-next-line react-hooks/exhaustive-deps

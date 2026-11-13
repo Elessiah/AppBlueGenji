@@ -377,11 +377,23 @@ async function writePrunedRoundTargets(
       [tournamentId, ...doomed.flatMap((row) => [row.phase_id, row.bracket, row.round_number])],
     );
   }
-  for (const { row, targets } of shortened) {
+  // Une seule instruction (CASE) pour tous les tours raccourcis, comme `doomed`.
+  if (shortened.length > 0) {
+    const key = "(phase_id = ? AND bracket = ? AND round_number = ?)";
     await connection.execute(
-      `UPDATE bg_tournament_round_maps SET map_point_targets = ?
-        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
-      [serializeMapPointTargets(targets), tournamentId, row.phase_id, row.bracket, row.round_number],
+      `UPDATE bg_tournament_round_maps
+          SET map_point_targets = CASE ${shortened.map(() => `WHEN ${key} THEN ?`).join(" ")} ELSE map_point_targets END
+        WHERE tournament_id = ? AND (${shortened.map(() => key).join(" OR ")})`,
+      [
+        ...shortened.flatMap(({ row, targets }) => [
+          row.phase_id,
+          row.bracket,
+          row.round_number,
+          serializeMapPointTargets(targets),
+        ]),
+        tournamentId,
+        ...shortened.flatMap(({ row }) => [row.phase_id, row.bracket, row.round_number]),
+      ],
     );
   }
 }
@@ -401,10 +413,23 @@ function shortenedMapTargets<R extends { round_number: number; map_point_targets
   });
 }
 
+function sameMatchFormat(a: MatchFormat | null, b: MatchFormat | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.type === b.type &&
+    a.value === b.value &&
+    (a.maxMaps ?? null) === (b.maxMaps ?? null) &&
+    Boolean(a.drawsAllowed) === Boolean(b.drawsAllowed)
+  );
+}
+
 /** Ce que l'édition change pour les points propres aux tours (`pruneRoundPointTargets`). */
 function roundPointsChange(
   patch: Partial<EditableTournamentValues>,
-  current: { mapPointTarget: number | null },
+  current: Pick<
+    EditableTournamentValues,
+    "mapPointTarget" | "format" | "hasThirdPlaceMatch" | "matchFormat" | "endurancePlayoffFormat"
+  >,
   valid: Pick<
     ValidatedTournamentInput,
     "mapPointTarget" | "format" | "hasThirdPlaceMatch" | "matchFormat" | "endurancePlayoffFormat"
@@ -412,10 +437,17 @@ function roundPointsChange(
 ): Parameters<typeof pruneRoundPointTargets>[2] {
   return {
     turnedOff: valid.mapPointTarget === null && current.mapPointTarget !== null,
+    // Valeurs comparées, pas présence dans le patch : un formulaire qui renvoie
+    // toujours ces champs ne déclenche pas le balayage des tours à chaque édition.
     structureChanged:
-      patch.format !== undefined || patch.phases !== undefined || patch.hasThirdPlaceMatch !== undefined,
+      (patch.format !== undefined && patch.format !== current.format) ||
+      patch.phases !== undefined ||
+      (patch.hasThirdPlaceMatch !== undefined && patch.hasThirdPlaceMatch !== current.hasThirdPlaceMatch),
     matchFormatChanged:
-      patch.format !== undefined || patch.matchFormat !== undefined || patch.endurancePlayoffFormat !== undefined,
+      (patch.format !== undefined && patch.format !== current.format) ||
+      (patch.matchFormat !== undefined && !sameMatchFormat(patch.matchFormat, current.matchFormat)) ||
+      (patch.endurancePlayoffFormat !== undefined &&
+        !sameMatchFormat(patch.endurancePlayoffFormat, current.endurancePlayoffFormat)),
     format: valid.format,
     hasThirdPlaceMatch: valid.hasThirdPlaceMatch,
     maxMaps: (roundNumber) => roundMaxMaps(valid, roundNumber),

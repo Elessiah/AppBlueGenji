@@ -277,7 +277,14 @@ describe("RoundMapsDialog per-map points fields wiring", () => {
   });
 
   it("perMapInput_edit_clearsOnlyItsOwnFieldError", () => {
-    expect(source).toContain("onEdit={() => fieldErrors.clear(field)}");
+    expect(source).toContain("onEdit={() => onClearError(index)}");
+    expect(source).toContain("clearFieldError(`map-${index}`)");
+  });
+
+  it("perMapRow_isMemoizedWithStableCallbacks", () => {
+    expect(source).toContain("const MapPointRow = memo(function MapPointRow");
+    expect(source).toContain("const editMap = useCallback(");
+    expect(source).toContain("const shownDrafts = useMemo(");
   });
 
   it("perMapLegend_flexLivesInInnerSpan_notOnLegend", () => {

@@ -284,11 +284,21 @@ export function briefMaxMaps(row: LobbyBriefRow): number | null {
  * quand toutes les cartes ont le même N (la page du match dit alors un seul
  * « premier à N », `hasPerMapTargets`).
  */
-export function briefPointTargets(row: LobbyBriefRow): number[] | null {
-  const target = briefPointTarget(row);
+export function briefPointTargets(
+  row: LobbyBriefRow,
+  target: number | null = briefPointTarget(row),
+  /** Cartes au plus du match, si l'appelant l'a déjà calculé (`briefMaxMaps`). */
+  maxMaps?: number | null,
+): number[] | null {
+  // Sans réglage carte par carte (le cas courant) ou format éteint : rien à
+  // résoudre, ni le format du match à relire.
+  if (target === null || !row.round_point_targets) return null;
   const perMap = effectiveMapPointTargets(
     target,
-    clipMapPointTargets(parseStoredMapPointTargets(row.round_point_targets), briefMaxMaps(row)),
+    clipMapPointTargets(
+      parseStoredMapPointTargets(row.round_point_targets),
+      maxMaps === undefined ? briefMaxMaps(row) : maxMaps,
+    ),
   );
   return hasPerMapTargets(target, perMap) ? perMap : null;
 }
@@ -481,6 +491,9 @@ export function lobbyBriefSides(
   const slots = parseStoredSlots(row.round_slots_json);
   const storedFirstMap = row.first_map === null || row.first_map === "" ? null : String(row.first_map);
   const banFirstTeamId = firstBanTeamFor(parseFirstBanRule(row.first_ban_rule), hostTeamId, team1Id, team2Id);
+  // Résolus une fois par ligne : chacun relit le format du tournoi.
+  const pointTarget = briefPointTarget(row);
+  const maxMaps = briefMaxMaps(row);
   const base = {
     tournamentId: Number(row.tournament_id),
     tournamentName: String(row.tournament_name),
@@ -497,9 +510,9 @@ export function lobbyBriefSides(
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
     tiebreakMap: briefTiebreakMap(row),
-    pointTarget: briefPointTarget(row),
-    pointTargets: briefPointTargets(row),
-    maxMaps: briefMaxMaps(row),
+    pointTarget,
+    pointTargets: briefPointTargets(row, pointTarget, maxMaps),
+    maxMaps,
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
     // Le bot n'ouvre de salon vocal que pour un match suivi (`MATCH_VOICE.md`) :

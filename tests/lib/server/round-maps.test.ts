@@ -886,6 +886,28 @@ describe("briefPointTargets", () => {
   });
 });
 
+describe("briefPointTargets — coût", () => {
+  it("briefPointTargets_explicitMaxMaps_usesItInsteadOfRereadingFormat", () => {
+    const row = briefRow({ tournament_point_target: 5, match_format_value: 5, round_point_targets: "[3,7,9]" });
+
+    expect(briefPointTargets(row, 5, 2)).toEqual([3, 7]);
+  });
+
+  it("briefPointTargets_explicitNullMaxMaps_keepsEveryStoredMap", () => {
+    const row = briefRow({ tournament_point_target: 5, match_format_value: 1, round_point_targets: "[3,7]" });
+
+    expect(briefPointTargets(row, 5, null)).toEqual([3, 7]);
+  });
+
+  it("briefPointTargets_explicitNullTarget_returnsNull", () => {
+    expect(briefPointTargets(briefRow({ round_point_targets: "[3]" }), null)).toBeNull();
+  });
+
+  it("briefPointTargets_emptyStoredColumn_returnsNullWithoutParsing", () => {
+    expect(briefPointTargets(briefRow({ tournament_point_target: 5, round_point_targets: "" }))).toBeNull();
+  });
+});
+
 describe("briefPointTarget", () => {
   it("briefPointTarget_roundOverride_returnsOverride", () => {
     expect(briefPointTarget(briefRow({ tournament_point_target: 5, round_point_target: 7 }))).toBe(7);
@@ -1042,6 +1064,24 @@ describe("setRoundPointTarget", () => {
 
     await expect(setRoundPointTarget(7, ROUND, 3)).rejects.toThrow("MAP_POINTS_FINISHED");
 
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
+  it("setRoundPointTarget_unchangedOnFinishedTournament_returnsUnchangedWithoutPosabilityQueries", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...DUEL, state: "FINISHED" }] },
+      { pattern: /SELECT map_point_target, map_point_targets FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3, map_point_targets: "[3,4]" }] },
+    ]);
+
+    await expect(setRoundPointTarget(7, ROUND, 3, [3, 4])).resolves.toEqual({
+      target: 3,
+      before: 3,
+      mapTargets: [3, 4],
+      mapTargetsBefore: [3, 4],
+      changed: false,
+    });
+
+    expect(writes(/FROM bg_matches|FROM bg_tournament_phases/)).toHaveLength(0);
     expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
   });
 

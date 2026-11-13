@@ -574,11 +574,12 @@ export async function setRoundPointTarget(
     const mapTargets = requestedMaps ?? mapsBefore;
     // Poser : un réglage est posé (tour ou carte) ; garder un réglage resté
     // tel quel en retirant l'autre ne « pose » rien de neuf.
-    const poses = target !== null || (requestedMaps !== null && requestedMaps.length > 0);
-    if (poses) await assertRoundPointsPosable(connection, tournament, round, requestedMaps, duelOn);
+    // Rien ne change : retour sans requête de plus sous le verrou.
     if (before === target && sameMapPointTargets(mapsBefore, mapTargets)) {
       return { before, mapsBefore, mapTargets, changed: false };
     }
+    const poses = target !== null || (requestedMaps !== null && requestedMaps.length > 0);
+    if (poses) await assertRoundPointsPosable(connection, tournament, round, requestedMaps, duelOn);
     // Format éteint, le réglage du tour ne joue plus : le retirer ne change
     // aucune règle sous un score.
     if (duelOn) await assertMapPointsUnlocked(connection, tournamentId, round);
