@@ -370,7 +370,10 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * doit pas en déplacer les tendances. Le journal compte des lignes et, pour les
  * équipes et les tournois laissés tels quels, en donne les **identifiants** (de
  * quoi les renommer à la main) — jamais un nom ni l'identifiant d'un joueur
- * (`RGPD_LOGS_AND_VISITS.md`).
+ * (`RGPD_LOGS_AND_VISITS.md`). Un pseudo laissé tel quel ne pose donc **pas**
+ * le marqueur : la passe se rejoue au démarrage suivant, et le nettoie dès que
+ * l'original a changé de nom ; le staff le retrouve par la requête de
+ * `UNTRUSTED_NAMES.md` (§ « Pseudos laissés tels quels »), pas par le journal.
  */
 export async function cleanStoredNames(db: Pool): Promise<void> {
   if (await cleanNamesAlreadyDone(db)) return;
@@ -395,7 +398,9 @@ export async function cleanStoredNames(db: Pool): Promise<void> {
         complete = false;
         break;
       }
-      complete = done && complete;
+      // Pseudo laissé tel quel (identifiant jamais journalisé) : la passe se
+      // rejouera, plutôt que de le figer derrière le marqueur.
+      complete = done === true && complete;
     }
   } catch (error) {
     complete = false;
@@ -438,11 +443,16 @@ async function markCleanNamesDone(db: Pool): Promise<void> {
 
 type CleanTarget = (typeof STORED_NAME_COLUMNS)[number];
 
-/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. Vrai si menée à bout ; `"aborted"` si une écriture a échoué (la passe s'arrête). */
+/**
+ * Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne.
+ * Vrai si menée à bout ; `"kept"` si des lignes d'une colonne sans identifiant
+ * journalisé (pseudos) sont restées telles quelles — la passe est à rejouer ;
+ * `"aborted"` si une écriture a échoué (la passe s'arrête).
+ */
 async function cleanNameColumn(
   db: PoolConnection,
   { table, column, logIds }: CleanTarget,
-): Promise<boolean | "aborted"> {
+): Promise<boolean | "kept" | "aborted"> {
   let rows: StoredNameRow[];
   try {
     [rows] = await db.execute<StoredNameRow[]>(`SELECT id, ${column} AS name FROM ${table}`);
@@ -462,13 +472,17 @@ async function cleanNameColumn(
     } else cleaned += outcome;
   }
   if (cleaned > 0 || keptIds.length > 0) {
-    const ids = logIds && keptIds.length > 0 ? ` (id : ${keptIds.join(", ")})` : "";
+    let ids = "";
+    if (keptIds.length > 0) {
+      ids = logIds ? ` (id : ${keptIds.join(", ")})` : " (requête de UNTRUSTED_NAMES.md, passe rejouée au prochain démarrage)";
+    }
     console.log(
       `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) sans caractère invisible, ` +
         `${keptIds.length} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou doublon)${ids}.`,
     );
   }
-  return failed ? "aborted" : true;
+  if (failed) return "aborted";
+  return !logIds && keptIds.length > 0 ? "kept" : true;
 }
 
 /** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), `"kept"` ou `"failed"`. */

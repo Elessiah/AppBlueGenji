@@ -282,6 +282,33 @@ export function accountDeletionOutcome(
 export const SESSION_GONE_CODES: ReadonlySet<string> = new Set(["UNAUTHORIZED", "USER_NOT_FOUND"]);
 
 /**
+ * Refus de `DELETE /api/profile` : ce que la confirmation annonçait (le motif
+ * de l'aperçu) n'est plus ce que la demande ferait — un tournoi individuel a
+ * commencé entre l'aperçu et le clic, par exemple, et l'effacement complet
+ * promis deviendrait une anonymisation. Rien n'est écrit ; l'écran relit
+ * l'aperçu et redemande la confirmation sur la nouvelle description.
+ */
+export const ACCOUNT_DELETION_PLAN_CHANGED = "ACCOUNT_DELETION_PLAN_CHANGED";
+
+const RETENTION_REASONS: ReadonlySet<string> = new Set<AccountRetentionReason>([
+  "TOURNAMENTS",
+  "SOLO_REGISTRATIONS",
+  "ORGANIZED_TOURNAMENTS",
+  "OWNED_TEAMS",
+]);
+
+/**
+ * Le motif que la confirmation a annoncé, tel que le corps de la demande le
+ * porte : un motif connu, `null` (effacement complet annoncé), ou `undefined`
+ * quand l'écran n'en a annoncé aucun (aperçu en échec, corps absent ou
+ * illisible) — alors rien n'est comparé.
+ */
+export function parseConfirmedReason(value: unknown): AccountRetentionReason | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" && RETENTION_REASONS.has(value) ? (value as AccountRetentionReason) : undefined;
+}
+
+/**
  * Le refus, en français.
  *
  * La suppression ne peut échouer que de deux façons, et l'une d'elles est une
@@ -300,6 +327,9 @@ export function accountDeletionErrorMessage(code: string | undefined): string {
   }
   if (code === "LAST_ADMIN_ACCOUNT") {
     return "Tu es le dernier administrateur : nomme un autre administrateur avant de supprimer ton compte.";
+  }
+  if (code === ACCOUNT_DELETION_PLAN_CHANGED) {
+    return "Ce que la suppression emporterait vient de changer : relis la confirmation mise à jour avant de valider.";
   }
   return "La suppression du compte a échoué. Réessaie dans un instant.";
 }

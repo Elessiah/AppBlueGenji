@@ -17,7 +17,8 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
-import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "@/lib/server/ranking-cache";
+import { cached } from "@/lib/server/cache";
+import { PROFILELESS_PLAYERS_CACHE_KEY } from "@/lib/server/ranking-cache";
 import { accountTraceSql } from "./account-deletion";
 
 async function computeProfilelessPlayerIds(): Promise<number[]> {
@@ -33,17 +34,26 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
 }
 
 /**
+ * Durée de vie de la liste. Seule une suppression, une réactivation ou un
+ * rattrapage la change vraiment, et chacun l'oublie aussitôt
+ * (`invalidateTeamIdentityViews`). Un score ne la vide pas : il ne peut que
+ * donner une fiche à un compte anonymisé qui n'en avait pas — son nom reste du
+ * texte au plus cette durée, jamais un lien vers une 404.
+ */
+export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
+
+/**
  * Les comptes supprimés sans fiche, par id croissant.
  *
- * Mutualisé dans le cache du classement, sous le préfixe des entrées tirées de
- * la liste : **tout** score qui tombe l'oublie (`invalidateTeamRanking`), comme
- * toute suppression de compte (`invalidateTeamIdentityViews`). Ne lève jamais :
- * une panne de lecture rend des liens (au pire vers une fiche 404) plutôt
- * qu'une page tombée — il est lu par la mise en page racine.
+ * Mutualisé hors du préfixe du classement (que chaque score vide) :
+ * le balayage des comptes supprimés n'est rejoué qu'à une écriture d'identité
+ * ou à l'échéance. Ne lève jamais : une panne de lecture rend des liens (au
+ * pire vers une fiche 404) plutôt qu'une page tombée — il est lu par la mise en
+ * page racine.
  */
 export async function loadProfilelessPlayerIds(): Promise<number[]> {
   try {
-    return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}profileless-players`, computeProfilelessPlayerIds);
+    return await cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
   } catch (error) {
     console.error(`[profileless-players] lecture impossible : ${failureReason(error)}`);
     return [];

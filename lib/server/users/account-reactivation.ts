@@ -148,18 +148,27 @@ export async function discardReactivationTicket(token: string | undefined): Prom
 }
 
 /**
- * L'entrée solo reprend le vrai pseudo : les lecteurs de ses tournois voyaient
- * le pseudo d'emprunt. Meilleur effort, ne lève jamais (le compte est déjà
- * réactivé). Imports différés : ce module est lu par `auth.ts`.
+ * Le compte reprend son vrai pseudo : les lecteurs des tournois qui le
+ * nomment — son entrée solo (tous ses tournois), et tout tournoi pas terminé où
+ * il paraît (effectif d'une équipe engagée, cast, arbitrage :
+ * `listNamingTournamentIds`) — voyaient le pseudo d'emprunt. Meilleur effort,
+ * ne lève jamais (le compte est déjà réactivé). Imports différés : ce module
+ * est lu par `auth.ts`.
  */
 async function republishSoloEntryTournaments(userId: number): Promise<void> {
   try {
     const db = await getDatabase();
-    const { listSoloRegistrationTournamentIds } = await import("./account-deletion");
+    const { listNamingTournamentIds, listSoloRegistrationTournamentIds, mergeTournamentIds } = await import(
+      "./account-deletion"
+    );
     const { publishUpdatedEvent } = await import("@/lib/server/tournaments/notifications");
-    for (const tournamentId of await listSoloRegistrationTournamentIds(db, userId)) publishUpdatedEvent(tournamentId);
+    const tournamentIds = mergeTournamentIds(
+      await listSoloRegistrationTournamentIds(db, userId),
+      await listNamingTournamentIds(db, userId),
+    );
+    for (const tournamentId of tournamentIds) publishUpdatedEvent(tournamentId);
   } catch (error) {
-    console.error("[account-reactivation] tournois de l'entrée solo non rediffusés", failureReason(error));
+    console.error("[account-reactivation] tournois qui nomment le compte non rediffusés", failureReason(error));
   }
 }
 

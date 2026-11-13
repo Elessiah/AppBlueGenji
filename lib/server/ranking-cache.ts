@@ -18,7 +18,7 @@
  * entrées sans importer le service, dont la chaîne d'imports refermerait un
  * cycle.
  */
-import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
+import { cached, invalidateCached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { invalidateLandingLeaderboards, invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { invalidateRankingShareImages } from "@/lib/server/share-image-cache";
 
@@ -117,6 +117,13 @@ export function invalidateRankingLists(): void {
 }
 
 /**
+ * Clé des comptes supprimés sans fiche (`users/profileless-players.ts`) : hors
+ * du préfixe du classement, qu'un score vide — seule une écriture d'identité
+ * (suppression, réactivation, rattrapage) l'oublie, ci-dessous.
+ */
+export const PROFILELESS_PLAYERS_CACHE_KEY = "profileless-players";
+
+/**
  * Oublie tout ce qui **nomme ou montre** une équipe du classement sans toucher
  * aux matchs : les entrées tirées de la liste (identités, podium, cartes
  * d'aperçu et leurs PNG) et les vues de la vitrine qui nomment des équipes.
@@ -126,5 +133,6 @@ export function invalidateRankingLists(): void {
  */
 export function invalidateTeamIdentityViews(): void {
   invalidateRankingLists();
+  invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);
   invalidateLandingTeamViews();
 }

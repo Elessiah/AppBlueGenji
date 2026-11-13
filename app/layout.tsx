@@ -327,7 +327,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <AppLocaleProvider locale={locale}>
         <ShellTextProvider locale={locale} messages={shellMessages}>
         <PodiumTiersProvider tiers={podiumTiers}>
-        <ProfilelessPlayersProvider ids={profilelessPlayers}>
+        <ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>
         <ToastProvider>
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}

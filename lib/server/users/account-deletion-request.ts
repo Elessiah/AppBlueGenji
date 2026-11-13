@@ -1,8 +1,10 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import {
+  ACCOUNT_DELETION_PLAN_CHANGED,
   ACCOUNT_REACTIVATION_DAYS,
   type AccountDeletionPlan,
+  type AccountRetentionReason,
   accountDeletionPlan,
   ACTIVE_TOURNAMENT_STATES,
   ownedTeamFate,
@@ -44,6 +46,7 @@ import { holdAccountIdentity } from "./account-deletion-hold";
 import {
   assertSoloLockSetFresh,
   listCastTournamentIds,
+  listNamingTournamentIds,
   listSoloRegistrationTournamentIds,
   loadAccountTrace,
   loadSoloRegistrations,
@@ -55,6 +58,7 @@ import {
   forfeitSoloEntriesAfterCommit,
   listForfeitableSoloEntries,
   logDeletionWithdrawal,
+  syncOpenSoloTournamentsOn,
   withdrawSoloRegistrationsOn,
 } from "./deleted-solo-entries";
 import { failureReason } from "@/lib/server/failure-reason";
@@ -402,6 +406,16 @@ async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAcco
   }
 }
 
+/** `listNamingTournamentIds`, au meilleur effort : un relevé en échec ne rediffuse rien de plus. */
+async function namingTournamentsOrNone(userId: number): Promise<number[]> {
+  try {
+    return await listNamingTournamentIds(await getDatabase(), userId);
+  } catch (error) {
+    console.error("[account-deletion] tournois qui nomment le compte non relevés", failureReason(error));
+    return [];
+  }
+}
+
 /** Rafraîchit les lecteurs, notifie le successeur, journalise et joue les forfaits. */
 async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
   const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments, replay } = effects;
@@ -424,11 +438,14 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     );
   }
   // L'entrée solo restée inscrite (jouée, tournoi en cours ou terminé) porte
-  // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai.
+  // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai. De même
+  // tout tournoi pas terminé qui le nomme encore — effectif d'une équipe
+  // engagée, cast ou arbitrage d'un match joué (`listNamingTournamentIds`).
   for (const tournamentId of new Set([
     ...withdrawn.map((entry) => entry.tournamentId),
     ...organizedHandedOver,
     ...soloTournaments,
+    ...(await namingTournamentsOrNone(userId)),
   ])) {
     publishUpdatedEvent(tournamentId);
   }
@@ -528,8 +545,24 @@ async function assertAnotherAdminRemains(connection: PoolConnection, userId: num
  */
 export async function requestAccountDeletion(
   userId: number,
-  options: { requestedAt?: Date; requestedAtRaw?: string; accountCreatedAt?: string } = {},
+  options: {
+    requestedAt?: Date;
+    requestedAtRaw?: string;
+    accountCreatedAt?: string;
+    /**
+     * Le motif que la confirmation a annoncé (`null` : effacement complet).
+     * Relu juste avant la transaction : différent, rien n'est écrit
+     * (`ACCOUNT_DELETION_PLAN_CHANGED`). Hors des verrous, comme l'aperçu :
+     * la fenêtre qui compte est celle de la modale, pas les quelques
+     * millisecondes jusqu'au verrou.
+     */
+    confirmedReason?: AccountRetentionReason | null;
+  } = {},
 ): Promise<AccountDeletionRequestOutcome> {
+  if (options.confirmedReason !== undefined) {
+    const current = await getAccountDeletionRequestPlan(userId);
+    if (current.reason !== options.confirmedReason) throw new Error(ACCOUNT_DELETION_PLAN_CHANGED);
+  }
   const db = await getDatabase();
   let soloEntryTournaments: number[] = [];
   let withdrawn: DeletionWithdrawal[] = [];
@@ -554,8 +587,9 @@ export async function requestAccountDeletion(
     // verrou ferait attendre un tournoi en cours pour rien.
     soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
     const organizedIds = await listOrganizedTournamentIds(db, userId);
+    const openSoloTournaments = await listSoloRegistrationTournamentIds(db, userId, true);
     const soloTournaments = mergeTournamentIds(
-      await listSoloRegistrationTournamentIds(db, userId, true),
+      openSoloTournaments,
       organizedIds,
       await listCastTournamentIds(db, userId),
     );
@@ -588,6 +622,11 @@ export async function requestAccountDeletion(
         await assertAnotherAdminRemains(connection, userId);
       }
 
+      // Un tournoi dont l'heure de début est passée sans que personne ait
+      // ouvert sa page passe en cours ici : son inscription, que la fenêtre de
+      // retrait refuse, est alors forfaitée dès la demande comme dans tout
+      // tournoi en cours, au lieu de rester jusqu'à la passe horaire.
+      await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
       withdrawn = await withdrawSoloRegistrationsOn(
         connection,
         await loadSoloRegistrations(connection, userId),

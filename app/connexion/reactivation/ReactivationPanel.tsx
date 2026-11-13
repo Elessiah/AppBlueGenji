@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { REACTIVATED_LOGIN_REQUIRED } from "@/lib/shared/account-deletion";
 import { suspendedLoginText } from "@/lib/shared/login-text";
@@ -35,12 +36,16 @@ const DECLINE_TIMEOUT_MS = 8000;
  * fenêtre privée), l'écran ne parle pas d'un lien « expiré » que le visiteur
  * n'a jamais eu.
  */
+/** Ce que la réactivation ne défait pas, dans l'ordre des gestes de la demande. */
+const NOT_UNDONE_ITEMS = ["teams", "organized", "registrations", "forfeits", "casts"] as const;
+
 export function ReactivationPanel({
   finalAt,
   hadTicket = true,
 }: Readonly<{ finalAt: string | null; hadTicket?: boolean }>) {
   const text = useLoginText();
   const { t } = text;
+  const keptId = useId();
   const router = useLocaleRouter();
   const { showError, showSuccess, showInfo } = useToast();
   // Le geste en cours : les deux boutons se ferment (`aria-disabled` + garde,
@@ -216,8 +221,20 @@ export function ReactivationPanel({
         ) : (
           <>
             <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink)" }}>{t("reactivation.lead", { date })}</p>
-            <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.kept")}</p>
-            <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.notUndone")}</p>
+            {/* Ce qui revient, en une phrase ; le détail (pseudo pris, avatar
+                masqué, compte suspendu) derrière le « i ». */}
+            <InfoHintRow inline>
+              <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14, margin: 0 }}>{t("reactivation.keptLead")}</p>
+              <InfoHint id={keptId} subject={t("reactivation.keptSubject")}>
+                <p>{t("reactivation.kept")}</p>
+              </InfoHint>
+            </InfoHintRow>
+            <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14, marginBottom: 4 }}>{t("reactivation.notUndoneLead")}</p>
+            <ul style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14, marginTop: 0, paddingLeft: 20 }}>
+              {NOT_UNDONE_ITEMS.map((item) => (
+                <li key={item}>{t(`reactivation.notUndoneItems.${item}`)}</li>
+              ))}
+            </ul>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
               <CyberButton
                 ref={confirmRef}

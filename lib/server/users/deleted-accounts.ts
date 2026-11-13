@@ -66,6 +66,45 @@ async function settleDeletedAccount(
 
 
 /**
+ * Marqueur (`bg_settings`) du dernier relevé **complet** des comptes
+ * supprimés, daté par la base (`UTC_TIMESTAMP()`, `AAAA-MM-JJ HH:MM:SS`).
+ */
+export const DELETED_ACCOUNTS_FULL_SCAN_MARKER = "deleted_accounts_full_scan_at";
+
+/** Le relevé complet vaut pour une journée : au-delà, le démarrage suivant le refait. */
+export const DELETED_ACCOUNTS_FULL_SCAN_HOURS = 24;
+
+/** Un relevé complet a-t-il été mené à bout dans la journée ? Lecture impossible : non (on refait). */
+async function fullScanIsFresh(db: Awaited<ReturnType<typeof getDatabase>>): Promise<boolean> {
+  try {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT 1 FROM bg_settings
+        WHERE setting_key = ?
+          AND setting_value > DATE_FORMAT(DATE_SUB(UTC_TIMESTAMP(), INTERVAL ${DELETED_ACCOUNTS_FULL_SCAN_HOURS} HOUR), '%Y-%m-%d %H:%i:%s')
+        LIMIT 1`,
+      [DELETED_ACCOUNTS_FULL_SCAN_MARKER],
+    );
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Date le relevé complet ; un échec est dit, le prochain démarrage refait le relevé. */
+async function markFullScan(db: Awaited<ReturnType<typeof getDatabase>>): Promise<void> {
+  try {
+    await db.execute(
+      `INSERT INTO bg_settings (setting_key, setting_value)
+       VALUES (?, DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-%d %H:%i:%s'))
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      [DELETED_ACCOUNTS_FULL_SCAN_MARKER],
+    );
+  } catch (error) {
+    console.error("[deleted-accounts] Date du relevé complet non écrite :", failureReason(error));
+  }
+}
+
+/**
  * Applique la règle de suppression **en vigueur** aux comptes déjà supprimés.
  *
  * La règle a changé deux fois sous des comptes qui l'avaient déjà subie : un
@@ -103,6 +142,17 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
     return { withdrawn: 0, forfeited: 0 };
   });
   const trace = accountTraceSql();
+  // La question « ne laisse plus rien » (les quatre traces, dont `played` et
+  // ses jointures équipes, matchs, tournois) se pose à **chaque** compte
+  // anonymisé : une fois par jour suffit — un compte n'y devient effaçable que
+  // si l'historique qui le retenait disparaît (tournoi supprimé), et la règle
+  // du jour est déjà appliquée à chaque suppression. Les autres démarrages ne
+  // relèvent que les marques bon marché de l'ancienne règle.
+  const fullScan = !(await fullScanIsFresh(db));
+  const leavesNothing = fullScan
+    ? `
+          OR NOT (${trace.organized} OR ${trace.owned} OR ${trace.soloRegistered} OR ${trace.played})`
+    : "";
   const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
     String.raw`SELECT u.id
        FROM bg_users u
@@ -111,8 +161,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
         AND (
           u.pseudo LIKE 'compte\_supprime\_%'
           OR u.is_admin = 1
-          OR u.platform_roles_json IS NOT NULL
-          OR NOT (${trace.played} OR ${trace.soloRegistered} OR ${trace.organized} OR ${trace.owned})
+          OR u.platform_roles_json IS NOT NULL${leavesNothing}
         )
       ORDER BY u.id`,
   );
@@ -143,6 +192,8 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   for (const candidate of candidates) {
     await reconcileOneAccount(db, Number(candidate.id), outcome, touchedTournaments);
   }
+  // Mené à bout sans échec : les démarrages de la journée s'en dispensent.
+  if (fullScan && outcome.failed === 0) await markFullScan(db);
 
   // Même raison que la suppression elle-même (`deleteOwnAccount`) : les vues
   // de l'accueil qui nomment une entrée solo ne gardent pas l'ancien pseudo.

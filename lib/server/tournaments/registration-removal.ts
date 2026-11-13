@@ -24,7 +24,7 @@
  * classement ni de phase. La fenêtre garantit qu'il n'y en a pas — ils naissent
  * tous à la bascule `REGISTRATION → RUNNING`, que ce module refuse de franchir.
  */
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
@@ -46,6 +46,26 @@ export type RemovedEntrant = {
   maxTeams: number;
   participantType: ParticipantType;
 };
+
+/**
+ * Le geste même du retrait, sur la transaction de l'appelant — qui tient déjà
+ * la ligne du tournoi (`lockTournamentRow`) et en a jugé la fenêtre : la ligne
+ * d'inscription effacée, les rangs refermés. Partagé avec la suppression d'un
+ * compte (`deleted-solo-entries.ts`, `account-erasure.ts`), qui retire ses
+ * inscriptions solo de la même façon.
+ */
+export async function withdrawRegistrationOn(
+  connection: PoolConnection,
+  tournamentId: number,
+  teamId: number,
+): Promise<void> {
+  await connection.execute(
+    `DELETE FROM bg_tournament_registrations
+     WHERE tournament_id = ? AND team_id = ?`,
+    [tournamentId, teamId],
+  );
+  await resequenceSeeds(connection, tournamentId);
+}
 
 /**
  * Retire un engagé du plateau.
@@ -102,13 +122,7 @@ export async function removeTournamentEntrant(
     const entrantName = rows[0]?.team_name;
     if (entrantName === undefined) throw new Error("TEAM_NOT_IN_TOURNAMENT");
 
-    await connection.execute(
-      `DELETE FROM bg_tournament_registrations
-       WHERE tournament_id = ? AND team_id = ?`,
-      [tournamentId, teamId],
-    );
-
-    await resequenceSeeds(connection, tournamentId);
+    await withdrawRegistrationOn(connection, tournamentId, teamId);
 
     const [counted] = await connection.execute<(RowDataPacket & { c: number })[]>(
       `SELECT COUNT(*) AS c FROM bg_tournament_registrations WHERE tournament_id = ?`,

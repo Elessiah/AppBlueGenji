@@ -23,6 +23,8 @@ import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
+import { syncTournamentState } from "@/lib/server/tournaments/state";
+import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
 import { failureReason } from "@/lib/server/failure-reason";
@@ -250,6 +252,38 @@ export async function listCastTournamentIds(runner: SqlRunner, userId: number): 
      SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
      ORDER BY tournament_id`,
     [userId, userId, userId, userId],
+  );
+  return rows.map((row) => Number(row.tournament_id));
+}
+
+/**
+ * Les tournois **pas terminés** dont une page nomme le compte, par id
+ * croissant : son entrée solo inscrite, l'effectif d'une équipe engagée dont il
+ * est ou a été membre, un match qu'il caste, dont il a fourni le lien, qu'il
+ * arbitre ou dont il a lancé le direct. La demande et la réactivation changent
+ * le nom sous lequel il paraît : leurs lecteurs ouverts sont rediffusés
+ * (`publishUpdatedEvent`). Un tournoi terminé n'a plus de flux qui vive des
+ * jours : sa page se relit au chargement.
+ */
+export async function listNamingTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
+  const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
+    `SELECT n.tournament_id
+       FROM (
+         SELECT r.tournament_id FROM bg_teams s JOIN bg_tournament_registrations r ON r.team_id = s.id WHERE s.solo_user_id = ?
+         UNION
+         SELECT r.tournament_id FROM bg_team_members tm JOIN bg_tournament_registrations r ON r.team_id = tm.team_id WHERE tm.user_id = ?
+         UNION
+         SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters c ON c.match_id = m.id WHERE c.user_id = ?
+         UNION
+         SELECT m.tournament_id FROM bg_matches m JOIN bg_match_streams st ON st.match_id = m.id WHERE st.link_user_id = ?
+         UNION
+         SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
+         UNION
+         SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
+       ) n
+       JOIN bg_tournaments t ON t.id = n.tournament_id AND t.state <> 'FINISHED' AND t.finished_at IS NULL
+      ORDER BY n.tournament_id`,
+    [userId, userId, userId, userId, userId, userId],
   );
   return rows.map((row) => Number(row.tournament_id));
 }
@@ -592,6 +626,9 @@ async function deleteAccountNow(
   // Les avatars en quarantaine qu'emporte l'effacement : le fichier part après
   // le commit.
   let quarantinedFiles: string[] = [];
+  // Les tournois pas encore commencés de l'entrée solo, synchronisés sous
+  // verrou : prévenus après le commit (un coup d'envoi a pu y être donné).
+  let startedTournaments: number[] = [];
 
   // Une transaction annulée par un interblocage (une désignation d'arbitre
   // verrouille le match puis le compte, la suppression l'inverse) se rejoue
@@ -605,10 +642,8 @@ async function deleteAccountNow(
     // les autres tiennent (pool saturé, plus aucune requête ne passe).
     // Y compris ceux de ses casts et arbitrages : la transaction verrouille leurs
     // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
-    const soloTournaments = mergeTournamentIds(
-      await listSoloRegistrationTournamentIds(db, userId, true),
-      await listCastTournamentIds(db, userId),
-    );
+    const openSoloTournaments = await listSoloRegistrationTournamentIds(db, userId, true);
+    const soloTournaments = mergeTournamentIds(openSoloTournaments, await listCastTournamentIds(db, userId));
     const connection = await db.getConnection();
     try {
       // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un
@@ -647,6 +682,13 @@ async function deleteAccountNow(
         return null;
       }
       await assertSoloLockSetFresh(connection, userId, new Set(soloTournaments), lastAttempt);
+      // Les tournois pas encore commencés de l'entrée solo, remis à l'heure
+      // comme au retrait d'un engagé par le staff (`syncTournamentState`) : un
+      // tournoi dont l'heure de début est passée sans synchronisation passe en
+      // cours ici, et son inscription retient la ligne (anonymisation) au lieu
+      // d'être retirée d'un plateau déjà tiré. Ses lignes de journal partent
+      // avec le commit.
+      for (const tournamentId of openSoloTournaments) await syncTournamentState(connection, tournamentId);
       // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
       // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
       const hold = await readDeletionHold(connection, userId, true);
@@ -700,6 +742,9 @@ async function deleteAccountNow(
       }
 
       await connection.commit();
+      afterCommit(() => flushBotLogs(connection), "Lignes de journal du coup d'envoi non envoyées");
+      // Passés en cours : leurs lecteurs voient le coup d'envoi.
+      startedTournaments = openSoloTournaments;
       return plan;
     } catch (error) {
       // Sur une connexion morte, l'annulation lève à son tour : gardée, pour que
@@ -715,6 +760,9 @@ async function deleteAccountNow(
       if (isReferencedRowError(error)) throw new Error("ACCOUNT_STILL_REFERENCED");
       throw error;
     } finally {
+      // Après le commit, la file est déjà partie ; sur un échec, ses lignes
+      // (coup d'envoi d'une transaction annulée) ne partent jamais.
+      discardBotLogs(connection);
       connection.release();
     }
   };
@@ -745,7 +793,7 @@ async function deleteAccountNow(
 
   // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
   // des engagés, l'aperçu du tirage et les instantanés ouverts.
-  for (const tournamentId of withdrawnFrom) {
+  for (const tournamentId of new Set([...withdrawnFrom, ...startedTournaments])) {
     afterCommit(() => publishUpdatedEvent(tournamentId), `Tournoi #${tournamentId} non prévenu`);
   }
 

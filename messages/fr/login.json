@@ -142,8 +142,17 @@
   "reactivation": {
     "title": "Réactiver ton compte ?",
     "lead": "Tu as demandé la suppression de ton compte. Elle deviendra définitive le {date} : d'ici là, tu peux encore le réactiver.",
+    "keptLead": "Réactiver te rend ton profil, tes statistiques, tes réglages, ton pseudo et ton avatar.",
+    "keptSubject": "ce que la réactivation rend",
     "kept": "Réactiver te rend ton compte : profil, statistiques, réglages, et ton pseudo et ton avatar, masqués partout depuis la demande (si ton pseudo a été pris entre-temps, il te revient, raccourci au besoin, suivi de « OG », par exemple « PseudoOG » — ou « PseudoOG2 »… si celui-ci l'est aussi, à défaut ton pseudo d'emprunt : tu peux le changer dans Mon profil). Un avatar que la modération a masqué ou supprimé entre-temps ne revient pas. Un compte suspendu peut aussi être réactivé : il reste suspendu.",
-    "notUndone": "Ce qui a été fait à la demande n'est pas annulé : tu as quitté tes équipes (propriété transmise, équipe fantôme ou dissoute), tes tournois organisés ont changé d'organisateur quand quelqu'un pouvait les reprendre, tes inscriptions à des tournois individuels pas encore commencés ont été retirées, tes matchs restants d'un tournoi individuel en cours où tu n'avais jamais joué ont été perdus par forfait, et tes casts, désignations d'arbitre, invitations et demandes d'adhésion en attente ont été retirés.",
+    "notUndoneLead": "Ce qui a été fait à la demande n'est pas annulé :",
+    "notUndoneItems": {
+      "teams": "tu as quitté tes équipes (propriété transmise, équipe fantôme ou dissoute) ;",
+      "organized": "tes tournois organisés ont changé d'organisateur quand quelqu'un pouvait les reprendre ;",
+      "registrations": "tes inscriptions à des tournois individuels pas encore commencés ont été retirées ;",
+      "forfeits": "tes matchs restants d'un tournoi individuel en cours où tu n'avais jamais joué ont été perdus par forfait ;",
+      "casts": "tes casts, désignations d'arbitre, invitations et demandes d'adhésion en attente ont été retirés."
+    },
     "confirm": "Réactiver mon compte",
     "cancel": "Ne pas réactiver",
     "done": "Ton compte est réactivé.",

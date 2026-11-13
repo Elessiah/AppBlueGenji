@@ -4,11 +4,11 @@ import { fail, ok } from "@/lib/server/http";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { getFullProfile } from "@/lib/server/users/full-profile";
 import { updateOwnProfile } from "@/lib/server/users/profile-update";
-import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
+import { ACCOUNT_DELETED_ERROR, ACCOUNT_DELETION_PLAN_CHANGED, parseConfirmedReason } from "@/lib/shared/account-deletion";
 import { BATTLETAG_LOCKED } from "@/lib/shared/battletag-lock";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
 import { isProfileInputError } from "@/lib/shared/profile-input-errors";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonBody, readOptionalJsonObject } from "@/lib/server/request-body";
 import type { FullProfileResponse } from "@/lib/shared/types";
 
 /** Les refus de `requestAccountDeletion` qui sortent tels quels : ils ont un sens pour l'écran. */
@@ -91,9 +91,16 @@ export async function PATCH(req: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+
+  // Le motif que la confirmation a annoncé (`confirmedReason`) : comparé à ce
+  // que la demande ferait, il refuse un sort que la modale n'a pas décrit.
+  // Corps absent ou illisible : rien n'est comparé — supprimer son compte est
+  // un droit, une description manquante ne le suspend pas.
+  const read = await readOptionalJsonObject(req, "INVALID_BODY");
+  const confirmedReason = "body" in read ? parseConfirmedReason(read.body.confirmedReason) : undefined;
 
   let plan: Awaited<ReturnType<typeof requestAccountDeletion>>;
   try {
@@ -101,13 +108,14 @@ export async function DELETE() {
     // la même promesse, et le motif de la conservation encore moins. La
     // suppression n'est définitive que trente jours plus tard (`finalAt`) : se
     // reconnecter d'ici là la réactive (E4).
-    plan = await requestAccountDeletion(user.id);
+    plan = await requestAccountDeletion(user.id, confirmedReason === undefined ? {} : { confirmedReason });
   } catch (error) {
     // Deux refus nommés — la course sur une clé étrangère (le second essai
     // anonymisera) et un compte déjà introuvable. Tout le reste est une panne
     // dont le message est interne (MySQL nomme base, table et contrainte) : il
     // reste au journal, le client reçoit le code générique.
     const message = (error as Error).message;
+    if (message === ACCOUNT_DELETION_PLAN_CHANGED) return fail(message, 409);
     if (ACCOUNT_DELETION_REFUSALS.has(message)) return fail(message, 400);
     console.error("[profile] DELETE failed:", failureReason(error));
     return fail("ACCOUNT_DELETE_FAILED", 400);

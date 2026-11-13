@@ -4,13 +4,20 @@ import { useId, useState, type ReactNode } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
-  deletionConsequencesParagraphs,
+  deletionDialogContent,
   deletionErrorText,
   deletionOutcomeText,
   type ProfileText,
 } from "@/app/(secured)/profil/_lib/profile-text";
-import { SESSION_GONE_CODES, type AccountDeletionPlan, type ConfirmationSubject } from "@/lib/shared/account-deletion";
+import {
+  ACCOUNT_DELETION_PLAN_CHANGED,
+  RETENTION_UNKNOWN,
+  SESSION_GONE_CODES,
+  type AccountDeletionPlan,
+  type ConfirmationSubject,
+} from "@/lib/shared/account-deletion";
 import { previewAccountDeletion, type PendingAccountDeletion } from "./account-deletion-preview";
 import { localeHref } from "@/lib/shared/locales";
 
@@ -51,14 +58,25 @@ export type AccountDeletionResult = { ok: true; applied: ConfirmationSubject } |
  * Supprime le compte connecté. Le corps d'un refus porte un **code**, pas une
  * phrase : la traduction vit dans le module de texte, et un code inconnu
  * retombe sur la phrase générique plutôt que de s'afficher tel quel.
+ *
+ * Le motif que la confirmation a annoncé part avec la demande
+ * (`confirmedReason`) : s'il n'est plus celui que la demande ferait, le
+ * serveur refuse (`ACCOUNT_DELETION_PLAN_CHANGED`) au lieu d'appliquer un sort
+ * que la modale n'a pas décrit. Sans aperçu (`UNKNOWN`), la modale n'a rien
+ * promis : rien n'est comparé.
  */
 export async function requestAccountDeletion(
   previewed: ConfirmationSubject,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AccountDeletionResult> {
   let response: Response;
+  const confirmed = previewed === RETENTION_UNKNOWN ? {} : { confirmedReason: previewed };
   try {
-    response = await fetchImpl("/api/profile", { method: "DELETE" });
+    response = await fetchImpl("/api/profile", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(confirmed),
+    });
   } catch {
     return { ok: false, code: "ACCOUNT_DELETE_FAILED" };
   }
@@ -89,7 +107,7 @@ interface UseAccountDeletionOptions {
   onCancel?: () => void;
   /** `overBlocking` : la confirmation s'empile sur une fenêtre bloquante (conditions). */
   layer?: "default" | "overBlocking";
-  /** Ouverte depuis la fenêtre des conditions (non acceptées) : `deletionConsequencesParagraphs(…, fromTerms)`. */
+  /** Ouverte depuis la fenêtre des conditions (non acceptées) : `deletionDialogContent(…, fromTerms)`. */
   fromTerms?: boolean;
 }
 
@@ -120,6 +138,7 @@ export function useAccountDeletion({
   const [deleting, setDeleting] = useState(false);
   // Seul le premier paragraphe (ce que la suppression fait) décrit la modale.
   const leadId = useId();
+  const residualId = useId();
   /** Aperçu reçu, modale de suppression ouverte. */
   const [pendingDeletion, setPendingDeletion] = useState<PendingAccountDeletion | null>(null);
 
@@ -148,6 +167,13 @@ export function useAccountDeletion({
   /** Joué par la modale : rend `false` sur un refus, qui la laisse ouverte. */
   const performAccountDeletion = async (previewed: ConfirmationSubject): Promise<boolean> => {
     const result = await requestAccountDeletion(previewed);
+    if (!result.ok && result.code === ACCOUNT_DELETION_PLAN_CHANGED) {
+      // Le sort annoncé n'est plus le bon : la modale reste ouverte et se
+      // réécrit sur un aperçu frais, à relire avant de confirmer de nouveau.
+      setPendingDeletion(await previewAccountDeletion());
+      showError(deletionErrorText(text, result.code), { lang: contentLang });
+      return false;
+    }
     if (!result.ok && !SESSION_GONE_CODES.has(result.code)) {
       showError(deletionErrorText(text, result.code), { lang: contentLang });
       return false;
@@ -164,7 +190,8 @@ export function useAccountDeletion({
     return true;
   };
 
-  const dialog = pendingDeletion ? (
+  const content = pendingDeletion ? deletionDialogContent(text, pendingDeletion.subject, fromTerms) : null;
+  const dialog = pendingDeletion && content ? (
     <ConfirmActionDialog
       title={text.t("deletion.question")}
       confirmLabel={text.t("deletion.confirm")}
@@ -180,10 +207,22 @@ export function useAccountDeletion({
       onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
       describedById={leadId}
     >
-      {deletionConsequencesParagraphs(text, pendingDeletion.subject, fromTerms).map((paragraph, index) => (
-        // Liste figée par l'aperçu : la position est une clé stable (deux textes peuvent se répéter).
-        <p key={`paragraph-${index}`} id={index === 0 ? leadId : undefined}>{paragraph}</p>
-      ))}
+      <p id={leadId}>{content.consequence}</p>
+      {content.termsNote ? <p>{content.termsNote}</p> : null}
+      <p>{content.handoverLead}</p>
+      <ul>
+        {content.handoverItems.map((item, index) => (
+          // Liste figée par le texte : la position est une clé stable.
+          <li key={`handover-${index}`}>{item}</li>
+        ))}
+      </ul>
+      <p>{content.window}</p>
+      <InfoHintRow inline>
+        <span>{content.residualLead}</span>
+        <InfoHint id={residualId} subject={content.residualSubject}>
+          <p>{content.residual}</p>
+        </InfoHint>
+      </InfoHintRow>
     </ConfirmActionDialog>
   ) : null;
 
