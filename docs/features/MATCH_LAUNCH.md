@@ -183,7 +183,11 @@ sinon un refus à l'heure du départ. Ce refus est donc relu **une fois**
 (`contactsRetryDelay`, `CONTACTS_RETRY_MAX_WAIT_MS`), à l'heure du départ plus
 une seconde ; tout autre refus (match terminé, sans heure, tiers) part aussitôt.
 Fermer la modale coupe l'attente et la lecture (`AbortSignal`). Ouverte avant
-le départ sur un match qui a un caster (`casterContactsPending`, `lib/shared/match-launch.ts`, la règle de la note de `CasterCard`), la modale
+le départ sur un match qui a un caster (`casterContactsPending`, `lib/shared/match-launch.ts`, la règle de la note de `CasterCard`),
+ou, pour un lecteur caster, dont l'arbitre désigné a un contact que le départ
+lui ouvrira (`refereeContactsPending` : drapeau `LaunchReferee.contactsPending`
+posé par le serveur — tag Discord certifié lu par la carte, BattleTag en
+Overwatch ; un arbitre sans aucun contact à ouvrir n'arme rien), la modale
 relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
 seconde ; une réponse « programmé » dont l'en-tête est déjà à l'heure est
 relue une seconde plus tard — `casterRereadDelay`), et quand la carte reçoit

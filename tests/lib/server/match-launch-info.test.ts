@@ -1517,6 +1517,83 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       expect(JSON.stringify(info?.referee)).not.toContain("Arbitre#1");
     });
 
+    // Le départ ouvrira-t-il quelque chose au lecteur caster ? Le serveur le dit
+    // (`contactsPending`) : sans rien à ouvrir, le client n'arme aucune relecture.
+    describe("contacts de l'arbitre en attente du départ", () => {
+      const later = () => new Date(Date.now() + 3 * 3_600_000).toISOString();
+
+      it("loadViewerMatchContacts_staffCasterScheduledOwMatch_flagsRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+        ];
+        state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
+
+        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+        expect(info?.referee).toMatchObject({ contactsShown: false, contactsPending: true });
+      });
+
+      it("listViewerMatchLaunches_casterScheduledMrMatch_noRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [
+          candidate({ tournament_game: "MR", match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+        ];
+        state.users = [casterUser(VIEWER), juge()];
+
+        const [info] = await listViewerMatchLaunches(viewer);
+
+        expect(info.viewer.role).toBe("CASTER");
+        expect(info.referee?.contactsShown).toBe(false);
+        expect(info.referee).not.toHaveProperty("contactsPending");
+      });
+
+      it("listViewerMatchLaunches_casterScheduledOwMatch_flagsRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+        ];
+        state.users = [casterUser(VIEWER), juge()];
+
+        const [info] = await listViewerMatchLaunches(viewer);
+
+        expect(info.referee).toMatchObject({ battletag: null, contactsPending: true });
+      });
+
+      it("loadViewerMatchContacts_playerReaderScheduled_noRefereeContactsPending", async () => {
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, self_managed: 0 }),
+        ];
+        state.users = [juge()];
+
+        const info = await loadViewerMatchContacts(viewer, 42);
+
+        expect(info?.referee).not.toHaveProperty("contactsPending");
+      });
+
+      it("loadViewerMatchContacts_staffCasterOpenedMatch_noRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
+        state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
+
+        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+        expect(info?.referee).toMatchObject({ contactsShown: true });
+        expect(info?.referee).not.toHaveProperty("contactsPending");
+      });
+
+      it("listViewerMatchLaunches_refereeAlsoCastsScheduled_noContactsPendingOnOwnCard", async () => {
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: REFEREE, self_managed: 0 }),
+        ];
+        state.users = [juge()];
+
+        const [info] = await listViewerMatchLaunches(viewer);
+
+        expect(info.referee).not.toHaveProperty("contactsPending");
+      });
+    });
+
     it("loadViewerMatchContacts_staffCasterOpenedMatch_sendsRefereeContacts", async () => {
       state.viewerMemberships = [];
       state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
