@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/transaction");
 jest.mock("@/lib/server/tournaments/registration");
+jest.mock("@/lib/server/tournaments/lobby-brief", () => ({ silencePausedLobbyBriefs: jest.fn(async () => undefined) }));
+jest.mock("@/lib/server/tournaments/match-reminders", () => ({ forgetCheckInReads: jest.fn() }));
 
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { setMatchCheckIn } from "@/lib/server/tournaments/match-check-in";
+import { silencePausedLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
+import { forgetCheckInReads } from "@/lib/server/tournaments/match-reminders";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 type Row = Record<string, unknown>;
@@ -57,13 +61,36 @@ describe("setMatchCheckIn", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
-  it("setMatchCheckIn_turnOn_writesResumeInstant", async () => {
+  it("setMatchCheckIn_turnOn_setsFlagOnly", async () => {
     const connection = connectionWith({ state: "RUNNING", match_check_in: 0, match_check_in_paused_at: null });
     await expect(setMatchCheckIn(7, true, now)).resolves.toMatchObject({ enabled: true, changed: true });
-    expect(connection.execute).toHaveBeenCalledWith(
-      "UPDATE bg_tournaments SET match_check_in = 1, match_check_in_resumed_at = ? WHERE id = ?",
-      [now, 7],
-    );
+    expect(connection.execute).toHaveBeenCalledWith("UPDATE bg_tournaments SET match_check_in = 1 WHERE id = ?", [7]);
+  });
+
+  it("setMatchCheckIn_turnOn_silencesBriefsDueSincePause", async () => {
+    const pausedAt = new Date("2026-11-13T20:40:00Z");
+    connectionWith({ state: "RUNNING", match_check_in: 0, match_check_in_paused_at: pausedAt });
+    await setMatchCheckIn(7, true, now);
+    const [, tournamentId, pause, at] = jest.mocked(silencePausedLobbyBriefs).mock.calls[0];
+    expect([tournamentId, pause, at]).toEqual([7, pausedAt, now]);
+  });
+
+  it("setMatchCheckIn_turnOff_noBriefSilence", async () => {
+    connectionWith({ state: "RUNNING", match_check_in: 1, match_check_in_paused_at: null });
+    await setMatchCheckIn(7, false, now);
+    expect(silencePausedLobbyBriefs).not.toHaveBeenCalled();
+  });
+
+  it("setMatchCheckIn_changed_forgetsCheckInReads", async () => {
+    connectionWith({ state: "RUNNING", match_check_in: 1, match_check_in_paused_at: null });
+    await setMatchCheckIn(7, false, now);
+    expect(forgetCheckInReads).toHaveBeenCalledTimes(1);
+  });
+
+  it("setMatchCheckIn_unchanged_keepsCheckInReads", async () => {
+    connectionWith({ state: "RUNNING", match_check_in: 1, match_check_in_paused_at: null });
+    await setMatchCheckIn(7, true, now);
+    expect(forgetCheckInReads).not.toHaveBeenCalled();
   });
 
   it("setMatchCheckIn_turnOnAfterPause_silencesOnlyWindowsOpenedSincePause", async () => {

@@ -29,11 +29,12 @@ import {
   dispatchLobbyBriefs,
   LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
+  silencePausedLobbyBriefs,
 } from "@/lib/server/tournaments/lobby-brief";
 import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
 import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
 import { renderDm } from "@/lib/shared/dm-language";
-import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
 const MATCH = {
@@ -332,37 +333,13 @@ describe("dispatchLobbyBriefs", () => {
   it("dueSql_checkInOff_notDueInReadNorClaim", async () => {
     const { query, execute } = mockDb([MATCH]);
     await dispatchLobbyBriefs();
-    // Option « Check-in des matchs » éteinte, ou rallumée après l'échéance : pas de brief (MATCH_CHECK_IN_SETTING.md).
+    // Option « Check-in des matchs » éteinte : rien ne part ni n'est réservé ; ce
+    // qui est devenu dû pendant l'arrêt est réservé par la remise en marche.
     const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
     const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
     for (const sql of [read, claim]) {
-      expect(sql).toContain("AND t.match_check_in = 1 AND (t.match_check_in_resumed_at IS NULL OR LEAST(");
-      expect(sql).toContain(">= t.match_check_in_resumed_at OR");
-    }
-  });
-
-  it("dueSql_checkInResumed_dueBeforePauseStillSent", async () => {
-    const { query, execute } = mockDb([MATCH]);
-    await dispatchLobbyBriefs();
-    // Seul ce qui était dû pendant l'arrêt se tait : un check-in dû avant l'arrêt part encore.
-    const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
-    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
-    for (const sql of [read, claim]) {
-      expect(sql).toMatch(/OR LEAST\(.*\) < t\.match_check_in_paused_at\)/);
-    }
-  });
-
-  it("dueSql_checkInResumed_ignoresLobbyOpenedForReplacedPairing", async () => {
-    const { query, execute } = mockDb([MATCH]);
-    await dispatchLobbyBriefs();
-    // Un salon ouvert pour un appariement remplacé ne fait pas taire le check-in du nouveau.
-    const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
-    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
-    const guarded = "CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.lobby_opened_at END";
-    for (const sql of [read, claim]) {
-      const resume = sql.slice(sql.indexOf("t.match_check_in_resumed_at IS NULL"), sql.indexOf(">= t.match_check_in_resumed_at"));
-      expect(resume.split(guarded)).toHaveLength(3);
-      expect(resume.replaceAll(guarded, "")).not.toContain("m.lobby_opened_at");
+      expect(sql).toContain("AND t.match_check_in = 1");
+      expect(sql).not.toContain("match_check_in_paused_at");
     }
   });
 
@@ -1294,5 +1271,68 @@ describe("dispatchLobbyBriefs", () => {
     await dispatchLobbyBriefs();
     expect(await dispatchLobbyBriefs()).toBe(0);
     expect(query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("silencePausedLobbyBriefs (remise en marche du check-in)", () => {
+  const now = new Date("2026-11-13T21:00:00Z");
+  const flat = (sql: string) => sql.replace(/\s+/g, " ");
+
+  it("silencePausedLobbyBriefs_noPause_reservesBothSidesWithoutTimeBound", async () => {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValue([{ affectedRows: 0 }, []]);
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, null, now);
+
+    const calls = connection.execute.mock.calls as unknown as [string, unknown[]][];
+    expect(calls).toHaveLength(2);
+    expect(flat(calls[0][0])).toContain("SELECT m.id, CONCAT(m.team1_id, ''), ?");
+    expect(flat(calls[1][0])).toContain("SELECT m.id, CONCAT(m.team2_id, ''), ?");
+    for (const [sql, params] of calls) {
+      expect(sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")).toBe(true);
+      // Fenêtre du brief sans la garde de l'option (encore éteinte pour la lecture).
+      expect(flat(sql)).toContain("m.status = 'READY'");
+      expect(sql).not.toContain("t.match_check_in = 1");
+      expect(sql).not.toContain("NOW() - INTERVAL ? SECOND");
+      expect(params).toEqual([LOBBY_BRIEF_PHASE, 7]);
+    }
+  });
+
+  it("silencePausedLobbyBriefs_withPause_boundsHorizonAndLobbySincePause", async () => {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValue([{ affectedRows: 1 }, []]);
+    const pausedAt = new Date("2026-11-13T20:40:00Z");
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, pausedAt, now);
+
+    const [sql, params] = connection.execute.mock.calls[0] as unknown as [string, unknown[]];
+    // H-15 comparé à l'arrêt (heure du processus) ; le salon, à l'arrêt ramené sur l'horloge de la base.
+    expect(flat(sql)).toContain("AND (m.start_at IS NULL OR m.start_at - INTERVAL 15 MINUTE >= ?)");
+    expect(flat(sql)).toContain(">= NOW() - INTERVAL ? SECOND)");
+    expect(params).toEqual([LOBBY_BRIEF_PHASE, 7, pausedAt, 1200]);
+  });
+
+  it("silencePausedLobbyBriefs_pauseAfterNow_elapsedClampedToZero", async () => {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValue([{ affectedRows: 0 }, []]);
+    const pausedAt = new Date("2026-11-13T21:00:05Z");
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, pausedAt, now);
+
+    expect((connection.execute.mock.calls[0] as unknown as [string, unknown[]])[1][3]).toBe(0);
+  });
+
+  it("silencePausedLobbyBriefs_lobbyDue_ignoresUnlaunchedEarlyLobby", async () => {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValue([{ affectedRows: 0 }, []]);
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, new Date("2026-11-13T20:00:00Z"), now);
+
+    const sql = flat((connection.execute.mock.calls[0] as unknown as [string])[0]);
+    // Le salon ne compte qu'au lancement, ou faute d'horaire : un salon ouvert tôt
+    // sans lancement attend H-15 et ne fait pas taire un check-in dû après la reprise.
+    expect(sql).toContain("WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)");
+    expect(sql).toContain("WHEN m.start_at IS NULL THEN m.lobby_opened_at END END");
+    expect(sql).toContain("m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)");
   });
 });

@@ -1,6 +1,6 @@
 import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { enforceRateLimit } from "@/lib/server/api-guard";
-import { serviceErrorCode } from "@/lib/server/failure-reason";
+import { failureReason, serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import type { RateLimitRule } from "@/lib/server/rate-limit";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
@@ -79,6 +79,13 @@ export async function putTournamentToggle<T extends TournamentToggleResult>(
     if (message === "TOURNAMENT_FINISHED") return fail(message, 409);
     return fail(serviceErrorCode(error, spec.failedCode), 500);
   }
-  if (result.changed) spec.announce(result, tournamentId, user);
+  if (result.changed) {
+    // Le changement est validé : un journal en échec ne le fait pas passer pour refusé.
+    try {
+      spec.announce(result, tournamentId, user);
+    } catch (error) {
+      console.error(`[tournament-toggle] journal du tournoi ${tournamentId} non publié`, failureReason(error));
+    }
+  }
   return ok({ ...spec.extra?.(result), enabled: result.enabled, changed: result.changed });
 }

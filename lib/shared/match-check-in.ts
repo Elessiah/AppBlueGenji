@@ -9,9 +9,11 @@
  * « Nouveau match », départ de match) ne change pas, ni les salons Discord.
  *
  * L'option se lit **à l'envoi** : la basculer en plein tournoi vaut pour tout
- * ce qui n'est pas encore parti. Rallumée, elle ne rattrape rien de ce qui
- * était dû pendant l'arrêt (entre `match_check_in_paused_at` et la remise en
- * marche `resumedAt` : `lobby-brief`, `setMatchCheckIn`).
+ * ce qui n'est pas encore parti. Seul ce qui est dû **pendant l'arrêt** (depuis
+ * `match_check_in_paused_at`, ou depuis toujours sans arrêt daté) se tait pour
+ * de bon : rallumée, l'option ne le rattrape pas (réservé sans message par la
+ * remise en marche, `setMatchCheckIn`), et ce qui était dû avant l'arrêt sans
+ * être encore parti part à la remise en marche ({@link checkInReminderFate}).
  */
 import { canToggleLiveTournamentOption } from "./tournament-state";
 import type { TournamentState } from "./types";
@@ -19,31 +21,35 @@ import type { TournamentState } from "./types";
 /** L'option telle que la base la porte. */
 export type MatchCheckInSetting = {
   enabled: boolean;
-  /** Dernière remise en marche ; `null` = jamais rallumée depuis la création. */
-  resumedAt: Date | null;
+  /** Dernier arrêt ; `null` = jamais éteinte depuis la création, ou créée éteinte. */
+  pausedAt: Date | null;
 };
 
-/** Lit les deux colonnes (`match_check_in`, `match_check_in_resumed_at`) ; absentes = allumée. */
+/** Instant lu en base ; absent ou illisible = `null`. */
+export function readDbInstant(value: Date | string | null | undefined): Date | null {
+  if (value === undefined || value === null) return null;
+  const instant = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(instant.getTime()) ? instant : null;
+}
+
+/** Lit les deux colonnes (`match_check_in`, `match_check_in_paused_at`) ; absentes = allumée. */
 export function readMatchCheckIn(
   flag: number | string | boolean | null | undefined,
-  resumedAt: Date | string | null | undefined,
+  pausedAt?: Date | string | null,
 ): MatchCheckInSetting {
   const enabled = flag === undefined || flag === null ? true : Number(flag) !== 0;
-  if (resumedAt === undefined || resumedAt === null) return { enabled, resumedAt: null };
-  const instant = resumedAt instanceof Date ? resumedAt : new Date(resumedAt);
-  // Une date illisible ne fait pas taire le check-in : elle vaut « jamais éteinte ».
-  return { enabled, resumedAt: Number.isFinite(instant.getTime()) ? instant : null };
+  return { enabled, pausedAt: readDbInstant(pausedAt) };
 }
 
 /**
- * Un message du check-in dû à `dueAt` part-il ? Oui si l'option est allumée
- * et que sa dernière remise en marche ne lui est pas postérieure : rallumer
- * l'option ne fait pas partir d'un coup ce qui était dû pendant qu'elle était
- * éteinte.
+ * Sort du rappel 10 h dû à `dueAt` : `send` (option allumée), `silence` (dû
+ * pendant l'arrêt — réservé sans message, jamais rattrapé) ou `hold` (dû avant
+ * l'arrêt, pas encore parti : ni envoyé ni réservé, il part à la remise en
+ * marche). Sans arrêt daté, tout l'avant compte pour l'arrêt.
  */
-export function checkInSendable(setting: MatchCheckInSetting, dueAt: Date): boolean {
-  if (!setting.enabled) return false;
-  return setting.resumedAt === null || setting.resumedAt.getTime() <= dueAt.getTime();
+export function checkInReminderFate(setting: MatchCheckInSetting, dueAt: Date): "send" | "silence" | "hold" {
+  if (setting.enabled) return "send";
+  return setting.pausedAt !== null && dueAt.getTime() < setting.pausedAt.getTime() ? "hold" : "silence";
 }
 
 /**

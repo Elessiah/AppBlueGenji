@@ -357,31 +357,14 @@ const BRIEF_FROM = `FROM bg_matches m
          AND rm.bracket = m.bracket AND rm.round_number = m.round_number
        ${seedJoins("m")}`;
 
-/** Ouverture du salon, si elle vaut pour l'appariement actuel du match. */
-const CURRENT_LOBBY_OPENED_SQL = `CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.lobby_opened_at END`;
-
-/**
- * Premier repère du check-in d'un match : 15 minutes avant l'horaire, ou
- * l'ouverture du salon si elle vient plus tôt ou faute d'horaire. Le salon ne
- * compte que s'il a été ouvert pour l'appariement actuel (`launch_pairing`) :
- * celui d'un appariement remplacé ne fait pas taire le nouveau.
- */
-const BRIEF_FIRST_DUE_SQL = `LEAST(COALESCE(m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE, ${CURRENT_LOBBY_OPENED_SQL}),
-                      COALESCE(${CURRENT_LOBBY_OPENED_SQL}, m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE))`;
-
 /**
  * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
  * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
- * rien ne part. Rallumée, le check-in d'un match ne part pas si son premier
- * repère ({@link BRIEF_FIRST_DUE_SQL}) tombe **pendant l'arrêt** — entre le
- * dernier arrêt (`match_check_in_paused_at`, faute de quoi depuis toujours) et
- * la remise en marche : ce qui était dû pendant qu'elle était éteinte n'est pas
- * rattrapé d'un coup, ce qui était dû avant l'arrêt part encore dans sa fenêtre.
+ * rien ne part ni n'est réservé. Ce qui est devenu dû pendant l'arrêt est
+ * réservé sans message par la remise en marche ({@link silencePausedLobbyBriefs}) ;
+ * ce qui était dû avant l'arrêt reste libre et part, rallumée, dans sa fenêtre.
  */
-const CHECK_IN_ON_SQL = `t.match_check_in = 1
-        AND (t.match_check_in_resumed_at IS NULL
-             OR ${BRIEF_FIRST_DUE_SQL} >= t.match_check_in_resumed_at
-             OR ${BRIEF_FIRST_DUE_SQL} < t.match_check_in_paused_at)`;
+const CHECK_IN_ON_SQL = `t.match_check_in = 1`;
 
 /**
  * Un match dû : jouable, pas un bye, sans score, et **dans son quart d'heure**
@@ -407,10 +390,9 @@ const CHECK_IN_ON_SQL = `t.match_check_in = 1
  * Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
  * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
-const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
+const BRIEF_WINDOW_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
         AND m.self_managed = 1 AND m.referee_user_id IS NULL
         AND t.start_visibility_at <= NOW()
-        AND ${CHECK_IN_ON_SQL}
         AND ((m.start_at IS NOT NULL
               AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
               AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)
@@ -418,6 +400,59 @@ const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
               AND (m.start_at IS NULL OR m.start_at <= NOW() OR m.launched_at IS NOT NULL)
               AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
               AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
+
+/** {@link BRIEF_WINDOW_SQL} d'un tournoi dont le check-in est allumé. */
+const BRIEF_DUE_SQL = `${BRIEF_WINDOW_SQL}
+        AND ${CHECK_IN_ON_SQL}`;
+
+/**
+ * Instant où le salon a rendu le check-in dû (horloge de la base, comme
+ * `lobby_opened_at` et `launched_at`), `NULL` si le salon n'y est pour rien :
+ * ouvert pour l'appariement actuel (`launch_pairing`), et à l'ouverture faute
+ * d'horaire, au lancement pour un match lancé — un salon ouvert tôt sans
+ * lancement attend le quart d'heure de l'horaire, comme dans {@link BRIEF_WINDOW_SQL}.
+ */
+const LOBBY_DUE_SQL = `CASE WHEN m.lobby_opened_at IS NOT NULL AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
+              THEN CASE WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)
+                        WHEN m.start_at IS NULL THEN m.lobby_opened_at END END`;
+
+/**
+ * Remise en marche du check-in (`setMatchCheckIn`, dans sa transaction) :
+ * réserve **sans message**, côté par côté, le check-in des matchs du tournoi
+ * qui est dû maintenant et l'est devenu **pendant l'arrêt** — 15 minutes avant
+ * l'horaire et, s'il compte, l'instant du salon ({@link LOBBY_DUE_SQL}) tombent
+ * tous deux après l'arrêt. Un check-in dû avant l'arrêt reste libre (il part) ;
+ * un match devenu dû après la remise en marche n'est pas touché. Réservé ici,
+ * chaque arrêt est soldé une fois pour toutes : un second arrêt ne rouvre pas
+ * le premier. L'horaire se compare à l'arrêt (heure du processus, comme les
+ * horaires) ; le salon, à l'arrêt ramené sur l'horloge de la base (`NOW()`
+ * moins le temps écoulé depuis l'arrêt). Sans arrêt daté (tournoi créé sans
+ * check-in), tout ce qui est dû se tait.
+ */
+export async function silencePausedLobbyBriefs(
+  connection: Pick<Db, "execute">,
+  tournamentId: number,
+  pausedAt: Date | null,
+  now: Date,
+): Promise<void> {
+  const sincePause =
+    pausedAt === null
+      ? ""
+      : `AND (m.start_at IS NULL OR m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE >= ?)
+          AND (${LOBBY_DUE_SQL} IS NULL OR ${LOBBY_DUE_SQL} >= NOW() - INTERVAL ? SECOND)`;
+  const params =
+    pausedAt === null ? [] : [pausedAt, Math.max(0, Math.floor((now.getTime() - pausedAt.getTime()) / 1000))];
+  for (const team of ["m.team1_id", "m.team2_id"]) {
+    await connection.execute(
+      `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
+       SELECT m.id, CONCAT(${team}, ''), ? FROM bg_matches m
+         JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
+        WHERE m.tournament_id = ? AND ${BRIEF_WINDOW_SQL}
+          ${sincePause}`,
+      [LOBBY_BRIEF_PHASE, tournamentId, ...params],
+    );
+  }
+}
 
 /**
  * Réserve un côté — clé (match, id de l'engagée, `LOBBY_BRIEF`), une seule

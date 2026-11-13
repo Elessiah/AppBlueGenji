@@ -147,4 +147,17 @@ describe("PUT /api/admin/tournaments/[id]/match-check-in", () => {
     expect(announceStaffTournamentAction).not.toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it("put_staffLogThrows_returns200WithCommittedValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(announceStaffTournamentAction).mockImplementationOnce(() => {
+      throw new Error("journal en panne");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const res = await PUT(putReq({ enabled: false }), params("7"));
+    // Le changement est validé : le journal en échec ne le fait pas passer pour refusé.
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ enabled: false, changed: true });
+    error.mockRestore();
+  });
 });

@@ -6,9 +6,11 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { CHECK_IN_REMINDER_KEY, MATCH_REMINDER_OFFSETS, MATCH_SEEN_KEY } from "@/lib/shared/discord-notifications";
-import { canToggleMatchCheckIn } from "@/lib/shared/match-check-in";
+import { canToggleMatchCheckIn, readDbInstant } from "@/lib/shared/match-check-in";
 import type { TournamentState } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { silencePausedLobbyBriefs } from "./lobby-brief";
+import { forgetCheckInReads } from "./match-reminders";
 import { publishUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
 import { inTransaction } from "./transaction";
@@ -51,24 +53,19 @@ const SILENCE_OPENED_REMINDERS_SQL = `INSERT IGNORE INTO bg_match_reminders (mat
        JOIN bg_match_reminders seen ON seen.match_id = m.id AND seen.offset_key = ?
       WHERE m.tournament_id = ? AND m.start_at > ? AND m.start_at <= ? AND m.start_at >= ?`;
 
-/** Instant lu en base, `null` s'il manque ou ne se lit pas. */
-function instantOf(value: Date | string | null): Date | null {
-  if (value === null) return null;
-  const instant = value instanceof Date ? value : new Date(value);
-  return Number.isFinite(instant.getTime()) ? instant : null;
-}
-
 /**
  * Allume ou éteint le check-in des matchs, à tout moment jusqu'à la clôture
  * (en cours compris). Éteinte, l'option date son arrêt
- * (`match_check_in_paused_at`) ; rallumée, sa remise en marche
- * (`match_check_in_resumed_at`) — heure du processus, comme les horaires de
- * match : rien de ce qui était dû entre les deux ne part. Le rappel 10 h des
+ * (`match_check_in_paused_at`, heure du processus, comme les horaires de
+ * match) : rien de ce qui devient dû jusqu'à la remise en marche ne part. Le rappel 10 h des
  * manches déjà annoncées dont la fenêtre s'est ouverte pendant l'arrêt est
  * réservé **sans message** dans la même transaction
- * ({@link SILENCE_OPENED_REMINDERS_SQL}). Sans arrêt daté (tournoi créé sans
- * check-in), tout l'avant compte pour l'arrêt. Rejouée sur un interblocage
- * avec un balayage qui réserve la même marque.
+ * ({@link SILENCE_OPENED_REMINDERS_SQL}), comme le check-in de H-15 devenu dû
+ * pendant l'arrêt (`silencePausedLobbyBriefs`) : chaque arrêt est soldé à sa
+ * remise en marche, plusieurs arrêts ne se confondent pas. Sans arrêt daté
+ * (tournoi créé sans check-in), tout l'avant compte pour l'arrêt. Rejouée sur
+ * un interblocage avec un balayage qui réserve la même marque ; les relectures
+ * de l'option en cache dans les balayages sont oubliées une fois validée.
  *
  * @throws `TOURNAMENT_NOT_FOUND` | `TOURNAMENT_FINISHED`
  */
@@ -98,10 +95,10 @@ export async function setMatchCheckIn(
         return true;
       }
       await connection.execute(
-        `UPDATE bg_tournaments SET match_check_in = 1, match_check_in_resumed_at = ? WHERE id = ?`,
-        [now, tournamentId],
+        `UPDATE bg_tournaments SET match_check_in = 1 WHERE id = ?`,
+        [tournamentId],
       );
-      const pausedAt = instantOf(tournament.match_check_in_paused_at);
+      const pausedAt = readDbInstant(tournament.match_check_in_paused_at);
       const lead = checkInReminderLeadMs();
       await connection.execute(SILENCE_OPENED_REMINDERS_SQL, [
         CHECK_IN_REMINDER_KEY,
@@ -111,9 +108,13 @@ export async function setMatchCheckIn(
         new Date(now.getTime() + lead),
         pausedAt ? new Date(pausedAt.getTime() + lead) : now,
       ]);
+      await silencePausedLobbyBriefs(connection, tournamentId, pausedAt, now);
       return true;
     }),
   );
-  if (changed) publishUpdatedEvent(tournamentId);
+  if (changed) {
+    forgetCheckInReads();
+    publishUpdatedEvent(tournamentId);
+  }
   return { tournamentId, enabled, changed };
 }

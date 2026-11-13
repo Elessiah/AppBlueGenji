@@ -10,6 +10,8 @@ import {
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
+  createCheckInReader,
+  forgetCheckInReads,
   MATCH_DM_RETRY_DELAY_MS,
   pendingRefereeDigest,
   resetMatchReminderThrottle,
@@ -126,15 +128,20 @@ function executeDouble(options: {
   /** État actuel de la manche (relu par la reprise des messages privés). */
   status?: string;
   /** Option « Check-in des matchs » relue à l'envoi et à la reprise (absente : celle du passage). */
-  checkIn?: { flag: number; resumedAt?: Date | null };
+  checkIn?: { flag: number; pausedAt?: Date | null };
   /** La relecture de l'option échoue. */
   checkInReadFails?: boolean;
+  /** Paliers réservés pour l'horaire actuel, relus par la reprise (`GROUP_CONCAT`). */
+  takenOffsets?: string | null;
+  /** Appelé à chaque relecture de l'option (une bascule validée pendant le passage, par exemple). */
+  onCheckInRead?: () => void;
 }) {
   const checkInColumns = options.checkIn
-    ? { match_check_in: options.checkIn.flag, match_check_in_resumed_at: options.checkIn.resumedAt ?? null }
+    ? { match_check_in: options.checkIn.flag, match_check_in_paused_at: options.checkIn.pausedAt ?? null }
     : {};
   return jest.fn(async (sql: string, params?: unknown[]) => {
-    if (sql.startsWith("SELECT match_check_in, match_check_in_resumed_at FROM bg_tournaments")) {
+    if (sql.startsWith("SELECT match_check_in, match_check_in_paused_at FROM bg_tournaments")) {
+      options.onCheckInRead?.();
       if (options.checkInReadFails) throw new Error("base injoignable");
       return [options.checkIn ? [checkInColumns] : []];
     }
@@ -149,6 +156,7 @@ function executeDouble(options: {
             match_team2_id: team2,
             status: options.status ?? "READY",
             ...checkInColumns,
+            taken_offsets: options.takenOffsets ?? null,
             ...told,
           },
         ],
@@ -537,7 +545,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
   it("dispatchDueMatchReminders_announcementSentOffRetriedOn_promisesTenHourReminder", async () => {
     const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), {
-      matches: [{ ...MATCH, match_check_in: 0, match_check_in_resumed_at: null }],
+      matches: [{ ...MATCH, match_check_in: 0, match_check_in_paused_at: null }],
       sent: [],
     });
     await matchAtRetry({ checkIn: { flag: 1 } });
@@ -547,6 +555,17 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // Rallumée pendant l'attente : le rappel 10 h partira, la reprise le promet.
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     expect(sentMessages()[0]).toContain("Prochain rappel : 10 heures");
+  });
+
+  it("dispatchDueMatchReminders_tenHourMarkTakenBeforeAnnouncementRetry_retryPromisesNoTenHourReminder", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), { sent: [] });
+    // Entre-temps, le palier 10 h a été réservé (tu par une remise en marche, ou déjà parti).
+    await matchAtRetry({ checkIn: { flag: 1 }, takenOffsets: "SEEN,P1D,PT10H" });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).not.toContain("Prochain rappel : 10 heures");
   });
 
   it("dispatchDueMatchReminders_recipientOptedOutBeforeRetry_retryStaysSilent", async () => {
@@ -1838,9 +1857,10 @@ describe("messages privés de match coupés par le joueur (droit d'opposition)",
 
 describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN_SETTING.md)", () => {
   const INVITE = "https://discord.gg/Sgdh3p4VhC";
-  const NO_CHECK_IN = { ...MATCH, match_check_in: 0, match_check_in_resumed_at: null };
+  const NO_CHECK_IN = { ...MATCH, match_check_in: 0, match_check_in_paused_at: null };
   /** Le palier 10 h s'ouvre à 08:00 UTC pour un coup d'envoi à 18:00. */
-  const resumedAt = (iso: string) => ({ ...MATCH, match_check_in: 1, match_check_in_resumed_at: new Date(iso) });
+  const pausedAt = (iso: string) => ({ ...MATCH, match_check_in: 0, match_check_in_paused_at: new Date(iso) });
+  const CHECK_IN_ON = { ...MATCH, match_check_in: 1, match_check_in_paused_at: new Date("2026-09-10T07:00:00Z") };
 
   it("dispatchDueMatchReminders_checkInOff_consumesTenHourMarkSilently", async () => {
     const { execute } = await mockDb({ matches: [NO_CHECK_IN], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
@@ -1863,10 +1883,34 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     }
   });
 
-  it("dispatchDueMatchReminders_resumedAfterTenHourWindowOpenedButNotPreClaimed_sendsReminder", async () => {
-    // Manche connue après la remise en marche (aucune marque posée par `setMatchCheckIn`) :
-    // rien n'était dû pendant l'arrêt, le rappel 10 h part.
-    await mockDb({ matches: [resumedAt("2026-09-10T09:00:00Z")], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+  it("dispatchDueMatchReminders_checkInOffDueBeforePause_holdsWithoutClaim", async () => {
+    // Palier ouvert à 08:00, arrêt à 09:00 : dû avant l'arrêt, il attend la remise en marche.
+    const { execute } = await mockDb({
+      matches: [pausedAt("2026-09-10T09:00:00Z")],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual([]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDueAfterPause_claimsSilently", async () => {
+    const { execute } = await mockDb({
+      matches: [pausedAt("2026-09-10T07:00:00Z")],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInOnAfterPause_sendsReminder", async () => {
+    // Manche sans marque posée par la remise en marche : le rappel 10 h part.
+    await mockDb({ matches: [CHECK_IN_ON], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
 
     expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
 
@@ -1876,7 +1920,7 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
   it("dispatchDueMatchReminders_tenHourMarkPreClaimedAtResume_staysSilent", async () => {
     // La remise en marche a réservé le palier dû pendant l'arrêt : la manche n'est plus lue.
     await mockDb({
-      matches: [resumedAt("2026-09-10T09:00:00Z")],
+      matches: [CHECK_IN_ON],
       sent: [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 31, offset_key: "PT10H" }],
     });
 
@@ -1908,6 +1952,22 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_turnedOffAfterReadDueBeforePause_releasesClaim", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([...SEEN, { match_id: 31, offset_key: "P1D" }], {
+      flag: 0,
+      pausedAt: new Date("2026-09-10T09:00:00Z"),
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    // Dû avant l'arrêt : la marque est rendue, le rappel partira à la remise en marche.
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE"))
+      .map(([, params]) => params[1]);
+    expect(releases).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
   it("dispatchDueMatchReminders_checkInTurnedOffAfterSweepRead_announcementDropsCheckIn", async () => {
@@ -1952,14 +2012,6 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     expect(rereads).toHaveLength(1);
   });
 
-  it("dispatchDueMatchReminders_resumedBeforeTenHourWindowOpened_sendsReminder", async () => {
-    await mockDb({ matches: [resumedAt("2026-09-10T07:00:00Z")], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
-
-    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
-
-    for (const message of sentMessages()) expect(message).toContain(INVITE);
-  });
-
   it("dispatchDueMatchReminders_checkInOffDiscoveredLate_announcesWithoutCheckIn", async () => {
     const { execute } = await mockDb({ matches: [NO_CHECK_IN], sent: [] });
 
@@ -2001,5 +2053,49 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     }
     expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain("Check-in");
     expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2], "en").body).not.toContain("Check-in");
+  });
+});
+
+describe("createCheckInReader (relecture de l'option avant l'envoi)", () => {
+  async function readerDb() {
+    const execute = executeDouble({ checkIn: { flag: 1 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+    return execute;
+  }
+
+  it("createCheckInReader_secondReadWithinTtl_reusesRead", async () => {
+    const execute = await readerDb();
+    const read = createCheckInReader();
+
+    await read(7);
+    await read(7);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("createCheckInReader_toggleValidatedBetweenReads_rereads", async () => {
+    const execute = await readerDb();
+    const read = createCheckInReader();
+
+    await read(7);
+    forgetCheckInReads();
+    await read(7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("createCheckInReader_ttlCountedFromResolution_rereadsAfterOneSecond", async () => {
+    const execute = await readerDb();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const read = createCheckInReader();
+    await read(7);
+
+    clock.mockReturnValue(1_000_999);
+    await read(7);
+    clock.mockReturnValue(1_001_000);
+    await read(7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 });

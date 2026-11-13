@@ -1,50 +1,58 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { canToggleMatchCheckIn, checkInSendable, readMatchCheckIn } from "@/lib/shared/match-check-in";
+import { canToggleMatchCheckIn, checkInReminderFate, readDbInstant, readMatchCheckIn } from "@/lib/shared/match-check-in";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 
-const due = new Date("2026-11-13T20:00:00Z");
+const pausedAt = new Date("2026-11-13T20:00:00Z");
+const off = { enabled: false, pausedAt };
+
+describe("readDbInstant", () => {
+  it("readDbInstant_null_returnsNull", () => {
+    expect(readDbInstant(null)).toBeNull();
+  });
+
+  it("readDbInstant_unreadableString_returnsNull", () => {
+    expect(readDbInstant("pas une date")).toBeNull();
+  });
+
+  it("readDbInstant_isoString_parsed", () => {
+    expect(readDbInstant("2026-11-13T19:00:00Z")).toEqual(new Date("2026-11-13T19:00:00Z"));
+  });
+});
 
 describe("readMatchCheckIn", () => {
-  it("readMatchCheckIn_absentColumns_enabledWithoutResume", () => {
-    expect(readMatchCheckIn(undefined, undefined)).toEqual({ enabled: true, resumedAt: null });
+  it("readMatchCheckIn_absentColumns_enabledNoPause", () => {
+    expect(readMatchCheckIn(undefined, undefined)).toEqual({ enabled: true, pausedAt: null });
   });
 
   it("readMatchCheckIn_nullFlag_enabled", () => {
     expect(readMatchCheckIn(null, null).enabled).toBe(true);
   });
 
-  it("readMatchCheckIn_zeroFlag_disabled", () => {
-    expect(readMatchCheckIn(0, null).enabled).toBe(false);
-  });
-
-  it("readMatchCheckIn_stringDate_parsed", () => {
-    expect(readMatchCheckIn(1, "2026-11-13T19:00:00Z").resumedAt).toEqual(new Date("2026-11-13T19:00:00Z"));
-  });
-
-  it("readMatchCheckIn_unreadableDate_nullResume", () => {
-    expect(readMatchCheckIn(1, "pas une date").resumedAt).toBeNull();
+  it("readMatchCheckIn_zeroFlagWithPause_disabledWithPause", () => {
+    expect(readMatchCheckIn(0, "2026-11-13T20:00:00Z")).toEqual({ enabled: false, pausedAt });
   });
 });
 
-describe("checkInSendable", () => {
-  it("checkInSendable_disabled_false", () => {
-    expect(checkInSendable({ enabled: false, resumedAt: null }, due)).toBe(false);
+describe("checkInReminderFate", () => {
+  it("checkInReminderFate_enabled_send", () => {
+    expect(checkInReminderFate({ enabled: true, pausedAt }, new Date("2026-11-13T21:00:00Z"))).toBe("send");
   });
 
-  it("checkInSendable_enabledNeverResumed_true", () => {
-    expect(checkInSendable({ enabled: true, resumedAt: null }, due)).toBe(true);
+  it("checkInReminderFate_disabledNoPause_silence", () => {
+    // Créé sans check-in : tout l'avant compte pour l'arrêt.
+    expect(checkInReminderFate({ enabled: false, pausedAt: null }, new Date("2020-01-01T00:00:00Z"))).toBe("silence");
   });
 
-  it("checkInSendable_resumedAfterDue_false", () => {
-    expect(checkInSendable({ enabled: true, resumedAt: new Date("2026-11-13T20:00:01Z") }, due)).toBe(false);
+  it("checkInReminderFate_dueBeforePause_hold", () => {
+    expect(checkInReminderFate(off, new Date("2026-11-13T19:59:59Z"))).toBe("hold");
   });
 
-  it("checkInSendable_resumedExactlyAtDue_true", () => {
-    expect(checkInSendable({ enabled: true, resumedAt: new Date("2026-11-13T20:00:00Z") }, due)).toBe(true);
+  it("checkInReminderFate_dueExactlyAtPause_silence", () => {
+    expect(checkInReminderFate(off, pausedAt)).toBe("silence");
   });
 });
 
