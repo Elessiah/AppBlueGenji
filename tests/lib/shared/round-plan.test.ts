@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { ROUND_MAP_SLOTS_MAX, type RoundKey } from "@/lib/shared/round-maps";
-import { plannedRoundKeys, roundMaxMaps, type RoundPlanInput } from "@/lib/shared/round-plan";
+import { plannedRoundKeys, roundMaxMaps, withoutUnbuiltRounds, type RoundPlanInput } from "@/lib/shared/round-plan";
 import type { TournamentPhase } from "@/lib/shared/types";
 
 /** Tours proposés par la fenêtre « Cartes et bans » (`docs/features/ROUND_MAPS.md`). */
@@ -172,5 +172,55 @@ describe("roundMaxMaps", () => {
     };
     expect(roundMaxMaps(endurance, 1)).toBe(1);
     expect(roundMaxMaps(endurance, PLAYOFF_ROUND_OFFSET)).toBe(3);
+  });
+});
+
+/** Réglages par tour d'un tournoi lancé, sans les tours jamais générés (`docs/features/ROUND_MAPS.md`). */
+describe("withoutUnbuiltRounds", () => {
+  it("withoutUnbuiltRounds_registrationState_keepsEverything", () => {
+    const items = [upper(1), upper(4)];
+    const kept = withoutUnbuiltRounds(items, { format: "SINGLE", state: "REGISTRATION", phases: null }, []);
+    expect(kept).toEqual([upper(1), upper(4)]);
+  });
+
+  it("withoutUnbuiltRounds_runningSingle_dropsRoundsWithoutMatches", () => {
+    const items = [upper(1), upper(2), upper(3), upper(4)];
+    const kept = withoutUnbuiltRounds(items, { format: "SINGLE", state: "RUNNING", phases: null }, [upper(1), upper(2)]);
+    expect(kept).toEqual([upper(1), upper(2)]);
+  });
+
+  it("withoutUnbuiltRounds_finishedDouble_keepsBuiltGrandResetDropsUnbuiltLower", () => {
+    const grandReset: RoundKey = { phaseId: 0, bracket: "GRAND", roundNumber: 2 };
+    const lowerFive: RoundKey = { phaseId: 0, bracket: "LOWER", roundNumber: 5 };
+    const built: RoundKey[] = [upper(1), { phaseId: 0, bracket: "GRAND", roundNumber: 1 }, grandReset];
+    const kept = withoutUnbuiltRounds([grandReset, lowerFive], { format: "DOUBLE", state: "FINISHED", phases: null }, built);
+    expect(kept).toEqual([grandReset]);
+  });
+
+  it("withoutUnbuiltRounds_runningSwiss_keepsFutureRounds", () => {
+    const kept = withoutUnbuiltRounds([upper(5)], { format: "SWISS", state: "RUNNING", phases: null }, [upper(1)]);
+    expect(kept).toEqual([upper(5)]);
+  });
+
+  it("withoutUnbuiltRounds_multiEliminationPhaseNotOpened_keepsItsRounds", () => {
+    const phases = [phase({ id: 11, format: "SWISS" }), phase({ id: 12, format: "SINGLE" })];
+    const kept = withoutUnbuiltRounds([upper(3, 12)], { format: "MULTI", state: "RUNNING", phases }, [upper(1, 11)]);
+    expect(kept).toEqual([upper(3, 12)]);
+  });
+
+  it("withoutUnbuiltRounds_multiOpenedEliminationPhase_dropsItsUnbuiltRounds", () => {
+    const phases = [phase({ id: 11, format: "SWISS" }), phase({ id: 12, format: "SINGLE" })];
+    const kept = withoutUnbuiltRounds(
+      [upper(1, 12), upper(3, 12)],
+      { format: "MULTI", state: "RUNNING", phases },
+      [upper(1, 11), upper(1, 12)],
+    );
+    expect(kept).toEqual([upper(1, 12)]);
+  });
+
+  it("withoutUnbuiltRounds_multiUnknownPhase_keepsItem", () => {
+    const phases = [phase({ id: 11, format: "SINGLE" })];
+    const kept = withoutUnbuiltRounds([upper(4, 99)], { format: "MULTI", state: "RUNNING", phases }, [upper(1, 99)]);
+    expect(kept).toEqual([upper(4, 99)]);
   });
 });

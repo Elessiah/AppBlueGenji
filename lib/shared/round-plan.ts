@@ -277,3 +277,35 @@ export function applicableTiebreaks(
 ): RoundTiebreak[] {
   return tiebreaks.filter((round) => roundAllowsTiebreak(tournament, round));
 }
+
+
+/**
+ * Réglages par tour (cartes, maps de départage, points) d'un tournoi **lancé**,
+ * sans ceux des tours qu'il ne jouera jamais : en élimination (simple ou
+ * double, tournoi ou phase), une fois l'arbre créé, un tour sans match n'en
+ * aura plus — le plan, dimensionné avant le départ sur la capacité, a pu en
+ * régler au-delà des inscrites. Ces réglages restent en base mais ne
+ * grossissent plus chaque instantané. Avant le lancement, en ronde suisse,
+ * survie, BlueGenji Survie, ou pour une phase pas encore ouverte, tout est
+ * gardé (tours créés au fil de l'eau).
+ */
+export function withoutUnbuiltRounds<T extends RoundKey>(
+  items: readonly T[],
+  tournament: {
+    format: TournamentFormat;
+    state: TournamentState;
+    phases: ReadonlyArray<Pick<TournamentPhase, "id" | "format">> | null;
+  },
+  built: readonly RoundKey[],
+): T[] {
+  if (tournament.state !== "RUNNING" && tournament.state !== "FINISHED") return [...items];
+  const builtPhases = new Set(built.map((round) => round.phaseId));
+  const builtKeys = new Set(built.map((round) => `${round.phaseId}:${round.bracket}:${round.roundNumber}`));
+  const formatOf = (phaseId: number) =>
+    tournament.format === "MULTI" ? tournament.phases?.find((phase) => phase.id === phaseId)?.format : tournament.format;
+  return items.filter((item) => {
+    const format = formatOf(item.phaseId);
+    if (format === undefined || !ELIMINATION_FORMATS.has(format) || !builtPhases.has(item.phaseId)) return true;
+    return builtKeys.has(`${item.phaseId}:${item.bracket}:${item.roundNumber}`);
+  });
+}
