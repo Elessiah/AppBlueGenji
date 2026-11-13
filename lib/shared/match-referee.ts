@@ -276,9 +276,26 @@ export function refereeNamesAttempt(missing: string, attempted: string): { read:
 }
 
 /**
+ * Désignation déjà résolue (`held`) : seule la marque `mine` (éligibilité de
+ * l'arbitre, relue par le serveur) peut avoir changé sous la même empreinte.
+ * L'entrée relue qui la change, `"drop"` quand la marque tombe sur un pseudo
+ * illisible (absent de la liste commune), `null` sinon. Une réponse qui connaît
+ * le match sous une autre empreinte (`otherKey`, en retard) ne retire rien.
+ */
+function refereeMarkChange<T extends RefereeNameEntry>(held: T | undefined, found: T | undefined, otherKey: boolean): T | "drop" | null {
+  if (held === undefined) return null;
+  if (held.mine !== true) return found?.mine === true ? found : null;
+  if (otherKey) return null;
+  if (found === undefined) return "drop";
+  return found.mine === true ? null : found;
+}
+
+/**
  * Fusionne une liste de pseudos relue dans celle qu'on a : chaque désignation
  * montrée encore sans pseudo que la réponse **résout** (même empreinte, pseudo
- * ou marque `mine`) prend l'entrée relue ; le reste est gardé tel quel. Une
+ * ou marque `mine`) prend l'entrée relue, de même qu'une désignation déjà
+ * résolue dont la marque `mine` a changé sous la même empreinte (arbitre devenu
+ * éligible ou ne l'étant plus) ; le reste est gardé tel quel. Une
  * réponse en retard (lue avant une désignation plus récente, ou doublée par le
  * contexte d'une reconnexion) n'écrase donc jamais une liste plus à jour, et
  * une réponse qui résout un **autre** sous-ensemble n'est pas perdue.
@@ -293,16 +310,24 @@ export function mergeRefereeNames<T extends RefereeNameEntry>(
   incoming: readonly T[],
 ): { names: T[] | null; stale: boolean } {
   const added: T[] = [];
+  const dropped = new Set<number>();
   let stale = false;
   for (const match of matches) {
-    if (!refereeNameMissing(match, current)) continue;
     const found = incoming.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+    const otherKey = incoming.some((name) => name.matchId === match.id && name.refereeKey !== match.refereeKey);
+    if (!refereeNameMissing(match, current)) {
+      const held = current.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+      const change = refereeMarkChange(held, found, otherKey);
+      if (change === "drop") dropped.add(match.id);
+      else if (change !== null) added.push(change);
+      continue;
+    }
     if (found && (found.pseudo !== "" || found.mine === true)) added.push(found);
-    else if (incoming.some((name) => name.matchId === match.id && name.refereeKey !== match.refereeKey)) stale = true;
+    else if (otherKey) stale = true;
   }
-  if (added.length === 0) return { names: null, stale };
-  const replaced = new Set(added.map((name) => name.matchId));
-  return { names: [...current.filter((name) => !replaced.has(name.matchId)), ...added], stale };
+  if (added.length === 0 && dropped.size === 0) return { names: null, stale };
+  for (const name of added) dropped.add(name.matchId);
+  return { names: [...current.filter((name) => !dropped.has(name.matchId)), ...added], stale };
 }
 
 /** Plus courte attente avant de relire les pseudos après un échec (429, 5xx, réseau, réponse en retard). */

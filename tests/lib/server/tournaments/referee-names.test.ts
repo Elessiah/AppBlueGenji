@@ -122,6 +122,24 @@ describe("refereeKeySecret", () => {
     expect(secret.toString("utf8")).not.toBe("jeton");
   });
 
+  it("refereeKeySecret_noSecretInProduction_warns", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    refereeKeySecret({ NODE_ENV: "production" } as NodeJS.ProcessEnv);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("refereeKeySecret_noSecretOutsideProduction_staysSilent", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    refereeKeySecret({ NODE_ENV: "development" } as NodeJS.ProcessEnv);
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("refereeKeySecret_noSecretConfigured_returnsRandomSecret", () => {
     const env = { NODE_ENV: "test" } as NodeJS.ProcessEnv;
 
@@ -345,7 +363,7 @@ describe("forgetRefereeNamesOf", () => {
 
     await forgetRefereeNamesOf(4);
 
-    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("referee_user_id = ? AND status IN ('PENDING', 'READY')"), [4]);
+    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("referee_user_id = ? AND status <> 'COMPLETED'"), [4]);
     expect(jest.mocked(invalidateCachedPrefix).mock.calls).toEqual([["referee-names:7:"], ["referee-names:9:"]]);
     expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([[7], [9]]);
   });

@@ -32,12 +32,19 @@ import { playsMatchSql } from "./match-players";
  * Secret des empreintes : dérivé (HMAC, étiquette propre) du sel des visites
  * ou, à défaut, du secret partagé avec le bot — jamais l'un d'eux tel quel.
  * Stable d'un démarrage à l'autre. Sans l'un ni l'autre (poste de dev, tests),
- * un secret tiré au hasard : une constante connue laisserait retrouver
+ * un secret tiré au hasard, signalé en production : une constante connue laisserait retrouver
  * l'arbitre d'un match en énumérant les comptes.
  */
 export function refereeKeySecret(env: NodeJS.ProcessEnv = process.env): Buffer {
   const base = env.VISIT_HASH_SALT?.trim() || env.BOT_INTERNAL_TOKEN?.trim();
-  if (!base) return randomBytes(32);
+  if (!base) {
+    // En production, l'oubli se signale : chaque redémarrage changerait de
+    // nouveau toutes les empreintes (et deux processus n'en auraient pas les mêmes).
+    if (env.NODE_ENV === "production") {
+      console.warn("[referee-names] ni VISIT_HASH_SALT ni BOT_INTERNAL_TOKEN : empreintes d'arbitre tirées au hasard à chaque démarrage");
+    }
+    return randomBytes(32);
+  }
   return createHmac("sha256", base).update("bg-referee-key:v1").digest();
 }
 
@@ -218,10 +225,11 @@ export function forgetRefereeNames(): void {
 }
 
 /**
- * Un compte s'est renommé : les tournois où il arbitre un match dont le nom se
- * montre (score pas encore déclaré, `showsRefereeName`) oublient leurs pseudos
- * **et republient leur instantané** — l'empreinte, qui porte le pseudo, change,
- * et les membres déjà connectés relisent le nouveau. Un joueur qui se renomme
+ * Un compte s'est renommé : les tournois où il arbitre un match non joué (dont
+ * l'instantané porte l'empreinte — `refereeKey` hors `COMPLETED`, en attente de
+ * confirmation comprise) oublient leurs pseudos **et republient leur
+ * instantané** — l'empreinte, qui porte le pseudo, change, et les membres déjà
+ * connectés relisent le nouveau. Un joueur qui se renomme
  * ne touche rien. Une lecture indexée (`idx_bg_matches_referee`) ; si elle
  * échoue, tout le cache des pseudos est oublié — un ancien pseudo n'est jamais
  * servi faute de l'avoir lue. Ne lève jamais.
@@ -231,7 +239,7 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
   try {
     tournamentIds = await withConnection(async (connection) => {
       const [found] = await connection.query<RowDataPacket[]>(
-        `SELECT DISTINCT tournament_id FROM bg_matches WHERE referee_user_id = ? AND status IN ('PENDING', 'READY')`,
+        `SELECT DISTINCT tournament_id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED'`,
         [userId],
       );
       return found.map((row) => Number(row.tournament_id));

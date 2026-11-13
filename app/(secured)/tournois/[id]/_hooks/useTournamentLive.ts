@@ -50,6 +50,8 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
  * même instant.
  */
 const REFEREE_NAMES_SPREAD_MS = 2_000;
+/** Reprises d'office d'affilée de la relecture des pseudos après un échec ; au-delà, le prochain instantané retente. */
+const REFEREE_NAMES_AUTO_RETRIES = 6;
 
 /**
  * Personne ne regarde le plateau (onglet caché en régime calme : les rendus
@@ -192,13 +194,18 @@ export function useTournamentLive(tournamentId: number) {
    * Relecture des pseudos d'arbitre (`refreshRefereeNames`) : dernier ensemble
    * d'empreintes manquantes essayé, minuteur d'étalement, lecture en vol (annulée
    * au changement de tournoi), instant avant lequel aucune reprise ne part après
-   * un échec, et relecture différée tant que personne ne regarde.
+   * un échec, relecture différée tant que personne ne regarde, relecture à
+   * relancer à la fin de celle en vol (demandée pendant, ou reprise d'un échec)
+   * et nombre de reprises d'office d'affilée.
    */
   const namesAttemptRef = useRef("");
   const namesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const namesAbortRef = useRef<AbortController | null>(null);
   const namesRetryAtRef = useRef(0);
   const namesDeferredRef = useRef(false);
+  const namesPendingRef = useRef(false);
+  const namesRetriesRef = useRef(0);
+  const refreshNamesRef = useRef<() => void>(() => undefined);
 
   /**
    * Lecture REST. Chemin de secours uniquement : le flux se suffit à lui-même.
@@ -310,7 +317,10 @@ export function useTournamentLive(tournamentId: number) {
    * ne relance rien (pseudo vide). Rien tant que personne ne regarde
    * (`nobodyWatches`) : la relecture part au retour sur l'onglet. Après un
    * échec (429, 5xx, réseau) ou une réponse en retard sur l'instantané, la
-   * reprise attend `Retry-After`, 10 s au moins (`refereeNamesRetryDelay`).
+   * reprise attend `Retry-After`, 10 s au moins (`refereeNamesRetryDelay`), et
+   * part d'elle-même — sans attendre un autre instantané — au plus
+   * `REFEREE_NAMES_AUTO_RETRIES` fois d'affilée. Une demande arrivée pendant
+   * une lecture en vol n'est pas perdue : elle repart à la fin de celle-ci.
    */
   const refreshRefereeNames = useCallback(() => {
     const detail = stateRef.current.detail;
@@ -323,7 +333,11 @@ export function useTournamentLive(tournamentId: number) {
       namesAttemptRef.current = attempt.attempted;
       return;
     }
-    if (namesTimerRef.current !== null || namesAbortRef.current !== null) return;
+    if (namesTimerRef.current !== null) return;
+    if (namesAbortRef.current !== null) {
+      namesPendingRef.current = true;
+      return;
+    }
     if (nobodyWatches()) {
       namesDeferredRef.current = true;
       return;
@@ -332,10 +346,15 @@ export function useTournamentLive(tournamentId: number) {
     namesAttemptRef.current = missing;
     const forTournament = detail.card.id;
     // Une lecture ratée rouvre le même ensemble, mais pas avant l'attente :
-    // le prochain instantané (ou le retour sur l'onglet) retentera.
-    const retryLater = (delayMs: number) => {
+    // la reprise part d'elle-même à la fin de cette lecture (bornée), sinon le
+    // prochain instantané (ou le retour sur l'onglet) retentera.
+    const retryLater = (delayMs: number, auto: boolean) => {
       namesRetryAtRef.current = Date.now() + delayMs;
       if (namesAttemptRef.current === missing) namesAttemptRef.current = "";
+      if (auto && namesRetriesRef.current < REFEREE_NAMES_AUTO_RETRIES) {
+        namesRetriesRef.current += 1;
+        namesPendingRef.current = true;
+      }
     };
     const spread = Math.random() * REFEREE_NAMES_SPREAD_MS; // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
     namesTimerRef.current = setTimeout(() => {
@@ -349,7 +368,9 @@ export function useTournamentLive(tournamentId: number) {
             signal: controller.signal,
           });
           if (!response.ok) {
-            retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")));
+            // Seuls un refus de quota et une panne passagère se reprennent d'office.
+            const transient = response.status === 429 || response.status >= 500;
+            retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")), transient);
             return;
           }
           const payload = (await response.json()) as { refereeNames?: unknown };
@@ -360,18 +381,30 @@ export function useTournamentLive(tournamentId: number) {
           // réponse en retard n'écrase pas plus à jour, et une qui en résout un
           // autre sous-ensemble n'est pas perdue.
           const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, names);
-          if (merged.stale) retryLater(refereeNamesRetryDelay(null));
+          if (merged.stale) retryLater(refereeNamesRetryDelay(null), true);
+          else namesRetriesRef.current = 0;
           if (merged.names !== null) commit({ ...current, detail: { ...current.detail, refereeNames: merged.names } });
         } catch {
           // Lecture annulée (autre tournoi) : rien à reprendre. Réseau coupé :
           // « Arbitre désigné » reste, la reprise attend.
-          if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null));
+          if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);
         } finally {
-          if (namesAbortRef.current === controller) namesAbortRef.current = null;
+          // Annulée (autre tournoi) : la référence est déjà vidée, rien ne repart.
+          if (namesAbortRef.current === controller) {
+            namesAbortRef.current = null;
+            if (namesPendingRef.current) {
+              namesPendingRef.current = false;
+              refreshNamesRef.current();
+            }
+          }
         }
       })();
     }, Math.max(spread, namesRetryAtRef.current - Date.now()));
   }, [commit]);
+
+  useEffect(() => {
+    refreshNamesRef.current = refreshRefereeNames;
+  }, [refreshRefereeNames]);
 
   // Retour sur l'onglet : la relecture différée part.
   useEffect(
@@ -391,6 +424,8 @@ export function useTournamentLive(tournamentId: number) {
       namesAttemptRef.current = "";
       namesRetryAtRef.current = 0;
       namesDeferredRef.current = false;
+      namesPendingRef.current = false;
+      namesRetriesRef.current = 0;
     },
     [tournamentId],
   );

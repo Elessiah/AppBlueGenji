@@ -6,6 +6,7 @@ import {
   REFEREE_READY_REREAD_MAX,
   refereeReadyRereadDue,
   refereeReadyRereadStep,
+  serverClockSkew,
 } from "@/components/match-launch/MatchContactsDialog";
 import { splitChannelText } from "@/components/cyber/landing/LiveCard";
 import {
@@ -166,6 +167,34 @@ describe("mergeRefereeNames", () => {
     expect(mergeRefereeNames(shownB, namedA, namedB).names).toEqual(namedB);
   });
 
+  it("mergeRefereeNames_resolvedEntryGainsMine_replacesWithMarkedEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, namedB, marked)).toEqual({ names: marked, stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedMineEntryLosesMark_replacesWithUnmarkedEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, marked, namedB)).toEqual({ names: namedB, stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedMineUnreadablePseudoAbsentFromIncoming_dropsEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, marked, [])).toEqual({ names: [], stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedEntrySameMark_returnsNull", () => {
+    expect(mergeRefereeNames(shownB, namedB, namedB)).toEqual({ names: null, stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedMineIncomingOtherKey_keepsEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, marked, namedA)).toEqual({ names: null, stale: false });
+  });
+
   it("mergeRefereeNames_matchesWithoutReferee_returnsNull", () => {
     expect(mergeRefereeNames([shown(5, null)], [], namedB)).toEqual({ names: null, stale: false });
   });
@@ -267,8 +296,16 @@ describe("refereeReadyRereadDue", () => {
 describe("refereeReadyRereadStep", () => {
   const NOW = Date.parse("2026-11-13T20:00:00Z");
 
-  it("refereeReadyRereadStep_beforeAutoLaunch_returnsRead", () => {
-    expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: "2026-11-13T20:05:00Z", reads: 500, backingOff: false })).toBe("read");
+  it("refereeReadyRereadStep_beforeAutoLaunchBelowCap_returnsRead", () => {
+    expect(
+      refereeReadyRereadStep({ now: NOW, autoLaunchAt: "2026-11-13T20:05:00Z", reads: REFEREE_READY_REREAD_MAX - 1, backingOff: false }),
+    ).toBe("read");
+  });
+
+  it("refereeReadyRereadStep_beforeAutoLaunchCapReached_returnsStop", () => {
+    expect(
+      refereeReadyRereadStep({ now: NOW, autoLaunchAt: "2026-11-13T23:00:00Z", reads: REFEREE_READY_REREAD_MAX, backingOff: false }),
+    ).toBe("stop");
   });
 
   it("refereeReadyRereadStep_autoLaunchReached_returnsStop", () => {
@@ -289,6 +326,22 @@ describe("refereeReadyRereadStep", () => {
 
   it("refereeReadyRereadStep_backingOff_returnsSkip", () => {
     expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: null, reads: 0, backingOff: true })).toBe("skip");
+  });
+});
+
+describe("serverClockSkew", () => {
+  const RECEIVED = Date.parse("2026-11-13T20:00:00Z");
+
+  it("serverClockSkew_readableDate_returnsServerMinusReceived", () => {
+    expect(serverClockSkew("Fri, 13 Nov 2026 19:55:00 GMT", RECEIVED)).toBe(-300_000);
+  });
+
+  it("serverClockSkew_nullDate_returnsZero", () => {
+    expect(serverClockSkew(null, RECEIVED)).toBe(0);
+  });
+
+  it("serverClockSkew_unreadableDate_returnsZero", () => {
+    expect(serverClockSkew("pas une date", RECEIVED)).toBe(0);
   });
 });
 

@@ -196,13 +196,14 @@ règle a changé avec l'arbitre hôte.
   `referee-names.ts`, sous un secret **stable** dérivé de `VISIT_HASH_SALT`
   ou, à défaut, de `BOT_INTERNAL_TOKEN` — `refereeKeySecret` : un
   redémarrage ne change pas la version des instantanés arbitrés ; aléatoire
-  sans l'un ni l'autre), `null` sans arbitre
+  sans l'un ni l'autre, avec un avertissement en production), `null` sans arbitre
   éligible, pour un match terminé (`COMPLETED`) et, dans un tournoi terminé,
   pour tout match resté non joué (`withoutRefereeKeys` ne vide que les
   empreintes où `showsRefereeName` est vrai — un match resté non joué ne
   nomme pas son arbitre indéfiniment). Le pseudo entre dans l'empreinte : un
   arbitre qui se renomme (`forgetRefereeNamesOf`) change la version et fait
-  republier les tournois où il arbitre un match à jouer, les membres
+  republier les tournois où il arbitre un match non joué (en attente de
+  confirmation comprise : son empreinte change aussi), les membres
   connectés relisent son nouveau pseudo. L'empreinte d'un score en
   attente de confirmation reste (relève de la fenêtre « Contacts » quand
   l'arbitre change, même dans un tournoi terminé), mais le pseudo aux membres ne se montre que pour
@@ -213,8 +214,9 @@ règle a changé avec l'arbitre hôte.
   que dans `MatchLaunchInfo` (parties, staff). La fenêtre « Contacts » relit
   toutes les 10 s en lobby tant qu'un arbitre n'est pas prêt
   (`refereeReadyRereadDue`, `useClientPower().clocks`) — jamais chez
-  l'arbitre lui-même, jusqu'à `autoLaunchAt` ou, sans cette heure, 180
-  relectures au plus (`refereeReadyRereadStep`), et pas tant qu'une relecture
+  l'arbitre lui-même, jusqu'à `autoLaunchAt` (heure du serveur : horloge du
+  poste corrigée de son écart, `serverClockSkew`) et 180 relectures au plus,
+  le premier des deux (`refereeReadyRereadStep`), et pas tant qu'une relecture
   ratée attend sa reprise (échecs, `Retry-After`).
 - **Membre connecté** : `TournamentViewerContext.refereeNames`
   (`{ matchId, refereeKey, pseudo }`, `loadRefereeNames`, cache 30 s par
@@ -235,9 +237,11 @@ règle a changé avec l'arbitre hôte.
   `loadLiveRefereeNames`, cache jusqu'à la prochaine écriture du tournoi —
   jamais l'instantané entier). Cette relecture attend que l'onglet soit
   regardé, s'annule au changement de tournoi, n'en lance pas une seconde en
-  vol, ne garde que les pseudos encore manquants (`mergeRefereeNames`) et,
-  après un échec ou une réponse en retard, attend `Retry-After` ou 10 s
-  (`refereeNamesRetryDelay`) ; une relecture REST qui apporte les pseudos
+  vol (une demande arrivée pendant repart à sa fin), ne garde que les pseudos
+  encore manquants — et la marque `mine` changée sous la même empreinte —
+  (`mergeRefereeNames`) et, après un échec passager (429, 5xx, réseau) ou une
+  réponse en retard, repart d'elle-même après `Retry-After` ou 10 s
+  (`refereeNamesRetryDelay`), six fois d'affilée au plus ; une relecture REST qui apporte les pseudos
   annule celle en attente. `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
   aux matchs qui les montrent** (`pruneRefereeNames` : le pseudo d'un match
   dont le score vient d'être déclaré quitte l'état du client sans attendre la

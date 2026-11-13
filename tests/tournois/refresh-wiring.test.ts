@@ -259,8 +259,8 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
   it("refreshRefereeNames_failedRead_reopensSameMissingSet", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
     expect(body).toContain('if (namesAttemptRef.current === missing) namesAttemptRef.current = "";');
-    expect(body).toMatch(/if \(!response\.ok\) \{\s*retryLater\(refereeNamesRetryDelay\(response\.headers\.get\("retry-after"\)\)\);\s*return;\s*\}/);
-    expect(body).toContain("if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null));");
+    expect(body).toContain('retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")), transient);');
+    expect(body).toContain("if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);");
   });
 
   it("refreshRefereeNames_lateResponse_mergesOnlyMissingNames", () => {
@@ -269,14 +269,14 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
 
     expect(merge).toBeGreaterThan(-1);
     expect(merge).toBeLessThan(body.indexOf("commit("));
-    expect(body).toContain("if (merged.stale) retryLater(refereeNamesRetryDelay(null));");
+    expect(body).toContain("if (merged.stale) retryLater(refereeNamesRetryDelay(null), true);");
     expect(body).toContain("if (merged.names !== null) commit(");
   });
 
-  it("refreshRefereeNames_readInFlightOrScheduled_startsNothing", () => {
+  it("refreshRefereeNames_readScheduled_startsNothing", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
 
-    expect(body).toContain("if (namesTimerRef.current !== null || namesAbortRef.current !== null) return;");
+    expect(body).toContain("if (namesTimerRef.current !== null) return;");
     expect(body).toContain("signal: controller.signal");
     expect(body).toContain("Math.max(spread, namesRetryAtRef.current - Date.now())");
   });
@@ -286,6 +286,27 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
 
     expect(body).toMatch(/if \(nobodyWatches\(\)\) \{\s*namesDeferredRef\.current = true;\s*return;\s*\}/);
     expect(hook).toContain("if (namesDeferredRef.current && !nobodyWatches()) refreshRefereeNames();");
+  });
+
+  it("refreshRefereeNames_callDuringInFlightRead_rerunsWhenItEnds", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toMatch(/if \(namesAbortRef\.current !== null\) \{\s*namesPendingRef\.current = true;\s*return;\s*\}/);
+    expect(body).toMatch(/if \(namesAbortRef\.current === controller\) \{\s*namesAbortRef\.current = null;\s*if \(namesPendingRef\.current\) \{\s*namesPendingRef\.current = false;\s*refreshNamesRef\.current\(\);/);
+    expect(hook).toContain("refreshNamesRef.current = refreshRefereeNames;");
+  });
+
+  it("refreshRefereeNames_failedRead_autoRetriesOnlyTransientAndBounded", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toContain("const transient = response.status === 429 || response.status >= 500;");
+    expect(body).toMatch(/if \(auto && namesRetriesRef\.current < REFEREE_NAMES_AUTO_RETRIES\) \{\s*namesRetriesRef\.current \+= 1;\s*namesPendingRef\.current = true;/);
+    expect(body).toContain("else namesRetriesRef.current = 0;");
+    expect(hook).toContain("const REFEREE_NAMES_AUTO_RETRIES = 6;");
+  });
+
+  it("refreshRefereeNames_tournamentChange_resetsPendingAndRetries", () => {
+    expect(hook).toMatch(/namesPendingRef\.current = false;\s*namesRetriesRef\.current = 0;\s*\},\s*\[tournamentId\]/);
   });
 
   it("refreshRefereeNames_tournamentChange_abortsAndResets", () => {
