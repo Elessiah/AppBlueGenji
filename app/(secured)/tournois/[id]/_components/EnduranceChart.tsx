@@ -126,8 +126,10 @@ function roundSubText(state: RoundState, progress: { played: number; total: numb
 
 function axisClass(round: number, shown: number, lastRound: number): string {
   if (round === shown) return `${styles.axisX} ${styles.axisXShown}`;
-  if (round > lastRound) return `${styles.axisX} ${styles.axisXFuture}`;
-  return styles.axisX;
+  // Manche paire : masquée sur un tracé très étroit (une sur deux, la première gardée).
+  const sparse = round % 2 === 0 ? ` ${styles.axisXSparse}` : "";
+  if (round > lastRound) return `${styles.axisX} ${styles.axisXFuture}${sparse}`;
+  return `${styles.axisX}${sparse}`;
 }
 
 /** Puce « manche par manche » de l'encart : la manche affichée est soulignée, les suivantes grisées. */

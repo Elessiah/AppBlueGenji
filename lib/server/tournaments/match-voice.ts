@@ -71,11 +71,6 @@ function channelState(row: VoiceRow | undefined): VoiceChannelState | null {
   return { channelId, failed: channelId === null && row.failed_at !== null };
 }
 
-function rowFor<R extends VoiceRow>(rows: readonly R[], matchId: number, teamId: number | null): R | undefined {
-  if (teamId === null) return undefined;
-  return rows.find((row) => Number(row.match_id) === matchId && Number(row.team_id) === teamId);
-}
-
 /**
  * Ligne de l'instantané : l'heure de la base (`db_now`) — la seule horloge des règles des salons
  * (option, échéance), celle que lisent `DUE_CHANNELS_SQL`, `OPEN_DUE_CHANNELS_SQL` et
@@ -190,8 +185,14 @@ async function voiceInfosFromRows(
     `SELECT id, solo_user_id IS NOT NULL AS solo, is_ghost AS ghost FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
     teamIds,
   );
+  // Index par clé : l'instantané d'un gros tableau ne refait pas une recherche
+  // linéaire par engagée et par salon.
+  const teamsById = new Map(teamRows.map((row) => [Number(row.id), row]));
+  const channels = new Map(rows.map((row) => [`${Number(row.match_id)}:${Number(row.team_id)}`, row]));
+  const channel = (matchId: number, teamId: number | null) =>
+    teamId === null ? undefined : channels.get(`${matchId}:${teamId}`);
   const team = (teamId: number | null) => {
-    const row = teamRows.find((candidate) => Number(candidate.id) === teamId);
+    const row = teamId === null ? undefined : teamsById.get(teamId);
     // Équipe absente de `bg_teams` : `DUE_CHANNELS_SQL` (jointure interne) ne lui
     // ouvrira jamais de salon — aucun « en attente » sans fin, comme une fantôme.
     if (!row) return { isSolo: false, isGhost: true };
@@ -200,8 +201,8 @@ async function voiceInfosFromRows(
   for (const match of candidates) {
     const info = matchVoiceInfo(
       { enabled, startAt: match.startAt, team1: team(match.team1Id), team2: team(match.team2Id) },
-      channelState(rowFor(rows, match.id, match.team1Id)),
-      channelState(rowFor(rows, match.id, match.team2Id)),
+      channelState(channel(match.id, match.team1Id)),
+      channelState(channel(match.id, match.team2Id)),
     );
     if (info) result.set(match.id, info);
   }

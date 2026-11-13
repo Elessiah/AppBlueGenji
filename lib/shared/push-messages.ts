@@ -1099,6 +1099,26 @@ export function refereeReleasedPush(input: RefereeReleasedMatch, locale: Locale 
   };
 }
 
+/**
+ * Récapitulatif à l'arbitre dont l'opposition vient d'être retenue : **un**
+ * avis pour tous les matchs dont il est retiré (`referee-objection.ts`), au
+ * lieu d'un par match. Aucun nom d'engagé ni de tournoi : le nombre suffit, la
+ * page du tournoi (un seul) ou la liste des tournois (plusieurs) détaille.
+ */
+export function refereeObjectionReleasedPush(
+  input: { count: number; tournamentIds: readonly number[] },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
+  const only = input.tournamentIds.length === 1 ? input.tournamentIds[0] : null;
+  return {
+    title: text.t("refereeObjectionReleased.title"),
+    body: text.t("refereeObjectionReleased.body", { count: input.count }),
+    url: localeHref(only !== null ? tournamentHref(only) : "/tournois", locale),
+    tag: "referee-objection-released",
+  };
+}
+
 /** Nouveau signalement, ou contestation, reçu par la modération. */
 export function staffReportPush(input: { reportId: number; contest: boolean }, locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];

@@ -173,16 +173,25 @@ pure dans `_lib/endurance-chart.ts`.
   général : la courbe survolée est redessinée dans un calque supérieur sans
   événements, les autres s'atténuent par un attribut du groupe — un survol ne
   déplace aucun nœud. La zone de survol (`chartHitPath`) est calculée une fois
-  par manche et géométrie. Ordre, Top N, seuil, couleurs, fond du tracé et
+  par manche et géométrie. Le tracé entier et ses longueurs cumulées
+  (`chartLinePath`) aussi : une image ne fait que dévoiler une longueur
+  (`chartLineAt` → `stroke-dasharray`) et placer la tête, sans reconstruire
+  de tracé ; survol et clic sont délégués au groupe des courbes
+  (`data-team-id` des zones de survol), aucun gestionnaire recréé par courbe. Ordre, Top N, seuil, couleurs, fond du tracé et
   tableau `sr-only` sont mémoïsés ; les lignes de la légende le sont aussi
   (`LegendRow`) : un survol ne reconstruit que les deux lignes concernées. Les
   séries ne sont recalculées que si le **contenu** change (`enduranceChartInputKey`) :
   un instantané poussé identique pour le graphique (score de play-off, autre
   champ du tournoi) garde séries, ordre, légende et tableau.
 - **Tracé étroit** : `.plot` est un conteneur de requête ; le texte du SVG (en
-  unités utilisateur) passe de 11 à 16, 22 puis 28 quand le tracé tombe sous 600,
-  430 puis 320 px, pour rester lisible une fois mis à l'échelle (375 px :
-  ~0,32) ; « Départ » s'efface sous 430 px. Sous ~800 px la légende passe sous
+  unités utilisateur) grossit par paliers dès que le tracé passe sous les 760
+  unités du viewBox : chaque palier vaut ⌈11 × 760 ÷ sa borne basse⌉ (14 sous
+  760 px … 56 sous 182 px), soit **au moins 11 px rendus** jusqu'à un tracé de
+  150 px (375 px d'écran : ~0,32 ; une requête par palier) ; « Départ »
+  s'efface sous 440 px, les points de l'axe Y passent alors **dans** le tracé
+  (halo du fond), et sous 290 px une
+  manche sur deux (les paires, la manche affichée gardée) : « M12 » ne tiendrait
+  plus dans le pas d'une manche. Sous ~800 px la légende passe sous
   le tracé et l'encart **réserve sa hauteur** (plus de saut à chaque tap) ;
   sous 520 px chaque ligne de légende met le nom sur toute la largeur, capital
   et écart dessous (noms sur deux lignes au plus partout).
