@@ -5,6 +5,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { LoginTextProvider } from "@/components/i18n/login-text";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { peekReactivationTicket, reactivationCookieName } from "@/lib/server/users/account-reactivation";
 import { ReactivationPanel } from "./ReactivationPanel";
 
@@ -13,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await requestLocale();
   const { reactivation } = messagesFor(locale).login;
   return {
-    ...pageMetadata({ title: reactivation.title, description: reactivation.metaDescription, path: "/connexion/reactivation", locale }),
+    ...pageMetadata({ title: reactivation.title, description: reactivation.metaDescription.replace("{days}", String(ACCOUNT_REACTIVATION_DAYS)), path: "/connexion/reactivation", locale }),
     robots: { index: false, follow: true },
   };
 }

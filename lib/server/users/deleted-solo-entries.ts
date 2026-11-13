@@ -524,7 +524,14 @@ async function withdrawDeletedAccountRegistrations(
       new Set(tournamentIds),
     );
     await connection.commit();
-    flushBotLogs(connection);
+    // Commis : une annonce qui ne part pas ne fait pas passer les retraits pour
+    // un échec (ni rediffusion ni journal ne suivraient, et le compte serait
+    // mis à l'écart comme s'il n'avait rien produit).
+    try {
+      flushBotLogs(connection);
+    } catch (error) {
+      console.error(`[deleted-accounts] annonces du compte #${userId} non envoyées :`, failureReason(error));
+    }
     // Passé en cours : les lecteurs du tournoi voient son coup d'envoi.
     for (const tournamentId of started) publishUpdatedEvent(tournamentId);
     return { withdrawn, started: started.length };

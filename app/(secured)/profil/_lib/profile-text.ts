@@ -115,7 +115,7 @@ export function deletionConsequencesParagraphs(text: ProfileText, subject: Confi
     logDays: CONNECTION_LOG_RETENTION_DAYS,
   });
   const kind = deletionCase(subject);
-  const consequence = t(`deletion.consequences.${kind}`);
+  const consequence = t(`deletion.consequences.${kind}`, { days: ACCOUNT_REACTIVATION_DAYS });
   const termsNote = fromTerms && kind === "OWNED_TEAMS" ? [t("deletion.ownedTeamsFromTerms")] : [];
   return [consequence, ...termsNote, t("deletion.handover"), t("deletion.irreversible", { days: ACCOUNT_REACTIVATION_DAYS }), residual];
 }
@@ -148,7 +148,7 @@ export function deletionDialogContent(text: ProfileText, subject: ConfirmationSu
   const { t } = text;
   const kind = deletionCase(subject);
   return {
-    consequence: t(`deletion.consequences.${kind}`),
+    consequence: t(`deletion.consequences.${kind}`, { days: ACCOUNT_REACTIVATION_DAYS }),
     termsNote: fromTerms && kind === "OWNED_TEAMS" ? t("deletion.ownedTeamsFromTerms") : null,
     handoverLead: t("deletion.handoverList.lead"),
     handoverItems: [

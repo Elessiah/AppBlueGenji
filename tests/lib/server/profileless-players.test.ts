@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
-import { loadProfilelessPlayerIds, PROFILELESS_PLAYERS_TTL_MS } from "@/lib/server/users/profileless-players";
+import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, PROFILELESS_PLAYERS_TTL_MS } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
@@ -106,12 +106,22 @@ describe("loadProfilelessPlayerIds", () => {
     const execute = mockDb(() => [[{ id: 3 }]]);
 
     await loadProfilelessPlayerIds();
-    invalidateTeamRanking();
     invalidateTeamRankingForScore();
     const ids = await loadProfilelessPlayerIds();
 
     expect(ids).toEqual([3]);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  // EF-62 cycle 1 : un tournoi supprimé peut retirer son seul match joué.
+  it("loadProfilelessPlayerIds_afterTournamentDeletionInvalidation_reloads", async () => {
+    const execute = mockDb(() => [[{ id: 3 }]]);
+
+    await loadProfilelessPlayerIds();
+    invalidateTeamRanking();
+    await loadProfilelessPlayerIds();
+
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("loadProfilelessPlayerIds_afterTtl_reloads", async () => {
@@ -129,6 +139,41 @@ describe("loadProfilelessPlayerIds", () => {
     } finally {
       now.mockRestore();
     }
+  });
+});
+
+describe("anonymizedAccountHasNoPage (EF-62 cycle 1)", () => {
+  it("anonymizedAccountHasNoPage_idInCachedList_returnsTrue", async () => {
+    mockDb(() => [[{ id: 7 }]]);
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(true);
+  });
+
+  it("anonymizedAccountHasNoPage_idNotInList_returnsFalse", async () => {
+    mockDb(() => [[{ id: 3 }]]);
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(false);
+  });
+
+  it("anonymizedAccountHasNoPage_listFailsAndNeverPlayed_returnsTrueFromLiveQuery", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const execute = mockDb((sql) => {
+      if (sql.includes("u.is_deleted = 1")) throw new Error("LIST_DOWN");
+      return [[{ played: 0 }]];
+    });
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(true);
+    expect(execute).toHaveBeenLastCalledWith(expect.stringContaining("AS played"), [7]);
+  });
+
+  it("anonymizedAccountHasNoPage_listFailsAndPlayed_returnsFalse", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    mockDb((sql) => {
+      if (sql.includes("u.is_deleted = 1")) throw new Error("LIST_DOWN");
+      return [[{ played: 1 }]];
+    });
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(false);
   });
 });
 

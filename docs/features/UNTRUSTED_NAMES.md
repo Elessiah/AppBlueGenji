@@ -62,10 +62,10 @@ entre-temps, y égalerait l'ancien nom à invisible — il serait réécrit. Le 
 #### Pseudos laissés tels quels
 
 Un nom d'équipe ou de tournoi laissé tel quel est journalisé par son
-identifiant ; un pseudo ne l'est jamais (`RGPD_LOGS_AND_VISITS.md`). La passe
-ne pose donc pas son marqueur tant qu'un pseudo reste à nettoyer : elle se
-rejoue à chaque démarrage, et nettoie le sosie dès que l'original a changé de
-nom. Le staff les retrouve en base (MariaDB 11.8) :
+identifiant ; un pseudo ne l'est jamais (`RGPD_LOGS_AND_VISITS.md`) — le
+journal renvoie à cette requête. La passe pose son marqueur quand même (la
+rejouer à chaque démarrage rebalaierait toutes les colonnes pour un doublon) :
+le staff retrouve ces pseudos en base (MariaDB 11.8) et les renomme à la main :
 
 ```sql
 SELECT id FROM bg_users

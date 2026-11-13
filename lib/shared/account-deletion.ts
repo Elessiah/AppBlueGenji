@@ -238,7 +238,7 @@ export function accountDeletionConfirmation(
     case "OWNED_TEAMS":
       return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible} ${residual}`;
     case null:
-      return `Supprimer ton compte ? Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement à la fin des trente jours, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées dès maintenant. ${irreversible} ${residual}`;
+      return `Supprimer ton compte ? Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement à la fin des ${ACCOUNT_REACTIVATION_DAYS} jours, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées dès maintenant. ${irreversible} ${residual}`;
     default:
       return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, engagement dans un tournoi individuel déjà commencé ou terminé, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible} ${residual}`;
   }

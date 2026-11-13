@@ -81,8 +81,12 @@ import { failureReason } from "@/lib/server/failure-reason";
  */
 
 /** Ce que la demande a fait, et quand la suppression deviendra définitive. */
-export type AccountDeletionRequestOutcome = AccountDeletionPlan & {
-  /** Fin de la fenêtre de réactivation (ISO). */
+export type AccountDeletionRequestOutcome = Partial<AccountDeletionPlan> & {
+  /**
+   * Fin de la fenêtre de réactivation (ISO). Le plan (`mode`, `reason`) manque
+   * quand les traces n'ont pu être relues après le commit et qu'aucun aperçu
+   * confirmé ne le remplace : l'écran garde alors ce que la modale a annoncé.
+   */
   finalAt: string;
 };
 
@@ -559,9 +563,10 @@ export async function requestAccountDeletion(
     confirmedReason?: AccountRetentionReason | null;
   } = {},
 ): Promise<AccountDeletionRequestOutcome> {
+  let confirmedPlan: AccountDeletionPlan | null = null;
   if (options.confirmedReason !== undefined) {
-    const current = await getAccountDeletionRequestPlan(userId);
-    if (current.reason !== options.confirmedReason) throw new Error(ACCOUNT_DELETION_PLAN_CHANGED);
+    confirmedPlan = await getAccountDeletionRequestPlan(userId);
+    if (confirmedPlan.reason !== options.confirmedReason) throw new Error(ACCOUNT_DELETION_PLAN_CHANGED);
   }
   const db = await getDatabase();
   let soloEntryTournaments: number[] = [];
@@ -626,7 +631,12 @@ export async function requestAccountDeletion(
       // ouvert sa page passe en cours ici : son inscription, que la fenêtre de
       // retrait refuse, est alors forfaitée dès la demande comme dans tout
       // tournoi en cours, au lieu de rester jusqu'à la passe horaire.
-      await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
+      // Pas au rejeu d'une restauration : synchroniser lancerait des tournois
+      // et posterait leurs annonces pendant la remise en état (la passe
+      // horaire s'en charge une fois le site rouvert).
+      if (options.accountCreatedAt === undefined) {
+        await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
+      }
       withdrawn = await withdrawSoloRegistrationsOn(
         connection,
         await loadSoloRegistrations(connection, userId),
@@ -710,11 +720,6 @@ export async function requestAccountDeletion(
   // L'interblocage se rejoue **dans** chaque essai du jeu de verrous : sa
   // fenêtre de rejeu se mesure sur une transaction, pas sur plusieurs.
   await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
-  // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues
-  // après le commit, hors des verrous de tournois et d'équipes. Le compte est
-  // déjà en attente, rien de ce qu'elles relèvent ne bouge plus de son fait.
-  const plan = accountDeletionPlan(await loadAccountTrace(db, userId));
-
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
   // réactivation la retire ; la suppression définitive écrit la sienne.
@@ -740,5 +745,16 @@ export async function requestAccountDeletion(
     replay: options.accountCreatedAt !== undefined,
   });
 
+  // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues
+  // après le commit, le journal et les suites, hors des verrous de tournois et
+  // d'équipes. Le compte est déjà en attente, rien de ce qu'elles relèvent ne
+  // bouge plus de son fait. Une panne ici ne change pas la demande faite en
+  // échec : le plan confirmé la remplace, ou l'écran garde son aperçu.
+  let plan: Partial<AccountDeletionPlan> = confirmedPlan ?? {};
+  try {
+    plan = accountDeletionPlan(await loadAccountTrace(db, userId));
+  } catch (error) {
+    console.error("[account-deletion] traces non relues après la demande", failureReason(error));
+  }
   return { ...plan, finalAt: reactivationDeadline(stampedAt).toISOString() };
 }

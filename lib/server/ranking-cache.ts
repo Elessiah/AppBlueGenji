@@ -47,6 +47,9 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
  */
 export function invalidateTeamRanking(): void {
   invalidateRankingReplay();
+  // Un tournoi supprimé peut retirer à un compte anonymisé son seul match
+  // joué : sa fiche tombe aussitôt, comme ses liens.
+  invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);
   // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées.
   invalidateRankingShareImages();
 }

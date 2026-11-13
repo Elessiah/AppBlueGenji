@@ -259,7 +259,8 @@ export async function listCastTournamentIds(runner: SqlRunner, userId: number): 
 /**
  * Les tournois **pas terminés** dont une page nomme le compte, par id
  * croissant : son entrée solo inscrite, l'effectif d'une équipe engagée dont il
- * est ou a été membre, un match qu'il caste, dont il a fourni le lien, qu'il
+ * est membre ou l'était au coup d'envoi (une équipe quittée avant ne le nomme
+ * plus), un match qu'il caste, dont il a fourni le lien, qu'il
  * arbitre ou dont il a lancé le direct. La demande et la réactivation changent
  * le nom sous lequel il paraît : leurs lecteurs ouverts sont rediffusés
  * (`publishUpdatedEvent`). Un tournoi terminé n'a plus de flux qui vive des
@@ -271,7 +272,10 @@ export async function listNamingTournamentIds(runner: SqlRunner, userId: number)
        FROM (
          SELECT r.tournament_id FROM bg_teams s JOIN bg_tournament_registrations r ON r.team_id = s.id WHERE s.solo_user_id = ?
          UNION
-         SELECT r.tournament_id FROM bg_team_members tm JOIN bg_tournament_registrations r ON r.team_id = tm.team_id WHERE tm.user_id = ?
+         SELECT r.tournament_id FROM bg_team_members tm
+           JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
+           JOIN bg_tournaments rt ON rt.id = r.tournament_id
+          WHERE tm.user_id = ? AND (tm.left_at IS NULL OR tm.left_at >= rt.start_at)
          UNION
          SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters c ON c.match_id = m.id WHERE c.user_id = ?
          UNION
@@ -687,8 +691,12 @@ async function deleteAccountNow(
       // tournoi dont l'heure de début est passée sans synchronisation passe en
       // cours ici, et son inscription retient la ligne (anonymisation) au lieu
       // d'être retirée d'un plateau déjà tiré. Ses lignes de journal partent
-      // avec le commit.
-      for (const tournamentId of openSoloTournaments) await syncTournamentState(connection, tournamentId);
+      // avec le commit. Seuls ceux dont l'état a changé sont rediffusés (comme
+      // `syncOpenSoloTournamentsOn`, que ce module ne peut importer sans cycle).
+      const changed: number[] = [];
+      for (const tournamentId of openSoloTournaments) {
+        if ((await syncTournamentState(connection, tournamentId)).stateChanged) changed.push(tournamentId);
+      }
       // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
       // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
       const hold = await readDeletionHold(connection, userId, true);
@@ -744,7 +752,7 @@ async function deleteAccountNow(
       await connection.commit();
       afterCommit(() => flushBotLogs(connection), "Lignes de journal du coup d'envoi non envoyées");
       // Passés en cours : leurs lecteurs voient le coup d'envoi.
-      startedTournaments = openSoloTournaments;
+      startedTournaments = changed;
       return plan;
     } catch (error) {
       // Sur une connexion morte, l'annulation lève à son tour : gardée, pour que

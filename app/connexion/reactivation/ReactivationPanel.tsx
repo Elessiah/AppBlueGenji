@@ -30,15 +30,15 @@ const BUTTON_STYLE = { minHeight: 44, flex: "1 1 160px", justifyContent: "center
 /** Délai au-delà duquel « Ne pas réactiver » rend la main (connexion figée). */
 const DECLINE_TIMEOUT_MS = 8000;
 
+/** Ce que la réactivation ne défait pas, dans l'ordre des gestes de la demande. */
+const NOT_UNDONE_ITEMS = ["teams", "organized", "registrations", "forfeits", "casts"] as const;
+
 /**
  * Carte de l'écran de réactivation : la date, ce qui ne revient pas, et le geste.
  * `hadTicket` : un cookie de ticket est arrivé avec la page — sans lui (favori,
  * fenêtre privée), l'écran ne parle pas d'un lien « expiré » que le visiteur
  * n'a jamais eu.
  */
-/** Ce que la réactivation ne défait pas, dans l'ordre des gestes de la demande. */
-const NOT_UNDONE_ITEMS = ["teams", "organized", "registrations", "forfeits", "casts"] as const;
-
 export function ReactivationPanel({
   finalAt,
   hadTicket = true,

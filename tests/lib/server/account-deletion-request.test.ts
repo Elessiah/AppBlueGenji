@@ -1280,3 +1280,49 @@ describe("requestAccountDeletion — EF-62 (aperçu confirmé, tournois synchron
     expect(publishUpdatedEvent).toHaveBeenCalledWith(9);
   });
 });
+
+describe("requestAccountDeletion — EF-62 cycle 1 (traces après le commit, rejeu)", () => {
+  it("requestAccountDeletion_traceFailsAfterCommit_recordsJournalAndReturnsWithoutMode", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadAccountTrace).mockRejectedValue(new Error("DB_DOWN"));
+    fakeDb({});
+
+    const outcome = await requestAccountDeletion(7);
+
+    expect(outcome).toHaveProperty("finalAt");
+    expect(outcome.mode).toBeUndefined();
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+    expect(closeUserStreams).toHaveBeenCalledWith(7);
+    log.mockRestore();
+  });
+
+  it("requestAccountDeletion_traceFailsWithConfirmedReason_returnsConfirmedPlan", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadAccountTrace).mockResolvedValueOnce(NO_TRACE).mockRejectedValue(new Error("DB_DOWN"));
+    fakeDb({});
+
+    const outcome = await requestAccountDeletion(7, { confirmedReason: null });
+
+    expect(outcome).toMatchObject({ mode: "ERASE", reason: null });
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  it("requestAccountDeletion_replay_skipsOpenSoloTournamentSync", async () => {
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3]);
+    fakeDb({});
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(syncOpenSoloTournamentsOn).not.toHaveBeenCalled();
+  });
+
+  it("requestAccountDeletion_ordinaryRequest_syncsOpenSoloTournaments", async () => {
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3]);
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(syncOpenSoloTournamentsOn).toHaveBeenCalledWith(expect.anything(), [3]);
+  });
+});

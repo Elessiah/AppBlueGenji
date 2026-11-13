@@ -121,7 +121,7 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
 
     expect(fr).not.toContain("nom neutre");
     expect(en).not.toContain("neutral name");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-15");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-13");
   });
 
   it("rgpdPolicy_sitePseudo_listsStreamingUnderContract", () => {

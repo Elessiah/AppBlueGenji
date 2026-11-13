@@ -1095,11 +1095,22 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   instruction (`resetOptionalColumns`, colonne par colonne en repli si une
   colonne manque).
 - **Comptes sans fiche** : la liste (`loadProfilelessPlayerIds`) vit sous sa
-  propre clé (dix minutes, vidée par `invalidateTeamIdentityViews`), plus sous
-  le préfixe du classement que chaque score vide. Le fournisseur la relit à la
-  navigation client (`/api/players/profileless`, connecté, au plus une fois
-  par minute) ; `/rgpd` dit qu'une page déjà ouverte garde son lien jusqu'au
-  rechargement.
+  propre clé (dix minutes, vidée par `invalidateTeamIdentityViews` et par une
+  suppression de tournoi, `invalidateTeamRanking`), plus sous le préfixe du
+  classement que chaque score vide. La fiche lit la même liste
+  (`anonymizedAccountHasNoPage`) ; liste illisible, elle interroge le seul
+  compte en base (jamais une fiche rouverte par une panne). Le fournisseur la
+  relit à la navigation client (`/api/players/profileless`, connecté, au plus
+  une fois par minute) ; `/rgpd` dit qu'une page déjà ouverte garde son lien
+  jusqu'au rechargement.
+- **Revue standard cycle 1** : les traces du plan rendu se lisent après le
+  journal et les suites, et une panne ne fait plus passer la demande pour un
+  échec (plan confirmé ou aperçu gardé) ; le rejeu d'une restauration ne
+  synchronise pas les tournois (ni lancement ni annonce) ; la suppression
+  définitive ne rediffuse que les tournois passés en cours ; une annonce en
+  échec après le commit de la passe horaire n'annule plus ses suites ;
+  `listNamingTournamentIds` borne l'effectif d'équipe au coup d'envoi ; textes
+  du délai tirés de `ACCOUNT_REACTIVATION_DAYS` (FR + EN).
 - **Écrans** : la confirmation liste ce que la demande transmet ou retire
   (`deletionDialogContent`), les restes après la fin du délai derrière un
   « i » ; la page de réactivation dit ce qui revient en une phrase (détail

@@ -254,7 +254,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // re-rendue d'un lien à l'autre, elles suivent au chargement suivant.
   // Et les comptes supprimés sans fiche (D13), dont les liens de joueur rendent
   // le nom en texte : au seul visiteur connecté, le seul à qui un nom mène
-  // quelque part. Mutualisés avec le classement, ils ne lèvent jamais.
+  // quelque part. Sous leur propre clé de cache (dix minutes, vidée à chaque
+  // écriture d'identité), ils ne lèvent jamais.
   const [privacyChanges, rawPodiumTiers, profilelessPlayers] = await Promise.all([
     privacyChangesLoad,
     loadPodiumTiers(),

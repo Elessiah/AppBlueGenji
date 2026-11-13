@@ -167,6 +167,6 @@
     "missing": "Aucune réactivation n'attend sur cet appareil. Connecte-toi : si la suppression de ton compte est demandée, tu pourras le réactiver.",
     "pseudoChanged": "Ton pseudo d'avant n'a pas pu t'être rendu : tu en portes un autre, que tu peux changer dans Mon profil.",
     "declineFailed": "Ton choix n'a pas pu être enregistré. Réessaie dans un instant.",
-    "metaDescription": "Réactiver un compte BlueGenji Esport dont la suppression a été demandée, pendant les trente jours qui suivent la demande."
+    "metaDescription": "Réactiver un compte BlueGenji Esport dont la suppression a été demandée, pendant les {days} jours qui suivent la demande."
   }
 }

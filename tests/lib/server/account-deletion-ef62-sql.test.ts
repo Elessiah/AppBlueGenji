@@ -46,4 +46,14 @@ describe("listNamingTournamentIds", () => {
     expect(q).toContain("WHERE referee_user_id = ?");
     expect(q).toContain("WHERE live_trigger_user_id = ?");
   });
+  // Revue standard cycle 1 : une équipe quittée avant le coup d'envoi ne le nomme plus.
+  it("listNamingTournamentIds_sql_boundsMembershipByTournamentStart", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
+
+    await listNamingTournamentIds(fakePool({ execute }), 7);
+
+    expect(execute.mock.calls[0][0].replace(/\s+/g, " ")).toContain(
+      "tm.user_id = ? AND (tm.left_at IS NULL OR tm.left_at >= rt.start_at)",
+    );
+  });
 });

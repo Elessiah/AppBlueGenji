@@ -16,6 +16,7 @@ jest.mock("@/lib/server/tournaments/referee-names", () => ({
 }));
 
 import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
+import { syncTournamentState } from "@/lib/server/tournaments/state";
 import {
   assertSoloLockSetFresh,
   loadSoloRegistrations,
@@ -1133,5 +1134,36 @@ describe("deleteOwnAccount — accueil et #live", () => {
     await deleteOwnAccount(7);
 
     expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([[3, { landingLive: false }]]);
+  });
+});
+
+/** EF-62 (revue standard, cycle 1) : seuls les tournois passés en cours sont rediffusés. */
+describe("deleteOwnAccount — tournois ouverts synchronisés", () => {
+  beforeEach(() => {
+    // Une implémentation laissée par un test précédent ne doit pas lever ici.
+    jest.mocked(publishUpdatedEvent).mockReset();
+  });
+
+  it("deleteOwnAccount_openSoloTournamentUnchanged_notRepublished", async () => {
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7);
+
+    expect(syncTournamentState).toHaveBeenCalledWith(expect.anything(), 55);
+    expect(publishUpdatedEvent).not.toHaveBeenCalledWith(55);
+  });
+
+  it("deleteOwnAccount_openSoloTournamentStarted_republished", async () => {
+    jest.mocked(syncTournamentState).mockResolvedValueOnce({
+      row: null,
+      stateChanged: true,
+      contentChanged: false,
+      launchesChanged: false,
+    });
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7);
+
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(55);
   });
 });

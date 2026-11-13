@@ -242,7 +242,7 @@
       "SOLO_REGISTRATIONS": "Your personal information will be erased and your username replaced with a borrowed one, but your record will remain: you're an entrant in a solo tournament that has already started or ended, where your username serves as the entrant's name and will be replaced by that borrowed username.",
       "ORGANIZED_TOURNAMENTS": "Your personal information will be erased and your username replaced with a borrowed one, but your record will remain: you're the organizer of tournaments that must keep an owner.",
       "OWNED_TEAMS": "Your personal information will be erased and your username replaced with a borrowed one, but your record will remain: you own a team that nobody could manage without you. Transfer or disband it first for a complete erasure.",
-      "NONE": "You haven't played any match or left a tournament that no one can take over: your account and profile will be erased entirely at the end of the thirty days, and any registrations you have for solo tournaments that haven't started yet will be withdrawn right away.",
+      "NONE": "You haven't played any match or left a tournament that no one can take over: your account and profile will be erased entirely at the end of the {days} days, and any registrations you have for solo tournaments that haven't started yet will be withdrawn right away.",
       "UNKNOWN": "The site couldn't tell what will remain: depending on what you left behind (a match played, an entry in a solo tournament that has already started or ended, a tournament organized), it will be anonymized or erased entirely."
     },
     "outcome": {

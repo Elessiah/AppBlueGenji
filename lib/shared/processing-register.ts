@@ -84,7 +84,7 @@ import { frEn, localize, type Localizable } from "@/lib/shared/bilingual";
 import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/shared/account-deletion";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-15";
+export const REGISTER_UPDATED_AT = "2026-11-13";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et

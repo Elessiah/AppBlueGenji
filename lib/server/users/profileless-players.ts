@@ -34,11 +34,12 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
 }
 
 /**
- * Durée de vie de la liste. Seule une suppression, une réactivation ou un
- * rattrapage la change vraiment, et chacun l'oublie aussitôt
- * (`invalidateTeamIdentityViews`). Un score ne la vide pas : il ne peut que
- * donner une fiche à un compte anonymisé qui n'en avait pas — son nom reste du
- * texte au plus cette durée, jamais un lien vers une 404.
+ * Durée de vie de la liste. Une suppression, une réactivation ou un rattrapage
+ * l'oublie aussitôt (`invalidateTeamIdentityViews`), comme une suppression de
+ * tournoi (`invalidateTeamRanking`). Un score ne la vide pas : il donne au plus
+ * une fiche à un compte anonymisé qui n'en avait pas (son nom reste du texte au
+ * plus cette durée) ; une correction qui lui retire son seul match joué lui
+ * laisse sa fiche, sous pseudo d'emprunt, au plus cette même durée.
  */
 export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
 
@@ -53,9 +54,46 @@ export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
  */
 export async function loadProfilelessPlayerIds(): Promise<number[]> {
   try {
-    return await cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
+    return await readProfilelessPlayerIds();
   } catch (error) {
     console.error(`[profileless-players] lecture impossible : ${failureReason(error)}`);
     return [];
   }
+}
+
+function readProfilelessPlayerIds(): Promise<number[]> {
+  return cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
+}
+
+/** La liste vue en ensemble, rebâtie seulement quand le cache rend une autre liste. */
+const profilelessSets = new WeakMap<readonly number[], ReadonlySet<number>>();
+
+function asSet(ids: readonly number[]): ReadonlySet<number> {
+  let set = profilelessSets.get(ids);
+  if (set === undefined) {
+    set = new Set(ids);
+    profilelessSets.set(ids, set);
+  }
+  return set;
+}
+
+/**
+ * Un compte **anonymisé** (déjà lu comme supprimé, suppression non plus en
+ * attente) est-il sans fiche ? La même liste que celle qui décide des liens :
+ * la fiche et ses liens ne se contredisent pas. Si la liste ne se lit pas, la
+ * question se pose au seul compte en base — une panne ne rouvre pas la fiche
+ * d'un compte qui n'a jamais joué (D13). Lève si les deux lectures échouent.
+ */
+export async function anonymizedAccountHasNoPage(userId: number): Promise<boolean> {
+  try {
+    return asSet(await readProfilelessPlayerIds()).has(userId);
+  } catch (error) {
+    console.error(`[profileless-players] liste illisible, lecture du compte : ${failureReason(error)}`);
+  }
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { played: number })[]>(
+    `SELECT ${accountTraceSql().played} AS played FROM (SELECT ? AS id) u`,
+    [userId],
+  );
+  return !Number(rows[0]?.played ?? 0);
 }

@@ -370,10 +370,10 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * doit pas en déplacer les tendances. Le journal compte des lignes et, pour les
  * équipes et les tournois laissés tels quels, en donne les **identifiants** (de
  * quoi les renommer à la main) — jamais un nom ni l'identifiant d'un joueur
- * (`RGPD_LOGS_AND_VISITS.md`). Un pseudo laissé tel quel ne pose donc **pas**
- * le marqueur : la passe se rejoue au démarrage suivant, et le nettoie dès que
- * l'original a changé de nom ; le staff le retrouve par la requête de
- * `UNTRUSTED_NAMES.md` (§ « Pseudos laissés tels quels »), pas par le journal.
+ * (`RGPD_LOGS_AND_VISITS.md`). Un pseudo laissé tel quel, sans identifiant au
+ * journal, se retrouve par la requête staff de `UNTRUSTED_NAMES.md`
+ * (§ « Pseudos laissés tels quels ») : le marqueur est posé quand même, la
+ * passe ne rebalaie pas toutes les colonnes à chaque démarrage pour un doublon.
  */
 export async function cleanStoredNames(db: Pool): Promise<void> {
   if (await cleanNamesAlreadyDone(db)) return;
@@ -398,9 +398,7 @@ export async function cleanStoredNames(db: Pool): Promise<void> {
         complete = false;
         break;
       }
-      // Pseudo laissé tel quel (identifiant jamais journalisé) : la passe se
-      // rejouera, plutôt que de le figer derrière le marqueur.
-      complete = done === true && complete;
+      complete = done && complete;
     }
   } catch (error) {
     complete = false;
@@ -443,16 +441,11 @@ async function markCleanNamesDone(db: Pool): Promise<void> {
 
 type CleanTarget = (typeof STORED_NAME_COLUMNS)[number];
 
-/**
- * Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne.
- * Vrai si menée à bout ; `"kept"` si des lignes d'une colonne sans identifiant
- * journalisé (pseudos) sont restées telles quelles — la passe est à rejouer ;
- * `"aborted"` si une écriture a échoué (la passe s'arrête).
- */
+/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. Vrai si menée à bout ; `"aborted"` si une écriture a échoué (la passe s'arrête). */
 async function cleanNameColumn(
   db: PoolConnection,
   { table, column, logIds }: CleanTarget,
-): Promise<boolean | "kept" | "aborted"> {
+): Promise<boolean | "aborted"> {
   let rows: StoredNameRow[];
   try {
     [rows] = await db.execute<StoredNameRow[]>(`SELECT id, ${column} AS name FROM ${table}`);
@@ -474,15 +467,14 @@ async function cleanNameColumn(
   if (cleaned > 0 || keptIds.length > 0) {
     let ids = "";
     if (keptIds.length > 0) {
-      ids = logIds ? ` (id : ${keptIds.join(", ")})` : " (requête de UNTRUSTED_NAMES.md, passe rejouée au prochain démarrage)";
+      ids = logIds ? ` (id : ${keptIds.join(", ")})` : " (requête staff de UNTRUSTED_NAMES.md)";
     }
     console.log(
       `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) sans caractère invisible, ` +
         `${keptIds.length} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou doublon)${ids}.`,
     );
   }
-  if (failed) return "aborted";
-  return !logIds && keptIds.length > 0 ? "kept" : true;
+  return failed ? "aborted" : true;
 }
 
 /** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), `"kept"` ou `"failed"`. */
