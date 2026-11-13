@@ -515,6 +515,9 @@ const MATCH_FIELDS = {
   streams: "public",
   lobbyOpenedAt: "public",
   loserTeamId: "public",
+  mapPointTarget: "public",
+  // Score de la carte unique d'un BO1 : les scores des cartes sont publics.
+  displayScore: "public",
   maps: "parcouru",
   matchNumber: "public",
   nextLoserMatchId: "public",
@@ -611,6 +614,7 @@ const CARD_FIELDS = {
   image: "public",
   launchPhase: "public",
   liveUrl: "public",
+  mapPointTarget: "public",
   matchFormat: "public",
   maxTeams: "public",
   name: "public",

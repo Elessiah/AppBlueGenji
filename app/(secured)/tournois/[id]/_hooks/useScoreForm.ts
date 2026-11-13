@@ -41,16 +41,23 @@ export function savedToastKey(forfeit: boolean, paused: boolean) {
   return paused ? "score.admin.savedPaused" : "score.admin.saved";
 }
 
-/** L'arbitrage peut se passer du code de replay (replay perdu) : « Pas de code de replay ». */
-const ADMIN_MAP_RULES: MapEntryRules = { requireReplayCode: false };
+/**
+ * L'arbitrage peut se passer du code de replay (replay perdu) : « Pas de code
+ * de replay ». Les points par carte du format Duel / Arcade s'imposent à lui
+ * comme aux engagés (`lib/shared/map-points.ts`).
+ */
+function adminMapRules(pointTarget: number | null): MapEntryRules {
+  return { requireReplayCode: false, pointTarget };
+}
 
 /**
- * Empreinte des règles des lignes d'ouverture (format de la manche, jeu),
- * champ par champ — rien à sérialiser à chaque frappe.
+ * Empreinte des règles des lignes d'ouverture (format de la manche, jeu,
+ * points par carte), champ par champ — rien à sérialiser à chaque frappe.
  */
-function rulesKey(format: MatchFormat | null, game: string | null): string {
-  if (!format) return `|${game ?? ""}`;
-  return `${format.type}:${format.value}:${format.maxMaps ?? ""}:${format.drawsAllowed ? 1 : 0}|${game ?? ""}`;
+function rulesKey(format: MatchFormat | null, game: string | null, pointTarget: number | null): string {
+  const points = `|${pointTarget ?? ""}`;
+  if (!format) return `|${game ?? ""}${points}`;
+  return `${format.type}:${format.value}:${format.maxMaps ?? ""}:${format.drawsAllowed ? 1 : 0}|${game ?? ""}${points}`;
 }
 
 /**
@@ -75,12 +82,14 @@ export function useScoreForm(
   const dialogText = useDialogsText();
   const matchFormat = useMatchFormat(match);
   const game = useTournamentGame();
+  const pointTarget = match?.mapPointTarget ?? null;
+  const mapRules = adminMapRules(pointTarget);
   // Détail map par map (`docs/features/MAP_SCORES.md`) : seule saisie du
   // score, qui en est **dérivé** — aucun score à la main.
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`, une
   // ligne vierge d'emblée) ; ce qui se valide et part en retire la ligne vierge
   // de fin (`sentMaps`).
-  const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), ADMIN_MAP_RULES);
+  const openingRows = () => progressiveMapRows(matchFormat, game, initialAdminMaps(match), mapRules);
   // Valeurs d'ouverture : le score se lit sur les maps d'ouverture, jamais sur
   // le score stocké ou proposé — c'est lui qui part.
   const openingState = () => adminFormStateFor(match, openingRows());
@@ -103,7 +112,7 @@ export function useScoreForm(
   // Règles des lignes d'ouverture (format de la manche, jeu) : changées pendant
   // que le dialogue est ouvert, elles changent ce qu'ouvrir produirait sans
   // toucher à l'empreinte du résultat — l'alignement doit les suivre aussi.
-  const rules = rulesKey(matchFormat, game);
+  const rules = rulesKey(matchFormat, game, pointTarget);
   const [synced, setSynced] = useState(() => ({
     signature: storedResultSignature(match),
     proposals: pendingProposalSignature(match),
@@ -164,7 +173,7 @@ export function useScoreForm(
       matchFormat,
       game,
       report.maps.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score })),
-      ADMIN_MAP_RULES,
+      mapRules,
     );
     setMaps(rows);
     setState((s) => ({ ...s, forfeitTeamId: undefined, doubleForfeit: undefined, ...scoresFromMaps(rows) }));
@@ -174,18 +183,18 @@ export function useScoreForm(
   // Le serveur ne rend qu'un code : la même règle, rejouée ici, retrouve le
   // champ qu'il désigne.
   const flagMapRefusal = (code: string, decisive: boolean) => {
-    const local = checkMapList(matchFormat, game, sentMaps, { decisive, ...ADMIN_MAP_RULES });
+    const local = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });
     const target = refusalFieldOnRows(local, maps);
     if (!target || local.error !== code || !options.onMapRefusal) return;
-    options.onMapRefusal(target, mapViolationText(dialogText, local.error, matchFormat, game));
+    options.onMapRefusal(target, mapViolationText(dialogText, local.error, matchFormat, game, pointTarget));
   };
 
   /** Contrôle des maps avant l'envoi ; `true` (refus signalé) bloque l'envoi. */
   const refuseMaps = (decisive: boolean): boolean => {
-    const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive, ...ADMIN_MAP_RULES });
+    const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });
     if (!mapCheck.error) return false;
     flagMapRefusal(mapCheck.error, decisive);
-    showError(mapViolationText(dialogText, mapCheck.error, matchFormat, game));
+    showError(mapViolationText(dialogText, mapCheck.error, matchFormat, game, pointTarget));
     return true;
   };
 
@@ -279,7 +288,7 @@ export function useScoreForm(
      * que l'infobulle du bouton affiche à la place du blocage de score.
      * Rien sous un forfait : la liste est masquée et ses maps ne partent pas.
      */
-    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? sentMaps : [], decision),
+    mapsRefused: mapRefusals(matchFormat, game, mapsSent ? sentMaps : [], decision, mapRules),
     game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
@@ -331,10 +340,11 @@ function mapRefusals(
   game: TournamentGame | null | undefined,
   maps: ReadonlyArray<MatchMapInput>,
   decision: Pick<ScoreFormDecision, "saveBlocker" | "resolveBlocker">,
+  mapRules: MapEntryRules,
 ): { save: MapListViolation | null; resolve: MapListViolation | null; onBlankRow: boolean } {
   if (maps.length === 0) return { save: null, resolve: null, onBlankRow: false };
-  const save = checkMapList(format, game, maps, { decisive: false, ...ADMIN_MAP_RULES });
-  const resolve = checkMapList(format, game, maps, { decisive: true, ...ADMIN_MAP_RULES });
+  const save = checkMapList(format, game, maps, { decisive: false, ...mapRules });
+  const resolve = checkMapList(format, game, maps, { decisive: true, ...mapRules });
   // Un geste interdit pour une autre raison que les maps (résultat déjà
   // tranché, double forfait, saisie fermée) le reste : le refus de map ne
   // rouvre pas le bouton, et c'est cette raison-là qui s'affiche.

@@ -1,4 +1,5 @@
 import type { BracketMatch } from "@/lib/shared/types";
+import { shownMatchScore } from "@/lib/shared/map-points";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /** Ce que la carte d'un match (`MatchRow`) affiche pour l'une de ses deux lignes. */
@@ -15,7 +16,7 @@ export interface MatchSideView {
 
 type MatchSidesInput = Pick<
   BracketMatch,
-  "team1Id" | "team2Id" | "team1Score" | "team2Score" | "winnerTeamId" | "forfeitTeamId"
+  "team1Id" | "team2Id" | "team1Score" | "team2Score" | "winnerTeamId" | "forfeitTeamId" | "displayScore"
 >;
 
 /**
@@ -23,6 +24,8 @@ type MatchSidesInput = Pick<
  * *enregistré*, sans attendre qu'il soit tranché : l'arbitrage peut noter un
  * forfait sans valider le résultat, et le score plein porté en face se lisait
  * sinon comme une rencontre jouée et gagnée. Rien de tel sur une exemption.
+ * Match sur une seule carte : le score de la carte (`displayScore`, 5–3)
+ * plutôt que 1–0 (`docs/features/MAP_SCORES.md`).
  */
 export function matchSideViews(
   match: MatchSidesInput,
@@ -39,8 +42,6 @@ export function matchSideViews(
       emptyLabel: (roundNumber === 1 || roundNumber >= PLAYOFF_ROUND_OFFSET) && ownId === null && otherId !== null ? "BYE" : "TBD",
     };
   };
-  return [
-    side(match.team1Id, match.team2Id, match.team1Score),
-    side(match.team2Id, match.team1Id, match.team2Score),
-  ];
+  const shown = shownMatchScore(match);
+  return [side(match.team1Id, match.team2Id, shown.team1), side(match.team2Id, match.team1Id, shown.team2)];
 }

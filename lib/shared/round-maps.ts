@@ -19,6 +19,7 @@
  */
 import { FIRST_MAP_MAX_LENGTH } from "./match-referee";
 import { visibleText } from "./visible-text";
+import type { RoundPointTarget } from "./map-points";
 
 /** Créneaux au plus par manche. */
 export const ROUND_MAP_SLOTS_MAX = 9;
@@ -110,6 +111,13 @@ export type TournamentMapRules = {
    * (`RoundMapsDialog`). Absent : aucune.
    */
   staleTiebreaks?: RoundTiebreak[];
+  /**
+   * Format Duel / Arcade : points par carte **propres à un tour**
+   * (`bg_tournament_round_maps.map_point_target`, `lib/shared/map-points.ts`),
+   * qui remplacent ceux du tournoi (`TournamentCard.mapPointTarget`). Absent :
+   * aucun.
+   */
+  pointTargets?: RoundPointTarget[];
 };
 
 /** Map de départage d'un tour du tournoi (`bg_tournament_round_maps.tiebreak_map`). */

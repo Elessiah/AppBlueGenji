@@ -24,9 +24,12 @@ const MapDetailsDialog = dynamic(() => orReload(import("./MapDetailsDialog").the
  * dans une modale. Pas de volet déplié **dans** la carte : l'arbre dimensionne
  * chaque créneau sur la plus haute de ses cartes, si bien qu'un volet ouvert
  * faisait sauter tout le plateau. Rien sur un match sans détail (forfait,
- * exemption).
+ * exemption). En format Duel / Arcade (`mapPointTarget`), le bouton porte
+ * les points de chaque carte (« Points : 5–3 ») plutôt que leur nombre.
  */
-export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name"> }>) {
+export function MatchMapDetails({
+  match,
+}: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name" | "mapPointTarget"> }>) {
   const text = useTournamentPageText();
   const [open, setOpen] = useState(false);
   // Détail affiché tant que la modale est ouverte, même s'il disparaît de
@@ -38,6 +41,13 @@ export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, 
   if (!hasMaps && !open) return null;
   const team1 = match.team1Name ?? text.t("match.team1");
   const team2 = match.team2Name ?? text.t("match.team2");
+
+  const pointTarget = match.mapPointTarget ?? null;
+  const versus = versusText(text, team1, team2);
+  // Même bouton en Duel / Arcade : le détail des points est dans la modale (une
+  // chaîne de scores par carte débordait de la carte d'un BO5, à 375 px).
+  const summary = text.t("match.maps.summary", { count: String(match.maps.length) });
+  const summaryLabel = text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versus });
 
   const close = () => {
     setOpen(false);
@@ -54,9 +64,9 @@ export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, 
           className={styles.summary}
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
-          aria-label={text.t("match.maps.summaryLabel", { count: String(match.maps.length), match: versusText(text, team1, team2) })}
+          aria-label={summaryLabel}
         >
-          {text.t("match.maps.summary", { count: String(match.maps.length) })}
+          {summary}
         </button>
       )}
       {open && (
@@ -65,6 +75,7 @@ export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, 
           maps={shown.current}
           team1Name={team1}
           team2Name={team2}
+          pointTarget={pointTarget}
           onClose={close}
         />
       )}

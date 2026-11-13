@@ -58,6 +58,8 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     team1Ready: false,
     team2Ready: false,
     replayUrl: null,
+    mapPointTarget: null,
+    displayScore: null,
     ...overrides,
   };
 }

@@ -244,3 +244,17 @@ describe("tournamentSettingsGroups — réglages du mode", () => {
     });
   });
 });
+
+describe("tournamentSettingsGroups — format Duel / Arcade", () => {
+  it("tournamentSettingsGroups_duelOn_showsFirstToN", () => {
+    const groups = tournamentSettingsGroups(input({ card: tournamentCard({ mapPointTarget: 5 }) }));
+
+    expect(group(groups, "Tournoi")["Points par carte (Duel / Arcade)"]).toBe("Premier à 5");
+  });
+
+  it("tournamentSettingsGroups_duelOff_hidesTheRow", () => {
+    const groups = tournamentSettingsGroups(input());
+
+    expect(group(groups, "Tournoi")).not.toHaveProperty("Points par carte (Duel / Arcade)");
+  });
+});

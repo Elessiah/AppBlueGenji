@@ -119,6 +119,7 @@ Le jeu se lit avec le format, dans la même requête
 | `MAP_COUNT_EXCEEDED` | plus de lignes que le plafond |
 | `MAP_REPLAY_CODE_REQUIRED` / `_INVALID` / `_DUPLICATE` | code manquant, hors motif, en double |
 | `MAP_SCORE_INVALID` | score de map non entier, négatif ou > 99 |
+| `MAP_POINTS_INVALID` | format Duel / Arcade : carte où le vainqueur n'a pas exactement N points ou l'autre en a N ou plus (`DUEL_ARCADE.md`) |
 | `MAP_AFTER_DECISION` | map après la fin acquise |
 | `MAP_LIST_INCOMPLETE` | égalités ouvertes : match sans vainqueur clos avant d'avoir joué toutes ses maps |
 | `SCORE_EXCEEDS_MATCH_FORMAT`, `SCORE_BELOW_MATCH_FORMAT`, `DRAW_NOT_ALLOWED` | score dérivé refusé par les règles existantes |
@@ -362,6 +363,16 @@ le tait.
   de secours (le détail des propositions, lui, passe par le contexte du
   lecteur — voir ci-dessus).
   Le détail retenu s'affiche tel quel, sauf sur un forfait.
+- **Match sur une seule carte** (BO1 / FT1, tout format, Duel ou non) : l'arbre,
+  la carte du match (`/suivre` compris) et l'en-tête de la page du match
+  montrent le **score de la carte** (5–3), pas celui du match (1–0).
+  `singleMapDisplayScore` (`lib/shared/map-points.ts`) le pose en
+  `BracketMatch.displayScore` dans l'instantané commun (`attachDisplayScores`,
+  flux SSE et REST de secours), lu par `matchSideViews`. Rien sans détail d'une
+  seule carte (vainqueur seul, carte nulle rejouée), ni sur un forfait : 1–0
+  reste affiché. **Affichage seul** — `team1Score` / `team2Score` restent les
+  cartes gagnées, que comptent Suisse, Survie, BG Survie, classements et
+  départages. La carte de l'accueil ne montre jamais de match joué.
 - Carte de match : bouton « Détail des maps (N) » qui ouvre une **modale** (un volet déplié dans la carte grandissait chaque créneau de l'arbre), score de chaque map et code
   copiable — « Pas de code de replay » (sans bouton de copie) pour une map
   posée sans code par l'arbitrage. **Décision de l'utilisateur (2026-10-06)** : les codes retenus
@@ -369,6 +380,10 @@ le tait.
   (les pages de tournoi exigent une session), pour qu'un match diffusé en direct
   et un match qui ne l'est pas offrent les mêmes informations ; les propositions
   en attente restent réservées aux deux équipes et à l'arbitrage.
+- Format Duel / Arcade (`DUEL_ARCADE.md`) : `BracketMatch.mapPointTarget` porte le N
+  effectif ; le bouton de détail montre alors les points (« Points : 5–3 ») et la
+  modale rappelle « Premier à N points ». La concordance des propositions
+  compare déjà les points de chaque carte.
 - Discord : aucun code n'y part. Si un jour un code y est cité, il passe par
   `discordInline` (`UNTRUSTED_NAMES.md`).
 

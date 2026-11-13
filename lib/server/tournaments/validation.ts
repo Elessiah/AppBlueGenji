@@ -15,6 +15,7 @@ import {
   matchMaxMapsNeedsDraws,
   type MatchFormat,
 } from "@/lib/shared/match-format";
+import { isValidMapPointTarget } from "@/lib/shared/map-points";
 import { isParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import {
   DEFAULT_REGISTRATION_FILTERS,
@@ -191,6 +192,11 @@ export type TournamentInputBody = {
   launchPhase?: boolean | null;
   /** Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ; absent = éteint. */
   teamVoiceChannels?: boolean | null;
+  /**
+   * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
+   * une carte ; absent ou `null` = format éteint.
+   */
+  mapPointTarget?: number | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -246,6 +252,8 @@ export type ValidatedTournamentInput = {
   launchPhase: boolean;
   /** Salons vocaux d'équipe avant chaque match (`docs/features/MATCH_VOICE.md`). */
   teamVoiceChannels: boolean;
+  /** Points par carte du format Duel / Arcade ; `null` = format éteint. */
+  mapPointTarget: number | null;
 };
 
 /** Issue d'un contrôle : un code d'erreur, ou la valeur validée. */
@@ -300,6 +308,8 @@ export function validateTournamentInput(
   if ("error" in endurance) return endurance;
   const swiss = validateSwissSettings(body);
   if ("error" in swiss) return swiss;
+  const mapPointTarget = validateMapPointTarget(body);
+  if ("error" in mapPointTarget) return mapPointTarget;
 
   return {
     value: {
@@ -327,6 +337,7 @@ export function validateTournamentInput(
       refereeScheduling: body.refereeScheduling === true,
       launchPhase: body.launchPhase === true,
       teamVoiceChannels: body.teamVoiceChannels === true,
+      mapPointTarget: mapPointTarget.value,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
@@ -576,6 +587,13 @@ function validateEnduranceSettings(
       enduranceEarlyExit: body.format === "BG_SURVIE" && body.enduranceEarlyExit === true,
     },
   };
+}
+
+/** Format Duel / Arcade : un entier de 1 à 99, ou rien (format éteint). */
+function validateMapPointTarget(body: TournamentInputBody): Checked<number | null> {
+  const target = body.mapPointTarget ?? null;
+  if (target !== null && !isValidMapPointTarget(target)) return { error: "INVALID_MAP_POINT_TARGET" };
+  return { value: target };
 }
 
 function validateSwissSettings(

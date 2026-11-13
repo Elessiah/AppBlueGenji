@@ -22,7 +22,7 @@ import {
 import type { ParticipantType } from "@/lib/shared/participants";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { normalizePhaseConfigs, validatePhases } from "@/lib/shared/tournament-phases";
-import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
+import type { PhaseFormat, TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import {
   validateDateOrder,
@@ -30,8 +30,12 @@ import {
   type ValidatedTournamentInput,
 } from "./validation";
 import { insertPhases } from "./phases-repository";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
+import { assertMapPointsUnlocked } from "./map-points";
+import { queueRoundMapsNotice, roundMapsFingerprint, scheduleRoundMapsNotice } from "./round-maps-notice";
+import { bracketFitsFormat, parseStoredMapPointTarget } from "@/lib/shared/map-points";
 
 /** Valeurs éditables d'un tournoi. Dates en ISO, comme partout côté client. */
 export type EditableTournamentValues = {
@@ -62,6 +66,11 @@ export type EditableTournamentValues = {
   /** Phase de lancement des matchs (option, éteinte par défaut). */
   launchPhase: boolean;
   matchFormat: MatchFormat | null;
+  /**
+   * Format Duel / Arcade : points qui gagnent une carte (`null` = éteint,
+   * `docs/features/DUEL_ARCADE.md`).
+   */
+  mapPointTarget: number | null;
   /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
   endurancePlayoffFormat: MatchFormat | null;
   /**
@@ -101,7 +110,7 @@ async function loadEditRow(
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
       registration_min_players, referee_scheduling, match_launch_phase,
-      team_voice_channels
+      team_voice_channels, map_point_target
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -147,6 +156,7 @@ function toValues(
     enduranceMaxRounds: num(row.endurance_max_rounds),
     enduranceEarlyExit: Number(row.endurance_early_exit) === 1,
     launchPhase: Number(row.match_launch_phase) === 1,
+    mapPointTarget: parseStoredMapPointTarget(row.map_point_target),
     matchFormat: parseMatchFormat(
       row.match_format_type,
       row.match_format_value,
@@ -244,12 +254,136 @@ export async function loadEditableTournament(
 }
 
 /**
+ * Points par carte changés : refusé si un match du tournoi porte déjà un score
+ * (`MAP_POINTS_LOCKED`) — garde-fou, la fenêtre d'édition se ferme en principe
+ * avant le premier match (`docs/features/DUEL_ARCADE.md`).
+ */
+async function assertPointTargetChangeAllowed(
+  connection: PoolConnection,
+  tournamentId: number,
+  before: number | null,
+  after: number | null,
+): Promise<void> {
+  if (after !== before) await assertMapPointsUnlocked(connection, tournamentId, null);
+}
+
+/**
+ * Points propres aux tours (format Duel / Arcade) que l'édition rend caducs :
+ * **tous** quand le format est éteint — gardés, ils resurgiraient sans que
+ * l'écran des cartes les montre (il ne les règle que format allumé) le jour où
+ * le format serait rallumé avec un autre N —, sinon ceux d'un tour que le
+ * nouveau format (ou les nouvelles phases d'un MULTI, ou la petite finale
+ * retirée) ne jouera plus (`bracketFitsFormat`), lignes orphelines portées par
+ * chaque instantané. Le contrôle `MAP_POINTS_LOCKED` a déjà eu lieu sous le
+ * verrou du tournoi. Une ligne qui ne portait que ces points disparaît ; chaque
+ * tour effacé est annoncé au journal du staff, comme un retrait par la route
+ * des points d'un tour (`setRoundPointTarget`).
+ *
+ * @returns `true` si un réglage a été effacé (annonce à planifier au commit).
+ */
+async function pruneRoundPointTargets(
+  connection: PoolConnection,
+  tournamentId: number,
+  change: { turnedOff: boolean; structureChanged: boolean; format: TournamentFormat; hasThirdPlaceMatch: boolean },
+): Promise<boolean> {
+  if (!change.turnedOff && !change.structureChanged) return false;
+  const [rows] = await connection.execute<
+    (RowDataPacket & { phase_id: number; bracket: string; round_number: number; map_point_target: number })[]
+  >(
+    `SELECT phase_id, bracket, round_number, map_point_target FROM bg_tournament_round_maps
+      WHERE tournament_id = ? AND map_point_target IS NOT NULL`,
+    [tournamentId],
+  );
+  let doomed = rows;
+  if (change.turnedOff) {
+    await connection.execute(
+      `UPDATE bg_tournament_round_maps SET map_point_target = NULL
+        WHERE tournament_id = ? AND map_point_target IS NOT NULL`,
+      [tournamentId],
+    );
+  } else {
+    const fits = await roundFitter(connection, tournamentId, change.format, change.hasThirdPlaceMatch);
+    doomed = rows.filter((row) => !fits(Number(row.phase_id), String(row.bracket)));
+    if (doomed.length === 0) return false;
+    // Une seule instruction pour tous les tours caducs : le verrou du tournoi
+    // n'attend pas R allers-retours.
+    await connection.execute(
+      `UPDATE bg_tournament_round_maps SET map_point_target = NULL
+        WHERE tournament_id = ? AND (${doomed.map(() => "(phase_id = ? AND bracket = ? AND round_number = ?)").join(" OR ")})`,
+      [tournamentId, ...doomed.flatMap((row) => [row.phase_id, row.bracket, row.round_number])],
+    );
+  }
+  await connection.execute(
+    `DELETE FROM bg_tournament_round_maps
+      WHERE tournament_id = ? AND slots_json = '[]' AND tiebreak_map IS NULL AND map_point_target IS NULL`,
+    [tournamentId],
+  );
+  await queueRoundMapsNotice(
+    connection,
+    tournamentId,
+    doomed.map((row) => ({
+      phaseId: Number(row.phase_id),
+      bracket: String(row.bracket),
+      roundNumber: Number(row.round_number),
+      before: roundMapsFingerprint(parseStoredMapPointTarget(row.map_point_target)),
+    })),
+    { points: true },
+  );
+  return doomed.length > 0;
+}
+
+/** Ce que l'édition change pour les points propres aux tours (`pruneRoundPointTargets`). */
+function roundPointsChange(
+  patch: Partial<EditableTournamentValues>,
+  current: { mapPointTarget: number | null },
+  valid: Pick<ValidatedTournamentInput, "mapPointTarget" | "format" | "hasThirdPlaceMatch">,
+): Parameters<typeof pruneRoundPointTargets>[2] {
+  return {
+    turnedOff: valid.mapPointTarget === null && current.mapPointTarget !== null,
+    structureChanged:
+      patch.format !== undefined || patch.phases !== undefined || patch.hasThirdPlaceMatch !== undefined,
+    format: valid.format,
+    hasThirdPlaceMatch: valid.hasThirdPlaceMatch,
+  };
+}
+
+/** Tour (phase, tableau) que le tournoi édité jouera encore. */
+async function roundFitter(
+  connection: PoolConnection,
+  tournamentId: number,
+  format: TournamentFormat,
+  hasThirdPlaceMatch: boolean,
+): Promise<(phaseId: number, bracket: string) => boolean> {
+  if (format !== "MULTI") {
+    return (phaseId, bracket) => phaseId === 0 && bracketFitsFormat(format, bracket, hasThirdPlaceMatch);
+  }
+  const [phases] = await connection.execute<
+    (RowDataPacket & { id: number; format: PhaseFormat; has_third_place_match: number | boolean | null })[]
+  >(`SELECT id, format, has_third_place_match FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
+  const byId = new Map(phases.map((phase) => [Number(phase.id), phase]));
+  return (phaseId, bracket) => {
+    const phase = byId.get(phaseId);
+    return phase !== undefined && bracketFitsFormat(phase.format, bracket, Boolean(Number(phase.has_third_place_match)));
+  };
+}
+
+/**
  * Applique un patch d'édition. Rend le nom du tournoi **d'avant** et celui
  * qu'il vient d'écrire, lus sous le verrou de la ligne : le journal du staff
  * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
  * suit avant que sa ligne parte.
  */
-export async function updateTournament(
+export function updateTournament(
+  tournamentId: number,
+  patch: Partial<EditableTournamentValues>,
+): Promise<{ previousName: string; name: string }> {
+  // Le contrôle `MAP_POINTS_LOCKED` verrouille les matchs du tournoi : face à un
+  // report en cours, l'ordre des verrous peut s'inverser. L'interblocage se
+  // rejoue (transaction annulée en entier) plutôt que de rendre un 500 au staff.
+  return retryOnDeadlock(() => applyTournamentUpdate(tournamentId, patch));
+}
+
+async function applyTournamentUpdate(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
 ): Promise<{ previousName: string; name: string }> {
@@ -257,6 +391,7 @@ export async function updateTournament(
   const connection = await db.getConnection();
   let previousName: string;
   let name: string;
+  let roundPointsPruned = false;
 
   try {
     await connection.beginTransaction();
@@ -293,6 +428,7 @@ export async function updateTournament(
 
     const { valid, normalizedPhases } = validateEditedValues(next);
     name = valid.name;
+    await assertPointTargetChangeAllowed(connection, tournamentId, current.mapPointTarget, valid.mapPointTarget);
 
     await connection.execute(
       `UPDATE bg_tournaments SET
@@ -309,7 +445,7 @@ export async function updateTournament(
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
         registration_discord_requirement = ?, registration_blizzard_requirement = ?,
-        registration_min_players = ?, match_launch_phase = ?
+        registration_min_players = ?, match_launch_phase = ?, map_point_target = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -345,6 +481,7 @@ export async function updateTournament(
         valid.registrationFilters.blizzardRequirement,
         valid.registrationFilters.minPlayers,
         valid.launchPhase ? 1 : 0,
+        valid.mapPointTarget,
         tournamentId,
       ],
     );
@@ -371,6 +508,7 @@ export async function updateTournament(
         await insertPhases(connection, tournamentId, normalizedPhases);
       }
     }
+    roundPointsPruned = await pruneRoundPointTargets(connection, tournamentId, roundPointsChange(patch, current, valid));
 
     await connection.commit();
   } catch (error) {
@@ -386,7 +524,13 @@ export async function updateTournament(
   // Une édition est un geste rare du staff : une reconstruction de plus.
   invalidateSpectatorSnapshot(tournamentId);
   publishUpdatedEvent(tournamentId);
+  scheduleRoundPointsNotice(roundPointsPruned);
   return { previousName, name };
+}
+
+/** Points de tour effacés par l'édition : leur annonce part une fois le commit fait. */
+function scheduleRoundPointsNotice(pruned: boolean): void {
+  if (pruned) scheduleRoundMapsNotice();
 }
 
 /**
@@ -418,6 +562,7 @@ function validateEditedValues(next: EditableTournamentValues): {
     enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
     enduranceEarlyExit: next.enduranceEarlyExit,
     launchPhase: next.launchPhase,
+    mapPointTarget: next.mapPointTarget,
     matchFormatType: next.matchFormat?.type ?? null,
     matchFormatValue: next.matchFormat?.value ?? null,
     matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,

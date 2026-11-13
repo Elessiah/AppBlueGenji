@@ -854,6 +854,10 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_MAP_RULES: "Règle de ban invalide.",
   INVALID_TIEBREAK_MAP: "Nom de map de départage invalide (64 caractères au plus).",
   TIEBREAK_NOT_ALLOWED: "La map de départage ne se règle que sur un tour de play-offs à format de match défini (BO ou FT).",
+  INVALID_MAP_POINT_TARGET: "Points par carte invalides : un entier entre 1 et 99.",
+  MAP_POINTS_DISABLED: "Le format Duel / Arcade n'est pas activé sur ce tournoi : active-le dans ses réglages avant de régler les points d'un tour.",
+  MAP_POINTS_LOCKED: "Points par carte figés : un match concerné porte déjà un score ou a ouvert son lancement.",
+  MAP_POINTS_FINISHED: "Le tournoi est terminé : les points par carte d'un tour ne peuvent plus être posés.",
   INVALID_MAP_PICK: "Cette carte ne fait pas partie du pool du tour.",
   NOT_MAP_PICKER: "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte.",
   ROUND_MAPS_SET:

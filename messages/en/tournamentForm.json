@@ -22,7 +22,7 @@
     "fieldRefusal": "{message} ({field})",
     "finished": "The tournament is finished: it can no longer be edited.",
     "lockStarted": "The tournament is in progress: only referee match scheduling and team voice channels can still be changed.",
-    "lockVisible": "The tournament has been visible since {date} — the format, the game and the settings can no longer be changed.",
+    "lockVisible": "The tournament has been visible since {date} — the tournament format, the game and the settings can no longer be changed, except the match format and the points per map.",
     "savedNone": "No changes to save.",
     "saved": "Tournament updated.",
     "savedWithPlanning": "Tournament updated. {planning}",
@@ -65,6 +65,7 @@
       "registrationBlizzardRequirement": "Blizzard account at registration",
       "registrationMinPlayers": "Minimum players on the team",
       "launchPhase": "Match launch phase",
+      "mapPointTarget": "Duel / Arcade format",
       "phases": "Tournament stages"
     },
     "voiceErrors": {
@@ -186,6 +187,13 @@
       "edit": "Can be changed until the tournament closes — even while it's in progress.",
       "warning": "On saving, matches with no date that haven't launched yet leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time. Matches already launched carry on.",
       "warningDirect": "On saving, matches with no date that haven't launched yet wait for a referee to set their time. Matches already launched carry on."
+    },
+    "duelArcade": {
+      "label": "Duel / Arcade format",
+      "description": "Each map is won by the first side to reach N points (a Widowmaker duel to 5, for example): the winner scores exactly N, the other fewer. The match format still counts maps, and a round can have its own points.",
+      "target": "First to X points per map",
+      "scope": "Can be changed until the tournament starts, even with registrants.",
+      "locked": "The tournament has started: this format can no longer be changed."
     },
     "launchPhase": {
       "label": "Match launch phase",

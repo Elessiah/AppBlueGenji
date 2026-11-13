@@ -53,6 +53,7 @@
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
  */
+import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -211,6 +212,9 @@ export type LobbyBriefRow = RowDataPacket & {
   next_ban_rule?: string | null;
   /** Map de départage du tour et ce qui dit si elle s'applique (play-offs à format défini). */
   round_tiebreak_map?: string | null;
+  /** Format Duel / Arcade : points du tournoi et réglage propre au tour (`DUEL_ARCADE.md`). */
+  tournament_point_target?: number | null;
+  round_point_target?: number | null;
   phase_id?: number | null;
   phase_format?: PhaseFormat | null;
   tournament_format?: TournamentFormat | null;
@@ -252,6 +256,16 @@ export function briefTiebreakMap(row: LobbyBriefRow): string | null {
 }
 
 /**
+ * Points par carte annoncés au brief (format Duel / Arcade) : ceux du tour,
+ * sinon du tournoi ; `null` quand le format est éteint sur le tournoi (un
+ * réglage de tour resté ne rallume rien).
+ */
+export function briefPointTarget(row: LobbyBriefRow): number | null {
+  const tournament = parseStoredMapPointTarget(row.tournament_point_target);
+  return tournament === null ? null : (parseStoredMapPointTarget(row.round_point_target) ?? tournament);
+}
+
+/**
  * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
  * allume l'arbitrage planifié le tient pour lancé (`lobby_opened_at` posé,
  * `match-schedule`, `referee-scheduling`), sans qu'aucun salon ne s'ouvre.
@@ -281,12 +295,10 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             CASE WHEN m.live_trigger IS NULL THEN NULL ELSE ${streamUrlCandidatesSql("m")} END AS stream_urls,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
             t.first_ban_rule, t.next_ban_rule,
-            (SELECT rm.slots_json FROM bg_tournament_round_maps rm
-              WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
-                AND rm.bracket = m.bracket AND rm.round_number = m.round_number) AS round_slots_json,
-            (SELECT rm.tiebreak_map FROM bg_tournament_round_maps rm
-              WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
-                AND rm.bracket = m.bracket AND rm.round_number = m.round_number) AS round_tiebreak_map,
+            rm.slots_json AS round_slots_json,
+            rm.tiebreak_map AS round_tiebreak_map,
+            t.map_point_target AS tournament_point_target,
+            rm.map_point_target AS round_point_target,
             m.phase_id, t.format AS tournament_format,
             (SELECT p.format FROM bg_tournament_phases p WHERE p.id = m.phase_id) AS phase_format,
             t.match_format_type, t.match_format_value, t.match_format_max_maps, t.match_format_draws,
@@ -296,6 +308,8 @@ const BRIEF_FROM = `FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
+       LEFT JOIN bg_tournament_round_maps rm ON rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
+         AND rm.bracket = m.bracket AND rm.round_number = m.round_number
        ${seedJoins("m")}`;
 
 /**
@@ -454,6 +468,7 @@ export function lobbyBriefSides(
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
     tiebreakMap: briefTiebreakMap(row),
+    pointTarget: briefPointTarget(row),
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
     // Le bot n'ouvre de salon vocal que pour un match suivi (`MATCH_VOICE.md`) :

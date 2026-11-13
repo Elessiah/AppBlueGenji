@@ -34,6 +34,12 @@ import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
 import { TeamVoiceChannelsField } from "./TeamVoiceChannelsField";
 import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LAUNCH_PHASE_MORE_ID, LaunchPhaseField } from "./LaunchPhaseField";
+import {
+  DUEL_ARCADE_FIELD_ID,
+  DuelArcadeField,
+  MAP_POINT_TARGET_FIELD_ID,
+  MAP_POINT_TARGET_HINT_ID,
+} from "./DuelArcadeField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
   sectionEyebrow,
@@ -74,6 +80,7 @@ const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
   startAt: "start-at",
   enduranceEarlyExit: EARLY_EXIT_FIELD_ID,
   launchPhase: LAUNCH_PHASE_FIELD_ID,
+  mapPointTarget: MAP_POINT_TARGET_FIELD_ID,
 };
 
 // Les valeurs et leurs conversions vivent dans `_lib/tournament-form-values`.
@@ -135,9 +142,13 @@ export function TournamentForm({
   const errorsText = useErrorsText();
   const em = (children: ReadonlyArray<ReactNode>) => <em>{richNodes(children)}</em>;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
-  const fieldErrors = useFieldErrors(TOURNAMENT_FIELD_ERRORS, FIELD_IDS);
-
   const [values, setValues] = useState<TournamentFormValues>(initialValues);
+  // Format Duel / Arcade décoché : le champ des points n'est pas rendu, un refus
+  // des points (décocher sous un score, `MAP_POINTS_LOCKED`) se rattache à la case.
+  const fieldErrors = useFieldErrors(
+    TOURNAMENT_FIELD_ERRORS,
+    values.duelArcade ? FIELD_IDS : { ...FIELD_IDS, mapPointTarget: DUEL_ARCADE_FIELD_ID },
+  );
   const set = <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));
     if (key in FIELD_IDS) fieldErrors.clear(key as TournamentFormField);
@@ -515,6 +526,20 @@ export function TournamentForm({
                 </p>
               </div>
             )}
+
+            <DuelArcadeField
+              checked={values.duelArcade}
+              target={values.mapPointTarget}
+              locked={locked("mapPointTarget")}
+              aria={fieldAttrs("mapPointTarget", MAP_POINT_TARGET_HINT_ID)}
+              error={fieldErrors.message("mapPointTarget")}
+              onCheckedChange={(checked) => {
+                set("duelArcade", checked);
+                fieldErrors.clear("mapPointTarget");
+              }}
+              onTargetChange={(target) => set("mapPointTarget", target)}
+              onTargetEdit={() => fieldErrors.clear("mapPointTarget")}
+            />
 
             <FormatSettings
               values={values}

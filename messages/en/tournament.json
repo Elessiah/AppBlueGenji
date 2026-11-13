@@ -260,6 +260,8 @@
     "maps": {
       "summary": "Map details ({count})",
       "summaryLabel": "Map details ({count}): {match}",
+      "firstTo": "First to {points}",
+      "pointTarget": "Each map is won by the first to {points} points.",
       "title": "Map details",
       "vs": "{team1} vs {team2}",
       "listLabel": "Match maps",

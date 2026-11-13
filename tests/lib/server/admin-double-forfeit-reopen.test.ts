@@ -64,7 +64,7 @@ describe("adminResolveMatch — correction qui rouvre une exemption", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Ni format ni jeu : les maps de l'arbitre ne passent que le motif permissif.
-    jest.mocked(loadTournamentMatchRules).mockResolvedValue({ format: null, game: null, refereeScheduling: false });
+    jest.mocked(loadTournamentMatchRules).mockResolvedValue({ format: null, game: null, refereeScheduling: false, pointTarget: null });
   });
 
   it("rouvre le tournoi quand la cascade a rouvert une rencontre close", async () => {

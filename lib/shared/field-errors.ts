@@ -287,7 +287,8 @@ export type TournamentFormField =
   | "registrationCloseAt"
   | "startAt"
   | "enduranceEarlyExit"
-  | "launchPhase";
+  | "launchPhase"
+  | "mapPointTarget";
 
 export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
   MISSING_NAME: "name",
@@ -296,6 +297,8 @@ export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
   INVALID_MATCH_FORMAT: "matchFormatValue",
   INVALID_ENDURANCE_EARLY_EXIT: "enduranceEarlyExit",
   INVALID_LAUNCH_PHASE: "launchPhase",
+  INVALID_MAP_POINT_TARGET: "mapPointTarget",
+  MAP_POINTS_LOCKED: "mapPointTarget",
 };
 
 /**

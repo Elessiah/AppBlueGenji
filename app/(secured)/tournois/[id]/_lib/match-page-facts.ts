@@ -23,7 +23,7 @@ export type MatchPageHeaderScore = { left: string; right: string; leftForfeits: 
  * `null` quand rien n'est encore joué (le tableau d'affichage dit « VS »).
  */
 export function matchPageHeaderScore(
-  match: Pick<BracketMatch, "team1Id" | "team2Id" | "team1Score" | "team2Score" | "winnerTeamId" | "forfeitTeamId" | "roundNumber">,
+  match: Pick<BracketMatch, "team1Id" | "team2Id" | "team1Score" | "team2Score" | "winnerTeamId" | "forfeitTeamId" | "roundNumber" | "displayScore">,
   sides: readonly [Pick<MatchPageSide, "slot">, Pick<MatchPageSide, "slot">],
   doubleForfeit: boolean,
 ): MatchPageHeaderScore | null {

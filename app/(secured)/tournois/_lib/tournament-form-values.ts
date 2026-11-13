@@ -22,6 +22,7 @@ import {
   type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
 import type { ParticipantType } from "@/lib/shared/participants";
+import { DEFAULT_MAP_POINT_TARGET } from "@/lib/shared/map-points";
 import { createDefaultPhase } from "../creer/phase-form";
 
 /** Plafond de manches qualificatives BG Survie proposé à la création. */
@@ -132,6 +133,13 @@ export type TournamentFormValues = {
    * Décochée par défaut : un match part dès son heure.
    */
   launchPhase: boolean;
+  /**
+   * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : case, et points qui
+   * gagnent une carte — gardés quand la case se décoche, pour la recocher sans
+   * ressaisir. Seul `mapPointTarget` part (`null` case décochée).
+   */
+  duelArcade: boolean;
+  mapPointTarget: number;
   phases: PhaseConfig[];
 };
 
@@ -166,6 +174,8 @@ export type TournamentApiValues = {
   enduranceMaxRounds: number | null;
   enduranceEarlyExit: boolean;
   launchPhase: boolean;
+  /** Points par carte du format Duel / Arcade ; `null` = éteint. */
+  mapPointTarget: number | null;
   matchFormat: MatchFormat | null;
   endurancePlayoffFormat: MatchFormat | null;
   registrationDiscordRequirement: PlayerRequirement;
@@ -220,6 +230,9 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     registrationMinPlayers: DEFAULT_REGISTRATION_FILTERS.minPlayers,
     // Éteinte : la phase de lancement n'est pas proposée d'office.
     launchPhase: false,
+    // Format Duel / Arcade éteint ; « premier à 5 » proposé quand on le coche.
+    duelArcade: false,
+    mapPointTarget: DEFAULT_MAP_POINT_TARGET,
     // Éteinte : un match entre en lancement dès que ses deux engagés sont connus.
     refereeScheduling: false,
     // Éteinte : aucun salon vocal n'est ouvert d'office.
@@ -332,6 +345,9 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // Toujours envoyé (jamais `undefined`) : décocher doit éteindre l'option,
     // la liste blanche de l'édition ignorant un champ absent.
     launchPhase: values.launchPhase,
+    // `null` (jamais `undefined`) case décochée : l'édition doit pouvoir
+    // éteindre le format Duel / Arcade.
+    mapPointTarget: values.duelArcade ? values.mapPointTarget : null,
   };
 }
 
@@ -380,6 +396,8 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
         : defaults.enduranceMaxRounds,
     enduranceEarlyExit: apiValues.format === "BG_SURVIE" && apiValues.enduranceEarlyExit,
     launchPhase: apiValues.launchPhase,
+    duelArcade: apiValues.mapPointTarget !== null,
+    mapPointTarget: apiValues.mapPointTarget ?? defaults.mapPointTarget,
     // Même règle pour les égalités : hors BG Survie, la valeur stockée est
     // toujours fermée (le serveur la ferme), elle ne dit pas un choix — une
     // bascule vers le mode présente donc le défaut de création, comme le

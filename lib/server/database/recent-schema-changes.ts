@@ -566,6 +566,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`loadLiveRefereeNames` : matchs à jouer arbitrés) ne parcourt plus tous
     // les matchs du tournoi : `tournament_id` puis les seuls matchs arbitrés.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_tournament_referee (tournament_id, referee_user_id, status)`,
+    // DUEL-ARCADE — points par carte du format Duel / Arcade, au tournoi et
+    // par tour (`docs/features/DUEL_ARCADE.md`).
+    `ALTER TABLE bg_tournaments ADD COLUMN map_point_target TINYINT UNSIGNED NULL AFTER match_format_draws`,
+    `ALTER TABLE bg_tournament_round_maps ADD COLUMN map_point_target TINYINT UNSIGNED NULL AFTER tiebreak_map`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

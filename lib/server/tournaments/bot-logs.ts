@@ -1406,6 +1406,11 @@ export type MatchLogRow = SubjectRow & {
   status?: string | null;
   referee_user_id?: number | null;
   self_managed?: number | null;
+  /**
+   * Format Duel / Arcade : points des cartes retenues (« 5-3,2-5 »), lus
+   * seulement quand le format est allumé (`docs/features/DUEL_ARCADE.md`).
+   */
+  final_map_points?: string | null;
 };
 
 /**
@@ -1442,7 +1447,12 @@ async function readMatch(matchId: number): Promise<MatchLogRow | null> {
         m.is_bye,
         m.status,
         m.referee_user_id,
-        m.self_managed
+        m.self_managed,
+        CASE WHEN tr.map_point_target IS NULL THEN NULL ELSE (
+          SELECT GROUP_CONCAT(CONCAT(mm.team1_score, '-', mm.team2_score) ORDER BY mm.map_number SEPARATOR ',')
+            FROM bg_match_maps mm
+           WHERE mm.match_id = m.id AND mm.source = 'FINAL'
+        ) END AS final_map_points
        ${MATCH_LOG_FROM_SQL}`,
     [matchId],
   );
@@ -1575,8 +1585,24 @@ async function resolveMatchFinishedLog(
     forfeit,
     doubleForfeit,
     staffValidated: entry.staffValidated === true,
+    mapPoints: forfeit || doubleForfeit ? null : parseLoggedMapPoints(match.final_map_points),
   });
   return { message, tournamentId: Number(match.tournament_id) };
+}
+
+/**
+ * Points des cartes d'un match en format Duel / Arcade, lus de la colonne
+ * agrégée (« 5-3,2-5 ») : rien d'illisible ne part vers Discord.
+ */
+export function parseLoggedMapPoints(raw: string | null | undefined): Array<{ team1Score: number; team2Score: number }> | null {
+  if (!raw) return null;
+  const maps: Array<{ team1Score: number; team2Score: number }> = [];
+  for (const part of String(raw).split(",")) {
+    const match = /^(\d{1,2})-(\d{1,2})$/.exec(part);
+    if (!match) return null;
+    maps.push({ team1Score: Number(match[1]), team2Score: Number(match[2]) });
+  }
+  return maps.length > 0 ? maps : null;
 }
 
 /** La manche d'une alerte, telle que le push la nomme. */

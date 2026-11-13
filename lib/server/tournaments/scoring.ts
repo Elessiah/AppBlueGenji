@@ -18,6 +18,7 @@ import {
 } from "./bot-logs";
 import { resolveUserEntrant } from "./registration";
 import { loadTournamentMatchRules } from "./repository";
+import { matchRoundKey } from "./map-points";
 import {
   REPORTED_MAP_SOURCES,
   clearMapSets,
@@ -482,6 +483,8 @@ export async function reportMatchScore(
       id,
       tournament_id,
       round_number,
+      phase_id,
+      bracket,
       team1_id,
       team2_id,
       team1_report_score,
@@ -555,13 +558,16 @@ export async function reportMatchScore(
   // gagnée vaut un point, une map nulle n'en vaut à personne. Chaque map porte
   // son code de replay, jugé selon le jeu du tournoi — d'où la lecture du jeu
   // avec le format, dans la même requête.
-  const { format: matchFormat, game } = await loadTournamentMatchRules(
+  // Format Duel / Arcade : chaque carte doit atteindre les points du tour
+  // (`docs/features/DUEL_ARCADE.md`), confirmation comprise.
+  const { format: matchFormat, game, pointTarget } = await loadTournamentMatchRules(
     connection,
     tournamentId,
     Number(match.round_number),
+    matchRoundKey(match),
   );
   const { myScore, opponentScore, reporterSource } = reporterView(
-    checkMapList(matchFormat, game, maps, { decisive: true }),
+    checkMapList(matchFormat, game, maps, { decisive: true, pointTarget }),
     isTeam1Reporter,
   );
   // « Confirmer » : la proposition adverse doit être **celle que l'engagé a

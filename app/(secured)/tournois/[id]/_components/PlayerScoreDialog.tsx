@@ -13,7 +13,8 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { forfeitMapCount } from "@/lib/shared/match-format";
+import { forfeitMapCount, type MatchFormat } from "@/lib/shared/match-format";
+import { singleMapDisplayScore } from "@/lib/shared/map-points";
 import {
   checkMapList,
   mapFieldKey,
@@ -95,20 +96,43 @@ function reportsSignature(match: BracketMatch): string {
   return `${match.id}|${one(match.team1Report)}|${one(match.team2Report)}`;
 }
 
-function scoreText(report: MatchScoreReport): string {
-  return `${report.team1Score} – ${report.team2Score}`;
+/**
+ * Score d'une proposition tel que la modale le cite : celui de la carte (5 – 3)
+ * sur un match à une carte dont le détail est lu, comme l'arbre le montre
+ * (`singleMapDisplayScore`, `MAP_SCORES.md`) ; sinon celui du match (2 – 1).
+ */
+export function scoreText(report: MatchScoreReport, format: MatchFormat | null = null): string {
+  const single = singleMapDisplayScore({ ...report, forfeitTeamId: null }, format);
+  const shown = single ?? { team1: report.team1Score, team2: report.team2Score };
+  return `${shown.team1} – ${shown.team2}`;
 }
 
 /**
  * Phrase du désaccord. À score égal, ce sont les maps qui diffèrent (codes de
  * replay ou scores de map, `MAP_SCORES.md`) : le dire, sans quoi « toi : 2 – 1,
- * eux : 2 – 1 » n'expliquerait rien.
+ * eux : 2 – 1 » n'expliquerait rien. Sur un match à une carte, le score cité
+ * est celui de la carte (`scoreText`) : « 5 – 3 contre 5 – 4 » dit l'écart —
+ * pourvu que les deux propositions n'aient qu'une carte.
  */
-function conflictText(text: TournamentDialogsText, mine: MatchScoreReport, theirs: MatchScoreReport, opponentName: string): string {
-  const sameScore = mine.team1Score === theirs.team1Score && mine.team2Score === theirs.team2Score;
-  return sameScore
-    ? text.t("score.player.conflictMaps", { score: scoreText(mine), opponent: opponentName })
-    : text.t("score.player.conflictScores", { mine: scoreText(mine), opponent: opponentName, theirs: scoreText(theirs) });
+export function conflictText(
+  text: TournamentDialogsText,
+  mine: MatchScoreReport,
+  theirs: MatchScoreReport,
+  opponentName: string,
+  format: MatchFormat | null = null,
+): string {
+  // Même unité des deux côtés : les points de la carte seulement si les deux
+  // propositions n'en ont qu'une (une carte nulle rejouée en fait deux), sinon
+  // le score du match — jamais « 5 – 3 » contre « 1 – 0 ».
+  const bothSingle =
+    singleMapDisplayScore({ ...mine, forfeitTeamId: null }, format) !== null &&
+    singleMapDisplayScore({ ...theirs, forfeitTeamId: null }, format) !== null;
+  const shownFormat = bothSingle ? format : null;
+  const mineText = scoreText(mine, shownFormat);
+  const theirsText = scoreText(theirs, shownFormat);
+  return mineText === theirsText
+    ? text.t("score.player.conflictMaps", { score: mineText, opponent: opponentName })
+    : text.t("score.player.conflictScores", { mine: mineText, opponent: opponentName, theirs: theirsText });
 }
 
 
@@ -186,9 +210,9 @@ function theirsPendingStatus(
   text: TournamentDialogsText,
   names: { opponentName: string; myName: string },
   theirs: MatchScoreReport,
-  reader: { canReport: boolean; detailLoading: boolean },
+  reader: { canReport: boolean; detailLoading: boolean; format?: MatchFormat | null },
 ): string {
-  const values = { opponent: names.opponentName, score: scoreText(theirs), mine: names.myName };
+  const values = { opponent: names.opponentName, score: scoreText(theirs, null), mine: names.myName };
   // Qui ne peut pas reporter ne reçoit jamais le détail (`matchProposals`) :
   // rien à confirmer ni à ressaisir de son côté, et rien à dire du détail.
   if (!reader.canReport) return text.t("score.player.theirs.readOnly", values);
@@ -307,9 +331,10 @@ export function diffZoneTitle(
   differs: boolean,
   opponentName: string,
   theirs: MatchScoreReport | null,
+  format: MatchFormat | null = null,
 ): string {
   if (differs) return text.t("score.player.diff.title", { opponent: opponentName });
-  return text.t("score.player.diff.titleTheirs", { opponent: opponentName, score: theirs ? scoreText(theirs) : "" });
+  return text.t("score.player.diff.titleTheirs", { opponent: opponentName, score: theirs ? scoreText(theirs, format) : "" });
 }
 
 /**
@@ -385,12 +410,15 @@ export function PlayerScoreDialog({
   const [myName, opponentName] = myTeamIsTeam1 ? [team1, team2] : [team2, team1];
 
   const game = useTournamentGame();
+  // Format Duel / Arcade : chaque carte au premier à N points
+  // (`docs/features/DUEL_ARCADE.md`) — la même règle que le serveur.
+  const pointTarget = match.mapPointTarget ?? null;
   // Saisie **map par map** (`docs/features/MAP_SCORES.md`) : le score du match
   // se dérive des maps, chacune avec son code de replay.
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`) ; ce qui
   // se valide et part en retire la ligne vierge de fin (`trimTrailingBlankMaps`).
   const [rows, setRows] = useState<MatchMapInput[]>(() =>
-    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view)),
+    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), { pointTarget }),
   );
   const maps = useMemo(() => trimTrailingBlankMaps(rows), [rows]);
   const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", rows.length));
@@ -411,7 +439,7 @@ export function PlayerScoreDialog({
   const signature = reportsSignature(match);
   useEffect(() => {
     const nextView = playerReportView(match, myTeamId);
-    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(nextView));
+    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(nextView), { pointTarget });
     const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
     if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
@@ -429,7 +457,7 @@ export function PlayerScoreDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
-  const check = checkMapList(matchFormat, game, maps, { decisive: true });
+  const check = checkMapList(matchFormat, game, maps, { decisive: true, pointTarget });
   // Rien de saisi : la ligne vierge d'ouverture n'est pas une proposition.
   const nothingEntered = !maps.some(isMapTouched);
   const entered =
@@ -509,10 +537,10 @@ export function PlayerScoreDialog({
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
   // qu'un code : la même règle, rejouée ici, retrouve le champ.
   const flagRefusal = (code: string): boolean => {
-    const local = checkMapList(matchFormat, game, maps, { decisive: true });
+    const local = checkMapList(matchFormat, game, maps, { decisive: true, pointTarget });
     const target = refusalFieldOnRows(local, rows);
     if (!target || local.error !== code) return false;
-    fieldErrors.flag(mapFieldKey(target.index, target.field), mapViolationText(text, local.error, matchFormat, game));
+    fieldErrors.flag(mapFieldKey(target.index, target.field), mapViolationText(text, local.error, matchFormat, game, pointTarget));
     return true;
   };
 
@@ -528,10 +556,10 @@ export function PlayerScoreDialog({
     seenAt: string | null;
   }): Promise<boolean> => {
     if (submitting) return false;
-    const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true });
+    const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true, pointTarget });
     if (sendCheck.error) {
       if (!send.confirmTheirs) flagRefusal(sendCheck.error);
-      showError(mapViolationText(text, sendCheck.error, matchFormat, game));
+      showError(mapViolationText(text, sendCheck.error, matchFormat, game, pointTarget));
       return false;
     }
     const entered1 = sendCheck.score.team1;
@@ -658,12 +686,16 @@ export function PlayerScoreDialog({
     if (!view) return null;
     switch (view.phase) {
       case "MINE_PENDING": {
-        const mine = { score: scoreText(view.mine!), opponent: opponentName };
+        const mine = { score: scoreText(view.mine!, matchFormat), opponent: opponentName };
         if (autoValidationPaused) return `${t("score.player.minePending", mine)} ${t("score.player.autoValidatePaused")}`;
         return deadline ? t("score.player.minePendingDeadline", { ...mine, deadline }) : t("score.player.minePending", mine);
       }
       case "THEIRS_PENDING": {
-        const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+        const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, {
+          canReport: canReportScore,
+          detailLoading,
+          format: matchFormat,
+        });
         if (autoValidationPaused) return `${pending} ${t("score.player.autoValidatePaused")}`;
         return deadline ? `${pending} ${t("score.player.autoValidateAt", { deadline })}` : pending;
       }
@@ -671,7 +703,7 @@ export function PlayerScoreDialog({
       // par le flux s'annonce une fois, où que soit le focus — la région est
       // déjà montée (une proposition l'avait remplie).
       case "CONFLICT": {
-        const conflict = `${conflictText(text, view.mine!, view.theirs!, opponentName)} ${t("score.player.locked")}`;
+        const conflict = `${conflictText(text, view.mine!, view.theirs!, opponentName, matchFormat)} ${t("score.player.locked")}`;
         // Détail des propositions encore en lecture : les deux blocs de maps
         // n'ont rien à montrer — le dire, et dire quoi faire s'il n'arrive pas.
         return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;
@@ -689,7 +721,7 @@ export function PlayerScoreDialog({
   const submitLabel = confirmsAsIs ? t("score.player.confirm") : t("score.player.send");
   let blocker: string | null = null;
   if (unchangedMine) blocker = t("score.player.alreadySent", { opponent: opponentName });
-  else if (check.error) blocker = mapViolationText(text, check.error, matchFormat, game);
+  else if (check.error) blocker = mapViolationText(text, check.error, matchFormat, game, pointTarget);
   // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
   // une map **renseignée** — une ligne vierge qu'on vient d'ajouter n'appelle
   // pas encore de reproche.
@@ -772,6 +804,7 @@ export function PlayerScoreDialog({
                 team2Id={match.team2Id}
                 mapNames={mapNames}
                 tiebreakMap={tiebreakMap}
+                pointTarget={pointTarget}
                 disabled={submitting}
                 fieldErrors={fieldErrors}
               />
@@ -845,7 +878,7 @@ export function PlayerScoreDialog({
             <fieldset className={styles.diffZone} aria-labelledby="player-score-diff-title">
               <InfoHintRow>
                 <p id="player-score-diff-title" className={mapStyles.proposalTitle}>
-                  {diffZoneTitle(text, differences.length > 0, opponentName, theirs)}
+                  {diffZoneTitle(text, differences.length > 0, opponentName, theirs, matchFormat)}
                 </p>
                 <InfoHint id="player-score-diff-help" subject={t("score.player.diff.hintSubject")}>
                   <p>{t("score.player.diff.hint", { opponent: opponentName })}</p>

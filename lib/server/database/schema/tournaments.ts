@@ -48,6 +48,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       match_format_value INT NULL,
       match_format_max_maps INT NULL,
       match_format_draws TINYINT(1) NOT NULL DEFAULT 0,
+      -- Format Duel / Arcade (\`docs/features/DUEL_ARCADE.md\`) : chaque carte se
+      -- gagne au premier à N points ; \`NULL\` = format éteint.
+      map_point_target TINYINT UNSIGNED NULL,
       swiss_total_rounds INT NULL,
       swiss_current_round INT NOT NULL DEFAULT 0,
       swiss_points_win INT NOT NULL DEFAULT 3,
@@ -328,6 +331,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // l'autogestion groupée ; posable avant que ses matchs existent.
   // `tiebreak_map` : map de départage d'un tour de play-offs à format défini
   // (une ligne qui ne porte qu'elle a `slots_json = '[]'`).
+  // `map_point_target` : points par carte propres au tour, en format Duel /
+  // Arcade (`docs/features/DUEL_ARCADE.md`) ; même règle de ligne.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_tournament_round_maps (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -337,6 +342,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       round_number INT NOT NULL,
       slots_json TEXT NOT NULL,
       tiebreak_map VARCHAR(64) NULL,
+      map_point_target TINYINT UNSIGNED NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uq_bg_round_maps_round (tournament_id, phase_id, bracket, round_number),
       CONSTRAINT fk_bg_round_maps_tournament FOREIGN KEY (tournament_id)

@@ -272,6 +272,22 @@ describe("formatLobbyBriefDm — map de départage", () => {
   it("formatLobbyBriefDm_noTiebreak_noLine", () => {
     expect(formatLobbyBriefDm(side({ tiebreakMap: null }), URL)).not.toContain("départage");
   });
+
+  it("formatLobbyBriefDm_pointTargetFr_addsLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL)).toContain(
+      "* Format Duel / Arcade : chaque carte se gagne au premier à 5 points.",
+    );
+  });
+
+  it("formatLobbyBriefDm_pointTargetEn_addsLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL, "en")).toContain(
+      "* Duel / Arcade format: each map is won by the first to 5 points.",
+    );
+  });
+
+  it("formatLobbyBriefDm_noPointTarget_noLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: null }), URL)).not.toContain("Duel / Arcade");
+  });
 });
 
 /**

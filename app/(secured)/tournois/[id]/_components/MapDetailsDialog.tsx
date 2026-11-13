@@ -20,12 +20,15 @@ export function MapDetailsDialog({
   maps,
   team1Name,
   team2Name,
+  pointTarget = null,
   onClose,
 }: Readonly<{
   matchId: number;
   maps: ReadonlyArray<MatchMapResult>;
   team1Name: string;
   team2Name: string;
+  /** Points par carte du format Duel / Arcade (`null` = éteint). */
+  pointTarget?: number | null;
   onClose: () => void;
 }>) {
   const dialogRef = useDialogBehavior({ open: true, onClose });
@@ -51,7 +54,13 @@ export function MapDetailsDialog({
             <p className={dialogStyles.opponents}>{t("match.maps.vs", { team1: team1Name, team2: team2Name })}</p>
           </div>
         </div>
-        <MapResultList maps={maps} team1Name={team1Name} team2Name={team2Name} label={t("match.maps.listLabel")} />
+        <MapResultList
+          maps={maps}
+          team1Name={team1Name}
+          team2Name={team2Name}
+          label={t("match.maps.listLabel")}
+          pointTarget={pointTarget}
+        />
         <div className={dialogStyles.actions}>
           <button type="button" className={`${dialogStyles.link} ${dialogStyles.close}`} onClick={onClose}>
             {t("match.maps.close")}

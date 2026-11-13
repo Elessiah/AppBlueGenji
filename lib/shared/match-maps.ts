@@ -18,6 +18,7 @@
 
 import { checkMatchScores, formatAllowsTiebreak, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
 import type { MatchFormat, MatchScoreViolation } from "./match-format";
+import { duelMapScoreFault } from "./map-points";
 import type { TournamentGame } from "./types";
 
 /** Une map telle qu'on la saisit — orientation du plateau (équipe 1, équipe 2). */
@@ -196,6 +197,7 @@ export type MapListViolation =
   | "MAP_REPLAY_CODE_INVALID"
   | "MAP_REPLAY_CODE_DUPLICATE"
   | "MAP_SCORE_INVALID"
+  | "MAP_POINTS_INVALID"
   | "MAP_AFTER_DECISION"
   | "MAP_LIST_INCOMPLETE"
   | MatchScoreViolation;
@@ -216,6 +218,12 @@ export interface MapListCheck {
  */
 export interface MapEntryRules {
   requireReplayCode?: boolean;
+  /**
+   * Format Duel / Arcade (`lib/shared/map-points.ts`) : chaque carte se gagne
+   * au premier à N points — le vainqueur marque exactement N, l'autre de 0 à
+   * N − 1 (`MAP_POINTS_INVALID` sinon). `null` / absent : format éteint.
+   */
+  pointTarget?: number | null;
 }
 
 /** Contrôle d'une ligne seule : code (présent, au motif, unique) puis scores. */
@@ -223,23 +231,28 @@ function checkMapEntry(
   map: MatchMapInput,
   game: TournamentGame | null | undefined,
   seen: Set<string>,
-  requireReplayCode: boolean,
+  rules: { requireReplayCode: boolean; pointTarget: number | null },
 ): { error: MapListViolation; field: MapField } | null {
   const code = normalizeReplayCode(map.replayCode);
   if (code === "") {
-    if (requireReplayCode) return { error: "MAP_REPLAY_CODE_REQUIRED", field: "replayCode" };
-    return checkMapScores(map);
+    if (rules.requireReplayCode) return { error: "MAP_REPLAY_CODE_REQUIRED", field: "replayCode" };
+    return checkMapScores(map, rules.pointTarget);
   }
   if (!isValidReplayCode(code, game)) return { error: "MAP_REPLAY_CODE_INVALID", field: "replayCode" };
   if (seen.has(code)) return { error: "MAP_REPLAY_CODE_DUPLICATE", field: "replayCode" };
   seen.add(code);
-  return checkMapScores(map);
+  return checkMapScores(map, rules.pointTarget);
 }
 
-function checkMapScores(map: MatchMapInput): { error: MapListViolation; field: MapField } | null {
+function checkMapScores(
+  map: MatchMapInput,
+  pointTarget: number | null,
+): { error: MapListViolation; field: MapField } | null {
   if (!isValidMapScore(map.team1Score)) return { error: "MAP_SCORE_INVALID", field: "team1Score" };
   if (!isValidMapScore(map.team2Score)) return { error: "MAP_SCORE_INVALID", field: "team2Score" };
-  return null;
+  if (pointTarget === null) return null;
+  const fault = duelMapScoreFault(map, pointTarget);
+  return fault === null ? null : { error: "MAP_POINTS_INVALID", field: fault };
 }
 
 function isValidMapScore(value: unknown): value is number {
@@ -260,7 +273,10 @@ export function checkMapList(
   maps: ReadonlyArray<MatchMapInput>,
   options: { decisive: boolean } & MapEntryRules,
 ): MapListCheck {
-  const requireReplayCode = options.requireReplayCode !== false;
+  const entryRules = {
+    requireReplayCode: options.requireReplayCode !== false,
+    pointTarget: options.pointTarget ?? null,
+  };
   const score = deriveMatchScore(
     maps.map((m) => ({
       team1Score: isValidMapScore(m.team1Score) ? m.team1Score : 0,
@@ -280,7 +296,7 @@ export function checkMapList(
   let team1 = 0;
   let team2 = 0;
   for (const [index, map] of maps.entries()) {
-    const entry = checkMapEntry(map, game, seen, requireReplayCode);
+    const entry = checkMapEntry(map, game, seen, entryRules);
     if (entry) return refuse(entry.error, index, entry.field);
     // Une map jouée après que la rencontre est acquise n'a pas eu lieu.
     if (index > 0 && isSettled(format, team1, team2, index)) return refuse("MAP_AFTER_DECISION", index);
@@ -332,7 +348,12 @@ export function sameMapLists(
 }
 
 /** Message en clair d'un refus, pour la notification et le champ. */
-export function mapListViolationMessage(error: MapListViolation, format: MatchFormat | null, game?: TournamentGame | null): string {
+export function mapListViolationMessage(
+  error: MapListViolation,
+  format: MatchFormat | null,
+  game?: TournamentGame | null,
+  pointTarget?: number | null,
+): string {
   switch (error) {
     case "MAP_LIST_EMPTY":
       return "Ajoute au moins une map jouée.";
@@ -346,6 +367,10 @@ export function mapListViolationMessage(error: MapListViolation, format: MatchFo
       return "Ce code de replay figure déjà sur une autre map.";
     case "MAP_SCORE_INVALID":
       return `Score de map manquant ou invalide : un entier entre 0 et ${MAP_SCORE_MAX} (0 – 0 pour une map nulle).`;
+    case "MAP_POINTS_INVALID":
+      return pointTarget
+        ? `Map au premier à ${pointTarget} points : le vainqueur en marque exactement ${pointTarget}, l'autre de 0 à ${pointTarget - 1}.`
+        : "Points de la map invalides.";
     case "MAP_AFTER_DECISION":
       return "Cette map suit la fin du match : le résultat était déjà acquis.";
     case "MAP_LIST_INCOMPLETE":
@@ -411,7 +436,9 @@ export function isMapComplete(
 ): boolean {
   const code = normalizeReplayCode(map.replayCode);
   const codeOk = code === "" ? rules.requireReplayCode === false : isValidReplayCode(code, game);
-  return codeOk && isValidMapScore(map.team1Score) && isValidMapScore(map.team2Score);
+  if (!codeOk || !isValidMapScore(map.team1Score) || !isValidMapScore(map.team2Score)) return false;
+  // Format Duel / Arcade : une carte n'est jouée qu'une fois N atteint.
+  return rules.pointTarget === null || rules.pointTarget === undefined || duelMapScoreFault(map, rules.pointTarget) === null;
 }
 
 /**
@@ -485,6 +512,7 @@ export const MAP_LIST_ERROR_CODES: ReadonlySet<string> = new Set<MapListViolatio
   "MAP_REPLAY_CODE_INVALID",
   "MAP_REPLAY_CODE_DUPLICATE",
   "MAP_SCORE_INVALID",
+  "MAP_POINTS_INVALID",
   "MAP_AFTER_DECISION",
   "MAP_LIST_INCOMPLETE",
 ]);

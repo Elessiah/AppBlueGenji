@@ -92,9 +92,15 @@ export function mapViolationText(
   error: MapListViolation,
   format: MatchFormat | null,
   game?: TournamentGame | null,
+  /** Format Duel / Arcade : points d'une carte (`lib/shared/map-points.ts`). */
+  pointTarget?: number | null,
 ): string {
   const { t } = text;
   switch (error) {
+    case "MAP_POINTS_INVALID":
+      return pointTarget
+        ? t("score.maps.violation.points", { points: pointTarget, max: pointTarget - 1 })
+        : t("score.maps.violation.pointsFree");
     case "MAP_LIST_EMPTY":
       return t("score.maps.violation.empty");
     case "MAP_COUNT_EXCEEDED":

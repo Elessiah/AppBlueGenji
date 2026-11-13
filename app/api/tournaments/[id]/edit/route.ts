@@ -91,7 +91,7 @@ function updateFailureResponse(error: unknown): Response {
       { status: 409 },
     );
   }
-  if (message === "TOURNAMENT_LOCKED") return fail(message, 409);
+  if (message === "TOURNAMENT_LOCKED" || message === "MAP_POINTS_LOCKED") return fail(message, 409);
   if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
   if (message.startsWith("INVALID_") || message.startsWith("MISSING_") ||
       message === "MAX_TEAMS_CANNOT_DECREASE" ||

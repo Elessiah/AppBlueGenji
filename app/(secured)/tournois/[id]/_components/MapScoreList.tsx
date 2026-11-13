@@ -61,6 +61,11 @@ interface MapScoreListProps {
    * « Map de départage : Ilios » (`tiebreakRowIndex`).
    */
   tiebreakMap?: string | null;
+  /**
+   * Format Duel / Arcade (`lib/shared/map-points.ts`) : chaque carte se gagne
+   * au premier à N points. `null` / absent : format éteint.
+   */
+  pointTarget?: number | null;
 }
 
 /**
@@ -134,6 +139,7 @@ export function MapScoreList({
   fieldErrors,
   mapNames = [],
   tiebreakMap = null,
+  pointTarget = null,
 }: Readonly<MapScoreListProps>) {
   const text = useDialogsText();
   const { t } = text;
@@ -172,7 +178,7 @@ export function MapScoreList({
   // et que le match n'est pas acquis ; les lignes vierges devenues inutiles
   // s'en vont, les lignes renseignées restent (refusées sur leur champ).
   const change = (next: MatchMapInput[]) => {
-    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional });
+    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget });
     // Seule une ligne ajoutée **par l'affichage progressif** s'annonce : une
     // liste remplacée de l'extérieur (proposition reçue) arrive déjà remplie.
     autoGrown.current = rows.length > maps.length;
@@ -216,7 +222,15 @@ export function MapScoreList({
     // Tout refus se lève : un code en double, une map de trop ou un match
     // inachevé se corrigent souvent sur un **autre** champ que celui désigné.
     fieldErrors.clear();
-    change(maps.map((map, i) => (i === index ? { ...map, ...patch } : map)));
+    const next = maps.map((map, i) => (i === index ? { ...map, ...patch } : map));
+    change(next);
+    // Format Duel / Arcade : « N – N » est la seule saisie que les plafonds des
+    // deux champs laissent passer sans être juste — dite à la frappe, sur le
+    // champ modifié, plutôt qu'à l'envoi seulement.
+    const row = next[index];
+    if (pointTarget !== null && (field === "team1Score" || field === "team2Score") && row.team1Score === pointTarget && row.team2Score === pointTarget) {
+      fieldErrors.flag(mapFieldKey(index, field), t("score.maps.violation.points", { points: pointTarget, max: pointTarget - 1 }));
+    }
   };
   // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au
   // « Retirer » de la ligne qui prend sa place (ou de la dernière), sinon au
@@ -260,7 +274,9 @@ export function MapScoreList({
           </p>
           <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
             <p>
-              {t("score.maps.drawHint")}
+              {pointTarget === null
+                ? t("score.maps.drawHint")
+                : t("score.maps.duelRules", { points: pointTarget, max: pointTarget - 1 })}
               {replayHint ? ` ${replayHint}` : ""}
               {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
             </p>
@@ -324,7 +340,7 @@ export function MapScoreList({
                     id={t1Id}
                     className={styles.scoreInput}
                     min={0}
-                    max={MAP_SCORE_MAX}
+                    max={pointTarget ?? MAP_SCORE_MAX}
                     inputMode="numeric"
                     onKeyDown={keepEnterInList}
                     value={map.team1Score}
@@ -348,7 +364,7 @@ export function MapScoreList({
                     id={t2Id}
                     className={styles.scoreInput}
                     min={0}
-                    max={MAP_SCORE_MAX}
+                    max={pointTarget ?? MAP_SCORE_MAX}
                     inputMode="numeric"
                     onKeyDown={keepEnterInList}
                     value={map.team2Score}

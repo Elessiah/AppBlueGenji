@@ -30,6 +30,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { isMissingTableError, isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
+import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
 import {
   ROUND_MAPS_NOTICE_KEYS_MAX,
   ROUND_MAPS_NOTICE_LISTED,
@@ -48,6 +49,11 @@ export type NoticeRound = {
   bracket: string;
   roundNumber: number;
   tiebreak?: true;
+  /**
+   * Seuls les **points par carte** du tour ont changé (format Duel / Arcade,
+   * `DUEL_ARCADE.md`) : l'annonce le dit à part, comme la map de départage.
+   */
+  points?: true;
   /**
    * Empreinte du réglage **avant** le premier changement de la fenêtre
    * ({@link roundMapsFingerprint} : cartes du tour, ou map de départage). À
@@ -92,8 +98,9 @@ let sweeping: Promise<number> | null = null;
 let sweepAgain = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
-/** Clé d'une manche en attente — celle de sa map de départage est à part. */
+/** Clé d'une manche en attente — celles de sa map de départage et de ses points sont à part. */
 function pendingKey(round: NoticeRound): string {
+  if (round.points) return `${roundKey(round)}:P`;
   return `${roundKey(round)}${round.tiebreak ? ":T" : ""}`;
 }
 
@@ -129,6 +136,7 @@ function parsePending(raw: unknown): NoticeRound[] {
       bracket: entry.bracket,
       roundNumber: entry.roundNumber,
       ...(entry.tiebreak === true ? { tiebreak: true as const } : {}),
+      ...(entry.points === true ? { points: true as const } : {}),
       ...(typeof entry.before === "string" ? { before: entry.before } : {}),
     }));
 }
@@ -158,13 +166,14 @@ function parseOverflow(raw: unknown): number {
  * poserait un verrou d'intervalle sur une ligne absente (interblocage entre
  * deux tournois réglés en même temps).
  *
- * `tiebreak` : le changement ne porte que sur la map de départage du tour.
+ * `tiebreak` : le changement ne porte que sur la map de départage du tour ;
+ * `points` : que sur ses points par carte (format Duel / Arcade).
  */
 export async function queueRoundMapsNotice(
   connection: PoolConnection,
   tournamentId: number,
   rounds: readonly NoticeRound[],
-  options: { tiebreak?: boolean } = {},
+  options: { tiebreak?: boolean; points?: boolean } = {},
 ): Promise<void> {
   if (rounds.length === 0) return;
   // Point de sauvegarde : une annonce impossible à mettre en attente (table
@@ -189,7 +198,7 @@ async function writePendingNotice(
   connection: PoolConnection,
   tournamentId: number,
   rounds: readonly NoticeRound[],
-  options: { tiebreak?: boolean },
+  options: { tiebreak?: boolean; points?: boolean },
 ): Promise<void> {
   await connection.execute(
     `INSERT INTO bg_round_maps_notices (tournament_id, rounds_json, changes, send_after)
@@ -205,12 +214,16 @@ async function writePendingNotice(
   const merged = new Map<string, NoticeRound>();
   for (const entry of parsePending(stored)) merged.set(pendingKey(entry), entry);
   let more = parseOverflow(stored);
+  // Points d'abord : un changement ne porte que sur l'un ou l'autre.
+  let kind: Pick<NoticeRound, "points" | "tiebreak"> = {};
+  if (options.points) kind = { points: true };
+  else if (options.tiebreak) kind = { tiebreak: true };
   for (const round of rounds) {
     const entry: NoticeRound = {
       phaseId: round.phaseId,
       bracket: round.bracket,
       roundNumber: round.roundNumber,
-      ...(options.tiebreak ? { tiebreak: true as const } : {}),
+      ...kind,
       ...(round.before === undefined ? {} : { before: round.before }),
     };
     const key = pendingKey(entry);
@@ -269,12 +282,15 @@ async function labelRounds(
         bracketRank(a.bracket) - bracketRank(b.bracket) ||
         a.bracket.localeCompare(b.bracket) ||
         a.roundNumber - b.roundNumber ||
-        Number(a.tiebreak ?? false) - Number(b.tiebreak ?? false),
+        Number(a.tiebreak ?? false) - Number(b.tiebreak ?? false) ||
+        Number(a.points ?? false) - Number(b.points ?? false),
     )
     .map((round) => {
       const phase = phases.get(round.phaseId);
       const name = matchRoundLabel(round.bracket, round.roundNumber, (phase?.format ?? row.format) === "SWISS");
-      const label = round.tiebreak ? `${name} (map de départage)` : name;
+      let label = name;
+      if (round.tiebreak) label = `${name} (map de départage)`;
+      else if (round.points) label = `${name} (points par carte)`;
       return phase ? `Phase ${Number(phase.position)} · ${label}` : label;
     });
 }
@@ -284,7 +300,7 @@ async function labelRounds(
  * (et comptée) qu'une fois : « cartes de manche modifiées » couvre son départage.
  */
 function withoutCoveredTiebreaks(rounds: readonly NoticeRound[]): NoticeRound[] {
-  const mapsChanged = new Set(rounds.filter((round) => !round.tiebreak).map(roundKey));
+  const mapsChanged = new Set(rounds.filter((round) => !round.tiebreak && !round.points).map(roundKey));
   return rounds.filter((round) => !round.tiebreak || !mapsChanged.has(roundKey(round)));
 }
 
@@ -336,6 +352,7 @@ type RoundMapsRow = RowDataPacket & {
   round_number: number;
   slots_json: string | null;
   tiebreak_map: string | null;
+  map_point_target?: number | null;
 };
 
 /**
@@ -352,7 +369,7 @@ async function stillChanged(
   let rows: RoundMapsRow[];
   try {
     [rows] = await db.execute<RoundMapsRow[]>(
-      `SELECT phase_id, bracket, round_number, slots_json, tiebreak_map
+      `SELECT phase_id, bracket, round_number, slots_json, tiebreak_map, map_point_target
          FROM bg_tournament_round_maps WHERE tournament_id = ?`,
       [tournamentId],
     );
@@ -366,9 +383,10 @@ async function stillChanged(
   return rounds.filter((round) => {
     if (round.before === undefined) return true;
     const row = current.get(roundKey(round));
-    const now = round.tiebreak
-      ? roundMapsFingerprint(parseStoredTiebreak(row?.tiebreak_map))
-      : roundMapsFingerprint(parseStoredSlots(row?.slots_json));
+    let now: string;
+    if (round.points) now = roundMapsFingerprint(parseStoredMapPointTarget(row?.map_point_target));
+    else if (round.tiebreak) now = roundMapsFingerprint(parseStoredTiebreak(row?.tiebreak_map));
+    else now = roundMapsFingerprint(parseStoredSlots(row?.slots_json));
     return now !== round.before;
   });
 }

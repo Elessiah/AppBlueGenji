@@ -7,6 +7,7 @@ import { toIso } from "@/lib/server/serialization";
 import { matchWinnerSide, sideTeamIds, type MatchFormat } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchRules, reopenTournament } from "./repository";
+import { matchRoundKey } from "./map-points";
 import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
 import { clearMapSets, loadStoredMapSet, rewriteMapSet } from "./match-maps";
 import { finalizeMatch } from "./scoring";
@@ -389,13 +390,14 @@ async function checkAdminMaps(
   maps: ReadonlyArray<MatchMapInput>,
   decisive: boolean,
 ): Promise<{ format: MatchFormat | null; score: { team1: number; team2: number } }> {
-  const { format, game, refereeScheduling } = await loadTournamentMatchRules(
+  const { format, game, refereeScheduling, pointTarget } = await loadTournamentMatchRules(
     connection,
     Number(match.tournament_id),
     Number(match.round_number),
+    matchRoundKey(match),
   );
   assertScoreEntryOpen(match, refereeScheduling);
-  const check = checkMapList(format, game, maps, { decisive, requireReplayCode: false });
+  const check = checkMapList(format, game, maps, { decisive, requireReplayCode: false, pointTarget });
   if (check.error) throw new Error(check.error);
   return { format, score: check.score };
 }
@@ -430,6 +432,8 @@ export async function adminSaveMatchScores(
       id,
       tournament_id,
       round_number,
+      phase_id,
+      bracket,
       team1_id,
       team2_id,
       next_winner_match_id,
@@ -603,6 +607,7 @@ export async function adminResolveMatch(
       next_loser_slot,
       winner_team_id,
       phase_id,
+      bracket,
       status,
       start_at,
       launched_at,

@@ -43,6 +43,8 @@ function fakeConnection(
     alreadyPaused?: boolean;
     /** Maps `FINAL` déjà portées par le match (`loadStoredMapSet`, ids 501…) ; aucune par défaut. */
     finalMaps?: MatchMapInput[];
+    /** Format Duel / Arcade : points qui gagnent une carte (`map_point_target`) ; éteint par défaut. */
+    mapPointTarget?: number;
   } = {},
 ): {
   conn: PoolConnection;
@@ -139,7 +141,14 @@ function fakeConnection(
       // jeu et programmation par l'arbitrage (ERREUR.txt EF-15).
       if (q.includes("match_format_type")) {
         return [
-          [{ match_format_type: null, match_format_value: null, referee_scheduling: options.refereeScheduling ? 1 : 0 }],
+          [
+            {
+              match_format_type: null,
+              match_format_value: null,
+              referee_scheduling: options.refereeScheduling ? 1 : 0,
+              map_point_target: options.mapPointTarget ?? null,
+            },
+          ],
           [],
         ];
       }
@@ -559,5 +568,42 @@ describe("adminSaveMatchScores — allers-retours", () => {
 
     expect(statements.some((sql) => sql.startsWith("DELETE FROM bg_match_maps"))).toBe(true);
     expect(statements.some((sql) => sql.startsWith("INSERT INTO bg_match_maps"))).toBe(false);
+  });
+});
+
+describe("arbitrage — format Duel / Arcade", () => {
+  const duelMap = (team1Score: number, team2Score: number): MatchMapInput[] => [
+    { replayCode: "", team1Score, team2Score },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("adminSaveMatchScores_mapBelowTarget_throwsMapPointsInvalid", async () => {
+    const { conn, writes } = fakeConnection({ mapPointTarget: 5 });
+
+    await expect(adminSaveMatchScores(conn, 10, { maps: duelMap(4, 3), userId: 1 })).rejects.toThrow("MAP_POINTS_INVALID");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("adminSaveMatchScores_mapAtTarget_saves", async () => {
+    const { conn, writes } = fakeConnection({ mapPointTarget: 5 });
+
+    await adminSaveMatchScores(conn, 10, { maps: duelMap(5, 3), userId: 1 });
+
+    expect(writes).toHaveLength(1);
+  });
+
+  it("adminResolveMatch_loserAtTarget_throwsMapPointsInvalid", async () => {
+    const { conn } = fakeConnection({ mapPointTarget: 5 });
+
+    await expect(adminResolveMatch(conn, 10, { maps: duelMap(5, 5), userId: 1 })).rejects.toThrow("MAP_POINTS_INVALID");
+  });
+
+  it("adminResolveMatch_formatOff_acceptsAnyMapScore", async () => {
+    const { conn } = fakeConnection();
+
+    await expect(adminResolveMatch(conn, 10, { maps: duelMap(4, 3), userId: 1 })).resolves.toBeUndefined();
   });
 });

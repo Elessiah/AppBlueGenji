@@ -42,7 +42,7 @@ export function editLockNotice(
   if (reason === "STARTED") {
     return "Le tournoi est en cours : seules la planification des matchs par l'arbitrage et les salons vocaux d'équipe restent modifiables.";
   }
-  return `Le tournoi est visible depuis le ${formatLocalDateTime(startVisibilityAt)} — le format, le jeu et les réglages ne sont plus modifiables.`;
+  return `Le tournoi est visible depuis le ${formatLocalDateTime(startVisibilityAt)} — le format du tournoi, le jeu et les réglages ne sont plus modifiables, sauf le format des matchs et les points par carte.`;
 }
 
 /** Ce que l'enregistrement de la planification a produit, tel que la route le rend. */

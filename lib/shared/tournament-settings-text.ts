@@ -186,6 +186,15 @@ export function settingsGroupsFrom(
       value: text.t(solo ? "settings.general.maxSolo" : "settings.general.maxTeam", { count: card.maxTeams }),
     },
     { label: text.t("settings.general.matchFormat"), value: matchFormatSetting(text, card.matchFormat) },
+    // Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : montré allumé seulement.
+    ...(card.mapPointTarget == null
+      ? []
+      : [
+          {
+            label: text.t("settings.general.mapPointTarget"),
+            value: text.t("settings.general.mapPointTargetValue", { count: card.mapPointTarget }),
+          },
+        ]),
     { label: text.t("settings.general.seeding"), value: text.t(`settings.seeding.${input.seedingSource}`) },
     { label: text.t("settings.general.launchPhase"), value: yesNo(text, card.launchPhase) },
     { label: text.t("settings.general.teamVoice"), value: yesNo(text, card.teamVoiceChannels) },

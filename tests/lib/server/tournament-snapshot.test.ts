@@ -868,3 +868,76 @@ describe("castersOnReadStreams", () => {
     expect(castersOnReadStreams(streams, casters)).toEqual(casters);
   });
 });
+
+describe("getTournamentSnapshot — score affiché d'un match sur une seule carte", () => {
+  const BO1 = { match_format_type: "BO", match_format_value: 1 } as const;
+  const final = (team1Score: number, team2Score: number) => ({
+    final: [{ mapNumber: 1, replayCode: "", team1Score, team2Score }],
+    team1: [],
+    team2: [],
+  });
+
+  function playedMatch() {
+    return matchRow({ id: 1, status: "COMPLETED", team1_score: 1, team2_score: 0, winner_team_id: 11, team1_id: 11, team2_id: 12 });
+  }
+
+  it("getTournamentSnapshot_bo1WithMapPoints_carriesTheMapScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow(BO1));
+    jest.mocked(getMatchRows).mockResolvedValue([playedMatch()]);
+    jest.mocked(loadMapsByMatch).mockResolvedValue(new Map([[1, final(5, 3)]]));
+
+    const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(match.displayScore).toEqual({ team1: 5, team2: 3 });
+    // Le score du match, que lisent classements et départages, reste 1–0.
+    expect([match.team1Score, match.team2Score]).toEqual([1, 0]);
+  });
+
+  it("getTournamentSnapshot_severalMatchesSameRound_eachCarriesItsMapScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow(BO1));
+    jest.mocked(getMatchRows).mockResolvedValue([
+      playedMatch(),
+      matchRow({ id: 2, status: "COMPLETED", team1_score: 0, team2_score: 1, winner_team_id: 14, team1_id: 13, team2_id: 14 }),
+    ]);
+    jest.mocked(loadMapsByMatch).mockResolvedValue(new Map([[1, final(5, 3)], [2, final(2, 5)]]));
+
+    const matches = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(matches.map((match) => match.displayScore)).toEqual([{ team1: 5, team2: 3 }, { team1: 2, team2: 5 }]);
+  });
+
+  it("getTournamentSnapshot_roundOverride_onlyThatRoundFollowsIt", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ map_point_target: 5 }));
+    jest.mocked(getMatchRows).mockResolvedValue([
+      matchRow({ id: 1, round_number: 1 }),
+      matchRow({ id: 2, round_number: 2 }),
+    ]);
+    jest.mocked(loadMapRules).mockResolvedValue({
+      ...EMPTY_MAP_RULES,
+      pointTargets: [{ phaseId: 0, bracket: "UPPER", roundNumber: 2, target: 7 }],
+    });
+
+    const matches = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(matches.map((match) => match.mapPointTarget)).toEqual([5, 7]);
+  });
+
+  it("getTournamentSnapshot_bo3_noDisplayScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ match_format_type: "BO", match_format_value: 3 }));
+    jest.mocked(getMatchRows).mockResolvedValue([playedMatch()]);
+    jest.mocked(loadMapsByMatch).mockResolvedValue(new Map([[1, final(5, 3)]]));
+
+    const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(match.displayScore).toBeUndefined();
+  });
+
+  it("getTournamentSnapshot_bo1WithoutMapDetail_noDisplayScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow(BO1));
+    jest.mocked(getMatchRows).mockResolvedValue([playedMatch()]);
+
+    const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(match.displayScore).toBeUndefined();
+  });
+});

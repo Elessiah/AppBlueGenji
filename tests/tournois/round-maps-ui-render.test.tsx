@@ -119,7 +119,7 @@ describe("câblage de la fenêtre des cartes", () => {
 
     expect(source).toContain("onClose={requestClose}");
     expect(source).toContain("if (!busy) requestClose();");
-    expect(source).toMatch(/if \(roundDirty \|\| rulesDirty \|\| tiebreakDirty\) setPending\(\{ kind: "close" \}\)/);
+    expect(source).toMatch(/if \(roundDirty \|\| rulesDirty \|\| tiebreakDirty \|\| pointsDirty\) setPending\(\{ kind: "close" \}\)/);
   });
 
   it("dialog_saveRound_refusesOverMaxAndUnchangedRoundsBeforeSending", () => {
@@ -218,7 +218,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "tiebreakDraft_isCoveredByCloseAndRoundSwitchConfirmations",
       file: "RoundMapsDialog.tsx",
-      present: ["onDirtyChange={setTiebreakDirty}", 'if (roundDirty || tiebreakDirty) setPending({ kind: "switch", id })', "return () => onDirtyChange(false)"],
+      present: ["onDirtyChange={setTiebreakDirty}", 'if (roundDirty || tiebreakDirty || pointsDirty) setPending({ kind: "switch", id })', "return () => onDirtyChange(false)"],
       absent: [],
     },
     {
