@@ -691,7 +691,7 @@ function RoundPointsForm({
                 const mapInputId = `${ids}-points-map-${index}`;
                 const followsId = `${mapInputId}-follows`;
                 return (
-                  <li key={mapInputId} className={styles.pointMap}>
+                  <li key={mapInputId} className={`field ${styles.pointMap}`}>
                     <label htmlFor={mapInputId}>{t("dialog.pointsMapLabel", { index: index + 1 })}</label>
                     <NumberInput
                       id={mapInputId}

@@ -52,6 +52,7 @@ import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapN
 import { roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { hasPerMapTargets } from "@/lib/shared/map-points";
+import { matchMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
 import { useLiveControls, useRefereeNameOf } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText, useMapError } from "../_lib/error-map";
@@ -421,19 +422,17 @@ export function pointTargetFacts(
     mapFirstTo: (map: string, points: string) => string;
     othersFirstTo: (points: string) => string;
   },
+  /** Format du match (`null` = score libre) : au-delà de `matchMaxMaps`, aucune carte « suivante ». */
+  format: MatchFormat | null = null,
 ): KeyFact[] {
   const target = match.mapPointTarget;
   if (target == null) return [];
   const perMap = match.mapPointTargets ?? [];
   if (!hasPerMapTargets(target, perMap)) return [{ id: "pointTarget", label, value: text.firstTo(String(target)) }];
-  return [
-    {
-      id: "pointTarget",
-      label,
-      value: perMap.map((points, index) => text.mapFirstTo(String(index + 1), String(points))).join(" · "),
-      detail: text.othersFirstTo(String(target)),
-    },
-  ];
+  const value = perMap.map((points, index) => text.mapFirstTo(String(index + 1), String(points))).join(" · ");
+  // Toutes les cartes du format réglées : aucune carte ne suit le match.
+  if (format && perMap.length >= matchMaxMaps(format)) return [{ id: "pointTarget", label, value }];
+  return [{ id: "pointTarget", label, value, detail: text.othersFirstTo(String(target)) }];
 }
 
 /** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », ou pool à choisir. */
@@ -553,11 +552,16 @@ function MatchKeyFacts({
     ),
   });
   facts.push(
-    ...pointTargetFacts(match, page.t("facts.pointTarget"), {
-      firstTo: (points) => t("match.maps.firstTo", { points }),
-      mapFirstTo: (number, points) => t("match.maps.mapFirstTo", { number, points }),
-      othersFirstTo: (points) => t("match.maps.othersFirstTo", { points }),
-    }),
+    ...pointTargetFacts(
+      match,
+      page.t("facts.pointTarget"),
+      {
+        firstTo: (points) => t("match.maps.firstTo", { points }),
+        mapFirstTo: (number, points) => t("match.maps.mapFirstTo", { number, points }),
+        othersFirstTo: (points) => t("match.maps.othersFirstTo", { points }),
+      },
+      format,
+    ),
   );
   // Règlement §14 : l'équipe du haut (l'hôte) prend le côté gauche.
   if (hostSide) {
