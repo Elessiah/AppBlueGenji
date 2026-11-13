@@ -546,7 +546,7 @@ export async function requestAccountDeletion(
   // Une transaction annulée par un interblocage (une désignation d'arbitre
   // verrouille le match puis le compte, la demande l'inverse) se rejoue
   // entière, relevés compris (`retryOnDeadlock`).
-  const transact = async (lastAttempt: boolean): Promise<AccountDeletionPlan> => {
+  const transact = async (lastAttempt: boolean): Promise<void> => {
     departures.length = 0;
     // Tous les tournois de l'entrée solo sont rediffusés (son nom d'engagé
     // change) ; seuls ceux pas encore commencés sont verrouillés — une
@@ -652,7 +652,6 @@ export async function requestAccountDeletion(
         [userId],
       );
       await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-      const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
       await connection.commit();
       // Commis : une annonce qui ne part pas ne doit pas faire passer la
       // demande pour un échec (ni journal ni suites ne suivraient).
@@ -661,7 +660,6 @@ export async function requestAccountDeletion(
       } catch (error) {
         console.error("[account-deletion] annonces non envoyées", failureReason(error));
       }
-      return plan;
     } catch (error) {
       await connection.rollback().catch(() => {});
       discardBotLogs(connection);
@@ -672,7 +670,11 @@ export async function requestAccountDeletion(
   };
   // L'interblocage se rejoue **dans** chaque essai du jeu de verrous : sa
   // fenêtre de rejeu se mesure sur une transaction, pas sur plusieurs.
-  const plan = await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
+  await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
+  // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues
+  // après le commit, hors des verrous de tournois et d'équipes. Le compte est
+  // déjà en attente, rien de ce qu'elles relèvent ne bouge plus de son fait.
+  const plan = accountDeletionPlan(await loadAccountTrace(db, userId));
 
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La

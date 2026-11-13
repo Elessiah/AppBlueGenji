@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -29,8 +29,21 @@ export {
   type PendingAccountDeletion,
 } from "./account-deletion-preview";
 
-/** Délai entre le toast de réussite et le retour à l'accueil (le temps de le lire). */
+/** Délai minimal entre le toast d'issue et le retour à l'accueil. */
 export const ACCOUNT_DELETED_REDIRECT_MS = 1200;
+/** Plafond du délai : au-delà, l'attente devant un bouton « en cours » pèse plus que la lecture. */
+export const ACCOUNT_DELETED_REDIRECT_MAX_MS = 10_000;
+/** Temps de lecture accordé par caractère du toast (~25 caractères par seconde). */
+const REDIRECT_MS_PER_CHAR = 40;
+
+/**
+ * Délai avant le rechargement de l'accueil, proportionnel au toast qu'il
+ * emporte : la notification de session fermée (~290 caractères, consigne de
+ * réactivation comprise) doit pouvoir se lire avant que la page ne change.
+ */
+export function accountDeletedRedirectDelay(message: string): number {
+  return Math.min(ACCOUNT_DELETED_REDIRECT_MAX_MS, Math.max(ACCOUNT_DELETED_REDIRECT_MS, message.length * REDIRECT_MS_PER_CHAR));
+}
 
 export type AccountDeletionResult = { ok: true; applied: ConfirmationSubject } | { ok: false; code: string };
 
@@ -105,6 +118,8 @@ export function useAccountDeletion({
   // Langue de l'adresse (le texte peut retomber sur le français) : après la suppression, l'accueil de cette langue.
   const pageLocale = useAppLocale();
   const [deleting, setDeleting] = useState(false);
+  // Seul le premier paragraphe (ce que la suppression fait) décrit la modale.
+  const leadId = useId();
   /** Aperçu reçu, modale de suppression ouverte. */
   const [pendingDeletion, setPendingDeletion] = useState<PendingAccountDeletion | null>(null);
 
@@ -137,14 +152,15 @@ export function useAccountDeletion({
       showError(deletionErrorText(text, result.code), { lang: contentLang });
       return false;
     }
-    if (result.ok) showSuccess(deletionOutcomeText(text, result.applied), { lang: contentLang });
-    else showError(deletionErrorText(text, result.code), { lang: contentLang });
+    const message = result.ok ? deletionOutcomeText(text, result.applied) : deletionErrorText(text, result.code);
+    if (result.ok) showSuccess(message, { lang: contentLang });
+    else showError(message, { lang: contentLang });
     // La session est fermée (par cette suppression, ou avant elle) : l'accueil,
     // rechargé en entier, dans la langue de la page (`/en` sous `/en/profil`),
     // se lit sans compte. La confirmation reste « en cours » jusque-là.
     setTimeout(() => {
       window.location.href = localeHref("/", pageLocale);
-    }, ACCOUNT_DELETED_REDIRECT_MS);
+    }, accountDeletedRedirectDelay(message));
     return true;
   };
 
@@ -162,9 +178,11 @@ export function useAccountDeletion({
         onCancel?.();
       }}
       onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
+      describedById={leadId}
     >
-      {deletionConsequencesParagraphs(text, pendingDeletion.subject, fromTerms).map((paragraph) => (
-        <p key={paragraph}>{paragraph}</p>
+      {deletionConsequencesParagraphs(text, pendingDeletion.subject, fromTerms).map((paragraph, index) => (
+        // Liste figée par l'aperçu : la position est une clé stable (deux textes peuvent se répéter).
+        <p key={`paragraph-${index}`} id={index === 0 ? leadId : undefined}>{paragraph}</p>
       ))}
     </ConfirmActionDialog>
   ) : null;

@@ -20,19 +20,6 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "@/lib/server/ranking-cache";
 import { accountTraceSql } from "./account-deletion";
 
-/**
- * Un compte **supprimé** a-t-il joué ? Ne se pose que pour une ligne déjà lue
- * comme supprimée (`getFullProfile`, `getPlayerPageIdentity`).
- */
-export async function deletedAccountHasStats(userId: number): Promise<boolean> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { played: number })[]>(
-    `SELECT ${accountTraceSql().played} AS played FROM (SELECT ? AS id) u`,
-    [userId],
-  );
-  return Boolean(Number(rows[0]?.played ?? 0));
-}
-
 async function computeProfilelessPlayerIds(): Promise<number[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(

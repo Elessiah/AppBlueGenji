@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateTeamIdentityViews, invalidateTeamRanking } from "@/lib/server/ranking-cache";
-import { deletedAccountHasStats, loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
+import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
@@ -53,7 +53,7 @@ function userRow(overrides: Record<string, unknown> = {}) {
 /** Base d'une fiche : la ligne du compte, la trace « a joué », le reste vide. */
 function profileDb(row: Record<string, unknown>, played: number) {
   return mockDb((sql) => {
-    if (sql.includes("AS played")) return [[{ played }]];
+    if (sql.includes("u.is_deleted = 1")) return [played ? [] : [{ id: 7 }]];
     if (sql.includes("FROM bg_users WHERE id = ? LIMIT 1")) return [[row]];
     return [[]];
   });
@@ -63,21 +63,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   clearCache();
   jest.mocked(getPlayerEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
-});
-
-describe("deletedAccountHasStats", () => {
-  it("deletedAccountHasStats_playedTrue_returnsTrue", async () => {
-    const execute = mockDb(() => [[{ played: 1 }]]);
-
-    expect(await deletedAccountHasStats(7)).toBe(true);
-    expect(execute.mock.calls[0][1]).toEqual([7]);
-  });
-
-  it("deletedAccountHasStats_playedFalse_returnsFalse", async () => {
-    mockDb(() => [[{ played: 0 }]]);
-
-    expect(await deletedAccountHasStats(7)).toBe(false);
-  });
 });
 
 describe("loadProfilelessPlayerIds", () => {
@@ -156,14 +141,14 @@ describe("getFullProfile — compte supprimé (D13)", () => {
     const profile = await getFullProfile({ id: 1 }, 7);
 
     expect(profile?.profile.isDeleted).toBe(false);
-    expect(execute.mock.calls.some(([sql]) => String(sql).includes("AS played"))).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("u.is_deleted = 1"))).toBe(false);
   });
 });
 
 describe("getPlayerPageIdentity — compte supprimé (D13)", () => {
   function identityDb(isDeleted: number, played: number, pending = false) {
     return mockDb((sql) => {
-      if (sql.includes("AS played")) return [[{ played }]];
+      if (sql.includes("u.is_deleted = 1")) return [played ? [] : [{ id: 7 }]];
       return [[{ pseudo: "Renard Pâle", is_deleted: isDeleted, deletion_requested_at: pending ? "2026-11-01 10:00:00" : null }]];
     });
   }

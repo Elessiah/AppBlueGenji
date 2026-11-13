@@ -17,6 +17,7 @@ jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
     ...actual,
+    useId: () => "lead-id",
     useState: <T,>(initial: T) => {
       const index = cursor++;
       if (!(index in cells)) cells[index] = initial;
@@ -35,6 +36,8 @@ jest.mock("@/components/i18n/locale-context", () => ({ useAppLocale: () => local
 const locale: { current: "fr" | "en" } = { current: "fr" };
 
 import {
+  ACCOUNT_DELETED_REDIRECT_MAX_MS,
+  accountDeletedRedirectDelay,
   ACCOUNT_DELETED_REDIRECT_MS,
   ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS,
   previewAccountDeletion,
@@ -205,6 +208,12 @@ describe("useAccountDeletion", () => {
     expect(props.confirmLabel).toBe("Supprimer mon compte");
     expect(props.layer).toBe("overBlocking");
     expect(props.closeOnSuccess).toBe(false);
+    // Seul le premier paragraphe décrit la modale (pas tout le corps d'un bloc).
+    expect(props.describedById).toBe("lead-id");
+    const paragraphs = props.children as Array<ReactElement<{ id?: string }>>;
+    expect(paragraphs[0].props.id).toBe("lead-id");
+    expect(paragraphs.slice(1).every((p) => p.props.id === undefined)).toBe(true);
+    expect(new Set(paragraphs.map((p) => p.key)).size).toBe(paragraphs.length);
   });
 
   const englishProfileText: typeof FR_PROFILE = scopedText("en", enProfile);
@@ -284,7 +293,7 @@ describe("useAccountDeletion", () => {
     // Textes retombés sur le français sous /en : le toast le déclare aussi.
     expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr" });
     expect(fakeWindow.location.href).toBe("/tournois");
-    jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
+    jest.advanceTimersByTime(accountDeletedRedirectDelay(showSuccess.mock.calls.at(-1)?.[0] ?? ""));
     expect(fakeWindow.location.href).toBe("/en");
   });
 
@@ -306,7 +315,13 @@ describe("useAccountDeletion", () => {
     expect(await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm()).toBe(true);
     expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Ta session est fermée/), { lang: undefined });
     expect(showSuccess).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
+    // Le délai suit la longueur de la notification : pas de rechargement à 1,2 s.
+    const message = showError.mock.calls.at(-1)?.[0] ?? "";
+    const delay = accountDeletedRedirectDelay(message);
+    expect(delay).toBeGreaterThan(ACCOUNT_DELETED_REDIRECT_MS);
+    jest.advanceTimersByTime(delay - 1);
+    expect(fakeWindow.location.href).toBe("/tournois");
+    jest.advanceTimersByTime(1);
     expect(fakeWindow.location.href).toBe("/");
   });
 
@@ -334,6 +349,19 @@ describe("useAccountDeletion", () => {
     expect(showError).toHaveBeenCalledWith(expect.stringMatching(/rattaché à un tournoi ou à une équipe/), { lang: undefined });
     jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS * 2);
     expect(fakeWindow.location.href).toBe("/tournois");
+  });
+});
+
+describe("accountDeletedRedirectDelay", () => {
+  it("un toast court garde le délai minimal", () => {
+    expect(accountDeletedRedirectDelay("")).toBe(ACCOUNT_DELETED_REDIRECT_MS);
+    expect(accountDeletedRedirectDelay("Compte supprimé.")).toBe(ACCOUNT_DELETED_REDIRECT_MS);
+  });
+  it("un toast long allonge le délai à proportion", () => {
+    expect(accountDeletedRedirectDelay("x".repeat(100))).toBe(4000);
+  });
+  it("le délai est plafonné", () => {
+    expect(accountDeletedRedirectDelay("x".repeat(10_000))).toBe(ACCOUNT_DELETED_REDIRECT_MAX_MS);
   });
 });
 

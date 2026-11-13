@@ -327,7 +327,7 @@ compte supprimé n'est pas une alerte.
 **La fiche n'est gardée que s'il a joué (décision D13, 2026-11-02).** Un compte
 supprimé sans match compté (`accountTraceSql().played`, la trace
 `playedMatches`) n'a plus de fiche : `getFullProfile` et `getPlayerPageIdentity`
-rendent `null` (`deletedAccountHasStats`, `lib/server/users/profileless-players.ts`),
+rendent `null` (lus dans la liste mise en cache `loadProfilelessPlayerIds`, `lib/server/users/profileless-players.ts`, celle qui décide des liens),
 donc `/api/players/[id]` répond `404 PLAYER_NOT_FOUND` et la page la carte
 « introuvable » (FR et EN), titre neutre compris. Ses statistiques n'existent
 pas ; celles d'un compte qui a joué appartiennent aussi à ses adversaires.

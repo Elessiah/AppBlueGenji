@@ -14,7 +14,7 @@ import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@
 import { applyVisibility, mapPublicUser, type UserRow } from "./players";
 import { accountLocaleFromRow } from "./account-locale";
 import { matchDmEnabled } from "./match-dm-preference";
-import { deletedAccountHasStats } from "./profileless-players";
+import { loadProfilelessPlayerIds } from "./profileless-players";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le
@@ -105,7 +105,9 @@ function ownerOnlyColumns(isSelf: boolean): string {
  */
 async function hasNoPlayerPage(isDeleted: boolean, pending: boolean, userId: number): Promise<boolean> {
   if (!isDeleted) return false;
-  return pending || !(await deletedAccountHasStats(userId));
+  // La même liste (mise en cache) que celle qui décide des liens : la fiche et
+  // ses liens ne se contredisent pas, et la visite ne refait aucune requête.
+  return pending || (await loadProfilelessPlayerIds()).includes(userId);
 }
 
 /** Une donnée réservée au titulaire : `undefined` pour tout autre lecteur. */

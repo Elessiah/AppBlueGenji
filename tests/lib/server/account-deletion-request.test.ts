@@ -297,6 +297,23 @@ describe("requestAccountDeletion — le compte", () => {
     expect(closeUserStreams).toHaveBeenCalledWith(7);
   });
 
+  it("requestAccountDeletion_traceForPlan_readAfterCommitOffTheTransaction", async () => {
+    const { connection } = fakeDb({});
+    const order: string[] = [];
+    connection.commit.mockImplementation(async () => {
+      order.push("commit");
+    });
+    jest.mocked(loadAccountTrace).mockImplementation(async (db) => {
+      order.push((db as unknown) === connection ? "trace-on-transaction" : "trace");
+      return NO_TRACE;
+    });
+
+    await requestAccountDeletion(7);
+
+    // Les traces du plan rendu au client ne tournent plus sous les verrous.
+    expect(order).toEqual(["commit", "trace"]);
+  });
+
   // D21 : le journal garde la date telle que la base l'a écrite.
   it("requestAccountDeletion_nominal_journalsStoredRequestDate", async () => {
     fakeDb({ storedRequestedAt: "2026-11-10 09:15:00" });
