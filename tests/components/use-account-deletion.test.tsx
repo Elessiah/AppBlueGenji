@@ -132,7 +132,17 @@ describe("requestAccountDeletion", () => {
     const calls: FetchCall[] = [];
     const fetchImpl = fakeFetch({ "DELETE /api/profile": () => jsonResponse(200, { deleted: true, mode: "ERASE", reason: null }) }, calls);
     expect(await requestAccountDeletion("TOURNAMENTS", fetchImpl)).toEqual({ ok: true, applied: null });
-    expect(calls).toEqual([{ url: "/api/profile", init: { method: "DELETE" } }]);
+    expect(calls).toEqual([{ url: "/api/profile", init: { method: "DELETE", headers: { "content-type": "application/json" }, body: '{"confirmedReason":"TOURNAMENTS"}' } }]);
+  });
+
+  // EF-62 (E46) : un aperçu inconnu ne confirme aucun motif — rien n'est comparé.
+  it("requestAccountDeletion_unknownPreview_sendsEmptyBody", async () => {
+    const calls: FetchCall[] = [];
+    const fetchImpl = fakeFetch({ "DELETE /api/profile": () => jsonResponse(200, { deleted: true, mode: "ERASE", reason: null }) }, calls);
+
+    await requestAccountDeletion(RETENTION_UNKNOWN, fetchImpl);
+
+    expect(calls[0].init).toEqual({ method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" });
   });
 
   it("sans `mode` dans la réponse, retombe sur l'aperçu", async () => {
@@ -210,10 +220,11 @@ describe("useAccountDeletion", () => {
     expect(props.closeOnSuccess).toBe(false);
     // Seul le premier paragraphe décrit la modale (pas tout le corps d'un bloc).
     expect(props.describedById).toBe("lead-id");
-    const paragraphs = props.children as Array<ReactElement<{ id?: string }>>;
-    expect(paragraphs[0].props.id).toBe("lead-id");
-    expect(paragraphs.slice(1).every((p) => p.props.id === undefined)).toBe(true);
-    expect(new Set(paragraphs.map((p) => p.key)).size).toBe(paragraphs.length);
+    const blocks = props.children as Array<ReactElement<{ id?: string }> | null>;
+    expect(blocks[0]?.props.id).toBe("lead-id");
+    // Hors des conditions, pas de note : la place reste vide.
+    expect(blocks[1]).toBeNull();
+    expect(blocks.filter((block) => block?.props.id === "lead-id")).toHaveLength(1);
   });
 
   const englishProfileText: typeof FR_PROFILE = scopedText("en", enProfile);
@@ -276,6 +287,31 @@ describe("useAccountDeletion", () => {
     expect(calls.map((call) => call.init?.method ?? "GET")).toEqual(["GET"]);
   });
 
+  // EF-62 (E46) : le plan a changé entre l'aperçu et le clic — la modale se recharge, rien n'est fait.
+  it("onConfirm_planChanged_reloadsPreviewShowsErrorAndStaysOpen", async () => {
+    const preview = jest
+      .fn<() => Response>()
+      .mockReturnValueOnce(jsonResponse(200, { mode: "ERASE", reason: null }))
+      .mockReturnValueOnce(jsonResponse(200, { mode: "ANONYMIZE", reason: "TOURNAMENTS" }));
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": preview,
+        "DELETE /api/profile": () => jsonResponse(409, { error: "ACCOUNT_DELETION_PLAN_CHANGED" }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+
+    const ok = await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
+    rerender();
+
+    expect(ok).toBe(false);
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(showError).toHaveBeenCalledWith(FR_PROFILE.t("deletion.errors.ACCOUNT_DELETION_PLAN_CHANGED"), expect.anything());
+    expect(useAccountDeletion({ text: FR_PROFILE }).dialog).not.toBeNull();
+  });
+
   it("confirmer appelle la route de suppression (qui ferme la session), dit l'issue puis ramène à l'accueil de la langue", async () => {
     locale.current = "en";
     globalThis.fetch = fakeFetch(
@@ -289,7 +325,7 @@ describe("useAccountDeletion", () => {
     rerender();
     const ok = await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
     expect(ok).toBe(true);
-    expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE" } });
+    expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE", headers: { "content-type": "application/json" }, body: '{"confirmedReason":null}' } });
     // Textes retombés sur le français sous /en : le toast le déclare aussi.
     expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr" });
     expect(fakeWindow.location.href).toBe("/tournois");

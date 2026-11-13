@@ -5,6 +5,11 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
+// La synchronisation des tournois ouverts (E61) a ses propres tests : ici, un tournoi
+// déjà à son état, sans requête qui brouille l'ordre des verrous.
+jest.mock("@/lib/server/tournaments/state", () => ({
+  syncTournamentState: jest.fn(async () => ({ row: null, stateChanged: false, contentChanged: false, launchesChanged: false })),
+}));
 jest.mock("@/lib/server/tournaments/referee-names", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names"),
   forgetRefereeNames: jest.fn(),

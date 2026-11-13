@@ -27,6 +27,16 @@ const FINAL_AT = "2026-12-05T10:00:00.000Z";
  * accepté** les conditions en vigueur. Toute porte des conditions est ici
  * fermée — elles passent quand même.
  */
+/** Le DELETE de la modale : son corps porte le motif que la confirmation a annoncé. */
+function deleteRequest(body?: unknown): Request {
+  if (body === undefined) return new Request("http://localhost/api/profile", { method: "DELETE" });
+  return new Request("http://localhost/api/profile", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, roles: [] }));
@@ -46,10 +56,10 @@ describe("suppression et export sans conditions acceptées", () => {
 
   it("la suppression s'exécute et ferme la session", async () => {
     jest.mocked(requestAccountDeletion).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS", finalAt: FINAL_AT });
-    const response = await DELETE();
+    const response = await DELETE(deleteRequest());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ deleted: true, mode: "ANONYMIZE", reason: "TOURNAMENTS" });
-    expect(requestAccountDeletion).toHaveBeenCalledWith(7);
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, {});
     expect(clearSession).toHaveBeenCalledTimes(1);
   });
 

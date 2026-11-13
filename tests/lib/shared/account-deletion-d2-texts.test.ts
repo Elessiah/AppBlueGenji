@@ -36,8 +36,10 @@ describe("écran de réactivation", () => {
   });
 
   it("reactivationMessages_notUndone_saysHandoversStay", () => {
-    expect(frLogin.reactivation.notUndone).toContain("n'est pas annulé");
-    expect(enLogin.reactivation.notUndone).toContain("not undone");
+    expect(frLogin.reactivation.notUndoneLead).toContain("n'est pas annulé");
+    expect(enLogin.reactivation.notUndoneLead).toContain("not undone");
+    expect(Object.keys(frLogin.reactivation.notUndoneItems)).toEqual(["teams", "organized", "registrations", "forfeits", "casts"]);
+    expect(Object.keys(enLogin.reactivation.notUndoneItems)).toEqual(Object.keys(frLogin.reactivation.notUndoneItems));
   });
 });
 

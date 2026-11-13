@@ -304,3 +304,23 @@ describe("cleanStoredNames", () => {
     expect(logged()).not.toContain("22");
   });
 });
+
+/** EF-62 (E29) : un pseudo laissé tel quel n'est pas figé derrière le marqueur. */
+describe("cleanStoredNames — pseudos laissés", () => {
+  it("cleanStoredNames_pseudoKept_markerNotSetAndPassRerunsNextStart", async () => {
+    const { execute, pool } = database({ bg_users: [{ id: 22, name: "\u200B" }] });
+
+    await cleanStoredNames(pool);
+
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("INSERT INTO bg_settings"))).toBe(false);
+  });
+
+  it("cleanStoredNames_pseudoKept_logPointsToStaffQueryWithoutId", async () => {
+    const { pool } = database({ bg_users: [{ id: 22, name: "\u200B" }] });
+
+    await cleanStoredNames(pool);
+
+    expect(logged()).toContain("(requête de UNTRUSTED_NAMES.md, passe rejouée au prochain démarrage)");
+    expect(logged()).not.toContain("22");
+  });
+});

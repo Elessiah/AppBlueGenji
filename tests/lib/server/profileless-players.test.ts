@@ -6,8 +6,8 @@ jest.mock("@/lib/server/stats-service");
 import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
-import { invalidateTeamIdentityViews, invalidateTeamRanking } from "@/lib/server/ranking-cache";
-import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
+import { invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
+import { loadProfilelessPlayerIds, PROFILELESS_PLAYERS_TTL_MS } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
@@ -102,14 +102,33 @@ describe("loadProfilelessPlayerIds", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
-  it("loadProfilelessPlayerIds_afterScore_reloads", async () => {
+  it("loadProfilelessPlayerIds_afterScore_keepsCachedList", async () => {
     const execute = mockDb(() => [[{ id: 3 }]]);
 
     await loadProfilelessPlayerIds();
     invalidateTeamRanking();
-    await loadProfilelessPlayerIds();
+    invalidateTeamRankingForScore();
+    const ids = await loadProfilelessPlayerIds();
 
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(ids).toEqual([3]);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadProfilelessPlayerIds_afterTtl_reloads", async () => {
+    const execute = mockDb(() => [[{ id: 3 }]]);
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    try {
+      await loadProfilelessPlayerIds();
+      now.mockReturnValue(1_000_000 + PROFILELESS_PLAYERS_TTL_MS - 1);
+      await loadProfilelessPlayerIds();
+      expect(execute).toHaveBeenCalledTimes(1);
+
+      now.mockReturnValue(1_000_000 + PROFILELESS_PLAYERS_TTL_MS + 1);
+      await loadProfilelessPlayerIds();
+      expect(execute).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 
@@ -190,6 +209,6 @@ describe("branchements D13", () => {
   it("layout_signedInVisitor_providesProfilelessPlayers", () => {
     const layout = readSource("app/layout.tsx");
     expect(layout).toContain("user ? loadProfilelessPlayerIds() : Promise.resolve(NO_PROFILELESS_PLAYERS)");
-    expect(layout).toContain("<ProfilelessPlayersProvider ids={profilelessPlayers}>");
+    expect(layout).toContain("<ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>");
   });
 });

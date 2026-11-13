@@ -17,6 +17,7 @@ jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
     ...actual,
+    useId: () => "reactivation-id",
     useRef: <T,>(initial: T) => {
       const index = refCursor++;
       if (!(index in refs)) refs[index] = { current: initial };

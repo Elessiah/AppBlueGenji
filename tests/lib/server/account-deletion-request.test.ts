@@ -32,6 +32,7 @@ jest.mock("@/lib/server/users/account-deletion", () => ({
     }
   },
   listCastTournamentIds: jest.fn(),
+  listNamingTournamentIds: jest.fn(),
   listSoloRegistrationTournamentIds: jest.fn(),
   loadAccountTrace: jest.fn(),
   loadSoloRegistrations: jest.fn(),
@@ -44,6 +45,7 @@ jest.mock("@/lib/server/users/deleted-solo-entries", () => ({
   forfeitSoloEntriesAfterCommit: jest.fn(),
   listForfeitableSoloEntries: jest.fn(),
   logDeletionWithdrawal: jest.fn(),
+  syncOpenSoloTournamentsOn: jest.fn(),
   withdrawSoloRegistrationsOn: jest.fn(),
 }));
 
@@ -65,6 +67,7 @@ import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notificat
 import {
   assertSoloLockSetFresh,
   listCastTournamentIds,
+  listNamingTournamentIds,
   listSoloRegistrationTournamentIds,
   loadAccountTrace,
   loadSoloRegistrations,
@@ -73,6 +76,7 @@ import {
   forfeitSoloEntriesAfterCommit,
   listForfeitableSoloEntries,
   logDeletionWithdrawal,
+  syncOpenSoloTournamentsOn,
   withdrawSoloRegistrationsOn,
 } from "@/lib/server/users/deleted-solo-entries";
 import { getAccountDeletionRequestPlan, requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
@@ -235,6 +239,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([]);
   jest.mocked(listCastTournamentIds).mockResolvedValue([]);
+  jest.mocked(listNamingTournamentIds).mockResolvedValue([]);
+  jest.mocked(syncOpenSoloTournamentsOn).mockResolvedValue([]);
   jest.mocked(loadSoloRegistrations).mockResolvedValue([]);
   jest.mocked(loadAccountTrace).mockResolvedValue(NO_TRACE);
   jest.mocked(withdrawSoloRegistrationsOn).mockResolvedValue([]);
@@ -1224,5 +1230,53 @@ describe("getAccountDeletionRequestPlan", () => {
     fakeDb({ organizerSuccessor: 21 });
 
     expect(await getAccountDeletionRequestPlan(7)).toEqual({ mode: "ERASE", reason: null });
+  });
+});
+
+describe("requestAccountDeletion — EF-62 (aperçu confirmé, tournois synchronisés, rediffusion)", () => {
+  it("requestAccountDeletion_confirmedReasonDiffers_throwsPlanChangedWithoutTransaction", async () => {
+    jest.mocked(loadAccountTrace).mockResolvedValue({ ...NO_TRACE, organizedTournaments: true });
+    const { connection } = fakeDb({ organizerSuccessor: null });
+
+    await expect(requestAccountDeletion(7, { confirmedReason: null })).rejects.toThrow("ACCOUNT_DELETION_PLAN_CHANGED");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(holdAccountIdentity).not.toHaveBeenCalled();
+  });
+
+  it("requestAccountDeletion_confirmedReasonMatches_commits", async () => {
+    jest.mocked(loadAccountTrace).mockResolvedValue({ ...NO_TRACE, organizedTournaments: true });
+    const { connection } = fakeDb({ organizerSuccessor: null });
+
+    await requestAccountDeletion(7, { confirmedReason: "ORGANIZED_TOURNAMENTS" });
+
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("requestAccountDeletion_openSoloTournaments_syncedBeforeWithdrawal", async () => {
+    const order: string[] = [];
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3, 5]);
+    jest.mocked(syncOpenSoloTournamentsOn).mockImplementation(async (_c, ids) => {
+      order.push(`sync ${ids.join(",")}`);
+      return [];
+    });
+    jest.mocked(withdrawSoloRegistrationsOn).mockImplementation(async () => {
+      order.push("withdraw");
+      return [];
+    });
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(order).toEqual(["sync 3,5", "withdraw"]);
+  });
+
+  it("requestAccountDeletion_namingTournaments_republished", async () => {
+    jest.mocked(listNamingTournamentIds).mockResolvedValue([9]);
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(9);
   });
 });
