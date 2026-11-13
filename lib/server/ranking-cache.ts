@@ -25,6 +25,13 @@ import { invalidateRankingShareImages } from "@/lib/server/share-image-cache";
 const PREFIX = "ranking:";
 
 /**
+ * Clé des comptes supprimés sans fiche (`users/profileless-players.ts`) : hors
+ * du préfixe du classement, qu'un score vide — seule une écriture d'identité
+ * (suppression, réactivation, rattrapage) l'oublie, plus bas.
+ */
+export const PROFILELESS_PLAYERS_CACHE_KEY = "profileless-players";
+
+/**
  * Durée de vie du classement rejoué.
  *
  * Elle ne borne que la dérive d'un chiffre qui bougerait sans passer par une
@@ -118,13 +125,6 @@ export function invalidateRankingLists(): void {
   // gardaient l'ancien nom ou l'ancien logo jusqu'à leur échéance.
   invalidateRankingShareImages();
 }
-
-/**
- * Clé des comptes supprimés sans fiche (`users/profileless-players.ts`) : hors
- * du préfixe du classement, qu'un score vide — seule une écriture d'identité
- * (suppression, réactivation, rattrapage) l'oublie, ci-dessous.
- */
-export const PROFILELESS_PLAYERS_CACHE_KEY = "profileless-players";
 
 /**
  * Oublie tout ce qui **nomme ou montre** une équipe du classement sans toucher

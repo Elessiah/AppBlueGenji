@@ -357,7 +357,9 @@ describe("settleDeletedSoloEntries — relevé des candidats", () => {
     expect(sql).toContain("t.state IN ('UPCOMING', 'REGISTRATION')");
     expect(sql).toContain("t.state = 'RUNNING' AND NOT EXISTS");
     expect(sql).toContain("om.status IN ('PENDING', 'READY')");
-    expect(sql).toContain(`LIMIT ${SETTLE_BATCH_SIZE}`);
+    // Lecture à texte fixe (aucun `NOT IN` de mille paramètres) : le lot se tranche ensuite.
+    expect(sql).toContain(`LIMIT ${SETTLE_BATCH_SIZE + 1000}`);
+    expect(sql).not.toContain("NOT IN (?");
     expect(SETTLE_BATCH_SIZE).toBe(200);
   });
 });
@@ -419,6 +421,14 @@ describe("forfeitSoloEntriesAfterCommit — un appel à la fois", () => {
 describe("settleDeletedSoloEntries — EF-62", () => {
   const candidateCall = (execute: ReturnType<typeof fakeDb>, index: number) =>
     execute.mock.calls.filter(([q]) => String(q).includes("SELECT DISTINCT u.id"))[index];
+  /** Combien de fois le compte a été repris par un passage (relevé de ses inscriptions ouvertes). */
+  const reads = (execute: ReturnType<typeof fakeDb>, userId: number) =>
+    execute.mock.calls.filter(
+      ([q, params]) =>
+        String(q).includes("t.state IN ('UPCOMING', 'REGISTRATION')") &&
+        String(q).includes("SELECT DISTINCT r.tournament_id") &&
+        JSON.stringify(params) === JSON.stringify([userId]),
+    ).length;
 
   it("settleDeletedSoloEntries_candidateQuery_forfeitableNeedsBothSeatsOrActiveStanding", async () => {
     const execute = fakeDb({ candidates: [] });
@@ -438,9 +448,10 @@ describe("settleDeletedSoloEntries — EF-62", () => {
     await settleDeletedSoloEntries();
     await settleDeletedSoloEntries();
 
-    const [sql, params] = candidateCall(execute, 1);
-    expect(String(sql)).toContain("AND u.id NOT IN (?)");
-    expect(params).toEqual([7]);
+    // Le même texte à chaque passage, sans paramètre : le compte est écarté du lot, pas de la requête.
+    expect(String(candidateCall(execute, 1)[0])).toBe(String(candidateCall(execute, 0)[0]));
+    expect(candidateCall(execute, 1)[1]).toBeUndefined();
+    expect(reads(execute, 7)).toBe(1);
   });
 
   it("settleDeletedSoloEntries_effectivePass_accountNotSetAside", async () => {
@@ -449,7 +460,7 @@ describe("settleDeletedSoloEntries — EF-62", () => {
     await settleDeletedSoloEntries();
     await settleDeletedSoloEntries();
 
-    expect(String(candidateCall(execute, 1)[0])).not.toContain("NOT IN");
+    expect(reads(execute, 7)).toBe(2);
   });
 
   it("settleDeletedSoloEntries_afterIdleWindow_accountReconsidered", async () => {
@@ -463,7 +474,55 @@ describe("settleDeletedSoloEntries — EF-62", () => {
       now.mockRestore();
     }
 
-    expect(String(candidateCall(execute, 1)[0])).not.toContain("NOT IN");
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_firstIdle_shorterThanAnHourlyPass", async () => {
+    // Un forfait qui prend prise quelques minutes plus tard (appariement tiré) n'attend pas six heures.
+    expect(SETTLE_IDLE_MS).toBeLessThan(60 * 60 * 1000);
+    const execute = fakeDb({ candidates: [7], forfeitable: [] });
+    const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
+    try {
+      await settleDeletedSoloEntries();
+      now.mockReturnValue(5_000_000 + 60 * 60 * 1000);
+      await settleDeletedSoloEntries();
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_repeatedIdle_waitDoublesUpToCap", async () => {
+    const execute = fakeDb({ candidates: [7], forfeitable: [] });
+    const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
+    try {
+      await settleDeletedSoloEntries(); // échec 1 : écart SETTLE_IDLE_MS
+      now.mockReturnValue(5_000_000 + SETTLE_IDLE_MS + 1);
+      await settleDeletedSoloEntries(); // échec 2 : écart doublé
+      now.mockReturnValue(5_000_000 + SETTLE_IDLE_MS + 1 + SETTLE_IDLE_MS + 1);
+      await settleDeletedSoloEntries(); // encore à l'écart (2 x SETTLE_IDLE_MS)
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_idleAccountsAmongCandidates_batchStillFull", async () => {
+    // Les comptes à l'écart sont écartés après lecture : le lot reste plein de comptes à traiter.
+    const ids = Array.from({ length: SETTLE_BATCH_SIZE + 5 }, (_, index) => index + 1);
+    const execute = fakeDb({ candidates: ids, forfeitable: [] });
+
+    await settleDeletedSoloEntries();
+    const firstPass = ids.filter((id) => reads(execute, id) > 0);
+    await settleDeletedSoloEntries();
+    const secondPass = ids.filter((id) => reads(execute, id) > 1);
+
+    expect(firstPass).toHaveLength(SETTLE_BATCH_SIZE);
+    // Seuls les cinq comptes laissés de côté par le premier lot passent au second.
+    expect(ids.filter((id) => reads(execute, id) === 1)).toHaveLength(SETTLE_BATCH_SIZE + 5);
+    expect(secondPass).toHaveLength(0);
   });
 });
 

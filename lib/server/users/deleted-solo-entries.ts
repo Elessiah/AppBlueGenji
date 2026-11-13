@@ -11,6 +11,7 @@ import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./account-deletion";
+import { startDueTournaments } from "./tournament-start-sync";
 import { failureReason } from "@/lib/server/failure-reason";
 
 /*
@@ -53,39 +54,61 @@ export function soloEntryNeverPlayedSql(entry = "s.id", tournament = "r.tourname
 /** Comptes relevés par passage de `settleDeletedSoloEntries`. */
 export const SETTLE_BATCH_SIZE = 200;
 
-/** Mise à l'écart d'un compte dont le passage n'a rien produit (échec durable, forfait sans prise). */
-export const SETTLE_IDLE_MS = 6 * 60 * 60 * 1000;
+/** Lignes lues : le lot, plus de quoi absorber toutes les mises à l'écart retenues. */
+const SETTLE_CANDIDATE_LIMIT = SETTLE_BATCH_SIZE + 1000;
 
-/** Au-delà, les plus anciennes mises à l'écart tombent : la requête garde une liste bornée. */
+/**
+ * Première mise à l'écart d'un compte dont le passage n'a rien produit (échec,
+ * forfait sans prise) : une demi-heure, soit moins qu'un passage horaire — le
+ * compte est donc relu au passage suivant. Chaque échec de suite double la
+ * durée, jusqu'à {@link SETTLE_IDLE_MAX_MS} : un forfait qui prend prise
+ * quelques minutes plus tard (appariement tiré) n'attend pas six heures, et un
+ * compte qui échoue sans cesse ne pèse plus sur le lot.
+ */
+export const SETTLE_IDLE_MS = 30 * 60 * 1000;
+
+/** Plafond de la mise à l'écart. */
+export const SETTLE_IDLE_MAX_MS = 6 * 60 * 60 * 1000;
+
+/** Mises à l'écart retenues : les plus anciennes tombent, la mémoire reste bornée. */
 const SETTLE_IDLE_MAX = 1000;
 
 /**
- * Comptes mis à l'écart par ce processus, jusqu'à l'instant noté : un compte
- * relevé dont le passage ne retire ni ne forfaite rien (échec qui se répète,
- * match que le forfait ne tranche pas) n'occupe plus le lot à chaque passage
- * horaire — comme `finalizeDueAccountDeletions` met à l'écart ses échecs.
+ * Comptes mis à l'écart par ce processus : jusqu'à quand, et combien d'échecs de
+ * suite (l'entrée échue reste, pour que le suivant double la durée). Un compte
+ * relevé dont le passage ne retire ni ne forfaite rien n'occupe plus le lot à
+ * chaque passage — comme `finalizeDueAccountDeletions` met à l'écart ses échecs.
+ * Perdue au redémarrage : les comptes reviennent alors tous au premier passage,
+ * ce que le lot borné absorbe.
  */
-const settleIdleUntil = new Map<number, number>();
+const settleIdle = new Map<number, { until: number; strikes: number }>();
 
-/** Les comptes encore à l'écart à `now` ; les échéances passées sont oubliées. */
-function idleAccountIds(now: number): number[] {
-  for (const [userId, until] of settleIdleUntil) if (until <= now) settleIdleUntil.delete(userId);
-  return [...settleIdleUntil.keys()];
+/** Les comptes encore à l'écart à `now`. */
+function idleAccountIds(now: number): Set<number> {
+  const idle = new Set<number>();
+  for (const [userId, entry] of settleIdle) if (entry.until > now) idle.add(userId);
+  return idle;
 }
 
-/** Met un compte à l'écart (borné : la plus ancienne mise à l'écart tombe la première). */
+/** Met un compte à l'écart (durée doublée à chaque échec de suite ; la plus ancienne entrée tombe la première). */
 function setAside(userId: number, now: number): void {
-  settleIdleUntil.delete(userId);
-  settleIdleUntil.set(userId, now + SETTLE_IDLE_MS);
-  if (settleIdleUntil.size > SETTLE_IDLE_MAX) {
-    const oldest = settleIdleUntil.keys().next().value;
-    if (oldest !== undefined) settleIdleUntil.delete(oldest);
+  const strikes = (settleIdle.get(userId)?.strikes ?? 0) + 1;
+  settleIdle.delete(userId);
+  settleIdle.set(userId, { until: now + Math.min(SETTLE_IDLE_MS * 2 ** (strikes - 1), SETTLE_IDLE_MAX_MS), strikes });
+  if (settleIdle.size > SETTLE_IDLE_MAX) {
+    const oldest = settleIdle.keys().next().value;
+    if (oldest !== undefined) settleIdle.delete(oldest);
   }
+}
+
+/** Un compte qui a produit quelque chose repart de zéro. */
+function clearIdle(userId: number): void {
+  settleIdle.delete(userId);
 }
 
 /** Tests : oublie les mises à l'écart du processus. */
 export function resetSettleIdleForTests(): void {
-  settleIdleUntil.clear();
+  settleIdle.clear();
 }
 
 /** Une inscription retirée par la suppression du compte. */
@@ -464,8 +487,6 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
   const db = await getDatabase();
   const now = Date.now();
   const idle = idleAccountIds(now);
-  const notIdle = idle.length > 0 ? `
-        AND u.id NOT IN (${idle.map(() => "?").join(", ")})` : "";
   // Seuls les comptes qui ont **quelque chose** à faire : une inscription à
   // retirer (tournoi pas commencé) ou une entrée en cours à forfaiter. Un
   // compte dont l'entrée a joué reste inscrit à un tournoi en cours des
@@ -481,18 +502,25 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
         AND (
           t.state IN ('UPCOMING', 'REGISTRATION')
           OR (t.state = 'RUNNING' AND ${forfeitableEntrySql()})
-        )${notIdle}
+        )
       ORDER BY u.id
-      LIMIT ${SETTLE_BATCH_SIZE}`,
-    idle,
+      LIMIT ${SETTLE_CANDIDATE_LIMIT}`,
   );
   const outcome = { withdrawn: 0, forfeited: 0 };
-  for (const candidate of candidates) {
+  // Un tournoi n'est remis à l'heure qu'une fois par passage, quel que soit le
+  // nombre de comptes qui y sont inscrits (`startDueTournaments`).
+  const synced = new Set<number>();
+  // Les comptes à l'écart sont écartés ici et non par un `NOT IN` de mille
+  // paramètres : le texte de la requête reste le même d'un passage à l'autre
+  // (une seule entrée du cache d'instructions, un seul plan), et la marge de
+  // `SETTLE_CANDIDATE_LIMIT` garantit un lot plein malgré eux.
+  const batch = candidates.filter((candidate) => !idle.has(Number(candidate.id))).slice(0, SETTLE_BATCH_SIZE);
+  for (const candidate of batch) {
     const userId = Number(candidate.id);
     let effective = false;
     let withdrawals: Awaited<ReturnType<typeof withdrawDeletedAccountRegistrations>>;
     try {
-      withdrawals = await withdrawDeletedAccountRegistrations(userId);
+      withdrawals = await withdrawDeletedAccountRegistrations(userId, synced);
     } catch (error) {
       console.error(
         `[deleted-accounts] Inscriptions solo du compte #${userId} reportées :`,
@@ -516,9 +544,10 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
     } catch (error) {
       console.error(`[deleted-accounts] forfaits du compte #${userId} reportés :`, failureReason(error));
     }
-    // Rien de produit (échec, ou forfait sans prise) : à l'écart quelques
-    // heures, pour que le lot serve aux comptes qui avancent.
-    if (!effective) setAside(userId, now);
+    // Rien de produit (échec, ou forfait sans prise) : à l'écart, de plus en
+    // plus longtemps, pour que le lot serve aux comptes qui avancent.
+    if (effective) clearIdle(userId);
+    else setAside(userId, now);
   }
   return outcome;
 }
@@ -529,12 +558,18 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
  */
 async function withdrawDeletedAccountRegistrations(
   userId: number,
+  synced: Set<number>,
 ): Promise<{ withdrawn: DeletionWithdrawal[]; started: number }> {
   const db = await getDatabase();
   // Les seuls tournois pas encore commencés : une inscription ne part que de
   // ceux-là, et verrouiller un tournoi en cours le ferait attendre pour rien.
   const tournamentIds = await listSoloRegistrationTournamentIds(db, userId, true);
   if (tournamentIds.length === 0) return { withdrawn: [], started: 0 };
+  // Un tournoi dont l'heure de début est passée sans synchronisation passe en
+  // cours ici, hors de la transaction du compte : son inscription se forfaite
+  // ensuite, au lieu d'être relevée à chaque passage sans rien produire. Une
+  // fois par tournoi et par passage ; un échec attend le passage suivant.
+  const started = await startDueTournaments(tournamentIds, synced);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -547,10 +582,6 @@ async function withdrawDeletedAccountRegistrations(
       await connection.rollback();
       return { withdrawn: [], started: 0 };
     }
-    // Un tournoi dont l'heure de début est passée sans synchronisation passe
-    // en cours ici : son inscription se forfaite ensuite, au lieu d'être
-    // relevée à chaque passage sans rien produire.
-    const started = await syncOpenSoloTournamentsOn(connection, tournamentIds);
     const withdrawn = await withdrawSoloRegistrationsOn(
       connection,
       await loadSoloRegistrations(connection, userId),
@@ -564,14 +595,6 @@ async function withdrawDeletedAccountRegistrations(
       flushBotLogs(connection);
     } catch (error) {
       console.error(`[deleted-accounts] annonces du compte #${userId} non envoyées :`, failureReason(error));
-    }
-    // Passé en cours : les lecteurs du tournoi voient son coup d'envoi.
-    for (const tournamentId of started) {
-      try {
-        publishUpdatedEvent(tournamentId);
-      } catch (error) {
-        console.error(`[deleted-accounts] tournoi #${tournamentId} non prévenu :`, failureReason(error));
-      }
     }
     return { withdrawn, started: started.length };
   } catch (error) {

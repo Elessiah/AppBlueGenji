@@ -1075,7 +1075,7 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   `PENDING`/`READY` dont **les deux** places sont prises, ou un classement
   `ACTIVE` (suisse et survie à la phase courante — `current_phase_id` en
   `MULTI` —, BG Survie avant ses phases finales) : l'abandon la retire d'une
-  ronde qui n'est pas encore tirée. La passe horaire met de côté six heures
+  ronde qui n'est pas encore tirée. La passe horaire met de côté (30 min, doublé à chaque échec, 6 h au plus)
   (`SETTLE_IDLE_MS`, au plus mille comptes en mémoire) un compte dont le
   passage n'a rien fait, ou a échoué.
 - **Aperçu confirmé** : le DELETE de la modale envoie le motif qu'elle a
@@ -1215,3 +1215,29 @@ autres comptées puis citées par des lignes de suite, cinq par ligne
 (`formatAccountDeletionFollowUpLogs` ; « et d'autres, plus anciennes » au-delà de 500 lignes lues, un match programmé en comptant deux) ;
 lecture en échec → « vérifier le salon d'alertes ». Détail :
 `LIVE_STREAMS.md` § Information des joueurs.
+
+## Revue performance (EF-62, cycle 1)
+
+- **Liste des comptes sans fiche** : une lecture en échec n'est pas gardée par
+  le cache ; pendant `PROFILELESS_FAILURE_BACKOFF_MS` (15 s) la dernière liste
+  connue (conservée une heure) est servie, ou rien n'est demandé (une ligne de
+  journal par panne). Plafond `PROFILELESS_PLAYERS_MAX` (20 000, avertissement
+  au-delà : un lien en trop mène à une 404). La clé de cache est déclarée en tête
+  de `ranking-cache.ts`. Côté client, un essai en échec attend
+  `PROFILELESS_RETRY_MS` (15 s) au lieu de repartir à chaque page.
+- **Coup d'envoi tardif** : `startDueTournaments` (`tournament-start-sync.ts`)
+  remet à l'heure, avant la transaction et sous le seul verrou du tournoi, ceux
+  dont l'état stocké est en retard — plus sous le verrou du compte. Le passage
+  horaire ne relit un tournoi qu'une fois par passe ; la synchronisation de la
+  transaction de suppression reste le filet.
+- **Passage horaire** : mise à l'écart d'un compte sans effet de 30 min,
+  doublée à chaque échec de suite jusqu'à 6 h (`SETTLE_IDLE_MS`,
+  `SETTLE_IDLE_MAX_MS`) ; la requête des candidats garde un texte fixe (lecture
+  de `SETTLE_BATCH_SIZE + 1000` lignes, mises à l'écart retranchées en code, au
+  lieu d'un `NOT IN` à mille paramètres). Les existences de classement
+  (`bg_*_standings`) se lisent par clé primaire.
+- **Relevé complet** (`reconcileStaleFullScan`) : mené aussi par le passage
+  horaire quand le marqueur du jour est périmé, au plus une tentative par jour
+  et par processus.
+- **Demande et réactivation** : le relevé des tournois qui nomment le compte part
+  en parallèle de la suite ; la réactivation lit ses deux listes ensemble.

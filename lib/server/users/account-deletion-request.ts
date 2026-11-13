@@ -61,6 +61,7 @@ import {
   syncOpenSoloTournamentsOn,
   withdrawSoloRegistrationsOn,
 } from "./deleted-solo-entries";
+import { startDueTournaments } from "./tournament-start-sync";
 import { failureReason } from "@/lib/server/failure-reason";
 
 /*
@@ -424,6 +425,9 @@ async function namingTournamentsOrNone(userId: number, leftTeamIds: readonly num
 async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
   const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments, replay } = effects;
   const liveCast = new Set(effects.liveCastTournaments);
+  // Le relevé (une jointure à six branches) part tout de suite et se lit plus
+  // bas : il ne dépend ni de l'avatar ni des flux, et ne lève jamais.
+  const namingLoad = namingTournamentsOrNone(userId, departures.map((departure) => departure.teamId));
   closeUserStreams(userId);
   // L'avatar mis de côté change d'adresse : l'ancienne, connue de qui l'avait
   // vue, ne doit plus rien servir pendant les trente jours. En premier, avant
@@ -449,7 +453,7 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     ...withdrawn.map((entry) => entry.tournamentId),
     ...organizedHandedOver,
     ...soloTournaments,
-    ...(await namingTournamentsOrNone(userId, departures.map((departure) => departure.teamId))),
+    ...(await namingLoad),
   ])) {
     publishUpdatedEvent(tournamentId);
   }
@@ -608,6 +612,10 @@ export async function requestAccountDeletion(
     // Le repreneur se cherche hors verrous (balayage de `bg_users`) ; la
     // transaction ne fait que le relire par sa clé.
     const successorHint = organizedIds.length > 0 ? await findOrganizerSuccessor(db, userId) : null;
+    // Le coup d'envoi tardif d'un tournoi se donne avant la transaction, sous le
+    // seul verrou du tournoi : dedans, il le ferait sous celui du compte
+    // (`startDueTournaments`). La synchronisation plus bas reste le filet.
+    if (!replay) await startDueTournaments(openSoloTournaments);
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();

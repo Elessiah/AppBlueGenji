@@ -5,7 +5,7 @@ jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/registration-removal", () => ({ withdrawRegistrationOn: jest.fn() }));
-jest.mock("@/lib/server/tournaments/state", () => ({ syncTournamentState: jest.fn() }));
+jest.mock("@/lib/server/tournaments/state", () => ({ syncTournamentState: jest.fn(), computeTournamentState: jest.fn() }));
 jest.mock("@/lib/server/tournaments/bot-logs", () => ({ flushBotLogs: jest.fn(), discardBotLogs: jest.fn() }));
 jest.mock("@/lib/server/users/account-deletion", () => ({
   listSoloRegistrationTournamentIds: jest.fn(),
@@ -14,7 +14,7 @@ jest.mock("@/lib/server/users/account-deletion", () => ({
 
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { syncTournamentState } from "@/lib/server/tournaments/state";
+import { computeTournamentState, syncTournamentState } from "@/lib/server/tournaments/state";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "@/lib/server/users/account-deletion";
 import { resetSettleIdleForTests, settleDeletedSoloEntries } from "@/lib/server/users/deleted-solo-entries";
@@ -29,6 +29,8 @@ function fakeDb() {
   const execute = jest.fn<SqlQuery>(async (sql) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     if (q.startsWith("SELECT DISTINCT u.id")) return [[{ id: 7 }]];
+    // Un tournoi en retard sur ses dates : remis à l'heure avant la transaction.
+    if (q.startsWith("SELECT state, finished_at")) return [[{ state: "REGISTRATION" }]];
     return [[]];
   });
   const connection = connectionMock();
@@ -44,6 +46,7 @@ beforeEach(() => {
   resetSettleIdleForTests();
   jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3]);
   jest.mocked(loadSoloRegistrations).mockResolvedValue([]);
+  jest.mocked(computeTournamentState).mockReturnValue("RUNNING");
   jest.mocked(syncTournamentState).mockResolvedValue({
     row: null,
     stateChanged: true,
@@ -62,7 +65,8 @@ describe("settleDeletedSoloEntries — annonces après le commit", () => {
 
     await settleDeletedSoloEntries();
 
-    expect(connection.commit).toHaveBeenCalledTimes(1);
+    // Deux transactions : le coup d'envoi du tournoi, puis le retrait du compte.
+    expect(connection.commit).toHaveBeenCalledTimes(2);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(3);
     expect(JSON.stringify(log.mock.calls)).not.toContain("reportées");
     log.mockRestore();

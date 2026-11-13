@@ -17,7 +17,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
-import { cached } from "@/lib/server/cache";
+import { cached, cachedStale } from "@/lib/server/cache";
 import { PROFILELESS_PLAYERS_CACHE_KEY } from "@/lib/server/ranking-cache";
 import { sortedIdsInclude } from "@/lib/shared/sorted-ids";
 import { accountTraceSql } from "./account-deletion";
@@ -33,7 +33,12 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
   );
   // Trié ici aussi, sans se fier au seul `ORDER BY` : la recherche
   // dichotomique (`sortedIdsInclude`) en dépend.
-  return rows.map((row) => Number(row.id)).sort((a, b) => a - b);
+  const ids = rows.map((row) => Number(row.id)).sort((a, b) => a - b);
+  if (ids.length <= PROFILELESS_PLAYERS_MAX) return ids;
+  console.warn(
+    `[profileless-players] ${ids.length} comptes sans fiche : liste tronquée à ${PROFILELESS_PLAYERS_MAX}.`,
+  );
+  return ids.slice(0, PROFILELESS_PLAYERS_MAX);
 }
 
 /**
@@ -45,6 +50,29 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
  * laisse sa fiche, sous pseudo d'emprunt, au plus cette même durée.
  */
 export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
+
+/**
+ * Au-delà, la liste est tronquée (les plus récents d'abord retranchés) : elle
+ * voyage dans la charge de **chaque** page d'un visiteur connecté, et nul ne
+ * l'élague. Un lien au-delà mène au pire à une fiche 404, comme sur une panne
+ * de lecture ; un avertissement le dit, pour qu'on revoie la forme de la liste
+ * avant d'y arriver.
+ */
+export const PROFILELESS_PLAYERS_MAX = 20_000;
+
+/** Après une lecture en échec, aucune relance avant ce délai : la base en peine n'est pas martelée. */
+export const PROFILELESS_FAILURE_BACKOFF_MS = 15_000;
+
+/** Instant de la dernière lecture en échec. Remis à zéro par la première réussite. */
+let lastFailureAt: number | null = null;
+
+/** Conservation de la dernière liste au-delà de sa durée de vie, pour servir pendant une panne. */
+const PROFILELESS_PLAYERS_RETAIN_MS = 60 * 60_000;
+
+/** Tests : oublie la dernière panne. */
+export function resetProfilelessFailureForTests(): void {
+  lastFailureAt = null;
+}
 
 /**
  * Les comptes supprimés sans fiche, par id croissant.
@@ -59,13 +87,49 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
   try {
     return await readProfilelessPlayerIds();
   } catch (error) {
-    console.error(`[profileless-players] lecture impossible : ${failureReason(error)}`);
+    // Le délai de grâce rejoue l'erreur déjà dite : une ligne par panne, pas par page.
+    if (!(error instanceof ProfilelessBackoffError)) {
+      console.error(`[profileless-players] lecture impossible : ${failureReason(error)}`);
+    }
     return [];
   }
 }
 
-function readProfilelessPlayerIds(): Promise<number[]> {
-  return cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
+/** Levée pendant le délai de grâce qui suit une panne de lecture (rien n'est relancé). */
+class ProfilelessBackoffError extends Error {
+  constructor() {
+    super("PROFILELESS_READ_BACKOFF");
+    this.name = "ProfilelessBackoffError";
+  }
+}
+
+/**
+ * La liste, mutualisée. Une lecture en échec n'est pas gardée par le cache :
+ * sans ce garde-fou, chaque page d'un visiteur connecté (mise en page racine) et
+ * chaque rafraîchissement client relançaient le balayage complet sur une base
+ * déjà en peine. Pendant {@link PROFILELESS_FAILURE_BACKOFF_MS} on sert donc la
+ * dernière liste connue (périmée, conservée une heure), ou on refuse sans
+ * requête.
+ */
+async function readProfilelessPlayerIds(): Promise<number[]> {
+  const now = Date.now();
+  if (lastFailureAt !== null && now - lastFailureAt >= 0 && now - lastFailureAt < PROFILELESS_FAILURE_BACKOFF_MS) {
+    const stale = cachedStale<number[]>(PROFILELESS_PLAYERS_CACHE_KEY, now);
+    if (stale !== undefined) return stale;
+    throw new ProfilelessBackoffError();
+  }
+  try {
+    const ids = await cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds, {
+      retainMs: PROFILELESS_PLAYERS_RETAIN_MS,
+    });
+    lastFailureAt = null;
+    return ids;
+  } catch (error) {
+    lastFailureAt = now;
+    const stale = cachedStale<number[]>(PROFILELESS_PLAYERS_CACHE_KEY, now);
+    if (stale !== undefined) return stale;
+    throw error;
+  }
 }
 
 /**
@@ -81,7 +145,9 @@ export async function anonymizedAccountHasNoPage(userId: number): Promise<boolea
   try {
     return sortedIdsInclude(await readProfilelessPlayerIds(), userId);
   } catch (error) {
-    console.error(`[profileless-players] liste illisible, lecture du compte : ${failureReason(error)}`);
+    if (!(error instanceof ProfilelessBackoffError)) {
+      console.error(`[profileless-players] liste illisible, lecture du compte : ${failureReason(error)}`);
+    }
   }
   try {
     const db = await getDatabase();

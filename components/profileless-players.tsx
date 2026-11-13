@@ -21,6 +21,13 @@ const ProfilelessPlayersContext = createContext<ReadonlySet<number>>(new Set());
 /** Intervalle minimal entre deux relectures de la liste à la navigation. */
 export const PROFILELESS_REFRESH_MS = 60_000;
 
+/**
+ * Délai avant de réessayer après un échec (hors ligne, 429, 5xx) : plus court
+ * qu'une fenêtre, mais jamais un essai par changement de page — un refus
+ * (`DIRECTORY_READ_RULE`) que l'on martèlerait resterait déclenché.
+ */
+export const PROFILELESS_RETRY_MS = 15_000;
+
 /** Les ids d'une réponse de `/api/players/profileless`, ou `null` si elle n'en porte pas. */
 export function parseProfilelessIds(body: unknown): number[] | null {
   if (typeof body !== "object" || body === null) return null;
@@ -83,18 +90,19 @@ function ProfilelessRefresh({ onIds }: Readonly<{ onIds: (ids: number[]) => void
     if (pathname === firstPath.current) return;
     firstPath.current = pathname;
     const now = Date.now();
-    const previous = loadedAt.current;
-    if (now - previous < PROFILELESS_REFRESH_MS) return;
+    if (now - loadedAt.current < PROFILELESS_REFRESH_MS) return;
     loadedAt.current = now;
-    // Un essai qui échoue ne prend pas la fenêtre : le suivant repart aussitôt.
-    const giveBack = () => {
-      if (loadedAt.current === now) loadedAt.current = previous;
+    // Un essai qui échoue ne garde pas toute la fenêtre, mais pas aucune : le
+    // suivant attend `PROFILELESS_RETRY_MS` (jamais un essai par page, ni deux
+    // en vol — la fenêtre est prise avant l'envoi).
+    const retryLater = () => {
+      if (loadedAt.current === now) loadedAt.current = Date.now() - (PROFILELESS_REFRESH_MS - PROFILELESS_RETRY_MS);
     };
     // Jamais annulée par la navigation suivante : la fenêtre est déjà prise,
     // la réponse doit servir.
-    // Hors ligne ou refus : la liste connue reste (au pire un lien vers une 404), et le prochain changement de page réessaie.
+    // Hors ligne ou refus : la liste connue reste (au pire un lien vers une 404), et un changement de page après le délai réessaie.
     void fetchProfilelessIds().then((next) => {
-      if (!next) giveBack();
+      if (!next) retryLater();
       else if (mounted.current) latest.current(next);
     });
   }, [pathname]);

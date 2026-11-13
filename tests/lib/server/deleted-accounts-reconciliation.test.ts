@@ -310,7 +310,7 @@ describe("reconcileDeletedAccounts", () => {
     const { queries, connections } = fakeDb({ 14: { pseudo: "Nova", isDeleted: false } });
     // La liste ne le rend pas (filtrée) : on la force à le proposer.
     jest.mocked(getDatabase).mockResolvedValue(fakePool({
-      execute: jest.fn(async () => [[{ id: 14 }]]),
+      execute: jest.fn(async (sql: string) => (String(sql).includes("SELECT") && String(sql).includes("u.id") ? [[{ id: 14 }]] : [[]])),
       getConnection: (await getDatabase()).getConnection,
     }));
 

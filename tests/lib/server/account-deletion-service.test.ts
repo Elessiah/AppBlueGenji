@@ -93,6 +93,8 @@ const STARTED_REGISTRATION: SoloRegistrationRow = {
 const BEFORE_TRANSACTION = [
   "SELECT DISTINCT r.tournament_id",
   "SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters",
+  // Remise à l'heure des tournois, avant la transaction (`startDueTournaments`).
+  "SELECT state, finished_at, registration_open_at",
 ];
 const inTransaction = (queries: Query[]) => queries.filter((q) => !BEFORE_TRANSACTION.some((prefix) => q.sql.startsWith(prefix)));
 

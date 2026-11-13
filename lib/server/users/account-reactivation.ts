@@ -162,10 +162,13 @@ async function republishSoloEntryTournaments(userId: number): Promise<void> {
       "./account-deletion"
     );
     const { publishUpdatedEvent } = await import("@/lib/server/tournaments/notifications");
-    const tournamentIds = mergeTournamentIds(
-      await listSoloRegistrationTournamentIds(db, userId),
-      await listNamingTournamentIds(db, userId),
-    );
+    // Deux relevés indépendants (les inscriptions solo comptent aussi les
+    // tournois terminés, que le second écarte) : lus ensemble.
+    const [soloTournaments, namingTournaments] = await Promise.all([
+      listSoloRegistrationTournamentIds(db, userId),
+      listNamingTournamentIds(db, userId),
+    ]);
+    const tournamentIds = mergeTournamentIds(soloTournaments, namingTournaments);
     for (const tournamentId of tournamentIds) publishUpdatedEvent(tournamentId);
   } catch (error) {
     console.error("[account-reactivation] tournois qui nomment le compte non rediffusés", failureReason(error));

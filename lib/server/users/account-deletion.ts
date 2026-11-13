@@ -24,6 +24,7 @@ import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tour
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
+import { startDueTournaments } from "./tournament-start-sync";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
@@ -663,6 +664,9 @@ async function deleteAccountNow(
     // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
     const openSoloTournaments = await listSoloRegistrationTournamentIds(db, userId, true);
     const soloTournaments = mergeTournamentIds(openSoloTournaments, await listCastTournamentIds(db, userId));
+    // Le coup d'envoi tardif d'un tournoi se donne avant, sous le seul verrou du
+    // tournoi et non sous celui du compte (`startDueTournaments`).
+    if (!replay) await startDueTournaments(openSoloTournaments);
     const connection = await db.getConnection();
     try {
       // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un

@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
-import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, PROFILELESS_PLAYERS_TTL_MS } from "@/lib/server/users/profileless-players";
+import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_PLAYERS_MAX, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
@@ -62,6 +62,7 @@ function profileDb(row: Record<string, unknown>, played: number) {
 beforeEach(() => {
   jest.clearAllMocks();
   clearCache();
+  resetProfilelessFailureForTests();
   jest.mocked(getPlayerEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
 });
 
@@ -286,5 +287,108 @@ describe("branchements D13", () => {
     const layout = readSource("app/layout.tsx");
     expect(layout).toContain("user ? loadProfilelessPlayerIds() : Promise.resolve(NO_PROFILELESS_PLAYERS)");
     expect(layout).toContain("<ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>");
+  });
+});
+
+describe("loadProfilelessPlayerIds — panne de lecture (EF-62, revue performance)", () => {
+  it("loadProfilelessPlayerIds_failureThenCallInBackoff_noSecondQuery", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    const execute = mockDb(() => {
+      throw new Error("LOCK_WAIT");
+    });
+
+    expect(await loadProfilelessPlayerIds()).toEqual([]);
+    expect(await loadProfilelessPlayerIds()).toEqual([]);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadProfilelessPlayerIds_afterBackoff_retriesAndRecovers", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    let healthy = false;
+    const execute = mockDb(() => {
+      if (!healthy) throw new Error("LOCK_WAIT");
+      return [[{ id: 3 }]];
+    });
+    await loadProfilelessPlayerIds();
+    healthy = true;
+    now.mockReturnValue(1_000_000 + PROFILELESS_FAILURE_BACKOFF_MS);
+
+    expect(await loadProfilelessPlayerIds()).toEqual([3]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
+  it("loadProfilelessPlayerIds_failureAfterTtlWithStaleList_servesStaleList", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    let healthy = true;
+    const execute = mockDb(() => {
+      if (!healthy) throw new Error("LOCK_WAIT");
+      return [[{ id: 3 }]];
+    });
+    await loadProfilelessPlayerIds();
+    healthy = false;
+    now.mockReturnValue(1_000_000 + PROFILELESS_PLAYERS_TTL_MS + 1);
+
+    expect(await loadProfilelessPlayerIds()).toEqual([3]);
+    // Pendant le délai de grâce : toujours la liste périmée, sans requête.
+    expect(await loadProfilelessPlayerIds()).toEqual([3]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
+  it("loadProfilelessPlayerIds_overCap_truncatedWithWarning", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
+
+    const ids = await loadProfilelessPlayerIds();
+
+    expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX);
+    expect(ids[ids.length - 1]).toBe(PROFILELESS_PLAYERS_MAX);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("anonymizedAccountHasNoPage_duringBackoff_readsTheAccountAloneWithoutLogSpam", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    const execute = mockDb((sql) => {
+      if (sql.includes("WHERE u.is_deleted = 1")) throw new Error("LOCK_WAIT");
+      return [[{ played: 1 }]];
+    });
+    await loadProfilelessPlayerIds();
+    error.mockClear();
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(false);
+
+    expect(error).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ranking-cache — clé de la liste", () => {
+  it("rankingCache_profilelessKey_declaredBeforeItsFirstUse", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("lib/server/ranking-cache.ts", "utf8");
+
+    expect(source.indexOf("export const PROFILELESS_PLAYERS_CACHE_KEY")).toBeLessThan(
+      source.indexOf("invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY)"),
+    );
+  });
+});
+
+describe("ProfilelessRefresh — nouvel essai après un échec", () => {
+  it("profilelessRefresh_failedFetch_waitsRetryDelayInsteadOfRetryingAtEveryPage", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("components/profileless-players.tsx", "utf8");
+    const { PROFILELESS_REFRESH_MS, PROFILELESS_RETRY_MS } = await import("@/components/profileless-players");
+
+    expect(PROFILELESS_RETRY_MS).toBeGreaterThan(0);
+    expect(PROFILELESS_RETRY_MS).toBeLessThan(PROFILELESS_REFRESH_MS);
+    expect(source).toContain("PROFILELESS_REFRESH_MS - PROFILELESS_RETRY_MS");
+    expect(source).not.toContain("giveBack");
   });
 });
