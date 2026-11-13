@@ -328,6 +328,18 @@ describe("invalidPointField", () => {
     expect(invalidPointField([3, 5, 7, 9], 3)).toBe("map-2");
   });
 
+  it("invalidPointField_roundTargetOutOfBounds_pointsRoundField", () => {
+    expect(invalidPointField([3, 5], 3, MAP_POINT_TARGET_MAX + 1)).toBe("points");
+  });
+
+  it("invalidPointField_roundTargetAndMapBothInvalid_roundFieldWins", () => {
+    expect(invalidPointField([MAP_POINT_TARGET_MAX + 1], 3, 0)).toBe("points");
+  });
+
+  it("invalidPointField_roundTargetValidMapInvalid_stillPointsMap", () => {
+    expect(invalidPointField([3, MAP_POINT_TARGET_MAX + 1], 3, 5)).toBe("map-1");
+  });
+
   it("invalidPointField_allValid_pointsRoundField", () => {
     expect(invalidPointField([3, 5], 3)).toBe("points");
   });

@@ -70,7 +70,7 @@ export function MapResultList({
               <span className={styles.label}>
                 {t("match.maps.map", { number: String(map.mapNumber) })}
                 {target !== null && (
-                  <span className={styles.target}> · {t("match.maps.rowTarget", { points: String(target) })}</span>
+                  <span className={styles.target}>{t("match.maps.rowTarget", { points: String(target) })}</span>
                 )}
               </span>
               <span className={styles.score} title={outcome}>

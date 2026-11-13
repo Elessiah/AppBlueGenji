@@ -227,6 +227,14 @@
   border: 0;
 }
 
+/* `<legend>` : bloc simple, la disposition en ligne vit dans un `<span>` (le flex
+   d'une légende n'est pas honoré partout). */
+.pointMapsLegend {
+  display: block;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
 .pointMapsTitle {
   font-size: 13px;
   font-weight: 600;
@@ -243,7 +251,6 @@
 }
 
 .pointMap {
-  display: grid;
   gap: 4px;
   min-width: 0;
 }

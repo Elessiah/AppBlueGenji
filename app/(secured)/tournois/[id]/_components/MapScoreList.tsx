@@ -314,7 +314,7 @@ export function MapScoreList({
               <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel} aria-hidden="true">
                   {labels.label}
-                  {rowTargetText && ` · ${rowTargetText}`}
+                  {rowTargetText && <span className={styles.mapTarget}>{rowTargetText}</span>}
                 </span>
                 {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
                     cinq lignes, « Code de replay » seul ne dirait pas laquelle. La

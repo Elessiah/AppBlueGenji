@@ -1123,19 +1123,14 @@ describe("pointTargetFacts", () => {
   });
 
   it("pointTargetFacts_perMapTargets_listsEachMapWithDetail", () => {
-    expect(pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 3] }, "Points", TEXT)).toEqual([
-      {
-        id: "pointTarget",
-        label: "Points",
-        value: "Map 1 : premier à 5 · Map 2 : premier à 3",
-        detail: "Maps suivantes : premier à 5.",
-      },
-    ]);
+    const [fact] = pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 3] }, "Points", TEXT);
+    expect(fact.detail).toBe("Maps suivantes : premier à 5.");
+    expect(renderToStaticMarkup(<>{fact.value}</>)).toMatch(/Map 1 : premier à 5<\/span><span>Map 2 : premier à 3/);
   });
 
   it("pointTargetFacts_everyMapOfFormatSet_omitsFollowingMapsDetail", () => {
-    expect(pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 3, 7] }, "Points", TEXT, { type: "BO", value: 3 })).toEqual([
-      { id: "pointTarget", label: "Points", value: "Map 1 : premier à 5 · Map 2 : premier à 3 · Map 3 : premier à 7" },
-    ]);
+    const [fact] = pointTargetFacts({ mapPointTarget: 5, mapPointTargets: [5, 3, 7] }, "Points", TEXT, { type: "BO", value: 3 });
+    expect(fact.detail).toBeUndefined();
+    expect(renderToStaticMarkup(<>{fact.value}</>)).toContain("Map 3 : premier à 7");
   });
 });

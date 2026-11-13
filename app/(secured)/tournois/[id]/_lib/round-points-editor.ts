@@ -69,13 +69,15 @@ export type MapPointField = "points" | `map-${number}`;
 
 /**
  * Champ à désigner pour un refus `INVALID_MAP_POINT_TARGET` (le serveur ne rend
- * qu'un code) : la première carte hors bornes, sinon la dernière carte que le
+ * qu'un code) : le nombre du tour s'il est hors bornes, sinon la première carte hors bornes, sinon la dernière carte que le
  * format joue (réglage trop long), sinon le nombre du tour.
  */
 export function invalidPointField(
   mapTargets: ReadonlyArray<MapPointDraft>,
   rows: number,
+  roundTarget: number | null = null,
 ): MapPointField {
+  if (roundTarget !== null && !isValidMapPointTarget(roundTarget)) return "points";
   const bad = mapTargets.findIndex((value) => value !== null && !isValidMapPointTarget(value));
   if (bad >= 0) return `map-${bad}`;
   if (mapTargets.length > rows && rows > 0) return `map-${rows - 1}`;

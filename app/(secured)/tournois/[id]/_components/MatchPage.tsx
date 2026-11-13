@@ -429,7 +429,14 @@ export function pointTargetFacts(
   if (target == null) return [];
   const perMap = match.mapPointTargets ?? [];
   if (!hasPerMapTargets(target, perMap)) return [{ id: "pointTarget", label, value: text.firstTo(String(target)) }];
-  const value = perMap.map((points, index) => text.mapFirstTo(String(index + 1), String(points))).join(" · ");
+  // Une ligne par carte réglée : une chaîne continue ne se lirait pas à 375 px sur cinq ou sept cartes.
+  const value = (
+    <span className={styles.factLines}>
+      {perMap.map((points, index) => (
+        <span key={index}>{text.mapFirstTo(String(index + 1), String(points))}</span>
+      ))}
+    </span>
+  );
   // Toutes les cartes du format réglées : aucune carte ne suit le match.
   if (format && perMap.length >= matchMaxMaps(format)) return [{ id: "pointTarget", label, value }];
   return [{ id: "pointTarget", label, value, detail: text.othersFirstTo(String(target)) }];

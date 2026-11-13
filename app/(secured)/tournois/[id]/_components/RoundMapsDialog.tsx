@@ -646,7 +646,7 @@ function RoundPointsForm({
       },
       (code, text) => {
         // Le serveur ne dit pas quelle carte : la même règle, rejouée ici, la retrouve.
-        if (code === "INVALID_MAP_POINT_TARGET") fieldErrors.flag(invalidPointField(mapTargets, rows), text);
+        if (code === "INVALID_MAP_POINT_TARGET") fieldErrors.flag(invalidPointField(mapTargets, rows, target), text);
         else fieldErrors.report(code, text);
       },
     );
@@ -693,12 +693,14 @@ function RoundPointsForm({
           )}
         </div>
         {rows > 0 && (
-          <fieldset className={styles.pointMaps} disabled={locked}>
-            <legend className={styles.labelRow}>
-              <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
-              <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
-                {t("dialog.pointsPerMapHint")}
-              </InfoHint>
+          <fieldset className={styles.pointMaps} disabled={locked || busy}>
+            <legend className={styles.pointMapsLegend}>
+              <span className={styles.labelRow}>
+                <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
+                <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
+                  {t("dialog.pointsPerMapHint")}
+                </InfoHint>
+              </span>
             </legend>
             <ol className={styles.pointMapList}>
               {shownDrafts.map((draft, index) => {
@@ -714,13 +716,15 @@ function RoundPointsForm({
                       max={MAP_POINT_TARGET_MAX}
                       value={draft ?? value}
                       onValueChange={(next) => setDrafts(editMapPointDraft(shownDrafts, index, next, value))}
-                      onEdit={() => fieldErrors.clear()}
+                      onEdit={() => fieldErrors.clear(field)}
                       {...fieldErrors.aria(field, draft === null && followsId)}
                     />
                     <FieldErrorText fieldId={mapInputId} message={fieldErrors.message(field)} />
-                    <span id={followsId} className={styles.muted}>
-                      {draft === null ? t("dialog.pointsMapFollows") : ""}
-                    </span>
+                    {draft === null && (
+                      <span id={followsId} className={styles.muted}>
+                        {t("dialog.pointsMapFollows")}
+                      </span>
+                    )}
                   </li>
                 );
               })}
