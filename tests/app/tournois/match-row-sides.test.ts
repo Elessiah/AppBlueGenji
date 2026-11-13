@@ -66,3 +66,27 @@ describe("matchSideViews", () => {
     expect(matchSideViews({ ...base, team2Id: null }, 2, false)[1].emptyLabel).toBe("TBD");
   });
 });
+
+describe("matchSideViews — match sur une seule carte", () => {
+  it("matchSideViews_displayScore_showsTheMapScore", () => {
+    const match = { ...base, team1Score: 1, team2Score: 0, winnerTeamId: 1, displayScore: { team1: 5, team2: 3 } };
+
+    const [a, b] = matchSideViews(match, 1, false);
+
+    expect(a).toMatchObject({ win: true, score: 5 });
+    expect(b).toMatchObject({ win: false, score: 3 });
+  });
+
+  it("matchSideViews_noDisplayScore_keepsTheMatchScore", () => {
+    const [a, b] = matchSideViews({ ...base, team1Score: 1, team2Score: 0, winnerTeamId: 1, displayScore: null }, 1, false);
+
+    expect(a.score).toBe(1);
+    expect(b.score).toBe(0);
+  });
+
+  it("matchSideViews_displayScoreOnForfeit_keepsFf", () => {
+    const match = { ...base, team1Score: 0, team2Score: 1, forfeitTeamId: 1, displayScore: { team1: 5, team2: 3 } };
+
+    expect(matchSideViews(match, 1, false)[0].score).toBe("FF");
+  });
+});

@@ -14,6 +14,7 @@
  * tant que le format est allumé sur le tournoi.
  */
 import { roundKeyId, type RoundKey } from "./round-maps";
+import { matchWinsRequired, type MatchFormat } from "./match-format";
 
 /** Bornes de N, partagées par le formulaire et le garde-fou serveur. */
 export const MAP_POINT_TARGET_MIN = 1;
@@ -92,4 +93,33 @@ export function duelMapScoreFault(
  */
 export function mapPointsLine(maps: ReadonlyArray<{ team1Score: number; team2Score: number }>): string {
   return maps.map((map) => `${map.team1Score}\u2013${map.team2Score}`).join(" \u00b7 ");
+}
+
+/** Score d'une carte, tel qu'un arbre ou une carte de match l'affiche. */
+export type DisplayScore = { team1: number; team2: number };
+
+/**
+ * Score **affiché** d'un match joué sur une seule carte (BO1 / FT1, Duel ou
+ * non) : celui de la carte (5–3), plutôt que le score du match (1–0), qui ne
+ * dit rien de plus que le vainqueur (`docs/features/MAP_SCORES.md`).
+ *
+ * `null` — on garde le score du match — hors format à une carte, sans score
+ * posé, sur un forfait, ou quand le détail ne tient pas en une seule carte
+ * (aucune saisie, ou une carte nulle rejouée). Affichage seul : classements et
+ * départages comptent toujours les cartes gagnées.
+ */
+export function singleMapDisplayScore(
+  match: {
+    team1Score: number | null;
+    team2Score: number | null;
+    forfeitTeamId: number | null;
+    maps: ReadonlyArray<{ team1Score: number; team2Score: number }>;
+  },
+  format: MatchFormat | null,
+): DisplayScore | null {
+  if (format === null || matchWinsRequired(format) !== 1) return null;
+  if (match.team1Score === null || match.team2Score === null || match.forfeitTeamId !== null) return null;
+  if (match.maps.length !== 1) return null;
+  const [map] = match.maps;
+  return { team1: map.team1Score, team2: map.team2Score };
 }

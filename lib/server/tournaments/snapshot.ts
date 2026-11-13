@@ -24,7 +24,8 @@
  * l'entrée ({@link invalidateTournamentSnapshot}). Personne ne lit donc un
  * score périmé.
  */
-import { effectiveMapPointTarget } from "@/lib/shared/map-points";
+import { effectiveMapPointTarget, singleMapDisplayScore } from "@/lib/shared/map-points";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { createHash } from "node:crypto";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
@@ -418,6 +419,23 @@ function attachPointTargets(
   }
 }
 
+/**
+ * Match sur une seule carte : le score de la carte à l'affichage (5–3 plutôt
+ * que 1–0), dans l'instantané commun — flux et REST de secours le portent
+ * ensemble (`docs/features/MAP_SCORES.md`). Champ posé seulement quand il dit
+ * quelque chose.
+ */
+function attachDisplayScores(
+  matches: BracketMatch[],
+  card: Pick<TournamentCard, "format" | "matchFormat" | "endurancePlayoffFormat">,
+): void {
+  for (const match of matches) {
+    const format = tournamentMatchFormat(card.format, card.matchFormat, card.endurancePlayoffFormat, match.roundNumber);
+    const score = singleMapDisplayScore(match, format);
+    if (score) match.displayScore = score;
+  }
+}
+
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
   const tournament = await loadMaintainedRow(tournamentId);
   if (!tournament) return null;
@@ -586,6 +604,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       await loadMapsByMatch(connection, matchIds),
     );
     attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets);
+    attachDisplayScores(mappedMatches, card);
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
     // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).
     // Dans l'instantané commun — l'état de chaque salon, jamais qui —, servi

@@ -69,6 +69,9 @@ chaque carte : 5–3 contre 5–2 est un écart.
   montre « Points : 5–3 · 2–5 » ; la modale de détail rappelle « Premier à N
   points ». Page du match : fait « Points par carte ». Réglages du tournoi :
   ligne « Points par carte (Duel / Arcade) », montrée allumée seulement.
+- Match en BO1 / FT1 : l'arbre et la carte du match montrent les points de
+  la carte (5–3), pas 1–0 (`displayScore`, `MAP_SCORES.md` § Affichage) ;
+  classements et départages comptent toujours 1–0.
 - Discord (journal « Match terminé ») : « (points : 5–3) » après le score, des
   chiffres seulement, aucun pseudo ; rien sur un forfait.
 

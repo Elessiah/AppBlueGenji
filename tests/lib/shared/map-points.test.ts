@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  singleMapDisplayScore,
   DEFAULT_MAP_POINT_TARGET,
   MAP_POINT_TARGET_MAX,
   MAP_POINT_TARGET_MIN,
@@ -120,5 +121,44 @@ describe("mapPointsLine", () => {
 
   it("mapPointsLine_noMap_returnsEmpty", () => {
     expect(mapPointsLine([])).toBe("");
+  });
+});
+
+describe("singleMapDisplayScore", () => {
+  const BO1 = { type: "BO", value: 1 } as const;
+  const played = { team1Score: 1, team2Score: 0, forfeitTeamId: null, maps: [{ team1Score: 5, team2Score: 3 }] };
+
+  it("singleMapDisplayScore_bo1WithOneMap_returnsTheMapScore", () => {
+    expect(singleMapDisplayScore(played, BO1)).toEqual({ team1: 5, team2: 3 });
+  });
+
+  it("singleMapDisplayScore_ft1WithOneMap_returnsTheMapScore", () => {
+    expect(singleMapDisplayScore(played, { type: "FT", value: 1 })).toEqual({ team1: 5, team2: 3 });
+  });
+
+  it("singleMapDisplayScore_bo3_returnsNull", () => {
+    expect(singleMapDisplayScore(played, { type: "BO", value: 3 })).toBeNull();
+  });
+
+  it("singleMapDisplayScore_freeFormat_returnsNull", () => {
+    expect(singleMapDisplayScore(played, null)).toBeNull();
+  });
+
+  it("singleMapDisplayScore_noMapRecorded_returnsNull", () => {
+    expect(singleMapDisplayScore({ ...played, maps: [] }, BO1)).toBeNull();
+  });
+
+  it("singleMapDisplayScore_drawnMapReplayed_returnsNull", () => {
+    const maps = [{ team1Score: 2, team2Score: 2 }, { team1Score: 3, team2Score: 1 }];
+
+    expect(singleMapDisplayScore({ ...played, maps }, BO1)).toBeNull();
+  });
+
+  it("singleMapDisplayScore_forfeit_returnsNull", () => {
+    expect(singleMapDisplayScore({ ...played, forfeitTeamId: 2 }, BO1)).toBeNull();
+  });
+
+  it("singleMapDisplayScore_noScorePosted_returnsNull", () => {
+    expect(singleMapDisplayScore({ ...played, team1Score: null, team2Score: null }, BO1)).toBeNull();
   });
 });

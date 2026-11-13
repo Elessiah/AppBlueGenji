@@ -868,3 +868,47 @@ describe("castersOnReadStreams", () => {
     expect(castersOnReadStreams(streams, casters)).toEqual(casters);
   });
 });
+
+describe("getTournamentSnapshot — score affiché d'un match sur une seule carte", () => {
+  const BO1 = { match_format_type: "BO", match_format_value: 1 } as const;
+  const final = (team1Score: number, team2Score: number) => ({
+    final: [{ mapNumber: 1, replayCode: "", team1Score, team2Score }],
+    team1: [],
+    team2: [],
+  });
+
+  function playedMatch() {
+    return matchRow({ id: 1, status: "COMPLETED", team1_score: 1, team2_score: 0, winner_team_id: 11, team1_id: 11, team2_id: 12 });
+  }
+
+  it("getTournamentSnapshot_bo1WithMapPoints_carriesTheMapScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow(BO1));
+    jest.mocked(getMatchRows).mockResolvedValue([playedMatch()]);
+    jest.mocked(loadMapsByMatch).mockResolvedValue(new Map([[1, final(5, 3)]]));
+
+    const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(match.displayScore).toEqual({ team1: 5, team2: 3 });
+    // Le score du match, que lisent classements et départages, reste 1–0.
+    expect([match.team1Score, match.team2Score]).toEqual([1, 0]);
+  });
+
+  it("getTournamentSnapshot_bo3_noDisplayScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ match_format_type: "BO", match_format_value: 3 }));
+    jest.mocked(getMatchRows).mockResolvedValue([playedMatch()]);
+    jest.mocked(loadMapsByMatch).mockResolvedValue(new Map([[1, final(5, 3)]]));
+
+    const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(match.displayScore).toBeUndefined();
+  });
+
+  it("getTournamentSnapshot_bo1WithoutMapDetail_noDisplayScore", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow(BO1));
+    jest.mocked(getMatchRows).mockResolvedValue([playedMatch()]);
+
+    const [match] = (await getTournamentSnapshot(TOURNAMENT_ID))?.matches ?? [];
+
+    expect(match.displayScore).toBeUndefined();
+  });
+});

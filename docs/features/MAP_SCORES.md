@@ -363,6 +363,16 @@ le tait.
   de secours (le détail des propositions, lui, passe par le contexte du
   lecteur — voir ci-dessus).
   Le détail retenu s'affiche tel quel, sauf sur un forfait.
+- **Match sur une seule carte** (BO1 / FT1, tout format, Duel ou non) : l'arbre,
+  la carte du match (`/suivre` compris) et l'en-tête de la page du match
+  montrent le **score de la carte** (5–3), pas celui du match (1–0).
+  `singleMapDisplayScore` (`lib/shared/map-points.ts`) le pose en
+  `BracketMatch.displayScore` dans l'instantané commun (`attachDisplayScores`,
+  flux SSE et REST de secours), lu par `matchSideViews`. Rien sans détail d'une
+  seule carte (vainqueur seul, carte nulle rejouée), ni sur un forfait : 1–0
+  reste affiché. **Affichage seul** — `team1Score` / `team2Score` restent les
+  cartes gagnées, que comptent Suisse, Survie, BG Survie, classements et
+  départages. La carte de l'accueil ne montre jamais de match joué.
 - Carte de match : bouton « Détail des maps (N) » qui ouvre une **modale** (un volet déplié dans la carte grandissait chaque créneau de l'arbre), score de chaque map et code
   copiable — « Pas de code de replay » (sans bouton de copie) pour une map
   posée sans code par l'arbitrage. **Décision de l'utilisateur (2026-10-06)** : les codes retenus
