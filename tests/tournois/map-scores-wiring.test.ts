@@ -545,7 +545,15 @@ describe("format Duel / Arcade — refus des points rattaché à un champ rendu"
     const field = readSource("app/(secured)/tournois/_components/DuelArcadeField.tsx");
     expect(field).toContain("const errorFieldId = checked ? MAP_POINT_TARGET_FIELD_ID : DUEL_ARCADE_FIELD_ID;");
     expect(field).toContain("<FieldErrorText fieldId={errorFieldId} message={error} />");
-    expect(field).toContain('aria-invalid={checked ? undefined : aria["aria-invalid"]}');
+    expect(field).toContain("aria-invalid={checked || !error ? undefined : true}");
+  });
+
+  it("DuelArcadeField_uncheckedWithoutError_describedOnlyByMoreInfo", () => {
+    const field = readSource("app/(secured)/tournois/_components/DuelArcadeField.tsx");
+    expect(field).toContain(
+      "checked || !error ? DUEL_ARCADE_MORE_ID : `${fieldErrorId(DUEL_ARCADE_FIELD_ID)} ${DUEL_ARCADE_MORE_ID}`",
+    );
+    expect(field).not.toContain('[aria["aria-describedby"], DUEL_ARCADE_MORE_ID]');
   });
 
   it("TournamentForm_duelOff_pointsRefusalTargetsTheCheckbox", () => {

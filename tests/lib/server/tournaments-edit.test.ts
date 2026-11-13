@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/snapshot");
+jest.mock("@/lib/server/tournaments/round-maps-notice");
 
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
+import { queueRoundMapsNotice, scheduleRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice";
 import { loadEditableTournament, updateTournament } from "@/lib/server/tournaments/edit";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -52,6 +54,7 @@ let rowToReturn: Record<string, unknown> | null;
 let phaseRowsToReturn: Record<string, unknown>[] = [];
 /** Matchs lus par le verrou des points par carte (`assertMapPointsUnlocked`). */
 let matchRowsToReturn: Record<string, unknown>[] = [];
+let roundMapRowsToReturn: Record<string, unknown>[] = [];
 
 const connection = {
   beginTransaction: jest.fn(async () => undefined),
@@ -60,6 +63,7 @@ const connection = {
   release: jest.fn(() => undefined),
   execute: jest.fn(async (sql: string, params: unknown[] = []) => {
     executed.push({ sql, params });
+    if (/^\s*SELECT[\s\S]*FROM bg_tournament_round_maps/i.test(sql)) return [roundMapRowsToReturn];
     if (/FROM bg_tournaments/i.test(sql)) return [rowToReturn ? [rowToReturn] : []];
     if (/FROM bg_tournament_phases/i.test(sql)) return [phaseRowsToReturn];
     if (/FROM bg_match_maps/i.test(sql)) return [[]];
@@ -73,6 +77,7 @@ beforeEach(() => {
   rowToReturn = hiddenRow();
   phaseRowsToReturn = [];
   matchRowsToReturn = [];
+  roundMapRowsToReturn = [];
   jest.clearAllMocks();
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: async () => connection,
@@ -448,6 +453,99 @@ describe("updateTournament — format Duel / Arcade", () => {
     expect(clear!.params).toEqual([1]);
     const remove = executed.find((q) => /DELETE FROM bg_tournament_round_maps/.test(q.sql));
     expect(remove!.sql).toMatch(/slots_json = '\[\]' AND tiebreak_map IS NULL AND map_point_target IS NULL/);
+  });
+
+  it("updateTournament_duelTurnedOff_announcesEachClearedRound", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5 });
+    roundMapRowsToReturn = [{ phase_id: 0, bracket: "UPPER", round_number: 3, map_point_target: 7 }];
+
+    await updateTournament(1, { mapPointTarget: null });
+
+    expect(jest.mocked(queueRoundMapsNotice)).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      [expect.objectContaining({ phaseId: 0, bracket: "UPPER", roundNumber: 3 })],
+      { points: true },
+    );
+    expect(jest.mocked(scheduleRoundMapsNotice)).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTournament_duelTurnedOffWithoutRoundTargets_schedulesNothing", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5 });
+
+    await updateTournament(1, { mapPointTarget: null });
+
+    expect(jest.mocked(scheduleRoundMapsNotice)).not.toHaveBeenCalled();
+  });
+
+  it("updateTournament_formatChangedToSingle_prunesUnplayableRoundTargets", async () => {
+    rowToReturn = hiddenRow({ format: "DOUBLE", map_point_target: 5 });
+    roundMapRowsToReturn = [
+      { phase_id: 0, bracket: "GRAND", round_number: 1, map_point_target: 7 },
+      { phase_id: 0, bracket: "UPPER", round_number: 2, map_point_target: 3 },
+    ];
+
+    await updateTournament(1, { format: "SINGLE" });
+
+    const cleared = executed.filter((q) => /UPDATE bg_tournament_round_maps SET map_point_target = NULL/.test(q.sql));
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0].params).toEqual([1, 0, "GRAND", 1]);
+    expect(executed.some((q) => /DELETE FROM bg_tournament_round_maps/.test(q.sql))).toBe(true);
+    expect(jest.mocked(scheduleRoundMapsNotice)).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTournament_formatChangedAllRoundsStillPlayable_writesNothing", async () => {
+    rowToReturn = hiddenRow({ format: "SINGLE", map_point_target: 5 });
+    roundMapRowsToReturn = [{ phase_id: 0, bracket: "UPPER", round_number: 2, map_point_target: 3 }];
+
+    await updateTournament(1, { format: "DOUBLE" });
+
+    expect(executed.some((q) => /UPDATE bg_tournament_round_maps|DELETE FROM bg_tournament_round_maps/.test(q.sql))).toBe(false);
+    expect(jest.mocked(queueRoundMapsNotice)).not.toHaveBeenCalled();
+  });
+
+  it("updateTournament_multiPhasesReplaced_prunesOldPhaseTargets", async () => {
+    rowToReturn = hiddenRow({ format: "MULTI", map_point_target: 5 });
+    phaseRowsToReturn = [{ id: 12, format: "SINGLE", has_third_place_match: 0 }];
+    roundMapRowsToReturn = [
+      { phase_id: 4, bracket: "UPPER", round_number: 1, map_point_target: 7 },
+      { phase_id: 12, bracket: "UPPER", round_number: 1, map_point_target: 3 },
+      { phase_id: 12, bracket: "THIRD_PLACE", round_number: 1, map_point_target: 3 },
+    ];
+
+    await updateTournament(1, {
+      format: "MULTI",
+      phases: [
+        {
+          position: 1,
+          format: "SWISS",
+          name: null,
+          qualifierMode: "COUNT",
+          qualifierValue: 8,
+          hasThirdPlaceMatch: false,
+          swissTotalRounds: 4,
+          survivalRoundsBeforeFirstCut: null,
+          survivalRoundsPerCut: null,
+        },
+        {
+          position: 2,
+          format: "SINGLE",
+          name: null,
+          qualifierMode: "COUNT",
+          qualifierValue: 1,
+          hasThirdPlaceMatch: false,
+          swissTotalRounds: null,
+          survivalRoundsBeforeFirstCut: null,
+          survivalRoundsPerCut: null,
+        },
+      ],
+    });
+
+    const cleared = executed.filter((q) => /UPDATE bg_tournament_round_maps SET map_point_target = NULL/.test(q.sql));
+    expect(cleared.map((q) => q.params)).toEqual([
+      [1, 4, "UPPER", 1],
+      [1, 12, "THIRD_PLACE", 1],
+    ]);
   });
 
   it("updateTournament_duelKept_leavesRoundTargets", async () => {

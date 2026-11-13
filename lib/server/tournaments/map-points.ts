@@ -27,6 +27,12 @@ export function matchRoundKey(match: { phase_id?: number | null; bracket: string
  * pour `setRoundPointTarget`) peut s'interbloquer, ce que `retryOnDeadlock`
  * rejoue sur tous les chemins de saisie. Le N du tournoi, lui, n'est plus
  * modifiable une fois des matchs créés (fenêtre `LOCKED`).
+ *
+ * Coût assumé : sans ligne pour la manche (cas courant), la lecture pose un
+ * verrou d'intervalle partagé, qui ne gêne que l'**insertion** d'une manche
+ * voisine (cartes, départage, points) pendant la saisie. Ces écritures du staff
+ * passent toutes par `retryOnDeadlock` ; une lecture simple, elle, jugerait le
+ * score sur un réglage périmé (`REPEATABLE READ`), ce qu'aucun rejeu ne répare.
  */
 export async function loadMatchPointTarget(
   connection: PoolConnection,

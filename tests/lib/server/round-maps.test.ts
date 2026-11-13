@@ -997,7 +997,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_multiSwissPhaseLower_throwsInvalidRound", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
-      { pattern: /SELECT format FROM bg_tournament_phases/, rows: [{ format: "SWISS" }] },
+      { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "SWISS" }] },
     ]);
 
     await expect(setRoundPointTarget(7, { phaseId: 4, bracket: "LOWER", roundNumber: 1 }, 3)).rejects.toThrow("INVALID_ROUND");
@@ -1006,7 +1006,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_multiDoublePhaseLower_upserts", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
-      { pattern: /SELECT format FROM bg_tournament_phases/, rows: [{ format: "DOUBLE" }] },
+      { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "DOUBLE" }] },
       { pattern: /^SELECT id, team1_score/, rows: [BLANK_MATCH] },
     ]);
 
@@ -1014,6 +1014,36 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
 
     const [insert] = writes(/INSERT INTO bg_tournament_round_maps/);
     expect(insert[1]).toEqual([7, 4, "LOWER", 1, 3]);
+  });
+
+  it("setRoundPointTarget_singleWithoutThirdPlaceMatch_thirdPlaceThrowsInvalidRound", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "SINGLE", has_third_place_match: 0, map_point_target: 5 }] },
+    ]);
+
+    await expect(setRoundPointTarget(7, { phaseId: 0, bracket: "THIRD_PLACE", roundNumber: 1 }, 3)).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
+  it("setRoundPointTarget_singleWithThirdPlaceMatch_thirdPlaceUpserts", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "SINGLE", has_third_place_match: 1, map_point_target: 5 }] },
+      { pattern: /^SELECT id, team1_score/, rows: [BLANK_MATCH] },
+    ]);
+
+    await setRoundPointTarget(7, { phaseId: 0, bracket: "THIRD_PLACE", roundNumber: 1 }, 3);
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(1);
+  });
+
+  it("setRoundPointTarget_multiSinglePhaseWithoutThirdPlace_throwsInvalidRound", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
+      { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "SINGLE", has_third_place_match: 0 }] },
+    ]);
+
+    await expect(setRoundPointTarget(7, { phaseId: 4, bracket: "THIRD_PLACE", roundNumber: 1 }, 3)).rejects.toThrow("INVALID_ROUND");
   });
 
   it("setRoundPointTarget_newTarget_queuesPointsNotice", async () => {

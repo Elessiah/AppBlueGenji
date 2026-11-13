@@ -31,7 +31,11 @@ Seuls onze champs survivent à la publication (`RESTRICTED_FIELDS`) :
 - `matchFormat` et `mapPointTarget` — format des matchs et points par carte
   (`DUEL_ARCADE.md`) : passer un BO9 en BO1 + premier à 5 pendant les
   inscriptions, inscrites comprises (décision DUEL-ARCADE). Les points sont
-  refusés (`MAP_POINTS_LOCKED`, 409) si un match porte déjà un score.
+  refusés (`MAP_POINTS_LOCKED`, 409) si un match porte déjà un score. Décocher
+  Duel efface dans la même transaction **tous** les points réglés par tour
+  (irréversible, même en recochant ensuite) et le signale au journal du staff ;
+  changer le format (ou les phases d'un MULTI) efface les réglages de tour que
+  le nouveau format ne joue plus.
 
 Tout ce qui change la **structure** du tournoi est verrouillé : format, jeu, barèmes, réglages. Changez une `Survie` en `Double élimination` une fois que le tournoi est lisible, et vous démentez l'annonce lue par les équipes.
 

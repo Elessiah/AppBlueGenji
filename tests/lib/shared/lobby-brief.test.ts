@@ -48,6 +48,16 @@ function cappedSide(overrides: Partial<LobbyBriefSide>): LobbyBriefSide {
 const INVITE = "https://discord.gg/Sgdh3p4VhC";
 
 describe("formatLobbyBriefDm", () => {
+  it("formatLobbyBriefDm_pointTargetOne_singularFrAndEn", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 1 }), URL)).toContain("chaque carte se gagne au premier à 1 point.");
+    expect(formatLobbyBriefDm(side({ pointTarget: 1 }), URL, "en")).toContain("each map is won by the first to 1 point.");
+  });
+
+  it("formatLobbyBriefDm_pointTargetSeveral_pluralFrAndEn", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
+    expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL, "en")).toContain("each map is won by the first to 5 points.");
+  });
+
   it("écrit le check-in en français : titre, préparation, paramètres, maps et pied", () => {
     expect(formatLobbyBriefDm(side(), URL)).toBe(
       [

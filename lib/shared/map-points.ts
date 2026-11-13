@@ -62,14 +62,18 @@ export function effectiveMapPointTarget(
 /**
  * Tableau (`bracket`) qu'un format peut jouer : `UPPER` partout, `LOWER` et
  * `GRAND` en double élimination seulement, la petite finale (`THIRD_PLACE`) en
- * élimination simple et dans l'arbre final de BlueGenji Survie. Garde-fou de la
+ * élimination simple qui la joue (`hasThirdPlaceMatch`) et dans l'arbre final de BlueGenji Survie. Garde-fou de la
  * pose des points d'un tour : une clé que le format ne jouera jamais n'est
  * pas écrite (ligne orpheline portée par chaque instantané).
  */
-export function bracketFitsFormat(format: TournamentFormat | PhaseFormat, bracket: string): boolean {
+export function bracketFitsFormat(
+  format: TournamentFormat | PhaseFormat,
+  bracket: string,
+  hasThirdPlaceMatch = false,
+): boolean {
   if (bracket === "UPPER") return true;
   if (bracket === "LOWER" || bracket === "GRAND") return format === "DOUBLE";
-  if (bracket === "THIRD_PLACE") return format === "SINGLE" || format === "BG_SURVIE";
+  if (bracket === "THIRD_PLACE") return (format === "SINGLE" && hasThirdPlaceMatch) || format === "BG_SURVIE";
   return false;
 }
 

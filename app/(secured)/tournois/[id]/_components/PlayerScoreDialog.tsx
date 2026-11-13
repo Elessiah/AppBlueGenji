@@ -111,7 +111,8 @@ export function scoreText(report: MatchScoreReport, format: MatchFormat | null =
  * Phrase du désaccord. À score égal, ce sont les maps qui diffèrent (codes de
  * replay ou scores de map, `MAP_SCORES.md`) : le dire, sans quoi « toi : 2 – 1,
  * eux : 2 – 1 » n'expliquerait rien. Sur un match à une carte, le score cité
- * est celui de la carte (`scoreText`) : « 5 – 3 contre 5 – 4 » dit l'écart.
+ * est celui de la carte (`scoreText`) : « 5 – 3 contre 5 – 4 » dit l'écart —
+ * pourvu que les deux propositions n'aient qu'une carte.
  */
 export function conflictText(
   text: TournamentDialogsText,
@@ -120,8 +121,15 @@ export function conflictText(
   opponentName: string,
   format: MatchFormat | null = null,
 ): string {
-  const mineText = scoreText(mine, format);
-  const theirsText = scoreText(theirs, format);
+  // Même unité des deux côtés : les points de la carte seulement si les deux
+  // propositions n'en ont qu'une (une carte nulle rejouée en fait deux), sinon
+  // le score du match — jamais « 5 – 3 » contre « 1 – 0 ».
+  const bothSingle =
+    singleMapDisplayScore({ ...mine, forfeitTeamId: null }, format) !== null &&
+    singleMapDisplayScore({ ...theirs, forfeitTeamId: null }, format) !== null;
+  const shownFormat = bothSingle ? format : null;
+  const mineText = scoreText(mine, shownFormat);
+  const theirsText = scoreText(theirs, shownFormat);
   return mineText === theirsText
     ? text.t("score.player.conflictMaps", { score: mineText, opponent: opponentName })
     : text.t("score.player.conflictScores", { mine: mineText, opponent: opponentName, theirs: theirsText });

@@ -152,6 +152,7 @@ type TournamentRow = RowDataPacket & MapRulesColumns & {
   name: string;
   format: string;
   map_point_target?: number | null;
+  has_third_place_match?: number | boolean | null;
 };
 
 /**
@@ -160,7 +161,7 @@ type TournamentRow = RowDataPacket & MapRulesColumns & {
  */
 async function lockTournament(connection: PoolConnection, tournamentId: number): Promise<TournamentRow> {
   const [rows] = await connection.execute<TournamentRow[]>(
-    `SELECT id, name, format, first_ban_rule, next_ban_rule, next_pick_rule, map_point_target
+    `SELECT id, name, format, first_ban_rule, next_ban_rule, next_pick_rule, map_point_target, has_third_place_match
        FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
     [tournamentId],
   );
@@ -213,18 +214,26 @@ async function roundsOfTournament(
  */
 async function roundFitsTournament(
   connection: PoolConnection,
-  tournament: Pick<TournamentRow, "id" | "format">,
+  tournament: Pick<TournamentRow, "id" | "format" | "has_third_place_match">,
   round: RoundKey,
 ): Promise<boolean> {
   if (tournament.format !== "MULTI") {
-    return round.phaseId === 0 && bracketFitsFormat(tournament.format as TournamentFormat, round.bracket);
+    return (
+      round.phaseId === 0 &&
+      bracketFitsFormat(tournament.format as TournamentFormat, round.bracket, Boolean(Number(tournament.has_third_place_match)))
+    );
   }
   if (round.phaseId === 0) return false;
-  const [rows] = await connection.execute<(RowDataPacket & { format: PhaseFormat })[]>(
-    `SELECT format FROM bg_tournament_phases WHERE tournament_id = ? AND id = ? LIMIT 1`,
+  const [rows] = await connection.execute<
+    (RowDataPacket & { format: PhaseFormat; has_third_place_match: number | boolean | null })[]
+  >(
+    `SELECT format, has_third_place_match FROM bg_tournament_phases WHERE tournament_id = ? AND id = ? LIMIT 1`,
     [Number(tournament.id), round.phaseId],
   );
-  return rows[0] !== undefined && bracketFitsFormat(rows[0].format, round.bracket);
+  return (
+    rows[0] !== undefined &&
+    bracketFitsFormat(rows[0].format, round.bracket, Boolean(Number(rows[0].has_third_place_match)))
+  );
 }
 
 /** Tours au plus d'une copie « à tous les tours » (partagé avec l'écran, qui découpe). */

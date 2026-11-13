@@ -182,8 +182,13 @@ describe("bracketFitsFormat", () => {
     expect(bracketFitsFormat("SINGLE", "LOWER")).toBe(false);
   });
 
-  it("bracketFitsFormat_thirdPlaceInSingle_true", () => {
-    expect(bracketFitsFormat("SINGLE", "THIRD_PLACE")).toBe(true);
+  it("bracketFitsFormat_thirdPlaceInSingleWithThirdPlaceMatch_true", () => {
+    expect(bracketFitsFormat("SINGLE", "THIRD_PLACE", true)).toBe(true);
+  });
+
+  it("bracketFitsFormat_thirdPlaceInSingleWithoutThirdPlaceMatch_false", () => {
+    expect(bracketFitsFormat("SINGLE", "THIRD_PLACE")).toBe(false);
+    expect(bracketFitsFormat("SINGLE", "THIRD_PLACE", false)).toBe(false);
   });
 
   it("bracketFitsFormat_thirdPlaceInBgSurvie_true", () => {

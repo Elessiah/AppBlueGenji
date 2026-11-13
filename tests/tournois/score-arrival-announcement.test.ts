@@ -64,6 +64,25 @@ describe("modale de score — match sur une carte (format Duel / Arcade)", () =>
     expect(conflictText(FR, report(5, 3), report(5, 3), "Les Loups", BO1)).toContain("Même score (5 – 3)");
   });
 
+  it("conflictText_bo1OneSideReplayedADraw_citesBothMatchScores", () => {
+    const replayed: MatchScoreReport = {
+      team1Score: 1,
+      team2Score: 0,
+      reportedAt: "2026-09-28T20:00:00.000Z",
+      maps: [
+        { mapNumber: 1, replayCode: "ABC123", team1Score: 3, team2Score: 3 },
+        { mapNumber: 2, replayCode: "DEF456", team1Score: 5, team2Score: 2 },
+      ],
+    };
+    expect(conflictText(EN, report(5, 3), replayed, "Wolves", BO1)).toContain("Same score (1 – 0)");
+  });
+
+  it("conflictText_bo1DetailStillLoading_citesBothMatchScores", () => {
+    const loading: MatchScoreReport = { team1Score: 0, team2Score: 1, reportedAt: "2026-09-28T20:00:00.000Z", maps: [] };
+    expect(conflictText(FR, report(5, 3), loading, "Les Loups", BO1)).toContain("1 – 0");
+    expect(conflictText(FR, report(5, 3), loading, "Les Loups", BO1)).not.toContain("5 – 3");
+  });
+
   it("diffZoneTitle_bo1Theirs_citesPoints", () => {
     expect(diffZoneTitle(FR, false, "Les Loups", report(5, 4), BO1)).toBe("Déclaration de Les Loups : 5 – 4");
   });

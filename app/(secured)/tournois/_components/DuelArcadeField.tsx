@@ -4,7 +4,7 @@ import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
 import { MAP_POINT_TARGET_MAX, MAP_POINT_TARGET_MIN } from "@/lib/shared/map-points";
-import type { FieldAria } from "@/lib/shared/field-errors";
+import { fieldErrorId, type FieldAria } from "@/lib/shared/field-errors";
 import { CHECKBOX_CARD_LAYOUT, CHECKBOX_CARD_TITLE, checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import { useFormText } from "../_lib/form-text";
 
@@ -52,9 +52,10 @@ export function DuelArcadeField({
   // Décochée, le champ des points n'existe pas : un refus des points
   // (`MAP_POINTS_LOCKED` en décochant sous un score) se rattache à la case.
   const errorFieldId = checked ? MAP_POINT_TARGET_FIELD_ID : DUEL_ARCADE_FIELD_ID;
-  const checkboxDescribedBy = checked
-    ? DUEL_ARCADE_MORE_ID
-    : [aria["aria-describedby"], DUEL_ARCADE_MORE_ID].filter(Boolean).join(" ");
+  // Décochée, la case ne reçoit que le refus (le texte d'aide des points
+  // décrit un champ absent) : sa description ne change qu'avec une erreur.
+  const checkboxDescribedBy =
+    checked || !error ? DUEL_ARCADE_MORE_ID : `${fieldErrorId(DUEL_ARCADE_FIELD_ID)} ${DUEL_ARCADE_MORE_ID}`;
   return (
     <div style={FULL_WIDTH}>
       <div className="checkbox-card" style={{ ...CHECKBOX_CARD_LAYOUT, ...checkboxCardChrome(checked, locked) }}>
@@ -66,7 +67,7 @@ export function DuelArcadeField({
           onChange={(e) => onCheckedChange(e.target.checked)}
           aria-labelledby="duel-arcade-label"
           aria-describedby={checkboxDescribedBy}
-          aria-invalid={checked ? undefined : aria["aria-invalid"]}
+          aria-invalid={checked || !error ? undefined : true}
           className="checkbox-card-input"
         />
         <div style={{ flex: 1, minWidth: 0 }}>
