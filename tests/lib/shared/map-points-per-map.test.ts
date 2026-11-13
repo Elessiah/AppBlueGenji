@@ -9,7 +9,9 @@ import {
   normalizeMapPointTargets,
   parseStoredMapPointTargets,
   roundMapPointTargetsOf,
+  sameMapPointTargets,
   serializeMapPointTargets,
+  trimMapPointTargets,
 } from "@/lib/shared/map-points";
 import {
   checkMapList,
@@ -25,9 +27,6 @@ import {
   invalidPointField,
   mapPointDrafts,
   mapPointRowCount,
-  mapPointTargetsToSend,
-  sameMapPointTargets,
-  shownSavedMapPointTargets,
 } from "@/app/(secured)/tournois/[id]/_lib/round-points-editor";
 
 /**
@@ -285,12 +284,6 @@ describe("mapPointRowCount", () => {
   });
 });
 
-describe("shownSavedMapPointTargets", () => {
-  it("shownSavedMapPointTargets_savedLongerThanRows_clipped", () => {
-    expect(shownSavedMapPointTargets([5, 3, 7, 9], 3)).toEqual([5, 3, 7]);
-  });
-});
-
 describe("mapPointDrafts", () => {
   it("mapPointDrafts_savedEqualToRound_keepsExplicitValueAndPads", () => {
     expect(mapPointDrafts([7, 3], 3)).toEqual([7, 3, null]);
@@ -307,15 +300,11 @@ describe("editMapPointDraft", () => {
   });
 });
 
-describe("mapPointTargetsToSend", () => {
-  it("mapPointTargetsToSend_trailingNulls_trimmed", () => {
-    expect(mapPointTargetsToSend([null, 3, null, null])).toEqual([null, 3]);
-  });
-
+describe("trimMapPointTargets (envoi de l'écran)", () => {
   // Une carte réglée à 7 garde son 7 quand le tour vaut aussi 7 : elle ne
   // devient pas une carte qui suit le tour.
-  it("mapPointTargetsToSend_explicitEqualToRound_kept", () => {
-    expect(mapPointTargetsToSend([null, 7, null])).toEqual([null, 7]);
+  it("trimMapPointTargets_explicitEqualToRound_kept", () => {
+    expect(trimMapPointTargets([null, 7, null])).toEqual([null, 7]);
   });
 });
 

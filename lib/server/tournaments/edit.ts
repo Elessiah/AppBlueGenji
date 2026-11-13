@@ -443,11 +443,12 @@ function roundPointsChange(
       (patch.format !== undefined && patch.format !== current.format) ||
       patch.phases !== undefined ||
       (patch.hasThirdPlaceMatch !== undefined && patch.hasThirdPlaceMatch !== current.hasThirdPlaceMatch),
+    // Valeurs **validées** (plafond de cartes borné, nulles normalisées) : un
+    // patch qui revient au même ne balaie rien, un qui raccourcit est vu.
     matchFormatChanged:
-      (patch.format !== undefined && patch.format !== current.format) ||
-      (patch.matchFormat !== undefined && !sameMatchFormat(patch.matchFormat, current.matchFormat)) ||
-      (patch.endurancePlayoffFormat !== undefined &&
-        !sameMatchFormat(patch.endurancePlayoffFormat, current.endurancePlayoffFormat)),
+      valid.format !== current.format ||
+      !sameMatchFormat(valid.matchFormat ?? null, current.matchFormat) ||
+      !sameMatchFormat(valid.endurancePlayoffFormat ?? null, current.endurancePlayoffFormat),
     format: valid.format,
     hasThirdPlaceMatch: valid.hasThirdPlaceMatch,
     maxMaps: (roundNumber) => roundMaxMaps(valid, roundNumber),

@@ -71,7 +71,7 @@ import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
-import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
+import { applyMapRules, roundKeyId, type RoundTiebreak, type TournamentMapRules } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks, indexBuiltRounds, roundMaxMaps, withoutUnbuiltRounds } from "@/lib/shared/round-plan";
 import { forgetLiveRefereeNames, withoutRefereeKeys } from "./referee-names";
@@ -476,6 +476,24 @@ function attachDisplayScores(
   }
 }
 
+/**
+ * Réglages de manche des seuls tours que le tournoi jouera (`withoutUnbuiltRounds`) :
+ * cartes, départages, points du tour et points carte par carte.
+ */
+function builtRoundsMapRules(
+  rules: TournamentMapRules,
+  scope: Parameters<typeof withoutUnbuiltRounds>[1],
+  index: Parameters<typeof withoutUnbuiltRounds>[2],
+): TournamentMapRules {
+  return {
+    ...rules,
+    rounds: withoutUnbuiltRounds(rules.rounds, scope, index),
+    tiebreaks: withoutUnbuiltRounds(rules.tiebreaks, scope, index),
+    ...(rules.pointTargets ? { pointTargets: withoutUnbuiltRounds(rules.pointTargets, scope, index) } : {}),
+    ...(rules.mapPointTargets ? { mapPointTargets: withoutUnbuiltRounds(rules.mapPointTargets, scope, index) } : {}),
+  };
+}
+
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
   const tournament = await loadMaintainedRow(tournamentId);
   if (!tournament) return null;
@@ -628,18 +646,11 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
         roundNumber: Number(row.round_number),
       })),
     );
-    const planScope = { format: card.format, phases: phasesDetail?.phases ?? null };
-    const storedMapRules = {
-      ...loadedMapRules,
-      rounds: withoutUnbuiltRounds(loadedMapRules.rounds, planScope, builtIndex),
-      tiebreaks: withoutUnbuiltRounds(loadedMapRules.tiebreaks, planScope, builtIndex),
-      ...(loadedMapRules.pointTargets
-        ? { pointTargets: withoutUnbuiltRounds(loadedMapRules.pointTargets, planScope, builtIndex) }
-        : {}),
-      ...(loadedMapRules.mapPointTargets
-        ? { mapPointTargets: withoutUnbuiltRounds(loadedMapRules.mapPointTargets, planScope, builtIndex) }
-        : {}),
-    };
+    const storedMapRules = builtRoundsMapRules(
+      loadedMapRules,
+      { format: card.format, phases: phasesDetail?.phases ?? null },
+      builtIndex,
+    );
     // Map de départage : celles des seuls tours éligibles (play-offs à format
     // défini) — un réglage resté d'un format changé depuis n'est pas montré.
     const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {

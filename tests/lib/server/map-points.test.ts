@@ -199,6 +199,16 @@ describe("loadMatchPointRules", () => {
     expect(actual).toEqual({ pointTarget: 5, pointTargets: [3] });
   });
 
+  // Même borne que l'instantané et le brief : la règle qui juge un score est
+  // celle que les deux portes montrent.
+  it("loadMatchPointRules_perMapLongerThanMaxMaps_clipsToMaxMaps", async () => {
+    route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 5, map_point_targets: "[3,7,9]" }] }]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND, 2);
+
+    expect(actual).toEqual({ pointTarget: 5, pointTargets: [3, 7] });
+  });
+
   it("loadMatchPointRules_noRow_returnsTournamentTargetOnly", async () => {
     route([]);
 

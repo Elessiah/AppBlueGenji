@@ -288,7 +288,10 @@ async function assertRoundPointsPosable(
   if (tournament.state === "FINISHED") throw new Error("MAP_POINTS_FINISHED");
   if ((await roundsFittingTournament(connection, tournament, [round])).length === 0) throw new Error("INVALID_ROUND");
   const maxMaps = roundMaxMapsOf(tournament, round);
-  if (requestedMaps !== null && maxMaps !== null && requestedMaps.length > maxMaps) {
+  // Un tour à une seule carte n'a pas de réglage carte par carte : son nombre
+  // dit déjà tout (l'écran n'en montre aucun champ, `mapPointRowCount`).
+  const settable = maxMaps !== null && maxMaps <= 1 ? 0 : maxMaps;
+  if (requestedMaps !== null && settable !== null && requestedMaps.length > settable) {
     throw new Error("INVALID_MAP_POINT_TARGET");
   }
 }
@@ -620,16 +623,22 @@ export async function setRoundPointTarget(
       [tournamentId, round.phaseId, round.bracket, round.roundNumber],
     );
     const before = parseStoredMapPointTarget(rows[0]?.map_point_target);
-    const mapsBefore = parseStoredMapPointTargets(rows[0]?.map_point_targets);
+    const rawMapsBefore = rows[0]?.map_point_targets ?? null;
+    const mapsBefore = parseStoredMapPointTargets(rawMapsBefore);
     const mapTargets = requestedMaps ?? mapsBefore;
-    // Poser : un réglage est posé (tour ou carte) ; garder un réglage resté
-    // tel quel en retirant l'autre ne « pose » rien de neuf.
-    // Rien ne change : retour sans requête de plus sous le verrou.
-    if (before === target && sameMapPointTargets(mapsBefore, mapTargets)) {
+    // Rien ne change : retour sans requête de plus sous le verrou. Une colonne
+    // illisible ou hors forme (lue tolérante) que la requête réécrit n'est pas
+    // « inchangée » : elle est réécrite sous sa forme normale.
+    const mapsColumnClean = requestedMaps === null || serializeMapPointTargets(mapTargets) === rawMapsBefore;
+    if (before === target && sameMapPointTargets(mapsBefore, mapTargets) && mapsColumnClean) {
       return { before, mapsBefore, mapTargets, changed: false };
     }
-    const poses = target !== null || (requestedMaps !== null && requestedMaps.length > 0);
-    if (poses) await assertRoundPointsPosable(connection, tournament, round, requestedMaps, duelOn);
+    // Poser : un réglage **neuf** (tour ou carte) ; garder un réglage resté
+    // tel quel en retirant l'autre ne « pose » rien de neuf.
+    const posesRound = target !== null && target !== before;
+    const posesMaps = requestedMaps !== null && requestedMaps.length > 0 && !sameMapPointTargets(requestedMaps, mapsBefore);
+    const poses = posesRound || posesMaps;
+    if (poses) await assertRoundPointsPosable(connection, tournament, round, posesMaps ? requestedMaps : null, duelOn);
     // Format éteint, le réglage du tour ne joue plus : le retirer ne change
     // aucune règle sous un score.
     if (duelOn) await assertMapPointsUnlocked(connection, tournamentId, round);

@@ -16,11 +16,14 @@ import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
 import {
+  clipMapPointTargets,
   MAP_POINT_TARGET_MAX,
   MAP_POINT_TARGET_MIN,
   roundMapPointTargetsOf,
   roundPointsLocked,
   roundPointTargetOf,
+  sameMapPointTargets,
+  trimMapPointTargets,
 } from "@/lib/shared/map-points";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -79,9 +82,6 @@ import {
   invalidPointField,
   mapPointDrafts,
   mapPointRowCount,
-  mapPointTargetsToSend,
-  sameMapPointTargets,
-  shownSavedMapPointTargets,
   type MapPointDraft,
   type MapPointField,
 } from "../_lib/round-points-editor";
@@ -677,7 +677,7 @@ function RoundPointsForm({
   // `savedMaps` arrive neufs à chaque instantané : l'identité ne suit que le contenu.
   const savedMapsKey = savedMaps.join(",");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const savedSend = useMemo(() => shownSavedMapPointTargets(savedMaps, rows), [savedMapsKey, rows]);
+  const savedSend = useMemo(() => clipMapPointTargets(savedMaps, rows), [savedMapsKey, rows]);
   const [value, setValue] = useState(effective);
   const [drafts, setDrafts] = useState<MapPointDraft[]>(() => mapPointDrafts(savedSend, rows));
   const fieldIds = useMemo(() => {
@@ -691,7 +691,7 @@ function RoundPointsForm({
     () => Array.from({ length: rows }, (_, index) => drafts[index] ?? null),
     [drafts, rows],
   );
-  const sendMaps = useMemo(() => mapPointTargetsToSend(shownDrafts), [shownDrafts]);
+  const sendMaps = useMemo(() => trimMapPointTargets(shownDrafts), [shownDrafts]);
   // Suit le serveur tant que la saisie n'a pas bougé depuis le dernier alignement.
   const serverKey = `${effective}|${savedSend.join(",")}`;
   const synced = useRef({ key: serverKey, effective, maps: savedSend });
@@ -701,7 +701,7 @@ function RoundPointsForm({
     synced.current = { key: serverKey, effective, maps: savedSend };
     setValue((current) => (current === before.effective ? effective : current));
     setDrafts((current) => {
-      const untouched = sameMapPointTargets(mapPointTargetsToSend(current), before.maps);
+      const untouched = sameMapPointTargets(trimMapPointTargets(current), before.maps);
       return untouched ? mapPointDrafts(savedSend, rows) : current;
     });
     // `serverKey` résume `effective` et `savedSend`.

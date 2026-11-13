@@ -3,13 +3,13 @@ import type { TournamentGame, TournamentState } from "@/lib/shared/types";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
 import { refereeKeptColumns } from "./cast-eligibility";
-import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
+import { forfeitMapCount, matchMaxMaps, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 import { AUTO_VALIDATION_PAUSED_SQL } from "./score-report-sql";
 import { loadMatchPointRules } from "./map-points";
-import type { RoundKey } from "@/lib/shared/round-maps";
+import { ROUND_MAP_SLOTS_MAX, type RoundKey } from "@/lib/shared/round-maps";
 
 /**
  * Format de match applicable à une manche (`null` = saisie libre).
@@ -107,8 +107,10 @@ export async function loadTournamentMatchRules(
     round,
   );
   const game = row.game === "OW" || row.game === "MR" ? row.game : null;
+  // Même borne que `roundMaxMaps` (instantané, brief) : le format de ce match.
+  const maxMaps = format ? Math.min(ROUND_MAP_SLOTS_MAX, matchMaxMaps(format)) : null;
   const points = roundKey
-    ? await loadMatchPointRules(connection, tournamentId, row.map_point_target, roundKey)
+    ? await loadMatchPointRules(connection, tournamentId, row.map_point_target, roundKey, maxMaps)
     : { pointTarget: null, pointTargets: null };
   return { format, game, refereeScheduling: Number(row.referee_scheduling ?? 0) === 1, ...points };
 }

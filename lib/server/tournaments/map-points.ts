@@ -5,6 +5,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
+  clipMapPointTargets,
   effectiveMapPointTarget,
   effectiveMapPointTargets,
   parseStoredMapPointTarget,
@@ -49,13 +50,17 @@ export type MatchPointRules = {
  *
  * Rend en plus les points réglés **carte par carte** sur le tour
  * (`map_point_targets`) : même ligne, même lecture verrouillante. Ordre de
- * résolution d'une carte : la carte, le tour, le tournoi.
+ * résolution d'une carte : la carte, le tour, le tournoi. Limités aux cartes
+ * que le match joue (`maxMaps`, comme l'instantané et le brief) : la règle qui
+ * juge un score est celle que les deux portes montrent.
  */
 export async function loadMatchPointRules(
   connection: PoolConnection,
   tournamentId: number,
   tournamentTarget: unknown,
   round: RoundKey,
+  /** Cartes au plus d'un match du tour (`roundMaxMaps`) ; `null` : rien n'est coupé. */
+  maxMaps: number | null = null,
 ): Promise<MatchPointRules> {
   const target = parseStoredMapPointTarget(tournamentTarget);
   if (target === null) return { pointTarget: null, pointTargets: null };
@@ -71,7 +76,10 @@ export async function loadMatchPointRules(
   const pointTarget = effectiveMapPointTarget(target, own === null ? [] : [{ ...round, target: own }], round);
   return {
     pointTarget,
-    pointTargets: effectiveMapPointTargets(pointTarget, parseStoredMapPointTargets(rows[0]?.map_point_targets)),
+    pointTargets: effectiveMapPointTargets(
+      pointTarget,
+      clipMapPointTargets(parseStoredMapPointTargets(rows[0]?.map_point_targets), maxMaps),
+    ),
   };
 }
 

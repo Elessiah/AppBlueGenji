@@ -56,27 +56,39 @@ describe("formatLobbyBriefDm", () => {
   it("formatLobbyBriefDm_perMapTargets_listsEachMapFr", () => {
     const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL);
 
-    expect(actual).toContain("Format Duel / Arcade : carte 1 au premier à 5, carte 2 au premier à 3, puis premier à 5 pour les suivantes.");
+    expect(actual).toContain("Format Duel / Arcade : Map 1 au premier à 5 points, Map 2 au premier à 3 points, puis premier à 5 points pour les suivantes.");
     expect(actual).not.toContain("chaque carte se gagne");
   });
 
   it("formatLobbyBriefDm_perMapTargets_listsEachMapEn", () => {
     const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL, "en");
 
-    expect(actual).toContain("Duel / Arcade format: map 1 first to 5, map 2 first to 3, then first to 5 for the next ones.");
+    expect(actual).toContain("Duel / Arcade format: Map 1 first to 5 points, Map 2 first to 3 points, then first to 5 points for the next ones.");
+  });
+
+  it("formatLobbyBriefDm_perMapSinglePoint_singularFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [1, 7] }), URL);
+
+    expect(actual).toContain("Map 1 au premier à 1 point, Map 2 au premier à 7 points, puis premier à 5 points pour les suivantes.");
+  });
+
+  it("formatLobbyBriefDm_perMapSinglePoint_singularEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [1, 7] }), URL, "en");
+
+    expect(actual).toContain("Map 1 first to 1 point, Map 2 first to 7 points, then first to 5 points for the next ones.");
   });
 
   it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseFr", () => {
     const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL);
 
-    expect(actual).toContain("Format Duel / Arcade : carte 1 au premier à 5, carte 2 au premier à 3, carte 3 au premier à 7.");
+    expect(actual).toContain("Format Duel / Arcade : Map 1 au premier à 5 points, Map 2 au premier à 3 points, Map 3 au premier à 7 points.");
     expect(actual).not.toContain("pour les suivantes");
   });
 
   it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseEn", () => {
     const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL, "en");
 
-    expect(actual).toContain("Duel / Arcade format: map 1 first to 5, map 2 first to 3, map 3 first to 7.");
+    expect(actual).toContain("Duel / Arcade format: Map 1 first to 5 points, Map 2 first to 3 points, Map 3 first to 7 points.");
     expect(actual).not.toContain("for the next ones");
   });
 

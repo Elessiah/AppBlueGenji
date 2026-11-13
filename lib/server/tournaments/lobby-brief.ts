@@ -497,9 +497,10 @@ export function lobbyBriefSides(
   const slots = parseStoredSlots(row.round_slots_json);
   const storedFirstMap = row.first_map === null || row.first_map === "" ? null : String(row.first_map);
   const banFirstTeamId = firstBanTeamFor(parseFirstBanRule(row.first_ban_rule), hostTeamId, team1Id, team2Id);
-  // Résolus une fois par ligne : chacun relit le format du tournoi.
+  // Résolus une fois par ligne. Le format du match n'est relu que pour un tour
+  // réglé carte par carte (format allumé) : seul ce cas le lit (`briefPointTargets`, DM).
   const pointTarget = briefPointTarget(row);
-  const maxMaps = briefMaxMaps(row);
+  const maxMaps = pointTarget !== null && row.round_point_targets ? briefMaxMaps(row) : null;
   const base = {
     tournamentId: Number(row.tournament_id),
     tournamentName: String(row.tournament_name),

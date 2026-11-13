@@ -52,11 +52,15 @@ Duels 1v1 en arcade (Widowmaker, « premier à 5 ») : chaque carte se gagne au
   points d'un tour sans cartes imposées et ne rien changer aux lecteurs des
   cartes. Même route, corps `{ …, target, mapTargets }` (`mapTargets` absent =
   inchangé, `[]` = tout retirer ; `normalizeMapPointTargets`, 9 entrées au
-  plus et pas plus que les cartes du format du tour, sinon
-  `INVALID_MAP_POINT_TARGET`). Une édition qui raccourcit le format de match
+  plus et pas plus que les cartes du format du tour — aucune sur un tour à une
+  seule carte —, sinon `INVALID_MAP_POINT_TARGET`). Seul un réglage **neuf**
+  exige un tour posable (format allumé, tournoi pas terminé, tour joué) :
+  garder le nombre du tour en retirant les cartes passe toujours ; une colonne
+  illisible renvoyée telle quelle est réécrite sous sa forme normale. Une édition qui raccourcit le format de match
   (BO3 → BO1) coupe les réglages des cartes qu'il ne joue plus
   (`pruneRoundPointTargets`, annoncé au journal) ; instantané et check-in
-  ignorent de toute façon une carte au-delà du format (`clipMapPointTargets`). « Revenir aux points du tournoi »
+  ignorent de toute façon une carte au-delà du format (`clipMapPointTargets`),
+  tout comme la règle qui juge un score (`loadMatchPointRules`, borne du format du match). « Revenir aux points du tournoi »
   retire le nombre du tour et ceux des cartes. Même verrou, même journal
   (l'empreinte `roundPointsFingerprint` couvre tour et cartes), audit pm2 avec
   les deux listes.
@@ -145,8 +149,8 @@ chaque carte : 5–3 contre 5–2 est un écart.
   retour en arrière d'un tour lisent le même score affiché (`shownMatchScore`).
 - Check-in du match (message privé, `MATCH_LOBBY_BRIEF.md`) : « Format Duel /
   Arcade : chaque carte se gagne au premier à N points. » (N du tour, sinon du
-  tournoi ; FR et EN), sous les cartes ; carte par carte : « carte 1 au premier
-  à 5, carte 2 au premier à 3, puis premier à 5 pour les suivantes. »
+  tournoi ; FR et EN), sous les cartes ; carte par carte : « Map 1 au premier
+  à 5 points, Map 2 au premier à 3 points, puis premier à 5 points pour les suivantes. »
   (`briefPointTargets`) — sans « puis … pour les suivantes » quand toutes les
   cartes du format sont réglées, et une seule ligne quand elles valent toutes
   le N du match (`hasPerMapTargets`, comme la page du match).

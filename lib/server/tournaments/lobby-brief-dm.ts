@@ -106,6 +106,11 @@ type TournamentText = {
   goodLuck: string;
 };
 
+/** « 5 points », « 1 point » (FR : pluriel dès 2). */
+const pointsFr = (points: number) => `${points} point${points > 1 ? "s" : ""}`;
+/** "5 points", "1 point". */
+const pointsEn = (points: number) => `${points} point${points === 1 ? "" : "s"}`;
+
 const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
   fr: {
     title: (subject) => `# Check-in ${subject}`,
@@ -148,8 +153,8 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     pointTarget: (points) => `Format Duel / Arcade : chaque carte se gagne au premier à ${points} point${points > 1 ? "s" : ""}.`,
     pointTargetsPerMap: (targets, rest) =>
       "Format Duel / Arcade : " +
-      targets.map((points, index) => `carte ${index + 1} au premier à ${points}`).join(", ") +
-      (rest === null ? "." : `, puis premier à ${rest} pour les suivantes.`),
+      targets.map((points, index) => `Map ${index + 1} au premier à ${pointsFr(points)}`).join(", ") +
+      (rest === null ? "." : `, puis premier à ${pointsFr(rest)} pour les suivantes.`),
     live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invite les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Préviens les casters inscrits (leurs contacts sont sur la page du match).",
@@ -197,8 +202,8 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     pointTarget: (points) => `Duel / Arcade format: each map is won by the first to ${points} point${points === 1 ? "" : "s"}.`,
     pointTargetsPerMap: (targets, rest) =>
       "Duel / Arcade format: " +
-      targets.map((points, index) => `map ${index + 1} first to ${points}`).join(", ") +
-      (rest === null ? "." : `, then first to ${rest} for the next ones.`),
+      targets.map((points, index) => `Map ${index + 1} first to ${pointsEn(points)}`).join(", ") +
+      (rest === null ? "." : `, then first to ${pointsEn(rest)} for the next ones.`),
     live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",
