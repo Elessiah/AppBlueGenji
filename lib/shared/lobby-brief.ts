@@ -81,6 +81,8 @@ export type LobbyBriefSide = {
    * une carte de ce match (réglage du tour, sinon du tournoi), `null` format éteint.
    */
   pointTarget?: number | null;
+  /** N effectif des cartes réglées une à une (carte 1 en tête), absent sans réglage carte par carte. */
+  pointTargets?: number[] | null;
   nextBan: NextBanRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;

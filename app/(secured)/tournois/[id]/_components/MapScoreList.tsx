@@ -18,6 +18,7 @@ import {
   type MapField,
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
+import { hasPerMapTargets, mapPointTargetAt } from "@/lib/shared/map-points";
 import type { TournamentGame } from "@/lib/shared/types";
 import { visibleText } from "@/lib/shared/visible-text";
 import { EntrantLogo } from "./EntrantName";
@@ -66,6 +67,12 @@ interface MapScoreListProps {
    * au premier à N points. `null` / absent : format éteint.
    */
   pointTarget?: number | null;
+  /**
+   * N effectif carte par carte (réglage du tour, carte 1 en tête,
+   * `BracketMatch.mapPointTargets`) ; une carte au-delà suit `pointTarget`.
+   * Chaque ligne dit alors son propre N.
+   */
+  pointTargets?: ReadonlyArray<number> | null;
 }
 
 /**
@@ -140,6 +147,7 @@ export function MapScoreList({
   mapNames = [],
   tiebreakMap = null,
   pointTarget = null,
+  pointTargets = null,
 }: Readonly<MapScoreListProps>) {
   const text = useDialogsText();
   const { t } = text;
@@ -159,6 +167,9 @@ export function MapScoreList({
   // Le compteur ne compte que les maps renseignées, pas la ligne vierge ouverte.
   const played = maps.filter(isMapTouched).length;
   const hintId = `${idPrefix}-map-hint`;
+  // Format Duel / Arcade : N de chaque ligne (la carte, sinon le match).
+  const targetAt = (index: number) => mapPointTargetAt(pointTarget, pointTargets, index);
+  const perMapTargets = hasPerMapTargets(pointTarget, pointTargets);
 
   // Clés de ligne stables : retirer la map 2 ne doit pas faire hériter la
   // ligne suivante de l'état React (focus, saisie en cours) de celle retirée.
@@ -178,7 +189,7 @@ export function MapScoreList({
   // et que le match n'est pas acquis ; les lignes vierges devenues inutiles
   // s'en vont, les lignes renseignées restent (refusées sur leur champ).
   const change = (next: MatchMapInput[]) => {
-    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget });
+    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget, pointTargets });
     // Seule une ligne ajoutée **par l'affichage progressif** s'annonce : une
     // liste remplacée de l'extérieur (proposition reçue) arrive déjà remplie.
     autoGrown.current = rows.length > maps.length;
@@ -228,8 +239,9 @@ export function MapScoreList({
     // deux champs laissent passer sans être juste — dite à la frappe, sur le
     // champ modifié, plutôt qu'à l'envoi seulement.
     const row = next[index];
-    if (pointTarget !== null && (field === "team1Score" || field === "team2Score") && row.team1Score === pointTarget && row.team2Score === pointTarget) {
-      fieldErrors.flag(mapFieldKey(index, field), t("score.maps.violation.points", { points: pointTarget, max: pointTarget - 1 }));
+    const rowTarget = targetAt(index);
+    if (rowTarget !== null && (field === "team1Score" || field === "team2Score") && row.team1Score === rowTarget && row.team2Score === rowTarget) {
+      fieldErrors.flag(mapFieldKey(index, field), t("score.maps.violation.points", { points: rowTarget, max: rowTarget - 1 }));
     }
   };
   // Le bouton « Retirer » activé disparaît avec sa ligne : le focus va au
@@ -274,9 +286,9 @@ export function MapScoreList({
           </p>
           <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
             <p>
-              {pointTarget === null
-                ? t("score.maps.drawHint")
-                : t("score.maps.duelRules", { points: pointTarget, max: pointTarget - 1 })}
+              {pointTarget === null && t("score.maps.drawHint")}
+              {pointTarget !== null && !perMapTargets && t("score.maps.duelRules", { points: pointTarget, max: pointTarget - 1 })}
+              {pointTarget !== null && perMapTargets && t("score.maps.duelRulesPerMap")}
               {replayHint ? ` ${replayHint}` : ""}
               {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
             </p>
@@ -295,10 +307,14 @@ export function MapScoreList({
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
             const mapName = mapNames[index] ?? null;
             const labels = mapRowLabels(t, index, mapName, index === tiebreakIndex ? tiebreakName : null);
+            const rowTarget = targetAt(index);
+            // Réglage carte par carte : chaque ligne dit son N, à l'œil et dans le nom des champs de score.
+            const rowTargetText = perMapTargets && rowTarget !== null ? t("score.maps.rowTarget", { points: rowTarget }) : "";
             return (
               <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel} aria-hidden="true">
                   {labels.label}
+                  {rowTargetText && ` · ${rowTargetText}`}
                 </span>
                 {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
                     cinq lignes, « Code de replay » seul ne dirait pas laquelle. La
@@ -334,13 +350,14 @@ export function MapScoreList({
                     <span className={styles.fieldLabelText}>
                       <span className="sr-only">{labels.scorePrefix}</span>
                       {team1Name}
+                      {rowTargetText && <span className="sr-only">{`, ${rowTargetText}`}</span>}
                     </span>
                   </label>
                   <NumberInput
                     id={t1Id}
                     className={styles.scoreInput}
                     min={0}
-                    max={pointTarget ?? MAP_SCORE_MAX}
+                    max={rowTarget ?? MAP_SCORE_MAX}
                     inputMode="numeric"
                     onKeyDown={keepEnterInList}
                     value={map.team1Score}
@@ -358,13 +375,14 @@ export function MapScoreList({
                     <span className={styles.fieldLabelText}>
                       <span className="sr-only">{labels.scorePrefix}</span>
                       {team2Name}
+                      {rowTargetText && <span className="sr-only">{`, ${rowTargetText}`}</span>}
                     </span>
                   </label>
                   <NumberInput
                     id={t2Id}
                     className={styles.scoreInput}
                     min={0}
-                    max={pointTarget ?? MAP_SCORE_MAX}
+                    max={rowTarget ?? MAP_SCORE_MAX}
                     inputMode="numeric"
                     onKeyDown={keepEnterInList}
                     value={map.team2Score}

@@ -333,6 +333,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // (une ligne qui ne porte qu'elle a `slots_json = '[]'`).
   // `map_point_target` : points par carte propres au tour, en format Duel /
   // Arcade (`docs/features/DUEL_ARCADE.md`) ; même règle de ligne.
+  // `map_point_targets` : ces points carte par carte (JSON `[5, null, 7]`,
+  // `null` = la carte suit le tour) ; même règle de ligne.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_tournament_round_maps (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -343,6 +345,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       slots_json TEXT NOT NULL,
       tiebreak_map VARCHAR(64) NULL,
       map_point_target TINYINT UNSIGNED NULL,
+      map_point_targets VARCHAR(128) NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uq_bg_round_maps_round (tournament_id, phase_id, bracket, round_number),
       CONSTRAINT fk_bg_round_maps_tournament FOREIGN KEY (tournament_id)

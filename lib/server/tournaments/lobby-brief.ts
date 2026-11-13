@@ -53,7 +53,7 @@
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
  */
-import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
+import { effectiveMapPointTargets, parseStoredMapPointTarget, parseStoredMapPointTargets } from "@/lib/shared/map-points";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -215,6 +215,7 @@ export type LobbyBriefRow = RowDataPacket & {
   /** Format Duel / Arcade : points du tournoi et réglage propre au tour (`DUEL_ARCADE.md`). */
   tournament_point_target?: number | null;
   round_point_target?: number | null;
+  round_point_targets?: string | null;
   phase_id?: number | null;
   phase_format?: PhaseFormat | null;
   tournament_format?: TournamentFormat | null;
@@ -265,6 +266,11 @@ export function briefPointTarget(row: LobbyBriefRow): number | null {
   return tournament === null ? null : (parseStoredMapPointTarget(row.round_point_target) ?? tournament);
 }
 
+/** Points réglés carte par carte sur le tour, effectifs (la carte, sinon {@link briefPointTarget}). */
+export function briefPointTargets(row: LobbyBriefRow): number[] | null {
+  return effectiveMapPointTargets(briefPointTarget(row), parseStoredMapPointTargets(row.round_point_targets));
+}
+
 /**
  * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
  * allume l'arbitrage planifié le tient pour lancé (`lobby_opened_at` posé,
@@ -299,6 +305,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             rm.tiebreak_map AS round_tiebreak_map,
             t.map_point_target AS tournament_point_target,
             rm.map_point_target AS round_point_target,
+            rm.map_point_targets AS round_point_targets,
             m.phase_id, t.format AS tournament_format,
             (SELECT p.format FROM bg_tournament_phases p WHERE p.id = m.phase_id) AS phase_format,
             t.match_format_type, t.match_format_value, t.match_format_max_maps, t.match_format_draws,
@@ -469,6 +476,7 @@ export function lobbyBriefSides(
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
     tiebreakMap: briefTiebreakMap(row),
     pointTarget: briefPointTarget(row),
+    pointTargets: briefPointTargets(row),
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
     // Le bot n'ouvre de salon vocal que pour un match suivi (`MATCH_VOICE.md`) :

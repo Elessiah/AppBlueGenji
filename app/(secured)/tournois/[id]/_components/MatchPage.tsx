@@ -51,6 +51,7 @@ import { shownTiebreakMap } from "@/lib/shared/match-maps";
 import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapName } from "@/lib/shared/round-maps";
 import { roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
+import { hasPerMapTargets } from "@/lib/shared/map-points";
 import { useLiveControls, useRefereeNameOf } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText, useMapError } from "../_lib/error-map";
@@ -407,13 +408,32 @@ function tiebreakFacts(tiebreak: string | null, label: string, detail: string): 
   return tiebreak === null ? [] : [{ id: "tiebreak", label, value: visibleText(tiebreak), detail }];
 }
 
-/** Fait « Points par carte » : format Duel / Arcade allumé seulement (`DUEL_ARCADE.md`). */
-function pointTargetFacts(
-  target: number | null | undefined,
+/**
+ * Fait « Points par carte » : format Duel / Arcade allumé seulement
+ * (`DUEL_ARCADE.md`). Réglé carte par carte sur le tour : chaque carte réglée
+ * avec son N, les suivantes en détail.
+ */
+export function pointTargetFacts(
+  match: Pick<BracketMatch, "mapPointTarget" | "mapPointTargets">,
   label: string,
-  firstTo: (points: string) => string,
+  text: {
+    firstTo: (points: string) => string;
+    mapFirstTo: (map: string, points: string) => string;
+    othersFirstTo: (points: string) => string;
+  },
 ): KeyFact[] {
-  return target == null ? [] : [{ id: "pointTarget", label, value: firstTo(String(target)) }];
+  const target = match.mapPointTarget;
+  if (target == null) return [];
+  const perMap = match.mapPointTargets ?? [];
+  if (!hasPerMapTargets(target, perMap)) return [{ id: "pointTarget", label, value: text.firstTo(String(target)) }];
+  return [
+    {
+      id: "pointTarget",
+      label,
+      value: perMap.map((points, index) => text.mapFirstTo(String(index + 1), String(points))).join(" · "),
+      detail: text.othersFirstTo(String(target)),
+    },
+  ];
 }
 
 /** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », ou pool à choisir. */
@@ -532,9 +552,13 @@ function MatchKeyFacts({
       matchFormatText(text, format)
     ),
   });
-  facts.push(...pointTargetFacts(match.mapPointTarget, page.t("facts.pointTarget"), (points) =>
-    t("match.maps.firstTo", { points }),
-  ));
+  facts.push(
+    ...pointTargetFacts(match, page.t("facts.pointTarget"), {
+      firstTo: (points) => t("match.maps.firstTo", { points }),
+      mapFirstTo: (number, points) => t("match.maps.mapFirstTo", { number, points }),
+      othersFirstTo: (points) => t("match.maps.othersFirstTo", { points }),
+    }),
+  );
   // Règlement §14 : l'équipe du haut (l'hôte) prend le côté gauche.
   if (hostSide) {
     facts.push({
@@ -1077,6 +1101,7 @@ function ResultSection({ match, sides }: Readonly<{ match: BracketMatch; sides: 
         team2Name={team2}
         label={t("match.maps.listLabel")}
         pointTarget={match.mapPointTarget ?? null}
+        pointTargets={match.mapPointTargets ?? null}
       />
     </section>
   );

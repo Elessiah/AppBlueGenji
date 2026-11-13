@@ -29,7 +29,7 @@ const MapDetailsDialog = dynamic(() => orReload(import("./MapDetailsDialog").the
  */
 export function MatchMapDetails({
   match,
-}: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name" | "mapPointTarget"> }>) {
+}: Readonly<{ match: Pick<BracketMatch, "id" | "maps" | "team1Name" | "team2Name" | "mapPointTarget" | "mapPointTargets"> }>) {
   const text = useTournamentPageText();
   const [open, setOpen] = useState(false);
   // Détail affiché tant que la modale est ouverte, même s'il disparaît de
@@ -76,6 +76,7 @@ export function MatchMapDetails({
           team1Name={team1}
           team2Name={team2}
           pointTarget={pointTarget}
+          pointTargets={match.mapPointTargets ?? null}
           onClose={close}
         />
       )}

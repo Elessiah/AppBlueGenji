@@ -5,7 +5,13 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
-import { MAP_POINT_TARGET_MAX, MAP_POINT_TARGET_MIN, roundPointsLocked, roundPointTargetOf } from "@/lib/shared/map-points";
+import {
+  MAP_POINT_TARGET_MAX,
+  MAP_POINT_TARGET_MIN,
+  roundMapPointTargetsOf,
+  roundPointsLocked,
+  roundPointTargetOf,
+} from "@/lib/shared/map-points";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -58,6 +64,14 @@ import {
   storedRoundsSignature,
 } from "../_lib/round-maps-editor";
 import { useRoundMapsText, type RoundMapsText } from "../_lib/round-maps-text";
+import {
+  editMapPointDraft,
+  mapPointDrafts,
+  mapPointRowCount,
+  mapPointTargetsToSend,
+  sameMapPointTargets,
+  type MapPointDraft,
+} from "../_lib/round-points-editor";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import styles from "./RoundMapsDialog.module.css";
 
@@ -540,16 +554,20 @@ const POINTS_FIELD_ERRORS = {
 
 /**
  * Points par carte propres à un tour, en format Duel / Arcade
- * (`docs/features/DUEL_ARCADE.md`) : « Enregistrer » pose le nombre du tour,
- * « Revenir aux points du tournoi » le retire. Montré seulement quand le
- * format est allumé sur le tournoi. Suit le serveur tant que le champ n'a pas
- * été modifié.
+ * (`docs/features/DUEL_ARCADE.md`) : « Enregistrer » pose le nombre du tour et
+ * celui de chaque carte (« Carte par carte », préremplies de leur N effectif :
+ * la carte, sinon le tour, sinon le tournoi — une carte laissée au nombre du
+ * tour le suit), « Revenir aux points du tournoi » retire tout. Montré
+ * seulement quand le format est allumé sur le tournoi. Suit le serveur tant
+ * que rien n'a été modifié.
  */
 function RoundPointsForm({
   tournamentId,
   round,
   tournamentTarget,
   saved,
+  savedMaps,
+  maxMaps,
   locked,
   busy,
   run,
@@ -563,6 +581,10 @@ function RoundPointsForm({
   tournamentTarget: number;
   /** Points propres au tour (`null` = il suit le tournoi). */
   saved: number | null;
+  /** Points propres à chaque carte du tour (`null` = la carte suit le tour). */
+  savedMaps: readonly (number | null)[];
+  /** Cartes que le format du tour joue au plus (`roundMaxMaps`, `null` en score libre). */
+  maxMaps: number | null;
   busy: boolean;
   run: RunTask;
   onDirtyChange: (dirty: boolean) => void;
@@ -574,25 +596,42 @@ function RoundPointsForm({
   const statusId = `${ids}-points-status`;
   const lockedId = `${ids}-points-locked`;
   const effective = saved ?? tournamentTarget;
+  const rows = mapPointRowCount(maxMaps, savedMaps);
+  const savedSend = mapPointTargetsToSend(savedMaps, effective);
   const [value, setValue] = useState(effective);
+  const [drafts, setDrafts] = useState<MapPointDraft[]>(() => mapPointDrafts(savedMaps, effective, rows));
   const fieldErrors = useFieldErrors(POINTS_FIELD_ERRORS, { points: inputId });
-  const synced = useRef(effective);
+  // Brouillon aligné sur le nombre de cartes du format (un flux peut le changer).
+  const shownDrafts = Array.from({ length: rows }, (_, index) => drafts[index] ?? null);
+  const sendMaps = mapPointTargetsToSend(shownDrafts, value);
+  // Suit le serveur tant que la saisie n'a pas bougé depuis le dernier alignement.
+  const serverKey = `${effective}|${savedSend.join(",")}`;
+  const synced = useRef({ key: serverKey, effective, maps: savedSend });
   useEffect(() => {
     const before = synced.current;
-    synced.current = effective;
-    setValue((current) => (current === before ? effective : current));
-  }, [effective]);
-  const dirty = value !== effective;
+    if (before.key === serverKey) return;
+    synced.current = { key: serverKey, effective, maps: savedSend };
+    setValue((current) => (current === before.effective ? effective : current));
+    setDrafts((current) => {
+      const untouched = sameMapPointTargets(mapPointTargetsToSend(current, before.effective), before.maps);
+      return untouched ? mapPointDrafts(savedMaps, effective, rows) : current;
+    });
+    // `serverKey` résume `effective` et `savedMaps`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverKey]);
+  const dirty = value !== effective || !sameMapPointTargets(sendMaps, savedSend);
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
   }, [dirty, onDirtyChange]);
 
-  const send = (target: number | null, success: string) =>
+  const send = (target: number | null, mapTargets: MapPointDraft[], success: string) =>
     run(
       async () => {
-        await putJson(`/api/admin/tournaments/${tournamentId}/round-points`, { ...round, target });
-        setValue(target ?? tournamentTarget);
+        await putJson(`/api/admin/tournaments/${tournamentId}/round-points`, { ...round, target, mapTargets });
+        const roundTarget = target ?? tournamentTarget;
+        setValue(roundTarget);
+        setDrafts(mapPointDrafts(mapTargets, roundTarget, rows));
         showSuccess(success);
       },
       (code, text) => fieldErrors.report(code, text),
@@ -602,8 +641,9 @@ function RoundPointsForm({
     event.preventDefault();
     if (busy || locked || !dirty) return;
     // Le nombre du tournoi saisi sur le tour : le tour le suit, aucun réglage propre à garder.
-    void send(value === tournamentTarget ? null : value, t("dialog.pointsSaved"));
+    void send(value === tournamentTarget ? null : value, sendMaps, t("dialog.pointsSaved"));
   };
+  const hasOwn = saved !== null || savedMaps.length > 0;
 
   return (
     <form onSubmit={save} aria-busy={busy}>
@@ -638,15 +678,48 @@ function RoundPointsForm({
             </p>
           )}
         </div>
+        {rows > 0 && (
+          <fieldset className={styles.pointMaps} disabled={locked}>
+            <legend className={styles.labelRow}>
+              <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
+              <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
+                {t("dialog.pointsPerMapHint")}
+              </InfoHint>
+            </legend>
+            <ol className={styles.pointMapList}>
+              {shownDrafts.map((draft, index) => {
+                const mapInputId = `${ids}-points-map-${index}`;
+                const followsId = `${mapInputId}-follows`;
+                return (
+                  <li key={mapInputId} className={styles.pointMap}>
+                    <label htmlFor={mapInputId}>{t("dialog.pointsMapLabel", { index: index + 1 })}</label>
+                    <NumberInput
+                      id={mapInputId}
+                      min={MAP_POINT_TARGET_MIN}
+                      max={MAP_POINT_TARGET_MAX}
+                      value={draft ?? value}
+                      onValueChange={(next) => setDrafts(editMapPointDraft(shownDrafts, index, next, value))}
+                      onEdit={() => fieldErrors.clear()}
+                      aria-describedby={draft === null ? followsId : undefined}
+                    />
+                    <span id={followsId} className={styles.muted}>
+                      {draft === null ? t("dialog.pointsMapFollows") : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </fieldset>
+        )}
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           <button
             type="button"
             className="btn ghost"
-            aria-disabled={busy || locked || saved === null || undefined}
+            aria-disabled={busy || locked || !hasOwn || undefined}
             onClick={() => {
-              if (busy || locked || saved === null) return;
-              void send(null, t("dialog.pointsRemoved"));
+              if (busy || locked || !hasOwn) return;
+              void send(null, [], t("dialog.pointsRemoved"));
             }}
           >
             {t("dialog.pointsRemove")}
@@ -1332,6 +1405,8 @@ export function RoundMapsDialog({
             round={round}
             tournamentTarget={detail.card.mapPointTarget}
             saved={roundPointTargetOf(rules.pointTargets, round)}
+            savedMaps={roundMapPointTargetsOf(rules.mapPointTargets, round)}
+            maxMaps={maxMaps}
             locked={pointsLocked}
             busy={busy}
             run={run}

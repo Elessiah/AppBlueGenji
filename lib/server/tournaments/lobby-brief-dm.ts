@@ -92,6 +92,8 @@ type TournamentText = {
   nextBans: Readonly<Record<NextBanRule, string>>;
   tiebreak: string;
   pointTarget: (points: number) => string;
+  /** Points réglés carte par carte (`pointTargets`) ; `rest` = N des cartes suivantes. */
+  pointTargetsPerMap: (targets: ReadonlyArray<number>, rest: number) => string;
   /** Lignes du cast. */
   live: (url: string) => string;
   inviteCasters: string;
@@ -143,6 +145,10 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     },
     tiebreak: "Map de départage (jouée seulement si la série est à égalité après les maps régulières) : ",
     pointTarget: (points) => `Format Duel / Arcade : chaque carte se gagne au premier à ${points} point${points > 1 ? "s" : ""}.`,
+    pointTargetsPerMap: (targets, rest) =>
+      "Format Duel / Arcade : " +
+      targets.map((points, index) => `carte ${index + 1} au premier à ${points}`).join(", ") +
+      `, puis premier à ${rest} pour les suivantes.`,
     live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invite les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Préviens les casters inscrits (leurs contacts sont sur la page du match).",
@@ -188,6 +194,10 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     },
     tiebreak: "Tiebreak map (played only if the series is level after the regular maps): ",
     pointTarget: (points) => `Duel / Arcade format: each map is won by the first to ${points} point${points === 1 ? "" : "s"}.`,
+    pointTargetsPerMap: (targets, rest) =>
+      "Duel / Arcade format: " +
+      targets.map((points, index) => `map ${index + 1} first to ${points}`).join(", ") +
+      `, then first to ${rest} for the next ones.`,
     live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",
@@ -296,6 +306,14 @@ function clipToDiscordMax(text: string): string {
 /** Pas de réduction du bloc des cartes quand le message dépasse `DISCORD_MESSAGE_MAX`. */
 const MAPS_BUDGET_STEP = 30;
 
+/** Ligne Duel / Arcade du check-in : un N pour toutes les cartes, ou carte par carte. */
+function pointTargetLines(side: LobbyBriefSide, text: Pick<TournamentText, "pointTarget" | "pointTargetsPerMap">): string[] {
+  if (!side.pointTarget) return [];
+  const perMap = side.pointTargets ?? [];
+  if (perMap.length === 0) return [`* ${text.pointTarget(side.pointTarget)}`];
+  return [`* ${text.pointTargetsPerMap(perMap, side.pointTarget)}`];
+}
+
 function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale, mapsBudget: number): string {
   const text = DM_TEXT[locale];
   const quote = (name: string) => quoted(name, locale);
@@ -334,7 +352,7 @@ function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Loc
     `* ${text.firstBan(names.ban, names.banNext)}`,
     `* ${text.nextBans[side.nextBan]}`,
     ...(side.tiebreakMap ? [`* ${text.tiebreak}${quote(side.tiebreakMap)}`] : []),
-    ...(side.pointTarget ? [`* ${text.pointTarget(side.pointTarget)}`] : []),
+    ...pointTargetLines(side, text),
     ...(side.cast ? castBlock(side, locale) : []),
     "",
     text.scores,

@@ -11,9 +11,11 @@
  *
  * Réglé sur le tournoi (`bg_tournaments.map_point_target`, `NULL` = format
  * éteint), remplaçable par tour (`bg_tournament_round_maps.map_point_target`)
- * tant que le format est allumé sur le tournoi.
+ * puis carte par carte du tour (`bg_tournament_round_maps.map_point_targets`)
+ * tant que le format est allumé sur le tournoi. Ordre de résolution d'une
+ * carte : la carte, sinon le tour, sinon le tournoi.
  */
-import { roundKeyId, type RoundKey } from "./round-maps";
+import { ROUND_MAP_SLOTS_MAX, roundKeyId, type RoundKey } from "./round-maps";
 import { matchWinsRequired, type MatchFormat } from "./match-format";
 import type { PhaseFormat, TournamentFormat } from "./types";
 
@@ -27,6 +29,12 @@ export const DEFAULT_MAP_POINT_TARGET = 5;
 
 /** Points par carte propres à un tour. */
 export type RoundPointTarget = RoundKey & { target: number };
+
+/**
+ * Points propres à chaque carte d'un tour (carte 1 en tête ; `null` = la carte
+ * suit le tour). Jamais de `null` en fin de liste.
+ */
+export type RoundMapPointTargets = RoundKey & { targets: (number | null)[] };
 
 /** N valable : un entier entre les bornes. */
 export function isValidMapPointTarget(value: unknown): value is number {
@@ -57,6 +65,98 @@ export function effectiveMapPointTarget(
 ): number | null {
   if (tournamentTarget === null || tournamentTarget === undefined) return null;
   return roundPointTargetOf(roundTargets, round) ?? tournamentTarget;
+}
+
+/**
+ * Points carte par carte saisis par le staff : au plus
+ * {@link ROUND_MAP_SLOTS_MAX} entrées, chacune un N valable ou `null` (la carte
+ * suit le tour) ; les `null` de fin sont retirés (liste vide = aucun réglage).
+ *
+ * @throws `INVALID_MAP_POINT_TARGET` — forme invalide, N hors bornes ou trop d'entrées.
+ */
+export function normalizeMapPointTargets(raw: unknown): (number | null)[] {
+  if (!Array.isArray(raw) || raw.length > ROUND_MAP_SLOTS_MAX) throw new Error("INVALID_MAP_POINT_TARGET");
+  const targets = raw.map((value: unknown) => {
+    if (value === null) return null;
+    if (!isValidMapPointTarget(value)) throw new Error("INVALID_MAP_POINT_TARGET");
+    return value;
+  });
+  return trimTrailingNulls(targets);
+}
+
+function trimTrailingNulls(targets: (number | null)[]): (number | null)[] {
+  let end = targets.length;
+  while (end > 0 && targets[end - 1] === null) end -= 1;
+  return targets.slice(0, end);
+}
+
+/** Lecture tolérante de `map_point_targets` (JSON) : liste vide pour tout ce qui est illisible. */
+export function parseStoredMapPointTargets(raw: unknown): (number | null)[] {
+  if (raw === null || raw === undefined || raw === "") return [];
+  try {
+    const parsed: unknown = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    return trimTrailingNulls(
+      parsed.slice(0, ROUND_MAP_SLOTS_MAX).map((value: unknown) => parseStoredMapPointTarget(value)),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Valeur de colonne d'une liste normalisée : `NULL` quand elle est vide. */
+export function serializeMapPointTargets(targets: ReadonlyArray<number | null>): string | null {
+  return targets.length === 0 ? null : JSON.stringify(targets);
+}
+
+/** Points carte par carte réglés sur un tour (liste vide = toutes suivent le tour). */
+export function roundMapPointTargetsOf(
+  list: ReadonlyArray<RoundMapPointTargets> | null | undefined,
+  round: RoundKey,
+): (number | null)[] {
+  const id = roundKeyId(round);
+  return list?.find((item) => roundKeyId(item) === id)?.targets ?? [];
+}
+
+/**
+ * N **effectif** de chaque carte réglée d'un tour : la carte, sinon le tour
+ * (`roundTarget`, déjà résolu sur le tournoi). `null` quand le format est éteint
+ * (`roundTarget` nul) ou qu'aucune carte n'a de réglage propre : chaque carte
+ * suit alors `roundTarget`.
+ */
+export function effectiveMapPointTargets(
+  roundTarget: number | null | undefined,
+  mapTargets: ReadonlyArray<number | null> | null | undefined,
+): number[] | null {
+  if (roundTarget === null || roundTarget === undefined) return null;
+  if (!mapTargets || !mapTargets.some((value) => value !== null)) return null;
+  return mapTargets.map((value) => value ?? roundTarget);
+}
+
+/**
+ * N de la carte `index` (0 = carte 1) d'un match : celui de la carte s'il est
+ * réglé (`pointTargets`, N effectifs carte par carte), sinon celui du match
+ * (`pointTarget`, tour puis tournoi). `null` : format éteint.
+ */
+export function mapPointTargetAt(
+  pointTarget: number | null | undefined,
+  pointTargets: ReadonlyArray<number> | null | undefined,
+  index: number,
+): number | null {
+  if (pointTarget === null || pointTarget === undefined) return null;
+  return pointTargets?.[index] ?? pointTarget;
+}
+
+/** Les cartes d'un match ont-elles des N différents (réglage carte par carte) ? */
+export function hasPerMapTargets(
+  pointTarget: number | null | undefined,
+  pointTargets: ReadonlyArray<number> | null | undefined,
+): boolean {
+  return (
+    pointTarget !== null &&
+    pointTarget !== undefined &&
+    (pointTargets ?? []).some((value) => value !== pointTarget)
+  );
 }
 
 /**

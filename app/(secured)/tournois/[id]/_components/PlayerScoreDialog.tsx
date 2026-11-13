@@ -21,6 +21,7 @@ import {
   isMapTouched,
   progressiveMapRows,
   refusalFieldOnRows,
+  refusalPointTarget,
   trimTrailingBlankMaps,
   refusalOnTouchedRow,
   type MapListCheck,
@@ -411,14 +412,17 @@ export function PlayerScoreDialog({
 
   const game = useTournamentGame();
   // Format Duel / Arcade : chaque carte au premier à N points
-  // (`docs/features/DUEL_ARCADE.md`) — la même règle que le serveur.
+  // (`docs/features/DUEL_ARCADE.md`) — la même règle que le serveur, carte par
+  // carte quand le tour en règle une à une (`mapPointTargets`).
   const pointTarget = match.mapPointTarget ?? null;
+  const pointTargets = match.mapPointTargets ?? null;
+  const pointRules = { pointTarget, pointTargets };
   // Saisie **map par map** (`docs/features/MAP_SCORES.md`) : le score du match
   // se dérive des maps, chacune avec son code de replay.
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`) ; ce qui
   // se valide et part en retire la ligne vierge de fin (`trimTrailingBlankMaps`).
   const [rows, setRows] = useState<MatchMapInput[]>(() =>
-    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), { pointTarget }),
+    progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), pointRules),
   );
   const maps = useMemo(() => trimTrailingBlankMaps(rows), [rows]);
   const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", rows.length));
@@ -439,7 +443,7 @@ export function PlayerScoreDialog({
   const signature = reportsSignature(match);
   useEffect(() => {
     const nextView = playerReportView(match, myTeamId);
-    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(nextView), { pointTarget });
+    const next = progressiveMapRows(matchFormat, game, playerReportInitialMaps(nextView), pointRules);
     const typing = JSON.stringify(current.current) !== JSON.stringify(baseline.current);
     if (!typing) {
       // Les maps remplacées par la nouvelle proposition : les refus rattachés
@@ -457,7 +461,7 @@ export function PlayerScoreDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
-  const check = checkMapList(matchFormat, game, maps, { decisive: true, pointTarget });
+  const check = checkMapList(matchFormat, game, maps, { decisive: true, ...pointRules });
   // Rien de saisi : la ligne vierge d'ouverture n'est pas une proposition.
   const nothingEntered = !maps.some(isMapTouched);
   const entered =
@@ -537,10 +541,10 @@ export function PlayerScoreDialog({
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
   // qu'un code : la même règle, rejouée ici, retrouve le champ.
   const flagRefusal = (code: string): boolean => {
-    const local = checkMapList(matchFormat, game, maps, { decisive: true, pointTarget });
+    const local = checkMapList(matchFormat, game, maps, { decisive: true, ...pointRules });
     const target = refusalFieldOnRows(local, rows);
     if (!target || local.error !== code) return false;
-    fieldErrors.flag(mapFieldKey(target.index, target.field), mapViolationText(text, local.error, matchFormat, game, pointTarget));
+    fieldErrors.flag(mapFieldKey(target.index, target.field), mapViolationText(text, local.error, matchFormat, game, refusalPointTarget(local, pointRules)));
     return true;
   };
 
@@ -556,10 +560,10 @@ export function PlayerScoreDialog({
     seenAt: string | null;
   }): Promise<boolean> => {
     if (submitting) return false;
-    const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true, pointTarget });
+    const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true, ...pointRules });
     if (sendCheck.error) {
       if (!send.confirmTheirs) flagRefusal(sendCheck.error);
-      showError(mapViolationText(text, sendCheck.error, matchFormat, game, pointTarget));
+      showError(mapViolationText(text, sendCheck.error, matchFormat, game, refusalPointTarget(sendCheck, pointRules)));
       return false;
     }
     const entered1 = sendCheck.score.team1;
@@ -721,7 +725,7 @@ export function PlayerScoreDialog({
   const submitLabel = confirmsAsIs ? t("score.player.confirm") : t("score.player.send");
   let blocker: string | null = null;
   if (unchangedMine) blocker = t("score.player.alreadySent", { opponent: opponentName });
-  else if (check.error) blocker = mapViolationText(text, check.error, matchFormat, game, pointTarget);
+  else if (check.error) blocker = mapViolationText(text, check.error, matchFormat, game, refusalPointTarget(check, pointRules));
   // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
   // une map **renseignée** — une ligne vierge qu'on vient d'ajouter n'appelle
   // pas encore de reproche.
@@ -773,6 +777,8 @@ export function PlayerScoreDialog({
                 team1Name={team1}
                 team2Name={team2}
                 label={t("score.admin.proposalMaps", { name: myName })}
+                pointTarget={pointTarget}
+                pointTargets={pointTargets}
               />
             </div>
           )}
@@ -785,6 +791,8 @@ export function PlayerScoreDialog({
                 team1Name={team1}
                 team2Name={team2}
                 label={t("score.admin.proposalMaps", { name: opponentName })}
+                pointTarget={pointTarget}
+                pointTargets={pointTargets}
               />
             </div>
           )}
@@ -805,6 +813,7 @@ export function PlayerScoreDialog({
                 mapNames={mapNames}
                 tiebreakMap={tiebreakMap}
                 pointTarget={pointTarget}
+                pointTargets={pointTargets}
                 disabled={submitting}
                 fieldErrors={fieldErrors}
               />

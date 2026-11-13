@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
   assertMapPointsUnlocked,
+  loadMatchPointRules,
   loadMatchPointTarget,
   matchRoundKey,
 } from "@/lib/server/tournaments/map-points";
@@ -171,5 +172,39 @@ describe("assertMapPointsUnlocked", () => {
     expect(sql).toMatch(/FROM bg_match_maps WHERE match_id IN \(\?, \?\) LIMIT 1 LOCK IN SHARE MODE$/);
     expect(sql).not.toMatch(/JOIN|SELECT id FROM bg_matches/);
     expect(params).toEqual([4, 9]);
+  });
+});
+
+describe("loadMatchPointRules", () => {
+  it("loadMatchPointRules_formatOff_returnsNullsWithoutQuery", async () => {
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, null, ROUND);
+
+    expect(actual).toEqual({ pointTarget: null, pointTargets: null });
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
+  it("loadMatchPointRules_perMapRow_resolvesEachMapOnRoundTarget", async () => {
+    route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 4, map_point_targets: "[null,6]" }] }]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
+
+    expect(actual).toEqual({ pointTarget: 4, pointTargets: [4, 6] });
+    expect(connection.execute.mock.calls[0][0]).toMatch(/SELECT map_point_target, map_point_targets FROM/);
+  });
+
+  it("loadMatchPointRules_perMapWithoutRoundTarget_fallsBackOnTournament", async () => {
+    route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: null, map_point_targets: "[3]" }] }]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
+
+    expect(actual).toEqual({ pointTarget: 5, pointTargets: [3] });
+  });
+
+  it("loadMatchPointRules_noRow_returnsTournamentTargetOnly", async () => {
+    route([]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
+
+    expect(actual).toEqual({ pointTarget: 5, pointTargets: null });
   });
 });

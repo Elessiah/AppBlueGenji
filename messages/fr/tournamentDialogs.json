@@ -26,6 +26,8 @@
       "legend": "Maps jouées",
       "drawHint": "Une map nulle ne rapporte de point à personne.",
       "duelRules": "Le vainqueur d'une map marque exactement {points} points, l'autre de 0 à {max} : pas de map nulle.",
+      "duelRulesPerMap": "Chaque map se gagne au premier à un nombre de points propre, indiqué sur sa ligne : le vainqueur l'atteint exactement, l'autre reste en dessous. Pas de map nulle.",
+      "rowTarget": "premier à {points}",
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",
       "mapNamed": "Map {index} : {name}",

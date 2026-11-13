@@ -4,7 +4,12 @@
  * le réglage une fois un score saisi. Règles pures : `lib/shared/map-points.ts`.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { effectiveMapPointTarget, parseStoredMapPointTarget } from "@/lib/shared/map-points";
+import {
+  effectiveMapPointTarget,
+  effectiveMapPointTargets,
+  parseStoredMapPointTarget,
+  parseStoredMapPointTargets,
+} from "@/lib/shared/map-points";
 import type { RoundKey } from "@/lib/shared/round-maps";
 
 /** Manche d'une ligne de match (`bg_matches`). */
@@ -40,16 +45,44 @@ export async function loadMatchPointTarget(
   tournamentTarget: unknown,
   round: RoundKey,
 ): Promise<number | null> {
+  return (await loadMatchPointRules(connection, tournamentId, tournamentTarget, round)).pointTarget;
+}
+
+/** Points d'un match : N du match (tour, sinon tournoi) et N effectif carte par carte. */
+export type MatchPointRules = {
+  /** N du tour, sinon du tournoi ; `null` : format éteint. */
+  pointTarget: number | null;
+  /** N effectif des cartes réglées une à une (carte 1 en tête), `null` sans réglage carte par carte. */
+  pointTargets: number[] | null;
+};
+
+/**
+ * Comme {@link loadMatchPointTarget}, avec en plus les points réglés **carte
+ * par carte** sur le tour (`map_point_targets`) : même ligne, même lecture
+ * verrouillante. Ordre de résolution d'une carte : la carte, le tour, le tournoi.
+ */
+export async function loadMatchPointRules(
+  connection: PoolConnection,
+  tournamentId: number,
+  tournamentTarget: unknown,
+  round: RoundKey,
+): Promise<MatchPointRules> {
   const target = parseStoredMapPointTarget(tournamentTarget);
-  if (target === null) return null;
-  const [rows] = await connection.execute<(RowDataPacket & { map_point_target: number | null })[]>(
-    `SELECT map_point_target FROM bg_tournament_round_maps
+  if (target === null) return { pointTarget: null, pointTargets: null };
+  const [rows] = await connection.execute<
+    (RowDataPacket & { map_point_target: number | null; map_point_targets?: string | null })[]
+  >(
+    `SELECT map_point_target, map_point_targets FROM bg_tournament_round_maps
       WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1
       LOCK IN SHARE MODE`,
     [tournamentId, round.phaseId, round.bracket, round.roundNumber],
   );
   const own = parseStoredMapPointTarget(rows[0]?.map_point_target);
-  return effectiveMapPointTarget(target, own === null ? [] : [{ ...round, target: own }], round);
+  const pointTarget = effectiveMapPointTarget(target, own === null ? [] : [{ ...round, target: own }], round);
+  return {
+    pointTarget,
+    pointTargets: effectiveMapPointTargets(pointTarget, parseStoredMapPointTargets(rows[0]?.map_point_targets)),
+  };
 }
 
 /**

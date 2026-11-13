@@ -34,8 +34,8 @@ import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 import { assertMapPointsUnlocked } from "./map-points";
-import { queueRoundMapsNotice, roundMapsFingerprint, scheduleRoundMapsNotice } from "./round-maps-notice";
-import { bracketFitsFormat, parseStoredMapPointTarget } from "@/lib/shared/map-points";
+import { queueRoundMapsNotice, roundPointsFingerprint, scheduleRoundMapsNotice } from "./round-maps-notice";
+import { bracketFitsFormat, parseStoredMapPointTarget, parseStoredMapPointTargets } from "@/lib/shared/map-points";
 
 /** Valeurs éditables d'un tournoi. Dates en ISO, comme partout côté client. */
 export type EditableTournamentValues = {
@@ -288,17 +288,23 @@ async function pruneRoundPointTargets(
 ): Promise<boolean> {
   if (!change.turnedOff && !change.structureChanged) return false;
   const [rows] = await connection.execute<
-    (RowDataPacket & { phase_id: number; bracket: string; round_number: number; map_point_target: number })[]
+    (RowDataPacket & {
+      phase_id: number;
+      bracket: string;
+      round_number: number;
+      map_point_target: number | null;
+      map_point_targets?: string | null;
+    })[]
   >(
-    `SELECT phase_id, bracket, round_number, map_point_target FROM bg_tournament_round_maps
-      WHERE tournament_id = ? AND map_point_target IS NOT NULL`,
+    `SELECT phase_id, bracket, round_number, map_point_target, map_point_targets FROM bg_tournament_round_maps
+      WHERE tournament_id = ? AND (map_point_target IS NOT NULL OR map_point_targets IS NOT NULL)`,
     [tournamentId],
   );
   let doomed = rows;
   if (change.turnedOff) {
     await connection.execute(
-      `UPDATE bg_tournament_round_maps SET map_point_target = NULL
-        WHERE tournament_id = ? AND map_point_target IS NOT NULL`,
+      `UPDATE bg_tournament_round_maps SET map_point_target = NULL, map_point_targets = NULL
+        WHERE tournament_id = ? AND (map_point_target IS NOT NULL OR map_point_targets IS NOT NULL)`,
       [tournamentId],
     );
   } else {
@@ -308,14 +314,15 @@ async function pruneRoundPointTargets(
     // Une seule instruction pour tous les tours caducs : le verrou du tournoi
     // n'attend pas R allers-retours.
     await connection.execute(
-      `UPDATE bg_tournament_round_maps SET map_point_target = NULL
+      `UPDATE bg_tournament_round_maps SET map_point_target = NULL, map_point_targets = NULL
         WHERE tournament_id = ? AND (${doomed.map(() => "(phase_id = ? AND bracket = ? AND round_number = ?)").join(" OR ")})`,
       [tournamentId, ...doomed.flatMap((row) => [row.phase_id, row.bracket, row.round_number])],
     );
   }
   await connection.execute(
     `DELETE FROM bg_tournament_round_maps
-      WHERE tournament_id = ? AND slots_json = '[]' AND tiebreak_map IS NULL AND map_point_target IS NULL`,
+      WHERE tournament_id = ? AND slots_json = '[]' AND tiebreak_map IS NULL AND map_point_target IS NULL
+        AND map_point_targets IS NULL`,
     [tournamentId],
   );
   await queueRoundMapsNotice(
@@ -325,7 +332,10 @@ async function pruneRoundPointTargets(
       phaseId: Number(row.phase_id),
       bracket: String(row.bracket),
       roundNumber: Number(row.round_number),
-      before: roundMapsFingerprint(parseStoredMapPointTarget(row.map_point_target)),
+      before: roundPointsFingerprint(
+        parseStoredMapPointTarget(row.map_point_target),
+        parseStoredMapPointTargets(row.map_point_targets),
+      ),
     })),
     { points: true },
   );

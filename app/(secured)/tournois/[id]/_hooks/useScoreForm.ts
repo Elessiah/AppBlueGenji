@@ -25,6 +25,7 @@ import {
   refusalOnTouchedRow,
   type MapEntryRules,
   type MapField,
+  refusalPointTarget,
   type MapListViolation,
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
@@ -46,16 +47,21 @@ export function savedToastKey(forfeit: boolean, paused: boolean) {
  * de replay ». Les points par carte du format Duel / Arcade s'imposent à lui
  * comme aux engagés (`lib/shared/map-points.ts`).
  */
-function adminMapRules(pointTarget: number | null): MapEntryRules {
-  return { requireReplayCode: false, pointTarget };
+function adminMapRules(pointTarget: number | null, pointTargets: readonly number[] | null): MapEntryRules {
+  return { requireReplayCode: false, pointTarget, pointTargets };
 }
 
 /**
  * Empreinte des règles des lignes d'ouverture (format de la manche, jeu,
  * points par carte), champ par champ — rien à sérialiser à chaque frappe.
  */
-function rulesKey(format: MatchFormat | null, game: string | null, pointTarget: number | null): string {
-  const points = `|${pointTarget ?? ""}`;
+function rulesKey(
+  format: MatchFormat | null,
+  game: string | null,
+  pointTarget: number | null,
+  pointTargets: readonly number[] | null,
+): string {
+  const points = `|${pointTarget ?? ""}|${pointTargets?.join(",") ?? ""}`;
   if (!format) return `|${game ?? ""}${points}`;
   return `${format.type}:${format.value}:${format.maxMaps ?? ""}:${format.drawsAllowed ? 1 : 0}|${game ?? ""}${points}`;
 }
@@ -83,7 +89,8 @@ export function useScoreForm(
   const matchFormat = useMatchFormat(match);
   const game = useTournamentGame();
   const pointTarget = match?.mapPointTarget ?? null;
-  const mapRules = adminMapRules(pointTarget);
+  const pointTargets = match?.mapPointTargets ?? null;
+  const mapRules = adminMapRules(pointTarget, pointTargets);
   // Détail map par map (`docs/features/MAP_SCORES.md`) : seule saisie du
   // score, qui en est **dérivé** — aucun score à la main.
   // Lignes affichées, une à une au fil du format (`progressiveMapRows`, une
@@ -112,7 +119,7 @@ export function useScoreForm(
   // Règles des lignes d'ouverture (format de la manche, jeu) : changées pendant
   // que le dialogue est ouvert, elles changent ce qu'ouvrir produirait sans
   // toucher à l'empreinte du résultat — l'alignement doit les suivre aussi.
-  const rules = rulesKey(matchFormat, game, pointTarget);
+  const rules = rulesKey(matchFormat, game, pointTarget, pointTargets);
   const [synced, setSynced] = useState(() => ({
     signature: storedResultSignature(match),
     proposals: pendingProposalSignature(match),
@@ -186,7 +193,10 @@ export function useScoreForm(
     const local = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });
     const target = refusalFieldOnRows(local, maps);
     if (!target || local.error !== code || !options.onMapRefusal) return;
-    options.onMapRefusal(target, mapViolationText(dialogText, local.error, matchFormat, game, pointTarget));
+    options.onMapRefusal(
+      target,
+      mapViolationText(dialogText, local.error, matchFormat, game, refusalPointTarget(local, mapRules)),
+    );
   };
 
   /** Contrôle des maps avant l'envoi ; `true` (refus signalé) bloque l'envoi. */
@@ -194,7 +204,7 @@ export function useScoreForm(
     const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });
     if (!mapCheck.error) return false;
     flagMapRefusal(mapCheck.error, decisive);
-    showError(mapViolationText(dialogText, mapCheck.error, matchFormat, game, pointTarget));
+    showError(mapViolationText(dialogText, mapCheck.error, matchFormat, game, refusalPointTarget(mapCheck, mapRules)));
     return true;
   };
 
@@ -341,8 +351,14 @@ function mapRefusals(
   maps: ReadonlyArray<MatchMapInput>,
   decision: Pick<ScoreFormDecision, "saveBlocker" | "resolveBlocker">,
   mapRules: MapEntryRules,
-): { save: MapListViolation | null; resolve: MapListViolation | null; onBlankRow: boolean } {
-  if (maps.length === 0) return { save: null, resolve: null, onBlankRow: false };
+): {
+  save: MapListViolation | null;
+  resolve: MapListViolation | null;
+  onBlankRow: boolean;
+  /** N de la carte que le refus désigne (Duel / Arcade, réglage carte par carte), à citer dans le message. */
+  pointTarget: number | null;
+} {
+  if (maps.length === 0) return { save: null, resolve: null, onBlankRow: false, pointTarget: mapRules.pointTarget ?? null };
   const save = checkMapList(format, game, maps, { decisive: false, ...mapRules });
   const resolve = checkMapList(format, game, maps, { decisive: true, ...mapRules });
   // Un geste interdit pour une autre raison que les maps (résultat déjà
@@ -353,6 +369,7 @@ function mapRefusals(
     resolve: isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error,
     // Le refus affiché désigne une ligne vierge, qu'on vient d'ajouter : il se tait.
     onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),
+    pointTarget: refusalPointTarget(resolve.error ? resolve : save, mapRules),
   };
 }
 

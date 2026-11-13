@@ -215,3 +215,35 @@
   justify-content: flex-end;
   margin-top: 4px;
 }
+
+/* Points par carte, carte par carte (Duel / Arcade) : une grille de petits
+   champs, deux à trois par ligne à 375 px. */
+.pointMaps {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pointMapsTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pointMapList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pointMap {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}

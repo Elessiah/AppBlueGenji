@@ -4,6 +4,7 @@ import { Copy } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { useSpectatorView } from "@/components/spectator-view";
 import { mapWinnerSide, type MatchMapResult } from "@/lib/shared/match-maps";
+import { hasPerMapTargets, mapPointTargetAt } from "@/lib/shared/map-points";
 import styles from "./MatchMapDetails.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -18,7 +19,8 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
  * ne les transmet de toute façon pas (`spectatorSnapshot`).
  *
  * Format Duel / Arcade (`pointTarget`) : le score de chaque carte est en
- * points ; la règle (« premier à 5 ») est dite par le nom de la liste.
+ * points ; la règle (« premier à 5 ») est dite par le nom de la liste — ou,
+ * réglée carte par carte (`pointTargets`), sur chaque ligne.
  */
 export function MapResultList({
   maps,
@@ -26,6 +28,7 @@ export function MapResultList({
   team2Name,
   label,
   pointTarget = null,
+  pointTargets = null,
 }: Readonly<{
   maps: ReadonlyArray<MatchMapResult>;
   team1Name: string;
@@ -33,6 +36,8 @@ export function MapResultList({
   label: string;
   /** Points par carte du format Duel / Arcade (`null` = éteint). */
   pointTarget?: number | null;
+  /** N effectif carte par carte (carte 1 en tête) ; une carte au-delà suit `pointTarget`. */
+  pointTargets?: ReadonlyArray<number> | null;
 }>) {
   const { showError, showSuccess } = useToast();
   const { t } = useTournamentPageText();
@@ -46,17 +51,28 @@ export function MapResultList({
     }
   };
 
+  const perMap = hasPerMapTargets(pointTarget, pointTargets);
+  let listLabel = label;
+  if (perMap) listLabel = `${label} — ${t("match.maps.pointTargetPerMap")}`;
+  else if (pointTarget !== null) listLabel = `${label} — ${t("match.maps.pointTarget", { points: String(pointTarget) })}`;
+
   return (
     <>
-      <ol className={styles.list} aria-label={pointTarget === null ? label : `${label} — ${t("match.maps.pointTarget", { points: String(pointTarget) })}`}>
+      <ol className={styles.list} aria-label={listLabel}>
         {maps.map((map) => {
           const side = mapWinnerSide(map);
           let outcome = t("match.maps.drawn");
           if (side === 1) outcome = t("match.maps.wonBy", { team: team1Name });
           else if (side === 2) outcome = t("match.maps.wonBy", { team: team2Name });
+          const target = perMap ? mapPointTargetAt(pointTarget, pointTargets, map.mapNumber - 1) : null;
           return (
             <li key={map.mapNumber} className={styles.item}>
-              <span className={styles.label}>{t("match.maps.map", { number: String(map.mapNumber) })}</span>
+              <span className={styles.label}>
+                {t("match.maps.map", { number: String(map.mapNumber) })}
+                {target !== null && (
+                  <span className={styles.target}> · {t("match.maps.rowTarget", { points: String(target) })}</span>
+                )}
+              </span>
               <span className={styles.score} title={outcome}>
                 {map.team1Score} – {map.team2Score}
                 <span className="sr-only"> : {outcome}</span>

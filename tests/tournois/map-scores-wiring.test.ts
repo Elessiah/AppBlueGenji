@@ -70,7 +70,7 @@ describe("détail map par map — affichage", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<ProposalSection key=\{by\} text=\{text\} report=\{report\}/);
     // Chaque proposition rend son détail de maps (litige, ou report seul suspendu).
-    expect(dialog).toMatch(/function ProposalSection[\s\S]{0,800}<MapResultList maps=\{report\.maps\}/);
+    expect(dialog).toMatch(/function ProposalSection[\s\S]{0,1000}<MapResultList\s+maps=\{report\.maps\}/);
   });
 });
 
@@ -368,11 +368,11 @@ describe("détail map par map — saisie du seul détail et libellé de confirma
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).not.toContain("replayCodeOptional");
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("return { requireReplayCode: false, pointTarget };");
+    expect(hook).toContain("return { requireReplayCode: false, pointTarget, pointTargets };");
     expect(hook).toContain("const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });");
     expect(hook).toContain("const local = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });");
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
-    expect(list).toContain("progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget })");
+    expect(list).toContain("progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget, pointTargets })");
     expect(list).toContain('{replayCodeOptional ? t("score.maps.replayCodeOptional") : t("score.maps.replayCode")}');
     expect(list).toContain('{replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}');
     expect(FR_SCORE.maps.replayCodeOptional).toBe("Code de replay (facultatif)");
@@ -442,7 +442,7 @@ describe("détail map par map — lignes progressives dans les modales", () => {
   const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
 
   it("toute modification passe par l'affichage progressif ; une ligne ajoutée s'annonce", () => {
-    expect(list()).toContain("const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget });");
+    expect(list()).toContain("const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget, pointTargets });");
     // Seule une croissance due à l'affichage progressif s'annonce (pas une liste reçue).
     expect(list()).toContain("autoGrown.current = rows.length > maps.length;");
     expect(list()).toContain('if (autoGrown.current) setAnnouncement(t("score.maps.added", { index: maps.length }));');
@@ -455,7 +455,7 @@ describe("détail map par map — lignes progressives dans les modales", () => {
 
   it("engagé comme arbitrage partent d'une ligne vierge ; ce qui part la retire", () => {
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(player).toContain("progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), { pointTarget })");
+    expect(player).toContain("progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), pointRules)");
     expect(player).toContain("const maps = useMemo(() => trimTrailingBlankMaps(rows), [rows]);");
     expect(player).toMatch(/maps=\{rows\}\s*onChange=\{setRows\}\s*format=\{matchFormat\}/);
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
@@ -534,7 +534,7 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
 
   it("useScoreForm_rulesChangeWhileOpen_realignsBaseline", () => {
     const form = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(form).toContain("const rules = rulesKey(matchFormat, game, pointTarget);");
+    expect(form).toContain("const rules = rulesKey(matchFormat, game, pointTarget, pointTargets);");
     expect(form).not.toContain("JSON.stringify(matchFormat)");
     expect(form).toContain("rules !== synced.rules");
     expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
@@ -579,7 +579,7 @@ describe("format Duel / Arcade — revue UI cycle 1", () => {
 
   it("MapScoreList_tieAtTarget_flaggedWhileTyping", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
-    expect(list).toContain("row.team1Score === pointTarget && row.team2Score === pointTarget");
+    expect(list).toContain("row.team1Score === rowTarget && row.team2Score === rowTarget");
     expect(list).not.toContain("score.maps.duelHint");
   });
 

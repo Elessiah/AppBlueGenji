@@ -24,7 +24,12 @@
  * l'entrée ({@link invalidateTournamentSnapshot}). Personne ne lit donc un
  * score périmé.
  */
-import { singleMapDisplayScore, type RoundPointTarget } from "@/lib/shared/map-points";
+import {
+  effectiveMapPointTargets,
+  singleMapDisplayScore,
+  type RoundMapPointTargets,
+  type RoundPointTarget,
+} from "@/lib/shared/map-points";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
@@ -406,21 +411,29 @@ function encodeSnapshotFrame(
 
 /**
  * Format Duel / Arcade : points qui gagnent une carte, par match (réglage du
- * tour, sinon du tournoi) — dans l'instantané commun, servi par les deux
- * portes (`docs/features/DUEL_ARCADE.md`). Absent quand le format est éteint.
+ * tour, sinon du tournoi) et carte par carte (réglage de la carte, sinon celui
+ * du match) — dans l'instantané commun, servi par les deux portes
+ * (`docs/features/DUEL_ARCADE.md`). Absent quand le format est éteint.
  */
-function attachPointTargets(
+export function attachPointTargets(
   matches: BracketMatch[],
   tournamentTarget: number | null | undefined,
   roundTargets: ReadonlyArray<RoundPointTarget> | null | undefined,
+  roundMapTargets?: ReadonlyArray<RoundMapPointTargets> | null,
 ): void {
   if (tournamentTarget == null) return;
   // Un index des réglages de tour, bâti une fois : une recherche linéaire par
   // match rebâtirait la clé de chaque tour pour chacun des ~250 matchs.
   const byRound = new Map<string, number>();
   for (const entry of roundTargets ?? []) byRound.set(roundKeyId(entry), entry.target);
+  const mapsByRound = new Map<string, (number | null)[]>();
+  for (const entry of roundMapTargets ?? []) mapsByRound.set(roundKeyId(entry), entry.targets);
   for (const match of matches) {
-    match.mapPointTarget = byRound.get(roundKeyId(match)) ?? tournamentTarget;
+    const id = roundKeyId(match);
+    match.mapPointTarget = byRound.get(id) ?? tournamentTarget;
+    const perMap = effectiveMapPointTargets(match.mapPointTarget, mapsByRound.get(id));
+    // Champ omis sans réglage carte par carte (le cas courant).
+    if (perMap) match.mapPointTargets = perMap;
   }
 }
 
@@ -614,7 +627,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       ), mapRules),
       await loadMapsByMatch(connection, matchIds),
     );
-    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets);
+    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets, mapRules.mapPointTargets);
     attachDisplayScores(mappedMatches, card);
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
     // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).

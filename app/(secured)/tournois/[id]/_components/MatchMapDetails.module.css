@@ -61,6 +61,11 @@
   white-space: nowrap;
 }
 
+/* Duel / Arcade réglé carte par carte : le N de la carte, à côté de son numéro. */
+.target {
+  font-size: 12px;
+}
+
 .score {
   font-family: var(--font-mono);
   font-weight: 700;

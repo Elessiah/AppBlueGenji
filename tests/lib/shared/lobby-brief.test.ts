@@ -53,6 +53,27 @@ describe("formatLobbyBriefDm", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 1 }), URL, "en")).toContain("each map is won by the first to 1 point.");
   });
 
+  it("formatLobbyBriefDm_perMapTargets_listsEachMapFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL);
+
+    expect(actual).toContain("Format Duel / Arcade : carte 1 au premier à 5, carte 2 au premier à 3, puis premier à 5 pour les suivantes.");
+    expect(actual).not.toContain("chaque carte se gagne");
+  });
+
+  it("formatLobbyBriefDm_perMapTargets_listsEachMapEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL, "en");
+
+    expect(actual).toContain("Duel / Arcade format: map 1 first to 5, map 2 first to 3, then first to 5 for the next ones.");
+  });
+
+  it("formatLobbyBriefDm_emptyPerMapTargets_keepsSingleLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [] }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
+  });
+
+  it("formatLobbyBriefDm_perMapWithoutPointTarget_omitsLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: null, pointTargets: [3] }), URL)).not.toContain("Duel / Arcade");
+  });
+
   it("formatLobbyBriefDm_pointTargetSeveral_pluralFrAndEn", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
     expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL, "en")).toContain("each map is won by the first to 5 points.");

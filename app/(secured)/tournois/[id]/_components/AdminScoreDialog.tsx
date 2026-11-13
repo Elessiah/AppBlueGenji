@@ -149,7 +149,7 @@ function buttonTitleFor(text: TournamentDialogsText, input: {
   idle: string;
   format: MatchFormat | null;
   game: TournamentGame | null | undefined;
-  /** Points par carte du format Duel / Arcade (`null` = éteint). */
+  /** Points de la carte refusée, format Duel / Arcade (`null` = éteint). */
   pointTarget: number | null;
 }): string {
   if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");
@@ -180,10 +180,12 @@ function visibleBlocker(text: TournamentDialogsText, input: {
  * Une proposition d'engagée telle que l'arbitre la vérifie : score, puis maps et
  * codes de replay. Litige (les deux) ou report seul suspendu (`SCORE_DISPUTE_LOCK.md`).
  */
-function ProposalSection({ text, report, by, team1, team2 }: Readonly<{
+function ProposalSection({ text, report, by, team1, team2, points }: Readonly<{
   text: TournamentDialogsText;
   report: MatchScoreReport;
   by: string;
+  /** Points par carte (Duel / Arcade) : chaque carte dit son N quand le tour en règle une à une. */
+  points?: Pick<BracketMatch, "mapPointTarget" | "mapPointTargets">;
   team1: string;
   team2: string;
 }>) {
@@ -193,7 +195,14 @@ function ProposalSection({ text, report, by, team1, team2 }: Readonly<{
         {text.t("score.admin.proposalTitle", { name: by, score1: report.team1Score, score2: report.team2Score })}
       </p>
       {report.maps.length > 0 && (
-        <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={text.t("score.admin.proposalMaps", { name: by })} />
+        <MapResultList
+          maps={report.maps}
+          team1Name={team1}
+          team2Name={team2}
+          label={text.t("score.admin.proposalMaps", { name: by })}
+          pointTarget={points?.mapPointTarget ?? null}
+          pointTargets={points?.mapPointTargets ?? null}
+        />
       )}
     </section>
   );
@@ -323,7 +332,7 @@ export function AdminScoreDialog({
       idle,
       format: matchFormat,
       game: form.game,
-      pointTarget: match.mapPointTarget ?? null,
+      pointTarget: form.mapsRefused.pointTarget,
     });
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -382,7 +391,7 @@ export function AdminScoreDialog({
     blocker,
     format: matchFormat,
     game: form.game,
-    pointTarget: match.mapPointTarget ?? null,
+    pointTarget: form.mapsRefused.pointTarget,
   });
   // Score proposé par une engagée et jamais confirmé par l'autre — une équipe
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
@@ -551,7 +560,7 @@ export function AdminScoreDialog({
                 { report: match.team1Report, by: team1 },
                 { report: match.team2Report, by: team2 },
               ].map(({ report, by }) => (
-                <ProposalSection key={by} text={text} report={report} by={by} team1={team1} team2={team2} />
+                <ProposalSection key={by} text={text} report={report} by={by} team1={team1} team2={team2} points={match} />
               ))}
               {/* Seule la validation lève le verrou des engagées (`SCORE_DISPUTE_LOCK.md`) :
                   « Enregistrer » garde les deux propositions, donc le litige. */}
@@ -599,6 +608,7 @@ export function AdminScoreDialog({
               mapNames={mapNames}
               tiebreakMap={tiebreakMap}
               pointTarget={match.mapPointTarget ?? null}
+              pointTargets={match.mapPointTargets ?? null}
               disabled={form.submitting}
               fieldErrors={mapFieldErrors}
             />
