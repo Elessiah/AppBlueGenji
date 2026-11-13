@@ -1774,6 +1774,28 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(state.match?.launched_at).toBe(STAMP);
   });
 
+  it("claimMatchCast_designatedRefereeJoinsExistingStream_coCastsWithoutNewStream", async () => {
+    state.users[901] = { ...refereeUser, platform_roles_json: JSON.stringify(["CASTER"]) };
+    state.match = matchState({ referee_user_id: REFEREE, caster_user_id: 901 });
+    await claimMatchCast(42, REFEREE, true, { streamId: 1 });
+    expect(state.match?.streams).toHaveLength(1);
+    expect(state.match?.casters.map((caster) => [caster.user_id, caster.stream_id])).toEqual([[901, 1], [REFEREE, 1]]);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("setMatchReady_refereeCasterWithdrawsReady_clearsBothReadies", async () => {
+    state.match = matchState({
+      referee_user_id: REFEREE,
+      referee_ready_at: STAMP,
+      caster_user_id: REFEREE,
+      caster_ready_at: STAMP,
+    });
+    await setMatchReady(42, REFEREE, false);
+    expect(casterReadyOf(state)).toBeNull();
+    expect(state.match?.referee_ready_at).toBeNull();
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
   it("releaseMatchCast_refereeCaster_staysRefereeWithReady", async () => {
     state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP, caster_user_id: REFEREE, caster_ready_at: STAMP });
     await releaseMatchCast(42, REFEREE, false);
