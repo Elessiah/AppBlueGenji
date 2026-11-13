@@ -381,9 +381,24 @@ const BRIEF_FROM = `FROM bg_matches m
  * Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
  * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
+/**
+ * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
+ * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
+ * rien ne part. Rallumée, le check-in d'un match ne part que si son **premier
+ * repère** — 15 minutes avant l'horaire, ou l'ouverture du salon s'il vient
+ * plus tôt ou faute d'horaire — tombe après la remise en marche : ce qui était
+ * dû pendant qu'elle était éteinte n'est pas rattrapé d'un coup.
+ */
+const CHECK_IN_ON_SQL = `t.match_check_in = 1
+        AND (t.match_check_in_resumed_at IS NULL
+             OR LEAST(COALESCE(m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE, m.lobby_opened_at),
+                      COALESCE(m.lobby_opened_at, m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE))
+                >= t.match_check_in_resumed_at)`;
+
 const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
         AND m.self_managed = 1 AND m.referee_user_id IS NULL
         AND t.start_visibility_at <= NOW()
+        AND ${CHECK_IN_ON_SQL}
         AND ((m.start_at IS NOT NULL
               AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
               AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)

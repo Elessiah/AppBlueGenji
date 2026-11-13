@@ -156,6 +156,7 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
             IF(t.state = 'FINISHED', 'COMPLETED', m.status) AS status,
             m.start_at, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
+            t.match_check_in, t.match_check_in_resumed_at,
             t1.name AS team1_name, t2.name AS team2_name,
             ${newMatchPendingSql("NOW()")} AS new_match_pending, ${newMatchToldSql()} AS new_match_told
        FROM bg_matches m

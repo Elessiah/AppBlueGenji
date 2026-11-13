@@ -10,7 +10,9 @@ une seule mécanique : **le site rédige, le bot distribue**.
   arbitres (voir « Rappel de check-in et programme d'arbitrage »). Les rappels « une semaine » et
   « 1 h avant » ont été retirés (demande de l'association, 2026-10 : trop de
   notifications) — l'annonce immédiate tient lieu du premier, le départ du
-  match (push `MATCH_START`) du second.
+  match (push `MATCH_START`) du second. Un tournoi dont l'option « Check-in
+  des matchs » est décochée n'a ni rappel 10 h ni ligne de check-in
+  (`MATCH_CHECK_IN_SETTING.md`).
 - **Signalement d'un problème** — un inscrit alerte le staff depuis la page du
   tournoi ou depuis un match ; le bot le relaie au canal de logs et au rôle
   arbitre.
@@ -568,7 +570,10 @@ check-in avec le lien du serveur où le salon de check-in ouvre un quart d'heure
 avant le coup d'envoi ; et, en même temps, rappeler aux arbitres les matchs,
 les heures et les équipes.
 
-**Joueurs — palier `PT10H`.** Mêmes destinataires et canaux que le rappel 24 h
+**Joueurs — palier `PT10H`.** Option « Check-in des matchs » décochée (ou
+rallumée après l'ouverture du palier) : le palier est réservé sans message,
+et les annonces ne portent ni `checkInLine()` ni « Prochain rappel : 10 heures
+avant » (`MATCH_CHECK_IN_SETTING.md`). Sinon, Mêmes destinataires et canaux que le rappel 24 h
 (message privé Discord et push `MATCH_REMINDER` dans la langue de
 chacun, engagées solo comprises — « Ton match »). Le message ajoute
 `checkInLine()` : « Check-in : le salon de check-in ouvre 15 minutes avant le

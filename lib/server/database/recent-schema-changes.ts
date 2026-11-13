@@ -573,6 +573,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // DUEL-MAP-POINTS — points par carte réglés carte par carte sur un tour
     // (JSON, `docs/features/DUEL_ARCADE.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN map_point_targets VARCHAR(128) NULL AFTER map_point_target`,
+    // NO-CHECKIN — check-in des matchs (message H-15 et rappel 10 h) : allumé
+    // partout au départ (comportement d'avant), et l'instant de sa dernière
+    // remise en marche, nul (`docs/features/MATCH_CHECK_IN_SETTING.md`).
+    `ALTER TABLE bg_tournaments ADD COLUMN match_check_in TINYINT(1) NOT NULL DEFAULT 1 AFTER team_voice_channels`,
+    `ALTER TABLE bg_tournaments ADD COLUMN match_check_in_resumed_at DATETIME NULL AFTER match_check_in`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

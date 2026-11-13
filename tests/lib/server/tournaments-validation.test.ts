@@ -752,6 +752,24 @@ describe("validateTournamentInput — salons vocaux d'équipe", () => {
   });
 });
 
+describe("validateTournamentInput — check-in des matchs", () => {
+  it("validateTournamentInput_matchCheckInAbsent_defaultsOn", () => {
+    const result = validateTournamentInput({ ...base });
+    expect("value" in result && result.value.matchCheckIn).toBe(true);
+  });
+
+  it("validateTournamentInput_matchCheckInFalse_keepsOff", () => {
+    const result = validateTournamentInput({ ...base, matchCheckIn: false });
+    expect("value" in result && result.value.matchCheckIn).toBe(false);
+  });
+
+  it("validateTournamentInput_matchCheckInString_returnsInvalidCode", () => {
+    const body: Parameters<typeof validateTournamentInput>[0] = { ...base };
+    Object.assign(body, { matchCheckIn: "false" });
+    expect(validateTournamentInput(body)).toEqual({ error: "INVALID_MATCH_CHECK_IN" });
+  });
+});
+
 describe("validateTournamentInput — format Duel / Arcade", () => {
   it("validateTournamentInput_noMapPointTarget_formatOff", () => {
     expect(value(base).mapPointTarget).toBeNull();

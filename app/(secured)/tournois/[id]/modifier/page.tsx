@@ -80,6 +80,7 @@ type EditLoadPayload = {
   state: TournamentState;
   refereeScheduling: boolean;
   teamVoiceChannels: boolean;
+  matchCheckIn: boolean;
 };
 
 /** Raison du verrou affichée en tête : aucune, publication, ou tournoi lancé. */
@@ -113,6 +114,28 @@ function voiceErrorText(text: TournamentFormText, code: string): string {
   return text.t(known ? `edit.voiceErrors.${known}` : "edit.voiceErrors.fallback");
 }
 
+/** Refus de la bascule du check-in des matchs. */
+function checkInErrorText(text: TournamentFormText, code: string): string {
+  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_MATCH_CHECK_IN"] as const).find((c) => c === code);
+  return text.t(known ? `edit.checkInErrors.${known}` : "edit.checkInErrors.fallback");
+}
+
+/**
+ * Enregistre l'option « Check-in des matchs » par sa route dédiée
+ * (`MATCH_CHECK_IN_SETTING.md`) ; rend `true` si elle a changé.
+ */
+async function saveMatchCheckIn(tournamentId: number, enabled: boolean, text: TournamentFormText): Promise<boolean> {
+  const response = await fetch(`/api/admin/tournaments/${tournamentId}/match-check-in`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  const result = (await response.json().catch(() => ({}))) as { error?: string; changed?: boolean };
+  if (response.ok) return result.changed === true;
+  const code = result.error ?? "UNKNOWN";
+  throw new CodedError(code, checkInErrorText(text, code));
+}
+
 /**
  * Enregistre l'option « Salons vocaux d'équipe » par sa route dédiée
  * (`MATCH_VOICE.md`) ; rend `true` si elle a changé.
@@ -129,17 +152,24 @@ async function saveTeamVoiceChannels(tournamentId: number, enabled: boolean, tex
   throw new CodedError(code, voiceErrorText(text, code));
 }
 
-/** Les deux bascules, envoyées l'une sans l'autre ; `null` pour chacune quand la fenêtre est fermée. */
+/** Les trois bascules, envoyées l'une sans l'autre ; `null` pour chacune quand la fenêtre est fermée. */
 async function saveToggles(
   tournamentId: number,
   editable: boolean,
-  values: Pick<TournamentFormValues, "refereeScheduling" | "teamVoiceChannels">,
+  values: Pick<TournamentFormValues, "refereeScheduling" | "teamVoiceChannels" | "matchCheckIn">,
   text: TournamentFormText,
-): Promise<[PromiseSettledResult<PlanningSaveResult> | null, PromiseSettledResult<boolean> | null]> {
-  if (!editable) return [null, null];
+): Promise<
+  [
+    PromiseSettledResult<PlanningSaveResult> | null,
+    PromiseSettledResult<boolean> | null,
+    PromiseSettledResult<boolean> | null,
+  ]
+> {
+  if (!editable) return [null, null, null];
   return Promise.allSettled([
     saveRefereeScheduling(tournamentId, values.refereeScheduling, text),
     saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text),
+    saveMatchCheckIn(tournamentId, values.matchCheckIn, text),
   ]);
 }
 
@@ -239,6 +269,7 @@ export default function EditTournamentPage() {
           ...toFormValues(successPayload.values),
           refereeScheduling: successPayload.refereeScheduling,
           teamVoiceChannels: successPayload.teamVoiceChannels,
+          matchCheckIn: successPayload.matchCheckIn,
         },
         startVisibilityAt: successPayload.values.startVisibilityAt,
         state: successPayload.state,
@@ -360,12 +391,24 @@ export default function EditTournamentPage() {
           // dédiée, envoyée à chaque enregistrement, idempotente. Les deux
           // bascules partent l'une sans l'autre : un refus de la planification
           // n'empêche pas d'enregistrer les salons (et inversement) ; ce qui a
-          // réussi est confirmé, chaque refus est dit ensuite.
-          const [planningResult, voiceResult] = await saveToggles(tournamentId, planningEditable, values, text);
+          // réussi est confirmé, chaque refus est dit ensuite. Check-in des
+          // matchs : même régime, troisième bascule.
+          const [planningResult, voiceResult, checkInResult] = await saveToggles(
+            tournamentId,
+            planningEditable,
+            values,
+            text,
+          );
           const planning = settledValue(planningResult, null);
           const voiceChanged = settledValue(voiceResult, false);
-          const refusals = settledRefusals(planningResult, voiceResult);
-          const savedText = editSavedText(text, fieldsSent || voiceChanged, planning, values.refereeScheduling);
+          const checkInChanged = settledValue(checkInResult, false);
+          const refusals = settledRefusals(planningResult, voiceResult, checkInResult);
+          const savedText = editSavedText(
+            text,
+            fieldsSent || voiceChanged || checkInChanged,
+            planning,
+            values.refereeScheduling,
+          );
 
           // Un refus ne cache ni ce qui a été enregistré à côté, ni l'autre refus.
           if (refusals.length > 0) {

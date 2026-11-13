@@ -329,6 +329,18 @@ describe("dispatchLobbyBriefs", () => {
     expect(query.mock.calls[0][0]).toMatch(/AND t\.start_visibility_at <= NOW\(\)/);
   });
 
+  it("dueSql_checkInOff_notDueInReadNorClaim", async () => {
+    const { query, execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    // Option « Check-in des matchs » éteinte, ou rallumée après l'échéance : pas de brief (MATCH_CHECK_IN_SETTING.md).
+    const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    for (const sql of [read, claim]) {
+      expect(sql).toContain("AND t.match_check_in = 1 AND (t.match_check_in_resumed_at IS NULL OR LEAST(");
+      expect(sql).toContain(">= t.match_check_in_resumed_at)");
+    }
+  });
+
   it("dueSql_matchNotAnnouncedCast_streamUrlNull", async () => {
     const { query } = mockDb([]);
     await dispatchLobbyBriefs();

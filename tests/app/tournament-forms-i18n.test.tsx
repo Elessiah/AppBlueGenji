@@ -538,3 +538,64 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     expect(render("en", ui())).toContain("one round later if it would leave an odd number of teams");
   });
 });
+
+describe("case « Check-in des matchs » (MATCH_CHECK_IN_SETTING.md)", () => {
+  const create = (over: Partial<ReturnType<typeof defaultTournamentFormValues>> = {}) => (
+    <TournamentForm
+      mode="create"
+      initialValues={{ ...defaultTournamentFormValues(), ...over }}
+      editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
+      submitLabel="Create"
+      onSubmit={async () => undefined}
+    />
+  );
+
+  it("matchCheckInField_create_checkedByDefaultWithInfoHintInBothLanguages", () => {
+    const fr = render("fr", create());
+    const en = render("en", create());
+    expect(fr).toMatch(/<input id="match-check-in" type="checkbox"[^>]*checked/);
+    expect(fr).toContain("Check-in des matchs");
+    expect(fr).toContain('aria-controls="match-check-in-more"');
+    expect(fr).toContain("Cochée par défaut. Modifiable ensuite, jusqu&#x27;à la clôture du tournoi — même en cours.");
+    expect(en).toContain("Match check-in");
+    expect(en).toContain("no reminder 10 hours before");
+    expect(en).toContain("Ticked by default. Can be changed later, until the tournament closes — even while it runs.");
+    expectNoFrench(en);
+  });
+
+  it("matchCheckInField_unchecked_rendersUnchecked", () => {
+    expect(render("en", create({ matchCheckIn: false }))).toMatch(/<input id="match-check-in" type="checkbox"(?![^>]*checked)/);
+  });
+
+  it("matchCheckInField_runningTournament_staysEditableWithEditHint", () => {
+    const html = renderEdit(
+      <TournamentForm
+        mode="edit"
+        initialValues={{ ...defaultTournamentFormValues(), name: "Cup" }}
+        editableFields={editableFieldsForWindow("LOCKED")}
+        submitLabel="Save changes"
+        refereeSchedulingEditable
+        tournamentState="RUNNING"
+        onSubmit={async () => undefined}
+      />,
+    );
+    expect(html).not.toMatch(/id="match-check-in" type="checkbox" disabled/);
+    expect(html).toContain("Turned back on, it doesn&#x27;t catch up on what was due in the meantime.");
+  });
+
+  it("matchCheckInField_finishedTournament_lockedWithFinishedHint", () => {
+    const html = renderEdit(
+      <TournamentForm
+        mode="edit"
+        initialValues={{ ...defaultTournamentFormValues(), name: "Cup" }}
+        editableFields={editableFieldsForWindow("LOCKED")}
+        submitLabel="Save changes"
+        refereeSchedulingEditable={false}
+        tournamentState="FINISHED"
+        onSubmit={async () => undefined}
+      />,
+    );
+    expect(html).toMatch(/id="match-check-in" type="checkbox" disabled=""/);
+    expect(html).toContain("The tournament is finished: this option can no longer be changed.");
+  });
+});

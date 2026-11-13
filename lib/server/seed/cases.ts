@@ -108,6 +108,7 @@ export interface TournamentDef extends ReportStateCounts {
    */
   refereeScheduling?: boolean;
   launchPhase?: boolean; // phase de lancement des matchs (absent = éteinte, le défaut de la colonne)
+  matchCheckIn?: boolean; // check-in des matchs, MATCH_CHECK_IN_SETTING.md (absent = allumé, le défaut de la colonne)
   /**
    * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
    * une carte ; absent = format éteint. Pas de `mapDetails` avec lui : le
@@ -231,7 +232,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Live Horaire (heure passée)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 84, matchSchedule: { firstRoundHours: -3, hoursPerRound: 1 }, live: { url: "https://www.twitch.tv/bluegenji", trigger: "START_TIME", matchUrl: "https://www.twitch.tv/bluegenji" } },
   // Même configuration, heure à venir : le match reste « programmé » et
   // basculera tout seul à l'horaire — sans requête, minuteur côté client.
-  { name: "Live Horaire (heure à venir)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
+  // Check-in des matchs éteint (`MATCH_CHECK_IN_SETTING.md`) : ses manches, à
+  // moins de 10 h, n'ont ni rappel 10 h ni check-in à H-15.
+  { name: "Live Horaire (heure à venir)", matchCheckIn: false, game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
   // Calendrier seul, sans diffusion : le cas le plus courant — l'arbitre
   // annonce les horaires d'un plateau étalé sur la journée.
   // Planification par l'arbitrage : un plateau entier à planifier (aucune

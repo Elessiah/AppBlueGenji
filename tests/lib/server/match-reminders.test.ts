@@ -1736,3 +1736,94 @@ describe("messages privés de match coupés par le joueur (droit d'opposition)",
     expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toContainEqual([1, 2]);
   });
 });
+
+describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN_SETTING.md)", () => {
+  const INVITE = "https://discord.gg/Sgdh3p4VhC";
+  const NO_CHECK_IN = { ...MATCH, match_check_in: 0, match_check_in_resumed_at: null };
+  /** Le palier 10 h s'ouvre à 08:00 UTC pour un coup d'envoi à 18:00. */
+  const resumedAt = (iso: string) => ({ ...MATCH, match_check_in: 1, match_check_in_resumed_at: new Date(iso) });
+
+  it("dispatchDueMatchReminders_checkInOff_consumesTenHourMarkSilently", async () => {
+    const { execute } = await mockDb({ matches: [NO_CHECK_IN], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInOff_keepsTwentyFourHourReminder", async () => {
+    await mockDb({ matches: [NO_CHECK_IN] });
+
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("dans moins de 24 heures");
+      expect(message).not.toContain("check-in");
+    }
+  });
+
+  it("dispatchDueMatchReminders_resumedAfterTenHourWindowOpened_staysSilent", async () => {
+    const { execute } = await mockDb({
+      matches: [resumedAt("2026-09-10T09:00:00Z")],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_resumedBeforeTenHourWindowOpened_sendsReminder", async () => {
+    await mockDb({ matches: [resumedAt("2026-09-10T07:00:00Z")], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) expect(message).toContain(INVITE);
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDiscoveredLate_announcesWithoutCheckIn", async () => {
+    const { execute } = await mockDb({ matches: [NO_CHECK_IN], sent: [] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain("check-in");
+      expect(message).not.toContain(INVITE);
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain(INVITE);
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDiscoveredAtTwentyHours_promisesNoTenHourReminder", async () => {
+    await mockDb({ matches: [NO_CHECK_IN], sent: [] });
+
+    await dispatchDueMatchReminders(new Date("2026-09-09T22:00:00Z"));
+
+    expect(sentMessages()).toHaveLength(2);
+    for (const message of sentMessages()) expect(message).not.toContain("Prochain rappel : 10 heures");
+  });
+
+  it("announceMatchSchedule_checkInOff_dropsCheckInLine", async () => {
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble({}) }));
+
+    expect(
+      await announceMatchSchedule(notice({ match_check_in: 0 }), { rescheduled: false }, new Date("2026-09-10T17:50:00Z")),
+    ).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain("check-in");
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain("Check-in");
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2], "en").body).not.toContain("Check-in");
+  });
+});

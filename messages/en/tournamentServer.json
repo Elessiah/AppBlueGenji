@@ -35,7 +35,8 @@
       "mapPointTargetValue": "First to {count}",
       "seeding": "Starting order",
       "launchPhase": "Match launch phase",
-      "teamVoice": "Team voice channels"
+      "teamVoice": "Team voice channels",
+      "matchCheckIn": "Match check-in"
     },
     "conditions": {
       "minRoster": "Minimum roster size",

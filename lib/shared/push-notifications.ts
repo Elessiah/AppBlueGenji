@@ -47,7 +47,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_LOBBY_BRIEF: {
     label: "Check-in du match",
-    description: "15 minutes avant le coup d'envoi d'un match en autogestion d'une équipe que tu gères (propriétaire ou manager) ou de ton tournoi individuel (ou à l'ouverture de son salon, si elle vient plus tôt ou faute d'horaire) : qui joue à gauche (hôte) et à droite, la première carte, le premier ban et, s'il est casté, le rappel de trier les joueurs par rôle.",
+    description: "15 minutes avant le coup d'envoi d'un match en autogestion d'une équipe que tu gères (propriétaire ou manager) ou de ton tournoi individuel (ou à l'ouverture de son salon, si elle vient plus tôt ou faute d'horaire) : qui joue à gauche (hôte) et à droite, la première carte, le premier ban et, s'il est casté, le rappel de trier les joueurs par rôle — sauf si le tournoi n'a pas de check-in.",
     audience: null,
   },
   SCORE_TO_CONFIRM: {
@@ -67,7 +67,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_REMINDER: {
     label: "Horaires et rappels de match",
-    description: "L'horaire d'un match quand il est posé, changé ou retiré (celui déjà posé quand l'adversaire est connu part avec « Nouveau match »), puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in).",
+    description: "L'horaire d'un match quand il est posé, changé ou retiré (celui déjà posé quand l'adversaire est connu part avec « Nouveau match »), puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in) — seulement celui de 24 h si le tournoi n'a pas de check-in.",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {

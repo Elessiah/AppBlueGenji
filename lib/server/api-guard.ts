@@ -126,6 +126,13 @@ export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/** Bascule de l'option « Check-in des matchs » d'un tournoi, par compte (même plafond). */
+export const MATCH_CHECK_IN_TOGGLE_RULE: RateLimitRule = {
+  name: "match-check-in-toggle",
+  limit: 30,
+  windowMs: 5 * 60_000,
+};
+
 /** Vidage d'un salon vocal d'équipe par l'arbitrage (`POST /api/admin/matches/[id]/voice/clear`), par compte. */
 export const VOICE_CLEAR_RULE: RateLimitRule = {
   name: "voice-clear",

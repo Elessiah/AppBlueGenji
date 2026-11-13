@@ -64,6 +64,7 @@ import {
   MATCH_DM_SETTINGS_PATH,
 } from "@/lib/shared/discord-notifications";
 import { inBatches } from "@/lib/shared/in-batches";
+import { checkInSendable, readMatchCheckIn, type MatchCheckInSetting } from "@/lib/shared/match-check-in";
 import { PLAYED_MATCH_STATUSES, isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { siteUrl } from "@/lib/server/site-url";
 import { tournamentPageUrl } from "./app-url";
@@ -91,7 +92,24 @@ type ScheduledMatch = {
   team2_id: number;
   team1_name: string;
   team2_name: string;
+  /**
+   * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`) :
+   * `0` = éteinte (ni rappel 10 h, ni ligne du check-in) ; absente = allumée.
+   */
+  match_check_in?: number | null;
+  /** Dernière remise en marche de l'option : ce qui était dû avant ne part pas. */
+  match_check_in_resumed_at?: MaybeInstant;
 };
+
+/** L'option « Check-in des matchs » du tournoi de la manche. */
+function checkInSettingOf(match: ScheduledMatch): MatchCheckInSetting {
+  return readMatchCheckIn(match.match_check_in, match.match_check_in_resumed_at);
+}
+
+/** Paliers qu'une annonce peut promettre : sans check-in, jamais le rappel 10 h. */
+function promisedOffsets(remaining: readonly MatchReminderOffset[], checkInOn: boolean): MatchReminderOffset[] {
+  return checkInOn ? [...remaining] : remaining.filter((offset) => offset.key !== CHECK_IN_REMINDER_KEY);
+}
 
 type ScheduledMatchRow = RowDataPacket & ScheduledMatch;
 
@@ -495,6 +513,17 @@ async function planMatchSends(
     return [{ match, offset: null, remaining: [...remaining], announcement, claimed, now, plannedAt: Date.now() }];
   }
 
+  return planDueReminders(match, now, alreadySent);
+}
+
+/**
+ * Régime normal de {@link planMatchSends} : réserve le palier dont la fenêtre
+ * est ouverte. Check-in des matchs éteint, ou rallumé après l'ouverture du
+ * palier 10 h : ce rappel est réservé **sans message**
+ * (`MATCH_CHECK_IN_SETTING.md`) — la manche n'est plus relue, et rallumer
+ * l'option ne le fait pas partir après coup.
+ */
+async function planDueReminders(match: ScheduledMatch, now: Date, alreadySent: Set<string>): Promise<PlannedSend[]> {
   // `alreadySent` porte aussi la marque d'observation, qui n'est pas un palier :
   // on ne transmet que les clés qui en sont.
   const sentOffsets = MATCH_REMINDER_OFFSETS.map((offset) => offset.key).filter((key) =>
@@ -504,11 +533,21 @@ async function planMatchSends(
 
   const planned: PlannedSend[] = [];
   for (const offset of due) {
-    if (await claimDatedMark(match, offset.key)) {
-      planned.push({ match, offset, remaining: [], claimed: [offset.key], now, plannedAt: Date.now() });
-    }
+    if (!(await claimDatedMark(match, offset.key))) continue;
+    if (silencedCheckInReminder(match, offset)) continue;
+    planned.push({ match, offset, remaining: [], claimed: [offset.key], now, plannedAt: Date.now() });
   }
   return planned;
+}
+
+/** Le rappel 10 h d'une manche dont le tournoi n'a pas (ou n'avait pas, à son ouverture) de check-in. */
+function silencedCheckInReminder(match: ScheduledMatch, offset: MatchReminderOffset): boolean {
+  return offset.key === CHECK_IN_REMINDER_KEY && !checkInSendable(checkInSettingOf(match), offsetOpensAt(match, offset));
+}
+
+/** Ouverture de la fenêtre d'un palier : l'instant où son rappel est dû. */
+function offsetOpensAt(match: ScheduledMatch, offset: MatchReminderOffset): Date {
+  return new Date(new Date(match.start_at).getTime() - offset.minutesBefore * 60_000);
 }
 
 /** Une engagée de la manche, face à l'autre. */
@@ -532,13 +571,17 @@ async function sendToSide(
   // Un avis de retrait porte l'horaire qui ne vaut plus.
   const startAt = clearedStartAt ?? match.start_at;
   // Le check-in : le rappel de 10 h, ou l'annonce qui a consommé son palier
-  // (manche programmée moins de 10 h avant) — jamais un avis de retrait.
+  // (manche programmée moins de 10 h avant) — jamais un avis de retrait, ni
+  // rien quand le tournoi n'a pas de check-in (option lue à l'envoi).
+  const checkInOn = checkInSendable(checkInSettingOf(match), sentAt({ now, plannedAt }));
   let checkIn = false;
-  if (!clearedStartAt) {
+  if (!clearedStartAt && checkInOn) {
     checkIn = offset
       ? offset.key === CHECK_IN_REMINDER_KEY
       : !remaining.some((pending) => pending.key === CHECK_IN_REMINDER_KEY);
   }
+  // Sans check-in, l'annonce ne promet pas de rappel 10 h (il ne partira pas).
+  const promised = promisedOffsets(remaining, checkInOn);
   // À l'instant de l'envoi, pas du début du passage : un lot parti après
   // l'ouverture du salon ne doit plus dire qu'il « ouvre 15 minutes avant ».
   const checkInOpen = checkIn && isCheckInOpen(startAt, sentAt({ now, plannedAt }));
@@ -581,7 +624,7 @@ async function sendToSide(
     message = (locale) => buildMatchReminderMessage(offset, context, locale);
     discordContext = "match-reminder";
   } else {
-    message = (locale) => buildMatchScheduleAnnouncement(context, remaining, announcement, locale);
+    message = (locale) => buildMatchScheduleAnnouncement(context, promised, announcement, locale);
     discordContext = "match-scheduled";
   }
 
@@ -784,6 +827,7 @@ async function dispatchPlannedSend(
 const SWEEP_MATCH_SELECT = `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
+            t.match_check_in, t.match_check_in_resumed_at,
             t1.name AS team1_name, t2.name AS team2_name,
             EXISTS (SELECT 1 FROM bg_match_reminders sm WHERE sm.match_id = m.id AND sm.offset_key = ?) AS seen_mark,
             EXISTS (SELECT 1 FROM bg_match_reminders tm WHERE tm.match_id = m.id AND tm.offset_key = ?) AS told_mark
