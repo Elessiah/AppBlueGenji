@@ -621,8 +621,6 @@ function logNoManager(row: LobbyBriefRow, slot: LobbyBriefSlot): void {
 
 /** Ce qu'un balayage a lu une fois pour tous les matchs candidats. */
 type SweepContext = {
-  /** Gérants actifs lus, compte vivant ou non (règle du premier côté, `slotManagers`). */
-  memberships: Map<number, number[]>;
   managers: Map<number, number[]>;
   recipients: readonly NotificationRecipient[];
   briefSides: (row: LobbyBriefRow) => { teamId: number; side: LobbyBriefSide }[];
@@ -757,10 +755,9 @@ function slotManagers(
 ): { ghost: boolean; userIds: number[] } | null {
   const managers = sideManagers(row, slot, context);
   if (managers === null || managers.ghost || slot === 1) return managers;
-  // Appartenances brutes du premier côté : lues même quand il est déjà
-  // réservé, sans ses destinataires — un compte supprimé n'est destinataire
-  // d'aucun côté, l'écarter ici ne change rien.
-  const first = new Set(context.memberships.get(slotTeamId(row, 1)) ?? []);
+  // Gérants vivants du premier côté, lus même quand il est déjà réservé
+  // (`sweepTeamIds`) : même source que les destinataires du second.
+  const first = new Set(context.managers.get(slotTeamId(row, 1)) ?? []);
   const userIds = managers.userIds.filter((userId) => !first.has(userId));
   return { ghost: userIds.length === 0, userIds };
 }
@@ -814,18 +811,16 @@ function sideBriefed(row: LobbyBriefRow, slot: LobbyBriefSlot): boolean {
  * dont un seul côté attend (équipe sans gérant actif, toute la fenêtre) ne
  * relit plus à chaque passe celui déjà briefé.
  */
-function sweepTeamIds(rows: readonly LobbyBriefRow[]): { read: number[]; recipients: Set<number> } {
-  const read: number[] = [];
-  const recipients = new Set<number>();
+function sweepTeamIds(rows: readonly LobbyBriefRow[]): number[] {
+  const read = new Set<number>();
   for (const row of rows) {
-    for (const slot of [1, 2] as const) {
-      if (sideBriefed(row, slot)) continue;
-      recipients.add(slotTeamId(row, slot));
-      read.push(slotTeamId(row, slot));
-      if (slot === 2) read.push(slotTeamId(row, 1));
+    if (!sideBriefed(row, 1)) read.add(slotTeamId(row, 1));
+    if (!sideBriefed(row, 2)) {
+      read.add(slotTeamId(row, 2));
+      read.add(slotTeamId(row, 1));
     }
   }
-  return { read: [...new Set(read)], recipients };
+  return [...read];
 }
 
 async function runLobbyBriefSweep(): Promise<number> {
@@ -851,13 +846,8 @@ async function runLobbyBriefSweep(): Promise<number> {
   // Destinataires de tous les côtés en deux lectures, **avant** toute
   // réservation : une panne ici ne réserve rien, et arme le balayage suivant
   // (`onError`, dans la limite des relances).
-  const teams = sweepTeamIds(rows);
-  const memberships = await loadEntrantManagerIds(teams.read);
-  const recipients = await loadNotificationRecipients(
-    [...memberships].filter(([teamId]) => teams.recipients.has(teamId)).flatMap(([, userIds]) => userIds),
-    "certified",
-    { matchDm: true },
-  );
+  const memberships = await loadEntrantManagerIds(sweepTeamIds(rows));
+  const recipients = await loadNotificationRecipients([...memberships.values()].flat(), "certified", { matchDm: true });
   retries.delete(SWEEP_RETRY_KEY);
   // Gérants dont le compte vit encore : un compte supprimé (anonymisé) garde
   // son appartenance mais ne reçoit plus rien — une équipe qui n'a que lui
@@ -891,7 +881,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   const closed: number[] = [];
   const toRetry: string[] = [];
   for (const row of rows) {
-    const brief = await briefMatch(db, row, { memberships, managers, recipients, briefSides });
+    const brief = await briefMatch(db, row, { managers, recipients, briefSides });
     sent += brief.sent;
     toRelease.push(...brief.retry);
     closed.push(...brief.closed);

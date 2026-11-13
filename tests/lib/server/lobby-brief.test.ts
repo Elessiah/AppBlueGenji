@@ -176,7 +176,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(params).toEqual(["LOBBY_BRIEF", "LOBBY_BRIEF"]);
   });
 
-  it("dispatchLobbyBriefs_firstSideBriefedSecondWithoutManager_noClaimAndOnlyEmptySideRecipientsRead", async () => {
+  it("dispatchLobbyBriefs_firstSideBriefedSecondWithoutManager_noClaimAndFirstSideReadForExclusion", async () => {
     const { execute } = mockDb([{ ...MATCH, team1_briefed: 1, team2_briefed: 0 }]);
     jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[1, [10, 11]]]));
 
@@ -184,11 +184,13 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(claimParams(execute)).toEqual([]);
     expect(loadEntrantManagerIds).toHaveBeenCalledWith([2, 1]);
-    expect(loadNotificationRecipients).toHaveBeenCalledWith([], "certified", { matchDm: true });
+    // Les gérants vivants du premier côté, pour les écarter du second (`slotManagers`).
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([10, 11], "certified", { matchDm: true });
   });
 
   it("dispatchLobbyBriefs_secondSideBriefed_readsOnlyFirstSide", async () => {
     const { execute } = mockDb([{ ...MATCH, team1_briefed: 0, team2_briefed: 1 }]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[1, [10, 11]]]));
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
