@@ -27,7 +27,10 @@ import { ENGLISH_ENDURANCE_CHART, ENGLISH_VIEWS, withViewText } from "@/app/(sec
 import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
 import { tournamentPageMessages, type TournamentViewMessages } from "@/lib/shared/tournament-page-text";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
-import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
+import { tournamentsClientMessages, tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
+import { EN_TICKER_LABELS, tickerControls } from "@/lib/shared/ticker-labels";
+import { TournamentsListTextGate } from "@/components/i18n/tournaments-list-text-gate";
+import { englishTournamentsList } from "@/components/i18n/english-loaders-tournament";
 import { messageAt } from "@/lib/shared/scoped-text";
 import { readSource } from "../helpers/read-source";
 import frViews from "@/messages/fr/tournamentViews.json";
@@ -454,5 +457,53 @@ describe("chaque vue ne lit que les clés de son espace (EF-17)", () => {
 
   it.each([["_components/SwissView.tsx"], ["_components/SurvivalView.tsx"]])("%s : ses clés sont dans `tournamentViews`", (file) => {
     expect(missingFrom(frViews, viewKeys(file))).toEqual([]);
+  });
+});
+
+describe("TournamentsListTextGate — liste /tournois (EF-60)", () => {
+  function Probe() {
+    return <b>{useTournamentsText().t("list.searchLabel")}</b>;
+  }
+
+  it("englishTournamentsList_load_equalsServerSerializedEnglish", async () => {
+    await expect(englishTournamentsList.load()).resolves.toEqual(tournamentsClientMessages(EN));
+  });
+
+  it("EN_TICKER_LABELS_copy_matchesEnglishLandingTicker", () => {
+    expect(EN_TICKER_LABELS).toEqual(tickerControls(EN.landing.ticker));
+  });
+
+  it("TournamentsListTextGate_french_rendersChildrenFrench", () => {
+    const html = renderToStaticMarkup(
+      <TournamentsListTextGate locale="fr">
+        <Probe />
+      </TournamentsListTextGate>,
+    );
+    expect(html).toContain(FR.tournaments.list.searchLabel);
+  });
+
+  it("TournamentsListTextGate_englishProvided_rendersEnglish", () => {
+    const html = renderToStaticMarkup(
+      <TournamentsListTextGate locale="en" messages={tournamentsClientMessages(EN)}>
+        <Probe />
+      </TournamentsListTextGate>,
+    );
+    expect(html).toContain(EN.tournaments.list.searchLabel);
+  });
+
+  it("TournamentsListTextGate_englishNotProvided_rendersFallback", () => {
+    const html = renderToStaticMarkup(
+      <TournamentsListTextGate locale="en">
+        <Probe />
+      </TournamentsListTextGate>,
+    );
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain(FR.tournaments.list.searchLabel);
+  });
+
+  it("TournamentsPage_source_serializesEnglishOnDocumentLoadOnly", () => {
+    const source = readSource("app/(secured)/tournois/page.tsx");
+    expect(source).toContain("englishOnDocumentLoad(locale, tournamentsClientMessages)");
+    expect(source).toContain("<TournamentsListTextGate");
   });
 });

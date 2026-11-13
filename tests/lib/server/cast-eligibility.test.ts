@@ -9,6 +9,7 @@ import {
   loadRefereePermission,
   loadRefereeStanding,
   loadShownCasterIds,
+  refereeKeptColumns,
   refereeObjectionUpheld,
   type CastEligibilityFields,
 } from "@/lib/server/tournaments/cast-eligibility";
@@ -526,5 +527,18 @@ describe("loadShownCasterIds", () => {
 
     expect(String(execute.mock.calls[0][0])).toContain("mc.user_id IN (?)");
     expect(execute.mock.calls[0][1]).toEqual([42, 12]);
+  });
+});
+
+describe("refereeKeptColumns", () => {
+  it("refereeKeptColumns_alias_readsPseudoEligibilityAndObjectionUnderRefereeNames", () => {
+    expect(refereeKeptColumns("ru")).toBe(
+      "ru.pseudo AS referee_pseudo, ru.discord_verified_at AS referee_discord_verified_at, " +
+        "ru.discord_pseudo AS referee_discord_pseudo, ru.blizzard_sub AS referee_blizzard_sub, " +
+        "ru.overwatch_battletag AS referee_overwatch_battletag, " +
+        "ru.overwatch_battletag_typed AS referee_overwatch_battletag_typed, ru.is_deleted AS referee_is_deleted, " +
+        "ru.is_admin AS referee_is_admin, ru.platform_roles_json AS referee_platform_roles_json, " +
+        "ru.referee_objection_at AS referee_objection_at",
+    );
   });
 });

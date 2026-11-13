@@ -22,6 +22,9 @@ import {
 import { getTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
 import { getTournamentPreview } from "@/lib/server/tournaments/preview-cache";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
+import { withConnection } from "@/lib/server/database";
+import { loadViewerIdentityBlocks } from "@/lib/server/tournaments/match-launch";
+import { fakeConnection } from "../../helpers/sql-double";
 
 const HOUR = 3_600_000;
 
@@ -50,6 +53,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getUserActiveTeam).mockResolvedValue(null);
   jest.mocked(getTournamentPreview).mockResolvedValue(null);
+  jest.mocked(withConnection).mockImplementation((fn) => fn(fakeConnection({})));
+  jest.mocked(loadViewerIdentityBlocks).mockResolvedValue({ castBlock: "NOT_CASTER", refereeEligible: false });
 });
 
 describe("getVisibleTournamentSnapshot", () => {

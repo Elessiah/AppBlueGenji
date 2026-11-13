@@ -1,8 +1,9 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import { loadRefereeNames, markViewerReferee } from "@/lib/server/tournaments/referee-names";
+import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
+import { loadLiveRefereeNames, markViewerReferee, viewerDesignated } from "@/lib/server/tournaments/referee-names";
+import { loadViewerRefereeEligible } from "@/lib/server/tournaments/match-launch";
 import { can } from "@/lib/shared/permissions";
 
 /**
@@ -11,8 +12,10 @@ import { can } from "@/lib/shared/permissions";
  * contexte du lecteur qui suit une désignation changée (`refereeKey` de
  * l'instantané sans pseudo connu). Mêmes conditions que la lecture REST du
  * détail : une session (la page sans compte lit « Arbitre désigné ») et un
- * tournoi visible. Les pseudos sont les mêmes pour tous les membres : lus une
- * fois par version d'instantané.
+ * tournoi visible — lu sur sa carte seule (`getVisibleTournamentCard`), les
+ * pseudos par une requête dédiée (`loadLiveRefereeNames`) : l'instantané entier
+ * n'est jamais reconstruit pour une étiquette. Les pseudos sont les mêmes pour
+ * tous les membres : lus une fois jusqu'à la prochaine écriture du tournoi.
  */
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -27,9 +30,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const snapshot = await getVisibleTournamentSnapshot(tournamentId, { canManage: can(user, "tournaments") });
-  if (!snapshot) return fail("TOURNAMENT_NOT_FOUND", 404);
+  const manages = can(user, "tournaments");
+  const card = await getVisibleTournamentCard(tournamentId, { canManage: manages });
+  if (!card) return fail("TOURNAMENT_NOT_FOUND", 404);
 
-  // Marque par lecteur (`mine`) : l'arbitre désigné y reconnaît ses matchs.
-  return ok({ refereeNames: markViewerReferee(await loadRefereeNames(snapshot), user.id, snapshot.matches) });
+  const read = await loadLiveRefereeNames(card);
+  // Marque par lecteur (`mine`) : l'arbitre désigné y reconnaît ses matchs, s'il
+  // remplit encore la condition d'arbitrage — son identité n'est lue que s'il
+  // arbitre un des matchs montrés.
+  const eligible = viewerDesignated(read, user.id) && (await loadViewerRefereeEligible(user.id, manages, card.game));
+  return ok({ refereeNames: markViewerReferee(read, user.id, eligible) });
 }

@@ -23,11 +23,10 @@ import {
   viewerMayChangeLiveTrigger,
   viewerMayUnmarkLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
-import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import { useActionsText } from "../_lib/actions-text";
-import { useLiveControls } from "../_lib/live-context";
+import { useLiveControls, useViewerRefereesMatch } from "../_lib/live-context";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -418,8 +417,8 @@ export function MatchLiveDialog({
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
   const controls = useLiveControls();
-  const { openReplay, refereeNames } = controls;
-  const referee = viewerRefereesMatch(match, refereeNames);
+  const { openReplay } = controls;
+  const referee = useViewerRefereesMatch(match);
   // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
   const viewer = liveTriggerViewer(controls, referee);

@@ -48,6 +48,23 @@ const QUALIFIED_CAST_ELIGIBILITY_COLUMNS = CAST_ELIGIBILITY_COLUMNS.split(",")
   .map((column) => `u.${column.trim()}`)
   .join(", ");
 
+/**
+ * Colonnes de la règle de l'arbitre retenu (`refereeKept`) et de son
+ * empreinte (`refereeKey`) : pseudo, condition d'arbitrage et opposition, lus
+ * sur l'alias `alias` de `bg_users` sous les noms `referee_*` de `MatchRow`.
+ * **Une** liste pour l'instantané (`getMatchRows`) et la relecture directe
+ * des pseudos (`loadLiveRefereeNames`) : les deux jugent l'arbitre et
+ * calculent l'empreinte sur les mêmes colonnes.
+ */
+export function refereeKeptColumns(alias: string): string {
+  const eligibility = CAST_ELIGIBILITY_COLUMNS.split(",").map((column) => column.trim());
+  return [
+    `${alias}.pseudo AS referee_pseudo`,
+    ...eligibility.map((column) => `${alias}.${column} AS referee_${column}`),
+    `${alias}.referee_objection_at AS referee_objection_at`,
+  ].join(", ");
+}
+
 /** Identité d'un caster lue sur sa ligne ; un compte absent ou supprimé n'en a aucune. */
 export function casterIdentityOf(row: CasterIdentityFields | undefined): CasterIdentity {
   if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };

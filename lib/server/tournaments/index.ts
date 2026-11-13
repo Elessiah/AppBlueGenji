@@ -208,8 +208,8 @@ import {
   alertSelfResolvedDispute,
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
-import { loadViewerCastBlock } from "./match-launch";
-import { loadRefereeNames, markViewerReferee } from "./referee-names";
+import { loadViewerIdentityBlocks } from "./match-launch";
+import { loadRefereeNames, markViewerReferee, NO_REFEREE_NAMES, type RefereeNamesRead } from "./referee-names";
 import {
   cachedCertificationPrompt,
   finalCertificationPrompt,
@@ -1243,7 +1243,37 @@ export async function getTournamentViewerContext(
   } = rights;
   const isSolo = isSoloTournament(snapshot.card.participantType);
 
-  const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);
+  // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
+  // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
+  // Les mêmes pour tous : lus une fois par version d'instantané, en **vol
+  // unique** (`cached`) — lancés dès maintenant, en parallèle des lectures du
+  // lecteur : une vague de reconnexions ne tient qu'une place du pool de plus,
+  // une fois par version, et le cas courant (déjà en cache) ne coûte rien.
+  // Une simple étiquette : une erreur de lecture ne fait échouer ni l'ouverture
+  // du flux ni la lecture REST — sans pseudo, l'écran dit « Arbitre désigné »,
+  // et la relecture légère (`/referee-names`) les reprend.
+  const namesRead = loadRefereeNames(snapshot).catch((error: unknown): RefereeNamesRead => {
+    console.error("[referee-names] pseudos d'arbitre illisibles, contexte servi sans eux :", error);
+    return NO_REFEREE_NAMES;
+  });
+
+  // Engagé du lecteur et son identité (refus de caster, condition d'arbitrage).
+  // L'identité n'est lue que pour un porteur de `live` ou de `tournaments` : il
+  // lit alors les deux sur **une** connexion (l'identité n'en prend plus une à
+  // elle seule à chaque calcul du contexte). Sans ces droits, aucune place du
+  // pool n'est réservée : la lecture d'équipe ouvre sa propre requête.
+  const identityRights = { hasLivePermission: canManageLive, hasTournamentsPermission: canManage };
+  const { activeTeam, myTeamId, castBlock, refereeEligible } =
+    canManageLive || canManage
+      ? await withConnection(async (connection) => {
+          const entrant = await resolveViewerEntrant(snapshot, userId, connection);
+          const identity = await loadViewerIdentityBlocks(connection, userId, identityRights, snapshot.card.game);
+          return { ...entrant, ...identity };
+        })
+      : {
+          ...(await resolveViewerEntrant(snapshot, userId)),
+          ...(await loadViewerIdentityBlocks(null, userId, identityRights, snapshot.card.game)),
+        };
 
   // Qualité pour **engager** son équipe : `OWNER` ou `MANAGER`
   // (`lib/shared/team-roles.ts`). En individuel, le joueur n'engage que lui-même.
@@ -1329,10 +1359,6 @@ export async function getTournamentViewerContext(
   // une fois par lecteur.
   const preview = canPreview ? await getTournamentPreview(snapshot.card.id) : null;
 
-  // Inscription comme caster : la permission ne suffit pas, il faut aussi une
-  // identité vérifiée (`castBlockReason`).
-  const castBlock = await loadViewerCastBlock(userId, canManageLive, snapshot.card.game);
-
   // Détail des propositions en attente : aux deux engagés qui mènent leur
   // match, et à l'arbitrage — jamais dans l'instantané diffusé. Calculé ici,
   // porte commune du flux et de la lecture REST de secours.
@@ -1346,17 +1372,9 @@ export async function getTournamentViewerContext(
 
   const certificationPrompt = await certificationPromptRead();
 
-  // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
-  // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
-  // Les mêmes pour tous : lus une fois par version d'instantané.
-  // Une simple étiquette : une erreur de lecture ne fait échouer ni l'ouverture
-  // du flux ni la lecture REST — sans pseudo, l'écran dit « Arbitre désigné »,
-  // et la relecture légère (`/referee-names`) les reprend.
-  const names = await loadRefereeNames(snapshot).catch((error: unknown) => {
-    console.error("[referee-names] pseudos d'arbitre illisibles, contexte servi sans eux :", error);
-    return [];
-  });
-  const refereeNames = markViewerReferee(names, userId, snapshot.matches);
+  // La marque `mine` (l'arbitre se reconnaît) suppose qu'il remplit encore la
+  // condition d'arbitrage, relue ci-dessus.
+  const refereeNames = markViewerReferee(await namesRead, userId, refereeEligible);
 
   return {
     preview,

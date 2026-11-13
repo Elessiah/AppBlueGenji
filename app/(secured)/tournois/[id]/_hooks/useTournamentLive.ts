@@ -33,11 +33,18 @@ import { announceViewerChanges } from "../_lib/live-alerts";
 import { openLiveConnection } from "../_lib/live-connection";
 import { createLiveRenderGate, createQuietStream } from "../_lib/live-render-gate";
 import {
+  mergeRefereeNames,
   missingRefereeNamesKey,
   parseRefereeNames,
   refereeNamesAttempt,
-  refereeNamesImprove,
+  refereeNamesRetryDelay,
 } from "@/lib/shared/match-referee";
+import {
+  cancelScheduledNamesRead,
+  createRefereeNamesReader,
+  refereeNamesFailureRetries,
+  resetRefereeNamesReader,
+} from "../_lib/referee-names-reader";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -49,6 +56,18 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
  * même instant.
  */
 const REFEREE_NAMES_SPREAD_MS = 2_000;
+/** Reprises d'office d'affilée de la relecture des pseudos après un échec ; au-delà, le prochain instantané retente. */
+const REFEREE_NAMES_AUTO_RETRIES = 6;
+
+/**
+ * Personne ne regarde le plateau (onglet caché en régime calme : les rendus
+ * attendent le retour, `snapshotRenderDelayMs` nul) : la relecture des pseudos
+ * d'arbitre, une simple étiquette, attend elle aussi. Lu au magasin, pas sur
+ * `policyRef` : l'ordre des abonnés au régime n'y change rien.
+ */
+function nobodyWatches(): boolean {
+  return powerPolicy(getClientPowerInput()).snapshotRenderDelayMs === null;
+}
 
 /** Point de départ du régime, avant la première lecture du magasin. */
 const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: false };
@@ -178,6 +197,13 @@ export function useTournamentLive(tournamentId: number) {
   );
 
   /**
+   * Relecture des pseudos d'arbitre (`refreshRefereeNames`) : tout son état
+   * dans un seul objet (`_lib/referee-names-reader.ts`), remis à zéro d'un geste.
+   */
+  const [names] = useState(createRefereeNamesReader);
+  const refreshNamesRef = useRef<() => void>(() => undefined);
+
+  /**
    * Lecture REST. Chemin de secours uniquement : le flux se suffit à lui-même.
    * `silent` tait la notification d'erreur des rafraîchissements automatiques —
    * un incident réseau passager n'a pas à couvrir l'écran d'alertes.
@@ -213,13 +239,18 @@ export function useTournamentLive(tournamentId: number) {
             }
           : payload;
         commit({ tier: stateRef.current.tier, detail });
+        // Les pseudos viennent avec le contexte : la relecture légère encore en
+        // attente est annulée et son essai oublié — si le contexte ne les a pas
+        // apportés (lecture des pseudos en échec côté serveur), l'ensemble
+        // encore manquant se relit.
+        if (cancelScheduledNamesRead(names)) refreshNamesRef.current();
         return null;
       } catch (e) {
         if (!silent) showError(mapError((e as Error).message, errorsText));
         return null;
       }
     },
-    [tournamentId, commit, showError, errorsText],
+    [tournamentId, commit, showError, errorsText, names],
   );
 
   /**
@@ -277,62 +308,118 @@ export function useTournamentLive(tournamentId: number) {
    * le contexte, ils ne suivent pas une désignation faite depuis. Une empreinte
    * (`refereeKey`) sans pseudo connu déclenche **une** relecture légère, étalée
    * (`REFEREE_NAMES_SPREAD_MS`), par ensemble d'empreintes manquantes — la même
-   * ne relance rien (pseudo vide, réponse plus ancienne que l'instantané).
+   * ne relance rien (pseudo vide). Rien tant que personne ne regarde
+   * (`nobodyWatches`) : la relecture part au retour sur l'onglet. Après un
+   * échec (429, 5xx, réseau) ou une réponse en retard sur l'instantané, la
+   * reprise attend `Retry-After`, 10 s au moins (`refereeNamesRetryDelay`), et
+   * part d'elle-même — sans attendre un autre instantané — au plus
+   * `REFEREE_NAMES_AUTO_RETRIES` fois d'affilée. Une demande arrivée pendant
+   * une lecture en vol n'est pas perdue : elle repart à la fin de celle-ci.
    */
-  const namesAttemptRef = useRef("");
-  const namesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshRefereeNames = useCallback(() => {
     const detail = stateRef.current.detail;
     if (!detail) return;
     const missing = missingRefereeNamesKey(detail.matches, detail.refereeNames);
     // Plus rien ne manque : l'essai est oublié (`refereeNamesAttempt`), minuteur
     // en attente ou non — sa relecture compare sa propre clé.
-    const attempt = refereeNamesAttempt(missing, namesAttemptRef.current);
+    const attempt = refereeNamesAttempt(missing, names.attempt);
     if (!attempt.read) {
-      namesAttemptRef.current = attempt.attempted;
+      names.attempt = attempt.attempted;
       return;
     }
-    if (namesTimerRef.current !== null) return;
-    namesAttemptRef.current = missing;
+    // Un autre ensemble d'empreintes que celui qui a échoué : ni son attente ni
+    // ses reprises épuisées ne le concernent.
+    if (missing !== names.retryKey) {
+      names.retryAt = 0;
+      names.retries = 0;
+    }
+    if (names.timer !== null) return;
+    if (names.abort !== null) {
+      names.pending = true;
+      return;
+    }
+    if (nobodyWatches()) {
+      names.deferred = true;
+      return;
+    }
+    names.deferred = false;
+    names.attempt = missing;
     const forTournament = detail.card.id;
-    // Une lecture ratée (429, 5xx, réseau) rouvre le même ensemble : le
-    // prochain instantané retentera, étalé comme le premier essai.
-    const retryLater = () => {
-      if (namesAttemptRef.current === missing) namesAttemptRef.current = "";
+    // Une lecture ratée rouvre le même ensemble, mais pas avant l'attente :
+    // la reprise part d'elle-même à la fin de cette lecture (bornée), sinon le
+    // prochain instantané (ou le retour sur l'onglet) retentera.
+    const retryLater = (delayMs: number, auto: boolean) => {
+      names.retryAt = Date.now() + delayMs;
+      names.retryKey = missing;
+      if (names.attempt === missing) names.attempt = "";
+      if (auto && names.retries < REFEREE_NAMES_AUTO_RETRIES) {
+        names.retries += 1;
+        names.pending = true;
+      }
     };
-    namesTimerRef.current = setTimeout(() => {
-      namesTimerRef.current = null;
+    const spread = Math.random() * REFEREE_NAMES_SPREAD_MS; // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
+    names.timer = setTimeout(() => {
+      names.timer = null;
+      const controller = new AbortController();
+      names.abort = controller;
       void (async () => {
         try {
-          const response = await fetch(`/api/tournaments/${forTournament}/referee-names`, { cache: "no-store" });
+          const response = await fetch(`/api/tournaments/${forTournament}/referee-names`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
           if (!response.ok) {
-            retryLater();
+            // Seuls un refus de quota et une panne passagère se reprennent ; un
+            // 401, 403 ou 404 laisse l'essai posé : rien ne se relit avant un
+            // autre ensemble manquant.
+            if (refereeNamesFailureRetries(response.status)) {
+              retryLater(refereeNamesRetryDelay(response.headers.get("retry-after")), true);
+            }
             return;
           }
           const payload = (await response.json()) as { refereeNames?: unknown };
-          const names = parseRefereeNames(payload.refereeNames);
+          const incoming = parseRefereeNames(payload.refereeNames);
           const current = stateRef.current;
-          if (names === null || !current.detail || current.detail.card.id !== forTournament) return;
-          // Réponse en retard (deux désignations rapprochées, contexte d'une
-          // reconnexion arrivé entre-temps) : elle n'écrase pas plus à jour.
-          if (!refereeNamesImprove(current.detail.matches, current.detail.refereeNames, names)) return;
-          commit({ ...current, detail: { ...current.detail, refereeNames: names } });
+          if (incoming === null || !current.detail || current.detail.card.id !== forTournament) return;
+          // Seules les désignations encore sans pseudo prennent la réponse : une
+          // réponse en retard n'écrase pas plus à jour, et une qui en résout un
+          // autre sous-ensemble n'est pas perdue.
+          const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, incoming);
+          if (merged.stale) retryLater(refereeNamesRetryDelay(null), true);
+          else names.retries = 0;
+          if (merged.names !== null) commit({ ...current, detail: { ...current.detail, refereeNames: merged.names } });
         } catch {
-          // Réseau coupé : « Arbitre désigné » reste, le prochain instantané relit.
-          retryLater();
+          // Lecture annulée (autre tournoi) : rien à reprendre. Réseau coupé :
+          // « Arbitre désigné » reste, la reprise attend.
+          if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);
+        } finally {
+          // Annulée (autre tournoi) : la référence est déjà vidée, rien ne repart.
+          if (names.abort === controller) {
+            names.abort = null;
+            if (names.pending) {
+              names.pending = false;
+              refreshNamesRef.current();
+            }
+          }
         }
       })();
-    }, Math.random() * REFEREE_NAMES_SPREAD_MS); // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
-  }, [commit]);
+    }, Math.max(spread, names.retryAt - Date.now()));
+  }, [commit, names]);
 
+  useEffect(() => {
+    refreshNamesRef.current = refreshRefereeNames;
+  }, [refreshRefereeNames]);
+
+  // Retour sur l'onglet : la relecture différée part.
   useEffect(
-    () => () => {
-      if (namesTimerRef.current !== null) clearTimeout(namesTimerRef.current);
-      namesTimerRef.current = null;
-      namesAttemptRef.current = "";
-    },
-    [tournamentId],
+    () =>
+      subscribeClientPower(() => {
+        if (names.deferred && !nobodyWatches()) refreshRefereeNames();
+      }),
+    [refreshRefereeNames, names],
   );
+
+  useEffect(() => () => resetRefereeNamesReader(names), [tournamentId, names]);
 
   /**
    * Message du flux : intégré tout de suite, puis — pour qui en a un — aperçu
@@ -352,7 +439,9 @@ export function useTournamentLive(tournamentId: number) {
       commit(applyLiveMessage(stateRef.current, message));
       // `force` : on vient de commiter cette version, la déduplication par
       // version rejetterait la relecture avant d'en avoir pris l'aperçu.
-      if (stalePreview) void load(true, true);
+      // Les pseudos viennent avec la relecture ; si elle échoue (429, réseau),
+      // la relecture légère prend le relais (rien si plus rien ne manque).
+      if (stalePreview) void load(true, true).then(() => refreshRefereeNames());
       else if (message.type === "snapshot") refreshRefereeNames();
     },
     [commit, load, refreshRefereeNames],

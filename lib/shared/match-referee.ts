@@ -241,11 +241,32 @@ export function missingRefereeNamesKey(
   matches: readonly RefereeNamedMatch[],
   names: readonly RefereeNameEntry[],
 ): string {
+  const byKey = indexRefereeNames(names);
   const missing: string[] = [];
   for (const match of matches) {
-    if (refereeNameMissing(match, names)) missing.push(`${match.id}:${match.refereeKey}`);
+    if (refereeNameMissing(match, byKey)) missing.push(`${match.id}:${match.refereeKey}`);
   }
   return missing.join(",");
+}
+
+/** Clé d'une désignation : le match et son empreinte (un match sans empreinte n'égale aucune entrée). */
+function designationKey(matchId: number, refereeKey: string | null): string {
+  return refereeKey === null ? `${matchId}!` : `${matchId}#${refereeKey}`;
+}
+
+/**
+ * Index des entrées par désignation (`designationKey`) : une lecture en temps
+ * constant par match, au lieu d'un parcours de la liste — un plateau de
+ * centaines de matchs relit chaque réponse sans coût quadratique. En cas de
+ * doublon, la première entrée l'emporte (comme le `find` d'avant).
+ */
+function indexRefereeNames<T extends RefereeNameEntry>(names: readonly T[]): Map<string, T> {
+  const byKey = new Map<string, T>();
+  for (const name of names) {
+    const key = designationKey(name.matchId, name.refereeKey);
+    if (!byKey.has(key)) byKey.set(key, name);
+  }
+  return byKey;
 }
 
 /**
@@ -253,9 +274,9 @@ export function missingRefereeNamesKey(
  * l'arbitre lui-même (`mine`, posée même quand son pseudo n'est pas lisible —
  * `markViewerReferee` : la relire n'apprendrait rien de plus).
  */
-function refereeNameMissing(match: RefereeNamedMatch, names: readonly RefereeNameEntry[]): boolean {
+function refereeNameMissing(match: RefereeNamedMatch, byKey: ReadonlyMap<string, RefereeNameEntry>): boolean {
   if (!showsRefereeName(match)) return false;
-  const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+  const entry = byKey.get(designationKey(match.id, match.refereeKey));
   return entry === undefined || (entry.pseudo === "" && entry.mine !== true);
 }
 
@@ -275,30 +296,106 @@ export function refereeNamesAttempt(missing: string, attempted: string): { read:
   return { read: missing !== attempted, attempted };
 }
 
-/** Nombre de désignations montrées dont le pseudo manque dans `names`. */
-function missingRefereeNamesCount(
-  matches: readonly RefereeNamedMatch[],
-  names: readonly RefereeNameEntry[],
-): number {
-  let missing = 0;
-  for (const match of matches) {
-    if (refereeNameMissing(match, names)) missing += 1;
-  }
-  return missing;
+/**
+ * Désignation déjà résolue (`held`) : seule la marque `mine` (éligibilité de
+ * l'arbitre, relue par le serveur) peut avoir changé sous la même empreinte.
+ * L'entrée relue qui la change, `"drop"` quand la marque tombe sur un pseudo
+ * illisible (absent de la liste commune), `null` sinon. Une réponse qui connaît
+ * le match sous une autre empreinte (`otherKey`, en retard) ne retire rien.
+ */
+function refereeMarkChange<T extends RefereeNameEntry>(held: T | undefined, found: T | undefined, otherKey: boolean): T | "drop" | null {
+  if (held === undefined) return null;
+  if (held.mine !== true) return found?.mine === true ? found : null;
+  if (otherKey) return null;
+  if (found === undefined) return "drop";
+  return found.mine === true ? null : found;
 }
 
 /**
- * Une liste de pseudos relue **améliore**-t-elle celle qu'on a ? Vrai quand
- * elle laisse moins de désignations montrées sans pseudo. Une réponse en
- * retard (lue avant une désignation plus récente, ou doublée par le contexte
- * d'une reconnexion) n'écrase ainsi jamais une liste plus à jour.
+ * Fusionne une liste de pseudos relue dans celle qu'on a : chaque désignation
+ * montrée encore sans pseudo que la réponse **résout** (même empreinte, pseudo
+ * ou marque `mine`) prend l'entrée relue, de même qu'une désignation déjà
+ * résolue dont la marque `mine` a changé sous la même empreinte (arbitre devenu
+ * éligible ou ne l'étant plus) ; le reste est gardé tel quel. Une
+ * réponse en retard (lue avant une désignation plus récente, ou doublée par le
+ * contexte d'une reconnexion) n'écrase donc jamais une liste plus à jour, et
+ * une réponse qui résout un **autre** sous-ensemble n'est pas perdue.
+ *
+ * `names` : la liste fusionnée, `null` si la réponse ne résout rien.
+ * `stale` : la réponse connaît une désignation manquante sous une **autre**
+ * empreinte — le serveur retardait : la relecture est à refaire plus tard.
  */
-export function refereeNamesImprove(
+export function mergeRefereeNames<T extends RefereeNameEntry>(
   matches: readonly RefereeNamedMatch[],
-  current: readonly RefereeNameEntry[],
-  incoming: readonly RefereeNameEntry[],
-): boolean {
-  return missingRefereeNamesCount(matches, incoming) < missingRefereeNamesCount(matches, current);
+  current: readonly T[],
+  incoming: readonly T[],
+): { names: T[] | null; stale: boolean } {
+  const added: T[] = [];
+  const dropped = new Set<number>();
+  let stale = false;
+  const incomingByKey = indexRefereeNames(incoming);
+  const currentByKey = indexRefereeNames(current);
+  const incomingKeys = refereeKeysByMatch(incoming);
+  for (const match of matches) {
+    const key = designationKey(match.id, match.refereeKey);
+    const found = incomingByKey.get(key);
+    const otherKey = knownUnderOtherKey(incomingKeys, match);
+    if (!refereeNameMissing(match, currentByKey)) {
+      const held = currentByKey.get(key);
+      const change = refereeMarkChange(held, found, otherKey);
+      if (change === "drop") dropped.add(match.id);
+      else if (change !== null) added.push(change);
+      continue;
+    }
+    if (found && (found.pseudo !== "" || found.mine === true)) added.push(found);
+    else if (otherKey) stale = true;
+  }
+  if (added.length === 0 && dropped.size === 0) return { names: null, stale };
+  for (const name of added) dropped.add(name.matchId);
+  return { names: [...current.filter((name) => !dropped.has(name.matchId)), ...added], stale };
+}
+
+/** Empreintes qu'une liste connaît, par match. */
+function refereeKeysByMatch(names: readonly RefereeNameEntry[]): Map<number, Set<string>> {
+  const byMatch = new Map<number, Set<string>>();
+  for (const name of names) {
+    const keys = byMatch.get(name.matchId) ?? new Set<string>();
+    keys.add(name.refereeKey);
+    byMatch.set(name.matchId, keys);
+  }
+  return byMatch;
+}
+
+/** La liste connaît-elle ce match sous une **autre** empreinte que la sienne ? */
+function knownUnderOtherKey(byMatch: ReadonlyMap<number, ReadonlySet<string>>, match: RefereeNamedMatch): boolean {
+  const known = byMatch.get(match.id);
+  if (known === undefined) return false;
+  for (const refereeKey of known) if (refereeKey !== match.refereeKey) return true;
+  return false;
+}
+
+/** Plus courte attente avant de relire les pseudos après un échec (429, 5xx, réseau, réponse en retard). */
+export const REFEREE_NAMES_RETRY_MS = 10_000;
+
+/** Plus longue attente suivie : un `Retry-After` démesuré (proxy) ne gèle pas les pseudos des arbitres. */
+export const REFEREE_NAMES_RETRY_MAX_MS = 60_000;
+
+/**
+ * Attente avant de relire les pseudos après un échec : l'en-tête `Retry-After`
+ * d'un refus de quota — secondes ou date HTTP —, jamais moins de
+ * {@link REFEREE_NAMES_RETRY_MS} ni plus de {@link REFEREE_NAMES_RETRY_MAX_MS}.
+ */
+export function refereeNamesRetryDelay(retryAfter: string | null, now: number = Date.now()): number {
+  let asked = 0;
+  if (retryAfter !== null && retryAfter.trim() !== "") {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) asked = seconds > 0 ? seconds * 1_000 : 0;
+    else {
+      const date = Date.parse(retryAfter);
+      asked = Number.isFinite(date) ? Math.max(0, date - now) : 0;
+    }
+  }
+  return Math.min(REFEREE_NAMES_RETRY_MAX_MS, Math.max(REFEREE_NAMES_RETRY_MS, asked));
 }
 
 /** Liste de pseudos d'arbitre reçue d'une réponse (forme contrôlée), `null` si elle n'en est pas une. */

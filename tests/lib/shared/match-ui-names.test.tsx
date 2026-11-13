@@ -2,14 +2,20 @@ import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { applyLiveMessage } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 import { MapScoreList } from "@/app/(secured)/tournois/[id]/_components/MapScoreList";
-import { refereeReadyRereadDue } from "@/components/match-launch/MatchContactsDialog";
+import {
+  REFEREE_READY_REREAD_MAX,
+  refereeReadyRereadDue,
+  refereeReadyRereadStep,
+  serverClockSkew,
+} from "@/components/match-launch/MatchContactsDialog";
 import { splitChannelText } from "@/components/cyber/landing/LiveCard";
 import {
   missingRefereeNamesKey,
   parseRefereeNames,
   refereeNameOf,
+  mergeRefereeNames,
   refereeNamesAttempt,
-  refereeNamesImprove,
+  refereeNamesRetryDelay,
   showsRefereeName,
 } from "@/lib/shared/match-referee";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
@@ -95,6 +101,15 @@ describe("missingRefereeNamesKey — l'arbitre reconnu de lui seul", () => {
     expect(missingRefereeNamesKey([shown(5, "k5")], [{ matchId: 5, refereeKey: "k5", pseudo: "", mine: true }])).toBe("");
   });
 
+  it("missingRefereeNamesKey_duplicateEntriesSameDesignation_firstWins", () => {
+    const names = [
+      { matchId: 5, refereeKey: "k5", pseudo: "" },
+      { matchId: 5, refereeKey: "k5", pseudo: "Nova" },
+    ];
+
+    expect(missingRefereeNamesKey([shown(5, "k5")], names)).toBe("5:k5");
+  });
+
   it("missingRefereeNamesKey_emptyPseudoNotMine_missing", () => {
     expect(missingRefereeNamesKey([shown(5, "k5")], [{ matchId: 5, refereeKey: "k5", pseudo: "" }])).toBe("5:k5");
   });
@@ -121,30 +136,107 @@ describe("missingRefereeNamesKey", () => {
   });
 });
 
-describe("refereeNamesImprove", () => {
+describe("mergeRefereeNames", () => {
   const shownB = [shown(5, "kB")];
   const namedA = [{ matchId: 5, refereeKey: "kA", pseudo: "Ancien" }];
   const namedB = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau" }];
 
-  it("refereeNamesImprove_lateResponseForOlderDesignation_returnsFalse", () => {
-    expect(refereeNamesImprove(shownB, namedB, namedA)).toBe(false);
+  it("mergeRefereeNames_lateResponseWhileAlreadyNamed_returnsNullNotStale", () => {
+    expect(mergeRefereeNames(shownB, namedB, namedA)).toEqual({ names: null, stale: false });
   });
 
-  it("refereeNamesImprove_incomingNamesMissingDesignation_returnsTrue", () => {
-    expect(refereeNamesImprove(shownB, [], namedB)).toBe(true);
+  it("mergeRefereeNames_incomingResolvesMissingDesignation_addsIt", () => {
+    expect(mergeRefereeNames(shownB, [], namedB)).toEqual({ names: namedB, stale: false });
   });
 
-  it("refereeNamesImprove_incomingMineEntryWithoutPseudo_returnsTrue", () => {
-    // L'arbitre au pseudo illisible se reconnaît : la réponse est gardée.
-    expect(refereeNamesImprove(shownB, [], [{ matchId: 5, refereeKey: "kB", pseudo: "", mine: true }])).toBe(true);
+  it("mergeRefereeNames_incomingMineEntryWithoutPseudo_addsIt", () => {
+    // L'arbitre au pseudo illisible se reconnaît : l'entrée est gardée.
+    const mine = [{ matchId: 5, refereeKey: "kB", pseudo: "", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, [], mine)).toEqual({ names: mine, stale: false });
   });
 
-  it("refereeNamesImprove_sameCoverage_returnsFalse", () => {
-    expect(refereeNamesImprove(shownB, [], namedA)).toBe(false);
+  it("mergeRefereeNames_incomingEmptyPseudoNotMine_returnsNull", () => {
+    expect(mergeRefereeNames(shownB, [], [{ matchId: 5, refereeKey: "kB", pseudo: "" }])).toEqual({ names: null, stale: false });
   });
 
-  it("refereeNamesImprove_matchesWithoutReferee_returnsFalse", () => {
-    expect(refereeNamesImprove([shown(5, null)], [], namedB)).toBe(false);
+  it("mergeRefereeNames_incomingOlderKeyForMissingMatch_flagsStale", () => {
+    expect(mergeRefereeNames(shownB, [], namedA)).toEqual({ names: null, stale: true });
+  });
+
+  it("mergeRefereeNames_incomingResolvesOtherSubset_keepsCurrentAndAddsNew", () => {
+    const matches = [shown(5, "k5"), shown(6, "k6")];
+    const current = [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }];
+    const incoming = [{ matchId: 6, refereeKey: "k6", pseudo: "Arbitre" }];
+
+    expect(mergeRefereeNames(matches, current, incoming).names).toEqual([...current, ...incoming]);
+  });
+
+  it("mergeRefereeNames_currentHasOlderEntryForMissingMatch_replacesIt", () => {
+    expect(mergeRefereeNames(shownB, namedA, namedB).names).toEqual(namedB);
+  });
+
+  it("mergeRefereeNames_resolvedEntryGainsMine_replacesWithMarkedEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, namedB, marked)).toEqual({ names: marked, stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedMineEntryLosesMark_replacesWithUnmarkedEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, marked, namedB)).toEqual({ names: namedB, stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedMineUnreadablePseudoAbsentFromIncoming_dropsEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, marked, [])).toEqual({ names: [], stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedEntrySameMark_returnsNull", () => {
+    expect(mergeRefereeNames(shownB, namedB, namedB)).toEqual({ names: null, stale: false });
+  });
+
+  it("mergeRefereeNames_resolvedMineIncomingOtherKey_keepsEntry", () => {
+    const marked = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau", mine: true as const }];
+
+    expect(mergeRefereeNames(shownB, marked, namedA)).toEqual({ names: null, stale: false });
+  });
+
+  it("mergeRefereeNames_matchesWithoutReferee_returnsNull", () => {
+    expect(mergeRefereeNames([shown(5, null)], [], namedB)).toEqual({ names: null, stale: false });
+  });
+});
+
+describe("refereeNamesRetryDelay", () => {
+  it("refereeNamesRetryDelay_noHeader_returnsTenSeconds", () => {
+    expect(refereeNamesRetryDelay(null)).toBe(10_000);
+  });
+
+  it("refereeNamesRetryDelay_longerRetryAfter_followsHeader", () => {
+    expect(refereeNamesRetryDelay("30")).toBe(30_000);
+  });
+
+  it("refereeNamesRetryDelay_shorterRetryAfter_keepsTenSecondFloor", () => {
+    expect(refereeNamesRetryDelay("2")).toBe(10_000);
+  });
+
+  it("refereeNamesRetryDelay_hugeRetryAfter_cappedAtOneMinute", () => {
+    expect(refereeNamesRetryDelay("3600")).toBe(60_000);
+  });
+
+  it("refereeNamesRetryDelay_httpDate_followsTheDate", () => {
+    const now = Date.parse("2026-10-21T07:27:00Z");
+    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 07:27:30 GMT", now)).toBe(30_000);
+    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 07:27:03 GMT", now)).toBe(10_000);
+    expect(refereeNamesRetryDelay("Wed, 21 Oct 2026 09:00:00 GMT", now)).toBe(60_000);
+  });
+
+  it("refereeNamesRetryDelay_unreadableOrNegativeHeader_returnsTenSeconds", () => {
+    expect(refereeNamesRetryDelay("pas une date")).toBe(10_000);
+    expect(refereeNamesRetryDelay("")).toBe(10_000);
+    expect(refereeNamesRetryDelay("-5")).toBe(10_000);
   });
 });
 
@@ -193,6 +285,7 @@ describe("refereeReadyRereadDue", () => {
     ({
       phase: "LOBBY",
       referee: { userId: 7, pseudo: "Juge", ready: false, isViewer: false },
+      viewer: { isReferee: false },
       ...overrides,
     }) as MatchLaunchInfo;
 
@@ -214,6 +307,62 @@ describe("refereeReadyRereadDue", () => {
 
   it("refereeReadyRereadDue_noLaunch_returnsFalse", () => {
     expect(refereeReadyRereadDue(null)).toBe(false);
+  });
+
+  it("refereeReadyRereadDue_viewerIsTheReferee_returnsFalse", () => {
+    expect(refereeReadyRereadDue(launch({ viewer: { isReferee: true } as MatchLaunchInfo["viewer"] }))).toBe(false);
+  });
+});
+
+describe("refereeReadyRereadStep", () => {
+  const NOW = Date.parse("2026-11-13T20:00:00Z");
+
+  it("refereeReadyRereadStep_beforeAutoLaunchBelowCap_returnsRead", () => {
+    expect(
+      refereeReadyRereadStep({ now: NOW, autoLaunchAt: "2026-11-13T20:05:00Z", reads: REFEREE_READY_REREAD_MAX - 1, backingOff: false }),
+    ).toBe("read");
+  });
+
+  it("refereeReadyRereadStep_beforeAutoLaunchCapReached_returnsStop", () => {
+    expect(
+      refereeReadyRereadStep({ now: NOW, autoLaunchAt: "2026-11-13T23:00:00Z", reads: REFEREE_READY_REREAD_MAX, backingOff: false }),
+    ).toBe("stop");
+  });
+
+  it("refereeReadyRereadStep_autoLaunchReached_returnsStop", () => {
+    expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: "2026-11-13T20:00:00Z", reads: 0, backingOff: false })).toBe("stop");
+  });
+
+  it("refereeReadyRereadStep_noAutoLaunchBelowCap_returnsRead", () => {
+    expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: null, reads: REFEREE_READY_REREAD_MAX - 1, backingOff: false })).toBe("read");
+  });
+
+  it("refereeReadyRereadStep_noAutoLaunchCapReached_returnsStop", () => {
+    expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: null, reads: REFEREE_READY_REREAD_MAX, backingOff: false })).toBe("stop");
+  });
+
+  it("refereeReadyRereadStep_unreadableAutoLaunch_fallsBackToCap", () => {
+    expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: "pas une date", reads: REFEREE_READY_REREAD_MAX, backingOff: false })).toBe("stop");
+  });
+
+  it("refereeReadyRereadStep_backingOff_returnsSkip", () => {
+    expect(refereeReadyRereadStep({ now: NOW, autoLaunchAt: null, reads: 0, backingOff: true })).toBe("skip");
+  });
+});
+
+describe("serverClockSkew", () => {
+  const RECEIVED = Date.parse("2026-11-13T20:00:00Z");
+
+  it("serverClockSkew_readableDate_returnsServerMinusReceived", () => {
+    expect(serverClockSkew("Fri, 13 Nov 2026 19:55:00 GMT", RECEIVED)).toBe(-300_000);
+  });
+
+  it("serverClockSkew_nullDate_returnsZero", () => {
+    expect(serverClockSkew(null, RECEIVED)).toBe(0);
+  });
+
+  it("serverClockSkew_unreadableDate_returnsZero", () => {
+    expect(serverClockSkew("pas une date", RECEIVED)).toBe(0);
   });
 });
 

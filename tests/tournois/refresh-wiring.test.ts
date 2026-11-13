@@ -235,11 +235,13 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // `resolveViewerEntrant`, partagé avec la relecture des propositions d'un
     // match (ERREUR.txt EF-15) : le contexte du lecteur n'en passe aucune (sa
     // lecture d'équipe ouvre sa propre requête), la relecture d'un match passe
-    // la sienne (une seule place du pool, revue perf #542).
+    // la sienne (une seule place du pool, revue perf #542). Un porteur de `live`
+    // ou de `tournaments` lit engagé et identité sur une seule connexion (EF-60).
     expect(index).toMatch(/if \(!isSoloTournament\(snapshot\.card\.participantType\)\) \{\s*const activeTeam = await getUserActiveTeam\(userId, connection\);/);
     expect(index).toContain("await resolveViewerEntrant({ card: tournament }, userId, connection)");
     expect(index).toContain("const myTeamId = connection ? await resolve(connection) : await withConnection(resolve);");
-    expect(index).toContain("const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);");
+    expect(index).toContain("...(await resolveViewerEntrant(snapshot, userId)),");
+    expect(index).toMatch(/canManageLive \|\| canManage\s*\? await withConnection\(async \(connection\) => \{\s*const entrant = await resolveViewerEntrant\(snapshot, userId, connection\);/);
   });
 });
 describe("compteur de visites — déduplication dans l'onglet", () => {
@@ -256,21 +258,75 @@ describe("compteur de visites — déduplication dans l'onglet", () => {
 describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)", () => {
   it("refreshRefereeNames_failedRead_reopensSameMissingSet", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
-    expect(body).toContain('if (namesAttemptRef.current === missing) namesAttemptRef.current = "";');
-    expect(body).toMatch(/if \(!response\.ok\) \{\s*retryLater\(\);\s*return;\s*\}/);
-    expect(body).toMatch(/catch \{[^}]*retryLater\(\);\s*\}/);
+    expect(body).toContain('if (names.attempt === missing) names.attempt = "";');
+    expect(body).toMatch(/if \(refereeNamesFailureRetries\(response\.status\)\) \{\s*retryLater\(refereeNamesRetryDelay\(response\.headers\.get\("retry-after"\)\), true\);/);
+    expect(body).toContain("if (!controller.signal.aborted) retryLater(refereeNamesRetryDelay(null), true);");
   });
 
-  it("refreshRefereeNames_lateResponse_commitsOnlyWhenNamesImprove", () => {
+  it("refreshRefereeNames_otherMissingSet_ignoresEarlierBackoffAndExhaustedRetries", () => {
     const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
-    const guard = body.indexOf("if (!refereeNamesImprove(current.detail.matches, current.detail.refereeNames, names)) return;");
+    expect(body).toContain("if (missing !== names.retryKey) {");
+    expect(body).toContain("names.retryAt = 0;");
+    expect(body).toContain("names.retries = 0;");
+    expect(body).toContain("names.retryKey = missing;");
+  });
 
-    expect(guard).toBeGreaterThan(-1);
-    expect(guard).toBeLessThan(body.indexOf("commit("));
+  it("refreshRefereeNames_lateResponse_mergesOnlyMissingNames", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+    const merge = body.indexOf("const merged = mergeRefereeNames(current.detail.matches, current.detail.refereeNames, incoming);");
+
+    expect(merge).toBeGreaterThan(-1);
+    expect(merge).toBeLessThan(body.indexOf("commit("));
+    expect(body).toContain("if (merged.stale) retryLater(refereeNamesRetryDelay(null), true);");
+    expect(body).toContain("if (merged.names !== null) commit(");
+  });
+
+  it("refreshRefereeNames_readScheduled_startsNothing", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toContain("if (names.timer !== null) return;");
+    expect(body).toContain("signal: controller.signal");
+    expect(body).toContain("Math.max(spread, names.retryAt - Date.now())");
+  });
+
+  it("refreshRefereeNames_nobodyWatching_defersUntilPowerChange", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toMatch(/if \(nobodyWatches\(\)\) \{\s*names\.deferred = true;\s*return;\s*\}/);
+    expect(hook).toContain("if (names.deferred && !nobodyWatches()) refreshRefereeNames();");
+  });
+
+  it("refreshRefereeNames_callDuringInFlightRead_rerunsWhenItEnds", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toMatch(/if \(names\.abort !== null\) \{\s*names\.pending = true;\s*return;\s*\}/);
+    expect(body).toMatch(/if \(names\.abort === controller\) \{\s*names\.abort = null;\s*if \(names\.pending\) \{\s*names\.pending = false;\s*refreshNamesRef\.current\(\);/);
+    expect(hook).toContain("refreshNamesRef.current = refreshRefereeNames;");
+  });
+
+  it("refreshRefereeNames_failedRead_autoRetriesOnlyTransientAndBounded", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+
+    expect(body).toMatch(/if \(auto && names\.retries < REFEREE_NAMES_AUTO_RETRIES\) \{\s*names\.retries \+= 1;\s*names\.pending = true;/);
+    expect(body).toContain("else names.retries = 0;");
+    expect(hook).toContain("const REFEREE_NAMES_AUTO_RETRIES = 6;");
+  });
+
+  it("refreshRefereeNames_tournamentChange_resetsWholeReader", () => {
+    expect(hook).toContain("useEffect(() => () => resetRefereeNamesReader(names), [tournamentId, names]);");
+  });
+
+  it("load_restCommit_cancelsPendingNamesReadAndRereadsIfStillMissing", () => {
+    const load = hook.slice(hook.indexOf("commit({ tier: stateRef.current.tier, detail });"));
+    expect(load.slice(0, 600)).toContain("if (cancelScheduledNamesRead(names)) refreshNamesRef.current();");
+  });
+
+  it("stalePreview_reread_thenRefreshesNames", () => {
+    expect(hook).toContain("if (stalePreview) void load(true, true).then(() => refreshRefereeNames());");
   });
 
   it("refereeKey_secret_survivesModuleReevaluation", () => {
     const names = read("lib/server/tournaments/referee-names.ts");
-    expect(names).toContain("holder.__bgRefereeKeySecret ??= randomBytes(32);");
+    expect(names).toContain("holder.__bgRefereeKeySecret ??= refereeKeySecret();");
   });
 });
