@@ -82,4 +82,33 @@ describe("settleDeletedSoloEntries — annonces après le commit", () => {
     expect(String(candidateQueries[1][0])).not.toContain("NOT IN");
     log.mockRestore();
   });
+
+  // Revue standard cycle 2 : un écouteur qui lève après le commit ne fait pas
+  // non plus passer les retraits pour un échec.
+  it("settleDeletedSoloEntries_publishThrowsAfterCommit_stillCountsAndRepublishesWithdrawals", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(publishUpdatedEvent).mockImplementationOnce(() => {
+      throw new Error("LISTENER_DOWN");
+    });
+    jest.mocked(loadSoloRegistrations).mockResolvedValue([
+      {
+        tournamentId: 3,
+        teamId: 900,
+        hasMatch: false,
+        state: "REGISTRATION",
+        registrationOpenAt: "2026-01-01T00:00:00.000Z",
+        registrationCloseAt: "2098-12-31T00:00:00.000Z",
+        startAt: "2099-01-01T00:00:00.000Z",
+      },
+    ]);
+    fakeDb();
+
+    const outcome = await settleDeletedSoloEntries();
+
+    expect(outcome.withdrawn).toBe(1);
+    // Le coup d'envoi (qui lève), puis le retrait, rediffusé par le passage.
+    expect(publishUpdatedEvent).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("reportées");
+    log.mockRestore();
+  });
 });

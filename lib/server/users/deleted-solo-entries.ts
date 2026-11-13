@@ -524,16 +524,22 @@ async function withdrawDeletedAccountRegistrations(
       new Set(tournamentIds),
     );
     await connection.commit();
-    // Commis : une annonce qui ne part pas ne fait pas passer les retraits pour
-    // un échec (ni rediffusion ni journal ne suivraient, et le compte serait
-    // mis à l'écart comme s'il n'avait rien produit).
+    // Commis : une annonce ou un écouteur qui lève ne fait pas passer les
+    // retraits pour un échec (ni rediffusion ni journal ne suivraient, et le
+    // compte serait mis à l'écart comme s'il n'avait rien produit).
     try {
       flushBotLogs(connection);
     } catch (error) {
       console.error(`[deleted-accounts] annonces du compte #${userId} non envoyées :`, failureReason(error));
     }
     // Passé en cours : les lecteurs du tournoi voient son coup d'envoi.
-    for (const tournamentId of started) publishUpdatedEvent(tournamentId);
+    for (const tournamentId of started) {
+      try {
+        publishUpdatedEvent(tournamentId);
+      } catch (error) {
+        console.error(`[deleted-accounts] tournoi #${tournamentId} non prévenu :`, failureReason(error));
+      }
+    }
     return { withdrawn, started: started.length };
   } catch (error) {
     await connection.rollback().catch(() => {});

@@ -265,8 +265,21 @@ export async function listCastTournamentIds(runner: SqlRunner, userId: number): 
  * le nom sous lequel il paraît : leurs lecteurs ouverts sont rediffusés
  * (`publishUpdatedEvent`). Un tournoi terminé n'a plus de flux qui vive des
  * jours : sa page se relit au chargement.
+ *
+ * `leftTeamIds` : les équipes que la demande vient de quitter. Leur départ
+ * (`left_at = NOW()`) précède le coup d'envoi d'un tournoi pas commencé, que
+ * la borne ci-dessus écarterait — alors que ses lecteurs ouverts affichent
+ * encore l'effectif d'avant, nom compris : leurs tournois pas terminés sont
+ * rediffusés aussi.
  */
-export async function listNamingTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
+export async function listNamingTournamentIds(
+  runner: SqlRunner,
+  userId: number,
+  leftTeamIds: readonly number[] = [],
+): Promise<number[]> {
+  const justLeft = leftTeamIds.length > 0 ? `
+         UNION
+         SELECT r.tournament_id FROM bg_tournament_registrations r WHERE r.team_id IN (${leftTeamIds.map(() => "?").join(", ")})` : "";
   const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
     `SELECT n.tournament_id
        FROM (
@@ -283,11 +296,11 @@ export async function listNamingTournamentIds(runner: SqlRunner, userId: number)
          UNION
          SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
          UNION
-         SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
+         SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?${justLeft}
        ) n
        JOIN bg_tournaments t ON t.id = n.tournament_id AND t.state <> 'FINISHED' AND t.finished_at IS NULL
       ORDER BY n.tournament_id`,
-    [userId, userId, userId, userId, userId, userId],
+    [userId, userId, userId, userId, userId, userId, ...leftTeamIds],
   );
   return rows.map((row) => Number(row.tournament_id));
 }
@@ -693,9 +706,16 @@ async function deleteAccountNow(
       // d'être retirée d'un plateau déjà tiré. Ses lignes de journal partent
       // avec le commit. Seuls ceux dont l'état a changé sont rediffusés (comme
       // `syncOpenSoloTournamentsOn`, que ce module ne peut importer sans cycle).
+      // Pas au rejeu d'une restauration (`expectedCreatedAt`), comme à la
+      // demande : synchroniser lancerait des tournois pendant la remise en
+      // état. Un tournoi dont l'heure est passée garde alors l'inscription
+      // (la fenêtre de retrait la refuse) ; la passe horaire le lancera puis
+      // forfaitera l'entrée, une fois le site rouvert.
       const changed: number[] = [];
-      for (const tournamentId of openSoloTournaments) {
-        if ((await syncTournamentState(connection, tournamentId)).stateChanged) changed.push(tournamentId);
+      if (expectedCreatedAt === undefined) {
+        for (const tournamentId of openSoloTournaments) {
+          if ((await syncTournamentState(connection, tournamentId)).stateChanged) changed.push(tournamentId);
+        }
       }
       // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
       // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).

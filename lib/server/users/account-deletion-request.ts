@@ -411,9 +411,9 @@ async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAcco
 }
 
 /** `listNamingTournamentIds`, au meilleur effort : un relevé en échec ne rediffuse rien de plus. */
-async function namingTournamentsOrNone(userId: number): Promise<number[]> {
+async function namingTournamentsOrNone(userId: number, leftTeamIds: readonly number[]): Promise<number[]> {
   try {
-    return await listNamingTournamentIds(await getDatabase(), userId);
+    return await listNamingTournamentIds(await getDatabase(), userId, leftTeamIds);
   } catch (error) {
     console.error("[account-deletion] tournois qui nomment le compte non relevés", failureReason(error));
     return [];
@@ -449,7 +449,7 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     ...withdrawn.map((entry) => entry.tournamentId),
     ...organizedHandedOver,
     ...soloTournaments,
-    ...(await namingTournamentsOrNone(userId)),
+    ...(await namingTournamentsOrNone(userId, departures.map((departure) => departure.teamId))),
   ])) {
     publishUpdatedEvent(tournamentId);
   }

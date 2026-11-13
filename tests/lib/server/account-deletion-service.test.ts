@@ -1166,4 +1166,13 @@ describe("deleteOwnAccount — tournois ouverts synchronisés", () => {
 
     expect(publishUpdatedEvent).toHaveBeenCalledWith(55);
   });
+  // Revue standard cycle 2 : le rejeu d'une restauration ne lance aucun tournoi.
+  it("deleteOwnAccount_replay_neverSyncsTournaments", async () => {
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05" });
+
+    expect(syncTournamentState).not.toHaveBeenCalled();
+    expect(publishUpdatedEvent).not.toHaveBeenCalledWith(55);
+  });
 });

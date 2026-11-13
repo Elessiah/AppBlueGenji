@@ -175,6 +175,16 @@ describe("anonymizedAccountHasNoPage (EF-62 cycle 1)", () => {
 
     expect(await anonymizedAccountHasNoPage(7)).toBe(false);
   });
+
+  // Revue standard cycle 2 : une double panne ferme la fiche (404), sans lever.
+  it("anonymizedAccountHasNoPage_listAndLiveQueryFail_returnsTrue", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    mockDb(() => {
+      throw new Error("DB_DOWN");
+    });
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(true);
+  });
 });
 
 describe("getFullProfile — compte supprimé (D13)", () => {

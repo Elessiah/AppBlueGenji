@@ -65,35 +65,30 @@ function readProfilelessPlayerIds(): Promise<number[]> {
   return cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
 }
 
-/** La liste vue en ensemble, rebâtie seulement quand le cache rend une autre liste. */
-const profilelessSets = new WeakMap<readonly number[], ReadonlySet<number>>();
-
-function asSet(ids: readonly number[]): ReadonlySet<number> {
-  let set = profilelessSets.get(ids);
-  if (set === undefined) {
-    set = new Set(ids);
-    profilelessSets.set(ids, set);
-  }
-  return set;
-}
-
 /**
  * Un compte **anonymisé** (déjà lu comme supprimé, suppression non plus en
  * attente) est-il sans fiche ? La même liste que celle qui décide des liens :
  * la fiche et ses liens ne se contredisent pas. Si la liste ne se lit pas, la
  * question se pose au seul compte en base — une panne ne rouvre pas la fiche
- * d'un compte qui n'a jamais joué (D13). Lève si les deux lectures échouent.
+ * d'un compte qui n'a jamais joué (D13). Si la seconde lecture échoue aussi,
+ * le compte est dit sans fiche : la panne rend une 404, jamais une erreur ni
+ * une fiche qu'il n'aurait peut-être pas.
  */
 export async function anonymizedAccountHasNoPage(userId: number): Promise<boolean> {
   try {
-    return asSet(await readProfilelessPlayerIds()).has(userId);
+    return (await readProfilelessPlayerIds()).includes(userId);
   } catch (error) {
     console.error(`[profileless-players] liste illisible, lecture du compte : ${failureReason(error)}`);
   }
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { played: number })[]>(
-    `SELECT ${accountTraceSql().played} AS played FROM (SELECT ? AS id) u`,
-    [userId],
-  );
-  return !Number(rows[0]?.played ?? 0);
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<(RowDataPacket & { played: number })[]>(
+      `SELECT ${accountTraceSql().played} AS played FROM (SELECT ? AS id) u`,
+      [userId],
+    );
+    return !Number(rows[0]?.played ?? 0);
+  } catch (error) {
+    console.error(`[profileless-players] compte illisible, fiche fermée : ${failureReason(error)}`);
+    return true;
+  }
 }

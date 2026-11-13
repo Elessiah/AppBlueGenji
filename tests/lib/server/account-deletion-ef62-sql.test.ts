@@ -56,4 +56,15 @@ describe("listNamingTournamentIds", () => {
       "tm.user_id = ? AND (tm.left_at IS NULL OR tm.left_at >= rt.start_at)",
     );
   });
+  // Revue standard cycle 2 : l'équipe que la demande vient de quitter nomme
+  // encore le compte dans ses tournois pas commencés.
+  it("listNamingTournamentIds_leftTeamIds_addsRegistrationsOfLeftTeams", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
+
+    await listNamingTournamentIds(fakePool({ execute }), 7, [21, 22]);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql.replace(/\s+/g, " ")).toContain("FROM bg_tournament_registrations r WHERE r.team_id IN (?, ?)");
+    expect(params).toEqual([7, 7, 7, 7, 7, 7, 21, 22]);
+  });
 });

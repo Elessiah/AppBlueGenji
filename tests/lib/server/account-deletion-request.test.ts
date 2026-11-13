@@ -1279,6 +1279,15 @@ describe("requestAccountDeletion — EF-62 (aperçu confirmé, tournois synchron
 
     expect(publishUpdatedEvent).toHaveBeenCalledWith(9);
   });
+
+  // Revue standard cycle 2 : l'équipe quittée par la demande compte encore.
+  it("requestAccountDeletion_leftTeam_passedToNamingTournaments", async () => {
+    fakeDb({ teams: [3] });
+
+    await requestAccountDeletion(7);
+
+    expect(listNamingTournamentIds).toHaveBeenCalledWith(expect.anything(), 7, [3]);
+  });
 });
 
 describe("requestAccountDeletion — EF-62 cycle 1 (traces après le commit, rejeu)", () => {

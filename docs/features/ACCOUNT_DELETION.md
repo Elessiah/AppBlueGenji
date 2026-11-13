@@ -1111,6 +1111,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   échec après le commit de la passe horaire n'annule plus ses suites ;
   `listNamingTournamentIds` borne l'effectif d'équipe au coup d'envoi ; textes
   du délai tirés de `ACCOUNT_REACTIVATION_DAYS` (FR + EN).
+- **Revue standard cycle 2** : `npm run replay:deletions` coupe tout envoi
+  sortant du processus (`muteOutboundForProcess`, `lib/server/outbound-mute.ts` :
+  bot Discord dégradé comme injoignable, push sans envoi), forfaits et retraits
+  rejoués compris ; la suppression définitive rejouée ne synchronise pas non
+  plus les tournois (la passe horaire les lance ensuite) ; une équipe que la
+  demande vient de quitter fait rediffuser ses tournois pas terminés
+  (`listNamingTournamentIds(…, leftTeamIds)`) ; une double panne de lecture
+  ferme la fiche (404) au lieu de lever ; un écouteur qui lève après le commit
+  de la passe horaire n'annule plus ses suites ; description de la page de
+  réactivation par `formatMessage`.
 - **Écrans** : la confirmation liste ce que la demande transmet ou retire
   (`deletionDialogContent`), les restes après la fin du délai derrière un
   « i » ; la page de réactivation dit ce qui revient en une phrase (détail
