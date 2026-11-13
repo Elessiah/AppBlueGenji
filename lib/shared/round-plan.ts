@@ -280,32 +280,64 @@ export function applicableTiebreaks(
 
 
 /**
- * Réglages par tour (cartes, maps de départage, points) d'un tournoi **lancé**,
- * sans ceux des tours qu'il ne jouera jamais : en élimination (simple ou
- * double, tournoi ou phase), une fois l'arbre créé, un tour sans match n'en
- * aura plus — le plan, dimensionné avant le départ sur la capacité, a pu en
- * régler au-delà des inscrites. Ces réglages restent en base mais ne
- * grossissent plus chaque instantané. Avant le lancement, en ronde suisse,
- * survie, BlueGenji Survie, ou pour une phase pas encore ouverte, tout est
- * gardé (tours créés au fil de l'eau).
+ * Format dont l'arbre entier est créé d'un coup (au lancement, ou à
+ * l'ouverture de la phase) : élimination simple ou double. Ses tours sont
+ * alors tous connus ; en ronde suisse, survie ou BlueGenji Survie, ils se
+ * créent au fil de l'eau.
+ */
+export function isWholeBracketFormat(format: TournamentFormat | PhaseFormat | null | undefined): boolean {
+  return format != null && ELIMINATION_FORMATS.has(format);
+}
+
+/** Clé d'un tableau (`phaseId:bracket`) dans un {@link BuiltRoundIndex}. */
+export function builtBracketKey(phaseId: number, bracket: string): string {
+  return `${phaseId}:${bracket}`;
+}
+
+/** Plus haut tour créé de chaque tableau (clé {@link builtBracketKey}). */
+export type BuiltRoundIndex = ReadonlyMap<string, number>;
+
+/** Index des tours créés, à bâtir **une** fois par lecture des matchs. */
+export function indexBuiltRounds(built: readonly RoundKey[]): BuiltRoundIndex {
+  const index = new Map<string, number>();
+  for (const round of built) {
+    const key = builtBracketKey(round.phaseId, round.bracket);
+    index.set(key, Math.max(index.get(key) ?? 0, round.roundNumber));
+  }
+  return index;
+}
+
+/**
+ * Règle **unique** du « tour jamais créé », partagée par le serveur (pose d'un
+ * réglage, `roundsFittingTournament`) et l'instantané (`withoutUnbuiltRounds`) :
+ * en élimination (`isWholeBracketFormat`), un tour au-delà du plus haut tour
+ * créé de son tableau n'existera pas ; un tableau sans aucun match (arbre pas
+ * encore créé) garde tous ses tours. Hors élimination, tout tour compte.
+ */
+export function roundWithinBuiltBracket(
+  round: RoundKey,
+  format: TournamentFormat | PhaseFormat | null | undefined,
+  index: BuiltRoundIndex,
+): boolean {
+  if (!isWholeBracketFormat(format)) return true;
+  const maxRound = index.get(builtBracketKey(round.phaseId, round.bracket));
+  return maxRound === undefined || round.roundNumber <= maxRound;
+}
+
+/**
+ * Réglages par tour (cartes, maps de départage, points) sans ceux des tours
+ * que le tournoi ne jouera jamais ({@link roundWithinBuiltBracket}) : le plan,
+ * dimensionné avant le départ sur la capacité, a pu en régler au-delà des
+ * inscrites. Ils ne grossissent plus chaque instantané ; la création de
+ * l'arbre les retire de la base (`purgeUnbuiltRoundSettings`). Phase inconnue
+ * d'un multi-phases : gardé. `index` : {@link indexBuiltRounds}, bâti une fois.
  */
 export function withoutUnbuiltRounds<T extends RoundKey>(
   items: readonly T[],
-  tournament: {
-    format: TournamentFormat;
-    state: TournamentState;
-    phases: ReadonlyArray<Pick<TournamentPhase, "id" | "format">> | null;
-  },
-  built: readonly RoundKey[],
+  tournament: { format: TournamentFormat; phases: ReadonlyArray<Pick<TournamentPhase, "id" | "format">> | null },
+  index: BuiltRoundIndex,
 ): T[] {
-  if (tournament.state !== "RUNNING" && tournament.state !== "FINISHED") return [...items];
-  const builtPhases = new Set(built.map((round) => round.phaseId));
-  const builtKeys = new Set(built.map((round) => `${round.phaseId}:${round.bracket}:${round.roundNumber}`));
   const formatOf = (phaseId: number) =>
     tournament.format === "MULTI" ? tournament.phases?.find((phase) => phase.id === phaseId)?.format : tournament.format;
-  return items.filter((item) => {
-    const format = formatOf(item.phaseId);
-    if (format === undefined || !ELIMINATION_FORMATS.has(format) || !builtPhases.has(item.phaseId)) return true;
-    return builtKeys.has(`${item.phaseId}:${item.bracket}:${item.roundNumber}`);
-  });
+  return items.filter((item) => roundWithinBuiltBracket(item, formatOf(item.phaseId), index));
 }

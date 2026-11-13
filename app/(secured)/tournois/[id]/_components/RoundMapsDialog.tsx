@@ -953,21 +953,22 @@ export function RoundMapsDialog({
 
   // Libellés de la liste des tours (et de la copie), calculés une fois par
   // changement des tours ou de leurs réglages, pas à chaque frappe.
-  const optionLabels = useMemo(() => {
-    const labels = new Map<string, string>();
-    for (const key of rounds) {
+  const summaryLabel = useCallback(
+    (key: RoundKey) => {
       const config = roundMapsOf(rules.rounds, key);
       const tiebreak = roundTiebreakOf(rules.tiebreaks, key) === null ? "" : ` · ${t("dialog.summaryTiebreak")}`;
-      if (!config) {
-        labels.set(roundKeyId(key), `${roundLabel(key)} · ${t("dialog.summaryNone")}${tiebreak}`);
-        continue;
-      }
+      if (!config) return `${roundLabel(key)} · ${t("dialog.summaryNone")}${tiebreak}`;
       const { maps, pools } = roundMapsSummary(config.slots);
-      labels.set(roundKeyId(key), `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}${tiebreak}`);
-    }
-    return labels;
-  }, [rounds, rules.rounds, rules.tiebreaks, roundLabel, t]);
-  const optionLabel = (key: RoundKey) => optionLabels.get(roundKeyId(key)) ?? roundLabel(key);
+      return `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}${tiebreak}`;
+    },
+    [rules.rounds, rules.tiebreaks, roundLabel, t],
+  );
+  const optionLabels = useMemo(
+    () => new Map(rounds.map((key) => [roundKeyId(key), summaryLabel(key)] as const)),
+    [rounds, summaryLabel],
+  );
+  // Un tour hors de la liste mémorisée garde son résumé (« aucune », « N cartes »).
+  const optionLabel = (key: RoundKey) => optionLabels.get(roundKeyId(key)) ?? summaryLabel(key);
 
   /** Applique l'édition au créneau ; `false` si elle est refusée (notification, saisie conservée). */
   const editSlot = (index: number, edit: (slot: readonly string[]) => SlotEdit): boolean => {

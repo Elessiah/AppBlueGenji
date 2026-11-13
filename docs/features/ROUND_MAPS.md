@@ -185,7 +185,16 @@ Match avec arbitre désigné : l'ordre du premier ban ne suit pas
   compris. Il lit le match hors transaction (match absent ou joué : refus sans
   verrou), puis prend `lockTournamentRow` en **première** instruction, relit le
   match `FOR UPDATE` et le réglage du tour : jamais un réglage figé avant le
-  verrou. Le choix dans un pool passe par `map-pick`.
+  verrou. Le choix dans un pool passe par `map-pick`. La saisie libre prend
+  le verrou partagé du tournoi (`lockTournamentRowShared`) borné à 5 s
+  (`withShortLockWait`, 409 `CONCURRENT_UPDATE_RETRY` au-delà).
+- Un tour ne se règle (cartes, départage, points) que s'il existe : en
+  élimination (`SINGLE`, `DOUBLE`), dans la limite des tours **construits** de
+  son tableau (`roundWithinBuiltBracket`, règle partagée par l'écran,
+  l'instantané et le serveur — un tableau sans match garde tout son plan). La
+  création d'un tableau purge les réglages posés au-delà de ses tours réels
+  (`purgeUnbuiltRoundSettings`). « Appliquer à tous » relit seulement les tours
+  visés et écrit par paquets de `ROUND_MAPS_UPSERT_CHUNK` (64) lignes.
 - Un choix verrouille le tournoi avant de relire le match et son pool, comme
   `setRoundMaps` : il ne se valide pas contre un pool remplacé au même instant.
   Verrou **partagé** (`LOCK IN SHARE MODE`) : il attend une écriture des cartes
@@ -292,8 +301,14 @@ au pool.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
   Les choix dans le pool d'un même match se regroupent (`mapPickBursts`,
-  `MAP_PICK_LOG_WINDOW_MS` = 60 s de silence, 5 min au plus) : **une** ligne
-  par rafale, à l'état final, au lieu d'une par bascule carte/vide.
+  `MAP_PICK_LOG_WINDOW_MS` = 60 s de silence, 5 min au plus) : le **premier**
+  part aussitôt (ligne `MAP_PICKED*` habituelle), la suite de la rafale fait
+  **une** ligne de fin (`formatMapPickBurstLog` : cartes choisies, choix
+  retirés, et qui a agi — staff, équipe en autogestion, ou les deux : une
+  reprise par l'arbitrage n'est jamais tue). Un autre changement d'arbitrage du
+  même match ferme d'abord la rafale ouverte, et les avis d'un match partent
+  dans l'ordre (`createKeyedChain`) : le résumé ne passe jamais après un
+  retrait qui l'a suivi. Un arrêt du serveur ne peut perdre que la ligne de fin.
 - Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche
   est réglée, ordre des bans de la carte 1, règle des cartes suivantes. Le bloc
   des cartes est coupé à un créneau entier au-delà de `MAPS_LINE_MAX` (420

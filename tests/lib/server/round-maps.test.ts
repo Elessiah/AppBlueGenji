@@ -17,6 +17,7 @@ import {
   loadMapRules,
   parseMapRulesInput,
   ROUND_MAPS_BULK_MAX,
+  ROUND_MAPS_UPSERT_CHUNK,
   parseRoundKey,
   parseRoundKeys,
   pickMatchMap,
@@ -312,6 +313,34 @@ describe("setRoundsMaps", () => {
       { phaseId: 0, bracket: "UPPER", roundNumber: 2, before: roundMapsFingerprint([]) },
       { phaseId: 0, bracket: "UPPER", roundNumber: 3, before: roundMapsFingerprint([]) },
     ]);
+  });
+
+  it("setRoundsMaps_severalRounds_readsOnlyTargetedRows", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+
+    await setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]]);
+
+    const [read] = writes(/SELECT[\s\S]*FROM bg_tournament_round_maps/);
+    expect(read[0]).toMatch(/\(phase_id, bracket, round_number\) IN \(\(\?, \?, \?\), \(\?, \?, \?\)\)/);
+    expect(read[1]).toEqual([7, 0, "UPPER", 2, 0, "UPPER", 3]);
+  });
+
+  it("setRoundsMaps_moreRoundsThanChunk_upsertsInBoundedChunks", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+    const rounds = Array.from({ length: ROUND_MAPS_UPSERT_CHUNK + 1 }, (_, index) => ({ ...ROUND, roundNumber: index + 1 }));
+
+    await setRoundsMaps(7, rounds, [["Ilios"]]);
+
+    const inserts = writes(/INSERT INTO bg_tournament_round_maps/);
+    expect(inserts).toHaveLength(2);
+    expect(inserts[0][1] as unknown[]).toHaveLength(ROUND_MAPS_UPSERT_CHUNK * 5);
+    expect(inserts[1][1] as unknown[]).toHaveLength(5);
   });
 
   it("setRoundsMaps_onlySomeRoundsChange_writesTheChangedOnes", async () => {

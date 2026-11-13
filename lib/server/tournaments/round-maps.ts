@@ -34,7 +34,13 @@ import {
   type RoundTiebreak,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
-import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
+import {
+  builtBracketKey,
+  isWholeBracketFormat,
+  roundAllowsTiebreak,
+  roundWithinBuiltBracket,
+  tiebreakTournamentFromRow,
+} from "@/lib/shared/round-plan";
 import {
   bracketFitsFormat,
   isValidMapPointTarget,
@@ -172,9 +178,6 @@ async function lockTournament(connection: PoolConnection, tournamentId: number):
 }
 
 
-/** Formats dont l'arbre entier est créé au lancement (ou à l'ouverture de la phase). */
-const WHOLE_BRACKET_FORMATS: ReadonlySet<string> = new Set(["SINGLE", "DOUBLE"]);
-
 type PhaseRules = { format: TournamentFormat | PhaseFormat; thirdPlace: boolean };
 
 /** Format (et petite finale) de chaque phase citée par `rounds` : la phase 0 hors MULTI, sinon les phases **de ce** tournoi. */
@@ -226,9 +229,7 @@ async function roundsFittingTournament(
     return phase !== undefined && bracketFitsFormat(phase.format, round.bracket, phase.thirdPlace);
   });
   const wholePhaseIds = [
-    ...new Set(
-      fitting.map((round) => round.phaseId).filter((phaseId) => WHOLE_BRACKET_FORMATS.has(phases.get(phaseId)?.format ?? "")),
-    ),
+    ...new Set(fitting.map((round) => round.phaseId).filter((phaseId) => isWholeBracketFormat(phases.get(phaseId)?.format))),
   ];
   if (wholePhaseIds.length === 0) return fitting;
   const [built] = await connection.execute<
@@ -239,12 +240,13 @@ async function roundsFittingTournament(
       GROUP BY phase_id, bracket`,
     [Number(tournament.id), ...wholePhaseIds],
   );
-  const maxRounds = new Map(built.map((row) => [`${Number(row.phase_id)}:${String(row.bracket)}`, row.max_round]));
-  return fitting.filter((round) => {
-    if (!WHOLE_BRACKET_FORMATS.has(phases.get(round.phaseId)?.format ?? "")) return true;
-    const maxRound = maxRounds.get(`${round.phaseId}:${round.bracket}`);
-    return maxRound === null || maxRound === undefined || round.roundNumber <= Number(maxRound);
-  });
+  const index = new Map(
+    built.flatMap((row) =>
+      row.max_round === null ? [] : [[builtBracketKey(Number(row.phase_id), String(row.bracket)), Number(row.max_round)] as const],
+    ),
+  );
+  // Même règle que l'instantané (`withoutUnbuiltRounds`) : un réglage accepté ici y reste visible.
+  return fitting.filter((round) => roundWithinBuiltBracket(round, phases.get(round.phaseId)?.format, index));
 }
 
 /** Tours au plus d'une copie « à tous les tours » (partagé avec l'écran, qui découpe). */
@@ -279,6 +281,9 @@ type StoredRoundRow = RowDataPacket & {
   map_point_target: number | null;
 };
 
+/** Manches au plus par upsert groupé de `writeRoundsSlots`. */
+export const ROUND_MAPS_UPSERT_CHUNK = 64;
+
 /** Clé d'un tour, pour indexer les lignes lues. */
 function roundKeyOf(round: RoundKey): string {
   return `${round.phaseId}:${round.bracket}:${round.roundNumber}`;
@@ -298,10 +303,12 @@ async function writeRoundsSlots(
   rounds: readonly RoundKey[],
   slots: string[][],
 ): Promise<{ round: RoundKey; before: string[][] }[]> {
+  // Les seules lignes visées (`setRoundMaps` n'en relit qu'une), pas tout le tournoi.
   const [rows] = await connection.execute<StoredRoundRow[]>(
     `SELECT id, phase_id, bracket, round_number, slots_json, tiebreak_map, map_point_target
-       FROM bg_tournament_round_maps WHERE tournament_id = ?`,
-    [tournamentId],
+       FROM bg_tournament_round_maps
+      WHERE tournament_id = ? AND (phase_id, bracket, round_number) IN (${rounds.map(() => "(?, ?, ?)").join(", ")})`,
+    [tournamentId, ...rounds.flatMap((round) => [round.phaseId, round.bracket, round.roundNumber])],
   );
   const stored = new Map(
     rows.map((row) => [
@@ -336,12 +343,17 @@ async function writeRoundsSlots(
       );
     }
   } else {
-    await connection.execute(
-      `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
-       VALUES ${changed.map(() => "(?, ?, ?, ?, ?)").join(", ")}
-       ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
-      changed.flatMap(({ round }) => [tournamentId, round.phaseId, round.bracket, round.roundNumber, wanted]),
-    );
+    // Par lots bornés ({@link ROUND_MAPS_UPSERT_CHUNK}) : la taille d'une
+    // requête ne dépend plus du seul plafond de `parseRoundKeys`.
+    for (let start = 0; start < changed.length; start += ROUND_MAPS_UPSERT_CHUNK) {
+      const chunk = changed.slice(start, start + ROUND_MAPS_UPSERT_CHUNK);
+      await connection.execute(
+        `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
+         VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+         ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
+        chunk.flatMap(({ round }) => [tournamentId, round.phaseId, round.bracket, round.roundNumber, wanted]),
+      );
+    }
   }
   return changed.map(({ round, before }) => ({ round, before }));
 }
