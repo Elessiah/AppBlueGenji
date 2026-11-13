@@ -220,7 +220,32 @@ describe("shownMatchScore", () => {
 });
 
 describe("roundPointsLocked", () => {
-  const clean = { phaseId: 0, bracket: "UPPER", roundNumber: 2, team1Score: null, team2Score: null, team1Report: null, team2Report: null, maps: [] };
+  const clean = {
+    phaseId: 0,
+    bracket: "UPPER",
+    roundNumber: 2,
+    team1Id: 10,
+    team2Id: 20,
+    team1Score: null,
+    team2Score: null,
+    team1Report: null,
+    team2Report: null,
+    maps: [],
+    lobbyOpenedAt: null,
+    launchedAt: null,
+  };
+
+  it("roundPointsLocked_byeScored_returnsFalse", () => {
+    expect(roundPointsLocked([{ ...clean, team2Id: null, team1Score: 1, team2Score: 0 }], ROUND)).toBe(false);
+  });
+
+  it("roundPointsLocked_lobbyOpened_returnsTrue", () => {
+    expect(roundPointsLocked([{ ...clean, lobbyOpenedAt: "2026-11-13T20:00:00.000Z" }], ROUND)).toBe(true);
+  });
+
+  it("roundPointsLocked_launched_returnsTrue", () => {
+    expect(roundPointsLocked([{ ...clean, launchedAt: "2026-11-13T20:00:00.000Z" }], ROUND)).toBe(true);
+  });
 
   it("roundPointsLocked_noMatches_returnsFalse", () => {
     expect(roundPointsLocked([], ROUND)).toBe(false);

@@ -129,7 +129,7 @@
     "pointsOwn": "Ce tour a ses propres points : premier à {points} (tournoi : {tournament}).",
     "pointsSave": "Enregistrer les points du tour",
     "pointsRemove": "Revenir aux points du tournoi",
-    "pointsLocked": "Un match du tour porte déjà un score : les points sont figés.",
+    "pointsLocked": "Un match du tour porte déjà un score ou a ouvert son lancement : les points sont figés.",
     "pointsSaved": "Points du tour enregistrés.",
     "pointsRemoved": "Le tour suit de nouveau les points du tournoi.",
     "summaryTiebreak": "map de départage",

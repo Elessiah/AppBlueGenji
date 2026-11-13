@@ -894,7 +894,18 @@ describe("briefTiebreakMap", () => {
 
 describe("setRoundPointTarget", () => {
   const DUEL = { ...TOURNAMENT, map_point_target: 5 };
-  const BLANK_MATCH = { id: 1, team1_score: null, team2_score: null, team1_reported_at: null, team2_reported_at: null };
+  const BLANK_MATCH = {
+    id: 1,
+    team1_id: 10,
+    team2_id: 20,
+    is_bye: 0,
+    team1_score: null,
+    team2_score: null,
+    team1_reported_at: null,
+    team2_reported_at: null,
+    lobby_opened_at: null,
+    launched_at: null,
+  };
 
   it("setRoundPointTarget_invalidTarget_throwsWithoutQuery", async () => {
     await expect(setRoundPointTarget(7, ROUND, 0)).rejects.toThrow("INVALID_MAP_POINT_TARGET");
@@ -919,12 +930,12 @@ describe("setRoundPointTarget", () => {
   it("setRoundPointTarget_newTarget_upsertsAndPublishes", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
-      { pattern: /^SELECT id, team1_score/, rows: [BLANK_MATCH] },
+      { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
     ]);
 
     const actual = await setRoundPointTarget(7, ROUND, 3);
 
-    expect(actual).toBe(3);
+    expect(actual).toEqual({ target: 3, before: null, changed: true });
     expect(connection.execute.mock.calls[0][0]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 FOR UPDATE/);
     const [insert] = writes(/INSERT INTO bg_tournament_round_maps/);
     expect(insert[0]).toMatch(/ON DUPLICATE KEY UPDATE map_point_target = VALUES\(map_point_target\)/);
@@ -935,7 +946,7 @@ describe("setRoundPointTarget", () => {
   it("setRoundPointTarget_scoredRound_throwsLockedWithoutWrite", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
-      { pattern: /^SELECT id, team1_score/, rows: [{ ...BLANK_MATCH, team1_reported_at: new Date() }] },
+      { pattern: /^SELECT id, team1_id/, rows: [{ ...BLANK_MATCH, team1_reported_at: new Date() }] },
     ]);
 
     await expect(setRoundPointTarget(7, ROUND, 3)).rejects.toThrow("MAP_POINTS_LOCKED");
@@ -951,8 +962,9 @@ describe("setRoundPointTarget", () => {
       { pattern: /SELECT map_point_target FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] },
     ]);
 
-    await setRoundPointTarget(7, ROUND, 3);
+    const actual = await setRoundPointTarget(7, ROUND, 3);
 
+    expect(actual).toEqual({ target: 3, before: 3, changed: false });
     expect(writes(/^\s*(INSERT|UPDATE|DELETE)/)).toHaveLength(0);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
@@ -963,7 +975,7 @@ describe("setRoundPointTarget", () => {
       { pattern: /SELECT map_point_target FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] },
     ]);
 
-    await expect(setRoundPointTarget(7, ROUND, null)).resolves.toBeNull();
+    await expect(setRoundPointTarget(7, ROUND, null)).resolves.toEqual({ target: null, before: 3, changed: true });
 
     expect(writes(/UPDATE bg_tournament_round_maps SET map_point_target = NULL/)).toHaveLength(1);
     const [remove] = writes(/DELETE FROM bg_tournament_round_maps/);
@@ -977,14 +989,68 @@ describe("setRoundPointTarget", () => {
       { pattern: /SELECT map_point_target FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] },
     ]);
 
-    await expect(setRoundPointTarget(7, ROUND, null)).resolves.toBeNull();
+    await expect(setRoundPointTarget(7, ROUND, null)).resolves.toEqual({ target: null, before: 3, changed: true });
 
     expect(writes(/UPDATE bg_tournament_round_maps SET map_point_target = NULL/)).toHaveLength(1);
+  });
+
+  it("setRoundPointTarget_nullWhileFormatOffOnScoredRound_clearsWithoutLock", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, map_point_target: null }] },
+      { pattern: /SELECT map_point_target FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] },
+      { pattern: /^SELECT id, team1_id/, rows: [{ ...BLANK_MATCH, team1_score: 2, team2_score: 0 }] },
+    ]);
+
+    await expect(setRoundPointTarget(7, ROUND, null)).resolves.toEqual({ target: null, before: 3, changed: true });
+
+    expect(writes(/^SELECT id, team1_id/)).toHaveLength(0);
+    expect(writes(/UPDATE bg_tournament_round_maps SET map_point_target = NULL/)).toHaveLength(1);
+  });
+
+  it("setRoundPointTarget_finishedTournament_throwsMapPointsFinished", async () => {
+    route(connection.execute, [{ pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...DUEL, state: "FINISHED" }] }]);
+
+    await expect(setRoundPointTarget(7, ROUND, 3)).rejects.toThrow("MAP_POINTS_FINISHED");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
+  it("setRoundPointTarget_byeOnlyScoredRound_upserts", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
+      { pattern: /^SELECT id, team1_id/, rows: [{ ...BLANK_MATCH, team2_id: null, is_bye: 1, team1_score: 1, team2_score: 0 }] },
+    ]);
+
+    await setRoundPointTarget(7, ROUND, 3);
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(1);
+  });
+
+  it("setRoundPointTarget_launchedMatchInRound_throwsLocked", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
+      { pattern: /^SELECT id, team1_id/, rows: [{ ...BLANK_MATCH, launched_at: new Date() }] },
+    ]);
+
+    await expect(setRoundPointTarget(7, ROUND, 3)).rejects.toThrow("MAP_POINTS_LOCKED");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
   });
 });
 
 describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
-  const BLANK_MATCH = { id: 1, team1_score: null, team2_score: null, team1_reported_at: null, team2_reported_at: null };
+  const BLANK_MATCH = {
+    id: 1,
+    team1_id: 10,
+    team2_id: 20,
+    is_bye: 0,
+    team1_score: null,
+    team2_score: null,
+    team1_reported_at: null,
+    team2_reported_at: null,
+    lobby_opened_at: null,
+    launched_at: null,
+  };
 
   it("setRoundPointTarget_lowerBracketOnSingle_throwsInvalidRound", async () => {
     route(connection.execute, [{ pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, map_point_target: 5 }] }]);
@@ -1007,7 +1073,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
       { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "DOUBLE" }] },
-      { pattern: /^SELECT id, team1_score/, rows: [BLANK_MATCH] },
+      { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
     ]);
 
     await setRoundPointTarget(7, { phaseId: 4, bracket: "LOWER", roundNumber: 1 }, 3);
@@ -1029,7 +1095,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_singleWithThirdPlaceMatch_thirdPlaceUpserts", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "SINGLE", has_third_place_match: 1, map_point_target: 5 }] },
-      { pattern: /^SELECT id, team1_score/, rows: [BLANK_MATCH] },
+      { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
     ]);
 
     await setRoundPointTarget(7, { phaseId: 0, bracket: "THIRD_PLACE", roundNumber: 1 }, 3);
@@ -1049,13 +1115,48 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_newTarget_queuesPointsNotice", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, map_point_target: 5 }] },
-      { pattern: /^SELECT id, team1_score/, rows: [BLANK_MATCH] },
+      { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
     ]);
 
     await setRoundPointTarget(7, ROUND, 3);
 
     const [pending] = writes(/UPDATE bg_round_maps_notices SET rounds_json/);
     expect(JSON.parse(String((pending[1] as unknown[])[0]))).toEqual([{ ...ROUND, points: true, before: roundMapsFingerprint(null) }]);
+  });
+});
+
+describe("setRoundPointTarget — tours d'un arbre créé", () => {
+  const DUEL = { ...TOURNAMENT, map_point_target: 5 };
+
+  it("setRoundPointTarget_singleBracketBuiltRoundBeyondLast_throwsInvalidRound", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
+      { pattern: /SELECT MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ max_round: 3 }] },
+    ]);
+
+    await expect(setRoundPointTarget(7, { phaseId: 0, bracket: "UPPER", roundNumber: 1999 }, 9)).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
+  it("setRoundPointTarget_singleBracketNotBuilt_upserts", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
+      { pattern: /SELECT MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ max_round: null }] },
+    ]);
+
+    await setRoundPointTarget(7, { phaseId: 0, bracket: "UPPER", roundNumber: 4 }, 9);
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(1);
+  });
+
+  it("setRoundPointTarget_swissRoundNotYetCreated_upsertsWithoutBoundQuery", async () => {
+    route(connection.execute, [{ pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...DUEL, format: "SWISS" }] }]);
+
+    await setRoundPointTarget(7, { phaseId: 0, bracket: "UPPER", roundNumber: 6 }, 9);
+
+    expect(writes(/SELECT MAX\(round_number\)/)).toHaveLength(0);
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(1);
   });
 });
 

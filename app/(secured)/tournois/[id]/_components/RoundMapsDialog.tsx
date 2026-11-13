@@ -535,6 +535,7 @@ const POINTS_FIELD_ERRORS = {
   INVALID_MAP_POINT_TARGET: "points",
   MAP_POINTS_LOCKED: "points",
   MAP_POINTS_DISABLED: "points",
+  MAP_POINTS_FINISHED: "points",
 } as const satisfies Record<string, "points">;
 
 /**

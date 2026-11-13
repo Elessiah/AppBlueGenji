@@ -129,7 +129,7 @@
     "pointsOwn": "This round has its own points: first to {points} (tournament: {tournament}).",
     "pointsSave": "Save the round's points",
     "pointsRemove": "Back to the tournament's points",
-    "pointsLocked": "A match in this round already has a score: the points are locked.",
+    "pointsLocked": "A match in this round already has a score or has opened its launch: the points are locked.",
     "pointsSaved": "Round points saved.",
     "pointsRemoved": "The round follows the tournament's points again.",
     "summaryTiebreak": "tiebreak map",

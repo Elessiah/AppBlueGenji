@@ -45,9 +45,23 @@ Duels 1v1 en arcade (Widowmaker, « premier à 5 ») : chaque carte se gagne au
 ### Verrou
 
 Changer N (tournoi ou tour) est refusé (`MAP_POINTS_LOCKED`, 409) dès qu'un
-match concerné porte un score, une proposition ou des cartes saisies
-(`assertMapPointsUnlocked`, sous le verrou du tournoi puis des matchs, requêtes
-sans jointure — MariaDB).
+match **jouable** concerné porte un score, une proposition ou des cartes
+saisies, ou a ouvert son lancement (`lobby_opened_at` / `launched_at` : les
+équipes jouent la règle que le brief leur a annoncée) —
+`assertMapPointsUnlocked`, sous le verrou du tournoi puis des matchs, cartes
+relues en `LOCK IN SHARE MODE`, requêtes sans jointure (MariaDB). Une exemption
+(`is_bye`, place vide) ou un match fantôme, clos d'office par le moteur, ne fige
+rien. L'écran grise le champ par la même règle (`roundPointsLocked`).
+
+Poser les points d'un tour exige un tournoi pas encore terminé
+(`MAP_POINTS_FINISHED`, 409) et, en élimination (simple ou double, phase MULTI
+comprise) une fois l'arbre créé, un tour qui en fait partie (`INVALID_ROUND`) ;
+avant la création de l'arbre, ou en ronde suisse / Survie, le numéro n'est borné
+que par `parseRoundKey` (1–2000). Format éteint sur le tournoi, retirer un
+réglage resté (sans effet) se fait sans condition de score. Un changement réel
+part au journal Discord du staff, anonyme et regroupé avec les cartes
+(`round-maps-notice`), et nomme son auteur dans pm2 seulement
+(`auditStaffAction`, ligne `[staff-audit]`).
 
 Les saisies lisent le réglage du tour en **lecture verrouillante**
 (`loadMatchPointTarget`, `LOCK IN SHARE MODE`) : un report qui attendait le
@@ -62,7 +76,9 @@ matchs) est rejoué par `retryOnDeadlock`.
 |---|---|---|
 | `INVALID_MAP_POINT_TARGET` | 400 | N hors 1–99 ou corps sans `target` |
 | `MAP_POINTS_DISABLED` | 400 | points de tour alors que le format est éteint sur le tournoi |
-| `MAP_POINTS_LOCKED` | 409 | un match concerné porte déjà un score |
+| `MAP_POINTS_LOCKED` | 409 | un match jouable concerné porte déjà un score ou a ouvert son lancement |
+| `MAP_POINTS_FINISHED` | 409 | points de tour posés sur un tournoi terminé |
+| `INVALID_ROUND` | 400 | tour hors du tournoi (phase, tableau, ou tour absent d'un arbre créé) |
 | `MAP_POINTS_INVALID` | 400 | carte qui ne respecte pas « premier à N » |
 
 ## Contrôle des scores

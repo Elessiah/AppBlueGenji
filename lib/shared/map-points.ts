@@ -159,21 +159,26 @@ export function shownMatchScore(match: {
 }
 
 /**
- * Un match du tour porte-t-il déjà un score (retenu, proposé ou en cartes) ?
- * Lecture **de l'écran** du verrou `MAP_POINTS_LOCKED` du serveur
- * (`assertMapPointsUnlocked`) : elle grise le champ avant l'envoi, le serveur
- * reste seul juge.
+ * Un match jouable du tour porte-t-il déjà un score (retenu, proposé ou en
+ * cartes) ou a-t-il ouvert son lancement ? Lecture **de l'écran** du verrou
+ * `MAP_POINTS_LOCKED` du serveur (`assertMapPointsUnlocked`) : elle grise le
+ * champ avant l'envoi, le serveur reste seul juge. Une exemption ou un match
+ * fantôme (place vide), clos d'office, ne fige rien.
  */
 export function roundPointsLocked(
   matches: ReadonlyArray<{
     phaseId: number;
     bracket: string;
     roundNumber: number;
+    team1Id: number | null;
+    team2Id: number | null;
     team1Score: number | null;
     team2Score: number | null;
     team1Report: unknown;
     team2Report: unknown;
     maps: ReadonlyArray<unknown>;
+    lobbyOpenedAt: string | null;
+    launchedAt: string | null;
   }>,
   round: RoundKey,
 ): boolean {
@@ -182,10 +187,14 @@ export function roundPointsLocked(
       match.phaseId === round.phaseId &&
       match.bracket === round.bracket &&
       match.roundNumber === round.roundNumber &&
+      match.team1Id !== null &&
+      match.team2Id !== null &&
       (match.team1Score !== null ||
         match.team2Score !== null ||
         Boolean(match.team1Report) ||
         Boolean(match.team2Report) ||
-        match.maps.length > 0),
+        match.maps.length > 0 ||
+        match.lobbyOpenedAt !== null ||
+        match.launchedAt !== null),
   );
 }

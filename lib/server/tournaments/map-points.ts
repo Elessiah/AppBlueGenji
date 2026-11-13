@@ -54,15 +54,21 @@ export async function loadMatchPointTarget(
 
 /**
  * Refuse (`MAP_POINTS_LOCKED`) de changer les points par carte quand un match
- * concerné porte déjà un score — score retenu, proposition d'engagé ou cartes
- * saisies (`bg_match_maps`, arbitrage compris) : la règle changerait sous un
- * score déjà jugé par l'ancienne. Concerné : les matchs de la manche `round`,
- * ou de tout le tournoi sans manche.
+ * concerné est **jouable** et porte déjà un score — score retenu, proposition
+ * d'engagé ou cartes saisies (`bg_match_maps`, arbitrage compris) — ou a déjà
+ * ouvert son lancement (`lobby_opened_at` / `launched_at`) : la règle
+ * changerait sous un score déjà jugé par l'ancienne, ou sous un match que les
+ * équipes jouent avec la règle annoncée (brief du salon). Concerné : les
+ * matchs de la manche `round`, ou de tout le tournoi sans manche. Une
+ * exemption (`is_bye`, place vide) ou un match fantôme (deux places vides),
+ * clos d'office par le moteur, ne fige rien : personne n'y marque de point.
  *
  * À appeler **sous le verrou du tournoi** (`FOR UPDATE`, première
  * instruction). Les matchs concernés sont verrouillés à leur tour — ordre
  * tournoi puis matchs, celui du moteur — pour qu'un report en cours sur l'un
- * d'eux soit attendu puis vu, plutôt que manqué. Requêtes sans jointure
+ * d'eux soit attendu puis vu, plutôt que manqué ; les cartes se relisent en
+ * lecture verrouillante (`LOCK IN SHARE MODE`), qui voit la dernière écriture
+ * commitée plutôt que l'image figée de la transaction. Requêtes sans jointure
  * (MariaDB, `CLAUDE.md`).
  */
 export async function assertMapPointsUnlocked(
@@ -76,27 +82,38 @@ export async function assertMapPointsUnlocked(
   const [matches] = await connection.execute<
     (RowDataPacket & {
       id: number;
+      team1_id: number | null;
+      team2_id: number | null;
+      is_bye: number | boolean | null;
       team1_score: number | null;
       team2_score: number | null;
       team1_reported_at: Date | null;
       team2_reported_at: Date | null;
+      lobby_opened_at: Date | null;
+      launched_at: Date | null;
     })[]
   >(
-    `SELECT id, team1_score, team2_score, team1_reported_at, team2_reported_at FROM bg_matches
+    `SELECT id, team1_id, team2_id, is_bye, team1_score, team2_score, team1_reported_at, team2_reported_at,
+            lobby_opened_at, launched_at
+       FROM bg_matches
       WHERE tournament_id = ?${scope.sql} FOR UPDATE`,
     [tournamentId, ...scope.params],
   );
-  if (matches.length === 0) return;
-  const scored = (match: (typeof matches)[number]) =>
+  const playable = matches.filter(
+    (match) => match.team1_id !== null && match.team2_id !== null && !Number(match.is_bye ?? 0),
+  );
+  if (playable.length === 0) return;
+  const locked = (match: (typeof playable)[number]) =>
     match.team1_score !== null || match.team2_score !== null
-    || match.team1_reported_at !== null || match.team2_reported_at !== null;
-  if (matches.some(scored)) {
+    || match.team1_reported_at !== null || match.team2_reported_at !== null
+    || match.lobby_opened_at !== null || match.launched_at !== null;
+  if (playable.some(locked)) {
     throw new Error("MAP_POINTS_LOCKED");
   }
+  const ids = playable.map((match) => Number(match.id));
   const [maps] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps
-      WHERE match_id IN (SELECT id FROM bg_matches WHERE tournament_id = ?${scope.sql}) LIMIT 1`,
-    [tournamentId, ...scope.params],
+    `SELECT 1 FROM bg_match_maps WHERE match_id IN (${ids.map(() => "?").join(", ")}) LIMIT 1 LOCK IN SHARE MODE`,
+    ids,
   );
   if (maps.length > 0) throw new Error("MAP_POINTS_LOCKED");
 }

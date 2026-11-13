@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
+jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/tournaments/round-maps", () => {
   const actual = jest.requireActual<typeof import("@/lib/server/tournaments/round-maps")>(
     "@/lib/server/tournaments/round-maps",
@@ -11,6 +12,7 @@ jest.mock("@/lib/server/tournaments/round-maps", () => {
 import { PUT } from "@/app/api/admin/tournaments/[id]/round-points/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { setRoundPointTarget } from "@/lib/server/tournaments/round-maps";
+import { auditStaffAction } from "@/lib/server/staff-audit";
 import { authUser } from "../../helpers/auth-user";
 
 /**
@@ -128,7 +130,7 @@ describe("PUT /api/admin/tournaments/[id]/round-points", () => {
 
   it("put_validTarget_returnsStoredTarget", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundPointTarget).mockResolvedValue(3);
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 3, before: null, changed: true });
 
     const actual = await PUT(put({ ...ROUND, target: 3 }), tournament("7"));
 
@@ -139,11 +141,44 @@ describe("PUT /api/admin/tournaments/[id]/round-points", () => {
 
   it("put_nullTarget_passesNullToClearTheOverride", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundPointTarget).mockResolvedValue(null);
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: null, before: 3, changed: true });
 
     const actual = await PUT(put({ ...ROUND, target: null }), tournament("7"));
 
     expect(actual.status).toBe(200);
     expect(setRoundPointTarget).toHaveBeenCalledWith(7, ROUND, null);
+  });
+
+  it("put_changed_auditsTheStaffMemberInPm2", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 7, before: null, changed: true });
+
+    await PUT(put({ ...ROUND, target: 7 }), tournament("7"));
+
+    expect(auditStaffAction).toHaveBeenCalledWith(
+      "🎯 Points par carte du tournoi #7, phase 0 UPPER tour 2 : points du tournoi → 7",
+      { id: arbitre.id, pseudo: arbitre.pseudo },
+    );
+  });
+
+  it("put_unchanged_writesNoAudit", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundPointTarget).mockResolvedValue({ target: 3, before: 3, changed: false });
+
+    const actual = await PUT(put({ ...ROUND, target: 3 }), tournament("7"));
+
+    expect(actual.status).toBe(200);
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("put_finishedTournament_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundPointTarget).mockRejectedValue(new Error("MAP_POINTS_FINISHED"));
+
+    const actual = await PUT(put({ ...ROUND, target: 3 }), tournament("7"));
+
+    expect(actual.status).toBe(409);
+    await expect(actual.json()).resolves.toEqual({ error: "MAP_POINTS_FINISHED" });
+    expect(auditStaffAction).not.toHaveBeenCalled();
   });
 });
