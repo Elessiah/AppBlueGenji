@@ -54,6 +54,20 @@ const MATCH = {
   map_picks: null,
 };
 
+/** Ligne de `bg_tournament_round_maps` telle que la relit l'écriture groupée des cartes. */
+function storedRound(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 1,
+    phase_id: 0,
+    bracket: "UPPER",
+    round_number: 2,
+    slots_json: "[]",
+    tiebreak_map: null,
+    map_point_target: null,
+    ...overrides,
+  };
+}
+
 const BO3_ROW = {
   format: "SINGLE",
   match_format_type: "BO",
@@ -211,7 +225,7 @@ describe("setRoundMaps", () => {
   it("une liste vide retire le réglage", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
-      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, slots_json: '[["Ilios"]]' }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [storedRound({ slots_json: '[["Ilios"]]' })] },
     ]);
     await expect(setRoundMaps(7, ROUND, [])).resolves.toEqual([]);
     expect(writes(/DELETE FROM bg_tournament_round_maps/)).toHaveLength(1);
@@ -222,7 +236,7 @@ describe("setRoundMaps", () => {
   it("un réglage inchangé n'écrit ni ne publie rien", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
-      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, slots_json: '[["Ilios"]]' }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [storedRound({ slots_json: '[["Ilios"]]' })] },
     ]);
     await setRoundMaps(7, ROUND, [["Ilios"]]);
     expect(writes(/^\s*(INSERT|DELETE)/)).toHaveLength(0);
@@ -286,9 +300,10 @@ describe("setRoundsMaps", () => {
     await expect(setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]])).resolves.toEqual({ slots: [["Ilios"]], skipped: 0 });
     expect(connection.execute.mock.calls[0][0]).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
     expect(writes(/FROM bg_tournaments/)).toHaveLength(1);
+    // Une lecture et une écriture pour toute la série, jamais une par tour.
+    expect(writes(/SELECT[\s\S]*FROM bg_tournament_round_maps/)).toHaveLength(1);
     expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([
-      [7, 0, "UPPER", 2, '[["Ilios"]]'],
-      [7, 0, "UPPER", 3, '[["Ilios"]]'],
+      [7, 0, "UPPER", 2, '[["Ilios"]]', 7, 0, "UPPER", 3, '[["Ilios"]]'],
     ]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(sendBotLog).not.toHaveBeenCalled();
@@ -299,10 +314,67 @@ describe("setRoundsMaps", () => {
     ]);
   });
 
+  it("setRoundsMaps_onlySomeRoundsChange_writesTheChangedOnes", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [storedRound({ slots_json: '[["Ilios"]]' })] },
+    ]);
+    await setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]]);
+    expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([
+      [7, 0, "UPPER", 3, '[["Ilios"]]'],
+    ]);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("setRoundsMaps_clearSeveralRounds_deletesBareRowsAndEmptiesKeptOnesInOneStatementEach", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      {
+        pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/,
+        rows: [
+          storedRound({ id: 11, slots_json: '[["Ilios"]]' }),
+          storedRound({ id: 12, round_number: 3, slots_json: '[["Ilios"]]', tiebreak_map: "Busan" }),
+          storedRound({ id: 13, round_number: 4, slots_json: '[["Ilios"]]', map_point_target: 5 }),
+        ],
+      },
+    ]);
+    await setRoundsMaps(7, [ROUND, ROUND_3, { ...ROUND, roundNumber: 4 }, { ...ROUND, roundNumber: 5 }], []);
+    expect(writes(/DELETE FROM bg_tournament_round_maps/).map(([, params]) => params)).toEqual([[7, 11]]);
+    expect(writes(/UPDATE bg_tournament_round_maps SET slots_json = '\[\]'/).map(([, params]) => params)).toEqual([
+      [7, 12, 13],
+    ]);
+  });
+
+  it("setRoundsMaps_lowerBracketOnSingleElimination_skippedNotWritten", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+    const result = await setRoundsMaps(7, [ROUND, { phaseId: 0, bracket: "GRAND", roundNumber: 1500 }], [["Ilios"]]);
+    expect(result.skipped).toBe(1);
+    expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([
+      [7, 0, "UPPER", 2, '[["Ilios"]]'],
+    ]);
+  });
+
+  it("setRoundsMaps_roundBeyondBuiltBracket_skipped", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ phase_id: 0, bracket: "UPPER", max_round: 3 }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+    const result = await setRoundsMaps(7, [ROUND, { ...ROUND, roundNumber: 9 }], [["Ilios"]]);
+    expect(result.skipped).toBe(1);
+    expect(writes(/MAX\(round_number\)/)).toHaveLength(1);
+  });
+
   it("setRoundsMaps_everyRoundUnchanged_publishesNothing", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
-      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, slots_json: '[["Ilios"]]' }] },
+      {
+        pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/,
+        rows: [storedRound({ slots_json: '[["Ilios"]]' }), storedRound({ id: 2, round_number: 3, slots_json: '[["Ilios"]]' })],
+      },
     ]);
     await setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]]);
     expect(writes(/^\s*(INSERT|DELETE)/)).toHaveLength(0);
@@ -378,7 +450,7 @@ describe("setRoundsMaps", () => {
   it("setRoundsMaps_clearOrphanRound_deletesWithoutPhaseCheck", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
-      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, phaseId: 4, slots_json: '[["Ilios"]]' }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [storedRound({ phase_id: 4, slots_json: '[["Ilios"]]' })] },
     ]);
 
     await setRoundsMaps(7, [{ ...ROUND, phaseId: 4 }], []);
@@ -742,6 +814,29 @@ describe("setRoundTiebreak", () => {
     ]);
   });
 
+  it("setRoundTiebreak_grandFinalOnSingleElimination_throwsInvalidRoundWithoutWriting", async () => {
+    route(connection.execute, [
+      { pattern: /FOR UPDATE/, rows: [TOURNAMENT] },
+      { pattern: /SELECT format, match_format_type/, rows: [BO3_ROW] },
+    ]);
+
+    await expect(setRoundTiebreak(7, { phaseId: 0, bracket: "GRAND", roundNumber: 1500 }, "Busan")).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
+  it("setRoundTiebreak_roundBeyondBuiltBracket_throwsInvalidRound", async () => {
+    route(connection.execute, [
+      { pattern: /FOR UPDATE/, rows: [TOURNAMENT] },
+      { pattern: /MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ phase_id: 0, bracket: "UPPER", max_round: 3 }] },
+      { pattern: /SELECT format, match_format_type/, rows: [BO3_ROW] },
+    ]);
+
+    await expect(setRoundTiebreak(7, { ...ROUND, roundNumber: 4 }, "Busan")).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)).toHaveLength(0);
+  });
+
   it("setRoundTiebreak_locksTournamentFirst", async () => {
     route(connection.execute, [
       { pattern: /FOR UPDATE/, rows: [TOURNAMENT] },
@@ -827,14 +922,25 @@ describe("setRoundMaps — ligne qui porte une map de départage", () => {
   it("setRoundMaps_emptySlots_keepsRowWithTiebreak", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
-      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, slots_json: '[["Ilios"]]' }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [storedRound({ slots_json: '[["Ilios"]]', tiebreak_map: "Busan" })] },
     ]);
 
     await setRoundMaps(7, ROUND, []);
 
-    const [remove] = writes(/DELETE FROM bg_tournament_round_maps/);
-    expect(remove[0]).toMatch(/AND tiebreak_map IS NULL/);
-    expect(writes(/UPDATE bg_tournament_round_maps SET slots_json = '\[\]'/)).toHaveLength(1);
+    expect(writes(/DELETE FROM bg_tournament_round_maps/)).toHaveLength(0);
+    expect(writes(/UPDATE bg_tournament_round_maps SET slots_json = '\[\]'/).map(([, params]) => params)).toEqual([[7, 1]]);
+  });
+
+  it("setRoundMaps_emptySlotsOnBareRow_deletesItWithoutUpdate", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [storedRound({ slots_json: '[["Ilios"]]' })] },
+    ]);
+
+    await setRoundMaps(7, ROUND, []);
+
+    expect(writes(/DELETE FROM bg_tournament_round_maps/).map(([, params]) => params)).toEqual([[7, 1]]);
+    expect(writes(/UPDATE bg_tournament_round_maps SET slots_json/)).toHaveLength(0);
   });
 });
 
@@ -1063,7 +1169,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_multiSwissPhaseLower_throwsInvalidRound", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
-      { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "SWISS" }] },
+      { pattern: /has_third_place_match FROM bg_tournament_phases/, rows: [{ id: 4, format: "SWISS" }] },
     ]);
 
     await expect(setRoundPointTarget(7, { phaseId: 4, bracket: "LOWER", roundNumber: 1 }, 3)).rejects.toThrow("INVALID_ROUND");
@@ -1072,7 +1178,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_multiDoublePhaseLower_upserts", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
-      { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "DOUBLE" }] },
+      { pattern: /has_third_place_match FROM bg_tournament_phases/, rows: [{ id: 4, format: "DOUBLE" }] },
       { pattern: /^SELECT id, team1_id/, rows: [BLANK_MATCH] },
     ]);
 
@@ -1106,7 +1212,7 @@ describe("setRoundPointTarget — tour que le tournoi peut jouer", () => {
   it("setRoundPointTarget_multiSinglePhaseWithoutThirdPlace_throwsInvalidRound", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [{ ...TOURNAMENT, format: "MULTI", map_point_target: 5 }] },
-      { pattern: /SELECT format, has_third_place_match FROM bg_tournament_phases/, rows: [{ format: "SINGLE", has_third_place_match: 0 }] },
+      { pattern: /has_third_place_match FROM bg_tournament_phases/, rows: [{ id: 4, format: "SINGLE", has_third_place_match: 0 }] },
     ]);
 
     await expect(setRoundPointTarget(7, { phaseId: 4, bracket: "THIRD_PLACE", roundNumber: 1 }, 3)).rejects.toThrow("INVALID_ROUND");
@@ -1131,7 +1237,7 @@ describe("setRoundPointTarget — tours d'un arbre créé", () => {
   it("setRoundPointTarget_singleBracketBuiltRoundBeyondLast_throwsInvalidRound", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
-      { pattern: /SELECT MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ max_round: 3 }] },
+      { pattern: /MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ phase_id: 0, bracket: "UPPER", max_round: 3 }] },
     ]);
 
     await expect(setRoundPointTarget(7, { phaseId: 0, bracket: "UPPER", roundNumber: 1999 }, 9)).rejects.toThrow("INVALID_ROUND");
@@ -1142,7 +1248,7 @@ describe("setRoundPointTarget — tours d'un arbre créé", () => {
   it("setRoundPointTarget_singleBracketNotBuilt_upserts", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments WHERE id/, rows: [DUEL] },
-      { pattern: /SELECT MAX\(round_number\) AS max_round FROM bg_matches/, rows: [{ max_round: null }] },
+      { pattern: /MAX\(round_number\) AS max_round FROM bg_matches/, rows: [] },
     ]);
 
     await setRoundPointTarget(7, { phaseId: 0, bracket: "UPPER", roundNumber: 4 }, 9);
