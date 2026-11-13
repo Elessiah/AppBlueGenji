@@ -17,6 +17,7 @@
  */
 import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { createCoalescer } from "@/lib/server/coalescer";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatRefereeChangeLog, type RefereeLogChange } from "@/lib/shared/bot-logs";
@@ -233,14 +234,51 @@ export function announceRefereeChange(change: RefereeChange, options: RefereeAnn
  * simultanées. Ne lève jamais.
  */
 export function announceRefereeChanges(changes: readonly RefereeChange[], options: RefereeAnnounceOptions = {}): void {
-  if (changes.length === 0) return;
+  // Choix de carte dans le pool : regroupés par match (`mapPickBursts`), une
+  // ligne au journal pour la rafale, à l'état final.
+  const immediate = changes.filter((change) => {
+    if (change.kind !== "MAP_PICK" || options.log === false) return true;
+    mapPickBursts.add(String(change.matchId), change);
+    return false;
+  });
+  if (immediate.length === 0) return;
   void (async () => {
-    for (const change of changes) {
+    for (const change of immediate) {
       await deliverRefereeChange(change, options).catch((error) =>
         console.error("[referee] changement d'arbitrage non annoncé", error),
       );
     }
   })();
+}
+
+/** Silence après lequel la rafale de choix de cartes d'un match part au journal. */
+export const MAP_PICK_LOG_WINDOW_MS = 60_000;
+/** Au plus tard, une rafale ouverte part ce délai après son premier choix. */
+export const MAP_PICK_LOG_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * Choix de cartes d'un même match (`pickMatchMap`) : chaque bascule carte/vide
+ * écrivait sa ligne au journal du staff, jusqu'au plafond de la route
+ * (`MAP_PICK_WRITE_RULE`). Une rafale n'en écrit plus qu'**une**, à l'état
+ * final (dernier choix : posé ou retiré, par l'arbitrage ou une équipe) — même
+ * principe que les bascules d'un caster (`cast-notices.ts`). Aucun avis n'en
+ * dépend (`refereeReleaseNotice` : aucun). L'arrêt du serveur annonce les
+ * rafales en attente (`flushAllCoalescers`).
+ */
+const mapPickBursts = createCoalescer<RefereeChange>({
+  windowMs: MAP_PICK_LOG_WINDOW_MS,
+  maxAgeMs: MAP_PICK_LOG_MAX_AGE_MS,
+  deliver: (_first, last) => deliverRefereeChange(last),
+});
+
+/** Annonce tout de suite les rafales de choix de cartes. Réservé aux tests. */
+export function flushMapPickLogs(): Promise<void> {
+  return mapPickBursts.flushAll();
+}
+
+/** Abandonne les rafales de choix de cartes. Réservé aux tests. */
+export function resetMapPickLogs(): void {
+  mapPickBursts.reset();
 }
 
 /** Changements constatés au fond d'une transaction, annoncés après son commit (`./cast-notices`, même cycle). */

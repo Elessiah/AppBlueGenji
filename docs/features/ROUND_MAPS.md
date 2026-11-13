@@ -291,6 +291,9 @@ au pool.
   qu'il en reste : elles peuvent être celles d'un autre membre du staff.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
+  Les choix dans le pool d'un même match se regroupent (`mapPickBursts`,
+  `MAP_PICK_LOG_WINDOW_MS` = 60 s de silence, 5 min au plus) : **une** ligne
+  par rafale, à l'état final, au lieu d'une par bascule carte/vide.
 - Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche
   est réglée, ordre des bans de la carte 1, règle des cartes suivantes. Le bloc
   des cartes est coupé à un créneau entier au-delà de `MAPS_LINE_MAX` (420
