@@ -12,7 +12,7 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { cached } from "@/lib/server/cache";
-import { withConnection } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import {
   allPartiesReady,
@@ -66,6 +66,7 @@ import {
   type MatchStreamRow,
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { releaseWithServerLockWait, withShortLockWait } from "./lock-wait";
 import { lockTournamentRow, lockTournamentRowShared } from "./registration";
 import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { activeMemberSql } from "./match-players";
@@ -1925,18 +1926,24 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
   // écritures d'arbitrage qui prennent le match puis le tournoi. **Une**
   // connexion par essai : la lecture du tournoi du match se fait avant la
   // transaction (lecture autonome, aucune image figée avant le verrou), sur
-  // la connexion qui la porte ensuite.
-  const tournamentId = await retryOnDeadlock(() =>
-    withConnection(async (connection) => {
+  // la connexion qui la porte ensuite. Prise ici (pas `withConnection`) :
+  // rendue par `releaseWithServerLockWait`, jamais au pool sous le délai de
+  // verrou court.
+  const tournamentId = await retryOnDeadlock(async () => {
+    const connection = await (await getDatabase()).getConnection();
+    try {
       const [pre] = await connection.execute<FirstMapRow[]>(FIRST_MAP_SELECT, [matchId]);
       assertFirstMapSettable(pre[0]);
       const ownerId = Number(pre[0].tournament_id);
-      return transact(connection, async () => {
+      // `await` : le `finally` ne rend la connexion qu'une fois la transaction close.
+      return await transact(connection, async () => {
         // Verrou **partagé** du tournoi, comme un choix dans le pool
         // (`pickMatchMap`) : il attend un remplacement des cartes du tour
         // (verrou exclusif) sans mettre en file les premières cartes des
-        // autres matchs.
-        await lockTournamentRowShared(connection, ownerId);
+        // autres matchs. Attente bornée (`withShortLockWait`) : passé le délai
+        // court, `ER_LOCK_WAIT_TIMEOUT` rend 409 `CONCURRENT_UPDATE_RETRY`
+        // au lieu de garder la connexion jusqu'à `innodb_lock_wait_timeout`.
+        await withShortLockWait(connection, () => lockTournamentRowShared(connection, ownerId));
         const [rows] = await connection.execute<FirstMapRow[]>(`${FIRST_MAP_SELECT} FOR UPDATE`, [matchId]);
         const row = rows[0];
         assertFirstMapSettable(row);
@@ -1951,8 +1958,10 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
         queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: typed !== null });
         return ownerId;
       });
-    }),
-  );
+    } finally {
+      await releaseWithServerLockWait(connection);
+    }
+  });
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 
@@ -2071,13 +2080,18 @@ export async function releaseObjectingReferee(
       // Relue sous le verrou du match : levée entre-temps, l'opposition ne
       // retire plus rien.
       if (!(await refereeObjectionUpheld(connection, refereeId, true))) return null;
+      // État du tournoi en lecture **partagée** (une table, sans jointure —
+      // règle MariaDB) : un passage RUNNING → FINISHED (verrou exclusif)
+      // attend ce retrait, et le lancement qu'il déclenche ne se décide pas
+      // sur un état périmé. Tournoi disparu : rien n'est retiré ni compté.
       const [tournament] = await connection.execute<(RowDataPacket & { state: string })[]>(
-        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
         [row.tournament_id],
       );
+      if (!tournament[0]) return null;
       await clearMatchReferee(
         connection,
-        { tournament_state: tournament[0]?.state ?? "" },
+        { tournament_state: tournament[0].state },
         matchId,
         undecided ? launched : undefined,
       );

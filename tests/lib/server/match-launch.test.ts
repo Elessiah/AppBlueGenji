@@ -8,7 +8,7 @@ jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import type { PoolConnection } from "mysql2/promise";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
-import { withConnection } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { invalidateCachedPrefix } from "@/lib/server/cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import {
@@ -42,7 +42,7 @@ import {
   setRoundSelfManaged,
   takeMatchReferee,
 } from "@/lib/server/tournaments/match-launch";
-import { fakeConnection } from "../../helpers/sql-double";
+import { fakeConnection, fakePool } from "../../helpers/sql-double";
 
 /**
  * Service du lancement d'un match, contre une connexion **à état** : les
@@ -477,10 +477,18 @@ function executeFor(state: World) {
 function connectionFor(state: World): PoolConnection {
   return fakeConnection({
     execute: executeFor(state),
+    query: async () => [[], []],
     beginTransaction: async () => undefined,
     commit: async () => undefined,
     rollback: async () => undefined,
+    release: () => undefined,
+    destroy: () => undefined,
   });
+}
+
+/** Pool dont `getConnection` rend `connection` (gestes qui prennent leur connexion eux-mêmes). */
+function poolGiving(connection: PoolConnection) {
+  return fakePool({ getConnection: async () => connection });
 }
 
 let state: World;
@@ -492,6 +500,7 @@ beforeEach(() => {
   jest
     .mocked(withConnection)
     .mockImplementation((run) => run(connectionFor(state)));
+  jest.mocked(getDatabase).mockImplementation(async () => poolGiving(connectionFor(state)));
 });
 
 describe("setMatchReady", () => {
@@ -1954,40 +1963,50 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
   it("setMatchFirstMap_inTransaction_locksTournamentFirst", async () => {
     const base = executeFor(state);
     const statements: string[] = [];
-    jest.mocked(withConnection).mockImplementation((run) =>
-      run(
-        fakeConnection({
-          execute: async (sql: string, params: unknown[] = []) => {
-            statements.push(sql);
-            return base(sql, params);
-          },
-          beginTransaction: async () => {
-            statements.push("BEGIN");
-          },
-          commit: async () => undefined,
-          rollback: async () => undefined,
-        }),
-      ),
+    const getConnection = jest.fn(async () =>
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          statements.push(sql);
+          return base(sql, params);
+        },
+        query: async (sql: string) => {
+          statements.push(sql);
+          return [[], []];
+        },
+        beginTransaction: async () => {
+          statements.push("BEGIN");
+        },
+        commit: async () => undefined,
+        rollback: async () => undefined,
+        release: () => undefined,
+        destroy: () => undefined,
+      }),
     );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection }));
     await setMatchFirstMap(42, "Ilios");
     const begin = statements.indexOf("BEGIN");
-    // Verrou partagé : les premières cartes de deux matchs ne s'attendent pas.
-    expect(statements[begin + 1]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 LOCK IN SHARE MODE/);
+    // Attente bornée, puis verrou partagé : les premières cartes de deux matchs ne s'attendent pas.
+    expect(statements[begin + 1]).toBe("SET SESSION innodb_lock_wait_timeout = 5");
+    expect(statements[begin + 2]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 LOCK IN SHARE MODE/);
+    expect(statements[begin + 3]).toBe("SET SESSION innodb_lock_wait_timeout = DEFAULT");
     // Une seule connexion : la lecture du tournoi précède la transaction sur la même.
-    expect(withConnection).toHaveBeenCalledTimes(1);
+    expect(getConnection).toHaveBeenCalledTimes(1);
     expect(statements.slice(0, begin).some((sql) => sql.startsWith("SELECT tournament_id, status"))).toBe(true);
   });
 
   it("setMatchFirstMap_tournamentGoneUnderLock_throwsTournamentNotFound", async () => {
     const base = executeFor(state);
-    jest.mocked(withConnection).mockImplementation((run) =>
-      run(
+    jest.mocked(getDatabase).mockResolvedValue(
+      poolGiving(
         fakeConnection({
           execute: async (sql: string, params: unknown[] = []) =>
             /LOCK IN SHARE MODE/.test(sql) ? [[], []] : base(sql, params),
+          query: async () => [[], []],
           beginTransaction: async () => undefined,
           commit: async () => undefined,
           rollback: async () => undefined,
+          release: () => undefined,
+          destroy: () => undefined,
         }),
       ),
     );
@@ -2187,6 +2206,40 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
     expect(released).toBe(true);
     expect(state.match?.referee_user_id).toBeNull();
     expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("releaseObjectingReferee_tournamentGone_releasesNothing", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    const base = executeFor(state);
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) =>
+            sql.startsWith("SELECT state FROM bg_tournaments") ? [[], []] : base(sql, params),
+          beginTransaction: async () => undefined,
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    const batch = { tournamentIds: new Set<number>() };
+
+    const released = await releaseObjectingReferee(42, REFEREE, [], batch);
+
+    expect(released).toBe(false);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(batch.tournamentIds.size).toBe(0);
+  });
+
+  it("releaseObjectingReferee_unfinishedMatch_readsTournamentStateUnderSharedLock", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    state.issued = [];
+
+    await releaseObjectingReferee(42, REFEREE);
+
+    expect(state.issued).toContain("SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE");
   });
 
   it("releaseObjectingReferee_launchedMatch_stillReleases", async () => {

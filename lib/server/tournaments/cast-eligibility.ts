@@ -259,6 +259,9 @@ export async function loadRefereeStanding(
   game: TournamentGame,
   lock = false,
 ): Promise<RefereeStanding> {
+  // Colonne déjà vue absente dans ce processus : la seule condition, d'emblée
+  // (un aller-retour en échec de moins par désignation).
+  if (objectionColumn.missing) return { block: await loadRefereeEligibility(executor, userId, game, lock), objection: false };
   try {
     const [rows] = await executor.execute<(CastEligibilityRow & { referee_objection_at: Date | string | null })[]>(
       `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
@@ -267,8 +270,22 @@ export async function loadRefereeStanding(
     return { block: refereeEligibilityBlock(rows[0], game), objection: (rows[0]?.referee_objection_at ?? null) !== null };
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
+    objectionColumn.missing = true;
     return { block: await loadRefereeEligibility(executor, userId, game, lock), objection: false };
   }
+}
+
+/**
+ * `bg_users.referee_objection_at` absente (son `ALTER` n'a pas été joué) : notée
+ * à la première erreur, pour ne plus la redemander. Le schéma se joue à la
+ * première requête du processus : une colonne absente le reste jusqu'au
+ * prochain démarrage.
+ */
+const objectionColumn = { missing: false };
+
+/** Oublie l'absence notée de la colonne. Réservé aux tests. */
+export function resetObjectionColumnProbe(): void {
+  objectionColumn.missing = false;
 }
 
 /**
