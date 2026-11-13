@@ -16,6 +16,7 @@ import {
   chartHitPath,
   chartLine,
   chartLineAt,
+  lineDash,
   chartLinePath,
   chartOrderAt,
   chartRankAt,
@@ -311,6 +312,19 @@ describe("tracés", () => {
     const path = chartLinePath(series[1], 2, geometry);
     expect(chartLineAt(path, 2).hollow).toBe(true);
     expect(chartLineAt(path, 0.5).hollow).toBe(false);
+  });
+
+  it("lineDash_partialLength_dashesVisiblePart", () => {
+    expect(lineDash({ visible: 40, total: 100 })).toBe("40 101");
+  });
+
+  it("lineDash_wholeOrOverLength_noDash", () => {
+    expect(lineDash({ visible: null, total: 100 })).toBeUndefined();
+    expect(lineDash({ visible: 100, total: 100 })).toBeUndefined();
+  });
+
+  it("lineDash_zeroLengthPath_noDash", () => {
+    expect(lineDash({ visible: 0, total: 0 })).toBeUndefined();
   });
 
   it("chartLineAt_forfeitAtShownRound_flagsForfeit", () => {

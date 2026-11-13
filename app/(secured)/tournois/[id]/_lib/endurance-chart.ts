@@ -468,6 +468,15 @@ export function chartLineAt(path: ChartLinePath, progress: number): ChartLineFra
   };
 }
 
+/**
+ * Tirets qui dévoilent `visible` unités du tracé ; aucun quand la courbe est
+ * entière (dernière image, ou dévoilé ≥ longueur) ou sans longueur.
+ */
+export function lineDash(frame: Pick<ChartLineFrame, "visible" | "total">): string | undefined {
+  if (frame.visible === null || frame.total <= 0 || frame.visible >= frame.total) return undefined;
+  return `${Math.max(0, frame.visible)} ${frame.total + 1}`;
+}
+
 // ---------- Animation ----------
 
 /** Accélération puis freinage, sur [0, 1]. */

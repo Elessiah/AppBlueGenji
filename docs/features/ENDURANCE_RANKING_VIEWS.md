@@ -186,8 +186,10 @@ pure dans `_lib/endurance-chart.ts`.
 - **Tracé étroit** : `.plot` est un conteneur de requête ; le texte du SVG (en
   unités utilisateur) grossit par paliers dès que le tracé passe sous les 760
   unités du viewBox : chaque palier vaut ⌈11 × 760 ÷ sa borne basse⌉ (14 sous
-  760 px … 42 sous 220 px), soit **au moins 11 px rendus** à toute largeur
-  (375 px d'écran : ~0,32) ; « Départ » s'efface sous 440 px, et sous 290 px une
+  760 px … 56 sous 182 px), soit **au moins 11 px rendus** jusqu'à un tracé de
+  150 px (375 px d'écran : ~0,32 ; une requête par palier) ; « Départ »
+  s'efface sous 440 px, les points de l'axe Y passent alors **dans** le tracé
+  (halo du fond), et sous 290 px une
   manche sur deux (les paires, la manche affichée gardée) : « M12 » ne tiendrait
   plus dans le pas d'une manche. Sous ~800 px la légende passe sous
   le tracé et l'encart **réserve sa hauteur** (plus de saut à chaque tap) ;

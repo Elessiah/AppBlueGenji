@@ -7,7 +7,9 @@ import {
   chartLineAt,
   chartLinePath,
   chartRoundMs,
+  lineDash,
   type ChartGeometry,
+  type ChartLinePath,
   type EnduranceChartSeries,
 } from "../_lib/endurance-chart";
 import styles from "./EnduranceChart.module.css";
@@ -39,6 +41,9 @@ type Props = Readonly<{
 
 /** Ce que la tête lit d'une courbe : sa position et son état (`chartLine` ou `chartLineAt`). */
 type HeadLine = { head: { x: number; y: number }; hollow: boolean; forfeit: boolean };
+
+/** Tracé d'une courbe gardé d'un rendu à l'autre (`EnduranceChartLines`). */
+type CachedPath = { item: EnduranceChartSeries; shown: number; geometry: ChartGeometry; path: ChartLinePath };
 
 /** L'engagé d'une zone de survol (`data-team-id`), `null` hors d'une zone. */
 function hitTeamId(target: EventTarget | null): number | null {
@@ -187,10 +192,23 @@ export const EnduranceChartLines = memo(function EnduranceChartLines({
   // Tracés entiers et longueurs cumulées, une fois par courbe et par manche
   // affichée : chaque image ne fait plus que dévoiler une longueur
   // (`stroke-dasharray`) et placer la tête — aucun tracé reconstruit.
-  const paths = useMemo(
-    () => entries.map((entry) => ({ entry, path: chartLinePath(entry.item, shown, geometry) })),
-    [entries, shown, geometry],
-  );
+  // Mémoire **par courbe** (clé : l'engagé) : un instantané qui ne change
+  // qu'une courbe ne recalcule qu'elle, pas les 64 du mode « Tous ». Une
+  // entrée ne vaut que pour sa série, sa manche affichée et sa géométrie.
+  const pathCache = useRef(new Map<number, CachedPath>());
+  const paths = useMemo(() => {
+    const previous = pathCache.current;
+    const next = new Map<number, CachedPath>();
+    const built = entries.map((entry) => {
+      const cached = previous.get(entry.item.teamId);
+      const fresh = cached !== undefined && cached.item === entry.item && cached.shown === shown && cached.geometry === geometry;
+      const path = fresh ? cached.path : chartLinePath(entry.item, shown, geometry);
+      next.set(entry.item.teamId, { item: entry.item, shown, geometry, path });
+      return { entry, path };
+    });
+    pathCache.current = next;
+    return built;
+  }, [entries, shown, geometry]);
 
   // Survol et clic délégués au groupe (`data-team-id` des zones de survol) :
   // aucun gestionnaire recréé par courbe à chaque image.
@@ -203,7 +221,9 @@ export const EnduranceChartLines = memo(function EnduranceChartLines({
   );
   const handleOut = useCallback(
     (event: MouseEvent<SVGGElement>) => {
-      if (hitTeamId(event.target) !== null && hitTeamId(event.relatedTarget) === null) onLeave();
+      // Quitte la courbe survolée seulement : vers une autre zone, `onHover` suit.
+      const from = hitTeamId(event.target);
+      if (from !== null && hitTeamId(event.relatedTarget) !== from) onLeave();
     },
     [onLeave],
   );
@@ -234,7 +254,9 @@ export const EnduranceChartLines = memo(function EnduranceChartLines({
                 style={{
                   stroke: color,
                   strokeWidth: 2.25,
-                  strokeDasharray: frame.visible === null ? undefined : `${frame.visible} ${frame.total + 1}`,
+                  strokeDasharray: lineDash(frame),
+                  // Rien de dévoilé : pas de point laissé par l'extrémité arrondie.
+                  strokeOpacity: frame.visible !== null && frame.visible <= 0 && frame.total > 0 ? 0 : undefined,
                 }}
               />
               <Head line={frame} stroke={color} forfeitLabel={forfeitLabel} />

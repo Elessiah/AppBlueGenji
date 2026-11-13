@@ -164,19 +164,19 @@ describe("mouvement", () => {
 
   it("endurancePlotBands_eachBand_rendersAtLeast11PxAtItsLowerBound", () => {
     // Le SVG est mis à l'échelle (largeur ÷ 760) : chaque palier rend ≥ 11 px à la
-    // borne basse de sa bande (la suivante, + 1 px ; 200 px pour la dernière).
+    // borne basse de sa bande (la suivante, + 1 px ; 150 px pour la dernière).
     const bands = [...CSS.matchAll(/@container endurancePlot \(max-width: (\d+)px\) \{\s*\.axisY,[^{]*\{\s*font-size: (\d+)px;/g)].map(
       (m) => ({ max: Number(m[1]), size: Number(m[2]) }),
     );
     expect(bands.length).toBeGreaterThanOrEqual(8);
     bands.forEach((band, index) => {
-      const lower = index + 1 < bands.length ? bands[index + 1].max + 1 : 200;
+      const lower = index + 1 < bands.length ? bands[index + 1].max + 1 : 150;
       expect((band.size * lower) / 760).toBeGreaterThanOrEqual(11);
     });
   });
 
   it("endurancePlot_veryNarrow_hidesEveryOtherRoundLabel", () => {
-    expect(CSS).toMatch(/@container endurancePlot \(max-width: 289px\) \{\s*\.axisXSparse \{\s*display: none;/);
+    expect(CSS).toMatch(/@container endurancePlot \(max-width: 289px\) \{[^@]*\.axisXSparse \{\s*display: none;/);
     expect(CHART).toContain("round % 2 === 0 ? ` ${styles.axisXSparse}` : \"\"");
   });
 
@@ -185,6 +185,20 @@ describe("mouvement", () => {
     expect(LINES).toContain("onMouseOver={handleOver}");
     expect(LINES).toContain("onClick={handleClick}");
     expect(LINES).not.toContain("onMouseEnter=");
+  });
+
+  it("endurancePlot_narrow_movesPointLabelsInsideThePlot", () => {
+    expect(CSS).toMatch(/@container endurancePlot \(max-width: 439px\) \{[^@]*\.axisY \{\s*text-anchor: start;/);
+  });
+
+  it("endurancePlotBands_onePerThreshold_noDuplicateQuery", () => {
+    const widths = [...CSS.matchAll(/@container endurancePlot \(max-width: (\d+)px\)/g)].map((m) => m[1]);
+    expect(new Set(widths).size).toBe(widths.length);
+  });
+
+  it("enduranceChartLines_lineAndHead_ignorePointer", () => {
+    expect(CSS).toMatch(/\.line \{[^}]*pointer-events: none;/);
+    expect(CSS).toMatch(/\.head \{[^}]*pointer-events: none;/);
   });
 
   it("aucune animation CSS infinie", () => {
@@ -198,7 +212,7 @@ describe("légende : survol, focus, lecteur d'écran", () => {
     expect(CHART).toContain("const leave = useCallback(() => setHover(focusedRef.current), []);");
     expect(CHART).not.toContain("onMouseLeave={() => setHover(null)}");
     // Délégué au groupe : quitter une zone de survol pour hors d'une zone rend la main.
-    expect(LINES).toContain("hitTeamId(event.relatedTarget) === null) onLeave();");
+    expect(LINES).toContain("if (from !== null && hitTeamId(event.relatedTarget) !== from) onLeave();");
   });
 
   it("un retri de la légende recale le survol et garde le bouton focalisé visible", () => {

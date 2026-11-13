@@ -236,17 +236,19 @@
 /* Tracé plus étroit que le viewBox (760 unités) : le SVG est mis à l'échelle
    (largeur ÷ 760), son texte avec. Chaque palier pose la taille (en unités du
    SVG) qui rend au moins 11 px à sa borne basse : ⌈11 × 760 ÷ borne⌉ — 8 360 ÷
-   largeur. « Départ » s'efface quand il toucherait « M1 » ; sous 290 px, une
-   manche sur deux (la manche affichée reste) : « M12 » en 34 unités ne tient
-   plus dans le pas d'une manche (692 ÷ 12 ≈ 58 unités). */
+   largeur —, du viewBox entier jusqu'à 150 px de tracé (un écran de 320 px en
+   laisse ~190). « Départ » s'efface quand il toucherait « M1 » ; sous 290 px,
+   une manche sur deux (la manche affichée reste) : « M12 » en 34 unités ne
+   tient plus dans le pas d'une manche (692 ÷ 12 ≈ 58 unités). Sous 440 px,
+   les graduations des points passent **dans** le tracé, au-dessus de leur
+   ligne (une gouttière de 48 unités ne tient plus « 1000 » en 22 unités et
+   plus), détachées des courbes par un liseré du fond de la carte. */
+
+/* 600–759 px : 14 unités ≥ 11 px dès 600 px. */
 @container endurancePlot (max-width: 759px) {
   .svg {
     overflow: visible;
   }
-}
-
-/* 600–759 px : 14 unités ≥ 11 px dès 600 px. */
-@container endurancePlot (max-width: 759px) {
   .axisY,
   .axisX,
   .cutLabel,
@@ -283,6 +285,18 @@
   .forfeit {
     font-size: 22px;
   }
+  .axisStart {
+    display: none;
+  }
+  .axisY {
+    text-anchor: start;
+    /* Unités du SVG : de la gouttière (x = 40) au bord du tracé (48), au-dessus de la ligne. */
+    transform: translate(12px, -10px);
+    paint-order: stroke;
+    stroke: var(--cyber-bg-1);
+    stroke-width: 6px;
+    stroke-linejoin: round;
+  }
 }
 
 /* 330–379 px : 26 unités ≥ 11 px dès 330 px. */
@@ -313,6 +327,9 @@
   .forfeit {
     font-size: 34px;
   }
+  .axisXSparse {
+    display: none;
+  }
 }
 
 /* 220–249 px : 38 unités ≥ 11 px dès 220 px. */
@@ -325,7 +342,7 @@
   }
 }
 
-/* 0–219 px : 42 unités ≥ 11 px dès 200 px. */
+/* 200–219 px : 42 unités ≥ 11 px dès 200 px. */
 @container endurancePlot (max-width: 219px) {
   .axisY,
   .axisX,
@@ -335,26 +352,38 @@
   }
 }
 
-@container endurancePlot (max-width: 439px) {
-  .axisStart {
-    display: none;
+/* 182–199 px : 46 unités ≥ 11 px dès 182 px. */
+@container endurancePlot (max-width: 199px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 46px;
   }
 }
 
-@container endurancePlot (max-width: 289px) {
-  .axisXSparse {
-    display: none;
+/* 150–181 px : 56 unités ≥ 11 px dès 150 px. */
+@container endurancePlot (max-width: 181px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 56px;
   }
 }
 
+/* Seule la zone de survol (`.hit`) reçoit le pointeur : passer de la zone au
+   trait ou à la tête de la même courbe ne la « quitte » pas (pas de clignement). */
 .line {
   fill: none;
   stroke-linejoin: round;
   stroke-linecap: round;
+  pointer-events: none;
 }
 
 .head {
   stroke-width: 2;
+  pointer-events: none;
 }
 
 .forfeit {
