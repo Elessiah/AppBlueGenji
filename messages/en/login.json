@@ -142,7 +142,7 @@
   "reactivation": {
     "title": "Reactivate your account?",
     "lead": "You asked for your account to be deleted. The deletion becomes final on {date}: until then, you can still reactivate it.",
-    "keptLead": "Reactivating gives you back your profile, statistics, settings, username and avatar.",
+    "keptLead": "Reactivating gives you back your profile, statistics and settings, and normally your username and avatar: the exceptions (username already taken, avatar hidden, suspended account) are in the “i” button.",
     "keptSubject": "what reactivation gives back",
     "kept": "Reactivating gives you back your account: profile, statistics, settings, and your username and avatar, hidden everywhere since the request (if your username was taken in the meantime, it comes back, shortened if needed, followed by “OG”, for example “UsernameOG” — or “UsernameOG2”… if that is taken too, failing that your borrowed username: you can change it in My profile). An avatar that moderation hid or removed in the meantime does not come back. A suspended account can be reactivated too: it stays suspended.",
     "notUndoneLead": "What was done when you asked is not undone:",

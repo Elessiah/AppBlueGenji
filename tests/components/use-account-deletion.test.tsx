@@ -29,9 +29,9 @@ jest.mock("react", () => {
   };
 });
 
-const showError = jest.fn<(message: string, options?: { lang?: string }) => void>();
-const showSuccess = jest.fn<(message: string, options?: { lang?: string }) => void>();
-jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess }) }));
+const showError = jest.fn<(message: string, options?: { lang?: string; durationMs?: number }) => void>();
+const showSuccess = jest.fn<(message: string, options?: { lang?: string; durationMs?: number }) => void>();
+jest.mock("@/components/ui/toast", () => ({ TOAST_DURATION_MS: 5000, useToast: () => ({ showError, showSuccess }) }));
 jest.mock("@/components/i18n/locale-context", () => ({ useAppLocale: () => locale.current }));
 const locale: { current: "fr" | "en" } = { current: "fr" };
 
@@ -44,7 +44,7 @@ import {
   requestAccountDeletion,
   useAccountDeletion,
 } from "@/components/account/use-account-deletion";
-import { FR_PROFILE } from "@/app/(secured)/profil/_lib/profile-text";
+import { deletionErrorText, FR_PROFILE } from "@/app/(secured)/profil/_lib/profile-text";
 import type { ConfirmActionDialogProps } from "@/components/ui/confirm-action-dialog";
 import { RETENTION_UNKNOWN } from "@/lib/shared/account-deletion";
 import { readSource } from "../helpers/read-source";
@@ -312,6 +312,41 @@ describe("useAccountDeletion", () => {
     expect(useAccountDeletion({ text: FR_PROFILE }).dialog).not.toBeNull();
   });
 
+  it("onConfirm_planChangedAndFreshPreviewUnknown_showsGenericError", async () => {
+    const preview = jest
+      .fn<() => Response>()
+      .mockReturnValueOnce(jsonResponse(200, { mode: "ERASE", reason: null }))
+      .mockReturnValueOnce(jsonResponse(500, { error: "X" }));
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": preview,
+        "DELETE /api/profile": () => jsonResponse(409, { error: "ACCOUNT_DELETION_PLAN_CHANGED" }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+    await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
+    expect(showError).toHaveBeenCalledWith(deletionErrorText(FR_PROFILE, undefined), expect.anything());
+    expect(showError).not.toHaveBeenCalledWith(FR_PROFILE.t("deletion.errors.ACCOUNT_DELETION_PLAN_CHANGED"), expect.anything());
+  });
+
+  it("onConfirm_sessionGoneLongMessage_toastLastsAsLongAsRedirectDelay", async () => {
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }),
+        "DELETE /api/profile": () => jsonResponse(401, { error: "UNAUTHORIZED" }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+    await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
+    const [message, options] = showError.mock.calls.at(-1) ?? ["", {}];
+    expect(options?.durationMs).toBe(accountDeletedRedirectDelay(message));
+    expect(options?.durationMs).toBeGreaterThan(5000);
+  });
+
   it("confirmer appelle la route de suppression (qui ferme la session), dit l'issue puis ramène à l'accueil de la langue", async () => {
     locale.current = "en";
     globalThis.fetch = fakeFetch(
@@ -327,7 +362,7 @@ describe("useAccountDeletion", () => {
     expect(ok).toBe(true);
     expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE", headers: { "content-type": "application/json" }, body: '{"confirmedReason":null}' } });
     // Textes retombés sur le français sous /en : le toast le déclare aussi.
-    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr" });
+    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr", durationMs: expect.any(Number) });
     expect(fakeWindow.location.href).toBe("/tournois");
     jest.advanceTimersByTime(accountDeletedRedirectDelay(showSuccess.mock.calls.at(-1)?.[0] ?? ""));
     expect(fakeWindow.location.href).toBe("/en");
@@ -349,7 +384,7 @@ describe("useAccountDeletion", () => {
     rerender();
     // `true` : la confirmation reste « en cours » (aucun second envoi) jusqu'au rechargement.
     expect(await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm()).toBe(true);
-    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Ta session est fermée/), { lang: undefined });
+    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Ta session est fermée/), { lang: undefined, durationMs: expect.any(Number) });
     expect(showSuccess).not.toHaveBeenCalled();
     // Le délai suit la longueur de la notification : pas de rechargement à 1,2 s.
     const message = showError.mock.calls.at(-1)?.[0] ?? "";

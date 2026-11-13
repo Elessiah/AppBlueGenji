@@ -47,6 +47,16 @@ export function ProfilelessPlayersProvider({
   );
 }
 
+/** La liste fraîche, ou `null` (hors ligne, refus, corps illisible). */
+export async function fetchProfilelessIds(fetchImpl: typeof fetch = fetch): Promise<number[] | null> {
+  try {
+    const response = await fetchImpl("/api/players/profileless", { cache: "no-store" });
+    return response.ok ? parseProfilelessIds(await response.json()) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Relit la liste à chaque navigation client, au plus une fois par fenêtre. Monté
  * pour le seul visiteur connecté (`usePathname` n'existe que sous le routeur).
@@ -73,18 +83,20 @@ function ProfilelessRefresh({ onIds }: Readonly<{ onIds: (ids: number[]) => void
     if (pathname === firstPath.current) return;
     firstPath.current = pathname;
     const now = Date.now();
-    if (now - loadedAt.current < PROFILELESS_REFRESH_MS) return;
+    const previous = loadedAt.current;
+    if (now - previous < PROFILELESS_REFRESH_MS) return;
     loadedAt.current = now;
+    // Un essai qui échoue ne prend pas la fenêtre : le suivant repart aussitôt.
+    const giveBack = () => {
+      if (loadedAt.current === now) loadedAt.current = previous;
+    };
     // Jamais annulée par la navigation suivante : la fenêtre est déjà prise,
     // la réponse doit servir.
-    fetch("/api/players/profileless", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: unknown) => {
-        const next = parseProfilelessIds(body);
-        if (mounted.current && next) latest.current(next);
-      })
-      // Hors ligne ou refus : la liste connue reste, au pire un lien vers une 404.
-      .catch(() => undefined);
+    // Hors ligne ou refus : la liste connue reste (au pire un lien vers une 404), et le prochain changement de page réessaie.
+    void fetchProfilelessIds().then((next) => {
+      if (!next) giveBack();
+      else if (mounted.current) latest.current(next);
+    });
   }, [pathname]);
 
   return null;

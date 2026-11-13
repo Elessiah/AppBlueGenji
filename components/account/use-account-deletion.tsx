@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { useToast } from "@/components/ui/toast";
+import { TOAST_DURATION_MS, useToast } from "@/components/ui/toast";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
   deletionDialogContent,
@@ -170,8 +170,11 @@ export function useAccountDeletion({
     if (!result.ok && result.code === ACCOUNT_DELETION_PLAN_CHANGED) {
       // Le sort annoncé n'est plus le bon : la modale reste ouverte et se
       // réécrit sur un aperçu frais, à relire avant de confirmer de nouveau.
-      setPendingDeletion(await previewAccountDeletion());
-      showError(deletionErrorText(text, result.code), { lang: contentLang });
+      const fresh = await previewAccountDeletion();
+      setPendingDeletion(fresh);
+      // Un aperçu qui n'a pas répondu ne promet aucune « confirmation mise à
+      // jour » : la phrase générique, que la confirmation (« inconnu ») confirme.
+      showError(deletionErrorText(text, fresh.subject === RETENTION_UNKNOWN ? undefined : result.code), { lang: contentLang });
       return false;
     }
     if (!result.ok && !SESSION_GONE_CODES.has(result.code)) {
@@ -179,14 +182,17 @@ export function useAccountDeletion({
       return false;
     }
     const message = result.ok ? deletionOutcomeText(text, result.applied) : deletionErrorText(text, result.code);
-    if (result.ok) showSuccess(message, { lang: contentLang });
-    else showError(message, { lang: contentLang });
+    const delay = accountDeletedRedirectDelay(message);
+    // Le toast reste jusqu'au rechargement : sa durée est celle du délai.
+    const toastOptions = { lang: contentLang, durationMs: Math.max(delay, TOAST_DURATION_MS) };
+    if (result.ok) showSuccess(message, toastOptions);
+    else showError(message, toastOptions);
     // La session est fermée (par cette suppression, ou avant elle) : l'accueil,
     // rechargé en entier, dans la langue de la page (`/en` sous `/en/profil`),
     // se lit sans compte. La confirmation reste « en cours » jusque-là.
     setTimeout(() => {
       window.location.href = localeHref("/", pageLocale);
-    }, accountDeletedRedirectDelay(message));
+    }, delay);
     return true;
   };
 
@@ -211,9 +217,8 @@ export function useAccountDeletion({
       {content.termsNote ? <p>{content.termsNote}</p> : null}
       <p>{content.handoverLead}</p>
       <ul>
-        {content.handoverItems.map((item, index) => (
-          // Liste figée par le texte : la position est une clé stable.
-          <li key={`handover-${index}`}>{item}</li>
+        {content.handoverItems.map((item) => (
+          <li key={item}>{item}</li>
         ))}
       </ul>
       <p>{content.window}</p>
