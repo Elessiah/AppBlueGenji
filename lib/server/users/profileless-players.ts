@@ -19,6 +19,7 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { cached } from "@/lib/server/cache";
 import { PROFILELESS_PLAYERS_CACHE_KEY } from "@/lib/server/ranking-cache";
+import { sortedIdsInclude } from "@/lib/shared/sorted-ids";
 import { accountTraceSql } from "./account-deletion";
 
 async function computeProfilelessPlayerIds(): Promise<number[]> {
@@ -30,7 +31,9 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
         AND (u.deletion_requested_at IS NOT NULL OR NOT ${accountTraceSql().played})
       ORDER BY u.id`,
   );
-  return rows.map((row) => Number(row.id));
+  // Trié ici aussi, sans se fier au seul `ORDER BY` : la recherche
+  // dichotomique (`sortedIdsInclude`) en dépend.
+  return rows.map((row) => Number(row.id)).sort((a, b) => a - b);
 }
 
 /**
@@ -65,20 +68,6 @@ function readProfilelessPlayerIds(): Promise<number[]> {
   return cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
 }
 
-/** Recherche dichotomique dans la liste, triée par id croissant (`ORDER BY u.id`). */
-function sortedIncludes(ids: readonly number[], userId: number): boolean {
-  let low = 0;
-  let high = ids.length - 1;
-  while (low <= high) {
-    const middle = (low + high) >>> 1;
-    const id = ids[middle];
-    if (id === userId) return true;
-    if (id < userId) low = middle + 1;
-    else high = middle - 1;
-  }
-  return false;
-}
-
 /**
  * Un compte **anonymisé** (déjà lu comme supprimé, suppression non plus en
  * attente) est-il sans fiche ? La même liste que celle qui décide des liens :
@@ -90,7 +79,7 @@ function sortedIncludes(ids: readonly number[], userId: number): boolean {
  */
 export async function anonymizedAccountHasNoPage(userId: number): Promise<boolean> {
   try {
-    return sortedIncludes(await readProfilelessPlayerIds(), userId);
+    return sortedIdsInclude(await readProfilelessPlayerIds(), userId);
   } catch (error) {
     console.error(`[profileless-players] liste illisible, lecture du compte : ${failureReason(error)}`);
   }

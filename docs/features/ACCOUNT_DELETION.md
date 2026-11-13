@@ -1131,6 +1131,15 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   d'un retrait commis lève ; la liste des comptes sans fiche se lit par
   dichotomie (triée par id). Gardé : la double panne de lecture rend 404
   (décision du cycle 2).
+- **Revue standard cycle 4** : le balayage des annonces de confidentialité
+  (`dispatchPrivacyChangeNotifications`, son propre étranglement) ne part pas
+  non plus envois coupés, et `throttledSweep.schedule` n'arme aucun minuteur
+  quand sa garde est fausse. Tout nouveau balayage qui **réserve avant
+  d'envoyer** lit `outboundMuted()` (ou passe par `throttledSweep`). La passe
+  horaire rediffuse et journalise chaque retrait commis dans deux `try`
+  distincts ; la liste des comptes sans fiche est triée dans le code (pas
+  seulement par `ORDER BY`) et se lit par `sortedIdsInclude`
+  (`lib/shared/sorted-ids.ts`), route d'équipe comprise.
 - **Écrans** : la confirmation liste ce que la demande transmet ou retire
   (`deletionDialogContent`), les restes après la fin du délai derrière un
   « i » ; la page de réactivation dit ce qui revient en une phrase (détail

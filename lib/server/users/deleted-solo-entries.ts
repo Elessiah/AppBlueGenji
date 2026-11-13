@@ -428,6 +428,30 @@ async function forfeitEntriesOneByOne(
 }
 
 /**
+ * Rediffuse puis journalise un retrait déjà commis par la passe horaire, chacun
+ * dans son `try` : l'un qui lève ne prive pas l'autre — le retrait ne sera plus
+ * jamais relu par une passe. Ne lève jamais.
+ */
+async function announceSettledWithdrawal(userId: number, tournamentId: number): Promise<void> {
+  try {
+    publishUpdatedEvent(tournamentId);
+  } catch (error) {
+    console.error(
+      `[deleted-accounts] retrait du compte #${userId} (tournoi ${tournamentId}) non rediffusé :`,
+      failureReason(error),
+    );
+  }
+  try {
+    await logDeletionWithdrawal(tournamentId, false);
+  } catch (error) {
+    console.error(
+      `[deleted-accounts] retrait du compte #${userId} (tournoi ${tournamentId}) non journalisé :`,
+      failureReason(error),
+    );
+  }
+}
+
+/**
  * Rattrapage (E2) : applique la règle du jour aux comptes **déjà** supprimés
  * (demande en cours ou suppression faite) — inscriptions solo à un tournoi pas
  * encore commencé retirées, entrées jamais jouées d'un tournoi en cours
@@ -483,17 +507,7 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
     // lève n'empêche ni les tournois suivants ni les forfaits, et le compte
     // n'est pas mis à l'écart comme s'il n'avait rien produit.
     effective = withdrawn.length > 0 || started > 0;
-    for (const entry of withdrawn) {
-      try {
-        publishUpdatedEvent(entry.tournamentId);
-        await logDeletionWithdrawal(entry.tournamentId, false);
-      } catch (error) {
-        console.error(
-          `[deleted-accounts] retrait du compte #${userId} (tournoi ${entry.tournamentId}) non annoncé :`,
-          failureReason(error),
-        );
-      }
-    }
+    for (const entry of withdrawn) await announceSettledWithdrawal(userId, entry.tournamentId);
     try {
       // Un tournoi qui échoue n'empêche pas les suivants du même compte.
       const forfeited = await forfeitSoloEntriesAfterCommit(await listForfeitableSoloEntries(db, userId));

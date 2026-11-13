@@ -162,6 +162,14 @@ describe("anonymizedAccountHasNoPage (EF-62 cycle 1)", () => {
     expect(await anonymizedAccountHasNoPage(40)).toBe(true);
   });
 
+  // Revue standard cycle 4 : la liste est triée dans le code, pas seulement par la requête.
+  it("loadProfilelessPlayerIds_unsortedRows_returnsAscendingIds", async () => {
+    mockDb(() => [[{ id: 9 }, { id: 2 }, { id: 5 }]]);
+
+    expect(await loadProfilelessPlayerIds()).toEqual([2, 5, 9]);
+    expect(await anonymizedAccountHasNoPage(2)).toBe(true);
+  });
+
   it("anonymizedAccountHasNoPage_idBetweenListedIds_returnsFalse", async () => {
     mockDb(() => [[{ id: 2 }, { id: 5 }, { id: 11 }, { id: 40 }]]);
 

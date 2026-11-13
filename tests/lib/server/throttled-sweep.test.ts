@@ -118,4 +118,27 @@ describe("throttledSweep", () => {
 
     expect(sweep).not.toHaveBeenCalled();
   });
+
+  // Revue standard cycle 4 : garde fausse, aucun minuteur ne s'arme.
+  it("schedule_whileMuted_armsNoTimer", async () => {
+    jest.mocked(outboundMuted).mockReturnValueOnce(true);
+    const { sweeps, sweep } = sweeper();
+
+    sweeps.schedule(0);
+
+    expect(jest.getTimerCount()).toBe(0);
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(sweep).not.toHaveBeenCalled();
+  });
+
+  it("schedule_enabledGuardFalse_armsNoTimer", async () => {
+    const sweep = jest.fn(async () => 3);
+    const sweeps = throttledSweep({ throttleMs: 10_000, sweep, onError: jest.fn(), enabled: () => false });
+
+    sweeps.schedule(0);
+
+    expect(jest.getTimerCount()).toBe(0);
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(sweep).not.toHaveBeenCalled();
+  });
 });

@@ -136,12 +136,44 @@ describe("settleDeletedSoloEntries — annonces après le commit", () => {
     await settleDeletedSoloEntries();
 
     expect(outcome.withdrawn).toBe(1);
-    expect(JSON.stringify(log.mock.calls)).toContain("non annoncé");
+    expect(JSON.stringify(log.mock.calls)).toContain("non rediffusé");
     expect(JSON.stringify(log.mock.calls)).not.toContain("reportées");
-    // Forfaits relevés après les retraits, malgré la rediffusion en échec.
-    expect(afterFirstPass).toBeGreaterThan(1);
+    // Journal tenté et forfaits relevés malgré la rediffusion en échec.
+    const firstPass = execute.mock.calls.slice(0, afterFirstPass).map(([q]) => String(q));
+    expect(firstPass.some((q) => q.includes("FROM bg_tournaments t WHERE t.id = ?"))).toBe(true);
+    expect(firstPass.some((q) => q.includes("t.state = 'RUNNING'"))).toBe(true);
     const candidateQueries = execute.mock.calls.filter(([q]) => String(q).includes("SELECT DISTINCT u.id"));
     expect(String(candidateQueries[1][0])).not.toContain("NOT IN");
+    log.mockRestore();
+  });
+
+  // Revue standard cycle 4 : un journal qui lève n'arrête pas les forfaits.
+  it("settleDeletedSoloEntries_withdrawalLogThrows_stillQueriesForfeits", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadSoloRegistrations).mockResolvedValue([
+      {
+        tournamentId: 3,
+        teamId: 900,
+        hasMatch: false,
+        state: "REGISTRATION",
+        registrationOpenAt: "2026-01-01T00:00:00.000Z",
+        registrationCloseAt: "2098-12-31T00:00:00.000Z",
+        startAt: "2099-01-01T00:00:00.000Z",
+      },
+    ]);
+    const { execute } = fakeDb();
+    const candidates = execute.getMockImplementation();
+    execute.mockImplementation(async (sql, params) => {
+      if (String(sql).includes("FROM bg_tournaments t WHERE t.id = ?")) throw new Error("DB_DOWN");
+      return candidates!(sql, params);
+    });
+
+    const outcome = await settleDeletedSoloEntries();
+
+    expect(outcome.withdrawn).toBe(1);
+    const queries = execute.mock.calls.map(([q]) => String(q));
+    expect(queries.some((q) => q.includes("t.state = 'RUNNING'"))).toBe(true);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("reportées");
     log.mockRestore();
   });
 });

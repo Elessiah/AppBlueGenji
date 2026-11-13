@@ -40,7 +40,8 @@ export function throttledSweep(options: {
   let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 
   function schedule(delayMs: number): void {
-    if (trailingTimer) return;
+    // Garde fausse (envois coupés compris) : aucun minuteur ne s'arme.
+    if (trailingTimer || !enabled()) return;
     trailingTimer = setTimeout(() => {
       trailingTimer = null;
       void run();

@@ -4,8 +4,10 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/push-subscriptions");
 jest.mock("@/lib/server/web-push", () => ({ webPushConfig: jest.fn(() => null) }));
+jest.mock("@/lib/server/outbound-mute", () => ({ outboundMuted: jest.fn(() => false) }));
 
 import { getDatabase } from "@/lib/server/database";
+import { outboundMuted } from "@/lib/server/outbound-mute";
 import { isBotCircuitOpen, pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import {
   dispatchPrivacyChangeNotifications,
@@ -92,6 +94,17 @@ describe("dispatchPrivacyChangeNotifications", () => {
   });
   afterEach(() => {
     resetPrivacyNotificationThrottle();
+  });
+
+  // EF-62 revue standard cycle 4 : envois coupés, rien n'est réservé puis perdu.
+  it("dispatchPrivacyChangeNotifications_whileMuted_returnsZeroWithoutQuery", async () => {
+    jest.mocked(outboundMuted).mockReturnValueOnce(true);
+    fakeDb({ candidates: [candidate()] });
+
+    const sent = await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(sent).toBe(0);
+    expect(getDatabase).not.toHaveBeenCalled();
   });
 
   it("envoie un seul message qui cumule tous les changements dus", async () => {
