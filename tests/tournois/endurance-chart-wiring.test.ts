@@ -68,7 +68,8 @@ describe("performance (64 engagés × 12 manches)", () => {
     expect(CHART).not.toMatch(/setProgress|\bdrawn\b|chartAnimationFrame|requestAnimationFrame|chartLine\(/);
     expect(LINES).toContain("const [progress, setProgress] = useState(animate ? 0 : shown);");
     expect(LINES).toContain("export const EnduranceChartLines = memo(");
-    expect(LINES).toContain("chartLine(item, shown, drawn, geometry)");
+    expect(LINES).toContain("chartLinePath(entry.item, shown, geometry)");
+    expect(LINES).toContain("chartLineAt(path, drawn)");
     expect(CHART).toContain("<EnduranceChartLines");
     expect(CHART).toContain("{backdrop}");
     expect(CHART).toContain("{legend}");
@@ -179,6 +180,13 @@ describe("mouvement", () => {
     expect(CHART).toContain("round % 2 === 0 ? ` ${styles.axisXSparse}` : \"\"");
   });
 
+  it("enduranceChartLines_hitZones_delegatedHandlersOnGroup", () => {
+    expect(LINES).toContain("data-team-id={item.teamId}");
+    expect(LINES).toContain("onMouseOver={handleOver}");
+    expect(LINES).toContain("onClick={handleClick}");
+    expect(LINES).not.toContain("onMouseEnter=");
+  });
+
   it("aucune animation CSS infinie", () => {
     expect(CSS).not.toMatch(/animation\s*:/);
     expect(CSS).not.toContain("infinite");
@@ -189,7 +197,8 @@ describe("légende : survol, focus, lecteur d'écran", () => {
   it("un `mouseleave` revient à l'engagé qui a le focus clavier, ailleurs que sur le SVG entier", () => {
     expect(CHART).toContain("const leave = useCallback(() => setHover(focusedRef.current), []);");
     expect(CHART).not.toContain("onMouseLeave={() => setHover(null)}");
-    expect(LINES).toContain("onMouseLeave={onLeave}");
+    // Délégué au groupe : quitter une zone de survol pour hors d'une zone rend la main.
+    expect(LINES).toContain("hitTeamId(event.relatedTarget) === null) onLeave();");
   });
 
   it("un retri de la légende recale le survol et garde le bouton focalisé visible", () => {

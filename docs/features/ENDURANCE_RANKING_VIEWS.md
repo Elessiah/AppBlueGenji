@@ -173,7 +173,11 @@ pure dans `_lib/endurance-chart.ts`.
   général : la courbe survolée est redessinée dans un calque supérieur sans
   événements, les autres s'atténuent par un attribut du groupe — un survol ne
   déplace aucun nœud. La zone de survol (`chartHitPath`) est calculée une fois
-  par manche et géométrie. Ordre, Top N, seuil, couleurs, fond du tracé et
+  par manche et géométrie. Le tracé entier et ses longueurs cumulées
+  (`chartLinePath`) aussi : une image ne fait que dévoiler une longueur
+  (`chartLineAt` → `stroke-dasharray`) et placer la tête, sans reconstruire
+  de tracé ; survol et clic sont délégués au groupe des courbes
+  (`data-team-id` des zones de survol), aucun gestionnaire recréé par courbe. Ordre, Top N, seuil, couleurs, fond du tracé et
   tableau `sr-only` sont mémoïsés ; les lignes de la légende le sont aussi
   (`LegendRow`) : un survol ne reconstruit que les deux lignes concernées. Les
   séries ne sont recalculées que si le **contenu** change (`enduranceChartInputKey`) :
