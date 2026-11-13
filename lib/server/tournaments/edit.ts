@@ -30,6 +30,7 @@ import {
   type ValidatedTournamentInput,
 } from "./validation";
 import { insertPhases } from "./phases-repository";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 import { assertMapPointsUnlocked } from "./map-points";
@@ -303,14 +304,14 @@ async function pruneRoundPointTargets(
   } else {
     const fits = await roundFitter(connection, tournamentId, change.format, change.hasThirdPlaceMatch);
     doomed = rows.filter((row) => !fits(Number(row.phase_id), String(row.bracket)));
-    for (const row of doomed) {
-      await connection.execute(
-        `UPDATE bg_tournament_round_maps SET map_point_target = NULL
-          WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
-        [tournamentId, row.phase_id, row.bracket, row.round_number],
-      );
-    }
     if (doomed.length === 0) return false;
+    // Une seule instruction pour tous les tours caducs : le verrou du tournoi
+    // n'attend pas R allers-retours.
+    await connection.execute(
+      `UPDATE bg_tournament_round_maps SET map_point_target = NULL
+        WHERE tournament_id = ? AND (${doomed.map(() => "(phase_id = ? AND bracket = ? AND round_number = ?)").join(" OR ")})`,
+      [tournamentId, ...doomed.flatMap((row) => [row.phase_id, row.bracket, row.round_number])],
+    );
   }
   await connection.execute(
     `DELETE FROM bg_tournament_round_maps
@@ -372,7 +373,17 @@ async function roundFitter(
  * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
  * suit avant que sa ligne parte.
  */
-export async function updateTournament(
+export function updateTournament(
+  tournamentId: number,
+  patch: Partial<EditableTournamentValues>,
+): Promise<{ previousName: string; name: string }> {
+  // Le contrôle `MAP_POINTS_LOCKED` verrouille les matchs du tournoi : face à un
+  // report en cours, l'ordre des verrous peut s'inverser. L'interblocage se
+  // rejoue (transaction annulée en entier) plutôt que de rendre un 500 au staff.
+  return retryOnDeadlock(() => applyTournamentUpdate(tournamentId, patch));
+}
+
+async function applyTournamentUpdate(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
 ): Promise<{ previousName: string; name: string }> {

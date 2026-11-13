@@ -24,7 +24,8 @@
  * l'entrée ({@link invalidateTournamentSnapshot}). Personne ne lit donc un
  * score périmé.
  */
-import { effectiveMapPointTarget, singleMapDisplayScore } from "@/lib/shared/map-points";
+import { singleMapDisplayScore, type RoundPointTarget } from "@/lib/shared/map-points";
+import type { MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { createHash } from "node:crypto";
@@ -411,11 +412,15 @@ function encodeSnapshotFrame(
 function attachPointTargets(
   matches: BracketMatch[],
   tournamentTarget: number | null | undefined,
-  roundTargets: Parameters<typeof effectiveMapPointTarget>[1],
+  roundTargets: ReadonlyArray<RoundPointTarget> | null | undefined,
 ): void {
   if (tournamentTarget == null) return;
+  // Un index des réglages de tour, bâti une fois : une recherche linéaire par
+  // match rebâtirait la clé de chaque tour pour chacun des ~250 matchs.
+  const byRound = new Map<string, number>();
+  for (const entry of roundTargets ?? []) byRound.set(roundKeyId(entry), entry.target);
   for (const match of matches) {
-    match.mapPointTarget = effectiveMapPointTarget(tournamentTarget, roundTargets, match);
+    match.mapPointTarget = byRound.get(roundKeyId(match)) ?? tournamentTarget;
   }
 }
 
@@ -429,8 +434,14 @@ function attachDisplayScores(
   matches: BracketMatch[],
   card: Pick<TournamentCard, "format" | "matchFormat" | "endurancePlayoffFormat">,
 ): void {
+  // Le format ne dépend que du numéro de manche : une résolution par manche.
+  const formats = new Map<number, MatchFormat | null>();
   for (const match of matches) {
-    const format = tournamentMatchFormat(card.format, card.matchFormat, card.endurancePlayoffFormat, match.roundNumber);
+    let format = formats.get(match.roundNumber);
+    if (format === undefined) {
+      format = tournamentMatchFormat(card.format, card.matchFormat, card.endurancePlayoffFormat, match.roundNumber);
+      formats.set(match.roundNumber, format);
+    }
     const score = singleMapDisplayScore(match, format);
     if (score) match.displayScore = score;
   }

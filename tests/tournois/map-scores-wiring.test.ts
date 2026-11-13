@@ -565,7 +565,7 @@ describe("format Duel / Arcade — refus des points rattaché à un champ rendu"
 describe("format Duel / Arcade — revue UI cycle 1", () => {
   it("RoundPointsForm_locked_disablesInputAndButtonsAndSaysWhy", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx");
-    expect(dialog).toContain("locked={roundPointsLocked(detail.matches, round)}");
+    expect(dialog).toContain("locked={pointsLocked}");
     expect(dialog).toContain("disabled={locked}");
     expect(dialog).toContain("aria-disabled={busy || locked || !dirty || undefined}");
     expect(dialog).toContain('t("dialog.pointsLocked")');

@@ -542,10 +542,33 @@ describe("updateTournament — format Duel / Arcade", () => {
     });
 
     const cleared = executed.filter((q) => /UPDATE bg_tournament_round_maps SET map_point_target = NULL/.test(q.sql));
-    expect(cleared.map((q) => q.params)).toEqual([
-      [1, 4, "UPPER", 1],
-      [1, 12, "THIRD_PLACE", 1],
-    ]);
+    // Une seule instruction pour tous les tours caducs.
+    expect(cleared.map((q) => q.params)).toEqual([[1, 4, "UPPER", 1, 12, "THIRD_PLACE", 1]]);
+    expect(cleared[0].sql).toContain("(phase_id = ? AND bracket = ? AND round_number = ?) OR (phase_id = ? AND bracket = ? AND round_number = ?)");
+  });
+
+  it("updateTournament_deadlockOnFirstAttempt_replaysTheWholeTransaction", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    connection.execute.mockImplementationOnce(async () => {
+      throw deadlock;
+    });
+
+    await expect(updateTournament(1, { name: "Coupe bis" })).resolves.toMatchObject({ name: "Coupe bis" });
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(2);
+  });
+
+  it("updateTournament_otherError_isNotReplayed", async () => {
+    connection.execute.mockImplementationOnce(async () => {
+      throw new Error("boom");
+    });
+
+    await expect(updateTournament(1, { name: "Coupe bis" })).rejects.toThrow("boom");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("updateTournament_duelKept_leavesRoundTargets", async () => {

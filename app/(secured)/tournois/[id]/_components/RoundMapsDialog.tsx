@@ -816,6 +816,8 @@ export function RoundMapsDialog({
     return start ? roundKeyId(start) : "";
   });
   const round = findRound(rounds, roundId);
+  // Un balayage des matchs : refait au changement de tour ou d'instantané, pas à chaque frappe.
+  const pointsLocked = useMemo(() => (round ? roundPointsLocked(detail.matches, round) : false), [detail.matches, round]);
   const [slots, setSlots] = useState<string[][]>(() => slotsToEdit(rules.rounds, round));
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
   const [copyTarget, setCopyTarget] = useState("");
@@ -1329,7 +1331,7 @@ export function RoundMapsDialog({
             round={round}
             tournamentTarget={detail.card.mapPointTarget}
             saved={roundPointTargetOf(rules.pointTargets, round)}
-            locked={roundPointsLocked(detail.matches, round)}
+            locked={pointsLocked}
             busy={busy}
             run={run}
             onDirtyChange={setPointsDirty}
