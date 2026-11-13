@@ -2,6 +2,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import type { TournamentGame, TournamentState } from "@/lib/shared/types";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
+import { refereeKeptColumns } from "./cast-eligibility";
 import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
@@ -369,15 +370,7 @@ export async function getMatchRows(
       m.self_managed,
       m.first_map,
       m.map_picks,
-      ru.discord_verified_at AS referee_discord_verified_at,
-      ru.discord_pseudo AS referee_discord_pseudo,
-      ru.blizzard_sub AS referee_blizzard_sub,
-      ru.overwatch_battletag AS referee_overwatch_battletag,
-      ru.overwatch_battletag_typed AS referee_overwatch_battletag_typed,
-      ru.is_deleted AS referee_is_deleted,
-      ru.is_admin AS referee_is_admin,
-      ru.platform_roles_json AS referee_platform_roles_json,
-      ru.referee_objection_at AS referee_objection_at,
+      ${refereeKeptColumns("ru")},
       (m.referee_user_id IS NOT NULL AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "r")}) AS referee_plays_match,
       es1.\`rank\` AS team1_seed,
       es2.\`rank\` AS team2_seed,

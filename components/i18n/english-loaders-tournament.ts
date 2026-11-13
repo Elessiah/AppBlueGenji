@@ -3,7 +3,8 @@
 import { onceLoader } from "@/lib/shared/lazy-component";
 import type { TournamentActionsClientMessages } from "@/lib/shared/tournament-actions-text";
 import type { TournamentSheetMessages } from "@/lib/shared/tournament-page-text";
-import type { TournamentsSharedMessages } from "@/lib/shared/tournaments-text";
+import type { TournamentsClientMessages, TournamentsSharedMessages } from "@/lib/shared/tournaments-text";
+import { EN_TICKER_LABELS } from "@/lib/shared/ticker-labels";
 
 /**
  * L'anglais de la fiche d'un tournoi : son espace (sans les vues), ses gestes et
@@ -37,5 +38,26 @@ export const englishTournamentSheet = /* @__PURE__ */ onceLoader<TournamentSheet
     page: tournament.default,
     actions: { errors: errors.default, actions: actions.default },
     shared: { ...shared.default, labels: labels.default },
+  })),
+);
+
+/**
+ * L'anglais de la liste `/tournois` (liste, bandeau, cartes, textes communs avec
+ * la fiche et libellés du bandeau), chargé à part quand la page ne l'a pas
+ * sérialisé (navigation, préchargement, `router.refresh()`) : la réponse du
+ * routeur n'emporte plus ses ~6 Ko. Une fois pour la session.
+ */
+export const englishTournamentsList = /* @__PURE__ */ onceLoader<TournamentsClientMessages>(() =>
+  Promise.all([
+    import("@/messages/en/tournaments.json"),
+    import("@/messages/en/tournamentsShared.json"),
+    import("@/messages/en/labels.json"),
+  ]).then(([tournaments, shared, labels]) => ({
+    list: tournaments.default.list,
+    ticker: tournaments.default.ticker,
+    cards: tournaments.default.cards,
+    ...shared.default,
+    labels: labels.default,
+    tickerControls: EN_TICKER_LABELS,
   })),
 );

@@ -96,9 +96,56 @@ export function shouldRetryReread(failures: number): boolean {
  */
 export const REFEREE_READY_REREAD_MS = 10_000;
 
-/** Relever la modale pour suivre le « Prêt » de l'arbitre ? En lancement, arbitre présenté et pas encore prêt. */
+/**
+ * Relever la modale pour suivre le « Prêt » de l'arbitre ? En lancement,
+ * arbitre présenté et pas encore prêt — sauf pour l'arbitre lui-même, qui
+ * connaît son propre « Prêt » (son geste relit la modale).
+ */
 export function refereeReadyRereadDue(launch: MatchLaunchInfo | null): boolean {
-  return launch !== null && launch.phase === "LOBBY" && launch.referee !== null && !launch.referee.ready;
+  return (
+    launch !== null &&
+    launch.phase === "LOBBY" &&
+    launch.referee !== null &&
+    !launch.referee.ready &&
+    !launch.viewer.isReferee
+  );
+}
+
+/**
+ * Plafond de la relève, heure de lancement d'office connue ou non : une
+ * demi-heure de relectures, pas une boucle sans fin.
+ */
+export const REFEREE_READY_REREAD_MAX = 180;
+
+/**
+ * Ce que fait un battement de la relève : `stop` à l'heure du lancement
+ * d'office (`autoLaunchAt` : le match part, l'instantané fera relire la
+ * modale) ou au plafond de relectures, le premier des deux ; `skip` tant
+ * qu'une relecture ratée attend sa reprise (échecs, `Retry-After`) — la chaîne
+ * de reprise s'en charge ; `read` sinon. `now` est l'heure **du serveur**
+ * (horloge du poste corrigée de son écart, `serverClockSkew`) : `autoLaunchAt`
+ * en vient.
+ */
+export function refereeReadyRereadStep(input: {
+  now: number;
+  autoLaunchAt: string | null;
+  reads: number;
+  backingOff: boolean;
+}): "stop" | "skip" | "read" {
+  const stopAt = input.autoLaunchAt === null ? Number.NaN : Date.parse(input.autoLaunchAt);
+  if (input.reads >= REFEREE_READY_REREAD_MAX || (Number.isFinite(stopAt) && input.now >= stopAt)) return "stop";
+  if (input.backingOff) return "skip";
+  return "read";
+}
+
+/**
+ * Écart (ms) entre l'heure du serveur (en-tête `Date` d'une lecture) et celle
+ * du poste au moment de la recevoir ; 0 sans en-tête lisible. Ajouté à
+ * `Date.now()`, il donne l'heure du serveur malgré une horloge locale fausse.
+ */
+export function serverClockSkew(serverDate: string | null, receivedAt: number): number {
+  const server = serverDate === null ? Number.NaN : Date.parse(serverDate);
+  return Number.isFinite(server) ? server - receivedAt : 0;
 }
 
 /** Plus longue attente que `setTimeout` accepte (≈ 24,8 jours). */
@@ -297,6 +344,15 @@ export function useMatchContacts(
     setRereadFailures(0);
     setReadKey((key) => key + 1);
   };
+  // Une relecture ratée attend sa reprise (échecs comptés, `Retry-After`) :
+  // la relève de l'arbitre ne la double pas. Lu par le minuteur, sans le relancer.
+  const backingOffRef = useRef(false);
+  useEffect(() => {
+    backingOffRef.current = rereadFailures > 0 || rereadWait > 0;
+  }, [rereadFailures, rereadWait]);
+  // Écart de l'horloge du poste sur celle du serveur, relevé à chaque lecture
+  // réussie : la relève s'arrête à l'heure de lancement d'office du serveur.
+  const clockSkewRef = useRef(0);
   useEffect(() => {
     if (!launch) {
       // Lecture coupée : l'empreinte suit la carte, sans quoi la lecture
@@ -324,11 +380,29 @@ export function useMatchContacts(
   const { clocks } = useClientPower();
   // Jamais lecture coupée : la relève poserait deux états toutes les 10 s sans rien lire.
   const followReferee = enabled && clocks && refereeReadyRereadDue(launch);
+  const followUntil = launch?.autoLaunchAt ?? null;
+  // Relevés faits : compté hors de l'effet, que l'onglet masqué puis revu ou une
+  // mise à jour du lancement relance — le plafond tient pour toute la modale.
+  const followReadsRef = useRef(0);
+  useEffect(() => {
+    followReadsRef.current = 0;
+  }, [matchId]);
   useEffect(() => {
     if (!followReferee) return;
-    const timer = setInterval(rereadNow, REFEREE_READY_REREAD_MS);
+    const timer = setInterval(() => {
+      const step = refereeReadyRereadStep({
+        now: Date.now() + clockSkewRef.current,
+        autoLaunchAt: followUntil,
+        reads: followReadsRef.current,
+        backingOff: backingOffRef.current,
+      });
+      if (step === "stop") clearInterval(timer);
+      if (step !== "read") return;
+      followReadsRef.current += 1;
+      rereadNow();
+    }, REFEREE_READY_REREAD_MS);
     return () => clearInterval(timer);
-  }, [followReferee]);
+  }, [followReferee, followUntil]);
 
   // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
   useEffect(() => {
@@ -368,8 +442,10 @@ export function useMatchContacts(
           showError(contactsErrorText(text, read.error));
           return;
         }
+        clockSkewRef.current = serverClockSkew(read.serverDate, Date.now());
         setServerDate(read.serverDate);
         setRereadFailures(0);
+        setRereadWait(0);
         setState({ kind: "ready", launch: read.launch });
       } catch {
         if (!alive) return;

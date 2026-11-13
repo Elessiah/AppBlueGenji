@@ -23,9 +23,9 @@ import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
 import { visibleText } from "@/lib/shared/visible-text";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
-import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
+import { castEligibilityBlock } from "./cast-eligibility";
 import type { MatchCasterRow, MatchStreamRow } from "./match-casters";
-import { refereeKey } from "./referee-names";
+import { refereeKept, refereeKey } from "./referee-names";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -170,7 +170,9 @@ export type MatchRow = RowDataPacket & {
   self_managed?: number | null;
   first_map?: string | null;
   map_picks?: string | null;
-  /** Condition d'arbitrage de l'arbitre désigné (`refereeEligibilitySql`). */
+  /** Pseudo de l'arbitre désigné, tel qu'en base : il entre dans l'empreinte (`refereeKey`). */
+  referee_pseudo?: string | null;
+  /** Condition d'arbitrage de l'arbitre désigné (`refereeKeptColumns`). */
   referee_discord_verified_at?: Date | null;
   referee_discord_pseudo?: string | null;
   referee_blizzard_sub?: string | null;
@@ -501,34 +503,6 @@ function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: Tournament
   return castEligibilityBlock(caster.eligibility, game) !== null;
 }
 
-/**
- * L'arbitre désigné compte-t-il encore ? Il remplit la condition d'arbitrage
- * (relue sur la jointure de l'instantané) et, sur un match à jouer, n'a pas
- * d'opposition retenue ; sinon l'instantané le tait, comme
- * un caster inéligible, et la lecture de la modale le retire avant le lancement.
- */
-function refereeKept(row: MatchRow, game: TournamentGame): boolean {
-  if (row.referee_user_id === null || row.referee_user_id === undefined) return false;
-  // Avant le départ, l'arbitre qui joue désormais le match ne compte plus — la
-  // même règle que le verrou du lancement (`lockLaunchMatch`).
-  if (castBeforeLaunch(row) && Number(row.referee_plays_match ?? 0) === 1) return false;
-  // Opposition retenue : plus montré sur un match à jouer, même si un retrait
-  // en série l'a manqué (un match joué garde son arbitre, comme en base).
-  if (row.status !== "COMPLETED" && (row.referee_objection_at ?? null) !== null) return false;
-  return (
-    refereeEligibilityBlock({
-      discord_verified_at: row.referee_discord_verified_at ?? null,
-      discord_pseudo: row.referee_discord_pseudo ?? null,
-      blizzard_sub: row.referee_blizzard_sub ?? null,
-      overwatch_battletag: row.referee_overwatch_battletag ?? null,
-      overwatch_battletag_typed: row.referee_overwatch_battletag_typed ?? null,
-      is_deleted: Number(row.referee_is_deleted ?? 1),
-      is_admin: Number(row.referee_is_admin ?? 0),
-      platform_roles_json: row.referee_platform_roles_json ?? null,
-    }, game) === null
-  );
-}
-
 /** Premier ban d'un match arbitré : la règle de l'arbitre hôte, tant qu'il n'est pas joué. */
 function refereeFirstBan(
   status: MatchRow["status"],
@@ -586,7 +560,9 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], ga
     // (`showsRefereeName` : `PENDING`/`READY` — textes RGPD « jusqu'à la
     // déclaration de son score ou la fin du tournoi »). Tournoi terminé : `snapshot.ts`.
     refereeKey:
-      referee && row.status !== "COMPLETED" ? refereeKey(Number(row.id), Number(row.referee_user_id)) : null,
+      referee && row.status !== "COMPLETED"
+        ? refereeKey(Number(row.id), Number(row.referee_user_id), String(row.referee_pseudo ?? ""))
+        : null,
     selfManaged: Number(row.self_managed ?? 0) === 1,
     firstMap: firstMap === "" ? null : firstMap,
     mapPicks: parseMapPicks(row.map_picks),

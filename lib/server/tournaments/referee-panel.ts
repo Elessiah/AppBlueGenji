@@ -76,7 +76,12 @@ type PanelMatchRow = RowDataPacket & {
   tournament_game: TournamentGame;
 };
 
-type RoundStateRow = RowDataPacket & { open: number | string; self_managed: number | string | null; refereed: number | string | null };
+type RoundStateRow = RowDataPacket & {
+  open: number | string;
+  self_managed: number | string | null;
+  refereed: number | string | null;
+  slots_json: string | null;
+};
 
 type StaffRow = CastEligibilityRow & { id: number; pseudo: string; referee_objection_at: Date | string | null };
 
@@ -110,19 +115,22 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     );
     const byId = new Map(staff.map((row) => [Number(row.id), row]));
     const players = await loadMatchPlayerIds(connection, match);
-    const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
-      `SELECT slots_json FROM bg_tournament_round_maps
-        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
-      [match.tournament_id, match.phase_id, match.bracket, match.round_number],
-    );
+    // État de la manche et ses cartes, sur la même clé de manche : **une**
+    // requête (l'agrégat rend toujours une ligne, cartes absentes = `NULL`) ;
+    // la clé de manche est unique (`uq_bg_round_maps_round`) : la sous-requête
+    // ne rend jamais deux lignes, `LIMIT 1` ne fait que le dire.
+    const roundKey = [match.tournament_id, match.phase_id, match.bracket, match.round_number];
     const [roundStateRows] = await connection.execute<RoundStateRow[]>(
       `SELECT COUNT(*) AS open,
               SUM(self_managed = 1) AS self_managed,
-              SUM(self_managed = 0 AND referee_user_id IS NOT NULL) AS refereed
+              SUM(self_managed = 0 AND referee_user_id IS NOT NULL) AS refereed,
+              (SELECT rm.slots_json FROM bg_tournament_round_maps rm
+                WHERE rm.tournament_id = ? AND rm.phase_id = ? AND rm.bracket = ? AND rm.round_number = ?
+                LIMIT 1) AS slots_json
          FROM bg_matches
-        WHERE tournament_id = ? AND phase_id = ? AND round_number = ? AND bracket = ?
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?
           AND status <> 'COMPLETED' AND is_bye = 0`,
-      [match.tournament_id, match.phase_id, match.round_number, match.bracket],
+      [...roundKey, ...roundKey],
     );
     const roundState = roundStateRows[0];
     // Avant le départ, l'arbitre qui joue désormais le match ne compte plus —
@@ -181,7 +189,7 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
         selfManaged: Number(roundState?.self_managed ?? 0),
         refereed: Number(roundState?.refereed ?? 0),
       },
-      roundSlots: parseStoredSlots(roundRows[0]?.slots_json),
+      roundSlots: parseStoredSlots(roundState?.slots_json),
       candidates: staff
         // Un joueur du match ne l'arbitre pas (`REFEREE_IS_PLAYER`) : pas
         // proposé ; une opposition retenue ferme l'arbitrage (`REFEREE_OBJECTION`).

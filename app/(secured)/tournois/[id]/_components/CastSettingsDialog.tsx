@@ -7,7 +7,6 @@ import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { offersCastRelease } from "@/lib/shared/cast-settings";
 import { canToggleOnAir, isMatchCastable, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { liveTriggerViewer, viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
-import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -15,7 +14,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { useLiveControls } from "../_lib/live-context";
+import { useLiveControls, useViewerRefereesMatch } from "../_lib/live-context";
 import { useTournamentGame } from "../_lib/match-format-context";
 import { useOnAirToggle } from "../_lib/use-on-air-toggle";
 import {
@@ -95,7 +94,7 @@ export function CastSettingsDialog({
   const { openReplay } = controls;
   // Le mode posé par un autre caster se lit sans se changer
   // (`LIVE_TRIGGER_NOT_OWNED`) : un co-caster ne décide pas pour celui qui l'a posé.
-  const viewer = liveTriggerViewer(controls, viewerRefereesMatch(match, controls.refereeNames));
+  const viewer = liveTriggerViewer(controls, useViewerRefereesMatch(match));
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
   const game = useTournamentGame();
   const titleId = useId();

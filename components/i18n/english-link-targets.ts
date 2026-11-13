@@ -15,6 +15,7 @@ import { preloadProfileEnglish } from "./profile-english";
 
 /** Le préchargement de chaque page (survol, navigation par le code) — dans ce morceau à la demande. */
 const PAGE_PRELOADS: Record<keyof typeof PAGE_LOADERS, () => void> = {
+  tournaments: preloadMissing(PAGE_LOADERS.tournaments),
   tournamentSheet: preloadMissing(PAGE_LOADERS.tournamentSheet),
   teamPage: preloadMissing(PAGE_LOADERS.teamPage),
   teams: preloadMissing(PAGE_LOADERS.teams),

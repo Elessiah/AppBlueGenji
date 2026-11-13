@@ -11,6 +11,7 @@
  */
 export const ENGLISH_PAGES = {
   profile: /^\/profil$/,
+  tournaments: /^\/tournois$/,
   tournamentSheet: /^\/tournois\/\d+(\/.*)?$/,
   teamPage: /^\/equipes\/\d+$/,
   teams: /^\/equipes(\/creer)?$/,

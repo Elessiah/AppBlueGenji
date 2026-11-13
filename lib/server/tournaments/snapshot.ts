@@ -66,7 +66,7 @@ import { computeRunningRatio } from "@/lib/shared/tournament-progress";
 import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
-import { withoutRefereeKeys } from "./referee-names";
+import { forgetLiveRefereeNames, withoutRefereeKeys } from "./referee-names";
 import { loadTournamentVoiceInfos } from "./match-voice";
 
 /**
@@ -145,6 +145,9 @@ export function spectatorSnapshotCacheKey(tournamentId: number): string {
  */
 export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
+  // La lecture directe des pseudos d'arbitre (`loadLiveRefereeNames`) suit
+  // chaque écriture du tournoi, comme l'instantané.
+  forgetLiveRefereeNames(tournamentId);
 }
 
 /** Clé de la carte d'encart d'un tournoi (`publicTournamentCard`), posée ici pour la même raison. */

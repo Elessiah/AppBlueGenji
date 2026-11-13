@@ -562,6 +562,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`created_by`) : index nommé, qui prend le relais de l'index implicite
     // de la clé étrangère `fk_bg_team_inv_creator` (même colonne).
     `ALTER TABLE bg_team_invitations ADD INDEX idx_bg_team_inv_creator (created_by)`,
+    // EF-60 — la lecture directe des pseudos d'arbitre d'un tournoi
+    // (`loadLiveRefereeNames` : matchs à jouer arbitrés) ne parcourt plus tous
+    // les matchs du tournoi : `tournament_id` puis les seuls matchs arbitrés.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_tournament_referee (tournament_id, referee_user_id, status)`,
     // DUEL-ARCADE — points par carte du format Duel / Arcade, au tournoi et
     // par tour (`docs/features/DUEL_ARCADE.md`).
     `ALTER TABLE bg_tournaments ADD COLUMN map_point_target TINYINT UNSIGNED NULL AFTER match_format_draws`,

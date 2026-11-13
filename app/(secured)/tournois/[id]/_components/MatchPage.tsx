@@ -34,7 +34,7 @@ import {
   GAME_SETTINGS,
   type MatchPageSide,
 } from "@/lib/shared/match-page";
-import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap, refereeNameOf } from "@/lib/shared/match-referee";
+import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
 import { castWithoutStartAt, streamLinkText, type MatchLiveState } from "@/lib/shared/live-streams";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
@@ -51,7 +51,7 @@ import { shownTiebreakMap } from "@/lib/shared/match-maps";
 import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapName } from "@/lib/shared/round-maps";
 import { roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
-import { useLiveControls } from "../_lib/live-context";
+import { useLiveControls, useRefereeNameOf } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText, useMapError } from "../_lib/error-map";
 import { useMatchCardModel } from "../_lib/match-card-model";
@@ -354,8 +354,7 @@ function DecisionValue({ value, subject, hintId, hint }: Readonly<{ value: React
 function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof matchPageDecision>, hintId: string): KeyFact | null {
   const { t } = useTournamentPageText();
   const page = useMatchPageText();
-  const { refereeNames } = useLiveControls();
-  const refereeName = refereeNameOf(match, refereeNames);
+  const refereeName = useRefereeNameOf(match);
   if (decision === "REFEREE") {
     return {
       id: "officiating",
