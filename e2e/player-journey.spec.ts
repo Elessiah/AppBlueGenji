@@ -211,6 +211,10 @@ test.describe("Parcours joueur dans un tournoi", () => {
     // l'avis dit qu'il ouvre un litige verrouillé.
     await expect(dialog).toContainText("ouvre un litige et verrouille la saisie des deux adversaires");
     await dialog.getByRole("button", { name: "Envoyer le score" }).click();
+    // Ouvrir un litige se confirme (`ConfirmActionDialog`, écarts carte par carte).
+    const confirm = pageB.getByRole("alertdialog", { name: "Ouvrir un litige ?" });
+    await expect(confirm).toContainText("Map 1 écart");
+    await confirm.getByRole("button", { name: "Envoyer le score" }).click();
     await expect(dialog).toHaveCount(0);
 
     await expect(matchCard(pageB, matchId)).toContainText("Score en litige · saisie verrouillée, arbitrage attendu");
