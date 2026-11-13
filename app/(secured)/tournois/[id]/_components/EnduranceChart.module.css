@@ -233,39 +233,117 @@
   text-anchor: end;
 }
 
-/* Tracé étroit (375 px : l'échelle tombe à ~0,33) : texte du SVG par paliers,
-   pour rester lisible une fois mis à l'échelle ; « Départ » s'efface quand il
-   toucherait « M1 ». */
-@container endurancePlot (max-width: 599px) {
+/* Tracé plus étroit que le viewBox (760 unités) : le SVG est mis à l'échelle
+   (largeur ÷ 760), son texte avec. Chaque palier pose la taille (en unités du
+   SVG) qui rend au moins 11 px à sa borne basse : ⌈11 × 760 ÷ borne⌉ — 8 360 ÷
+   largeur. « Départ » s'efface quand il toucherait « M1 » ; sous 290 px, une
+   manche sur deux (la manche affichée reste) : « M12 » en 34 unités ne tient
+   plus dans le pas d'une manche (692 ÷ 12 ≈ 58 unités). */
+@container endurancePlot (max-width: 759px) {
   .svg {
     overflow: visible;
   }
+}
+
+/* 600–759 px : 14 unités ≥ 11 px dès 600 px. */
+@container endurancePlot (max-width: 759px) {
   .axisY,
   .axisX,
   .cutLabel,
   .forfeit {
-    font-size: 16px;
+    font-size: 14px;
   }
 }
 
-@container endurancePlot (max-width: 429px) {
+/* 520–599 px : 17 unités ≥ 11 px dès 520 px. */
+@container endurancePlot (max-width: 599px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 17px;
+  }
+}
+
+/* 440–519 px : 19 unités ≥ 11 px dès 440 px. */
+@container endurancePlot (max-width: 519px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 19px;
+  }
+}
+
+/* 380–439 px : 22 unités ≥ 11 px dès 380 px. */
+@container endurancePlot (max-width: 439px) {
   .axisY,
   .axisX,
   .cutLabel,
   .forfeit {
     font-size: 22px;
   }
+}
+
+/* 330–379 px : 26 unités ≥ 11 px dès 330 px. */
+@container endurancePlot (max-width: 379px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 26px;
+  }
+}
+
+/* 290–329 px : 29 unités ≥ 11 px dès 290 px. */
+@container endurancePlot (max-width: 329px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 29px;
+  }
+}
+
+/* 250–289 px : 34 unités ≥ 11 px dès 250 px. */
+@container endurancePlot (max-width: 289px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 34px;
+  }
+}
+
+/* 220–249 px : 38 unités ≥ 11 px dès 220 px. */
+@container endurancePlot (max-width: 249px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 38px;
+  }
+}
+
+/* 0–219 px : 42 unités ≥ 11 px dès 200 px. */
+@container endurancePlot (max-width: 219px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 42px;
+  }
+}
+
+@container endurancePlot (max-width: 439px) {
   .axisStart {
     display: none;
   }
 }
 
-@container endurancePlot (max-width: 319px) {
-  .axisY,
-  .axisX,
-  .cutLabel,
-  .forfeit {
-    font-size: 28px;
+@container endurancePlot (max-width: 289px) {
+  .axisXSparse {
+    display: none;
   }
 }
 

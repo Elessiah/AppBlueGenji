@@ -156,9 +156,27 @@ describe("mouvement", () => {
   });
 
   it("le texte du SVG grossit par paliers quand le tracé se rétrécit", () => {
-    for (const width of [599, 429, 319]) expect(CSS).toContain(`@container endurancePlot (max-width: ${width}px)`);
+    for (const width of [599, 439, 289]) expect(CSS).toContain(`@container endurancePlot (max-width: ${width}px)`);
     expect(CSS).toMatch(/\.plot \{\s*\/\*[^]*?\*\/\s*container: endurancePlot \/ inline-size;/);
     expect(CSS).toMatch(/\.chart \{\s*\/\*[^]*?\*\/\s*container: enduranceChart \/ inline-size;/);
+  });
+
+  it("endurancePlotBands_eachBand_rendersAtLeast11PxAtItsLowerBound", () => {
+    // Le SVG est mis à l'échelle (largeur ÷ 760) : chaque palier rend ≥ 11 px à la
+    // borne basse de sa bande (la suivante, + 1 px ; 200 px pour la dernière).
+    const bands = [...CSS.matchAll(/@container endurancePlot \(max-width: (\d+)px\) \{\s*\.axisY,[^{]*\{\s*font-size: (\d+)px;/g)].map(
+      (m) => ({ max: Number(m[1]), size: Number(m[2]) }),
+    );
+    expect(bands.length).toBeGreaterThanOrEqual(8);
+    bands.forEach((band, index) => {
+      const lower = index + 1 < bands.length ? bands[index + 1].max + 1 : 200;
+      expect((band.size * lower) / 760).toBeGreaterThanOrEqual(11);
+    });
+  });
+
+  it("endurancePlot_veryNarrow_hidesEveryOtherRoundLabel", () => {
+    expect(CSS).toMatch(/@container endurancePlot \(max-width: 289px\) \{\s*\.axisXSparse \{\s*display: none;/);
+    expect(CHART).toContain("round % 2 === 0 ? ` ${styles.axisXSparse}` : \"\"");
   });
 
   it("aucune animation CSS infinie", () => {
