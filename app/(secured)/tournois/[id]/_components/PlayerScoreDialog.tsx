@@ -79,7 +79,10 @@ interface PlayerScoreDialogProps {
   proposals: MatchProposalMaps[];
   onClose: () => void;
   onSubmitted: () => void;
-  /** Relit le contexte du lecteur (lecture REST) : une proposition a changé. */
+  /**
+   * Un refus dit l'état lu périmé : la page le remet à jour — rien à faire
+   * quand le flux est ouvert (il apporte l'écriture), lecture REST sinon.
+   */
   onRefresh: () => void | Promise<unknown>;
   /**
    * Le geste du lecteur peut trancher le match (envoi, forfait) : `true` dès
