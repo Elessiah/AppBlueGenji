@@ -23,6 +23,9 @@ describe("métadonnées de l'écran de réactivation", () => {
     const { reactivation, meta: loginMeta } = messagesFor(locale.current).login;
     expect(meta.title).toBe(reactivation.title);
     expect(meta.title).not.toBe(loginMeta.title);
+    // Description propre aussi, pas celle de la connexion.
+    expect(meta.description).toBe(reactivation.metaDescription);
+    expect(meta.description).not.toBe(loginMeta.description);
     expect(meta.robots).toEqual({ index: false, follow: true });
     expect(JSON.stringify(meta.alternates)).toContain("/connexion/reactivation");
   });

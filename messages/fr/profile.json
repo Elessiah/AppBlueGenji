@@ -233,7 +233,7 @@
       "SOLO_REGISTRATIONS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt.",
       "ORGANIZED_TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire.",
       "OWNED_TEAMS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet.",
-      "NONE": "Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées.",
+      "NONE": "Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement à la fin des trente jours, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées dès maintenant.",
       "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, engagement dans un tournoi individuel déjà commencé ou terminé, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
     },
     "outcome": {
