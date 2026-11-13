@@ -36,6 +36,8 @@ function fakeConnection(
     afterReport?: Record<string, unknown>;
     /** Maps de la proposition adverse (`TEAM2`), telles que la base les rend. */
     team2Maps?: Record<string, unknown>[];
+    /** Format Duel / Arcade : points qui gagnent une carte ; éteint par défaut. */
+    mapPointTarget?: number;
   } = {},
 ): { conn: PoolConnection; writes: string[]; mapWrites: { sql: string; params: unknown }[] } {
   const writes: string[] = [];
@@ -93,6 +95,7 @@ function fakeConnection(
               match_format_draws: format?.draws ? 1 : 0,
               endurance_playoff_format_type: null,
               endurance_playoff_format_value: null,
+              map_point_target: extra.mapPointTarget ?? null,
             },
           ],
           [],
@@ -332,6 +335,33 @@ describe("reportMatchScore — confirmation d'une proposition adverse", () => {
     await expect(reportMatchScore(conn, 1, 10, 42, maps, { reportedAt: reportedAt.toISOString() })).rejects.toThrow(
       "PROPOSAL_STALE",
     );
+    expect(writes).toHaveLength(0);
+  });
+});
+
+describe("reportMatchScore — format Duel / Arcade", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 100, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+  });
+
+  it("reportMatchScore_mapAtTarget_recordsTheReport", async () => {
+    mockTournament({ type: "BO", value: 1 });
+    const { conn, writes } = fakeConnection({ type: "BO", value: 1 }, "SINGLE", null, { mapPointTarget: 5 });
+
+    await reportMatchScore(conn, 1, 10, 42, [{ replayCode: "MAP001", team1Score: 5, team2Score: 3 }]);
+
+    expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
+  });
+
+  it("reportMatchScore_winnerBelowTarget_throwsMapPointsInvalidWithoutWrite", async () => {
+    mockTournament({ type: "BO", value: 1 });
+    const { conn, writes } = fakeConnection({ type: "BO", value: 1 }, "SINGLE", null, { mapPointTarget: 5 });
+
+    await expect(
+      reportMatchScore(conn, 1, 10, 42, [{ replayCode: "MAP001", team1Score: 4, team2Score: 3 }]),
+    ).rejects.toThrow("MAP_POINTS_INVALID");
     expect(writes).toHaveLength(0);
   });
 });

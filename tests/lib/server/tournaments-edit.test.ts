@@ -50,6 +50,8 @@ const executed: { sql: string; params: unknown[] }[] = [];
 let rowToReturn: Record<string, unknown> | null;
 /** Phases lues pour un tournoi MULTI. Vide par défaut : la plupart des cas sont mono-format. */
 let phaseRowsToReturn: Record<string, unknown>[] = [];
+/** Matchs lus par le verrou des points par carte (`assertMapPointsUnlocked`). */
+let matchRowsToReturn: Record<string, unknown>[] = [];
 
 const connection = {
   beginTransaction: jest.fn(async () => undefined),
@@ -60,6 +62,8 @@ const connection = {
     executed.push({ sql, params });
     if (/FROM bg_tournaments/i.test(sql)) return [rowToReturn ? [rowToReturn] : []];
     if (/FROM bg_tournament_phases/i.test(sql)) return [phaseRowsToReturn];
+    if (/FROM bg_match_maps/i.test(sql)) return [[]];
+    if (/FROM bg_matches/i.test(sql)) return [matchRowsToReturn];
     return [{ affectedRows: 1, insertId: 1 }];
   }),
 };
@@ -68,6 +72,7 @@ beforeEach(() => {
   executed.length = 0;
   rowToReturn = hiddenRow();
   phaseRowsToReturn = [];
+  matchRowsToReturn = [];
   jest.clearAllMocks();
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: async () => connection,
@@ -390,5 +395,53 @@ describe("sortie anticipée « hors course » (BG Survie)", () => {
     rowToReturn = bgsRow({ state, start_visibility_at: past });
     await expect(updateTournament(1, { enduranceEarlyExit: true })).rejects.toThrow("TOURNAMENT_LOCKED");
     expect(executed.some((q) => /UPDATE bg_tournaments/i.test(q.sql))).toBe(false);
+  });
+});
+
+describe("updateTournament — format Duel / Arcade", () => {
+  const scored = { id: 9, team1_score: null, team2_score: null, team1_reported_at: new Date(), team2_reported_at: null };
+
+  it("updateTournament_duelTurnedOnDuringRegistration_writesTarget", async () => {
+    rowToReturn = hiddenRow({ state: "REGISTRATION", start_visibility_at: past });
+
+    await updateTournament(1, { mapPointTarget: 5 });
+
+    const update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql));
+    expect(update!.sql).toMatch(/map_point_target = \?/);
+    expect(update!.params).toContain(5);
+  });
+
+  it("updateTournament_matchFormatDuringRegistration_editable", async () => {
+    rowToReturn = hiddenRow({ state: "REGISTRATION", start_visibility_at: past, match_format_type: "BO", match_format_value: 9 });
+
+    await expect(updateTournament(1, { matchFormat: { type: "BO", value: 1 }, mapPointTarget: 5 })).resolves.toBeDefined();
+  });
+
+  it("updateTournament_targetChangedWithAReport_throwsLocked", async () => {
+    matchRowsToReturn = [scored];
+
+    await expect(updateTournament(1, { mapPointTarget: 5 })).rejects.toThrow("MAP_POINTS_LOCKED");
+
+    expect(executed.some((q) => /UPDATE bg_tournaments/i.test(q.sql))).toBe(false);
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("updateTournament_targetUnchanged_skipsTheScoreLock", async () => {
+    matchRowsToReturn = [scored];
+    rowToReturn = hiddenRow({ map_point_target: 5 });
+
+    await updateTournament(1, { name: "Autre nom", mapPointTarget: 5 });
+
+    expect(executed.some((q) => /FROM bg_matches/i.test(q.sql))).toBe(false);
+  });
+
+  it("updateTournament_invalidTarget_throwsInvalidMapPointTarget", async () => {
+    await expect(updateTournament(1, { mapPointTarget: 0 })).rejects.toThrow("INVALID_MAP_POINT_TARGET");
+  });
+
+  it("loadEditableTournament_storedTarget_readsIt", async () => {
+    rowToReturn = hiddenRow({ map_point_target: 5 });
+
+    expect((await loadEditableTournament(1))?.values.mapPointTarget).toBe(5);
   });
 });

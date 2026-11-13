@@ -19,6 +19,7 @@ import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { castBeforeLaunch, currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
 import { firstBanTeamId, matchHostTeamId, refereeHostedFirstBanTeamId } from "@/lib/shared/match-referee";
 import { parseMapPicks } from "@/lib/shared/round-maps";
+import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
 import { visibleText } from "@/lib/shared/visible-text";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
@@ -77,6 +78,8 @@ export type TournamentRow = RowDataPacket & {
    * l'option éteinte, le défaut de la colonne.
    */
   match_launch_phase?: number | null;
+  /** Format Duel / Arcade : points par carte, `NULL` = éteint (`lib/shared/map-points.ts`). */
+  map_point_target?: number | null;
   /** 1 = salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ; absent = éteinte. */
   team_voice_channels?: number | null;
   /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
@@ -295,6 +298,7 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     ),
     refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
     launchPhase: Number(row.match_launch_phase ?? 0) === 1,
+    mapPointTarget: parseStoredMapPointTarget(row.map_point_target),
     teamVoiceChannels: Number(row.team_voice_channels ?? 0) === 1,
     // Revalidé à la lecture, comme dans `findBroadcastingTournament` : une ligne
     // posée avant la liste blanche (ou éditée à la main en base) ne doit jamais

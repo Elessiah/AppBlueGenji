@@ -35,6 +35,7 @@
  * Module pur (`lib/shared`) : aucune base, aucun réseau. Le déclenchement et la
  * résolution des noms vivent dans `lib/server/tournaments/bot-logs.ts`.
  */
+import { mapPointsLine } from "./map-points";
 import { matchRoundLabel, formatMatchStart } from "./discord-notifications";
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "./oauth-providers";
 import { participantWording, type ParticipantType } from "./participants";
@@ -622,6 +623,11 @@ export function formatMatchResultLog(context: {
    * personne (« le staff »), à la place d'une ligne 🛠️ à part.
    */
   staffValidated?: boolean;
+  /**
+   * Format Duel / Arcade : points de chaque carte, dans l'ordre du plateau
+   * (« points : 5–3 · 2–5 ») — aucun nom de joueur, seulement des chiffres.
+   */
+  mapPoints?: ReadonlyArray<{ team1Score: number; team2Score: number }> | null;
 }): string {
   const round = matchRoundLabel(context.bracket, context.roundNumber, context.swiss);
   // Un forfait prononcé par un arbitre laisse les deux scores à `null` : la
@@ -633,7 +639,8 @@ export function formatMatchResultLog(context: {
       ? `${team1} vs ${team2}`
       : `${team1} ${context.team1Score}–${context.team2Score} ${team2}`;
   const validated = context.staffValidated ? ` — résultat validé par ${ANONYMOUS_STAFF_LABEL}` : "";
-  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeitNote(context)}${validated}.`;
+  const points = context.mapPoints && context.mapPoints.length > 0 ? ` (points : ${mapPointsLine(context.mapPoints)})` : "";
+  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${points}${forfeitNote(context)}${validated}.`;
 }
 
 /** Mention de forfait accolée au score d'une fin de match, vide sans forfait. */

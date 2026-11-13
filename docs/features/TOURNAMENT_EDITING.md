@@ -18,12 +18,16 @@ Tout est modifiable : nom, jeu, format, barèmes, réglages de survie ou de suis
 
 **Condition :** `state !== "RUNNING" AND state !== "FINISHED" AND startVisibilityAt ≤ maintenant()`
 
-Seuls cinq champs survivent à la publication :
+Seuls sept champs survivent à la publication :
 - `name` — le titre du tournoi
 - `description` — la présentation générale
 - `registrationCloseAt` — la date de clôture des inscriptions
 - `startAt` — le début du tournoi
 - `maxTeams` — la capacité (sous contrainte)
+- `matchFormat` et `mapPointTarget` — format des matchs et points par carte
+  (`DUEL_ARCADE.md`) : passer un BO9 en BO1 + premier à 5 pendant les
+  inscriptions, inscrites comprises (décision DUEL-ARCADE). Les points sont
+  refusés (`MAP_POINTS_LOCKED`, 409) si un match porte déjà un score.
 
 Tout ce qui change la **structure** du tournoi est verrouillé : format, jeu, barèmes, réglages. Changez une `Survie` en `Double élimination` une fois que le tournoi est lisible, et vous démentez l'annonce lue par les équipes.
 
@@ -151,4 +155,4 @@ deux écritures de la même règle, dont une seule aurait suivi l'ajout d'une fe
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Édition d'un tournoi après création** (`lib/shared/tournament-edit.ts` pur + `lib/server/tournaments/edit.ts`) : le staff `tournaments` peut modifier un tournoi selon trois fenêtres — `FULL` (tournoi caché, tout éditable), `RESTRICTED` (annoncé mais pas lancé, cinq champs : nom, description, clôture des inscriptions, début du tournoi, effectif maximal), `LOCKED` (en cours ou terminé, rien). Le module pur décide quels champs sont modifiables ; le serveur le rejoue sous `SELECT … FOR UPDATE` pour refuser une modification devenue interdite entre le chargement du formulaire et sa soumission. Validation partagée avec la création (`lib/server/tournaments/validation.ts`) : même barème, mêmes règles d'ordre des dates, pas de divergence possible. La route `PATCH /api/tournaments/[id]/edit` applique une liste blanche sur le corps (seuls les champs de `ALL_TOURNAMENT_FIELDS` passent) et mappe les erreurs HTTP (fenêtre fermée → 409, incohérence → 400). Voir `docs/features/TOURNAMENT_EDITING.md`.
+- **Édition d'un tournoi après création** (`lib/shared/tournament-edit.ts` pur + `lib/server/tournaments/edit.ts`) : le staff `tournaments` peut modifier un tournoi selon trois fenêtres — `FULL` (tournoi caché, tout éditable), `RESTRICTED` (annoncé mais pas lancé, sept champs : nom, description, clôture des inscriptions, début du tournoi, effectif maximal, format des matchs, points par carte), `LOCKED` (en cours ou terminé, rien). Le module pur décide quels champs sont modifiables ; le serveur le rejoue sous `SELECT … FOR UPDATE` pour refuser une modification devenue interdite entre le chargement du formulaire et sa soumission. Validation partagée avec la création (`lib/server/tournaments/validation.ts`) : même barème, mêmes règles d'ordre des dates, pas de divergence possible. La route `PATCH /api/tournaments/[id]/edit` applique une liste blanche sur le corps (seuls les champs de `ALL_TOURNAMENT_FIELDS` passent) et mappe les erreurs HTTP (fenêtre fermée → 409, incohérence → 400). Voir `docs/features/TOURNAMENT_EDITING.md`.

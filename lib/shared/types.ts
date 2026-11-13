@@ -487,6 +487,13 @@ export type TournamentCard = {
    */
   launchPhase: boolean;
   /**
+   * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : chaque carte se
+   * gagne au premier à N points (N ici, remplaçable par tour —
+   * `mapRules.pointTargets`). `null` / absent : format éteint. Public : c'est
+   * une règle du tournoi.
+   */
+  mapPointTarget?: number | null;
+  /**
    * Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : allumée, le bot
    * crée un salon par équipe un quart d'heure avant chaque match et le
    * lancement attend qu'ils soient pleins. Éteinte par défaut ; publique.
@@ -641,6 +648,12 @@ export type BracketMatch = {
    * posé.
    */
   maps: MatchMapResult[];
+  /**
+   * Format Duel / Arcade : points qui gagnent une carte de **ce** match (celui
+   * du tour, sinon du tournoi — `effectiveMapPointTarget`). `null` / absent :
+   * format éteint. Dans l'instantané commun, servi par les deux portes.
+   */
+  mapPointTarget?: number | null;
   updatedAt: string;
   /** ID de la phase du tournoi (0 pour un tournoi sans phases). */
   phaseId: number;

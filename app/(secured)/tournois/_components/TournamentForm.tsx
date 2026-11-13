@@ -34,6 +34,7 @@ import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
 import { TeamVoiceChannelsField } from "./TeamVoiceChannelsField";
 import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LAUNCH_PHASE_MORE_ID, LaunchPhaseField } from "./LaunchPhaseField";
+import { DuelArcadeField, MAP_POINT_TARGET_FIELD_ID, MAP_POINT_TARGET_HINT_ID } from "./DuelArcadeField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
   sectionEyebrow,
@@ -74,6 +75,7 @@ const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
   startAt: "start-at",
   enduranceEarlyExit: EARLY_EXIT_FIELD_ID,
   launchPhase: LAUNCH_PHASE_FIELD_ID,
+  mapPointTarget: MAP_POINT_TARGET_FIELD_ID,
 };
 
 // Les valeurs et leurs conversions vivent dans `_lib/tournament-form-values`.
@@ -515,6 +517,20 @@ export function TournamentForm({
                 </p>
               </div>
             )}
+
+            <DuelArcadeField
+              checked={values.duelArcade}
+              target={values.mapPointTarget}
+              locked={locked("mapPointTarget")}
+              aria={fieldAttrs("mapPointTarget", MAP_POINT_TARGET_HINT_ID)}
+              error={fieldErrors.message("mapPointTarget")}
+              onCheckedChange={(checked) => {
+                set("duelArcade", checked);
+                fieldErrors.clear("mapPointTarget");
+              }}
+              onTargetChange={(target) => set("mapPointTarget", target)}
+              onTargetEdit={() => fieldErrors.clear("mapPointTarget")}
+            />
 
             <FormatSettings
               values={values}

@@ -751,3 +751,25 @@ describe("validateTournamentInput — salons vocaux d'équipe", () => {
     expect(validateTournamentInput(body)).toEqual({ error: "INVALID_TEAM_VOICE_CHANNELS" });
   });
 });
+
+describe("validateTournamentInput — format Duel / Arcade", () => {
+  it("validateTournamentInput_noMapPointTarget_formatOff", () => {
+    expect(value(base).mapPointTarget).toBeNull();
+  });
+
+  it("validateTournamentInput_mapPointTargetFive_kept", () => {
+    expect(value({ ...base, mapPointTarget: 5 }).mapPointTarget).toBe(5);
+  });
+
+  it("validateTournamentInput_mapPointTargetNinetyNine_kept", () => {
+    expect(value({ ...base, mapPointTarget: 99 }).mapPointTarget).toBe(99);
+  });
+
+  it("validateTournamentInput_mapPointTargetZero_refused", () => {
+    expect(validateTournamentInput({ ...base, mapPointTarget: 0 })).toEqual({ error: "INVALID_MAP_POINT_TARGET" });
+  });
+
+  it("validateTournamentInput_mapPointTargetHundred_refused", () => {
+    expect(validateTournamentInput({ ...base, mapPointTarget: 100 })).toEqual({ error: "INVALID_MAP_POINT_TARGET" });
+  });
+});

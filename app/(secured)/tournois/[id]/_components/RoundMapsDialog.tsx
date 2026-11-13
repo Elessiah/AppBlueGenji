@@ -4,6 +4,8 @@ import { memo, useEffect, useId, useMemo, useRef, useState, type FormEvent, type
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
+import { NumberInput } from "@/components/ui/number-input";
+import { MAP_POINT_TARGET_MAX, MAP_POINT_TARGET_MIN, roundPointTargetOf } from "@/lib/shared/map-points";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -528,6 +530,125 @@ function TiebreakForm({
   );
 }
 
+/** Refus du serveur rattachés au champ des points du tour. */
+const POINTS_FIELD_ERRORS = {
+  INVALID_MAP_POINT_TARGET: "points",
+  MAP_POINTS_LOCKED: "points",
+  MAP_POINTS_DISABLED: "points",
+} as const satisfies Record<string, "points">;
+
+/**
+ * Points par carte propres à un tour, en format Duel / Arcade
+ * (`docs/features/DUEL_ARCADE.md`) : « Enregistrer » pose le nombre du tour,
+ * « Revenir aux points du tournoi » le retire. Montré seulement quand le
+ * format est allumé sur le tournoi. Suit le serveur tant que le champ n'a pas
+ * été modifié.
+ */
+function RoundPointsForm({
+  tournamentId,
+  round,
+  tournamentTarget,
+  saved,
+  busy,
+  run,
+  onDirtyChange,
+}: Readonly<{
+  tournamentId: number;
+  round: RoundKey;
+  /** Points du tournoi, que le tour suit sans réglage propre. */
+  tournamentTarget: number;
+  /** Points propres au tour (`null` = il suit le tournoi). */
+  saved: number | null;
+  busy: boolean;
+  run: RunTask;
+  onDirtyChange: (dirty: boolean) => void;
+}>) {
+  const { t } = useRoundMapsText();
+  const { showSuccess } = useToast();
+  const ids = useId();
+  const inputId = `${ids}-points`;
+  const statusId = `${ids}-points-status`;
+  const effective = saved ?? tournamentTarget;
+  const [value, setValue] = useState(effective);
+  const fieldErrors = useFieldErrors(POINTS_FIELD_ERRORS, { points: inputId });
+  const synced = useRef(effective);
+  useEffect(() => {
+    const before = synced.current;
+    synced.current = effective;
+    setValue((current) => (current === before ? effective : current));
+  }, [effective]);
+  const dirty = value !== effective;
+  useEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
+
+  const send = (target: number | null, success: string) =>
+    run(
+      async () => {
+        await putJson(`/api/admin/tournaments/${tournamentId}/round-points`, { ...round, target });
+        setValue(target ?? tournamentTarget);
+        showSuccess(success);
+      },
+      (code, text) => fieldErrors.report(code, text),
+    );
+
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    if (busy || !dirty) return;
+    // Le nombre du tournoi saisi sur le tour : le tour le suit, aucun réglage propre à garder.
+    void send(value === tournamentTarget ? null : value, t("dialog.pointsSaved"));
+  };
+
+  return (
+    <form onSubmit={save} aria-busy={busy}>
+      <fieldset className={styles.section}>
+        <legend className={styles.legend}>{t("dialog.pointsTitle")}</legend>
+        <div className="field">
+          <div className={styles.labelRow}>
+            <label htmlFor={inputId}>{t("dialog.pointsLabel")}</label>
+            <InfoHint id={`${ids}-points-hint`} subject={t("dialog.pointsTitle")}>
+              {t("dialog.pointsHint")}
+            </InfoHint>
+          </div>
+          <NumberInput
+            id={inputId}
+            min={MAP_POINT_TARGET_MIN}
+            max={MAP_POINT_TARGET_MAX}
+            value={value}
+            onValueChange={setValue}
+            onEdit={() => fieldErrors.clear()}
+            {...fieldErrors.aria("points", statusId)}
+          />
+          <FieldErrorText fieldId={inputId} message={fieldErrors.message("points")} />
+          <p id={statusId} className={styles.muted}>
+            {saved === null
+              ? t("dialog.pointsInherited", { points: tournamentTarget })
+              : t("dialog.pointsOwn", { points: saved, tournament: tournamentTarget })}
+          </p>
+        </div>
+        <div className={styles.actions}>
+          <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
+          <button
+            type="button"
+            className="btn ghost"
+            aria-disabled={busy || saved === null || undefined}
+            onClick={() => {
+              if (busy || saved === null) return;
+              void send(null, t("dialog.pointsRemoved"));
+            }}
+          >
+            {t("dialog.pointsRemove")}
+          </button>
+          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || undefined}>
+            {t("dialog.pointsSave")}
+          </button>
+        </div>
+      </fieldset>
+    </form>
+  );
+}
+
 /**
  * Maps de départage gardées en base sur des tours que le format n'autorise
  * plus : ni montrées ni jouées, mais le staff doit pouvoir les retirer.
@@ -692,6 +813,8 @@ export function RoundMapsDialog({
   const [busy, setBusy] = useState(false);
   // Saisie non enregistrée du champ de la map de départage (remontée par son formulaire).
   const [tiebreakDirty, setTiebreakDirty] = useState(false);
+  // Saisie non enregistrée des points du tour (format Duel / Arcade).
+  const [pointsDirty, setPointsDirty] = useState(false);
   // Créneau que désigne un refus (créneau vide entre deux cartes, carte de trop) ;
   // `null` : le refus du serveur ne dit pas lequel, il vise la liste entière.
   const [errorSlot, setErrorSlot] = useState<number | null>(null);
@@ -914,7 +1037,7 @@ export function RoundMapsDialog({
   const changeRound = (id: string) => {
     if (id === roundId) return;
     // Des cartes saisies et non enregistrées seraient perdues en silence : on le demande.
-    if (roundDirty || tiebreakDirty) setPending({ kind: "switch", id });
+    if (roundDirty || tiebreakDirty || pointsDirty) setPending({ kind: "switch", id });
     else selectRound(id);
   };
 
@@ -927,7 +1050,7 @@ export function RoundMapsDialog({
 
   // Fermer (Échap, voile, « Fermer ») jetterait les saisies non enregistrées : on le demande, comme au changement de tour.
   const requestClose = () => {
-    if (roundDirty || rulesDirty || tiebreakDirty) setPending({ kind: "close" });
+    if (roundDirty || rulesDirty || tiebreakDirty || pointsDirty) setPending({ kind: "close" });
     else onClose();
   };
 
@@ -1186,6 +1309,19 @@ export function RoundMapsDialog({
             run={run}
             onWritten={() => writtenRounds.current.add(roundKeyId(round))}
             onDirtyChange={setTiebreakDirty}
+          />
+        )}
+
+        {round && detail.card.mapPointTarget != null && (
+          <RoundPointsForm
+            key={`points-${roundKeyId(round)}`}
+            tournamentId={tournamentId}
+            round={round}
+            tournamentTarget={detail.card.mapPointTarget}
+            saved={roundPointTargetOf(rules.pointTargets, round)}
+            busy={busy}
+            run={run}
+            onDirtyChange={setPointsDirty}
           />
         )}
 

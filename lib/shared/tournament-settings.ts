@@ -44,6 +44,7 @@ export type TournamentSettingsInput = {
     | "registrationFilters"
     | "launchPhase"
     | "teamVoiceChannels"
+    | "mapPointTarget"
   >;
   phases: TournamentPhase[] | null;
   swiss: Pick<SwissMeta, "totalRounds" | "pointsForWin" | "pointsForDraw" | "pointsForLoss" | "pointsForBye"> | null;
@@ -188,6 +189,10 @@ export function tournamentSettingsGroups(input: TournamentSettingsInput): Tourna
     { label: "Participants", value: solo ? "Joueurs (tournoi individuel)" : "Équipes" },
     { label: "Effectif maximal", value: plural(card.maxTeams, solo ? "joueur" : "équipe") },
     { label: "Format des matchs", value: matchFormatSettingLabel(card.matchFormat) },
+    // Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : montré allumé seulement.
+    ...(card.mapPointTarget == null
+      ? []
+      : [{ label: "Points par carte (Duel / Arcade)", value: `Premier à ${card.mapPointTarget}` }]),
     { label: "Ordre de départ", value: SEEDING_LABELS[input.seedingSource] },
     { label: "Phase de lancement des matchs", value: yesNo(card.launchPhase) },
     { label: "Salons vocaux d'équipe", value: yesNo(card.teamVoiceChannels) },

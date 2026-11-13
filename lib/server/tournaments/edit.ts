@@ -32,6 +32,8 @@ import {
 import { insertPhases } from "./phases-repository";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
+import { assertMapPointsUnlocked } from "./map-points";
+import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
 
 /** Valeurs éditables d'un tournoi. Dates en ISO, comme partout côté client. */
 export type EditableTournamentValues = {
@@ -62,6 +64,11 @@ export type EditableTournamentValues = {
   /** Phase de lancement des matchs (option, éteinte par défaut). */
   launchPhase: boolean;
   matchFormat: MatchFormat | null;
+  /**
+   * Format Duel / Arcade : points qui gagnent une carte (`null` = éteint,
+   * `docs/features/DUEL_ARCADE.md`).
+   */
+  mapPointTarget: number | null;
   /** BG Survie : format de l'arbre final (`null` = celui du tournoi). */
   endurancePlayoffFormat: MatchFormat | null;
   /**
@@ -101,7 +108,7 @@ async function loadEditRow(
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
       registration_min_players, referee_scheduling, match_launch_phase,
-      team_voice_channels
+      team_voice_channels, map_point_target
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -147,6 +154,7 @@ function toValues(
     enduranceMaxRounds: num(row.endurance_max_rounds),
     enduranceEarlyExit: Number(row.endurance_early_exit) === 1,
     launchPhase: Number(row.match_launch_phase) === 1,
+    mapPointTarget: parseStoredMapPointTarget(row.map_point_target),
     matchFormat: parseMatchFormat(
       row.match_format_type,
       row.match_format_value,
@@ -249,6 +257,20 @@ export async function loadEditableTournament(
  * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
  * suit avant que sa ligne parte.
  */
+/**
+ * Points par carte changés : refusé si un match du tournoi porte déjà un score
+ * (`MAP_POINTS_LOCKED`) — garde-fou, la fenêtre d'édition se ferme en principe
+ * avant le premier match (`docs/features/DUEL_ARCADE.md`).
+ */
+async function assertPointTargetChangeAllowed(
+  connection: PoolConnection,
+  tournamentId: number,
+  before: number | null,
+  after: number | null,
+): Promise<void> {
+  if (after !== before) await assertMapPointsUnlocked(connection, tournamentId, null);
+}
+
 export async function updateTournament(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
@@ -293,6 +315,7 @@ export async function updateTournament(
 
     const { valid, normalizedPhases } = validateEditedValues(next);
     name = valid.name;
+    await assertPointTargetChangeAllowed(connection, tournamentId, current.mapPointTarget, valid.mapPointTarget);
 
     await connection.execute(
       `UPDATE bg_tournaments SET
@@ -309,7 +332,7 @@ export async function updateTournament(
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
         registration_discord_requirement = ?, registration_blizzard_requirement = ?,
-        registration_min_players = ?, match_launch_phase = ?
+        registration_min_players = ?, match_launch_phase = ?, map_point_target = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -345,6 +368,7 @@ export async function updateTournament(
         valid.registrationFilters.blizzardRequirement,
         valid.registrationFilters.minPlayers,
         valid.launchPhase ? 1 : 0,
+        valid.mapPointTarget,
         tournamentId,
       ],
     );
@@ -418,6 +442,7 @@ function validateEditedValues(next: EditableTournamentValues): {
     enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
     enduranceEarlyExit: next.enduranceEarlyExit,
     launchPhase: next.launchPhase,
+    mapPointTarget: next.mapPointTarget,
     matchFormatType: next.matchFormat?.type ?? null,
     matchFormatValue: next.matchFormat?.value ?? null,
     matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,

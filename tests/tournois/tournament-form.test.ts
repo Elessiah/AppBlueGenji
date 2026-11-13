@@ -303,13 +303,15 @@ describe("format de match — les deux notations", () => {
     expect(ALL_TOURNAMENT_FIELDS).toContain("matchFormat");
   });
 
-  it("verrouille le format une fois le tournoi annoncé, puis lancé", () => {
+  it("garde le format modifiable une fois le tournoi annoncé (Duel / Arcade), le verrouille une fois lancé", () => {
     const announced = {
       state: "REGISTRATION" as const,
       startVisibilityAt: new Date(Date.now() - 86_400_000).toISOString(),
       maxTeams: 8,
     };
-    expect(isFieldEditable("matchFormat", announced)).toBe(false);
+    expect(isFieldEditable("matchFormat", announced)).toBe(true);
+    expect(isFieldEditable("mapPointTarget", announced)).toBe(true);
+    expect(isFieldEditable("mapPointTarget", { ...announced, state: "RUNNING" })).toBe(false);
     expect(isFieldEditable("matchFormat", { ...announced, state: "RUNNING" })).toBe(false);
   });
 });
@@ -395,6 +397,7 @@ describe("toApiPayload — réglages du match nul", () => {
         enduranceMaxRounds: null,
         enduranceEarlyExit: false,
         launchPhase: false,
+        mapPointTarget: null,
         matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
         endurancePlayoffFormat: { type: "BO", value: 5 },
         registrationDiscordRequirement: "ANY_PLAYER",
@@ -474,6 +477,7 @@ describe("conditions d'inscription", () => {
         enduranceMaxRounds: null,
         enduranceEarlyExit: false,
         launchPhase: false,
+        mapPointTarget: null,
         matchFormat: null,
         endurancePlayoffFormat: null,
         registrationDiscordRequirement: "ALL_PLAYERS" as const,
@@ -521,5 +525,35 @@ describe("sortie anticipée « hors course » — formulaire", () => {
     expect(isFieldEditable("enduranceEarlyExit", hidden)).toBe(true);
     expect(isFieldEditable("enduranceEarlyExit", visible)).toBe(false);
     expect(isFieldEditable("enduranceEarlyExit", { ...hidden, state: "RUNNING" })).toBe(false);
+  });
+});
+
+describe("format Duel / Arcade — formulaire", () => {
+  it("defaultTournamentFormValues_duelOffWithFivePoints", () => {
+    const values = defaultTournamentFormValues();
+
+    expect(values.duelArcade).toBe(false);
+    expect(values.mapPointTarget).toBe(5);
+  });
+
+  it("toApiPayload_duelOff_sendsNull", () => {
+    const values = { ...defaultTournamentFormValues(), name: "Coupe", mapPointTarget: 7 };
+
+    expect(toApiPayload(values).mapPointTarget).toBeNull();
+  });
+
+  it("toApiPayload_duelOn_sendsTarget", () => {
+    const values = { ...defaultTournamentFormValues(), name: "Coupe", duelArcade: true, mapPointTarget: 7 };
+
+    expect(toApiPayload(values).mapPointTarget).toBe(7);
+  });
+
+  it("toFormValues_storedTarget_checksDuelArcade", () => {
+    const api = { ...toApiPayload({ ...defaultTournamentFormValues(), name: "Coupe" }), mapPointTarget: 3 };
+
+    const actual = toFormValues(api as Parameters<typeof toFormValues>[0]);
+
+    expect(actual.duelArcade).toBe(true);
+    expect(actual.mapPointTarget).toBe(3);
   });
 });

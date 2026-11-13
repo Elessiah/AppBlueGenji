@@ -1,5 +1,5 @@
 {
-  "count": 221,
+  "count": 225,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -222,6 +222,10 @@
     "VOICE_CLEAR_UNAVAILABLE": "Le bot Discord n'a pas pu vider le salon. Réessaie dans une minute.",
     "VOICE_CLEAR_FAILED": "Le salon vocal n'a pas pu être vidé.",
     "VOICE_CLEAR_IS_PLAYER": "Tu joues ce match : tu ne peux pas vider ses salons vocaux.",
-    "VOICE_CLEAR_NOT_TEAM_LEADER": "Seuls le propriétaire, un manager ou le capitaine de cette équipe peuvent vider son salon vocal."
+    "VOICE_CLEAR_NOT_TEAM_LEADER": "Seuls le propriétaire, un manager ou le capitaine de cette équipe peuvent vider son salon vocal.",
+    "MAP_POINTS_INVALID": "Points de carte invalides pour le format Duel / Arcade : le vainqueur marque exactement le nombre de points fixé, l'autre moins.",
+    "MAP_POINTS_LOCKED": "Points par carte figés : un score a déjà été saisi sur un match concerné.",
+    "MAP_POINTS_DISABLED": "Le format Duel / Arcade n'est pas activé sur ce tournoi : active-le dans ses réglages avant de régler les points d'un tour.",
+    "INVALID_MAP_POINT_TARGET": "Points par carte invalides : un entier entre 1 et 99."
   }
 }

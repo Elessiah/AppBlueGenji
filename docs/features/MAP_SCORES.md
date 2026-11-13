@@ -119,6 +119,7 @@ Le jeu se lit avec le format, dans la même requête
 | `MAP_COUNT_EXCEEDED` | plus de lignes que le plafond |
 | `MAP_REPLAY_CODE_REQUIRED` / `_INVALID` / `_DUPLICATE` | code manquant, hors motif, en double |
 | `MAP_SCORE_INVALID` | score de map non entier, négatif ou > 99 |
+| `MAP_POINTS_INVALID` | format Duel / Arcade : carte où le vainqueur n'a pas exactement N points ou l'autre en a N ou plus (`DUEL_ARCADE.md`) |
 | `MAP_AFTER_DECISION` | map après la fin acquise |
 | `MAP_LIST_INCOMPLETE` | égalités ouvertes : match sans vainqueur clos avant d'avoir joué toutes ses maps |
 | `SCORE_EXCEEDS_MATCH_FORMAT`, `SCORE_BELOW_MATCH_FORMAT`, `DRAW_NOT_ALLOWED` | score dérivé refusé par les règles existantes |
@@ -369,6 +370,10 @@ le tait.
   (les pages de tournoi exigent une session), pour qu'un match diffusé en direct
   et un match qui ne l'est pas offrent les mêmes informations ; les propositions
   en attente restent réservées aux deux équipes et à l'arbitrage.
+- Format Duel / Arcade (`DUEL_ARCADE.md`) : `BracketMatch.mapPointTarget` porte le N
+  effectif ; le bouton de détail montre alors les points (« Points : 5–3 ») et la
+  modale rappelle « Premier à N points ». La concordance des propositions
+  compare déjà les points de chaque carte.
 - Discord : aucun code n'y part. Si un jour un code y est cité, il passe par
   `discordInline` (`UNTRUSTED_NAMES.md`).
 

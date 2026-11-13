@@ -146,10 +146,12 @@ function buttonTitleFor(text: TournamentDialogsText, input: {
   idle: string;
   format: MatchFormat | null;
   game: TournamentGame | null | undefined;
+  /** Points par carte du format Duel / Arcade (`null` = éteint). */
+  pointTarget: number | null;
 }): string {
   if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");
   if (input.mapRefusal && input.onBlankRow) return input.idle;
-  if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);
+  if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game, input.pointTarget);
   return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : input.idle;
 }
 
@@ -162,11 +164,12 @@ function visibleBlocker(text: TournamentDialogsText, input: {
   blocker: ScoreFormBlocker | null;
   format: MatchFormat | null;
   game: TournamentGame | null | undefined;
+  pointTarget: number | null;
 }): string | null {
   if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");
   // Une ligne vierge n'appelle pas encore de reproche.
   if (input.blankMaps) return null;
-  if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);
+  if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game, input.pointTarget);
   return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : null;
 }
 
@@ -317,6 +320,7 @@ export function AdminScoreDialog({
       idle,
       format: matchFormat,
       game: form.game,
+      pointTarget: match.mapPointTarget ?? null,
     });
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -375,6 +379,7 @@ export function AdminScoreDialog({
     blocker,
     format: matchFormat,
     game: form.game,
+    pointTarget: match.mapPointTarget ?? null,
   });
   // Score proposé par une engagée et jamais confirmé par l'autre — une équipe
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
@@ -590,6 +595,7 @@ export function AdminScoreDialog({
               replayCodeOptional
               mapNames={mapNames}
               tiebreakMap={tiebreakMap}
+              pointTarget={match.mapPointTarget ?? null}
               disabled={form.submitting}
               fieldErrors={mapFieldErrors}
             />

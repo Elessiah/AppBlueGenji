@@ -39,6 +39,7 @@ export function tournamentCard(overrides: Partial<TournamentCard> = {}): Tournam
     launchPhase: true,
     liveUrl: null,
     image: null,
+    mapPointTarget: null,
     finishedAt: null,
     champion: null,
     runningProgress: null,

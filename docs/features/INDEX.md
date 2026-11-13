@@ -37,6 +37,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `PLAYER_SCORE_ENTRY.md` — Saisie, confirmation et contestation du score par un joueur ; forfait sur la manche.
 - `SCORE_DISPUTE_LOCK.md` — Litige de score : saisie verrouillée pour les deux équipes jusqu'à l'arbitrage (arbitre qui joue : autres membres du staff avertis) ; score seul validé d'office après 2 h de silence (un `UPDATE` conditionnel), suspendu par un « Enregistrer » d'arbitrage.
 - `MAP_SCORES.md` — Saisie du score map par map, seule saisie (arbitrage compris, code de replay facultatif pour lui), score du match dérivé dans le circuit existant.
+- `DUEL_ARCADE.md` — Format Duel / Arcade : chaque carte au premier à N points (tournoi, remplaçable par tour), contrôlé à chaque saisie de score, figé dès qu'un match concerné porte un score ; points affichés partout.
 - `TOURNAMENT_PREVIEW.md` — Aperçu du plateau pendant les inscriptions (staff et cast), sans écriture.
 - `SEEDING_ORDER.md` — Ordre de seeding aux flèches ↑ / ↓, figé au coup d'envoi.
 - `ENTRANT_REMOVAL.md` — Retrait d'un engagé, jusqu'au coup d'envoi seulement.

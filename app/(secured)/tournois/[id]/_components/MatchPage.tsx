@@ -408,6 +408,15 @@ function tiebreakFacts(tiebreak: string | null, label: string, detail: string): 
   return tiebreak === null ? [] : [{ id: "tiebreak", label, value: visibleText(tiebreak), detail }];
 }
 
+/** Fait « Points par carte » : format Duel / Arcade allumé seulement (`DUEL_ARCADE.md`). */
+function pointTargetFacts(
+  target: number | null | undefined,
+  label: string,
+  firstTo: (points: string) => string,
+): KeyFact[] {
+  return target == null ? [] : [{ id: "pointTarget", label, value: firstTo(String(target)) }];
+}
+
 /** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », ou pool à choisir. */
 function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFact[] }>) {
   const page = useMatchPageText();
@@ -524,6 +533,9 @@ function MatchKeyFacts({
       matchFormatText(text, format)
     ),
   });
+  facts.push(...pointTargetFacts(match.mapPointTarget, page.t("facts.pointTarget"), (points) =>
+    t("match.maps.firstTo", { points }),
+  ));
   // Règlement §14 : l'équipe du haut (l'hôte) prend le côté gauche.
   if (hostSide) {
     facts.push({
@@ -1060,7 +1072,13 @@ function ResultSection({ match, sides }: Readonly<{ match: BracketMatch; sides: 
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <SectionTitle id={titleId}>{page.t("sections.result")}</SectionTitle>
-      <MapResultList maps={match.maps} team1Name={team1} team2Name={team2} label={t("match.maps.listLabel")} />
+      <MapResultList
+        maps={match.maps}
+        team1Name={team1}
+        team2Name={team2}
+        label={t("match.maps.listLabel")}
+        pointTarget={match.mapPointTarget ?? null}
+      />
     </section>
   );
 }

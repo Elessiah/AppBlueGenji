@@ -7,6 +7,8 @@ import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 import { AUTO_VALIDATION_PAUSED_SQL } from "./score-report-sql";
+import { loadMatchPointTarget } from "./map-points";
+import type { RoundKey } from "@/lib/shared/round-maps";
 
 /**
  * Format de match applicable à une manche (`null` = saisie libre).
@@ -44,12 +46,22 @@ export async function loadTournamentMatchFormat(
  * ligne : la saisie d'arbitrage en a besoin pour juger la fenêtre de saisie, et
  * relire le tournoi pour une colonne coûtait un aller-retour sous le verrou du
  * match.
+ *
+ * `pointTarget` : points qui gagnent une carte en format Duel / Arcade
+ * (`docs/features/DUEL_ARCADE.md`) pour la manche `roundKey` — réglage du tour,
+ * sinon du tournoi, `null` format éteint (ou sans `roundKey`).
  */
 export async function loadTournamentMatchRules(
   connection: PoolConnection,
   tournamentId: number,
   round?: number | null,
-): Promise<{ format: MatchFormat | null; game: TournamentGame | null; refereeScheduling: boolean }> {
+  roundKey?: RoundKey | null,
+): Promise<{
+  format: MatchFormat | null;
+  game: TournamentGame | null;
+  refereeScheduling: boolean;
+  pointTarget: number | null;
+}> {
   const [rows] = await connection.execute<
     (RowDataPacket & {
       format: string;
@@ -61,13 +73,14 @@ export async function loadTournamentMatchRules(
       endurance_playoff_format_type: "BO" | "FT" | null;
       endurance_playoff_format_value: number | null;
       referee_scheduling: number | null;
+      map_point_target: number | null;
     })[]
   >(
     `SELECT format, game,
             match_format_type, match_format_value,
             match_format_max_maps, match_format_draws,
             endurance_playoff_format_type, endurance_playoff_format_value,
-            referee_scheduling
+            referee_scheduling, map_point_target
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,
@@ -75,7 +88,7 @@ export async function loadTournamentMatchRules(
   );
 
   const row = rows[0];
-  if (!row) return { format: null, game: null, refereeScheduling: false };
+  if (!row) return { format: null, game: null, refereeScheduling: false, pointTarget: null };
 
   const qualification = parseMatchFormat(
     row.match_format_type,
@@ -91,7 +104,10 @@ export async function loadTournamentMatchRules(
     round,
   );
   const game = row.game === "OW" || row.game === "MR" ? row.game : null;
-  return { format, game, refereeScheduling: Number(row.referee_scheduling ?? 0) === 1 };
+  const pointTarget = roundKey
+    ? await loadMatchPointTarget(connection, tournamentId, row.map_point_target, roundKey)
+    : null;
+  return { format, game, refereeScheduling: Number(row.referee_scheduling ?? 0) === 1, pointTarget };
 }
 
 /**
@@ -161,6 +177,7 @@ export async function loadTournamentRow(
       registration_min_players,
       referee_scheduling,
       match_launch_phase,
+      map_point_target,
       team_voice_channels,
       live_url,
       first_ban_rule,
@@ -422,6 +439,7 @@ export async function getTournamentListRow(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.map_point_target,
       t.team_voice_channels,
       t.live_url,
       t.image_url,
@@ -465,6 +483,7 @@ export async function getTournamentListRow(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.map_point_target,
       t.team_voice_channels,
       t.live_url,
       t.image_url,

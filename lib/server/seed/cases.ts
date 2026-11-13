@@ -108,6 +108,12 @@ export interface TournamentDef extends ReportStateCounts {
    */
   refereeScheduling?: boolean;
   launchPhase?: boolean; // phase de lancement des matchs (absent = éteinte, le défaut de la colonne)
+  /**
+   * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
+   * une carte ; absent = format éteint. Pas de `mapDetails` avec lui : le
+   * détail simulé n'en respecterait pas la règle.
+   */
+  mapPointTarget?: number;
 }
 
 /**
@@ -322,6 +328,10 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Solo Inscriptions Ouvertes", game: "OW", state: "REGISTRATION", participantType: "SOLO", format: "SINGLE", teamCount: 6, maxTeams: 16, daysOffset: 11 },
   { name: "Solo 8 Joueurs (simple élim.)", game: "MR", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 8 },
   { name: "Solo Suisse Terminé", game: "OW", state: "FINISHED", participantType: "SOLO", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -18, swissTotalRounds: 3, teamOffset: 16 },
+  // Format Duel / Arcade (DUEL_ARCADE.md) : le duel Widowmaker 1v1 — BO1, la
+  // carte au premier à 5 points. Aucun match joué : le premier tour attend un
+  // report (« 5 – 3 »), refusé hors de la règle.
+  { name: "Duel Arcade Widow (premier à 5)", game: "OW", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 4, maxTeams: 4, daysOffset: -1, playWaves: 0, teamOffset: 24, matchFormat: { type: "BO", value: 1 }, mapPointTarget: 5 },
 
   // ---- MULTI : tournois multi-phases -------------------------------------------
   {

@@ -22,7 +22,7 @@
     "fieldRefusal": "{message} ({field})",
     "finished": "Le tournoi est terminé : il n'est plus modifiable.",
     "lockStarted": "Le tournoi est en cours : seules la planification des matchs par l'arbitrage et les salons vocaux d'équipe restent modifiables.",
-    "lockVisible": "Le tournoi est visible depuis le {date} — le format, le jeu et les réglages ne sont plus modifiables.",
+    "lockVisible": "Le tournoi est visible depuis le {date} — le format du tournoi, le jeu et les réglages ne sont plus modifiables, sauf le format des matchs et les points par carte.",
     "savedNone": "Aucune modification à enregistrer.",
     "saved": "Tournoi modifié.",
     "savedWithPlanning": "Tournoi modifié. {planning}",
@@ -65,6 +65,7 @@
       "registrationBlizzardRequirement": "Compte Blizzard à l'inscription",
       "registrationMinPlayers": "Joueurs minimum dans l'équipe",
       "launchPhase": "Phase de lancement des matchs",
+      "mapPointTarget": "Format Duel / Arcade",
       "phases": "Phases du tournoi"
     },
     "voiceErrors": {
@@ -186,6 +187,13 @@
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
       "warning": "À l'enregistrement, les matchs sans date et pas encore lancés quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent.",
       "warningDirect": "À l'enregistrement, les matchs sans date et pas encore lancés attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent."
+    },
+    "duelArcade": {
+      "label": "Format Duel / Arcade",
+      "description": "Chaque carte se gagne au premier à N points (un duel Widowmaker au premier à 5, par exemple) : le vainqueur en marque exactement N, l'autre moins. Le format de match compte toujours des cartes, et un tour peut avoir ses propres points.",
+      "target": "Premier à X points par carte",
+      "scope": "Modifiable jusqu'au début du tournoi, même avec des inscrits.",
+      "locked": "Le tournoi a commencé : le format n'est plus modifiable."
     },
     "launchPhase": {
       "label": "Phase de lancement des matchs",

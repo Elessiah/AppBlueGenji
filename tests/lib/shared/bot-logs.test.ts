@@ -662,3 +662,27 @@ describe("formatForfeitCancelledLog", () => {
     expect(cancelled.split(" ")[0]).not.toBe(forfeit.split(" ")[0]);
   });
 });
+
+describe("formatMatchResultLog — format Duel / Arcade", () => {
+  const context = {
+    tournament: TOURNAMENT,
+    bracket: "UPPER" as const,
+    roundNumber: 2,
+    team1: { name: "Les Renards", participantType: "TEAM" as const },
+    team2: { name: "Team Nova", participantType: "TEAM" as const },
+    team1Score: 1,
+    team2Score: 0,
+  };
+
+  it("formatMatchResultLog_mapPoints_appendsThePointsAfterTheScore", () => {
+    const line = formatMatchResultLog({ ...context, mapPoints: [{ team1Score: 5, team2Score: 3 }] });
+
+    expect(line).toContain("Les Renards 1–0 Team Nova (points : 5\u20133).");
+  });
+
+  it("formatMatchResultLog_emptyMapPoints_addsNothing", () => {
+    const line = formatMatchResultLog({ ...context, mapPoints: [] });
+
+    expect(line).not.toContain("points");
+  });
+});

@@ -31,6 +31,8 @@
       "maxSolo": "{count, plural, one {# joueur} other {# joueurs}}",
       "maxLabel": "Effectif maximal",
       "matchFormat": "Format des matchs",
+      "mapPointTarget": "Points par carte (Duel / Arcade)",
+      "mapPointTargetValue": "Premier à {count}",
       "seeding": "Ordre de départ",
       "launchPhase": "Phase de lancement des matchs",
       "teamVoice": "Salons vocaux d'équipe"

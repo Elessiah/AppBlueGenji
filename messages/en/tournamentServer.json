@@ -31,6 +31,8 @@
       "maxSolo": "{count, plural, one {# player} other {# players}}",
       "maxLabel": "Maximum entrants",
       "matchFormat": "Match format",
+      "mapPointTarget": "Points per map (Duel / Arcade)",
+      "mapPointTargetValue": "First to {count}",
       "seeding": "Starting order",
       "launchPhase": "Match launch phase",
       "teamVoice": "Team voice channels"

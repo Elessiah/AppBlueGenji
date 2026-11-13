@@ -50,6 +50,7 @@ const values: EditableTournamentValues = {
   enduranceMaxRounds: null,
   enduranceEarlyExit: false,
   launchPhase: false,
+  mapPointTarget: null,
   matchFormat: null,
   endurancePlayoffFormat: null,
   registrationDiscordRequirement: "ANY_PLAYER",

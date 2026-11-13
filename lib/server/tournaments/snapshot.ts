@@ -24,10 +24,11 @@
  * l'entrée ({@link invalidateTournamentSnapshot}). Personne ne lit donc un
  * score périmé.
  */
+import { effectiveMapPointTarget } from "@/lib/shared/map-points";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { createHash } from "node:crypto";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
+import type { BracketMatch, TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { cached, invalidateCached, isCachedOrLoading } from "@/lib/server/cache";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
@@ -398,6 +399,22 @@ function encodeSnapshotFrame(
   };
 }
 
+/**
+ * Format Duel / Arcade : points qui gagnent une carte, par match (réglage du
+ * tour, sinon du tournoi) — dans l'instantané commun, servi par les deux
+ * portes (`docs/features/DUEL_ARCADE.md`). Absent quand le format est éteint.
+ */
+function attachPointTargets(
+  matches: BracketMatch[],
+  tournamentTarget: number | null | undefined,
+  roundTargets: Parameters<typeof effectiveMapPointTarget>[1],
+): void {
+  if (tournamentTarget == null) return;
+  for (const match of matches) {
+    match.mapPointTarget = effectiveMapPointTarget(tournamentTarget, roundTargets, match);
+  }
+}
+
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
   const tournament = await loadMaintainedRow(tournamentId);
   if (!tournament) return null;
@@ -565,6 +582,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       ), mapRules),
       await loadMapsByMatch(connection, matchIds),
     );
+    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets);
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
     // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).
     // Dans l'instantané commun — l'état de chaque salon, jamais qui —, servi

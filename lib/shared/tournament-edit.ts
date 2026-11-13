@@ -48,6 +48,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "registrationBlizzardRequirement",
   "registrationMinPlayers",
   "launchPhase",
+  "mapPointTarget",
   "phases",
 ] as const;
 
@@ -84,6 +85,14 @@ export const RESTRICTED_FIELDS: readonly TournamentField[] = [
   // ferait rentrer en lancement des matchs que la règle tenait déjà pour
   // lancés, ou l'inverse (`docs/features/MATCH_LAUNCH.md`).
   "launchPhase",
+  // Format de match et format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) :
+  // modifiables jusqu'au départ, même avec des inscrites — aucun match n'existe
+  // avant, aucun score n'est donc jugé par l'ancienne règle. Un BO9 qui était
+  // en fait un « premier à 5 » sur une carte doit pouvoir être repris sans
+  // recréer le tournoi. Le service refuse encore (`MAP_POINTS_LOCKED`) des
+  // points changés sous un score, par garde-fou.
+  "matchFormat",
+  "mapPointTarget",
 ];
 
 /**

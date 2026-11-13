@@ -61,6 +61,11 @@ interface MapScoreListProps {
    * « Map de départage : Ilios » (`tiebreakRowIndex`).
    */
   tiebreakMap?: string | null;
+  /**
+   * Format Duel / Arcade (`lib/shared/map-points.ts`) : chaque carte se gagne
+   * au premier à N points. `null` / absent : format éteint.
+   */
+  pointTarget?: number | null;
 }
 
 /**
@@ -134,6 +139,7 @@ export function MapScoreList({
   fieldErrors,
   mapNames = [],
   tiebreakMap = null,
+  pointTarget = null,
 }: Readonly<MapScoreListProps>) {
   const text = useDialogsText();
   const { t } = text;
@@ -172,7 +178,7 @@ export function MapScoreList({
   // et que le match n'est pas acquis ; les lignes vierges devenues inutiles
   // s'en vont, les lignes renseignées restent (refusées sur leur champ).
   const change = (next: MatchMapInput[]) => {
-    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional });
+    const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget });
     // Seule une ligne ajoutée **par l'affichage progressif** s'annonce : une
     // liste remplacée de l'extérieur (proposition reçue) arrive déjà remplie.
     autoGrown.current = rows.length > maps.length;
@@ -257,10 +263,13 @@ export function MapScoreList({
         <InfoHintRow inline>
           <p id={hintId} className={styles.hint}>
             {replayCodeHintText(text, game)}
+            {pointTarget === null ? "" : ` ${t("score.maps.duelHint", { points: pointTarget })}`}
           </p>
           <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
             <p>
-              {t("score.maps.drawHint")}
+              {pointTarget === null
+                ? t("score.maps.drawHint")
+                : t("score.maps.duelRules", { points: pointTarget, max: pointTarget - 1 })}
               {replayHint ? ` ${replayHint}` : ""}
               {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
             </p>
@@ -324,7 +333,7 @@ export function MapScoreList({
                     id={t1Id}
                     className={styles.scoreInput}
                     min={0}
-                    max={MAP_SCORE_MAX}
+                    max={pointTarget ?? MAP_SCORE_MAX}
                     inputMode="numeric"
                     onKeyDown={keepEnterInList}
                     value={map.team1Score}
@@ -348,7 +357,7 @@ export function MapScoreList({
                     id={t2Id}
                     className={styles.scoreInput}
                     min={0}
-                    max={MAP_SCORE_MAX}
+                    max={pointTarget ?? MAP_SCORE_MAX}
                     inputMode="numeric"
                     onKeyDown={keepEnterInList}
                     value={map.team2Score}

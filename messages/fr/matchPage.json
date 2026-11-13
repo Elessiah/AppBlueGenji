@@ -24,6 +24,7 @@
     "mapOpen": "Map {number} : à choisir",
     "mapImposed": "imposée",
     "format": "Format",
+    "pointTarget": "Points par carte",
     "sides": "Côtés",
     "sideLeft": "Gauche : {team}",
     "sideRight": "Droite : {team}",

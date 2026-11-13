@@ -413,6 +413,8 @@ export async function createTournament(
     launchPhase?: boolean | null;
     /** Salons vocaux d'équipe ; absents = option éteinte (le défaut). */
     teamVoiceChannels?: boolean | null;
+    /** Format Duel / Arcade : points par carte ; absent / `null` = format éteint. */
+    mapPointTarget?: number | null;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -543,8 +545,9 @@ export async function createTournament(
         registration_min_players,
         referee_scheduling,
         match_launch_phase,
-        team_voice_channels
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        team_voice_channels,
+        map_point_target
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -592,6 +595,7 @@ export async function createTournament(
         Number(payload.refereeScheduling === true),
         Number(payload.launchPhase === true),
         Number(payload.teamVoiceChannels === true),
+        payload.mapPointTarget ?? null,
       ],
     );
 
@@ -824,6 +828,7 @@ async function loadTournamentBuckets(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.map_point_target,
       t.team_voice_channels,
       t.live_url,
       t.image_url,

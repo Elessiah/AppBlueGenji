@@ -473,3 +473,60 @@ describe("code de replay facultatif — arbitrage (requireReplayCode: false)", (
     expect(progressiveMapRows(FT2, "OW", [noCode(2, Number.NaN)], rules)).toHaveLength(1);
   });
 });
+
+describe("checkMapList — format Duel / Arcade", () => {
+  const BO1: MatchFormat = { type: "BO", value: 1 };
+  const DUEL = { requireReplayCode: false, pointTarget: 5 };
+
+  it("checkMapList_duelWinnerExactlyTarget_derivesOneMap", () => {
+    const actual = checkMapList(BO1, "OW", [{ replayCode: "", team1Score: 5, team2Score: 3 }], { decisive: true, ...DUEL });
+
+    expect(actual).toEqual({ error: null, field: null, score: { team1: 1, team2: 0, drawnMaps: 0 } });
+  });
+
+  it("checkMapList_duelLoserAtTarget_refusesMapPointsInvalidOnTeam2", () => {
+    const actual = checkMapList(BO1, "OW", [{ replayCode: "", team1Score: 5, team2Score: 5 }], { decisive: true, ...DUEL });
+
+    expect(actual).toMatchObject({ error: "MAP_POINTS_INVALID", field: { index: 0, field: "team2Score" } });
+  });
+
+  it("checkMapList_duelWinnerBelowTarget_refusesMapPointsInvalid", () => {
+    const actual = checkMapList(BO1, "OW", [{ replayCode: "", team1Score: 4, team2Score: 3 }], { decisive: true, ...DUEL });
+
+    expect(actual).toMatchObject({ error: "MAP_POINTS_INVALID" });
+  });
+
+  it("checkMapList_noTarget_acceptsAnyMapScore", () => {
+    const actual = checkMapList(BO1, "OW", [{ replayCode: "", team1Score: 4, team2Score: 3 }], {
+      decisive: true,
+      requireReplayCode: false,
+    });
+
+    expect(actual.error).toBeNull();
+  });
+
+  it("isMapComplete_duelBelowTarget_false", () => {
+    expect(isMapComplete({ replayCode: "", team1Score: 4, team2Score: 3 }, "OW", DUEL)).toBe(false);
+  });
+
+  it("isMapComplete_duelAtTarget_true", () => {
+    expect(isMapComplete({ replayCode: "", team1Score: 5, team2Score: 3 }, "OW", DUEL)).toBe(true);
+  });
+
+  it("mapListViolationMessage_mapPointsInvalid_namesTheTarget", () => {
+    expect(mapListViolationMessage("MAP_POINTS_INVALID", BO1, "OW", 5)).toBe(
+      "Carte au premier à 5 points : le vainqueur en marque exactement 5, l'autre de 0 à 4.",
+    );
+  });
+
+  it("sameMapLists_samePlayButDifferentPoints_false", () => {
+    const mine = [{ replayCode: "", team1Score: 5, team2Score: 3 }];
+    const theirs = [{ replayCode: "", team1Score: 5, team2Score: 2 }];
+
+    expect(sameMapLists(mine, theirs)).toBe(false);
+  });
+
+  it("mapListErrorCodes_includeMapPointsInvalid", () => {
+    expect(MAP_LIST_ERROR_CODES.has("MAP_POINTS_INVALID")).toBe(true);
+  });
+});

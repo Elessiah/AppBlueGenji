@@ -149,6 +149,7 @@ Ce qu'elle contient aujourd'hui :
 | — (MATCH-VOICE) | `bg_match_voice_channels` | `failed_wide` (`TINYINT(1)`, 0 par défaut) — le dernier échec de rendu était une panne du bot entier : l'attente reste courte passé 48 h (`MATCH_VOICE.md`) |
 | — (CAST-FOLLOWUP) | `bg_matches` | `live_trigger_user_id` (`BIGINT NULL`, index `idx_bg_matches_live_trigger_user`) — caster qui a posé le mode d'antenne (`CAST_SETTINGS.md`) |
 | — (BO3-TIEBREAK) | `bg_tournament_round_maps` | `tiebreak_map` — `VARCHAR(64) NULL` : map de départage d'un tour de play-offs (tout format défini depuis TIEBREAK-ALL), jouée en map N + 1 seulement sur une série à égalité ; une ligne qui ne porte qu'elle a `slots_json = '[]'` (`ROUND_MAPS.md`) |
+| — (DUEL-ARCADE) | `bg_tournaments`, `bg_tournament_round_maps` | `map_point_target` — `TINYINT UNSIGNED NULL` sur les deux : points qui gagnent une carte en format Duel / Arcade (`NULL` = éteint sur le tournoi, suit le tournoi sur un tour) ; une ligne de tour qui ne porte qu'eux a `slots_json = '[]'` (`DUEL_ARCADE.md`) |
 | — (CAST-SETTINGS) | `bg_match_casters` | `cast_battletag` — `VARCHAR(64) NULL` : BattleTag qu'un caster donne pour **ce** cast, montré à la place de celui de son compte (Overwatch seulement), jamais vérifié ni recopié sur le profil ; part avec l'inscription, remis à `NULL` sur un cast gardé à l'anonymisation, rendu dans l'export (`CAST_SETTINGS.md`, registre T04) |
 
 `bg_matches.launched_at` n'est **pas** dans la liste, et c'est volontaire : son
