@@ -508,7 +508,7 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
   it("requestAccountDeletion_replay_awaitsAvatarPurge", async () => {
     fakeDb({});
 
-    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", replay: true });
 
     expect(rotateHeldAvatarFile).toHaveBeenCalledWith(7, { detachPurge: false });
   });
@@ -516,7 +516,7 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
   it("requestAccountDeletion_replay_noRelaunchNorNotice", async () => {
     fakeDb({ refereedMatches: [4], castMatches: [5] });
 
-    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", replay: true });
 
     expect(withdrawUserCasts).toHaveBeenCalled();
     expect(relaunchAfterRefereeWithdrawal).not.toHaveBeenCalled();
@@ -623,7 +623,7 @@ describe("requestAccountDeletion — dernier administrateur", () => {
   it("requestAccountDeletion_replayOfLastAdmin_notRefused", async () => {
     const { connection } = fakeDb({ isAdmin: true, otherAdmins: [] });
 
-    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", replay: true });
 
     expect(connection.commit).toHaveBeenCalled();
   });
@@ -977,7 +977,7 @@ describe("requestAccountDeletion — jeu de verrous, avatar mis de côté, rejeu
       successors: [{ id: 1, user_id: 21, roles_json: '["MANAGER"]', joined_at: "2026-01-01 00:00:00" }],
     });
 
-    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", requestedAt: new Date("2026-11-01T10:00:00Z") });
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", replay: true, requestedAt: new Date("2026-11-01T10:00:00Z") });
 
     expect(sendBotLog).not.toHaveBeenCalled();
     expect(logDeletionWithdrawal).not.toHaveBeenCalled();
@@ -1321,9 +1321,20 @@ describe("requestAccountDeletion — EF-62 cycle 1 (traces après le commit, rej
     jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3]);
     fakeDb({});
 
-    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", replay: true });
 
     expect(syncOpenSoloTournamentsOn).not.toHaveBeenCalled();
+  });
+
+  // Revue standard cycle 3 : le rejeu se dit par `replay`, pas par la seule
+  // vérification d'identité du compte.
+  it("requestAccountDeletion_identityCheckWithoutReplay_stillSyncsOpenSoloTournaments", async () => {
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3]);
+    fakeDb({});
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(syncOpenSoloTournamentsOn).toHaveBeenCalledWith(expect.anything(), [3]);
   });
 
   it("requestAccountDeletion_ordinaryRequest_syncsOpenSoloTournaments", async () => {

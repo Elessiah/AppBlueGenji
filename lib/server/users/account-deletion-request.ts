@@ -554,6 +554,12 @@ export async function requestAccountDeletion(
     requestedAtRaw?: string;
     accountCreatedAt?: string;
     /**
+     * Rejeu d'une restauration (`account-deletion-replay.ts`), dit
+     * explicitement : ni lancement, ni annonce, ni garde du dernier
+     * administrateur. `accountCreatedAt` ne vérifie que l'identité du compte.
+     */
+    replay?: boolean;
+    /**
      * Le motif que la confirmation a annoncé (`null` : effacement complet).
      * Relu juste avant la transaction : différent, rien n'est écrit
      * (`ACCOUNT_DELETION_PLAN_CHANGED`). Hors des verrous, comme l'aperçu :
@@ -579,6 +585,7 @@ export async function requestAccountDeletion(
   // Le rejeu d'une demande après restauration (`account-deletion-replay.ts`)
   // garde la date d'origine : la fenêtre de trente jours ne repart pas à zéro.
   const requestedAt = options.requestedAt ?? new Date();
+  const replay = options.replay === true;
   let accountCreatedAt = "";
   let requestedAtRaw: string | undefined;
   // Une transaction annulée par un interblocage (une désignation d'arbitre
@@ -623,7 +630,7 @@ export async function requestAccountDeletion(
       // Le dernier administrateur vivant fermerait l'administration de la
       // plateforme (rattrapable seulement en base). Le rejeu d'une demande
       // journalisée n'est pas refusé : elle a eu lieu.
-      if (options.accountCreatedAt === undefined && Number(locked[0].is_admin) === 1) {
+      if (!replay && Number(locked[0].is_admin) === 1) {
         await assertAnotherAdminRemains(connection, userId);
       }
 
@@ -634,7 +641,7 @@ export async function requestAccountDeletion(
       // Pas au rejeu d'une restauration : synchroniser lancerait des tournois
       // et posterait leurs annonces pendant la remise en état (la passe
       // horaire s'en charge une fois le site rouvert).
-      if (options.accountCreatedAt === undefined) {
+      if (!replay) {
         await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
       }
       withdrawn = await withdrawSoloRegistrationsOn(
@@ -661,7 +668,7 @@ export async function requestAccountDeletion(
       const withdrawal = await withdrawUserCasts(connection, userId, false);
       castTournaments = withdrawal.tournamentIds;
       liveCastTournaments = withdrawal.liveTournamentIds;
-      if (options.accountCreatedAt === undefined) {
+      if (!replay) {
         await relaunchAfterRefereeWithdrawal(
           connection,
           withdrawal.releasedRefereeMatchIds,
@@ -742,7 +749,7 @@ export async function requestAccountDeletion(
     castTournaments,
     liveCastTournaments,
     soloTournaments: soloEntryTournaments,
-    replay: options.accountCreatedAt !== undefined,
+    replay,
   });
 
   // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues

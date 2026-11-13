@@ -423,15 +423,16 @@ export async function getAccountDeletionPlan(userId: number): Promise<AccountDel
  * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
  *
  * `accountCreatedAt` (rejeu du journal) : la ligne verrouillée doit être ce
- * compte-là, sans quoi rien n'est écrit (`ACCOUNT_REASSIGNED`).
+ * compte-là, sans quoi rien n'est écrit (`ACCOUNT_REASSIGNED`). `replay` :
+ * rejeu d'une restauration, aucun tournoi n'est synchronisé (ni lancé).
  *
  * @throws USER_NOT_FOUND | ACCOUNT_REASSIGNED
  */
 export async function deleteOwnAccount(
   userId: number,
-  options: { accountCreatedAt?: string } = {},
+  options: { accountCreatedAt?: string; replay?: boolean } = {},
 ): Promise<AccountDeletionPlan> {
-  const plan = await deleteAccountNow(userId, false, options.accountCreatedAt);
+  const plan = await deleteAccountNow(userId, false, options.accountCreatedAt, options.replay === true);
   if (plan === null) throw new Error("USER_NOT_FOUND");
   return plan;
 }
@@ -443,15 +444,15 @@ export async function deleteOwnAccount(
  * ou anonymisé n'est plus en attente. Rend `null` quand rien n'est fait.
  * `accountCreatedAt` (rejeu du journal) : si la ligne verrouillée n'est pas ce
  * compte-là (identifiant réattribué), rien n'est écrit et `ACCOUNT_REASSIGNED`
- * est levé.
+ * est levé. `replay` : rejeu d'une restauration, sans synchronisation.
  *
  * @throws ACCOUNT_REASSIGNED
  */
 export async function finalizeAccountDeletion(
   userId: number,
-  options: { accountCreatedAt?: string } = {},
+  options: { accountCreatedAt?: string; replay?: boolean } = {},
 ): Promise<AccountDeletionPlan | null> {
-  return deleteAccountNow(userId, true, options.accountCreatedAt);
+  return deleteAccountNow(userId, true, options.accountCreatedAt, options.replay === true);
 }
 
 /**
@@ -617,6 +618,7 @@ async function deleteAccountNow(
   userId: number,
   onlyIfDue: boolean,
   expectedCreatedAt?: string,
+  replay = false,
 ): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
@@ -706,13 +708,13 @@ async function deleteAccountNow(
       // d'être retirée d'un plateau déjà tiré. Ses lignes de journal partent
       // avec le commit. Seuls ceux dont l'état a changé sont rediffusés (comme
       // `syncOpenSoloTournamentsOn`, que ce module ne peut importer sans cycle).
-      // Pas au rejeu d'une restauration (`expectedCreatedAt`), comme à la
+      // Pas au rejeu d'une restauration (`replay`, dit par l'appelant), comme à la
       // demande : synchroniser lancerait des tournois pendant la remise en
       // état. Un tournoi dont l'heure est passée garde alors l'inscription
       // (la fenêtre de retrait la refuse) ; la passe horaire le lancera puis
       // forfaitera l'entrée, une fois le site rouvert.
       const changed: number[] = [];
-      if (expectedCreatedAt === undefined) {
+      if (!replay) {
         for (const tournamentId of openSoloTournaments) {
           if ((await syncTournamentState(connection, tournamentId)).stateChanged) changed.push(tournamentId);
         }

@@ -37,6 +37,8 @@ const CIRCUIT_COOLDOWN_MS = 30_000;
 function isCircuitOpen(): boolean {
   // Envois coupés (rejeu d'une restauration) : tout appel se dégrade comme
   // devant un bot injoignable, chemin que chaque appelant sait déjà prendre.
+  // Les balayages qui réservent avant d'envoyer ne partent pas du tout
+  // (`throttled-sweep.ts`) : rien n'y est réservé puis perdu.
   if (outboundMuted()) return true;
   return Date.now() < circuitOpenUntil;
 }

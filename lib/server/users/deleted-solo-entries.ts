@@ -466,22 +466,41 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
   for (const candidate of candidates) {
     const userId = Number(candidate.id);
     let effective = false;
+    let withdrawals: Awaited<ReturnType<typeof withdrawDeletedAccountRegistrations>>;
     try {
-      const { withdrawn, started } = await withdrawDeletedAccountRegistrations(userId);
-      outcome.withdrawn += withdrawn.length;
-      for (const entry of withdrawn) {
-        publishUpdatedEvent(entry.tournamentId);
-        await logDeletionWithdrawal(entry.tournamentId, false);
-      }
-      // Un tournoi qui échoue n'empêche pas les suivants du même compte.
-      const forfeited = await forfeitSoloEntriesAfterCommit(await listForfeitableSoloEntries(db, userId));
-      outcome.forfeited += forfeited;
-      effective = withdrawn.length > 0 || started > 0 || forfeited > 0;
+      withdrawals = await withdrawDeletedAccountRegistrations(userId);
     } catch (error) {
       console.error(
         `[deleted-accounts] Inscriptions solo du compte #${userId} reportées :`,
         failureReason(error),
       );
+      setAside(userId, now);
+      continue;
+    }
+    const { withdrawn, started } = withdrawals;
+    outcome.withdrawn += withdrawn.length;
+    // Commis : ce qui suit ne défait rien. Une rediffusion ou un journal qui
+    // lève n'empêche ni les tournois suivants ni les forfaits, et le compte
+    // n'est pas mis à l'écart comme s'il n'avait rien produit.
+    effective = withdrawn.length > 0 || started > 0;
+    for (const entry of withdrawn) {
+      try {
+        publishUpdatedEvent(entry.tournamentId);
+        await logDeletionWithdrawal(entry.tournamentId, false);
+      } catch (error) {
+        console.error(
+          `[deleted-accounts] retrait du compte #${userId} (tournoi ${entry.tournamentId}) non annoncé :`,
+          failureReason(error),
+        );
+      }
+    }
+    try {
+      // Un tournoi qui échoue n'empêche pas les suivants du même compte.
+      const forfeited = await forfeitSoloEntriesAfterCommit(await listForfeitableSoloEntries(db, userId));
+      outcome.forfeited += forfeited;
+      if (forfeited > 0) effective = true;
+    } catch (error) {
+      console.error(`[deleted-accounts] forfaits du compte #${userId} reportés :`, failureReason(error));
     }
     // Rien de produit (échec, ou forfait sans prise) : à l'écart quelques
     // heures, pour que le lot serve aux comptes qui avancent.

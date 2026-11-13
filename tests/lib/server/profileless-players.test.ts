@@ -155,6 +155,19 @@ describe("anonymizedAccountHasNoPage (EF-62 cycle 1)", () => {
     expect(await anonymizedAccountHasNoPage(7)).toBe(false);
   });
 
+  it("anonymizedAccountHasNoPage_idAtEachEndOfSortedList_returnsTrue", async () => {
+    mockDb(() => [[{ id: 2 }, { id: 5 }, { id: 7 }, { id: 11 }, { id: 40 }]]);
+
+    expect(await anonymizedAccountHasNoPage(2)).toBe(true);
+    expect(await anonymizedAccountHasNoPage(40)).toBe(true);
+  });
+
+  it("anonymizedAccountHasNoPage_idBetweenListedIds_returnsFalse", async () => {
+    mockDb(() => [[{ id: 2 }, { id: 5 }, { id: 11 }, { id: 40 }]]);
+
+    expect(await anonymizedAccountHasNoPage(7)).toBe(false);
+  });
+
   it("anonymizedAccountHasNoPage_listFailsAndNeverPlayed_returnsTrueFromLiveQuery", async () => {
     jest.spyOn(console, "error").mockImplementation(() => {});
     const execute = mockDb((sql) => {

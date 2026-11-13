@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
+import { outboundMuted } from "@/lib/server/outbound-mute";
+
+jest.mock("@/lib/server/outbound-mute", () => ({ outboundMuted: jest.fn(() => false) }));
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -103,5 +106,16 @@ describe("throttledSweep", () => {
     expect(sweep).toHaveBeenCalledTimes(1);
     expect(await sweeps.run()).toBe(3);
     expect(sweep).toHaveBeenCalledTimes(2);
+  });
+  // EF-62 (revue standard, cycle 3) : envois coupés (rejeu d'une
+  // restauration), aucun balayage ne réserve de notification qu'il ne pourrait
+  // envoyer.
+  it("run_outboundMuted_returnsZeroWithoutSweeping", async () => {
+    jest.mocked(outboundMuted).mockReturnValueOnce(true);
+    const { sweeps, sweep } = sweeper();
+
+    expect(await sweeps.run()).toBe(0);
+
+    expect(sweep).not.toHaveBeenCalled();
   });
 });

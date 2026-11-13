@@ -65,6 +65,20 @@ function readProfilelessPlayerIds(): Promise<number[]> {
   return cached(PROFILELESS_PLAYERS_CACHE_KEY, PROFILELESS_PLAYERS_TTL_MS, computeProfilelessPlayerIds);
 }
 
+/** Recherche dichotomique dans la liste, triée par id croissant (`ORDER BY u.id`). */
+function sortedIncludes(ids: readonly number[], userId: number): boolean {
+  let low = 0;
+  let high = ids.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >>> 1;
+    const id = ids[middle];
+    if (id === userId) return true;
+    if (id < userId) low = middle + 1;
+    else high = middle - 1;
+  }
+  return false;
+}
+
 /**
  * Un compte **anonymisé** (déjà lu comme supprimé, suppression non plus en
  * attente) est-il sans fiche ? La même liste que celle qui décide des liens :
@@ -76,7 +90,7 @@ function readProfilelessPlayerIds(): Promise<number[]> {
  */
 export async function anonymizedAccountHasNoPage(userId: number): Promise<boolean> {
   try {
-    return (await readProfilelessPlayerIds()).includes(userId);
+    return sortedIncludes(await readProfilelessPlayerIds(), userId);
   } catch (error) {
     console.error(`[profileless-players] liste illisible, lecture du compte : ${failureReason(error)}`);
   }

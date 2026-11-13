@@ -1121,6 +1121,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   ferme la fiche (404) au lieu de lever ; un écouteur qui lève après le commit
   de la passe horaire n'annule plus ses suites ; description de la page de
   réactivation par `formatMessage`.
+- **Revue standard cycle 3** : envois coupés, aucun balayage de notifications
+  ne part (`throttledSweep` : départs de match, nouveaux matchs, brief du
+  salon) — il réserverait chaque notification avant un envoi impossible, qui
+  serait perdue au retour du site — ni la mise à jour des soirées #live ; le
+  rejeu se dit par l'option `replay: true` (demande, suppression, finalisation),
+  `accountCreatedAt` ne vérifiant plus que l'identité du compte ; la passe
+  horaire garde ses forfaits et le compte dans le lot quand la rediffusion
+  d'un retrait commis lève ; la liste des comptes sans fiche se lit par
+  dichotomie (triée par id). Gardé : la double panne de lecture rend 404
+  (décision du cycle 2).
 - **Écrans** : la confirmation liste ce que la demande transmet ou retire
   (`deletionDialogContent`), les restes après la fin du délai derrière un
   « i » ; la page de réactivation dit ce qui revient en une phrase (détail

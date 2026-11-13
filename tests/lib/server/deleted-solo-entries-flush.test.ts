@@ -111,4 +111,37 @@ describe("settleDeletedSoloEntries — annonces après le commit", () => {
     expect(JSON.stringify(log.mock.calls)).not.toContain("reportées");
     log.mockRestore();
   });
+  // Revue standard cycle 3 : la rediffusion d'un retrait déjà commis qui lève
+  // n'arrête ni les forfaits ni ne met le compte à l'écart.
+  it("settleDeletedSoloEntries_withdrawalRepublishThrows_stillForfeitsAndKeepsAccountInBatch", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(publishUpdatedEvent).mockImplementation(() => {
+      throw new Error("LISTENER_DOWN");
+    });
+    jest.mocked(loadSoloRegistrations).mockResolvedValue([
+      {
+        tournamentId: 3,
+        teamId: 900,
+        hasMatch: false,
+        state: "REGISTRATION",
+        registrationOpenAt: "2026-01-01T00:00:00.000Z",
+        registrationCloseAt: "2098-12-31T00:00:00.000Z",
+        startAt: "2099-01-01T00:00:00.000Z",
+      },
+    ]);
+    const { execute } = fakeDb();
+
+    const outcome = await settleDeletedSoloEntries();
+    const afterFirstPass = execute.mock.calls.length;
+    await settleDeletedSoloEntries();
+
+    expect(outcome.withdrawn).toBe(1);
+    expect(JSON.stringify(log.mock.calls)).toContain("non annoncé");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("reportées");
+    // Forfaits relevés après les retraits, malgré la rediffusion en échec.
+    expect(afterFirstPass).toBeGreaterThan(1);
+    const candidateQueries = execute.mock.calls.filter(([q]) => String(q).includes("SELECT DISTINCT u.id"));
+    expect(String(candidateQueries[1][0])).not.toContain("NOT IN");
+    log.mockRestore();
+  });
 });

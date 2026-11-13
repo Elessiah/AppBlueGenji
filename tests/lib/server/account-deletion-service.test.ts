@@ -1170,9 +1170,17 @@ describe("deleteOwnAccount — tournois ouverts synchronisés", () => {
   it("deleteOwnAccount_replay_neverSyncsTournaments", async () => {
     fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
 
-    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05" });
+    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05", replay: true });
 
     expect(syncTournamentState).not.toHaveBeenCalled();
     expect(publishUpdatedEvent).not.toHaveBeenCalledWith(55);
+  });
+  // Revue standard cycle 3 : la vérification d'identité seule n'est pas un rejeu.
+  it("deleteOwnAccount_identityCheckWithoutReplay_stillSyncsTournaments", async () => {
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05" });
+
+    expect(syncTournamentState).toHaveBeenCalled();
   });
 });
