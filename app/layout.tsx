@@ -245,7 +245,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // client. Décidé ici, le silence survivrait à la navigation — la mise en
   // page racine n'est pas re-rendue d'un lien à l'autre, et un joueur arrivé
   // par `/rgpd` parcourrait ensuite le site sans jamais avoir à répondre.
-  const privacyChanges = await pendingChangesFor(user?.id);
+  // Lancés ensemble avec les deux lectures suivantes : aucune n'attend l'autre.
+  const privacyChangesLoad = pendingChangesFor(user?.id);
   // Marches du podium du site, lues par chaque lien d'équipe ou de joueur
   // (`PODIUM_TIERS.md`) : posées une fois ici plutôt qu'une requête par lien.
   // Mutualisées avec le classement, elles ne lèvent jamais ; les membres ne
@@ -254,7 +255,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Et les comptes supprimés sans fiche (D13), dont les liens de joueur rendent
   // le nom en texte : au seul visiteur connecté, le seul à qui un nom mène
   // quelque part. Mutualisés avec le classement, ils ne lèvent jamais.
-  const [rawPodiumTiers, profilelessPlayers] = await Promise.all([
+  const [privacyChanges, rawPodiumTiers, profilelessPlayers] = await Promise.all([
+    privacyChangesLoad,
     loadPodiumTiers(),
     user ? loadProfilelessPlayerIds() : Promise.resolve(NO_PROFILELESS_PLAYERS),
   ]);

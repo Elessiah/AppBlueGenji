@@ -45,6 +45,35 @@ describe("createCoalescer", () => {
     expect(deliver).toHaveBeenCalledWith(1, 3);
   });
 
+  it("add_gesturesWithinBurst_armsOneTimer", () => {
+    const { deliver, coalescer } = setup();
+
+    for (let i = 1; i <= 5; i++) {
+      coalescer.add("a", i);
+      jest.advanceTimersByTime(100);
+    }
+
+    expect(jest.getTimerCount()).toBe(1);
+    jest.advanceTimersByTime(1_000);
+    expect(deliver).toHaveBeenCalledWith(1, 5);
+  });
+
+  it("fire_lateGesture_rearmsForRemainingSilence", () => {
+    const { deliver, coalescer } = setup();
+    coalescer.add("a", 1);
+    jest.advanceTimersByTime(900);
+    coalescer.add("a", 2);
+
+    jest.advanceTimersByTime(100);
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(1);
+    jest.advanceTimersByTime(899);
+    expect(deliver).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(deliver).toHaveBeenCalledWith(1, 2);
+  });
+
   it("une rafale sans silence part à l'âge maximal", () => {
     const { deliver, coalescer } = setup();
     for (let i = 0; i < 10; i++) {

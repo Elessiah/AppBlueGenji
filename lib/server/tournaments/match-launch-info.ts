@@ -182,6 +182,15 @@ function hasRunningTournament(withLaunchPhase: boolean): Promise<boolean> {
 }
 
 /**
+ * Un tournoi est-il en cours, toutes options confondues ? Même lecture
+ * mutualisée que la modale : le check-in du salon (`./lobby-brief`) n'est
+ * balayé que s'il y a un match à briefer.
+ */
+export function anyTournamentRunning(): Promise<boolean> {
+  return hasRunningTournament(false);
+}
+
+/**
  * Matchs à présenter au lecteur : ceux d'une équipe qu'il représente (membre
  * en cours ou entrée solo) ou qu'il caste. Les équipes du lecteur sont lues
  * **dans** la requête : un lecteur qui n'a aucun match — le cas courant — ne
