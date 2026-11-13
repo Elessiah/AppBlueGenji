@@ -176,6 +176,36 @@ describe("dispatchLobbyBriefs", () => {
     expect(params).toEqual(["LOBBY_BRIEF", "LOBBY_BRIEF"]);
   });
 
+  it("dispatchLobbyBriefs_firstSideBriefedSecondWithoutManager_noClaimAndOnlyEmptySideRecipientsRead", async () => {
+    const { execute } = mockDb([{ ...MATCH, team1_briefed: 1, team2_briefed: 0 }]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[1, [10, 11]]]));
+
+    expect(await dispatchLobbyBriefs()).toBe(0);
+
+    expect(claimParams(execute)).toEqual([]);
+    expect(loadEntrantManagerIds).toHaveBeenCalledWith([2, 1]);
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([], "certified", { matchDm: true });
+  });
+
+  it("dispatchLobbyBriefs_secondSideBriefed_readsOnlyFirstSide", async () => {
+    const { execute } = mockDb([{ ...MATCH, team1_briefed: 0, team2_briefed: 1 }]);
+
+    expect(await dispatchLobbyBriefs()).toBe(1);
+
+    expect(claimParams(execute)).toEqual([["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1"]]);
+    expect(loadEntrantManagerIds).toHaveBeenCalledWith([1]);
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([10, 11], "certified", { matchDm: true });
+  });
+
+  it("dispatchLobbyBriefs_firstSideBriefedDualManager_stillExcludedFromSecondSide", async () => {
+    mockDb([{ ...MATCH, team1_briefed: 1, team2_briefed: 0 }]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[1, [10]], [2, [10, 20]]]));
+
+    expect(await dispatchLobbyBriefs()).toBe(1);
+
+    expect(sends().map((send) => send.userIds)).toEqual([[20]]);
+  });
+
   it("dispatchLobbyBriefs_sweepSql_startBeyondLeadIsLobbyTriggeredWithoutVoiceLine", async () => {
     const { query } = mockDb([]);
 

@@ -70,6 +70,12 @@ n'ouvrent qu'au quart d'heure de l'horaire (`kickoff_state` vaut
 `UNSCHEDULED` au-delà de `LOBBY_BRIEF_LEAD_MINUTES`, `voice_tracked` est borné
 de même) — et rien ne repart à H-15 (même réservation).
 
+**Côté déjà réservé** (EF-61) : le balayage lit chaque côté réservé en colonne
+(`team1_briefed` / `team2_briefed`, `HAVING`) ; il n'y rejoue aucune réservation
+et n'en relit pas les destinataires — seules les appartenances du premier côté
+sont relues pour un second à briefer (`slotManagers`). Un match dont un seul
+côté attend un gérant ne coûte plus, par passe, que ce côté.
+
 **Destinataires relus juste avant l'envoi** (REFEREE-LOT-1) : chaque côté
 relit ses membres actifs (`loadEntrantManagerIds`) après sa réservation — un
 membre retiré depuis la lecture du balayage ne reçoit plus le lien du match ni

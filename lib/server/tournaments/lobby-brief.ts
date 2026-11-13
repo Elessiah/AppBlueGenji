@@ -224,6 +224,12 @@ export type LobbyBriefRow = RowDataPacket & {
   match_format_draws?: number | null;
   endurance_playoff_format_type?: "BO" | "FT" | null;
   endurance_playoff_format_value?: number | null;
+  /**
+   * Côté déjà réservé, lu par le balayage seul (`sideBriefedSql`) : ni
+   * réservation rejouée, ni destinataires relus pour lui. Absent : non.
+   */
+  team1_briefed?: number | null;
+  team2_briefed?: number | null;
 };
 
 /**
@@ -615,6 +621,8 @@ function logNoManager(row: LobbyBriefRow, slot: LobbyBriefSlot): void {
 
 /** Ce qu'un balayage a lu une fois pour tous les matchs candidats. */
 type SweepContext = {
+  /** Gérants actifs lus, compte vivant ou non (règle du premier côté, `slotManagers`). */
+  memberships: Map<number, number[]>;
   managers: Map<number, number[]>;
   recipients: readonly NotificationRecipient[];
   briefSides: (row: LobbyBriefRow) => { teamId: number; side: LobbyBriefSide }[];
@@ -749,7 +757,10 @@ function slotManagers(
 ): { ghost: boolean; userIds: number[] } | null {
   const managers = sideManagers(row, slot, context);
   if (managers === null || managers.ghost || slot === 1) return managers;
-  const first = new Set(context.managers.get(slotTeamId(row, 1)) ?? []);
+  // Appartenances brutes du premier côté : lues même quand il est déjà
+  // réservé, sans ses destinataires — un compte supprimé n'est destinataire
+  // d'aucun côté, l'écarter ici ne change rien.
+  const first = new Set(context.memberships.get(slotTeamId(row, 1)) ?? []);
   const userIds = managers.userIds.filter((userId) => !first.has(userId));
   return { ghost: userIds.length === 0, userIds };
 }
@@ -766,6 +777,8 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Pr
   // l'appariement.
   const ghosts: number[] = [];
   for (const slot of [1, 2] as const) {
+    // Côté déjà réservé au balayage : sa réservation ne serait que refusée.
+    if (sideBriefed(row, slot)) continue;
     const managers = slotManagers(row, slot, context);
     if (managers === null) continue;
     const { claimId, outcome, error } = await briefSlot(db, row, slot, managers, context);
@@ -790,12 +803,42 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Pr
   return brief;
 }
 
+/** Ce côté était-il déjà réservé à la lecture du balayage ? */
+function sideBriefed(row: LobbyBriefRow, slot: LobbyBriefSlot): boolean {
+  return Number((slot === 1 ? row.team1_briefed : row.team2_briefed) ?? 0) === 1;
+}
+
+/**
+ * Engagées dont le balayage lit les gérants : les côtés pas encore réservés,
+ * plus le premier côté d'un second à briefer (`slotManagers`) — un match
+ * dont un seul côté attend (équipe sans gérant actif, toute la fenêtre) ne
+ * relit plus à chaque passe celui déjà briefé.
+ */
+function sweepTeamIds(rows: readonly LobbyBriefRow[]): { read: number[]; recipients: Set<number> } {
+  const read: number[] = [];
+  const recipients = new Set<number>();
+  for (const row of rows) {
+    for (const slot of [1, 2] as const) {
+      if (sideBriefed(row, slot)) continue;
+      recipients.add(slotTeamId(row, slot));
+      read.push(slotTeamId(row, slot));
+      if (slot === 2) read.push(slotTeamId(row, 1));
+    }
+  }
+  return { read: [...new Set(read)], recipients };
+}
+
 async function runLobbyBriefSweep(): Promise<number> {
   const db = await getDatabase();
+  // Chaque côté réservé est lu une fois, en colonne : le filtre et le balayage
+  // jugent le même côté réservé.
   const [rows] = await db.query<LobbyBriefRow[]>(
-    `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM}
+    `SELECT ${BRIEF_COLUMNS},
+            ${sideBriefedSql("m.team1_id")} AS team1_briefed,
+            ${sideBriefedSql("m.team2_id")} AS team2_briefed
+       ${BRIEF_FROM}
       WHERE ${BRIEF_DUE_SQL}
-        AND NOT (${sideBriefedSql("m.team1_id")} AND ${sideBriefedSql("m.team2_id")})
+     HAVING NOT (team1_briefed = 1 AND team2_briefed = 1)
       ORDER BY m.id`,
     [LOBBY_BRIEF_PHASE, LOBBY_BRIEF_PHASE],
   );
@@ -808,8 +851,13 @@ async function runLobbyBriefSweep(): Promise<number> {
   // Destinataires de tous les côtés en deux lectures, **avant** toute
   // réservation : une panne ici ne réserve rien, et arme le balayage suivant
   // (`onError`, dans la limite des relances).
-  const memberships = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
-  const recipients = await loadNotificationRecipients([...memberships.values()].flat(), "certified", { matchDm: true });
+  const teams = sweepTeamIds(rows);
+  const memberships = await loadEntrantManagerIds(teams.read);
+  const recipients = await loadNotificationRecipients(
+    [...memberships].filter(([teamId]) => teams.recipients.has(teamId)).flatMap(([, userIds]) => userIds),
+    "certified",
+    { matchDm: true },
+  );
   retries.delete(SWEEP_RETRY_KEY);
   // Gérants dont le compte vit encore : un compte supprimé (anonymisé) garde
   // son appartenance mais ne reçoit plus rien — une équipe qui n'a que lui
@@ -823,11 +871,11 @@ async function runLobbyBriefSweep(): Promise<number> {
   // actif, seules à attendre) ne coûte aucune lecture des casteurs : il
   // reste candidat toute la fenêtre, et ces lectures seraient refaites à
   // chaque balayage pour rien.
-  const hasRecipients = (teamId: number, ghost: number | null | undefined) =>
-    Number(ghost ?? 0) === 1 || (managers.get(teamId) ?? []).length > 0;
-  const briefable = rows.filter(
-    (row) => hasRecipients(Number(row.team1_id), row.team1_ghost) || hasRecipients(Number(row.team2_id), row.team2_ghost),
-  );
+  const hasRecipients = (row: LobbyBriefRow, slot: LobbyBriefSlot) =>
+    !sideBriefed(row, slot) &&
+    (Number((slot === 1 ? row.team1_ghost : row.team2_ghost) ?? 0) === 1 ||
+      (managers.get(slotTeamId(row, slot)) ?? []).length > 0);
+  const briefable = rows.filter((row) => hasRecipients(row, 1) || hasRecipients(row, 2));
   // Ces lectures ne lèvent pas : une panne envoie le brief sans la ligne.
   const castersByMatch = await readMatchCasters(
     db,
@@ -843,7 +891,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   const closed: number[] = [];
   const toRetry: string[] = [];
   for (const row of rows) {
-    const brief = await briefMatch(db, row, { managers, recipients, briefSides });
+    const brief = await briefMatch(db, row, { memberships, managers, recipients, briefSides });
     sent += brief.sent;
     toRelease.push(...brief.retry);
     closed.push(...brief.closed);
