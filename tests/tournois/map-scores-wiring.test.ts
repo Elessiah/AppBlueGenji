@@ -237,7 +237,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("un détail adverse encore en lecture est annoncé comme tel, sans inviter à ressaisir", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     // Le détail attendu, levé quand les relectures ont pris fin sans lui (`detailPending`).
-    expect(dialog).toContain("detailPending: detailLoading } = useProposalMaps(");
+    expect(dialog).toContain("detailPending: detailLoading, reload: reloadProposals } = useProposalMaps(");
     expect(dialog).toContain('if (reader.detailLoading) return text.t("score.player.theirs.loading", values);');
     expect(FR_SCORE.player.theirs.loading).toContain("Lecture du détail de ses maps…");
     expect(dialog.indexOf("if (opponentDetailKnown(theirs))")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));

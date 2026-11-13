@@ -80,7 +80,10 @@ interface PlayerScoreDialogProps {
   proposals: MatchProposalMaps[];
   onClose: () => void;
   onSubmitted: () => void;
-  /** Relit le contexte du lecteur (lecture REST) : une proposition a changé. */
+  /**
+   * Un refus dit l'état lu périmé : la page le remet à jour — rien à faire
+   * quand le flux est ouvert (il apporte l'écriture), lecture REST sinon.
+   */
   onRefresh: () => void | Promise<unknown>;
   /**
    * Le geste du lecteur peut trancher le match (envoi, forfait) : `true` dès
@@ -398,7 +401,7 @@ export function PlayerScoreDialog({
   // de l'adversaire (codes et scores), à confirmer d'un clic.
   // `detailPending` : seulement pour qui peut lire le détail (`canReportScore`),
   // et levé quand les relectures ont pris fin sans lui.
-  const { match, detailPending: detailLoading } = useProposalMaps(
+  const { match, detailPending: detailLoading, reload: reloadProposals } = useProposalMaps(
     liveMatch,
     proposals,
     canReportScore,
@@ -579,6 +582,17 @@ export function PlayerScoreDialog({
   };
 
   /**
+   * Un refus « état périmé » : la page se remet à jour (`onRefresh`, sans effet
+   * flux ouvert : l'écriture arrive par lui), et le détail map par map encore
+   * manquant se relit par la route légère du match — l'instantané diffusé ne le
+   * porte jamais, et des lectures épuisées ne se rouvriraient qu'au prochain report.
+   */
+  const refreshAfterRefusal = () => {
+    reloadProposals();
+    void Promise.resolve(onRefresh()).catch(() => undefined);
+  };
+
+  /**
    * Envoie une version : la saisie (`confirmTheirs: false`, avec l'instant de
    * dépôt de la déclaration adverse **affichée**, `null` sans elle), ou la
    * déclaration adverse telle quelle (`confirm: { reportedAt }`). Rend `true`
@@ -646,10 +660,9 @@ export function PlayerScoreDialog({
       onOwnSettle?.(ownSettleAfterFailure(refusedCode));
       if (!send.confirmTheirs) flagRefusal(code);
       showError(mapError(code));
-      // Proposition changée ou expirée, ou litige ouvert entre-temps : la modale
-      // se recharge sur l'état du serveur sans attendre le flux (peut-être en
-      // reconnexion), plutôt que de laisser réessayer en vain.
-      if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
+      // Proposition changée ou expirée, ou litige ouvert entre-temps : plutôt que
+      // de laisser réessayer en vain, la modale se remet à jour (`refreshAfterRefusal`).
+      if (REFRESH_ON_REFUSAL.has(code)) refreshAfterRefusal();
       return false;
     } finally {
       setSubmitting(false);
@@ -693,7 +706,7 @@ export function PlayerScoreDialog({
       // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
       onOwnSettle?.(ownSettleAfterFailure(refusedCode));
       showError(mapError(code));
-      if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
+      if (REFRESH_ON_REFUSAL.has(code)) refreshAfterRefusal();
     } finally {
       setSubmitting(false);
     }

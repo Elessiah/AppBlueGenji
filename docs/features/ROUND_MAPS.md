@@ -185,7 +185,21 @@ Match avec arbitre désigné : l'ordre du premier ban ne suit pas
   compris. Il lit le match hors transaction (match absent ou joué : refus sans
   verrou), puis prend `lockTournamentRow` en **première** instruction, relit le
   match `FOR UPDATE` et le réglage du tour : jamais un réglage figé avant le
-  verrou. Le choix dans un pool passe par `map-pick`.
+  verrou. Le choix dans un pool passe par `map-pick`. La saisie libre prend
+  le verrou partagé du tournoi (`lockTournamentRowShared`) borné à 5 s
+  (`withShortLockWait`, 409 `CONCURRENT_UPDATE_RETRY` au-delà).
+- Un tour ne se règle (cartes, départage, points) que s'il existe : en
+  élimination (`SINGLE`, `DOUBLE`), dans la limite des tours **construits** de
+  son tableau (`roundWithinBuiltBracket`, règle partagée par l'écran,
+  l'instantané et le serveur). L'arbre d'une phase se crée d'un coup : tant
+  qu'elle n'a aucun match, tout son plan compte ; ensuite, un tableau sans match
+  (petite finale retirée, repêchage d'un arbre à deux) n'a plus de tour. La
+  création de l'arbre purge les réglages posés hors de ses tours réels
+  (`purgeUnbuiltRoundSettings`) : sinon ils reprendraient effet sans bruit sur
+  un arbre plus grand régénéré. Choix assumé : après un retour en inscriptions,
+  un réglage purgé ne revient pas, le staff le repose (la fenêtre montre de
+  nouveau tout le plan tant que l'arbre n'est pas recréé). « Appliquer à tous » relit seulement les tours
+  visés et écrit par paquets de `ROUND_MAPS_UPSERT_CHUNK` (64) lignes.
 - Un choix verrouille le tournoi avant de relire le match et son pool, comme
   `setRoundMaps` : il ne se valide pas contre un pool remplacé au même instant.
   Verrou **partagé** (`LOCK IN SHARE MODE`) : il attend une écriture des cartes
@@ -291,6 +305,17 @@ au pool.
   qu'il en reste : elles peuvent être celles d'un autre membre du staff.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
+  Les choix dans le pool d'un même match se regroupent (`mapPickBursts`,
+  `MAP_PICK_LOG_WINDOW_MS` = 60 s de silence, 5 min au plus) : le **premier**
+  part aussitôt (ligne `MAP_PICKED*` habituelle), la suite de la rafale fait
+  **une** ligne de fin (`formatMapPickBurstLog` : cartes choisies, choix
+  retirés, et qui a agi). Une rafale n'a qu'un auteur : un choix de l'autre
+  côté (l'arbitrage qui reprend le choix d'une équipe, ou l'inverse) clôt la
+  rafale ouverte et part en entier à sa place — une reprise par l'arbitrage
+  n'est jamais fondue dans un décompte. Un autre changement d'arbitrage du
+  même match ferme d'abord la rafale ouverte, et les avis d'un match partent
+  dans l'ordre (`createKeyedChain`) : le résumé ne passe jamais après un
+  retrait qui l'a suivi. Un arrêt du serveur ne peut perdre que la ligne de fin.
 - Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche
   est réglée, ordre des bans de la carte 1, règle des cartes suivantes. Le bloc
   des cartes est coupé à un créneau entier au-delà de `MAPS_LINE_MAX` (420

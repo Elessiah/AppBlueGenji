@@ -194,5 +194,9 @@
       "INELIGIBLE": "tu ne remplis plus les conditions de l'arbitrage",
       "JOINED_TEAM": "tu joues désormais ce match"
     }
+  },
+  "refereeObjectionReleased": {
+    "title": "Arbitrage retiré",
+    "body": "Tu n'arbitres plus {count, plural, one {# match} other {# matchs}} : le staff a retenu ton opposition à être présenté aux parties de tes matchs."
   }
 }

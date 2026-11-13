@@ -182,6 +182,15 @@ function hasRunningTournament(withLaunchPhase: boolean): Promise<boolean> {
 }
 
 /**
+ * Un tournoi est-il en cours, toutes options confondues ? Même lecture
+ * mutualisée que la modale : le check-in du salon (`./lobby-brief`) n'est
+ * balayé que s'il y a un match à briefer.
+ */
+export function anyTournamentRunning(): Promise<boolean> {
+  return hasRunningTournament(false);
+}
+
+/**
  * Matchs à présenter au lecteur : ceux d'une équipe qu'il représente (membre
  * en cours ou entrée solo) ou qu'il caste. Les équipes du lecteur sont lues
  * **dans** la requête : un lecteur qui n'a aucun match — le cas courant — ne
@@ -786,6 +795,29 @@ function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext)
 }
 
 /**
+ * `LaunchReferee.contactsPending` : fermés à ce lecteur caster jusqu'au départ
+ * (`refereeContactsOpen`), le départ lui ouvrira-t-il au moins un contact —
+ * le tag Discord certifié là où la lecture le porte (`ctx.refereeDiscord`), le
+ * BattleTag en Overwatch ? Sinon, aucune
+ * relecture à armer au départ (revue sécurité #531).
+ */
+function refereeContactsPendingFor(
+  user: UserRow,
+  row: CandidateRow,
+  isViewer: boolean,
+  open: boolean,
+  ctx: LaunchContext,
+  battletagFor: (context: LaunchContext) => string | null,
+): boolean {
+  // Le lecteur caster seul attend le départ (`refereeContactsOpen`) ; au
+  // départ, la fenêtre des contacts du match et celle du caster s'ouvrent.
+  if (open || isViewer || ctx.viewerRole !== "CASTER") return false;
+  const atStart: LaunchContext = { ...ctx, exposes: true, exposesCaster: true };
+  if (ctx.refereeDiscord && refereeDiscordTag(user, isViewer, atStart) !== null) return true;
+  return battletagRelevantFor(row.tournament_game) && battletagFor(atStart) !== null;
+}
+
+/**
  * L'arbitre désigné tel que les parties du match le lisent : pseudo et, en
  * Overwatch seulement (`withGameBattletag`), BattleTag (`visibleBattletag`,
  * clause `sharesLiveMatch`) ; son tag Discord certifié par la carte seulement,
@@ -799,6 +831,15 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
   const isViewer = Number(user.id) === ctx.viewer.id;
   const open = refereeContactsOpen(user, ctx);
   const discord = ctx.refereeDiscord ? { discordTag: refereeDiscordTag(user, isViewer, ctx) } : {};
+  const castBattletag = row.casters.find((caster) => caster.userId === Number(user.id))?.castBattletag ?? null;
+  const battletagFor = (context: LaunchContext) =>
+    refereeContactsOpen(user, context)
+      ? visibleBattletag(castBattletag ?? user.overwatch_battletag, context.viewer, {
+          userId: Number(user.id),
+          visible: Number(user.visible_overwatch) === 1,
+          sharesLiveMatch: true,
+        })
+      : null;
   return withGameBattletag(
     row.tournament_game,
     {
@@ -807,6 +848,7 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
       ...discord,
       ready: ctx.readiness.referee?.ready ?? false,
       contactsShown: open,
+      ...(refereeContactsPendingFor(user, row, isViewer, open, ctx, battletagFor) ? { contactsPending: true } : {}),
       isViewer,
     },
     () => {
@@ -817,14 +859,7 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
       // Un arbitre qui caste aussi le match et a donné un BattleTag pour ce
       // cast le voit repris ici : le tag de cast remplace celui du profil
       // partout où ce dernier était montré (`/rgpd`), carte d'arbitre comprise.
-      const castBattletag = row.casters.find((caster) => caster.userId === Number(user.id))?.castBattletag ?? null;
-      const battletag = open
-        ? visibleBattletag(castBattletag ?? user.overwatch_battletag, ctx.viewer, {
-            userId: Number(user.id),
-            visible: Number(user.visible_overwatch) === 1,
-            sharesLiveMatch: true,
-          })
-        : null;
+      const battletag = battletagFor(ctx);
       // La pastille « vérifié » ne part qu'avec le BattleTag du compte : le lien
       // Battle.net se tait avec lui, et un tag de cast n'est jamais vérifié.
       return { battletag, battletagVerified: battletag !== null && castBattletag === null && battletagFromBlizzard(user) };

@@ -88,6 +88,7 @@
       "proposalWithoutMaps": "This proposal has no map details to reuse: enter the maps played to confirm it.",
       "saveWillPause": "“Save” pauses the automatic confirmation of {author}'s proposal: only “Confirm the result” then settles the match, unless {other} confirms it.",
       "conflict": "This match changed while you were entering it — someone else saved a result. Sending now would overwrite theirs.",
+      "rulesChanged": "The round format changed while you were entering the score: the maps entered follow the old format and would be refused.",
       "adoptStored": "Use the latest value",
       "forfeit": {
         "open": "Declare a forfeit on this round",

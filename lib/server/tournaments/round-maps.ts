@@ -7,7 +7,7 @@
  * ligne au journal du staff, sans nommer personne.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import { withConnection } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { formatMapRulesLog } from "@/lib/shared/bot-logs";
 import {
@@ -34,7 +34,14 @@ import {
   type RoundTiebreak,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
-import { roundAllowsTiebreak, roundMaxMaps, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
+import {
+  indexBuiltRounds,
+  isWholeBracketFormat,
+  roundAllowsTiebreak,
+  roundMaxMaps,
+  roundWithinBuiltBracket,
+  tiebreakTournamentFromRow,
+} from "@/lib/shared/round-plan";
 import {
   bracketFitsFormat,
   isValidMapPointTarget,
@@ -49,8 +56,9 @@ import {
 import { assertMapPointsUnlocked } from "./map-points";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { releaseWithServerLockWait, withShortLockWait } from "./lock-wait";
+import { withShortLockWait } from "./lock-wait";
 import { resolveMatchParty } from "./match-launch";
+import { lockTournamentRowShared } from "./registration";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
 import { loadRoundSlots } from "./round-map-slots";
@@ -146,7 +154,7 @@ export { loadRoundSlots };
 /**
  * Manche lue d'un corps de requête : sa **forme** seulement (numéro de 1 à
  * {@link ROUND_NUMBER_MAX}) ; son appartenance au tournoi se vérifie sous
- * verrou (`roundsOfTournament`). @throws `INVALID_ROUND`
+ * verrou (`roundsFittingTournament`). @throws `INVALID_ROUND`
  */
 export function parseRoundKey(body: { phaseId?: unknown; roundNumber?: unknown; bracket?: unknown }): RoundKey {
   const { phaseId, roundNumber, bracket } = body;
@@ -189,90 +197,78 @@ async function lockTournament(connection: PoolConnection, tournamentId: number):
   return rows[0];
 }
 
-/**
- * Verrou **partagé** du tournoi, pour un choix dans un pool : il attend un
- * `setRoundsMaps` en cours (verrou exclusif) et le retient le temps du choix,
- * sans mettre en file les choix des autres matchs entre eux. Écriture
- * MariaDB (`LOCK IN SHARE MODE`, requête sans jointure — `CLAUDE.md`).
- */
-async function lockTournamentShared(connection: PoolConnection, tournamentId: number): Promise<void> {
-  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
-    [tournamentId],
-  );
-  if (!rows[0]) throw new Error("TOURNAMENT_NOT_FOUND");
-}
 
-/**
- * Tours de `rounds` qui appartiennent au tournoi verrouillé : phase 0 hors
- * MULTI, sinon une phase **de ce** tournoi. Les autres (clé inventée, ou ligne
- * restée d'une phase supprimée par une édition du tournoi) sont écartés : on
- * n'y écrit pas de cartes, mais une copie « à tous les tours » qui en contient
- * ne refuse pas pour autant les tours valides.
- */
-async function roundsOfTournament(
-  connection: PoolConnection,
-  tournament: Pick<TournamentRow, "id" | "format">,
-  rounds: readonly RoundKey[],
-): Promise<RoundKey[]> {
-  if (tournament.format !== "MULTI") return rounds.filter((round) => round.phaseId === 0);
-  const phaseIds = [...new Set(rounds.map((round) => round.phaseId).filter((phaseId) => phaseId !== 0))];
-  if (phaseIds.length === 0) return [];
-  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_tournament_phases WHERE tournament_id = ? AND id IN (${phaseIds.map(() => "?").join(", ")})`,
-    [Number(tournament.id), ...phaseIds],
-  );
-  const owned = new Set(rows.map((row) => Number(row.id)));
-  return rounds.filter((round) => owned.has(round.phaseId));
-}
+type PhaseRules = { format: TournamentFormat | PhaseFormat; thirdPlace: boolean };
 
-/** Formats dont l'arbre entier est créé au lancement (ou à l'ouverture de la phase). */
-const WHOLE_BRACKET_FORMATS: ReadonlySet<string> = new Set(["SINGLE", "DOUBLE"]);
-
-/**
- * Tour que le tournoi verrouillé peut jouer : phase 0 hors MULTI, sinon une
- * phase **de ce** tournoi, et un tableau que le format (de la phase) joue
- * (`bracketFitsFormat` : pas de tableau perdant hors double élimination).
- * En élimination, une fois l'arbre créé, le tour doit en être un (ses tours
- * sont tous connus) ; avant, ou en ronde suisse / Survie (tours créés au fil
- * de l'eau), le numéro n'est borné que par `parseRoundKey`.
- * Pose des points d'un tour (`setRoundPointTarget`).
- */
-async function roundFitsTournament(
+/** Format (et petite finale) de chaque phase citée par `rounds` : la phase 0 hors MULTI, sinon les phases **de ce** tournoi. */
+async function phaseRulesOf(
   connection: PoolConnection,
   tournament: Pick<TournamentRow, "id" | "format" | "has_third_place_match">,
-  round: RoundKey,
-): Promise<boolean> {
-  let format: string;
-  if (tournament.format === "MULTI") {
-    if (round.phaseId === 0) return false;
-    const [rows] = await connection.execute<
-      (RowDataPacket & { format: PhaseFormat; has_third_place_match: number | boolean | null })[]
-    >(
-      `SELECT format, has_third_place_match FROM bg_tournament_phases WHERE tournament_id = ? AND id = ? LIMIT 1`,
-      [Number(tournament.id), round.phaseId],
-    );
-    const phase = rows[0];
-    if (phase === undefined || !bracketFitsFormat(phase.format, round.bracket, Boolean(Number(phase.has_third_place_match)))) {
-      return false;
-    }
-    format = phase.format;
-  } else {
-    if (
-      round.phaseId !== 0 ||
-      !bracketFitsFormat(tournament.format as TournamentFormat, round.bracket, Boolean(Number(tournament.has_third_place_match)))
-    ) {
-      return false;
-    }
-    format = tournament.format;
+  rounds: readonly RoundKey[],
+): Promise<Map<number, PhaseRules>> {
+  if (tournament.format !== "MULTI") {
+    return new Map([
+      [0, { format: tournament.format as TournamentFormat, thirdPlace: Boolean(Number(tournament.has_third_place_match)) }],
+    ]);
   }
-  if (!WHOLE_BRACKET_FORMATS.has(format)) return true;
-  const [built] = await connection.execute<(RowDataPacket & { max_round: number | null })[]>(
-    `SELECT MAX(round_number) AS max_round FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND bracket = ?`,
-    [Number(tournament.id), round.phaseId, round.bracket],
+  const phaseIds = [...new Set(rounds.map((round) => round.phaseId).filter((phaseId) => phaseId !== 0))];
+  if (phaseIds.length === 0) return new Map();
+  const [rows] = await connection.execute<
+    (RowDataPacket & { id: number; format: PhaseFormat; has_third_place_match: number | boolean | null })[]
+  >(
+    `SELECT id, format, has_third_place_match FROM bg_tournament_phases
+      WHERE tournament_id = ? AND id IN (${phaseIds.map(() => "?").join(", ")})`,
+    [Number(tournament.id), ...phaseIds],
   );
-  const maxRound = built[0]?.max_round;
-  return maxRound === null || maxRound === undefined || round.roundNumber <= Number(maxRound);
+  return new Map(
+    rows.map((row) => [Number(row.id), { format: row.format, thirdPlace: Boolean(Number(row.has_third_place_match)) }]),
+  );
+}
+
+/**
+ * Tours de `rounds` que le tournoi verrouillé peut jouer : phase 0 hors MULTI,
+ * sinon une phase **de ce** tournoi, et un tableau que le format (de la phase)
+ * joue (`bracketFitsFormat` : pas de tableau perdant hors double élimination,
+ * pas de petite finale sans elle). En élimination, une fois l'arbre créé, le
+ * tour doit en être un (ses tours sont tous connus) ; avant, ou en ronde
+ * suisse / Survie (tours créés au fil de l'eau), le numéro n'est borné que
+ * par `parseRoundKey`. Les autres (clé inventée — `GRAND` n° 1500 sur une
+ * élimination simple —, ou ligne restée d'une phase supprimée) sont écartés :
+ * on n'y écrit ni cartes, ni map de départage, ni points, mais une copie « à
+ * tous les tours » qui en contient ne refuse pas pour autant les tours valides.
+ * Deux lectures au plus, quel que soit le nombre de tours.
+ */
+async function roundsFittingTournament(
+  connection: PoolConnection,
+  tournament: Pick<TournamentRow, "id" | "format" | "has_third_place_match">,
+  rounds: readonly RoundKey[],
+): Promise<RoundKey[]> {
+  const phases = await phaseRulesOf(connection, tournament, rounds);
+  const fitting = rounds.filter((round) => {
+    const phase = phases.get(round.phaseId);
+    return phase !== undefined && bracketFitsFormat(phase.format, round.bracket, phase.thirdPlace);
+  });
+  const wholePhaseIds = [
+    ...new Set(fitting.map((round) => round.phaseId).filter((phaseId) => isWholeBracketFormat(phases.get(phaseId)?.format))),
+  ];
+  if (wholePhaseIds.length === 0) return fitting;
+  const [built] = await connection.execute<
+    (RowDataPacket & { phase_id: number; bracket: string; max_round: number | null })[]
+  >(
+    `SELECT phase_id, bracket, MAX(round_number) AS max_round FROM bg_matches
+      WHERE tournament_id = ? AND phase_id IN (${wholePhaseIds.map(() => "?").join(", ")})
+      GROUP BY phase_id, bracket`,
+    [Number(tournament.id), ...wholePhaseIds],
+  );
+  const index = indexBuiltRounds(
+    built.flatMap((row) =>
+      row.max_round === null
+        ? []
+        : [{ phaseId: Number(row.phase_id), bracket: String(row.bracket), roundNumber: Number(row.max_round) }],
+    ),
+  );
+  // Même règle que l'instantané (`withoutUnbuiltRounds`) : un réglage accepté ici y reste visible.
+  return fitting.filter((round) => roundWithinBuiltBracket(round, phases.get(round.phaseId)?.format, index));
 }
 
 /**
@@ -290,7 +286,7 @@ async function assertRoundPointsPosable(
 ): Promise<void> {
   if (!duelOn) throw new Error("MAP_POINTS_DISABLED");
   if (tournament.state === "FINISHED") throw new Error("MAP_POINTS_FINISHED");
-  if (!(await roundFitsTournament(connection, tournament, round))) throw new Error("INVALID_ROUND");
+  if ((await roundsFittingTournament(connection, tournament, [round])).length === 0) throw new Error("INVALID_ROUND");
   const maxMaps = roundMaxMapsOf(tournament, round);
   if (requestedMaps !== null && maxMaps !== null && requestedMaps.length > maxMaps) {
     throw new Error("INVALID_MAP_POINT_TARGET");
@@ -326,41 +322,95 @@ export function parseRoundKeys(raw: unknown): RoundKey[] {
 /** Ce qu'une écriture de cartes a retenu (`setRoundsMaps`). */
 export type RoundsMapsResult = { slots: string[][]; skipped: number };
 
+/** Ligne de réglage d'un tour, telle que relue sous le verrou du tournoi. */
+type StoredRoundRow = RowDataPacket & {
+  id: number;
+  phase_id: number;
+  bracket: string;
+  round_number: number;
+  slots_json: string | null;
+  tiebreak_map: string | null;
+  map_point_target: number | null;
+  map_point_targets?: string | null;
+};
+
+/** Manches au plus par upsert groupé de `writeRoundsSlots`. */
+export const ROUND_MAPS_UPSERT_CHUNK = 64;
+
+/** Clé d'un tour, pour indexer les lignes lues. */
+function roundKeyOf(round: RoundKey): string {
+  return `${round.phaseId}:${round.bracket}:${round.roundNumber}`;
+}
+
 /**
- * Écrit (ou retire) le réglage d'une manche ; rend le réglage d'avant, `null`
- * s'il ne change rien.
+ * Écrit (ou retire) le même réglage sur plusieurs manches, **en lot** : une
+ * lecture des lignes du tournoi, puis une écriture groupée des seules manches
+ * qui changent (un upsert, ou un `DELETE` et un `UPDATE` pour un retrait) —
+ * jamais une lecture et une écriture par tour sous le verrou du tournoi.
+ *
+ * @returns les manches changées, chacune avec son réglage d'avant.
  */
-async function writeRoundSlots(
+async function writeRoundsSlots(
   connection: PoolConnection,
   tournamentId: number,
-  round: RoundKey,
+  rounds: readonly RoundKey[],
   slots: string[][],
-): Promise<string[][] | null> {
-  const before = await loadRoundSlots(connection, tournamentId, round);
-  if (JSON.stringify(before) === JSON.stringify(slots)) return null;
+): Promise<{ round: RoundKey; before: string[][] }[]> {
+  // Les seules lignes visées (`setRoundMaps` n'en relit qu'une), pas tout le tournoi.
+  const [rows] = await connection.execute<StoredRoundRow[]>(
+    `SELECT id, phase_id, bracket, round_number, slots_json, tiebreak_map, map_point_target, map_point_targets
+       FROM bg_tournament_round_maps
+      WHERE tournament_id = ? AND (phase_id, bracket, round_number) IN (${rounds.map(() => "(?, ?, ?)").join(", ")})`,
+    [tournamentId, ...rounds.flatMap((round) => [round.phaseId, round.bracket, round.roundNumber])],
+  );
+  const stored = new Map(
+    rows.map((row) => [
+      roundKeyOf({ phaseId: Number(row.phase_id), bracket: String(row.bracket), roundNumber: Number(row.round_number) }),
+      row,
+    ]),
+  );
+  const wanted = JSON.stringify(slots);
+  const changed = rounds.flatMap((round) => {
+    const row = stored.get(roundKeyOf(round));
+    const before = parseStoredSlots(row?.slots_json);
+    return JSON.stringify(before) === wanted ? [] : [{ round, before, row }];
+  });
+  if (changed.length === 0) return [];
   if (slots.length === 0) {
     // Une map de départage (ou des points par carte) réglée garde la ligne :
-    // seules ses cartes partent.
-    await connection.execute(
-      `DELETE FROM bg_tournament_round_maps
-        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?
-          AND tiebreak_map IS NULL AND map_point_target IS NULL AND map_point_targets IS NULL`,
-      [tournamentId, round.phaseId, round.bracket, round.roundNumber],
-    );
-    await connection.execute(
-      `UPDATE bg_tournament_round_maps SET slots_json = '[]'
-        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
-      [tournamentId, round.phaseId, round.bracket, round.roundNumber],
-    );
+    // seules ses cartes partent. Une manche sans ligne n'a rien à retirer.
+    const kept = changed.flatMap(({ row }) => (row ? [row] : []));
+    const holdsSettings = (row: StoredRoundRow) =>
+      row.tiebreak_map !== null || row.map_point_target !== null || (row.map_point_targets ?? null) !== null;
+    const bare = kept.filter((row) => !holdsSettings(row)).map((row) => Number(row.id));
+    const emptied = kept.filter(holdsSettings).map((row) => Number(row.id));
+    if (bare.length > 0) {
+      await connection.execute(
+        `DELETE FROM bg_tournament_round_maps WHERE tournament_id = ? AND id IN (${bare.map(() => "?").join(", ")})`,
+        [tournamentId, ...bare],
+      );
+    }
+    if (emptied.length > 0) {
+      await connection.execute(
+        `UPDATE bg_tournament_round_maps SET slots_json = '[]'
+          WHERE tournament_id = ? AND id IN (${emptied.map(() => "?").join(", ")})`,
+        [tournamentId, ...emptied],
+      );
+    }
   } else {
-    await connection.execute(
-      `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
-       VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
-      [tournamentId, round.phaseId, round.bracket, round.roundNumber, JSON.stringify(slots)],
-    );
+    // Par lots bornés ({@link ROUND_MAPS_UPSERT_CHUNK}) : la taille d'une
+    // requête ne dépend plus du seul plafond de `parseRoundKeys`.
+    for (let start = 0; start < changed.length; start += ROUND_MAPS_UPSERT_CHUNK) {
+      const chunk = changed.slice(start, start + ROUND_MAPS_UPSERT_CHUNK);
+      await connection.execute(
+        `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
+         VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+         ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
+        chunk.flatMap(({ round }) => [tournamentId, round.phaseId, round.bracket, round.roundNumber, wanted]),
+      );
+    }
   }
-  return before;
+  return changed.map(({ round, before }) => ({ round, before }));
 }
 
 /**
@@ -390,14 +440,13 @@ export async function setRoundsMaps(
   const result = await retryOnDeadlock(() => inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
     // Retirer est permis sur toute clé (une ligne orpheline doit pouvoir partir) ;
-    // poser des cartes, seulement sur les tours du tournoi.
-    const targets = slots.length === 0 ? rounds : await roundsOfTournament(connection, tournament, rounds);
+    // poser des cartes, seulement sur les tours que le tournoi peut jouer.
+    const targets = slots.length === 0 ? rounds : await roundsFittingTournament(connection, tournament, rounds);
     if (targets.length === 0) throw new Error("INVALID_ROUND");
-    const changedRounds: (RoundKey & { before: string })[] = [];
-    for (const round of targets) {
-      const before = await writeRoundSlots(connection, tournamentId, round, slots);
-      if (before !== null) changedRounds.push({ ...round, before: roundMapsFingerprint(before) });
-    }
+    const changedRounds = (await writeRoundsSlots(connection, tournamentId, targets, slots)).map(({ round, before }) => ({
+      ...round,
+      before: roundMapsFingerprint(before),
+    }));
     // L'annonce Discord ne part pas ici : elle est mise en attente dans la
     // transaction et une seule ligne résume la série (`./round-maps-notice`).
     await queueRoundMapsNotice(connection, tournamentId, changedRounds);
@@ -460,7 +509,8 @@ async function tiebreakAllowedUnderLock(
  * en N + 1 seulement si la série est à égalité après les N maps régulières. Une
  * carte, imposée ; les cartes du tour et leurs choix ne changent pas. Réservé
  * à l'arbitrage (permission `tournaments`, vérifiée par la route). Verrou du
- * tournoi en première instruction, format relu dessous ; retirer est permis
+ * tournoi en première instruction, format relu dessous ; poser exige un tour
+ * que le tournoi peut jouer (`roundsFittingTournament`) ; retirer est permis
  * sur toute clé (un réglage resté d'un format changé doit pouvoir partir).
  *
  * @returns la map retenue (`null` = retirée).
@@ -472,7 +522,7 @@ export async function setRoundTiebreak(tournamentId: number, round: RoundKey, ra
   const changed = await retryOnDeadlock(() => inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
     if (map !== null) {
-      const [owned] = await roundsOfTournament(connection, tournament, [round]);
+      const [owned] = await roundsFittingTournament(connection, tournament, [round]);
       if (!owned) throw new Error("INVALID_ROUND");
       if (!(await tiebreakAllowedUnderLock(connection, tournamentId, round))) throw new Error("TIEBREAK_NOT_ALLOWED");
     }
@@ -750,11 +800,10 @@ export async function pickMatchMap(
 ): Promise<void> {
   // Rejouée sur interblocage : le verrou tournoi puis match croise les
   // écritures d'arbitrage qui prennent le match puis le tournoi.
-  // Connexion prise ici (pas `withConnection`) : rendue par
-  // `releaseWithServerLockWait`, jamais au pool sous le délai de verrou court.
-  const tournamentId = await retryOnDeadlock(async () => {
-    const connection = await (await getDatabase()).getConnection();
-    try {
+  // `withConnection` rend la connexion par `releaseWithServerLockWait` : jamais
+  // au pool sous le délai de verrou court.
+  const tournamentId = await retryOnDeadlock(() =>
+    withConnection(async (connection) => {
       // Le match lu avant la transaction (lecture autonome) : sous REPEATABLE
       // READ, une lecture dans la transaction avant le verrou figerait la vue, et
       // le pool relu ensuite serait celui d'avant un `setRoundMaps` simultané
@@ -774,7 +823,7 @@ export async function pickMatchMap(
         // (remplacement du pool, avancement) ne garde pas la connexion jusqu'à
         // `innodb_lock_wait_timeout` — passé le délai court, `ER_LOCK_WAIT_TIMEOUT`
         // rend 409 `CONCURRENT_UPDATE_RETRY` (`launchFailure`).
-        await withShortLockWait(connection, () => lockTournamentShared(connection, ownerId));
+        await withShortLockWait(connection, () => lockTournamentRowShared(connection, ownerId));
         const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
         const row = rows[0];
         if (!row) throw new Error("MATCH_NOT_FOUND");
@@ -792,10 +841,8 @@ export async function pickMatchMap(
         queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
         return ownerId;
       });
-    } finally {
-      await releaseWithServerLockWait(connection);
-    }
-  });
+    }),
+  );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 

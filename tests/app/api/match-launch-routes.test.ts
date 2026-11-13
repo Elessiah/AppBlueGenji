@@ -21,7 +21,11 @@ import {
   setMatchHost,
   setMatchReady,
 } from "@/lib/server/tournaments/match-launch";
-import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
+import {
+  anyTournamentRunning,
+  listViewerMatchLaunches,
+  loadViewerMatchContacts,
+} from "@/lib/server/tournaments/match-launch-info";
 import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice";
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
@@ -50,7 +54,11 @@ function jsonRequest(method: string, body?: unknown) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(dispatchLobbyBriefs).mockResolvedValue(0);
+  jest.mocked(anyTournamentRunning).mockResolvedValue(true);
 });
+
+/** Le check-in part après la lecture mutualisée « un tournoi en cours ? », sans être attendu. */
+const settleBackground = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("POST /api/matches/[matchId]/ready", () => {
   it("rejette un visiteur anonyme", async () => {
@@ -426,12 +434,38 @@ describe("GET /api/me/match-launches", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 80 }));
     jest.mocked(listViewerMatchLaunches).mockResolvedValue([]);
     await launchesGet();
+    await settleBackground();
     expect(dispatchLobbyBriefs).toHaveBeenCalledTimes(1);
+  });
+
+  it("launchesGet_noRunningTournament_skipsCheckInSweep", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 81 }));
+    jest.mocked(listViewerMatchLaunches).mockResolvedValue([]);
+    jest.mocked(anyTournamentRunning).mockResolvedValue(false);
+
+    await launchesGet();
+    await settleBackground();
+
+    expect(dispatchLobbyBriefs).not.toHaveBeenCalled();
+    expect(dispatchMatchVoiceChannels).toHaveBeenCalledTimes(1);
+  });
+
+  it("launchesGet_runningProbeFails_answersWithoutCheckInSweep", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 82 }));
+    jest.mocked(listViewerMatchLaunches).mockResolvedValue([]);
+    jest.mocked(anyTournamentRunning).mockRejectedValue(new Error("ECONNREFUSED"));
+
+    const res = await launchesGet();
+    await settleBackground();
+
+    expect(res.status).toBe(200);
+    expect(dispatchLobbyBriefs).not.toHaveBeenCalled();
   });
 
   it("launchesGet_anonymous_noCheckInSweep", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
     await launchesGet();
+    await settleBackground();
     expect(dispatchLobbyBriefs).not.toHaveBeenCalled();
   });
 

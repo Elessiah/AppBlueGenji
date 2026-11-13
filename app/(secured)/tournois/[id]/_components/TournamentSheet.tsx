@@ -575,6 +575,10 @@ function TournamentSheetView({
   const markOwnSettle = useCallback((settling: boolean) => {
     playerScoreOwnSettle.current = settling;
   }, []);
+  // Un refus « état périmé » du report d'équipe : flux ouvert, l'écriture qui l'a
+  // causé arrive par lui (instantané **et** contexte du lecteur) — relire tout
+  // le tournoi en REST doublerait la donnée. Flux coupé, la lecture de secours.
+  const refreshUnlessLive = useCallback(() => (isLive ? undefined : refresh()), [isLive, refresh]);
   const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
   const openMatchSchedule = useCallback(
     (match: BracketMatch) => setMatchForScheduleId(match.id),
@@ -1400,7 +1404,7 @@ function TournamentSheetView({
           tiebreakMap={playerScorePlan.tiebreakMap}
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
-          onRefresh={refresh}
+          onRefresh={refreshUnlessLive}
           onOwnSettle={markOwnSettle}
         />
       )}

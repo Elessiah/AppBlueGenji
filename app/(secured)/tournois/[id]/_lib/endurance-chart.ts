@@ -408,6 +408,75 @@ export function chartLine(
   return { d, head, hollow, forfeit: hollow && shownState.kind === "FORFEIT" };
 }
 
+/**
+ * Courbe **entière** jusqu'à la manche `target`, calculée une fois par courbe
+ * et par manche affichée : l'animation n'en dévoile qu'une longueur
+ * (`chartLineAt` → `stroke-dasharray`), sans reconstruire le tracé à chaque
+ * image (64 courbes × ~150 images en mode « Tous »).
+ */
+export type ChartLinePath = {
+  /** Tracé complet, du départ à la manche `target`. */
+  d: string;
+  /** Points de chaque manche (0 = départ). */
+  points: readonly { x: number; y: number }[];
+  /** Longueur cumulée du tracé à chaque point (unités du SVG). */
+  lengths: readonly number[];
+  /** État de l'engagé à la manche affichée (tête creuse, forfait). */
+  shownKind: EnduranceChartSeries["states"][number]["kind"] | null;
+};
+
+export function chartLinePath(series: EnduranceChartSeries, target: number, geometry: ChartGeometry): ChartLinePath {
+  const values = series.values.slice(0, target + 1);
+  const points = values.map((value, round) => ({ x: chartX(geometry, round), y: chartY(geometry, value) }));
+  const lengths = [0];
+  for (let k = 1; k < points.length; k += 1) {
+    lengths.push(lengths[k - 1] + Math.hypot(points[k].x - points[k - 1].x, points[k].y - points[k - 1].y));
+  }
+  const d = points.map((point, k) => `${k === 0 ? "M" : "L"}${fmt(point.x)} ${fmt(point.y)}`).join(" ");
+  return { d, points, lengths, shownKind: series.states[target - 1]?.kind ?? null };
+}
+
+/** Une image de la courbe : longueur dévoilée (`null` : entière), tête et son état. */
+export type ChartLineFrame = {
+  visible: number | null;
+  total: number;
+  head: { x: number; y: number };
+  hollow: boolean;
+  forfeit: boolean;
+};
+
+/**
+ * L'image de `path` à l'avancement `progress` (en manches) : même tête et même
+ * état que `chartLine`, la longueur dévoilée en plus — le tracé, lui, ne change pas.
+ */
+export function chartLineAt(path: ChartLinePath, progress: number): ChartLineFrame {
+  const lastIdx = path.points.length - 1;
+  const total = path.lengths[lastIdx] ?? 0;
+  const hollow = path.shownKind !== null && path.shownKind !== "PLAYED" && progress >= lastIdx;
+  const forfeit = hollow && path.shownKind === "FORFEIT";
+  if (progress >= lastIdx) return { visible: null, total, head: path.points[lastIdx], hollow, forfeit };
+  const k = Math.max(0, Math.floor(progress));
+  const f = Math.max(0, progress - k);
+  const from = path.points[k];
+  const to = path.points[k + 1];
+  return {
+    visible: path.lengths[k] + (path.lengths[k + 1] - path.lengths[k]) * f,
+    total,
+    head: { x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f },
+    hollow,
+    forfeit,
+  };
+}
+
+/**
+ * Tirets qui dévoilent `visible` unités du tracé ; aucun quand la courbe est
+ * entière (dernière image, ou dévoilé ≥ longueur) ou sans longueur.
+ */
+export function lineDash(frame: Pick<ChartLineFrame, "visible" | "total">): string | undefined {
+  if (frame.visible === null || frame.total <= 0 || frame.visible >= frame.total) return undefined;
+  return `${Math.max(0, frame.visible)} ${frame.total + 1}`;
+}
+
 // ---------- Animation ----------
 
 /** Accélération puis freinage, sur [0, 1]. */

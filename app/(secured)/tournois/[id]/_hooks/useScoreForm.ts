@@ -7,7 +7,9 @@ import {
   decideScoreForm,
   initialAdminMaps,
   pendingProposalSignature,
+  rulesConflictShown,
   sameScoreFormState,
+  scoreFormSyncOutcome,
   scoresFromMaps,
   storedResultSignature,
   type ScoreFormBlocker,
@@ -133,6 +135,9 @@ export function useScoreForm(
     mapsBaseline: openingRows(),
   }));
   const [conflict, setConflict] = useState(false);
+  // Règle (`rulesKey`) sous laquelle la saisie gardée a été tapée, posée au
+  // premier changement de règle qui la laisse en place ; `null` sinon.
+  const [rulesEnteredUnder, setRulesEnteredUnder] = useState<string | null>(null);
 
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
@@ -142,20 +147,24 @@ export function useScoreForm(
     const next = adminFormStateFor(match, nextMaps);
     setSynced({ signature, proposals, rules, baseline: next, mapsBaseline: nextMaps });
 
-    if (untouched) {
+    // Seul un résultat **enregistré** fait conflit (une proposition d'équipe
+    // n'écrase rien), et jamais pendant notre propre envoi.
+    const outcome = scoreFormSyncOutcome({
+      untouched,
+      resultChanged: signature !== synced.signature,
+      rulesChanged: rules !== synced.rules,
+      submitting,
+    });
+    if (outcome.adopt) {
       setState(next);
       setMaps(nextMaps);
       options.onMapsReset?.();
       setConflict(false);
-    } else if (signature !== synced.signature && !submitting) {
-      // Seul un résultat **enregistré** fait conflit : une proposition
-      // d'équipe arrivée pendant la saisie n'écrase rien, la saisie reste.
-      //
-      // Pas pendant un envoi : le flux rapporte alors **notre propre** écriture,
-      // qui arrive presque toujours avant la réponse HTTP. Sans cette réserve,
-      // l'arbitre voyait « ce match a été modifié pendant ta saisie » accuser un
-      // tiers de sa propre validation, le temps que le dialogue se referme.
-      setConflict(true);
+      setRulesEnteredUnder(null);
+    } else {
+      if (outcome.conflict) setConflict(true);
+      // La première règle compte : BO3 → BO5 → BO3 retombe sur celle de la saisie.
+      if (outcome.rulesConflict) setRulesEnteredUnder((current) => current ?? synced.rules);
     }
   }
 
@@ -168,6 +177,7 @@ export function useScoreForm(
     setMaps(nextMaps);
     options.onMapsReset?.();
     setConflict(false);
+    setRulesEnteredUnder(null);
   };
 
   /**
@@ -306,6 +316,15 @@ export function useScoreForm(
     decision,
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,
+    /**
+     * Le format de la manche (ou le jeu) a changé pendant la saisie, et les
+     * maps gardées seraient refusées par la règle courante (`rulesConflictShown`).
+     */
+    rulesConflict: rulesConflictShown({
+      enteredUnder: rulesEnteredUnder,
+      rules,
+      mapsRefusedNow: mapsSent && savedMapsRefused(matchFormat, game, sentMaps, mapRules),
+    }),
     adoptStoredResult,
     adoptReport,
     /**
@@ -332,6 +351,16 @@ export function useScoreForm(
      */
     refuseMapsBefore: (action: "save" | "resolve") => mapsSent && refuseMaps(action === "resolve"),
   };
+}
+
+/** Les maps qui partiraient sont-elles refusées par la règle courante, même à l'enregistrement ? */
+function savedMapsRefused(
+  format: MatchFormat | null,
+  game: TournamentGame | null | undefined,
+  maps: ReadonlyArray<MatchMapInput>,
+  mapRules: MapEntryRules,
+): boolean {
+  return checkMapList(format, game, maps, { decisive: false, ...mapRules }).error !== null;
 }
 
 const STRUCTURAL_BLOCKERS: ReadonlySet<ScoreFormBlocker> = new Set<ScoreFormBlocker>([

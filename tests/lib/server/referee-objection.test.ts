@@ -3,16 +3,21 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/cast-eligibility");
+jest.mock("@/lib/server/tournaments/referee-notices");
+jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/referee-names", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names"),
   forgetRefereeNames: jest.fn(),
 }));
 
+import { flushAllCoalescers } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereePermission } from "@/lib/server/tournaments/cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "@/lib/server/tournaments/match-launch";
 import { setRefereeObjection } from "@/lib/server/tournaments/referee-objection";
 import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
+import { announceObjectionReleases } from "@/lib/server/tournaments/referee-notices";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -30,6 +35,7 @@ beforeEach(() => {
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(releaseObjectingReferee).mockResolvedValue(true);
   jest.mocked(loadRefereePermission).mockResolvedValue(true);
+  jest.mocked(announceObjectionReleases).mockResolvedValue(undefined);
 });
 
 describe("setRefereeObjection", () => {
@@ -41,8 +47,8 @@ describe("setRefereeObjection", () => {
     expect(result).toEqual({ changed: true, released: 2, failed: 0 });
     expect(execute.mock.calls[0][0]).toContain("SET referee_objection_at = NOW()");
     expect(execute.mock.calls[1][0]).toContain("status <> 'COMPLETED'");
-    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(1, 11, REFEREE, expect.any(Array));
-    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(2, 12, REFEREE, expect.any(Array));
+    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(1, 11, REFEREE, expect.any(Array), expect.anything());
+    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(2, 12, REFEREE, expect.any(Array), expect.anything());
   });
 
   it("setRefereeObjection_sweep_signalsMatchesLeftWithoutRefereeOnceTogether", async () => {
@@ -87,7 +93,7 @@ describe("setRefereeObjection", () => {
     const result = await setRefereeObjection(REFEREE, true);
 
     expect(result).toEqual({ changed: false, released: 1, failed: 0 });
-    expect(releaseObjectingReferee).toHaveBeenCalledWith(11, REFEREE, expect.any(Array));
+    expect(releaseObjectingReferee).toHaveBeenCalledWith(11, REFEREE, expect.any(Array), expect.anything());
   });
 
   it("setRefereeObjection_lift_clearsWithoutSweep", async () => {
@@ -153,7 +159,7 @@ describe("setRefereeObjection", () => {
     const result = await setRefereeObjection(REFEREE, true);
 
     expect(result).toEqual({ changed: true, released: 1, failed: 1 });
-    expect(releaseObjectingReferee).toHaveBeenCalledWith(12, REFEREE, expect.any(Array));
+    expect(releaseObjectingReferee).toHaveBeenCalledWith(12, REFEREE, expect.any(Array), expect.anything());
     expect(consoleError).toHaveBeenCalledTimes(1);
     consoleError.mockRestore();
   });
@@ -205,5 +211,76 @@ describe("setRefereeObjection", () => {
 
     expect(String(consoleError.mock.calls[0][0])).not.toContain("4711");
     consoleError.mockRestore();
+  });
+});
+
+describe("setRefereeObjection — annonces regroupées", () => {
+  const tournamentOf: Record<number, number> = { 11: 7, 12: 7, 13: 8 };
+
+  function releaseInto() {
+    jest.mocked(releaseObjectingReferee).mockImplementation(async (matchId, _refereeId, _undecided, batch) => {
+      batch?.tournamentIds.add(tournamentOf[matchId]);
+      return true;
+    });
+  }
+
+  it("setRefereeObjection_matchesAcrossTwoTournaments_publishesEachTournamentOnce", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }, { id: 12 }, { id: 13 }], []]);
+    releaseInto();
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(2);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
+  });
+
+  it("setRefereeObjection_releasedMatches_sendsOneRecapNotice", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }, { id: 12 }], []]);
+    releaseInto();
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(announceObjectionReleases).toHaveBeenCalledTimes(1);
+    expect(announceObjectionReleases).toHaveBeenCalledWith(REFEREE, 2, [7]);
+  });
+
+  it("setRefereeObjection_slowRecapPush_answersWithoutWaitingForIt", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
+    releaseInto();
+    let deliver: () => void = () => undefined;
+    jest.mocked(announceObjectionReleases).mockReturnValueOnce(new Promise<void>((resolve) => (deliver = resolve)));
+
+    await expect(setRefereeObjection(REFEREE, true)).resolves.toBeDefined();
+
+    expect(queueDeferredNoRefereeAlerts).toHaveBeenCalledTimes(1);
+    deliver();
+  });
+
+  it("setRefereeObjection_releasedMatches_shutdownFlushAwaitsRecapNotice", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
+    releaseInto();
+    let deliver: () => void = () => undefined;
+    jest.mocked(announceObjectionReleases).mockReturnValueOnce(new Promise<void>((resolve) => (deliver = resolve)));
+    await setRefereeObjection(REFEREE, true);
+    let flushed = false;
+
+    const flush = flushAllCoalescers().then(() => (flushed = true));
+    await Promise.resolve();
+    expect(flushed).toBe(false);
+    deliver();
+    await flush;
+
+    expect(flushed).toBe(true);
+  });
+
+  it("setRefereeObjection_nothingReleased_noPublish", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
+    jest.mocked(releaseObjectingReferee).mockResolvedValueOnce(false);
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(announceObjectionReleases).toHaveBeenCalledWith(REFEREE, 0, []);
   });
 });
