@@ -309,8 +309,10 @@ au pool.
   `MAP_PICK_LOG_WINDOW_MS` = 60 s de silence, 5 min au plus) : le **premier**
   part aussitôt (ligne `MAP_PICKED*` habituelle), la suite de la rafale fait
   **une** ligne de fin (`formatMapPickBurstLog` : cartes choisies, choix
-  retirés, et qui a agi — staff, équipe en autogestion, ou les deux : une
-  reprise par l'arbitrage n'est jamais tue). Un autre changement d'arbitrage du
+  retirés, et qui a agi). Une rafale n'a qu'un auteur : un choix de l'autre
+  côté (l'arbitrage qui reprend le choix d'une équipe, ou l'inverse) clôt la
+  rafale ouverte et part en entier à sa place — une reprise par l'arbitrage
+  n'est jamais fondue dans un décompte. Un autre changement d'arbitrage du
   même match ferme d'abord la rafale ouverte, et les avis d'un match partent
   dans l'ordre (`createKeyedChain`) : le résumé ne passe jamais après un
   retrait qui l'a suivi. Un arrêt du serveur ne peut perdre que la ligne de fin.

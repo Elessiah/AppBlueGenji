@@ -196,8 +196,9 @@ function connectionFor(world: World): PoolConnection {
       return [world.viewerMemberships, []];
     }
     if (sql.startsWith("SELECT id FROM bg_teams WHERE solo_user_id")) return [world.viewerSolo, []];
-    if (sql.includes("FOR UPDATE")) {
-      // Relecture sous verrou d'un candidat par l'entretien : le jeu n'y est
+    if (sql.includes("FOR UPDATE") || sql.startsWith("SELECT m.tournament_id, m.status, m.referee_user_id FROM bg_matches m")) {
+      // Relecture sous verrou d'un candidat, ou lecture du match d'un retrait
+      // sur opposition avant sa transaction (même ligne) : le jeu n'y est
       // pas (il se lit à part, dans le contexte).
       return [
         world.candidates

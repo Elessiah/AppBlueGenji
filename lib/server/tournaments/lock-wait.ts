@@ -13,9 +13,14 @@ export const SHORT_LOCK_WAIT_SECONDS = 5;
 
 /**
  * Exécute `read` sous un délai de verrou court, puis remet celui du serveur.
- * Pour la **seule** lecture verrouillée des manches : le verrou du tournoi,
- * pris avant, s'attend sans borne (son détenteur le rend sans rien attendre du
- * geste), et le rejeu qui suit garde le délai du serveur — des écritures qui
+ * Pour la **seule** lecture verrouillée qui peut attendre longtemps : celle des
+ * manches d'un geste qui tient déjà le tournoi (ce verrou-là, pris avant,
+ * s'attend alors sans borne : son détenteur le rend sans rien attendre du
+ * geste), ou le verrou **partagé** du tournoi d'un geste d'un seul match
+ * (première carte, choix dans le pool) qu'un remplacement des cartes ou un
+ * avancement tient en exclusif — passé le délai, le staff ou l'équipe lit
+ * « réessaie » (409) au lieu de tenir une connexion jusqu'à
+ * `innodb_lock_wait_timeout`. Le rejeu qui suit garde le délai du serveur — des écritures qui
  * tolèrent un dépassement de délai (journal du bot, alertes) perdraient sinon
  * leur ligne en silence. Une remise ratée après une lecture réussie arrête le
  * geste ; dans tous les cas, elle est rattrapée au retour au pool

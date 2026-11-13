@@ -103,8 +103,10 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   la levée vaut pour tout compte qui en porte une ;
 - retenue : l'arbitre est retiré de **tous** ses matchs non terminés (tout
   statut sauf `COMPLETED`, score en attente de confirmation compris), lancés
-  compris (`releaseObjectingReferee`, un match par transaction sous un verrou
-  **allégé** — la seule ligne du match, puis l'opposition relue ; le contexte
+  compris (`releaseObjectingReferee`, un match par transaction : tournoi du
+  match lu avant, puis son verrou partagé en première instruction — ordre du
+  moteur, tournoi puis match —, puis un verrou **allégé** du match — sa seule
+  ligne —, puis l'opposition relue ; le contexte
   complet n'est relu par `launchIfAllReady` que si le tournoi est en cours —,
   un match qui n'attendait que lui part) ; **un** avis push récapitulatif
   `REFEREE_RELEASED` (« Tu n'arbitres plus N matchs », `refereeObjectionReleasedPush`,
@@ -147,8 +149,8 @@ balayage est rejouable : une opposition déjà retenue reste proposée au
 formulaire, la retenir de nouveau refait le tour. Un échec sur un match
 n'arrête pas les autres ; il est compté, et la route répond 500
 (`REFEREE_OBJECTION_FAILED`) **après** le journal. `releaseObjectingReferee`
-relit l'opposition sous le verrou du match (ordre match puis compte, celui de
-`writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
+relit l'opposition sous le verrou du match (ordre tournoi, match puis compte,
+celui du moteur et de `writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
 L'instantané (`refereeKept`, jointure `referee_objection_at`), la lecture de la
 modale (`keepEligibleReferees`) et le check-in du match (`loadEligibleRefereeIds`)
 relisent aussi l'opposition : un balayage resté incomplet ne laisse pas

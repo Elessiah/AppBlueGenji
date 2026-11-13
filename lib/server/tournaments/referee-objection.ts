@@ -25,6 +25,7 @@
  * retenue le refait.
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { trackAnnouncement } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereePermission } from "./cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "./match-launch";
@@ -123,7 +124,8 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
   }
   for (const tournamentId of batch.tournamentIds) publishMatchUpdatedEvent(tournamentId);
   await queueDeferredNoRefereeAlerts(undecided);
-  // L'avis récapitulatif part sans retenir la réponse du staff (il ne lève jamais).
-  void announceObjectionReleases(refereeId, released, [...batch.tournamentIds]);
+  // L'avis récapitulatif part sans retenir la réponse du staff (il ne lève
+  // jamais), suivi pour que l'arrêt du serveur l'attende (`trackAnnouncement`).
+  void trackAnnouncement(announceObjectionReleases(refereeId, released, [...batch.tournamentIds]));
   return { released, failed };
 }

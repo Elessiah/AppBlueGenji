@@ -12,7 +12,7 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { cached } from "@/lib/server/cache";
-import { getDatabase, withConnection } from "@/lib/server/database";
+import { withConnection } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import {
   allPartiesReady,
@@ -66,7 +66,7 @@ import {
   type MatchStreamRow,
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { releaseWithServerLockWait, withShortLockWait } from "./lock-wait";
+import { withShortLockWait } from "./lock-wait";
 import { lockTournamentRow, lockTournamentRowShared } from "./registration";
 import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { activeMemberSql } from "./match-players";
@@ -1964,12 +1964,10 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
   // écritures d'arbitrage qui prennent le match puis le tournoi. **Une**
   // connexion par essai : la lecture du tournoi du match se fait avant la
   // transaction (lecture autonome, aucune image figée avant le verrou), sur
-  // la connexion qui la porte ensuite. Prise ici (pas `withConnection`) :
-  // rendue par `releaseWithServerLockWait`, jamais au pool sous le délai de
-  // verrou court.
-  const tournamentId = await retryOnDeadlock(async () => {
-    const connection = await (await getDatabase()).getConnection();
-    try {
+  // la connexion qui la porte ensuite. `withConnection` la rend par
+  // `releaseWithServerLockWait` : jamais au pool sous le délai de verrou court.
+  const tournamentId = await retryOnDeadlock(() =>
+    withConnection(async (connection) => {
       const [pre] = await connection.execute<FirstMapRow[]>(FIRST_MAP_SELECT, [matchId]);
       assertFirstMapSettable(pre[0]);
       const ownerId = Number(pre[0].tournament_id);
@@ -1996,10 +1994,8 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
         queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: typed !== null });
         return ownerId;
       });
-    } finally {
-      await releaseWithServerLockWait(connection);
-    }
-  });
+    }),
+  );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 
@@ -2079,6 +2075,16 @@ export async function relaunchAfterRefereeWithdrawal(
   }
 }
 
+/** Ligne de match lue par le retrait sur opposition (`releaseObjectingReferee`). */
+type ObjectionMatchRow = RowDataPacket & { tournament_id: number; status: string; referee_user_id: number | null };
+
+const OBJECTION_MATCH_SELECT = `SELECT m.tournament_id, m.status, m.referee_user_id FROM bg_matches m WHERE m.id = ?`;
+
+/** Le match a-t-il encore cet arbitre, sans être joué ? */
+function objectionReleasable(row: ObjectionMatchRow | undefined, refereeId: number): row is ObjectionMatchRow {
+  return row !== undefined && nullableId(row.referee_user_id) === refereeId && row.status !== "COMPLETED";
+}
+
 /**
  * Retire de ce match l'arbitre dont l'opposition vient d'être retenue
  * (`referee-objection.ts`) — **quel que soit l'état du match tant qu'il n'est
@@ -2103,38 +2109,51 @@ export async function releaseObjectingReferee(
   // Comme `releaseIneligibleReferee` : remis à l'appelant après validation seulement.
   let launched: NoRefereeCandidate[] = [];
   const tournamentId = await retryOnDeadlock(() =>
-    inTransaction(async (connection) => {
+    withConnection(async (connection) => {
       launched = [];
-      // Verrou **allégé** : la seule ligne du match, sans le contexte complet
-      // de `lockLaunchMatch` (condition de l'arbitre, équipes, casters) —
-      // inutile pour un retrait, et relu par `launchIfAllReady` une fois
-      // l'arbitre ôté, s'il y a lieu de lancer. Même ordre de verrous que
-      // `lockLaunchMatch` puis `writeReferee` : match, puis compte.
-      const [rows] = await connection.execute<
-        (RowDataPacket & { tournament_id: number; status: string; referee_user_id: number | null })[]
-      >(`SELECT m.tournament_id, m.status, m.referee_user_id FROM bg_matches m WHERE m.id = ? LIMIT 1 FOR UPDATE`, [matchId]);
-      const row = rows[0];
-      if (!row || nullableId(row.referee_user_id) !== refereeId || row.status === "COMPLETED") return null;
-      // Relue sous le verrou du match : levée entre-temps, l'opposition ne
-      // retire plus rien.
-      if (!(await refereeObjectionUpheld(connection, refereeId, true))) return null;
-      // État du tournoi en lecture **partagée** (une table, sans jointure —
-      // règle MariaDB) : un passage RUNNING → FINISHED (verrou exclusif)
-      // attend ce retrait, et le lancement qu'il déclenche ne se décide pas
-      // sur un état périmé. Tournoi disparu : rien n'est retiré ni compté.
-      const [tournament] = await connection.execute<(RowDataPacket & { state: string })[]>(
-        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
-        [row.tournament_id],
-      );
-      if (!tournament[0]) return null;
-      await clearMatchReferee(
-        connection,
-        { tournament_state: tournament[0].state },
-        matchId,
-        undecided ? launched : undefined,
-      );
-      if (!batch) queueRefereeChange(connection, { kind: "OBJECTION_RELEASED", matchId, refereeId });
-      return Number(row.tournament_id);
+      // Le tournoi du match lu **avant** la transaction (lecture autonome, sur
+      // la connexion qui la porte ensuite) : le verrou du tournoi se prend
+      // ainsi **avant** celui du match, dans l'ordre du moteur
+      // (`lockTournamentRow` puis `lockLaunchMatch`) — l'inverse croiserait
+      // un avancement qui tient le tournoi et attend ce match. Un match déjà
+      // sans cet arbitre ou joué ne prend aucun verrou.
+      const [pre] = await connection.execute<ObjectionMatchRow[]>(`${OBJECTION_MATCH_SELECT} LIMIT 1`, [matchId]);
+      if (!objectionReleasable(pre[0], refereeId)) return null;
+      const ownerId = Number(pre[0].tournament_id);
+      return await transact(connection, async () => {
+        launched = [];
+        // État du tournoi en lecture **partagée**, en première instruction (une
+        // table, sans jointure — règle MariaDB) : un passage RUNNING → FINISHED
+        // (verrou exclusif) attend ce retrait, et le lancement qu'il déclenche
+        // ne se décide pas sur un état périmé. Tournoi disparu : rien n'est
+        // retiré ni compté.
+        const [tournament] = await connection.execute<(RowDataPacket & { state: string })[]>(
+          `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+          [ownerId],
+        );
+        if (!tournament[0]) return null;
+        // Verrou **allégé** : la seule ligne du match, sans le contexte complet
+        // de `lockLaunchMatch` (condition de l'arbitre, équipes, casters) —
+        // inutile pour un retrait, et relu par `launchIfAllReady` une fois
+        // l'arbitre ôté, s'il y a lieu de lancer. Puis le compte, comme
+        // `lockLaunchMatch` puis `writeReferee` : match, puis compte.
+        const [rows] = await connection.execute<ObjectionMatchRow[]>(`${OBJECTION_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [
+          matchId,
+        ]);
+        const row = rows[0];
+        if (!objectionReleasable(row, refereeId) || Number(row.tournament_id) !== ownerId) return null;
+        // Relue sous le verrou du match : levée entre-temps, l'opposition ne
+        // retire plus rien.
+        if (!(await refereeObjectionUpheld(connection, refereeId, true))) return null;
+        await clearMatchReferee(
+          connection,
+          { tournament_state: tournament[0].state },
+          matchId,
+          undecided ? launched : undefined,
+        );
+        if (!batch) queueRefereeChange(connection, { kind: "OBJECTION_RELEASED", matchId, refereeId });
+        return ownerId;
+      });
     }),
   );
   undecided?.push(...launched);

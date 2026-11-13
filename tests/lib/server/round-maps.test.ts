@@ -30,7 +30,7 @@ import {
 import { briefPointTarget, briefTiebreakMap, type LobbyBriefRow } from "@/lib/server/tournaments/lobby-brief";
 import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
 import { roundMapsFingerprint } from "@/lib/server/tournaments/round-maps-notice";
-import { connectionMock, fakeConnection, fakePool, type SqlMock } from "../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool, poolBackedWithConnection, type SqlMock } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
 
 /**
@@ -634,6 +634,7 @@ describe("pickMatchMap", () => {
   });
 
   it("un interblocage au verrou rejoue le choix, une connexion par essai", async () => {
+    jest.mocked(withConnection).mockImplementation(poolBackedWithConnection(getDatabase));
     withMatch(MATCH);
     const routed = connection.execute.getMockImplementation();
     let deadlocked = false;
@@ -653,6 +654,7 @@ describe("pickMatchMap", () => {
   });
 
   it("pickMatchMap_tournamentLockHeld_waitsShortlyAndThrowsLockWaitTimeout", async () => {
+    jest.mocked(withConnection).mockImplementation(poolBackedWithConnection(getDatabase));
     withMatch(MATCH);
     const routed = connection.execute.getMockImplementation();
     connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
@@ -674,6 +676,7 @@ describe("pickMatchMap", () => {
   });
 
   it("pickMatchMap_restoreFailsAfterLock_destroysConnectionInsteadOfReleasing", async () => {
+    jest.mocked(withConnection).mockImplementation(poolBackedWithConnection(getDatabase));
     withMatch(MATCH);
     connection.query.mockResolvedValueOnce([[], []]).mockRejectedValue(new Error("connexion tombée"));
 

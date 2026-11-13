@@ -7,7 +7,7 @@
  * ligne au journal du staff, sans nommer personne.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import { withConnection } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { formatMapRulesLog } from "@/lib/shared/bot-logs";
 import {
@@ -50,7 +50,7 @@ import {
 import { assertMapPointsUnlocked } from "./map-points";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { releaseWithServerLockWait, withShortLockWait } from "./lock-wait";
+import { withShortLockWait } from "./lock-wait";
 import { resolveMatchParty } from "./match-launch";
 import { lockTournamentRowShared } from "./registration";
 import { publishMatchUpdatedEvent } from "./notifications";
@@ -720,11 +720,10 @@ export async function pickMatchMap(
 ): Promise<void> {
   // Rejouée sur interblocage : le verrou tournoi puis match croise les
   // écritures d'arbitrage qui prennent le match puis le tournoi.
-  // Connexion prise ici (pas `withConnection`) : rendue par
-  // `releaseWithServerLockWait`, jamais au pool sous le délai de verrou court.
-  const tournamentId = await retryOnDeadlock(async () => {
-    const connection = await (await getDatabase()).getConnection();
-    try {
+  // `withConnection` rend la connexion par `releaseWithServerLockWait` : jamais
+  // au pool sous le délai de verrou court.
+  const tournamentId = await retryOnDeadlock(() =>
+    withConnection(async (connection) => {
       // Le match lu avant la transaction (lecture autonome) : sous REPEATABLE
       // READ, une lecture dans la transaction avant le verrou figerait la vue, et
       // le pool relu ensuite serait celui d'avant un `setRoundMaps` simultané
@@ -762,10 +761,8 @@ export async function pickMatchMap(
         queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
         return ownerId;
       });
-    } finally {
-      await releaseWithServerLockWait(connection);
-    }
-  });
+    }),
+  );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 

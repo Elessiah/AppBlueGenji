@@ -10,6 +10,7 @@ jest.mock("@/lib/server/tournaments/referee-names", () => ({
   forgetRefereeNames: jest.fn(),
 }));
 
+import { flushAllCoalescers } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereePermission } from "@/lib/server/tournaments/cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "@/lib/server/tournaments/match-launch";
@@ -34,6 +35,7 @@ beforeEach(() => {
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(releaseObjectingReferee).mockResolvedValue(true);
   jest.mocked(loadRefereePermission).mockResolvedValue(true);
+  jest.mocked(announceObjectionReleases).mockResolvedValue(undefined);
 });
 
 describe("setRefereeObjection", () => {
@@ -246,11 +248,30 @@ describe("setRefereeObjection — annonces regroupées", () => {
   it("setRefereeObjection_slowRecapPush_answersWithoutWaitingForIt", async () => {
     execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
     releaseInto();
-    jest.mocked(announceObjectionReleases).mockReturnValueOnce(new Promise<void>(() => undefined));
+    let deliver: () => void = () => undefined;
+    jest.mocked(announceObjectionReleases).mockReturnValueOnce(new Promise<void>((resolve) => (deliver = resolve)));
 
     await expect(setRefereeObjection(REFEREE, true)).resolves.toBeDefined();
 
     expect(queueDeferredNoRefereeAlerts).toHaveBeenCalledTimes(1);
+    deliver();
+  });
+
+  it("setRefereeObjection_releasedMatches_shutdownFlushAwaitsRecapNotice", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
+    releaseInto();
+    let deliver: () => void = () => undefined;
+    jest.mocked(announceObjectionReleases).mockReturnValueOnce(new Promise<void>((resolve) => (deliver = resolve)));
+    await setRefereeObjection(REFEREE, true);
+    let flushed = false;
+
+    const flush = flushAllCoalescers().then(() => (flushed = true));
+    await Promise.resolve();
+    expect(flushed).toBe(false);
+    deliver();
+    await flush;
+
+    expect(flushed).toBe(true);
   });
 
   it("setRefereeObjection_nothingReleased_noPublish", async () => {

@@ -427,20 +427,23 @@ describe("announceRefereeChanges — choix de cartes regroupés par match", () =
     expect(lines[1]).toContain("ensuite 1 choix retiré, par le staff.");
   });
 
-  it("announceRefereeChanges_teamThenRefereeOverride_summaryNamesBothActors", async () => {
+  it("announceRefereeChanges_staffPickAfterTeamBurst_closesBurstThenLogsStaffPickInFull", async () => {
     mockMatch(matchRow());
 
     announceRefereeChanges([
       { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true },
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true },
       { kind: "MAP_PICK", matchId: 42, set: true, byTeam: false },
-      { kind: "MAP_PICK", matchId: 42, set: false, byTeam: true },
     ]);
     await flushMapPickLogs();
     await settleMany();
 
     const lines = loggedLines();
+    expect(lines).toHaveLength(3);
     expect(lines[0]).toContain("par une équipe du match (autogestion)");
-    expect(lines[1]).toContain("ensuite 1 carte choisie, 1 choix retiré, par le staff et une équipe du match (autogestion).");
+    expect(lines[1]).toContain("ensuite 1 carte choisie, par une équipe du match (autogestion).");
+    expect(lines[2]).toContain("Carte choisie dans le pool");
+    expect(lines[2]).toContain("par le staff");
   });
 
   it("announceRefereeChanges_releaseAfterOpenBurst_logsBurstBeforeRelease", async () => {

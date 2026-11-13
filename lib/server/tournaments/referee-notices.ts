@@ -273,7 +273,15 @@ export const MAP_PICK_LOG_WINDOW_MS = 60_000;
 export const MAP_PICK_LOG_MAX_AGE_MS = 5 * 60_000;
 
 /** Choix qui suivent le premier d'une rafale : comptés, pour la ligne de clôture. */
-type MapPickTally = { matchId: number; picked: number; cleared: number; byStaff: boolean; byTeam: boolean };
+type MapPickTally = {
+  matchId: number;
+  /** Auteur du premier choix de la rafale : une rafale n'a qu'un auteur. */
+  openedByTeam: boolean;
+  picked: number;
+  cleared: number;
+  byStaff: boolean;
+  byTeam: boolean;
+};
 
 /** Décompte de la rafale **ouverte** de chaque match ; une rafale close en ouvre un neuf. */
 const openTallies = new Map<number, MapPickTally>();
@@ -285,7 +293,9 @@ const openTallies = new Map<number, MapPickTally>();
  * sur-le-champ, tel quel (choisi ou retiré, par l'arbitrage ou une équipe) ;
  * les suivants n'écrivent qu'**une** ligne de clôture qui les compte et nomme
  * qui a agi (`formatMapPickBurstLog`) — la carte d'un créneau ne remplace
- * jamais celle d'un autre, et une reprise par l'arbitrage reste au journal.
+ * jamais celle d'un autre. Une rafale n'a qu'un auteur : un choix de l'autre
+ * côté (l'arbitrage qui reprend le choix d'une équipe, ou l'inverse) clôt la
+ * rafale ouverte et part à son tour en entier, à sa place dans le journal.
  * Aucun avis n'en dépend (`refereeReleaseNotice` : aucun). L'arrêt du serveur
  * annonce les rafales en attente (`flushAllCoalescers`) ; un arrêt brutal ne
  * perd que la ligne de clôture, jamais le premier choix.
@@ -293,8 +303,14 @@ const openTallies = new Map<number, MapPickTally>();
 function noteMapPick(change: Extract<RefereeChange, { kind: "MAP_PICK" }>): void {
   const key = String(change.matchId);
   let tally = mapPickBursts.waiting(key) ? openTallies.get(change.matchId) : undefined;
+  if (tally && tally.openedByTeam !== change.byTeam) {
+    // Changement d'auteur : la rafale ouverte se clôt d'abord (rangée dans la
+    // file du match dans ce tour, `deliverQueues`), puis ce choix en ouvre une.
+    void mapPickBursts.flush(key);
+    tally = undefined;
+  }
   if (!tally) {
-    tally = { matchId: change.matchId, picked: 0, cleared: 0, byStaff: false, byTeam: false };
+    tally = { matchId: change.matchId, openedByTeam: change.byTeam, picked: 0, cleared: 0, byStaff: false, byTeam: false };
     openTallies.set(change.matchId, tally);
     void matchAnnouncements.chain(change.matchId, () => deliverQuietly(change, {}));
   } else {

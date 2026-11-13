@@ -9,6 +9,7 @@ import {
   loadRefereePermission,
   loadRefereeStanding,
   resetObjectionColumnProbe,
+  OBJECTION_COLUMN_RECHECK_MS,
   loadShownCasterIds,
   refereeKeptColumns,
   refereeObjectionUpheld,
@@ -462,6 +463,21 @@ describe("loadRefereeStanding (EF-31)", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute.mock.calls[0][0]).not.toContain("referee_objection_at");
+  });
+
+  it("loadRefereeStanding_columnAddedAfterRecheckDelay_readsObjectionAgain", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'referee_objection_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn).mockResolvedValueOnce([[referee], []]);
+    await loadRefereeStanding(connectionWith(execute), 950, "OW");
+    execute.mockReset().mockResolvedValue([[{ ...referee, referee_objection_at: "2026-10-28 20:00:00" }], []]);
+    now.mockReturnValue(1_000_000 + OBJECTION_COLUMN_RECHECK_MS);
+
+    const standing = await loadRefereeStanding(connectionWith(execute), 950, "OW");
+
+    expect(standing).toEqual({ block: null, objection: true });
+    expect(execute.mock.calls[0][0]).toContain("referee_objection_at");
+    now.mockRestore();
   });
 
   it("loadRefereeStanding_otherError_rethrows", async () => {
