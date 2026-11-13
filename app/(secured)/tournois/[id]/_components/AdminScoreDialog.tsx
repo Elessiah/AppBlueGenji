@@ -559,9 +559,9 @@ export function AdminScoreDialog({
             </div>
           )}
 
-          {form.conflict && (
+          {(form.conflict || form.rulesConflict) && (
             <div className={styles.conflict} role="alert">
-              {t("score.admin.conflict")}
+              {t(form.conflict ? "score.admin.conflict" : "score.admin.rulesChanged")}
               {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
               <button
                 type="button"

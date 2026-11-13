@@ -8,6 +8,7 @@ import {
   initialAdminMaps,
   pendingProposalSignature,
   sameScoreFormState,
+  scoreFormSyncOutcome,
   scoresFromMaps,
   storedResultSignature,
   type ScoreFormBlocker,
@@ -126,6 +127,7 @@ export function useScoreForm(
     mapsBaseline: openingRows(),
   }));
   const [conflict, setConflict] = useState(false);
+  const [rulesConflict, setRulesConflict] = useState(false);
 
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
@@ -135,20 +137,23 @@ export function useScoreForm(
     const next = adminFormStateFor(match, nextMaps);
     setSynced({ signature, proposals, rules, baseline: next, mapsBaseline: nextMaps });
 
-    if (untouched) {
+    // Seul un résultat **enregistré** fait conflit (une proposition d'équipe
+    // n'écrase rien), et jamais pendant notre propre envoi.
+    const outcome = scoreFormSyncOutcome({
+      untouched,
+      resultChanged: signature !== synced.signature,
+      rulesChanged: rules !== synced.rules,
+      submitting,
+    });
+    if (outcome.adopt) {
       setState(next);
       setMaps(nextMaps);
       options.onMapsReset?.();
       setConflict(false);
-    } else if (signature !== synced.signature && !submitting) {
-      // Seul un résultat **enregistré** fait conflit : une proposition
-      // d'équipe arrivée pendant la saisie n'écrase rien, la saisie reste.
-      //
-      // Pas pendant un envoi : le flux rapporte alors **notre propre** écriture,
-      // qui arrive presque toujours avant la réponse HTTP. Sans cette réserve,
-      // l'arbitre voyait « ce match a été modifié pendant ta saisie » accuser un
-      // tiers de sa propre validation, le temps que le dialogue se referme.
-      setConflict(true);
+      setRulesConflict(false);
+    } else {
+      if (outcome.conflict) setConflict(true);
+      if (outcome.rulesConflict) setRulesConflict(true);
     }
   }
 
@@ -161,6 +166,7 @@ export function useScoreForm(
     setMaps(nextMaps);
     options.onMapsReset?.();
     setConflict(false);
+    setRulesConflict(false);
   };
 
   /**
@@ -296,6 +302,8 @@ export function useScoreForm(
     decision,
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,
+    /** Le format de la manche (ou le jeu) a changé pendant qu'une saisie était en cours. */
+    rulesConflict,
     adoptStoredResult,
     adoptReport,
     /**
