@@ -271,6 +271,34 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
   );
 }
 
+/**
+ * Bandeau d'une saisie dépassée : résultat enregistré par un tiers, ou format
+ * de la manche changé (`rulesConflict`) — « Reprendre » repart du match à jour.
+ */
+function ScoreConflictNotice({
+  text,
+  form,
+}: Readonly<{
+  text: TournamentDialogsText;
+  form: Pick<ReturnType<typeof useScoreForm>, "conflict" | "rulesConflict" | "adoptStoredResult" | "submitting">;
+}>) {
+  if (!form.conflict && !form.rulesConflict) return null;
+  return (
+    <div className={styles.conflict} role="alert">
+      {text.t(form.conflict ? "score.admin.conflict" : "score.admin.rulesChanged")}
+      {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
+      <button
+        type="button"
+        className={styles.conflictAction}
+        onClick={form.adoptStoredResult}
+        disabled={form.submitting}
+      >
+        {text.t("score.admin.adoptStored")}
+      </button>
+    </div>
+  );
+}
+
 export function AdminScoreDialog({
   match: liveMatch,
   proposals = NO_PROPOSALS,
@@ -559,20 +587,7 @@ export function AdminScoreDialog({
             </div>
           )}
 
-          {(form.conflict || form.rulesConflict) && (
-            <div className={styles.conflict} role="alert">
-              {t(form.conflict ? "score.admin.conflict" : "score.admin.rulesChanged")}
-              {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
-              <button
-                type="button"
-                className={styles.conflictAction}
-                onClick={form.adoptStoredResult}
-                disabled={form.submitting}
-              >
-                {t("score.admin.adoptStored")}
-              </button>
-            </div>
-          )}
+          <ScoreConflictNotice text={text} form={form} />
 
           {/* La règle chiffrée sous les champs plutôt qu'en `title` de la
               pastille : une infobulle sur un `<span>` ne s'atteint ni au clavier

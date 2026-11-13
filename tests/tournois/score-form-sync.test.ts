@@ -46,8 +46,9 @@ describe("AdminScoreDialog — avis de format changé", () => {
     const fr = JSON.parse(read("messages/fr/tournamentDialogs.json")) as Dialogs;
     const en = JSON.parse(read("messages/en/tournamentDialogs.json")) as Dialogs;
 
-    expect(dialog).toContain("{(form.conflict || form.rulesConflict) && (");
-    expect(dialog).toContain('t(form.conflict ? "score.admin.conflict" : "score.admin.rulesChanged")');
+    expect(dialog).toContain("if (!form.conflict && !form.rulesConflict) return null;");
+    expect(dialog).toContain('text.t(form.conflict ? "score.admin.conflict" : "score.admin.rulesChanged")');
+    expect(dialog).toContain("<ScoreConflictNotice text={text} form={form} />");
     expect(fr.score.admin.rulesChanged).toContain("format de la manche a changé");
     expect(en.score.admin.rulesChanged).toContain("round format changed");
   });

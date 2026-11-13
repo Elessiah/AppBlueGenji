@@ -778,26 +778,34 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Pr
     if (sideBriefed(row, slot)) continue;
     const managers = slotManagers(row, slot, context);
     if (managers === null) continue;
-    const { claimId, outcome, error } = await briefSlot(db, row, slot, managers, context);
-    if (claimId === null) {
-      if (outcome === "error") return { ...brief, error };
-      continue;
-    }
-    if (outcome === "ghost") ghosts.push(claimId);
-    else if (outcome === "error") return { ...brief, retry: [...brief.retry, claimId], error };
-    // Salon refermé depuis la réservation : rien de plus ne part de ce match,
-    // ses réservations sans envoi sont rendues, sans relance.
-    else if (outcome === "closed") return { sent: brief.sent, retry: [], closed: [...ghosts, ...brief.retry, claimId], lost: false };
-    else if (outcome === "sent") brief.sent += 1;
-    else if (outcome === "retry") brief.retry.push(claimId);
-    else if (outcome === "lost") {
-      console.error(
-        `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
-      );
-      brief.lost = true;
-    }
+    const result = await briefSlot(db, row, slot, managers, context);
+    const done = recordSlot(brief, ghosts, row, result);
+    if (done) return done;
   }
   return brief;
+}
+
+/**
+ * Porte l'issue d'un côté au bilan du match ; rend le bilan **final** quand
+ * elle arrête le match (panne, salon refermé), `null` pour passer au côté suivant.
+ */
+function recordSlot(brief: MatchBrief, ghosts: number[], row: LobbyBriefRow, result: SlotResult): MatchBrief | null {
+  const { claimId, outcome, error } = result;
+  if (claimId === null) return outcome === "error" ? { ...brief, error } : null;
+  if (outcome === "ghost") ghosts.push(claimId);
+  else if (outcome === "error") return { ...brief, retry: [...brief.retry, claimId], error };
+  // Salon refermé depuis la réservation : rien de plus ne part de ce match,
+  // ses réservations sans envoi sont rendues, sans relance.
+  else if (outcome === "closed") return { sent: brief.sent, retry: [], closed: [...ghosts, ...brief.retry, claimId], lost: false };
+  else if (outcome === "sent") brief.sent += 1;
+  else if (outcome === "retry") brief.retry.push(claimId);
+  else if (outcome === "lost") {
+    console.error(
+      `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
+    );
+    brief.lost = true;
+  }
+  return null;
 }
 
 /** Ce côté était-il déjà réservé à la lecture du balayage ? */
