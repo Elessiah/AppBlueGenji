@@ -59,6 +59,19 @@ des colonnes ignore casse, accents et invisibles, et « TEAM », renommé
 entre-temps, y égalerait l'ancien nom à invisible — il serait réécrit. Le journal
 (`pm2 logs`) ne compte que des lignes, jamais un nom.
 
+#### Pseudos laissés tels quels
+
+Un nom d'équipe ou de tournoi laissé tel quel est journalisé par son
+identifiant ; un pseudo ne l'est jamais (`RGPD_LOGS_AND_VISITS.md`). La passe
+ne pose donc pas son marqueur tant qu'un pseudo reste à nettoyer : elle se
+rejoue à chaque démarrage, et nettoie le sosie dès que l'original a changé de
+nom. Le staff les retrouve en base (MariaDB 11.8) :
+
+```sql
+SELECT id FROM bg_users
+ WHERE pseudo REGEXP '[\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2069}\x{FEFF}]';
+```
+
 Ces restes expliquent que les filtres de sortie demeurent. Ils passent eux aussi
 par `withoutInvisibles`, **sans NFKC** : un nom ancien stylisé (« ＢＬＵＥ ») se
 lit à l'identique sur sa fiche, au classement et dans le menu du compte.

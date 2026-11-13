@@ -1057,7 +1057,67 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   restauré vivant (il repasse par la demande), lignes illisibles du journal
   gardées à la réécriture.
 
+## Solde ERREUR.txt (EF-62, 2026-11-13)
+
+- **Tournois synchronisés avant le retrait** : la demande, la suppression
+  définitive et la passe horaire (`settleDeletedSoloEntries`) appliquent
+  d'abord `syncTournamentState` aux tournois solo ouverts du compte
+  (`syncOpenSoloTournamentsOn`, sous leurs verrous). Un tournoi resté
+  `REGISTRATION` en base après son heure de départ démarre alors dans la même
+  transaction : son entrée se forfaite au lieu d'être retirée d'un tirage déjà
+  dû. Les journaux du bot de ce démarrage partent après le commit
+  (`flushBotLogs`), sont jetés sur un échec (`discardBotLogs`) ; les tournois
+  démarrés sont rediffusés.
+- **Retrait d'une inscription, un seul chemin** : `withdrawRegistrationOn`
+  (`tournaments/registration-removal.ts`) — DELETE puis `resequenceSeeds` —
+  sert au retrait par le staff, à la demande et à l'effacement (`eraseAccount`).
+- **Forfait sans match ouvert** : une entrée est forfaitable si elle a un match
+  `PENDING`/`READY` dont **les deux** places sont prises, ou un classement
+  `ACTIVE` (suisse et survie à la phase courante — `current_phase_id` en
+  `MULTI` —, BG Survie avant ses phases finales) : l'abandon la retire d'une
+  ronde qui n'est pas encore tirée. La passe horaire met de côté six heures
+  (`SETTLE_IDLE_MS`, au plus mille comptes en mémoire) un compte dont le
+  passage n'a rien fait, ou a échoué.
+- **Aperçu confirmé** : le DELETE de la modale envoie le motif qu'elle a
+  annoncé (`confirmedReason`). S'il ne correspond plus au plan de l'écriture
+  (une partie jouée entre-temps, un tournoi créé), le serveur répond 409
+  `ACCOUNT_DELETION_PLAN_CHANGED` sans rien faire, et la modale se recharge
+  avec le nouvel aperçu. Corps absent ou illisible : rien n'est comparé.
+- **Rediffusion des tournois qui le nomment** : demande et réactivation
+  republient tout tournoi non terminé qui nomme le compte
+  (`listNamingTournamentIds` : inscription solo ou d'équipe, cast, lien de
+  diffusion, arbitre, déclencheur du live), pas seulement ceux de son entrée
+  solo.
+- **Rattrapage moins coûteux** : la branche « compte sans trace » de
+  `reconcileDeletedAccounts` (balayage complet) ne tourne qu'une fois par jour
+  (`deleted_accounts_full_scan_at` dans `bg_settings`, posé seulement sans
+  échec) ; l'anonymisation remet ses colonnes facultatives en une seule
+  instruction (`resetOptionalColumns`, colonne par colonne en repli si une
+  colonne manque).
+- **Comptes sans fiche** : la liste (`loadProfilelessPlayerIds`) vit sous sa
+  propre clé (dix minutes, vidée par `invalidateTeamIdentityViews`), plus sous
+  le préfixe du classement que chaque score vide. Le fournisseur la relit à la
+  navigation client (`/api/players/profileless`, connecté, au plus une fois
+  par minute) ; `/rgpd` dit qu'une page déjà ouverte garde son lien jusqu'au
+  rechargement.
+- **Écrans** : la confirmation liste ce que la demande transmet ou retire
+  (`deletionDialogContent`), les restes après la fin du délai derrière un
+  « i » ; la page de réactivation dit ce qui revient en une phrase (détail
+  derrière un « i ») et liste ce qui n'est pas défait. Pas de liens vers
+  équipes ou tournois : la page s'affiche avant toute session.
+- **Rejeu d'une sauvegarde** : `/rgpd` et le registre (T01) disent qu'une
+  demande encore en attente dans la sauvegarde restaurée reprend la date du
+  journal (`REDATE`).
+- **Obsolètes** : `hasMatch` du retrait solo (déjà borné au tournoi, et un
+  match n'existe qu'après le départ, désormais synchronisé) ; relecture des
+  entrées jouées par la passe horaire (filtrée par les candidats).
+
 ## Décisions requises (ouvertes)
+
+- Comptes sans fiche dans la charge RSC (EF-62) : la liste entière part sur
+  chaque page connectée et dit quels identifiants sont des comptes supprimés —
+  l'accepter (identifiants seuls) ou n'envoyer que ceux de la page ? Recommandé :
+  l'accepter tant qu'elle reste sous quelques milliers.
 
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
   en attente n'en reçoit **aucun avis** (`userRecipient` écarte
