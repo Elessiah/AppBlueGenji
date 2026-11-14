@@ -49,22 +49,27 @@ créé sans check-in) — se tait ; ce qui était dû avant l'arrêt, et que le
 balayage (lancé par les visites) n'avait pas encore pris, n'est ni envoyé ni
 réservé pendant l'arrêt et part à la remise en marche. **Chaque arrêt est
 soldé à sa remise en marche** : ce qui y est devenu dû est réservé sans message
-dans la transaction même (rejouée sur un interblocage) — un second arrêt ne
-rouvre pas le premier.
+dans la transaction même (rejouée sur un interblocage, l'instant présent repris
+à chaque tentative) — un second arrêt ne rouvre pas le premier.
 
 - **check-in du match** : éteinte, la garde `CHECK_IN_ON_SQL`
   (`t.match_check_in = 1`, dans la lecture **et** dans la réservation) ne laisse
-  rien partir ni réserver. Rallumer réserve, côté par côté
-  (`silencePausedLobbyBriefs`), le check-in des matchs dus **maintenant**
-  (`BRIEF_WINDOW_SQL`) dont H-15 **et**, s'il compte, l'instant du salon
-  (`LOBBY_DUE_SQL` : ouverture faute d'horaire, lancement pour un match lancé,
-  appariement actuel seulement — un salon ouvert tôt sans lancement ne compte
-  pas) tombent après l'arrêt. L'horaire se compare à l'arrêt (heure du
-  processus) ; le salon, à l'arrêt ramené sur l'horloge de la base (`NOW()`
-  moins le temps écoulé) ;
+  rien partir ni réserver. Rallumer tait, pour les deux côtés en une
+  instruction (`silencePausedLobbyBriefs`), le check-in des matchs dus
+  **maintenant** (`BRIEF_WINDOW_SQL`) qu'aucune branche active n'a rendu dû
+  avant l'arrêt : ni l'horaire (H-15 avant l'arrêt, encore dans sa fenêtre) ni
+  le salon (`LOBBY_ENTRY_SQL` : lancement pour un match lancé, ouverture faute
+  d'horaire, sinon le plus tard de l'ouverture et de l'horaire). L'horaire se
+  compare à l'arrêt (heure du processus) ; le salon, à l'arrêt ramené sur
+  l'horloge de la base (`NOW()` moins le temps écoulé). La réservation muette
+  (`LOBBY_BRIEF_MUTE`, clé `<engagée>@<horaire>`) ne vaut que pour l'horaire du
+  moment : un match déplacé ensuite reçoit son check-in à la nouvelle heure ;
 - **rappel 10 h** : éteinte, un palier dû pendant l'arrêt est **réservé sans
   message** ; un palier dû avant l'arrêt est laissé libre (`checkInReminderFate`
-  : `send` / `silence` / `hold`), et rendu s'il était déjà réservé à l'envoi.
+  : `send` / `silence` / `hold`), et rendu s'il était déjà réservé à l'envoi —
+  y compris par une annonce de première observation (une manche découverte
+  pendant l'arrêt ne consomme pas un palier dû avant l'arrêt, ni à la
+  préparation ni à l'envoi).
   Rallumer réserve aussi sans message le palier des manches **déjà annoncées**
   (marque `SEEN`) dont le coup d'envoi tombe dans les 10 h **et** au moins 10 h
   après l'arrêt : leur fenêtre s'est ouverte pendant l'arrêt. Ni statut ni
@@ -77,9 +82,8 @@ rouvre pas le premier.
 L'option est **relue juste avant chaque envoi qui en dépend** (rappel 10 h,
 annonce d'horaire ; jamais un avis de retrait ni le rappel 24 h) : une ronde
 suisse part par lots, et l'option a pu changer depuis la lecture du passage.
-Une relecture **revenue** depuis moins d'une seconde sert aux autres envois du
-même tournoi dans le passage (`createCheckInReader`) ; une bascule validée
-rend caduques les relectures en cache (`forgetCheckInReads`). La reprise des
+La relecture n'a pas de cache (`readCheckInState`, une ligne par clé primaire
+et par envoi) : une bascule faite par un autre processus vaut aussi. La reprise des
 messages privés non remis (deux minutes plus tard) la relit aussi : éteinte,
 un rappel 10 h ne se reprend pas ; une annonce reprise dit la ligne de
 check-in et promet le rappel 10 h selon ce que l'option vaut **à la reprise**,

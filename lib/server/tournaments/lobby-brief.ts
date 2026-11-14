@@ -152,7 +152,8 @@ function sideBriefedSql(team: string): string {
   return `(EXISTS (SELECT 1 FROM bg_match_start_notices n
               WHERE n.match_id = m.id
                 AND ((n.phase = ? AND n.pairing = CONCAT(${team}, '')) OR ${legacyBriefSql("n", team)}))
-            OR ${briefMarkSql(team)})`;
+            OR ${briefMarkSql(team)}
+            OR ${mutedBriefSql(team)})`;
 }
 
 /** Id de l'engagée de ce côté, clé de sa réservation. */
@@ -366,6 +367,17 @@ const BRIEF_FROM = `FROM bg_matches m
  */
 const CHECK_IN_ON_SQL = `t.match_check_in = 1`;
 
+/** {@link BRIEF_WINDOW_SQL} par l'horaire : dans son quart d'heure, pas trop en retard. */
+const TIME_BRANCH_SQL = `m.start_at IS NOT NULL
+              AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
+              AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE`;
+
+/** {@link BRIEF_WINDOW_SQL} par le salon : ouvert pour l'appariement actuel, depuis peu. */
+const LOBBY_BRANCH_SQL = `m.lobby_opened_at IS NOT NULL
+              AND (m.start_at IS NULL OR m.start_at <= NOW() OR m.launched_at IS NOT NULL)
+              AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
+              AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE`;
+
 /**
  * Un match dû : jouable, pas un bye, sans score, et **dans son quart d'heure**
  * — par son horaire (`LOBBY_BRIEF_LEAD_MINUTES`, borné par
@@ -393,41 +405,59 @@ const CHECK_IN_ON_SQL = `t.match_check_in = 1`;
 const BRIEF_WINDOW_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
         AND m.self_managed = 1 AND m.referee_user_id IS NULL
         AND t.start_visibility_at <= NOW()
-        AND ((m.start_at IS NOT NULL
-              AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
-              AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)
-          OR (m.lobby_opened_at IS NOT NULL
-              AND (m.start_at IS NULL OR m.start_at <= NOW() OR m.launched_at IS NOT NULL)
-              AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-              AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
+        AND ((${TIME_BRANCH_SQL}) OR (${LOBBY_BRANCH_SQL}))`;
 
 /** {@link BRIEF_WINDOW_SQL} d'un tournoi dont le check-in est allumé. */
 const BRIEF_DUE_SQL = `${BRIEF_WINDOW_SQL}
         AND ${CHECK_IN_ON_SQL}`;
 
 /**
- * Instant où le salon a rendu le check-in dû (horloge de la base, comme
- * `lobby_opened_at` et `launched_at`), `NULL` si le salon n'y est pour rien :
- * ouvert pour l'appariement actuel (`launch_pairing`), et à l'ouverture faute
- * d'horaire, au lancement pour un match lancé — un salon ouvert tôt sans
- * lancement attend le quart d'heure de l'horaire, comme dans {@link BRIEF_WINDOW_SQL}.
+ * Instant où le salon a fait entrer le match dans {@link LOBBY_BRANCH_SQL}
+ * (horloge de la base, comme `lobby_opened_at` et `launched_at`) : le
+ * lancement pour un match lancé, l'ouverture faute d'horaire, sinon le plus
+ * tard de l'ouverture et de l'horaire — un salon ouvert tôt sans lancement
+ * attend l'horaire, un salon ouvert en retard compte à son ouverture.
  */
-const LOBBY_DUE_SQL = `CASE WHEN m.lobby_opened_at IS NOT NULL AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-              THEN CASE WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)
-                        WHEN m.start_at IS NULL THEN m.lobby_opened_at END END`;
+const LOBBY_ENTRY_SQL = `CASE WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)
+              WHEN m.start_at IS NULL THEN m.lobby_opened_at
+              ELSE GREATEST(m.lobby_opened_at, m.start_at) END`;
+
+/**
+ * Phase des réservations **muettes** de la remise en marche (16 caractères au
+ * plus ; préfixe `LOBBY_BRIEF`, épargné comme le check-in par les retours
+ * arrière). Sa clé (`pairing`) porte l'engagée **et l'horaire** du match
+ * ({@link mutedBriefKeySql}) : une nouvelle heure n'est plus tue, son check-in
+ * part — la réservation d'un check-in parti, elle, vaut quelle que soit l'heure.
+ */
+export const LOBBY_BRIEF_MUTED_PHASE = "LOBBY_BRIEF_MUTE";
+
+/** Clé d'une réservation muette : `<engagée>@<horaire AAAAMMJJhhmmss>` (vide sans horaire). */
+function mutedBriefKeySql(team: string): string {
+  return `CONCAT(${team}, '@', COALESCE(DATE_FORMAT(m.start_at, '%Y%m%d%H%i%s'), ''))`;
+}
+
+/** L'engagée `team` du match `m` a-t-elle été tue par une remise en marche, pour l'horaire actuel ? */
+function mutedBriefSql(team: string): string {
+  return `EXISTS (SELECT 1 FROM bg_match_start_notices u
+              WHERE u.match_id = m.id AND u.phase = '${LOBBY_BRIEF_MUTED_PHASE}'
+                AND u.pairing = ${mutedBriefKeySql(team)})`;
+}
 
 /**
  * Remise en marche du check-in (`setMatchCheckIn`, dans sa transaction) :
- * réserve **sans message**, côté par côté, le check-in des matchs du tournoi
- * qui est dû maintenant et l'est devenu **pendant l'arrêt** — 15 minutes avant
- * l'horaire et, s'il compte, l'instant du salon ({@link LOBBY_DUE_SQL}) tombent
- * tous deux après l'arrêt. Un check-in dû avant l'arrêt reste libre (il part) ;
- * un match devenu dû après la remise en marche n'est pas touché. Réservé ici,
- * chaque arrêt est soldé une fois pour toutes : un second arrêt ne rouvre pas
- * le premier. L'horaire se compare à l'arrêt (heure du processus, comme les
- * horaires) ; le salon, à l'arrêt ramené sur l'horloge de la base (`NOW()`
- * moins le temps écoulé depuis l'arrêt). Sans arrêt daté (tournoi créé sans
- * check-in), tout ce qui est dû se tait.
+ * tait, côté par côté, le check-in des matchs du tournoi qui est dû maintenant
+ * et l'est devenu **pendant l'arrêt** — aucune des branches qui le rendent dû
+ * (horaire : H-15 ; salon : {@link LOBBY_ENTRY_SQL}) n'y est entrée avant
+ * l'arrêt. Un check-in dû avant l'arrêt, encore dans sa fenêtre, reste libre (il
+ * part) ; un match devenu dû après la remise en marche n'est pas touché. La
+ * réservation muette ({@link LOBBY_BRIEF_MUTED_PHASE}) solde l'arrêt une fois
+ * pour toutes (un second arrêt ne le rouvre pas) mais pour l'horaire du moment
+ * seulement : déplacé, le match reçoit son check-in à la nouvelle heure.
+ * L'horaire se compare à l'arrêt (heure du processus, comme les horaires) ; le
+ * salon, à l'arrêt ramené sur l'horloge de la base (`NOW()` moins le temps
+ * écoulé depuis l'arrêt, `now` pris à chaque tentative de la transaction).
+ * Sans arrêt daté (tournoi créé sans check-in), tout ce qui est dû se tait.
+ * Une seule instruction pour les deux côtés.
  */
 export async function silencePausedLobbyBriefs(
   connection: Pick<Db, "execute">,
@@ -435,23 +465,22 @@ export async function silencePausedLobbyBriefs(
   pausedAt: Date | null,
   now: Date,
 ): Promise<void> {
-  const sincePause =
+  const dueBeforePause =
     pausedAt === null
       ? ""
-      : `AND (m.start_at IS NULL OR m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE >= ?)
-          AND (${LOBBY_DUE_SQL} IS NULL OR ${LOBBY_DUE_SQL} >= NOW() - INTERVAL ? SECOND)`;
+      : `AND NOT (((${TIME_BRANCH_SQL}) AND m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE < ?)
+                OR ((${LOBBY_BRANCH_SQL}) AND ${LOBBY_ENTRY_SQL} < NOW() - INTERVAL ? SECOND))`;
   const params =
     pausedAt === null ? [] : [pausedAt, Math.max(0, Math.floor((now.getTime() - pausedAt.getTime()) / 1000))];
-  for (const team of ["m.team1_id", "m.team2_id"]) {
-    await connection.execute(
-      `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
-       SELECT m.id, CONCAT(${team}, ''), ? FROM bg_matches m
-         JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
-        WHERE m.tournament_id = ? AND ${BRIEF_WINDOW_SQL}
-          ${sincePause}`,
-      [LOBBY_BRIEF_PHASE, tournamentId, ...params],
-    );
-  }
+  await connection.execute(
+    `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
+     SELECT m.id, ${mutedBriefKeySql("IF(side.n = 1, m.team1_id, m.team2_id)")}, ? FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
+       JOIN (SELECT 1 AS n UNION ALL SELECT 2) side
+      WHERE m.tournament_id = ? AND ${BRIEF_WINDOW_SQL}
+        ${dueBeforePause}`,
+    [LOBBY_BRIEF_MUTED_PHASE, tournamentId, ...params],
+  );
 }
 
 /**
@@ -483,8 +512,9 @@ async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot)
         JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
         WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}
           AND NOT ${LEGACY_BRIEF_SQL}
-          AND NOT ${briefMarkSql("?")}`,
-      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey, teamKey],
+          AND NOT ${briefMarkSql("?")}
+          AND NOT ${mutedBriefSql("?")}`,
+      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey, teamKey, teamKey],
     );
     const { affectedRows, insertId } = result as { affectedRows?: number; insertId?: number };
     return affectedRows === 1 && insertId ? Number(insertId) : null;

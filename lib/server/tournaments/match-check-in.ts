@@ -10,7 +10,6 @@ import { canToggleMatchCheckIn, readDbInstant } from "@/lib/shared/match-check-i
 import type { TournamentState } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { silencePausedLobbyBriefs } from "./lobby-brief";
-import { forgetCheckInReads } from "./match-reminders";
 import { publishUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
 import { inTransaction } from "./transaction";
@@ -64,18 +63,20 @@ const SILENCE_OPENED_REMINDERS_SQL = `INSERT IGNORE INTO bg_match_reminders (mat
  * pendant l'arrêt (`silencePausedLobbyBriefs`) : chaque arrêt est soldé à sa
  * remise en marche, plusieurs arrêts ne se confondent pas. Sans arrêt daté
  * (tournoi créé sans check-in), tout l'avant compte pour l'arrêt. Rejouée sur
- * un interblocage avec un balayage qui réserve la même marque ; les relectures
- * de l'option en cache dans les balayages sont oubliées une fois validée.
+ * un interblocage avec un balayage qui réserve la même marque, l'instant
+ * présent repris à chaque tentative (`now` des tests, sinon l'horloge) : une
+ * tentative rejouée après une attente ne borne pas l'arrêt trop tard.
  *
  * @throws `TOURNAMENT_NOT_FOUND` | `TOURNAMENT_FINISHED`
  */
 export async function setMatchCheckIn(
   tournamentId: number,
   enabled: boolean,
-  now: Date = new Date(),
+  fixedNow?: Date,
 ): Promise<MatchCheckInResult> {
   const changed = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
+      const now = fixedNow ?? new Date();
       // Verrou en toute première instruction (piège `REPEATABLE READ`).
       await lockTournamentRow(connection, tournamentId);
       const [rows] = await connection.execute<CheckInRow[]>(
@@ -113,7 +114,6 @@ export async function setMatchCheckIn(
     }),
   );
   if (changed) {
-    forgetCheckInReads();
     publishUpdatedEvent(tournamentId);
   }
   return { tournamentId, enabled, changed };

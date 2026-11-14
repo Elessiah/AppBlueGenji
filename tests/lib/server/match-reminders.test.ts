@@ -10,8 +10,7 @@ import {
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
-  createCheckInReader,
-  forgetCheckInReads,
+  readCheckInState,
   MATCH_DM_RETRY_DELAY_MS,
   pendingRefereeDigest,
   resetMatchReminderThrottle,
@@ -1997,7 +1996,7 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     error.mockRestore();
   });
 
-  it("dispatchDueMatchReminders_sameTournamentTwoTenHourReminders_rereadsCheckInOnce", async () => {
+  it("dispatchDueMatchReminders_sameTournamentTwoTenHourReminders_rereadsCheckInPerSend", async () => {
     const second = { ...MATCH, id: 32 };
     const sent = [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 32, offset_key: "SEEN" }, { match_id: 32, offset_key: "P1D" }];
     const db = await mockDb({ matches: [MATCH, second], sent });
@@ -2007,9 +2006,9 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
 
     expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(4);
 
-    // Une relecture de l'option sert aux envois du même tournoi dans le passage.
+    // Sans cache : chaque envoi qui dépend de l'option la relit (bascule d'un autre processus comprise).
     const rereads = (execute.mock.calls as unknown as [string][]).filter(([sql]) => sql.startsWith("SELECT match_check_in"));
-    expect(rereads).toHaveLength(1);
+    expect(rereads).toHaveLength(2);
   });
 
   it("dispatchDueMatchReminders_checkInOffDiscoveredLate_announcesWithoutCheckIn", async () => {
@@ -2024,6 +2023,54 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
       expect(message).not.toContain(INVITE);
     }
     expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain(INVITE);
+  });
+
+  it("dispatchDueMatchReminders_firstObservationOffDueBeforePause_holdsTenHourReminder", async () => {
+    // Palier ouvert à 08:00, arrêt à 09:00, manche découverte à 13:00 : l'annonce part
+    // sans le check-in, le rappel 10 h n'est pas réservé — il partira à la remise en marche.
+    const { execute } = await mockDb({ matches: [pausedAt("2026-09-10T09:00:00Z")], sent: [] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain(INVITE);
+      expect(message).not.toContain("Prochain rappel : 10 heures");
+    }
+  });
+
+  it("dispatchDueMatchReminders_firstObservationOffDueDuringPause_claimsTenHourSilently", async () => {
+    const { execute } = await mockDb({ matches: [pausedAt("2026-09-10T07:00:00Z")], sent: [] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
+  });
+
+  it("dispatchDueMatchReminders_announcementTurnedOffBeforeSendDueBeforePause_releasesTenHourClaim", async () => {
+    // Préparée allumée (palier 10 h consommé par l'annonce), relue éteinte avec un arrêt
+    // après l'ouverture du palier : la marque 10 h est rendue, l'annonce part sans check-in.
+    const { execute } = await mockDbWithFreshCheckIn([], { flag: 0, pausedAt: new Date("2026-09-10T09:00:00Z") });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE"))
+      .map(([, params]) => params[1]);
+    expect(releases).toEqual(["PT10H"]);
+    for (const message of sentMessages()) {
+      expect(message).not.toContain(INVITE);
+      expect(message).not.toContain("Prochain rappel : 10 heures");
+    }
+  });
+
+  it("dispatchDueMatchReminders_announcementTurnedOffBeforeSendDueDuringPause_keepsTenHourClaim", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([], { flag: 0, pausedAt: new Date("2026-09-10T07:00:00Z") });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
   });
 
   it("dispatchDueMatchReminders_checkInOffDiscoveredAtTwentyHours_promisesNoTenHourReminder", async () => {
@@ -2056,46 +2103,23 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
   });
 });
 
-describe("createCheckInReader (relecture de l'option avant l'envoi)", () => {
-  async function readerDb() {
+describe("readCheckInState (relecture de l'option avant l'envoi)", () => {
+  it("readCheckInState_twoReads_queriesEachTime", async () => {
     const execute = executeDouble({ checkIn: { flag: 1 } });
     const { getDatabase } = await import("@/lib/server/database");
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
-    return execute;
-  }
 
-  it("createCheckInReader_secondReadWithinTtl_reusesRead", async () => {
-    const execute = await readerDb();
-    const read = createCheckInReader();
-
-    await read(7);
-    await read(7);
-
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("createCheckInReader_toggleValidatedBetweenReads_rereads", async () => {
-    const execute = await readerDb();
-    const read = createCheckInReader();
-
-    await read(7);
-    forgetCheckInReads();
-    await read(7);
+    await readCheckInState(7);
+    await expect(readCheckInState(7)).resolves.toEqual({ match_check_in: 1, match_check_in_paused_at: null });
 
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
-  it("createCheckInReader_ttlCountedFromResolution_rereadsAfterOneSecond", async () => {
-    const execute = await readerDb();
-    const clock = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
-    const read = createCheckInReader();
-    await read(7);
+  it("readCheckInState_unknownTournament_returnsUndefined", async () => {
+    const execute = executeDouble({});
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
 
-    clock.mockReturnValue(1_000_999);
-    await read(7);
-    clock.mockReturnValue(1_001_000);
-    await read(7);
-
-    expect(execute).toHaveBeenCalledTimes(2);
+    await expect(readCheckInState(7)).resolves.toBeUndefined();
   });
 });

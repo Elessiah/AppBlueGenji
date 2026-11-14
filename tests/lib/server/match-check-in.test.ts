@@ -4,14 +4,12 @@ jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/transaction");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/lobby-brief", () => ({ silencePausedLobbyBriefs: jest.fn(async () => undefined) }));
-jest.mock("@/lib/server/tournaments/match-reminders", () => ({ forgetCheckInReads: jest.fn() }));
 
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { setMatchCheckIn } from "@/lib/server/tournaments/match-check-in";
 import { silencePausedLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
-import { forgetCheckInReads } from "@/lib/server/tournaments/match-reminders";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 type Row = Record<string, unknown>;
@@ -81,16 +79,27 @@ describe("setMatchCheckIn", () => {
     expect(silencePausedLobbyBriefs).not.toHaveBeenCalled();
   });
 
-  it("setMatchCheckIn_changed_forgetsCheckInReads", async () => {
-    connectionWith({ state: "RUNNING", match_check_in: 1, match_check_in_paused_at: null });
-    await setMatchCheckIn(7, false, now);
-    expect(forgetCheckInReads).toHaveBeenCalledTimes(1);
-  });
+  it("setMatchCheckIn_deadlockRetry_takesFreshNowPerAttempt", async () => {
+    const pausedAt = new Date("2026-11-13T20:40:00Z");
+    const connection = connectionWith({ state: "RUNNING", match_check_in: 0, match_check_in_paused_at: pausedAt });
+    const later = new Date("2026-11-13T21:00:03Z");
+    jest.useFakeTimers({ doNotFake: ["setTimeout", "setImmediate", "nextTick", "queueMicrotask"], now });
+    try {
+      jest
+        .mocked(inTransaction)
+        .mockImplementationOnce(async () => {
+          jest.setSystemTime(later);
+          throw Object.assign(new Error("deadlock"), { code: "ER_LOCK_DEADLOCK" });
+        })
+        .mockImplementation(async (run) => run(fakeConnection(connection)));
 
-  it("setMatchCheckIn_unchanged_keepsCheckInReads", async () => {
-    connectionWith({ state: "RUNNING", match_check_in: 1, match_check_in_paused_at: null });
-    await setMatchCheckIn(7, true, now);
-    expect(forgetCheckInReads).not.toHaveBeenCalled();
+      await setMatchCheckIn(7, true);
+    } finally {
+      jest.useRealTimers();
+    }
+
+    // La tentative rejouée borne l'arrêt avec son propre instant, pas celui de la première.
+    expect(jest.mocked(silencePausedLobbyBriefs).mock.calls[0][3]).toEqual(later);
   });
 
   it("setMatchCheckIn_turnOnAfterPause_silencesOnlyWindowsOpenedSincePause", async () => {
