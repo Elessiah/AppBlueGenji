@@ -56,7 +56,7 @@ Tout le reste suit seul :
 
 | Effet | Où |
 | --- | --- |
-| Modale à la prochaine page de chaque compte concerné | `app/layout.tsx` → `components/privacy/PrivacyChangesModal.tsx` |
+| Modale à la prochaine page de chaque compte concerné | `app/layout.tsx` → `components/privacy/PrivacyChangesModal.tsx` (titres et résumés seulement, `privacyChangeHeads` ; le détail se lit à l'ouverture par `GET /api/profile/privacy-changes?ids=…&locale=…`, le bouton attend — #587 : la charge de chaque page d'un compte en retard en portait des dizaines de Ko) |
 | Message privé Discord aux comptes joignables | `lib/server/privacy-change-notifications.ts` |
 | « Dernière mise à jour » de `/rgpd` | `privacyPolicyUpdatedLabel(today)` |
 

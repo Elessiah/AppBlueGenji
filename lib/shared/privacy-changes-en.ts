@@ -36,7 +36,7 @@ import {
 import { DATA_CONTACT_ROLE_EN, REPORT_FORM_NAME_EN, WEB_ACCESS_LOG_FIELDS_EN, monthsEn } from "@/lib/shared/legal-text-en";
 import type { Locale } from "@/lib/shared/locales";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import type { PrivacyChange } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
@@ -1072,4 +1072,24 @@ export function localizedPrivacyChanges(changes: readonly PrivacyChange[], local
       links: change.links?.map((link, index) => ({ href: link.href, label: english.linkLabels?.[index] ?? link.label })),
     };
   });
+}
+
+/**
+ * The entries as the root layout ships them to the privacy modal: everything
+ * but the `details` (#587 — every page of an account behind on several entries
+ * carried tens of kB of them). The modal fetches them once it opens
+ * (`privacyChangeDetailsFor`, `GET /api/profile/privacy-changes`).
+ */
+export function privacyChangeHeads(changes: readonly PrivacyChange[]): PrivacyChange[] {
+  return changes.map((change) => ({ ...change, details: [] }));
+}
+
+/**
+ * The `details` of the registry entries `ids`, in `locale`, by id. Unknown ids
+ * are skipped (the route has already refused them).
+ */
+export function privacyChangeDetailsFor(ids: readonly string[], locale: Locale): Record<string, readonly string[]> {
+  const wanted = new Set(ids);
+  const entries = localizedPrivacyChanges(PRIVACY_CHANGES.filter((change) => wanted.has(change.id)), locale);
+  return Object.fromEntries(entries.map((change) => [change.id, change.details]));
 }

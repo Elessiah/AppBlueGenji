@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { crossesLocale } from "@/lib/shared/locales";
+import { crossesLocale, type Locale } from "@/lib/shared/locales";
 import {
   formatPrivacyChangeDateIn,
   privacyAnsweredEvent,
@@ -54,17 +54,28 @@ export function privacyModalIntroKey(changes: readonly PrivacyChange[]) {
  * dire « une seule fois ».
  *
  * Rendue par la mise en page racine, côté serveur : la liste est dans le HTML
- * initial, sans aller-retour ni clignotement.
+ * initial, sans aller-retour ni clignotement. Le **détail** des entrées, lui,
+ * n'y est pas (`detailsDeferred`, #587) : la charge de chaque page d'un compte
+ * en retard en portait des dizaines de Ko. Il se lit une fois, à l'ouverture
+ * (`GET /api/profile/privacy-changes`), et le bouton attend qu'il soit là — on
+ * ne prend pas connaissance d'un détail encore absent. En panne, une erreur le
+ * dit et le bouton se libère : la politique, liée, porte tout le texte.
  *
  * Langue de la page (lot 7b-2) : son habillage vient de `shell.privacyModal`,
  * et les entrées arrivent **déjà traduites** de la mise en page
  * (`localizedPrivacyChanges`) — aucune traduction n'est chargée ici.
  */
-export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChange[] }>) {
+export function PrivacyChangesModal({
+  changes,
+  detailsDeferred = false,
+}: Readonly<{ changes: PrivacyChange[]; detailsDeferred?: boolean }>) {
   const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails | null>(null);
+  const [detailsFailed, setDetailsFailed] = useState(false);
+  const detailsRequested = useRef(false);
   // Fermée par un lien d'action pendant un enregistrement : sa réponse ne doit
   // plus parler d'une modale que le joueur a quittée.
   const leftByLink = useRef(false);
@@ -82,6 +93,19 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
     onClose: () => {},
     locked: busy,
   });
+
+  const idsKey = changes.map((change) => change.id).join(",");
+  useEffect(() => {
+    if (!open || !detailsDeferred || detailsRequested.current) return;
+    detailsRequested.current = true;
+    loadPrivacyChangeDetails(idsKey, locale).then(setLoadedDetails, () => {
+      setDetailsFailed(true);
+      showError(t("privacyModal.detailsFailed"));
+    });
+  }, [open, detailsDeferred, idsKey, locale, showError, t]);
+  const detailsPending = detailsDeferred && loadedDetails === null && !detailsFailed;
+  const detailsOf = (change: PrivacyChange) =>
+    change.details.length > 0 ? change.details : (loadedDetails?.[change.id] ?? []);
 
   if (!open) return null;
 
@@ -157,6 +181,11 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
         </p>
 
         <ScrollArea orientation="y" className={styles.changes} ariaLabel={t("privacyModal.detailsLabel")}>
+          {detailsPending && (
+            <p className={styles.changeSummary} role="status">
+              {t("privacyModal.detailsLoading")}
+            </p>
+          )}
           <ol className={styles.changeList}>
             {changes.map((change) => (
               <li key={change.id} className={styles.change}>
@@ -167,9 +196,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
                   </time>
                 </div>
                 <p className={styles.changeSummary}>{entryText(change.summary)}</p>
-                {change.details.length > 0 && (
+                {detailsOf(change).length > 0 && (
                   <ul className={styles.changeDetails}>
-                    {change.details.map((detail, index) => (
+                    {detailsOf(change).map((detail, index) => (
                       <li key={index} /* NOSONAR S6479 — détails d'une entrée publiée, immuables */>{entryText(detail)}</li>
                     ))}
                   </ul>
@@ -212,11 +241,23 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
         </p>
 
         <div className={styles.actions}>
-          <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy}>
+          <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy || detailsPending}>
             {busy ? t("privacyModal.saving") : t("privacyModal.acknowledge")}
           </CyberButton>
         </div>
       </div>
     </div>
   );
+}
+
+/** Détail des entrées présentées, par identifiant (`GET /api/profile/privacy-changes`). */
+export type PrivacyChangeDetails = Record<string, readonly string[]>;
+
+/** Lit le détail des entrées `idsKey` (identifiants joints par des virgules), dans la langue de la page. */
+async function loadPrivacyChangeDetails(idsKey: string, locale: Locale): Promise<PrivacyChangeDetails> {
+  const query = new URLSearchParams({ ids: idsKey, locale });
+  const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const body = (await response.json()) as { details?: PrivacyChangeDetails };
+  return body.details ?? {};
 }

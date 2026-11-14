@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { ToastProvider } from "@/components/ui/toast";
 import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
+import { privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
 
 /**
  * La modale se rend **côté serveur**, depuis la mise en page racine : ce que
@@ -82,6 +83,29 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(render([{ ...PRIVACY_CHANGES[0], links: undefined }])).not.toContain("/profil#");
   });
 
+  // #587 : la mise en page envoie les entrées sans détail ; la modale l'attend.
+  it("PrivacyChangesModal_detailsDeferred_rendsTitlesAndSummariesWithoutDetailsAndHoldsTheButton", () => {
+    const entry = PRIVACY_CHANGES[0];
+
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <PrivacyChangesModal changes={privacyChangeHeads([entry])} detailsDeferred />
+      </ToastProvider>,
+    );
+
+    expect(markup).toContain(entry.title.replace(/'/g, "&#x27;"));
+    expect(markup).not.toContain(entry.details[0].slice(0, 40).replace(/'/g, "&#x27;"));
+    expect(markup).toContain("Chargement du détail des changements…");
+    expect(markup).toMatch(/<button[^>]*disabled=""/);
+  });
+
+  it("PrivacyChangesModal_detailsGiven_buttonIsNotHeld", () => {
+    const markup = render([PRIVACY_CHANGES[0]]);
+
+    expect(markup).not.toMatch(/<button[^>]*disabled=""/);
+    expect(markup).not.toContain("Chargement du détail");
+  });
+
   it("parle au singulier pour un seul changement", () => {
     expect(render([PRIVACY_CHANGES[0]])).toContain("Nos règles de confidentialité ont changé");
   });
@@ -141,7 +165,10 @@ describe("mise en page racine", () => {
 
   it("monte la modale et déclenche l'annonce Discord", () => {
     // Entrées traduites par la mise en page (lot 7b-2), dans la langue de la page.
-    expect(layout).toContain("<PrivacyChangesModal changes={localizedPrivacyChanges(privacyChanges, locale)} />");
+    // #587 : sans leur détail, que la modale lit à l'ouverture.
+    expect(layout).toContain(
+      "<PrivacyChangesModal changes={privacyChangeHeads(localizedPrivacyChanges(privacyChanges, locale))} detailsDeferred />",
+    );
     expect(layout).toContain("void dispatchPrivacyChangeNotifications().catch(");
   });
 

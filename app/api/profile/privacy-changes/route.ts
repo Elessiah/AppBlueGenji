@@ -7,6 +7,12 @@
  * clic n'est pas acquitté par qui ne l'a pas lu, et réapparaîtra au chargement
  * suivant. Il n'y a pas de refus : la modale informe, elle ne demande aucun
  * accord.
+ *
+ * `GET` rend le **détail** des entrées que la modale présente (#587 : la mise en
+ * page n'en envoie plus que titre et résumé). Des entrées publiées seulement —
+ * le texte même de l'historique de `/rgpd` — si bien qu'aucune donnée de compte
+ * n'est lue : la session ne sert qu'à réserver la route aux comptes connectés,
+ * seuls à voir la modale.
  */
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
@@ -17,6 +23,19 @@ import {
   privacyChangeDay,
 } from "@/lib/shared/privacy-changes";
 import { readJsonBody } from "@/lib/server/request-body";
+import { privacyChangeDetailsFor } from "@/lib/shared/privacy-changes-en";
+
+export async function GET(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return fail("UNAUTHORIZED", 401);
+
+  const params = new URL(req.url).searchParams;
+  const ids = (params.get("ids") ?? "").split(",").filter((id) => id.length > 0);
+  const check = checkPrivacyAcknowledgement(ids, privacyChangeDay(new Date()));
+  if (!check.ok) return fail(check.error, 400);
+
+  return ok({ details: privacyChangeDetailsFor(check.ids, params.get("locale") === "en" ? "en" : "fr") });
+}
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
