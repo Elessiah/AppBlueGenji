@@ -112,7 +112,6 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       discordVerified: false,
-      battletagVerified: false,
       // Battle.net rattaché : un BattleTag n'est plus à demander de ce côté.
       battletagRelevant: false,
       teamHasContact: false,
@@ -211,7 +210,6 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       discordVerified: false,
-      battletagVerified: false,
       battletagRelevant: false,
       teamHasContact: false,
     });
