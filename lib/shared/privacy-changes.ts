@@ -13,8 +13,10 @@
  *   voit toutes les trois dans la même modale, et un clic les acquitte
  *   ensemble (`bg_privacy_acknowledgments`, une ligne par changement) ;
  * - chaque compte joignable sur Discord qui n'en a pas pris connaissance sur
- *   le site en reçoit un résumé en message privé, une fois par changement (refait,
- *   push compris, si le bot n'a pas pu le remettre), pas avant qu'une semaine
+ *   le site en reçoit un résumé en message privé, une fois par changement tant qu'il a moins de 60 jours
+ *   (`PRIVACY_DM_WINDOW_DAYS` ; refait, push compris, si le bot n'a pas pu le
+ *   remettre ; jamais relancé pour un membre introuvable ou aux messages
+ *   privés fermés), pas avant qu'une semaine
  *   ait passé depuis le plus ancien dû et au plus un message par mois — les
  *   changements rapprochés partent ensemble
  *   (`lib/server/privacy-change-notifications.ts`) ;
@@ -2000,9 +2002,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // dans un navigateur laisse celle des autres appareils). /rgpd (rgpd-policy) le
     // dit depuis ce lot. Deux autres précisions (revue juridique EF-63), déjà vraies
     // avant ce lot : un caster qui est aussi arbitre du site lit les contacts des
-    // équipes de son match dès que les deux adversaires sont connus ; le relevé du
-    // « Prêt » de l'arbitre désigné s'affiche aussi à ses parties sur la page du
-    // match, et l'état public du lancement peut le laisser deviner. Rien ne change dans le
+    // équipes de son match dès que les deux adversaires sont connus (fenêtre
+    // « Contacts » de la carte et « Infos de connexion » de la page du match) ; le
+    // relevé du « Prêt » de l'arbitre désigné s'affiche aussi à ses parties, aux
+    // arbitres et aux administrateurs du site sur la page du match, et l'état public du lancement peut le laisser deviner. Rien ne change dans le
     // code. Pour tous les comptes ; datée du lendemain de la nuit de déploiement
     // (comme `REGISTER_UPDATED_AT`) — avancer ensemble si la mise en ligne glisse.
     id: "2026-11-marque-de-session-rectificatif",
@@ -2013,8 +2016,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Précision sur l'information du 29 octobre 2026 : quand le site ne reçoit pas ta réponse à la fenêtre de certification du tag Discord, ou la refuse, la marque de ta session reste, et la fenêtre peut revenir tant que cette session dure — pas seulement au chargement suivant. Seule exception : la certification refusée parce que ton tag ne peut plus être certifié, où la fenêtre répond d'elle-même « Plus tard », qui ne lève la marque que si le site le reçoit sans le refuser. Deux précisions aussi sur les contacts de match et le « Prêt » de l'arbitre.",
     details: [
       "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse (une panne du site comprise), laisse la marque sur ta session — sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis dans ce navigateur, elle n'y revient sur ton compte qu'à une nouvelle connexion par Discord ou Blizzard — chacune de tes sessions a sa propre marque, que gardent tes autres appareils.",
-      "Contacts de match : un caster qui est aussi arbitre du site lit les contacts des équipes de son match (tag Discord certifié et, dans un tournoi Overwatch, BattleTag, même masqué) dans la fenêtre « Contacts » de la carte du match, dès que ses deux adversaires sont connus, comme les autres arbitres — et pas seulement le temps du match, comme les autres casters.",
-      "« Prêt » de l'arbitre désigné : son relevé s'affiche aussi à ses parties et aux arbitres du site sur la page du match, et pas seulement dans les fenêtres « Contacts » et de lancement ; l'état du lancement, public, peut en outre laisser deviner s'il est prêt.",
+      "Contacts de match : un caster qui est aussi arbitre du site lit les contacts des équipes de son match (tag Discord certifié et, dans un tournoi Overwatch, BattleTag, même masqué) dans la fenêtre « Contacts » de la carte du match et dans les « Infos de connexion » de la page du match, dès que ses deux adversaires sont connus, comme les autres arbitres — et pas seulement le temps du match, comme les autres casters.",
+      "« Prêt » de l'arbitre désigné : son relevé s'affiche aussi à ses parties, aux arbitres et aux administrateurs du site sur la page du match, et pas seulement dans les fenêtres « Contacts » et de lancement ; l'état du lancement, public, peut en outre laisser deviner s'il est prêt.",
       "Rien d'autre ne change : la marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données ; « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },

@@ -1902,9 +1902,9 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
     expect(english.details).toHaveLength(4);
     expect(entry.details[1]).toContain("un caster qui est aussi arbitre du site lit les contacts des équipes de son match");
     expect(english.details[1]).toContain("a caster who is also a referee of the site reads the contacts of the teams of their match");
-    expect(entry.details[2]).toContain("s'affiche aussi à ses parties et aux arbitres du site sur la page du match");
+    expect(entry.details[2]).toContain("s'affiche aussi à ses parties, aux arbitres et aux administrateurs du site sur la page du match");
     expect(entry.details[2]).toContain("l'état du lancement, public, peut en outre laisser deviner s'il est prêt");
-    expect(english.details[2]).toContain("also shown to the match's parties and the site's referees on the match page");
+    expect(english.details[2]).toContain("also shown to the match's parties and the site's referees and admins on the match page");
     expect(entry.details[3]).toMatch(/^Rien d'autre ne change/);
   });
 
