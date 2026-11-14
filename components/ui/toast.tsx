@@ -28,6 +28,11 @@ export interface ToastOptions {
    * doit pas empiler le même message, ni le faire relire par un lecteur d'écran.
    */
   once?: boolean;
+  /**
+   * Durée d'affichage (par défaut `TOAST_DURATION_MS`) : un message long,
+   * qu'un rechargement de page suit, doit rester le temps d'être lu.
+   */
+  durationMs?: number;
 }
 
 interface Toast {
@@ -35,6 +40,7 @@ interface Toast {
   message: string;
   type: ToastType;
   lang?: string;
+  durationMs?: number;
 }
 
 interface ToastContextValue {
@@ -76,7 +82,7 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const add = useCallback((message: string, type: ToastType, options?: ToastOptions) => {
     const id = ++nextId.current;
-    setToasts((prev) => withToast(prev, { id, message, type, lang: options?.lang }, options?.once === true));
+    setToasts((prev) => withToast(prev, { id, message, type, lang: options?.lang, durationMs: options?.durationMs }, options?.once === true));
   }, []);
 
   const dismiss = useCallback((id: number) => {
@@ -156,6 +162,7 @@ const TOAST_PREFIX_KEY = {
  */
 export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
   const { t } = useShellText();
+  const duration = toast.durationMs ?? TOAST_DURATION_MS;
   const [override, setOverride] = useState<CountdownOverride>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -181,7 +188,7 @@ export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismi
 
   useEffect(() => {
     const now = Date.now();
-    countdown.current ??= startCountdown(TOAST_DURATION_MS, now);
+    countdown.current ??= startCountdown(duration, now);
     if (paused) {
       countdown.current = pauseCountdown(countdown.current, now);
       return;
@@ -189,7 +196,7 @@ export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismi
     countdown.current = resumeCountdown(countdown.current, now);
     const timer = window.setTimeout(dismissSelf, countdownRemaining(countdown.current, now));
     return () => window.clearTimeout(timer);
-  }, [paused, dismissSelf]);
+  }, [paused, dismissSelf, duration]);
 
   const prefix = t(TOAST_PREFIX_KEY[toast.type]);
 
@@ -248,7 +255,7 @@ export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismi
       <span
         className={styles.progress}
         aria-hidden="true"
-        style={{ animationDuration: `${TOAST_DURATION_MS}ms` }}
+        style={{ animationDuration: `${duration}ms` }}
       />
     </div>
   );

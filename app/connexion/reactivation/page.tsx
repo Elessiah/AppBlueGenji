@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { pageMetadata } from "@/lib/shared/page-metadata";
+import { formatMessage } from "@/lib/shared/message-format";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { LoginTextProvider } from "@/components/i18n/login-text";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { peekReactivationTicket, reactivationCookieName } from "@/lib/server/users/account-reactivation";
 import { ReactivationPanel } from "./ReactivationPanel";
 
 /** Titre propre à l'écran (il reprend la question posée), jamais celui de la connexion ; `noindex`. */
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await requestLocale();
-  const { reactivation, meta } = messagesFor(locale).login;
+  const { reactivation } = messagesFor(locale).login;
   return {
-    ...pageMetadata({ title: reactivation.title, description: meta.description, path: "/connexion/reactivation", locale }),
+    ...pageMetadata({ title: reactivation.title, description: formatMessage(locale, reactivation.metaDescription, { days: ACCOUNT_REACTIVATION_DAYS }), path: "/connexion/reactivation", locale }),
     robots: { index: false, follow: true },
   };
 }

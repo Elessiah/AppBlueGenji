@@ -217,7 +217,7 @@ async function handleRedate(
     );
     const redated = Number(result.affectedRows) === 1;
     if (plan.finalize) {
-      const finalized = await finalizeAccountDeletion(entry.userId, { accountCreatedAt: entry.accountCreatedAt });
+      const finalized = await finalizeAccountDeletion(entry.userId, { accountCreatedAt: entry.accountCreatedAt, replay: true });
       if (finalized) {
         report.replayed += 1;
         log(`  ✓ #${entry.userId} — ${finalized.mode === "ERASE" ? "effacé" : "anonymisé"} (fenêtre close)`);
@@ -332,6 +332,7 @@ async function requestRestoredLiveAccount(entry: AccountDeletionEntry): Promise<
       requestedAt: new Date(entry.deletedAt),
       requestedAtRaw: entry.requestedAt,
       accountCreatedAt: entry.accountCreatedAt,
+      replay: true,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "USER_NOT_FOUND") return;
@@ -354,6 +355,7 @@ async function replayDeletion(
         requestedAt: new Date(entry.deletedAt),
         requestedAtRaw: entry.requestedAt,
         accountCreatedAt: entry.accountCreatedAt,
+        replay: true,
       });
       report.replayed += 1;
       log(`  ✓ #${entry.userId} — demande de suppression rejouée`);
@@ -365,7 +367,7 @@ async function replayDeletion(
     // le registre (T01) : effacé directement, il laisserait un propriétaire
     // anonyme à ses équipes.
     await requestRestoredLiveAccount(entry);
-    const plan = await deleteOwnAccount(entry.userId, { accountCreatedAt: entry.accountCreatedAt });
+    const plan = await deleteOwnAccount(entry.userId, { accountCreatedAt: entry.accountCreatedAt, replay: true });
     report.replayed += 1;
     log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"}`);
   } catch (error) {

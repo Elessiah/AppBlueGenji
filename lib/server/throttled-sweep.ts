@@ -1,3 +1,5 @@
+import { outboundMuted } from "@/lib/server/outbound-mute";
+
 /**
  * Étranglement à relève des balayages de notifications (départs de match,
  * brief du salon) : un balayage au plus toutes les `throttleMs`, et un appel
@@ -8,6 +10,10 @@
  *
  * Jamais une exception : `sweep` qui lève est confiée à `onError`, et l'appel
  * rend `0`.
+ *
+ * Envois coupés (rejeu d'une restauration, `outbound-mute.ts`) : aucun
+ * balayage ne part. Un balayage **réserve** chaque notification avant de
+ * l'envoyer ; réservée sans envoi possible, elle serait perdue pour de bon.
  */
 export type ThrottledSweep = {
   /** Lance le balayage s'il est dû ; sinon arme la relève. Rend ce que le balayage a compté. */
@@ -28,12 +34,14 @@ export function throttledSweep(options: {
    */
   enabled?: () => boolean;
 }): ThrottledSweep {
+  const enabled = (): boolean => !outboundMuted() && (options.enabled?.() ?? true);
   let lastSweepAt = 0;
   let pending: Promise<number> | null = null;
   let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 
   function schedule(delayMs: number): void {
-    if (trailingTimer) return;
+    // Garde fausse (envois coupés compris) : aucun minuteur ne s'arme.
+    if (trailingTimer || !enabled()) return;
     trailingTimer = setTimeout(() => {
       trailingTimer = null;
       void run();
@@ -42,7 +50,7 @@ export function throttledSweep(options: {
   }
 
   async function run(): Promise<number> {
-    if (options.enabled && !options.enabled()) return 0;
+    if (!enabled()) return 0;
     if (pending) {
       schedule(options.throttleMs);
       return pending;

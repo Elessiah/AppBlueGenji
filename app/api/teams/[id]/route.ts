@@ -12,6 +12,7 @@ import { getTeamDetail } from "@/lib/server/teams/detail";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
 import { updateTeamMeta } from "@/lib/server/teams/identity";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
+import { sortedIdsInclude } from "@/lib/shared/sorted-ids";
 import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
 import { can } from "@/lib/shared/permissions";
 import { INVALID_TEAM_FIELDS, teamFieldsAreText } from "@/lib/shared/team-name";
@@ -38,7 +39,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     // Sauf un compte supprimé **sans fiche** (D13) : la redirection mènerait à
     // une page introuvable — l'entrée n'a alors nulle part où mener.
     const soloUserId = await findSoloEntryUser(teamId);
-    if (soloUserId !== null && !(await loadProfilelessPlayerIds()).includes(soloUserId)) {
+    if (soloUserId !== null && !sortedIdsInclude(await loadProfilelessPlayerIds(), soloUserId)) {
       return fail("TEAM_IS_SOLO_ENTRY", 404, { soloUserId });
     }
     return fail("TEAM_NOT_FOUND", 404);

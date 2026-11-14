@@ -142,8 +142,17 @@
   "reactivation": {
     "title": "Reactivate your account?",
     "lead": "You asked for your account to be deleted. The deletion becomes final on {date}: until then, you can still reactivate it.",
-    "kept": "Reactivating gives you back your account: profile, statistics, settings, and your username and avatar, hidden everywhere since the request (if your username was taken in the meantime, it comes back, shortened if needed, followed by “OG”, for example “UsernameOG” — or “UsernameOG2”… if that is taken too, failing that your borrowed username: you can change it in My profile). An avatar that moderation hid or removed in the meantime does not come back. A suspended account can be reactivated too: it stays suspended.",
-    "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser when someone could take them over, your registrations for solo tournaments that had not started yet were withdrawn, your remaining matches in an ongoing solo tournament where you had never played were lost by forfeit, and your casts, referee assignments and pending invitations and join requests were withdrawn.",
+    "keptLead": "Reactivating gives you back your profile, statistics and settings, and normally your username and avatar (unless the username is already taken, or moderation hid or removed the avatar); a suspended account comes back suspended. The details are in the “i” button.",
+    "keptSubject": "what reactivation gives back",
+    "kept": "Reactivating gives you back your account: profile, statistics, settings, and your username and avatar, hidden everywhere since the request (if your username was taken in the meantime, it comes back, shortened if needed, followed by “OG”, for example “UsernameOG” — or “UsernameOG2”… if that is taken too, failing that your borrowed username: you can change it in My profile). An avatar that moderation hid or removed in the meantime does not come back, and a suspended account, which can be reactivated too, stays suspended.",
+    "notUndoneLead": "What was done when you asked is not undone:",
+    "notUndoneItems": {
+      "teams": "you left your teams (ownership handed over, team turned into a ghost team or disbanded);",
+      "organized": "your organised tournaments changed organiser when someone could take them over;",
+      "registrations": "your registrations for solo tournaments that had not started yet were withdrawn;",
+      "forfeits": "matches in an ongoing solo tournament where you had never played, already lost by forfeit (or by withdrawal from the standings), stay lost;",
+      "casts": "your casts, referee assignments and pending invitations and join requests were withdrawn."
+    },
     "confirm": "Reactivate my account",
     "cancel": "Don't reactivate",
     "done": "Your account is reactivated.",
@@ -157,6 +166,7 @@
     "declined": "Your account is not reactivated: its deletion becomes final on {date}. Until then, logging in will offer it again.",
     "missing": "No reactivation is waiting on this device. Log in: if your account's deletion was requested, you will be able to reactivate it.",
     "pseudoChanged": "Your previous username could not be given back: you now have another one, which you can change in My profile.",
-    "declineFailed": "Your choice could not be recorded. Try again in a moment."
+    "declineFailed": "Your choice could not be recorded. Try again in a moment.",
+    "metaDescription": "Reactivate a BlueGenji Esport account whose deletion was requested, within {days} days of the request."
   }
 }

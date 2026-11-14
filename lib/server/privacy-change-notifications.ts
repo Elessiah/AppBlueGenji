@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isBotCircuitOpen } from "@/lib/server/bot-integration";
+import { outboundMuted } from "@/lib/server/outbound-mute";
 import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { privacyChangePush } from "@/lib/shared/push-messages";
 import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
@@ -295,6 +296,9 @@ async function sendPrivacyGroup(
  * @returns Le nombre de messages remis (0 si le balayage a été étranglé).
  */
 export async function dispatchPrivacyChangeNotifications(now: Date = new Date()): Promise<number> {
+  // Envois coupés (rejeu d'une restauration) : le balayage réserverait avant
+  // un envoi impossible, l'annonce serait perdue. Rien ne part, rien n'est lu.
+  if (outboundMuted()) return 0;
   if (pendingSweep) return pendingSweep;
   if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
 
