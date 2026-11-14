@@ -32,7 +32,7 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { visibleText } from "@/lib/shared/visible-text";
-import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import type { TournamentState } from "@/lib/shared/types";
@@ -1108,8 +1108,8 @@ export type TeamVoiceChannelsResult = {
 /**
  * Allume ou éteint l'option « Salons vocaux d'équipe », à tout moment jusqu'à
  * la clôture du tournoi, en cours compris (décision de l'utilisateur,
- * 2026-11-02) — même règle que la planification par l'arbitrage
- * (`canToggleRefereeScheduling`), que le formulaire applique déjà : un tournoi
+ * 2026-11-02) — règle commune des options d'organisation
+ * (`canToggleLiveTournamentOption`), que le formulaire applique déjà : un tournoi
  * terminé n'a plus de match à qui ouvrir un salon.
  *
  * - Allumée en cours de tournoi : les matchs à plus d'un quart d'heure ont
@@ -1132,7 +1132,7 @@ export async function setTeamVoiceChannels(tournamentId: number, enabled: boolea
     >(`SELECT name, state, team_voice_channels FROM bg_tournaments WHERE id = ? LIMIT 1`, [tournamentId]);
     const tournament = rows[0];
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-    if (!canToggleRefereeScheduling(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
+    if (!canToggleLiveTournamentOption(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
     const changed = (Number(tournament.team_voice_channels ?? 0) === 1) !== enabled;
     if (changed) {
       await connection.execute(`UPDATE bg_tournaments SET team_voice_channels = ? WHERE id = ?`, [

@@ -4,7 +4,9 @@
 gèrent ses deux engagées (propriétaire et managers, ou le joueur d'une entrée
 solo) reçoivent son **check-in** : un seul message, en message privé Discord
 et en notification push (sujet `MATCH_LOBBY_BRIEF`, « Check-in du match »),
-**une seule fois par match et par engagée**.
+**une seule fois par match et par engagée**. Rien ne part pour un tournoi
+dont l'option « Check-in des matchs » est décochée, ni pour une échéance
+antérieure à sa reprise (`MATCH_CHECK_IN_SETTING.md`).
 
 Spécification : décisions de l'utilisateur du 2026-10-26 et du 2026-10-27
 (`MATCH_REFEREE.md`), **refondues le 2026-11-04** — le brief du salon et le

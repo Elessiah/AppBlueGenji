@@ -501,6 +501,12 @@ export type TournamentCard = {
    */
   teamVoiceChannels: boolean;
   /**
+   * Check-in des matchs (`docs/features/MATCH_CHECK_IN_SETTING.md`) : éteint,
+   * ni check-in à H-15 ni rappel 10 h. Allumé par défaut ; modifiable à tout
+   * moment jusqu'à la clôture.
+   */
+  matchCheckIn: boolean;
+  /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
    */

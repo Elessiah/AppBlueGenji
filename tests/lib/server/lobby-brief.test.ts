@@ -29,11 +29,13 @@ import {
   dispatchLobbyBriefs,
   LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
+  LOBBY_BRIEF_MUTED_PHASE,
+  silencePausedLobbyBriefs,
 } from "@/lib/server/tournaments/lobby-brief";
 import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
 import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
 import { renderDm } from "@/lib/shared/dm-language";
-import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
 const MATCH = {
@@ -194,7 +196,7 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(claimParams(execute)).toEqual([["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1"]]);
+    expect(claimParams(execute)).toEqual([["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1", "1"]]);
     expect(loadEntrantManagerIds).toHaveBeenCalledWith([1]);
     expect(loadNotificationRecipients).toHaveBeenCalledWith([10, 11], "certified", { matchDm: true });
   });
@@ -249,6 +251,20 @@ describe("dispatchLobbyBriefs", () => {
     expect(claim).toContain(
       "AND NOT EXISTS (SELECT 1 FROM bg_lobby_brief_marks k WHERE k.tournament_id = m.tournament_id AND k.phase_id = m.phase_id AND k.bracket = m.bracket AND k.round_number = m.round_number AND k.match_number = m.match_number AND k.team_id = ?)",
     );
+  });
+
+  it("dispatchLobbyBriefs_claimAndSweep_skipSideMutedForCurrentStart", async () => {
+    const { query, execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    const muted =
+      "EXISTS (SELECT 1 FROM bg_match_start_notices u WHERE u.match_id = m.id AND u.phase = 'LOBBY_BRIEF_MUTE' AND u.pairing = CONCAT(";
+    const sweep = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    // Tu par une remise en marche pour cet horaire : ni candidat, ni réservé ;
+    // la clé porte l'horaire, une nouvelle heure n'est plus tue.
+    expect(sweep).toContain(`${muted}m.team1_id, '@', COALESCE(DATE_FORMAT(m.start_at, '%Y%m%d%H%i%s'), ''))`);
+    expect(sweep).toContain(`${muted}m.team2_id, '@'`);
+    expect(claim).toContain(`AND NOT ${muted}?, '@', COALESCE(DATE_FORMAT(m.start_at, '%Y%m%d%H%i%s'), ''))`);
   });
 
   it("dispatchLobbyBriefs_sideSent_durableMarkWrittenWithTeamAndMatch", async () => {
@@ -327,6 +343,19 @@ describe("dispatchLobbyBriefs", () => {
     await dispatchLobbyBriefs();
     // Un tournoi masqué de nouveau n'envoie ni son nom ni ses équipes, comme les salons vocaux.
     expect(query.mock.calls[0][0]).toMatch(/AND t\.start_visibility_at <= NOW\(\)/);
+  });
+
+  it("dueSql_checkInOff_notDueInReadNorClaim", async () => {
+    const { query, execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    // Option « Check-in des matchs » éteinte : rien ne part ni n'est réservé ; ce
+    // qui est devenu dû pendant l'arrêt est réservé par la remise en marche.
+    const read = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    for (const sql of [read, claim]) {
+      expect(sql).toContain("AND t.match_check_in = 1");
+      expect(sql).not.toContain("match_check_in_paused_at");
+    }
   });
 
   it("dueSql_matchNotAnnouncedCast_streamUrlNull", async () => {
@@ -428,8 +457,8 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(2);
 
     expect(claimParams(execute)).toEqual([
-      ["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1"],
-      ["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"],
+      ["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1", "1"],
+      ["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2", "2"],
     ]);
     expect(loadEntrantManagerIds).toHaveBeenCalledWith([1, 2]);
     // Une seule lecture pour tous les côtés ; message de match : tag certifié seul.
@@ -667,7 +696,7 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"]]);
+    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2", "2"]]);
     expect(logged(error, "aucun gérant actif")).toBe(true);
     // Balayage suivant : toujours sans gestionnaire, pm2 ne le redit pas.
     error.mockClear();
@@ -1073,6 +1102,15 @@ describe("dispatchLobbyBriefs", () => {
     expect(query.mock.calls[1][0]).toContain("bg_match_start_notices n WHERE n.id = ?) AS claim_kept");
   });
 
+  it("dispatchLobbyBriefs_claimedSide_rereadChecksCheckInStillOn", async () => {
+    const { query } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Option éteinte entre la réservation et l'envoi : la relecture ne rend rien, rien ne part.
+    expect(String(query.mock.calls[1][0]).replace(/\s+/g, " ")).toContain("AND t.match_check_in = 1");
+  });
+
   it("dispatchLobbyBriefs_lobbyClosedBeforeSend_noRetryArmedAndLoggedAsClosed", async () => {
     jest.useFakeTimers();
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -1200,7 +1238,7 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"]]);
+    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2", "2"]]);
     expect(logged(error, "aucun gérant actif")).toBe(true);
     error.mockRestore();
   });
@@ -1257,5 +1295,93 @@ describe("dispatchLobbyBriefs", () => {
     await dispatchLobbyBriefs();
     expect(await dispatchLobbyBriefs()).toBe(0);
     expect(query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("silencePausedLobbyBriefs (remise en marche du check-in)", () => {
+  const now = new Date("2026-11-13T21:00:00Z");
+  const flat = (sql: string) => sql.replace(/\s+/g, " ");
+  /** Lecture des matchs dus (sans verrou) puis écriture des réservations muettes. */
+  function dueConnection(ids: number[]) {
+    const connection = connectionMock();
+    connection.execute.mockImplementation(async (sql: string) =>
+      sql.startsWith("SELECT m.id") ? [ids.map((id) => ({ id })), []] : [{ affectedRows: ids.length }, []],
+    );
+    return connection;
+  }
+  const insertCall = (connection: ReturnType<typeof connectionMock>) =>
+    connection.execute.mock.calls.find(([sql]) => String(sql).startsWith("INSERT IGNORE")) as unknown as [string, unknown[]];
+
+  it("silencePausedLobbyBriefs_noPause_mutesBothSidesInOneStatement", async () => {
+    const connection = dueConnection([11, 12]);
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, null, now);
+
+    const calls = connection.execute.mock.calls as unknown as [string, unknown[]][];
+    // Lecture sans verrou, puis une seule instruction d'écriture pour les deux côtés.
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].startsWith("SELECT m.id FROM bg_matches m")).toBe(true);
+    expect(calls[0][1]).toEqual([7]);
+    const [sql, params] = insertCall(connection);
+    expect(flat(sql)).toContain("WHERE m.id IN (?, ?) AND m.tournament_id = ?");
+    expect(sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")).toBe(true);
+    expect(flat(sql)).toContain("JOIN (SELECT 1 AS n UNION ALL SELECT 2) side");
+    expect(flat(sql)).toContain(
+      "CONCAT(IF(side.n = 1, m.team1_id, m.team2_id), '@', COALESCE(DATE_FORMAT(m.start_at, '%Y%m%d%H%i%s'), ''))",
+    );
+    // Fenêtre du brief sans la garde de l'option (encore éteinte pour la lecture).
+    expect(flat(sql)).toContain("m.status = 'READY'");
+    expect(sql).not.toContain("t.match_check_in = 1");
+    expect(sql).not.toContain("NOW() - INTERVAL ? SECOND");
+    expect(params).toEqual([LOBBY_BRIEF_MUTED_PHASE, 11, 12, 7]);
+  });
+
+  it("silencePausedLobbyBriefs_withPause_excludesBranchesEnteredBeforePause", async () => {
+    const connection = dueConnection([11]);
+    const pausedAt = new Date("2026-11-13T20:40:00Z");
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, pausedAt, now);
+
+    const [sql, params] = insertCall(connection);
+    // La lecture sans verrou porte les mêmes bornes que l'écriture.
+    expect((connection.execute.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual([7, pausedAt, 1200]);
+    // Horaire : H-15 avant l'arrêt (heure du processus) et encore dans sa fenêtre ;
+    // salon : entré avant l'arrêt ramené sur l'horloge de la base.
+    expect(flat(sql)).toContain("AND m.start_at - INTERVAL 15 MINUTE < ?)");
+    expect(flat(sql)).toContain("END < NOW() - INTERVAL ? SECOND))");
+    expect(flat(sql)).toContain("AND NOT (((m.start_at IS NOT NULL");
+    expect(params).toEqual([LOBBY_BRIEF_MUTED_PHASE, 11, 7, pausedAt, 1200]);
+  });
+
+  it("silencePausedLobbyBriefs_pauseAfterNow_elapsedClampedToZero", async () => {
+    const connection = dueConnection([11]);
+    const pausedAt = new Date("2026-11-13T21:00:05Z");
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, pausedAt, now);
+
+    expect(insertCall(connection)[1][4]).toBe(0);
+  });
+
+  it("silencePausedLobbyBriefs_lobbyEntry_launchOpeningOrLaterOfOpeningAndStart", async () => {
+    const connection = dueConnection([11]);
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, new Date("2026-11-13T20:00:00Z"), now);
+
+    const sql = flat(insertCall(connection)[0]);
+    // Lancé : au lancement ; sans horaire : à l'ouverture ; sinon le plus tard des
+    // deux — un salon ouvert en retard pendant l'arrêt compte à son ouverture.
+    expect(sql).toContain("WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)");
+    expect(sql).toContain("WHEN m.start_at IS NULL THEN m.lobby_opened_at");
+    expect(sql).toContain("ELSE GREATEST(m.lobby_opened_at, m.start_at) END");
+    expect(sql).toContain("m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)");
+  });
+
+  it("silencePausedLobbyBriefs_noDueMatch_writesNothingAndTakesNoRowLock", async () => {
+    const connection = dueConnection([]);
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, null, now);
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(String(connection.execute.mock.calls[0][0])).toMatch(/^SELECT m\.id/);
   });
 });

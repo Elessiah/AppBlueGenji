@@ -21,11 +21,12 @@ import {
   type TournamentFormValues,
 } from "../../_components/TournamentForm";
 import { editLockNoticeText, editSavedText, type PlanningSaveResult } from "../_lib/edit-entry";
-import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { TournamentState } from "@/lib/shared/types";
 import { mapError, useErrorsText } from "../_lib/error-map";
 import { useFormText } from "../../_lib/form-text";
 import { CodedError } from "@/lib/shared/field-errors";
+import { putToggle, saveSimpleToggle } from "../../_lib/toggle-save";
 import { mergeRefusals, settledRefusals, settledValue } from "@/lib/shared/settled-value";
 
 /**
@@ -80,6 +81,7 @@ type EditLoadPayload = {
   state: TournamentState;
   refereeScheduling: boolean;
   teamVoiceChannels: boolean;
+  matchCheckIn: boolean;
 };
 
 /** Raison du verrou affichée en tête : aucune, publication, ou tournoi lancé. */
@@ -101,46 +103,28 @@ function refusalText(
   return text.t("edit.fieldRefusal", { message, field: text.t(`edit.fields.${labeled}`) });
 }
 
-/** Refus de la bascule de planification (`refereeSchedulingErrorMessage`). */
-function planningErrorText(text: TournamentFormText, code: string): string {
-  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_REFEREE_SCHEDULING"] as const).find((c) => c === code);
-  return text.t(known ? `edit.planningErrors.${known}` : "edit.planningErrors.fallback");
-}
-
-/** Refus de la bascule des salons vocaux d'équipe. */
-function voiceErrorText(text: TournamentFormText, code: string): string {
-  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_TEAM_VOICE_CHANNELS"] as const).find((c) => c === code);
-  return text.t(known ? `edit.voiceErrors.${known}` : "edit.voiceErrors.fallback");
-}
-
 /**
- * Enregistre l'option « Salons vocaux d'équipe » par sa route dédiée
- * (`MATCH_VOICE.md`) ; rend `true` si elle a changé.
+ * Les trois bascules, envoyées **l'une après l'autre** (elles verrouillent
+ * toutes la même ligne de tournoi : en parallèle, l'une perdrait le verrou) ;
+ * `null` pour chacune quand la fenêtre est fermée.
  */
-async function saveTeamVoiceChannels(tournamentId: number, enabled: boolean, text: TournamentFormText): Promise<boolean> {
-  const response = await fetch(`/api/admin/tournaments/${tournamentId}/voice-channels`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
-  const result = (await response.json().catch(() => ({}))) as { error?: string; changed?: boolean };
-  if (response.ok) return result.changed === true;
-  const code = result.error ?? "UNKNOWN";
-  throw new CodedError(code, voiceErrorText(text, code));
-}
-
-/** Les deux bascules, envoyées l'une sans l'autre ; `null` pour chacune quand la fenêtre est fermée. */
 async function saveToggles(
   tournamentId: number,
   editable: boolean,
-  values: Pick<TournamentFormValues, "refereeScheduling" | "teamVoiceChannels">,
+  values: Pick<TournamentFormValues, "refereeScheduling" | "teamVoiceChannels" | "matchCheckIn">,
   text: TournamentFormText,
-): Promise<[PromiseSettledResult<PlanningSaveResult> | null, PromiseSettledResult<boolean> | null]> {
-  if (!editable) return [null, null];
-  return Promise.allSettled([
-    saveRefereeScheduling(tournamentId, values.refereeScheduling, text),
-    saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text),
-  ]);
+): Promise<
+  [
+    PromiseSettledResult<PlanningSaveResult> | null,
+    PromiseSettledResult<boolean> | null,
+    PromiseSettledResult<boolean> | null,
+  ]
+> {
+  if (!editable) return [null, null, null];
+  const [planning] = await Promise.allSettled([saveRefereeScheduling(tournamentId, values.refereeScheduling, text)]);
+  const [voice] = await Promise.allSettled([saveSimpleToggle(tournamentId, "voice", values.teamVoiceChannels, text)]);
+  const [checkIn] = await Promise.allSettled([saveSimpleToggle(tournamentId, "checkIn", values.matchCheckIn, text)]);
+  return [planning, voice, checkIn];
 }
 
 /** Envoie les champs de la fenêtre d'édition ; un refus nomme le champ en cause. */
@@ -166,21 +150,8 @@ async function saveRefereeScheduling(
   enabled: boolean,
   text: TournamentFormText,
 ): Promise<PlanningSaveResult> {
-  const response = await fetch(`/api/admin/tournaments/${tournamentId}/referee-scheduling`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
-  const result = (await response.json().catch(() => ({}))) as {
-    error?: string;
-    changed?: boolean;
-    movedToPlanning?: number;
-  };
-  if (response.ok) {
-    return { changed: result.changed === true, movedToPlanning: result.movedToPlanning ?? 0 };
-  }
-  const code = result.error ?? "UNKNOWN";
-  throw new CodedError(code, planningErrorText(text, code));
+  const result = await putToggle(tournamentId, "planning", enabled, text);
+  return { changed: result.changed === true, movedToPlanning: result.movedToPlanning ?? 0 };
 }
 
 export default function EditTournamentPage() {
@@ -239,6 +210,7 @@ export default function EditTournamentPage() {
           ...toFormValues(successPayload.values),
           refereeScheduling: successPayload.refereeScheduling,
           teamVoiceChannels: successPayload.teamVoiceChannels,
+          matchCheckIn: successPayload.matchCheckIn,
         },
         startVisibilityAt: successPayload.values.startVisibilityAt,
         state: successPayload.state,
@@ -270,7 +242,7 @@ export default function EditTournamentPage() {
   // Plus rien ne se règle sur un tournoi terminé, planification comprise. Le
   // bouton « Modifier » n'y apparaît pas, mais l'URL reste atteignable à la
   // main : on explique plutôt que de rendre un formulaire entièrement grisé.
-  const planningEditable = canToggleRefereeScheduling(loaded.state);
+  const planningEditable = canToggleLiveTournamentOption(loaded.state);
   if (loaded.window === "LOCKED" && !planningEditable) {
     return (
       <section className="fade-in container">
@@ -306,7 +278,7 @@ export default function EditTournamentPage() {
         editableFields={editableFields}
         submitLabel={t("edit.submit")}
         explanationId={explanationId}
-        refereeSchedulingEditable={planningEditable}
+        togglesEditable={planningEditable}
         tournamentState={loaded.state}
         onSubmit={async (values) => {
           const payload = toApiPayload(values);
@@ -360,12 +332,24 @@ export default function EditTournamentPage() {
           // dédiée, envoyée à chaque enregistrement, idempotente. Les deux
           // bascules partent l'une sans l'autre : un refus de la planification
           // n'empêche pas d'enregistrer les salons (et inversement) ; ce qui a
-          // réussi est confirmé, chaque refus est dit ensuite.
-          const [planningResult, voiceResult] = await saveToggles(tournamentId, planningEditable, values, text);
+          // réussi est confirmé, chaque refus est dit ensuite. Check-in des
+          // matchs : même régime, troisième bascule.
+          const [planningResult, voiceResult, checkInResult] = await saveToggles(
+            tournamentId,
+            planningEditable,
+            values,
+            text,
+          );
           const planning = settledValue(planningResult, null);
           const voiceChanged = settledValue(voiceResult, false);
-          const refusals = settledRefusals(planningResult, voiceResult);
-          const savedText = editSavedText(text, fieldsSent || voiceChanged, planning, values.refereeScheduling);
+          const checkInChanged = settledValue(checkInResult, false);
+          const refusals = settledRefusals(planningResult, voiceResult, checkInResult);
+          const savedText = editSavedText(
+            text,
+            fieldsSent || voiceChanged || checkInChanged,
+            planning,
+            values.refereeScheduling,
+          );
 
           // Un refus ne cache ni ce qui a été enregistré à côté, ni l'autre refus.
           if (refusals.length > 0) {

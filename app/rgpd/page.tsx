@@ -1047,7 +1047,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
@@ -1093,12 +1093,12 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match, quand un
+            rappels (24 h et 10 h avant ; 24 h seulement dans un tournoi sans check-in), quand vous êtes retiré d&apos;un match, quand un
             nouveau match vous attend (les deux adversaires d&apos;un match de votre équipe ou de votre tournoi individuel
             viennent d&apos;être connus, première manche comprise : adversaire, horaire s&apos;il est déjà
             posé — sans « Match programmé » en plus — et lien de la page du match, une seule fois par match et par affiche) et, si vous castez, quand votre
             inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, pour un match en autogestion seulement
-            (aucun pour un match arbitré ou sans décision d&apos;arbitrage), 15 minutes avant son coup d&apos;envoi
+            (aucun pour un match arbitré ou sans décision d&apos;arbitrage, ni dans un tournoi sans check-in), 15 minutes avant son coup d&apos;envoi
             — ou à l&apos;ouverture de son salon si elle vient plus tôt ou si le match n&apos;a pas d&apos;horaire —, une seule fois par match, le check-in du match
             (rejoindre le salon vocal de votre équipe — dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe », pour un match
             qui a un horaire, jamais en tournoi individuel ni contre une équipe fantôme — et le salon de check-in, équipe à gauche — l&apos;hôte — et à droite, paramètres de partie, déroulé

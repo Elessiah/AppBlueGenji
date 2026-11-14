@@ -1073,7 +1073,9 @@ export function formatStaffMatchActionLog(context: {
  *   image en place, qu'elle supprime) ;
  * - `LIVE_URL_SET` / `LIVE_URL_REMOVED` — lien de diffusion du tournoi ;
  * - `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` — option « Salons vocaux d'équipe »
- *   (`docs/features/MATCH_VOICE.md`).
+ *   (`docs/features/MATCH_VOICE.md`) ;
+ * - `MATCH_CHECK_IN_ON` / `MATCH_CHECK_IN_OFF` — option « Check-in des matchs »
+ *   (`docs/features/MATCH_CHECK_IN_SETTING.md`).
  */
 export type StaffTournamentAction =
   | "EDITED"
@@ -1087,7 +1089,9 @@ export type StaffTournamentAction =
   | "LIVE_URL_SET"
   | "LIVE_URL_REMOVED"
   | "TEAM_VOICE_ON"
-  | "TEAM_VOICE_OFF";
+  | "TEAM_VOICE_OFF"
+  | "MATCH_CHECK_IN_ON"
+  | "MATCH_CHECK_IN_OFF";
 
 const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   EDITED: "Tournoi modifié",
@@ -1102,6 +1106,8 @@ const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   LIVE_URL_REMOVED: "Lien de diffusion du tournoi retiré",
   TEAM_VOICE_ON: "Salons vocaux d'équipe activés",
   TEAM_VOICE_OFF: "Salons vocaux d'équipe désactivés",
+  MATCH_CHECK_IN_ON: "Check-in des matchs activé",
+  MATCH_CHECK_IN_OFF: "Check-in des matchs désactivé",
 };
 
 /** Étape franchie par « Avancer l'étape suivante » (`ADVANCED`), telle que la ligne la nomme. */

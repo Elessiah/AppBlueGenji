@@ -29,6 +29,8 @@
     "planningDisabled": "Planification par l'arbitrage désactivée : les matchs sans date entrent en lancement.",
     "planningEnabled": "Planification par l'arbitrage activée.",
     "planningEnabledMoved": "Planification activée : {count, plural, =1 {1 match à planifier} other {# matchs à planifier}}.",
+    "concurrentRetry": "Un autre enregistrement est en cours sur ce tournoi. Réessaie dans un instant.",
+    "tooManyRequests": "Trop de changements d'options coup sur coup. Patiente quelques minutes avant de réessayer.",
     "planningErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
       "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
@@ -73,6 +75,12 @@
       "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
       "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe.",
       "fallback": "Les salons vocaux d'équipe n'ont pas pu être modifiés. Réessaie dans un instant."
+    },
+    "checkInErrors": {
+      "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
+      "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
+      "INVALID_MATCH_CHECK_IN": "Valeur invalide pour le check-in des matchs.",
+      "fallback": "Le check-in des matchs n'a pas pu être modifié. Réessaie dans un instant."
     }
   },
   "form": {
@@ -210,6 +218,13 @@
       "description": "Allumée : un quart d'heure avant chaque match, le bot Discord ouvre un salon vocal de {capacity} places par équipe (aucun si l'un des deux camps est une entrée solo ou une équipe fantôme) ; le lancement du match n'en dépend pas. Le site garde, pour chaque équipe du match, l'identifiant du salon et ses horaires, jamais qui s'y trouve (détail : page RGPD, « Salons vocaux d'équipe »).",
       "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
+      "finished": "Le tournoi est terminé : l'option n'est plus modifiable."
+    },
+    "matchCheckIn": {
+      "label": "Check-in des matchs",
+      "description": "Décochée, aucun check-in n'est envoyé 15 minutes avant un match, ni de rappel 10 h avant, et aucun message ne parle du check-in. Le rappel 24 h avant, les annonces d'horaire et les salons Discord (check-in, vocaux) restent comme d'habitude.",
+      "create": "Cochée par défaut. Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
+      "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours. Rallumée, elle ne rattrape pas ce qui était dû entre-temps.",
       "finished": "Le tournoi est terminé : l'option n'est plus modifiable."
     }
   },

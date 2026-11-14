@@ -44,6 +44,12 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       -- Salons vocaux d'équipe créés par le bot avant chaque match, et lancement
       -- tenu à leur remplissage : option éteinte par défaut (\`docs/features/MATCH_VOICE.md\`).
       team_voice_channels TINYINT(1) NOT NULL DEFAULT 0,
+      -- Check-in des matchs (message H-15, rappel 10 h) : allumé par défaut ;
+      -- \`match_check_in_paused_at\` = dernier arrêt : ce qui devient dû
+      -- pendant l'arrêt ne part pas, la remise en marche le réserve sans
+      -- message (\`docs/features/MATCH_CHECK_IN_SETTING.md\`).
+      match_check_in TINYINT(1) NOT NULL DEFAULT 1,
+      match_check_in_paused_at DATETIME NULL,
       match_format_type ENUM('BO', 'FT') NULL,
       match_format_value INT NULL,
       match_format_max_maps INT NULL,

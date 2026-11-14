@@ -69,7 +69,13 @@ describe("tournamentSettingsGroups — réglages généraux", () => {
       "Ordre de départ": "Fixé par l'arbitrage",
       "Phase de lancement des matchs": "Oui",
       "Salons vocaux d'équipe": "Non",
+      "Check-in des matchs": "Oui",
     });
+  });
+
+  it("tournamentSettingsGroups_checkInOff_saysNo", () => {
+    const groups = tournamentSettingsGroups(input({ card: tournamentCard({ matchCheckIn: false }) }));
+    expect(group(groups, "Tournoi")["Check-in des matchs"]).toBe("Non");
   });
 
   it("annonce les salons vocaux d'équipe quand l'option est allumée", () => {

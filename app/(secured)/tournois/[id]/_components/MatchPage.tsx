@@ -719,7 +719,7 @@ function MapsSection({
  * qui ouvre la page (elle vit sous `(secured)` : sans session, la carte
  * « Connexion requise » la remplace) : ce sont les règles de la partie, pas une consigne
  * d'organisation — l'aide-mémoire de l'autogestion les reprend pour qui
- * organise le match, et le check-in du match les écrit sur Discord
+ * organise le match, et le check-in du match (si le tournoi en a un) les écrit sur Discord
  * (`docs/features/MATCH_LOBBY_BRIEF.md`). Une seule liste
  * (`GAME_SETTINGS`), trois rendus.
  */

@@ -1,9 +1,8 @@
 "use client";
 
 import type { TournamentFormText } from "@/lib/shared/tournament-actions-text";
-import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
-import { CHECKBOX_CARD_LAYOUT, CHECKBOX_CARD_TITLE, checkboxCardChrome, HINT } from "../_lib/form-styles";
 import { useFormText } from "../_lib/form-text";
+import { SettingToggleCard } from "./SettingToggleCard";
 
 /** Précision sous la description, selon l'écran. */
 function scopeHint(text: TournamentFormText, mode: "create" | "edit", editable: boolean): string {
@@ -46,39 +45,16 @@ export function RefereeSchedulingField({
   const { t } = text;
   return (
     <>
-      <div className="checkbox-card" style={{ ...CHECKBOX_CARD_LAYOUT, ...checkboxCardChrome(checked, !editable) }}>
-        <input
-          id="referee-scheduling"
-          type="checkbox"
-          checked={checked}
-          disabled={!editable}
-          onChange={(e) => onChange(e.target.checked)}
-          aria-labelledby="referee-scheduling-label"
-          aria-describedby={
-            warnUndoesLaunches
-              ? "referee-scheduling-more referee-scheduling-hint referee-scheduling-warning"
-              : "referee-scheduling-more referee-scheduling-hint"
-          }
-          className="checkbox-card-input"
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <InfoHintRow>
-            <label
-              id="referee-scheduling-label"
-              htmlFor="referee-scheduling"
-              style={{ ...CHECKBOX_CARD_TITLE, cursor: editable ? "pointer" : "default" }}
-            >
-              {t("form.referee.label")}
-            </label>
-            <InfoHint id="referee-scheduling-more" subject={t("form.referee.label")}>
-              <p>{t("form.referee.description")}</p>
-            </InfoHint>
-          </InfoHintRow>
-          <p id="referee-scheduling-hint" style={{ ...HINT, margin: "4px 0 0" }}>
-            {scopeHint(text, mode, editable)}
-          </p>
-        </div>
-      </div>
+      <SettingToggleCard
+        id="referee-scheduling"
+        checked={checked}
+        editable={editable}
+        label={t("form.referee.label")}
+        description={<p>{t("form.referee.description")}</p>}
+        scopeHint={scopeHint(text, mode, editable)}
+        extraDescribedBy={warnUndoesLaunches ? "referee-scheduling-warning" : undefined}
+        onChange={onChange}
+      />
       {warnUndoesLaunches && (
         // `<output>` : région d'état native, lue quand elle apparaît au clic.
         <output

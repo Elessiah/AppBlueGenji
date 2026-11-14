@@ -20,17 +20,7 @@
  * Voir `docs/features/MATCH_PLANNING.md`.
  */
 import { matchLaunchPhase, type MatchLaunchPhase } from "./match-launch";
-import type { BracketMatch, TournamentState } from "./types";
-
-/**
- * L'option se règle à la création, et **se modifie à tout moment avant la
- * clôture** — tournoi en cours compris : c'est une règle d'organisation, qui
- * ne touche ni aux appariements ni aux scores. Sur un tournoi terminé, elle
- * ne décrirait plus rien.
- */
-export function canToggleRefereeScheduling(state: TournamentState): boolean {
-  return state !== "FINISHED";
-}
+import type { BracketMatch } from "./types";
 
 /** Libellé d'une phase de lancement, pour la carte de match et l'arbitrage. */
 export const LAUNCH_PHASE_LABELS: Readonly<Record<MatchLaunchPhase, string | null>> = {
