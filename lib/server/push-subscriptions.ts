@@ -14,6 +14,7 @@ import crypto from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
+import { outboundMuted } from "@/lib/server/outbound-mute";
 import { isMissingTableError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { siteBaseUrl } from "@/lib/server/site-url";
@@ -262,7 +263,8 @@ export async function pushToUsers(
   config: WebPushConfig | null = webPushConfig(),
 ): Promise<number> {
   const ids = [...new Set(userIds.filter((id) => Number.isInteger(id) && id > 0))];
-  if (!config || ids.length === 0) return 0;
+  // Envois coupés (rejeu d'une restauration, `outbound-mute.ts`) : rien ne part.
+  if (!config || ids.length === 0 || outboundMuted()) return 0;
   try {
     const db = await getDatabase();
     const [read] = await db.query<SubscriptionRow[]>(

@@ -18,11 +18,18 @@
  * entrées sans importer le service, dont la chaîne d'imports refermerait un
  * cycle.
  */
-import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
+import { cached, invalidateCached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { invalidateLandingLeaderboards, invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { invalidateRankingShareImages } from "@/lib/server/share-image-cache";
 
 const PREFIX = "ranking:";
+
+/**
+ * Clé des comptes supprimés sans fiche (`users/profileless-players.ts`) : hors
+ * du préfixe du classement, qu'un score vide — seule une écriture d'identité
+ * (suppression, réactivation, rattrapage) l'oublie, plus bas.
+ */
+export const PROFILELESS_PLAYERS_CACHE_KEY = "profileless-players";
 
 /**
  * Durée de vie du classement rejoué.
@@ -47,6 +54,9 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
  */
 export function invalidateTeamRanking(): void {
   invalidateRankingReplay();
+  // Un tournoi supprimé peut retirer à un compte anonymisé son seul match
+  // joué : sa fiche tombe aussitôt, comme ses liens.
+  invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);
   // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées.
   invalidateRankingShareImages();
 }
@@ -124,7 +134,19 @@ export function invalidateRankingLists(): void {
  * quarantaine, rétabli), statut de fantôme, dissolution. Le rejeu reste en
  * cache : il ne lit que les matchs.
  */
+/**
+ * Oublie la seule liste des comptes sans fiche. Pour une correction
+ * d'arbitrage d'un match déjà clos (`adminResolveMatchPublic`) : elle peut
+ * retirer à un compte anonymisé son seul match joué, et sa fiche doit tomber
+ * aussitôt (`/rgpd`), sans attendre l'échéance de la liste. Un score ordinaire
+ * ne la vide pas (`invalidateTeamRankingForScore`).
+ */
+export function invalidateProfilelessPlayers(): void {
+  invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);
+}
+
 export function invalidateTeamIdentityViews(): void {
   invalidateRankingLists();
+  invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);
   invalidateLandingTeamViews();
 }

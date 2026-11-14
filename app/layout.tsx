@@ -57,7 +57,7 @@ import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { PodiumTiersProvider } from "@/components/podium-tiers";
 import { loadPodiumTiers } from "@/lib/server/podium-tiers";
 import { ProfilelessPlayersProvider } from "@/components/profileless-players";
-import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
+import { loadProfilelessPlayerIdsForClient } from "@/lib/server/users/profileless-players";
 import { visiblePodiumTiers } from "@/lib/shared/podium-tiers";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -254,11 +254,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // re-rendue d'un lien à l'autre, elles suivent au chargement suivant.
   // Et les comptes supprimés sans fiche (D13), dont les liens de joueur rendent
   // le nom en texte : au seul visiteur connecté, le seul à qui un nom mène
-  // quelque part. Mutualisés avec le classement, ils ne lèvent jamais.
+  // quelque part. Sous leur propre clé de cache (dix minutes, vidée à chaque
+  // écriture d'identité), ils ne lèvent jamais.
   const [privacyChanges, rawPodiumTiers, profilelessPlayers] = await Promise.all([
     privacyChangesLoad,
     loadPodiumTiers(),
-    user ? loadProfilelessPlayerIds() : Promise.resolve(NO_PROFILELESS_PLAYERS),
+    user ? loadProfilelessPlayerIdsForClient() : Promise.resolve(NO_PROFILELESS_PLAYERS),
   ]);
   const podiumTiers = visiblePodiumTiers(rawPodiumTiers, user !== null);
   // L'annonce Discord des mêmes changements, entraînée par le trafic comme les
@@ -327,7 +328,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <AppLocaleProvider locale={locale}>
         <ShellTextProvider locale={locale} messages={shellMessages}>
         <PodiumTiersProvider tiers={podiumTiers}>
-        <ProfilelessPlayersProvider ids={profilelessPlayers}>
+        <ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>
         <ToastProvider>
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}

@@ -483,7 +483,7 @@ describe("messages `login`", () => {
   it.each(LOCALES.map((locale) => [locale]))("%s : même texte que next-intl, message par message", (locale) => {
     const tags = ["strong", "join", "terms", "policy", "fr"];
     for (const { key, source } of leaves(messagesFor(locale).login)) {
-      const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15, version: 4, date: "DT" };
+      const values = { audience: "A", provider: "P", time: "T", end: "E", reference: "S-1", day: "D", clause: "C", age: 15, version: 4, date: "DT", days: 30 };
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
       const expected = reference.markup("m", {
         ...values,

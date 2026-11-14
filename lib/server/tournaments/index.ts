@@ -187,6 +187,7 @@ import { discardBotLogs, flushBotLogs, markResultValidatedByStaff, queueBotLog }
 import { isUnsettled, releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
+import { invalidateProfilelessPlayers } from "@/lib/server/ranking-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchVoiceChannels } from "./match-voice";
@@ -2289,6 +2290,9 @@ async function adminResolveMatchOnce(
     // être lu, l'id du tournoi ne se découvrant qu'en cours de transaction. Un
     // arbitrage reste rare, contrairement au report de score.
     invalidateTournamentLists();
+    // Une correction peut retirer à un compte anonymisé son seul match joué :
+    // sa fiche tombe aussitôt (`/rgpd`), sans attendre l’échéance de la liste.
+    if (dispute?.kind === "corrected") invalidateProfilelessPlayers();
     return dispute;
   } catch (error) {
     await rollbackKeepingError(connection);

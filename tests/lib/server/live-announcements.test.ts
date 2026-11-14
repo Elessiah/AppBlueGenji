@@ -5,8 +5,10 @@ jest.mock("@/lib/server/bot-integration", () => ({
   isBotCircuitOpen: jest.fn(),
   pushLiveEvening: jest.fn(),
 }));
+jest.mock("@/lib/server/outbound-mute", () => ({ outboundMuted: jest.fn(() => false) }));
 
 import { getDatabase } from "@/lib/server/database";
+import { outboundMuted } from "@/lib/server/outbound-mute";
 import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import {
   LIVE_ANNOUNCE_MAX_AGE_MINUTES,
@@ -1670,5 +1672,31 @@ describe("eveningTextKey (texte retenu en mémoire)", () => {
     expect(eveningTextKey("texte", ["https://b.example"])).not.toBe(base);
     // Le séparateur entre texte et liens ne laisse pas deux découpages se confondre.
     expect(eveningTextKey("texte", [])).not.toBe(eveningTextKey("texte\n", []));
+  });
+});
+
+// EF-62 (revue standard, cycle 3) : rejeu d'une restauration, envois coupés —
+// aucune soirée n'est relue ni modifiée.
+describe("mise à jour de la soirée — envois coupés", () => {
+  it("refreshLiveEvenings_outboundMuted_returnsZeroWithoutReading", async () => {
+    jest.mocked(outboundMuted).mockReturnValueOnce(true);
+
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+
+    expect(getDatabase).not.toHaveBeenCalled();
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+  });
+
+  it("requestLiveEveningRefresh_outboundMuted_armsNoTimer", () => {
+    jest.useFakeTimers();
+    try {
+      jest.mocked(outboundMuted).mockReturnValueOnce(true);
+
+      requestLiveEveningRefresh();
+
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

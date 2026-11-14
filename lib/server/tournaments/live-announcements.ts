@@ -73,6 +73,7 @@ import { parisInstant } from "@/lib/shared/match-start-entry";
 import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import type { MatchStatus } from "@/lib/shared/types";
+import { outboundMuted } from "@/lib/server/outbound-mute";
 
 type LiveCandidateRow = RowDataPacket & {
   id: number;
@@ -1077,7 +1078,8 @@ function retryRefresh(): void {
  * sont désactivées. Ne lit rien : la lecture vient au terme du délai.
  */
 export function requestLiveEveningRefresh(): void {
-  if (!liveAnnouncementsEnabled()) return;
+  // Envois coupés (rejeu d'une restauration) : rien ne s'arme, rien ne part.
+  if (!liveAnnouncementsEnabled() || outboundMuted()) return;
   // Une nouvelle fin de match rend ses essais à la mise à jour.
   refreshRetries = 0;
   scheduleRefresh();
@@ -1098,7 +1100,7 @@ export function requestLiveEveningRefresh(): void {
  * @returns Le nombre de messages modifiés.
  */
 export async function refreshLiveEvenings(now: number = Date.now()): Promise<number> {
-  if (!liveAnnouncementsEnabled()) return 0;
+  if (!liveAnnouncementsEnabled() || outboundMuted()) return 0;
   // Bot en panne : rien ne pourrait partir, rien n'est lu — la mise à jour
   // est relancée, la fin de match n'est pas perdue.
   if (isBotCircuitOpen()) {
