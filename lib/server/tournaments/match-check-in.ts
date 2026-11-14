@@ -47,10 +47,25 @@ function checkInReminderLeadMs(): number {
  * horaires. Paramètres : clé du palier, clé d'observation, tournoi, instant
  * présent, instant + 10 h, ouverture la plus ancienne à taire (arrêt + 10 h).
  */
-const SILENCE_OPENED_REMINDERS_SQL = `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+const OPENED_REMINDER_WINDOW_SQL = `m.tournament_id = ? AND m.start_at > ? AND m.start_at <= ? AND m.start_at >= ?`;
+
+/**
+ * Les manches à taire, lues **sans verrou** : l'`INSERT … SELECT` verrouille
+ * chaque ligne qu'il parcourt (lignes de manche, marques que le balayage pose),
+ * il ne doit donc parcourir que celles-ci, par clé primaire, et non tout le
+ * tournoi sous son verrou. Le filtre sur le tournoi passe par l'index de
+ * `tournament_id` (préfixe de `idx_bg_matches_phase_round`) : un tournoi compte
+ * des dizaines de manches, un index `(tournament_id, start_at)` de plus
+ * alourdirait chaque écriture de match pour rien.
+ */
+const SELECT_OPENED_REMINDERS_SQL = `SELECT m.id FROM bg_matches m
+       JOIN bg_match_reminders seen ON seen.match_id = m.id AND seen.offset_key = ?
+      WHERE ${OPENED_REMINDER_WINDOW_SQL}`;
+
+const SILENCE_OPENED_REMINDERS_SQL = (idCount: number): string => `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
      SELECT m.id, ?, m.start_at FROM bg_matches m
        JOIN bg_match_reminders seen ON seen.match_id = m.id AND seen.offset_key = ?
-      WHERE m.tournament_id = ? AND m.start_at > ? AND m.start_at <= ? AND m.start_at >= ?`;
+      WHERE m.id IN (${Array.from({ length: idCount }, () => "?").join(", ")}) AND ${OPENED_REMINDER_WINDOW_SQL}`;
 
 /**
  * Allume ou éteint le check-in des matchs, à tout moment jusqu'à la clôture
@@ -101,14 +116,22 @@ export async function setMatchCheckIn(
       );
       const pausedAt = readDbInstant(tournament.match_check_in_paused_at);
       const lead = checkInReminderLeadMs();
-      await connection.execute(SILENCE_OPENED_REMINDERS_SQL, [
-        CHECK_IN_REMINDER_KEY,
-        MATCH_SEEN_KEY,
+      const window = [
         tournamentId,
         now,
         new Date(now.getTime() + lead),
         pausedAt ? new Date(pausedAt.getTime() + lead) : now,
-      ]);
+      ];
+      const [opened] = await connection.execute<RowDataPacket[]>(SELECT_OPENED_REMINDERS_SQL, [MATCH_SEEN_KEY, ...window]);
+      if (opened.length > 0) {
+        const ids = opened.map((row) => Number(row.id));
+        await connection.execute(SILENCE_OPENED_REMINDERS_SQL(ids.length), [
+          CHECK_IN_REMINDER_KEY,
+          MATCH_SEEN_KEY,
+          ...ids,
+          ...window,
+        ]);
+      }
       await silencePausedLobbyBriefs(connection, tournamentId, pausedAt, now);
       return true;
     }),

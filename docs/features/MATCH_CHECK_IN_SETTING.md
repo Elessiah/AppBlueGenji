@@ -110,6 +110,26 @@ L'aide des messages privés de match (« Mon profil », `profile.json`) dit que 
 check-in et le rappel 10 h manquent dans un tournoi sans check-in ; les rôles
 d'équipe (`team.json`) disent « si le tournoi en a un ». FR et EN.
 
+## Coût (revue performance)
+
+- **Lecture de l'option à l'envoi** : sans cache entre lots, mais les envois
+  lancés pendant qu'une lecture du même tournoi est en vol la partagent
+  (`readCheckInState`) — une lecture par tournoi et par lot, pas par message.
+- **Remise en marche** : les manches à taire se lisent **sans verrou**
+  d'abord (rappels 10 h, check-in H-15), puis l'écriture ne parcourt que ces
+  manches par clé primaire — elle ne verrouille plus tout le tournoi sous son
+  verrou. Le filtre `tournament_id` passe par le préfixe de
+  `idx_bg_matches_phase_round` : aucun index de plus.
+- **Reprises des messages privés** : quelques-unes à la fois
+  (`SWEEP_CONCURRENCY`) ; les paliers déjà réservés ne se relisent que pour
+  une annonce d'horaire.
+- **Écarts assumés** : un rappel 10 h dû avant l'arrêt reste « tenu » et se
+  replanifie à chaque balayage (calcul pur, aucune E/S, il doit partir à la
+  remise en marche) ; la page d'édition envoie ses trois bascules à chaque
+  enregistrement, l'une après l'autre (même verrou de tournoi ; décision
+  antérieure : écrire ce que le formulaire montre) ; l'arrêt est daté à
+  l'horloge du processus comme les horaires, le salon à celle de la base.
+
 ## Données de test et RGPD
 
 Seed : « Live Horaire (heure à venir) » a l'option éteinte. RGPD : rien de

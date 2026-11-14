@@ -115,18 +115,33 @@ type CheckInStateRow = RowDataPacket & {
 /** Relit l'option d'un tournoi (ligne absente : tournoi supprimé). */
 type CheckInReader = (tournamentId: number) => Promise<CheckInStateRow | undefined>;
 
+/** Lectures en vol, par tournoi : les envois lancés ensemble n'en partagent qu'une. */
+const checkInReadsInFlight = new Map<number, Promise<CheckInStateRow | undefined>>();
+
 /**
- * Relecture de l'option, **sans cache** : une ligne lue par clé primaire par
- * envoi qui en dépend — une bascule validée, dans ce processus ou un autre,
- * vaut pour tout envoi qui la relit ensuite. Exporté pour les tests.
+ * Relecture de l'option, **sans cache** : une ligne lue par clé primaire — une
+ * bascule validée, dans ce processus ou un autre, vaut pour tout envoi qui la
+ * relit ensuite. Les envois d'un même lot (les deux côtés d'une manche, les
+ * manches d'une ronde suisse du même tournoi) lancés pendant qu'une lecture est
+ * en vol la **partagent** : une lecture par tournoi et par lot, pas par envoi.
+ * La lecture partagée est retirée dès qu'elle aboutit, jamais gardée au-delà :
+ * un envoi qui démarre ensuite relit. Exporté pour les tests.
  */
-export const readCheckInState: CheckInReader = async (tournamentId) => {
-  const db = await getDatabase();
-  const [rows] = await db.execute<CheckInStateRow[]>(
-    `SELECT match_check_in, match_check_in_paused_at FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [tournamentId],
-  );
-  return rows[0];
+export const readCheckInState: CheckInReader = (tournamentId) => {
+  const inFlight = checkInReadsInFlight.get(tournamentId);
+  if (inFlight) return inFlight;
+  const read = (async () => {
+    const db = await getDatabase();
+    const [rows] = await db.execute<CheckInStateRow[]>(
+      `SELECT match_check_in, match_check_in_paused_at FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    return rows[0];
+  })().finally(() => {
+    if (checkInReadsInFlight.get(tournamentId) === read) checkInReadsInFlight.delete(tournamentId);
+  });
+  checkInReadsInFlight.set(tournamentId, read);
+  return read;
 };
 
 /**
@@ -736,6 +751,7 @@ async function sendToSide(
             match,
             sentStart: clearedStartAt ? null : new Date(match.start_at),
             checkInReminder: offset?.key === CHECK_IN_REMINDER_KEY,
+            announcement: !offset && !clearedStartAt,
             // Le salon a pu ouvrir pendant l'attente : la reprise le dit. Et
             // l'option, relue, a pu changer : la reprise parle du check-in et
             // promet le rappel 10 h selon ce qu'elle vaut maintenant.
@@ -761,6 +777,8 @@ type DmRetry = {
   sentStart: Date | null;
   /** Le message est le rappel 10 h (il se tait si l'option s'est éteinte). */
   checkInReminder: boolean;
+  /** Le message est une annonce d'horaire : seule elle promet des paliers, donc relit ceux déjà réservés. */
+  announcement: boolean;
   /** Recalcule ce qui dépend de l'instant d'envoi (check-in ouvert), de l'option et des paliers relus. */
   refresh: (state: RetryState) => void;
 };
@@ -788,6 +806,10 @@ type RetryStateRow = RowDataPacket & {
   taken_offsets: string | null;
 };
 
+/** Paliers réservés pour l'horaire actuel : lus pour une annonce seulement, qui seule les promet. */
+const TAKEN_OFFSETS_SQL = `(SELECT GROUP_CONCAT(r.offset_key) FROM bg_match_reminders r
+              WHERE r.match_id = m.id AND r.start_at <=> m.start_at) AS taken_offsets`;
+
 /**
  * La reprise dit-elle encore vrai ? La manche existe, n'est pas jouée, garde
  * ses engagées et l'horaire du message (ou n'en a toujours aucun pour un avis
@@ -803,8 +825,7 @@ async function retryStillCurrent(retry: DmRetry): Promise<RetryState | null> {
   const [rows] = await db.execute<RetryStateRow[]>(
     `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id, m.status,
             t.match_check_in, t.match_check_in_paused_at,
-            (SELECT GROUP_CONCAT(r.offset_key) FROM bg_match_reminders r
-              WHERE r.match_id = m.id AND r.start_at <=> m.start_at) AS taken_offsets
+            ${retry.announcement ? TAKEN_OFFSETS_SQL : "NULL AS taken_offsets"}
        FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1`,
     [Number(retry.match.id)],
   );
@@ -847,8 +868,10 @@ export const MATCH_DM_RETRY_DELAY_MS = 120_000;
 function scheduleDmRetry(retries: readonly DmRetry[]): void {
   if (retries.length === 0) return;
   const timer = setTimeout(() => {
-    for (const retry of retries) {
-      void retryStillCurrent(retry)
+    // Quelques reprises à la fois : après une panne du bot, une ronde entière
+    // se reprend d'un coup, et chacune lit la base puis appelle le bot.
+    void inBatches(retries, SWEEP_CONCURRENCY, (retry) =>
+      retryStillCurrent(retry)
         .then(async (state) => {
           if (!state) return null;
           const recipients = await retryRecipients(retry);
@@ -864,8 +887,8 @@ function scheduleDmRetry(retries: readonly DmRetry[]): void {
             );
           }
         })
-        .catch((error: unknown) => console.error("[match-reminders] reprise des messages privés impossible", failureReason(error)));
-    }
+        .catch((error: unknown) => console.error("[match-reminders] reprise des messages privés impossible", failureReason(error))),
+    );
   }, MATCH_DM_RETRY_DELAY_MS);
   timer.unref?.();
 }

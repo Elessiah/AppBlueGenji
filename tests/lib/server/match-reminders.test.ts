@@ -369,6 +369,8 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(writes).toEqual([]);
   });
 
+  let retryExecute: ReturnType<typeof executeDouble>;
+
   /** Les reprises de messages privés programmées pendant l'appel (minuteur capturé, pas lancé). */
   function captureDmRetries(): (() => void)[] {
     const retries: (() => void)[] = [];
@@ -436,8 +438,15 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       return [recipients.filter((r) => ids.has(r.id)).map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))];
     });
     const { getDatabase } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble(options) }));
+    retryExecute = executeDouble(options);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: retryExecute }));
     return query;
+  }
+
+  /** Relecture de la manche par la reprise : le SQL qu'elle a joué. */
+  function retryStateSql(): string {
+    const call = retryExecute.mock.calls.find(([sql]) => sql.startsWith("SELECT m.start_at AS match_start_at"));
+    return call ? call[0] : "";
   }
 
   /** Les comptes ont-ils été relus (la reprise a atteint sa décision) ? */
@@ -565,6 +574,26 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     expect(sentMessages()[0]).not.toContain("Prochain rappel : 10 heures");
+  });
+
+  it("dispatchDueMatchReminders_announcementRetry_readsTakenOffsets", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), { sent: [] });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    expect(retryStateSql()).toContain("GROUP_CONCAT");
+  });
+
+  it("dispatchDueMatchReminders_reminderRetry_skipsTakenOffsetsSubquery", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    // Seule une annonce promet des paliers : un rappel ne relit pas ceux déjà réservés.
+    expect(retryStateSql()).not.toContain("GROUP_CONCAT");
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
   });
 
   it("dispatchDueMatchReminders_recipientOptedOutBeforeRetry_retryStaysSilent", async () => {
@@ -1996,7 +2025,7 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
     error.mockRestore();
   });
 
-  it("dispatchDueMatchReminders_sameTournamentTwoTenHourReminders_rereadsCheckInPerSend", async () => {
+  it("dispatchDueMatchReminders_sameTournamentTwoTenHourReminders_sharesOneCheckInReadPerBatch", async () => {
     const second = { ...MATCH, id: 32 };
     const sent = [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 32, offset_key: "SEEN" }, { match_id: 32, offset_key: "P1D" }];
     const db = await mockDb({ matches: [MATCH, second], sent });
@@ -2006,9 +2035,9 @@ describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN
 
     expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(4);
 
-    // Sans cache : chaque envoi qui dépend de l'option la relit (bascule d'un autre processus comprise).
+    // Les envois lancés ensemble partagent la lecture en vol : une par tournoi et par lot, pas par envoi.
     const rereads = (execute.mock.calls as unknown as [string][]).filter(([sql]) => sql.startsWith("SELECT match_check_in"));
-    expect(rereads).toHaveLength(2);
+    expect(rereads).toHaveLength(1);
   });
 
   it("dispatchDueMatchReminders_checkInOffDiscoveredLate_announcesWithoutCheckIn", async () => {
@@ -2111,6 +2140,32 @@ describe("readCheckInState (relecture de l'option avant l'envoi)", () => {
 
     await readCheckInState(7);
     await expect(readCheckInState(7)).resolves.toEqual({ match_check_in: 1, match_check_in_paused_at: null });
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_concurrentReadsOfOneTournament_shareOneQuery", async () => {
+    const execute = executeDouble({ checkIn: { flag: 0 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    const [first, second, other] = await Promise.all([readCheckInState(7), readCheckInState(7), readCheckInState(8)]);
+
+    expect(first).toBe(second);
+    expect(other).toEqual({ match_check_in: 0, match_check_in_paused_at: null });
+    // Un tournoi n'emprunte pas la lecture d'un autre.
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_failedRead_isNotKeptForTheNextRead", async () => {
+    const execute = jest.fn(async () => {
+      throw new Error("base injoignable");
+    });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    await expect(readCheckInState(7)).rejects.toThrow("base injoignable");
+    await expect(readCheckInState(7)).rejects.toThrow("base injoignable");
 
     expect(execute).toHaveBeenCalledTimes(2);
   });

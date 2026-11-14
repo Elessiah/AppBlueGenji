@@ -19,6 +19,7 @@ function connectionWith(tournament: Row | undefined) {
   const connection = connectionMock();
   connection.execute.mockImplementation(async (sql) => {
     if (sql.startsWith("SELECT state, match_check_in")) return [tournament ? [tournament] : [], []];
+    if (sql.startsWith("SELECT m.id")) return [[{ id: 31 }, { id: 32 }], []];
     return [{ affectedRows: 1 }, []];
   });
   jest.mocked(inTransaction).mockImplementation(async (run) => run(fakeConnection(connection)));
@@ -114,7 +115,11 @@ describe("setMatchCheckIn", () => {
     // Ni statut ni engagées : une manche rendue jouable ensuite reste tue.
     expect(sql).not.toContain("m.status");
     expect(sql).not.toContain("team1_id");
-    expect(params).toEqual(["PT10H", "SEEN", 7, now, new Date("2026-11-14T07:00:00Z"), new Date("2026-11-14T05:00:00Z")]);
+    // Les manches sont lues sans verrou, l'écriture ne parcourt que celles-là (clé primaire).
+    expect(sql).toContain("m.id IN (?, ?)");
+    expect(params).toEqual(["PT10H", "SEEN", 31, 32, 7, now, new Date("2026-11-14T07:00:00Z"), new Date("2026-11-14T05:00:00Z")]);
+    const select = connection.execute.mock.calls.find(([text]) => text.startsWith("SELECT m.id")) as [string, unknown[]];
+    expect(select[1]).toEqual(["SEEN", 7, now, new Date("2026-11-14T07:00:00Z"), new Date("2026-11-14T05:00:00Z")]);
   });
 
   it("setMatchCheckIn_turnOnNeverPaused_silencesEveryOpenedWindow", async () => {
@@ -122,7 +127,7 @@ describe("setMatchCheckIn", () => {
     await setMatchCheckIn(7, true, now);
     const insert = connection.execute.mock.calls.find(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_reminders"));
     // Créé sans check-in : tout l'avant compte pour l'arrêt, la borne basse est maintenant.
-    expect((insert as [string, unknown[]])[1][5]).toEqual(now);
+    expect((insert as [string, unknown[]])[1][7]).toEqual(now);
   });
 
   it("setMatchCheckIn_deadlockOnce_replaysAndSucceeds", async () => {
@@ -145,5 +150,23 @@ describe("setMatchCheckIn", () => {
     await expect(setMatchCheckIn(7, true, now)).resolves.toEqual({ tournamentId: 7, enabled: true, changed: false });
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE") || sql.startsWith("INSERT"))).toBe(false);
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("setMatchCheckIn (coût sous verrou)", () => {
+  it("setMatchCheckIn_noOpenedWindow_skipsTheReminderWrite", async () => {
+    const connection = connectionMock();
+    connection.execute.mockImplementation(async (sql) => {
+      if (sql.startsWith("SELECT state, match_check_in")) {
+        return [[{ state: "RUNNING", match_check_in: 0, match_check_in_paused_at: null }], []];
+      }
+      if (sql.startsWith("SELECT m.id")) return [[], []];
+      return [{ affectedRows: 1 }, []];
+    });
+    jest.mocked(inTransaction).mockImplementation(async (run) => run(fakeConnection(connection)));
+
+    await setMatchCheckIn(7, true, now);
+
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_reminders"))).toBe(false);
   });
 });

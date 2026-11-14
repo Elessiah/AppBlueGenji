@@ -1292,16 +1292,29 @@ describe("dispatchLobbyBriefs", () => {
 describe("silencePausedLobbyBriefs (remise en marche du check-in)", () => {
   const now = new Date("2026-11-13T21:00:00Z");
   const flat = (sql: string) => sql.replace(/\s+/g, " ");
+  /** Lecture des matchs dus (sans verrou) puis écriture des réservations muettes. */
+  function dueConnection(ids: number[]) {
+    const connection = connectionMock();
+    connection.execute.mockImplementation(async (sql: string) =>
+      sql.startsWith("SELECT m.id") ? [ids.map((id) => ({ id })), []] : [{ affectedRows: ids.length }, []],
+    );
+    return connection;
+  }
+  const insertCall = (connection: ReturnType<typeof connectionMock>) =>
+    connection.execute.mock.calls.find(([sql]) => String(sql).startsWith("INSERT IGNORE")) as unknown as [string, unknown[]];
 
   it("silencePausedLobbyBriefs_noPause_mutesBothSidesInOneStatement", async () => {
-    const connection = connectionMock();
-    connection.execute.mockResolvedValue([{ affectedRows: 0 }, []]);
+    const connection = dueConnection([11, 12]);
 
     await silencePausedLobbyBriefs(fakeConnection(connection), 7, null, now);
 
     const calls = connection.execute.mock.calls as unknown as [string, unknown[]][];
-    expect(calls).toHaveLength(1);
-    const [sql, params] = calls[0];
+    // Lecture sans verrou, puis une seule instruction d'écriture pour les deux côtés.
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].startsWith("SELECT m.id FROM bg_matches m")).toBe(true);
+    expect(calls[0][1]).toEqual([7]);
+    const [sql, params] = insertCall(connection);
+    expect(flat(sql)).toContain("WHERE m.id IN (?, ?) AND m.tournament_id = ?");
     expect(sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")).toBe(true);
     expect(flat(sql)).toContain("JOIN (SELECT 1 AS n UNION ALL SELECT 2) side");
     expect(flat(sql)).toContain(
@@ -1311,47 +1324,55 @@ describe("silencePausedLobbyBriefs (remise en marche du check-in)", () => {
     expect(flat(sql)).toContain("m.status = 'READY'");
     expect(sql).not.toContain("t.match_check_in = 1");
     expect(sql).not.toContain("NOW() - INTERVAL ? SECOND");
-    expect(params).toEqual([LOBBY_BRIEF_MUTED_PHASE, 7]);
+    expect(params).toEqual([LOBBY_BRIEF_MUTED_PHASE, 11, 12, 7]);
   });
 
   it("silencePausedLobbyBriefs_withPause_excludesBranchesEnteredBeforePause", async () => {
-    const connection = connectionMock();
-    connection.execute.mockResolvedValue([{ affectedRows: 1 }, []]);
+    const connection = dueConnection([11]);
     const pausedAt = new Date("2026-11-13T20:40:00Z");
 
     await silencePausedLobbyBriefs(fakeConnection(connection), 7, pausedAt, now);
 
-    const [sql, params] = connection.execute.mock.calls[0] as unknown as [string, unknown[]];
+    const [sql, params] = insertCall(connection);
+    // La lecture sans verrou porte les mêmes bornes que l'écriture.
+    expect((connection.execute.mock.calls[0] as unknown as [string, unknown[]])[1]).toEqual([7, pausedAt, 1200]);
     // Horaire : H-15 avant l'arrêt (heure du processus) et encore dans sa fenêtre ;
     // salon : entré avant l'arrêt ramené sur l'horloge de la base.
     expect(flat(sql)).toContain("AND m.start_at - INTERVAL 15 MINUTE < ?)");
     expect(flat(sql)).toContain("END < NOW() - INTERVAL ? SECOND))");
     expect(flat(sql)).toContain("AND NOT (((m.start_at IS NOT NULL");
-    expect(params).toEqual([LOBBY_BRIEF_MUTED_PHASE, 7, pausedAt, 1200]);
+    expect(params).toEqual([LOBBY_BRIEF_MUTED_PHASE, 11, 7, pausedAt, 1200]);
   });
 
   it("silencePausedLobbyBriefs_pauseAfterNow_elapsedClampedToZero", async () => {
-    const connection = connectionMock();
-    connection.execute.mockResolvedValue([{ affectedRows: 0 }, []]);
+    const connection = dueConnection([11]);
     const pausedAt = new Date("2026-11-13T21:00:05Z");
 
     await silencePausedLobbyBriefs(fakeConnection(connection), 7, pausedAt, now);
 
-    expect((connection.execute.mock.calls[0] as unknown as [string, unknown[]])[1][3]).toBe(0);
+    expect(insertCall(connection)[1][4]).toBe(0);
   });
 
   it("silencePausedLobbyBriefs_lobbyEntry_launchOpeningOrLaterOfOpeningAndStart", async () => {
-    const connection = connectionMock();
-    connection.execute.mockResolvedValue([{ affectedRows: 0 }, []]);
+    const connection = dueConnection([11]);
 
     await silencePausedLobbyBriefs(fakeConnection(connection), 7, new Date("2026-11-13T20:00:00Z"), now);
 
-    const sql = flat((connection.execute.mock.calls[0] as unknown as [string])[0]);
+    const sql = flat(insertCall(connection)[0]);
     // Lancé : au lancement ; sans horaire : à l'ouverture ; sinon le plus tard des
     // deux — un salon ouvert en retard pendant l'arrêt compte à son ouverture.
     expect(sql).toContain("WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)");
     expect(sql).toContain("WHEN m.start_at IS NULL THEN m.lobby_opened_at");
     expect(sql).toContain("ELSE GREATEST(m.lobby_opened_at, m.start_at) END");
     expect(sql).toContain("m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)");
+  });
+
+  it("silencePausedLobbyBriefs_noDueMatch_writesNothingAndTakesNoRowLock", async () => {
+    const connection = dueConnection([]);
+
+    await silencePausedLobbyBriefs(fakeConnection(connection), 7, null, now);
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(String(connection.execute.mock.calls[0][0])).toMatch(/^SELECT m\.id/);
   });
 });

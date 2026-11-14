@@ -472,14 +472,27 @@ export async function silencePausedLobbyBriefs(
                 OR ((${LOBBY_BRANCH_SQL}) AND ${LOBBY_ENTRY_SQL} < NOW() - INTERVAL ? SECOND))`;
   const params =
     pausedAt === null ? [] : [pausedAt, Math.max(0, Math.floor((now.getTime() - pausedAt.getTime()) / 1000))];
+  // Lecture sans verrou d'abord : l'`INSERT … SELECT` pose des verrous sur
+  // chaque ligne qu'il parcourt, et sur toute la liste des matchs du tournoi
+  // il ferait attendre les scores et les lancements sous le verrou du tournoi.
+  // Il ne parcourt plus que les matchs retenus (clé primaire) ; ses conditions
+  // restent les mêmes, relues sous le verrou.
+  const windowSql = `m.tournament_id = ? AND ${BRIEF_WINDOW_SQL} ${dueBeforePause}`;
+  const [due] = await connection.execute<RowDataPacket[]>(
+    `SELECT m.id FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
+      WHERE ${windowSql}`,
+    [tournamentId, ...params],
+  );
+  if (due.length === 0) return;
+  const ids = due.map((row) => Number(row.id));
   await connection.execute(
     `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
      SELECT m.id, ${mutedBriefKeySql("IF(side.n = 1, m.team1_id, m.team2_id)")}, ? FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
        JOIN (SELECT 1 AS n UNION ALL SELECT 2) side
-      WHERE m.tournament_id = ? AND ${BRIEF_WINDOW_SQL}
-        ${dueBeforePause}`,
-    [LOBBY_BRIEF_MUTED_PHASE, tournamentId, ...params],
+      WHERE m.id IN (${ids.map(() => "?").join(", ")}) AND ${windowSql}`,
+    [LOBBY_BRIEF_MUTED_PHASE, ...ids, tournamentId, ...params],
   );
 }
 
