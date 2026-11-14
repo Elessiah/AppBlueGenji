@@ -1991,7 +1991,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // dure** — pas seulement « au chargement suivant », et sans liste fermée de
     // refus ; seule la certification refusée parce que le tag ne peut plus être
     // certifié la lève, par le « Plus tard » que la fenêtre envoie d'elle-même
-    // (`closeForSession`, `DiscordCertifyPrompt`) — s'il parvient au site, et la
+    // (`closeForSession`, `DiscordCertifyPrompt`) — s'il parvient au site et n'y est pas refusé (autre compte, panne : 409/503/500), et la
     // marque n'est posée qu'à une connexion par Discord ou Blizzard
     // (`createSession`). /rgpd (rgpd-policy) le dit depuis ce lot. Rien ne change dans le
     // code. Pour tous les comptes ; datée du lendemain de la nuit de déploiement
@@ -2003,7 +2003,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Précision sur l'information du 29 octobre 2026 : quand le site ne reçoit pas ta réponse à la fenêtre de certification du tag Discord, ou la refuse pour une autre raison qu'un tag qui ne peut plus être certifié, la marque de ta session reste, et la fenêtre peut revenir tant que cette session dure — pas seulement au chargement suivant.",
     details: [
-      "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse (une panne du site comprise), laisse la marque sur ta session — sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève dès qu'il parvient au site. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis, elle ne revient sur ton compte qu'à une nouvelle connexion par Discord ou Blizzard.",
+      "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse (une panne du site comprise), laisse la marque sur ta session — sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis, elle ne revient sur ton compte qu'à une nouvelle connexion par Discord ou Blizzard.",
       "Rien d'autre ne change : la marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données ; « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },

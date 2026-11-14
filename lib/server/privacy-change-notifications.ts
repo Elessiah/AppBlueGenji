@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { isBotCircuitOpen } from "@/lib/server/bot-integration";
 import { outboundMuted } from "@/lib/server/outbound-mute";
 import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
@@ -201,6 +202,28 @@ async function runSweep(now: Date): Promise<number> {
   // d'`INSERT`/`DELETE` pendant toute la panne.
   if (isBotCircuitOpen()) return 0;
 
+  // Un seul balayage à la fois, **entre processus** (pm2 en lance plusieurs) :
+  // deux balayages simultanés se partageaient les réservations d'un même compte,
+  // chacun rendait sa part et aucun n'écrivait — à chaque minute de départ
+  // commun, sans fin. Celui qui n'obtient pas le verrou passe son tour.
+  try {
+    return await withNamedLock(await getDatabase(), PRIVACY_SWEEP_LOCK_NAME, 0, () =>
+      sweepUnderLock(now, changes, settled),
+    );
+  } catch (error) {
+    if (error instanceof NamedLockUnavailableError) return 0;
+    throw error;
+  }
+}
+
+/** Verrou nommé du balayage des annonces de confidentialité. */
+export const PRIVACY_SWEEP_LOCK_NAME = "bg_privacy_change_sweep";
+
+async function sweepUnderLock(
+  now: Date,
+  changes: readonly PrivacyChange[],
+  settled: readonly PrivacyChange[],
+): Promise<number> {
   const candidates = await loadCandidates(
     settled,
     changes.some((change) => change.audience === "LIVE_STAFF"),
@@ -243,10 +266,12 @@ async function runSweep(now: Date): Promise<number> {
     }
     const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
-    // Une partie du lot réservée entre-temps par un balayage concurrent : ce
-    // compte est rendu, sans message. Ce balayage-là peut nommer ces
-    // changements… ou les rendre (bot injoignable) : ni l'en-tête ni « … et N
-    // autre(s) » ne pourraient dire juste. Le balayage suivant relit l'état.
+    // Une partie du lot déjà réservée depuis la relecture (`loadDone`) — plus
+    // possible entre balayages, sérialisés par le verrou nommé ; garde-fou
+    // seulement : ce compte est rendu, sans message, plutôt qu'un en-tête ou un
+    // « … et N autre(s) » faux. Le balayage suivant relit l'état. Une réservation
+    // laissée par un processus tué entre `reserve` et l'envoi compte, elle, pour
+    // annoncée : l'envoi est « au plus une fois », jamais doublé.
     if (reserved.length < batch.length) {
       await release(
         [userId],

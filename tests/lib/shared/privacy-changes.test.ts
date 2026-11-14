@@ -1797,26 +1797,30 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
       fr: [
         "tant que cette session dure",
         "ou qu'il refuse (une panne du site comprise)",
-        "sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève dès qu'il parvient au site",
+        "sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé",
         "qu'à une nouvelle connexion par Discord ou Blizzard",
         "information du 29 octobre",
       ],
       en: [
         "as long as that session lasts",
         "or that it refuses (a site failure included)",
-        "except, as it said, a verification refused because your Discord tag can no longer be verified from that window: the window then answers “Later” by itself, which clears it once it reaches the site",
+        "except, as it said, a verification refused because your Discord tag can no longer be verified from that window: the window then answers “Later” by itself, which clears it in turn if it reaches the site and is not refused there",
         "only comes back on your account at a new login with Discord or Blizzard",
         "information of October 29",
       ],
     });
     // Le refus « tag qui ne peut plus être certifié » lève la marque par le « Plus tard »
-    // que la fenêtre envoie d'elle-même (`closeForSession`), s'il parvient au site :
+    // que la fenêtre envoie d'elle-même (`closeForSession`), s'il parvient au site sans y être refusé :
     // aucune promesse d'un refus « quel qu'il soit », et la marque ne revient qu'à une
     // connexion par Discord ou Blizzard (`createSession`).
     const fr = [entry.summary, ...entry.details].join(" ");
     const en = [english.summary, ...english.details].join(" ");
     expect(fr).not.toContain("pour quelque raison que ce soit");
     expect(en).not.toContain("for whatever reason");
+    // Le « Plus tard » automatique peut lui-même être refusé (autre compte, panne) :
+    // aucune promesse qu'il lève la marque dès qu'il arrive.
+    expect(fr).not.toContain("dès qu'il parvient au site");
+    expect(en).not.toContain("once it reaches the site");
     expect(entry.summary).toContain("pour une autre raison qu'un tag qui ne peut plus être certifié");
     expect(english.summary).toContain("for a reason other than a tag that can no longer be verified");
     expect(entry.summary).toContain("pas seulement au chargement suivant");

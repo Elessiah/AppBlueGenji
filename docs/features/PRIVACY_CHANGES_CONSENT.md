@@ -229,14 +229,17 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   inverse — un drapeau par entrée qui court-circuite délai et intervalle —
   rouvrirait le spam au premier changement qu'on jugerait important.
 
-  Le balayage suppose **un seul processus** (pm2 en mode `fork`, voir
-  `docs/DEPLOYMENT.md`) : l'intervalle est lu avant la réservation, et deux
-  processus concurrents pourraient tous deux l'enjamber.
+  Le balayage passe derrière un **verrou nommé** (`PRIVACY_SWEEP_LOCK_NAME`,
+  `GET_LOCK` sans attente) : un seul processus à la fois balaie, l'autre passe
+  son tour. Sans lui, deux balayages simultanés enjambaient l'intervalle, ou se
+  partageaient les réservations d'un compte et rendaient chacun leur part sans
+  écrire. Envoi « au plus une fois » : une réservation laissée par un processus
+  tué avant l'envoi compte pour annoncée (la modale, elle, l'a présentée).
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni lus sur le site ni déjà reçus, et renvoie au site
   pour le détail — en disant qu'aucun accord n'est demandé, sauf quand le message porte des conditions d'utilisation à accepter (`asksTermsAcceptance` sur l'entrée, posé pour toute version des conditions depuis la version 7) : `privacyChangesForOneMessage` les **choisit d'abord** — elles partent toujours dans le premier message, à leur place dans l'ordre du registre, et ce qu'elles évincent est le plus **récent** des autres changements, qui a le plus de fenêtre devant lui (revue EF-19 #501) — et le pied dit alors que seules ces conditions demandent l'accord, si elles ne sont pas encore acceptées, « pour le reste » aucun accord (dans un aperçu, `buildPrivacyChangesMessage` le dit aussi quand elles ne sont que comptées). Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
   ne **réserve** que les changements qu'un message peut nommer tous
-  (`privacyChangesForOneMessage`) : leurs résumés quand ils tiennent tous, sinon **leurs titres seuls** — seulement s'ils en nomment davantage, leur phrase d'introduction pouvant coûter plus que des résumés courts —, un par ligne, sous une phrase qui renvoie au site pour les résumés (#587 : un compte en retard d'une trentaine d'entrées n'en apprenait que deux par mois ; une douzaine de titres tiennent). Le reste est **compté** dans ce message (« … et N autre(s) », l'en-tête comptant le tout, paramètre `later` = dus moins **réservés** — un changement du lot réservé entre-temps par un balayage concurrent reste compté ; le push du même envoi compte de même, `privacyChangePush(titles, locale, later)`) mais ni réservé ni tenu pour annoncé : il part au message suivant — un mois plus tard au plus tôt, l'intervalle minimal valant pour lui aussi (revers : un premier message parti tard dans la fenêtre de 60 jours peut en laisser sortir ce reste avant le suivant ; la modale, elle, l'a présenté, et le message l'a compté). Le
+  (`privacyChangesForOneMessage`) : leurs résumés quand ils tiennent tous, sinon **leurs titres seuls** — seulement s'ils en nomment davantage, leur phrase d'introduction pouvant coûter plus que des résumés courts —, un par ligne, sous une phrase qui renvoie au site pour les résumés (#587 : un compte en retard d'une trentaine d'entrées n'en apprenait que deux par mois ; une douzaine de titres tiennent). Le reste est **compté** dans ce message (« … et N autre(s) », l'en-tête comptant le tout, paramètre `later` = dus moins le **lot nommé** — un lot dont une partie est déjà réservée ne part pas, ses réservations sont rendues ; le push du même envoi compte de même, `privacyChangePush(titles, locale, later)`) mais ni réservé ni tenu pour annoncé : il part au message suivant — un mois plus tard au plus tôt, l'intervalle minimal valant pour lui aussi (revers : un premier message parti tard dans la fenêtre de 60 jours peut en laisser sortir ce reste avant le suivant ; la modale, elle, l'a présenté, et le message l'a compté). Le
   repli qui *compte* les derniers (« … et 1 autre ») ne suffit pas à l'envoi :
   réservés avant l'envoi, ils étaient tenus pour annoncés sans que leur titre
   ait été écrit — et c'était toujours le plus récent qui tombait. Le registre

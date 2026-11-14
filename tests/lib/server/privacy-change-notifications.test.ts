@@ -11,6 +11,7 @@ import { outboundMuted } from "@/lib/server/outbound-mute";
 import { isBotCircuitOpen, pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import {
   dispatchPrivacyChangeNotifications,
+  PRIVACY_SWEEP_LOCK_NAME,
   resetPrivacyNotificationThrottle,
 } from "@/lib/server/privacy-change-notifications";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
@@ -24,7 +25,7 @@ import {
   privacyChangesForOneMessage,
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { fakePool } from "../../helpers/sql-double";
+import { fakeConnection, fakePool } from "../../helpers/sql-double";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
 
@@ -65,11 +66,21 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
   };
 }
 
-function fakeDb(options: { candidates?: Candidate[]; done?: { user_id: number; change_id: string }[]; taken?: string[] } = {}) {
+function fakeDb(
+  options: {
+    candidates?: Candidate[];
+    done?: { user_id: number; change_id: string }[];
+    taken?: string[];
+    /** Verrou du balayage tenu par un autre processus (`GET_LOCK` rend 0). */
+    lockHeldElsewhere?: boolean;
+  } = {},
+) {
   const calls: { sql: string; params: unknown[] }[] = [];
   const handler = async (sql: string, params: unknown[] = []) => {
     const q = flat(sql);
     calls.push({ sql: q, params });
+    if (q.startsWith("SELECT GET_LOCK")) return [[{ acquired: options.lockHeldElsewhere ? 0 : 1 }]];
+    if (q.startsWith("SELECT RELEASE_LOCK")) return [[{ released: 1 }]];
     if (q.startsWith("SELECT u.id, u.pseudo")) return [options.candidates ?? []];
     if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
     if (q.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications")) {
@@ -80,7 +91,8 @@ function fakeDb(options: { candidates?: Candidate[]; done?: { user_id: number; c
   };
   const execute = jest.fn(handler);
   const query = jest.fn(handler);
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
+  const getConnection = jest.fn(async () => fakeConnection({ execute, query, release: jest.fn(), destroy: jest.fn() }));
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query, getConnection }));
   return calls;
 }
 
@@ -310,8 +322,9 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  // Un balayage concurrent a pris une partie du lot : il peut la nommer ou la
-  // rendre (bot injoignable) — aucun décompte juste n'est possible ici.
+  // Garde-fou : une partie du lot déjà réservée (verrou nommé contourné,
+  // réservation laissée par un processus tué) — aucun décompte juste n'est
+  // possible ici.
   it("dispatchPrivacyChangeNotifications_partOfBatchTakenElsewhere_releasesOwnReservationsWithoutMessage", async () => {
     const [first, ...rest] = privacyChangesForOneMessage(DUE, siteBaseUrl());
     const calls = fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
@@ -335,6 +348,44 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][1]).toHaveLength(1);
+  });
+
+  it("dispatchPrivacyChangeNotifications_sweepRunsUnderNamedLock_takenWithoutWaitAndReleased", async () => {
+    const calls = fakeDb({ candidates: [candidate()] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const lock = calls.findIndex((c) => c.sql.startsWith("SELECT GET_LOCK"));
+    const reserve = calls.findIndex((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
+    const unlock = calls.findIndex((c) => c.sql.startsWith("SELECT RELEASE_LOCK"));
+    expect(calls[lock].params).toEqual([PRIVACY_SWEEP_LOCK_NAME, 0]);
+    expect(lock).toBeLessThan(reserve);
+    expect(unlock).toBeGreaterThan(reserve);
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  // Deux processus au même instant : l'un balaie, l'autre passe son tour au lieu
+  // de se partager les réservations d'un compte (chacun rendant sa part, aucun
+  // n'écrivant).
+  it("dispatchPrivacyChangeNotifications_lockHeldByAnotherProcess_skipsWithoutReservingOrSending", async () => {
+    const calls = fakeDb({ candidates: [candidate()], lockHeldElsewhere: true });
+
+    expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
+
+    expect(calls.some((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))).toBe(false);
+    expect(calls.some((c) => c.sql.startsWith("INSERT IGNORE"))).toBe(false);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchPrivacyChangeNotifications_lockSkipped_nextSweepAfterThrottleSends", async () => {
+    fakeDb({ candidates: [candidate()], lockHeldElsewhere: true });
+    await dispatchPrivacyChangeNotifications(NOW);
+    resetPrivacyNotificationThrottle();
+    fakeDb({ candidates: [candidate()] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
   });
 
   it("regroupe les comptes qui ont les mêmes changements à recevoir", async () => {
@@ -428,9 +479,13 @@ describe("dispatchPrivacyChangeNotifications — notifications push", () => {
         return [[candidate()]];
       }
       if (q.startsWith("SELECT user_id, change_id")) return [[]];
+      if (q.startsWith("SELECT GET_LOCK")) return [[{ acquired: 1 }]];
       return [{ affectedRows: 1 }];
     };
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn(handler), query: jest.fn(handler) }));
+    const execute = jest.fn(handler);
+    const query = jest.fn(handler);
+    const getConnection = jest.fn(async () => fakeConnection({ execute, query, release: jest.fn() }));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query, getConnection }));
 
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBeGreaterThan(0);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);

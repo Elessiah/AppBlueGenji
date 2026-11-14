@@ -10,6 +10,7 @@ import {
 } from "@/lib/shared/certification-prompt";
 import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
 import { anotherModalOpen, watchModalsClosed, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
+import { profileCertificationDialogOpenedSince } from "@/lib/shared/profile-certification-dialog";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
 function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
@@ -53,43 +54,37 @@ export async function saveNeverAgain(shownTo: number | null, onOtherAccount: () 
 export const REFUSAL_NOTICE_MAX_WAIT_MS = 120_000;
 
 /**
- * Sauf dans le dialogue de certification de `/profil`, ouvert par
- * « Certifier » (code reçu par message privé, saisi) : le guet y attend jusqu'à
- * dix minutes, et le refus se dit à sa fermeture, encore dans son contexte.
+ * Sauf quand le dialogue de certification de `/profil`, ouvert par
+ * « Certifier » (code reçu par message privé, saisi), l'a été depuis le refus :
+ * le guet y attend jusqu'à dix minutes, et le refus se dit à sa fermeture,
+ * encore dans son contexte.
  */
 export const PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS = 600_000;
-
-/** Le dialogue de certification de `/profil` (`DiscordVerificationDialog`). */
-const PROFILE_CERTIFICATION_DIALOG_SELECTOR = '[aria-modal="true"][aria-labelledby="discord-verify-title"]';
-
-/** Le dialogue de certification de `/profil` est-il ouvert ? */
-export function profileCertificationDialogOpen(): boolean {
-  return typeof document !== "undefined" && document.querySelector(PROFILE_CERTIFICATION_DIALOG_SELECTOR) !== null;
-}
 
 /** Le guet du refus en cours, un seul à la fois pour tout le document. */
 let pendingRefusalNotice: (() => void) | null = null;
 
 /**
  * Appelle `notice` une fois plus aucune modale ouverte (`watchModalsClosed`),
- * au plus `maxWaitMs` après le refus (`REFUSAL_NOTICE_MAX_WAIT_MS`) — ou
- * `extendedMaxWaitMs` si, à cette échéance, `extendWhile` est vrai (le
- * dialogue de certification de `/profil` ouvert) : passé ce délai, le guet
- * s'arrête sans rien dire. Un nouveau refus remplace le guet précédent.
- * Renvoie l'arrêt.
+ * si c'est au plus `maxWaitMs` après le refus (`REFUSAL_NOTICE_MAX_WAIT_MS`) —
+ * ou au plus `extendedMaxWaitMs` si `extendWhile(refus)` est vrai à ce moment
+ * (le dialogue de certification de `/profil` ouvert depuis le refus, même
+ * juste après les deux minutes : `profileCertificationDialogOpenedSince`).
+ * Sinon le guet s'arrête sans rien dire, au plus tard à `extendedMaxWaitMs`.
+ * Un nouveau refus remplace le guet précédent. Renvoie l'arrêt.
  */
 export function noticeOnceModalsClosed(
   notice: () => void,
   maxWaitMs = REFUSAL_NOTICE_MAX_WAIT_MS,
   {
-    extendWhile = profileCertificationDialogOpen,
+    extendWhile = profileCertificationDialogOpenedSince,
     extendedMaxWaitMs = PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS,
-  }: { extendWhile?: () => boolean; extendedMaxWaitMs?: number } = {},
+  }: { extendWhile?: (since: number) => boolean; extendedMaxWaitMs?: number } = {},
 ): () => void {
   pendingRefusalNotice?.();
+  const refusedAt = Date.now();
   let stopWatch: (() => void) | null = null;
   let done = false;
-  let timer: ReturnType<typeof setTimeout>;
   const stop = () => {
     if (done) return;
     done = true;
@@ -97,16 +92,15 @@ export function noticeOnceModalsClosed(
     stopWatch?.();
     if (pendingRefusalNotice === stop) pendingRefusalNotice = null;
   };
-  timer = setTimeout(() => {
-    // Seul le dialogue de certification de `/profil` prolonge l'attente.
-    if (extendedMaxWaitMs > maxWaitMs && extendWhile()) timer = setTimeout(stop, extendedMaxWaitMs - maxWaitMs);
-    else stop();
-  }, maxWaitMs);
+  // Borne dure : au-delà, plus aucun refus ne se dit.
+  const timer = setTimeout(stop, Math.max(maxWaitMs, extendedMaxWaitMs));
   pendingRefusalNotice = stop;
   stopWatch = watchModalsClosed(() => {
     if (done) return;
     stop();
-    notice();
+    // Passé les deux minutes, seul le dialogue de certification de `/profil`
+    // (ouvert depuis le refus) garde au refus son contexte.
+    if (Date.now() - refusedAt < maxWaitMs || extendWhile(refusedAt)) notice();
   });
   // Appelé sur-le-champ (aucune modale ouverte) : le guet est déjà clos.
   if (done) stopWatch();

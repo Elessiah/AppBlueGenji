@@ -96,7 +96,61 @@ export function createPrivacyDetailsReads() {
     isLatest(seq: number): boolean {
       return latest?.seq === seq;
     },
+    /**
+     * Oublie la lecture `seq` si c'est la dernière : la clé qu'elle couvrait
+     * sera relue au prochain `start` (échec tu, modale masquée entre-temps).
+     */
+    forget(seq: number): void {
+      if (latest?.seq === seq) latest = null;
+    },
   };
+}
+
+/** Ce que la modale branche sur une lecture de détail (`runPrivacyDetailsRead`). */
+export type PrivacyDetailsReadHooks = {
+  /** La lecture elle-même (`GET /api/profile/privacy-changes`). */
+  load: (ids: string[]) => Promise<PrivacyChangeDetails>;
+  /** Lecture neuve lancée : un échec précédent ne libère plus le bouton. */
+  onStart: () => void;
+  onLoaded: (ids: string[], details: PrivacyChangeDetails) => void;
+  /** Échec de la dernière lecture, modale encore ouverte : le dire, libérer le bouton. */
+  onFailed: () => void;
+  /** La modale est-elle **encore** ouverte (lu au retour de la lecture) ? */
+  isOpen: () => boolean;
+};
+
+/**
+ * Lance la lecture de détail que réclame `requestKey`, sauf si la dernière la
+ * couvre déjà. Seule la **dernière** lecture parle de son échec (une lecture
+ * dépassée se tait) — et seulement si la modale est encore ouverte : masquée
+ * entre-temps (lien vers `/rgpd`), l'échec ne se dit pas sur une page sans
+ * modale, et la lecture est oubliée pour être relancée à la réouverture.
+ */
+export function runPrivacyDetailsRead(
+  reads: ReturnType<typeof createPrivacyDetailsReads>,
+  requestKey: string,
+  hooks: PrivacyDetailsReadHooks,
+): void {
+  if (requestKey === "") return;
+  const seq = reads.start(requestKey);
+  if (seq === null) return;
+  hooks.onStart();
+  const { ids } = splitRequestKey(requestKey);
+  hooks.load(ids).then(
+    // Chaque identifiant demandé est tenu pour lu, même sans détail rendu :
+    // sinon la lecture se relancerait sans fin.
+    (details) => hooks.onLoaded(ids, details),
+    () => {
+      // Une lecture dépassée (liste ou langue changée depuis, même revenue à
+      // l'identique) se tait : la dernière lecture parle pour la liste présentée.
+      if (!reads.isLatest(seq)) return;
+      if (!hooks.isOpen()) {
+        reads.forget(seq);
+        return;
+      }
+      hooks.onFailed();
+    },
+  );
 }
 
 /**
@@ -176,31 +230,28 @@ export function PrivacyChangesModal({
   });
 
   const requestKey = privacyDetailsRequestKey(changes, loadedDetails, locale);
+  // Lu au retour d'une lecture : la modale a pu être masquée entre-temps.
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
   useEffect(() => {
     if (!open || !detailsDeferred) return;
-    const seq = detailsReads.current.start(requestKey);
-    if (seq === null) return;
-    // Lecture neuve : un échec précédent ne libère plus le bouton.
-    setDetailsFailedFor(null);
-    const ids = requestKey.slice(requestKey.indexOf("|") + 1).split(",");
-    loadPrivacyChangeDetails(ids.join(","), locale).then(
-      (details) => {
-        // Chaque identifiant demandé est tenu pour lu, même sans détail rendu :
-        // sinon la lecture se relancerait sans fin.
+    runPrivacyDetailsRead(detailsReads.current, requestKey, {
+      load: (ids) => loadPrivacyChangeDetails(ids.join(","), locale),
+      onStart: () => setDetailsFailedFor(null),
+      onLoaded: (ids, details) =>
         setLoadedDetails((previous) => {
           const next = { ...previous };
           for (const id of ids) next[detailKey(locale, id)] = details[id] ?? [];
           return next;
-        });
-      },
-      () => {
-        // Une lecture dépassée (liste ou langue changée depuis, même revenue à
-        // l'identique) se tait : la dernière lecture parle pour la liste présentée.
-        if (!detailsReads.current.isLatest(seq)) return;
+        }),
+      onFailed: () => {
         setDetailsFailedFor(requestKey);
         showError(t("privacyModal.detailsFailed"));
       },
-    );
+      isOpen: () => openRef.current,
+    });
   }, [open, detailsDeferred, requestKey, locale, showError, t]);
   const detailsPending = privacyDetailsPending(detailsDeferred, requestKey, detailsFailedFor);
   const detailsOf = (change: PrivacyChange) =>

@@ -72,10 +72,10 @@ describe("/rgpd — choix « Ne plus voir » de la certification Discord", () =>
   // la fenêtre ne revient qu'à la session d'origine).
   it("dit qu'une réponse perdue ou refusée laisse la marque", () => {
     expect(fr).toContain(
-      "Une réponse qui ne parvient pas au site, ou qu'il refuse, ne lève pas la marque (sauf la certification refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre : elle répond alors d'elle-même « Plus tard », qui la lève s'il parvient au site) : la fenêtre peut revenir tant que cette session dure.",
+      "Une réponse qui ne parvient pas au site, ou qu'il refuse, ne lève pas la marque (sauf la certification refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre : elle répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé) : la fenêtre peut revenir tant que cette session dure.",
     );
     expect(en).toContain(
-      "An answer that doesn't reach the site, or that it refuses, doesn't clear the mark (except a verification refused because your Discord tag can no longer be verified from the window: it then answers “Later” by itself, which clears it if it reaches the site): the window may come back as long as that session lasts.",
+      "An answer that doesn't reach the site, or that it refuses, doesn't clear the mark (except a verification refused because your Discord tag can no longer be verified from the window: it then answers “Later” by itself, which clears it in turn if it reaches the site and is not refused there): the window may come back as long as that session lasts.",
     );
   });
 

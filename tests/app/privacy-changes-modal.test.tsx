@@ -12,6 +12,9 @@ import {
   privacyDetailsPending,
   privacyDetailsReadCovers,
   privacyDetailsRequestKey,
+  runPrivacyDetailsRead,
+  type PrivacyChangeDetails,
+  type PrivacyDetailsReadHooks,
 } from "@/components/privacy/PrivacyChangesModal";
 import { ToastProvider } from "@/components/ui/toast";
 import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
@@ -206,6 +209,17 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(reads.start("fr|c")).toBe(2);
   });
 
+  it("createPrivacyDetailsReads_forgetNotLatest_keepsLatestCovering", () => {
+    const reads = createPrivacyDetailsReads();
+    const first = reads.start("fr|a")!;
+    reads.start("en|a");
+    reads.start("fr|a");
+
+    reads.forget(first);
+
+    expect(reads.start("fr|a")).toBeNull();
+  });
+
   it("PrivacyChangesModal_detailsGiven_buttonIsNotHeld", () => {
     const markup = render([PRIVACY_CHANGES[0]]);
 
@@ -222,6 +236,107 @@ describe("PrivacyChangesModal — rendu serveur", () => {
  * Le comportement client ne se monte pas sans navigateur ; ses contrats se
  * lisent sur la source, où une régression se verrait d'abord.
  */
+/** Lecture différée : le test la résout ou la rejette quand il veut. */
+function deferredLoad() {
+  const pending: { resolve: (details: PrivacyChangeDetails) => void; reject: (error: Error) => void }[] = [];
+  const load = jest.fn<PrivacyDetailsReadHooks["load"]>(
+    () => new Promise<PrivacyChangeDetails>((resolve, reject) => pending.push({ resolve, reject })),
+  );
+  return { load, pending };
+}
+
+function readHooks(load: PrivacyDetailsReadHooks["load"], open = { current: true }) {
+  return {
+    load,
+    onStart: jest.fn<PrivacyDetailsReadHooks["onStart"]>(),
+    onLoaded: jest.fn<PrivacyDetailsReadHooks["onLoaded"]>(),
+    onFailed: jest.fn<PrivacyDetailsReadHooks["onFailed"]>(),
+    isOpen: () => open.current,
+  };
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("runPrivacyDetailsRead — câblage des lectures de détail", () => {
+  it("runPrivacyDetailsRead_emptyKey_startsNothing", () => {
+    const { load } = deferredLoad();
+    const hooks = readHooks(load);
+
+    runPrivacyDetailsRead(createPrivacyDetailsReads(), "", hooks);
+
+    expect(load).not.toHaveBeenCalled();
+    expect(hooks.onStart).not.toHaveBeenCalled();
+  });
+
+  it("runPrivacyDetailsRead_newKey_relocksThenLoadsRequestedIds", async () => {
+    const { load, pending } = deferredLoad();
+    const hooks = readHooks(load);
+
+    runPrivacyDetailsRead(createPrivacyDetailsReads(), "fr|a,b", hooks);
+    pending[0].resolve({ a: ["détail a"] });
+    await settle();
+
+    expect(hooks.onStart).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledWith(["a", "b"]);
+    expect(hooks.onLoaded).toHaveBeenCalledWith(["a", "b"], { a: ["détail a"] });
+  });
+
+  it("runPrivacyDetailsRead_keyCoveredByLatest_startsNoDuplicateRead", () => {
+    const { load } = deferredLoad();
+    const reads = createPrivacyDetailsReads();
+    const hooks = readHooks(load);
+
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(hooks.onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("runPrivacyDetailsRead_latestFailsWhileOpen_reportsFailure", async () => {
+    const { load, pending } = deferredLoad();
+    const hooks = readHooks(load);
+
+    runPrivacyDetailsRead(createPrivacyDetailsReads(), "fr|a", hooks);
+    pending[0].reject(new Error("HTTP 500"));
+    await settle();
+
+    expect(hooks.onFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("runPrivacyDetailsRead_supersededReadFails_staysSilent", async () => {
+    const { load, pending } = deferredLoad();
+    const reads = createPrivacyDetailsReads();
+    const hooks = readHooks(load);
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    runPrivacyDetailsRead(reads, "en|a", hooks);
+
+    pending[0].reject(new Error("HTTP 500"));
+    await settle();
+
+    expect(hooks.onFailed).not.toHaveBeenCalled();
+  });
+
+  // Revue std 4 : modale masquée (lien vers /rgpd) pendant la lecture — aucun
+  // toast sur une page sans modale, et la lecture repart à la réouverture.
+  it("runPrivacyDetailsRead_latestFailsAfterModalHidden_silentAndRereadsOnReopen", async () => {
+    const { load, pending } = deferredLoad();
+    const reads = createPrivacyDetailsReads();
+    const open = { current: true };
+    const hooks = readHooks(load, open);
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    open.current = false;
+
+    pending[0].reject(new Error("HTTP 500"));
+    await settle();
+    open.current = true;
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+
+    expect(hooks.onFailed).not.toHaveBeenCalled();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("PrivacyChangesModal — contrats du geste", () => {
   const source = readFileSync(join(__dirname, "..", "..", "components", "privacy", "PrivacyChangesModal.tsx"), "utf8");
 

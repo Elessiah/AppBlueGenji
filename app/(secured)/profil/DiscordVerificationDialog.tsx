@@ -20,6 +20,7 @@ import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordVerificationErrorMessage } from "./discord-errors";
 import { ScrollArea } from "@/components/cyber";
 import { takeSubmit } from "@/lib/shared/take-submit";
+import { markProfileCertificationDialogOpen } from "@/lib/shared/profile-certification-dialog";
 
 /** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
 export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
@@ -205,6 +206,9 @@ export function DiscordVerificationDialog({
   // pas décoratif : une certification en cours d'envoi ne doit pas se faire
   // interrompre par une touche.
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: loading });
+  // Ouvert : un refus de « Ne plus voir » retenu derrière lui (fiche d'un
+  // tournoi) attend sa fermeture jusqu'à dix minutes (`noticeOnceModalsClosed`).
+  useEffect(() => markProfileCertificationDialogOpen(), []);
   // Les boutons suivent la même règle, sans `disabled` : le focus n'en tombe
   // pas hors de la modale pendant l'envoi (`aria-disabled`, clic ignoré).
   const cancel = () => {

@@ -672,7 +672,7 @@ describe("revue UI/UX", () => {
 
     const html = renderToStaticMarkup(<PlayerDetailPage />);
 
-    expect(html).toContain("Masqué pour tous, sauf dans tes matchs Overwatch (contacts, lancement, page du match) : équipes, casters, arbitres, admins, selon ton rôle.");
+    expect(html).toContain("Masqué à tous, sauf dans tes matchs Overwatch (contacts, lancement, page du match) : équipes, casters, arbitres et admins, selon ton rôle.");
     mockLocale = "en";
   });
 
