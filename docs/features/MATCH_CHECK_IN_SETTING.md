@@ -142,10 +142,16 @@ d'équipe (`team.json`) disent « si le tournoi en a un ». FR et EN.
 
 Seed : « Live Horaire (heure à venir) » a l'option éteinte. RGPD : rien de
 nouveau n'est collecté ni lu, l'option ne fait que retirer des envois — pas
-d'entrée `PRIVACY_CHANGES` ; le registre (T04) et `/rgpd` (FR et EN) disent
-que le check-in et le rappel 10 h ne partent pas dans un tournoi sans
-check-in, comme les descriptions des sujets push `MATCH_LOBBY_BRIEF` et
-`MATCH_REMINDER`.
+d'entrée `PRIVACY_CHANGES` ; le registre (T04) et `/rgpd` (FR et EN, messages
+privés et push) disent que le check-in et le rappel 10 h ne partent pas dans
+un tournoi sans check-in (ni le lien d'invitation au serveur du check-in),
+comme les descriptions des sujets push `MATCH_LOBBY_BRIEF` et
+`MATCH_REMINDER`. Les marques techniques nées de l'option (rappel 10 h tu
+dans `bg_match_reminders`, `LOBBY_BRIEF_MUTE` — numéro de l'engagée et
+horaire — dans `bg_match_start_notices`, gardées avec le match) sont décrites
+dans la ligne de conservation des traces d'envoi du registre. Le basculement
+est un geste du staff journalisé sur Discord (`MATCH_CHECK_IN_ON`/`OFF`),
+listé dans la ligne « Autres gestes du staff » du registre.
 
 Tests : `match-check-in.test.ts` (partagé et serveur), `match-check-in-route.test.ts`,
 `match-reminders.test.ts` (bloc « Check-in des matchs » et reprises),
