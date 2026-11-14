@@ -10,6 +10,7 @@ import {
 } from "@/lib/shared/certification-prompt";
 import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
 import { anotherModalOpen, watchModalsClosed, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
+import { onSessionChanged } from "@/lib/shared/session-change-signal";
 import {
   onProfileCertificationDialogOpened,
   profileCertificationDialogOpenedSince,
@@ -67,6 +68,9 @@ export const REFUSAL_NOTICE_MAX_WAIT_MS = 120_000;
  */
 export const PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS = 600_000;
 
+/** Revérification du guet prolongé par le dialogue de `/profil`. */
+export const REFUSAL_NOTICE_RECHECK_MS = 10_000;
+
 /** Le guet du refus en cours, un seul à la fois pour tout le document. */
 let pendingRefusalNotice: (() => void) | null = null;
 
@@ -112,6 +116,7 @@ export function noticeOnceModalsClosed(
   extended();
   let stopWatch: (() => void) | null = null;
   let stopSignal: (() => void) | null = null;
+  let stopSession: (() => void) | null = null;
   let done = false;
   const stop = () => {
     if (done) return;
@@ -120,6 +125,7 @@ export function noticeOnceModalsClosed(
     clearTimeout(hardTimer);
     stopWatch?.();
     stopSignal?.();
+    stopSession?.();
     if (pendingRefusalNotice === stop) pendingRefusalNotice = null;
   };
   const startWatch = () => {
@@ -137,18 +143,31 @@ export function noticeOnceModalsClosed(
   const hardTimer = setTimeout(stop, Math.max(maxWaitMs, extendedMaxWaitMs));
   // Passé le délai ordinaire sans dialogue de profil : plus d'observateur sur
   // le document (il ne servirait à rien tant qu'une modale reste ouverte) ;
-  // l'ouverture du dialogue le rétablit.
-  const softTimer = setTimeout(() => {
-    if (done || extended()) return;
+  // l'ouverture du dialogue le rétablit. Prolongé par le dialogue, le guet se
+  // revérifie (`REFUSAL_NOTICE_RECHECK_MS`) : l'extension expire deux minutes
+  // après sa fermeture, l'observateur ne doit pas courir jusqu'aux dix minutes.
+  const softCheck = () => {
+    if (done) return;
+    if (extended()) {
+      softTimer = setTimeout(softCheck, Math.min(maxWaitMs, REFUSAL_NOTICE_RECHECK_MS));
+      return;
+    }
     stopWatch?.();
     stopWatch = null;
     stopSignal = onProfileCertificationDialogOpened(() => {
       stopSignal?.();
       stopSignal = null;
-      if (!done && !stopWatch) startWatch();
+      if (done || stopWatch) return;
+      startWatch();
+      clearTimeout(softTimer);
+      softTimer = setTimeout(softCheck, Math.min(maxWaitMs, REFUSAL_NOTICE_RECHECK_MS));
     });
-  }, maxWaitMs);
+  };
+  let softTimer = setTimeout(softCheck, maxWaitMs);
   pendingRefusalNotice = stop;
+  // La session change sans recharger le document : le refus ne s'adresse plus
+  // au compte connecté.
+  stopSession = onSessionChanged(stop);
   startWatch();
   return stop;
 }

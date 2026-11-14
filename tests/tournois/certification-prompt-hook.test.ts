@@ -97,10 +97,12 @@ import {
   noticeOnceModalsClosed,
   PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS,
   REFUSAL_NOTICE_MAX_WAIT_MS,
+  REFUSAL_NOTICE_RECHECK_MS,
   saveNeverAgain,
   useCertificationPrompt,
 } from "@/app/(secured)/tournois/[id]/_hooks/useCertificationPrompt";
 import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
+import { signalSessionChanged } from "@/lib/shared/session-change-signal";
 import {
   markProfileCertificationDialogOpen,
   profileCertificationDialogOpenedSince,
@@ -609,6 +611,47 @@ describe("useCertificationPrompt", () => {
       modals.closedWatchers.forEach((watcher) => watcher());
 
       expect(notice).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // Revue sécurité cycle 3 : prolongé par le dialogue puis celui-ci fermé, une
+  // autre modale gardée ouverte — l'observateur cesse peu après la fin de
+  // l'extension, pas aux dix minutes.
+  it("noticeOnceModalsClosed_profileDialogClosedThenOtherModalStays_stopsObservingAfterExtensionExpires", () => {
+    jest.useFakeTimers();
+    try {
+      const closeDialog = markProfileCertificationDialogOpen();
+      modals.open = true;
+      noticeOnceModalsClosed(jest.fn());
+
+      jest.advanceTimersByTime(60_000);
+      closeDialog();
+      jest.advanceTimersByTime(REFUSAL_NOTICE_MAX_WAIT_MS - 1);
+      expect(modals.closedStopped).toBe(0);
+      jest.advanceTimersByTime(REFUSAL_NOTICE_RECHECK_MS);
+      expect(modals.closedStopped).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // Revue sécurité cycle 3 : déconnexion ou connexion sans rechargement — le
+  // refus retenu ne s'adresse jamais au compte suivant.
+  it("noticeOnceModalsClosed_sessionChanged_dropsTheNoticeSilently", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      const notice = jest.fn();
+      noticeOnceModalsClosed(notice);
+
+      signalSessionChanged();
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).not.toHaveBeenCalled();
+      expect(modals.closedStopped).toBe(1);
     } finally {
       jest.useRealTimers();
     }

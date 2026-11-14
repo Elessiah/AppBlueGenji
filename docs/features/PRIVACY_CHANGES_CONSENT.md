@@ -245,13 +245,19 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   minute ordinaire, pas à chaque rendu).
   Un lot en partie déjà réservé écarte le compte : le doublon (`ER_DUP_ENTRY`)
   annule toute l'instruction, aucune ligne n'en reste (un `INSERT IGNORE`
-  partiel aurait tenu le reste pour annoncé sans l'envoyer). Un compte effacé
-  entre la lecture et la réservation (clé étrangère) est écarté de même, sans
-  abandonner le balayage. Un compte dont aucun changement dû ne se nomme
-  (garde-fou : `privacyChangesForOneMessage` essaie chacun seul, le premier de
-  l'ordre ne bloquant pas les autres) sort des lectures suivantes du processus
-  tant que l'ensemble des changements passés le délai ne change pas
-  (`unnameableUserIds`) : il ne tient plus une place du lot à chaque balayage.
+  partiel aurait tenu le reste pour annoncé sans l'envoyer). La réservation est
+  un `INSERT … SELECT` gardé par `is_deleted = 0` : un compte mis en
+  suppression entre la lecture et la réservation n'en reçoit aucune ligne ni
+  aucun message ; effacé (clé étrangère), il est écarté de même, sans
+  abandonner le balayage. Un changement qui ne tient pas même seul n'en bloque
+  pas d'autres : `privacyChangesForOneMessage` cherche alors le lot parmi ceux
+  qui tiennent seuls (plusieurs à la fois) — sauf des conditions d'utilisation
+  qui ne tiennent pas : rien ne part, le pied dirait sinon qu'aucun accord
+  n'est demandé (garde-fous, le registre vérifie que chacun tient). La lecture
+  avance par **curseur** (`cursorAfterId`, dernier compte d'un lot plein, retour
+  à zéro au bout de la liste) : un compte écarté en mémoire, pour quelque motif
+  que ce soit, ne tient jamais les vingt places du lot à chaque balayage, et il
+  est relu au tour suivant.
   `GET /api/profile/privacy-changes` répond `Cache-Control: private,
   max-age=300` (texte publié, identique pour tous) ; un avis hors politique
   (`GOOGLE_LINKED`, absent de `/rgpd`) n'est rendu par cette route qu'au

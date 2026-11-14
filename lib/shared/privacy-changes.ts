@@ -2390,12 +2390,22 @@ export function privacyChangesForOneMessage(
     const batch = fitting(priority.slice(0, count).map(({ index }) => index));
     if (batch) return batch;
   }
-  // Le premier de l'ordre ne tient pas même seul : un autre, seul, peut tenir —
-  // le nommer plutôt que tout bloquer derrière celui qui ne tient pas (le
-  // registre vérifie que chacun tient ; garde-fou seulement).
-  for (const { index } of priority.slice(1)) {
-    const batch = fitting([index]);
-    if (batch) return batch;
+  // Un changement ne tient pas même seul : les autres, ensemble, peuvent tenir —
+  // les nommer plutôt que tout bloquer derrière lui (le registre vérifie que
+  // chacun tient ; garde-fou seulement). Le lot se recherche alors sur ceux qui
+  // tiennent seuls, dans le même ordre : plusieurs à la fois, pas un par mois,
+  // pour qu'aucun ne sorte de la fenêtre d'annonce sans avoir été nommé.
+  // Des conditions d'utilisation qui ne tiennent pas : rien — leur acceptation
+  // reste due, et le pied d'un message qui ne les nommerait pas dirait
+  // qu'aucun accord n'est demandé.
+  const alone = priority.filter(({ index }) => fitting([index]) !== null);
+  if (alone.length < priority.length) {
+    const kept = new Set(alone.map(({ index }) => index));
+    if (priority.some(({ change, index }) => change.asksTermsAcceptance && !kept.has(index))) return [];
+    for (let count = alone.length; count >= 1; count -= 1) {
+      const batch = fitting(alone.slice(0, count).map(({ index }) => index));
+      if (batch) return batch;
+    }
   }
   // Pas même un changement nommé, « … et N autre(s) » compris : rien n'est
   // réservé — mieux vaut attendre qu'annoncer sans nommer.

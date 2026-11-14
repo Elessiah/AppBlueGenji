@@ -559,6 +559,19 @@ describe("privacyChangesForOneMessage", () => {
     expect(privacyChangesForOneMessage(fr, null, en)).toEqual([B]);
   });
 
+  // Revue sécurité cycle 3 : les autres, ensemble, plutôt qu'un seul par message.
+  it("privacyChangesForOneMessage_firstUnfitAndOthersFitTogether_namesAllTheOthers", () => {
+    const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
+    expect(privacyChangesForOneMessage([huge, A, B], null)).toEqual([A, B]);
+  });
+
+  // Revue sécurité cycle 3 : des conditions qui ne se nomment pas ne laissent pas
+  // partir un message dont le pied dirait qu'aucun accord n'est demandé.
+  it("privacyChangesForOneMessage_termsCannotBeNamed_returnsEmpty", () => {
+    const terms = change("conditions", "2026-01-10", { title: "x".repeat(5000), asksTermsAcceptance: true });
+    expect(privacyChangesForOneMessage([terms, A], null)).toEqual([]);
+  });
+
   it("privacyChangesForOneMessage_noneCanBeNamed_returnsEmpty", () => {
     const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
     const huger = change("y", "2026-01-11", { title: "w".repeat(5000) });

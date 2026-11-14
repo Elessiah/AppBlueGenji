@@ -1,5 +1,6 @@
 "use client";
 
+import { signalSessionChanged } from "@/lib/shared/session-change-signal";
 import { useEffect, useId, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
@@ -147,6 +148,7 @@ export function ReactivationPanel({
       const done = (await response.json().catch(() => ({}))) as { pseudoChanged?: boolean };
       showSuccess(t("reactivation.done"));
       if (done.pseudoChanged === true) showInfo(t("reactivation.pseudoChanged"));
+      signalSessionChanged();
       router.replace("/profil");
       // La barre de navigation passe à la session ouverte.
       router.refresh();

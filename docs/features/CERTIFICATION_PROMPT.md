@@ -171,8 +171,13 @@ cette modale.
   les 2 min), de quoi finir la certification ; l'extension ne vaut que tant
   que ce dialogue est ouvert ou fermé depuis moins de 2 min
   (`profileCertificationDialogRecent`) — fermé puis une autre modale gardée
-  ouverte des minutes, le refus se tait — puis se tait, et un nouveau refus remplace le
-  précédent : jamais de toast sans contexte des minutes plus tard) —, un corps sans
+  ouverte des minutes, le refus se tait, et l'observation du document cesse
+  (revérifiée toutes les `REFUSAL_NOTICE_RECHECK_MS`, 10 s, tant que
+  l'extension court) — puis se tait, et un nouveau refus remplace le
+  précédent : jamais de toast sans contexte des minutes plus tard ; une
+  déconnexion ou une connexion sans rechargement (`signalSessionChanged`,
+  `lib/shared/session-change-signal.ts`) l'abandonne : il ne s'adresse jamais
+  au compte suivant) —, un corps sans
   compte lisible 400 `INVALID_ACTION`. Plafonné par compte
   (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée
   en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`) au

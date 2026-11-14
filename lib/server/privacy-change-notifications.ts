@@ -83,21 +83,21 @@ let lastSweepFoundNobody = false;
  */
 let lastIdleSettledKey = "";
 
-/** Identité d'un ensemble de changements annonçables passés le délai. */
-function keyOf(settled: readonly PrivacyChange[]): string {
-  return settled.map((change) => change.id).join("|");
+/** Identité d'un ensemble de changements (passés le délai, dus, réservés). */
+function keyOf(changes: readonly PrivacyChange[]): string {
+  return changes.map((change) => change.id).join("|");
 }
 
 /**
- * Comptes dont aucun changement dû ne tient nommé dans un message
- * (`privacyChangesForOneMessage` vide — garde-fou, le registre le vérifie) :
- * écartés de la lecture tant que l'ensemble des changements passés le délai
- * reste le même, sans quoi les mêmes vingt premiers occuperaient le lot à
- * chaque balayage et les suivants ne seraient jamais lus. Propre au processus,
- * vidé quand l'ensemble change (`unnameableKey`).
+ * Curseur de lecture du balayage (dernier compte lu d'un lot plein) : la
+ * lecture suivante reprend **après** lui, puis repart de zéro au bout de la
+ * liste. Un compte écarté en mémoire (rien de nommable, lot déjà pris, compte
+ * effacé entre-temps) ne retient ainsi jamais les vingt places du lot : chaque
+ * balayage avance, quel que soit le motif de l'écart, et ce compte est relu au
+ * tour suivant — son état peut avoir changé. Propre au processus ; rien ne
+ * grandit avec le nombre de comptes écartés.
  */
-const unnameableUserIds = new Set<number>();
-let unnameableKey = "";
+let cursorAfterId = 0;
 let pendingSweep: Promise<number> | null = null;
 
 type CandidateRow = RowDataPacket & {
@@ -133,7 +133,7 @@ async function loadCandidates(
   db: Queryable,
   settled: readonly PrivacyChange[],
   liveStaff: boolean,
-  excluded: readonly number[],
+  afterId: number,
 ): Promise<CandidateRow[]> {
   // Un compte sans Discord n'est candidat que si le push est **allumé** : sans
   // clés, rien ne peut lui parvenir, et le réserver consommerait l'annonce pour
@@ -141,12 +141,12 @@ async function loadCandidates(
   // retombe sur Discord seul plutôt que d'éteindre toute l'annonce.
   if (webPushConfig()) {
     try {
-      return await queryCandidates(db, settled, true, liveStaff, excluded);
+      return await queryCandidates(db, settled, true, liveStaff, afterId);
     } catch (error) {
       if (!isMissingTableError(error)) throw error;
     }
   }
-  return queryCandidates(db, settled, false, liveStaff, excluded);
+  return queryCandidates(db, settled, false, liveStaff, afterId);
 }
 
 /**
@@ -159,7 +159,7 @@ async function queryCandidates(
   settled: readonly PrivacyChange[],
   withPush: boolean,
   liveStaff: boolean,
-  excluded: readonly number[],
+  afterId: number,
 ): Promise<CandidateRow[]> {
   const clause = settled
     .map(
@@ -178,13 +178,13 @@ async function queryCandidates(
         AND (${clause})
         AND NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications r
                          WHERE r.user_id = u.id AND r.sent_at > NOW() - INTERVAL ? DAY)
-        ${excluded.length > 0 ? `AND u.id NOT IN (${excluded.map(() => "?").join(", ")})` : ""}
+        AND u.id > ?
       ORDER BY u.id
       LIMIT ${PRIVACY_DM_BATCH_SIZE}`,
     [
       ...settled.flatMap((change) => [change.publishedAt, change.id, change.id]),
       PRIVACY_DM_MIN_INTERVAL_DAYS,
-      ...excluded,
+      afterId,
     ],
   );
   return rows;
@@ -219,17 +219,25 @@ async function loadDone(db: Queryable, userIds: number[]): Promise<Map<number, s
  * est déjà prise (`ER_DUP_ENTRY`, annulation de l'instruction sous InnoDB).
  * Rend `null` dans ce cas — aucune ligne n'est restée : un `INSERT IGNORE`
  * partiel laissait les autres tenues pour annoncées sans jamais être envoyées.
- * Rend aussi `null` pour un compte effacé depuis la lecture (clé étrangère) :
- * l'erreur levée aurait abandonné le balayage entier, et les comptes déjà
- * réservés avant lui seraient restés annoncés sans message.
+ * Rend aussi `null` pour un compte supprimé depuis la lecture : mis en
+ * suppression (`is_deleted = 1`, la ligne reste — aucune ligne n'est alors
+ * insérée, `affectedRows` à 0, et aucun message ne part), ou effacé (clé
+ * étrangère : l'erreur levée aurait abandonné le balayage entier, et les
+ * comptes déjà réservés avant lui seraient restés annoncés sans message).
+ * L'`INSERT … SELECT` lit la ligne du compte sous verrou partagé : une
+ * suppression en cours est attendue, puis vue.
  */
 async function reserve(db: Queryable, userId: number, changes: PrivacyChange[]): Promise<PrivacyChange[] | null> {
   try {
-    await db.query<ResultSetHeader>(
+    const [result] = await db.query<ResultSetHeader>(
       `INSERT INTO bg_privacy_change_notifications (user_id, change_id)
-       VALUES ${changes.map(() => "(?, ?)").join(", ")}`,
-      changes.flatMap((change) => [userId, change.id]),
+       SELECT u.id, c.change_id
+         FROM bg_users u
+         JOIN (${changes.map(() => "SELECT ? AS change_id").join(" UNION ALL ")}) c
+        WHERE u.id = ? AND u.is_deleted = 0`,
+      [...changes.map((change) => change.id), userId],
     );
+    if (result.affectedRows !== changes.length) return null;
   } catch (error) {
     if (isDuplicateEntryError(error) || isMissingParentRowError(error)) return null;
     throw error;
@@ -290,19 +298,17 @@ async function reserveUnderLock(
   settled: readonly PrivacyChange[],
 ): Promise<Map<string, PrivacyGroup>> {
   const groups = new Map<string, PrivacyGroup>();
-  const currentKey = keyOf(settled);
-  if (unnameableKey !== currentKey) {
-    unnameableUserIds.clear();
-    unnameableKey = currentKey;
+  const liveStaff = changes.some((change) => change.audience === "LIVE_STAFF");
+  let candidates = await loadCandidates(db, settled, liveStaff, cursorAfterId);
+  // Personne après le curseur : la liste reprend du début, dans ce balayage.
+  if (candidates.length === 0 && cursorAfterId > 0) {
+    cursorAfterId = 0;
+    candidates = await loadCandidates(db, settled, liveStaff, 0);
   }
-  const candidates = await loadCandidates(
-    db,
-    settled,
-    changes.some((change) => change.audience === "LIVE_STAFF"),
-    [...unnameableUserIds],
-  );
+  // Lot plein : il peut en rester après lui. Sinon, le tour est fini.
+  cursorAfterId = candidates.length >= PRIVACY_DM_BATCH_SIZE ? Number(candidates.at(-1)?.id ?? 0) : 0;
   lastSweepFoundNobody = candidates.length === 0;
-  lastIdleSettledKey = currentKey;
+  lastIdleSettledKey = keyOf(settled);
   if (candidates.length === 0) return groups;
   const done = await loadDone(db, candidates.map((row) => Number(row.id)));
 
@@ -332,19 +338,15 @@ async function reserveUnderLock(
     // donc après l'intervalle minimal (`PRIVACY_DM_MIN_INTERVAL_DAYS`).
     // Calculé une fois par ensemble de changements dus : la plupart des comptes
     // du lot ont le même.
-    const dueKey = due.map((change) => change.id).join("|");
+    const dueKey = keyOf(due);
     let batch = batchByDue.get(dueKey);
     if (!batch) {
       batch = privacyChangesForOneMessage(due, siteUrl, localizedPrivacyChanges(due, "en"));
       batchByDue.set(dueKey, batch);
     }
-    // Rien de nommable (garde-fou, le registre le vérifie) : rien n'est réservé,
-    // et le compte sort des lectures suivantes (`unnameableUserIds`) pour ne
-    // pas tenir une place du lot à chaque balayage.
-    if (batch.length === 0) {
-      unnameableUserIds.add(userId);
-      continue;
-    }
+    // Rien de nommable (garde-fou, le registre le vérifie) : rien n'est
+    // réservé ; le curseur (`cursorAfterId`) passe au-delà du compte.
+    if (batch.length === 0) continue;
     // Une partie du lot déjà réservée depuis la relecture (`loadDone`) — plus
     // possible entre balayages, sérialisés par le verrou nommé ; garde-fou
     // seulement : ce compte est écarté, sans message, plutôt qu'un en-tête ou un
@@ -356,7 +358,7 @@ async function reserveUnderLock(
     // Ce qui reste dû après ce lot est compté dans le message (« … et N
     // autre(s) ») : le joueur sait que d'autres changements l'attendent.
     const later = due.length - batch.length;
-    const key = `${reserved.map((change) => change.id).join("|")}#${later}`;
+    const key = `${keyOf(reserved)}#${later}`;
     const group = groups.get(key) ?? { changes: reserved, later, recipients: [] };
     group.recipients.push(recipient);
     groups.set(key, group);
@@ -446,7 +448,6 @@ export function resetPrivacyNotificationThrottle(): void {
   lastSweepAt = 0;
   lastSweepFoundNobody = false;
   lastIdleSettledKey = "";
-  unnameableUserIds.clear();
-  unnameableKey = "";
+  cursorAfterId = 0;
   pendingSweep = null;
 }

@@ -11,6 +11,7 @@ import { outboundMuted } from "@/lib/server/outbound-mute";
 import { isBotCircuitOpen, pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import {
   dispatchPrivacyChangeNotifications,
+  PRIVACY_DM_BATCH_SIZE,
   PRIVACY_SWEEP_LOCK_NAME,
   resetPrivacyNotificationThrottle,
   SWEEP_IDLE_THROTTLE_MS,
@@ -69,6 +70,28 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
   };
 }
 
+type FakeReservationOptions = {
+  taken?: string[];
+  reserveError?: string;
+  reserveErrorFor?: number;
+  deletedUsers?: number[];
+};
+
+/**
+ * Une réservation : une instruction, plusieurs lignes — les changements, puis
+ * le compte ; tout ou rien, comme InnoDB annule l'instruction sur un doublon.
+ */
+function fakeReservation(options: FakeReservationOptions, params: unknown[]) {
+  const userId = params.at(-1);
+  const changeIds = params.slice(0, -1);
+  if (options.reserveError && (options.reserveErrorFor === undefined || userId === options.reserveErrorFor))
+    throw Object.assign(new Error("reserve failed"), { code: options.reserveError });
+  if (options.deletedUsers?.includes(Number(userId))) return [{ affectedRows: 0 }];
+  if (changeIds.some((changeId) => options.taken?.includes(`${userId}:${changeId}`)))
+    throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+  return [{ affectedRows: changeIds.length }];
+}
+
 function fakeDb(
   options: {
     candidates?: Candidate[];
@@ -80,6 +103,10 @@ function fakeDb(
     reserveError?: string;
     /** Le compte dont la réservation échoue (`reserveError`) ; tous sinon. */
     reserveErrorFor?: number;
+    /** Comptes mis en suppression (`is_deleted = 1`) depuis la lecture : rien n'est inséré. */
+    deletedUsers?: number[];
+    /** Candidats rendus selon le curseur (`u.id > ?`, dernier paramètre). */
+    candidatesAfter?: (afterId: number) => Candidate[];
   } = {},
 ) {
   const calls: { sql: string; params: unknown[]; viaPool?: boolean }[] = [];
@@ -88,20 +115,12 @@ function fakeDb(
     calls.push({ sql: q, params });
     if (q.startsWith("SELECT GET_LOCK")) return [[{ acquired: options.lockHeldElsewhere ? 0 : 1 }]];
     if (q.startsWith("SELECT RELEASE_LOCK")) return [[{ released: 1 }]];
-    if (q.startsWith("SELECT u.id, u.pseudo")) return [options.candidates ?? []];
-    if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
-    if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) {
-      // Une instruction, plusieurs lignes : `(user, changement)` à la suite —
-      // tout ou rien, comme InnoDB annule l'instruction sur un doublon.
-      if (options.reserveError && (options.reserveErrorFor === undefined || params[0] === options.reserveErrorFor))
-        throw Object.assign(new Error("reserve failed"), { code: options.reserveError });
-      for (let i = 0; i < params.length; i += 2) {
-        if (options.taken?.includes(`${params[i]}:${params[i + 1]}`)) {
-          throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
-        }
-      }
-      return [{ affectedRows: params.length / 2 }];
+    if (q.startsWith("SELECT u.id, u.pseudo")) {
+      if (options.candidatesAfter) return [options.candidatesAfter(Number(params.at(-1)))];
+      return [options.candidates ?? []];
     }
+    if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
+    if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) return fakeReservation(options, params);
     return [{ affectedRows: 1 }];
   };
   const execute = jest.fn(handler);
@@ -161,7 +180,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     // que le message n'a pas pu nommer.
     const reservations = calls.filter((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
     expect(reservations).toHaveLength(1);
-    expect(reservations[0].params.filter((_, index) => index % 2 === 1)).toEqual(batch.map((c) => c.id));
+    expect(reservations[0].params).toEqual([...batch.map((c) => c.id), 1]);
   });
 
   it("envoie au message suivant ce qu'un message n'a pas pu nommer", async () => {
@@ -256,7 +275,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
     expect(select.sql).toContain("r.sent_at > NOW() - INTERVAL ? DAY");
     expect(select.sql.indexOf("r.sent_at")).toBeLessThan(select.sql.indexOf("LIMIT"));
-    expect(select.params.at(-1)).toBe(PRIVACY_DM_MIN_INTERVAL_DAYS);
+    expect(select.params.slice(-2)).toEqual([PRIVACY_DM_MIN_INTERVAL_DAYS, 0]);
   });
 
   it("n'écrit pas avant le délai de la modale : aucune requête", async () => {
@@ -280,6 +299,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(select.params).toEqual([
       ...settled.flatMap((c) => [c.publishedAt, c.id, c.id]),
       PRIVACY_DM_MIN_INTERVAL_DAYS,
+      0,
     ]);
 
     // Un seul message, qui porte aussi les changements récents — tous ceux
@@ -388,48 +408,99 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
   });
 
-  // Revue sécurité cycle 2 : un compte dont rien ne se nomme (adresse du site
-  // démesurée) ne tient plus une place du lot à chaque balayage.
-  it("dispatchPrivacyChangeNotifications_nothingNameable_accountLeftOutOfNextReads", async () => {
-    const previous = process.env.APP_URL;
-    process.env.APP_URL = `https://${"x".repeat(2_000)}.fr`;
+  // Revue sécurité cycle 3 : un compte mis en suppression (la ligne reste)
+  // entre la lecture et la réservation ne reçoit ni réservation ni message.
+  it("dispatchPrivacyChangeNotifications_accountMarkedDeletedBeforeReservation_noMessageOthersSent", async () => {
+    const calls = fakeDb({
+      candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })],
+      deletedUsers: [2],
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const recipients = jest.mocked(pushDiscordDirectMessages).mock.calls.flatMap(([, batch]) => batch);
+    expect(recipients.map((entry) => entry.discordId)).toEqual(["100000000000000001"]);
+    expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
+  });
+
+  it("dispatchPrivacyChangeNotifications_reservation_guardedByAccountNotDeleted", async () => {
+    const calls = fakeDb({ candidates: [candidate({ id: 1 })] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const insert = calls.find((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))!;
+    expect(insert.sql).toContain("FROM bg_users u");
+    expect(insert.sql).toContain("WHERE u.id = ? AND u.is_deleted = 0");
+  });
+
+  // Revue sécurité cycle 3 : la lecture avance par curseur — aucun compte
+  // écarté en mémoire ne tient les vingt places du lot à chaque balayage.
+  it("dispatchPrivacyChangeNotifications_fullBatch_nextReadStartsAfterTheLastAccount", async () => {
     const now = jest.spyOn(Date, "now");
     try {
       now.mockReturnValue(1_000_000);
-      const calls = fakeDb({ candidates: [candidate({ id: 7 })] });
+      const page = Array.from({ length: PRIVACY_DM_BATCH_SIZE }, (_, index) =>
+        candidate({ id: index + 1, discord_id: String(index + 10) }),
+      );
+      const calls = fakeDb({ candidatesAfter: (afterId) => (afterId === 0 ? page : [candidate({ id: 99, discord_id: "99" })]) });
       await dispatchPrivacyChangeNotifications(NOW);
-      expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(false);
-      expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
 
       now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
       await dispatchPrivacyChangeNotifications(NOW);
+
       const reads = calls.filter((c) => c.sql.startsWith("SELECT u.id, u.pseudo"));
-      expect(reads).toHaveLength(2);
-      expect(reads[0].sql).not.toContain("u.id NOT IN");
-      expect(reads[1].sql).toContain("AND u.id NOT IN (?)");
-      expect(reads[1].params.at(-1)).toBe(7);
+      expect(reads.map((read) => read.params.at(-1))).toEqual([0, PRIVACY_DM_BATCH_SIZE]);
+      expect(reads[0].sql).toContain("AND u.id > ?");
     } finally {
       now.mockRestore();
-      if (previous === undefined) delete process.env.APP_URL;
-      else process.env.APP_URL = previous;
     }
   });
 
-  it("dispatchPrivacyChangeNotifications_nothingNameableThenSettledSetChanges_accountReadAgain", async () => {
+  it("dispatchPrivacyChangeNotifications_nobodyAfterTheCursor_wrapsToTheStartInTheSameSweep", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      const page = Array.from({ length: PRIVACY_DM_BATCH_SIZE }, (_, index) =>
+        candidate({ id: index + 1, discord_id: String(index + 10) }),
+      );
+      let sweeps = 0;
+      const calls = fakeDb({
+        candidatesAfter: (afterId) => {
+          if (afterId === 0) {
+            sweeps += 1;
+            return sweeps === 1 ? page : [candidate({ id: 5, discord_id: "5" })];
+          }
+          return [];
+        },
+      });
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      const reads = calls.filter((c) => c.sql.startsWith("SELECT u.id, u.pseudo"));
+      expect(reads.map((read) => read.params.at(-1))).toEqual([0, PRIVACY_DM_BATCH_SIZE, 0]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("dispatchPrivacyChangeNotifications_nothingNameable_noReservationAndNoExclusionList", async () => {
     const previous = process.env.APP_URL;
     process.env.APP_URL = `https://${"x".repeat(2_000)}.fr`;
     const now = jest.spyOn(Date, "now");
     try {
-      const before = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS - 1);
       now.mockReturnValue(1_000_000);
       const calls = fakeDb({ candidates: [candidate({ id: 7 })] });
-      await dispatchPrivacyChangeNotifications(before);
-
+      await dispatchPrivacyChangeNotifications(NOW);
       now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
       await dispatchPrivacyChangeNotifications(NOW);
+
+      expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(false);
+      expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
       const reads = calls.filter((c) => c.sql.startsWith("SELECT u.id, u.pseudo"));
       expect(reads).toHaveLength(2);
-      expect(reads[1].sql).not.toContain("u.id NOT IN");
+      expect(reads[1].sql).not.toContain("NOT IN");
     } finally {
       now.mockRestore();
       if (previous === undefined) delete process.env.APP_URL;
@@ -446,7 +517,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const inserts = calls.filter((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
     expect(inserts).toHaveLength(2);
     const batch = privacyChangesForOneMessage(DUE, siteBaseUrl());
-    expect(inserts[0].params).toEqual(batch.flatMap((change) => [1, change.id]));
+    expect(inserts[0].params).toEqual([...batch.map((change) => change.id), 1]);
   });
 
   // Performance cycle 1 : les envois au bot, lents, ne tiennent pas le verrou ni sa connexion.
@@ -649,7 +720,7 @@ describe("dispatchPrivacyChangeNotifications — notifications push", () => {
     jest.mocked(webPushConfig).mockReturnValue(CONFIG);
     const handler = async (sql: string, params: unknown[] = []) => {
       const q = flat(sql);
-      if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) return [{ affectedRows: params.length / 2 }];
+      if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) return [{ affectedRows: params.length - 1 }];
       if (q.startsWith("SELECT u.id, u.pseudo")) {
         if (q.includes("bg_push_subscriptions")) throw Object.assign(new Error("absente"), { code: "ER_NO_SUCH_TABLE" });
         return [[candidate()]];
