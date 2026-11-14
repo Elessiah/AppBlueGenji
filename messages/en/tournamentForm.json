@@ -29,6 +29,7 @@
     "planningDisabled": "Referee scheduling turned off: matches without a date move into launch.",
     "planningEnabled": "Referee scheduling turned on.",
     "planningEnabledMoved": "Scheduling turned on: {count, plural, =1 {1 match to schedule} other {# matches to schedule}}.",
+    "concurrentRetry": "Another save is in progress on this tournament. Try again in a moment.",
     "planningErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournament not found.",
       "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
@@ -220,7 +221,7 @@
     },
     "matchCheckIn": {
       "label": "Match check-in",
-      "description": "Unticked, no check-in is sent 15 minutes before a match, no reminder 10 hours before, and no message mentions the check-in. The Discord channels (check-in, voice) stay open as usual.",
+      "description": "Unticked, no check-in is sent 15 minutes before a match, no reminder 10 hours before, and no message mentions the check-in. The 24 h reminder, the schedule announcements and the Discord channels (check-in, voice) stay as usual.",
       "create": "Ticked by default. Can be changed later, until the tournament closes — even while it runs.",
       "edit": "Can be changed until the tournament closes — even while it runs. Turned back on, it doesn't catch up on what was due in the meantime.",
       "finished": "The tournament is finished: this option can no longer be changed."

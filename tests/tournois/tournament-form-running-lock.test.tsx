@@ -21,7 +21,7 @@ function renderLocked(format: TournamentFormat): string {
         initialValues={{ ...defaultTournamentFormValues(), name: "Coupe", format }}
         editableFields={editableFieldsForWindow("LOCKED")}
         submitLabel="Enregistrer les modifications"
-        refereeSchedulingEditable
+        togglesEditable
         tournamentState="RUNNING"
         onSubmit={async () => {}}
       />
@@ -59,7 +59,7 @@ describe("TournamentForm — tournoi lancé", () => {
           initialValues={{ ...defaultTournamentFormValues(), name: "Coupe" }}
           editableFields={editableFieldsForWindow("LOCKED")}
           submitLabel="Enregistrer"
-          refereeSchedulingEditable={false}
+          togglesEditable={false}
           tournamentState="FINISHED"
           onSubmit={async () => {}}
         />

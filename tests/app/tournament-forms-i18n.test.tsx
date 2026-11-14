@@ -574,7 +574,7 @@ describe("case « Check-in des matchs » (MATCH_CHECK_IN_SETTING.md)", () => {
         initialValues={{ ...defaultTournamentFormValues(), name: "Cup" }}
         editableFields={editableFieldsForWindow("LOCKED")}
         submitLabel="Save changes"
-        refereeSchedulingEditable
+        togglesEditable
         tournamentState="RUNNING"
         onSubmit={async () => undefined}
       />,
@@ -590,7 +590,7 @@ describe("case « Check-in des matchs » (MATCH_CHECK_IN_SETTING.md)", () => {
         initialValues={{ ...defaultTournamentFormValues(), name: "Cup" }}
         editableFields={editableFieldsForWindow("LOCKED")}
         submitLabel="Save changes"
-        refereeSchedulingEditable={false}
+        togglesEditable={false}
         tournamentState="FINISHED"
         onSubmit={async () => undefined}
       />,

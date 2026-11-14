@@ -29,6 +29,7 @@
     "planningDisabled": "Planification par l'arbitrage désactivée : les matchs sans date entrent en lancement.",
     "planningEnabled": "Planification par l'arbitrage activée.",
     "planningEnabledMoved": "Planification activée : {count, plural, =1 {1 match à planifier} other {# matchs à planifier}}.",
+    "concurrentRetry": "Un autre enregistrement est en cours sur ce tournoi. Réessaie dans un instant.",
     "planningErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
       "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
@@ -220,7 +221,7 @@
     },
     "matchCheckIn": {
       "label": "Check-in des matchs",
-      "description": "Décochée, aucun check-in n'est envoyé 15 minutes avant un match, ni de rappel 10 h avant, et aucun message ne parle du check-in. Les salons Discord (check-in, vocaux) restent ouverts comme d'habitude.",
+      "description": "Décochée, aucun check-in n'est envoyé 15 minutes avant un match, ni de rappel 10 h avant, et aucun message ne parle du check-in. Le rappel 24 h avant, les annonces d'horaire et les salons Discord (check-in, vocaux) restent comme d'habitude.",
       "create": "Cochée par défaut. Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours. Rallumée, elle ne rattrape pas ce qui était dû entre-temps.",
       "finished": "Le tournoi est terminé : l'option n'est plus modifiable."

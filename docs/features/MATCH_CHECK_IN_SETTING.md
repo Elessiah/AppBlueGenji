@@ -33,7 +33,7 @@ carte commune `SettingToggleCard`) (`{ enabled }`, limite
 `MATCH_CHECK_IN_TOGGLE_RULE`, codes `INVALID_TOURNAMENT_ID`,
 `INVALID_MATCH_CHECK_IN`, `TOURNAMENT_NOT_FOUND` 404, `TOURNAMENT_FINISHED`
 409, `MATCH_CHECK_IN_UPDATE_FAILED` 500), envoyée à chaque enregistrement avec
-les deux autres interrupteurs (`Promise.allSettled`, `settledRefusals`).
+les deux autres interrupteurs, **l'un après l'autre** (même ligne verrouillée : en parallèle l'un perdrait le verrou ; `saveToggles`, `_lib/toggle-save.ts`, `settledRefusals`) ; une contention (409 `CONCURRENT_UPDATE_RETRY`) a son message (`edit.concurrentRetry`).
 `setMatchCheckIn` verrouille la ligne du tournoi en première instruction,
 publie l'événement de mise à jour et le journal staff
 `MATCH_CHECK_IN_ON` / `MATCH_CHECK_IN_OFF` (anonyme sur Discord).

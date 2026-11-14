@@ -26,6 +26,7 @@ import type { TournamentState } from "@/lib/shared/types";
 import { mapError, useErrorsText } from "../_lib/error-map";
 import { useFormText } from "../../_lib/form-text";
 import { CodedError } from "@/lib/shared/field-errors";
+import { putToggle, saveSimpleToggle } from "../../_lib/toggle-save";
 import { mergeRefusals, settledRefusals, settledValue } from "@/lib/shared/settled-value";
 
 /**
@@ -102,57 +103,11 @@ function refusalText(
   return text.t("edit.fieldRefusal", { message, field: text.t(`edit.fields.${labeled}`) });
 }
 
-/** Refus de la bascule de planification (`refereeSchedulingErrorMessage`). */
-function planningErrorText(text: TournamentFormText, code: string): string {
-  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_REFEREE_SCHEDULING"] as const).find((c) => c === code);
-  return text.t(known ? `edit.planningErrors.${known}` : "edit.planningErrors.fallback");
-}
-
-/** Refus de la bascule des salons vocaux d'équipe. */
-function voiceErrorText(text: TournamentFormText, code: string): string {
-  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_TEAM_VOICE_CHANNELS"] as const).find((c) => c === code);
-  return text.t(known ? `edit.voiceErrors.${known}` : "edit.voiceErrors.fallback");
-}
-
-/** Refus de la bascule du check-in des matchs. */
-function checkInErrorText(text: TournamentFormText, code: string): string {
-  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_MATCH_CHECK_IN"] as const).find((c) => c === code);
-  return text.t(known ? `edit.checkInErrors.${known}` : "edit.checkInErrors.fallback");
-}
-
 /**
- * Enregistre l'option « Check-in des matchs » par sa route dédiée
- * (`MATCH_CHECK_IN_SETTING.md`) ; rend `true` si elle a changé.
+ * Les trois bascules, envoyées **l'une après l'autre** (elles verrouillent
+ * toutes la même ligne de tournoi : en parallèle, l'une perdrait le verrou) ;
+ * `null` pour chacune quand la fenêtre est fermée.
  */
-async function saveMatchCheckIn(tournamentId: number, enabled: boolean, text: TournamentFormText): Promise<boolean> {
-  const response = await fetch(`/api/admin/tournaments/${tournamentId}/match-check-in`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
-  const result = (await response.json().catch(() => ({}))) as { error?: string; changed?: boolean };
-  if (response.ok) return result.changed === true;
-  const code = result.error ?? "UNKNOWN";
-  throw new CodedError(code, checkInErrorText(text, code));
-}
-
-/**
- * Enregistre l'option « Salons vocaux d'équipe » par sa route dédiée
- * (`MATCH_VOICE.md`) ; rend `true` si elle a changé.
- */
-async function saveTeamVoiceChannels(tournamentId: number, enabled: boolean, text: TournamentFormText): Promise<boolean> {
-  const response = await fetch(`/api/admin/tournaments/${tournamentId}/voice-channels`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
-  const result = (await response.json().catch(() => ({}))) as { error?: string; changed?: boolean };
-  if (response.ok) return result.changed === true;
-  const code = result.error ?? "UNKNOWN";
-  throw new CodedError(code, voiceErrorText(text, code));
-}
-
-/** Les trois bascules, envoyées l'une sans l'autre ; `null` pour chacune quand la fenêtre est fermée. */
 async function saveToggles(
   tournamentId: number,
   editable: boolean,
@@ -166,11 +121,10 @@ async function saveToggles(
   ]
 > {
   if (!editable) return [null, null, null];
-  return Promise.allSettled([
-    saveRefereeScheduling(tournamentId, values.refereeScheduling, text),
-    saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text),
-    saveMatchCheckIn(tournamentId, values.matchCheckIn, text),
-  ]);
+  const [planning] = await Promise.allSettled([saveRefereeScheduling(tournamentId, values.refereeScheduling, text)]);
+  const [voice] = await Promise.allSettled([saveSimpleToggle(tournamentId, "voice", values.teamVoiceChannels, text)]);
+  const [checkIn] = await Promise.allSettled([saveSimpleToggle(tournamentId, "checkIn", values.matchCheckIn, text)]);
+  return [planning, voice, checkIn];
 }
 
 /** Envoie les champs de la fenêtre d'édition ; un refus nomme le champ en cause. */
@@ -196,21 +150,8 @@ async function saveRefereeScheduling(
   enabled: boolean,
   text: TournamentFormText,
 ): Promise<PlanningSaveResult> {
-  const response = await fetch(`/api/admin/tournaments/${tournamentId}/referee-scheduling`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
-  const result = (await response.json().catch(() => ({}))) as {
-    error?: string;
-    changed?: boolean;
-    movedToPlanning?: number;
-  };
-  if (response.ok) {
-    return { changed: result.changed === true, movedToPlanning: result.movedToPlanning ?? 0 };
-  }
-  const code = result.error ?? "UNKNOWN";
-  throw new CodedError(code, planningErrorText(text, code));
+  const result = await putToggle(tournamentId, "planning", enabled, text);
+  return { changed: result.changed === true, movedToPlanning: result.movedToPlanning ?? 0 };
 }
 
 export default function EditTournamentPage() {
@@ -337,7 +278,7 @@ export default function EditTournamentPage() {
         editableFields={editableFields}
         submitLabel={t("edit.submit")}
         explanationId={explanationId}
-        refereeSchedulingEditable={planningEditable}
+        togglesEditable={planningEditable}
         tournamentState={loaded.state}
         onSubmit={async (values) => {
           const payload = toApiPayload(values);

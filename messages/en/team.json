@@ -163,7 +163,7 @@
     },
     "noticesTitle": "Match notices",
     "noticesLine": "Every member receives the team's match notices.",
-    "noticesHint": "New match, times and reminders: Discord direct message (certified tag, box ticked in “My profile”) and push; match start and tournament start: push only. Check-in and join requests follow the same direct-message rule, score to confirm goes out as a push.",
+    "noticesHint": "New match, times and reminders: Discord direct message (certified tag, box ticked in “My profile”) and push; match start and tournament start: push only. Check-in (if the tournament has one) and join requests follow the same direct-message rule, score to confirm goes out as a push.",
     "roles": {
       "OWNER": {
         "team": "Everything: name, tag, description, logo, members, roles, registrations. The only one who can transfer ownership or disband the team.",
@@ -181,7 +181,7 @@
         "team": "Their own game roles only.",
         "matches": "“Ready”, score entry and confirmation, clearing the team voice channel; first contact shown for the match.",
         "messages": "Match notices, score to confirm.",
-        "hint": "Given by the owner or a manager. The captain declares the team ready and reports the result without committing the team (no forfeit, withdrawal or registration); the check-in for a self-managed match (game host, settings) goes to the owner and managers."
+        "hint": "Given by the owner or a manager. The captain declares the team ready and reports the result without committing the team (no forfeit, withdrawal or registration); the check-in for a self-managed match (game host, settings; if the tournament has one) goes to the owner and managers."
       },
       "COACH": {
         "team": "Their own game roles only.",
