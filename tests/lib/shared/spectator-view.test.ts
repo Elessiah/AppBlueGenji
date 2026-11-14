@@ -633,6 +633,7 @@ const CARD_FIELDS = {
   survivalRoundsBeforeFirstCut: "public",
   survivalRoundsPerCut: "public",
   teamVoiceChannels: "public",
+  matchCheckIn: "public",
 } as const satisfies Record<keyof TournamentCard, Disposition>;
 
 const PHASE_FIELDS = {

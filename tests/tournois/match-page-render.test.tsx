@@ -1055,7 +1055,7 @@ describe("page d'un match — salons vocaux d'équipe", () => {
 
     // Ce qui est enregistré à côté d'un refus est confirmé, puis tous les refus sont dits.
     expect(refusal).toBeGreaterThan(-1);
-    expect(source).toContain("settledRefusals(planningResult, voiceResult)");
+    expect(source).toContain("settledRefusals(planningResult, voiceResult, checkInResult)");
     expect(source.indexOf("showSuccess(", refusal)).toBeLessThan(source.indexOf("throw mergeRefusals(refusals)"));
     expect(source.indexOf("throw mergeRefusals(refusals)")).toBeLessThan(source.indexOf("router.push("));
   });

@@ -37,7 +37,7 @@ import {
   REFEREE_DIGEST_LEAD_MS,
 } from "@/lib/shared/discord-notifications";
 import { inBatches } from "@/lib/shared/in-batches";
-import { PLAYED_MATCH_STATUSES } from "@/lib/shared/match-schedule";
+import { PLAYED_MATCH_STATUS_SQL, PLAYED_MATCH_STATUSES } from "@/lib/shared/match-schedule";
 import { toParticipantType } from "@/lib/shared/participants";
 import { refereeDigestPush } from "@/lib/shared/push-messages";
 import { claimDatedMark } from "./reminder-marks";
@@ -69,7 +69,7 @@ const DIGEST_FROM = `FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status NOT IN (${PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ")})
+      WHERE m.status NOT IN (${PLAYED_MATCH_STATUS_SQL})
         AND t.state <> 'FINISHED'
         AND m.start_at IS NOT NULL
         AND m.start_at > ?

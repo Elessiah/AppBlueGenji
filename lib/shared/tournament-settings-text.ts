@@ -198,6 +198,7 @@ export function settingsGroupsFrom(
     { label: text.t("settings.general.seeding"), value: text.t(`settings.seeding.${input.seedingSource}`) },
     { label: text.t("settings.general.launchPhase"), value: yesNo(text, card.launchPhase) },
     { label: text.t("settings.general.teamVoice"), value: yesNo(text, card.teamVoiceChannels) },
+    { label: text.t("settings.general.matchCheckIn"), value: yesNo(text, card.matchCheckIn) },
   ];
 
   const conditions: TournamentSetting[] = [];

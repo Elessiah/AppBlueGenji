@@ -2,7 +2,7 @@
 
 exports[`runMigrations — une base déjà à jour émet la passe à l'octet près (empreinte figée) 1`] = `
 {
-  "sha256": "f84f369644b09cad65c2b2d438dc24d312dd7e22cf7ee2163c52e518a86a7dbf",
-  "statements": 207,
+  "sha256": "59670a62f0be809e0f0c0a7f256288fcbf467e9aa9b0a5b92bb956f9c3565791",
+  "statements": 209,
 }
 `;

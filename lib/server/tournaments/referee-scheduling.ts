@@ -23,7 +23,7 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
-import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { TournamentState } from "@/lib/shared/types";
 import { publishUpdatedEvent } from "./notifications";
 
@@ -79,7 +79,7 @@ export async function setRefereeScheduling(
       );
       const tournament = rows[0];
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-      if (!canToggleRefereeScheduling(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
+      if (!canToggleLiveTournamentOption(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
 
       // Sans changement, rien à écrire ni à annoncer : le formulaire d'édition
       // renvoie la valeur affichée à chaque enregistrement, et rejouer

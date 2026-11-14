@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  canToggleRefereeScheduling,
   LAUNCH_PHASE_LABELS,
   enablePlanningConsequence,
   matchesToPlan,
@@ -12,18 +11,6 @@ import {
   toPlanCountLabel,
 } from "@/lib/shared/match-planning";
 import { bracketMatch } from "../../helpers/bracket-match";
-
-describe("canToggleRefereeScheduling", () => {
-  it("se modifie à tout moment avant la clôture, tournoi en cours compris", () => {
-    expect(canToggleRefereeScheduling("UPCOMING")).toBe(true);
-    expect(canToggleRefereeScheduling("REGISTRATION")).toBe(true);
-    expect(canToggleRefereeScheduling("RUNNING")).toBe(true);
-  });
-
-  it("se fige une fois le tournoi terminé", () => {
-    expect(canToggleRefereeScheduling("FINISHED")).toBe(false);
-  });
-});
 
 describe("matchesToPlan", () => {
   const toPlan = bracketMatch({ id: 1, status: "READY", team1Id: 1, team2Id: 2, startAt: null });

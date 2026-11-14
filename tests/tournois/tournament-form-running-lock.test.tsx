@@ -21,7 +21,7 @@ function renderLocked(format: TournamentFormat): string {
         initialValues={{ ...defaultTournamentFormValues(), name: "Coupe", format }}
         editableFields={editableFieldsForWindow("LOCKED")}
         submitLabel="Enregistrer les modifications"
-        refereeSchedulingEditable
+        togglesEditable
         tournamentState="RUNNING"
         onSubmit={async () => {}}
       />
@@ -41,12 +41,13 @@ describe("TournamentForm — tournoi lancé", () => {
   });
 
   it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"], ["SWISS"], ["SURVIVAL"], ["BG_SURVIE"], ["MULTI"]])(
-    "ne laisse que les cases de planification et de salons vocaux modifiables (%s)",
+    "ne laisse que les cases de planification, de salons vocaux et de check-in modifiables (%s)",
     (format) => {
       const enabled = enabledFields(renderLocked(format));
-      expect(enabled).toHaveLength(2);
+      expect(enabled).toHaveLength(3);
       expect(enabled[0]).toContain('id="referee-scheduling"');
       expect(enabled[1]).toContain('id="team-voice-channels"');
+      expect(enabled[2]).toContain('id="match-check-in"');
     },
   );
 
@@ -58,7 +59,7 @@ describe("TournamentForm — tournoi lancé", () => {
           initialValues={{ ...defaultTournamentFormValues(), name: "Coupe" }}
           editableFields={editableFieldsForWindow("LOCKED")}
           submitLabel="Enregistrer"
-          refereeSchedulingEditable={false}
+          togglesEditable={false}
           tournamentState="FINISHED"
           onSubmit={async () => {}}
         />

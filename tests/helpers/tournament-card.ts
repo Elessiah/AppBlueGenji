@@ -29,6 +29,7 @@ export function tournamentCard(overrides: Partial<TournamentCard> = {}): Tournam
     survivalRoundsBeforeFirstCut: null,
     survivalRoundsPerCut: null,
     teamVoiceChannels: false,
+    matchCheckIn: true,
     phases: null,
     matchFormat: null,
     endurancePlayoffFormat: null,

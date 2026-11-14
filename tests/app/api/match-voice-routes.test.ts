@@ -8,12 +8,15 @@ jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/api-guard", () => ({
   ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
   enforceRateLimit: jest.fn(() => null),
+  reserveRateLimit: jest.fn(
+    jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard").reserveRateLimit,
+  ),
 }));
 
 import { PUT } from "@/app/api/admin/tournaments/[id]/voice-channels/route";
 import { GET } from "@/app/api/matches/[matchId]/voice/route";
 import { POST as CLEAR } from "@/app/api/admin/matches/[matchId]/voice/clear/route";
-import { enforceRateLimit, MATCH_VOICE_READ_RULE, TEAM_VOICE_TOGGLE_RULE, VOICE_CLEAR_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, reserveRateLimit, MATCH_VOICE_READ_RULE, TEAM_VOICE_TOGGLE_RULE, VOICE_CLEAR_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { announceStaffMatchAction, announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import { auditStaffAction } from "@/lib/server/staff-audit";
@@ -94,10 +97,10 @@ describe("PUT /api/admin/tournaments/[id]/voice-channels", () => {
 
   it("put_rateLimited_returns429WithoutService", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(enforceRateLimit).mockReturnValueOnce(NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }));
+    jest.mocked(reserveRateLimit).mockReturnValueOnce({ refused: NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }), refund: () => undefined });
     const res = await PUT(putReq({ enabled: true }), tournamentParams("7"));
     expect(res.status).toBe(429);
-    expect(enforceRateLimit).toHaveBeenCalledWith(TEAM_VOICE_TOGGLE_RULE, 3);
+    expect(reserveRateLimit).toHaveBeenCalledWith(TEAM_VOICE_TOGGLE_RULE, 3);
     expect(setTeamVoiceChannels).not.toHaveBeenCalled();
   });
 

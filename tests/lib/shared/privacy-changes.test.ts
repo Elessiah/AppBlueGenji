@@ -2602,8 +2602,41 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   });
 
   it("processingRegister_staffJournal_listsVoiceOptionToggleFrAndEn", () => {
-    expect(PROCESSING_ACTIVITIES.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("option « Salons vocaux d'équipe » allumée ou éteinte");
-    expect(PROCESSING_ACTIVITIES_EN.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("“Team voice channels” option turned on or off");
+    expect(PROCESSING_ACTIVITIES.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("options « Salons vocaux d'équipe » et « Check-in des matchs » allumées ou éteintes");
+    expect(PROCESSING_ACTIVITIES_EN.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("“Team voice channels” and “Match check-in” options turned on or off");
+  });
+
+  it("processingRegister_staffJournal_listsCheckInToggleAsTournamentActionFrAndEn", () => {
+    expect(PROCESSING_ACTIVITIES.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("règles de ban, options « Salons vocaux d'équipe » et « Check-in des matchs », têtes de série");
+    expect(PROCESSING_ACTIVITIES_EN.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("ban rules, “Team voice channels” and “Match check-in” options, seeding");
+  });
+
+  it("processingRegister_retention_describesSilentReminderAndMutedCheckInFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.map((a) => a.retention.join(" ")).join(" ");
+    const en = PROCESSING_ACTIVITIES_EN.map((a) => a.retention.join(" ")).join(" ");
+    expect(fr).toContain("le rappel 10 h y est marqué comme traité sans que rien ne parte");
+    expect(fr).toContain("la marque d'un check-in du match qui n'est pas parti pendant l'arrêt : numéro de l'engagée et horaire du match");
+    expect(en).toContain("the 10 h reminder is marked as handled there without anything being sent");
+    expect(en).toContain("the mark of a match check-in that did not go out during the pause: the entrant's number and the match time");
+  });
+
+  it("processingRegister_t04_noCheckInLinkWithoutCheckInFrAndEn", () => {
+    const t04 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T04")!;
+    const t04En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
+    expect(t04.subPurposes.join(" ")).toContain("seul le rappel 24 h part et aucune annonce ne porte ce lien");
+    expect(t04En.subPurposes.join(" ")).toContain("only the 24 h reminder is sent and no announcement carries that link");
+  });
+
+  it("pushTopic_matchLobbyBrief_opensWithCheckInConditionFrAndEn", () => {
+    expect(PUSH_TOPICS.MATCH_LOBBY_BRIEF.description).toMatch(/^Dans un tournoi qui a un check-in, 15 minutes avant/);
+    expect(enPush.topics.MATCH_LOBBY_BRIEF.description).toMatch(/^In a tournament that has check-in, 15 minutes before/);
+    expect(PUSH_TOPICS.MATCH_LOBBY_BRIEF.description).not.toContain("sauf si le tournoi");
+  });
+
+  it("rgpdEn_pushSection_qualifiesCheckInAndRemindersByTournamentOption", () => {
+    const source = readFileSync(join(process.cwd(), "app/rgpd/RgpdEn.tsx"), "utf8");
+    expect(source).toContain("their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match");
+    expect(source).toContain("or of your solo tournament, in a tournament that has check-in,");
   });
 
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
