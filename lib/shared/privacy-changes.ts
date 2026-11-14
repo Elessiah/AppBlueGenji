@@ -1991,19 +1991,29 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // dure** — pas seulement « au chargement suivant », et sans liste fermée de
     // refus ; seule la certification refusée parce que le tag ne peut plus être
     // certifié la lève, par le « Plus tard » que la fenêtre envoie d'elle-même
-    // (`closeForSession`, `DiscordCertifyPrompt`) — s'il parvient au site et n'y est pas refusé (autre compte, panne : 409/503/500), et la
+    // (`closeForSession`, `DiscordCertifyPrompt`) — s'il parvient au site et n'y est
+    // pas refusé (toute réponse d'erreur de la route certify-prompt : autre compte,
+    // session absente, action invalide, panne — liste non fermée), et la
     // marque n'est posée qu'à une connexion par Discord ou Blizzard
-    // (`createSession`). /rgpd (rgpd-policy) le dit depuis ce lot. Rien ne change dans le
+    // (`createSession`) ; elle est propre à chaque session (un refus « autre compte »
+    // dans un navigateur laisse celle des autres appareils). /rgpd (rgpd-policy) le
+    // dit depuis ce lot. Deux autres précisions (revue juridique EF-63), déjà vraies
+    // avant ce lot : un caster qui est aussi arbitre du site lit les contacts des
+    // équipes de son match dès que les deux adversaires sont connus ; le relevé du
+    // « Prêt » de l'arbitre désigné s'affiche aussi à ses parties sur la page du
+    // match, et l'état public du lancement peut le laisser deviner. Rien ne change dans le
     // code. Pour tous les comptes ; datée du lendemain de la nuit de déploiement
     // (comme `REGISTER_UPDATED_AT`) — avancer ensemble si la mise en ligne glisse.
     id: "2026-11-marque-de-session-rectificatif",
     publishedAt: "2026-11-16",
-    title: "Proposition de certification du tag Discord : quand la fenêtre revient",
+    title: "Proposition de certification du tag Discord : quand la fenêtre revient (et deux autres précisions)",
     links: [DATA_COLLECTED_SECTION_LINK],
     summary:
-      "Précision sur l'information du 29 octobre 2026 : quand le site ne reçoit pas ta réponse à la fenêtre de certification du tag Discord, ou la refuse pour une autre raison qu'un tag qui ne peut plus être certifié, la marque de ta session reste, et la fenêtre peut revenir tant que cette session dure — pas seulement au chargement suivant.",
+      "Précision sur l'information du 29 octobre 2026 : quand le site ne reçoit pas ta réponse à la fenêtre de certification du tag Discord, ou la refuse pour une autre raison qu'un tag qui ne peut plus être certifié (la fenêtre répond alors « Plus tard », qui ne lève la marque que s'il est reçu), la marque de ta session reste, et la fenêtre peut revenir tant que cette session dure — pas seulement au chargement suivant. Deux précisions aussi sur les contacts de match et le « Prêt » de l'arbitre.",
     details: [
-      "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse (une panne du site comprise), laisse la marque sur ta session — sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis, elle ne revient sur ton compte qu'à une nouvelle connexion par Discord ou Blizzard.",
+      "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse (une panne du site comprise), laisse la marque sur ta session — sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis dans ce navigateur, elle n'y revient sur ton compte qu'à une nouvelle connexion par Discord ou Blizzard — chacune de tes sessions a sa propre marque, que gardent tes autres appareils.",
+      "Contacts de match : un caster qui est aussi arbitre du site lit les contacts des équipes de son match (tag Discord certifié et, dans un tournoi Overwatch, BattleTag, même masqué) dès que ses deux adversaires sont connus, comme les autres arbitres — et pas seulement le temps du match, comme les autres casters.",
+      "« Prêt » de l'arbitre désigné : son relevé s'affiche aussi à ses parties sur la page du match, et pas seulement dans les fenêtres « Contacts » et de lancement ; l'état du lancement, public, peut en outre laisser deviner s'il est prêt.",
       "Rien d'autre ne change : la marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données ; « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },

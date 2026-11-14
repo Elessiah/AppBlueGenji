@@ -72,10 +72,10 @@ describe("/rgpd — choix « Ne plus voir » de la certification Discord", () =>
   // la fenêtre ne revient qu'à la session d'origine).
   it("dit qu'une réponse perdue ou refusée laisse la marque", () => {
     expect(fr).toContain(
-      "Une réponse qui ne parvient pas au site, ou qu'il refuse, ne lève pas la marque (sauf la certification refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre : elle répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé) : la fenêtre peut revenir tant que cette session dure.",
+      "Une réponse qui ne parvient pas au site, ou qu'il refuse, ne lève pas la marque (sauf la certification refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé) : la fenêtre peut revenir tant que cette session dure — sauf si un autre compte s'est connecté depuis dans ce navigateur : elle n'y revient alors sur ton compte qu'à ta prochaine connexion par Discord ou Blizzard (chaque session a sa propre marque).",
     );
     expect(en).toContain(
-      "An answer that doesn't reach the site, or that it refuses, doesn't clear the mark (except a verification refused because your Discord tag can no longer be verified from the window: it then answers “Later” by itself, which clears it in turn if it reaches the site and is not refused there): the window may come back as long as that session lasts.",
+      "An answer that doesn't reach the site, or that it refuses, doesn't clear the mark (except a verification refused because your Discord tag can no longer be verified from the window: the window then answers “Later” by itself, which clears it in turn if it reaches the site and is not refused there): the window may come back as long as that session lasts — unless another account has logged in since in that browser: there it then only comes back on your account at your next login with Discord or Blizzard (each session has its own mark).",
     );
   });
 

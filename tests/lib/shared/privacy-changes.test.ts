@@ -1890,6 +1890,24 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
     expect(entry.summary).toContain("pas seulement au chargement suivant");
   });
 
+  // Revue juridique EF-63 : la marque est propre à chaque session ; le « Plus tard »
+  // automatique ne la lève que s'il est reçu ; deux précisions d'audience déjà vraies.
+  it("privacyChanges_sessionMarkRectification_otherSessionsKeepTheirMarkAndAudienceClarifications", () => {
+    expect(entry.details[0]).toContain("chacune de tes sessions a sa propre marque, que gardent tes autres appareils");
+    expect(english.details[0]).toContain("each of your sessions has its own mark, which your other devices keep");
+    expect(entry.details[0]).not.toContain("connecté depuis, elle ne revient sur ton compte");
+    expect(entry.summary).toContain("qui ne lève la marque que s'il est reçu");
+    expect(english.summary).toContain("which only clears the mark if it is received");
+    expect(entry.details).toHaveLength(4);
+    expect(english.details).toHaveLength(4);
+    expect(entry.details[1]).toContain("un caster qui est aussi arbitre du site lit les contacts des équipes de son match");
+    expect(english.details[1]).toContain("a caster who is also a referee of the site reads the contacts of the teams of their match");
+    expect(entry.details[2]).toContain("s'affiche aussi à ses parties sur la page du match");
+    expect(entry.details[2]).toContain("l'état du lancement, public, peut en outre laisser deviner s'il est prêt");
+    expect(english.details[2]).toContain("also shown to the match's parties on the match page");
+    expect(entry.details[3]).toMatch(/^Rien d'autre ne change/);
+  });
+
   it("privacyChanges_sessionMarkOriginal_publishedTextUntouched", () => {
     expect(original.publishedAt).toBe("2026-10-29");
     expect(original.details[0]).toContain("la fenêtre peut revenir au chargement suivant.");

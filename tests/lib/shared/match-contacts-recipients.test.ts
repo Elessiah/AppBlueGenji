@@ -281,8 +281,10 @@ describe("BattleTag masqué — arbitre désigné", () => {
     expect(enProfile.battletagNotice.asReferee).toContain("of a match you are the assigned referee of</strong>");
     expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asReferee"');
     // L'avertissement reste court : il nomme les publics et les fenêtres, la liste en donne le détail.
-    expect(frProfile.battletagNotice.warning).toContain("des équipes, casters, arbitres et admins d'un match, selon leur rôle, dans sa fenêtre « Contacts », sa fenêtre de lancement et sa page du match");
-    expect(enProfile.battletagNotice.warning).toContain("to the teams, casters, referees and admins of a match, by their role, in its “Contacts” window, its launch window and its match page");
+    // Revue juridique EF-63 : un caster ou l'arbitre désigné y est montré sans être contact d'équipe.
+    expect(frProfile.battletagNotice.warning).toContain("des équipes, casters, arbitres et admins d'un match, selon leur rôle, si tu fais partie des contacts présentés, si tu castes le match ou si tu en es l'arbitre désigné, dans sa fenêtre « Contacts », sa fenêtre de lancement et sa page du match");
+    expect(enProfile.battletagNotice.warning).toContain("to the teams, casters, referees and admins of a match, by their role, if you're among the contacts shown, if you cast the match or if you are its assigned referee, in its “Contacts” window, its launch window and its match page");
+    expect(frProfile.battletagNotice.warning).not.toContain("visible, si tu fais partie des contacts présentés, des équipes");
     expect(frProfile.battletagNotice.staff).toContain("ne s'ouvre qu'aux équipes, aux casters et à l'arbitre désigné");
     expect(enProfile.battletagNotice.staff).toContain("only opens for the teams, the casters and the assigned referee");
   });
