@@ -1270,7 +1270,8 @@ export type PersonalDataExport = {
   liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null; refused: boolean }[];
   /**
    * Inscriptions de caster du titulaire (`bg_match_casters`) : match, tournoi,
-   * stream tenu, « Prêt » et date d'inscription — gardées avec un match joué.
+   * stream tenu, « Prêt », date d'inscription et BattleTag donné pour ce cast
+   * (`castBattletag`) — gardées avec un match joué.
    */
   casts: {
     matchId: number;

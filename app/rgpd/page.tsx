@@ -292,7 +292,7 @@ function RgpdFr({
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
             BattleTag par Blizzard (tenu à jour à chaque connexion tant que le compte
             Battle.net est rattaché ; s&apos;il n&apos;en donne aucun, le BattleTag saisi à la main reste,
-            sans être tenu pour vérifié), la photo par Google ou Discord (copiée, et masquée
+            sans être tenu pour vérifié — pour un Battle.net déjà rattaché avec un BattleTag avant ce changement (31 octobre 2026), à partir de votre prochaine connexion par Battle.net), la photo par Google ou Discord (copiée, et masquée
             tant que vous ne l&apos;affichez pas). Ce que vous renseignez vous-même (pseudos de jeu
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
             et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
@@ -1168,8 +1168,8 @@ function RgpdFr({
             lancement montre le match. Son tag Discord certifié est aussi présenté, dans la fenêtre « Contacts » et sur la page du match, aux seules parties du match — à ses deux équipes dès que ses deux adversaires sont connus et jusqu&apos;à sa fin, à ses casters le temps du match — jamais aux arbitres sans rôle sur ce match ni dans la fenêtre de lancement (s&apos;il caste aussi le
             match, son tag et son BattleTag suivent la règle des casters : ses parties ne les lisent que le temps du match, fenêtre de lancement comprise, les autres arbitres dès que ses deux adversaires sont connus). Le staff qui gère les tournois lit à tout moment, dans la fenêtre « Arbitrage » d&apos;un match, le pseudo de son arbitre désigné et des comptes qui peuvent arbitrer. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
             d&apos;un match, jusqu&apos;à la déclaration de son score ou la fin du tournoi ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
-            « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres le lisent, dans les
-            fenêtres « Contacts » et de lancement. S&apos;il ne remplit plus ces conditions ou
+            « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres en lisent le relevé, dans les
+            fenêtres « Contacts » et de lancement et sur la page du match — l&apos;état du lancement, public, peut toutefois laisser deviner s&apos;il est prêt. S&apos;il ne remplit plus ces conditions ou
             devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
             un autre arbitre à qui le match est confié, l&apos;autogestion, son opposition retenue) ou qu&apos;il lui est retiré d&apos;office, il
@@ -1302,10 +1302,10 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec le lien de sa chaîne (obligatoire), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
+            avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
-            l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
-            son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
+            l&apos;organisation) reste au match. Le lien qu&apos;un caster a fourni en ouvrant
+            son stream part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
             tient encore ce stream ; un membre de l&apos;organisation y indique, en posant le lien, s&apos;il est celui de
             l&apos;organisation — il reste alors au match, même si ce membre le caste — ou sa propre chaîne,
             qui part avec son compte. Un caster ne l&apos;indique jamais en ouvrant son propre stream ni dans
@@ -1330,7 +1330,7 @@ function RgpdFr({
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
             « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties
-            du match et arbitres —, dans un tournoi Overwatch seulement) : il est gardé avec son inscription de caster, part avec elle, n&apos;est jamais
+            du match, ses autres casters et arbitres —, dans un tournoi Overwatch seulement) : il est gardé avec son inscription de caster, part avec elle et à la suppression du compte, n&apos;est jamais
             recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
             masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
             service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}

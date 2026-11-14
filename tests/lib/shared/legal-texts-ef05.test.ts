@@ -67,13 +67,21 @@ describe("/rgpd — choix « Ne plus voir » de la certification Discord", () =>
     expect(en).toContain("This choice is included in the export of your data");
   });
 
+  // Revue EF-19 #501 : sans liste fermée des refus (un 500 garde aussi la marque),
+  // et sans promettre un retour au chargement suivant (un autre compte connecté :
+  // la fenêtre ne revient qu'à la session d'origine).
   it("dit qu'une réponse perdue ou refusée laisse la marque", () => {
     expect(fr).toContain(
-      "Une réponse qui ne parvient pas au site, ou qu'il refuse (autre compte connecté depuis dans ce navigateur, compte introuvable), ne lève pas la marque : la fenêtre peut revenir au chargement suivant.",
+      "Une réponse qui ne parvient pas au site, ou qu'il refuse, ne lève pas la marque : la fenêtre peut revenir tant que cette session dure.",
     );
     expect(en).toContain(
-      "An answer that doesn't reach the site, or that it refuses (another account logged in since in that browser, account not found), doesn't clear the mark: the window may come back at the next page load.",
+      "An answer that doesn't reach the site, or that it refuses, doesn't clear the mark: the window may come back as long as that session lasts.",
     );
+  });
+
+  it("rgpdPolicy_markKeptLine_noClosedListOfRefusals", () => {
+    expect(fr).not.toContain("(autre compte connecté depuis dans ce navigateur, compte introuvable)");
+    expect(en).not.toContain("(another account logged in since in that browser, account not found)");
   });
 
   it("nomme l'exception par l'équipe du lecteur", () => {

@@ -83,7 +83,8 @@ affichées dans le tableau « Données collectées ») :
   joueur seulement pour une inscription faite depuis le 16 octobre 2026 ; la
   trace part avec le match, le message Discord reste), ses **rôles de match**
   (`match-roles-export.ts`, EF-21) — inscriptions de caster (`casts` : match,
-  tournoi, stream, « Prêt », date), liens de chaîne fournis
+  tournoi, stream, « Prêt », date, `castBattletag` : BattleTag donné pour ce
+  cast), liens de chaîne fournis
   (`providedStreamLinks`, `bg_match_streams.link_user_id`) et arbitrages
   désignés (`refereeAssignments`, avec le « Prêt ») —, l'origine du BattleTag
   (`account.overwatchBattletagTyped`, `profile.battletagFromBlizzard`),
