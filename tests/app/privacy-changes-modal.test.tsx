@@ -408,3 +408,18 @@ describe("mise en page racine", () => {
     expect(layout).not.toMatch(/bannerDismissed=\{[^}]*privacyChanges/);
   });
 });
+
+describe("revue UI cycle 1 : chargement des détails", () => {
+  const source = readFileSync("components/privacy/PrivacyChangesModal.tsx", "utf8");
+
+  it("modal_detailsPending_loadingOutputInsideActionsFooter", () => {
+    const loading = source.indexOf("styles.detailsLoading");
+    expect(loading).toBeGreaterThan(source.indexOf("className={styles.actions}"));
+    expect(loading).toBeGreaterThan(source.indexOf("</ScrollArea>"));
+  });
+
+  it("loadDetails_fetch_carriesTimeoutSignal", () => {
+    expect(source).toContain("signal: AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS)");
+    expect(source).toContain("PRIVACY_DETAILS_TIMEOUT_MS = 15_000");
+  });
+});

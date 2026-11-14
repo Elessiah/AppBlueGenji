@@ -331,11 +331,6 @@ export function PrivacyChangesModal({
         </p>
 
         <ScrollArea orientation="y" className={styles.changes} ariaLabel={t("privacyModal.detailsLabel")}>
-          {detailsPending && (
-            <output className={`${styles.changeSummary} ${styles.detailsLoading}`}>
-              {t("privacyModal.detailsLoading")}
-            </output>
-          )}
           <ol className={styles.changeList}>
             {changes.map((change) => (
               <li key={change.id} className={styles.change}>
@@ -391,6 +386,12 @@ export function PrivacyChangesModal({
         </p>
 
         <div className={styles.actions}>
+          {/* Au pied de la modale, à côté du bouton qu'il bloque : visible sans défiler. */}
+          {detailsPending && (
+            <output className={`${styles.changeSummary} ${styles.detailsLoading}`}>
+              {t("privacyModal.detailsLoading")}
+            </output>
+          )}
           <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy || detailsPending}>
             {busy ? t("privacyModal.saving") : t("privacyModal.acknowledge")}
           </CyberButton>
@@ -400,13 +401,19 @@ export function PrivacyChangesModal({
   );
 }
 
+/** Au-delà, la lecture du détail est tenue pour échouée. */
+const PRIVACY_DETAILS_TIMEOUT_MS = 15_000;
+
 /** Détail des entrées présentées, par identifiant (`GET /api/profile/privacy-changes`). */
 export type PrivacyChangeDetails = Record<string, readonly string[]>;
 
 /** Lit le détail des entrées `idsKey` (identifiants joints par des virgules), dans la langue de la page. */
 async function loadPrivacyChangeDetails(idsKey: string, locale: Locale): Promise<PrivacyChangeDetails> {
   const query = new URLSearchParams({ ids: idsKey, locale });
-  const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`);
+  // Borné : une lecture qui ne répond pas libère le bouton (échec, notifié).
+  const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`, {
+    signal: AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS),
+  });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json()) as { details?: PrivacyChangeDetails };
   return body.details ?? {};
