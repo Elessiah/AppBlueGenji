@@ -65,11 +65,20 @@ Un nom d'équipe ou de tournoi laissé tel quel est journalisé par son
 identifiant ; un pseudo ne l'est jamais (`RGPD_LOGS_AND_VISITS.md`) — le
 journal renvoie à cette requête. La passe pose son marqueur quand même (la
 rejouer à chaque démarrage rebalaierait toutes les colonnes pour un doublon) :
-le staff retrouve ces pseudos en base (MariaDB 11.8) et les renomme à la main :
+le staff retrouve ces pseudos en base et les renomme à la main. La classe
+reprend tout ce que retire `withoutInvisiblesKeepingSpaces` (contrôles `\p{Cc}`,
+caractères de format `\p{Cf}` — césure conditionnelle, étiquettes, commandes de
+direction comprises —, remplissages hangul) ; un pseudo vide une fois nettoyé
+n'est fait que de ces caractères et y figure donc aussi. Les barres obliques
+inverses sont **doublées** : MariaDB (11.8, PCRE2) retire celle d'une
+échappatoire inconnue d'une chaîne SQL, et `\x{…}` y deviendrait une plage
+invalide (« range out of order »). La liste peut compter un emoji composé (liant
+U+200D) ou un drapeau de subdivision, que la passe garde : à écarter à la
+lecture.
 
 ```sql
 SELECT id FROM bg_users
- WHERE pseudo REGEXP '[\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2069}\x{FEFF}]';
+ WHERE pseudo REGEXP '[\\p{Cc}\\p{Cf}\\x{115F}\\x{1160}\\x{3164}\\x{FFA0}]';
 ```
 
 Ces restes expliquent que les filtres de sortie demeurent. Ils passent eux aussi

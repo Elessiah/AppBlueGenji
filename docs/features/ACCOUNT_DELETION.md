@@ -1079,10 +1079,14 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   (`SETTLE_IDLE_MS`, au plus mille comptes en mémoire) un compte dont le
   passage n'a rien fait, ou a échoué.
 - **Aperçu confirmé** : le DELETE de la modale envoie le motif qu'elle a
-  annoncé (`confirmedReason`). S'il ne correspond plus au plan de l'écriture
-  (une partie jouée entre-temps, un tournoi créé), le serveur répond 409
-  `ACCOUNT_DELETION_PLAN_CHANGED` sans rien faire, et la modale se recharge
-  avec le nouvel aperçu. Corps absent ou illisible : rien n'est comparé.
+  annoncé (`confirmedReason`). S'il ne correspond plus à l'aperçu relu juste
+  avant l'écriture, hors verrous (une partie jouée entre-temps, un tournoi
+  créé), le serveur répond 409 `ACCOUNT_DELETION_PLAN_CHANGED` sans rien
+  faire, et la modale se recharge avec le nouvel aperçu. Corps absent ou
+  illisible : rien n'est comparé. Un changement survenu entre cette relecture
+  et les verrous (le successeur d'un tournoi organisé suspendu entre-temps)
+  n'est pas refusé : la demande aboutit et sa réponse porte le motif réel,
+  que la notification de succès décrit.
 - **Rediffusion des tournois qui le nomment** : demande et réactivation
   republient tout tournoi non terminé qui nomme le compte
   (`listNamingTournamentIds` : inscription solo ou d'équipe, cast, lien de
@@ -1264,3 +1268,27 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 - La liste compte aussi les comptes en attente (leur fiche répond 404 pendant
   les trente jours) : la question de son exposition reste une décision ouverte
   dans `ERREUR.txt`.
+
+## Revue juridique (EF-62, cycle 1)
+
+- **Forfait d'une entrée solo, dit exactement** : `/rgpd` (FR et EN), le
+  registre (T01), la modale (`deletion.handoverList.forfeit`, `handover`,
+  `ACCOUNT_DELETION_HANDOVER`) et la page de réactivation disent qu'un tournoi
+  à classement pose un abandon du classement, et qu'un match d'arbre qui attend
+  encore son adversaire n'est perdu qu'une fois celui-ci connu, au passage
+  horaire qui suit. À la réactivation : les matchs déjà perdus le restent.
+- **Correction d'arbitrage** : `adminResolveMatchPublic` oublie la liste des
+  comptes sans fiche (`invalidateProfilelessPlayers`) quand l'issue d'un match
+  clos change — la fiche d'un compte anonymisé privé de son seul match joué
+  tombe aussitôt. Un score ordinaire ne la vide toujours pas.
+- **Copie du navigateur au-delà du plafond** : les identifiants les plus
+  récents restent (`slice(-PROFILELESS_PLAYERS_MAX)`), les plus anciens tombent.
+- **Réactivation** : `keptLead` nomme l'avatar masqué **ou supprimé** et dit à
+  part qu'un compte suspendu revient suspendu ; `kept` (derrière le « i »)
+  tient en deux phrases.
+- **Requête staff des pseudos laissés tels quels** (`UNTRUSTED_NAMES.md`) :
+  barres obliques inverses doublées et classe alignée sur
+  `withoutInvisiblesKeepingSpaces`.
+- `REGISTER_UPDATED_AT` avancé (texte de T01 changé). Aucune entrée
+  `PRIVACY_CHANGES` : rien de collecté, lu, gardé ni effacé ne change, seules
+  des précisions.

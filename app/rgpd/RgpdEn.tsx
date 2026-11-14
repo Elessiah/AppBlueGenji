@@ -329,7 +329,7 @@ export function RgpdEn({
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others and a member whose own account deletion has been requested not being counted; a team left with
           no other member becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
-          tournament where it never played are lost by forfeit. At the end of that time, the account is erased
+          tournament where it never played are lost by forfeit (withdrawal from the standings in a standings-based tournament; a match still waiting for its opponent is lost once that opponent is known, at the following hourly pass). At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
           the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an

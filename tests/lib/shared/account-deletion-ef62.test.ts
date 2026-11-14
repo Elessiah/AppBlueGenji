@@ -4,7 +4,13 @@ import { parseProfilelessIds } from "@/components/profileless-players";
 import { deletionDialogContent, FR_PROFILE } from "@/app/(secured)/profil/_lib/profile-text";
 import { scopedText } from "@/lib/shared/scoped-text";
 import enProfile from "@/messages/en/profile.json";
-import { ACCOUNT_REACTIVATION_DAYS, accountDeletionConfirmation } from "@/lib/shared/account-deletion";
+import { ACCOUNT_DELETION_HANDOVER, ACCOUNT_REACTIVATION_DAYS, accountDeletionConfirmation, RETENTION_UNKNOWN, type ConfirmationSubject } from "@/lib/shared/account-deletion";
+import frProfile from "@/messages/fr/profile.json";
+import frLogin from "@/messages/fr/login.json";
+import enLogin from "@/messages/en/login.json";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import { readSource } from "../../helpers/read-source";
 
 /** EF-62 : motif confirmé par la modale, relecture des comptes sans fiche. */
 describe("parseConfirmedReason", () => {
@@ -76,5 +82,71 @@ describe("deletionDialogContent — délai de l'effacement complet", () => {
 
   it("accountDeletionConfirmation_none_usesReactivationConstant", () => {
     expect(accountDeletionConfirmation(null)).toContain(`à la fin des ${ACCOUNT_REACTIVATION_DAYS} jours`);
+  });
+});
+
+// Revue juridique EF-62 cycle 1 : la modale réelle, ses copies et le forfait nuancé.
+describe("deletionDialogContent — parité FR/EN", () => {
+  const subjects: ConfirmationSubject[] = [null, "TOURNAMENTS", "SOLO_REGISTRATIONS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS", RETENTION_UNKNOWN];
+
+  for (const subject of subjects) it(`deletionDialogContent_${String(subject)}_frAndEnSameShapeNonEmpty`, () => {
+    const fr = deletionDialogContent(FR_PROFILE, subject, true);
+    const en = deletionDialogContent(scopedText("en", enProfile), subject, true);
+
+    expect(Object.keys(en)).toEqual(Object.keys(fr));
+    expect(en.handoverItems).toHaveLength(fr.handoverItems.length);
+    for (const text of [fr.consequence, en.consequence, fr.window, en.window, fr.residual, en.residual, ...fr.handoverItems, ...en.handoverItems]) {
+      expect(text.trim().length).toBeGreaterThan(0);
+    }
+    expect(en.consequence).not.toBe(fr.consequence);
+  });
+
+  it("deletionDialogContent_forfeitItem_mentionsStandingsAndAwaitedOpponent", () => {
+    const fr = deletionDialogContent(FR_PROFILE, null).handoverItems[3];
+    const en = deletionDialogContent(scopedText("en", enProfile), null).handoverItems[3];
+
+    expect(fr).toContain("abandon du classement dans un tournoi à classement");
+    expect(fr).toContain("un match qui attend encore ton adversaire, une fois celui-ci connu");
+    expect(en).toContain("withdrawal from the standings in a standings-based tournament");
+    expect(en).toContain("a match still waiting for your opponent, once that opponent is known");
+  });
+
+  it("forfeitNuance_handoverCopies_agree", () => {
+    expect(ACCOUNT_DELETION_HANDOVER).toContain("un match qui attend encore ton adversaire, une fois celui-ci connu");
+    expect(frProfile.deletion.handover).toContain("un match qui attend encore ton adversaire, une fois celui-ci connu");
+    expect(enProfile.deletion.handover).toContain("a match still waiting for your opponent, once that opponent is known");
+  });
+});
+
+describe("textes juridiques — forfait d'une entrée solo", () => {
+  it("registerT01_forfeit_mentionsHourlyPassForAwaitedOpponent", () => {
+    const fr = JSON.stringify(PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T01"));
+    const en = JSON.stringify(PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T01"));
+
+    expect(fr).toContain("un match qui attend encore son adversaire est perdu une fois celui-ci connu, au passage horaire qui suit");
+    expect(en).toContain("a match still waiting for its opponent is lost once that opponent is known, at the following hourly pass");
+  });
+
+  it("rgpdEn_forfeit_mentionsHourlyPassForAwaitedOpponent", () => {
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("a match still waiting for its opponent is lost once that opponent is known, at the following hourly pass");
+  });
+});
+
+describe("page de réactivation — ce qui revient", () => {
+  it("reactivationKeptLead_frAndEn_nameRemovedAvatarAndSuspendedAccount", () => {
+    expect(frLogin.reactivation.keptLead).toContain("avatar masqué ou supprimé par la modération");
+    expect(frLogin.reactivation.keptLead).toContain("un compte suspendu revient suspendu");
+    expect(enLogin.reactivation.keptLead).toContain("moderation hid or removed the avatar");
+    expect(enLogin.reactivation.keptLead).toContain("a suspended account comes back suspended");
+  });
+
+  it("reactivationKept_frAndEn_atMostTwoSentences", () => {
+    expect(frLogin.reactivation.kept.split(/[.!?](?:\s|$)/).filter((part) => part.trim()).length).toBeLessThanOrEqual(2);
+    expect(enLogin.reactivation.kept.split(/[.!?](?:\s|$)/).filter((part) => part.trim()).length).toBeLessThanOrEqual(2);
+  });
+
+  it("reactivationNotUndoneForfeits_frAndEn_sayAlreadyLost", () => {
+    expect(frLogin.reactivation.notUndoneItems.forfeits).toContain("déjà perdus par forfait (ou par abandon du classement), le restent");
+    expect(enLogin.reactivation.notUndoneItems.forfeits).toContain("already lost by forfeit (or by withdrawal from the standings), stay lost");
   });
 });

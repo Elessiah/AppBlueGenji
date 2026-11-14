@@ -49,8 +49,9 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
  * l'oublie aussitôt (`invalidateTeamIdentityViews`), comme une suppression de
  * tournoi (`invalidateTeamRanking`). Un score ne la vide pas : il donne au plus
  * une fiche à un compte anonymisé qui n'en avait pas (son nom reste du texte au
- * plus cette durée) ; une correction qui lui retire son seul match joué lui
- * laisse sa fiche, sous pseudo d'emprunt, au plus cette même durée.
+ * plus cette durée). Une correction d'arbitrage, qui peut lui retirer son seul
+ * match joué, l'oublie aussitôt (`invalidateProfilelessPlayers`, appelé par
+ * `adminResolveMatchPublic`) : sa fiche tombe sans attendre l'échéance.
  */
 export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
 // Cache d'un seul processus : le site tourne en un processus pm2
@@ -58,8 +59,8 @@ export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
 // Passer à plusieurs instances demanderait d'y diffuser l'invalidation.
 
 /**
- * Au-delà, la copie envoyée au navigateur est tronquée (les plus récents
- * d'abord retranchés) : elle voyage dans la charge de **chaque** page d'un
+ * Au-delà, la copie envoyée au navigateur est tronquée (les plus anciens
+ * d'abord retranchés, les suppressions récentes restent) : elle voyage dans la charge de **chaque** page d'un
  * visiteur connecté. Un lien au-delà mène au pire à une fiche 404, comme sur
  * une panne de lecture ; un avertissement le dit, pour qu'on revoie la forme
  * de la liste avant d'y arriver. Les décisions du serveur (la fiche elle-même,
@@ -109,7 +110,10 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
  */
 export async function loadProfilelessPlayerIdsForClient(): Promise<number[]> {
   const ids = await loadProfilelessPlayerIds();
-  return ids.length <= PROFILELESS_PLAYERS_MAX ? ids : ids.slice(0, PROFILELESS_PLAYERS_MAX);
+  // Les plus récents gardés (ids croissants : la fin de la liste) : une
+  // suppression du jour voit ses liens tomber, comme `/rgpd` le dit ; ce sont
+  // les plus anciennes qui retombent au pire sur une fiche 404.
+  return ids.length <= PROFILELESS_PLAYERS_MAX ? ids : ids.slice(-PROFILELESS_PLAYERS_MAX);
 }
 
 /** Levée pendant le délai de grâce qui suit une panne de lecture (rien n'est relancé). */

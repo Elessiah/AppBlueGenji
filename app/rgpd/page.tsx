@@ -438,7 +438,7 @@ function RgpdFr({
           passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres et un membre dont la suppression du compte est elle-même demandée n&apos;étant pas compté ; une équipe où il ne reste aucun autre
           membre devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
-          cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
+          cours où il n&apos;a jamais joué sont perdus par forfait (abandon du classement dans un tournoi à classement ; un match qui attend encore son adversaire est perdu une fois celui-ci connu, au passage horaire qui suit). Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
           modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
           d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la

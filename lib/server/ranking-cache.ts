@@ -134,6 +134,17 @@ export function invalidateRankingLists(): void {
  * quarantaine, rétabli), statut de fantôme, dissolution. Le rejeu reste en
  * cache : il ne lit que les matchs.
  */
+/**
+ * Oublie la seule liste des comptes sans fiche. Pour une correction
+ * d'arbitrage d'un match déjà clos (`adminResolveMatchPublic`) : elle peut
+ * retirer à un compte anonymisé son seul match joué, et sa fiche doit tomber
+ * aussitôt (`/rgpd`), sans attendre l'échéance de la liste. Un score ordinaire
+ * ne la vide pas (`invalidateTeamRankingForScore`).
+ */
+export function invalidateProfilelessPlayers(): void {
+  invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);
+}
+
 export function invalidateTeamIdentityViews(): void {
   invalidateRankingLists();
   invalidateCached(PROFILELESS_PLAYERS_CACHE_KEY);

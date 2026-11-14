@@ -6,7 +6,7 @@ jest.mock("@/lib/server/stats-service");
 import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
-import { invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
+import { invalidateProfilelessPlayers, invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, loadProfilelessPlayerIdsForClient, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_PLAYERS_MAX, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
@@ -360,7 +360,9 @@ describe("loadProfilelessPlayerIds — panne de lecture (EF-62, revue performanc
     const ids = await loadProfilelessPlayerIdsForClient();
 
     expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX);
-    expect(ids[ids.length - 1]).toBe(PROFILELESS_PLAYERS_MAX);
+    // Les plus récents (ids les plus hauts) restent, les plus anciens tombent.
+    expect(ids[0]).toBe(4);
+    expect(ids[ids.length - 1]).toBe(PROFILELESS_PLAYERS_MAX + 3);
   });
 
   it("anonymizedAccountHasNoPage_idBeyondClientCap_returnsTrue", async () => {
@@ -407,5 +409,35 @@ describe("ProfilelessRefresh — nouvel essai après un échec", () => {
     expect(PROFILELESS_RETRY_MS).toBeLessThan(PROFILELESS_REFRESH_MS);
     expect(source).toContain("PROFILELESS_REFRESH_MS - PROFILELESS_RETRY_MS");
     expect(source).not.toContain("giveBack");
+  });
+});
+
+// Revue juridique EF-62 cycle 1 : une correction d'arbitrage oublie la liste.
+describe("invalidateProfilelessPlayers", () => {
+  it("invalidateProfilelessPlayers_cachedList_nextReadRecomputes", async () => {
+    const execute = mockDb(() => [[{ id: 3 }]]);
+
+    await loadProfilelessPlayerIds();
+    invalidateProfilelessPlayers();
+    await loadProfilelessPlayerIds();
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("adminResolveMatchOnce_correctedOutcome_invalidatesProfilelessAfterCommit", () => {
+    const source = readSource("lib/server/tournaments/index.ts");
+    const commit = source.indexOf("await connection.commit();", source.indexOf("async function adminResolveMatchOnce"));
+    const call = source.indexOf('if (dispute?.kind === "corrected") invalidateProfilelessPlayers();');
+
+    expect(call).toBeGreaterThan(commit);
+    expect(commit).toBeGreaterThan(0);
+  });
+
+  it("loadProfilelessPlayerIdsForClient_underCap_returnsAll", async () => {
+    mockDb(() => [[{ id: 3 }, { id: 8 }]]);
+
+    const ids = await loadProfilelessPlayerIdsForClient();
+
+    expect(ids).toEqual([3, 8]);
   });
 });
