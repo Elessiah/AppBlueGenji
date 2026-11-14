@@ -182,9 +182,9 @@ export function PrivacyChangesModal({
 
         <ScrollArea orientation="y" className={styles.changes} ariaLabel={t("privacyModal.detailsLabel")}>
           {detailsPending && (
-            <p className={styles.changeSummary} role="status">
+            <output className={`${styles.changeSummary} ${styles.detailsLoading}`}>
               {t("privacyModal.detailsLoading")}
-            </p>
+            </output>
           )}
           <ol className={styles.changeList}>
             {changes.map((change) => (

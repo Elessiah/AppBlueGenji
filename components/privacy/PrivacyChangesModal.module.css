@@ -188,3 +188,8 @@
     text-align: center;
   }
 }
+
+/* Chargement des détails (`<output>`, région vivante native) : bloc comme un paragraphe. */
+.detailsLoading {
+  display: block;
+}
