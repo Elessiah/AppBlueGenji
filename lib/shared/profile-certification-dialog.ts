@@ -13,6 +13,7 @@
 const openListeners = new Set<() => void>();
 let openCount = 0;
 let lastOpenedAt = Number.NEGATIVE_INFINITY;
+let lastClosedAt = Number.NEGATIVE_INFINITY;
 
 /**
  * Le dialogue s'ouvre : à appeler au montage. Renvoie la fermeture, à appeler
@@ -27,6 +28,7 @@ export function markProfileCertificationDialogOpen(now: number = Date.now()): ()
     if (closed) return;
     closed = true;
     openCount -= 1;
+    lastClosedAt = Date.now();
   };
 }
 
@@ -43,9 +45,19 @@ export function profileCertificationDialogOpenedSince(since: number): boolean {
   return openCount > 0 || lastOpenedAt >= since;
 }
 
+/**
+ * Le dialogue est-il ouvert, ou fermé depuis moins de `withinMs` ? Le refus
+ * retenu ne garde son contexte qu'à la fermeture du dialogue, pas des minutes
+ * après derrière une autre modale.
+ */
+export function profileCertificationDialogRecent(withinMs: number, now: number = Date.now()): boolean {
+  return openCount > 0 || now - lastClosedAt < withinMs;
+}
+
 /** Remet le signal à zéro. Réservé aux tests. */
 export function resetProfileCertificationDialogSignal(): void {
   openCount = 0;
   lastOpenedAt = Number.NEGATIVE_INFINITY;
+  lastClosedAt = Number.NEGATIVE_INFINITY;
   openListeners.clear();
 }

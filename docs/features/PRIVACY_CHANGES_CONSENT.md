@@ -241,15 +241,26 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   balayage qui ne trouve personne à prévenir espace le suivant de dix minutes
   (`SWEEP_IDLE_THROTTLE_MS`) : la lecture parcourt tous les comptes joignables ;
   un changement qui passe depuis le délai de la modale lève cette attente
-  dans chaque processus (`lastIdleSettledKey`).
+  dans chaque processus (`lastIdleSettledKey`, comparé seulement passé la
+  minute ordinaire, pas à chaque rendu).
   Un lot en partie déjà réservé écarte le compte : le doublon (`ER_DUP_ENTRY`)
   annule toute l'instruction, aucune ligne n'en reste (un `INSERT IGNORE`
-  partiel aurait tenu le reste pour annoncé sans l'envoyer).
+  partiel aurait tenu le reste pour annoncé sans l'envoyer). Un compte effacé
+  entre la lecture et la réservation (clé étrangère) est écarté de même, sans
+  abandonner le balayage. Un compte dont aucun changement dû ne se nomme
+  (garde-fou : `privacyChangesForOneMessage` essaie chacun seul, le premier de
+  l'ordre ne bloquant pas les autres) sort des lectures suivantes du processus
+  tant que l'ensemble des changements passés le délai ne change pas
+  (`unnameableUserIds`) : il ne tient plus une place du lot à chaque balayage.
   `GET /api/profile/privacy-changes` répond `Cache-Control: private,
   max-age=300` (texte publié, identique pour tous) ; un avis hors politique
-  (`GOOGLE_LINKED`, absent de `/rgpd`) n'y est rendu qu'au compte qui l'a à
-  lire (`loadPendingPrivacyChanges`, lu seulement si un tel avis est demandé),
-  omis sinon ; la modale abandonne une
+  (`GOOGLE_LINKED`, absent de `/rgpd`) n'est rendu par cette route qu'au
+  compte qui l'a à lire (`loadPendingPrivacyChanges`, lu seulement si un tel
+  avis est demandé), omis sinon — la réponse dépend alors du compte et part en
+  `private, no-store` (un autre compte connecté ensuite dans le navigateur ne
+  reçoit pas la lecture du premier). Ce n'est pas une confidentialité : le
+  registre, détail compris, est aussi dans le code client ; la route ne
+  présente pas l'avis à qui il ne s'adresse pas ; la modale abandonne une
   lecture de détail dépassée (`AbortSignal`) ; le guet du refus de « Ne plus voir »
   cesse d'observer le document à deux minutes sans dialogue de `/profil`.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les

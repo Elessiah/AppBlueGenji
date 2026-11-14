@@ -266,6 +266,15 @@ export function isReferencedRowError(error: unknown): boolean {
 }
 
 /**
+ * `true` si une clé étrangère a refusé l'insertion d'une ligne dont le parent
+ * n'existe plus — typiquement un compte effacé entre la lecture et l'écriture.
+ */
+export function isMissingParentRowError(error: unknown): boolean {
+  const code = errorCode(error);
+  return code === "ER_NO_REFERENCED_ROW_2" || code === "ER_NO_REFERENCED_ROW";
+}
+
+/**
  * `true` si l'instruction nomme une colonne que la table n'a pas.
  *
  * Sert aux reports de données d'une colonne vers une autre, joués avant le

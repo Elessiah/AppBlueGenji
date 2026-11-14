@@ -104,6 +104,7 @@ import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-promp
 import {
   markProfileCertificationDialogOpen,
   profileCertificationDialogOpenedSince,
+  profileCertificationDialogRecent,
   resetProfileCertificationDialogSignal,
 } from "@/lib/shared/profile-certification-dialog";
 
@@ -536,7 +537,7 @@ describe("useCertificationPrompt", () => {
       modals.open = true;
       const notice = jest.fn();
 
-      noticeOnceModalsClosed(notice, REFUSAL_NOTICE_MAX_WAIT_MS, { extendWhile: () => true });
+      noticeOnceModalsClosed(notice, REFUSAL_NOTICE_MAX_WAIT_MS, { extendWhile: () => true, dialogRecent: () => true });
       // Neuf minutes dans le dialogue de certification de `/profil`.
       jest.advanceTimersByTime(9 * 60_000);
       modals.open = false;
@@ -566,6 +567,64 @@ describe("useCertificationPrompt", () => {
       modals.closedWatchers.forEach((watcher) => watcher());
 
       expect(notice).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // Revue sécurité cycle 2 : le dialogue ouvert au refus puis fermé aussitôt,
+  // une autre modale gardée ouverte huit minutes — le refus n'a plus de contexte.
+  it("noticeOnceModalsClosed_profileDialogClosedThenOtherModalMinutesLater_staysSilent", () => {
+    jest.useFakeTimers();
+    try {
+      const closeDialog = markProfileCertificationDialogOpen();
+      modals.open = true;
+      const notice = jest.fn();
+      noticeOnceModalsClosed(notice);
+
+      jest.advanceTimersByTime(1_000);
+      closeDialog();
+      jest.advanceTimersByTime(8 * 60_000);
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_profileDialogClosedThenOtherModalSoonAfter_notices", () => {
+    jest.useFakeTimers();
+    try {
+      const closeDialog = markProfileCertificationDialogOpen();
+      modals.open = true;
+      const notice = jest.fn();
+      noticeOnceModalsClosed(notice);
+
+      jest.advanceTimersByTime(4 * 60_000);
+      closeDialog();
+      jest.advanceTimersByTime(60_000);
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("profileCertificationDialogRecent_openThenClosed_recentOnlyWithinDelay", () => {
+    jest.useFakeTimers();
+    try {
+      expect(profileCertificationDialogRecent(1_000)).toBe(false);
+      const close = markProfileCertificationDialogOpen();
+      expect(profileCertificationDialogRecent(1_000)).toBe(true);
+      close();
+      jest.advanceTimersByTime(999);
+      expect(profileCertificationDialogRecent(1_000)).toBe(true);
+      jest.advanceTimersByTime(1);
+      expect(profileCertificationDialogRecent(1_000)).toBe(false);
     } finally {
       jest.useRealTimers();
     }
@@ -645,7 +704,7 @@ describe("useCertificationPrompt", () => {
       modals.closedStopped = 0;
       const notice = jest.fn();
 
-      noticeOnceModalsClosed(notice, REFUSAL_NOTICE_MAX_WAIT_MS, { extendWhile: () => true });
+      noticeOnceModalsClosed(notice, REFUSAL_NOTICE_MAX_WAIT_MS, { extendWhile: () => true, dialogRecent: () => true });
       jest.advanceTimersByTime(PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS);
       modals.open = false;
       modals.closedWatchers.forEach((watcher) => watcher());

@@ -2375,14 +2375,27 @@ export function privacyChangesForOneMessage(
   // deux langues** : chaque compte le reçoit dans la sienne (BOT-NOTIF-LANG).
   // Un seul choix, tiré des entrées françaises, appliqué aux deux langues.
   const priority = termsFirst(changes.map((change, index) => ({ change, index })));
-  for (let count = priority.length; count >= 1; count -= 1) {
-    const kept = new Set(priority.slice(0, count).map(({ index }) => index));
+  const fitting = (indexes: readonly number[]): PrivacyChange[] | null => {
+    const kept = new Set(indexes);
     const pick = (list: readonly PrivacyChange[]) => list.filter((_, index) => kept.has(index));
+    const count = kept.size;
     const later = changes.length - count;
     const fits = layoutPrivacyChangesMessage(pick(changes), siteUrl, "fr", later).named === count;
     if (fits && (!english || layoutPrivacyChangesMessage(pick(english), siteUrl, "en", later).named === count)) {
       return pick(changes);
     }
+    return null;
+  };
+  for (let count = priority.length; count >= 1; count -= 1) {
+    const batch = fitting(priority.slice(0, count).map(({ index }) => index));
+    if (batch) return batch;
+  }
+  // Le premier de l'ordre ne tient pas même seul : un autre, seul, peut tenir —
+  // le nommer plutôt que tout bloquer derrière celui qui ne tient pas (le
+  // registre vérifie que chacun tient ; garde-fou seulement).
+  for (const { index } of priority.slice(1)) {
+    const batch = fitting([index]);
+    if (batch) return batch;
   }
   // Pas même un changement nommé, « … et N autre(s) » compris : rien n'est
   // réservé — mieux vaut attendre qu'annoncer sans nommer.

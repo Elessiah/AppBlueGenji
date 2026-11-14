@@ -181,6 +181,24 @@ describe("GET /api/profile/privacy-changes", () => {
       expect(await res.json()).toEqual({ details: { [restricted.id]: restricted.details } });
     });
 
+    // Revue sécurité cycle 2 : la réponse dépend du compte — jamais gardée par
+    // le navigateur, qu'un autre compte connecté ensuite ne reçoive celle-ci.
+    it("GET_restrictedEntryRequested_responseNotStored", async () => {
+      jest.mocked(loadPendingPrivacyChanges).mockResolvedValue([]);
+
+      const res = await GET(getReq(`ids=${first.id},${restricted.id}`));
+
+      expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    });
+
+    it("GET_restrictedEntryDue_responseNotStored", async () => {
+      jest.mocked(loadPendingPrivacyChanges).mockResolvedValue([restricted]);
+
+      const res = await GET(getReq(`ids=${restricted.id}`));
+
+      expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    });
+
     it("GET_restrictedOnlyNotDue_returnsEmptyDetails", async () => {
       jest.mocked(loadPendingPrivacyChanges).mockResolvedValue([first]);
 

@@ -168,7 +168,10 @@ cette modale.
   ouvert (souvent par le même « Certifier », monté avant la réponse du refus)
   ou l'a été depuis le refus (il le signale lui-même, `markProfileCertificationDialogOpen`
   dans `lib/shared/profile-certification-dialog.ts` — ouvert même juste après
-  les 2 min), de quoi finir la certification — puis se tait, et un nouveau refus remplace le
+  les 2 min), de quoi finir la certification ; l'extension ne vaut que tant
+  que ce dialogue est ouvert ou fermé depuis moins de 2 min
+  (`profileCertificationDialogRecent`) — fermé puis une autre modale gardée
+  ouverte des minutes, le refus se tait — puis se tait, et un nouveau refus remplace le
   précédent : jamais de toast sans contexte des minutes plus tard) —, un corps sans
   compte lisible 400 `INVALID_ACTION`. Plafonné par compte
   (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée

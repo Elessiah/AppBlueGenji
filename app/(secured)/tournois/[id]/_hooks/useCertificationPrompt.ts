@@ -13,6 +13,7 @@ import { anotherModalOpen, watchModalsClosed, watchUrgentModalOpened } from "@/l
 import {
   onProfileCertificationDialogOpened,
   profileCertificationDialogOpenedSince,
+  profileCertificationDialogRecent,
 } from "@/lib/shared/profile-certification-dialog";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
@@ -76,6 +77,9 @@ let pendingRefusalNotice: (() => void) | null = null;
  * (le dialogue de certification de `/profil` encore ouvert, ou ouvert depuis
  * le refus, même juste après les deux minutes :
  * `profileCertificationDialogOpenedSince`).
+ * L'extension ne vaut que tant que ce dialogue est ouvert ou fermé depuis moins
+ * de `maxWaitMs` (`dialogRecent`) : fermé, puis une autre modale gardée ouverte
+ * des minutes, le refus n'a plus de contexte et se tait.
  * Sinon le guet s'arrête sans rien dire, au plus tard à `extendedMaxWaitMs`.
  * Passées les `maxWaitMs` sans dialogue ouvert, l'observation du document
  * cesse : seule l'ouverture du dialogue (signal, sans coût) la rétablit.
@@ -86,8 +90,13 @@ export function noticeOnceModalsClosed(
   maxWaitMs = REFUSAL_NOTICE_MAX_WAIT_MS,
   {
     extendWhile = profileCertificationDialogOpenedSince,
+    dialogRecent = profileCertificationDialogRecent,
     extendedMaxWaitMs = PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS,
-  }: { extendWhile?: (since: number) => boolean; extendedMaxWaitMs?: number } = {},
+  }: {
+    extendWhile?: (since: number) => boolean;
+    dialogRecent?: (withinMs: number) => boolean;
+    extendedMaxWaitMs?: number;
+  } = {},
 ): () => void {
   pendingRefusalNotice?.();
   const refusedAt = Date.now();
@@ -97,7 +106,8 @@ export function noticeOnceModalsClosed(
   let sawDialog = false;
   const extended = () => {
     sawDialog ||= extendWhile(refusedAt);
-    return sawDialog;
+    // Vu, mais fermé depuis plus que le délai ordinaire : plus de contexte.
+    return sawDialog && dialogRecent(maxWaitMs);
   };
   extended();
   let stopWatch: (() => void) | null = null;

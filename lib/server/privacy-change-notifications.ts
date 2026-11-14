@@ -7,7 +7,7 @@ import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from
 import { privacyChangePush } from "@/lib/shared/push-messages";
 import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { isDuplicateEntryError, isMissingTableError } from "@/lib/server/mysql-errors";
+import { isDuplicateEntryError, isMissingParentRowError, isMissingTableError } from "@/lib/server/mysql-errors";
 import { LIVE_STAFF_SQL, privacyAudienceSql } from "@/lib/server/privacy-consent";
 import { webPushConfig } from "@/lib/server/web-push";
 import {
@@ -83,12 +83,21 @@ let lastSweepFoundNobody = false;
  */
 let lastIdleSettledKey = "";
 
-/** Identité de l'ensemble des changements annonçables passés le délai. */
-function settledKey(now: Date): string {
-  return settledPrivacyChanges(now, announceablePrivacyChanges(now))
-    .map((change) => change.id)
-    .join("|");
+/** Identité d'un ensemble de changements annonçables passés le délai. */
+function keyOf(settled: readonly PrivacyChange[]): string {
+  return settled.map((change) => change.id).join("|");
 }
+
+/**
+ * Comptes dont aucun changement dû ne tient nommé dans un message
+ * (`privacyChangesForOneMessage` vide — garde-fou, le registre le vérifie) :
+ * écartés de la lecture tant que l'ensemble des changements passés le délai
+ * reste le même, sans quoi les mêmes vingt premiers occuperaient le lot à
+ * chaque balayage et les suivants ne seraient jamais lus. Propre au processus,
+ * vidé quand l'ensemble change (`unnameableKey`).
+ */
+const unnameableUserIds = new Set<number>();
+let unnameableKey = "";
 let pendingSweep: Promise<number> | null = null;
 
 type CandidateRow = RowDataPacket & {
@@ -124,6 +133,7 @@ async function loadCandidates(
   db: Queryable,
   settled: readonly PrivacyChange[],
   liveStaff: boolean,
+  excluded: readonly number[],
 ): Promise<CandidateRow[]> {
   // Un compte sans Discord n'est candidat que si le push est **allumé** : sans
   // clés, rien ne peut lui parvenir, et le réserver consommerait l'annonce pour
@@ -131,12 +141,12 @@ async function loadCandidates(
   // retombe sur Discord seul plutôt que d'éteindre toute l'annonce.
   if (webPushConfig()) {
     try {
-      return await queryCandidates(db, settled, true, liveStaff);
+      return await queryCandidates(db, settled, true, liveStaff, excluded);
     } catch (error) {
       if (!isMissingTableError(error)) throw error;
     }
   }
-  return queryCandidates(db, settled, false, liveStaff);
+  return queryCandidates(db, settled, false, liveStaff, excluded);
 }
 
 /**
@@ -149,6 +159,7 @@ async function queryCandidates(
   settled: readonly PrivacyChange[],
   withPush: boolean,
   liveStaff: boolean,
+  excluded: readonly number[],
 ): Promise<CandidateRow[]> {
   const clause = settled
     .map(
@@ -167,9 +178,14 @@ async function queryCandidates(
         AND (${clause})
         AND NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications r
                          WHERE r.user_id = u.id AND r.sent_at > NOW() - INTERVAL ? DAY)
+        ${excluded.length > 0 ? `AND u.id NOT IN (${excluded.map(() => "?").join(", ")})` : ""}
       ORDER BY u.id
       LIMIT ${PRIVACY_DM_BATCH_SIZE}`,
-    [...settled.flatMap((change) => [change.publishedAt, change.id, change.id]), PRIVACY_DM_MIN_INTERVAL_DAYS],
+    [
+      ...settled.flatMap((change) => [change.publishedAt, change.id, change.id]),
+      PRIVACY_DM_MIN_INTERVAL_DAYS,
+      ...excluded,
+    ],
   );
   return rows;
 }
@@ -203,6 +219,9 @@ async function loadDone(db: Queryable, userIds: number[]): Promise<Map<number, s
  * est déjà prise (`ER_DUP_ENTRY`, annulation de l'instruction sous InnoDB).
  * Rend `null` dans ce cas — aucune ligne n'est restée : un `INSERT IGNORE`
  * partiel laissait les autres tenues pour annoncées sans jamais être envoyées.
+ * Rend aussi `null` pour un compte effacé depuis la lecture (clé étrangère) :
+ * l'erreur levée aurait abandonné le balayage entier, et les comptes déjà
+ * réservés avant lui seraient restés annoncés sans message.
  */
 async function reserve(db: Queryable, userId: number, changes: PrivacyChange[]): Promise<PrivacyChange[] | null> {
   try {
@@ -212,7 +231,7 @@ async function reserve(db: Queryable, userId: number, changes: PrivacyChange[]):
       changes.flatMap((change) => [userId, change.id]),
     );
   } catch (error) {
-    if (isDuplicateEntryError(error)) return null;
+    if (isDuplicateEntryError(error) || isMissingParentRowError(error)) return null;
     throw error;
   }
   return changes;
@@ -271,13 +290,19 @@ async function reserveUnderLock(
   settled: readonly PrivacyChange[],
 ): Promise<Map<string, PrivacyGroup>> {
   const groups = new Map<string, PrivacyGroup>();
+  const currentKey = keyOf(settled);
+  if (unnameableKey !== currentKey) {
+    unnameableUserIds.clear();
+    unnameableKey = currentKey;
+  }
   const candidates = await loadCandidates(
     db,
     settled,
     changes.some((change) => change.audience === "LIVE_STAFF"),
+    [...unnameableUserIds],
   );
   lastSweepFoundNobody = candidates.length === 0;
-  lastIdleSettledKey = settledKey(now);
+  lastIdleSettledKey = currentKey;
   if (candidates.length === 0) return groups;
   const done = await loadDone(db, candidates.map((row) => Number(row.id)));
 
@@ -313,8 +338,13 @@ async function reserveUnderLock(
       batch = privacyChangesForOneMessage(due, siteUrl, localizedPrivacyChanges(due, "en"));
       batchByDue.set(dueKey, batch);
     }
-    // Rien de nommable (garde-fou, le registre le vérifie) : rien n'est réservé.
-    if (batch.length === 0) continue;
+    // Rien de nommable (garde-fou, le registre le vérifie) : rien n'est réservé,
+    // et le compte sort des lectures suivantes (`unnameableUserIds`) pour ne
+    // pas tenir une place du lot à chaque balayage.
+    if (batch.length === 0) {
+      unnameableUserIds.add(userId);
+      continue;
+    }
     // Une partie du lot déjà réservée depuis la relecture (`loadDone`) — plus
     // possible entre balayages, sérialisés par le verrou nommé ; garde-fou
     // seulement : ce compte est écarté, sans message, plutôt qu'un en-tête ou un
@@ -390,8 +420,17 @@ export async function dispatchPrivacyChangeNotifications(now: Date = new Date())
   // un envoi impossible, l'annonce serait perdue. Rien ne part, rien n'est lu.
   if (outboundMuted()) return 0;
   if (pendingSweep) return pendingSweep;
-  const idle = lastSweepFoundNobody && settledKey(now) === lastIdleSettledKey;
-  if (Date.now() - lastSweepAt < (idle ? SWEEP_IDLE_THROTTLE_MS : SWEEP_THROTTLE_MS)) return 0;
+  const elapsed = Date.now() - lastSweepAt;
+  if (elapsed < SWEEP_THROTTLE_MS) return 0;
+  // L'attente longue, seulement passé l'ordinaire : le registre n'est relu
+  // (ensemble passé le délai) qu'une fois par minute au plus, pas à chaque rendu.
+  if (
+    lastSweepFoundNobody &&
+    elapsed < SWEEP_IDLE_THROTTLE_MS &&
+    keyOf(settledPrivacyChanges(now, announceablePrivacyChanges(now))) === lastIdleSettledKey
+  ) {
+    return 0;
+  }
 
   pendingSweep = runSweep(now);
   try {
@@ -407,5 +446,7 @@ export function resetPrivacyNotificationThrottle(): void {
   lastSweepAt = 0;
   lastSweepFoundNobody = false;
   lastIdleSettledKey = "";
+  unnameableUserIds.clear();
+  unnameableKey = "";
   pendingSweep = null;
 }

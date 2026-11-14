@@ -165,29 +165,34 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
 
   // Revue sécurité cycle 1 : le repli à un changement doit le **nommer** même
   // quand l'en-tête et la ligne « … et N autre(s) » comptent tout le reste.
-  it("privacyChangesForOneMessage_eachEntryFirstWithAllOthersLater_namedInBothLanguages", () => {
-    const english = localizedPrivacyChanges(PRIVACY_CHANGES, "en");
-    for (const [index, entry] of PRIVACY_CHANGES.entries()) {
-      const others = PRIVACY_CHANGES.filter((_, other) => other !== index);
-      const batch = privacyChangesForOneMessage(
-        [entry, ...others],
-        "https://bluegenji.fr",
-        [english[index], ...english.filter((_, other) => other !== index)],
-      );
-      expect(batch.length).toBeGreaterThan(0);
-      const later = PRIVACY_CHANGES.length - batch.length;
-      for (const locale of ["fr", "en"] as const) {
-        const message = buildPrivacyChangesMessage(
-          localizedPrivacyChanges(batch, locale),
-          "https://bluegenji.fr",
-          locale,
-          later,
+  // Revue sécurité cycle 2 : avec une marge sur l'adresse du site (hôte de
+  // préproduction, `www.`, chemin) — un lot vide écarterait ces comptes.
+  it.each(["https://bluegenji.fr", `https://${"preproduction.".repeat(4)}bluegenji.fr/site`])(
+    "privacyChangesForOneMessage_eachEntryFirstWithAllOthersLater_namedInBothLanguages (%s)",
+    (siteUrl) => {
+      const english = localizedPrivacyChanges(PRIVACY_CHANGES, "en");
+      for (const [index, entry] of PRIVACY_CHANGES.entries()) {
+        const others = PRIVACY_CHANGES.filter((_, other) => other !== index);
+        const batch = privacyChangesForOneMessage(
+          [entry, ...others],
+          siteUrl,
+          [english[index], ...english.filter((_, other) => other !== index)],
         );
-        expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-        for (const named of localizedPrivacyChanges(batch, locale)) expect(message).toContain(named.title);
+        expect(batch.length).toBeGreaterThan(0);
+        const later = PRIVACY_CHANGES.length - batch.length;
+        for (const locale of ["fr", "en"] as const) {
+          const message = buildPrivacyChangesMessage(
+            localizedPrivacyChanges(batch, locale),
+            siteUrl,
+            locale,
+            later,
+          );
+          expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+          for (const named of localizedPrivacyChanges(batch, locale)) expect(message).toContain(named.title);
+        }
       }
-    }
-  });
+  },
+  );
 
   it("privacyChangesForOneMessage_singleEntryThatCannotBeNamed_returnsEmpty", () => {
     const huge = { ...A, title: "T".repeat(PRIVACY_DM_MAX_LENGTH), summary: "S" };
@@ -542,9 +547,22 @@ describe("privacyChangesForOneMessage", () => {
 
   // Revue sécurité cycle 1 : un changement qui ne se nomme pas (même seul) n'est
   // plus rendu — il serait réservé, tenu pour annoncé, sans titre écrit.
-  it("ne rend pas un changement que le message ne pourrait pas nommer", () => {
+  // Revue sécurité cycle 2 : il ne bloque pas les autres, nommés seuls.
+  it("privacyChangesForOneMessage_firstCannotBeNamed_namesAnotherAlone", () => {
     const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
-    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([]);
+    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([A]);
+  });
+
+  it("privacyChangesForOneMessage_firstCannotBeNamedInEnglishOnly_namesAnotherAlone", () => {
+    const fr = [A, B];
+    const en = [{ ...A, title: "y".repeat(5000) }, B];
+    expect(privacyChangesForOneMessage(fr, null, en)).toEqual([B]);
+  });
+
+  it("privacyChangesForOneMessage_noneCanBeNamed_returnsEmpty", () => {
+    const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
+    const huger = change("y", "2026-01-11", { title: "w".repeat(5000) });
+    expect(privacyChangesForOneMessage([huge, huger], null)).toEqual([]);
   });
 
   it("ne rend rien quand il n'y a rien", () => {
