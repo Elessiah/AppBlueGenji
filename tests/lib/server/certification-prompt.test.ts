@@ -112,10 +112,11 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       discordVerified: false,
-      battletagVerified: false,
       // Battle.net rattaché : un BattleTag n'est plus à demander de ce côté.
       battletagRelevant: false,
       teamHasContact: false,
+      // Overwatch : la modale dit encore que Blizzard le renseignera (revue juridique #497).
+      battletagUnfixable: true,
     });
   });
 
@@ -211,9 +212,10 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       discordVerified: false,
-      battletagVerified: false,
       battletagRelevant: false,
       teamHasContact: false,
+      // Overwatch : la modale dit encore que Blizzard le renseignera (revue juridique #497).
+      battletagUnfixable: true,
     });
   });
 
@@ -279,6 +281,15 @@ describe("loadCertificationPrompt", () => {
   it("Battle.net rattaché sans BattleTag : rien à lui demander de ce côté (inactionnable)", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD, blizzard_sub: "sub", overwatch_battletag: null }]);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+  });
+
+  it("loadCertificationPrompt_marvelRivals_neverFlagsTheBattletagAsUnfixable", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE, blizzard_sub: "sub", overwatch_battletag: null }]);
+
+    const prompt = await loadCertificationPrompt(executor, 7, 42, false, false);
+
+    expect(prompt).not.toBeNull();
+    expect(prompt).not.toHaveProperty("battletagUnfixable");
   });
 
   it("rien pour un lecteur qui n'est plus dans le roster", async () => {
@@ -517,6 +528,45 @@ describe("mémoire courte des invitations", () => {
     expect(load).toHaveBeenCalledTimes(2);
     // La relecture, elle, est retenue.
     expect(peekCertificationPrompt("7:42:1:1", now)).toEqual({ prompt: null });
+  });
+
+  // Revue #521 : la relecture n'ajoute pas ses propres trois secondes à l'attente.
+  it("cachedCertificationPrompt_forgottenReadRereadHangs_waitIsBoundedFromTheFirstRead", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      clock = 0;
+      let finishFirst!: (value: typeof PROMPT | null) => void;
+      const load = jest
+        .fn<() => Promise<typeof PROMPT | null>>()
+        .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+        .mockImplementationOnce(() => new Promise(() => undefined));
+      let settled = false;
+      const reading = cachedCertificationPrompt("7:42:1:1", load, now).then((prompt) => {
+        settled = true;
+        return prompt;
+      });
+      forgetCertificationPromptsOf(7);
+      clock = 2_000;
+      jest.advanceTimersByTime(2_000);
+      finishFirst(PROMPT);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(settled).toBe(false);
+
+      // Une seconde de plus (3 s depuis la première lecture) : « rien », sans
+      // attendre les trois secondes propres de la relecture.
+      await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_READ_TIMEOUT_MS - 2_000);
+
+      expect(settled).toBe(true);
+      expect(await reading).toBeNull();
+    } finally {
+      jest.clearAllTimers();
+      forgetCertificationPrompts();
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   it("cachedCertificationPrompt_teamReadForgotten_servesTheNowDueInvitation (EF-23)", async () => {

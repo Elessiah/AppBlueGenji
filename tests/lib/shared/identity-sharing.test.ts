@@ -63,7 +63,9 @@ describe("HIDDEN_BATTLETAG_AUDIENCE", () => {
   });
 
   it("dit qui le lit, et quand, comme contact et comme caster", () => {
-    expect(battletag).toContain("si tu es présenté comme contact (fenêtres « Contacts » et de lancement)");
+    expect(battletag).toContain("si tu es présenté comme contact (fenêtres « Contacts » et de lancement, et sur la page du match, à ses parties)");
+    expect(battletag).toContain("avant, intérêt légitime : tu t'y opposes et te retires d'un match par le formulaire de signalement");
+    expect(battletag).not.toContain("(tu peux te retirer d'un match à tout moment ;");
     expect(battletag).toContain("dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match");
     expect(battletag).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match");
   });

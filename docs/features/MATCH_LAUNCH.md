@@ -405,8 +405,9 @@ gardent le fournisseur que l'ancienne règle leur avait donné.
 
 ## Casters et streams
 
-Un match a **une liste de streams** (`bg_match_streams` : un lien facultatif
-chacun) et **une liste de casters** (`bg_match_casters` : un compte, le stream
+Un match a **une liste de streams** (`bg_match_streams` : un lien chacun,
+obligatoire pour le stream qu'ouvre un caster, facultatif pour celui de la
+configuration du direct) et **une liste de casters** (`bg_match_casters` : un compte, le stream
 qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
 L'instantané lit les streams puis les casters ; un caster lu sur un stream que
 la première lecture n'a pas vu (ouvert entre les deux) fait relire les streams

@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { crossesLocale } from "@/lib/shared/locales";
+import { crossesLocale, type Locale } from "@/lib/shared/locales";
 import {
   formatPrivacyChangeDateIn,
   privacyAnsweredEvent,
@@ -34,6 +34,160 @@ export function privacyModalIntroKey(changes: readonly PrivacyChange[]) {
   return terms ? "privacyModal.introOneTerms" : "privacyModal.introOne";
 }
 
+/** Clé d'un détail lu : la langue en fait partie (un passage à `/en` relit l'anglais). */
+function detailKey(locale: Locale, id: string): string {
+  return `${locale}:${id}`;
+}
+
+/**
+ * La lecture de détail que réclame la liste **présentée** : les seules entrées
+ * sans détail ni détail déjà lu **dans cette langue**, préfixées de la langue —
+ * `""` quand rien ne manque. Une liste qui rétrécit ou se réordonne ne relit
+ * rien ; une entrée ajoutée sous la modale ouverte (publiée à minuit), ou un
+ * changement de langue, en relance une.
+ */
+export function privacyDetailsRequestKey(
+  changes: readonly Pick<PrivacyChange, "id" | "details">[],
+  loaded: PrivacyChangeDetails,
+  locale: Locale,
+): string {
+  const missing = changes
+    .filter((change) => change.details.length === 0 && !(detailKey(locale, change.id) in loaded))
+    .map((change) => change.id);
+  return missing.length > 0 ? `${locale}|${missing.join(",")}` : "";
+}
+
+/** Langue et identifiants d'une clé de lecture (`privacyDetailsRequestKey`). */
+function splitRequestKey(key: string): { locale: string; ids: string[] } {
+  const bar = key.indexOf("|");
+  return { locale: key.slice(0, bar), ids: key.slice(bar + 1).split(",") };
+}
+
+/**
+ * La lecture `readKey` couvre-t-elle `requestKey` ? Même langue, et chaque
+ * identifiant demandé déjà dans cette lecture. Une clé vide est toujours couverte.
+ */
+export function privacyDetailsReadCovers(readKey: string | null, requestKey: string): boolean {
+  if (requestKey === "") return true;
+  if (readKey === null || readKey === "") return false;
+  const read = splitRequestKey(readKey);
+  const wanted = splitRequestKey(requestKey);
+  return read.locale === wanted.locale && wanted.ids.every((id) => read.ids.includes(id));
+}
+
+/**
+ * Le suivi des lectures de détail d'une modale : seule la **dernière** lecture
+ * lancée parle (son échec se dit, celui d'une lecture dépassée se tait — même
+ * à clé égale, après un aller-retour de langue), et une clé que la dernière
+ * lecture couvre déjà n'en relance pas une (lecture dépassée revenue, qui
+ * réduit la clé à ce que la dernière attend encore).
+ */
+export function createPrivacyDetailsReads() {
+  let sequence = 0;
+  let latest: { seq: number; key: string; controller: AbortController; failed: boolean } | null = null;
+  return {
+    /**
+     * Numéro de la lecture à lancer, `null` si la dernière couvre déjà
+     * `requestKey`. Lancer une lecture **abandonne** la précédente, encore en
+     * vol : sa réponse ne parlerait plus pour la liste présentée.
+     */
+    start(requestKey: string): number | null {
+      if (privacyDetailsReadCovers(latest?.key ?? null, requestKey)) return null;
+      latest?.controller.abort();
+      sequence += 1;
+      latest = { seq: sequence, key: requestKey, controller: new AbortController(), failed: false };
+      return sequence;
+    },
+    /** Signal d'abandon de la lecture `seq` (levé par la lecture suivante). */
+    signal(seq: number): AbortSignal | undefined {
+      return latest?.seq === seq ? latest.controller.signal : undefined;
+    },
+    isLatest(seq: number): boolean {
+      return latest?.seq === seq;
+    },
+    /**
+     * Oublie la lecture `seq` si c'est la dernière : la clé qu'elle couvrait
+     * sera relue au prochain `start` (échec tu, modale masquée entre-temps).
+     */
+    forget(seq: number): void {
+      if (latest?.seq === seq) latest = null;
+    },
+    /** La lecture `seq`, la dernière, a échoué modale ouverte (échec dit). */
+    markFailed(seq: number): void {
+      if (latest?.seq === seq) latest.failed = true;
+    },
+    /**
+     * Oublie la dernière lecture si elle a échoué : la modale masquée puis
+     * rouverte relit le détail au lieu de rester sur l'échec.
+     */
+    dropFailed(): void {
+      if (latest?.failed) latest = null;
+    },
+  };
+}
+
+/** Ce que la modale branche sur une lecture de détail (`runPrivacyDetailsRead`). */
+export type PrivacyDetailsReadHooks = {
+  /** La lecture elle-même (`GET /api/profile/privacy-changes`). */
+  load: (ids: string[], signal?: AbortSignal) => Promise<PrivacyChangeDetails>;
+  /** Lecture neuve lancée : un échec précédent ne libère plus le bouton. */
+  onStart: () => void;
+  onLoaded: (ids: string[], details: PrivacyChangeDetails) => void;
+  /** Échec de la dernière lecture, modale encore ouverte : le dire, libérer le bouton. */
+  onFailed: () => void;
+  /** La modale est-elle **encore** ouverte (lu au retour de la lecture) ? */
+  isOpen: () => boolean;
+};
+
+/**
+ * Lance la lecture de détail que réclame `requestKey`, sauf si la dernière la
+ * couvre déjà. Seule la **dernière** lecture parle de son échec (une lecture
+ * dépassée se tait) — et seulement si la modale est encore ouverte : masquée
+ * entre-temps (lien vers `/rgpd`), l'échec ne se dit pas sur une page sans
+ * modale, et la lecture est oubliée pour être relancée à la réouverture.
+ */
+export function runPrivacyDetailsRead(
+  reads: ReturnType<typeof createPrivacyDetailsReads>,
+  requestKey: string,
+  hooks: PrivacyDetailsReadHooks,
+): void {
+  if (requestKey === "") return;
+  const seq = reads.start(requestKey);
+  if (seq === null) return;
+  hooks.onStart();
+  const { ids } = splitRequestKey(requestKey);
+  hooks.load(ids, reads.signal(seq)).then(
+    // Chaque identifiant demandé est tenu pour lu, même sans détail rendu :
+    // sinon la lecture se relancerait sans fin.
+    (details) => hooks.onLoaded(ids, details),
+    () => {
+      // Une lecture dépassée (liste ou langue changée depuis, même revenue à
+      // l'identique) se tait : la dernière lecture parle pour la liste présentée.
+      if (!reads.isLatest(seq)) return;
+      if (!hooks.isOpen()) {
+        reads.forget(seq);
+        return;
+      }
+      reads.markFailed(seq);
+      hooks.onFailed();
+    },
+  );
+}
+
+/**
+ * Le bouton attend-il le détail ? Oui tant qu'une lecture est due
+ * (`requestKey` non vide) et que la dernière lecture, en échec (`failedFor`),
+ * ne la couvre pas : on ne prend pas connaissance d'une entrée dont le détail
+ * n'a jamais été montré.
+ */
+export function privacyDetailsPending(
+  detailsDeferred: boolean,
+  requestKey: string,
+  failedFor: string | null,
+): boolean {
+  return detailsDeferred && requestKey !== "" && !(failedFor !== null && privacyDetailsReadCovers(failedFor, requestKey));
+}
+
 /**
  * Présente à un compte connecté les changements publiés du traitement de ses
  * données dont il n'a pas encore pris connaissance
@@ -54,17 +208,30 @@ export function privacyModalIntroKey(changes: readonly PrivacyChange[]) {
  * dire « une seule fois ».
  *
  * Rendue par la mise en page racine, côté serveur : la liste est dans le HTML
- * initial, sans aller-retour ni clignotement.
+ * initial, sans aller-retour ni clignotement. Le **détail** des entrées, lui,
+ * n'y est pas (`detailsDeferred`, #587) : la charge de chaque page d'un compte
+ * en retard en portait des dizaines de Ko. Il se lit une fois, à l'ouverture
+ * (`GET /api/profile/privacy-changes`), et le bouton attend qu'il soit là — on
+ * ne prend pas connaissance d'un détail encore absent. En panne, une erreur le
+ * dit et le bouton se libère : la politique, liée, porte tout le texte.
  *
  * Langue de la page (lot 7b-2) : son habillage vient de `shell.privacyModal`,
  * et les entrées arrivent **déjà traduites** de la mise en page
  * (`localizedPrivacyChanges`) — aucune traduction n'est chargée ici.
  */
-export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChange[] }>) {
+export function PrivacyChangesModal({
+  changes,
+  detailsDeferred = false,
+}: Readonly<{ changes: PrivacyChange[]; detailsDeferred?: boolean }>) {
   const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Détail lu, par langue et identifiant (`detailKey`).
+  const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails>({});
+  // Lecture (`privacyDetailsRequestKey`) en échec : le bouton se libère.
+  const [detailsFailedFor, setDetailsFailedFor] = useState<string | null>(null);
+  const detailsReads = useRef(createPrivacyDetailsReads());
   // Fermée par un lien d'action pendant un enregistrement : sa réponse ne doit
   // plus parler d'une modale que le joueur a quittée.
   const leftByLink = useRef(false);
@@ -82,6 +249,36 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
     onClose: () => {},
     locked: busy,
   });
+
+  const requestKey = privacyDetailsRequestKey(changes, loadedDetails, locale);
+  // Lu au retour d'une lecture : la modale a pu être masquée entre-temps.
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    // Masquée après un échec : la réouverture relira le détail.
+    if (!open) detailsReads.current.dropFailed();
+    if (!open || !detailsDeferred) return;
+    runPrivacyDetailsRead(detailsReads.current, requestKey, {
+      load: (ids, signal) => loadPrivacyChangeDetails(ids.join(","), locale, signal),
+      onStart: () => setDetailsFailedFor(null),
+      onLoaded: (ids, details) =>
+        setLoadedDetails((previous) => {
+          const next = { ...previous };
+          for (const id of ids) next[detailKey(locale, id)] = details[id] ?? [];
+          return next;
+        }),
+      onFailed: () => {
+        setDetailsFailedFor(requestKey);
+        showError(t("privacyModal.detailsFailed"));
+      },
+      isOpen: () => openRef.current,
+    });
+  }, [open, detailsDeferred, requestKey, locale, showError, t]);
+  const detailsPending = privacyDetailsPending(detailsDeferred, requestKey, detailsFailedFor);
+  const detailsOf = (change: PrivacyChange) =>
+    change.details.length > 0 ? change.details : (loadedDetails[detailKey(locale, change.id)] ?? []);
 
   if (!open) return null;
 
@@ -167,9 +364,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
                   </time>
                 </div>
                 <p className={styles.changeSummary}>{entryText(change.summary)}</p>
-                {change.details.length > 0 && (
+                {detailsOf(change).length > 0 && (
                   <ul className={styles.changeDetails}>
-                    {change.details.map((detail, index) => (
+                    {detailsOf(change).map((detail, index) => (
                       <li key={index} /* NOSONAR S6479 — détails d'une entrée publiée, immuables */>{entryText(detail)}</li>
                     ))}
                   </ul>
@@ -212,11 +409,49 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
         </p>
 
         <div className={styles.actions}>
-          <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy}>
+          {/* Au pied de la modale, à côté du bouton qu'il bloque : visible sans défiler. */}
+          {detailsPending && (
+            <output className={`${styles.changeSummary} ${styles.detailsLoading}`}>
+              {t("privacyModal.detailsLoading")}
+            </output>
+          )}
+          <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy || detailsPending}>
             {busy ? t("privacyModal.saving") : t("privacyModal.acknowledge")}
           </CyberButton>
         </div>
       </div>
     </div>
   );
+}
+
+/** Au-delà, la lecture du détail est tenue pour échouée. */
+const PRIVACY_DETAILS_TIMEOUT_MS = 15_000;
+
+/** Détail des entrées présentées, par identifiant (`GET /api/profile/privacy-changes`). */
+export type PrivacyChangeDetails = Record<string, readonly string[]>;
+
+/** Lit le détail des entrées `idsKey` (identifiants joints par des virgules), dans la langue de la page. */
+export async function loadPrivacyChangeDetails(
+  idsKey: string,
+  locale: Locale,
+  abort?: AbortSignal,
+): Promise<PrivacyChangeDetails> {
+  const query = new URLSearchParams({ ids: idsKey, locale });
+  // Borné : une lecture qui ne répond pas libère le bouton (échec, notifié).
+  // `AbortController` + minuterie, pas `AbortSignal.any`/`.timeout` (absents
+  // de Safari avant 17.4 / 16) : là, chaque lecture échouait d'emblée.
+  const controller = new AbortController();
+  const stop = () => controller.abort();
+  const timer = setTimeout(stop, PRIVACY_DETAILS_TIMEOUT_MS);
+  if (abort?.aborted) stop();
+  else abort?.addEventListener("abort", stop, { once: true });
+  try {
+    const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = (await response.json()) as { details?: PrivacyChangeDetails };
+    return body.details ?? {};
+  } finally {
+    clearTimeout(timer);
+    abort?.removeEventListener("abort", stop);
+  }
 }

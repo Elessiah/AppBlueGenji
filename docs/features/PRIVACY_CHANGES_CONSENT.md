@@ -56,7 +56,7 @@ Tout le reste suit seul :
 
 | Effet | Où |
 | --- | --- |
-| Modale à la prochaine page de chaque compte concerné | `app/layout.tsx` → `components/privacy/PrivacyChangesModal.tsx` |
+| Modale à la prochaine page de chaque compte concerné | `app/layout.tsx` → `components/privacy/PrivacyChangesModal.tsx` (titres et résumés seulement, `privacyChangeHeads` ; le détail se lit à l'ouverture par `GET /api/profile/privacy-changes?ids=…&locale=…`, le bouton attend — #587 : la charge de chaque page d'un compte en retard en portait des dizaines de Ko ; seules les entrées dont le détail manque dans la langue de la page se lisent (`privacyDetailsRequestKey`) : une entrée ajoutée sous la modale ouverte ou un changement de langue relance la lecture et bloque de nouveau le bouton, une liste qui rétrécit ne relit rien, seule la dernière lecture lancée parle — l'échec d'une lecture dépassée se tait, même revenue à la même clé — et une clé que la dernière lecture couvre déjà n'en relance pas, `createPrivacyDetailsReads`, `privacyDetailsPending`) |
 | Message privé Discord aux comptes joignables | `lib/server/privacy-change-notifications.ts` |
 | « Dernière mise à jour » de `/rgpd` | `privacyPolicyUpdatedLabel(today)` |
 
@@ -229,14 +229,54 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   inverse — un drapeau par entrée qui court-circuite délai et intervalle —
   rouvrirait le spam au premier changement qu'on jugerait important.
 
-  Le balayage suppose **un seul processus** (pm2 en mode `fork`, voir
-  `docs/DEPLOYMENT.md`) : l'intervalle est lu avant la réservation, et deux
-  processus concurrents pourraient tous deux l'enjamber.
+  Le balayage passe derrière un **verrou nommé** (`PRIVACY_SWEEP_LOCK_NAME`,
+  `GET_LOCK` sans attente) : un seul processus à la fois balaie, l'autre passe
+  son tour. Sans lui, deux balayages simultanés enjambaient l'intervalle, ou se
+  partageaient les réservations d'un compte et rendaient chacun leur part sans
+  écrire. Envoi « au plus une fois » : une réservation laissée par un processus
+  tué avant l'envoi compte pour annoncée (la modale, elle, l'a présentée).
+  Seule reprise : un compte que le bot n'a pas pu joindre est rendu au
+  balayage suivant (`discordUnreachedUserIds`), et le push, déjà parti, repart
+  avec lui — « un doublon vaut mieux qu'un silence » ; le registre (T10) le dit.
+  Le verrou ne couvre que la lecture des candidats et les **réservations** (une
+  instruction `INSERT` tout-ou-rien par compte, sur la connexion qui tient le
+  verrou) ; les envois au bot, lents, partent **après** sa libération. Un
+  balayage qui ne trouve personne à prévenir espace le suivant de dix minutes
+  (`SWEEP_IDLE_THROTTLE_MS`) : la lecture parcourt tous les comptes joignables ;
+  un changement qui passe depuis le délai de la modale lève cette attente
+  dans chaque processus (`lastIdleSettledKey`, comparé seulement passé la
+  minute ordinaire, pas à chaque rendu).
+  Un lot en partie déjà réservé écarte le compte : le doublon (`ER_DUP_ENTRY`)
+  annule toute l'instruction, aucune ligne n'en reste (un `INSERT IGNORE`
+  partiel aurait tenu le reste pour annoncé sans l'envoyer). La réservation est
+  un `INSERT … SELECT` gardé par `is_deleted = 0` : un compte mis en
+  suppression entre la lecture et la réservation n'en reçoit aucune ligne ni
+  aucun message ; effacé (clé étrangère), il est écarté de même, sans
+  abandonner le balayage. Un changement qui ne tient pas même seul n'en bloque
+  pas d'autres : `privacyChangesForOneMessage` cherche alors le lot parmi ceux
+  qui tiennent seuls (plusieurs à la fois) — sauf des conditions d'utilisation
+  qui ne tiennent pas : rien ne part, le pied dirait sinon qu'aucun accord
+  n'est demandé (garde-fous, le registre vérifie que chacun tient). La lecture
+  avance par **curseur** (`cursorAfterId`, dernier compte d'un lot plein, retour
+  à zéro au bout de la liste) : un compte écarté en mémoire, pour quelque motif
+  que ce soit, ne tient jamais les vingt places du lot à chaque balayage, et il
+  est relu au tour suivant.
+  `GET /api/profile/privacy-changes` répond `Cache-Control: private,
+  max-age=300` (texte publié, identique pour tous) ; un avis hors politique
+  (`GOOGLE_LINKED`, absent de `/rgpd`) n'est rendu par cette route qu'au
+  compte qui l'a à lire (`loadPendingPrivacyChanges`, lu seulement si un tel
+  avis est demandé), omis sinon — la réponse dépend alors du compte et part en
+  `private, no-store` (un autre compte connecté ensuite dans le navigateur ne
+  reçoit pas la lecture du premier). Ce n'est pas une confidentialité : le
+  registre, détail compris, est aussi dans le code client ; la route ne
+  présente pas l'avis à qui il ne s'adresse pas ; la modale abandonne une
+  lecture de détail dépassée (`AbortSignal`) ; le guet du refus de « Ne plus voir »
+  cesse d'observer le document à deux minutes sans dialogue de `/profil`.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni lus sur le site ni déjà reçus, et renvoie au site
-  pour le détail — en disant qu'aucun accord n'est demandé, sauf quand le message porte des conditions d'utilisation à accepter (`asksTermsAcceptance` sur l'entrée, posé pour toute version des conditions depuis la version 7) : `privacyChangesForOneMessage` les met **en tête** du lot, si bien qu'elles partent toujours dans le premier message, et le pied dit alors que seules ces conditions demandent l'accord, si elles ne sont pas encore acceptées, « pour le reste » aucun accord (dans un aperçu, `buildPrivacyChangesMessage` le dit aussi quand elles ne sont que comptées). Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
+  pour le détail — en disant qu'aucun accord n'est demandé, sauf quand le message porte des conditions d'utilisation à accepter (`asksTermsAcceptance` sur l'entrée, posé pour toute version des conditions depuis la version 7) : `privacyChangesForOneMessage` les **choisit d'abord** — elles partent toujours dans le premier message, à leur place dans l'ordre du registre, et ce qu'elles évincent est le plus **récent** des autres changements, qui a le plus de fenêtre devant lui (revue EF-19 #501) — et le pied dit alors que seules ces conditions demandent l'accord, si elles ne sont pas encore acceptées, « pour le reste » aucun accord (dans un aperçu, `buildPrivacyChangesMessage` le dit aussi quand elles ne sont que comptées). Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
   ne **réserve** que les changements qu'un message peut nommer tous
-  (`privacyChangesForOneMessage`), et le reste part au message suivant — un mois plus tard au plus tôt, l'intervalle minimal valant pour lui aussi (revers : un premier message parti tard dans la fenêtre de 60 jours peut en laisser sortir ce reste avant le suivant ; la modale, elle, l'a présenté). Le
+  (`privacyChangesForOneMessage`) : leurs résumés quand ils tiennent tous, sinon **leurs titres seuls** — seulement s'ils en nomment davantage, leur phrase d'introduction pouvant coûter plus que des résumés courts —, un par ligne, sous une phrase qui renvoie au site pour les résumés (#587 : un compte en retard d'une trentaine d'entrées n'en apprenait que deux par mois ; une douzaine de titres tiennent). Le reste est **compté** dans ce message (« … et N autre(s) », l'en-tête comptant le tout, paramètre `later` = dus moins le **lot nommé** — un lot dont une partie est déjà réservée ne part pas, ses réservations sont rendues ; le push du même envoi compte de même, `privacyChangePush(titles, locale, later)`) mais ni réservé ni tenu pour annoncé : il part au message suivant — un mois plus tard au plus tôt, l'intervalle minimal valant pour lui aussi (revers : un premier message parti tard dans la fenêtre de 60 jours peut en laisser sortir ce reste avant le suivant ; la modale, elle, l'a présenté, et le message l'a compté). Le
   repli qui *compte* les derniers (« … et 1 autre ») ne suffit pas à l'envoi :
   réservés avant l'envoi, ils étaient tenus pour annoncés sans que leur titre
   ait été écrit — et c'était toujours le plus récent qui tombait. Le registre

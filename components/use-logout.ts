@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
+import { signalSessionChanged } from "@/lib/shared/session-change-signal";
 
 /**
  * Le geste « Déconnexion », commun au menu du compte et au bouton de `/profil` :
@@ -31,6 +32,8 @@ export function useLogout(onSuccess?: () => void): { leaving: boolean; logout: (
       showError(t("account.logoutFailed"));
       return;
     }
+    // Rien de retenu pour ce compte ne doit s'adresser au suivant.
+    signalSessionChanged();
     onSuccess?.();
     router.push("/");
     router.refresh();

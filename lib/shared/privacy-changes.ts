@@ -13,8 +13,11 @@
  *   voit toutes les trois dans la même modale, et un clic les acquitte
  *   ensemble (`bg_privacy_acknowledgments`, une ligne par changement) ;
  * - chaque compte joignable sur Discord qui n'en a pas pris connaissance sur
- *   le site en reçoit un résumé en message privé, une seule fois par changement, une
- *   semaine après sa publication et au plus un message par mois — les
+ *   le site en reçoit un résumé en message privé, une fois par changement tant qu'il a moins de 60 jours
+ *   (`PRIVACY_DM_WINDOW_DAYS` ; refait, push compris, si le bot n'a pas pu le
+ *   remettre ; jamais relancé pour un membre introuvable ou aux messages
+ *   privés fermés), pas avant qu'une semaine
+ *   ait passé depuis le plus ancien dû et au plus un message par mois — les
  *   changements rapprochés partent ensemble
  *   (`lib/server/privacy-change-notifications.ts`) ;
  * - la mention « Dernière mise à jour » de `/rgpd` suit la dernière entrée.
@@ -1983,6 +1986,41 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd/registre#t08", label: "Lire le traitement T08 du registre" },
     ],
   },
+  {
+    // EF-63 (ERREUR.txt, revue EF-19 #501), rectificatif de l'entrée publiée
+    // `2026-10-proposition-certification-discord-marque-de-session` : une réponse
+    // refusée (autre compte connecté depuis, compte introuvable, échec du site)
+    // ne lève pas la marque, et la fenêtre peut revenir **tant que la session
+    // dure** — pas seulement « au chargement suivant », et sans liste fermée de
+    // refus ; seule la certification refusée parce que le tag ne peut plus être
+    // certifié la lève, par le « Plus tard » que la fenêtre envoie d'elle-même
+    // (`closeForSession`, `DiscordCertifyPrompt`) — s'il parvient au site et n'y est
+    // pas refusé (toute réponse d'erreur de la route certify-prompt : autre compte,
+    // session absente, action invalide, panne — liste non fermée), et la
+    // marque n'est posée qu'à une connexion par Discord ou Blizzard
+    // (`createSession`) ; elle est propre à chaque session (un refus « autre compte »
+    // dans un navigateur laisse celle des autres appareils). /rgpd (rgpd-policy) le
+    // dit depuis ce lot. Deux autres précisions (revue juridique EF-63), déjà vraies
+    // avant ce lot : un caster qui est aussi arbitre du site lit les contacts des
+    // équipes de son match dès que les deux adversaires sont connus (fenêtre
+    // « Contacts » de la carte et « Infos de connexion » de la page du match) ; le
+    // relevé du « Prêt » de l'arbitre désigné s'affiche aussi à ses parties, aux
+    // arbitres et aux administrateurs du site sur la page du match, et l'état public du lancement peut le laisser deviner. Rien ne change dans le
+    // code. Pour tous les comptes ; datée du lendemain de la nuit de déploiement
+    // (comme `REGISTER_UPDATED_AT`) — avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-marque-de-session-rectificatif",
+    publishedAt: "2026-11-16",
+    title: "Proposition de certification du tag Discord : quand la fenêtre revient (et deux autres précisions)",
+    links: [DATA_COLLECTED_SECTION_LINK],
+    summary:
+      "Précision sur l'information du 29 octobre 2026 : quand le site ne reçoit pas ta réponse à la fenêtre de certification du tag Discord, ou la refuse, la marque de ta session reste, et la fenêtre peut revenir tant que cette session dure — pas seulement au chargement suivant. Seule exception : la certification refusée parce que ton tag ne peut plus être certifié, où la fenêtre répond d'elle-même « Plus tard », qui ne lève la marque que si le site le reçoit sans le refuser. Deux précisions aussi sur les contacts de match et le « Prêt » de l'arbitre.",
+    details: [
+      "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse (une panne du site comprise), laisse la marque sur ta session — sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis dans ce navigateur, elle n'y revient sur ton compte qu'à une nouvelle connexion par Discord ou Blizzard — chacune de tes sessions a sa propre marque, que gardent tes autres appareils.",
+      "Contacts de match : un caster qui est aussi arbitre du site lit les contacts des équipes de son match (tag Discord certifié et, dans un tournoi Overwatch, BattleTag, même masqué) dans la fenêtre « Contacts » de la carte du match et dans les « Infos de connexion » de la page du match, dès que ses deux adversaires sont connus, comme les autres arbitres — et pas seulement le temps du match, comme les autres casters.",
+      "« Prêt » de l'arbitre désigné : son relevé s'affiche aussi à ses parties, aux arbitres et aux administrateurs du site sur la page du match, et pas seulement dans les fenêtres « Contacts » et de lancement ; l'état du lancement, public, peut en outre laisser deviner s'il est prêt.",
+      "Rien d'autre ne change : la marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données ; « Ne plus voir » reste gardé sur ton compte, avec sa date.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
@@ -2191,22 +2229,27 @@ export const PRIVACY_DM_MAX_LENGTH = 1800;
  * Un **résumé**, pas le texte complet : le détail vit sur le site, où le
  * joueur est connecté. Aucun accord n'est demandé, ni ici ni là-bas, hors des
  * conditions d'utilisation qu'une entrée annonce à accepter (`asksTermsAcceptance`,
- * dit par le pied). Le
- * message nomme chaque changement par son titre et son résumé, puis dit où
- * décider. Borné sous le plafond du bot : au-delà, les derniers changements
- * sont comptés plutôt que coupés au milieu d'une phrase.
+ * dit par le pied). Le message nomme chaque changement par son titre et son
+ * résumé, puis dit où décider. Quand les résumés ne tiennent pas tous sous le
+ * plafond du bot, il ne donne plus que les **titres** (`titlesOnly` du cadre) :
+ * un compte en retard apprend ses changements d'un coup plutôt que deux par
+ * mois. Au-delà, les derniers changements sont comptés plutôt que coupés au
+ * milieu d'une phrase.
  *
  * @param changes Changements **déjà dans la langue du message**
  *   (`localizedPrivacyChanges` pour l'anglais).
  * @param siteUrl Adresse absolue du site, `null` si elle n'est pas configurée.
  * @param locale Langue du message (langue du compte destinataire).
+ * @param later Changements dus au compte mais gardés pour un message suivant
+ *   (`privacyChangesForOneMessage`) : seulement comptés ici, nommés au suivant.
  */
 export function buildPrivacyChangesMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
   locale: "fr" | "en" = "fr",
+  later = 0,
 ): string {
-  return layoutPrivacyChangesMessage(changes, siteUrl, locale).text;
+  return layoutPrivacyChangesMessage(changes, siteUrl, locale, later).text;
 }
 
 /** En-tête, pied et ligne de reste d'un message privé, par langue. */
@@ -2214,6 +2257,7 @@ const PRIVACY_DM_FRAME: Record<
   "fr" | "en",
   {
     header: (count: number) => string;
+    titlesOnly: string;
     footer: (siteUrl: string | null, asksTerms: boolean) => string;
     omitted: (count: number) => string;
   }
@@ -2223,6 +2267,7 @@ const PRIVACY_DM_FRAME: Record<
       count > 1
         ? `🔐 **BlueGenji — ${count} changements de nos règles de confidentialité**`
         : "🔐 **BlueGenji — nos règles de confidentialité ont changé**",
+    titlesOnly: "Trop de changements pour les résumer ici : voici leurs titres, le résumé de chacun t'attend sur le site.",
     footer: (siteUrl, asksTerms) =>
       `Le détail t'attend à ta prochaine visite${siteUrl ? " sur " + siteUrl : " sur le site"}. ` +
       (asksTerms ? "Seules les nouvelles conditions d'utilisation demandent ton accord, si tu ne les as pas encore acceptées ; pour le reste, aucun accord ne t'est demandé : " : "Aucun accord ne t'est demandé : ") +
@@ -2236,6 +2281,7 @@ const PRIVACY_DM_FRAME: Record<
       count > 1
         ? `🔐 **BlueGenji — ${count} changes to our privacy rules**`
         : "🔐 **BlueGenji — our privacy rules have changed**",
+    titlesOnly: "Too many changes to summarise here: here are their titles, and each one's summary awaits you on the site.",
     footer: (siteUrl, asksTerms) =>
       `The details are waiting for you on your next visit${siteUrl ? " to " + siteUrl : " to the site"}. ` +
       (asksTerms ? "Only the new terms of use need your agreement, if you haven't accepted them yet; for the rest, no consent is asked of you: " : "No consent is asked of you: ") +
@@ -2249,80 +2295,138 @@ const PRIVACY_DM_FRAME: Record<
 /**
  * Le message **et** le nombre de changements qu'il nomme, sortis de la même
  * mise en page : `privacyChangesForOneMessage` décide sur ce nombre, jamais en
- * cherchant un titre dans le texte, qui dépendrait du format de ligne.
+ * cherchant un titre dans le texte, qui dépendrait du format de ligne. Résumés
+ * d'abord ; titres seuls quand les résumés ne nomment pas tout **et** que les
+ * titres en nomment davantage.
  */
 function layoutPrivacyChangesMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
   locale: "fr" | "en" = "fr",
+  later = 0,
+): { text: string; named: number } {
+  const full = layoutPrivacyChangesLines(changes, siteUrl, locale, later, false);
+  if (full.named === changes.length) return full;
+  // Titres seuls seulement s'ils nomment **plus** : leur phrase d'introduction
+  // peut, avec des résumés courts, en nommer moins que les résumés.
+  const titles = layoutPrivacyChangesLines(changes, siteUrl, locale, later, true);
+  return titles.named > full.named ? titles : full;
+}
+
+function layoutPrivacyChangesLines(
+  changes: readonly PrivacyChange[],
+  siteUrl: string | null,
+  locale: "fr" | "en",
+  later: number,
+  titlesOnly: boolean,
 ): { text: string; named: number } {
   const frame = PRIVACY_DM_FRAME[locale];
-  const header = frame.header(changes.length);
+  // L'en-tête compte aussi ce qui part plus tard : le joueur apprend combien de
+  // changements l'attendent, pas seulement combien ce message en nomme.
+  const header = frame.header(changes.length + later);
   // Des conditions à accepter parmi les changements dus, nommés ou seulement
   // comptés : le pied ne dit plus « aucun accord » sans exception.
   const footer = frame.footer(siteUrl, changes.some((change) => change.asksTermsAcceptance === true));
   const omittedLine = frame.omitted;
+  const intro = titlesOnly ? [frame.titlesOnly] : [];
+  // Titres seuls : une ligne chacun, sans ligne vide entre eux, pour en nommer plus.
+  const block = (lines: string[]) => (titlesOnly && lines.length > 0 ? [lines.join("\n")] : lines);
   const assemble = (lines: string[], omitted: number) =>
-    [header, ...lines, ...(omitted > 0 ? [omittedLine(omitted)] : []), footer].join("\n\n");
+    [header, ...intro, ...block(lines), ...(omitted > 0 ? [omittedLine(omitted)] : []), footer].join("\n\n");
 
   // Chaque changement n'est gardé que si le message **complet** — y compris la
   // mention de ceux qui ne tiendraient plus après lui — reste sous le plafond.
   const lines: string[] = [];
   for (const [index, change] of changes.entries()) {
-    const line = `• **${change.title}** (${formatPrivacyChangeDateIn(change.publishedAt, locale)}) — ${change.summary}`;
-    if (assemble([...lines, line], changes.length - index - 1).length > PRIVACY_DM_MAX_LENGTH) {
-      return { text: assemble(lines, changes.length - index), named: lines.length };
+    const head = `• **${change.title}** (${formatPrivacyChangeDateIn(change.publishedAt, locale)})`;
+    const line = titlesOnly ? head : `${head} — ${change.summary}`;
+    if (assemble([...lines, line], changes.length - index - 1 + later).length > PRIVACY_DM_MAX_LENGTH) {
+      return { text: assemble(lines, changes.length - index + later), named: lines.length };
     }
     lines.push(line);
   }
-  return { text: assemble(lines, 0), named: lines.length };
+  return { text: assemble(lines, later), named: lines.length };
 }
 
 /**
- * Les changements qu'**un** message privé peut nommer tous, dans l'ordre (conditions
- * à accepter en tête, voir plus bas).
+ * Les changements qu'**un** message privé peut nommer tous, dans l'ordre du
+ * registre.
  *
  * Le registre entier ne tient plus sous le plafond du bot, et le repli de
  * `buildPrivacyChangesMessage` — compter ce qui ne tient pas — convient à un
  * aperçu, pas à l'envoi : le balayage réserve chaque changement **avant**
  * l'envoi, si bien qu'un changement seulement compté était marqué annoncé sans
- * que son titre ait jamais été écrit. Et c'est toujours le **plus récent** qui
- * tombait ainsi. Le balayage n'envoie donc que ce lot, et le reste part au
- * suivant.
+ * que son titre ait jamais été écrit. Le balayage n'envoie donc que ce lot ; le
+ * reste est compté dans ce message (`later`) et nommé au suivant.
  *
- * Toujours au moins un changement quand il y en a : une entrée seule tient dans
- * un message (le registre le vérifie).
+ * Le lot donne les résumés quand ils tiennent tous, sinon les titres seuls
+ * (#587 : un compte en retard d'une trentaine d'entrées n'en apprenait que deux
+ * par mois, et les plus récentes sortaient de la fenêtre d'annonce sans jamais
+ * partir).
  *
- * Des conditions d'utilisation à accepter (`asksTermsAcceptance`) passent en
- * tête : elles partent toujours dans ce message, et son pied dit qu'elles
- * demandent l'accord — jamais un « aucun accord » sans exception alors que
- * leur fenêtre attend sur le site, ni leur annonce repoussée d'un mois.
+ * Au moins un changement quand il y en a : une entrée seule tient dans un
+ * message, même suivie de la ligne « … et N autre(s) » (le registre le
+ * vérifie) ; sinon le lot est vide, plutôt qu'un changement réservé sans être
+ * nommé.
+ *
+ * Des conditions d'utilisation à accepter (`asksTermsAcceptance`) sont toujours
+ * du lot : son pied dit qu'elles demandent l'accord — jamais un « aucun
+ * accord » sans exception alors que leur fenêtre attend sur le site, ni leur
+ * annonce repoussée d'un mois. Elles gardent leur place dans l'ordre, et ce
+ * qu'elles évincent est le **plus récent** des autres changements, qui a le plus
+ * de fenêtre d'annonce devant lui — jamais un plus ancien, qui en sortirait
+ * (revue EF-19 #501).
  */
 export function privacyChangesForOneMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
   english?: readonly PrivacyChange[],
 ): PrivacyChange[] {
-  // Le lot se cherche en retirant par la fin : l'en-tête et le pied dépendent
-  // du nombre de changements, un lot plus court n'est pas seulement un préfixe
-  // du message plus long. Avec `english` (les mêmes changements, dans le même
-  // ordre, en anglais), le lot doit tenir **dans les deux langues** : chaque
-  // compte le reçoit dans la sienne (BOT-NOTIF-LANG).
-  // Un seul ordre, tiré des entrées françaises, appliqué aux deux langues.
-  const order = termsFirst(changes.map((change, index) => ({ change, index })));
-  const ordered = order.map(({ change }) => change);
-  const orderedEnglish = english && order.map(({ index }) => english[index]);
-  for (let count = ordered.length; count > 1; count -= 1) {
-    const batch = ordered.slice(0, count);
-    const fits = layoutPrivacyChangesMessage(batch, siteUrl).named === count;
-    if (fits && (!orderedEnglish || layoutPrivacyChangesMessage(orderedEnglish.slice(0, count), siteUrl, "en").named === count)) {
-      return batch;
+  // Le lot se cherche en retirant par la fin de l'ordre de choix : l'en-tête et
+  // le pied dépendent du nombre de changements, un lot plus court n'est pas
+  // seulement un préfixe du message plus long. Avec `english` (les mêmes
+  // changements, dans le même ordre, en anglais), le lot doit tenir **dans les
+  // deux langues** : chaque compte le reçoit dans la sienne (BOT-NOTIF-LANG).
+  // Un seul choix, tiré des entrées françaises, appliqué aux deux langues.
+  const priority = termsFirst(changes.map((change, index) => ({ change, index })));
+  const fitting = (indexes: readonly number[]): PrivacyChange[] | null => {
+    const kept = new Set(indexes);
+    const pick = (list: readonly PrivacyChange[]) => list.filter((_, index) => kept.has(index));
+    const count = kept.size;
+    const later = changes.length - count;
+    const fits = layoutPrivacyChangesMessage(pick(changes), siteUrl, "fr", later).named === count;
+    if (fits && (!english || layoutPrivacyChangesMessage(pick(english), siteUrl, "en", later).named === count)) {
+      return pick(changes);
+    }
+    return null;
+  };
+  for (let count = priority.length; count >= 1; count -= 1) {
+    const batch = fitting(priority.slice(0, count).map(({ index }) => index));
+    if (batch) return batch;
+  }
+  // Un changement ne tient pas même seul : les autres, ensemble, peuvent tenir —
+  // les nommer plutôt que tout bloquer derrière lui (le registre vérifie que
+  // chacun tient ; garde-fou seulement). Le lot se recherche alors sur ceux qui
+  // tiennent seuls, dans le même ordre : plusieurs à la fois, pas un par mois,
+  // pour qu'aucun ne sorte de la fenêtre d'annonce sans avoir été nommé.
+  // Des conditions d'utilisation qui ne tiennent pas : rien — leur acceptation
+  // reste due, et le pied d'un message qui ne les nommerait pas dirait
+  // qu'aucun accord n'est demandé.
+  const alone = priority.filter(({ index }) => fitting([index]) !== null);
+  if (alone.length < priority.length) {
+    const kept = new Set(alone.map(({ index }) => index));
+    if (priority.some(({ change, index }) => change.asksTermsAcceptance && !kept.has(index))) return [];
+    for (let count = alone.length; count >= 1; count -= 1) {
+      const batch = fitting(alone.slice(0, count).map(({ index }) => index));
+      if (batch) return batch;
     }
   }
-  return ordered.slice(0, 1);
+  // Pas même un changement nommé, « … et N autre(s) » compris : rien n'est
+  // réservé — mieux vaut attendre qu'annoncer sans nommer.
+  return [];
 }
 
-/** Les conditions à accepter d'abord, le reste dans son ordre (tri stable). */
+/** L'ordre de **choix** du lot : les conditions à accepter d'abord, le reste dans son ordre (tri stable). */
 function termsFirst<T extends { change: PrivacyChange }>(items: readonly T[]): T[] {
   return [...items.filter(({ change }) => change.asksTermsAcceptance), ...items.filter(({ change }) => !change.asksTermsAcceptance)];
 }

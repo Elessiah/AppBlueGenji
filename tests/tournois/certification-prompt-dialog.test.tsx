@@ -111,6 +111,37 @@ describe("CertificationPromptDialog", () => {
     expect(render(OW_MANAGER)).toBe("");
   });
 
+  // Revue juridique #497 : Overwatch, BattleTag inactionnable — Discord seul, mais
+  // la modale prévient encore que Blizzard le renseignera et que les contacts le montreront.
+  it("render_overwatchBattletagUnfixable_discordOnlyButKeepsTheBattletagSentence", () => {
+    const prompt: CertificationPrompt = { ...MR_TEAM, battletagUnfixable: true };
+
+    const fr = render(prompt);
+    const en = render(prompt, "en");
+
+    expect(fr).toContain("Certifie ton Discord<");
+    expect(fr).not.toContain(">BattleTag<");
+    // Battle.net peut n'en donner aucun : la promesse est conditionnelle.
+    expect(fr).toContain("Blizzard le renseignera à ta prochaine connexion par Battle.net si ton compte Battle.net en a un");
+    expect(fr).toContain("sera montré même masqué, certifié ou non");
+    expect(en).toContain("Blizzard will fill it in at your next sign-in with Battle.net if your Battle.net account has one");
+    expect(en).toContain("verified or not");
+  });
+
+  // Revue sécurité cycle 1 : « les autres joueurs n'y voient qu'une pastille »
+  // taisait la case « Tag Discord », qui leur ouvre le tag certifié.
+  it("render_overwatchBattletagUnfixable_keepsTheDiscordTagVisibilityException", () => {
+    const prompt: CertificationPrompt = { ...MR_TEAM, battletagUnfixable: true };
+
+    const fr = render(prompt);
+    const en = render(prompt, "en");
+
+    expect(fr).not.toContain("n&#x27;y voient qu&#x27;une pastille");
+    expect(fr).toContain("et ton tag seulement si tu as coché « Tag Discord » dans tes réglages");
+    expect(en).not.toContain("only see a badge");
+    expect(en).toContain("and your tag only if you ticked “Discord tag” in your settings");
+  });
+
   it("Marvel Rivals : Discord seul, sans BattleTag ni Blizzard", () => {
     const html = render(MR_TEAM);
     expect(html).toContain("Certifie ton Discord<");
@@ -136,7 +167,7 @@ describe("CertificationPromptDialog", () => {
     expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et aux casters le temps du match");
     expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste lié");
     expect(render(OW_MANAGER)).toContain("Ne masque pas non plus ton BattleTag dans tes matchs : certifié ou non, présenté comme contact, il est montré même masqué");
-    expect(render(OW_MANAGER)).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
+    expect(render(OW_MANAGER)).toContain("aux arbitres et aux administrateurs du site dès que les deux adversaires sont connus et jusqu&#x27;à sa fin (à ses casters le temps du match)");
     const en = render(MR_TEAM, "en");
     expect(en).toContain("the bot sends you your match times and reminders by direct message");
     expect(en).not.toContain("If your profile holds a BattleTag");

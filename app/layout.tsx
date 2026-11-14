@@ -32,7 +32,7 @@ import { healRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-pr
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
 import type { PrivacyChange } from "@/lib/shared/privacy-changes";
-import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
+import { localizedPrivacyChanges, privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
@@ -367,8 +367,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             onAdPage={onRecruitmentPage}
           />
           </RecruitmentTextProvider>
-          {/* Entrées déjà dans la langue de la page (lot 7b-2) : la modale ne charge aucune traduction. */}
-          <PrivacyChangesModal changes={localizedPrivacyChanges(privacyChanges, locale)} />
+          {/* Entrées déjà dans la langue de la page (lot 7b-2) : la modale ne charge aucune traduction.
+              Sans leur détail (#587) : la modale le lit à l'ouverture, pas chaque page. */}
+          <PrivacyChangesModal changes={privacyChangeHeads(localizedPrivacyChanges(privacyChanges, locale))} detailsDeferred />
           {user && (
             <TermsAcceptanceModal
               initiallyRequired={termsRequired}

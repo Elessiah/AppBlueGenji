@@ -202,7 +202,9 @@
     "saved": "C'est noté, merci.",
     "failed": "Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.",
     "replay": "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.",
-    "inFrench": "(en français)"
+    "inFrench": "(en français)",
+    "detailsLoading": "Chargement du détail des changements…",
+    "detailsFailed": "Le détail des changements n'a pas pu être chargé : la politique de confidentialité le donne en entier."
   },
   "loading": "Chargement…",
   "imageCropLoad": {

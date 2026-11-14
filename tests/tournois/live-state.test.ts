@@ -807,6 +807,14 @@ describe("invitation à certifier poussée après la connexion (EF-04)", () => {
     expect(parsedPrompt(legacy)?.teamHasContact).toBe(true);
   });
 
+  it("parseLiveMessage_battletagUnfixableTrue_kept (revue juridique #497)", () => {
+    expect(parsedPrompt({ ...prompt, battletagRelevant: false, battletagUnfixable: true })?.battletagUnfixable).toBe(true);
+  });
+
+  it("parseLiveMessage_battletagUnfixableNotTrue_omitted", () => {
+    expect(parsedPrompt({ ...prompt, battletagUnfixable: "oui" })).not.toHaveProperty("battletagUnfixable");
+  });
+
   it("parseLiveMessage_managerTeamHasContactFalse_keepsFalse : le meneur d'une équipe injoignable le lit", () => {
     expect(parsedPrompt({ ...prompt, teamHasContact: false })?.teamHasContact).toBe(false);
   });

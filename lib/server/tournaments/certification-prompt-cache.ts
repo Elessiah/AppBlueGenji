@@ -163,12 +163,22 @@ function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, n
   // répondue : son issue date d'avant le geste — ni servie (elle montrerait
   // une invitation levée) ni remplacée par « rien » (elle tairait une
   // invitation due, « équipe sans contact »). Ceux qui l'attendaient reçoivent
-  // une relecture partie après le geste, partagée comme toute lecture.
+  // une relecture partie après le geste, partagée comme toute lecture. Leur
+  // attente reste bornée à `CERTIFICATION_PROMPT_READ_TIMEOUT_MS` **en tout**
+  // depuis la première lecture (revue #521 : la relecture ajoutait ses propres
+  // trois secondes, jusqu'à ~6 s) ; au-delà, « rien », comme un abandon — la
+  // relecture, elle, continue et sert les suivants.
   const reread = (): Promise<CertificationPrompt | null> => {
     slot.settled = { prompt: null };
     slot.expiresAt = 0;
     slot.successor = slotFor(key, load, now);
-    return slot.successor?.value ?? Promise.resolve(null);
+    if (!slot.successor) return Promise.resolve(null);
+    const left = Math.max(0, CERTIFICATION_PROMPT_READ_TIMEOUT_MS - (now() - slot.startedAt));
+    let capTimer: ReturnType<typeof setTimeout> | undefined;
+    const cap = new Promise<null>((resolve) => {
+      capTimer = setTimeout(() => resolve(null), left);
+    });
+    return Promise.race([slot.successor.value, cap]).finally(() => clearTimeout(capTimer));
   };
   slot.value = Promise.race([outcomeOf, expired]).then((outcome) => {
     clearTimeout(timer);

@@ -194,6 +194,11 @@
   color: var(--ink-mute);
 }
 
+.extraScopes {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
 /* Base d'une donnée de tournoi, de sauvegarde ou de connexion : violet de la
    palette (une information, pas un avertissement — l'ambre leur est réservé). */
 .badgeAccent {

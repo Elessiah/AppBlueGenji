@@ -1,5 +1,6 @@
 "use client";
 
+import { signalSessionChanged } from "@/lib/shared/session-change-signal";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
@@ -284,6 +285,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         }
         throw new CodedError(code, code === ACCOUNT_SUSPENDED ? suspendedLoginText(text, null) : loginErrorMessage(code, text));
       }
+      // Rien de retenu pour un compte précédent ne doit s'adresser à celui-ci.
+      signalSessionChanged();
       router.push(redirect);
       router.refresh();
     } catch (e) {

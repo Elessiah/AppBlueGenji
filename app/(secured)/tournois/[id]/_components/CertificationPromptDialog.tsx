@@ -72,6 +72,11 @@ function CertificationPromptDialogView({
   // Variante « Discord seul » d'une cellule, là où la ligne parle de Battle.net.
   const rowText = (row: (typeof ROWS)[number], column: "does" | "doesNot") => {
     const cell = `${row}.${column}` as const;
+    // Overwatch, BattleTag inactionnable : Discord seul, mais la phrase du
+    // BattleTag montré dans les contacts du match reste (revue juridique #497).
+    if (!withBattletag && prompt.battletagUnfixable && cell === "matches.doesNot") {
+      return t("certification.rows.matches.doesNotBattletagPending");
+    }
     if (!withBattletag && cell in DISCORD_ONLY_CELLS) return t(DISCORD_ONLY_CELLS[cell as DiscordOnlyCell]);
     return t(`certification.rows.${row}.${column}`);
   };

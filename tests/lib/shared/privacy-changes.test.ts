@@ -163,6 +163,42 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
     if (omitted > 0) expect(message).toContain(`… et ${omitted} autre(s) changement(s).`);
   });
 
+  // Revue sécurité cycle 1 : le repli à un changement doit le **nommer** même
+  // quand l'en-tête et la ligne « … et N autre(s) » comptent tout le reste.
+  // Revue sécurité cycle 2 : avec une marge sur l'adresse du site (hôte de
+  // préproduction, `www.`, chemin) — un lot vide écarterait ces comptes.
+  it.each(["https://bluegenji.fr", `https://${"preproduction.".repeat(4)}bluegenji.fr/site`])(
+    "privacyChangesForOneMessage_eachEntryFirstWithAllOthersLater_namedInBothLanguages (%s)",
+    (siteUrl) => {
+      const english = localizedPrivacyChanges(PRIVACY_CHANGES, "en");
+      for (const [index, entry] of PRIVACY_CHANGES.entries()) {
+        const others = PRIVACY_CHANGES.filter((_, other) => other !== index);
+        const batch = privacyChangesForOneMessage(
+          [entry, ...others],
+          siteUrl,
+          [english[index], ...english.filter((_, other) => other !== index)],
+        );
+        expect(batch.length).toBeGreaterThan(0);
+        const later = PRIVACY_CHANGES.length - batch.length;
+        for (const locale of ["fr", "en"] as const) {
+          const message = buildPrivacyChangesMessage(
+            localizedPrivacyChanges(batch, locale),
+            siteUrl,
+            locale,
+            later,
+          );
+          expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+          for (const named of localizedPrivacyChanges(batch, locale)) expect(message).toContain(named.title);
+        }
+      }
+  },
+  );
+
+  it("privacyChangesForOneMessage_singleEntryThatCannotBeNamed_returnsEmpty", () => {
+    const huge = { ...A, title: "T".repeat(PRIVACY_DM_MAX_LENGTH), summary: "S" };
+    expect(privacyChangesForOneMessage([huge], "https://bluegenji.fr")).toEqual([]);
+  });
+
   it("nomme chaque changement quand il est annoncé seul", () => {
     for (const entry of PRIVACY_CHANGES) {
       const message = buildPrivacyChangesMessage([entry], "https://bluegenji.fr");
@@ -326,14 +362,57 @@ describe("buildPrivacyChangesMessage", () => {
   });
 
   it("reste sous le plafond du bot et compte ce qui ne tient plus", () => {
-    const long = Array.from({ length: 12 }, (_, i) =>
-      change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }),
+    const long = Array.from({ length: 30 }, (_, i) =>
+      change(`long-${i}`, "2026-02-01", { title: `Titre long-${i} ${"t".repeat(150)}` }),
     );
     const message = buildPrivacyChangesMessage(long, "https://bluegenji.fr");
     expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
     expect(message).toContain("Titre long-0");
     expect(message).toContain("https://bluegenji.fr/rgpd");
+  });
+
+  it("buildPrivacyChangesMessage_summariesFit_givesSummariesWithoutTitlesOnlyIntro", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const message = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr", locale);
+      expect(message).toContain("Résumé a.");
+      expect(message).not.toMatch(/Trop de changements|Too many changes/);
+    }
+  });
+
+  it("buildPrivacyChangesMessage_summariesTooLong_listsTitlesOnlyOnePerLine", () => {
+    const long = (id: string) => change(id, "2026-01-10", { summary: "x".repeat(700) });
+
+    const message = buildPrivacyChangesMessage([long("a"), long("b"), long("c")], "https://bluegenji.fr", "en");
+
+    expect(message).toContain("Too many changes to summarise here");
+    expect(message).toContain("• **Titre a** (January 10, 2026)\n• **Titre b** (January 10, 2026)\n• **Titre c**");
+    expect(message).not.toContain("xxx");
+  });
+
+  it("buildPrivacyChangesMessage_shortSummariesOverflow_keepsSummariesWhenTitlesOnlyWouldNameFewer", () => {
+    // Résumés d'un caractère : les titres seuls n'économisent que ~5 caractères
+    // par ligne, moins que leur phrase d'introduction — ils nommeraient moins.
+    const many = Array.from({ length: 30 }, (_, i) =>
+      change(`s${String(i).padStart(2, "0")}`, "2026-01-10", { title: `s${i} ${"t".repeat(150)}`, summary: "s" }),
+    );
+
+    for (const locale of ["fr", "en"] as const) {
+      const message = buildPrivacyChangesMessage(many, "https://bluegenji.fr", locale);
+
+      expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+      expect(message).not.toMatch(/Trop de changements|Too many changes/);
+      expect(message).toContain("— s\n");
+      expect(message).toMatch(/autre\(s\) changement\(s\)|other change\(s\)/);
+    }
+  });
+
+  it("buildPrivacyChangesMessage_laterChanges_headerCountsThemAndOmittedLineNamesHowMany", () => {
+    const message = buildPrivacyChangesMessage([A], "https://bluegenji.fr", "fr", 4);
+
+    expect(message).toContain("5 changements de nos règles de confidentialité");
+    expect(message).toContain("**Titre a** (10 janvier 2026) — Résumé a.");
+    expect(message).toContain("• … et 4 autre(s) changement(s).");
   });
 
   it("en anglais (BOT-NOTIF-LANG) : cadre, date et lien anglais ; le français par défaut est inchangé", () => {
@@ -374,7 +453,7 @@ describe("buildPrivacyChangesMessage", () => {
   });
 
   it("buildPrivacyChangesMessage_termsChangeOnlyCounted_footerStillSaysTheTermsNeedAgreement", () => {
-    const filler = Array.from({ length: 6 }, (_, i) => change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }));
+    const filler = Array.from({ length: 30 }, (_, i) => change(`long-${i}`, "2026-02-01", { title: `Titre long-${i} ${"t".repeat(150)}` }));
 
     const message = buildPrivacyChangesMessage([...filler, terms], "https://bluegenji.fr");
 
@@ -429,46 +508,102 @@ describe("announceablePrivacyChanges", () => {
 
 describe("privacyChangesForOneMessage", () => {
   const long = (id: string) => change(id, "2026-01-10", { summary: "x".repeat(700) });
+  // Un titre de 150 caractères : une dizaine tiennent, titres seuls, sous le plafond.
+  const longTitle = (id: string, overrides: Partial<PrivacyChange> = {}) =>
+    change(id, "2026-01-10", { title: `${id} ${"t".repeat(150)}`, ...overrides });
+  const backlog = (count: number) => Array.from({ length: count }, (_, i) => longTitle(`n${String(i).padStart(2, "0")}`));
 
   it("garde tout ce qui tient dans un message", () => {
     expect(privacyChangesForOneMessage([A, B, C], "https://bluegenji.fr")).toEqual([A, B, C]);
   });
 
-  it("s'arrête au premier changement qui ne serait plus nommé, dans l'ordre", () => {
-    const batch = privacyChangesForOneMessage([long("a"), long("b"), long("c")], "https://bluegenji.fr");
-    expect(batch.map((c) => c.id)).toEqual(["a", "b"]);
+  // #587 : des résumés trop longs ne coupent plus le lot à deux changements.
+  it("privacyChangesForOneMessage_summariesTooLongTogether_keepsAllAsTitles", () => {
+    const changes = [long("a"), long("b"), long("c")];
+
+    const batch = privacyChangesForOneMessage(changes, "https://bluegenji.fr");
+
+    expect(batch).toEqual(changes);
     const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
-    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(message).toContain("Trop de changements pour les résumer ici");
+    expect(message).not.toContain("x".repeat(700));
     expect(message).not.toContain("autre(s) changement(s)");
   });
 
-  it("rend toujours au moins un changement quand il y en a", () => {
-    const huge = change("z", "2026-01-10", { summary: "x".repeat(5000) });
-    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([huge]);
+  it("privacyChangesForOneMessage_titlesOverflow_keepsTheOldestAndTheMessageCountsTheRest", () => {
+    const changes = backlog(30);
+
+    const batch = privacyChangesForOneMessage(changes, "https://bluegenji.fr");
+
+    expect(batch.length).toBeGreaterThan(1);
+    expect(batch.length).toBeLessThan(30);
+    expect(batch).toEqual(changes.slice(0, batch.length));
+    const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr", "fr", 30 - batch.length);
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(message).toContain("30 changements");
+    expect(message).toContain(`… et ${30 - batch.length} autre(s) changement(s).`);
+    expect(message).toContain(batch[batch.length - 1].title);
+  });
+
+  // Revue sécurité cycle 1 : un changement qui ne se nomme pas (même seul) n'est
+  // plus rendu — il serait réservé, tenu pour annoncé, sans titre écrit.
+  // Revue sécurité cycle 2 : il ne bloque pas les autres, nommés seuls.
+  it("privacyChangesForOneMessage_firstCannotBeNamed_namesAnotherAlone", () => {
+    const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
+    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([A]);
+  });
+
+  it("privacyChangesForOneMessage_firstCannotBeNamedInEnglishOnly_namesAnotherAlone", () => {
+    const fr = [A, B];
+    const en = [{ ...A, title: "y".repeat(5000) }, B];
+    expect(privacyChangesForOneMessage(fr, null, en)).toEqual([B]);
+  });
+
+  // Revue sécurité cycle 3 : les autres, ensemble, plutôt qu'un seul par message.
+  it("privacyChangesForOneMessage_firstUnfitAndOthersFitTogether_namesAllTheOthers", () => {
+    const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
+    expect(privacyChangesForOneMessage([huge, A, B], null)).toEqual([A, B]);
+  });
+
+  // Revue sécurité cycle 3 : des conditions qui ne se nomment pas ne laissent pas
+  // partir un message dont le pied dirait qu'aucun accord n'est demandé.
+  it("privacyChangesForOneMessage_termsCannotBeNamed_returnsEmpty", () => {
+    const terms = change("conditions", "2026-01-10", { title: "x".repeat(5000), asksTermsAcceptance: true });
+    expect(privacyChangesForOneMessage([terms, A], null)).toEqual([]);
+  });
+
+  it("privacyChangesForOneMessage_noneCanBeNamed_returnsEmpty", () => {
+    const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
+    const huger = change("y", "2026-01-11", { title: "w".repeat(5000) });
+    expect(privacyChangesForOneMessage([huge, huger], null)).toEqual([]);
   });
 
   it("ne rend rien quand il n'y a rien", () => {
     expect(privacyChangesForOneMessage([], null)).toEqual([]);
   });
 
-  // EF-19 : des conditions à accepter partent toujours dans le premier message.
-  it("privacyChangesForOneMessage_termsToAcceptAfterLongChanges_putsTheTermsFirstInBothLanguages", () => {
-    const terms = change("conditions", "2026-01-20", { asksTermsAcceptance: true });
-    const fr = [long("a"), long("b"), long("c"), terms];
+  // EF-19 : des conditions à accepter partent toujours dans le premier message —
+  // à leur place, en évinçant le plus récent des autres, jamais le plus ancien.
+  it("privacyChangesForOneMessage_termsToAcceptAfterBacklog_keepsTermsInOrderAndEvictsTheNewest", () => {
+    const terms = longTitle("conditions", { asksTermsAcceptance: true });
+    const fr = [...backlog(30), terms];
     const en = fr.map((entry) => ({ ...entry, summary: `${entry.summary} (en)` }));
 
     const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
 
-    expect(batch.map((c) => c.id)).toEqual(["conditions", "a"]);
-    expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr")).toContain("Seules les nouvelles conditions d'utilisation demandent ton accord");
+    expect(batch.at(-1)).toBe(terms);
+    expect(batch.slice(0, -1)).toEqual(fr.slice(0, batch.length - 1));
+    expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr", "fr", fr.length - batch.length)).toContain(
+      "Seules les nouvelles conditions d'utilisation demandent ton accord",
+    );
   });
 
-  it("privacyChangesForOneMessage_flagOnFrenchOnly_englishFollowsFrenchOrder", () => {
+  it("privacyChangesForOneMessage_flagOnFrenchOnly_englishFollowsFrenchChoice", () => {
     const fr = [long("a"), long("b"), change("conditions", "2026-01-20", { asksTermsAcceptance: true })];
-    // Anglais sans drapeau, et des conditions longues : seules, elles tiennent ;
-    // suivies de « a » (même ordre qu'en français), plus.
+    // Anglais sans drapeau, et un titre de conditions long : seul, il tient ;
+    // avec le titre de « a » (même choix qu'en français), plus.
     const en = fr.map(({ asksTermsAcceptance: _flag, ...entry }) =>
-      entry.id === "conditions" ? { ...entry, summary: "y".repeat(1100) } : entry,
+      entry.id === "conditions" ? { ...entry, title: "y".repeat(1360) } : entry,
     );
 
     const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
@@ -481,19 +616,21 @@ describe("privacyChangesForOneMessage", () => {
 
     const batch = privacyChangesForOneMessage(due, "https://bluegenji.fr", localizedPrivacyChanges(due, "en"));
 
-    expect(batch[0]?.id).toBe("2026-10-conditions-v7-casters-et-arbitre");
+    expect(batch.map((c) => c.id)).toContain("2026-10-conditions-v7-casters-et-arbitre");
   });
 
   it("avec l'anglais, le lot doit tenir dans les deux langues (BOT-NOTIF-LANG)", () => {
-    const fr = [long("a"), long("b"), long("c")];
-    // Les mêmes changements, plus longs en anglais : seuls deux tiennent ensemble.
-    const en = fr.map((entry) => ({ ...entry, summary: "y".repeat(800) }));
-    expect(privacyChangesForOneMessage(fr, "https://bluegenji.fr").map((c) => c.id)).toEqual(["a", "b"]);
+    const fr = backlog(30);
+    // Les mêmes changements, aux titres plus longs en anglais : le lot rétrécit.
+    const en = fr.map((entry) => ({ ...entry, title: `${entry.title}${"y".repeat(100)}` }));
+    const frOnly = privacyChangesForOneMessage(fr, "https://bluegenji.fr");
     const both = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
-    expect(both.map((c) => c.id)).toEqual(["a"]);
-    expect(buildPrivacyChangesMessage(en.slice(0, both.length), "https://bluegenji.fr", "en").length).toBeLessThanOrEqual(
-      PRIVACY_DM_MAX_LENGTH,
-    );
+
+    expect(both.length).toBeLessThan(frOnly.length);
+    const englishBatch = en.slice(0, both.length);
+    const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en", 30 - both.length);
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    for (const entry of englishBatch) expect(message).toContain(entry.title);
   });
 
   it("partage le registre réel en lots qui nomment tous leurs changements dans les deux langues", () => {
@@ -502,7 +639,7 @@ describe("privacyChangesForOneMessage", () => {
       const english = localizedPrivacyChanges(rest, "en");
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr", english);
       const englishBatch = localizedPrivacyChanges(batch, "en");
-      const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en");
+      const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en", rest.length - batch.length);
       for (const entry of englishBatch) expect(message).toContain(entry.title);
       rest = rest.filter((entry) => !batch.includes(entry));
     }
@@ -512,10 +649,19 @@ describe("privacyChangesForOneMessage", () => {
     let rest = [...PRIVACY_CHANGES];
     while (rest.length > 0) {
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr");
-      const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
+      const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr", "fr", rest.length - batch.length);
       for (const entry of batch) expect(message).toContain(entry.title);
       rest = rest.filter((entry) => !batch.includes(entry));
     }
+  });
+
+  // #587 : un retard d'une trentaine d'entrées en nomme bien plus de deux par message.
+  it("privacyChangesForOneMessage_realRegistryBacklogOf30_namesMoreThanTwoPerMessage", () => {
+    const due = PRIVACY_CHANGES.slice(-30);
+
+    const batch = privacyChangesForOneMessage(due, "https://bluegenji.fr", localizedPrivacyChanges(due, "en"));
+
+    expect(batch.length).toBeGreaterThan(5);
   });
 });
 
@@ -1693,6 +1839,80 @@ function expectEntryTexts(
   expect(english.details).toHaveLength(entry.details.length);
   expect(english.linkLabels).toHaveLength(1);
 }
+
+// EF-63 (ERREUR.txt, revue EF-19 #501) : l'entrée publiée du 29 octobre ne se
+// rectifie plus en place — une entrée rectificative, datée du déploiement.
+describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-11-marque-de-session-rectificatif")!;
+  const english = PRIVACY_CHANGES_EN["2026-11-marque-de-session-rectificatif"];
+  const original = PRIVACY_CHANGES.find((c) => c.id === "2026-10-proposition-certification-discord-marque-de-session")!;
+
+  it("privacyChanges_sessionMarkRectification_isStandaloneForEveryAccount", () => {
+    expectStandaloneEntry(entry, english, {
+      after: "2026-11-bot-avis-d-exclusion",
+      publishedAt: "2026-11-16",
+      audience: undefined,
+      links: original.links,
+    });
+  });
+
+  it("privacyChanges_sessionMarkRectification_saysAsLongAsTheSessionLastsWithoutClosedList", () => {
+    expectEntryTexts(entry, english, {
+      fr: [
+        "tant que cette session dure",
+        "ou qu'il refuse (une panne du site comprise)",
+        "sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève à son tour s'il parvient au site sans y être refusé",
+        "qu'à une nouvelle connexion par Discord ou Blizzard",
+        "information du 29 octobre",
+      ],
+      en: [
+        "as long as that session lasts",
+        "or that it refuses (a site failure included)",
+        "except, as it said, a verification refused because your Discord tag can no longer be verified from that window: the window then answers “Later” by itself, which clears it in turn if it reaches the site and is not refused there",
+        "only comes back on your account at a new login with Discord or Blizzard",
+        "information of October 29",
+      ],
+    });
+    // Le refus « tag qui ne peut plus être certifié » lève la marque par le « Plus tard »
+    // que la fenêtre envoie d'elle-même (`closeForSession`), s'il parvient au site sans y être refusé :
+    // aucune promesse d'un refus « quel qu'il soit », et la marque ne revient qu'à une
+    // connexion par Discord ou Blizzard (`createSession`).
+    const fr = [entry.summary, ...entry.details].join(" ");
+    const en = [english.summary, ...english.details].join(" ");
+    expect(fr).not.toContain("pour quelque raison que ce soit");
+    expect(en).not.toContain("for whatever reason");
+    // Le « Plus tard » automatique peut lui-même être refusé (autre compte, panne) :
+    // aucune promesse qu'il lève la marque dès qu'il arrive.
+    expect(fr).not.toContain("dès qu'il parvient au site");
+    expect(en).not.toContain("once it reaches the site");
+    expect(entry.summary).toContain("Seule exception : la certification refusée parce que ton tag ne peut plus être certifié");
+    expect(english.summary).toContain("The only exception: a verification refused because your tag can no longer be verified");
+    expect(entry.summary).toContain("pas seulement au chargement suivant");
+  });
+
+  // Revue juridique EF-63 : la marque est propre à chaque session ; le « Plus tard »
+  // automatique ne la lève que s'il est reçu sans refus ; deux précisions d'audience déjà vraies.
+  it("privacyChanges_sessionMarkRectification_otherSessionsKeepTheirMarkAndAudienceClarifications", () => {
+    expect(entry.details[0]).toContain("chacune de tes sessions a sa propre marque, que gardent tes autres appareils");
+    expect(english.details[0]).toContain("each of your sessions has its own mark, which your other devices keep");
+    expect(entry.details[0]).not.toContain("connecté depuis, elle ne revient sur ton compte");
+    expect(entry.summary).toContain("qui ne lève la marque que si le site le reçoit sans le refuser");
+    expect(english.summary).toContain("which only clears the mark if the site receives it and does not refuse it");
+    expect(entry.details).toHaveLength(4);
+    expect(english.details).toHaveLength(4);
+    expect(entry.details[1]).toContain("un caster qui est aussi arbitre du site lit les contacts des équipes de son match");
+    expect(english.details[1]).toContain("a caster who is also a referee of the site reads the contacts of the teams of their match");
+    expect(entry.details[2]).toContain("s'affiche aussi à ses parties, aux arbitres et aux administrateurs du site sur la page du match");
+    expect(entry.details[2]).toContain("l'état du lancement, public, peut en outre laisser deviner s'il est prêt");
+    expect(english.details[2]).toContain("also shown to the match's parties and the site's referees and admins on the match page");
+    expect(entry.details[3]).toMatch(/^Rien d'autre ne change/);
+  });
+
+  it("privacyChanges_sessionMarkOriginal_publishedTextUntouched", () => {
+    expect(original.publishedAt).toBe("2026-10-29");
+    expect(original.details[0]).toContain("la fenêtre peut revenir au chargement suivant.");
+  });
+});
 
 describe("PRIVACY_CHANGES — avis de retrait du cast (LOGS-NOTIFS ln-1)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-avis-de-retrait-du-cast")!;

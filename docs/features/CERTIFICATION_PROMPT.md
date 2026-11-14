@@ -79,7 +79,14 @@ Battle.net rattaché **sans** BattleTag venu de lui : rien à faire depuis le
 profil (rattachement déjà là, un BattleTag tapé n'y est jamais vérifié,
 `BATTLETAG_ORIGIN.md`) — la modale ne lui en
 parle pas (variante « Discord seul », `battletagRelevant: false`), mais il ne
-fait toujours pas un contact pour l'équipe.
+fait toujours pas un contact pour l'équipe. En Overwatch, la cellule « Tes
+matchs / ce que ça ne fait pas » garde pourtant la phrase du BattleTag
+(`battletagUnfixable: true`, clé `matches.doesNotBattletagPending`) : Blizzard
+le renseignera à la prochaine connexion par Battle.net **si le compte
+Battle.net en a un** (il peut n'en donner aucun), et les contacts du match le
+montreront même masqué, certifié ou non (revue juridique #497, revue EF-63). Hors Overwatch, le
+contexte du lecteur ne porte pas non plus son `battletagVerified` (revue
+sécurité #497).
 
 Un membre est certifié par les règles mêmes du lancement
 (`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).
@@ -149,7 +156,28 @@ cette modale.
   compte à qui la modale a été montrée (`{ userId }`, retenu à l'ouverture) :
   une session changée depuis (autre compte connecté dans un autre onglet)
   répond 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire — ce refus-là est
-  notifié (`showError`, `tournamentErrors.codes`, FR et EN) —, un corps sans
+  notifié (`showError`, `tournamentErrors.codes`, FR et EN), une fois plus
+  aucune modale ouverte (`watchModalsClosed` : ni derrière l'urgente devant
+  laquelle l'invitation s'est effacée, ni derrière le dialogue de
+  certification de `/profil` après « Certifier » — le guet porte sur le
+  document et survit à la navigation client ; un départ en chargement complet,
+  seul cas perdu, laisse le choix non gardé, que la modale redemandera ; le
+  guet est **borné** à `REFUSAL_NOTICE_MAX_WAIT_MS` (2 min,
+  `noticeOnceModalsClosed`) — porté à `PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS`
+  (10 min) seulement si le dialogue de certification de `/profil` est encore
+  ouvert (souvent par le même « Certifier », monté avant la réponse du refus)
+  ou l'a été depuis le refus (il le signale lui-même, `markProfileCertificationDialogOpen`
+  dans `lib/shared/profile-certification-dialog.ts` — ouvert même juste après
+  les 2 min), de quoi finir la certification ; l'extension ne vaut que tant
+  que ce dialogue est ouvert ou fermé depuis moins de 2 min
+  (`profileCertificationDialogRecent`) — fermé puis une autre modale gardée
+  ouverte des minutes, le refus se tait, et l'observation du document cesse
+  (revérifiée toutes les `REFUSAL_NOTICE_RECHECK_MS`, 10 s, tant que
+  l'extension court) — puis se tait, et un nouveau refus remplace le
+  précédent : jamais de toast sans contexte des minutes plus tard ; une
+  déconnexion ou une connexion sans rechargement (`signalSessionChanged`,
+  `lib/shared/session-change-signal.ts`) l'abandonne : il ne s'adresse jamais
+  au compte suivant) —, un corps sans
   compte lisible 400 `INVALID_ACTION`. Plafonné par compte
   (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée
   en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`) au

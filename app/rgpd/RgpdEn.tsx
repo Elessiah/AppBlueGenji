@@ -81,6 +81,7 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
 /** Column headings of the data table, repeated by each mobile card. */
@@ -109,11 +110,11 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {/* Scopes in a row under the same basis: one badge (`groupedExtraBases`, cf. page FR). */}
         {groupedExtraBases(entry.extraBases).map((group) => (
-          <span key={group.scopes.join("|")} className={styles.extraBase}>
+          <div key={group.scopes.join("|")} className={styles.extraBase}>
             {/* Même base que la principale : pas de second badge identique, mais « including » (cf. page FR). */}
             {group.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[group.base]}</span> </>}
-            {group.scopes.join("; ")}
-          </span>
+            <ExtraScopes scopes={group.scopes} />
+          </div>
         ))}
       </DataCell>
       <DataCell column={3}>
@@ -232,7 +233,7 @@ export function RgpdEn({
             sends what the table describes for it, which comes with the login: the Discord username from
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
             account is linked; if it gives none, a BattleTag typed in by hand stays, without being treated as
-            verified), the picture from Google or Discord (copied, and hidden until you show it). What
+            verified — for a Battle.net account already linked with a BattleTag before this change (October 31, 2026), from your next login with Battle.net), the picture from Google or Discord (copied, and hidden until you show it). What
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
             adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming
@@ -977,8 +978,8 @@ export function RgpdEn({
             window shows the match. Their certified Discord tag is also presented, in the “Contacts” window and on the match page, to the parties to the match alone — to both its teams as soon as both its opponents are known until its end, to its casters while the match is being played — never to referees with no role in that match nor in the launch window (if they also
             cast the match, their tag and BattleTag follow the casters&apos; rule: its parties read them only while the match is being played, launch window included, the other referees from the moment both its opponents are known). The staff who manage tournaments read at any time, in a match&apos;s “Refereeing” window, the username of its assigned referee and of the accounts that can referee. Any signed-in member also reads their username alone (never their BattleTag) on the card and
             page of a match, until its score is reported or the tournament ends; visitors without an account only read “Referee assigned”. Their “Ready” is
-            expected like those of the teams and casters; only the parties to the match and the referees read it, in the
-            “Contacts” and launch windows. If they no longer meet these requirements or become
+            expected like those of the teams and casters; only the parties to the match and the referees read the record of it, in the
+            “Contacts” and launch windows and on the match page — the state of the launch, which is public, may still let one guess whether they are ready. If they no longer meet these requirements or become
             a player of the match before its launch, they are no longer shown (and are removed from it before the launch); the refereeing of a
             deleted account is removed from all its matches. When someone else removes it from them (the staff,
             another referee the match is assigned to, self-management, their upheld objection) or it is removed automatically, they are
@@ -1093,10 +1094,10 @@ export function RgpdEn({
           <p id="retransmission">
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
-            casters: each caster joins a stream of the match or opens their own, with their channel link (required),
+            casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it),
             published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
-            set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
-            caster provided, there or when opening their stream, also goes when their account is deleted, played
+            set in the match&apos;s live configuration, by a member of the organizers, stays with the match when its casters leave. The link a
+            caster provided when opening their stream or in “Configure my broadcast” also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
             member casts it — or their own channel, which goes with their account. A caster never states it when opening their own
@@ -1119,8 +1120,8 @@ export function RgpdEn({
             link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
-            page: to the same people at the same times — parties to the match and referees —, in an Overwatch tournament only): it is kept with their caster
-            registration, goes with it, is never copied onto their profile nor presented as proven, and the “OW
+            page: to the same people at the same times — parties to the match, its other casters and referees —, in an Overwatch tournament only): it is kept with their caster
+            registration, goes with it and when the account is deleted, is never copied onto their profile nor presented as proven, and the “OW
             BattleTag” setting of the profile does not hide it — the caster is the one giving it, for this match,
             as part of the performance of the service (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).{" "}
             {STREAM_NOTICE_SHOWN_EN} {STREAM_NOTICE_SERVICE_EN} Since version 11 of the terms of use

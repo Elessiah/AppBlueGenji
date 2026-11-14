@@ -31,9 +31,22 @@ export type CertificationPromptReason = "MANAGER" | "TEAM_WITHOUT_CONTACT";
 export type CertificationPrompt = {
   reason: CertificationPromptReason;
   discordVerified: boolean;
-  battletagVerified: boolean;
+  /**
+   * Absent hors Overwatch (`battletagRelevant` faux) : la modale ne le lit pas,
+   * et le contexte du lecteur (flux et REST) ne porte pas un état de compte
+   * qui ne sert à rien — comme les contacts du match (revue sécurité #497).
+   */
+  battletagVerified?: boolean;
   /** `false` en Marvel Rivals : la modale ne parle alors que de Discord. */
   battletagRelevant: boolean;
+  /**
+   * Overwatch, mais BattleTag inactionnable depuis le profil (Battle.net
+   * rattaché sans BattleTag venu de lui) : `battletagRelevant` est faux, la
+   * modale ne parle que de Discord — sauf pour dire que Blizzard le renseignera
+   * à la prochaine connexion et que les contacts du match le montreront même
+   * masqué (revue juridique #497). Absent sinon.
+   */
+  battletagUnfixable?: true;
   /**
    * L'équipe a-t-elle un contact à présenter (`teamHasContact`) ? Toujours
    * `false` au motif `TEAM_WITHOUT_CONTACT` ; au motif `MANAGER`, `false` dit
@@ -72,9 +85,10 @@ export function certificationPromptFor(input: {
   let reason: CertificationPromptReason | null = null;
   if (input.isManager) reason = "MANAGER";
   else if (!input.teamHasContact) reason = "TEAM_WITHOUT_CONTACT";
-  return reason
+  if (!reason) return null;
+  return battletagRelevant
     ? { reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact: input.teamHasContact }
-    : null;
+    : { reason, discordVerified, battletagRelevant, teamHasContact: input.teamHasContact };
 }
 
 /**

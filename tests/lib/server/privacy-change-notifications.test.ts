@@ -11,19 +11,24 @@ import { outboundMuted } from "@/lib/server/outbound-mute";
 import { isBotCircuitOpen, pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import {
   dispatchPrivacyChangeNotifications,
+  PRIVACY_DM_BATCH_SIZE,
+  PRIVACY_SWEEP_LOCK_NAME,
   resetPrivacyNotificationThrottle,
+  SWEEP_IDLE_THROTTLE_MS,
 } from "@/lib/server/privacy-change-notifications";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import {
+  announceablePrivacyChanges,
   PRIVACY_CHANGES,
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   PRIVACY_DM_SETTLE_DAYS,
   PRIVACY_DM_WINDOW_DAYS,
   privacyChangeDay,
   privacyChangesForOneMessage,
+  settledPrivacyChanges,
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { fakePool } from "../../helpers/sql-double";
+import { fakeConnection, fakePool } from "../../helpers/sql-double";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
 
@@ -31,6 +36,10 @@ const DAY_MS = 86_400_000;
 const at = (iso: string, plusDays = 0) => new Date(Date.parse(`${iso}T12:00:00Z`) + plusDays * DAY_MS);
 /** Tous les changements du registre ont passé le délai de la modale. */
 const NOW = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS);
+// Le registre que le balayage de `NOW` peut encore annoncer (fenêtre de
+// `PRIVACY_DM_WINDOW_DAYS`) : les plus anciennes entrées en sortent.
+const DUE = announceablePrivacyChanges(NOW);
+const SWEEP_THROTTLE_PLUS = 61_000;
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
 
 type Candidate = {
@@ -61,22 +70,63 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
   };
 }
 
-function fakeDb(options: { candidates?: Candidate[]; done?: { user_id: number; change_id: string }[]; taken?: string[] } = {}) {
-  const calls: { sql: string; params: unknown[] }[] = [];
+type FakeReservationOptions = {
+  taken?: string[];
+  reserveError?: string;
+  reserveErrorFor?: number;
+  deletedUsers?: number[];
+};
+
+/**
+ * Une réservation : une instruction, plusieurs lignes — les changements, puis
+ * le compte ; tout ou rien, comme InnoDB annule l'instruction sur un doublon.
+ */
+function fakeReservation(options: FakeReservationOptions, params: unknown[]) {
+  const userId = params.at(-1);
+  const changeIds = params.slice(0, -1);
+  if (options.reserveError && (options.reserveErrorFor === undefined || userId === options.reserveErrorFor))
+    throw Object.assign(new Error("reserve failed"), { code: options.reserveError });
+  if (options.deletedUsers?.includes(Number(userId))) return [{ affectedRows: 0 }];
+  if (changeIds.some((changeId) => options.taken?.includes(`${userId}:${changeId}`)))
+    throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+  return [{ affectedRows: changeIds.length }];
+}
+
+function fakeDb(
+  options: {
+    candidates?: Candidate[];
+    done?: { user_id: number; change_id: string }[];
+    taken?: string[];
+    /** Verrou du balayage tenu par un autre processus (`GET_LOCK` rend 0). */
+    lockHeldElsewhere?: boolean;
+    /** Code d'erreur autre qu'un doublon rendu par la réservation. */
+    reserveError?: string;
+    /** Le compte dont la réservation échoue (`reserveError`) ; tous sinon. */
+    reserveErrorFor?: number;
+    /** Comptes mis en suppression (`is_deleted = 1`) depuis la lecture : rien n'est inséré. */
+    deletedUsers?: number[];
+    /** Candidats rendus selon le curseur (`u.id > ?`, dernier paramètre). */
+    candidatesAfter?: (afterId: number) => Candidate[];
+  } = {},
+) {
+  const calls: { sql: string; params: unknown[]; viaPool?: boolean }[] = [];
   const handler = async (sql: string, params: unknown[] = []) => {
     const q = flat(sql);
     calls.push({ sql: q, params });
-    if (q.startsWith("SELECT u.id, u.pseudo")) return [options.candidates ?? []];
-    if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
-    if (q.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications")) {
-      const key = `${params[0]}:${params[1]}`;
-      return [{ affectedRows: options.taken?.includes(key) ? 0 : 1 }];
+    if (q.startsWith("SELECT GET_LOCK")) return [[{ acquired: options.lockHeldElsewhere ? 0 : 1 }]];
+    if (q.startsWith("SELECT RELEASE_LOCK")) return [[{ released: 1 }]];
+    if (q.startsWith("SELECT u.id, u.pseudo")) {
+      if (options.candidatesAfter) return [options.candidatesAfter(Number(params.at(-1)))];
+      return [options.candidates ?? []];
     }
+    if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
+    if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) return fakeReservation(options, params);
     return [{ affectedRows: 1 }];
   };
   const execute = jest.fn(handler);
   const query = jest.fn(handler);
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
+  const getConnection = jest.fn(async () => fakeConnection({ execute, query, release: jest.fn(), destroy: jest.fn() }));
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query, getConnection }));
   return calls;
 }
 
@@ -118,23 +168,26 @@ describe("dispatchPrivacyChangeNotifications", () => {
       unknown[],
       string,
     ];
-    const batch = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    const batch = privacyChangesForOneMessage(DUE, siteBaseUrl());
     for (const change of batch) expect(message).toContain(change.title);
-    expect(message).not.toContain("autre(s) changement(s)");
+    // #587 : le registre entier ne tient pas dans un message ; le reste, dû mais
+    // gardé pour le suivant, est compté — le joueur sait que d'autres l'attendent.
+    expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
     expect(recipients).toEqual([{ discordId: "100000000000000001", handle: null, label: "Nova" }]);
     expect(context).toBe("privacy-changes");
 
     // Réservé **avant** l'envoi, une ligne par changement nommé — et rien de ce
     // que le message n'a pas pu nommer.
-    const reservations = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
-    expect(reservations.map((c) => c.params[1])).toEqual(batch.map((c) => c.id));
+    const reservations = calls.filter((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0].params).toEqual([...batch.map((c) => c.id), 1]);
   });
 
   it("envoie au message suivant ce qu'un message n'a pas pu nommer", async () => {
     // Le registre entier ne tient plus dans un message : le plus récent tombait
     // dans « … et 1 autre » et était pourtant marqué annoncé.
-    const first = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
-    expect(first.length).toBeLessThan(PRIVACY_CHANGES.length);
+    const first = privacyChangesForOneMessage(DUE, siteBaseUrl());
+    expect(first.length).toBeLessThan(DUE.length);
     fakeDb({
       candidates: [candidate()],
       done: first.map((change) => ({ user_id: 1, change_id: change.id })),
@@ -144,8 +197,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
     // Le message suivant nomme à son tour ce qu'il peut, dans l'ordre du registre.
-    // (Des conditions à accepter passent en tête du lot : le reste se lit par identifiant, pas par position.)
-    const second = privacyChangesForOneMessage(PRIVACY_CHANGES.filter((change) => !first.includes(change)), siteBaseUrl());
+    // (Des conditions à accepter sont toujours du lot : le reste se lit par identifiant, pas par position.)
+    const second = privacyChangesForOneMessage(DUE.filter((change) => !first.includes(change)), siteBaseUrl());
     expect(second.length).toBeGreaterThan(0);
     for (const change of second) expect(message).toContain(change.title);
     for (const change of first) expect(message).not.toContain(change.title);
@@ -222,7 +275,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
     expect(select.sql).toContain("r.sent_at > NOW() - INTERVAL ? DAY");
     expect(select.sql.indexOf("r.sent_at")).toBeLessThan(select.sql.indexOf("LIMIT"));
-    expect(select.params.at(-1)).toBe(PRIVACY_DM_MIN_INTERVAL_DAYS);
+    expect(select.params.slice(-2)).toEqual([PRIVACY_DM_MIN_INTERVAL_DAYS, 0]);
   });
 
   it("n'écrit pas avant le délai de la modale : aucune requête", async () => {
@@ -246,6 +299,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(select.params).toEqual([
       ...settled.flatMap((c) => [c.publishedAt, c.id, c.id]),
       PRIVACY_DM_MIN_INTERVAL_DAYS,
+      0,
     ]);
 
     // Un seul message, qui porte aussi les changements récents — tous ceux
@@ -287,7 +341,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
   });
 
   it("n'annonce pas ce que le compte a déjà accepté ou reçu", async () => {
-    const [first, ...rest] = PRIVACY_CHANGES;
+    const [first, ...rest] = DUE;
     fakeDb({ candidates: [candidate()], done: [{ user_id: 1, change_id: first.id }] });
     await dispatchPrivacyChangeNotifications(NOW);
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
@@ -302,6 +356,282 @@ describe("dispatchPrivacyChangeNotifications", () => {
     fakeDb({ candidates: [candidate()], taken: PRIVACY_CHANGES.map((c) => `1:${c.id}`) });
     await dispatchPrivacyChangeNotifications(NOW);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  // Garde-fou : une partie du lot déjà réservée (verrou nommé contourné,
+  // réservation laissée par un processus tué) — aucun décompte juste n'est
+  // possible ici.
+  it("dispatchPrivacyChangeNotifications_partOfBatchTakenElsewhere_skipsAccountWithoutMessageOrRelease", async () => {
+    const [first] = privacyChangesForOneMessage(DUE, siteBaseUrl());
+    const calls = fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
+
+    const sent = await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(sent).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    // Tout ou rien : le doublon annule l'instruction, il n'y a rien à effacer.
+    expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
+  });
+
+  // Sécurité cycle 1 : un `INSERT IGNORE` partiel laissait les autres lignes du
+  // lot tenues pour annoncées sans jamais être envoyées.
+  it("dispatchPrivacyChangeNotifications_reservation_plainInsertNeverIgnore", async () => {
+    const calls = fakeDb({ candidates: [candidate()] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(calls.some((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"))).toBe(false);
+    expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(true);
+  });
+
+  it("dispatchPrivacyChangeNotifications_reservationFailsOtherwise_errorNotSwallowed", async () => {
+    fakeDb({ candidates: [candidate()], reserveError: "ER_LOCK_WAIT_TIMEOUT" });
+
+    await expect(dispatchPrivacyChangeNotifications(NOW)).rejects.toMatchObject({ code: "ER_LOCK_WAIT_TIMEOUT" });
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  // Revue sécurité cycle 2 : un compte effacé entre la lecture et la
+  // réservation (clé étrangère) n'abandonne pas le balayage — les comptes déjà
+  // réservés reçoivent leur message.
+  it("dispatchPrivacyChangeNotifications_accountErasedBeforeReservation_skippedOthersStillSent", async () => {
+    const calls = fakeDb({
+      candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })],
+      reserveError: "ER_NO_REFERENCED_ROW_2",
+      reserveErrorFor: 2,
+    });
+
+    await expect(dispatchPrivacyChangeNotifications(NOW)).resolves.toBeGreaterThan(0);
+
+    const recipients = jest.mocked(pushDiscordDirectMessages).mock.calls.flatMap(([, batch]) => batch);
+    expect(recipients.map((entry) => entry.discordId)).toEqual(["100000000000000001"]);
+    expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
+  });
+
+  // Revue sécurité cycle 3 : un compte mis en suppression (la ligne reste)
+  // entre la lecture et la réservation ne reçoit ni réservation ni message.
+  it("dispatchPrivacyChangeNotifications_accountMarkedDeletedBeforeReservation_noMessageOthersSent", async () => {
+    const calls = fakeDb({
+      candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })],
+      deletedUsers: [2],
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const recipients = jest.mocked(pushDiscordDirectMessages).mock.calls.flatMap(([, batch]) => batch);
+    expect(recipients.map((entry) => entry.discordId)).toEqual(["100000000000000001"]);
+    expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
+  });
+
+  it("dispatchPrivacyChangeNotifications_reservation_guardedByAccountNotDeleted", async () => {
+    const calls = fakeDb({ candidates: [candidate({ id: 1 })] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const insert = calls.find((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))!;
+    expect(insert.sql).toContain("FROM bg_users u");
+    expect(insert.sql).toContain("WHERE u.id = ? AND u.is_deleted = 0");
+  });
+
+  // Revue sécurité cycle 3 : la lecture avance par curseur — aucun compte
+  // écarté en mémoire ne tient les vingt places du lot à chaque balayage.
+  it("dispatchPrivacyChangeNotifications_fullBatch_nextReadStartsAfterTheLastAccount", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      const page = Array.from({ length: PRIVACY_DM_BATCH_SIZE }, (_, index) =>
+        candidate({ id: index + 1, discord_id: String(index + 10) }),
+      );
+      const calls = fakeDb({ candidatesAfter: (afterId) => (afterId === 0 ? page : [candidate({ id: 99, discord_id: "99" })]) });
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      const reads = calls.filter((c) => c.sql.startsWith("SELECT u.id, u.pseudo"));
+      expect(reads.map((read) => read.params.at(-1))).toEqual([0, PRIVACY_DM_BATCH_SIZE]);
+      expect(reads[0].sql).toContain("AND u.id > ?");
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("dispatchPrivacyChangeNotifications_nobodyAfterTheCursor_wrapsToTheStartInTheSameSweep", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      const page = Array.from({ length: PRIVACY_DM_BATCH_SIZE }, (_, index) =>
+        candidate({ id: index + 1, discord_id: String(index + 10) }),
+      );
+      let sweeps = 0;
+      const calls = fakeDb({
+        candidatesAfter: (afterId) => {
+          if (afterId === 0) {
+            sweeps += 1;
+            return sweeps === 1 ? page : [candidate({ id: 5, discord_id: "5" })];
+          }
+          return [];
+        },
+      });
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      const reads = calls.filter((c) => c.sql.startsWith("SELECT u.id, u.pseudo"));
+      expect(reads.map((read) => read.params.at(-1))).toEqual([0, PRIVACY_DM_BATCH_SIZE, 0]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("dispatchPrivacyChangeNotifications_nothingNameable_noReservationAndNoExclusionList", async () => {
+    const previous = process.env.APP_URL;
+    process.env.APP_URL = `https://${"x".repeat(2_000)}.fr`;
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      const calls = fakeDb({ candidates: [candidate({ id: 7 })] });
+      await dispatchPrivacyChangeNotifications(NOW);
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(NOW);
+
+      expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(false);
+      expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+      const reads = calls.filter((c) => c.sql.startsWith("SELECT u.id, u.pseudo"));
+      expect(reads).toHaveLength(2);
+      expect(reads[1].sql).not.toContain("NOT IN");
+    } finally {
+      now.mockRestore();
+      if (previous === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = previous;
+    }
+  });
+
+  // Performance cycle 1 : une instruction par compte, pas un aller-retour par changement.
+  it("dispatchPrivacyChangeNotifications_reservation_oneStatementPerAccount", async () => {
+    const calls = fakeDb({ candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const inserts = calls.filter((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
+    expect(inserts).toHaveLength(2);
+    const batch = privacyChangesForOneMessage(DUE, siteBaseUrl());
+    expect(inserts[0].params).toEqual([...batch.map((change) => change.id), 1]);
+  });
+
+  // Performance cycle 1 : les envois au bot, lents, ne tiennent pas le verrou ni sa connexion.
+  it("dispatchPrivacyChangeNotifications_sends_afterLockReleased", async () => {
+    const calls = fakeDb({ candidates: [candidate()] });
+    let unlockedBeforeSend = false;
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      unlockedBeforeSend = calls.some((c) => c.sql.startsWith("SELECT RELEASE_LOCK"));
+      return { sent: 1, unresolved: [], failed: [] };
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(unlockedBeforeSend).toBe(true);
+  });
+
+  // Performance cycle 1 : un balayage sans personne à prévenir espace le suivant.
+  it("dispatchPrivacyChangeNotifications_nobodyToNotify_nextSweepWaitsTheIdleDelay", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      const calls = fakeDb({ candidates: [] });
+      await dispatchPrivacyChangeNotifications(NOW);
+      const count = calls.length;
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(NOW);
+      expect(calls).toHaveLength(count);
+
+      now.mockReturnValue(1_000_000 + SWEEP_IDLE_THROTTLE_MS);
+      await dispatchPrivacyChangeNotifications(NOW);
+      expect(calls.length).toBeGreaterThan(count);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  // Revue sécurité cycle 1 : l'attente longue ne retarde pas un changement qui
+  // vient de passer le délai de la modale, quel que soit le processus.
+  it("dispatchPrivacyChangeNotifications_nobodyThenChangeNewlySettled_sweepsAtNormalPace", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      const settledIds = (instant: Date) =>
+        settledPrivacyChanges(instant, announceablePrivacyChanges(instant)).map((change) => change.id);
+      // La veille du jour où la dernière entrée passe le délai de la modale.
+      const before = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS - 1);
+      const after = NOW;
+      expect(settledIds(after)).not.toEqual(settledIds(before));
+
+      now.mockReturnValue(1_000_000);
+      const calls = fakeDb({ candidates: [] });
+      await dispatchPrivacyChangeNotifications(before);
+      const count = calls.length;
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(before);
+      expect(calls).toHaveLength(count);
+
+      await dispatchPrivacyChangeNotifications(after);
+      expect(calls.length).toBeGreaterThan(count);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("dispatchPrivacyChangeNotifications_partialTakeForOneAccount_otherAccountStillServed", async () => {
+    const first = privacyChangesForOneMessage(DUE, siteBaseUrl())[0];
+    fakeDb({
+      candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })],
+      taken: [`1:${first.id}`],
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][1]).toHaveLength(1);
+  });
+
+  it("dispatchPrivacyChangeNotifications_sweepRunsUnderNamedLock_takenWithoutWaitAndReleased", async () => {
+    const calls = fakeDb({ candidates: [candidate()] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const lock = calls.findIndex((c) => c.sql.startsWith("SELECT GET_LOCK"));
+    const reserve = calls.findIndex((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
+    const unlock = calls.findIndex((c) => c.sql.startsWith("SELECT RELEASE_LOCK"));
+    expect(calls[lock].params).toEqual([PRIVACY_SWEEP_LOCK_NAME, 0]);
+    expect(lock).toBeLessThan(reserve);
+    expect(unlock).toBeGreaterThan(reserve);
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  // Deux processus au même instant : l'un balaie, l'autre passe son tour au lieu
+  // de se partager les réservations d'un compte (chacun rendant sa part, aucun
+  // n'écrivant).
+  it("dispatchPrivacyChangeNotifications_lockHeldByAnotherProcess_skipsWithoutReservingOrSending", async () => {
+    const calls = fakeDb({ candidates: [candidate()], lockHeldElsewhere: true });
+
+    expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
+
+    expect(calls.some((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))).toBe(false);
+    expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(false);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchPrivacyChangeNotifications_lockSkipped_nextSweepAfterThrottleSends", async () => {
+    fakeDb({ candidates: [candidate()], lockHeldElsewhere: true });
+    await dispatchPrivacyChangeNotifications(NOW);
+    resetPrivacyNotificationThrottle();
+    fakeDb({ candidates: [candidate()] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
   });
 
   it("regroupe les comptes qui ont les mêmes changements à recevoir", async () => {
@@ -319,7 +649,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(release).toBeDefined();
     expect(release!.params).toEqual([
       1,
-      ...privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl()).map((c) => c.id),
+      ...privacyChangesForOneMessage(DUE, siteBaseUrl()).map((c) => c.id),
     ]);
   });
 
@@ -388,16 +718,21 @@ describe("dispatchPrivacyChangeNotifications — notifications push", () => {
 
   it("retombe sur Discord seul si la table des abonnements manque", async () => {
     jest.mocked(webPushConfig).mockReturnValue(CONFIG);
-    const handler = async (sql: string) => {
+    const handler = async (sql: string, params: unknown[] = []) => {
       const q = flat(sql);
+      if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) return [{ affectedRows: params.length - 1 }];
       if (q.startsWith("SELECT u.id, u.pseudo")) {
         if (q.includes("bg_push_subscriptions")) throw Object.assign(new Error("absente"), { code: "ER_NO_SUCH_TABLE" });
         return [[candidate()]];
       }
       if (q.startsWith("SELECT user_id, change_id")) return [[]];
+      if (q.startsWith("SELECT GET_LOCK")) return [[{ acquired: 1 }]];
       return [{ affectedRows: 1 }];
     };
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn(handler), query: jest.fn(handler) }));
+    const execute = jest.fn(handler);
+    const query = jest.fn(handler);
+    const getConnection = jest.fn(async () => fakeConnection({ execute, query, release: jest.fn() }));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query, getConnection }));
 
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBeGreaterThan(0);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
