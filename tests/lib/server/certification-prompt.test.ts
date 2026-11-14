@@ -115,6 +115,8 @@ describe("loadCertificationPrompt", () => {
       // Battle.net rattaché : un BattleTag n'est plus à demander de ce côté.
       battletagRelevant: false,
       teamHasContact: false,
+      // Overwatch : la modale dit encore que Blizzard le renseignera (revue juridique #497).
+      battletagUnfixable: true,
     });
   });
 
@@ -212,6 +214,8 @@ describe("loadCertificationPrompt", () => {
       discordVerified: false,
       battletagRelevant: false,
       teamHasContact: false,
+      // Overwatch : la modale dit encore que Blizzard le renseignera (revue juridique #497).
+      battletagUnfixable: true,
     });
   });
 
@@ -277,6 +281,15 @@ describe("loadCertificationPrompt", () => {
   it("Battle.net rattaché sans BattleTag : rien à lui demander de ce côté (inactionnable)", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD, blizzard_sub: "sub", overwatch_battletag: null }]);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+  });
+
+  it("loadCertificationPrompt_marvelRivals_neverFlagsTheBattletagAsUnfixable", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE, blizzard_sub: "sub", overwatch_battletag: null }]);
+
+    const prompt = await loadCertificationPrompt(executor, 7, 42, false, false);
+
+    expect(prompt).not.toBeNull();
+    expect(prompt).not.toHaveProperty("battletagUnfixable");
   });
 
   it("rien pour un lecteur qui n'est plus dans le roster", async () => {

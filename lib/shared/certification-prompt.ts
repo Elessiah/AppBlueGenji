@@ -40,6 +40,14 @@ export type CertificationPrompt = {
   /** `false` en Marvel Rivals : la modale ne parle alors que de Discord. */
   battletagRelevant: boolean;
   /**
+   * Overwatch, mais BattleTag inactionnable depuis le profil (Battle.net
+   * rattaché sans BattleTag venu de lui) : `battletagRelevant` est faux, la
+   * modale ne parle que de Discord — sauf pour dire que Blizzard le renseignera
+   * à la prochaine connexion et que les contacts du match le montreront même
+   * masqué (revue juridique #497). Absent sinon.
+   */
+  battletagUnfixable?: true;
+  /**
    * L'équipe a-t-elle un contact à présenter (`teamHasContact`) ? Toujours
    * `false` au motif `TEAM_WITHOUT_CONTACT` ; au motif `MANAGER`, `false` dit
    * au meneur que son équipe est injoignable — le fait le plus urgent.

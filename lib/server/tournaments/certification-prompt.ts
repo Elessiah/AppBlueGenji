@@ -163,7 +163,8 @@ export async function loadCertificationPrompt(
   // même que ce refus a écartée.
   const onlyDiscordMissing = !prompt.discordVerified && (prompt.battletagVerified || !prompt.battletagRelevant);
   if (teamReachable && onlyDiscordMissing && choices.discordCertifyPromptOff) return null;
-  return prompt;
+  // Overwatch : la variante « Discord seul » garde la phrase du BattleTag.
+  return battletagRelevant && battletagUnfixable ? { ...prompt, battletagUnfixable: true } : prompt;
 }
 
 /**

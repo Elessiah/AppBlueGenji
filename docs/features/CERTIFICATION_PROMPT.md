@@ -79,7 +79,13 @@ Battle.net rattaché **sans** BattleTag venu de lui : rien à faire depuis le
 profil (rattachement déjà là, un BattleTag tapé n'y est jamais vérifié,
 `BATTLETAG_ORIGIN.md`) — la modale ne lui en
 parle pas (variante « Discord seul », `battletagRelevant: false`), mais il ne
-fait toujours pas un contact pour l'équipe.
+fait toujours pas un contact pour l'équipe. En Overwatch, la cellule « Tes
+matchs / ce que ça ne fait pas » garde pourtant la phrase du BattleTag
+(`battletagUnfixable: true`, clé `matches.doesNotBattletagPending`) : Blizzard
+le renseignera à la prochaine connexion par Battle.net, et les contacts du
+match le montreront même masqué (revue juridique #497). Hors Overwatch, le
+contexte du lecteur ne porte pas non plus son `battletagVerified` (revue
+sécurité #497).
 
 Un membre est certifié par les règles mêmes du lancement
 (`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).

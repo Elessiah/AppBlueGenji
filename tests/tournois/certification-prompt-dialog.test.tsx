@@ -111,6 +111,21 @@ describe("CertificationPromptDialog", () => {
     expect(render(OW_MANAGER)).toBe("");
   });
 
+  // Revue juridique #497 : Overwatch, BattleTag inactionnable — Discord seul, mais
+  // la modale prévient encore que Blizzard le renseignera et que les contacts le montreront.
+  it("render_overwatchBattletagUnfixable_discordOnlyButKeepsTheBattletagSentence", () => {
+    const prompt: CertificationPrompt = { ...MR_TEAM, battletagUnfixable: true };
+
+    const fr = render(prompt);
+    const en = render(prompt, "en");
+
+    expect(fr).toContain("Certifie ton Discord<");
+    expect(fr).not.toContain(">BattleTag<");
+    expect(fr).toContain("Blizzard le renseignera à ta prochaine connexion par Battle.net");
+    expect(fr).toContain("il sera montré même masqué");
+    expect(en).toContain("Blizzard will fill it in at your next sign-in with Battle.net");
+  });
+
   it("Marvel Rivals : Discord seul, sans BattleTag ni Blizzard", () => {
     const html = render(MR_TEAM);
     expect(html).toContain("Certifie ton Discord<");

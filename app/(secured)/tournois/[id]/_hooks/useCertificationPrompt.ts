@@ -184,9 +184,20 @@ export function useCertificationPrompt(
   const battletagVerified = prompt?.battletagVerified === true;
   const battletagRelevant = prompt?.battletagRelevant === true;
   const teamHasContact = prompt?.teamHasContact === true;
+  const battletagUnfixable = prompt?.battletagUnfixable === true;
   const stablePrompt = useMemo<CertificationPrompt | null>(
-    () => (reason ? { reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact } : null),
-    [reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact],
+    () =>
+      reason
+        ? {
+            reason,
+            discordVerified,
+            battletagVerified,
+            battletagRelevant,
+            teamHasContact,
+            ...(battletagUnfixable ? { battletagUnfixable: true as const } : {}),
+          }
+        : null,
+    [reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact, battletagUnfixable],
   );
 
   return {
