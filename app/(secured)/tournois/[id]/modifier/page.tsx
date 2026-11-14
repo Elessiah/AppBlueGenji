@@ -21,7 +21,7 @@ import {
   type TournamentFormValues,
 } from "../../_components/TournamentForm";
 import { editLockNoticeText, editSavedText, type PlanningSaveResult } from "../_lib/edit-entry";
-import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { TournamentState } from "@/lib/shared/types";
 import { mapError, useErrorsText } from "../_lib/error-map";
 import { useFormText } from "../../_lib/form-text";
@@ -242,7 +242,7 @@ export default function EditTournamentPage() {
   // Plus rien ne se règle sur un tournoi terminé, planification comprise. Le
   // bouton « Modifier » n'y apparaît pas, mais l'URL reste atteignable à la
   // main : on explique plutôt que de rendre un formulaire entièrement grisé.
-  const planningEditable = canToggleRefereeScheduling(loaded.state);
+  const planningEditable = canToggleLiveTournamentOption(loaded.state);
   if (loaded.window === "LOCKED" && !planningEditable) {
     return (
       <section className="fade-in container">

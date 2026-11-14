@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/transaction");
 jest.mock("@/lib/server/tournaments/registration");
+jest.mock("@/lib/server/tournaments/check-in-toggles");
 jest.mock("@/lib/server/tournaments/lobby-brief", () => ({ silencePausedLobbyBriefs: jest.fn(async () => undefined) }));
 
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -10,6 +11,7 @@ import { inTransaction } from "@/lib/server/tournaments/transaction";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { setMatchCheckIn } from "@/lib/server/tournaments/match-check-in";
 import { silencePausedLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
+import { noteCheckInToggle } from "@/lib/server/tournaments/check-in-toggles";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 type Row = Record<string, unknown>;
@@ -150,6 +152,24 @@ describe("setMatchCheckIn", () => {
     await expect(setMatchCheckIn(7, true, now)).resolves.toEqual({ tournamentId: 7, enabled: true, changed: false });
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE") || sql.startsWith("INSERT"))).toBe(false);
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchCheckIn_changed_notesToggle", async () => {
+    connectionWith({ state: "RUNNING", match_check_in: 1 });
+    await setMatchCheckIn(7, false, now);
+    expect(noteCheckInToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("setMatchCheckIn_unchanged_doesNotNoteToggle", async () => {
+    connectionWith({ state: "RUNNING", match_check_in: 1 });
+    await setMatchCheckIn(7, true, now);
+    expect(noteCheckInToggle).not.toHaveBeenCalled();
+  });
+
+  it("setMatchCheckIn_refused_doesNotNoteToggle", async () => {
+    connectionWith({ state: "FINISHED", match_check_in: 1 });
+    await expect(setMatchCheckIn(7, false, now)).rejects.toThrow("TOURNAMENT_FINISHED");
+    expect(noteCheckInToggle).not.toHaveBeenCalled();
   });
 });
 

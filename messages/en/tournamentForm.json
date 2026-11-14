@@ -30,6 +30,7 @@
     "planningEnabled": "Referee scheduling turned on.",
     "planningEnabledMoved": "Scheduling turned on: {count, plural, =1 {1 match to schedule} other {# matches to schedule}}.",
     "concurrentRetry": "Another save is in progress on this tournament. Try again in a moment.",
+    "tooManyRequests": "Too many option changes in a short time. Wait a few minutes before trying again.",
     "planningErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournament not found.",
       "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",

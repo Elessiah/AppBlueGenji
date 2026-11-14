@@ -16,6 +16,7 @@ import {
   resetMatchReminderThrottle,
   type MatchNotice,
 } from "@/lib/server/tournaments/match-reminders";
+import { noteCheckInToggle } from "@/lib/server/tournaments/check-in-toggles";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers, usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { fakePool, type SqlMock, type SqlQuery } from "../../helpers/sql-double";
@@ -2154,6 +2155,21 @@ describe("readCheckInState (relecture de l'option avant l'envoi)", () => {
     expect(first).toBe(second);
     expect(other).toEqual({ match_check_in: 0, match_check_in_paused_at: null });
     // Un tournoi n'emprunte pas la lecture d'un autre.
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_toggleNotedDuringRead_nextSendRereads", async () => {
+    const execute = executeDouble({ checkIn: { flag: 1 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    const before = readCheckInState(7);
+    noteCheckInToggle();
+    const after = readCheckInState(7);
+    await Promise.all([before, after]);
+
+    // Un envoi lancé après la bascule ne reprend pas la lecture partie avant elle.
+    expect(after).not.toBe(before);
     expect(execute).toHaveBeenCalledTimes(2);
   });
 

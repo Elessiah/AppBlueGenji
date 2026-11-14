@@ -37,9 +37,13 @@ export const TOGGLE_ROUTES = {
 
 export type ToggleKind = keyof typeof TOGGLE_ROUTES;
 
-/** Refus d'une bascule : un conflit de verrou se dit à part, un code inconnu tombe sur le repli du réglage. */
+/**
+ * Refus d'une bascule : un conflit de verrou et un débit dépassé (429) se
+ * disent à part, un code inconnu tombe sur le repli du réglage.
+ */
 export function toggleErrorText(text: TournamentFormText, kind: ToggleKind, code: string): string {
   if (code === "CONCURRENT_UPDATE_RETRY") return text.t("edit.concurrentRetry");
+  if (code === "TOO_MANY_REQUESTS") return text.t("edit.tooManyRequests");
   const { errors } = TOGGLE_ROUTES[kind];
   const key = Object.entries(errors).find(([known]) => known === code)?.[1] ?? errors.fallback;
   return text.t(key);

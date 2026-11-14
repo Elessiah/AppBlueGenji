@@ -24,8 +24,8 @@ information de check-in : ni instantané ni REST à câbler.
 
 Comme la planification et les salons vocaux, la case n'est **ni verrouillée ni
 restreinte** : modifiable à la création et à l'édition, tournoi en cours
-compris, jusqu'à `FINISHED` (`canToggleMatchCheckIn`, même règle que
-`canToggleRefereeScheduling` dont le formulaire tire le verrou), par le staff qui a la
+compris, jusqu'à `FINISHED` (`canToggleLiveTournamentOption`, règle unique des
+trois bascules, lue telle quelle par le formulaire et par les services), par le staff qui a la
 permission `tournaments`. À l'édition elle part par sa route propre,
 `PUT /api/admin/tournaments/[id]/match-check-in` (déroulé commun avec les
 salons vocaux : `putTournamentToggle`, `lib/server/tournament-toggle-route.ts` ;
@@ -103,6 +103,11 @@ session, permission `tournaments`, débit par compte — `REFEREE_SCHEDULING_TOG
 `TEAM_VOICE_TOGGLE_RULE`, `MATCH_CHECK_IN_TOGGLE_RULE` —, identifiant, corps,
 contention rendue en 409 `CONCURRENT_UPDATE_RETRY`) ; chaque route fournit son
 journal (`announce`) et, pour la planification, `movedToPlanning` (`extra`).
+Le débit est **réservé** puis rendu quand la requête ne change rien (ou
+échoue) : le formulaire envoie les trois bascules à chaque enregistrement, et
+seuls les vrais changements — ceux qui écrivent au journal Discord du staff —
+comptent dans le plafond. Un refus 429 (`TOO_MANY_REQUESTS`) se dit à part
+(`edit.tooManyRequests`), comme un conflit de verrou.
 
 ## Textes qui en parlent
 
@@ -115,6 +120,9 @@ d'équipe (`team.json`) disent « si le tournoi en a un ». FR et EN.
 - **Lecture de l'option à l'envoi** : sans cache entre lots, mais les envois
   lancés pendant qu'une lecture du même tournoi est en vol la partagent
   (`readCheckInState`) — une lecture par tournoi et par lot, pas par message.
+  Une bascule validée dans le processus depuis le départ d'une lecture la rend
+  non partageable (`noteCheckInToggle`, `check-in-toggles.ts`) : un envoi lancé
+  après la bascule relit, jamais sur l'option d'avant.
 - **Remise en marche** : les manches à taire se lisent **sans verrou**
   d'abord (rappels 10 h, check-in H-15), puis l'écriture ne parcourt que ces
   manches par clé primaire — elle ne verrouille plus tout le tournoi sous son

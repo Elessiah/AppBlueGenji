@@ -72,6 +72,7 @@ import { onPoster, toPoster, type PosterRow } from "./match-poster";
 import { dispatchRefereeDigest } from "./referee-digest";
 import { newMatchPendingSql } from "./new-match-sql";
 import { claimDatedMark, releaseDatedMarks } from "./reminder-marks";
+import { checkInToggleEpoch } from "./check-in-toggles";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -115,8 +116,11 @@ type CheckInStateRow = RowDataPacket & {
 /** Relit l'option d'un tournoi (ligne absente : tournoi supprimé). */
 type CheckInReader = (tournamentId: number) => Promise<CheckInStateRow | undefined>;
 
-/** Lectures en vol, par tournoi : les envois lancés ensemble n'en partagent qu'une. */
-const checkInReadsInFlight = new Map<number, Promise<CheckInStateRow | undefined>>();
+/**
+ * Lectures en vol, par tournoi, avec l'époque des bascules à leur départ
+ * (`checkInToggleEpoch`) : les envois lancés ensemble n'en partagent qu'une.
+ */
+const checkInReadsInFlight = new Map<number, { epoch: number; read: Promise<CheckInStateRow | undefined> }>();
 
 /**
  * Relecture de l'option, **sans cache** : une ligne lue par clé primaire — une
@@ -125,11 +129,14 @@ const checkInReadsInFlight = new Map<number, Promise<CheckInStateRow | undefined
  * manches d'une ronde suisse du même tournoi) lancés pendant qu'une lecture est
  * en vol la **partagent** : une lecture par tournoi et par lot, pas par envoi.
  * La lecture partagée est retirée dès qu'elle aboutit, jamais gardée au-delà :
- * un envoi qui démarre ensuite relit. Exporté pour les tests.
+ * un envoi qui démarre ensuite relit. Une bascule validée dans ce processus
+ * depuis le départ de la lecture (`noteCheckInToggle`) la rend non partageable :
+ * l'envoi relit, et ne part pas sur l'option d'avant. Exporté pour les tests.
  */
 export const readCheckInState: CheckInReader = (tournamentId) => {
+  const epoch = checkInToggleEpoch();
   const inFlight = checkInReadsInFlight.get(tournamentId);
-  if (inFlight) return inFlight;
+  if (inFlight && inFlight.epoch === epoch) return inFlight.read;
   const read = (async () => {
     const db = await getDatabase();
     const [rows] = await db.execute<CheckInStateRow[]>(
@@ -138,9 +145,9 @@ export const readCheckInState: CheckInReader = (tournamentId) => {
     );
     return rows[0];
   })().finally(() => {
-    if (checkInReadsInFlight.get(tournamentId) === read) checkInReadsInFlight.delete(tournamentId);
+    if (checkInReadsInFlight.get(tournamentId)?.read === read) checkInReadsInFlight.delete(tournamentId);
   });
-  checkInReadsInFlight.set(tournamentId, read);
+  checkInReadsInFlight.set(tournamentId, { epoch, read });
   return read;
 };
 

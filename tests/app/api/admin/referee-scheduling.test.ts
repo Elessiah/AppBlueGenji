@@ -5,12 +5,14 @@ jest.mock("@/lib/server/tournaments/referee-scheduling");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/api-guard", () => ({
   ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
-  enforceRateLimit: jest.fn(() => null),
+  reserveRateLimit: jest.fn(
+    jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard").reserveRateLimit,
+  ),
 }));
 
 import { PUT } from "@/app/api/admin/tournaments/[id]/referee-scheduling/route";
 import { NextResponse } from "next/server";
-import { enforceRateLimit, REFEREE_SCHEDULING_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { reserveRateLimit, REFEREE_SCHEDULING_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { setRefereeScheduling } from "@/lib/server/tournaments/referee-scheduling";
@@ -177,9 +179,9 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — bascule sans ef
 describe("PUT /api/admin/tournaments/[id]/referee-scheduling — débit", () => {
   it("put_rateLimited_returns429WithoutService", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(enforceRateLimit).mockReturnValueOnce(NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }));
+    jest.mocked(reserveRateLimit).mockReturnValueOnce({ refused: NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }), refund: () => undefined });
     expect((await PUT(req({ enabled: true }), params("7"))).status).toBe(429);
-    expect(enforceRateLimit).toHaveBeenCalledWith(REFEREE_SCHEDULING_TOGGLE_RULE, 3);
+    expect(reserveRateLimit).toHaveBeenCalledWith(REFEREE_SCHEDULING_TOGGLE_RULE, 3);
     expect(setRefereeScheduling).not.toHaveBeenCalled();
   });
 

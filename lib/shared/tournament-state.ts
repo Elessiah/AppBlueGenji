@@ -93,7 +93,7 @@ export function nextTournamentStateChangeAt(
  * clôture** — tournoi en cours compris (planification par l'arbitrage, salons
  * vocaux d'équipe, check-in des matchs) : elle ne touche ni aux appariements
  * ni aux scores, et un tournoi terminé n'a plus de match qu'elle décrirait.
- * Règle commune, que chaque option reprend sans dépendre des autres.
+ * Règle unique, lue telle quelle par l'écran et le service de chaque option.
  */
 export function canToggleLiveTournamentOption(state: TournamentState): boolean {
   return state !== "FINISHED";

@@ -360,8 +360,9 @@ const BRIEF_FROM = `FROM bg_matches m
 
 /**
  * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
- * relue à chaque lecture des candidats **et** dans la réservation : éteinte,
- * rien ne part ni n'est réservé. Ce qui est devenu dû pendant l'arrêt est
+ * relue à chaque lecture des candidats, dans la réservation **et** à la
+ * relecture de chaque côté juste avant l'envoi (`rereadBriefRow`) : éteinte,
+ * rien ne part ni n'est réservé (la réservation d'un côté relu éteint est rendue). Ce qui est devenu dû pendant l'arrêt est
  * réservé sans message par la remise en marche ({@link silencePausedLobbyBriefs}) ;
  * ce qui était dû avant l'arrêt reste libre et part, rallumée, dans sa fenêtre.
  */

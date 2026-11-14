@@ -6,8 +6,10 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { CHECK_IN_REMINDER_KEY, MATCH_REMINDER_OFFSETS, MATCH_SEEN_KEY } from "@/lib/shared/discord-notifications";
-import { canToggleMatchCheckIn, readDbInstant } from "@/lib/shared/match-check-in";
+import { readDbInstant } from "@/lib/shared/match-check-in";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { TournamentState } from "@/lib/shared/types";
+import { noteCheckInToggle } from "./check-in-toggles";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { silencePausedLobbyBriefs } from "./lobby-brief";
 import { publishUpdatedEvent } from "./notifications";
@@ -80,7 +82,8 @@ const SILENCE_OPENED_REMINDERS_SQL = (idCount: number): string => `INSERT IGNORE
  * (tournoi créé sans check-in), tout l'avant compte pour l'arrêt. Rejouée sur
  * un interblocage avec un balayage qui réserve la même marque, l'instant
  * présent repris à chaque tentative (`now` des tests, sinon l'horloge) : une
- * tentative rejouée après une attente ne borne pas l'arrêt trop tard.
+ * tentative rejouée après une attente ne borne pas l'arrêt trop tard. Validée,
+ * la bascule le note (`noteCheckInToggle`) : un envoi lancé ensuite relit l'option.
  *
  * @throws `TOURNAMENT_NOT_FOUND` | `TOURNAMENT_FINISHED`
  */
@@ -100,7 +103,7 @@ export async function setMatchCheckIn(
       );
       const tournament = rows[0];
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-      if (!canToggleMatchCheckIn(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
+      if (!canToggleLiveTournamentOption(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
       const current = Number(tournament.match_check_in ?? 1) !== 0;
       if (current === enabled) return false;
       if (!enabled) {
@@ -137,6 +140,8 @@ export async function setMatchCheckIn(
     }),
   );
   if (changed) {
+    // Aussitôt validée : aucun envoi lancé désormais ne rejoint une relecture partie avant.
+    noteCheckInToggle();
     publishUpdatedEvent(tournamentId);
   }
   return { tournamentId, enabled, changed };

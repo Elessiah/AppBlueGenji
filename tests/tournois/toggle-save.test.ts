@@ -31,6 +31,11 @@ describe("toggleErrorText", () => {
     expect(toggleErrorText(textOf(enForm), kind, "CONCURRENT_UPDATE_RETRY")).toBe(lookup(enForm, "edit.concurrentRetry"));
   });
 
+  it.each(KINDS)("%s: a rate-limit refusal says to wait in FR and EN", (kind) => {
+    expect(toggleErrorText(textOf(frForm), kind, "TOO_MANY_REQUESTS")).toBe(lookup(frForm, "edit.tooManyRequests"));
+    expect(toggleErrorText(textOf(enForm), kind, "TOO_MANY_REQUESTS")).toBe(lookup(enForm, "edit.tooManyRequests"));
+  });
+
   it.each(KINDS)("%s: known codes map to their text, unknown ones to the fallback", (kind) => {
     const { errors } = TOGGLE_ROUTES[kind];
     for (const messages of [frForm, enForm]) {

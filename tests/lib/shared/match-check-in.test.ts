@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { canToggleMatchCheckIn, checkInReminderFate, readDbInstant, readMatchCheckIn } from "@/lib/shared/match-check-in";
+import { checkInReminderFate, readDbInstant, readMatchCheckIn } from "@/lib/shared/match-check-in";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
@@ -56,19 +56,14 @@ describe("checkInReminderFate", () => {
   });
 });
 
-describe("canToggleMatchCheckIn", () => {
-  it("canToggleMatchCheckIn_running_true", () => {
-    expect(canToggleMatchCheckIn("RUNNING")).toBe(true);
-  });
-
-  it("canToggleMatchCheckIn_finished_false", () => {
-    expect(canToggleMatchCheckIn("FINISHED")).toBe(false);
-  });
-});
-
 describe("canToggleLiveTournamentOption", () => {
   it("canToggleLiveTournamentOption_running_true", () => {
     expect(canToggleLiveTournamentOption("RUNNING")).toBe(true);
+  });
+
+  it("canToggleLiveTournamentOption_beforeStart_true", () => {
+    expect(canToggleLiveTournamentOption("UPCOMING")).toBe(true);
+    expect(canToggleLiveTournamentOption("REGISTRATION")).toBe(true);
   });
 
   it("canToggleLiveTournamentOption_finished_false", () => {

@@ -1,9 +1,10 @@
 import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
-import { enforceRateLimit } from "@/lib/server/api-guard";
+import { reserveRateLimit } from "@/lib/server/api-guard";
 import { failureReason, serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import type { RateLimitRule } from "@/lib/server/rate-limit";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import type { StaffTournamentAction } from "@/lib/shared/bot-logs";
 import { can } from "@/lib/shared/permissions";
@@ -47,6 +48,9 @@ export function staffToggleLog(
  * (404 `TOURNAMENT_NOT_FOUND`), terminé (409 `TOURNAMENT_FINISHED`), contention
  * passagère (409 `CONCURRENT_UPDATE_RETRY`), code du site levé par le service,
  * autre échec (500, code de l'option). Journalisé seulement s'il change la valeur.
+ * Le débit est **réservé** puis rendu si la requête ne change rien ou échoue :
+ * le formulaire renvoie les trois bascules à chaque enregistrement, seuls les
+ * vrais changements (ceux qui écrivent au journal du staff) usent le plafond.
  */
 export async function putTournamentToggle<T extends TournamentToggleResult>(
   req: Request,
@@ -56,29 +60,31 @@ export async function putTournamentToggle<T extends TournamentToggleResult>(
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
-  const throttled = enforceRateLimit(spec.rule, user.id);
-  if (throttled) return throttled;
+  const slot = reserveRateLimit(spec.rule, user.id);
+  if (slot.refused) return slot.refused;
+  const refused = (response: Response): Response => {
+    slot.refund();
+    return response;
+  };
 
-  const { id } = await context.params;
-  const tournamentId = Number(id);
-  if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
-    return fail("INVALID_TOURNAMENT_ID", 400);
-  }
+  const tournamentId = parseMatchIdParam((await context.params).id);
+  if (tournamentId === null) return refused(fail("INVALID_TOURNAMENT_ID", 400));
 
   const read = await readJsonBodyOrFallback(req, {});
-  if ("refusal" in read) return read.refusal;
+  if ("refusal" in read) return refused(read.refusal);
   const body = read.body as { enabled?: unknown };
-  if (typeof body.enabled !== "boolean") return fail(spec.invalidCode, 400);
+  if (typeof body.enabled !== "boolean") return refused(fail(spec.invalidCode, 400));
 
   let result: T;
   try {
     result = await spec.apply(tournamentId, body.enabled);
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
-    if (message === "TOURNAMENT_FINISHED") return fail(message, 409);
-    return fail(serviceErrorCode(error, spec.failedCode), 500);
+    if (message === "TOURNAMENT_NOT_FOUND") return refused(fail(message, 404));
+    if (message === "TOURNAMENT_FINISHED") return refused(fail(message, 409));
+    return refused(fail(serviceErrorCode(error, spec.failedCode), 500));
   }
+  if (!result.changed) slot.refund();
   if (result.changed) {
     // Le changement est validé : un journal en échec ne le fait pas passer pour refusé.
     try {

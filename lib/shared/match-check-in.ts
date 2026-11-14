@@ -15,8 +15,6 @@
  * remise en marche, `setMatchCheckIn`), et ce qui était dû avant l'arrêt sans
  * être encore parti part à la remise en marche ({@link checkInReminderFate}).
  */
-import { canToggleLiveTournamentOption } from "./tournament-state";
-import type { TournamentState } from "./types";
 
 /** L'option telle que la base la porte. */
 export type MatchCheckInSetting = {
@@ -50,14 +48,4 @@ export function readMatchCheckIn(
 export function checkInReminderFate(setting: MatchCheckInSetting, dueAt: Date): "send" | "silence" | "hold" {
   if (setting.enabled) return "send";
   return setting.pausedAt !== null && dueAt.getTime() < setting.pausedAt.getTime() ? "hold" : "silence";
-}
-
-/**
- * L'option se bascule à tout moment jusqu'à la clôture, tournoi en cours
- * compris : un tournoi terminé n'a plus de match à prévenir (règle commune des
- * options d'organisation, `canToggleLiveTournamentOption`). L'écran et l'API
- * lisent tous deux cette fonction : ils ne divergent pas.
- */
-export function canToggleMatchCheckIn(state: TournamentState): boolean {
-  return canToggleLiveTournamentOption(state);
 }

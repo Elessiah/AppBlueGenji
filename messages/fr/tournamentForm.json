@@ -30,6 +30,7 @@
     "planningEnabled": "Planification par l'arbitrage activée.",
     "planningEnabledMoved": "Planification activée : {count, plural, =1 {1 match à planifier} other {# matchs à planifier}}.",
     "concurrentRetry": "Un autre enregistrement est en cours sur ce tournoi. Réessaie dans un instant.",
+    "tooManyRequests": "Trop de changements d'options coup sur coup. Patiente quelques minutes avant de réessayer.",
     "planningErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
       "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",

@@ -1102,6 +1102,15 @@ describe("dispatchLobbyBriefs", () => {
     expect(query.mock.calls[1][0]).toContain("bg_match_start_notices n WHERE n.id = ?) AS claim_kept");
   });
 
+  it("dispatchLobbyBriefs_claimedSide_rereadChecksCheckInStillOn", async () => {
+    const { query } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Option éteinte entre la réservation et l'envoi : la relecture ne rend rien, rien ne part.
+    expect(String(query.mock.calls[1][0]).replace(/\s+/g, " ")).toContain("AND t.match_check_in = 1");
+  });
+
   it("dispatchLobbyBriefs_lobbyClosedBeforeSend_noRetryArmedAndLoggedAsClosed", async () => {
     jest.useFakeTimers();
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);

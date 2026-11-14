@@ -6,12 +6,15 @@ jest.mock("@/lib/server/tournaments/match-check-in");
 jest.mock("@/lib/server/tournaments/staff-action-logs");
 jest.mock("@/lib/server/api-guard", () => ({
   ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
-  enforceRateLimit: jest.fn(() => null),
+  reserveRateLimit: jest.fn(
+    jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard").reserveRateLimit,
+  ),
 }));
 
 import { PUT } from "@/app/api/admin/tournaments/[id]/match-check-in/route";
-import { enforceRateLimit, MATCH_CHECK_IN_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { reserveRateLimit, MATCH_CHECK_IN_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import { setMatchCheckIn } from "@/lib/server/tournaments/match-check-in";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import { authUser } from "../../helpers/auth-user";
@@ -30,6 +33,7 @@ const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetRateLimit(MATCH_CHECK_IN_TOGGLE_RULE.name);
   jest.mocked(setMatchCheckIn).mockResolvedValue({ tournamentId: 7, enabled: false, changed: true });
 });
 
@@ -48,9 +52,9 @@ describe("PUT /api/admin/tournaments/[id]/match-check-in", () => {
 
   it("put_rateLimited_returns429WithoutService", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(enforceRateLimit).mockReturnValueOnce(NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }));
+    jest.mocked(reserveRateLimit).mockReturnValueOnce({ refused: NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }), refund: () => undefined });
     expect((await PUT(putReq({ enabled: false }), params("7"))).status).toBe(429);
-    expect(enforceRateLimit).toHaveBeenCalledWith(MATCH_CHECK_IN_TOGGLE_RULE, 3);
+    expect(reserveRateLimit).toHaveBeenCalledWith(MATCH_CHECK_IN_TOGGLE_RULE, 3);
     expect(setMatchCheckIn).not.toHaveBeenCalled();
   });
 
@@ -159,5 +163,49 @@ describe("PUT /api/admin/tournaments/[id]/match-check-in", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ enabled: false, changed: true });
     error.mockRestore();
+  });
+});
+
+describe("PUT match-check-in — débit réservé, rendu sans changement", () => {
+  const overCap = MATCH_CHECK_IN_TOGGLE_RULE.limit + 1;
+
+  it("put_noOpRequestsBeyondCap_neverThrottled", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchCheckIn).mockResolvedValue({ tournamentId: 7, enabled: true, changed: false });
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < overCap; attempt += 1) {
+      statuses.push((await PUT(putReq({ enabled: true }), params("7"))).status);
+    }
+    expect(statuses).toEqual(Array.from({ length: overCap }, () => 200));
+  });
+
+  it("put_realChangesBeyondCap_returns429WithoutService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (let attempt = 0; attempt < MATCH_CHECK_IN_TOGGLE_RULE.limit; attempt += 1) {
+      await PUT(putReq({ enabled: false }), params("7"));
+    }
+    jest.mocked(setMatchCheckIn).mockClear();
+    const res = await PUT(putReq({ enabled: false }), params("7"));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe("TOO_MANY_REQUESTS");
+    expect(setMatchCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("put_invalidBodiesBeyondCap_refundEachSlot", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (let attempt = 0; attempt < overCap; attempt += 1) {
+      await PUT(putReq({ enabled: "on" }), params("7"));
+    }
+    expect((await PUT(putReq({ enabled: false }), params("7"))).status).toBe(200);
+  });
+
+  it("put_serviceFailuresBeyondCap_refundEachSlot", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchCheckIn).mockRejectedValue(new Error("TOURNAMENT_FINISHED"));
+    for (let attempt = 0; attempt < overCap; attempt += 1) {
+      await PUT(putReq({ enabled: false }), params("7"));
+    }
+    jest.mocked(setMatchCheckIn).mockResolvedValue({ tournamentId: 7, enabled: false, changed: true });
+    expect((await PUT(putReq({ enabled: false }), params("7"))).status).toBe(200);
   });
 });
