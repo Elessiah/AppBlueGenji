@@ -46,6 +46,42 @@ export async function saveNeverAgain(shownTo: number | null, onOtherAccount: () 
   }
 }
 
+/** Au-delà, un refus encore retenu derrière une modale ne se dit plus. */
+export const REFUSAL_NOTICE_MAX_WAIT_MS = 120_000;
+
+/** Le guet du refus en cours, un seul à la fois pour tout le document. */
+let pendingRefusalNotice: (() => void) | null = null;
+
+/**
+ * Appelle `notice` une fois plus aucune modale ouverte (`watchModalsClosed`),
+ * au plus `REFUSAL_NOTICE_MAX_WAIT_MS` après le refus : passé ce délai, le
+ * guet s'arrête sans rien dire — un toast d'erreur sans contexte, minutes plus
+ * tard sur une autre page, ne renseignerait plus. Un nouveau refus remplace le
+ * guet précédent. Renvoie l'arrêt.
+ */
+export function noticeOnceModalsClosed(notice: () => void, maxWaitMs = REFUSAL_NOTICE_MAX_WAIT_MS): () => void {
+  pendingRefusalNotice?.();
+  let stopWatch: (() => void) | null = null;
+  let done = false;
+  const stop = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    stopWatch?.();
+    if (pendingRefusalNotice === stop) pendingRefusalNotice = null;
+  };
+  const timer = setTimeout(stop, maxWaitMs);
+  pendingRefusalNotice = stop;
+  stopWatch = watchModalsClosed(() => {
+    if (done) return;
+    stop();
+    notice();
+  });
+  // Appelé sur-le-champ (aucune modale ouverte) : le guet est déjà clos.
+  if (done) stopWatch();
+  return stop;
+}
+
 /**
  * Ouverture d'office de l'invitation à certifier (`CERTIFICATION_PROMPT.md`) :
  * une fois par page, dès que le contexte du lecteur en porte une, sauf déjà
@@ -93,9 +129,11 @@ export function useCertificationPrompt(
   // ou, après « Certifier », sur `/profil` où le dialogue de certification
   // s'ouvre — le toast partirait derrière. Le guet porte sur le document, pas
   // sur la fiche : il survit à la navigation client vers le profil, où la
-  // notification (mise en page racine) reste montée.
+  // notification (mise en page racine) reste montée. Le guet est **borné**
+  // (`REFUSAL_NOTICE_MAX_WAIT_MS`) : passé ce délai, le refus n'a plus de
+  // contexte et se tait, plutôt que d'observer la page indéfiniment.
   const refused = useCallback(() => {
-    watchModalsClosed(() => onOtherAccountRef.current());
+    noticeOnceModalsClosed(() => onOtherAccountRef.current());
   }, []);
   const [open, setOpen] = useState(false);
   // Case « Ne plus voir » : son seul état, tenu ici pour valoir aussi quand la

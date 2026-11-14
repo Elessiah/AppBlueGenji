@@ -70,6 +70,7 @@ const modals = {
   open: false,
   yieldWatchers: [] as (() => void)[],
   closedWatchers: [] as (() => void)[],
+  closedStopped: 0,
   stopped: 0,
 };
 jest.mock("@/lib/shared/dialog-focus", () => ({
@@ -84,11 +85,18 @@ jest.mock("@/lib/shared/dialog-focus", () => ({
   watchModalsClosed: (onClosed: () => void) => {
     if (!modals.open) onClosed();
     else modals.closedWatchers.push(onClosed);
-    return () => undefined;
+    return () => {
+      modals.closedStopped += 1;
+    };
   },
 }));
 
-import { saveNeverAgain, useCertificationPrompt } from "@/app/(secured)/tournois/[id]/_hooks/useCertificationPrompt";
+import {
+  noticeOnceModalsClosed,
+  REFUSAL_NOTICE_MAX_WAIT_MS,
+  saveNeverAgain,
+  useCertificationPrompt,
+} from "@/app/(secured)/tournois/[id]/_hooks/useCertificationPrompt";
 import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
 
 // Appelé hors composant, par le banc : le nom neutre le dit aux règles des crochets.
@@ -176,6 +184,7 @@ beforeEach(() => {
   modals.open = false;
   modals.yieldWatchers = [];
   modals.closedWatchers = [];
+  modals.closedStopped = 0;
   modals.stopped = 0;
   local = memoryStorage();
   session = memoryStorage();
@@ -385,6 +394,66 @@ describe("useCertificationPrompt", () => {
     modals.closedWatchers.forEach((watcher) => watcher());
 
     expect(onOtherAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("noticeOnceModalsClosed_noModalOpen_noticesAtOnceAndLeavesNoWatch", () => {
+    const notice = jest.fn();
+
+    noticeOnceModalsClosed(notice);
+
+    expect(notice).toHaveBeenCalledTimes(1);
+    expect(modals.closedStopped).toBe(1);
+  });
+
+  it("noticeOnceModalsClosed_modalStaysOpenPastTheCap_stopsWatchingWithoutNotice", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      const notice = jest.fn();
+
+      noticeOnceModalsClosed(notice);
+      jest.advanceTimersByTime(REFUSAL_NOTICE_MAX_WAIT_MS);
+
+      expect(modals.closedStopped).toBe(1);
+      // La modale se ferme bien plus tard, sur une autre page : silence.
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+      expect(notice).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_secondRefusal_replacesTheFirstWatch", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      const first = jest.fn();
+      const second = jest.fn();
+
+      noticeOnceModalsClosed(first);
+      noticeOnceModalsClosed(second);
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+      expect(modals.closedStopped).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_stoppedByCaller_neverNotices", () => {
+    modals.open = true;
+    const notice = jest.fn();
+
+    const stop = noticeOnceModalsClosed(notice);
+    stop();
+    modals.open = false;
+    modals.closedWatchers.forEach((watcher) => watcher());
+
+    expect(notice).not.toHaveBeenCalled();
   });
 
   it("stockage inaccessible : la modale s'ouvre et se ferme sans mémoire", () => {

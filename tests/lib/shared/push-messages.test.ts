@@ -282,6 +282,19 @@ describe("rédacteurs", () => {
     expect(privacyChangePush([]).url).toBe("/rgpd");
   });
 
+  it("privacyChangePush_noTitlesButLater_usesFallbackAndCountsLater", () => {
+    const body = privacyChangePush([], "fr", 2).body;
+
+    expect(body.startsWith("Traitement de tes données (et 2 autres)")).toBe(true);
+  });
+
+  it("privacyChangePush_laterChanges_countsThemLikeTheDiscordMessage", () => {
+    expect(privacyChangePush(["A", "B"], "fr", 3).body).toContain("(et 4 autres)");
+    expect(privacyChangePush(["A"], "fr", 1).body).toContain("(et 1 autre)");
+    expect(privacyChangePush(["A"], "en", 2).body).toMatch(/2 other/);
+    expect(privacyChangePush(["A"], "fr", -1).body).toMatch(/^A\. /);
+  });
+
   it("arbitrage : reprend la ligne sans Markdown, sans jamais en tirer le lien", () => {
     const content = refereeAlertPush("⚠️ **Conflit de score** — Coupe · https://site.test/tournois/4", "score_conflict-40");
     expect(content.body).toBe("⚠️ Conflit de score — Coupe ·");

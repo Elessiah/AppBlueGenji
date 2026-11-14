@@ -818,12 +818,17 @@ export function suspensionPush(kind: "SUSPENDED" | "LIFTED", locale: Locale = DE
  * Des changements du traitement des données sont à lire — une information,
  * aucun accord n'est demandé, hors des conditions d'utilisation qu'une entrée
  * annonce à accepter (fenêtre des conditions). `titles` : les titres **dans la langue du
- * destinataire** (`localizedPrivacyChanges`).
+ * destinataire** (`localizedPrivacyChanges`). `later` : les changements encore
+ * dus après ce lot, comptés comme dans le message privé du même envoi.
  */
-export function privacyChangePush(titles: readonly string[], locale: Locale = DEFAULT_LOCALE): PushContent {
+export function privacyChangePush(
+  titles: readonly string[],
+  locale: Locale = DEFAULT_LOCALE,
+  later = 0,
+): PushContent {
   const text = TEXT[locale];
   const first = titles[0] ?? text.t("privacyChange.fallback");
-  const others = titles.length - 1;
+  const others = Math.max(0, titles.length - 1) + Math.max(0, later);
   return {
     title: text.t("privacyChange.title"),
     body: others > 0 ? text.t("privacyChange.bodyMore", { first, others }) : text.t("privacyChange.body", { first }),

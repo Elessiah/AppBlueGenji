@@ -6,7 +6,7 @@ jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
+import { PrivacyChangesModal, privacyDetailsPending } from "@/components/privacy/PrivacyChangesModal";
 import { ToastProvider } from "@/components/ui/toast";
 import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
 import { privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
@@ -97,6 +97,19 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(markup).not.toContain(entry.details[0].slice(0, 40).replace(/'/g, "&#x27;"));
     expect(markup).toContain("Chargement du détail des changements…");
     expect(markup).toMatch(/<button[^>]*disabled=""/);
+  });
+
+  it("privacyDetailsPending_followsThePresentedList", () => {
+    // Détail donné par la mise en page : rien à attendre.
+    expect(privacyDetailsPending(false, "a,b", null, null)).toBe(false);
+    // Lecture en vol.
+    expect(privacyDetailsPending(true, "a,b", null, null)).toBe(true);
+    // Arrivé, ou en échec (l'erreur libère le bouton : la politique porte tout).
+    expect(privacyDetailsPending(true, "a,b", "a,b", null)).toBe(false);
+    expect(privacyDetailsPending(true, "a,b", null, "a,b")).toBe(false);
+    // Une entrée s'ajoute sous la modale ouverte : le bouton attend de nouveau.
+    expect(privacyDetailsPending(true, "a,b,c", "a,b", null)).toBe(true);
+    expect(privacyDetailsPending(true, "a,b,c", null, "a,b")).toBe(true);
   });
 
   it("PrivacyChangesModal_detailsGiven_buttonIsNotHeld", () => {

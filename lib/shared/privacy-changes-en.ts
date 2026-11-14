@@ -1052,6 +1052,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "When the exclusion is lifted, the notice is deleted with the rest. If Discord is temporarily unreachable, the ID of the excluded member, that of the message and the time it was queued are kept to retry during the bot's clean-up (every night, and when it restarts or after a restore; a limited number of notices each time), for 30 days at most, even after the exclusion is lifted; new: when it is lifted, up to ten of those replaced notices still queued are also retried at once, the others during the next clean-up. If lifting fails (the bot's database unavailable), the current notice may be deleted during a clean-up while the exclusion still applies. A notice that Discord refuses to delete for good (conversation or access closed), or that is still there after those 30 days, is no longer retried: the bot forgets its ID and the notice remains in the excluded member's direct conversation with the bot, like a notice sent before the bot kept its ID. If the bot's database is unavailable just after sending, or Discord's reply is lost, a notice may also remain without the bot keeping its ID; the same goes, after the bot's database is restored from a backup, for a notice sent since that backup.",
     ],
   },
+  "2026-11-marque-de-session-rectificatif": {
+    title: "Discord tag verification suggestion: when the window comes back",
+    linkLabels: ["Read the “Data collected” section"],
+    summary:
+      "A clarification of the information of October 29, 2026: when the site doesn't receive your answer to the Discord tag verification window, or refuses it, your session's mark stays, and the window may come back as long as that session lasts — not only at the next page load.",
+    details: [
+      "The information of October 29 only named two refusals (another account logged in since in that browser, or your account can't be found) and said the window could come back at the next page load. In fact, any answer that doesn't reach the site, or that it refuses for whatever reason (a site failure included), leaves the mark on your session. The window may then come back as long as that session lasts; when the refusal is due to another account logged in since, it only comes back on your account at a new login.",
+      "Nothing else changes: the mark contains nothing else, goes with the session and isn't included in the export of your data; “Don't show again” is still kept on your account, with its date.",
+    ],
+  },
 };
 
 /**

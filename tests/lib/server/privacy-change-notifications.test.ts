@@ -306,6 +306,26 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
+  it("dispatchPrivacyChangeNotifications_oneReservationTakenElsewhere_headerStillCountsEveryDueChange", async () => {
+    fakeDb({ candidates: [candidate()] });
+    await dispatchPrivacyChangeNotifications(NOW);
+    const baseline = String(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]);
+    const total = /(\d+) changements/.exec(baseline)?.[1];
+    expect(total).toBeDefined();
+
+    jest.clearAllMocks();
+    resetPrivacyNotificationThrottle();
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    const first = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl())[0];
+    fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const message = String(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]);
+    expect(message).toContain(`${total} changements`);
+    expect(message).not.toContain(`**${first.title}**`);
+  });
+
   it("regroupe les comptes qui ont les mêmes changements à recevoir", async () => {
     fakeDb({ candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })] });
     await dispatchPrivacyChangeNotifications(NOW);

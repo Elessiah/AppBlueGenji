@@ -243,9 +243,11 @@ async function runSweep(now: Date): Promise<number> {
     }
     const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
-    // Ce qui reste dû après ce lot est compté dans le message (« … et N
-    // autre(s) ») : le joueur sait que d'autres changements l'attendent.
-    const later = due.length - batch.length;
+    // Ce qui reste dû hors des changements réservés est compté dans le message
+    // (« … et N autre(s) ») : le joueur sait que d'autres changements l'attendent,
+    // et l'en-tête compte bien tout ce qui est dû — y compris un changement du lot
+    // réservé entre-temps par un balayage concurrent.
+    const later = due.length - reserved.length;
     const key = `${reserved.map((change) => change.id).join("|")}#${later}`;
     const group = groups.get(key) ?? { changes: reserved, later, recipients: [] };
     group.recipients.push(recipient);
@@ -275,7 +277,13 @@ async function sendPrivacyGroup(group: PrivacyGroup, siteUrl: string | null): Pr
         buildPrivacyChangesMessage(localizedPrivacyChanges(group.changes, locale), siteUrl, locale, group.later),
       context: "privacy-changes",
     },
-    push: (locale) => privacyChangePush(localizedPrivacyChanges(group.changes, locale).map((change) => change.title), locale),
+    // Le push compte comme le message privé du même envoi (`group.later`).
+    push: (locale) =>
+      privacyChangePush(
+        localizedPrivacyChanges(group.changes, locale).map((change) => change.title),
+        locale,
+        group.later,
+      ),
   });
   // Bot injoignable pour un appel (une langue) ou pour tous : seuls les comptes
   // qu'il devait joindre par cet appel sont rendus au balayage suivant — ceux

@@ -35,6 +35,22 @@ export function privacyModalIntroKey(changes: readonly PrivacyChange[]) {
 }
 
 /**
+ * Le bouton attend-il le détail ? Oui tant que la liste **présentée**
+ * (`idsKey`) n'a ni détail arrivé ni lecture en échec : une liste qui change
+ * sous la modale ouverte (entrée publiée à minuit, re-rendu de la mise en page)
+ * le bloque de nouveau, plutôt que de laisser prendre connaissance d'une
+ * entrée dont le détail n'a jamais été montré.
+ */
+export function privacyDetailsPending(
+  detailsDeferred: boolean,
+  idsKey: string,
+  loadedFor: string | null,
+  failedFor: string | null,
+): boolean {
+  return detailsDeferred && loadedFor !== idsKey && failedFor !== idsKey;
+}
+
+/**
  * Présente à un compte connecté les changements publiés du traitement de ses
  * données dont il n'a pas encore pris connaissance
  * (`lib/shared/privacy-changes.ts`), **tous à la fois** : un joueur revenu
@@ -73,9 +89,13 @@ export function PrivacyChangesModal({
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails | null>(null);
-  const [detailsFailed, setDetailsFailed] = useState(false);
-  const detailsRequested = useRef(false);
+  const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails>({});
+  // Liste (identifiants joints) dont le détail est arrivé, ou dont la lecture a
+  // échoué : une liste nouvelle (re-rendu de la mise en page, entrée publiée à
+  // minuit) relance une lecture et bloque de nouveau le bouton.
+  const [detailsLoadedFor, setDetailsLoadedFor] = useState<string | null>(null);
+  const [detailsFailedFor, setDetailsFailedFor] = useState<string | null>(null);
+  const detailsRequestedFor = useRef<string | null>(null);
   // Fermée par un lien d'action pendant un enregistrement : sa réponse ne doit
   // plus parler d'une modale que le joueur a quittée.
   const leftByLink = useRef(false);
@@ -96,16 +116,22 @@ export function PrivacyChangesModal({
 
   const idsKey = changes.map((change) => change.id).join(",");
   useEffect(() => {
-    if (!open || !detailsDeferred || detailsRequested.current) return;
-    detailsRequested.current = true;
-    loadPrivacyChangeDetails(idsKey, locale).then(setLoadedDetails, () => {
-      setDetailsFailed(true);
-      showError(t("privacyModal.detailsFailed"));
-    });
+    if (!open || !detailsDeferred || detailsRequestedFor.current === idsKey) return;
+    detailsRequestedFor.current = idsKey;
+    loadPrivacyChangeDetails(idsKey, locale).then(
+      (details) => {
+        setLoadedDetails((previous) => ({ ...previous, ...details }));
+        setDetailsLoadedFor(idsKey);
+      },
+      () => {
+        setDetailsFailedFor(idsKey);
+        showError(t("privacyModal.detailsFailed"));
+      },
+    );
   }, [open, detailsDeferred, idsKey, locale, showError, t]);
-  const detailsPending = detailsDeferred && loadedDetails === null && !detailsFailed;
+  const detailsPending = privacyDetailsPending(detailsDeferred, idsKey, detailsLoadedFor, detailsFailedFor);
   const detailsOf = (change: PrivacyChange) =>
-    change.details.length > 0 ? change.details : (loadedDetails?.[change.id] ?? []);
+    change.details.length > 0 ? change.details : (loadedDetails[change.id] ?? []);
 
   if (!open) return null;
 

@@ -82,8 +82,9 @@ parle pas (variante « Discord seul », `battletagRelevant: false`), mais il ne
 fait toujours pas un contact pour l'équipe. En Overwatch, la cellule « Tes
 matchs / ce que ça ne fait pas » garde pourtant la phrase du BattleTag
 (`battletagUnfixable: true`, clé `matches.doesNotBattletagPending`) : Blizzard
-le renseignera à la prochaine connexion par Battle.net, et les contacts du
-match le montreront même masqué (revue juridique #497). Hors Overwatch, le
+le renseignera à la prochaine connexion par Battle.net **si le compte
+Battle.net en a un** (il peut n'en donner aucun), et les contacts du match le
+montreront même masqué, certifié ou non (revue juridique #497, revue EF-63). Hors Overwatch, le
 contexte du lecteur ne porte pas non plus son `battletagVerified` (revue
 sécurité #497).
 
@@ -160,7 +161,10 @@ cette modale.
   laquelle l'invitation s'est effacée, ni derrière le dialogue de
   certification de `/profil` après « Certifier » — le guet porte sur le
   document et survit à la navigation client ; un départ en chargement complet,
-  seul cas perdu, laisse le choix non gardé, que la modale redemandera) —, un corps sans
+  seul cas perdu, laisse le choix non gardé, que la modale redemandera ; le
+  guet est **borné** à `REFUSAL_NOTICE_MAX_WAIT_MS` (2 min,
+  `noticeOnceModalsClosed`) puis se tait, et un nouveau refus remplace le
+  précédent : jamais de toast sans contexte des minutes plus tard) —, un corps sans
   compte lisible 400 `INVALID_ACTION`. Plafonné par compte
   (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée
   en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`) au

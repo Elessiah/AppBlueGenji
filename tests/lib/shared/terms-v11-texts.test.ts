@@ -238,8 +238,9 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
 
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
     // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595), des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(V11_ID);
-    expect(PRIVACY_CHANGES.at(-1)?.publishedAt).toBe(TERMS_UPDATED_AT);
+    // Puis l'avis d'exclusion du bot (même jour) et le rectificatif de la marque de session (EF-63, plus tard).
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(V11_ID);
+    expect(PRIVACY_CHANGES.at(-2)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();
   });

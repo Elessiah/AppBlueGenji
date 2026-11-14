@@ -121,9 +121,11 @@ describe("CertificationPromptDialog", () => {
 
     expect(fr).toContain("Certifie ton Discord<");
     expect(fr).not.toContain(">BattleTag<");
-    expect(fr).toContain("Blizzard le renseignera à ta prochaine connexion par Battle.net");
-    expect(fr).toContain("il sera montré même masqué");
-    expect(en).toContain("Blizzard will fill it in at your next sign-in with Battle.net");
+    // Battle.net peut n'en donner aucun : la promesse est conditionnelle.
+    expect(fr).toContain("Blizzard le renseignera à ta prochaine connexion par Battle.net si ton compte Battle.net en a un");
+    expect(fr).toContain("sera montré même masqué, certifié ou non");
+    expect(en).toContain("Blizzard will fill it in at your next sign-in with Battle.net if your Battle.net account has one");
+    expect(en).toContain("verified or not");
   });
 
   it("Marvel Rivals : Discord seul, sans BattleTag ni Blizzard", () => {

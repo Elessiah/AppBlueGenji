@@ -477,7 +477,7 @@ describe("anglais", () => {
     expect(html).toContain("Referee");
     expect(html).toContain("Owner, Support");
     expect(html).toContain("In progress");
-    expect(html).toContain("Hidden from everyone, except in your Overwatch matches (contacts; match page and referees if you cast or referee it).");
+    expect(html).toContain("Hidden from everyone, except in your Overwatch matches (contacts, launch, match page): parties, casters and referees, by your role.");
     // Qui le lit encore : la liste partagée, derrière le « i » du champ.
     expect(html).toContain('aria-controls="player-battletag-more"');
     expect(html).toContain("Hidden, your BattleTag can only be read in the “Contacts” window of your Overwatch matches");
@@ -672,7 +672,7 @@ describe("revue UI/UX", () => {
 
     const html = renderToStaticMarkup(<PlayerDetailPage />);
 
-    expect(html).toContain("Masqué pour tous, sauf dans tes matchs Overwatch (contacts ; page du match et arbitres si tu le castes ou l");
+    expect(html).toContain("Masqué pour tous, sauf dans tes matchs Overwatch (contacts, lancement, page du match) : parties, casters et arbitres, selon ton rôle.");
     mockLocale = "en";
   });
 

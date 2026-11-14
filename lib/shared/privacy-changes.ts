@@ -1983,6 +1983,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd/registre#t08", label: "Lire le traitement T08 du registre" },
     ],
   },
+  {
+    // EF-63 (ERREUR.txt, revue EF-19 #501), rectificatif de l'entrée publiée
+    // `2026-10-proposition-certification-discord-marque-de-session` : une réponse
+    // refusée (autre compte connecté depuis, compte introuvable, échec du site)
+    // ne lève pas la marque, et la fenêtre peut revenir **tant que la session
+    // dure** — pas seulement « au chargement suivant », et sans liste fermée de
+    // refus. /rgpd (rgpd-policy) le dit depuis ce lot. Rien ne change dans le
+    // code. Pour tous les comptes ; datée du lendemain de la nuit de déploiement
+    // (comme `REGISTER_UPDATED_AT`) — avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-marque-de-session-rectificatif",
+    publishedAt: "2026-11-15",
+    title: "Proposition de certification du tag Discord : quand la fenêtre revient",
+    links: [DATA_COLLECTED_SECTION_LINK],
+    summary:
+      "Précision sur l'information du 29 octobre 2026 : quand le site ne reçoit pas ta réponse à la fenêtre de certification du tag Discord, ou la refuse, la marque de ta session reste, et la fenêtre peut revenir tant que cette session dure — pas seulement au chargement suivant.",
+    details: [
+      "L'information du 29 octobre ne nommait que deux refus (un autre compte connecté depuis dans ce navigateur, ou ton compte introuvable) et disait que la fenêtre pouvait revenir au chargement suivant. En fait, toute réponse qui ne parvient pas au site, ou qu'il refuse pour quelque raison que ce soit (une panne du site comprise), laisse la marque sur ta session. La fenêtre peut alors revenir tant que cette session dure ; quand le refus vient d'un autre compte connecté depuis, elle ne revient sur ton compte qu'à une nouvelle connexion.",
+      "Rien d'autre ne change : la marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données ; « Ne plus voir » reste gardé sur ton compte, avec sa date.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
@@ -2258,7 +2278,8 @@ const PRIVACY_DM_FRAME: Record<
  * Le message **et** le nombre de changements qu'il nomme, sortis de la même
  * mise en page : `privacyChangesForOneMessage` décide sur ce nombre, jamais en
  * cherchant un titre dans le texte, qui dépendrait du format de ligne. Résumés
- * d'abord ; titres seuls quand les résumés ne nomment pas tout.
+ * d'abord ; titres seuls quand les résumés ne nomment pas tout **et** que les
+ * titres en nomment davantage.
  */
 function layoutPrivacyChangesMessage(
   changes: readonly PrivacyChange[],
@@ -2267,7 +2288,11 @@ function layoutPrivacyChangesMessage(
   later = 0,
 ): { text: string; named: number } {
   const full = layoutPrivacyChangesLines(changes, siteUrl, locale, later, false);
-  return full.named === changes.length ? full : layoutPrivacyChangesLines(changes, siteUrl, locale, later, true);
+  if (full.named === changes.length) return full;
+  // Titres seuls seulement s'ils nomment **plus** : leur phrase d'introduction
+  // peut, avec des résumés courts, en nommer moins que les résumés.
+  const titles = layoutPrivacyChangesLines(changes, siteUrl, locale, later, true);
+  return titles.named > full.named ? titles : full;
 }
 
 function layoutPrivacyChangesLines(

@@ -1095,8 +1095,8 @@ export function RgpdEn({
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
             casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it),
-            published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
-            set in the match&apos;s live configuration (by the organizers) stays with the match. The link a
+            published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the organizers&apos; link,
+            set in the match&apos;s live configuration by one of their members, stays with the match. The link a
             caster provided when opening their stream also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that

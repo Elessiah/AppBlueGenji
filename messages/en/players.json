@@ -108,7 +108,7 @@
     "hidden": "Hidden",
     "adultYes": "Yes (18+)",
     "adultNo": "No (minor)",
-    "battletagHiddenSelf": "Hidden from everyone, except in your Overwatch matches (contacts; match page and referees if you cast or referee it).",
+    "battletagHiddenSelf": "Hidden from everyone, except in your Overwatch matches (contacts, launch, match page): parties, casters and referees, by your role.",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "battletagHiddenSelfBadge": "The “Verified BattleTag” badge, however, stays visible to any logged-in player, without the BattleTag.",

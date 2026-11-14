@@ -354,6 +354,23 @@ describe("buildPrivacyChangesMessage", () => {
     expect(message).not.toContain("xxx");
   });
 
+  it("buildPrivacyChangesMessage_shortSummariesOverflow_keepsSummariesWhenTitlesOnlyWouldNameFewer", () => {
+    // Résumés d'un caractère : les titres seuls n'économisent que ~5 caractères
+    // par ligne, moins que leur phrase d'introduction — ils nommeraient moins.
+    const many = Array.from({ length: 30 }, (_, i) =>
+      change(`s${String(i).padStart(2, "0")}`, "2026-01-10", { title: `s${i} ${"t".repeat(150)}`, summary: "s" }),
+    );
+
+    for (const locale of ["fr", "en"] as const) {
+      const message = buildPrivacyChangesMessage(many, "https://bluegenji.fr", locale);
+
+      expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+      expect(message).not.toMatch(/Trop de changements|Too many changes/);
+      expect(message).toContain("— s\n");
+      expect(message).toMatch(/autre\(s\) changement\(s\)|other change\(s\)/);
+    }
+  });
+
   it("buildPrivacyChangesMessage_laterChanges_headerCountsThemAndOmittedLineNamesHowMany", () => {
     const message = buildPrivacyChangesMessage([A], "https://bluegenji.fr", "fr", 4);
 
@@ -1758,6 +1775,36 @@ function expectEntryTexts(
   expect(english.details).toHaveLength(entry.details.length);
   expect(english.linkLabels).toHaveLength(1);
 }
+
+// EF-63 (ERREUR.txt, revue EF-19 #501) : l'entrée publiée du 29 octobre ne se
+// rectifie plus en place — une entrée rectificative, datée du déploiement.
+describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-11-marque-de-session-rectificatif")!;
+  const english = PRIVACY_CHANGES_EN["2026-11-marque-de-session-rectificatif"];
+  const original = PRIVACY_CHANGES.find((c) => c.id === "2026-10-proposition-certification-discord-marque-de-session")!;
+
+  it("privacyChanges_sessionMarkRectification_isStandaloneForEveryAccount", () => {
+    expectStandaloneEntry(entry, english, {
+      after: "2026-11-bot-avis-d-exclusion",
+      publishedAt: "2026-11-15",
+      audience: undefined,
+      links: original.links,
+    });
+  });
+
+  it("privacyChanges_sessionMarkRectification_saysAsLongAsTheSessionLastsWithoutClosedList", () => {
+    expectEntryTexts(entry, english, {
+      fr: ["tant que cette session dure", "pour quelque raison que ce soit", "qu'à une nouvelle connexion", "information du 29 octobre"],
+      en: ["as long as that session lasts", "for whatever reason", "only comes back on your account at a new login", "information of October 29"],
+    });
+    expect(entry.summary).toContain("pas seulement au chargement suivant");
+  });
+
+  it("privacyChanges_sessionMarkOriginal_publishedTextUntouched", () => {
+    expect(original.publishedAt).toBe("2026-10-29");
+    expect(original.details[0]).toContain("la fenêtre peut revenir au chargement suivant.");
+  });
+});
 
 describe("PRIVACY_CHANGES — avis de retrait du cast (LOGS-NOTIFS ln-1)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-avis-de-retrait-du-cast")!;
