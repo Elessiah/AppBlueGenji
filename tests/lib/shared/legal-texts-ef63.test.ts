@@ -45,14 +45,16 @@ describe("/rgpd — BattleTag tapé", () => {
 describe("/rgpd — retransmission", () => {
   it("rgpdPage_streaming_linkRequiredToOpenAndConfigByOrganisation", () => {
     expect(fr).toContain("avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir)");
-    // Seul le lien **de l'organisation** reste : la chaîne propre d'un membre part avec son compte.
-    expect(fr).toContain("seul le lien de l&apos;organisation, posé dans la configuration du direct du match par l&apos;un de ses membres, reste au match.");
-    expect(fr).not.toContain("seul le lien posé dans la configuration");
+    // Tout lien posé dans la configuration du direct reste quand les casters partent
+    // (`orphanStreamIds` garde le stream du staff tant qu'il a un lien, quel qu'en soit l'auteur) ;
+    // la chaîne propre d'un membre part ensuite avec son compte.
+    expect(fr).toContain("seul le lien posé dans la configuration du direct du match, par un membre de l&apos;organisation, reste au match quand ses casters s&apos;en vont.");
+    expect(fr).not.toContain("seul le lien de l&apos;organisation");
     expect(fr).not.toContain("ou un caster) reste au match");
     expect(fr).not.toContain("là ou en ouvrant");
     expect(en).toContain("with their channel link (required to open it)");
-    expect(en).toContain("only the organizers&apos; link, set in the match&apos;s live configuration by one of their members, stays with the match.");
-    expect(en).not.toContain("only the link set in the match");
+    expect(en).toContain("only the link set in the match&apos;s live configuration, by a member of the organizers, stays with the match when its casters leave.");
+    expect(en).not.toContain("only the organizers&apos; link");
     expect(en).not.toContain("or a caster) stays with the match");
     expect(en).not.toContain("there or when opening their stream");
   });

@@ -46,8 +46,13 @@ export async function saveNeverAgain(shownTo: number | null, onOtherAccount: () 
   }
 }
 
-/** Au-delà, un refus encore retenu derrière une modale ne se dit plus. */
-export const REFUSAL_NOTICE_MAX_WAIT_MS = 120_000;
+/**
+ * Au-delà, un refus encore retenu derrière une modale ne se dit plus. Dix
+ * minutes : de quoi finir la certification ouverte par « Certifier » sur
+ * `/profil` (code reçu par message privé, saisi) — le refus se dit alors à sa
+ * fermeture, encore dans son contexte.
+ */
+export const REFUSAL_NOTICE_MAX_WAIT_MS = 600_000;
 
 /** Le guet du refus en cours, un seul à la fois pour tout le document. */
 let pendingRefusalNotice: (() => void) | null = null;

@@ -6,7 +6,7 @@ jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PrivacyChangesModal, privacyDetailsPending } from "@/components/privacy/PrivacyChangesModal";
+import { PrivacyChangesModal, privacyDetailsPending, privacyDetailsRequestKey } from "@/components/privacy/PrivacyChangesModal";
 import { ToastProvider } from "@/components/ui/toast";
 import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
 import { privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
@@ -99,17 +99,48 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(markup).toMatch(/<button[^>]*disabled=""/);
   });
 
-  it("privacyDetailsPending_followsThePresentedList", () => {
+  it("privacyDetailsPending_followsTheDueRequest", () => {
     // Détail donné par la mise en page : rien à attendre.
-    expect(privacyDetailsPending(false, "a,b", null, null)).toBe(false);
+    expect(privacyDetailsPending(false, "fr|a,b", null)).toBe(false);
     // Lecture en vol.
-    expect(privacyDetailsPending(true, "a,b", null, null)).toBe(true);
-    // Arrivé, ou en échec (l'erreur libère le bouton : la politique porte tout).
-    expect(privacyDetailsPending(true, "a,b", "a,b", null)).toBe(false);
-    expect(privacyDetailsPending(true, "a,b", null, "a,b")).toBe(false);
-    // Une entrée s'ajoute sous la modale ouverte : le bouton attend de nouveau.
-    expect(privacyDetailsPending(true, "a,b,c", "a,b", null)).toBe(true);
-    expect(privacyDetailsPending(true, "a,b,c", null, "a,b")).toBe(true);
+    expect(privacyDetailsPending(true, "fr|a,b", null)).toBe(true);
+    // Tout est lu, ou la lecture a échoué (l'erreur libère le bouton : la politique porte tout).
+    expect(privacyDetailsPending(true, "", null)).toBe(false);
+    expect(privacyDetailsPending(true, "fr|a,b", "fr|a,b")).toBe(false);
+    // Une autre lecture est due (entrée ajoutée, langue changée) : le bouton attend de nouveau.
+    expect(privacyDetailsPending(true, "fr|c", "fr|a,b")).toBe(true);
+  });
+
+  it("privacyDetailsRequestKey_asksOnlyWhatIsMissingInThePageLanguage", () => {
+    const heads = [
+      { id: "a", details: [] },
+      { id: "b", details: [] },
+    ];
+    // Rien de lu : toute la liste, dans la langue de la page.
+    expect(privacyDetailsRequestKey(heads, {}, "fr")).toBe("fr|a,b");
+    // Liste qui rétrécit ou se réordonne, détail déjà lu : aucune lecture.
+    const loaded = { "fr:a": ["x"], "fr:b": [] };
+    expect(privacyDetailsRequestKey([heads[1], heads[0]], loaded, "fr")).toBe("");
+    expect(privacyDetailsRequestKey([heads[0]], loaded, "fr")).toBe("");
+    // Entrée ajoutée sous la modale ouverte : elle seule.
+    expect(privacyDetailsRequestKey([...heads, { id: "c", details: [] }], loaded, "fr")).toBe("fr|c");
+    // Passage à l'anglais : tout se relit en anglais.
+    expect(privacyDetailsRequestKey(heads, loaded, "en")).toBe("en|a,b");
+    // Détail déjà porté par l'entrée : rien à lire.
+    expect(privacyDetailsRequestKey([{ id: "a", details: ["y"] }], {}, "fr")).toBe("");
+  });
+
+  it("privacyDetailsRequestKey_emptyList_returnsEmptyKey", () => {
+    expect(privacyDetailsRequestKey([], {}, "fr")).toBe("");
+  });
+
+  it("PrivacyChangesModal_lateFailureOfASupersededRead_staysSilent", () => {
+    const source = readFileSync(join(__dirname, "..", "..", "components", "privacy", "PrivacyChangesModal.tsx"), "utf8");
+    const failure = source.slice(source.indexOf("      () => {\n        // Une lecture dépassée"));
+    expect(failure.indexOf("if (detailsRequestedFor.current !== requestKey) return;")).toBeGreaterThan(-1);
+    expect(failure.indexOf("if (detailsRequestedFor.current !== requestKey) return;")).toBeLessThan(
+      failure.indexOf('showError(t("privacyModal.detailsFailed"))'),
+    );
   });
 
   it("PrivacyChangesModal_detailsGiven_buttonIsNotHeld", () => {

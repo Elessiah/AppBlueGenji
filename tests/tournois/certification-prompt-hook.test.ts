@@ -424,6 +424,42 @@ describe("useCertificationPrompt", () => {
     }
   });
 
+  it("noticeOnceModalsClosed_profileCertificationLastingMinutes_stillNoticesWhenItCloses", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      const notice = jest.fn();
+
+      noticeOnceModalsClosed(notice);
+      // Trois minutes dans le dialogue de certification de `/profil`.
+      jest.advanceTimersByTime(3 * 60_000);
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).toHaveBeenCalledTimes(1);
+      expect(REFUSAL_NOTICE_MAX_WAIT_MS).toBeGreaterThanOrEqual(10 * 60_000);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_justUnderTheCap_stillNotices", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      const notice = jest.fn();
+
+      noticeOnceModalsClosed(notice);
+      jest.advanceTimersByTime(REFUSAL_NOTICE_MAX_WAIT_MS - 1);
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("noticeOnceModalsClosed_secondRefusal_replacesTheFirstWatch", () => {
     jest.useFakeTimers();
     try {

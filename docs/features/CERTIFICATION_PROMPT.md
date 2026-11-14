@@ -162,8 +162,8 @@ cette modale.
   certification de `/profil` après « Certifier » — le guet porte sur le
   document et survit à la navigation client ; un départ en chargement complet,
   seul cas perdu, laisse le choix non gardé, que la modale redemandera ; le
-  guet est **borné** à `REFUSAL_NOTICE_MAX_WAIT_MS` (2 min,
-  `noticeOnceModalsClosed`) puis se tait, et un nouveau refus remplace le
+  guet est **borné** à `REFUSAL_NOTICE_MAX_WAIT_MS` (10 min — de quoi finir
+  la certification de `/profil` —, `noticeOnceModalsClosed`) puis se tait, et un nouveau refus remplace le
   précédent : jamais de toast sans contexte des minutes plus tard) —, un corps sans
   compte lisible 400 `INVALID_ACTION`. Plafonné par compte
   (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée

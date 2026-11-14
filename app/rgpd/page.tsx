@@ -1303,8 +1303,8 @@ function RgpdFr({
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
             avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
-            plus aucun caster ne le tient ; seul le lien de l&apos;organisation, posé dans la configuration du direct du
-            match par l&apos;un de ses membres, reste au match. Le lien qu&apos;un caster a fourni en ouvrant
+            plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du
+            match, par un membre de l&apos;organisation, reste au match quand ses casters s&apos;en vont. Le lien qu&apos;un caster a fourni en ouvrant
             son stream part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
             tient encore ce stream ; un membre de l&apos;organisation y indique, en posant le lien, s&apos;il est celui de
             l&apos;organisation — il reste alors au match, même si ce membre le caste — ou sa propre chaîne,

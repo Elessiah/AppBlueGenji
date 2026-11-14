@@ -1786,7 +1786,7 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
   it("privacyChanges_sessionMarkRectification_isStandaloneForEveryAccount", () => {
     expectStandaloneEntry(entry, english, {
       after: "2026-11-bot-avis-d-exclusion",
-      publishedAt: "2026-11-15",
+      publishedAt: "2026-11-16",
       audience: undefined,
       links: original.links,
     });
@@ -1794,9 +1794,30 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
 
   it("privacyChanges_sessionMarkRectification_saysAsLongAsTheSessionLastsWithoutClosedList", () => {
     expectEntryTexts(entry, english, {
-      fr: ["tant que cette session dure", "pour quelque raison que ce soit", "qu'à une nouvelle connexion", "information du 29 octobre"],
-      en: ["as long as that session lasts", "for whatever reason", "only comes back on your account at a new login", "information of October 29"],
+      fr: [
+        "tant que cette session dure",
+        "ou qu'il refuse (une panne du site comprise)",
+        "sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre, qui la lève",
+        "qu'à une nouvelle connexion par Discord ou Blizzard",
+        "information du 29 octobre",
+      ],
+      en: [
+        "as long as that session lasts",
+        "or that it refuses (a site failure included)",
+        "except, as it said, a verification refused because your Discord tag can no longer be verified from that window, which clears it",
+        "only comes back on your account at a new login with Discord or Blizzard",
+        "information of October 29",
+      ],
     });
+    // Le refus « tag qui ne peut plus être certifié » lève la marque (`closeForSession`) :
+    // aucune promesse d'un refus « quel qu'il soit », et la marque ne revient qu'à une
+    // connexion par Discord ou Blizzard (`createSession`).
+    const fr = [entry.summary, ...entry.details].join(" ");
+    const en = [english.summary, ...english.details].join(" ");
+    expect(fr).not.toContain("pour quelque raison que ce soit");
+    expect(en).not.toContain("for whatever reason");
+    expect(entry.summary).toContain("pour une autre raison qu'un tag qui ne peut plus être certifié");
+    expect(english.summary).toContain("for a reason other than a tag that can no longer be verified");
     expect(entry.summary).toContain("pas seulement au chargement suivant");
   });
 

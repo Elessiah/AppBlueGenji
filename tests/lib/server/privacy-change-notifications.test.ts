@@ -15,6 +15,7 @@ import {
 } from "@/lib/server/privacy-change-notifications";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import {
+  announceablePrivacyChanges,
   PRIVACY_CHANGES,
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   PRIVACY_DM_SETTLE_DAYS,
@@ -31,6 +32,9 @@ const DAY_MS = 86_400_000;
 const at = (iso: string, plusDays = 0) => new Date(Date.parse(`${iso}T12:00:00Z`) + plusDays * DAY_MS);
 /** Tous les changements du registre ont passé le délai de la modale. */
 const NOW = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS);
+// Le registre que le balayage de `NOW` peut encore annoncer (fenêtre de
+// `PRIVACY_DM_WINDOW_DAYS`) : les plus anciennes entrées en sortent.
+const DUE = announceablePrivacyChanges(NOW);
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
 
 type Candidate = {
@@ -118,7 +122,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
       unknown[],
       string,
     ];
-    const batch = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    const batch = privacyChangesForOneMessage(DUE, siteBaseUrl());
     for (const change of batch) expect(message).toContain(change.title);
     // #587 : le registre entier ne tient pas dans un message ; le reste, dû mais
     // gardé pour le suivant, est compté — le joueur sait que d'autres l'attendent.
@@ -135,8 +139,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
   it("envoie au message suivant ce qu'un message n'a pas pu nommer", async () => {
     // Le registre entier ne tient plus dans un message : le plus récent tombait
     // dans « … et 1 autre » et était pourtant marqué annoncé.
-    const first = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
-    expect(first.length).toBeLessThan(PRIVACY_CHANGES.length);
+    const first = privacyChangesForOneMessage(DUE, siteBaseUrl());
+    expect(first.length).toBeLessThan(DUE.length);
     fakeDb({
       candidates: [candidate()],
       done: first.map((change) => ({ user_id: 1, change_id: change.id })),
@@ -147,7 +151,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
     // Le message suivant nomme à son tour ce qu'il peut, dans l'ordre du registre.
     // (Des conditions à accepter sont toujours du lot : le reste se lit par identifiant, pas par position.)
-    const second = privacyChangesForOneMessage(PRIVACY_CHANGES.filter((change) => !first.includes(change)), siteBaseUrl());
+    const second = privacyChangesForOneMessage(DUE.filter((change) => !first.includes(change)), siteBaseUrl());
     expect(second.length).toBeGreaterThan(0);
     for (const change of second) expect(message).toContain(change.title);
     for (const change of first) expect(message).not.toContain(change.title);
@@ -289,7 +293,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
   });
 
   it("n'annonce pas ce que le compte a déjà accepté ou reçu", async () => {
-    const [first, ...rest] = PRIVACY_CHANGES;
+    const [first, ...rest] = DUE;
     fakeDb({ candidates: [candidate()], done: [{ user_id: 1, change_id: first.id }] });
     await dispatchPrivacyChangeNotifications(NOW);
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
@@ -306,7 +310,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  it("dispatchPrivacyChangeNotifications_oneReservationTakenElsewhere_headerStillCountsEveryDueChange", async () => {
+  it("dispatchPrivacyChangeNotifications_oneReservationTakenElsewhere_notCountedAsComingLater", async () => {
     fakeDb({ candidates: [candidate()] });
     await dispatchPrivacyChangeNotifications(NOW);
     const baseline = String(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]);
@@ -317,13 +321,17 @@ describe("dispatchPrivacyChangeNotifications", () => {
     resetPrivacyNotificationThrottle();
     jest.mocked(isBotCircuitOpen).mockReturnValue(false);
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
-    const first = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl())[0];
+    const first = privacyChangesForOneMessage(DUE, siteBaseUrl())[0];
     fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
     await dispatchPrivacyChangeNotifications(NOW);
 
     const message = String(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]);
-    expect(message).toContain(`${total} changements`);
+    // Le changement pris par l'autre balayage est nommé dans **son** message : ni
+    // compté dans l'en-tête, ni annoncé comme « autre » à venir.
+    expect(message).toContain(`${Number(total) - 1} changements`);
     expect(message).not.toContain(`**${first.title}**`);
+    const omitted = (text: string) => /… et (\d+) autre/.exec(text)?.[1] ?? null;
+    expect(omitted(message)).toBe(omitted(baseline));
   });
 
   it("regroupe les comptes qui ont les mêmes changements à recevoir", async () => {
@@ -341,7 +349,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(release).toBeDefined();
     expect(release!.params).toEqual([
       1,
-      ...privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl()).map((c) => c.id),
+      ...privacyChangesForOneMessage(DUE, siteBaseUrl()).map((c) => c.id),
     ]);
   });
 

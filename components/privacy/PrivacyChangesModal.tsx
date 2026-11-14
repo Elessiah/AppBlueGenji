@@ -34,20 +34,40 @@ export function privacyModalIntroKey(changes: readonly PrivacyChange[]) {
   return terms ? "privacyModal.introOneTerms" : "privacyModal.introOne";
 }
 
+/** Clé d'un détail lu : la langue en fait partie (un passage à `/en` relit l'anglais). */
+function detailKey(locale: Locale, id: string): string {
+  return `${locale}:${id}`;
+}
+
 /**
- * Le bouton attend-il le détail ? Oui tant que la liste **présentée**
- * (`idsKey`) n'a ni détail arrivé ni lecture en échec : une liste qui change
- * sous la modale ouverte (entrée publiée à minuit, re-rendu de la mise en page)
- * le bloque de nouveau, plutôt que de laisser prendre connaissance d'une
- * entrée dont le détail n'a jamais été montré.
+ * La lecture de détail que réclame la liste **présentée** : les seules entrées
+ * sans détail ni détail déjà lu **dans cette langue**, préfixées de la langue —
+ * `""` quand rien ne manque. Une liste qui rétrécit ou se réordonne ne relit
+ * rien ; une entrée ajoutée sous la modale ouverte (publiée à minuit), ou un
+ * changement de langue, en relance une.
+ */
+export function privacyDetailsRequestKey(
+  changes: readonly Pick<PrivacyChange, "id" | "details">[],
+  loaded: PrivacyChangeDetails,
+  locale: Locale,
+): string {
+  const missing = changes
+    .filter((change) => change.details.length === 0 && !(detailKey(locale, change.id) in loaded))
+    .map((change) => change.id);
+  return missing.length > 0 ? `${locale}|${missing.join(",")}` : "";
+}
+
+/**
+ * Le bouton attend-il le détail ? Oui tant qu'une lecture est due
+ * (`requestKey` non vide) et n'a pas échoué : on ne prend pas connaissance
+ * d'une entrée dont le détail n'a jamais été montré.
  */
 export function privacyDetailsPending(
   detailsDeferred: boolean,
-  idsKey: string,
-  loadedFor: string | null,
+  requestKey: string,
   failedFor: string | null,
 ): boolean {
-  return detailsDeferred && loadedFor !== idsKey && failedFor !== idsKey;
+  return detailsDeferred && requestKey !== "" && failedFor !== requestKey;
 }
 
 /**
@@ -89,11 +109,9 @@ export function PrivacyChangesModal({
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Détail lu, par langue et identifiant (`detailKey`).
   const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails>({});
-  // Liste (identifiants joints) dont le détail est arrivé, ou dont la lecture a
-  // échoué : une liste nouvelle (re-rendu de la mise en page, entrée publiée à
-  // minuit) relance une lecture et bloque de nouveau le bouton.
-  const [detailsLoadedFor, setDetailsLoadedFor] = useState<string | null>(null);
+  // Lecture (`privacyDetailsRequestKey`) en échec : le bouton se libère.
   const [detailsFailedFor, setDetailsFailedFor] = useState<string | null>(null);
   const detailsRequestedFor = useRef<string | null>(null);
   // Fermée par un lien d'action pendant un enregistrement : sa réponse ne doit
@@ -114,24 +132,33 @@ export function PrivacyChangesModal({
     locked: busy,
   });
 
-  const idsKey = changes.map((change) => change.id).join(",");
+  const requestKey = privacyDetailsRequestKey(changes, loadedDetails, locale);
   useEffect(() => {
-    if (!open || !detailsDeferred || detailsRequestedFor.current === idsKey) return;
-    detailsRequestedFor.current = idsKey;
-    loadPrivacyChangeDetails(idsKey, locale).then(
+    if (!open || !detailsDeferred || requestKey === "" || detailsRequestedFor.current === requestKey) return;
+    detailsRequestedFor.current = requestKey;
+    const ids = requestKey.slice(requestKey.indexOf("|") + 1).split(",");
+    loadPrivacyChangeDetails(ids.join(","), locale).then(
       (details) => {
-        setLoadedDetails((previous) => ({ ...previous, ...details }));
-        setDetailsLoadedFor(idsKey);
+        // Chaque identifiant demandé est tenu pour lu, même sans détail rendu :
+        // sinon la lecture se relancerait sans fin.
+        setLoadedDetails((previous) => {
+          const next = { ...previous };
+          for (const id of ids) next[detailKey(locale, id)] = details[id] ?? [];
+          return next;
+        });
       },
       () => {
-        setDetailsFailedFor(idsKey);
+        // Une lecture dépassée (liste ou langue changée depuis) se tait : la
+        // lecture en cours parle pour la liste présentée.
+        if (detailsRequestedFor.current !== requestKey) return;
+        setDetailsFailedFor(requestKey);
         showError(t("privacyModal.detailsFailed"));
       },
     );
-  }, [open, detailsDeferred, idsKey, locale, showError, t]);
-  const detailsPending = privacyDetailsPending(detailsDeferred, idsKey, detailsLoadedFor, detailsFailedFor);
+  }, [open, detailsDeferred, requestKey, locale, showError, t]);
+  const detailsPending = privacyDetailsPending(detailsDeferred, requestKey, detailsFailedFor);
   const detailsOf = (change: PrivacyChange) =>
-    change.details.length > 0 ? change.details : (loadedDetails[change.id] ?? []);
+    change.details.length > 0 ? change.details : (loadedDetails[detailKey(locale, change.id)] ?? []);
 
   if (!open) return null;
 
