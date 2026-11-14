@@ -243,11 +243,19 @@ async function runSweep(now: Date): Promise<number> {
     }
     const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
+    // Une partie du lot réservée entre-temps par un balayage concurrent : ce
+    // compte est rendu, sans message. Ce balayage-là peut nommer ces
+    // changements… ou les rendre (bot injoignable) : ni l'en-tête ni « … et N
+    // autre(s) » ne pourraient dire juste. Le balayage suivant relit l'état.
+    if (reserved.length < batch.length) {
+      await release(
+        [userId],
+        reserved.map((change) => change.id),
+      );
+      continue;
+    }
     // Ce qui reste dû après ce lot est compté dans le message (« … et N
-    // autre(s) ») : le joueur sait que d'autres changements l'attendent. Un
-    // changement du lot réservé entre-temps par un balayage concurrent n'en est
-    // pas : ce balayage l'a nommé dans son propre message, et il ne reviendra
-    // dans aucun message suivant.
+    // autre(s) ») : le joueur sait que d'autres changements l'attendent.
     const later = due.length - batch.length;
     const key = `${reserved.map((change) => change.id).join("|")}#${later}`;
     const group = groups.get(key) ?? { changes: reserved, later, recipients: [] };

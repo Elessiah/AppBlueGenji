@@ -47,27 +47,49 @@ export async function saveNeverAgain(shownTo: number | null, onOtherAccount: () 
 }
 
 /**
- * Au-delà, un refus encore retenu derrière une modale ne se dit plus. Dix
- * minutes : de quoi finir la certification ouverte par « Certifier » sur
- * `/profil` (code reçu par message privé, saisi) — le refus se dit alors à sa
- * fermeture, encore dans son contexte.
+ * Au-delà, un refus encore retenu derrière une modale ne se dit plus : un
+ * toast d'erreur sans contexte, minutes plus tard, ne renseignerait plus.
  */
-export const REFUSAL_NOTICE_MAX_WAIT_MS = 600_000;
+export const REFUSAL_NOTICE_MAX_WAIT_MS = 120_000;
+
+/**
+ * Sauf dans le dialogue de certification de `/profil`, ouvert par
+ * « Certifier » (code reçu par message privé, saisi) : le guet y attend jusqu'à
+ * dix minutes, et le refus se dit à sa fermeture, encore dans son contexte.
+ */
+export const PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS = 600_000;
+
+/** Le dialogue de certification de `/profil` (`DiscordVerificationDialog`). */
+const PROFILE_CERTIFICATION_DIALOG_SELECTOR = '[aria-modal="true"][aria-labelledby="discord-verify-title"]';
+
+/** Le dialogue de certification de `/profil` est-il ouvert ? */
+export function profileCertificationDialogOpen(): boolean {
+  return typeof document !== "undefined" && document.querySelector(PROFILE_CERTIFICATION_DIALOG_SELECTOR) !== null;
+}
 
 /** Le guet du refus en cours, un seul à la fois pour tout le document. */
 let pendingRefusalNotice: (() => void) | null = null;
 
 /**
  * Appelle `notice` une fois plus aucune modale ouverte (`watchModalsClosed`),
- * au plus `REFUSAL_NOTICE_MAX_WAIT_MS` après le refus : passé ce délai, le
- * guet s'arrête sans rien dire — un toast d'erreur sans contexte, minutes plus
- * tard sur une autre page, ne renseignerait plus. Un nouveau refus remplace le
- * guet précédent. Renvoie l'arrêt.
+ * au plus `maxWaitMs` après le refus (`REFUSAL_NOTICE_MAX_WAIT_MS`) — ou
+ * `extendedMaxWaitMs` si, à cette échéance, `extendWhile` est vrai (le
+ * dialogue de certification de `/profil` ouvert) : passé ce délai, le guet
+ * s'arrête sans rien dire. Un nouveau refus remplace le guet précédent.
+ * Renvoie l'arrêt.
  */
-export function noticeOnceModalsClosed(notice: () => void, maxWaitMs = REFUSAL_NOTICE_MAX_WAIT_MS): () => void {
+export function noticeOnceModalsClosed(
+  notice: () => void,
+  maxWaitMs = REFUSAL_NOTICE_MAX_WAIT_MS,
+  {
+    extendWhile = profileCertificationDialogOpen,
+    extendedMaxWaitMs = PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS,
+  }: { extendWhile?: () => boolean; extendedMaxWaitMs?: number } = {},
+): () => void {
   pendingRefusalNotice?.();
   let stopWatch: (() => void) | null = null;
   let done = false;
+  let timer: ReturnType<typeof setTimeout>;
   const stop = () => {
     if (done) return;
     done = true;
@@ -75,7 +97,11 @@ export function noticeOnceModalsClosed(notice: () => void, maxWaitMs = REFUSAL_N
     stopWatch?.();
     if (pendingRefusalNotice === stop) pendingRefusalNotice = null;
   };
-  const timer = setTimeout(stop, maxWaitMs);
+  timer = setTimeout(() => {
+    // Seul le dialogue de certification de `/profil` prolonge l'attente.
+    if (extendedMaxWaitMs > maxWaitMs && extendWhile()) timer = setTimeout(stop, extendedMaxWaitMs - maxWaitMs);
+    else stop();
+  }, maxWaitMs);
   pendingRefusalNotice = stop;
   stopWatch = watchModalsClosed(() => {
     if (done) return;
@@ -135,7 +161,8 @@ export function useCertificationPrompt(
   // s'ouvre — le toast partirait derrière. Le guet porte sur le document, pas
   // sur la fiche : il survit à la navigation client vers le profil, où la
   // notification (mise en page racine) reste montée. Le guet est **borné**
-  // (`REFUSAL_NOTICE_MAX_WAIT_MS`) : passé ce délai, le refus n'a plus de
+  // (`REFUSAL_NOTICE_MAX_WAIT_MS`, dix minutes dans le dialogue de
+  // certification de `/profil`) : passé ce délai, le refus n'a plus de
   // contexte et se tait, plutôt que d'observer la page indéfiniment.
   const refused = useCallback(() => {
     noticeOnceModalsClosed(() => onOtherAccountRef.current());

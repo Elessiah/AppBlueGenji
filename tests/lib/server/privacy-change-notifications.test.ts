@@ -310,28 +310,31 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  it("dispatchPrivacyChangeNotifications_oneReservationTakenElsewhere_notCountedAsComingLater", async () => {
-    fakeDb({ candidates: [candidate()] });
-    await dispatchPrivacyChangeNotifications(NOW);
-    const baseline = String(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]);
-    const total = /(\d+) changements/.exec(baseline)?.[1];
-    expect(total).toBeDefined();
+  // Un balayage concurrent a pris une partie du lot : il peut la nommer ou la
+  // rendre (bot injoignable) — aucun décompte juste n'est possible ici.
+  it("dispatchPrivacyChangeNotifications_partOfBatchTakenElsewhere_releasesOwnReservationsWithoutMessage", async () => {
+    const [first, ...rest] = privacyChangesForOneMessage(DUE, siteBaseUrl());
+    const calls = fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
 
-    jest.clearAllMocks();
-    resetPrivacyNotificationThrottle();
-    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
-    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    const sent = await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(sent).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    const release = calls.find((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"));
+    expect(release?.params).toEqual([1, ...rest.map((change) => change.id)]);
+  });
+
+  it("dispatchPrivacyChangeNotifications_partialTakeForOneAccount_otherAccountStillServed", async () => {
     const first = privacyChangesForOneMessage(DUE, siteBaseUrl())[0];
-    fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
+    fakeDb({
+      candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })],
+      taken: [`1:${first.id}`],
+    });
+
     await dispatchPrivacyChangeNotifications(NOW);
 
-    const message = String(jest.mocked(pushDiscordDirectMessages).mock.calls[0][0]);
-    // Le changement pris par l'autre balayage est nommé dans **son** message : ni
-    // compté dans l'en-tête, ni annoncé comme « autre » à venir.
-    expect(message).toContain(`${Number(total) - 1} changements`);
-    expect(message).not.toContain(`**${first.title}**`);
-    const omitted = (text: string) => /… et (\d+) autre/.exec(text)?.[1] ?? null;
-    expect(omitted(message)).toBe(omitted(baseline));
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][1]).toHaveLength(1);
   });
 
   it("regroupe les comptes qui ont les mêmes changements à recevoir", async () => {

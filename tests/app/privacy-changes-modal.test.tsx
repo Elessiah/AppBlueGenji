@@ -6,7 +6,13 @@ jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PrivacyChangesModal, privacyDetailsPending, privacyDetailsRequestKey } from "@/components/privacy/PrivacyChangesModal";
+import {
+  createPrivacyDetailsReads,
+  PrivacyChangesModal,
+  privacyDetailsPending,
+  privacyDetailsReadCovers,
+  privacyDetailsRequestKey,
+} from "@/components/privacy/PrivacyChangesModal";
 import { ToastProvider } from "@/components/ui/toast";
 import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
 import { privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
@@ -134,13 +140,70 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(privacyDetailsRequestKey([], {}, "fr")).toBe("");
   });
 
-  it("PrivacyChangesModal_lateFailureOfASupersededRead_staysSilent", () => {
-    const source = readFileSync(join(__dirname, "..", "..", "components", "privacy", "PrivacyChangesModal.tsx"), "utf8");
-    const failure = source.slice(source.indexOf("      () => {\n        // Une lecture dépassée"));
-    expect(failure.indexOf("if (detailsRequestedFor.current !== requestKey) return;")).toBeGreaterThan(-1);
-    expect(failure.indexOf("if (detailsRequestedFor.current !== requestKey) return;")).toBeLessThan(
-      failure.indexOf('showError(t("privacyModal.detailsFailed"))'),
-    );
+  it("privacyDetailsPending_failedReadCoversShrunkKey_releasesTheButton", () => {
+    // La dernière lecture (a, c) a échoué ; une lecture dépassée a depuis livré a.
+    expect(privacyDetailsPending(true, "fr|c", "fr|a,c")).toBe(false);
+  });
+
+  it("privacyDetailsPending_failedInOtherLocale_holdsTheButton", () => {
+    expect(privacyDetailsPending(true, "fr|a", "en|a")).toBe(true);
+  });
+
+  it("privacyDetailsReadCovers_sameLocaleSubset_true", () => {
+    expect(privacyDetailsReadCovers("fr|a,c", "fr|c")).toBe(true);
+  });
+
+  it("privacyDetailsReadCovers_otherLocale_false", () => {
+    expect(privacyDetailsReadCovers("en|a,c", "fr|c")).toBe(false);
+  });
+
+  it("privacyDetailsReadCovers_idNotInRead_false", () => {
+    expect(privacyDetailsReadCovers("fr|a", "fr|a,c")).toBe(false);
+  });
+
+  it("privacyDetailsReadCovers_noReadYet_falseUnlessNothingIsDue", () => {
+    expect(privacyDetailsReadCovers(null, "fr|a")).toBe(false);
+    expect(privacyDetailsReadCovers(null, "")).toBe(true);
+  });
+
+  it("createPrivacyDetailsReads_languageRoundTrip_onlyTheLastReadSpeaks", () => {
+    const reads = createPrivacyDetailsReads();
+
+    const firstFr = reads.start("fr|a,b");
+    const en = reads.start("en|a,b");
+    const secondFr = reads.start("fr|a,b");
+
+    // Même clé que la première, mais seule la troisième lecture parle : l'échec
+    // tardif de la première se tait.
+    expect(firstFr).not.toBeNull();
+    expect(en).not.toBeNull();
+    expect(secondFr).not.toBeNull();
+    expect(reads.isLatest(firstFr!)).toBe(false);
+    expect(reads.isLatest(en!)).toBe(false);
+    expect(reads.isLatest(secondFr!)).toBe(true);
+  });
+
+  it("createPrivacyDetailsReads_supersededSuccessShrinksTheKey_startsNoDuplicateRead", () => {
+    const reads = createPrivacyDetailsReads();
+    reads.start("fr|a");
+    reads.start("fr|a,c");
+
+    // La lecture de a revient : il ne reste que c, que la dernière lecture attend déjà.
+    expect(reads.start("fr|c")).toBeNull();
+  });
+
+  it("createPrivacyDetailsReads_sameKeyRerendered_startsOnce", () => {
+    const reads = createPrivacyDetailsReads();
+
+    expect(reads.start("fr|a")).toBe(1);
+    expect(reads.start("fr|a")).toBeNull();
+  });
+
+  it("createPrivacyDetailsReads_entryAddedUnderOpenModal_startsANewRead", () => {
+    const reads = createPrivacyDetailsReads();
+    reads.start("fr|a");
+
+    expect(reads.start("fr|c")).toBe(2);
   });
 
   it("PrivacyChangesModal_detailsGiven_buttonIsNotHeld", () => {

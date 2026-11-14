@@ -1797,19 +1797,20 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
       fr: [
         "tant que cette session dure",
         "ou qu'il refuse (une panne du site comprise)",
-        "sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre, qui la lève",
+        "sauf, comme elle le disait, la certification refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre : la fenêtre répond alors d'elle-même « Plus tard », qui la lève dès qu'il parvient au site",
         "qu'à une nouvelle connexion par Discord ou Blizzard",
         "information du 29 octobre",
       ],
       en: [
         "as long as that session lasts",
         "or that it refuses (a site failure included)",
-        "except, as it said, a verification refused because your Discord tag can no longer be verified from that window, which clears it",
+        "except, as it said, a verification refused because your Discord tag can no longer be verified from that window: the window then answers “Later” by itself, which clears it once it reaches the site",
         "only comes back on your account at a new login with Discord or Blizzard",
         "information of October 29",
       ],
     });
-    // Le refus « tag qui ne peut plus être certifié » lève la marque (`closeForSession`) :
+    // Le refus « tag qui ne peut plus être certifié » lève la marque par le « Plus tard »
+    // que la fenêtre envoie d'elle-même (`closeForSession`), s'il parvient au site :
     // aucune promesse d'un refus « quel qu'il soit », et la marque ne revient qu'à une
     // connexion par Discord ou Blizzard (`createSession`).
     const fr = [entry.summary, ...entry.details].join(" ");

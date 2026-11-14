@@ -57,17 +57,60 @@ export function privacyDetailsRequestKey(
   return missing.length > 0 ? `${locale}|${missing.join(",")}` : "";
 }
 
+/** Langue et identifiants d'une clé de lecture (`privacyDetailsRequestKey`). */
+function splitRequestKey(key: string): { locale: string; ids: string[] } {
+  const bar = key.indexOf("|");
+  return { locale: key.slice(0, bar), ids: key.slice(bar + 1).split(",") };
+}
+
+/**
+ * La lecture `readKey` couvre-t-elle `requestKey` ? Même langue, et chaque
+ * identifiant demandé déjà dans cette lecture. Une clé vide est toujours couverte.
+ */
+export function privacyDetailsReadCovers(readKey: string | null, requestKey: string): boolean {
+  if (requestKey === "") return true;
+  if (readKey === null || readKey === "") return false;
+  const read = splitRequestKey(readKey);
+  const wanted = splitRequestKey(requestKey);
+  return read.locale === wanted.locale && wanted.ids.every((id) => read.ids.includes(id));
+}
+
+/**
+ * Le suivi des lectures de détail d'une modale : seule la **dernière** lecture
+ * lancée parle (son échec se dit, celui d'une lecture dépassée se tait — même
+ * à clé égale, après un aller-retour de langue), et une clé que la dernière
+ * lecture couvre déjà n'en relance pas une (lecture dépassée revenue, qui
+ * réduit la clé à ce que la dernière attend encore).
+ */
+export function createPrivacyDetailsReads() {
+  let sequence = 0;
+  let latest: { seq: number; key: string } | null = null;
+  return {
+    /** Numéro de la lecture à lancer, `null` si la dernière couvre déjà `requestKey`. */
+    start(requestKey: string): number | null {
+      if (privacyDetailsReadCovers(latest?.key ?? null, requestKey)) return null;
+      sequence += 1;
+      latest = { seq: sequence, key: requestKey };
+      return sequence;
+    },
+    isLatest(seq: number): boolean {
+      return latest?.seq === seq;
+    },
+  };
+}
+
 /**
  * Le bouton attend-il le détail ? Oui tant qu'une lecture est due
- * (`requestKey` non vide) et n'a pas échoué : on ne prend pas connaissance
- * d'une entrée dont le détail n'a jamais été montré.
+ * (`requestKey` non vide) et que la dernière lecture, en échec (`failedFor`),
+ * ne la couvre pas : on ne prend pas connaissance d'une entrée dont le détail
+ * n'a jamais été montré.
  */
 export function privacyDetailsPending(
   detailsDeferred: boolean,
   requestKey: string,
   failedFor: string | null,
 ): boolean {
-  return detailsDeferred && requestKey !== "" && failedFor !== requestKey;
+  return detailsDeferred && requestKey !== "" && !(failedFor !== null && privacyDetailsReadCovers(failedFor, requestKey));
 }
 
 /**
@@ -113,7 +156,7 @@ export function PrivacyChangesModal({
   const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails>({});
   // Lecture (`privacyDetailsRequestKey`) en échec : le bouton se libère.
   const [detailsFailedFor, setDetailsFailedFor] = useState<string | null>(null);
-  const detailsRequestedFor = useRef<string | null>(null);
+  const detailsReads = useRef(createPrivacyDetailsReads());
   // Fermée par un lien d'action pendant un enregistrement : sa réponse ne doit
   // plus parler d'une modale que le joueur a quittée.
   const leftByLink = useRef(false);
@@ -134,8 +177,11 @@ export function PrivacyChangesModal({
 
   const requestKey = privacyDetailsRequestKey(changes, loadedDetails, locale);
   useEffect(() => {
-    if (!open || !detailsDeferred || requestKey === "" || detailsRequestedFor.current === requestKey) return;
-    detailsRequestedFor.current = requestKey;
+    if (!open || !detailsDeferred) return;
+    const seq = detailsReads.current.start(requestKey);
+    if (seq === null) return;
+    // Lecture neuve : un échec précédent ne libère plus le bouton.
+    setDetailsFailedFor(null);
     const ids = requestKey.slice(requestKey.indexOf("|") + 1).split(",");
     loadPrivacyChangeDetails(ids.join(","), locale).then(
       (details) => {
@@ -148,9 +194,9 @@ export function PrivacyChangesModal({
         });
       },
       () => {
-        // Une lecture dépassée (liste ou langue changée depuis) se tait : la
-        // lecture en cours parle pour la liste présentée.
-        if (detailsRequestedFor.current !== requestKey) return;
+        // Une lecture dépassée (liste ou langue changée depuis, même revenue à
+        // l'identique) se tait : la dernière lecture parle pour la liste présentée.
+        if (!detailsReads.current.isLatest(seq)) return;
         setDetailsFailedFor(requestKey);
         showError(t("privacyModal.detailsFailed"));
       },
