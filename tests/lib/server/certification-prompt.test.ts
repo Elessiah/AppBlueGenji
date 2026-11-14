@@ -519,6 +519,45 @@ describe("mémoire courte des invitations", () => {
     expect(peekCertificationPrompt("7:42:1:1", now)).toEqual({ prompt: null });
   });
 
+  // Revue #521 : la relecture n'ajoute pas ses propres trois secondes à l'attente.
+  it("cachedCertificationPrompt_forgottenReadRereadHangs_waitIsBoundedFromTheFirstRead", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      clock = 0;
+      let finishFirst!: (value: typeof PROMPT | null) => void;
+      const load = jest
+        .fn<() => Promise<typeof PROMPT | null>>()
+        .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+        .mockImplementationOnce(() => new Promise(() => undefined));
+      let settled = false;
+      const reading = cachedCertificationPrompt("7:42:1:1", load, now).then((prompt) => {
+        settled = true;
+        return prompt;
+      });
+      forgetCertificationPromptsOf(7);
+      clock = 2_000;
+      jest.advanceTimersByTime(2_000);
+      finishFirst(PROMPT);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(settled).toBe(false);
+
+      // Une seconde de plus (3 s depuis la première lecture) : « rien », sans
+      // attendre les trois secondes propres de la relecture.
+      await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_READ_TIMEOUT_MS - 2_000);
+
+      expect(settled).toBe(true);
+      expect(await reading).toBeNull();
+    } finally {
+      jest.clearAllTimers();
+      forgetCertificationPrompts();
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it("cachedCertificationPrompt_teamReadForgotten_servesTheNowDueInvitation (EF-23)", async () => {
     // Le seul contact certifié de l'équipe part pendant la lecture d'un
     // coéquipier : l'invitation devient due — « rien » la tairait.
