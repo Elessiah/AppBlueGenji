@@ -326,14 +326,40 @@ describe("buildPrivacyChangesMessage", () => {
   });
 
   it("reste sous le plafond du bot et compte ce qui ne tient plus", () => {
-    const long = Array.from({ length: 12 }, (_, i) =>
-      change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }),
+    const long = Array.from({ length: 30 }, (_, i) =>
+      change(`long-${i}`, "2026-02-01", { title: `Titre long-${i} ${"t".repeat(150)}` }),
     );
     const message = buildPrivacyChangesMessage(long, "https://bluegenji.fr");
     expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
     expect(message).toContain("Titre long-0");
     expect(message).toContain("https://bluegenji.fr/rgpd");
+  });
+
+  it("buildPrivacyChangesMessage_summariesFit_givesSummariesWithoutTitlesOnlyIntro", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const message = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr", locale);
+      expect(message).toContain("Résumé a.");
+      expect(message).not.toMatch(/Trop de changements|Too many changes/);
+    }
+  });
+
+  it("buildPrivacyChangesMessage_summariesTooLong_listsTitlesOnlyOnePerLine", () => {
+    const long = (id: string) => change(id, "2026-01-10", { summary: "x".repeat(700) });
+
+    const message = buildPrivacyChangesMessage([long("a"), long("b"), long("c")], "https://bluegenji.fr", "en");
+
+    expect(message).toContain("Too many changes to summarise here");
+    expect(message).toContain("• **Titre a** (January 10, 2026)\n• **Titre b** (January 10, 2026)\n• **Titre c**");
+    expect(message).not.toContain("xxx");
+  });
+
+  it("buildPrivacyChangesMessage_laterChanges_headerCountsThemAndOmittedLineNamesHowMany", () => {
+    const message = buildPrivacyChangesMessage([A], "https://bluegenji.fr", "fr", 4);
+
+    expect(message).toContain("5 changements de nos règles de confidentialité");
+    expect(message).toContain("**Titre a** (10 janvier 2026) — Résumé a.");
+    expect(message).toContain("• … et 4 autre(s) changement(s).");
   });
 
   it("en anglais (BOT-NOTIF-LANG) : cadre, date et lien anglais ; le français par défaut est inchangé", () => {
@@ -374,7 +400,7 @@ describe("buildPrivacyChangesMessage", () => {
   });
 
   it("buildPrivacyChangesMessage_termsChangeOnlyCounted_footerStillSaysTheTermsNeedAgreement", () => {
-    const filler = Array.from({ length: 6 }, (_, i) => change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }));
+    const filler = Array.from({ length: 30 }, (_, i) => change(`long-${i}`, "2026-02-01", { title: `Titre long-${i} ${"t".repeat(150)}` }));
 
     const message = buildPrivacyChangesMessage([...filler, terms], "https://bluegenji.fr");
 
@@ -429,21 +455,45 @@ describe("announceablePrivacyChanges", () => {
 
 describe("privacyChangesForOneMessage", () => {
   const long = (id: string) => change(id, "2026-01-10", { summary: "x".repeat(700) });
+  // Un titre de 150 caractères : une dizaine tiennent, titres seuls, sous le plafond.
+  const longTitle = (id: string, overrides: Partial<PrivacyChange> = {}) =>
+    change(id, "2026-01-10", { title: `${id} ${"t".repeat(150)}`, ...overrides });
+  const backlog = (count: number) => Array.from({ length: count }, (_, i) => longTitle(`n${String(i).padStart(2, "0")}`));
 
   it("garde tout ce qui tient dans un message", () => {
     expect(privacyChangesForOneMessage([A, B, C], "https://bluegenji.fr")).toEqual([A, B, C]);
   });
 
-  it("s'arrête au premier changement qui ne serait plus nommé, dans l'ordre", () => {
-    const batch = privacyChangesForOneMessage([long("a"), long("b"), long("c")], "https://bluegenji.fr");
-    expect(batch.map((c) => c.id)).toEqual(["a", "b"]);
+  // #587 : des résumés trop longs ne coupent plus le lot à deux changements.
+  it("privacyChangesForOneMessage_summariesTooLongTogether_keepsAllAsTitles", () => {
+    const changes = [long("a"), long("b"), long("c")];
+
+    const batch = privacyChangesForOneMessage(changes, "https://bluegenji.fr");
+
+    expect(batch).toEqual(changes);
     const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
-    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(message).toContain("Trop de changements pour les résumer ici");
+    expect(message).not.toContain("x".repeat(700));
     expect(message).not.toContain("autre(s) changement(s)");
   });
 
+  it("privacyChangesForOneMessage_titlesOverflow_keepsTheOldestAndTheMessageCountsTheRest", () => {
+    const changes = backlog(30);
+
+    const batch = privacyChangesForOneMessage(changes, "https://bluegenji.fr");
+
+    expect(batch.length).toBeGreaterThan(1);
+    expect(batch.length).toBeLessThan(30);
+    expect(batch).toEqual(changes.slice(0, batch.length));
+    const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr", "fr", 30 - batch.length);
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(message).toContain("30 changements");
+    expect(message).toContain(`… et ${30 - batch.length} autre(s) changement(s).`);
+    expect(message).toContain(batch[batch.length - 1].title);
+  });
+
   it("rend toujours au moins un changement quand il y en a", () => {
-    const huge = change("z", "2026-01-10", { summary: "x".repeat(5000) });
+    const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
     expect(privacyChangesForOneMessage([huge, A], null)).toEqual([huge]);
   });
 
@@ -451,24 +501,28 @@ describe("privacyChangesForOneMessage", () => {
     expect(privacyChangesForOneMessage([], null)).toEqual([]);
   });
 
-  // EF-19 : des conditions à accepter partent toujours dans le premier message.
-  it("privacyChangesForOneMessage_termsToAcceptAfterLongChanges_putsTheTermsFirstInBothLanguages", () => {
-    const terms = change("conditions", "2026-01-20", { asksTermsAcceptance: true });
-    const fr = [long("a"), long("b"), long("c"), terms];
+  // EF-19 : des conditions à accepter partent toujours dans le premier message —
+  // à leur place, en évinçant le plus récent des autres, jamais le plus ancien.
+  it("privacyChangesForOneMessage_termsToAcceptAfterBacklog_keepsTermsInOrderAndEvictsTheNewest", () => {
+    const terms = longTitle("conditions", { asksTermsAcceptance: true });
+    const fr = [...backlog(30), terms];
     const en = fr.map((entry) => ({ ...entry, summary: `${entry.summary} (en)` }));
 
     const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
 
-    expect(batch.map((c) => c.id)).toEqual(["conditions", "a"]);
-    expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr")).toContain("Seules les nouvelles conditions d'utilisation demandent ton accord");
+    expect(batch.at(-1)).toBe(terms);
+    expect(batch.slice(0, -1)).toEqual(fr.slice(0, batch.length - 1));
+    expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr", "fr", fr.length - batch.length)).toContain(
+      "Seules les nouvelles conditions d'utilisation demandent ton accord",
+    );
   });
 
-  it("privacyChangesForOneMessage_flagOnFrenchOnly_englishFollowsFrenchOrder", () => {
+  it("privacyChangesForOneMessage_flagOnFrenchOnly_englishFollowsFrenchChoice", () => {
     const fr = [long("a"), long("b"), change("conditions", "2026-01-20", { asksTermsAcceptance: true })];
-    // Anglais sans drapeau, et des conditions longues : seules, elles tiennent ;
-    // suivies de « a » (même ordre qu'en français), plus.
+    // Anglais sans drapeau, et un titre de conditions long : seul, il tient ;
+    // avec le titre de « a » (même choix qu'en français), plus.
     const en = fr.map(({ asksTermsAcceptance: _flag, ...entry }) =>
-      entry.id === "conditions" ? { ...entry, summary: "y".repeat(1100) } : entry,
+      entry.id === "conditions" ? { ...entry, title: "y".repeat(1500) } : entry,
     );
 
     const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
@@ -481,19 +535,21 @@ describe("privacyChangesForOneMessage", () => {
 
     const batch = privacyChangesForOneMessage(due, "https://bluegenji.fr", localizedPrivacyChanges(due, "en"));
 
-    expect(batch[0]?.id).toBe("2026-10-conditions-v7-casters-et-arbitre");
+    expect(batch.map((c) => c.id)).toContain("2026-10-conditions-v7-casters-et-arbitre");
   });
 
   it("avec l'anglais, le lot doit tenir dans les deux langues (BOT-NOTIF-LANG)", () => {
-    const fr = [long("a"), long("b"), long("c")];
-    // Les mêmes changements, plus longs en anglais : seuls deux tiennent ensemble.
-    const en = fr.map((entry) => ({ ...entry, summary: "y".repeat(800) }));
-    expect(privacyChangesForOneMessage(fr, "https://bluegenji.fr").map((c) => c.id)).toEqual(["a", "b"]);
+    const fr = backlog(30);
+    // Les mêmes changements, aux titres plus longs en anglais : le lot rétrécit.
+    const en = fr.map((entry) => ({ ...entry, title: `${entry.title}${"y".repeat(100)}` }));
+    const frOnly = privacyChangesForOneMessage(fr, "https://bluegenji.fr");
     const both = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
-    expect(both.map((c) => c.id)).toEqual(["a"]);
-    expect(buildPrivacyChangesMessage(en.slice(0, both.length), "https://bluegenji.fr", "en").length).toBeLessThanOrEqual(
-      PRIVACY_DM_MAX_LENGTH,
-    );
+
+    expect(both.length).toBeLessThan(frOnly.length);
+    const englishBatch = en.slice(0, both.length);
+    const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en", 30 - both.length);
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    for (const entry of englishBatch) expect(message).toContain(entry.title);
   });
 
   it("partage le registre réel en lots qui nomment tous leurs changements dans les deux langues", () => {
@@ -502,7 +558,7 @@ describe("privacyChangesForOneMessage", () => {
       const english = localizedPrivacyChanges(rest, "en");
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr", english);
       const englishBatch = localizedPrivacyChanges(batch, "en");
-      const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en");
+      const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en", rest.length - batch.length);
       for (const entry of englishBatch) expect(message).toContain(entry.title);
       rest = rest.filter((entry) => !batch.includes(entry));
     }
@@ -512,10 +568,19 @@ describe("privacyChangesForOneMessage", () => {
     let rest = [...PRIVACY_CHANGES];
     while (rest.length > 0) {
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr");
-      const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
+      const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr", "fr", rest.length - batch.length);
       for (const entry of batch) expect(message).toContain(entry.title);
       rest = rest.filter((entry) => !batch.includes(entry));
     }
+  });
+
+  // #587 : un retard d'une trentaine d'entrées en nomme bien plus de deux par message.
+  it("privacyChangesForOneMessage_realRegistryBacklogOf30_namesMoreThanTwoPerMessage", () => {
+    const due = PRIVACY_CHANGES.slice(-30);
+
+    const batch = privacyChangesForOneMessage(due, "https://bluegenji.fr", localizedPrivacyChanges(due, "en"));
+
+    expect(batch.length).toBeGreaterThan(5);
   });
 });
 

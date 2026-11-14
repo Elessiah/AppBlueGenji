@@ -30,9 +30,10 @@ import {
  * joignable reçoit **un** message par lot de changements qu'il n'a ni lus sur le site
  * ni déjà reçus : un joueur absent pendant trois changements en reçoit un seul
  * message qui les nomme tous les trois. Quand ils ne tiennent pas tous sous le
- * plafond du bot, le message nomme ce qui tient et le reste part au balayage
- * suivant (`privacyChangesForOneMessage`) — jamais un changement seulement
- * compté mais tenu pour annoncé.
+ * plafond du bot, le message ne donne que leurs titres ; s'ils ne tiennent
+ * toujours pas, il nomme ce qui tient, compte le reste, et ce reste part au
+ * balayage suivant (`privacyChangesForOneMessage`) — jamais un changement
+ * seulement compté mais tenu pour annoncé.
  *
  * **Discord est le seul canal de l'association, il ne se spamme pas.** Le
  * message attend que le plus ancien changement dû ait une semaine
@@ -143,6 +144,12 @@ async function queryCandidates(
   return rows;
 }
 
+/**
+ * Un message à envoyer : les changements réservés, le nombre de changements
+ * dus gardés pour le message suivant (seulement comptés), ses destinataires.
+ */
+type PrivacyGroup = { changes: PrivacyChange[]; later: number; recipients: NotificationRecipient[] };
+
 /** Acceptations et annonces déjà faites, par compte — deux raisons de ne plus écrire. */
 async function loadDone(userIds: number[]): Promise<Map<number, string[]>> {
   const db = await getDatabase();
@@ -203,7 +210,7 @@ async function runSweep(now: Date): Promise<number> {
 
   // Un message par **ensemble** de changements : deux comptes qui ont les mêmes
   // à recevoir partagent un seul appel au bot.
-  const groups = new Map<string, { changes: PrivacyChange[]; recipients: NotificationRecipient[] }>();
+  const groups = new Map<string, PrivacyGroup>();
   const siteUrl = siteBaseUrl();
   const batchByDue = new Map<string, PrivacyChange[]>();
   for (const row of candidates) {
@@ -236,8 +243,11 @@ async function runSweep(now: Date): Promise<number> {
     }
     const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
-    const key = reserved.map((change) => change.id).join("|");
-    const group = groups.get(key) ?? { changes: reserved, recipients: [] };
+    // Ce qui reste dû après ce lot est compté dans le message (« … et N
+    // autre(s) ») : le joueur sait que d'autres changements l'attendent.
+    const later = due.length - batch.length;
+    const key = `${reserved.map((change) => change.id).join("|")}#${later}`;
+    const group = groups.get(key) ?? { changes: reserved, later, recipients: [] };
     group.recipients.push(recipient);
     groups.set(key, group);
   }
@@ -254,17 +264,15 @@ async function runSweep(now: Date): Promise<number> {
  *
  * @returns Le nombre de messages remis (push et Discord confondus).
  */
-async function sendPrivacyGroup(
-  group: { changes: PrivacyChange[]; recipients: NotificationRecipient[] },
-  siteUrl: string | null,
-): Promise<number> {
+async function sendPrivacyGroup(group: PrivacyGroup, siteUrl: string | null): Promise<number> {
   const report = await notifyUsers(group.recipients, {
     topic: "PRIVACY_CHANGE",
     // Message privé et push dans la langue de chaque destinataire (lot 9-3,
     // BOT-NOTIF-LANG) ; le lot tient sous le plafond dans les deux langues
     // (`privacyChangesForOneMessage`).
     discord: {
-      message: (locale) => buildPrivacyChangesMessage(localizedPrivacyChanges(group.changes, locale), siteUrl, locale),
+      message: (locale) =>
+        buildPrivacyChangesMessage(localizedPrivacyChanges(group.changes, locale), siteUrl, locale, group.later),
       context: "privacy-changes",
     },
     push: (locale) => privacyChangePush(localizedPrivacyChanges(group.changes, locale).map((change) => change.title), locale),

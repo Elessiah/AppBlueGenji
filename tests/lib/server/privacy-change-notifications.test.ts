@@ -120,7 +120,9 @@ describe("dispatchPrivacyChangeNotifications", () => {
     ];
     const batch = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
     for (const change of batch) expect(message).toContain(change.title);
-    expect(message).not.toContain("autre(s) changement(s)");
+    // #587 : le registre entier ne tient pas dans un message ; le reste, dû mais
+    // gardé pour le suivant, est compté — le joueur sait que d'autres l'attendent.
+    expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
     expect(recipients).toEqual([{ discordId: "100000000000000001", handle: null, label: "Nova" }]);
     expect(context).toBe("privacy-changes");
 
@@ -144,7 +146,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
     // Le message suivant nomme à son tour ce qu'il peut, dans l'ordre du registre.
-    // (Des conditions à accepter passent en tête du lot : le reste se lit par identifiant, pas par position.)
+    // (Des conditions à accepter sont toujours du lot : le reste se lit par identifiant, pas par position.)
     const second = privacyChangesForOneMessage(PRIVACY_CHANGES.filter((change) => !first.includes(change)), siteBaseUrl());
     expect(second.length).toBeGreaterThan(0);
     for (const change of second) expect(message).toContain(change.title);
