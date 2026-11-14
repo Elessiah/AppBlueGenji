@@ -9,6 +9,7 @@
  * fiche du tournoi et le profil.
  */
 
+const openListeners = new Set<() => void>();
 let openCount = 0;
 let lastOpenedAt = Number.NEGATIVE_INFINITY;
 
@@ -19,11 +20,20 @@ let lastOpenedAt = Number.NEGATIVE_INFINITY;
 export function markProfileCertificationDialogOpen(now: number = Date.now()): () => void {
   openCount += 1;
   lastOpenedAt = now;
+  for (const listener of [...openListeners]) listener();
   let closed = false;
   return () => {
     if (closed) return;
     closed = true;
     openCount -= 1;
+  };
+}
+
+/** Appelle `listener` à chaque ouverture du dialogue ; renvoie l'arrêt. */
+export function onProfileCertificationDialogOpened(listener: () => void): () => void {
+  openListeners.add(listener);
+  return () => {
+    openListeners.delete(listener);
   };
 }
 
@@ -36,4 +46,5 @@ export function profileCertificationDialogOpenedSince(since: number): boolean {
 export function resetProfileCertificationDialogSignal(): void {
   openCount = 0;
   lastOpenedAt = Number.NEGATIVE_INFINITY;
+  openListeners.clear();
 }

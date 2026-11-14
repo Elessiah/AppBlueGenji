@@ -84,14 +84,23 @@ export function privacyDetailsReadCovers(readKey: string | null, requestKey: str
  */
 export function createPrivacyDetailsReads() {
   let sequence = 0;
-  let latest: { seq: number; key: string } | null = null;
+  let latest: { seq: number; key: string; controller: AbortController } | null = null;
   return {
-    /** Numéro de la lecture à lancer, `null` si la dernière couvre déjà `requestKey`. */
+    /**
+     * Numéro de la lecture à lancer, `null` si la dernière couvre déjà
+     * `requestKey`. Lancer une lecture **abandonne** la précédente, encore en
+     * vol : sa réponse ne parlerait plus pour la liste présentée.
+     */
     start(requestKey: string): number | null {
       if (privacyDetailsReadCovers(latest?.key ?? null, requestKey)) return null;
+      latest?.controller.abort();
       sequence += 1;
-      latest = { seq: sequence, key: requestKey };
+      latest = { seq: sequence, key: requestKey, controller: new AbortController() };
       return sequence;
+    },
+    /** Signal d'abandon de la lecture `seq` (levé par la lecture suivante). */
+    signal(seq: number): AbortSignal | undefined {
+      return latest?.seq === seq ? latest.controller.signal : undefined;
     },
     isLatest(seq: number): boolean {
       return latest?.seq === seq;
@@ -109,7 +118,7 @@ export function createPrivacyDetailsReads() {
 /** Ce que la modale branche sur une lecture de détail (`runPrivacyDetailsRead`). */
 export type PrivacyDetailsReadHooks = {
   /** La lecture elle-même (`GET /api/profile/privacy-changes`). */
-  load: (ids: string[]) => Promise<PrivacyChangeDetails>;
+  load: (ids: string[], signal?: AbortSignal) => Promise<PrivacyChangeDetails>;
   /** Lecture neuve lancée : un échec précédent ne libère plus le bouton. */
   onStart: () => void;
   onLoaded: (ids: string[], details: PrivacyChangeDetails) => void;
@@ -136,7 +145,7 @@ export function runPrivacyDetailsRead(
   if (seq === null) return;
   hooks.onStart();
   const { ids } = splitRequestKey(requestKey);
-  hooks.load(ids).then(
+  hooks.load(ids, reads.signal(seq)).then(
     // Chaque identifiant demandé est tenu pour lu, même sans détail rendu :
     // sinon la lecture se relancerait sans fin.
     (details) => hooks.onLoaded(ids, details),
@@ -238,7 +247,7 @@ export function PrivacyChangesModal({
   useEffect(() => {
     if (!open || !detailsDeferred) return;
     runPrivacyDetailsRead(detailsReads.current, requestKey, {
-      load: (ids) => loadPrivacyChangeDetails(ids.join(","), locale),
+      load: (ids, signal) => loadPrivacyChangeDetails(ids.join(","), locale, signal),
       onStart: () => setDetailsFailedFor(null),
       onLoaded: (ids, details) =>
         setLoadedDetails((previous) => {
@@ -408,11 +417,17 @@ const PRIVACY_DETAILS_TIMEOUT_MS = 15_000;
 export type PrivacyChangeDetails = Record<string, readonly string[]>;
 
 /** Lit le détail des entrées `idsKey` (identifiants joints par des virgules), dans la langue de la page. */
-async function loadPrivacyChangeDetails(idsKey: string, locale: Locale): Promise<PrivacyChangeDetails> {
+async function loadPrivacyChangeDetails(
+  idsKey: string,
+  locale: Locale,
+  abort?: AbortSignal,
+): Promise<PrivacyChangeDetails> {
   const query = new URLSearchParams({ ids: idsKey, locale });
   // Borné : une lecture qui ne répond pas libère le bouton (échec, notifié).
   const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`, {
-    signal: AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS),
+    signal: abort
+      ? AbortSignal.any([abort, AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS)])
+      : AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json()) as { details?: PrivacyChangeDetails };

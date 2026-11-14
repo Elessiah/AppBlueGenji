@@ -1,4 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { isBotCircuitOpen } from "@/lib/server/bot-integration";
@@ -66,7 +66,16 @@ export const PRIVACY_DM_BATCH_SIZE = 20;
 
 const SWEEP_THROTTLE_MS = 60_000;
 
+/**
+ * Après un balayage **sans aucun compte à prévenir**, le suivant attend plus :
+ * la lecture parcourt tous les comptes joignables (un `NOT EXISTS` par
+ * changement annonçable) et ne trouverait rien de neuf, sinon un compte devenu
+ * joignable depuis — que dix minutes de plus ne font pas attendre longtemps.
+ */
+export const SWEEP_IDLE_THROTTLE_MS = 600_000;
+
 let lastSweepAt = 0;
+let lastSweepFoundNobody = false;
 let pendingSweep: Promise<number> | null = null;
 
 type CandidateRow = RowDataPacket & {
@@ -79,6 +88,9 @@ type CandidateRow = RowDataPacket & {
   google_linked: 0 | 1 | null;
   live_staff: 0 | 1 | null;
 };
+
+/** Pool ou connexion du verrou : tout ce qui sait `query`. */
+type Queryable = Pick<Pool, "query">;
 
 type DoneRow = RowDataPacket & { user_id: number; change_id: string };
 
@@ -95,19 +107,23 @@ type DoneRow = RowDataPacket & { user_id: number; change_id: string };
  * d'annonce borne le nombre de conditions, et les `NOT EXISTS` passent par les
  * clés primaires.
  */
-async function loadCandidates(settled: readonly PrivacyChange[], liveStaff: boolean): Promise<CandidateRow[]> {
+async function loadCandidates(
+  db: Queryable,
+  settled: readonly PrivacyChange[],
+  liveStaff: boolean,
+): Promise<CandidateRow[]> {
   // Un compte sans Discord n'est candidat que si le push est **allumé** : sans
   // clés, rien ne peut lui parvenir, et le réserver consommerait l'annonce pour
   // de bon. Et si la table des abonnements manque (table tolérée), la lecture
   // retombe sur Discord seul plutôt que d'éteindre toute l'annonce.
   if (webPushConfig()) {
     try {
-      return await queryCandidates(settled, true, liveStaff);
+      return await queryCandidates(db, settled, true, liveStaff);
     } catch (error) {
       if (!isMissingTableError(error)) throw error;
     }
   }
-  return queryCandidates(settled, false, liveStaff);
+  return queryCandidates(db, settled, false, liveStaff);
 }
 
 /**
@@ -116,11 +132,11 @@ async function loadCandidates(settled: readonly PrivacyChange[], liveStaff: bool
  * `LIVE_STAFF_SQL` sur chaque compte à chaque balayage.
  */
 async function queryCandidates(
+  db: Queryable,
   settled: readonly PrivacyChange[],
   withPush: boolean,
   liveStaff: boolean,
 ): Promise<CandidateRow[]> {
-  const db = await getDatabase();
   const clause = settled
     .map(
       (change) => `(u.created_at < ? AND ${privacyAudienceSql(change)}
@@ -152,8 +168,7 @@ async function queryCandidates(
 type PrivacyGroup = { changes: PrivacyChange[]; later: number; recipients: NotificationRecipient[] };
 
 /** Acceptations et annonces déjà faites, par compte — deux raisons de ne plus écrire. */
-async function loadDone(userIds: number[]): Promise<Map<number, string[]>> {
-  const db = await getDatabase();
+async function loadDone(db: Queryable, userIds: number[]): Promise<Map<number, string[]>> {
   const placeholders = userIds.map(() => "?").join(", ");
   const [rows] = await db.query<DoneRow[]>(
     `SELECT user_id, change_id FROM bg_privacy_acknowledgments WHERE user_id IN (${placeholders})
@@ -169,18 +184,18 @@ async function loadDone(userIds: number[]): Promise<Map<number, string[]>> {
   return done;
 }
 
-/** Réserve chaque changement ; ne garde que ceux que ce balayage a obtenus. */
-async function reserve(userId: number, changes: PrivacyChange[]): Promise<PrivacyChange[]> {
-  const db = await getDatabase();
-  const reserved: PrivacyChange[] = [];
-  for (const change of changes) {
-    const [result] = await db.execute<ResultSetHeader>(
-      `INSERT IGNORE INTO bg_privacy_change_notifications (user_id, change_id) VALUES (?, ?)`,
-      [userId, change.id],
-    );
-    if (result.affectedRows === 1) reserved.push(change);
-  }
-  return reserved;
+/**
+ * Réserve les changements d'un compte **en une instruction** ; rend `null` si
+ * une partie était déjà prise (le nombre de lignes écrites ne dit pas lesquelles
+ * sont les nôtres : on ne rend rien, le balayage suivant relit l'état).
+ */
+async function reserve(db: Queryable, userId: number, changes: PrivacyChange[]): Promise<PrivacyChange[] | null> {
+  const [result] = await db.query<ResultSetHeader>(
+    `INSERT IGNORE INTO bg_privacy_change_notifications (user_id, change_id)
+     VALUES ${changes.map(() => "(?, ?)").join(", ")}`,
+    changes.flatMap((change) => [userId, change.id]),
+  );
+  return result.affectedRows === changes.length ? changes : null;
 }
 
 async function release(userIds: number[], changeIds: string[]): Promise<void> {
@@ -206,34 +221,47 @@ async function runSweep(now: Date): Promise<number> {
   // deux balayages simultanés se partageaient les réservations d'un même compte,
   // chacun rendait sa part et aucun n'écrivait — à chaque minute de départ
   // commun, sans fin. Celui qui n'obtient pas le verrou passe son tour.
+  let groups: Map<string, PrivacyGroup>;
   try {
-    return await withNamedLock(await getDatabase(), PRIVACY_SWEEP_LOCK_NAME, 0, () =>
-      sweepUnderLock(now, changes, settled),
+    // Le verrou ne couvre que la lecture et les réservations, sur la connexion
+    // qui le tient (une seule connexion du pool, brève) : les envois au bot,
+    // lents, partent après, les réservations étant déjà durables.
+    groups = await withNamedLock(await getDatabase(), PRIVACY_SWEEP_LOCK_NAME, 0, (connection) =>
+      reserveUnderLock(connection, now, changes, settled),
     );
   } catch (error) {
     if (error instanceof NamedLockUnavailableError) return 0;
     throw error;
   }
+  const siteUrl = siteBaseUrl();
+  let sent = 0;
+  for (const group of groups.values()) {
+    sent += await sendPrivacyGroup(group, siteUrl);
+  }
+  return sent;
 }
 
 /** Verrou nommé du balayage des annonces de confidentialité. */
 export const PRIVACY_SWEEP_LOCK_NAME = "bg_privacy_change_sweep";
 
-async function sweepUnderLock(
+async function reserveUnderLock(
+  db: Queryable,
   now: Date,
   changes: readonly PrivacyChange[],
   settled: readonly PrivacyChange[],
-): Promise<number> {
+): Promise<Map<string, PrivacyGroup>> {
+  const groups = new Map<string, PrivacyGroup>();
   const candidates = await loadCandidates(
+    db,
     settled,
     changes.some((change) => change.audience === "LIVE_STAFF"),
   );
-  if (candidates.length === 0) return 0;
-  const done = await loadDone(candidates.map((row) => Number(row.id)));
+  lastSweepFoundNobody = candidates.length === 0;
+  if (candidates.length === 0) return groups;
+  const done = await loadDone(db, candidates.map((row) => Number(row.id)));
 
   // Un message par **ensemble** de changements : deux comptes qui ont les mêmes
   // à recevoir partagent un seul appel au bot.
-  const groups = new Map<string, PrivacyGroup>();
   const siteUrl = siteBaseUrl();
   const batchByDue = new Map<string, PrivacyChange[]>();
   for (const row of candidates) {
@@ -264,21 +292,14 @@ async function sweepUnderLock(
       batch = privacyChangesForOneMessage(due, siteUrl, localizedPrivacyChanges(due, "en"));
       batchByDue.set(dueKey, batch);
     }
-    const reserved = await reserve(userId, batch);
-    if (reserved.length === 0) continue;
     // Une partie du lot déjà réservée depuis la relecture (`loadDone`) — plus
     // possible entre balayages, sérialisés par le verrou nommé ; garde-fou
-    // seulement : ce compte est rendu, sans message, plutôt qu'un en-tête ou un
+    // seulement : ce compte est écarté, sans message, plutôt qu'un en-tête ou un
     // « … et N autre(s) » faux. Le balayage suivant relit l'état. Une réservation
     // laissée par un processus tué entre `reserve` et l'envoi compte, elle, pour
     // annoncée : l'envoi est « au plus une fois », jamais doublé.
-    if (reserved.length < batch.length) {
-      await release(
-        [userId],
-        reserved.map((change) => change.id),
-      );
-      continue;
-    }
+    const reserved = await reserve(db, userId, batch);
+    if (!reserved) continue;
     // Ce qui reste dû après ce lot est compté dans le message (« … et N
     // autre(s) ») : le joueur sait que d'autres changements l'attendent.
     const later = due.length - batch.length;
@@ -288,11 +309,7 @@ async function sweepUnderLock(
     groups.set(key, group);
   }
 
-  let sent = 0;
-  for (const group of groups.values()) {
-    sent += await sendPrivacyGroup(group, siteUrl);
-  }
-  return sent;
+  return groups;
 }
 
 /**
@@ -350,7 +367,7 @@ export async function dispatchPrivacyChangeNotifications(now: Date = new Date())
   // un envoi impossible, l'annonce serait perdue. Rien ne part, rien n'est lu.
   if (outboundMuted()) return 0;
   if (pendingSweep) return pendingSweep;
-  if (Date.now() - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
+  if (Date.now() - lastSweepAt < (lastSweepFoundNobody ? SWEEP_IDLE_THROTTLE_MS : SWEEP_THROTTLE_MS)) return 0;
 
   pendingSweep = runSweep(now);
   try {
@@ -364,5 +381,6 @@ export async function dispatchPrivacyChangeNotifications(now: Date = new Date())
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetPrivacyNotificationThrottle(): void {
   lastSweepAt = 0;
+  lastSweepFoundNobody = false;
   pendingSweep = null;
 }

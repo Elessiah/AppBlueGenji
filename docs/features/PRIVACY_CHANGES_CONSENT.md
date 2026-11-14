@@ -235,6 +235,17 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   partageaient les réservations d'un compte et rendaient chacun leur part sans
   écrire. Envoi « au plus une fois » : une réservation laissée par un processus
   tué avant l'envoi compte pour annoncée (la modale, elle, l'a présentée).
+  Le verrou ne couvre que la lecture des candidats et les **réservations** (une
+  instruction `INSERT IGNORE` par compte, sur la connexion qui tient le
+  verrou) ; les envois au bot, lents, partent **après** sa libération. Un
+  balayage qui ne trouve personne à prévenir espace le suivant de dix minutes
+  (`SWEEP_IDLE_THROTTLE_MS`) : la lecture parcourt tous les comptes joignables.
+  Un lot en partie déjà réservé écarte le compte sans rien effacer (les lignes
+  écrites ne disent pas lesquelles sont les nôtres).
+  `GET /api/profile/privacy-changes` répond `Cache-Control: private,
+  max-age=300` (texte publié, identique pour tous) ; la modale abandonne une
+  lecture de détail dépassée (`AbortSignal`) ; le guet du refus de « Ne plus voir »
+  cesse d'observer le document à deux minutes sans dialogue de `/profil`.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni lus sur le site ni déjà reçus, et renvoie au site
   pour le détail — en disant qu'aucun accord n'est demandé, sauf quand le message porte des conditions d'utilisation à accepter (`asksTermsAcceptance` sur l'entrée, posé pour toute version des conditions depuis la version 7) : `privacyChangesForOneMessage` les **choisit d'abord** — elles partent toujours dans le premier message, à leur place dans l'ordre du registre, et ce qu'elles évincent est le plus **récent** des autres changements, qui a le plus de fenêtre devant lui (revue EF-19 #501) — et le pied dit alors que seules ces conditions demandent l'accord, si elles ne sont pas encore acceptées, « pour le reste » aucun accord (dans un aperçu, `buildPrivacyChangesMessage` le dit aussi quand elles ne sont que comptées). Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et

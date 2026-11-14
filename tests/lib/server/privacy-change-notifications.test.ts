@@ -13,6 +13,7 @@ import {
   dispatchPrivacyChangeNotifications,
   PRIVACY_SWEEP_LOCK_NAME,
   resetPrivacyNotificationThrottle,
+  SWEEP_IDLE_THROTTLE_MS,
 } from "@/lib/server/privacy-change-notifications";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import {
@@ -36,6 +37,7 @@ const NOW = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS);
 // Le registre que le balayage de `NOW` peut encore annoncer (fenêtre de
 // `PRIVACY_DM_WINDOW_DAYS`) : les plus anciennes entrées en sortent.
 const DUE = announceablePrivacyChanges(NOW);
+const SWEEP_THROTTLE_PLUS = 61_000;
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
 
 type Candidate = {
@@ -75,7 +77,7 @@ function fakeDb(
     lockHeldElsewhere?: boolean;
   } = {},
 ) {
-  const calls: { sql: string; params: unknown[] }[] = [];
+  const calls: { sql: string; params: unknown[]; viaPool?: boolean }[] = [];
   const handler = async (sql: string, params: unknown[] = []) => {
     const q = flat(sql);
     calls.push({ sql: q, params });
@@ -84,8 +86,12 @@ function fakeDb(
     if (q.startsWith("SELECT u.id, u.pseudo")) return [options.candidates ?? []];
     if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
     if (q.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications")) {
-      const key = `${params[0]}:${params[1]}`;
-      return [{ affectedRows: options.taken?.includes(key) ? 0 : 1 }];
+      // Une instruction, plusieurs lignes : `(user, changement)` à la suite.
+      let written = 0;
+      for (let i = 0; i < params.length; i += 2) {
+        if (!options.taken?.includes(`${params[i]}:${params[i + 1]}`)) written += 1;
+      }
+      return [{ affectedRows: written }];
     }
     return [{ affectedRows: 1 }];
   };
@@ -145,7 +151,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
     // Réservé **avant** l'envoi, une ligne par changement nommé — et rien de ce
     // que le message n'a pas pu nommer.
     const reservations = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
-    expect(reservations.map((c) => c.params[1])).toEqual(batch.map((c) => c.id));
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0].params.filter((_, index) => index % 2 === 1)).toEqual(batch.map((c) => c.id));
   });
 
   it("envoie au message suivant ce qu'un message n'a pas pu nommer", async () => {
@@ -325,16 +332,63 @@ describe("dispatchPrivacyChangeNotifications", () => {
   // Garde-fou : une partie du lot déjà réservée (verrou nommé contourné,
   // réservation laissée par un processus tué) — aucun décompte juste n'est
   // possible ici.
-  it("dispatchPrivacyChangeNotifications_partOfBatchTakenElsewhere_releasesOwnReservationsWithoutMessage", async () => {
-    const [first, ...rest] = privacyChangesForOneMessage(DUE, siteBaseUrl());
+  it("dispatchPrivacyChangeNotifications_partOfBatchTakenElsewhere_skipsAccountWithoutMessageOrRelease", async () => {
+    const [first] = privacyChangesForOneMessage(DUE, siteBaseUrl());
     const calls = fakeDb({ candidates: [candidate()], taken: [`1:${first.id}`] });
 
     const sent = await dispatchPrivacyChangeNotifications(NOW);
 
     expect(sent).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
-    const release = calls.find((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"));
-    expect(release?.params).toEqual([1, ...rest.map((change) => change.id)]);
+    // Le nombre de lignes écrites ne dit pas lesquelles sont les nôtres : rien n'est effacé.
+    expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
+  });
+
+  // Performance cycle 1 : une instruction par compte, pas un aller-retour par changement.
+  it("dispatchPrivacyChangeNotifications_reservation_oneStatementPerAccount", async () => {
+    const calls = fakeDb({ candidates: [candidate({ id: 1 }), candidate({ id: 2, pseudo: "Kai", discord_id: "3" })] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const inserts = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
+    expect(inserts).toHaveLength(2);
+    const batch = privacyChangesForOneMessage(DUE, siteBaseUrl());
+    expect(inserts[0].params).toEqual(batch.flatMap((change) => [1, change.id]));
+  });
+
+  // Performance cycle 1 : les envois au bot, lents, ne tiennent pas le verrou ni sa connexion.
+  it("dispatchPrivacyChangeNotifications_sends_afterLockReleased", async () => {
+    const calls = fakeDb({ candidates: [candidate()] });
+    let unlockedBeforeSend = false;
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      unlockedBeforeSend = calls.some((c) => c.sql.startsWith("SELECT RELEASE_LOCK"));
+      return { sent: 1, unresolved: [], failed: [] };
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(unlockedBeforeSend).toBe(true);
+  });
+
+  // Performance cycle 1 : un balayage sans personne à prévenir espace le suivant.
+  it("dispatchPrivacyChangeNotifications_nobodyToNotify_nextSweepWaitsTheIdleDelay", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(1_000_000);
+      const calls = fakeDb({ candidates: [] });
+      await dispatchPrivacyChangeNotifications(NOW);
+      const count = calls.length;
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(NOW);
+      expect(calls).toHaveLength(count);
+
+      now.mockReturnValue(1_000_000 + SWEEP_IDLE_THROTTLE_MS);
+      await dispatchPrivacyChangeNotifications(NOW);
+      expect(calls.length).toBeGreaterThan(count);
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("dispatchPrivacyChangeNotifications_partialTakeForOneAccount_otherAccountStillServed", async () => {
@@ -472,8 +526,9 @@ describe("dispatchPrivacyChangeNotifications — notifications push", () => {
 
   it("retombe sur Discord seul si la table des abonnements manque", async () => {
     jest.mocked(webPushConfig).mockReturnValue(CONFIG);
-    const handler = async (sql: string) => {
+    const handler = async (sql: string, params: unknown[] = []) => {
       const q = flat(sql);
+      if (q.startsWith("INSERT IGNORE")) return [{ affectedRows: params.length / 2 }];
       if (q.startsWith("SELECT u.id, u.pseudo")) {
         if (q.includes("bg_push_subscriptions")) throw Object.assign(new Error("absente"), { code: "ER_NO_SUCH_TABLE" });
         return [[candidate()]];

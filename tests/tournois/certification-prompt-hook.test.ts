@@ -434,16 +434,56 @@ describe("useCertificationPrompt", () => {
     }
   });
 
-  it("noticeOnceModalsClosed_nothingClosesForTenMinutes_stopsWatching", () => {
+  // Performance cycle 1 : sans dialogue de `/profil`, l'observateur du document
+  // cesse dès les deux minutes ; il ne tourne pas dix minutes pour rien.
+  it("noticeOnceModalsClosed_noProfileDialogAfterTwoMinutes_stopsObservingDocument", () => {
     jest.useFakeTimers();
     try {
       modals.open = true;
       noticeOnceModalsClosed(jest.fn());
 
+      jest.advanceTimersByTime(REFUSAL_NOTICE_MAX_WAIT_MS - 1);
+      expect(modals.closedStopped).toBe(0);
+      jest.advanceTimersByTime(1);
+      expect(modals.closedStopped).toBe(1);
+      jest.advanceTimersByTime(PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS);
+      expect(modals.closedStopped).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_profileDialogOpenedBeforeTwoMinutes_watchesUntilTenMinutes", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      noticeOnceModalsClosed(jest.fn());
+      const closeDialog = markProfileCertificationDialogOpen();
+
       jest.advanceTimersByTime(PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS - 1);
       expect(modals.closedStopped).toBe(0);
       jest.advanceTimersByTime(1);
       expect(modals.closedStopped).toBe(1);
+      closeDialog();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_profileDialogOpensAfterObservationStopped_watchesAgain", () => {
+    jest.useFakeTimers();
+    try {
+      modals.open = true;
+      noticeOnceModalsClosed(jest.fn());
+      jest.advanceTimersByTime(REFUSAL_NOTICE_MAX_WAIT_MS + 1_000);
+      const watchersBefore = modals.closedWatchers.length;
+
+      const closeDialog = markProfileCertificationDialogOpen();
+      expect(modals.closedWatchers).toHaveLength(watchersBefore + 1);
+      // Une seconde ouverture ne rouvre pas un second observateur.
+      closeDialog();
+      markProfileCertificationDialogOpen()();
+      expect(modals.closedWatchers).toHaveLength(watchersBefore + 1);
     } finally {
       jest.useRealTimers();
     }

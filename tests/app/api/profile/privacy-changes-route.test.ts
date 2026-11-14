@@ -127,6 +127,16 @@ describe("GET /api/profile/privacy-changes", () => {
     expect(await res.json()).toEqual({ details: { [first.id]: english.details } });
   });
 
+  it("GET_publishedIds_cachedPrivatelyByTheBrowser", async () => {
+    const res = await GET(getReq(`ids=${first.id}`));
+    expect(res.headers.get("Cache-Control")).toBe("private, max-age=300");
+  });
+
+  it("GET_refusals_notCached", async () => {
+    const res = await GET(getReq("ids="));
+    expect(res.headers.get("Cache-Control")).toBeNull();
+  });
+
   it("GET_noIds_returns400", async () => {
     const res = await GET(getReq("ids="));
 

@@ -195,6 +195,52 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(reads.start("fr|c")).toBeNull();
   });
 
+  // Performance cycle 1 : une lecture dépassée est abandonnée, pas laissée finir.
+  it("createPrivacyDetailsReads_newRead_abortsThePreviousOneStillInFlight", () => {
+    const reads = createPrivacyDetailsReads();
+    const first = reads.start("fr|a")!;
+    const firstSignal = reads.signal(first)!;
+    expect(firstSignal.aborted).toBe(false);
+
+    const second = reads.start("en|a")!;
+
+    expect(firstSignal.aborted).toBe(true);
+    expect(reads.signal(first)).toBeUndefined();
+    expect(reads.signal(second)?.aborted).toBe(false);
+  });
+
+  it("createPrivacyDetailsReads_coveredKey_doesNotAbortTheRunningRead", () => {
+    const reads = createPrivacyDetailsReads();
+    const first = reads.start("fr|a,b")!;
+
+    expect(reads.start("fr|a")).toBeNull();
+
+    expect(reads.signal(first)?.aborted).toBe(false);
+  });
+
+  it("runPrivacyDetailsRead_supersededByLanguage_abortedReadStaysSilent", async () => {
+    const reads = createPrivacyDetailsReads();
+    const hooks = {
+      load: jest.fn((_ids: string[], signal?: AbortSignal) =>
+        new Promise<Record<string, readonly string[]>>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+      ),
+      onStart: jest.fn(),
+      onLoaded: jest.fn(),
+      onFailed: jest.fn(),
+      isOpen: () => true,
+    };
+
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    runPrivacyDetailsRead(reads, "en|a", { ...hooks, load: jest.fn(() => new Promise<Record<string, readonly string[]>>(() => {})) });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(hooks.onFailed).not.toHaveBeenCalled();
+    expect(hooks.load.mock.calls[0][1]?.aborted).toBe(true);
+  });
+
   it("createPrivacyDetailsReads_sameKeyRerendered_startsOnce", () => {
     const reads = createPrivacyDetailsReads();
 
@@ -277,7 +323,7 @@ describe("runPrivacyDetailsRead — câblage des lectures de détail", () => {
     await settle();
 
     expect(hooks.onStart).toHaveBeenCalledTimes(1);
-    expect(load).toHaveBeenCalledWith(["a", "b"]);
+    expect(load).toHaveBeenCalledWith(["a", "b"], expect.any(AbortSignal));
     expect(hooks.onLoaded).toHaveBeenCalledWith(["a", "b"], { a: ["détail a"] });
   });
 
@@ -419,7 +465,7 @@ describe("revue UI cycle 1 : chargement des détails", () => {
   });
 
   it("loadDetails_fetch_carriesTimeoutSignal", () => {
-    expect(source).toContain("signal: AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS)");
+    expect(source).toContain("AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS)");
     expect(source).toContain("PRIVACY_DETAILS_TIMEOUT_MS = 15_000");
   });
 });
