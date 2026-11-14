@@ -548,6 +548,48 @@ describe("useCertificationPrompt", () => {
     }
   });
 
+  // Revue sécurité cycle 1 : « Certifier » monte le dialogue de `/profil` avant
+  // que la réponse du refus n'arrive — ouvert avant le refus, il étend le guet
+  // tant qu'il reste ouvert (règle de la revue std 3), jamais au-delà de dix minutes.
+  it("noticeOnceModalsClosed_profileDialogMountedBeforeRefusal_noticesWhenClosedLater", () => {
+    jest.useFakeTimers();
+    try {
+      const closeDialog = markProfileCertificationDialogOpen();
+      jest.advanceTimersByTime(1_000);
+      modals.open = true;
+      const notice = jest.fn();
+      noticeOnceModalsClosed(notice);
+
+      jest.advanceTimersByTime(5 * 60_000);
+      closeDialog();
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("noticeOnceModalsClosed_profileDialogMountedBeforeRefusal_silentPastTenMinutes", () => {
+    jest.useFakeTimers();
+    try {
+      const closeDialog = markProfileCertificationDialogOpen();
+      modals.open = true;
+      const notice = jest.fn();
+      noticeOnceModalsClosed(notice);
+
+      jest.advanceTimersByTime(PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS);
+      closeDialog();
+      modals.open = false;
+      modals.closedWatchers.forEach((watcher) => watcher());
+
+      expect(notice).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("profileCertificationDialogOpenedSince_openThenClosed_tracksOpeningTime", () => {
     expect(profileCertificationDialogOpenedSince(0)).toBe(false);
     const close = markProfileCertificationDialogOpen(1_000);

@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   createPrivacyDetailsReads,
+  loadPrivacyChangeDetails,
   PrivacyChangesModal,
   privacyDetailsPending,
   privacyDetailsReadCovers,
@@ -381,6 +382,52 @@ describe("runPrivacyDetailsRead — câblage des lectures de détail", () => {
     expect(hooks.onFailed).not.toHaveBeenCalled();
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  // Revue sécurité cycle 1 : un échec dit modale ouverte restait « couvrant » ;
+  // masquée puis rouverte, la modale ne relisait jamais le détail.
+  it("runPrivacyDetailsRead_failedWhileOpenThenHiddenAndReopened_rereads", async () => {
+    const { load, pending } = deferredLoad();
+    const reads = createPrivacyDetailsReads();
+    const hooks = readHooks(load);
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    pending[0].reject(new Error("HTTP 503"));
+    await settle();
+
+    reads.dropFailed();
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+
+    expect(hooks.onFailed).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("runPrivacyDetailsRead_failedWhileOpenRerendered_noRetryLoop", async () => {
+    const { load, pending } = deferredLoad();
+    const reads = createPrivacyDetailsReads();
+    const hooks = readHooks(load);
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    pending[0].reject(new Error("HTTP 503"));
+    await settle();
+
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("createPrivacyDetailsReads_dropFailed_keepsAReadInFlightOrSucceeded", async () => {
+    const { load, pending } = deferredLoad();
+    const reads = createPrivacyDetailsReads();
+    const hooks = readHooks(load);
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+
+    reads.dropFailed();
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+    pending[0].resolve({ a: ["x"] });
+    await settle();
+    reads.dropFailed();
+    runPrivacyDetailsRead(reads, "fr|a", hooks);
+
+    expect(load).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("PrivacyChangesModal — contrats du geste", () => {
@@ -464,8 +511,84 @@ describe("revue UI cycle 1 : chargement des détails", () => {
     expect(loading).toBeGreaterThan(source.indexOf("</ScrollArea>"));
   });
 
-  it("loadDetails_fetch_carriesTimeoutSignal", () => {
-    expect(source).toContain("AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS)");
+  it("loadDetails_fetch_timeoutConstant", () => {
     expect(source).toContain("PRIVACY_DETAILS_TIMEOUT_MS = 15_000");
+  });
+});
+
+/**
+ * Revue sécurité cycle 1 : `AbortSignal.any` / `.timeout`, absents de Safari
+ * avant 17.4, faisaient échouer toute lecture du détail — remplacés par un
+ * `AbortController` et une minuterie.
+ */
+describe("loadPrivacyChangeDetails — abandon sans AbortSignal.any", () => {
+  const realFetch = globalThis.fetch;
+  const realAny = (AbortSignal as { any?: unknown }).any;
+  const realTimeout = (AbortSignal as { timeout?: unknown }).timeout;
+  let seen: AbortSignal | undefined;
+
+  const hangingFetch = () =>
+    jest.fn((_url: string, init?: RequestInit) => {
+      seen = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        // Comme `fetch` : un signal déjà levé rejette d'emblée.
+        if (seen?.aborted) reject(new Error("aborted"));
+        seen?.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    Object.assign(AbortSignal, { any: realAny, timeout: realTimeout });
+    jest.useRealTimers();
+    seen = undefined;
+  });
+
+  it("loadPrivacyChangeDetails_olderBrowserWithoutAnyOrTimeout_readsDetails", async () => {
+    Object.assign(AbortSignal, { any: undefined, timeout: undefined });
+    globalThis.fetch = jest.fn(async () => Response.json({ details: { a: ["détail"] } })) as typeof fetch;
+
+    await expect(loadPrivacyChangeDetails("a", "fr", new AbortController().signal)).resolves.toEqual({
+      a: ["détail"],
+    });
+  });
+
+  it("loadPrivacyChangeDetails_callerAborts_requestAborted", async () => {
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    const caller = new AbortController();
+
+    const read = loadPrivacyChangeDetails("a", "fr", caller.signal);
+    caller.abort();
+
+    await expect(read).rejects.toThrow("aborted");
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it("loadPrivacyChangeDetails_alreadyAbortedSignal_abortsAtOnce", async () => {
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    const caller = new AbortController();
+    caller.abort();
+
+    await expect(loadPrivacyChangeDetails("a", "fr", caller.signal)).rejects.toThrow();
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it("loadPrivacyChangeDetails_noAnswerWithin15s_abortedByTimer", async () => {
+    jest.useFakeTimers();
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+
+    const read = loadPrivacyChangeDetails("a", "fr");
+    const settled = expect(read).rejects.toThrow("aborted");
+    jest.advanceTimersByTime(14_999);
+    expect(seen?.aborted).toBe(false);
+    jest.advanceTimersByTime(1);
+
+    await settled;
+  });
+
+  it("loadPrivacyChangeDetails_httpError_rejects", async () => {
+    globalThis.fetch = jest.fn(async () => new Response("", { status: 503 })) as typeof fetch;
+
+    await expect(loadPrivacyChangeDetails("a", "fr")).rejects.toThrow("HTTP 503");
   });
 });

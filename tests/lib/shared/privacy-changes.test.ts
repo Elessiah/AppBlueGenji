@@ -163,6 +163,37 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
     if (omitted > 0) expect(message).toContain(`… et ${omitted} autre(s) changement(s).`);
   });
 
+  // Revue sécurité cycle 1 : le repli à un changement doit le **nommer** même
+  // quand l'en-tête et la ligne « … et N autre(s) » comptent tout le reste.
+  it("privacyChangesForOneMessage_eachEntryFirstWithAllOthersLater_namedInBothLanguages", () => {
+    const english = localizedPrivacyChanges(PRIVACY_CHANGES, "en");
+    for (const [index, entry] of PRIVACY_CHANGES.entries()) {
+      const others = PRIVACY_CHANGES.filter((_, other) => other !== index);
+      const batch = privacyChangesForOneMessage(
+        [entry, ...others],
+        "https://bluegenji.fr",
+        [english[index], ...english.filter((_, other) => other !== index)],
+      );
+      expect(batch.length).toBeGreaterThan(0);
+      const later = PRIVACY_CHANGES.length - batch.length;
+      for (const locale of ["fr", "en"] as const) {
+        const message = buildPrivacyChangesMessage(
+          localizedPrivacyChanges(batch, locale),
+          "https://bluegenji.fr",
+          locale,
+          later,
+        );
+        expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+        for (const named of localizedPrivacyChanges(batch, locale)) expect(message).toContain(named.title);
+      }
+    }
+  });
+
+  it("privacyChangesForOneMessage_singleEntryThatCannotBeNamed_returnsEmpty", () => {
+    const huge = { ...A, title: "T".repeat(PRIVACY_DM_MAX_LENGTH), summary: "S" };
+    expect(privacyChangesForOneMessage([huge], "https://bluegenji.fr")).toEqual([]);
+  });
+
   it("nomme chaque changement quand il est annoncé seul", () => {
     for (const entry of PRIVACY_CHANGES) {
       const message = buildPrivacyChangesMessage([entry], "https://bluegenji.fr");
@@ -509,9 +540,11 @@ describe("privacyChangesForOneMessage", () => {
     expect(message).toContain(batch[batch.length - 1].title);
   });
 
-  it("rend toujours au moins un changement quand il y en a", () => {
+  // Revue sécurité cycle 1 : un changement qui ne se nomme pas (même seul) n'est
+  // plus rendu — il serait réservé, tenu pour annoncé, sans titre écrit.
+  it("ne rend pas un changement que le message ne pourrait pas nommer", () => {
     const huge = change("z", "2026-01-10", { title: "x".repeat(5000) });
-    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([huge]);
+    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([]);
   });
 
   it("ne rend rien quand il n'y a rien", () => {
@@ -539,7 +572,7 @@ describe("privacyChangesForOneMessage", () => {
     // Anglais sans drapeau, et un titre de conditions long : seul, il tient ;
     // avec le titre de « a » (même choix qu'en français), plus.
     const en = fr.map(({ asksTermsAcceptance: _flag, ...entry }) =>
-      entry.id === "conditions" ? { ...entry, title: "y".repeat(1500) } : entry,
+      entry.id === "conditions" ? { ...entry, title: "y".repeat(1360) } : entry,
     );
 
     const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);

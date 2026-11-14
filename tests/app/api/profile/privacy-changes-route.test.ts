@@ -5,7 +5,7 @@ jest.mock("@/lib/server/privacy-consent");
 
 import { GET, POST } from "@/app/api/profile/privacy-changes/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { acknowledgePrivacyChanges } from "@/lib/server/privacy-consent";
+import { acknowledgePrivacyChanges, loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { authUser } from "../../../helpers/auth-user";
@@ -154,5 +154,51 @@ describe("GET /api/profile/privacy-changes", () => {
     await GET(getReq(`ids=${first.id}`));
 
     expect(acknowledgePrivacyChanges).not.toHaveBeenCalled();
+    expect(loadPendingPrivacyChanges).not.toHaveBeenCalled();
+  });
+
+  // Revue sécurité cycle 1 : un avis réservé à un public, absent de /rgpd, ne se
+  // rend qu'au compte qui l'a à lire.
+  describe("avis hors politique (GOOGLE_LINKED)", () => {
+    const restricted = PRIVACY_CHANGES.find((change) => change.audience === "GOOGLE_LINKED");
+    if (!restricted) throw new Error("registre sans avis GOOGLE_LINKED");
+
+    it("GET_restrictedEntryNotDueToAccount_omitted", async () => {
+      jest.mocked(loadPendingPrivacyChanges).mockResolvedValue([]);
+
+      const res = await GET(getReq(`ids=${first.id},${restricted.id}`));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ details: { [first.id]: first.details } });
+      expect(loadPendingPrivacyChanges).toHaveBeenCalledWith(user.id);
+    });
+
+    it("GET_restrictedEntryDueToAccount_served", async () => {
+      jest.mocked(loadPendingPrivacyChanges).mockResolvedValue([restricted]);
+
+      const res = await GET(getReq(`ids=${restricted.id}`));
+
+      expect(await res.json()).toEqual({ details: { [restricted.id]: restricted.details } });
+    });
+
+    it("GET_restrictedOnlyNotDue_returnsEmptyDetails", async () => {
+      jest.mocked(loadPendingPrivacyChanges).mockResolvedValue([first]);
+
+      const res = await GET(getReq(`ids=${restricted.id}`));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ details: {} });
+    });
+
+    it("GET_liveStaffEntry_isPolicyVersion_servedWithoutAccountRead", async () => {
+      const liveStaff = PRIVACY_CHANGES.find((change) => change.audience === "LIVE_STAFF");
+      if (!liveStaff) throw new Error("registre sans avis LIVE_STAFF");
+
+      const res = await GET(getReq(`ids=${liveStaff.id}`));
+
+      const body = (await res.json()) as { details: Record<string, unknown> };
+      expect(Object.keys(body.details)).toEqual([liveStaff.id]);
+      expect(loadPendingPrivacyChanges).not.toHaveBeenCalled();
+    });
   });
 });

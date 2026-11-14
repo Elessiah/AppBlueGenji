@@ -7,7 +7,7 @@ import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from
 import { privacyChangePush } from "@/lib/shared/push-messages";
 import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { isDuplicateEntryError, isMissingTableError } from "@/lib/server/mysql-errors";
 import { LIVE_STAFF_SQL, privacyAudienceSql } from "@/lib/server/privacy-consent";
 import { webPushConfig } from "@/lib/server/web-push";
 import {
@@ -76,6 +76,19 @@ export const SWEEP_IDLE_THROTTLE_MS = 600_000;
 
 let lastSweepAt = 0;
 let lastSweepFoundNobody = false;
+/**
+ * Les changements passés le délai de la modale lors du balayage sans personne :
+ * un changement qui le passe depuis lève l'attente longue, dans **chaque**
+ * processus — l'état est propre à chacun, et seul le gagnant du verrou le tient.
+ */
+let lastIdleSettledKey = "";
+
+/** Identité de l'ensemble des changements annonçables passés le délai. */
+function settledKey(now: Date): string {
+  return settledPrivacyChanges(now, announceablePrivacyChanges(now))
+    .map((change) => change.id)
+    .join("|");
+}
 let pendingSweep: Promise<number> | null = null;
 
 type CandidateRow = RowDataPacket & {
@@ -185,17 +198,24 @@ async function loadDone(db: Queryable, userIds: number[]): Promise<Map<number, s
 }
 
 /**
- * Réserve les changements d'un compte **en une instruction** ; rend `null` si
- * une partie était déjà prise (le nombre de lignes écrites ne dit pas lesquelles
- * sont les nôtres : on ne rend rien, le balayage suivant relit l'état).
+ * Réserve les changements d'un compte **en une instruction**, tout ou rien :
+ * un `INSERT` simple de plusieurs lignes que la base annule en entier si l'une
+ * est déjà prise (`ER_DUP_ENTRY`, annulation de l'instruction sous InnoDB).
+ * Rend `null` dans ce cas — aucune ligne n'est restée : un `INSERT IGNORE`
+ * partiel laissait les autres tenues pour annoncées sans jamais être envoyées.
  */
 async function reserve(db: Queryable, userId: number, changes: PrivacyChange[]): Promise<PrivacyChange[] | null> {
-  const [result] = await db.query<ResultSetHeader>(
-    `INSERT IGNORE INTO bg_privacy_change_notifications (user_id, change_id)
-     VALUES ${changes.map(() => "(?, ?)").join(", ")}`,
-    changes.flatMap((change) => [userId, change.id]),
-  );
-  return result.affectedRows === changes.length ? changes : null;
+  try {
+    await db.query<ResultSetHeader>(
+      `INSERT INTO bg_privacy_change_notifications (user_id, change_id)
+       VALUES ${changes.map(() => "(?, ?)").join(", ")}`,
+      changes.flatMap((change) => [userId, change.id]),
+    );
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return null;
+    throw error;
+  }
+  return changes;
 }
 
 async function release(userIds: number[], changeIds: string[]): Promise<void> {
@@ -257,6 +277,7 @@ async function reserveUnderLock(
     changes.some((change) => change.audience === "LIVE_STAFF"),
   );
   lastSweepFoundNobody = candidates.length === 0;
+  lastIdleSettledKey = settledKey(now);
   if (candidates.length === 0) return groups;
   const done = await loadDone(db, candidates.map((row) => Number(row.id)));
 
@@ -292,6 +313,8 @@ async function reserveUnderLock(
       batch = privacyChangesForOneMessage(due, siteUrl, localizedPrivacyChanges(due, "en"));
       batchByDue.set(dueKey, batch);
     }
+    // Rien de nommable (garde-fou, le registre le vérifie) : rien n'est réservé.
+    if (batch.length === 0) continue;
     // Une partie du lot déjà réservée depuis la relecture (`loadDone`) — plus
     // possible entre balayages, sérialisés par le verrou nommé ; garde-fou
     // seulement : ce compte est écarté, sans message, plutôt qu'un en-tête ou un
@@ -367,7 +390,8 @@ export async function dispatchPrivacyChangeNotifications(now: Date = new Date())
   // un envoi impossible, l'annonce serait perdue. Rien ne part, rien n'est lu.
   if (outboundMuted()) return 0;
   if (pendingSweep) return pendingSweep;
-  if (Date.now() - lastSweepAt < (lastSweepFoundNobody ? SWEEP_IDLE_THROTTLE_MS : SWEEP_THROTTLE_MS)) return 0;
+  const idle = lastSweepFoundNobody && settledKey(now) === lastIdleSettledKey;
+  if (Date.now() - lastSweepAt < (idle ? SWEEP_IDLE_THROTTLE_MS : SWEEP_THROTTLE_MS)) return 0;
 
   pendingSweep = runSweep(now);
   try {
@@ -382,5 +406,6 @@ export async function dispatchPrivacyChangeNotifications(now: Date = new Date())
 export function resetPrivacyNotificationThrottle(): void {
   lastSweepAt = 0;
   lastSweepFoundNobody = false;
+  lastIdleSettledKey = "";
   pendingSweep = null;
 }

@@ -128,6 +128,20 @@ describe("CertificationPromptDialog", () => {
     expect(en).toContain("verified or not");
   });
 
+  // Revue sécurité cycle 1 : « les autres joueurs n'y voient qu'une pastille »
+  // taisait la case « Tag Discord », qui leur ouvre le tag certifié.
+  it("render_overwatchBattletagUnfixable_keepsTheDiscordTagVisibilityException", () => {
+    const prompt: CertificationPrompt = { ...MR_TEAM, battletagUnfixable: true };
+
+    const fr = render(prompt);
+    const en = render(prompt, "en");
+
+    expect(fr).not.toContain("n&#x27;y voient qu&#x27;une pastille");
+    expect(fr).toContain("et ton tag seulement si tu as coché « Tag Discord » dans tes réglages");
+    expect(en).not.toContain("only see a badge");
+    expect(en).toContain("and your tag only if you ticked “Discord tag” in your settings");
+  });
+
   it("Marvel Rivals : Discord seul, sans BattleTag ni Blizzard", () => {
     const html = render(MR_TEAM);
     expect(html).toContain("Certifie ton Discord<");

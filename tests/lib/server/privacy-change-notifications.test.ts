@@ -24,6 +24,7 @@ import {
   PRIVACY_DM_WINDOW_DAYS,
   privacyChangeDay,
   privacyChangesForOneMessage,
+  settledPrivacyChanges,
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { fakeConnection, fakePool } from "../../helpers/sql-double";
@@ -75,6 +76,8 @@ function fakeDb(
     taken?: string[];
     /** Verrou du balayage tenu par un autre processus (`GET_LOCK` rend 0). */
     lockHeldElsewhere?: boolean;
+    /** Code d'erreur autre qu'un doublon rendu par la réservation. */
+    reserveError?: string;
   } = {},
 ) {
   const calls: { sql: string; params: unknown[]; viaPool?: boolean }[] = [];
@@ -85,13 +88,16 @@ function fakeDb(
     if (q.startsWith("SELECT RELEASE_LOCK")) return [[{ released: 1 }]];
     if (q.startsWith("SELECT u.id, u.pseudo")) return [options.candidates ?? []];
     if (q.startsWith("SELECT user_id, change_id")) return [options.done ?? []];
-    if (q.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications")) {
-      // Une instruction, plusieurs lignes : `(user, changement)` à la suite.
-      let written = 0;
+    if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) {
+      // Une instruction, plusieurs lignes : `(user, changement)` à la suite —
+      // tout ou rien, comme InnoDB annule l'instruction sur un doublon.
+      if (options.reserveError) throw Object.assign(new Error("reserve failed"), { code: options.reserveError });
       for (let i = 0; i < params.length; i += 2) {
-        if (!options.taken?.includes(`${params[i]}:${params[i + 1]}`)) written += 1;
+        if (options.taken?.includes(`${params[i]}:${params[i + 1]}`)) {
+          throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+        }
       }
-      return [{ affectedRows: written }];
+      return [{ affectedRows: params.length / 2 }];
     }
     return [{ affectedRows: 1 }];
   };
@@ -150,7 +156,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     // Réservé **avant** l'envoi, une ligne par changement nommé — et rien de ce
     // que le message n'a pas pu nommer.
-    const reservations = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
+    const reservations = calls.filter((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
     expect(reservations).toHaveLength(1);
     expect(reservations[0].params.filter((_, index) => index % 2 === 1)).toEqual(batch.map((c) => c.id));
   });
@@ -340,8 +346,26 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     expect(sent).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
-    // Le nombre de lignes écrites ne dit pas lesquelles sont les nôtres : rien n'est effacé.
+    // Tout ou rien : le doublon annule l'instruction, il n'y a rien à effacer.
     expect(calls.some((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))).toBe(false);
+  });
+
+  // Sécurité cycle 1 : un `INSERT IGNORE` partiel laissait les autres lignes du
+  // lot tenues pour annoncées sans jamais être envoyées.
+  it("dispatchPrivacyChangeNotifications_reservation_plainInsertNeverIgnore", async () => {
+    const calls = fakeDb({ candidates: [candidate()] });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(calls.some((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"))).toBe(false);
+    expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(true);
+  });
+
+  it("dispatchPrivacyChangeNotifications_reservationFailsOtherwise_errorNotSwallowed", async () => {
+    fakeDb({ candidates: [candidate()], reserveError: "ER_LOCK_WAIT_TIMEOUT" });
+
+    await expect(dispatchPrivacyChangeNotifications(NOW)).rejects.toMatchObject({ code: "ER_LOCK_WAIT_TIMEOUT" });
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
   // Performance cycle 1 : une instruction par compte, pas un aller-retour par changement.
@@ -350,7 +374,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     await dispatchPrivacyChangeNotifications(NOW);
 
-    const inserts = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
+    const inserts = calls.filter((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
     expect(inserts).toHaveLength(2);
     const batch = privacyChangesForOneMessage(DUE, siteBaseUrl());
     expect(inserts[0].params).toEqual(batch.flatMap((change) => [1, change.id]));
@@ -391,6 +415,34 @@ describe("dispatchPrivacyChangeNotifications", () => {
     }
   });
 
+  // Revue sécurité cycle 1 : l'attente longue ne retarde pas un changement qui
+  // vient de passer le délai de la modale, quel que soit le processus.
+  it("dispatchPrivacyChangeNotifications_nobodyThenChangeNewlySettled_sweepsAtNormalPace", async () => {
+    const now = jest.spyOn(Date, "now");
+    try {
+      const settledIds = (instant: Date) =>
+        settledPrivacyChanges(instant, announceablePrivacyChanges(instant)).map((change) => change.id);
+      // La veille du jour où la dernière entrée passe le délai de la modale.
+      const before = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS - 1);
+      const after = NOW;
+      expect(settledIds(after)).not.toEqual(settledIds(before));
+
+      now.mockReturnValue(1_000_000);
+      const calls = fakeDb({ candidates: [] });
+      await dispatchPrivacyChangeNotifications(before);
+      const count = calls.length;
+
+      now.mockReturnValue(1_000_000 + SWEEP_THROTTLE_PLUS);
+      await dispatchPrivacyChangeNotifications(before);
+      expect(calls).toHaveLength(count);
+
+      await dispatchPrivacyChangeNotifications(after);
+      expect(calls.length).toBeGreaterThan(count);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it("dispatchPrivacyChangeNotifications_partialTakeForOneAccount_otherAccountStillServed", async () => {
     const first = privacyChangesForOneMessage(DUE, siteBaseUrl())[0];
     fakeDb({
@@ -410,7 +462,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     await dispatchPrivacyChangeNotifications(NOW);
 
     const lock = calls.findIndex((c) => c.sql.startsWith("SELECT GET_LOCK"));
-    const reserve = calls.findIndex((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
+    const reserve = calls.findIndex((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"));
     const unlock = calls.findIndex((c) => c.sql.startsWith("SELECT RELEASE_LOCK"));
     expect(calls[lock].params).toEqual([PRIVACY_SWEEP_LOCK_NAME, 0]);
     expect(lock).toBeLessThan(reserve);
@@ -427,7 +479,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
 
     expect(calls.some((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))).toBe(false);
-    expect(calls.some((c) => c.sql.startsWith("INSERT IGNORE"))).toBe(false);
+    expect(calls.some((c) => c.sql.startsWith("INSERT INTO bg_privacy_change_notifications"))).toBe(false);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
@@ -528,7 +580,7 @@ describe("dispatchPrivacyChangeNotifications — notifications push", () => {
     jest.mocked(webPushConfig).mockReturnValue(CONFIG);
     const handler = async (sql: string, params: unknown[] = []) => {
       const q = flat(sql);
-      if (q.startsWith("INSERT IGNORE")) return [{ affectedRows: params.length / 2 }];
+      if (q.startsWith("INSERT INTO bg_privacy_change_notifications")) return [{ affectedRows: params.length / 2 }];
       if (q.startsWith("SELECT u.id, u.pseudo")) {
         if (q.includes("bg_push_subscriptions")) throw Object.assign(new Error("absente"), { code: "ER_NO_SUCH_TABLE" });
         return [[candidate()]];

@@ -164,8 +164,9 @@ cette modale.
   seul cas perdu, laisse le choix non gardé, que la modale redemandera ; le
   guet est **borné** à `REFUSAL_NOTICE_MAX_WAIT_MS` (2 min,
   `noticeOnceModalsClosed`) — porté à `PROFILE_CERTIFICATION_NOTICE_MAX_WAIT_MS`
-  (10 min) seulement si le dialogue de certification de `/profil` a été ouvert
-  depuis le refus (il le signale lui-même, `markProfileCertificationDialogOpen`
+  (10 min) seulement si le dialogue de certification de `/profil` est encore
+  ouvert (souvent par le même « Certifier », monté avant la réponse du refus)
+  ou l'a été depuis le refus (il le signale lui-même, `markProfileCertificationDialogOpen`
   dans `lib/shared/profile-certification-dialog.ts` — ouvert même juste après
   les 2 min), de quoi finir la certification — puis se tait, et un nouveau refus remplace le
   précédent : jamais de toast sans contexte des minutes plus tard) —, un corps sans

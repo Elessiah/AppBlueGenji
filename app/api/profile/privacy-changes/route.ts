@@ -9,17 +9,19 @@
  * accord.
  *
  * `GET` rend le **détail** des entrées que la modale présente (#587 : la mise en
- * page n'en envoie plus que titre et résumé). Des entrées publiées seulement —
- * le texte même de l'historique de `/rgpd` — si bien qu'aucune donnée de compte
- * n'est lue : la session ne sert qu'à réserver la route aux comptes connectés,
- * seuls à voir la modale.
+ * page n'en envoie plus que titre et résumé). Une version de la politique — le
+ * texte même de l'historique de `/rgpd` — se rend sans lire le compte ; un avis
+ * réservé à un public et absent de `/rgpd` (`GOOGLE_LINKED`) ne se rend qu'au
+ * compte qui l'a à lire (`loadPendingPrivacyChanges`), sinon il est omis.
  */
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { acknowledgePrivacyChanges } from "@/lib/server/privacy-consent";
+import { acknowledgePrivacyChanges, loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import {
   checkPrivacyAcknowledgement,
   INVALID_PRIVACY_CHANGES,
+  isPrivacyPolicyVersion,
+  PRIVACY_CHANGES,
   privacyChangeDay,
 } from "@/lib/shared/privacy-changes";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -37,11 +39,28 @@ export async function GET(req: Request) {
   const check = checkPrivacyAcknowledgement(ids, privacyChangeDay(new Date()));
   if (!check.ok) return fail(check.error, 400);
 
-  const response = ok({ details: privacyChangeDetailsFor(check.ids, params.get("locale") === "en" ? "en" : "fr") });
+  const servable = await servableDetailIds(user.id, check.ids);
+  const response = ok({ details: privacyChangeDetailsFor(servable, params.get("locale") === "en" ? "en" : "fr") });
   // Texte publié, identique pour tous : le navigateur le garde (rechargements
   // de la page modale ouverte) sans le redemander ni relire la session.
   response.headers.set("Cache-Control", PRIVACY_DETAILS_CACHE_CONTROL);
   return response;
+}
+
+/**
+ * Les identifiants dont le détail peut se rendre à ce compte : toute version de
+ * la politique (publique sur `/rgpd`), et un avis hors politique seulement s'il
+ * est dû à ce compte — la base n'est lue que si l'un d'eux est demandé.
+ */
+async function servableDetailIds(userId: number, ids: readonly string[]): Promise<string[]> {
+  const byId = new Map(PRIVACY_CHANGES.map((change) => [change.id, change]));
+  const restricted = ids.filter((id) => {
+    const change = byId.get(id);
+    return change !== undefined && !isPrivacyPolicyVersion(change);
+  });
+  if (restricted.length === 0) return [...ids];
+  const pending = new Set((await loadPendingPrivacyChanges(userId)).map((change) => change.id));
+  return ids.filter((id) => !restricted.includes(id) || pending.has(id));
 }
 
 export async function POST(req: Request) {

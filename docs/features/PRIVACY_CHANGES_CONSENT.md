@@ -236,14 +236,20 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   écrire. Envoi « au plus une fois » : une réservation laissée par un processus
   tué avant l'envoi compte pour annoncée (la modale, elle, l'a présentée).
   Le verrou ne couvre que la lecture des candidats et les **réservations** (une
-  instruction `INSERT IGNORE` par compte, sur la connexion qui tient le
+  instruction `INSERT` tout-ou-rien par compte, sur la connexion qui tient le
   verrou) ; les envois au bot, lents, partent **après** sa libération. Un
   balayage qui ne trouve personne à prévenir espace le suivant de dix minutes
-  (`SWEEP_IDLE_THROTTLE_MS`) : la lecture parcourt tous les comptes joignables.
-  Un lot en partie déjà réservé écarte le compte sans rien effacer (les lignes
-  écrites ne disent pas lesquelles sont les nôtres).
+  (`SWEEP_IDLE_THROTTLE_MS`) : la lecture parcourt tous les comptes joignables ;
+  un changement qui passe depuis le délai de la modale lève cette attente
+  dans chaque processus (`lastIdleSettledKey`).
+  Un lot en partie déjà réservé écarte le compte : le doublon (`ER_DUP_ENTRY`)
+  annule toute l'instruction, aucune ligne n'en reste (un `INSERT IGNORE`
+  partiel aurait tenu le reste pour annoncé sans l'envoyer).
   `GET /api/profile/privacy-changes` répond `Cache-Control: private,
-  max-age=300` (texte publié, identique pour tous) ; la modale abandonne une
+  max-age=300` (texte publié, identique pour tous) ; un avis hors politique
+  (`GOOGLE_LINKED`, absent de `/rgpd`) n'y est rendu qu'au compte qui l'a à
+  lire (`loadPendingPrivacyChanges`, lu seulement si un tel avis est demandé),
+  omis sinon ; la modale abandonne une
   lecture de détail dépassée (`AbortSignal`) ; le guet du refus de « Ne plus voir »
   cesse d'observer le document à deux minutes sans dialogue de `/profil`.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les

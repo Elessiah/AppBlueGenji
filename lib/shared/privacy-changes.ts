@@ -2350,8 +2350,10 @@ function layoutPrivacyChangesLines(
  * par mois, et les plus récentes sortaient de la fenêtre d'annonce sans jamais
  * partir).
  *
- * Toujours au moins un changement quand il y en a : une entrée seule tient dans
- * un message (le registre le vérifie).
+ * Au moins un changement quand il y en a : une entrée seule tient dans un
+ * message, même suivie de la ligne « … et N autre(s) » (le registre le
+ * vérifie) ; sinon le lot est vide, plutôt qu'un changement réservé sans être
+ * nommé.
  *
  * Des conditions d'utilisation à accepter (`asksTermsAcceptance`) sont toujours
  * du lot : son pied dit qu'elles demandent l'accord — jamais un « aucun
@@ -2373,7 +2375,7 @@ export function privacyChangesForOneMessage(
   // deux langues** : chaque compte le reçoit dans la sienne (BOT-NOTIF-LANG).
   // Un seul choix, tiré des entrées françaises, appliqué aux deux langues.
   const priority = termsFirst(changes.map((change, index) => ({ change, index })));
-  for (let count = priority.length; count > 1; count -= 1) {
+  for (let count = priority.length; count >= 1; count -= 1) {
     const kept = new Set(priority.slice(0, count).map(({ index }) => index));
     const pick = (list: readonly PrivacyChange[]) => list.filter((_, index) => kept.has(index));
     const later = changes.length - count;
@@ -2382,7 +2384,9 @@ export function privacyChangesForOneMessage(
       return pick(changes);
     }
   }
-  return priority.slice(0, 1).map(({ change }) => change);
+  // Pas même un changement nommé, « … et N autre(s) » compris : rien n'est
+  // réservé — mieux vaut attendre qu'annoncer sans nommer.
+  return [];
 }
 
 /** L'ordre de **choix** du lot : les conditions à accepter d'abord, le reste dans son ordre (tri stable). */

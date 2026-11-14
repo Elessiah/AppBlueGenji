@@ -84,7 +84,7 @@ export function privacyDetailsReadCovers(readKey: string | null, requestKey: str
  */
 export function createPrivacyDetailsReads() {
   let sequence = 0;
-  let latest: { seq: number; key: string; controller: AbortController } | null = null;
+  let latest: { seq: number; key: string; controller: AbortController; failed: boolean } | null = null;
   return {
     /**
      * Numéro de la lecture à lancer, `null` si la dernière couvre déjà
@@ -95,7 +95,7 @@ export function createPrivacyDetailsReads() {
       if (privacyDetailsReadCovers(latest?.key ?? null, requestKey)) return null;
       latest?.controller.abort();
       sequence += 1;
-      latest = { seq: sequence, key: requestKey, controller: new AbortController() };
+      latest = { seq: sequence, key: requestKey, controller: new AbortController(), failed: false };
       return sequence;
     },
     /** Signal d'abandon de la lecture `seq` (levé par la lecture suivante). */
@@ -111,6 +111,17 @@ export function createPrivacyDetailsReads() {
      */
     forget(seq: number): void {
       if (latest?.seq === seq) latest = null;
+    },
+    /** La lecture `seq`, la dernière, a échoué modale ouverte (échec dit). */
+    markFailed(seq: number): void {
+      if (latest?.seq === seq) latest.failed = true;
+    },
+    /**
+     * Oublie la dernière lecture si elle a échoué : la modale masquée puis
+     * rouverte relit le détail au lieu de rester sur l'échec.
+     */
+    dropFailed(): void {
+      if (latest?.failed) latest = null;
     },
   };
 }
@@ -157,6 +168,7 @@ export function runPrivacyDetailsRead(
         reads.forget(seq);
         return;
       }
+      reads.markFailed(seq);
       hooks.onFailed();
     },
   );
@@ -245,6 +257,8 @@ export function PrivacyChangesModal({
     openRef.current = open;
   }, [open]);
   useEffect(() => {
+    // Masquée après un échec : la réouverture relira le détail.
+    if (!open) detailsReads.current.dropFailed();
     if (!open || !detailsDeferred) return;
     runPrivacyDetailsRead(detailsReads.current, requestKey, {
       load: (ids, signal) => loadPrivacyChangeDetails(ids.join(","), locale, signal),
@@ -417,19 +431,27 @@ const PRIVACY_DETAILS_TIMEOUT_MS = 15_000;
 export type PrivacyChangeDetails = Record<string, readonly string[]>;
 
 /** Lit le détail des entrées `idsKey` (identifiants joints par des virgules), dans la langue de la page. */
-async function loadPrivacyChangeDetails(
+export async function loadPrivacyChangeDetails(
   idsKey: string,
   locale: Locale,
   abort?: AbortSignal,
 ): Promise<PrivacyChangeDetails> {
   const query = new URLSearchParams({ ids: idsKey, locale });
   // Borné : une lecture qui ne répond pas libère le bouton (échec, notifié).
-  const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`, {
-    signal: abort
-      ? AbortSignal.any([abort, AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS)])
-      : AbortSignal.timeout(PRIVACY_DETAILS_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const body = (await response.json()) as { details?: PrivacyChangeDetails };
-  return body.details ?? {};
+  // `AbortController` + minuterie, pas `AbortSignal.any`/`.timeout` (absents
+  // de Safari avant 17.4 / 16) : là, chaque lecture échouait d'emblée.
+  const controller = new AbortController();
+  const stop = () => controller.abort();
+  const timer = setTimeout(stop, PRIVACY_DETAILS_TIMEOUT_MS);
+  if (abort?.aborted) stop();
+  else abort?.addEventListener("abort", stop, { once: true });
+  try {
+    const response = await fetch(`/api/profile/privacy-changes?${query.toString()}`, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = (await response.json()) as { details?: PrivacyChangeDetails };
+    return body.details ?? {};
+  } finally {
+    clearTimeout(timer);
+    abort?.removeEventListener("abort", stop);
+  }
 }

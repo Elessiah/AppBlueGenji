@@ -58,7 +58,9 @@ export const REFUSAL_NOTICE_MAX_WAIT_MS = 120_000;
 
 /**
  * Sauf quand le dialogue de certification de `/profil`, ouvert par
- * « Certifier » (code reçu par message privé, saisi), l'a été depuis le refus :
+ * « Certifier » (code reçu par message privé, saisi), l'a été depuis le refus
+ * ou l'est encore (ouvert par le même geste, avant que la réponse du refus
+ * n'arrive) :
  * le guet y attend jusqu'à dix minutes, et le refus se dit à sa fermeture,
  * encore dans son contexte.
  */
@@ -71,8 +73,9 @@ let pendingRefusalNotice: (() => void) | null = null;
  * Appelle `notice` une fois plus aucune modale ouverte (`watchModalsClosed`),
  * si c'est au plus `maxWaitMs` après le refus (`REFUSAL_NOTICE_MAX_WAIT_MS`) —
  * ou au plus `extendedMaxWaitMs` si `extendWhile(refus)` est vrai à ce moment
- * (le dialogue de certification de `/profil` ouvert depuis le refus, même
- * juste après les deux minutes : `profileCertificationDialogOpenedSince`).
+ * (le dialogue de certification de `/profil` encore ouvert, ou ouvert depuis
+ * le refus, même juste après les deux minutes :
+ * `profileCertificationDialogOpenedSince`).
  * Sinon le guet s'arrête sans rien dire, au plus tard à `extendedMaxWaitMs`.
  * Passées les `maxWaitMs` sans dialogue ouvert, l'observation du document
  * cesse : seule l'ouverture du dialogue (signal, sans coût) la rétablit.
@@ -88,6 +91,15 @@ export function noticeOnceModalsClosed(
 ): () => void {
   pendingRefusalNotice?.();
   const refusedAt = Date.now();
+  // Le dialogue de `/profil` vu ouvert depuis le refus — y compris ouvert
+  // **avant** lui (même « Certifier ») : à sa fermeture, il ne l'est plus, et
+  // `extendWhile` seul tairait alors le refus qu'il devait laisser dire.
+  let sawDialog = false;
+  const extended = () => {
+    sawDialog ||= extendWhile(refusedAt);
+    return sawDialog;
+  };
+  extended();
   let stopWatch: (() => void) | null = null;
   let stopSignal: (() => void) | null = null;
   let done = false;
@@ -105,8 +117,8 @@ export function noticeOnceModalsClosed(
       if (done) return;
       stop();
       // Passé les deux minutes, seul le dialogue de certification de `/profil`
-      // (ouvert depuis le refus) garde au refus son contexte.
-      if (Date.now() - refusedAt < maxWaitMs || extendWhile(refusedAt)) notice();
+      // (encore ouvert, ou ouvert depuis le refus) garde au refus son contexte.
+      if (Date.now() - refusedAt < maxWaitMs || extended()) notice();
     });
     // Appelé sur-le-champ (aucune modale ouverte) : le guet est déjà clos.
     if (done) stopWatch();
@@ -117,7 +129,7 @@ export function noticeOnceModalsClosed(
   // le document (il ne servirait à rien tant qu'une modale reste ouverte) ;
   // l'ouverture du dialogue le rétablit.
   const softTimer = setTimeout(() => {
-    if (done || extendWhile(refusedAt)) return;
+    if (done || extended()) return;
     stopWatch?.();
     stopWatch = null;
     stopSignal = onProfileCertificationDialogOpened(() => {
