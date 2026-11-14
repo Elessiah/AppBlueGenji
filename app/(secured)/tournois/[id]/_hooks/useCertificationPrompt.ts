@@ -9,7 +9,7 @@ import {
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
 import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
-import { anotherModalOpen, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
+import { anotherModalOpen, watchModalsClosed, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
 function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
@@ -72,7 +72,8 @@ export async function saveNeverAgain(shownTo: number | null, onOtherAccount: () 
  * jour). Une fiche figée la masque aussi.
  *
  * `onOtherAccount` : « Ne plus voir » refusé parce qu'un autre compte est
- * connecté depuis dans ce navigateur — l'appelant le notifie.
+ * connecté depuis dans ce navigateur — l'appelant le notifie, appelé une fois
+ * plus aucune modale ouverte.
  */
 export function useCertificationPrompt(
   tournamentId: number,
@@ -87,7 +88,15 @@ export function useCertificationPrompt(
   useEffect(() => {
     onOtherAccountRef.current = onOtherAccount;
   }, [onOtherAccount]);
-  const refused = useCallback(() => onOtherAccountRef.current(), []);
+  // Le refus se dit **une fois plus aucune modale ouverte** (revue #521) : la
+  // réponse arrive souvent quand une urgente est passée par-dessus (`yieldPlace`)
+  // ou, après « Certifier », sur `/profil` où le dialogue de certification
+  // s'ouvre — le toast partirait derrière. Le guet porte sur le document, pas
+  // sur la fiche : il survit à la navigation client vers le profil, où la
+  // notification (mise en page racine) reste montée.
+  const refused = useCallback(() => {
+    watchModalsClosed(() => onOtherAccountRef.current());
+  }, []);
   const [open, setOpen] = useState(false);
   // Case « Ne plus voir » : son seul état, tenu ici pour valoir aussi quand la
   // modale s'efface devant une urgente. La modale l'affiche (case, libellé

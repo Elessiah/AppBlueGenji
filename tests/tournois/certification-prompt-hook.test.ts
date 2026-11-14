@@ -69,6 +69,7 @@ jest.mock("react", () => ({
 const modals = {
   open: false,
   yieldWatchers: [] as (() => void)[],
+  closedWatchers: [] as (() => void)[],
   stopped: 0,
 };
 jest.mock("@/lib/shared/dialog-focus", () => ({
@@ -78,6 +79,12 @@ jest.mock("@/lib/shared/dialog-focus", () => ({
     return () => {
       modals.stopped += 1;
     };
+  },
+  // Comme le vrai guet : tout de suite si aucune modale n'est ouverte.
+  watchModalsClosed: (onClosed: () => void) => {
+    if (!modals.open) onClosed();
+    else modals.closedWatchers.push(onClosed);
+    return () => undefined;
   },
 }));
 
@@ -168,6 +175,7 @@ beforeEach(() => {
   bench.effects = [];
   modals.open = false;
   modals.yieldWatchers = [];
+  modals.closedWatchers = [];
   modals.stopped = 0;
   local = memoryStorage();
   session = memoryStorage();
@@ -359,6 +367,23 @@ describe("useCertificationPrompt", () => {
     const checked = act(() => first.setNeverAgain(true), PROMPT);
     act(() => checked.close(), PROMPT);
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onOtherAccount).toHaveBeenCalledTimes(1);
+  });
+
+  // Revue #521 : le refus ne part pas derrière une modale urgente (ou le dialogue
+  // de certification de /profil) : il attend qu'elle se ferme.
+  it("useCertificationPrompt_refusedWhileUrgentModalOpen_reportsOnceItCloses", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: CERTIFY_PROMPT_OTHER_ACCOUNT }), { status: 409 }));
+    const first = render(PROMPT);
+    act(() => first.setNeverAgain(true), PROMPT);
+    modals.open = true;
+    act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onOtherAccount).not.toHaveBeenCalled();
+
+    modals.open = false;
+    modals.closedWatchers.forEach((watcher) => watcher());
+
     expect(onOtherAccount).toHaveBeenCalledTimes(1);
   });
 

@@ -155,7 +155,12 @@ cette modale.
   compte à qui la modale a été montrée (`{ userId }`, retenu à l'ouverture) :
   une session changée depuis (autre compte connecté dans un autre onglet)
   répond 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire — ce refus-là est
-  notifié (`showError`, `tournamentErrors.codes`, FR et EN) —, un corps sans
+  notifié (`showError`, `tournamentErrors.codes`, FR et EN), une fois plus
+  aucune modale ouverte (`watchModalsClosed` : ni derrière l'urgente devant
+  laquelle l'invitation s'est effacée, ni derrière le dialogue de
+  certification de `/profil` après « Certifier » — le guet porte sur le
+  document et survit à la navigation client ; un départ en chargement complet,
+  seul cas perdu, laisse le choix non gardé, que la modale redemandera) —, un corps sans
   compte lisible 400 `INVALID_ACTION`. Plafonné par compte
   (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée
   en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`) au
