@@ -167,7 +167,7 @@ describe("CertificationPromptDialog", () => {
     expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et aux casters le temps du match");
     expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste lié");
     expect(render(OW_MANAGER)).toContain("Ne masque pas non plus ton BattleTag dans tes matchs : certifié ou non, présenté comme contact, il est montré même masqué");
-    expect(render(OW_MANAGER)).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
+    expect(render(OW_MANAGER)).toContain("aux arbitres et aux administrateurs du site dès que les deux adversaires sont connus et jusqu&#x27;à sa fin (à ses casters le temps du match)");
     const en = render(MR_TEAM, "en");
     expect(en).toContain("the bot sends you your match times and reminders by direct message");
     expect(en).not.toContain("If your profile holds a BattleTag");

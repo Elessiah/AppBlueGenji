@@ -1885,26 +1885,26 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
     // aucune promesse qu'il lève la marque dès qu'il arrive.
     expect(fr).not.toContain("dès qu'il parvient au site");
     expect(en).not.toContain("once it reaches the site");
-    expect(entry.summary).toContain("pour une autre raison qu'un tag qui ne peut plus être certifié");
-    expect(english.summary).toContain("for a reason other than a tag that can no longer be verified");
+    expect(entry.summary).toContain("Seule exception : la certification refusée parce que ton tag ne peut plus être certifié");
+    expect(english.summary).toContain("The only exception: a verification refused because your tag can no longer be verified");
     expect(entry.summary).toContain("pas seulement au chargement suivant");
   });
 
   // Revue juridique EF-63 : la marque est propre à chaque session ; le « Plus tard »
-  // automatique ne la lève que s'il est reçu ; deux précisions d'audience déjà vraies.
+  // automatique ne la lève que s'il est reçu sans refus ; deux précisions d'audience déjà vraies.
   it("privacyChanges_sessionMarkRectification_otherSessionsKeepTheirMarkAndAudienceClarifications", () => {
     expect(entry.details[0]).toContain("chacune de tes sessions a sa propre marque, que gardent tes autres appareils");
     expect(english.details[0]).toContain("each of your sessions has its own mark, which your other devices keep");
     expect(entry.details[0]).not.toContain("connecté depuis, elle ne revient sur ton compte");
-    expect(entry.summary).toContain("qui ne lève la marque que s'il est reçu");
-    expect(english.summary).toContain("which only clears the mark if it is received");
+    expect(entry.summary).toContain("qui ne lève la marque que si le site le reçoit sans le refuser");
+    expect(english.summary).toContain("which only clears the mark if the site receives it and does not refuse it");
     expect(entry.details).toHaveLength(4);
     expect(english.details).toHaveLength(4);
     expect(entry.details[1]).toContain("un caster qui est aussi arbitre du site lit les contacts des équipes de son match");
     expect(english.details[1]).toContain("a caster who is also a referee of the site reads the contacts of the teams of their match");
-    expect(entry.details[2]).toContain("s'affiche aussi à ses parties sur la page du match");
+    expect(entry.details[2]).toContain("s'affiche aussi à ses parties et aux arbitres du site sur la page du match");
     expect(entry.details[2]).toContain("l'état du lancement, public, peut en outre laisser deviner s'il est prêt");
-    expect(english.details[2]).toContain("also shown to the match's parties on the match page");
+    expect(english.details[2]).toContain("also shown to the match's parties and the site's referees on the match page");
     expect(entry.details[3]).toMatch(/^Rien d'autre ne change/);
   });
 

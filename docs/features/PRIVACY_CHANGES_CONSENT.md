@@ -235,6 +235,9 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   partageaient les réservations d'un compte et rendaient chacun leur part sans
   écrire. Envoi « au plus une fois » : une réservation laissée par un processus
   tué avant l'envoi compte pour annoncée (la modale, elle, l'a présentée).
+  Seule reprise : un compte que le bot n'a pas pu joindre est rendu au
+  balayage suivant (`discordUnreachedUserIds`), et le push, déjà parti, repart
+  avec lui — « un doublon vaut mieux qu'un silence » ; le registre (T10) le dit.
   Le verrou ne couvre que la lecture des candidats et les **réservations** (une
   instruction `INSERT` tout-ou-rien par compte, sur la connexion qui tient le
   verrou) ; les envois au bot, lents, partent **après** sa libération. Un
