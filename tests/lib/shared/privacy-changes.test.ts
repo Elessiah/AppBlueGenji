@@ -1850,7 +1850,7 @@ describe("PRIVACY_CHANGES — marque de session, rectificatif (EF-63)", () => {
   it("privacyChanges_sessionMarkRectification_isStandaloneForEveryAccount", () => {
     expectStandaloneEntry(entry, english, {
       after: "2026-11-bot-avis-d-exclusion",
-      publishedAt: "2026-11-16",
+      publishedAt: "2026-11-15",
       audience: undefined,
       links: original.links,
     });

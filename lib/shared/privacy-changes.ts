@@ -2009,7 +2009,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // code. Pour tous les comptes ; datée du lendemain de la nuit de déploiement
     // (comme `REGISTER_UPDATED_AT`) — avancer ensemble si la mise en ligne glisse.
     id: "2026-11-marque-de-session-rectificatif",
-    publishedAt: "2026-11-16",
+    publishedAt: "2026-11-15",
     title: "Proposition de certification du tag Discord : quand la fenêtre revient (et deux autres précisions)",
     links: [DATA_COLLECTED_SECTION_LINK],
     summary:
