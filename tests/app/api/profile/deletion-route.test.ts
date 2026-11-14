@@ -29,6 +29,16 @@ const FINAL_AT = "2026-12-05T10:00:00.000Z";
 const modeMock = getAccountDeletionRequestPlan as jest.MockedFunction<typeof getAccountDeletionRequestPlan>;
 const deleteMock = requestAccountDeletion as jest.MockedFunction<typeof requestAccountDeletion>;
 
+/** Le DELETE de la modale : son corps porte le motif que la confirmation a annoncé. */
+function deleteRequest(body?: unknown): Request {
+  if (body === undefined) return new Request("http://localhost/api/profile", { method: "DELETE" });
+  return new Request("http://localhost/api/profile", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, roles: [] }));
@@ -66,7 +76,7 @@ describe("DELETE /api/profile", () => {
   it("rend le plan que l'écriture a réellement appliqué", async () => {
     deleteMock.mockResolvedValue({ mode: "ERASE", reason: null, finalAt: FINAL_AT });
 
-    const payload = await DELETE().then((r) => r.json());
+    const payload = await DELETE(deleteRequest()).then((r) => r.json());
 
     expect(payload).toMatchObject({ deleted: true, mode: "ERASE", reason: null });
   });
@@ -74,7 +84,7 @@ describe("DELETE /api/profile", () => {
   it("rend le motif quand la ligne est retenue", async () => {
     deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "ORGANIZED_TOURNAMENTS", finalAt: FINAL_AT });
 
-    const payload = await DELETE().then((r) => r.json());
+    const payload = await DELETE(deleteRequest()).then((r) => r.json());
 
     expect(payload).toMatchObject({ mode: "ANONYMIZE", reason: "ORGANIZED_TOURNAMENTS" });
   });
@@ -82,7 +92,7 @@ describe("DELETE /api/profile", () => {
   it("ferme la session dans les deux cas", async () => {
     deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS", finalAt: FINAL_AT });
 
-    await DELETE();
+    await DELETE(deleteRequest());
 
     expect(clearSession).toHaveBeenCalled();
     // `clearSession` expire déjà le cookie : pas de second Set-Cookie.
@@ -94,7 +104,7 @@ describe("DELETE /api/profile", () => {
     deleteMock.mockResolvedValue({ mode: "ERASE", reason: null, finalAt: FINAL_AT });
     jest.mocked(clearSession).mockRejectedValue(new Error("Connection lost: The server closed the connection."));
 
-    const res = await DELETE();
+    const res = await DELETE(deleteRequest());
 
     expect(res.status).toBe(200);
     const payload = await res.json();
@@ -110,7 +120,7 @@ describe("DELETE /api/profile", () => {
   it("refuse l'appel anonyme sans rien écrire", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
 
-    expect((await DELETE()).status).toBe(401);
+    expect((await DELETE(deleteRequest())).status).toBe(401);
     expect(deleteMock).not.toHaveBeenCalled();
   });
 });
@@ -119,7 +129,7 @@ describe("DELETE /api/profile — aucun message interne ne sort", () => {
   it.each(["ACCOUNT_STILL_REFERENCED", "LAST_ADMIN_ACCOUNT", "USER_NOT_FOUND"])("rend le refus nommé %s tel quel", async (code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42 }));
     jest.mocked(requestAccountDeletion).mockRejectedValue(new Error(code));
-    const res = await DELETE();
+    const res = await DELETE(deleteRequest());
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: code });
   });
@@ -130,10 +140,38 @@ describe("DELETE /api/profile — aucun message interne ne sort", () => {
     jest.mocked(requestAccountDeletion).mockRejectedValue(
       new Error("Deadlock found when trying to get lock; try restarting transaction"),
     );
-    const res = await DELETE();
+    const res = await DELETE(deleteRequest());
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "ACCOUNT_DELETE_FAILED" });
     expect(log).toHaveBeenCalled();
     log.mockRestore();
+  });
+});
+
+describe("DELETE /api/profile — motif confirmé par la modale (EF-62)", () => {
+  it("DELETE_planChanged_returns409Code", async () => {
+    deleteMock.mockRejectedValue(new Error("ACCOUNT_DELETION_PLAN_CHANGED"));
+
+    const res = await DELETE(deleteRequest({ confirmedReason: null }));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_DELETION_PLAN_CHANGED" });
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  it("DELETE_bodyWithReason_passesConfirmedReason", async () => {
+    deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "OWNED_TEAMS", finalAt: FINAL_AT });
+
+    await DELETE(deleteRequest({ confirmedReason: "OWNED_TEAMS" }));
+
+    expect(deleteMock).toHaveBeenCalledWith(7, { confirmedReason: "OWNED_TEAMS" });
+  });
+
+  it("DELETE_bodyWithUnknownReason_passesNoOption", async () => {
+    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null, finalAt: FINAL_AT });
+
+    await DELETE(deleteRequest({ confirmedReason: "X" }));
+
+    expect(deleteMock).toHaveBeenCalledWith(7, {});
   });
 });

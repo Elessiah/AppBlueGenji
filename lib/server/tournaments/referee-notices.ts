@@ -17,10 +17,11 @@
  */
 import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { createCoalescer, createKeyedChain } from "@/lib/server/coalescer";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
-import { formatRefereeChangeLog, type RefereeLogChange } from "@/lib/shared/bot-logs";
-import { refereeReleasedPush, type RefereeReleaseReason } from "@/lib/shared/push-messages";
+import { formatMapPickBurstLog, formatRefereeChangeLog, type RefereeLogChange } from "@/lib/shared/bot-logs";
+import { refereeObjectionReleasedPush, refereeReleasedPush, type RefereeReleaseReason } from "@/lib/shared/push-messages";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
 /** Un changement d'arbitrage ou d'organisation, constaté sous verrou. */
@@ -195,29 +196,178 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
   });
 }
 
+/**
+ * Avis **récapitulatif** du balayage d'une opposition retenue
+ * (`referee-objection.ts`) : un seul push pour les `count` matchs retirés, au
+ * lieu d'un par match. Aucune ligne de journal (comme un `OBJECTION_RELEASED`
+ * de ce balayage, la ligne anonyme de la route suffit). Ne lève jamais.
+ */
+export async function announceObjectionReleases(
+  refereeId: number,
+  count: number,
+  tournamentIds: readonly number[],
+): Promise<void> {
+  if (count === 0) return;
+  try {
+    const recipients = await loadNotificationRecipients([refereeId], "certified");
+    await notifyUsers(recipients, {
+      topic: "REFEREE_RELEASED",
+      push: (locale) => refereeObjectionReleasedPush({ count, tournamentIds }, locale),
+    });
+  } catch (error) {
+    console.error("[referee] retraits sur opposition non annoncés", error);
+  }
+}
+
 /** Options d'une annonce : `log: false` tait la ligne du journal (geste groupé). */
 export type RefereeAnnounceOptions = { log?: boolean };
 
 /** Annonce un changement d'arbitrage, sans attendre ; ne lève jamais. */
 export function announceRefereeChange(change: RefereeChange, options: RefereeAnnounceOptions = {}): void {
-  void deliverRefereeChange(change, options).catch((error) => console.error("[referee] changement d'arbitrage non annoncé", error));
+  announceRefereeChanges([change], options);
 }
+
+/** Le changement, erreurs journalisées : ne rejette jamais. */
+function deliverQuietly(change: RefereeChange, options: RefereeAnnounceOptions): Promise<void> {
+  return deliverRefereeChange(change, options).catch((error) =>
+    console.error("[referee] changement d'arbitrage non annoncé", error),
+  );
+}
+
+/**
+ * Annonces d'un même match, **dans l'ordre des gestes** : un retrait d'arbitre
+ * noté après un choix de carte ne part jamais avant lui, ni avant la ligne qui
+ * clôt la rafale de choix en cours. Chaque annonce est attendue à l'arrêt du
+ * serveur (`createKeyedChain`).
+ */
+const matchAnnouncements = createKeyedChain<number>();
 
 /**
  * Annonce plusieurs changements **l'un après l'autre**, sans attendre l'appelant
  * (autogestion d'une manche) : chaque avis relit son match et son destinataire,
  * et seize avis lancés ensemble occupaient le pool d'une trentaine de requêtes
- * simultanées. Ne lève jamais.
+ * simultanées. Un choix de carte (`MAP_PICK`) se regroupe par match
+ * ({@link noteMapPick}) ; tout autre changement clôt d'abord la rafale de choix
+ * ouverte sur son match. Ne lève jamais.
  */
 export function announceRefereeChanges(changes: readonly RefereeChange[], options: RefereeAnnounceOptions = {}): void {
-  if (changes.length === 0) return;
-  void (async () => {
-    for (const change of changes) {
-      await deliverRefereeChange(change, options).catch((error) =>
-        console.error("[referee] changement d'arbitrage non annoncé", error),
-      );
+  let previous: Promise<void> = Promise.resolve();
+  for (const change of changes) {
+    if (change.kind === "MAP_PICK" && options.log !== false) {
+      noteMapPick(change);
+      continue;
     }
-  })();
+    // La rafale ouverte part d'abord : `deliverQueues` la range dans la file du match dans ce tour.
+    if (mapPickBursts.waiting(String(change.matchId))) void mapPickBursts.flush(String(change.matchId));
+    const gate = previous;
+    previous = matchAnnouncements.chain(change.matchId, async () => {
+      await gate;
+      await deliverQuietly(change, options);
+    });
+  }
+}
+
+/** Silence après lequel la rafale de choix de cartes d'un match se clôt au journal. */
+export const MAP_PICK_LOG_WINDOW_MS = 60_000;
+/** Au plus tard, une rafale ouverte se clôt ce délai après son premier choix. */
+export const MAP_PICK_LOG_MAX_AGE_MS = 5 * 60_000;
+
+/** Choix qui suivent le premier d'une rafale : comptés, pour la ligne de clôture. */
+type MapPickTally = {
+  matchId: number;
+  /** Auteur du premier choix de la rafale : une rafale n'a qu'un auteur. */
+  openedByTeam: boolean;
+  picked: number;
+  cleared: number;
+  byStaff: boolean;
+  byTeam: boolean;
+};
+
+/** Décompte de la rafale **ouverte** de chaque match ; une rafale close en ouvre un neuf. */
+const openTallies = new Map<number, MapPickTally>();
+
+/**
+ * Choix de cartes d'un même match (`pickMatchMap`) : chaque bascule carte/vide
+ * écrivait sa ligne au journal du staff, jusqu'au plafond de la route
+ * (`MAP_PICK_WRITE_RULE`). Le **premier** choix d'une rafale part
+ * sur-le-champ, tel quel (choisi ou retiré, par l'arbitrage ou une équipe) ;
+ * les suivants n'écrivent qu'**une** ligne de clôture qui les compte et nomme
+ * qui a agi (`formatMapPickBurstLog`) — la carte d'un créneau ne remplace
+ * jamais celle d'un autre. Une rafale n'a qu'un auteur : un choix de l'autre
+ * côté (l'arbitrage qui reprend le choix d'une équipe, ou l'inverse) clôt la
+ * rafale ouverte et part à son tour en entier, à sa place dans le journal.
+ * Aucun avis n'en dépend (`refereeReleaseNotice` : aucun). L'arrêt du serveur
+ * annonce les rafales en attente (`flushAllCoalescers`) ; un arrêt brutal ne
+ * perd que la ligne de clôture, jamais le premier choix.
+ */
+function noteMapPick(change: Extract<RefereeChange, { kind: "MAP_PICK" }>): void {
+  const key = String(change.matchId);
+  let tally = mapPickBursts.waiting(key) ? openTallies.get(change.matchId) : undefined;
+  if (tally && tally.openedByTeam !== change.byTeam) {
+    // Changement d'auteur : la rafale ouverte se clôt d'abord (rangée dans la
+    // file du match dans ce tour, `deliverQueues`), puis ce choix en ouvre une.
+    void mapPickBursts.flush(key);
+    tally = undefined;
+  }
+  if (!tally) {
+    tally = { matchId: change.matchId, openedByTeam: change.byTeam, picked: 0, cleared: 0, byStaff: false, byTeam: false };
+    openTallies.set(change.matchId, tally);
+    void matchAnnouncements.chain(change.matchId, () => deliverQuietly(change, {}));
+  } else {
+    if (change.set) tally.picked += 1;
+    else tally.cleared += 1;
+    if (change.byTeam) tally.byTeam = true;
+    else tally.byStaff = true;
+  }
+  mapPickBursts.add(key, tally);
+}
+
+const mapPickBursts = createCoalescer<MapPickTally>({
+  windowMs: MAP_PICK_LOG_WINDOW_MS,
+  maxAgeMs: MAP_PICK_LOG_MAX_AGE_MS,
+  deliverQueues: true,
+  deliver: (tally) => {
+    if (openTallies.get(tally.matchId) === tally) openTallies.delete(tally.matchId);
+    if (tally.picked + tally.cleared === 0) return;
+    return matchAnnouncements.chain(tally.matchId, () =>
+      deliverMapPickBurst(tally).catch((error) => console.error("[referee] choix de cartes non annoncés", error)),
+    );
+  },
+});
+
+/** Ligne de clôture d'une rafale de choix de cartes. */
+async function deliverMapPickBurst(tally: MapPickTally): Promise<void> {
+  const row = await loadMatchLogRow(tally.matchId);
+  if (!row) return;
+  const match = matchLogSubject(row);
+  sendBotLog(
+    formatMapPickBurstLog({
+      tournament: match.tournament,
+      matchId: match.matchId,
+      bracket: match.bracket,
+      roundNumber: match.roundNumber,
+      swiss: match.swiss,
+      team1: match.team1,
+      team2: match.team2,
+      picked: tally.picked,
+      cleared: tally.cleared,
+      byStaff: tally.byStaff,
+      byTeam: tally.byTeam,
+    }),
+    { tournamentId: match.tournament.id, category: "referees" },
+  );
+}
+
+/** Annonce tout de suite les rafales de choix de cartes. Réservé aux tests. */
+export function flushMapPickLogs(): Promise<void> {
+  return mapPickBursts.flushAll();
+}
+
+/** Abandonne les rafales de choix de cartes. Réservé aux tests. */
+export function resetMapPickLogs(): void {
+  mapPickBursts.reset();
+  openTallies.clear();
+  matchAnnouncements.reset();
 }
 
 /** Changements constatés au fond d'une transaction, annoncés après son commit (`./cast-notices`, même cycle). */

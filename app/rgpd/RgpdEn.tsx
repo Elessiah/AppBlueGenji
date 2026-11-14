@@ -326,11 +326,11 @@ export function RgpdEn({
           of that time — a hidden avatar follows the reports rule instead. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
-          bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
+          bring the account back as pending deletion; a request still pending in the restored backup takes back the date recorded in the log (the period runs from the latest request). As soon as it is requested, and without being undone by reactivation, it leaves its
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others and a member whose own account deletion has been requested not being counted; a team left with
           no other member becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
-          tournament where it never played are lost by forfeit. At the end of that time, the account is erased
+          tournament where it never played are lost by forfeit (withdrawal from the standings in a standings-based tournament; a match still waiting for its opponent is lost once that opponent is known, at the following hourly pass). At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
           the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
@@ -392,7 +392,7 @@ export function RgpdEn({
           exception being the replay codes described above) and the username is replaced by a randomly drawn{" "}
           <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
-          match played, the page is gone (page not found) and their name no longer leads anywhere. An account that has never played a match has no record
+          match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). An account that has never played a match has no record
           to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a
           tournament that no one on the staff could take over, or if it is an entrant in a{" "}
           <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. Its teams no longer keep the row:

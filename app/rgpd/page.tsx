@@ -435,11 +435,11 @@ function RgpdFr({
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
-          ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
+          ramène pas le compte en attente de suppression ; une demande encore en attente dans la sauvegarde restaurée y reprend la date notée au journal (le délai court de la dernière demande). Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
           passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres et un membre dont la suppression du compte est elle-même demandée n&apos;étant pas compté ; une équipe où il ne reste aucun autre
           membre devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
-          cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
+          cours où il n&apos;a jamais joué sont perdus par forfait (abandon du classement dans un tournoi à classement ; un match qui attend encore son adversaire est perdu une fois celui-ci connu, au passage horaire qui suit). Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
           modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
           d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
@@ -510,7 +510,7 @@ function RgpdFr({
           est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
           subsiste sous ce faux nom, et la fiche du joueur, gardée seulement s&apos;il a joué au moins un
           match, indique que le compte a été supprimé ; sans match joué, la fiche disparaît (page
-          introuvable) et son nom ne mène plus nulle part.
+          introuvable) et les liens qui y menaient deviennent du texte simple au fil de la navigation (une page déjà ouverte garde le sien jusqu&apos;à son rechargement).
           Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
           <strong>organisé</strong> un tournoi que personne au staff n'a pu reprendre, ou s'il est
           engagé dans un <strong>tournoi individuel</strong> déjà commencé ou terminé, dont l'engagé

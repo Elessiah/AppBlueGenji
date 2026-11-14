@@ -8,7 +8,7 @@ jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import type { PoolConnection } from "mysql2/promise";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
-import { withConnection } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { invalidateCachedPrefix } from "@/lib/server/cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import {
@@ -42,7 +42,7 @@ import {
   setRoundSelfManaged,
   takeMatchReferee,
 } from "@/lib/server/tournaments/match-launch";
-import { fakeConnection } from "../../helpers/sql-double";
+import { fakeConnection, fakePool, poolBackedWithConnection } from "../../helpers/sql-double";
 
 /**
  * Service du lancement d'un match, contre une connexion **à état** : les
@@ -477,10 +477,18 @@ function executeFor(state: World) {
 function connectionFor(state: World): PoolConnection {
   return fakeConnection({
     execute: executeFor(state),
+    query: async () => [[], []],
     beginTransaction: async () => undefined,
     commit: async () => undefined,
     rollback: async () => undefined,
+    release: () => undefined,
+    destroy: () => undefined,
   });
+}
+
+/** Pool dont `getConnection` rend `connection` (gestes qui prennent leur connexion eux-mêmes). */
+function poolGiving(connection: PoolConnection) {
+  return fakePool({ getConnection: async () => connection });
 }
 
 let state: World;
@@ -492,6 +500,7 @@ beforeEach(() => {
   jest
     .mocked(withConnection)
     .mockImplementation((run) => run(connectionFor(state)));
+  jest.mocked(getDatabase).mockImplementation(async () => poolGiving(connectionFor(state)));
 });
 
 describe("setMatchReady", () => {
@@ -1331,10 +1340,44 @@ describe("maintainMatchLaunches", () => {
       // La ligne du match, puis ses casters : chaque table verrouillée seule.
       expect(lock).toMatch(/FROM bg_matches m WHERE m\.id = \?|FROM bg_match_casters WHERE match_id = \?/);
     }
-    // Le contexte (état du tournoi, fantômes) est relu sans verrou.
-    const context = queries.find((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"));
-    expect(context).toBeDefined();
-    expect(context).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
+  });
+
+  it("maintainMatchLaunches_samePairingUnderLock_reusesCandidateContext", async () => {
+    const queries: string[] = [];
+    const base = executeFor(state);
+
+    await maintainMatchLaunches(
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          queries.push(sql.replace(/\s+/g, " ").trim());
+          return base(sql, params);
+        },
+      }),
+      7,
+    );
+
+    expect(queries.some((q) => /FROM bg_matches m WHERE m\.id = \? LIMIT 1 FOR UPDATE/.test(q))).toBe(true);
+    expect(queries.some((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"))).toBe(false);
+  });
+
+  it("maintainMatchLaunches_pairingChangedUnderLock_readsContextUnlocked", async () => {
+    const queries: string[] = [];
+    const base = executeFor(state);
+
+    await maintainMatchLaunches(
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          queries.push(sql.replace(/\s+/g, " ").trim());
+          if (sql.includes("FOR UPDATE") && state.match) state.match = { ...state.match, team2_id: 30 };
+          return base(sql, params);
+        },
+      }),
+      7,
+    );
+
+    const contexts = queries.filter((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"));
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
   });
 
   it("parcourt les candidats dans un ordre fixe, pour verrouiller sans interblocage", async () => {
@@ -1692,8 +1735,21 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     state.match = matchState();
     state.issued = [];
     await takeMatchReferee(42, REFEREE);
-    const eligibilityRead = state.issued.find((sql) => sql.includes("platform_roles_json FROM bg_users"));
-    expect(eligibilityRead).toMatch(/WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+    const lockedRead = state.issued.find(
+      (sql) => sql.includes("FROM bg_users") && sql.endsWith("LOCK IN SHARE MODE"),
+    );
+    expect(lockedRead).toMatch(/referee_objection_at FROM bg_users WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+  });
+
+  it("takeMatchReferee_anyTake_readsConditionAndObjectionInOneLockedRead", async () => {
+    state.match = matchState();
+    state.issued = [];
+    await takeMatchReferee(42, REFEREE);
+    const lockedUserReads = state.issued.filter(
+      (sql) => sql.includes("FROM bg_users") && sql.endsWith("LOCK IN SHARE MODE"),
+    );
+    expect(lockedUserReads).toHaveLength(1);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
   });
 
   it("takeMatchReferee_accountDeleted_refusesAndSetsNoReferee", async () => {
@@ -1772,6 +1828,28 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(casterReadyOf(state)).toBe(STAMP);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("claimMatchCast_designatedRefereeJoinsExistingStream_coCastsWithoutNewStream", async () => {
+    state.users[901] = { ...refereeUser, platform_roles_json: JSON.stringify(["CASTER"]) };
+    state.match = matchState({ referee_user_id: REFEREE, caster_user_id: 901 });
+    await claimMatchCast(42, REFEREE, true, { streamId: 1 });
+    expect(state.match?.streams).toHaveLength(1);
+    expect(state.match?.casters.map((caster) => [caster.user_id, caster.stream_id])).toEqual([[901, 1], [REFEREE, 1]]);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("setMatchReady_refereeCasterWithdrawsReady_clearsBothReadies", async () => {
+    state.match = matchState({
+      referee_user_id: REFEREE,
+      referee_ready_at: STAMP,
+      caster_user_id: REFEREE,
+      caster_ready_at: STAMP,
+    });
+    await setMatchReady(42, REFEREE, false);
+    expect(casterReadyOf(state)).toBeNull();
+    expect(state.match?.referee_ready_at).toBeNull();
+    expect(state.match?.referee_user_id).toBe(REFEREE);
   });
 
   it("releaseMatchCast_refereeCaster_staysRefereeWithReady", async () => {
@@ -1917,26 +1995,59 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
   });
 
   it("setMatchFirstMap_inTransaction_locksTournamentFirst", async () => {
+    jest.mocked(withConnection).mockImplementation(poolBackedWithConnection(getDatabase));
     const base = executeFor(state);
     const statements: string[] = [];
-    jest.mocked(withConnection).mockImplementation((run) =>
-      run(
+    const getConnection = jest.fn(async () =>
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          statements.push(sql);
+          return base(sql, params);
+        },
+        query: async (sql: string) => {
+          statements.push(sql);
+          return [[], []];
+        },
+        beginTransaction: async () => {
+          statements.push("BEGIN");
+        },
+        commit: async () => undefined,
+        rollback: async () => undefined,
+        release: () => undefined,
+        destroy: () => undefined,
+      }),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection }));
+    await setMatchFirstMap(42, "Ilios");
+    const begin = statements.indexOf("BEGIN");
+    // Attente bornée, puis verrou partagé : les premières cartes de deux matchs ne s'attendent pas.
+    expect(statements[begin + 1]).toBe("SET SESSION innodb_lock_wait_timeout = 5");
+    expect(statements[begin + 2]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 LOCK IN SHARE MODE/);
+    expect(statements[begin + 3]).toBe("SET SESSION innodb_lock_wait_timeout = DEFAULT");
+    // Une seule connexion : la lecture du tournoi précède la transaction sur la même.
+    expect(getConnection).toHaveBeenCalledTimes(1);
+    expect(statements.slice(0, begin).some((sql) => sql.startsWith("SELECT tournament_id, status"))).toBe(true);
+  });
+
+  it("setMatchFirstMap_tournamentGoneUnderLock_throwsTournamentNotFound", async () => {
+    jest.mocked(withConnection).mockImplementation(poolBackedWithConnection(getDatabase));
+    const base = executeFor(state);
+    jest.mocked(getDatabase).mockResolvedValue(
+      poolGiving(
         fakeConnection({
-          execute: async (sql: string, params: unknown[] = []) => {
-            statements.push(sql);
-            return base(sql, params);
-          },
-          beginTransaction: async () => {
-            statements.push("BEGIN");
-          },
+          execute: async (sql: string, params: unknown[] = []) =>
+            /LOCK IN SHARE MODE/.test(sql) ? [[], []] : base(sql, params),
+          query: async () => [[], []],
+          beginTransaction: async () => undefined,
           commit: async () => undefined,
           rollback: async () => undefined,
+          release: () => undefined,
+          destroy: () => undefined,
         }),
       ),
     );
-    await setMatchFirstMap(42, "Ilios");
-    const begin = statements.indexOf("BEGIN");
-    expect(statements[begin + 1]).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
+    await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+    expect(state.match?.first_map).toBeNull();
   });
 
   it("retire d'office un arbitre devenu inéligible avant le lancement, jamais après", async () => {
@@ -2092,6 +2203,104 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
       refereeId: REFEREE,
     });
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("releaseObjectingReferee_unfinishedMatch_locksMatchRowAloneBeforeRelease", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
+    state.issued = [];
+
+    await releaseObjectingReferee(42, REFEREE);
+
+    const release = state.issued.findIndex((sql) => sql.startsWith("UPDATE bg_matches SET referee_user_id = NULL"));
+    const beforeRelease = state.issued.slice(0, release);
+    // Verrou allégé : ni contexte du lancement, ni condition d'arbitrage, ni casters avant le retrait.
+    expect(beforeRelease.some((sql) => sql.includes("AS tournament_state"))).toBe(false);
+    expect(beforeRelease.some((sql) => sql.includes("platform_roles_json"))).toBe(false);
+    expect(beforeRelease.some((sql) => sql.includes("FROM bg_match_casters"))).toBe(false);
+  });
+
+  it("releaseObjectingReferee_unfinishedMatch_locksTournamentBeforeMatch", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    state.issued = [];
+
+    await releaseObjectingReferee(42, REFEREE);
+
+    const tournamentLock = state.issued.indexOf("SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE");
+    const matchLock = state.issued.findIndex((sql) => sql.startsWith("SELECT m.tournament_id, m.status, m.referee_user_id") && sql.endsWith("FOR UPDATE"));
+    expect(tournamentLock).toBeGreaterThanOrEqual(0);
+    expect(matchLock).toBeGreaterThan(tournamentLock);
+  });
+
+  it("releaseObjectingReferee_refereeAlreadyGone_takesNoLock", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: 961 });
+    state.issued = [];
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(false);
+    expect(state.issued.some((sql) => /FOR UPDATE|LOCK IN SHARE MODE/.test(sql))).toBe(false);
+    expect(state.match?.referee_user_id).toBe(961);
+  });
+
+  it("releaseObjectingReferee_withBatch_collectsTournamentWithoutNoticeOrPublish", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    const batch = { tournamentIds: new Set<number>() };
+
+    const released = await releaseObjectingReferee(42, REFEREE, [], batch);
+
+    expect(released).toBe(true);
+    expect([...batch.tournamentIds]).toEqual([7]);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("releaseObjectingReferee_tournamentNotRunning_clearsWithoutLaunching", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, tournament_state: "FINISHED", team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(true);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("releaseObjectingReferee_tournamentGone_releasesNothing", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    const base = executeFor(state);
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) =>
+            sql.startsWith("SELECT state FROM bg_tournaments") ? [[], []] : base(sql, params),
+          beginTransaction: async () => undefined,
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    const batch = { tournamentIds: new Set<number>() };
+
+    const released = await releaseObjectingReferee(42, REFEREE, [], batch);
+
+    expect(released).toBe(false);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(batch.tournamentIds.size).toBe(0);
+  });
+
+  it("releaseObjectingReferee_unfinishedMatch_readsTournamentStateUnderSharedLock", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+    state.issued = [];
+
+    await releaseObjectingReferee(42, REFEREE);
+
+    expect(state.issued).toContain("SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE");
   });
 
   it("releaseObjectingReferee_launchedMatch_stillReleases", async () => {

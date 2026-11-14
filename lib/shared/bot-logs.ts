@@ -871,6 +871,39 @@ export function formatRefereeChangeLog(context: {
 }
 
 /**
+ * Choix de cartes d'un match qui suivent le premier d'une rafale
+ * (`lib/server/tournaments/referee-notices.ts`) : **une** ligne, qui compte
+ * les cartes choisies et retirées et dit qui a agi — l'arbitrage (« le
+ * staff »), une équipe du match (autogestion), ou les deux. Ni la carte, ni
+ * le créneau : la page du match les dit.
+ */
+export function formatMapPickBurstLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  picked: number;
+  cleared: number;
+  byStaff: boolean;
+  byTeam: boolean;
+}): string {
+  const counts: string[] = [];
+  if (context.picked > 0) counts.push(`${context.picked} carte${context.picked > 1 ? "s" : ""} choisie${context.picked > 1 ? "s" : ""}`);
+  if (context.cleared > 0) counts.push(`${context.cleared} choix retiré${context.cleared > 1 ? "s" : ""}`);
+  const actors = [
+    ...(context.byStaff ? [ANONYMOUS_STAFF_LABEL] : []),
+    ...(context.byTeam ? ["une équipe du match (autogestion)"] : []),
+  ].join(" et ");
+  return (
+    `${lead("🧑‍⚖️", "Choix de cartes dans le pool", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), ensuite ${counts.join(", ")}, par ${actors}.`
+  );
+}
+
+/**
  * Autogestion activée ou désactivée sur toute une manche, d'un geste
  * (`count` : matchs changés). Le tournoi seul, sans équipe.
  */

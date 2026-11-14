@@ -27,6 +27,7 @@ import type { Locale } from "@/lib/shared/locales";
 import { pushRoundLabel } from "@/lib/shared/push-messages";
 import { GAME_SETTINGS } from "@/lib/shared/match-page";
 import type { NextBanRule } from "@/lib/shared/round-maps";
+import { hasPerMapTargets } from "@/lib/shared/map-points";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 function quoted(value: string, locale: Locale): string {
@@ -92,6 +93,8 @@ type TournamentText = {
   nextBans: Readonly<Record<NextBanRule, string>>;
   tiebreak: string;
   pointTarget: (points: number) => string;
+  /** Points réglés carte par carte (`pointTargets`) ; `rest` = N des cartes suivantes. */
+  pointTargetsPerMap: (targets: ReadonlyArray<number>, rest: number | null) => string;
   /** Lignes du cast. */
   live: (url: string) => string;
   inviteCasters: string;
@@ -102,6 +105,11 @@ type TournamentText = {
   issue: string;
   goodLuck: string;
 };
+
+/** « 5 points », « 1 point » (FR : pluriel dès 2). */
+const pointsFr = (points: number) => `${points} point${points > 1 ? "s" : ""}`;
+/** "5 points", "1 point". */
+const pointsEn = (points: number) => `${points} point${points === 1 ? "" : "s"}`;
 
 const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
   fr: {
@@ -143,6 +151,10 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     },
     tiebreak: "Map de départage (jouée seulement si la série est à égalité après les maps régulières) : ",
     pointTarget: (points) => `Format Duel / Arcade : chaque carte se gagne au premier à ${points} point${points > 1 ? "s" : ""}.`,
+    pointTargetsPerMap: (targets, rest) =>
+      "Format Duel / Arcade : " +
+      targets.map((points, index) => `Map ${index + 1} au premier à ${pointsFr(points)}`).join(", ") +
+      (rest === null ? "." : `, puis premier à ${pointsFr(rest)} pour les suivantes.`),
     live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invite les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Préviens les casters inscrits (leurs contacts sont sur la page du match).",
@@ -188,6 +200,10 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     },
     tiebreak: "Tiebreak map (played only if the series is level after the regular maps): ",
     pointTarget: (points) => `Duel / Arcade format: each map is won by the first to ${points} point${points === 1 ? "" : "s"}.`,
+    pointTargetsPerMap: (targets, rest) =>
+      "Duel / Arcade format: " +
+      targets.map((points, index) => `Map ${index + 1} first to ${pointsEn(points)}`).join(", ") +
+      (rest === null ? "." : `, then first to ${pointsEn(rest)} for the next ones.`),
     live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",
@@ -296,6 +312,16 @@ function clipToDiscordMax(text: string): string {
 /** Pas de réduction du bloc des cartes quand le message dépasse `DISCORD_MESSAGE_MAX`. */
 const MAPS_BUDGET_STEP = 30;
 
+/** Ligne Duel / Arcade du check-in : un N pour toutes les cartes, ou carte par carte. */
+function pointTargetLines(side: LobbyBriefSide, text: Pick<TournamentText, "pointTarget" | "pointTargetsPerMap">): string[] {
+  if (!side.pointTarget) return [];
+  const perMap = side.pointTargets ?? [];
+  if (!hasPerMapTargets(side.pointTarget, perMap)) return [`* ${text.pointTarget(side.pointTarget)}`];
+  // Toutes les cartes du match réglées : aucune ne suit le match (même règle que la page du match).
+  const coversAll = side.maxMaps != null && perMap.length >= side.maxMaps;
+  return [`* ${text.pointTargetsPerMap(perMap, coversAll ? null : side.pointTarget)}`];
+}
+
 function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale, mapsBudget: number): string {
   const text = DM_TEXT[locale];
   const quote = (name: string) => quoted(name, locale);
@@ -334,7 +360,7 @@ function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Loc
     `* ${text.firstBan(names.ban, names.banNext)}`,
     `* ${text.nextBans[side.nextBan]}`,
     ...(side.tiebreakMap ? [`* ${text.tiebreak}${quote(side.tiebreakMap)}`] : []),
-    ...(side.pointTarget ? [`* ${text.pointTarget(side.pointTarget)}`] : []),
+    ...pointTargetLines(side, text),
     ...(side.cast ? castBlock(side, locale) : []),
     "",
     text.scores,

@@ -14,6 +14,7 @@ import { generateMetadata as teamsLayoutMetadata } from "@/app/(secured)/equipes
 import { generateMetadata as playersLayoutMetadata } from "@/app/(secured)/joueurs/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
+import { clearCache } from "@/lib/server/cache";
 import { getTeamPageIdentity } from "@/lib/server/teams/detail";
 import { getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
@@ -41,6 +42,7 @@ function tabTitle(parent: Metadata, own: Metadata): string {
 }
 
 beforeEach(() => {
+  clearCache();
   jest.clearAllMocks();
   mockLocale = "fr";
   execute.mockReset();
@@ -118,14 +120,19 @@ describe("fiche de joueur", () => {
   });
 
   it("annonce un compte anonymisé sans son pseudo d'emprunt", async () => {
-    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1, played: 1 }]]);
+    execute.mockImplementation(async (sql: string) =>
+      sql.includes("u.is_deleted = 1") ? [[]] : [[{ pseudo: "Renard_Discret", is_deleted: 1 }]],
+    );
     expect(await playerMetadata(params("5"))).toMatchObject({ title: "Compte supprimé · Joueur" });
   });
 
   it("playerMetadata_deletedWithoutStats_usesNeutralTitle", async () => {
     // D13 : sans match joué, la fiche d'un compte supprimé n'existe plus ;
     // l'onglet ne l'annonce pas davantage.
-    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1, played: 0 }]]);
+    // La liste des comptes sans fiche (celle des liens) le nomme.
+    execute.mockImplementation(async (sql: string) =>
+      sql.includes("u.is_deleted = 1") ? [[{ id: 5 }]] : [[{ pseudo: "Renard_Discret", is_deleted: 1 }]],
+    );
     expect(await playerMetadata(params("5"))).toMatchObject({ title: "Joueur" });
   });
 
@@ -158,7 +165,9 @@ describe("fiches en anglais (lot 9)", () => {
 
   it("un compte anonymisé s'annonce « Deleted account »", async () => {
     mockLocale = "en";
-    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1, played: 1 }]]);
+    execute.mockImplementation(async (sql: string) =>
+      sql.includes("u.is_deleted = 1") ? [[]] : [[{ pseudo: "Renard_Discret", is_deleted: 1 }]],
+    );
     const metadata = await playerMetadata(params("5"));
     expect(metadata).toMatchObject({ title: "Deleted account · Player" });
     expect(metadata.alternates).toMatchObject({ canonical: "/en/joueurs/5" });

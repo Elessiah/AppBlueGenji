@@ -327,7 +327,7 @@ compte supprimé n'est pas une alerte.
 **La fiche n'est gardée que s'il a joué (décision D13, 2026-11-02).** Un compte
 supprimé sans match compté (`accountTraceSql().played`, la trace
 `playedMatches`) n'a plus de fiche : `getFullProfile` et `getPlayerPageIdentity`
-rendent `null` (`deletedAccountHasStats`, `lib/server/users/profileless-players.ts`),
+rendent `null` (lus dans la liste mise en cache `loadProfilelessPlayerIds`, `lib/server/users/profileless-players.ts`, celle qui décide des liens),
 donc `/api/players/[id]` répond `404 PLAYER_NOT_FOUND` et la page la carte
 « introuvable » (FR et EN), titre neutre compris. Ses statistiques n'existent
 pas ; celles d'un compte qui a joué appartiennent aussi à ses adversaires.
@@ -1057,7 +1057,111 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   restauré vivant (il repasse par la demande), lignes illisibles du journal
   gardées à la réécriture.
 
+## Solde ERREUR.txt (EF-62, 2026-11-13)
+
+- **Tournois synchronisés avant le retrait** : la demande, la suppression
+  définitive et la passe horaire (`settleDeletedSoloEntries`) appliquent
+  d'abord `syncTournamentState` aux tournois solo ouverts du compte
+  (`syncOpenSoloTournamentsOn`, sous leurs verrous). Un tournoi resté
+  `REGISTRATION` en base après son heure de départ démarre alors dans la même
+  transaction : son entrée se forfaite au lieu d'être retirée d'un tirage déjà
+  dû. Les journaux du bot de ce démarrage partent après le commit
+  (`flushBotLogs`), sont jetés sur un échec (`discardBotLogs`) ; les tournois
+  démarrés sont rediffusés.
+- **Retrait d'une inscription, un seul chemin** : `withdrawRegistrationOn`
+  (`tournaments/registration-removal.ts`) — DELETE puis `resequenceSeeds` —
+  sert au retrait par le staff, à la demande et à l'effacement (`eraseAccount`).
+- **Forfait sans match ouvert** : une entrée est forfaitable si elle a un match
+  `PENDING`/`READY` dont **les deux** places sont prises, ou un classement
+  `ACTIVE` (suisse et survie à la phase courante — `current_phase_id` en
+  `MULTI` —, BG Survie avant ses phases finales) : l'abandon la retire d'une
+  ronde qui n'est pas encore tirée. La passe horaire met de côté (30 min, doublé à chaque échec, 6 h au plus)
+  (`SETTLE_IDLE_MS`, au plus mille comptes en mémoire) un compte dont le
+  passage n'a rien fait, ou a échoué.
+- **Aperçu confirmé** : le DELETE de la modale envoie le motif qu'elle a
+  annoncé (`confirmedReason`). S'il ne correspond plus à l'aperçu relu juste
+  avant l'écriture, hors verrous (une partie jouée entre-temps, un tournoi
+  créé), le serveur répond 409 `ACCOUNT_DELETION_PLAN_CHANGED` sans rien
+  faire, et la modale se recharge avec le nouvel aperçu. Corps absent ou
+  illisible : rien n'est comparé. Un changement survenu entre cette relecture
+  et les verrous (le successeur d'un tournoi organisé suspendu entre-temps)
+  n'est pas refusé : la demande aboutit et sa réponse porte le motif réel,
+  que la notification de succès décrit.
+- **Rediffusion des tournois qui le nomment** : demande et réactivation
+  republient tout tournoi non terminé qui nomme le compte
+  (`listNamingTournamentIds` : inscription solo ou d'équipe, cast, lien de
+  diffusion, arbitre, déclencheur du live), pas seulement ceux de son entrée
+  solo.
+- **Rattrapage moins coûteux** : la branche « compte sans trace » de
+  `reconcileDeletedAccounts` (balayage complet) ne tourne qu'une fois par jour
+  (`deleted_accounts_full_scan_at` dans `bg_settings`, posé seulement sans
+  échec) ; l'anonymisation remet ses colonnes facultatives en une seule
+  instruction (`resetOptionalColumns`, colonne par colonne en repli si une
+  colonne manque).
+- **Comptes sans fiche** : la liste (`loadProfilelessPlayerIds`) vit sous sa
+  propre clé (dix minutes, vidée par `invalidateTeamIdentityViews` et par une
+  suppression de tournoi, `invalidateTeamRanking`), plus sous le préfixe du
+  classement que chaque score vide. La fiche lit la même liste
+  (`anonymizedAccountHasNoPage`) ; liste illisible, elle interroge le seul
+  compte en base (jamais une fiche rouverte par une panne). Le fournisseur la
+  relit à la navigation client (`/api/players/profileless`, connecté, au plus
+  une fois par minute) ; `/rgpd` dit qu'une page déjà ouverte garde son lien
+  jusqu'au rechargement.
+- **Revue standard cycle 1** : les traces du plan rendu se lisent après le
+  journal et les suites, et une panne ne fait plus passer la demande pour un
+  échec (plan confirmé ou aperçu gardé) ; le rejeu d'une restauration ne
+  synchronise pas les tournois (ni lancement ni annonce) ; la suppression
+  définitive ne rediffuse que les tournois passés en cours ; une annonce en
+  échec après le commit de la passe horaire n'annule plus ses suites ;
+  `listNamingTournamentIds` borne l'effectif d'équipe au coup d'envoi ; textes
+  du délai tirés de `ACCOUNT_REACTIVATION_DAYS` (FR + EN).
+- **Revue standard cycle 2** : `npm run replay:deletions` coupe tout envoi
+  sortant du processus (`muteOutboundForProcess`, `lib/server/outbound-mute.ts` :
+  bot Discord dégradé comme injoignable, push sans envoi), forfaits et retraits
+  rejoués compris ; la suppression définitive rejouée ne synchronise pas non
+  plus les tournois (la passe horaire les lance ensuite) ; une équipe que la
+  demande vient de quitter fait rediffuser ses tournois pas terminés
+  (`listNamingTournamentIds(…, leftTeamIds)`) ; une double panne de lecture
+  ferme la fiche (404) au lieu de lever ; un écouteur qui lève après le commit
+  de la passe horaire n'annule plus ses suites ; description de la page de
+  réactivation par `formatMessage`.
+- **Revue standard cycle 3** : envois coupés, aucun balayage de notifications
+  ne part (`throttledSweep` : départs de match, nouveaux matchs, brief du
+  salon) — il réserverait chaque notification avant un envoi impossible, qui
+  serait perdue au retour du site — ni la mise à jour des soirées #live ; le
+  rejeu se dit par l'option `replay: true` (demande, suppression, finalisation),
+  `accountCreatedAt` ne vérifiant plus que l'identité du compte ; la passe
+  horaire garde ses forfaits et le compte dans le lot quand la rediffusion
+  d'un retrait commis lève ; la liste des comptes sans fiche se lit par
+  dichotomie (triée par id). Gardé : la double panne de lecture rend 404
+  (décision du cycle 2).
+- **Revue standard cycle 4** : le balayage des annonces de confidentialité
+  (`dispatchPrivacyChangeNotifications`, son propre étranglement) ne part pas
+  non plus envois coupés, et `throttledSweep.schedule` n'arme aucun minuteur
+  quand sa garde est fausse. Tout nouveau balayage qui **réserve avant
+  d'envoyer** lit `outboundMuted()` (ou passe par `throttledSweep`). La passe
+  horaire rediffuse et journalise chaque retrait commis dans deux `try`
+  distincts ; la liste des comptes sans fiche est triée dans le code (pas
+  seulement par `ORDER BY`) et se lit par `sortedIdsInclude`
+  (`lib/shared/sorted-ids.ts`), route d'équipe comprise.
+- **Écrans** : la confirmation liste ce que la demande transmet ou retire
+  (`deletionDialogContent`), les restes après la fin du délai derrière un
+  « i » ; la page de réactivation dit ce qui revient en une phrase (détail
+  derrière un « i ») et liste ce qui n'est pas défait. Pas de liens vers
+  équipes ou tournois : la page s'affiche avant toute session.
+- **Rejeu d'une sauvegarde** : `/rgpd` et le registre (T01) disent qu'une
+  demande encore en attente dans la sauvegarde restaurée reprend la date du
+  journal (`REDATE`).
+- **Obsolètes** : `hasMatch` du retrait solo (déjà borné au tournoi, et un
+  match n'existe qu'après le départ, désormais synchronisé) ; relecture des
+  entrées jouées par la passe horaire (filtrée par les candidats).
+
 ## Décisions requises (ouvertes)
+
+- Comptes sans fiche dans la charge RSC (EF-62) : la liste entière part sur
+  chaque page connectée et dit quels identifiants sont des comptes supprimés —
+  l'accepter (identifiants seuls) ou n'envoyer que ceux de la page ? Recommandé :
+  l'accepter tant qu'elle reste sous quelques milliers.
 
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
   en attente n'en reçoit **aucun avis** (`userRecipient` écarte
@@ -1115,3 +1219,76 @@ autres comptées puis citées par des lignes de suite, cinq par ligne
 (`formatAccountDeletionFollowUpLogs` ; « et d'autres, plus anciennes » au-delà de 500 lignes lues, un match programmé en comptant deux) ;
 lecture en échec → « vérifier le salon d'alertes ». Détail :
 `LIVE_STREAMS.md` § Information des joueurs.
+
+## Revue performance (EF-62, cycle 1)
+
+- **Liste des comptes sans fiche** : une lecture en échec n'est pas gardée par
+  le cache ; pendant `PROFILELESS_FAILURE_BACKOFF_MS` (15 s) la dernière liste
+  connue (conservée une heure) est servie, ou rien n'est demandé (une ligne de
+  journal par panne). Plafond `PROFILELESS_PLAYERS_MAX` (20 000, avertissement
+  au-delà, copie du navigateur seulement : un lien en trop mène à une 404). La clé de cache est déclarée en tête
+  de `ranking-cache.ts`. Côté client, un essai en échec attend
+  `PROFILELESS_RETRY_MS` (15 s) au lieu de repartir à chaque page.
+- **Coup d'envoi tardif** : `startDueTournaments` (`tournament-start-sync.ts`)
+  remet à l'heure, avant la transaction et sous le seul verrou du tournoi, ceux
+  dont l'état stocké est en retard — plus sous le verrou du compte. Le passage
+  horaire ne relit un tournoi qu'une fois par passe ; la synchronisation de la
+  transaction de suppression reste le filet.
+- **Passage horaire** : mise à l'écart d'un compte sans effet de 30 min,
+  doublée à chaque échec de suite jusqu'à 6 h (`SETTLE_IDLE_MS`,
+  `SETTLE_IDLE_MAX_MS`) ; la requête des candidats garde un texte fixe (lecture
+  de `SETTLE_BATCH_SIZE + 1000` lignes, mises à l'écart retranchées en code, au
+  lieu d'un `NOT IN` à mille paramètres). Les existences de classement
+  (`bg_*_standings`) se lisent par clé primaire.
+- **Relevé complet** (`reconcileStaleFullScan`) : mené aussi par le passage
+  horaire quand le marqueur du jour est périmé, au plus une tentative par jour
+  et par processus.
+- **Demande et réactivation** : le relevé des tournois qui nomment le compte part
+  en parallèle de la suite ; la réactivation lit ses deux listes ensemble.
+
+## Revue sécurité (EF-62, cycle 1)
+
+- **Plafond de la liste sans fiche** : seule la copie envoyée au navigateur
+  (`loadProfilelessPlayerIdsForClient` : mise en page racine,
+  `/api/players/profileless`) est tronquée à `PROFILELESS_PLAYERS_MAX` ; la
+  fiche, l'annuaire, l'accueil et la redirection d'équipe solo lisent la liste
+  entière — la troncature ne rouvre aucune fiche. Cache d'un seul processus
+  (le site tourne en un processus pm2).
+- **Motif rendu par la demande** : les traces se relisent après le commit et le
+  journal mais **avant** les suites, dont les forfaits en tâche de fond
+  compteraient comme des matchs joués.
+- **Aperçu confirmé** : une panne de sa relecture ne suspend pas la demande (la
+  comparaison est sautée) ; le repreneur qu'il a trouvé sert d'indice à la
+  transaction (un seul balayage de `bg_users`).
+- `syncOpenSoloTournamentsOn` vit dans `tournament-start-sync.ts`, partagé par
+  la demande et la suppression définitive ; `listNamingTournamentIds` lit les
+  équipes quittées par une requête de forme fixe par équipe ; le relevé complet
+  horaire ne relit pas son marqueur ; une relecture client identique ne
+  re-rend pas les liens (`sameIds`).
+- La liste compte aussi les comptes en attente (leur fiche répond 404 pendant
+  les trente jours) : la question de son exposition reste une décision ouverte
+  dans `ERREUR.txt`.
+
+## Revue juridique (EF-62, cycle 1)
+
+- **Forfait d'une entrée solo, dit exactement** : `/rgpd` (FR et EN), le
+  registre (T01), la modale (`deletion.handoverList.forfeit`, `handover`,
+  `ACCOUNT_DELETION_HANDOVER`) et la page de réactivation disent qu'un tournoi
+  à classement pose un abandon du classement, et qu'un match d'arbre qui attend
+  encore son adversaire n'est perdu qu'une fois celui-ci connu, au passage
+  horaire qui suit. À la réactivation : les matchs déjà perdus le restent.
+- **Correction d'arbitrage** : `adminResolveMatchPublic` oublie la liste des
+  comptes sans fiche (`invalidateProfilelessPlayers`) quand l'issue d'un match
+  clos change — la fiche d'un compte anonymisé privé de son seul match joué
+  tombe aussitôt. Un score ordinaire ne la vide toujours pas.
+- **Copie du navigateur au-delà du plafond** : les identifiants les plus
+  récents restent (`slice(-PROFILELESS_PLAYERS_MAX)`), les plus anciens tombent.
+- **Réactivation** : `keptLead` nomme l'avatar masqué **ou supprimé** et dit à
+  part qu'un compte suspendu revient suspendu ; `kept` (derrière le « i »)
+  tient en deux phrases.
+- **Requête staff des pseudos laissés tels quels** (`UNTRUSTED_NAMES.md`) :
+  barres obliques inverses doublées et classe alignée sur
+  `withoutInvisiblesKeepingSpaces`.
+- `REGISTER_UPDATED_AT` avancé (texte de T01 changé). Aucune entrée
+  `PRIVACY_CHANGES` : rien de collecté, lu, gardé ni effacé ne change, seules
+  des précisions.

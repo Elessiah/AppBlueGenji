@@ -24,7 +24,13 @@
  * l'entrée ({@link invalidateTournamentSnapshot}). Personne ne lit donc un
  * score périmé.
  */
-import { singleMapDisplayScore, type RoundPointTarget } from "@/lib/shared/map-points";
+import {
+  clipMapPointTargets,
+  effectiveMapPointTargets,
+  singleMapDisplayScore,
+  type RoundMapPointTargets,
+  type RoundPointTarget,
+} from "@/lib/shared/map-points";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
@@ -65,9 +71,9 @@ import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
-import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
+import { applyMapRules, roundKeyId, type RoundTiebreak, type TournamentMapRules } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
-import { applicableTiebreaks } from "@/lib/shared/round-plan";
+import { applicableTiebreaks, indexBuiltRounds, roundMaxMaps, withoutUnbuiltRounds } from "@/lib/shared/round-plan";
 import { forgetLiveRefereeNames, withoutRefereeKeys } from "./referee-names";
 import { loadTournamentVoiceInfos } from "./match-voice";
 
@@ -406,21 +412,44 @@ function encodeSnapshotFrame(
 
 /**
  * Format Duel / Arcade : points qui gagnent une carte, par match (réglage du
- * tour, sinon du tournoi) — dans l'instantané commun, servi par les deux
- * portes (`docs/features/DUEL_ARCADE.md`). Absent quand le format est éteint.
+ * tour, sinon du tournoi) et carte par carte (réglage de la carte, sinon celui
+ * du match) — dans l'instantané commun, servi par les deux portes
+ * (`docs/features/DUEL_ARCADE.md`). Absent quand le format est éteint.
  */
-function attachPointTargets(
+export function attachPointTargets(
   matches: BracketMatch[],
   tournamentTarget: number | null | undefined,
   roundTargets: ReadonlyArray<RoundPointTarget> | null | undefined,
+  roundMapTargets?: ReadonlyArray<RoundMapPointTargets> | null,
+  /** Cartes au plus d'un match du tour (`roundMaxMaps`) : un réglage au-delà n'est pas servi. */
+  maxMaps: (roundNumber: number) => number | null = () => null,
 ): void {
   if (tournamentTarget == null) return;
   // Un index des réglages de tour, bâti une fois : une recherche linéaire par
   // match rebâtirait la clé de chaque tour pour chacun des ~250 matchs.
   const byRound = new Map<string, number>();
   for (const entry of roundTargets ?? []) byRound.set(roundKeyId(entry), entry.target);
+  const mapsByRound = new Map<string, (number | null)[]>();
+  for (const entry of roundMapTargets ?? []) mapsByRound.set(roundKeyId(entry), entry.targets);
+  // Résolution carte par carte : une fois par tour réglé (les matchs d'un tour
+  // partagent N et nombre de cartes), jamais sans réglage — le cas courant.
+  const resolved = new Map<string, number[] | null>();
   for (const match of matches) {
-    match.mapPointTarget = byRound.get(roundKeyId(match)) ?? tournamentTarget;
+    const id = roundKeyId(match);
+    match.mapPointTarget = byRound.get(id) ?? tournamentTarget;
+    const configured = mapsByRound.get(id);
+    if (!configured) continue;
+    let perMap = resolved.get(id);
+    if (perMap === undefined) {
+      perMap = effectiveMapPointTargets(
+        match.mapPointTarget,
+        clipMapPointTargets(configured, maxMaps(match.roundNumber)),
+      );
+      resolved.set(id, perMap);
+    }
+    // Champ omis sans réglage carte par carte (le cas courant) ; un seul tableau
+    // partagé par les matchs du tour.
+    if (perMap) match.mapPointTargets = perMap;
   }
 }
 
@@ -445,6 +474,24 @@ function attachDisplayScores(
     const score = singleMapDisplayScore(match, format);
     if (score) match.displayScore = score;
   }
+}
+
+/**
+ * Réglages de manche des seuls tours que le tournoi jouera (`withoutUnbuiltRounds`) :
+ * cartes, départages, points du tour et points carte par carte.
+ */
+function builtRoundsMapRules(
+  rules: TournamentMapRules,
+  scope: Parameters<typeof withoutUnbuiltRounds>[1],
+  index: Parameters<typeof withoutUnbuiltRounds>[2],
+): TournamentMapRules {
+  return {
+    ...rules,
+    rounds: withoutUnbuiltRounds(rules.rounds, scope, index),
+    tiebreaks: withoutUnbuiltRounds(rules.tiebreaks, scope, index),
+    ...(rules.pointTargets ? { pointTargets: withoutUnbuiltRounds(rules.pointTargets, scope, index) } : {}),
+    ...(rules.mapPointTargets ? { mapPointTargets: withoutUnbuiltRounds(rules.mapPointTargets, scope, index) } : {}),
+  };
 }
 
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
@@ -588,7 +635,22 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const { streamsByMatch, castersByMatch } = await loadCastersAndStreams(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
-    const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
+    const loadedMapRules = await loadMapRules(connection, tournamentId, tournament);
+    // Les réglages des tours que le tournoi ne jouera jamais (plan
+    // dimensionné sur la capacité avant le départ) ne partent pas dans chaque
+    // instantané (`withoutUnbuiltRounds`) ; l'index des tours créés est bâti une fois.
+    const builtIndex = indexBuiltRounds(
+      matches.map((row) => ({
+        phaseId: Number(row.phase_id ?? 0),
+        bracket: String(row.bracket),
+        roundNumber: Number(row.round_number),
+      })),
+    );
+    const storedMapRules = builtRoundsMapRules(
+      loadedMapRules,
+      { format: card.format, phases: phasesDetail?.phases ?? null },
+      builtIndex,
+    );
     // Map de départage : celles des seuls tours éligibles (play-offs à format
     // défini) — un réglage resté d'un format changé depuis n'est pas montré.
     const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {
@@ -614,7 +676,9 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       ), mapRules),
       await loadMapsByMatch(connection, matchIds),
     );
-    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets);
+    attachPointTargets(mappedMatches, card.mapPointTarget, mapRules.pointTargets, mapRules.mapPointTargets, (roundNumber) =>
+      roundMaxMaps(card, roundNumber),
+    );
     attachDisplayScores(mappedMatches, card);
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
     // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).

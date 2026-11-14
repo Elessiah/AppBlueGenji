@@ -238,7 +238,7 @@ export function accountDeletionConfirmation(
     case "OWNED_TEAMS":
       return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible} ${residual}`;
     case null:
-      return `Supprimer ton compte ? Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${irreversible} ${residual}`;
+      return `Supprimer ton compte ? Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement à la fin des ${ACCOUNT_REACTIVATION_DAYS} jours, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées dès maintenant. ${irreversible} ${residual}`;
     default:
       return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, engagement dans un tournoi individuel déjà commencé ou terminé, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible} ${residual}`;
   }
@@ -282,6 +282,33 @@ export function accountDeletionOutcome(
 export const SESSION_GONE_CODES: ReadonlySet<string> = new Set(["UNAUTHORIZED", "USER_NOT_FOUND"]);
 
 /**
+ * Refus de `DELETE /api/profile` : ce que la confirmation annonçait (le motif
+ * de l'aperçu) n'est plus ce que la demande ferait — un tournoi individuel a
+ * commencé entre l'aperçu et le clic, par exemple, et l'effacement complet
+ * promis deviendrait une anonymisation. Rien n'est écrit ; l'écran relit
+ * l'aperçu et redemande la confirmation sur la nouvelle description.
+ */
+export const ACCOUNT_DELETION_PLAN_CHANGED = "ACCOUNT_DELETION_PLAN_CHANGED";
+
+const RETENTION_REASONS: ReadonlySet<string> = new Set<AccountRetentionReason>([
+  "TOURNAMENTS",
+  "SOLO_REGISTRATIONS",
+  "ORGANIZED_TOURNAMENTS",
+  "OWNED_TEAMS",
+]);
+
+/**
+ * Le motif que la confirmation a annoncé, tel que le corps de la demande le
+ * porte : un motif connu, `null` (effacement complet annoncé), ou `undefined`
+ * quand l'écran n'en a annoncé aucun (aperçu en échec, corps absent ou
+ * illisible) — alors rien n'est comparé.
+ */
+export function parseConfirmedReason(value: unknown): AccountRetentionReason | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" && RETENTION_REASONS.has(value) ? (value as AccountRetentionReason) : undefined;
+}
+
+/**
  * Le refus, en français.
  *
  * La suppression ne peut échouer que de deux façons, et l'une d'elles est une
@@ -300,6 +327,9 @@ export function accountDeletionErrorMessage(code: string | undefined): string {
   }
   if (code === "LAST_ADMIN_ACCOUNT") {
     return "Tu es le dernier administrateur : nomme un autre administrateur avant de supprimer ton compte.";
+  }
+  if (code === ACCOUNT_DELETION_PLAN_CHANGED) {
+    return "Ce que la suppression emporterait vient de changer : relis la confirmation mise à jour avant de valider.";
   }
   return "La suppression du compte a échoué. Réessaie dans un instant.";
 }
@@ -338,7 +368,7 @@ export const ACCOUNT_DELETION_QUESTION = "Supprimer ton compte ?";
 
 /** Ce qui se fait dès la demande et que la réactivation ne défait pas (E3, E4). */
 export const ACCOUNT_DELETION_HANDOVER =
-  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu'après tous les autres ; s'il ne reste aucun autre membre, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore terminés, tes désignations d'arbitre et tes invitations et demandes d'adhésion d'équipe en attente seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.";
+  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu'après tous les autres ; s'il ne reste aucun autre membre, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore terminés, tes désignations d'arbitre et tes invitations et demandes d'adhésion d'équipe en attente seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait (abandon du classement dans un tournoi à classement ; un match qui attend encore ton adversaire, une fois celui-ci connu). Réactiver ton compte ne défera pas ces gestes.";
 
 /** La fenêtre de réactivation (E4). */
 export const ACCOUNT_DELETION_WINDOW =

@@ -26,6 +26,8 @@
       "legend": "Maps jouées",
       "drawHint": "Une map nulle ne rapporte de point à personne.",
       "duelRules": "Le vainqueur d'une map marque exactement {points} points, l'autre de 0 à {max} : pas de map nulle.",
+      "duelRulesPerMap": "Chaque map se gagne au premier à un nombre de points propre, indiqué sur sa ligne : le vainqueur l'atteint exactement, l'autre reste en dessous. Pas de map nulle.",
+      "rowTarget": "premier à {points}",
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",
       "mapNamed": "Map {index} : {name}",
@@ -86,6 +88,7 @@
       "proposalWithoutMaps": "Cette proposition n'a pas de détail de maps à reprendre : saisis les maps jouées pour la valider.",
       "saveWillPause": "« Enregistrer » suspend la validation automatique de la proposition de {author} : seul « Valider le résultat » tranche alors, à moins que {other} ne la confirme.",
       "conflict": "Ce match a été modifié pendant ta saisie — quelqu'un d'autre a enregistré un résultat. Envoyer maintenant écraserait le sien.",
+      "rulesChanged": "Le format de la manche a changé pendant ta saisie : les maps saisies suivent l'ancien format et seraient refusées.",
       "adoptStored": "Reprendre la valeur à jour",
       "forfeit": {
         "open": "Déclarer un forfait sur cette manche",

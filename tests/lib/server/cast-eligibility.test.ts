@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
 import {
   castEligibilityBlock,
@@ -8,6 +8,8 @@ import {
   loadRefereeEligibility,
   loadRefereePermission,
   loadRefereeStanding,
+  resetObjectionColumnProbe,
+  OBJECTION_COLUMN_RECHECK_MS,
   loadShownCasterIds,
   refereeKeptColumns,
   refereeObjectionUpheld,
@@ -419,6 +421,8 @@ describe("loadRefereeStanding (EF-31)", () => {
   const connectionWith = (execute: jest.Mock<SqlQuery>) => fakeConnection({ execute });
   const referee: CastEligibilityFields = { ...ELIGIBLE, platform_roles_json: JSON.stringify(["ARBITRE"]) };
 
+  beforeEach(() => resetObjectionColumnProbe());
+
   it("loadRefereeStanding_eligibleWithoutObjection_oneRead", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, referee_objection_at: null }], []]);
 
@@ -447,6 +451,33 @@ describe("loadRefereeStanding (EF-31)", () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn).mockResolvedValue([[referee], []]);
 
     await expect(loadRefereeStanding(connectionWith(execute), 950, "OW")).resolves.toEqual({ block: null, objection: false });
+  });
+
+  it("loadRefereeStanding_columnSeenMissing_skipsObjectionReadNextTime", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'referee_objection_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn).mockResolvedValue([[referee], []]);
+    await loadRefereeStanding(connectionWith(execute), 950, "OW");
+    execute.mockClear();
+
+    await expect(loadRefereeStanding(connectionWith(execute), 950, "OW")).resolves.toEqual({ block: null, objection: false });
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).not.toContain("referee_objection_at");
+  });
+
+  it("loadRefereeStanding_columnAddedAfterRecheckDelay_readsObjectionAgain", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'referee_objection_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn).mockResolvedValueOnce([[referee], []]);
+    await loadRefereeStanding(connectionWith(execute), 950, "OW");
+    execute.mockReset().mockResolvedValue([[{ ...referee, referee_objection_at: "2026-10-28 20:00:00" }], []]);
+    now.mockReturnValue(1_000_000 + OBJECTION_COLUMN_RECHECK_MS);
+
+    const standing = await loadRefereeStanding(connectionWith(execute), 950, "OW");
+
+    expect(standing).toEqual({ block: null, objection: true });
+    expect(execute.mock.calls[0][0]).toContain("referee_objection_at");
+    now.mockRestore();
   });
 
   it("loadRefereeStanding_otherError_rethrows", async () => {

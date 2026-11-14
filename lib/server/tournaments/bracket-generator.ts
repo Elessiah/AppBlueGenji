@@ -12,6 +12,7 @@ import { loadPhaseTeamIds } from "./phases-repository";
 import { noteDeletedMatches } from "./departed-notices";
 import { createSingleEliminationBracket } from "./bracket-single";
 import { createDoubleEliminationBracket } from "./bracket-double";
+import { purgeUnbuiltRoundSettings } from "./round-map-slots";
 
 /**
  * Le plateau déjà en base : y a-t-il des rencontres, et pour quelle taille ?
@@ -185,6 +186,8 @@ export async function createBracketIfMissing(
   } else {
     await createSingleEliminationBracket(connection, bracketTournament, registeredTeamIds, options);
   }
+  // Réglages par tour des tours que cet arbre n'aura jamais (`ROUND_MAPS.md`).
+  await purgeUnbuiltRoundSettings(connection, tournament.id, phaseId);
 
   return { finished: false, created: true };
 }

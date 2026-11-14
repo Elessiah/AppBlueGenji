@@ -36,8 +36,10 @@ describe("écran de réactivation", () => {
   });
 
   it("reactivationMessages_notUndone_saysHandoversStay", () => {
-    expect(frLogin.reactivation.notUndone).toContain("n'est pas annulé");
-    expect(enLogin.reactivation.notUndone).toContain("not undone");
+    expect(frLogin.reactivation.notUndoneLead).toContain("n'est pas annulé");
+    expect(enLogin.reactivation.notUndoneLead).toContain("not undone");
+    expect(Object.keys(frLogin.reactivation.notUndoneItems)).toEqual(["teams", "organized", "registrations", "forfeits", "casts"]);
+    expect(Object.keys(enLogin.reactivation.notUndoneItems)).toEqual(Object.keys(frLogin.reactivation.notUndoneItems));
   });
 });
 
@@ -103,8 +105,8 @@ describe("/rgpd et historique", () => {
 
   // Comme /rgpd et T01 : masqué ou supprimé par la modération, l'avatar n'est pas rendu.
   it("reactivationMessages_kept_carriesModerationCaveatFrAndEn", () => {
-    expect(frLogin.reactivation.kept).toContain("Un avatar que la modération a masqué ou supprimé entre-temps ne revient pas.");
-    expect(enLogin.reactivation.kept).toContain("An avatar that moderation hid or removed in the meantime does not come back.");
+    expect(frLogin.reactivation.kept).toContain("Un avatar que la modération a masqué ou supprimé entre-temps ne revient pas, et un compte suspendu, qui peut aussi être réactivé, reste suspendu.");
+    expect(enLogin.reactivation.kept).toContain("An avatar that moderation hid or removed in the meantime does not come back, and a suspended account, which can be reactivated too, stays suspended.");
   });
 });
 

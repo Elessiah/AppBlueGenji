@@ -558,16 +558,17 @@ export async function reportMatchScore(
   // gagnée vaut un point, une map nulle n'en vaut à personne. Chaque map porte
   // son code de replay, jugé selon le jeu du tournoi — d'où la lecture du jeu
   // avec le format, dans la même requête.
-  // Format Duel / Arcade : chaque carte doit atteindre les points du tour
-  // (`docs/features/DUEL_ARCADE.md`), confirmation comprise.
-  const { format: matchFormat, game, pointTarget } = await loadTournamentMatchRules(
+  // Format Duel / Arcade : chaque carte doit atteindre ses propres points (la
+  // carte, sinon le tour, sinon le tournoi — `docs/features/DUEL_ARCADE.md`),
+  // confirmation comprise.
+  const { format: matchFormat, game, pointTarget, pointTargets } = await loadTournamentMatchRules(
     connection,
     tournamentId,
     Number(match.round_number),
     matchRoundKey(match),
   );
   const { myScore, opponentScore, reporterSource } = reporterView(
-    checkMapList(matchFormat, game, maps, { decisive: true, pointTarget }),
+    checkMapList(matchFormat, game, maps, { decisive: true, pointTarget, pointTargets }),
     isTeam1Reporter,
   );
   // « Confirmer » : la proposition adverse doit être **celle que l'engagé a

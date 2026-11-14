@@ -247,24 +247,54 @@ export type RefereeStanding = { block: RefereeBlock | null; objection: boolean }
 /**
  * Condition d'arbitrage **et** opposition retenue de `userId`, en une seule
  * lecture de sa ligne (`lockLaunchMatch` lisait les deux séparément à chaque
- * verrou). Sans la colonne `referee_objection_at` (base pas encore migrée),
- * repli sur la seule condition, sans opposition — comme `refereeObjectionUpheld`.
+ * verrou ; `writeReferee` aussi, deux fois par désignation). Sans la colonne
+ * `referee_objection_at` (base pas encore migrée), repli sur la seule
+ * condition, sans opposition — comme `refereeObjectionUpheld`. `lock` : lecture
+ * verrouillée en partage, celle d'une désignation (`loadRefereeEligibility`,
+ * `refereeObjectionUpheld`).
  */
 export async function loadRefereeStanding(
   executor: Executor,
   userId: number,
   game: TournamentGame,
+  lock = false,
 ): Promise<RefereeStanding> {
+  // Colonne vue absente il y a peu : la seule condition, d'emblée (un
+  // aller-retour en échec de moins par désignation).
+  if (objectionColumnRecentlyMissing()) return { block: await loadRefereeEligibility(executor, userId, game, lock), objection: false };
   try {
     const [rows] = await executor.execute<(CastEligibilityRow & { referee_objection_at: Date | string | null })[]>(
-      `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1`,
+      `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
       [userId],
     );
     return { block: refereeEligibilityBlock(rows[0], game), objection: (rows[0]?.referee_objection_at ?? null) !== null };
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
-    return { block: await loadRefereeEligibility(executor, userId, game), objection: false };
+    objectionColumn.missingAt = Date.now();
+    return { block: await loadRefereeEligibility(executor, userId, game, lock), objection: false };
   }
+}
+
+/**
+ * `bg_users.referee_objection_at` absente (son `ALTER` n'a pas été joué) : notée
+ * à l'erreur, pour ne pas la redemander à chaque désignation — mais **reposée**
+ * passé {@link OBJECTION_COLUMN_RECHECK_MS} : la colonne ajoutée ensuite (autre
+ * instance, `ALTER` rejoué) rend l'opposition à nouveau lue, sans attendre un
+ * redémarrage. Sans cela, une opposition retenue resterait ignorée.
+ */
+const objectionColumn: { missingAt: number | null } = { missingAt: null };
+
+/** Délai après lequel une colonne d'opposition vue absente est redemandée. */
+export const OBJECTION_COLUMN_RECHECK_MS = 60_000;
+
+function objectionColumnRecentlyMissing(): boolean {
+  const at = objectionColumn.missingAt;
+  return at !== null && Date.now() - at < OBJECTION_COLUMN_RECHECK_MS;
+}
+
+/** Oublie l'absence notée de la colonne. Réservé aux tests. */
+export function resetObjectionColumnProbe(): void {
+  objectionColumn.missingAt = null;
 }
 
 /**

@@ -103,11 +103,18 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   la levée vaut pour tout compte qui en porte une ;
 - retenue : l'arbitre est retiré de **tous** ses matchs non terminés (tout
   statut sauf `COMPLETED`, score en attente de confirmation compris), lancés
-  compris (`releaseObjectingReferee`, un match par transaction sous
-  `lockLaunchMatch`, un match qui n'attendait que lui part) ; avis push
-  `REFEREE_RELEASED` motif `OBJECTION`, **aucune** ligne Discord par match
-  (nommer les matchs juste avant la ligne de l'opposition désignerait leur
-  arbitre) ; les matchs terminés gardent leur arbitre ; le staff en désigne un autre ;
+  compris (`releaseObjectingReferee`, un match par transaction : tournoi du
+  match lu avant, puis son verrou partagé en première instruction — ordre du
+  moteur, tournoi puis match —, puis un verrou **allégé** du match — sa seule
+  ligne —, puis l'opposition relue ; le contexte
+  complet n'est relu par `launchIfAllReady` que si le tournoi est en cours —,
+  un match qui n'attendait que lui part) ; **un** avis push récapitulatif
+  `REFEREE_RELEASED` (« Tu n'arbitres plus N matchs », `refereeObjectionReleasedPush`,
+  vers le tournoi s'il n'y en a qu'un, la liste sinon) et **un** `match_updated`
+  par tournoi touché, au lieu d'un de chaque par match ; **aucune** ligne
+  Discord par match (nommer les matchs juste avant la ligne de l'opposition
+  désignerait leur arbitre) ; les matchs terminés gardent leur arbitre ; le
+  staff en désigne un autre ;
 - tant qu'elle tient : ni « Je prends ce match » ni désignation
   (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee` et sur une
   re-désignation du même arbitre), absent des candidats, bouton « Arbitrer ce
@@ -131,7 +138,8 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   strict.
 
 Concurrence : l'écriture de l'opposition est une instruction seule (verrou
-exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition en
+exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition — avec la
+condition d'arbitrage, dans la même lecture (`loadRefereeStanding(…, true)`) — en
 `LOCK IN SHARE MODE` sous le verrou du match. Une prise concurrente passe donc
 avant (et le balayage, lancé après l'écriture, voit le match) ou après (et
 elle est refusée). Une transaction par match plutôt qu'une pour tous : ses
@@ -141,8 +149,8 @@ balayage est rejouable : une opposition déjà retenue reste proposée au
 formulaire, la retenir de nouveau refait le tour. Un échec sur un match
 n'arrête pas les autres ; il est compté, et la route répond 500
 (`REFEREE_OBJECTION_FAILED`) **après** le journal. `releaseObjectingReferee`
-relit l'opposition sous le verrou du match (ordre match puis compte, celui de
-`writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
+relit l'opposition sous le verrou du match (ordre tournoi, match puis compte,
+celui du moteur et de `writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
 L'instantané (`refereeKept`, jointure `referee_objection_at`), la lecture de la
 modale (`keepEligibleReferees`) et le check-in du match (`loadEligibleRefereeIds`)
 relisent aussi l'opposition : un balayage resté incomplet ne laisse pas
@@ -333,7 +341,17 @@ règle a changé avec l'arbitre hôte.
   puis verrouille ses matchs par clé primaire (identifiants lus d'abord, sans
   verrou : aucun intervalle d'index pris aux autres manches), et ses avis
   partent l'un après l'autre (`announceRefereeChanges`). Un match listé déjà
-  joué à l'envoi n'est ni listé ni compté.
+  joué à l'envoi n'est ni listé ni compté. Les avis d'un même match partent
+  dans l'ordre ; un choix de carte dans un pool ouvre une rafale (première
+  ligne aussitôt, une ligne de fin comptée, `ROUND_MAPS.md`) que tout autre
+  changement du match ferme d'abord. Après une opposition, les alertes « sans
+  arbitre » des matchs retirés (`queueDeferredNoRefereeAlerts`) sont mises en
+  file d'abord ; l'avis récapitulatif à l'arbitre (`announceObjectionReleases`)
+  part ensuite, sans faire attendre la réponse.
+- **Drapeau `contactsPending`** (`LaunchReferee`, `MATCH_LAUNCH.md`) : un caster
+  du match apprend avant le départ qu'un contact de l'arbitre lui sera ouvert
+  (un bit, jamais le contact). Accepté : il le lit au coup d'envoi de toute
+  façon, comme la note d'attente du caster (`casterContactsPending`).
 - **Avis à l'arbitre retiré** par un autre que lui : sujet push
   `REFEREE_RELEASED` (audience `tournaments`), **push seul**, jamais de message
   privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `OBJECTION`, `INELIGIBLE`,
