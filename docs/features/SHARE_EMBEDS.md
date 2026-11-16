@@ -100,7 +100,20 @@ de replay publics).
   membre, `/suivre/`, aperçu) ; une proposition en attente reste vide dans la
   réponse publique. Déclaré : `/rgpd` (scores map par map, « Suivre un tournoi
   sans compte », FR et EN), registre T03, entrée
-  `2026-11-apercus-partage-codes-replay` de `PRIVACY_CHANGES`.
+  `2026-11-apercus-partage-codes-replay` de `PRIVACY_CHANGES`. Les codes déjà
+  enregistrés deviennent publics eux aussi (dit dans l'entrée et /rgpd, avec
+  l'opposition art. 21 : l'association peut retirer le code d'un résultat).
+  Le score de chaque map était déjà public sur `/suivre/` avant ce lot.
+- **Description** : sans équipe en tête, l'image reprend la description du
+  tournoi publiée par l'organisation (déclarée) ; aucun pseudo n'est tiré d'un
+  compte.
+- **Adresse IP** : les plafonds (lecture, reconstruction, rendu d'aperçu)
+  sont tenus par réseau, en mémoire seulement. `rate-limit.ts` efface toute
+  clé épuisée (fenêtre close, seau plein) toutes les 30 s
+  (`RATE_LIMIT_SWEEP_INTERVAL_MS`, balayage paresseux + minuteur détaché hors
+  tests) : une adresse ne reste pas plus de deux minutes, durée déclarée au
+  registre T03 et dans /rgpd. Un plafond public plus long doit faire revoir
+  ces textes (`rate-limit-sweep.test.ts`).
 
 ## Cache
 

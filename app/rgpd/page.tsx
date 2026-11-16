@@ -474,8 +474,9 @@ function RgpdFr({
             quand le replay est perdu), qui permet de la revoir en
             jeu — et donc d'y lire les identifiants de jeu des joueurs présents, y compris un
             BattleTag masqué sur le site. Depuis novembre 2026, ces codes sont{" "}
-            <strong>publics</strong> une fois la map jouée et son résultat enregistré par
-            l'arbitrage ou retenu : visibles de tous sur la fiche du tournoi, sur sa page sans
+            <strong>publics</strong>, map par map, dès que l'arbitrage enregistre la map jouée
+            ou que le résultat est retenu — avant même la fin du match, et pour les matchs déjà
+            joués aussi : visibles de tous sur la fiche du tournoi, sur sa page sans
             compte et dans l&apos;aperçu d&apos;un lien de match partagé (voir ci-dessous), pour qu'un match diffusé en
             direct et un match qui ne l'est pas offrent les mêmes informations — jamais avant :
             tant qu'une proposition d'équipe attend, seules les deux équipes du match
@@ -485,7 +486,10 @@ function RgpdFr({
             suppression du compte. La partie elle-même est conservée par l'éditeur du jeu :
             supprimer votre compte ici n'efface pas vos identifiants de jeu d'un replay, et
             les codes restent attachés au résultat qu'ils documentent. Les maps que vous avez
-            saisies figurent dans l'export de vos données.
+            saisies figurent dans l'export de vos données. Vous pouvez vous opposer à la
+            publication du code de replay d&apos;un match auquel vous avez pris part (voir « Vos
+            droits ») : l&apos;association examine la demande et, si elle l&apos;accepte, retire le
+            code du résultat.
           </p>
           <p id="suivi-sans-compte">
             <strong>Suivre un tournoi sans compte.</strong> Depuis octobre 2026, la fiche d&apos;un
@@ -495,14 +499,17 @@ function RgpdFr({
             et Discord montrent déjà —, ainsi que les logos des équipes et, pour un tournoi individuel,
             l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
             interne, qui porte sa marque du podium, et les pénalités d&apos;une BlueGenji Survie (engagé, manche,
-            points), sans leur motif ni l&apos;arbitre qui les a posées. Depuis novembre 2026, les
-            scores de chaque map et leurs codes de replay y figurent aussi (voir ci-dessus), et le
-            bouton « Partager » d&apos;un tournoi ou d&apos;un match donne le lien de cette page. Son{" "}
+            points), sans leur motif ni l&apos;arbitre qui les a posées. Le score de chaque map y
+            figure, et depuis novembre 2026 son code de replay aussi (voir ci-dessus). Chaque
+            match y a sa propre page (<code>/suivre/tournois/…/matchs/…</code>), et le bouton
+            « Partager » d&apos;un tournoi ou d&apos;un match donne le lien de sa page sans compte. Son{" "}
             <strong>aperçu</strong> — l&apos;image et le texte qu&apos;affichent Discord, X ou une
             messagerie sous le lien — reprend le nom, le jeu, le format, l&apos;état, les dates et
-            l&apos;effectif du tournoi et l&apos;équipe en tête ou victorieuse ; pour un match, les
-            noms et logos des équipes, le score et chaque map jouée avec son score et son code de
-            replay. Il ne porte <strong>jamais le pseudo d&apos;un joueur</strong> : dans un
+            l&apos;effectif du tournoi et l&apos;équipe en tête ou victorieuse, à défaut sa
+            description publiée par l&apos;organisation ; pour un match, la manche, les noms et
+            logos des équipes, le score ou le forfait et chaque map jouée avec son nom, son score
+            et son code de replay. Il ne reprend <strong>jamais le pseudo d&apos;un joueur</strong>{" "}
+            depuis son compte : dans un
             tournoi individuel, les engagés y sont « Joueur 1 » et « Joueur 2 », sans avatar. Un
             tournoi non publié n&apos;a pas d&apos;aperçu. Le service qui affiche l&apos;aperçu en
             garde une copie selon ses propres règles. La page est servie depuis une copie partagée, renouvelée au plus
@@ -510,7 +517,9 @@ function RgpdFr({
             suppression de compte peut y apparaître avec ce délai. Cette page est exclue des moteurs de recherche (<code>noindex</code>)
             et n&apos;ouvre aucune session. Comme toute page du site, sa visite est comptée par la
             mesure d&apos;audience, sauf opposition (voir « Mesure d&apos;audience ») ; l&apos;adresse IP
-            du visiteur n&apos;y sert par ailleurs qu&apos;à limiter le nombre de lectures, en mémoire.
+            du visiteur (son réseau /64 en IPv6) n&apos;y sert par ailleurs qu&apos;à limiter le
+            nombre de lectures et d&apos;images d&apos;aperçu produites, en mémoire, deux minutes au
+            plus.
             Vous pouvez vous opposer à l&apos;affichage de votre pseudo (voir « Vos droits »).
           </p>
         </div>
