@@ -2839,6 +2839,22 @@ describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", (
 
 // MATCH-VOICE (#572, décisions D13 à D15) : vidage par l'arbitrage, match reporté,
 // ligne du site jamais close tant que le salon peut exister, aucune donnée d'utilisateur.
+/** Sources FR et EN de `/rgpd`, lues telles quelles. */
+function rgpdSources(): [string, string] {
+  const read = (file: string) => readFileSync(join(process.cwd(), "app", "rgpd", file), "utf8");
+  return [read("page.tsx"), read("RgpdEn.tsx")];
+}
+
+/** Les phrases attendues que le texte ne contient pas. */
+function absentPhrases(text: string, phrases: readonly string[]): string[] {
+  return phrases.filter((phrase) => !text.includes(phrase));
+}
+
+/** Les phrases retirées que le texte contient encore. */
+function presentPhrases(text: string, phrases: readonly string[]): string[] {
+  return phrases.filter((phrase) => text.includes(phrase));
+}
+
 describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–D15)", () => {
   const t18 = () => PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
   const t18En = () => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
@@ -2865,36 +2881,53 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   });
 
   it("processingRegister_t18_recheckEveryFiveMinutesAndBotRecreatesFrAndEn", () => {
-    const fr = t18().security.join(" ");
-    const en = t18En().security.join(" ");
-    expect(fr).toContain("le redemander (environ une fois toutes les 5 minutes par processus du site, environ une minute après une indisponibilité du bot, de 15 minutes avant l'horaire du match à 24 heures après");
-    expect(fr).toContain("un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site");
-    expect(en).toContain("ask for it again (about once every 5 minutes per site process, about a minute after the bot was unavailable, from 15 minutes before the match time to 24 hours after it");
-    expect(en).toContain("a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site");
-    expect(fr).toContain("sans appel au site, sauf au-delà de 48 heures depuis sa création, sa reprise ou sa dernière recréation ou de 3 recréations en 10 minutes, compte tenu en mémoire par le bot et remis à zéro à son redémarrage)");
-    expect(en).toContain("without calling the site, except beyond 48 hours since its creation, its reuse or its last recreation or 3 recreations within 10 minutes, a count the bot holds in memory and resets when it restarts)");
-    expect(fr).not.toContain("le redemander (environ une fois par minute");
-    expect(en).not.toContain("ask for it again (about once a minute");
+    const [fr, en] = [t18().security.join(" "), t18En().security.join(" ")];
+    expect(absentPhrases(fr, [
+      "le redemander (environ une fois toutes les 5 minutes par processus du site, environ une minute après une indisponibilité du bot, de 15 minutes avant l'horaire du match à 24 heures après",
+      "un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site",
+      "sans appel au site, sauf au-delà de 48 heures depuis sa création, sa reprise ou sa dernière recréation ou de 3 recréations en 10 minutes, compte tenu en mémoire par le bot et remis à zéro à son redémarrage)",
+    ])).toEqual([]);
+    expect(absentPhrases(en, [
+      "ask for it again (about once every 5 minutes per site process, about a minute after the bot was unavailable, from 15 minutes before the match time to 24 hours after it",
+      "a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site",
+      "without calling the site, except beyond 48 hours since its creation, its reuse or its last recreation or 3 recreations within 10 minutes, a count the bot holds in memory and resets when it restarts)",
+    ])).toEqual([]);
+    expect(presentPhrases(fr, [
+      "le redemander (environ une fois par minute",
+    ])).toEqual([]);
+    expect(presentPhrases(en, [
+      "ask for it again (about once a minute",
+    ])).toEqual([]);
   });
 
   it("rgpdPage_voiceChannelDeletedByModeration_recreatedAtOnceFrAndEn", () => {
-    const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
-    const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
-    expect(fr).toContain("un salon supprimé par la modération avant d&apos;être rendu au bot est, lui, recréé aussitôt par le bot sans ces conditions, sous le nom qu&apos;il portait (celui de l&apos;équipe, sauf si la modération l&apos;a renommé), puis rendu et supprimé comme tout autre salon (chaque recréation fait repartir les délais du bot, et ceux du site dès sa revérification suivante), sauf si plus de {VOICE_BOT_UNRELEASED_MAX_HOURS} heures ont passé depuis sa création, sa reprise ou sa dernière recréation, ou s&apos;il a déjà été recréé {VOICE_BOT_RECREATE_MAX} fois en {VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes (compte tenu en mémoire par le bot, qui repart de zéro à son redémarrage) — à défaut (bot arrêté, recréation en échec ou écartée), le site en rouvre un aux conditions ci-dessus");
-    expect(fr).toContain("si le bot redémarre, ou oublie l&apos;ancien identifiant, avant que le site n&apos;apprenne celui du salon recréé (à sa revérification suivante), un rendu par l&apos;ancien identifiant peut clore la ligne du site sans rendre ce salon, et un vidage par l&apos;ancien identifiant n&apos;en déconnecte personne ; le bot le traite alors comme un salon jamais rendu : supprimé s&apos;il est vide {VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa recréation, gardé tant qu&apos;il est occupé");
-    expect(fr).not.toContain("que le bot supprime alors comme un salon jamais rendu");
-    expect(en).toContain("a channel deleted by moderation before being handed back to the bot is instead recreated at once by the bot, without these conditions, under the name it had (the team&apos;s, unless moderation renamed it), then handed back and deleted like any other channel (each recreation restarts the bot&apos;s periods, and the site&apos;s from its next recheck), unless more than {VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation, its reuse or its last recreation, or it has already been recreated {VOICE_BOT_RECREATE_MAX} times within {VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes (a count the bot holds in memory, which starts again from zero when it restarts) — failing that (bot stopped, recreation failed or ruled out), the site reopens one under the conditions above");
-    expect(en).toContain("if the bot restarts, or forgets the old identifier, before the site learns the recreated channel&apos;s identifier (at its next recheck), a hand-back under the old identifier may close the site&apos;s record without handing that channel back, and a clearing under the old identifier disconnects no one from it; the bot then treats it as a channel never handed back: deleted if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its recreation, kept for as long as it is occupied");
-    expect(en).not.toContain("which the bot then deletes like a channel never handed back");
+    const [fr, en] = rgpdSources();
+    expect(absentPhrases(fr, [
+      "un salon supprimé par la modération avant d&apos;être rendu au bot est, lui, recréé aussitôt par le bot sans ces conditions, sous le nom qu&apos;il portait (celui de l&apos;équipe, sauf si la modération l&apos;a renommé), puis rendu et supprimé comme tout autre salon (chaque recréation fait repartir les délais du bot, et ceux du site dès sa revérification suivante), sauf si plus de {VOICE_BOT_UNRELEASED_MAX_HOURS} heures ont passé depuis sa création, sa reprise ou sa dernière recréation, ou s&apos;il a déjà été recréé {VOICE_BOT_RECREATE_MAX} fois en {VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes (compte tenu en mémoire par le bot, qui repart de zéro à son redémarrage) — à défaut (bot arrêté, recréation en échec ou écartée), le site en rouvre un aux conditions ci-dessus",
+      "si le bot redémarre, ou oublie l&apos;ancien identifiant, avant que le site n&apos;apprenne celui du salon recréé (à sa revérification suivante), un rendu par l&apos;ancien identifiant peut clore la ligne du site sans rendre ce salon, et un vidage par l&apos;ancien identifiant n&apos;en déconnecte personne ; le bot le traite alors comme un salon jamais rendu : supprimé s&apos;il est vide {VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa recréation, gardé tant qu&apos;il est occupé",
+    ])).toEqual([]);
+    expect(absentPhrases(en, [
+      "a channel deleted by moderation before being handed back to the bot is instead recreated at once by the bot, without these conditions, under the name it had (the team&apos;s, unless moderation renamed it), then handed back and deleted like any other channel (each recreation restarts the bot&apos;s periods, and the site&apos;s from its next recheck), unless more than {VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation, its reuse or its last recreation, or it has already been recreated {VOICE_BOT_RECREATE_MAX} times within {VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes (a count the bot holds in memory, which starts again from zero when it restarts) — failing that (bot stopped, recreation failed or ruled out), the site reopens one under the conditions above",
+      "if the bot restarts, or forgets the old identifier, before the site learns the recreated channel&apos;s identifier (at its next recheck), a hand-back under the old identifier may close the site&apos;s record without handing that channel back, and a clearing under the old identifier disconnects no one from it; the bot then treats it as a channel never handed back: deleted if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its recreation, kept for as long as it is occupied",
+    ])).toEqual([]);
+    expect(presentPhrases(fr, [
+      "que le bot supprime alors comme un salon jamais rendu",
+    ])).toEqual([]);
+    expect(presentPhrases(en, [
+      "which the bot then deletes like a channel never handed back",
+    ])).toEqual([]);
   });
 
   it("rgpdPage_voiceStaffLogAndRecordFollowRecreationFrAndEn", () => {
-    const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
-    const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
-    expect(fr).toContain("identifiant d&apos;un salon et erreur de Discord quand sa suppression, sa recréation ou son suivi échouent");
-    expect(fr).toContain("effacée avec le salon (une recréation la reporte sur le salon neuf, avec une nouvelle heure de création) ou quand il l&apos;oublie");
-    expect(en).toContain("identifier of a channel and Discord&apos;s error when its deletion, recreation or tracking fails");
-    expect(en).toContain("erased with the channel (a recreation moves it to the new channel, with a new creation time) or when it forgets it");
+    const [fr, en] = rgpdSources();
+    expect(absentPhrases(fr, [
+      "identifiant d&apos;un salon et erreur de Discord quand sa suppression, sa recréation ou son suivi échouent",
+      "effacée avec le salon (une recréation la reporte sur le salon neuf, avec une nouvelle heure de création) ou quand il l&apos;oublie",
+    ])).toEqual([]);
+    expect(absentPhrases(en, [
+      "identifier of a channel and Discord&apos;s error when its deletion, recreation or tracking fails",
+      "erased with the channel (a recreation moves it to the new channel, with a new creation time) or when it forgets it",
+    ])).toEqual([]);
   });
 
   it("processingRegister_t18_clearDeclaredWithoutOccupantDataFrAndEn", () => {
