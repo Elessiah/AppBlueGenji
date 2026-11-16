@@ -13,7 +13,7 @@ import {
   type TournamentMetadataRights,
   type TournamentShareLoader,
 } from "@/lib/server/tournament-metadata";
-import { matchEmbedCard, matchEmbedDescription, matchEmbedTitle } from "@/lib/shared/share-embed-cards";
+import { matchEmbedAlt, matchEmbedDescription, matchEmbedTitle } from "@/lib/shared/share-embed-cards";
 import { matchShareCardKey, matchShareVersion } from "@/lib/shared/share-embeds";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
@@ -104,6 +104,10 @@ export async function matchPageMetadata(
   loadCard?: TournamentMetadataCardLoader,
   loadShare: TournamentShareLoader = cachedTournamentShareLoader,
 ): Promise<Metadata> {
+  // Une seule lecture pour l'encart du tournoi et celui du match : un robot
+  // d'aperçu ne paie jamais deux fois le plafond de lecture publique.
+  let shareRead: ReturnType<TournamentShareLoader> | null = null;
+  const loadShareOnce: TournamentShareLoader = (id) => (shareRead ??= loadShare(id));
   const matchId = parseEntityPageId(rawMatchId);
   const tournamentId = parseEntityPageId(rawTournamentId);
   const granted = await rights().catch(() => null);
@@ -120,14 +124,14 @@ export async function matchPageMetadata(
     (id) => (missing || matchId === null ? tournamentPath(id) : matchPagePath(id, matchId, spectator)),
     async () => granted,
     loadCard,
-    loadShare,
+    loadShareOnce,
   );
   if (!position || metadata.alternates === undefined) return metadata;
   const locale = await requestLocale();
   const text = tournamentPageText(locale, tournamentPageMessages(messagesFor(locale)));
   const prefix = matchPositionText(text, position);
   // `tournamentId` et `matchId` sont lus : sans eux, `position` serait `null`.
-  const view = await loadShare(tournamentId as number).catch(() => null);
+  const view = await loadShareOnce(tournamentId as number).catch(() => null);
   const match = view?.share.matches.get(matchId as number);
   if (!view || !match) {
     const title = prefixedTitle(metadata.title, prefix);
@@ -145,7 +149,7 @@ export async function matchPageMetadata(
     matchShareCardKey(tournamentId as number, matchId as number),
     locale,
     matchShareVersion(view.card, match),
-    matchEmbedCard(view.card, match, prefix, messages).alt,
+    matchEmbedAlt(match, messages),
   );
   return {
     ...metadata,

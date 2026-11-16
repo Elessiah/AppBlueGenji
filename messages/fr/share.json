@@ -156,6 +156,7 @@
     "forfeit": "Forfait : {name}",
     "doubleForfeit": "Double forfait",
     "versus": "{team1} contre {team2}",
+    "scoreboardVersus": "VS",
     "moreMaps": "+{count} maps",
     "mapLine": "Map {number}{name} : {score}",
     "mapCode": "code {code}",

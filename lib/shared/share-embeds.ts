@@ -208,6 +208,24 @@ export function tournamentShareVersion(card: TournamentCard, leader: ShareLeader
   ]);
 }
 
+/** Fenêtre d'une empreinte de tournoi lue sans sa réponse publique : celle du cache de l'image. */
+export const UNSETTLED_SHARE_VERSION_MS = 5 * 60_000;
+
+/**
+ * Empreinte de l'image d'un tournoi quand l'encart n'a **pas** la réponse
+ * publique en mémoire (il ne la reconstruit jamais pour un robot) : l'équipe
+ * en tête, que la route de l'image dessinera, lui est inconnue. Pour un
+ * tournoi par équipes en cours ou terminé — seul cas où elle existe —
+ * l'empreinte change donc à chaque fenêtre de cinq minutes : une ancienne
+ * équipe en tête ne reste jamais plus longtemps chez Discord. Ailleurs, il n'y
+ * a pas d'équipe en tête, l'empreinte est exacte.
+ */
+export function tournamentShareVersionWithoutSummary(card: TournamentCard, now: number = Date.now()): string {
+  const base = tournamentShareVersion(card, null);
+  const leaderPossible = !isSoloTournament(card.participantType) && (card.state === "RUNNING" || card.state === "FINISHED");
+  return leaderPossible ? `${base}.${Math.floor(now / UNSETTLED_SHARE_VERSION_MS).toString(36)}` : base;
+}
+
 /** Empreinte de ce que l'image d'un match dessine. */
 export function matchShareVersion(card: TournamentCard, match: MatchShareSummary): string {
   return shareVersion([card.name, card.game, match]);

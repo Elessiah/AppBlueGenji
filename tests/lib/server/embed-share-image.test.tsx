@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GET } from "@/app/og/[locale]/[card]/route";
-import { EMBED_CARD_CACHE_CONTROL, buildEmbedShareImage, renderEmbedShareImage } from "@/lib/server/embed-share-image";
+import {
+  EMBED_CARD_CACHE_CONTROL,
+  NEUTRAL_CARD_CACHE_CONTROL,
+  buildEmbedShareImage,
+  renderEmbedShareImage,
+} from "@/lib/server/embed-share-image";
 import { renderPageShareImage } from "@/lib/server/page-share-image";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { clearShareImageCache } from "@/lib/server/share-image-cache";
@@ -97,6 +102,7 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
 
     expect(await response.text()).toBe("neutral");
     expect(renderPageShareImage).toHaveBeenCalledWith("home", "en");
+    expect(response.headers.get("cache-control")).toBe(NEUTRAL_CARD_CACHE_CONTROL);
   });
 
   it("GET_matchOfAnotherTournament_servesNeutralCard", async () => {
@@ -112,6 +118,8 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("neutral");
+    // Refus passager : jamais gardé par un robot sous l'adresse versionnée.
+    expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
   it("GET_unknownLocale_returns404WithoutReading", async () => {

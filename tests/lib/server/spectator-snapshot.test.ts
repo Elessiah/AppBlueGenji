@@ -10,11 +10,14 @@ import { isTournamentSnapshotWarm } from "@/lib/server/tournaments/snapshot";
 import { SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { tokensLeft as bucketTokensLeft } from "../../helpers/token-bucket";
+import { bracketMatch } from "../../helpers/bracket-match";
 import {
+  cachedTournamentShare,
   getSpectatorPayload,
   gzippedSpectatorBody,
   isSpectatorTournamentPublic,
   publicTournamentCard,
+  publicTournamentShare,
   publicTournamentSnapshot,
   SPECTATOR_MAX_CONCURRENT_REBUILDS,
   SpectatorRebuildRefused,
@@ -528,5 +531,54 @@ describe("publicTournamentCard", () => {
     expect(card?.name).toBe("Copie");
     expect(card?.state).toBe("REGISTRATION");
     expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+  });
+});
+
+describe("publicTournamentShare / cachedTournamentShare", () => {
+  const MATCH = bracketMatch({
+    id: 31,
+    maps: [{ mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 0 }],
+  });
+
+  it("publicTournamentShare_published_summaryFromPublicBody", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ matches: [MATCH] }));
+
+    const view = await publicTournamentShare(5, 0, CLIENT, () => true);
+
+    expect(view?.share.matches.get(31)?.maps).toEqual([
+      { mapNumber: 1, mapName: null, team1Score: 2, team2Score: 0, replayCode: "ABC123" },
+    ]);
+  });
+
+  it("publicTournamentShare_sameCopy_summaryBuiltOnce", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ matches: [MATCH] }));
+
+    const first = await publicTournamentShare(5, 0, CLIENT, () => true);
+    const second = await publicTournamentShare(5, 0, CLIENT, () => true);
+
+    expect(second?.share).toBe(first?.share);
+  });
+
+  it("publicTournamentShare_notPublished_returnsNull", async () => {
+    mockedSnapshot.mockResolvedValue(null);
+
+    expect(await publicTournamentShare(5, 0, CLIENT, () => true)).toBeNull();
+  });
+
+  it("publicTournamentShare_coldAndRefused_returnsNullWithoutReading", async () => {
+    expect(await publicTournamentShare(5, 0, CLIENT, () => false)).toBeNull();
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("cachedTournamentShare_noCopy_returnsNullWithoutReading", () => {
+    expect(cachedTournamentShare(5)).toBeNull();
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("cachedTournamentShare_copyInMemory_returnsSameSummary", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ matches: [MATCH] }));
+    const built = await publicTournamentShare(5, 0, CLIENT, () => true);
+
+    expect(cachedTournamentShare(5)?.share).toBe(built?.share);
   });
 });

@@ -198,6 +198,15 @@ describe("encart du lien partagé", () => {
     expect(memberMissing.alternates?.canonical).toBe("/tournois/12");
   });
 
+  it("matchPageMetadata_publicShare_readOnceForTournamentAndMatch", async () => {
+    const loadShare = jest.fn(async () => null);
+
+    await matchPageMetadata("12", "34", true, async () => ({ canManage: false }), undefined, loadShare);
+
+    // Un robot d'aperçu ne paie qu'une lecture du plafond public.
+    expect(loadShare).toHaveBeenCalledTimes(1);
+  });
+
   it("tournoi invisible, droits refusés ou identifiant de match invalide : l'encart du site", async () => {
     card.mockResolvedValueOnce(null);
     expect((await matchPageMetadata("12", "34", false, async () => ({ canManage: false }))).alternates).toBeUndefined();

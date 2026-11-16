@@ -3,9 +3,11 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import {
   EMBED_MAX_MAPS,
   embedShortDate,
+  matchEmbedAlt,
   matchEmbedCard,
   matchEmbedDescription,
   matchEmbedTitle,
+  tournamentEmbedAlt,
   tournamentEmbedCard,
 } from "@/lib/shared/share-embed-cards";
 import type { MatchShareSummary, ShareEntrantSide, ShareMapRow } from "@/lib/shared/share-embeds";
@@ -141,7 +143,7 @@ describe("matchEmbedCard", () => {
     const card = matchEmbedCard(CARD, summary({ team2: side, score: null, status: "PENDING" }), "Match 1", EN);
 
     expect(card.team2.name).toBe("To be decided");
-    expect(card.center).toEqual({ kind: "none" });
+    expect(card.center).toEqual({ kind: "none", text: "VS" });
     expect(card.state.label).toBe("Upcoming");
   });
 
@@ -183,6 +185,40 @@ describe("matchEmbedCard", () => {
     expect(card.center).toEqual({ kind: "label", text: "Forfeit: Bravo" });
   });
 
+  it("matchEmbedCard_forfeitWithFullScore_forfeitLabelNotScore", () => {
+    const card = matchEmbedCard(CARD, summary({ score: { team1: 2, team2: 0 }, forfeitSide: 2 }), "Match 1", FR);
+
+    expect(card.center).toEqual({ kind: "label", text: "Forfait : Bravo" });
+  });
+
+  it("matchEmbedCard_readyWithMaps_resultPending", () => {
+    const match = summary({ status: "READY", score: null, winnerSide: null, maps: [mapRow(1)] });
+
+    const card = matchEmbedCard(CARD, match, "Match 1", EN);
+
+    expect(card.state).toEqual({ label: "Result pending", tone: "info" });
+  });
+
+  it("matchEmbedCard_pendingWithScore_resultPending", () => {
+    const card = matchEmbedCard(CARD, summary({ status: "PENDING", winnerSide: null }), "Match 1", FR);
+
+    expect(card.state.label).toBe("Résultat en attente");
+  });
+
+  it("matchEmbedCard_readyWithoutScoreOrMaps_upcoming", () => {
+    const card = matchEmbedCard(CARD, summary({ status: "READY", score: null, winnerSide: null }), "Match 1", EN);
+
+    expect(card.state).toEqual({ label: "Upcoming", tone: "accent" });
+  });
+
+  it("matchEmbedAlt_soloSides_noPseudo", () => {
+    expect(matchEmbedAlt(summary({ team1: SOLO_1, team2: SOLO_2 }), EN)).toBe("Preview of the match Player 1 vs Player 2");
+  });
+
+  it("tournamentEmbedAlt_invisibleOnlyName_fallsBackToGenericTitle", () => {
+    expect(tournamentEmbedAlt({ ...CARD, name: "​" }, FR)).toBe("Aperçu du tournoi Tournoi");
+  });
+
   it("matchEmbedCard_doubleForfeit_labelCenter", () => {
     const card = matchEmbedCard(CARD, summary({ score: null, doubleForfeit: true, winnerSide: null }), "Match 1", EN);
 
@@ -215,6 +251,12 @@ describe("matchEmbedTitle / matchEmbedDescription", () => {
     expect(matchEmbedDescription(summary({ maps }), EN)).toBe(
       "Alpha 2 – 1 Bravo · Map 1 (Ilios): 2–1, code CODE1 · Map 2: 2–1",
     );
+  });
+
+  it("matchEmbedDescription_forfeitWithFullScore_saysForfeitNotScore", () => {
+    const description = matchEmbedDescription(summary({ score: { team1: 2, team2: 0 }, forfeitSide: 2 }), EN);
+
+    expect(description).toBe("Forfeit: Bravo");
   });
 
   it("matchEmbedDescription_doubleForfeit_saysSo", () => {

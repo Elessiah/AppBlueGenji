@@ -8,7 +8,11 @@
  * (`publicTournamentShareForRequest`, celle de `/suivre/`, au même plafond de
  * lecture). Un tournoi non publié, introuvable ou illisible — ou un match qui
  * n'est pas le sien — rend la carte **neutre** du site, jamais une erreur :
- * elle ne dit pas si le tournoi existe.
+ * elle ne dit pas si le tournoi existe. La carte neutre part en `no-store` :
+ * elle peut venir d'un refus passager (plafond de lecture, places de
+ * reconstruction prises, base injoignable), et un robot d'aperçu qui la
+ * garderait sous l'adresse versionnée montrerait la carte du site jusqu'au
+ * prochain score.
  *
  * **Cache.** Le PNG est gardé en mémoire (`cachedShareImage`, réserve
  * `embed`) sous une clé qui porte l'**empreinte de ce qu'il dessine** : un
@@ -54,12 +58,18 @@ export const EMBED_CARD_TTL_MS = 5 * 60_000;
 /** Carte neutre d'un tournoi ou d'un match sans aperçu : celle de l'accueil. */
 const NEUTRAL_CARD_KEY = "home";
 
-/** La carte neutre, servie en cache court : le tournoi peut être publié entre-temps. */
+/**
+ * En-tête de la carte neutre : jamais gardée. Elle peut répondre à un refus
+ * passager, et le tournoi peut être publié entre-temps.
+ */
+export const NEUTRAL_CARD_CACHE_CONTROL = "no-store";
+
+/** La carte neutre, jamais gardée par un robot (`NEUTRAL_CARD_CACHE_CONTROL`). */
 async function neutralImage(locale: Locale): Promise<Response | null> {
   const image = await renderPageShareImage(NEUTRAL_CARD_KEY, locale);
   if (!image) return null;
   return new Response(image.body, {
-    headers: { "content-type": "image/png", "cache-control": EMBED_CARD_CACHE_CONTROL },
+    headers: { "content-type": "image/png", "cache-control": NEUTRAL_CARD_CACHE_CONTROL },
   });
 }
 

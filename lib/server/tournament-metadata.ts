@@ -10,8 +10,13 @@ import { localizedTournamentShareDescription } from "@/lib/shared/tournament-sha
 import { parseTournamentId } from "@/lib/shared/spectator-view";
 import { cachedTournamentShare, type PublicTournamentShare } from "@/lib/server/spectator-snapshot";
 import { SHARE_CARD_SIZE } from "@/components/og/share-card";
-import { tournamentEmbedCard } from "@/lib/shared/share-embed-cards";
-import { embedShareImagePath, tournamentShareCardKey, tournamentShareVersion } from "@/lib/shared/share-embeds";
+import { tournamentEmbedAlt } from "@/lib/shared/share-embed-cards";
+import {
+  embedShareImagePath,
+  tournamentShareCardKey,
+  tournamentShareVersion,
+  tournamentShareVersionWithoutSummary,
+} from "@/lib/shared/share-embeds";
 import type { Locale } from "@/lib/shared/locales";
 import { pageShareImagePath } from "@/lib/shared/page-share-cards";
 
@@ -88,8 +93,9 @@ export function embedImageMetadata(key: string, locale: Locale, version: string,
  *   (`publicTournamentSnapshot`) : une rafale de F5 ou une annonce Discord ne
  *   coûte plus une requête par vue.
  * @param loadShare Résumé d'aperçu public : par défaut la copie déjà en
- *   mémoire (`cachedTournamentShareLoader`) ; la page sans compte lit la
- *   réponse publique (`publicTournamentShareForRequest`).
+ *   mémoire (`cachedTournamentShareLoader`), jamais une reconstruction payée
+ *   par un robot d'aperçu ; la page d'un match lit la réponse publique
+ *   (`publicTournamentShareForRequest`).
  */
 export async function tournamentPageMetadata(
   rawId: string,
@@ -137,12 +143,16 @@ export async function tournamentPageMetadata(
   const canonical = localeHref(path, locale);
   const languages = localeAlternates(path);
   const share = await loadShare(tournamentId).catch(() => null);
-  const leader = share?.share.leader ?? null;
+  // L'empreinte vient de la **même copie** que celle que la route de l'image
+  // dessine (carte et engagé en tête). Sans copie en mémoire, l'équipe en tête
+  // est inconnue : l'empreinte change alors par fenêtre de cinq minutes, pour
+  // qu'un changement d'équipe en tête ne reste pas indéfiniment chez Discord.
+  const imageCard = share?.card ?? card;
   const image = embedImageMetadata(
     tournamentShareCardKey(tournamentId),
     locale,
-    tournamentShareVersion(card, leader),
-    tournamentEmbedCard(card, leader, messages, locale).alt,
+    share ? tournamentShareVersion(share.card, share.share.leader) : tournamentShareVersionWithoutSummary(card),
+    tournamentEmbedAlt(imageCard, messages),
   );
 
   return {

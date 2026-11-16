@@ -7,6 +7,8 @@ import {
   parseEmbedShareCardKey,
   tournamentShareCardKey,
   tournamentShareVersion,
+  tournamentShareVersionWithoutSummary,
+  UNSETTLED_SHARE_VERSION_MS,
   type ShareSummarySource,
 } from "@/lib/shared/share-embeds";
 import { EMPTY_MAP_RULES } from "@/lib/shared/round-maps";
@@ -299,5 +301,32 @@ describe("empreintes", () => {
     const changed = { ...match, maps: [match.maps[0], { ...match.maps[1], replayCode: "XYZ" }] };
 
     expect(matchShareVersion(card, changed)).not.toBe(matchShareVersion(card, match));
+  });
+});
+
+describe("tournamentShareVersionWithoutSummary", () => {
+  const NOW = Date.parse("2026-05-13T10:00:00.000Z");
+
+  it("tournamentShareVersionWithoutSummary_upcoming_exactVersion", () => {
+    const card = tournamentCard({ state: "REGISTRATION" });
+
+    expect(tournamentShareVersionWithoutSummary(card, NOW)).toBe(tournamentShareVersion(card, null));
+  });
+
+  it("tournamentShareVersionWithoutSummary_soloRunning_exactVersion", () => {
+    const card = tournamentCard({ state: "RUNNING", participantType: "SOLO" });
+
+    expect(tournamentShareVersionWithoutSummary(card, NOW)).toBe(tournamentShareVersion(card, null));
+  });
+
+  it("tournamentShareVersionWithoutSummary_teamRunning_changesWithTheWindow", () => {
+    const card = tournamentCard({ state: "RUNNING", participantType: "TEAM" });
+
+    const first = tournamentShareVersionWithoutSummary(card, NOW);
+    const sameWindow = tournamentShareVersionWithoutSummary(card, NOW + 1_000);
+    const nextWindow = tournamentShareVersionWithoutSummary(card, NOW + UNSETTLED_SHARE_VERSION_MS);
+
+    expect(sameWindow).toBe(first);
+    expect(nextWindow).not.toBe(first);
   });
 });

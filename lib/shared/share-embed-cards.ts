@@ -13,7 +13,14 @@
 import type { Locale } from "./locales";
 import { INTL_LOCALE } from "./locales";
 import type { Messages } from "./i18n-messages";
-import { SHARE_STATE_TONES, SHARE_TIME_ZONE, truncateForShare, type ShareStateTone } from "./share-metadata";
+import {
+  fillShareTemplate as fill,
+  SHARE_STATE_TONES,
+  SHARE_TIME_ZONE,
+  shareInitial as initialOf,
+  truncateForShare,
+  type ShareStateTone,
+} from "./share-metadata";
 import type { MatchShareSummary, ShareEntrantSide, ShareLeader } from "./share-embeds";
 import { localizedTournamentLabel } from "./tournament-labels";
 import type { MatchStatus, TournamentCard } from "./types";
@@ -23,11 +30,6 @@ import { visibleText } from "./visible-text";
 export type ShareEmbedMessages = Pick<Messages, "share" | "labels">;
 
 type EmbedText = Messages["share"]["embed"];
-
-/** Remplit `{nom}` ; une variable inconnue reste telle quelle. */
-function fill(template: string, values: Readonly<Record<string, string | number>>): string {
-  return template.replace(/\{(\w+)\}/gu, (whole, name: string) => (name in values ? String(values[name]) : whole));
-}
 
 /** Longueur maximale du titre (nom du tournoi) : trois lignes à la plus petite taille. */
 export const EMBED_TITLE_MAX_LENGTH = 90;
@@ -85,11 +87,6 @@ export function embedSideName(side: ShareEntrantSide, slot: 1 | 2, text: EmbedTe
   if (side.teamId === null) return text.tbd;
   const name = side.name === null ? "" : shownText(side.name, EMBED_TEAM_NAME_MAX_LENGTH);
   return name || fill(text.teamFallback, { id: side.teamId });
-}
-
-/** Initiale du repli de logo (`ShareTeamMark`). */
-function initialOf(name: string): string {
-  return Array.from(name)[0]?.toUpperCase() ?? "?";
 }
 
 /** Une équipe dessinée : nom, initiale de repli, logo (fichier du site) et victoire. */
@@ -158,16 +155,33 @@ export function tournamentEmbedCard(
   };
 }
 
+type MatchStateBadge = { key: keyof EmbedText["matchStates"]; tone: ShareStateTone };
+
 /** Pastille d'état d'un match : à venir, résultat en attente, terminé. */
-const MATCH_STATE: Record<MatchStatus, { key: keyof EmbedText["matchStates"]; tone: ShareStateTone }> = {
+const MATCH_STATE: Record<MatchStatus, MatchStateBadge> = {
   PENDING: { key: "UPCOMING", tone: "accent" },
   READY: { key: "UPCOMING", tone: "accent" },
   AWAITING_CONFIRMATION: { key: "RUNNING", tone: "info" },
   COMPLETED: { key: "COMPLETED", tone: "success" },
 };
 
+/**
+ * La pastille d'un match : un match pas encore terminé qui porte déjà un score
+ * ou des maps retenues (saisie map par map) n'est plus « à venir » — son
+ * résultat est en attente.
+ */
+function matchStateOf(match: MatchShareSummary): MatchStateBadge {
+  const base = MATCH_STATE[match.status];
+  if (base.key === "UPCOMING" && (match.score !== null || match.maps.length > 0)) return MATCH_STATE.AWAITING_CONFIRMATION;
+  return base;
+}
+
 /** Le centre du tableau d'affichage : un score, ou un mot (forfait, double forfait). */
-export type EmbedScoreCenter = { kind: "score"; team1: string; team2: string } | { kind: "label"; text: string } | { kind: "none" };
+export type EmbedScoreCenter =
+  | { kind: "score"; team1: string; team2: string }
+  | { kind: "label"; text: string }
+  /** Ni score ni forfait : le tableau d'affichage écrit « VS » (`scoreboardVersus`). */
+  | { kind: "none"; text: string };
 
 /** Une case de map : « Map 1 · Ilios », son score et son code de replay. */
 export type EmbedMapCell = { label: string; score: string; code: string | null; winnerSide: 1 | 2 | null };
@@ -192,10 +206,12 @@ export type MatchEmbedCard = {
 
 function scoreCenter(match: MatchShareSummary, names: readonly [string, string], text: EmbedText): EmbedScoreCenter {
   if (match.doubleForfeit) return { kind: "label", text: text.doubleForfeit };
-  if (match.forfeitSide !== null && match.score === null) {
+  // Un forfait porte un score complet (`forfeitMatchScores`) : il se dit
+  // « Forfait : X », jamais comme un match joué.
+  if (match.forfeitSide !== null) {
     return { kind: "label", text: fill(text.forfeit, { name: names[match.forfeitSide - 1] }) };
   }
-  if (match.score === null) return { kind: "none" };
+  if (match.score === null) return { kind: "none", text: text.scoreboardVersus };
   return { kind: "score", team1: String(match.score.team1), team2: String(match.score.team2) };
 }
 
@@ -231,7 +247,7 @@ export function matchEmbedCard(
 ): MatchEmbedCard {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
-  const state = MATCH_STATE[match.status];
+  const state = matchStateOf(match);
   const shownMaps = match.maps.slice(0, EMBED_MAX_MAPS);
   const extra = match.maps.length - shownMaps.length;
   return {
@@ -250,8 +266,20 @@ export function matchEmbedCard(
     })),
     moreMaps: extra > 0 ? fill(text.moreMaps, { count: extra }) : null,
     footer: messages.share.footer,
-    alt: fill(text.matchAlt, { team1: names[0], team2: names[1] }),
+    alt: matchEmbedAlt(match, messages),
   };
+}
+
+/** Texte alternatif de l'image d'un match, sans rédiger la carte entière. */
+export function matchEmbedAlt(match: MatchShareSummary, messages: ShareEmbedMessages): string {
+  const text = messages.share.embed;
+  return fill(text.matchAlt, { team1: embedSideName(match.team1, 1, text), team2: embedSideName(match.team2, 2, text) });
+}
+
+/** Texte alternatif de l'image d'un tournoi, sans rédiger la carte entière. */
+export function tournamentEmbedAlt(card: TournamentCard, messages: ShareEmbedMessages): string {
+  const text = messages.share.embed;
+  return fill(text.tournamentAlt, { name: shownText(card.name, EMBED_TITLE_MAX_LENGTH) || text.tournamentFallback });
 }
 
 /** Titre de l'encart d'un match : « A contre B · Manche 2 · Match 3 ». */

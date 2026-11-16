@@ -9,6 +9,8 @@ jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr
 jest.mock("@/lib/server/tournaments-service");
 
 import { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
+import { tournamentPageMetadata, type TournamentShareLoader } from "@/lib/server/tournament-metadata";
+import { tournamentShareVersion, type ShareLeader } from "@/lib/shared/share-embeds";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import type { AuthUser } from "@/lib/server/auth";
@@ -39,6 +41,7 @@ const TOURNAMENT_DIR = ["app", "(secured)", "tournois", "[id]"];
 const SECURED_LAYOUT = read("app", "(secured)", "layout.tsx");
 const AUTH_GATE = read("app", "(secured)", "_shared", "AuthGate.tsx");
 const EMBED_IMAGE = read("lib", "server", "embed-share-image.tsx");
+const SPECTATOR_LAYOUT = read("app", "suivre", "tournois", "[id]", "layout.tsx");
 const AUTH = read("lib", "server", "auth.ts");
 
 const mockedUser = jest.mocked(getCurrentUser);
@@ -226,5 +229,45 @@ describe("route d'image d'un tournoi", () => {
 
   it("annonce la taille attendue d'un aperçu Open Graph", () => {
     expect(EMBED_IMAGE).toContain("...SHARE_CARD_SIZE");
+  });
+});
+
+describe("empreinte `?v=` de l'image d'un tournoi", () => {
+  const LEADER: ShareLeader = { kind: "LEADER", side: { teamId: 3, name: "Bravo", logoUrl: null, solo: false } };
+
+  it("tournamentPageMetadata_shareLoaded_versionFromShareCardAndLeader", async () => {
+    const shared = card({ state: "RUNNING", registeredTeams: 9 });
+    const loadShare: TournamentShareLoader = async () => ({ card: shared, share: { leader: LEADER, matches: new Map() } });
+
+    const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => card(), loadShare);
+
+    expect(meta.openGraph).toMatchObject({
+      images: [{ url: `/og/fr/tournament-42.png?v=${tournamentShareVersion(shared, LEADER)}` }],
+    });
+  });
+
+  it("tournamentPageMetadata_shareUnavailable_versionFromPageCard", async () => {
+    const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => card(), async () => null);
+
+    expect(meta.openGraph).toMatchObject({
+      images: [{ url: `/og/fr/tournament-42.png?v=${tournamentShareVersion(card(), null)}`, alt: "Aperçu du tournoi OW Open Cup" }],
+    });
+  });
+
+  it("tournamentPageMetadata_runningWithoutCopy_versionOfTheWindow", async () => {
+    const running = card({ state: "RUNNING" });
+
+    const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => running, async () => null);
+    const url = (meta.openGraph as { images: { url: string }[] }).images[0].url;
+
+    expect(url.startsWith(`/og/fr/tournament-42.png?v=${tournamentShareVersion(running, null)}.`)).toBe(true);
+  });
+
+  it("la page sans compte ne reconstruit jamais la réponse publique pour un robot", () => {
+    expect(SPECTATOR_LAYOUT).not.toContain("publicTournamentShareForRequest");
+  });
+
+  it("la carte neutre n'est jamais gardée par un robot (refus passager possible)", () => {
+    expect(EMBED_IMAGE).toContain('NEUTRAL_CARD_CACHE_CONTROL = "no-store"');
   });
 });

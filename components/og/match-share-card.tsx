@@ -99,7 +99,7 @@ function Center({ center }: Readonly<{ center: EmbedScoreCenter }>): ReactElemen
       </div>
     );
   }
-  return <div style={{ display: "flex", fontSize: 40, fontWeight: 700, color: SHARE_CARD_COLORS.inkMute }}>VS</div>;
+  return <div style={{ display: "flex", fontSize: 40, fontWeight: 700, color: SHARE_CARD_COLORS.inkMute }}>{center.text}</div>;
 }
 
 function MapCell({ cell, noCode }: Readonly<{ cell: EmbedMapCell; noCode: string }>): ReactElement {

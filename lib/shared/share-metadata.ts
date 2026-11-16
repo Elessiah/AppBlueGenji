@@ -91,6 +91,20 @@ const SHARE_CARD_TITLE_MAX_LENGTH = 90;
 const SHARE_CARD_TITLE_FALLBACK = "Tournoi";
 
 /**
+ * Remplit les variables `{nom}` d'un texte des cartes de partage ; une
+ * variable inconnue reste telle quelle. Commun aux cartes de pages
+ * (`page-share-cards.ts`) et d'aperçu (`share-embed-cards.ts`).
+ */
+export function fillShareTemplate(template: string, values: Readonly<Record<string, string | number>>): string {
+  return template.replace(/\{(\w+)\}/gu, (whole, name: string) => (name in values ? String(values[name]) : whole));
+}
+
+/** Initiale du repli de logo d'une carte de partage : premier caractère en capitale, « ? » sans nom. */
+export function shareInitial(name: string): string {
+  return Array.from(name)[0]?.toUpperCase() ?? "?";
+}
+
+/**
  * Coupe un texte sans couper un mot, et signale la coupe par une ellipse.
  *
  * Un texte plus court que la limite ressort **inchangé** : pas d'ellipse, pas

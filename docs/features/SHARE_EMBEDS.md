@@ -12,6 +12,8 @@ de replay publics).
   `TournamentHeader`) et l'action `share` de la carte de match
   (`_lib/match-card-actions.ts`, rangée dans « Plus d'actions », offerte aussi
   sur la page du match qui reprend les mêmes gestes).
+- Le geste est un seul crochet, `useShareLink()` (même fichier que le bouton),
+  que l'action du match réutilise.
 - Règle pure `lib/shared/share-link.ts` : feuille de partage du système
   (`navigator.share`) si elle existe — la fermer (`AbortError`) ne notifie
   rien —, sinon copie dans le presse-papiers. Résultat en notification
@@ -34,8 +36,11 @@ de replay publics).
   (seule première d'un classement suisse / Survie / BlueGenji Survie après un
   match joué), à défaut la description ; faits format, effectif, échéance ; le
   logo de l'équipe en tête occupe le motif.
-- Match : tournoi et place du match, logos et noms des deux engagés, score (ou
-  forfait), une case par map jouée (nom de la carte s'il est fixé, score, code
+- Match : tournoi et place du match, logos et noms des deux engagés, score —
+  un forfait se dit « Forfait : X » même s'il porte un score complet
+  (`forfeitMatchScores`), « VS » (`share.embed.scoreboardVersus`) sans score —,
+  pastille « À venir », « Résultat en attente » (dès qu'un score ou une map
+  retenue existe sur un match non terminé) ou « Match terminé », une case par map jouée (nom de la carte s'il est fixé, score, code
   de replay ou « Sans code »), neuf au plus, la suite comptée.
 - Encart : `tournamentPageMetadata` / `matchPageMetadata` posent
   `openGraph.images` et `twitter.images` (adresse versionnée, 1200×630, texte
@@ -54,8 +59,10 @@ de replay publics).
   page sans compte).
 - **Aucun pseudo** : un engagé solo est « Joueur 1 » / « Joueur 2 », sans
   avatar ; un tournoi individuel n'a pas de ligne « en tête ».
-- Tournoi non publié, introuvable, match d'un autre tournoi, base injoignable :
-  carte **neutre** du site (celle de l'accueil), jamais une erreur.
+- Tournoi non publié, introuvable, match d'un autre tournoi, base injoignable,
+  lecture refusée par le plafond : carte **neutre** du site (celle de
+  l'accueil), jamais une erreur, servie en `Cache-Control: no-store` — un refus
+  passager ne doit pas rester sous l'adresse versionnée.
 - **D74** : le code de replay d'une map jouée et retenue est public (fiche
   membre, `/suivre/`, aperçu) ; une proposition en attente reste vide dans la
   réponse publique. Déclaré : `/rgpd` (scores map par map, « Suivre un tournoi
@@ -69,4 +76,14 @@ de replay publics).
   que la carte dessine, un score saisi donne donc une nouvelle clé.
 - L'adresse publiée porte la même empreinte en `?v=` pour que Discord ou X ne
   resservent pas une ancienne image ; le paramètre reçu n'est jamais lu.
-- `Cache-Control: public, max-age=300`.
+  L'encart d'un tournoi lit la copie publique **déjà en mémoire** (jamais une
+  reconstruction payée par un robot) : avec elle, l'empreinte vient de la même
+  carte et de la même équipe en tête que l'image ; sans elle, l'équipe en tête
+  est inconnue, et l'empreinte d'un tournoi par équipes en cours ou terminé
+  change par fenêtre de cinq minutes (`tournamentShareVersionWithoutSummary`).
+  Une page de match lit la réponse publique une seule fois pour ses deux
+  encarts.
+- Le résumé d'aperçu d'une copie publique est calculé à la première demande et
+  gardé avec elle (`WeakMap`) : une reconstruction que personne ne partage ne
+  le paie pas.
+- `Cache-Control: public, max-age=300` (carte neutre : `no-store`).
