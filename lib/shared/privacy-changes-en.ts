@@ -1111,6 +1111,20 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing new about you is written to the database or to a log, and what deletion removes stays the same.",
     ],
   },
+  "2026-11-statistiques-frequentation-detaillees": {
+    linkLabels: ["Read what the detailed statistics measure", "Object to audience measurement"],
+    title: "Detailed audience statistics, without cookies",
+    summary:
+      "The site now measures its traffic page by page (page views, visits, time spent, days and hours of visit) to present it, as aggregate figures only, to the association's partners and advertisers, on an unlisted public page. No cookie, no third-party tool, no link to your account.",
+    details: [
+      "For each page shown, your browser notes the type of page (home, a tournament's page…), never its exact address, a number or a name; the time spent with the tab visible, capped at 30 minutes; your device class (mobile, tablet, computer); and, for the first page of a visit, the site you came from, which the server immediately reduces to a family (direct access, search engine, Discord, social network, video platform, other website).",
+      "The server adds a daily hash of your IP address and your browser, computed with a random salt held in memory only and replaced every day: once the day is over, no one, the association included, can recognise you. Your session is not read: the measurement does not know whether you are logged in.",
+      "These detailed page views are erased after 13 months (apart from encrypted backup copies); the aggregate figures per day, without any hash, are kept with no limit. Your IP address is only kept in memory, two minutes at most, to cap the submissions.",
+      "The statistics page (/frequentation) is public but absent from search engines and menus: it only shows totals, with the number of tournaments played, matches played, teams and accounts on the site.",
+      "Measurement exempt from consent (art. 82 of the French Data Protection Act, CNIL conditions for audience measurement). You can object to it as to the existing audience measurement: your browser's Global Privacy Control and Do Not Track signals, or the objection button of /rgpd, stop both measurements.",
+      "What does not change: nothing new is linked to your account, and what its deletion removes stays the same (these measurements, which are not linked to it, do not depend on it).",
+    ],
+  },
 };
 
 /**

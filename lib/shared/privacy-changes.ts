@@ -2106,6 +2106,30 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est écrit sur toi en base ni dans un journal, et ce que la suppression emporte reste le même.",
     ],
   },
+  {
+    // STATS-PAGE — statistiques de fréquentation détaillées (registre T19) :
+    // mesure sans cookie à empreinte du jour, chiffres agrégés publiés sur une
+    // page non référencée pour les partenaires. /rgpd § « Mesure d'audience »
+    // (sous-partie « Statistiques de fréquentation détaillées », FR et EN),
+    // registre T19 et T17. Pour tous les comptes.
+    id: "2026-11-statistiques-frequentation-detaillees",
+    publishedAt: "2026-11-19",
+    title: "Statistiques de fréquentation détaillées, sans cookie",
+    links: [
+      { href: "/rgpd#audience-detaillee", label: "Lire ce que mesurent les statistiques détaillées" },
+      { href: "/rgpd#audience", label: "T'opposer à la mesure d'audience" },
+    ],
+    summary:
+      "Le site mesure désormais sa fréquentation page par page (pages vues, visites, temps passé, jours et heures de visite) pour la présenter, en chiffres agrégés seulement, aux partenaires et annonceurs de l'association, sur une page publique non référencée. Aucun cookie, aucun outil tiers, aucun lien avec ton compte.",
+    details: [
+      "À chaque page affichée, ton navigateur note le type de la page (accueil, fiche d'un tournoi…), jamais son adresse précise, un numéro ni un nom ; le temps passé onglet visible, plafonné à 30 minutes ; la classe de ton appareil (mobile, tablette, ordinateur) ; et, pour la première page d'une visite, le site d'où tu viens, que le serveur réduit aussitôt à une famille (accès direct, moteur de recherche, Discord, réseau social, plateforme vidéo, autre site).",
+      "Le serveur y joint une empreinte du jour de ton adresse IP et de ton navigateur, calculée avec un sel aléatoire tenu en mémoire seulement et remplacé chaque jour : la journée passée, plus personne, l'association comprise, ne peut te reconnaître. Ta session n'est pas lue : la mesure ignore si tu es connecté.",
+      "Ces pages vues détaillées sont effacées au bout de 13 mois (hors copies de sauvegarde chiffrées) ; les chiffres agrégés par jour, sans empreinte, sont gardés sans limite. Ton adresse IP n'est gardée qu'en mémoire, deux minutes au plus, pour plafonner les envois.",
+      "La page des statistiques (/frequentation) est publique mais absente des moteurs de recherche et des menus : elle ne montre que des totaux, avec le nombre de tournois joués, de matchs disputés, d'équipes et de comptes du site.",
+      "Mesure dispensée de consentement (art. 82 de la loi Informatique et Libertés, conditions de la CNIL pour la mesure d'audience). Tu peux t'y opposer comme à la mesure d'audience existante : les signaux Global Privacy Control et Do Not Track de ton navigateur, ou le bouton d'opposition de /rgpd, arrêtent les deux mesures.",
+      "Ce qui ne change pas : rien de nouveau n'est rattaché à ton compte, et ce que sa suppression emporte reste le même (ces mesures, qui ne s'y rattachent pas, n'en dépendent pas).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

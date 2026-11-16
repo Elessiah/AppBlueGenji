@@ -496,6 +496,20 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
+ * Signalements de pages vues (`/api/audience`, registre T19), par IP.
+ *
+ * Un navigateur envoie sa file au plus toutes les minutes, ou à chaque dixième
+ * page, ou quand l'onglet passe en arrière-plan : trente envois par minute ne
+ * gênent qu'un client qui fabrique des signalements. La clé (l'IP) ne vit
+ * qu'en mémoire, deux minutes au plus après sa dernière requête.
+ */
+export const AUDIENCE_REQUEST_RULE: RateLimitRule = {
+  name: "audience-request",
+  limit: 30,
+  windowMs: 60_000,
+};
+
+/**
  * Lectures relayées vers le bot (`/api/bot/*`), par IP.
  *
  * Ces routes ne touchent pas la base : elles rouvrent une requête vers le bot,

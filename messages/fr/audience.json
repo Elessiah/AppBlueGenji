@@ -1,0 +1,148 @@
+{
+  "meta": {
+    "title": "Statistiques de fréquentation",
+    "description": "Fréquentation du site de BlueGenji Esport : visiteurs, pages consultées, temps passé et moments de visite."
+  },
+  "header": {
+    "eyebrow": "Dossier partenaires",
+    "title": "BlueGenji Esport en chiffres",
+    "lead": "La fréquentation du site de l'association, mesurée sans cookie ni suivi d'un site à l'autre, et présentée telle quelle.",
+    "updated": "Données arrêtées au {date}",
+    "since": "Mesure depuis le {date}",
+    "home": "Retour au site"
+  },
+  "ranges": {
+    "label": "Période",
+    "7d": "7 jours",
+    "30d": "30 jours",
+    "12m": "12 mois",
+    "all": "Depuis le début"
+  },
+  "kpis": {
+    "label": "Indicateurs clés",
+    "visitors": "Visiteurs",
+    "visitorsHint": "Visiteurs uniques de chaque jour, additionnés sur la période.",
+    "views": "Pages vues",
+    "visits": "Visites",
+    "avgVisitorsPerDay": "Visiteurs par jour",
+    "avgTimePerVisit": "Temps par visite",
+    "avgTimePerPage": "Temps par page",
+    "pagesPerVisit": "Pages par visite",
+    "bounceRate": "Visites d'une seule page",
+    "vsPrevious": "{change} sur la période précédente",
+    "noPrevious": "Pas de période précédente à comparer"
+  },
+  "evolution": {
+    "title": "Évolution de la fréquentation",
+    "hint": "Visiteurs et pages vues jour par jour sur la période choisie.",
+    "visitors": "Visiteurs",
+    "views": "Pages vues"
+  },
+  "buckets": {
+    "title": "Visiteurs par semaine, mois et année",
+    "hint": "Somme des visiteurs uniques de chaque jour : une personne venue trois jours compte trois fois.",
+    "label": "Regroupement",
+    "week": "Semaine",
+    "month": "Mois",
+    "year": "Année",
+    "weekOf": "Semaine du {date}"
+  },
+  "pages": {
+    "title": "Pages les plus consultées",
+    "hint": "Les pages sont regroupées par type : aucune adresse précise, aucun nom n'est conservé.",
+    "page": "Page",
+    "views": "Pages vues",
+    "share": "Part",
+    "avgTime": "Temps moyen",
+    "labels": {
+      "home": "Accueil",
+      "rules": "Règlements",
+      "rulesMode": "Règlement d'un mode",
+      "ranking": "Classement",
+      "tournaments": "Liste des tournois",
+      "tournament": "Fiche d'un tournoi",
+      "match": "Page d'un match",
+      "tournamentOther": "Autres pages de tournoi",
+      "follow": "Suivi d'un tournoi sans compte",
+      "teams": "Annuaire des équipes",
+      "team": "Fiche d'une équipe",
+      "players": "Annuaire des joueurs",
+      "player": "Fiche d'un joueur",
+      "profile": "Profil",
+      "login": "Connexion",
+      "bot": "Bot Discord",
+      "association": "L'association",
+      "volunteers": "Bénévoles",
+      "recruitment": "Recrutement",
+      "legal": "Pages légales",
+      "reports": "Signalements",
+      "admin": "Administration",
+      "other": "Autres pages"
+    }
+  },
+  "timing": {
+    "heatmapTitle": "Moments de visite",
+    "heatmapHint": "Pages vues par jour de la semaine et par heure (heure de Paris). Plus la case est foncée, plus le site est consulté.",
+    "weekdaysTitle": "Jours de la semaine",
+    "hoursTitle": "Heures de la journée",
+    "hourLabel": "{hour} h",
+    "weekdays": ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"],
+    "weekdaysShort": ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
+    "less": "Moins",
+    "more": "Plus",
+    "peak": "Moment le plus actif : {day}, {hour} h",
+    "peakNone": "Survolez une case pour lire son nombre de pages vues.",
+    "cell": "{day}, {hour} h : {views} pages vues"
+  },
+  "audience": {
+    "title": "Qui nous consulte",
+    "devices": "Appareils",
+    "sources": "Provenance des visiteurs",
+    "sourcesHint": "D'où arrivent les visiteurs à leur première page : le site d'origine n'est conservé que sous forme de famille.",
+    "locales": "Langue de lecture",
+    "deviceLabels": { "mobile": "Mobile", "tablet": "Tablette", "desktop": "Ordinateur" },
+    "sourceLabels": {
+      "direct": "Accès direct",
+      "search": "Moteurs de recherche",
+      "discord": "Discord",
+      "social": "Réseaux sociaux",
+      "video": "Plateformes vidéo",
+      "other": "Autres sites"
+    },
+    "localeLabels": { "fr": "Français", "en": "Anglais" }
+  },
+  "community": {
+    "title": "La communauté",
+    "hint": "Chiffres de la plateforme à ce jour, tous tournois confondus.",
+    "tournaments": "Tournois joués",
+    "matches": "Matchs disputés",
+    "teams": "Équipes sur la plateforme",
+    "players": "Comptes inscrits"
+  },
+  "table": {
+    "show": "Voir les données",
+    "hide": "Masquer les données",
+    "period": "Période",
+    "value": "Valeur"
+  },
+  "empty": {
+    "title": "Les premières mesures arrivent",
+    "body": "Les chiffres s'affichent dès le lendemain des premières visites mesurées."
+  },
+  "method": {
+    "title": "Méthode",
+    "items": [
+      "Mesure faite par le site lui-même : aucun cookie, aucun outil tiers, aucun lien avec un compte.",
+      "Un visiteur est reconnu le temps d'une journée seulement : les visiteurs d'une semaine, d'un mois ou d'une année sont la somme des visiteurs de chaque jour.",
+      "Le temps compté est celui où la page est affichée au premier plan, plafonné à 30 minutes par page.",
+      "Les robots connus et les personnes qui s'opposent à la mesure ne sont pas comptés. Les chiffres du jour en cours s'affichent le lendemain."
+    ],
+    "privacy": "Confidentialité de la mesure",
+    "sourceCode": "Code source",
+    "association": "BlueGenji Esport, association loi 1901"
+  },
+  "chart": {
+    "tooltip": "{label} : {value}",
+    "loading": "Chargement du graphique…"
+  }
+}

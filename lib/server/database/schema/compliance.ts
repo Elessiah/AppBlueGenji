@@ -63,6 +63,72 @@ const COMPLIANCE_TABLES: readonly string[] = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
 
+  // Statistiques de fréquentation détaillées (`lib/shared/audience.ts`,
+  // `docs/features/AUDIENCE_MEASUREMENT.md`, registre T19) : une ligne par page
+  // vue, gardée `AUDIENCE_RAW_RETENTION_MONTHS` mois. `visitor_key` est un HMAC
+  // sous un sel du **jour**, tenu en mémoire seulement et jeté au changement de
+  // jour : passé ce jour, il ne se recalcule plus. `page_key` est un gabarit
+  // (`player`, jamais un pseudo). Tables neuves : créées telles quelles sur une
+  // base qui tourne, aucune entrée de migration n'est due.
+  `
+      CREATE TABLE IF NOT EXISTS bg_audience_views (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      day DATE NOT NULL,
+      hour TINYINT UNSIGNED NOT NULL,
+      viewed_at DATETIME NOT NULL,
+      visitor_key CHAR(64) NOT NULL,
+      page_key VARCHAR(32) NOT NULL,
+      locale CHAR(2) NOT NULL,
+      device VARCHAR(8) NOT NULL,
+      source VARCHAR(10) NOT NULL,
+      is_view TINYINT(1) NOT NULL DEFAULT 1,
+      engaged_ms INT UNSIGNED NOT NULL DEFAULT 0,
+      INDEX idx_bg_audience_views_day (day, viewed_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  // Compteurs d'une journée révolue, repliés depuis le détail ; gardés sans
+  // limite (aucune empreinte, aucune donnée d'une personne). La ligne du jour
+  // est écrite en dernier : sa présence dit que le jour est replié.
+  `
+      CREATE TABLE IF NOT EXISTS bg_audience_days (
+      day DATE PRIMARY KEY,
+      views INT UNSIGNED NOT NULL DEFAULT 0,
+      visitors INT UNSIGNED NOT NULL DEFAULT 0,
+      visits INT UNSIGNED NOT NULL DEFAULT 0,
+      bounces INT UNSIGNED NOT NULL DEFAULT 0,
+      engaged_ms BIGINT UNSIGNED NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  `
+      CREATE TABLE IF NOT EXISTS bg_audience_day_pages (
+      day DATE NOT NULL,
+      page_key VARCHAR(32) NOT NULL,
+      views INT UNSIGNED NOT NULL DEFAULT 0,
+      visitors INT UNSIGNED NOT NULL DEFAULT 0,
+      engaged_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, page_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  `
+      CREATE TABLE IF NOT EXISTS bg_audience_day_hours (
+      day DATE NOT NULL,
+      hour TINYINT UNSIGNED NOT NULL,
+      views INT UNSIGNED NOT NULL DEFAULT 0,
+      visitors INT UNSIGNED NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, hour)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  `
+      CREATE TABLE IF NOT EXISTS bg_audience_day_dims (
+      day DATE NOT NULL,
+      dim VARCHAR(8) NOT NULL,
+      dim_value VARCHAR(10) NOT NULL,
+      views INT UNSIGNED NOT NULL DEFAULT 0,
+      visitors INT UNSIGNED NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, dim, dim_value)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+
   // Changements du traitement des données (`lib/shared/privacy-changes.ts`) :
   // une ligne par changement **dont le joueur a pris connaissance**, avec sa
   // date — la trace de l'information, que l'export RGPD rend au joueur

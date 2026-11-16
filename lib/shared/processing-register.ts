@@ -31,6 +31,7 @@
  * (`docs/features/LEGAL_DATA_FILES.md`).
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
@@ -87,7 +88,7 @@ import { frEn, localize, type Localizable } from "@/lib/shared/bilingual";
 import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/shared/account-deletion";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-18";
+export const REGISTER_UPDATED_AT = "2026-11-19";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -428,6 +429,9 @@ type ActivityText = { [K in Exclude<keyof ProcessingActivity, "ref">]: Localizab
 function registerActivities(activities: Record<string, ActivityText>): Localizable<ProcessingActivity>[] {
   return Object.entries(activities).map(([ref, activity]) => ({ ref, ...activity }));
 }
+
+/** Plafond du temps compté par page (T19), en minutes. */
+const AUDIENCE_MAX_ENGAGED_MINUTES = AUDIENCE_MAX_ENGAGED_MS / 60_000;
 
 const ACTIVITIES = registerActivities({
   T01: {
@@ -1523,8 +1527,8 @@ const ACTIVITIES = registerActivities({
         "Recording each request received by the site's proxy server (nginx)"),
       frEn("Détecter les attaques et les abus, comprendre une panne",
         "Detecting attacks and abuse, understanding an outage"),
-      frEn("Plafonner, en mémoire du site, les requêtes par adresse IP sur les routes ouvertes sans compte ou avant la connexion (données de la page d'accueil, page du bot et son direct, rapports de sécurité du navigateur, signalement sans compte, demande et saisie d'un code de connexion Discord)",
-        "Capping, in the site's memory, the requests per IP address on the routes open without an account or before logging in (home page data, the bot page and its live feed, the browser's security reports, report without an account, request and entry of a Discord login code)"),
+      frEn("Plafonner, en mémoire du site, les requêtes par adresse IP sur les routes ouvertes sans compte ou avant la connexion (données de la page d'accueil, page du bot et son direct, rapports de sécurité du navigateur, signalement sans compte, demande et saisie d'un code de connexion Discord, envoi des statistiques de fréquentation détaillées de T19)",
+        "Capping, in the site's memory, the requests per IP address on the routes open without an account or before logging in (home page data, the bot page and its live feed, the browser's security reports, report without an account, request and entry of a Discord login code, submission of T19's detailed audience statistics)"),
     ],
     legalBasis: frEn("Intérêt légitime (RGPD, art. 6.1.f) : sécurité du service (art. 32)",
       "Legitimate interest (GDPR, art. 6.1.f): security of the service (art. 32)"),
@@ -1650,6 +1654,63 @@ const ACTIVITIES = registerActivities({
         "No presence data: neither the identifier, the username nor the number of the people present is requested from the bot, received or logged by the site"),
       frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes par processus du site (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois toutes les ${VOICE_RECHECK_MINUTES} minutes par processus du site, environ une minute après une indisponibilité du bot, de ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'horaire du match à ${VOICE_CHANNEL_LATE_HOURS} heures après, ce qui en ouvre un neuf s'il a été supprimé et que le bot ne l'a pas déjà recréé — un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site, sauf au-delà de ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures depuis sa création, sa reprise ou sa dernière recréation ou de ${VOICE_BOT_RECREATE_MAX} recréations en ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes, compte tenu en mémoire par le bot et remis à zéro à son redémarrage) ou le rendre — en dehors du vidage demandé par l'arbitrage ou par l'équipe, dont la réponse ne donne que l'issue — jamais pour savoir qui s'y trouve, ni combien`,
         `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds per site process (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (about once every ${VOICE_RECHECK_MINUTES} minutes per site process, about a minute after the bot was unavailable, from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before the match time to ${VOICE_CHANNEL_LATE_HOURS} hours after it, which opens a new one if it was deleted and the bot has not already recreated it — a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site, except beyond ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours since its creation, its reuse or its last recreation or ${VOICE_BOT_RECREATE_MAX} recreations within ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes, a count the bot holds in memory and resets when it restarts) or hand it back — apart from a clearing requested by the referees or by the team, whose answer only gives its outcome — never to know who is in it, nor how many`),
+    ],
+  },
+  T19: {
+    name: frEn("Statistiques de fréquentation détaillées", "Detailed audience statistics"),
+    purpose: frEn("Mesurer la fréquentation du site page par page et la présenter, en chiffres agrégés, aux partenaires et annonceurs de l'association",
+      "Measuring the site's traffic page by page and presenting it, as aggregate figures, to the association's partners and advertisers"),
+    subPurposes: [
+      frEn("Compter les pages vues, les visites, les visiteurs uniques de chaque jour et le temps passé onglet visible, par type de page, par jour et par heure (heure de Paris), par classe d'appareil, par langue de la page et par famille de provenance",
+        "Counting page views, visits, each day's unique visitors and the time spent with the tab visible, by type of page, by day and by hour (Paris time), by device class, by language of the page and by referral family"),
+      frEn(`Publier ces chiffres agrégés, avec le nombre de tournois joués, de matchs disputés, d'équipes et de comptes du site (des totaux, aucune personne), sur une page publique non référencée (${AUDIENCE_PAGE_PATH}, exclue des moteurs de recherche et des menus du site)`,
+        `Publishing these aggregate figures, with the number of tournaments played, matches played, teams and accounts on the site (totals, no person), on an unlisted public page (${AUDIENCE_PAGE_PATH}, excluded from search engines and from the site's menus)`),
+    ],
+    legalBasis: frEn("Intérêt légitime (RGPD, art. 6.1.f : faire connaître l'audience de l'association à ses partenaires et annonceurs). Mesure dispensée de consentement (loi Informatique et Libertés, art. 82) : elle se limite à la mesure d'audience du site, ne produit que des chiffres agrégés, ne suit personne d'un site à l'autre, n'est rapprochée d'aucun compte ni d'aucun autre traitement, et ses données détaillées ne sont gardées que treize mois — conditions posées par la CNIL. Aucun cookie n'est déposé pour elle. Droit d'opposition (art. 21) appliqué par le site lui-même, comme pour T06 : signaux Global Privacy Control et Do Not Track du navigateur, ou bouton d'opposition de /rgpd#audience (cookie bg_audience_optout, sans identifiant) — une page vue refusée n'est ni transmise quand le navigateur expose ces signaux, ni enregistrée, le serveur les relisant",
+      "Legitimate interest (GDPR, art. 6.1.f: making the association's audience known to its partners and advertisers). Measurement exempt from consent (French Data Protection Act, art. 82): it is limited to measuring the site's audience, only produces aggregate figures, follows no one from one site to another, is linked to no account and to no other processing, and its detailed data are only kept thirteen months — conditions set by the CNIL. No cookie is set for it. Right to object (art. 21) applied by the site itself, as for T06: the browser's Global Privacy Control and Do Not Track signals, or the objection button of the privacy policy (“Audience measurement” section; bg_audience_optout cookie, without identifier) — a refused page view is neither sent when the browser exposes these signals, nor recorded, as the server reads them again"),
+    dataSubjects: [
+      frEn("Visiteurs du site, connectés ou non (le compte n'est jamais lu)", "Visitors of the site, logged in or not (the account is never read)"),
+    ],
+    dataCategories: [
+      frEn("Empreinte du jour (HMAC-SHA256) de l'adresse IP et du navigateur, calculée avec un sel aléatoire tiré pour la journée (heure de Paris), tenu en mémoire seulement et remplacé chaque jour : une fois la journée passée, plus personne — l'association comprise — ne peut recalculer l'empreinte d'un visiteur ; un même visiteur n'est donc reconnu que le temps d'une journée",
+        "Daily hash (HMAC-SHA256) of the IP address and the browser, computed with a random salt drawn for the day (Paris time), held in memory only and replaced every day: once the day is over, no one — the association included — can recompute a visitor's hash; the same visitor is therefore only recognised for one day"),
+      frEn("Type de page consultée (accueil, fiche d'un tournoi, fiche d'une équipe…), jamais son adresse précise, un numéro ni un nom ; langue de la page ; date et heure (heure de Paris)",
+        "Type of page viewed (home, a tournament's page, a team's page…), never its exact address, a number or a name; language of the page; date and hour (Paris time)"),
+      frEn("Classe d'appareil (mobile, tablette, ordinateur), déduite de la largeur de la fenêtre",
+        "Device class (mobile, tablet, computer), inferred from the window's width"),
+      frEn("Famille de provenance de la première page d'une visite (accès direct, moteur de recherche, Discord, réseau social, plateforme vidéo, autre site), déduite du site d'origine, qui n'est pas gardé",
+        "Referral family of a visit's first page (direct access, search engine, Discord, social network, video platform, other website), inferred from the referring site, which is not kept"),
+      frEn(`Temps passé sur la page onglet visible, plafonné à ${AUDIENCE_MAX_ENGAGED_MINUTES} minutes par page`,
+        `Time spent on the page with the tab visible, capped at ${AUDIENCE_MAX_ENGAGED_MINUTES} minutes per page`),
+      frEn("Adresse IP de qui envoie ces mesures, en mémoire seulement, pour plafonner les envois (avec T17), jamais enregistrée",
+        "IP address of whoever sends these measurements, in memory only, to cap the submissions (with T17), never recorded"),
+    ],
+    sensitiveData: frEn("Aucune", "None"),
+    retention: [
+      frEn(`Pages vues détaillées (empreinte du jour, type de page, langue, date et heure, appareil, provenance, temps) : ${AUDIENCE_RAW_RETENTION_MONTHS} mois, puis effacées par lots au fil de l'activité du site, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+        `Detailed page views (daily hash, type of page, language, date and hour, device, referral, time): ${monthsEn(AUDIENCE_RAW_RETENTION_MONTHS)}, then erased in batches as the site is used, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
+      frEn("Chiffres agrégés par jour (totaux, par type de page, par heure, par appareil, par langue, par provenance), sans empreinte : gardés sans limite, ils ne concernent plus personne",
+        "Aggregate figures per day (totals, by type of page, by hour, by device, by language, by referral), without any hash: kept with no limit, they no longer concern anyone"),
+      frEn("Sel du jour : en mémoire seulement, jamais en base, dans un journal ni dans une sauvegarde ; remplacé au changement de jour et perdu au redémarrage du site",
+        "Daily salt: in memory only, never in the database, in a log or in a backup; replaced when the day changes and lost when the site restarts"),
+      frEn("Adresse IP du plafond d'envois : deux minutes au plus après sa dernière requête, en mémoire ; pages vues reçues : quelques secondes en mémoire avant leur écriture groupée",
+        "IP address of the submission cap: two minutes at most after its last request, in memory; page views received: a few seconds in memory before being written together"),
+    ],
+    recipients: [
+      frEn(`Toute personne qui a le lien de la page ${AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés (partenaires, annonceurs)`,
+        `Anyone who has the link to the ${AUDIENCE_PAGE_PATH} page, for the aggregate figures only (partners, advertisers)`),
+      frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",
+        "The association's technical manager, who is also the site's host (database)"),
+    ],
+    transfers: [
+      frEn("Aucun", "None"),
+    ],
+    security: [
+      ...COMMON_SECURITY,
+      frEn("Aucun cookie ni stockage du navigateur pour la mesure ; la session n'est jamais lue : la mesure ignore si le visiteur est connecté",
+        "No cookie nor browser storage for the measurement; the session is never read: the measurement does not know whether the visitor is logged in"),
+      frEn("Opposition relue côté serveur (en-têtes Sec-GPC et DNT, cookie d'opposition) : une page vue refusée n'est ni hachée, ni décomptée du plafond d'envois, ni écrite ; robots connus écartés de la même façon",
+        "Objection read again on the server side (Sec-GPC and DNT headers, objection cookie): a refused page view is neither hashed, nor counted against the submission cap, nor written; known bots are set aside in the same way"),
     ],
   },
 });
