@@ -74,7 +74,7 @@ describe("clearTransactionStates", () => {
 
     clearTransactionStates(connection);
 
-    // Une file que personne n'a vidée ne reste pas sur la connexion rendue au pool.
+    // Une file que personne n'a vidée ne part pas avec la transaction suivante sur ce même objet connexion.
     expect(first.peek(connection)).toBeUndefined();
     expect(second.peek(connection)).toBeUndefined();
     expect(first.peek(other)).toEqual([3]);

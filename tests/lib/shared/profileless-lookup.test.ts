@@ -1,47 +1,103 @@
 import { describe, expect, it } from "@jest/globals";
-import { formatProfilelessLookup, parseProfilelessLookup, PROFILELESS_LOOKUP_MAX } from "@/lib/shared/profileless-lookup";
+import {
+  formatProfilelessLookup,
+  parseProfilelessLookup,
+  PROFILELESS_LOOKUP_MAX,
+  PROFILELESS_NAME_MAX,
+} from "@/lib/shared/profileless-lookup";
 
-/** D86 : seuls les identifiants affichés partent, en une question bornée. */
+/** Une question de `max` comptes nommés. */
+function players(count: number) {
+  return { players: Array.from({ length: count }, (_, index) => ({ id: index + 1, name: `Joueur${index + 1}` })) };
+}
+
+/** D86 : seuls les comptes affichés partent, chacun avec le nom que la page montre. */
 describe("parseProfilelessLookup", () => {
-  it("parseProfilelessLookup_validList_returnsIds", () => {
-    expect(parseProfilelessLookup("3,8")).toEqual([3, 8]);
+  it("parseProfilelessLookup_validPlayers_returnsEntries", () => {
+    const body = { players: [{ id: 3, name: "Alpha" }, { id: 8, name: "Beta" }] };
+
+    expect(parseProfilelessLookup(body)).toEqual([{ id: 3, name: "Alpha" }, { id: 8, name: "Beta" }]);
   });
 
-  it("parseProfilelessLookup_duplicates_dedupedInOrder", () => {
-    expect(parseProfilelessLookup("8,3,8")).toEqual([8, 3]);
+  it("parseProfilelessLookup_duplicateId_keepsFirstNameInOrder", () => {
+    const body = { players: [{ id: 8, name: "Beta" }, { id: 3, name: "Alpha" }, { id: 8, name: "Autre" }] };
+
+    expect(parseProfilelessLookup(body)).toEqual([{ id: 8, name: "Beta" }, { id: 3, name: "Alpha" }]);
   });
 
-  it("parseProfilelessLookup_absent_returnsNull", () => {
+  it("parseProfilelessLookup_nullBody_returnsNull", () => {
     expect(parseProfilelessLookup(null)).toBeNull();
   });
 
-  it("parseProfilelessLookup_empty_returnsNull", () => {
-    expect(parseProfilelessLookup("")).toBeNull();
+  it("parseProfilelessLookup_stringBody_returnsNull", () => {
+    expect(parseProfilelessLookup("3,8")).toBeNull();
   });
 
-  it.each(["0", "-1", "3,abc", "1.5", "3,", "03", " 3"])("parseProfilelessLookup_malformed %s_returnsNull", (raw) => {
-    expect(parseProfilelessLookup(raw)).toBeNull();
+  it("parseProfilelessLookup_playersNotArray_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: { id: 3, name: "Alpha" } })).toBeNull();
   });
 
-  it("parseProfilelessLookup_unsafeInteger_returnsNull", () => {
-    expect(parseProfilelessLookup("9999999999999999")).toBeNull();
+  it("parseProfilelessLookup_emptyPlayers_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [] })).toBeNull();
   });
 
   it("parseProfilelessLookup_exactlyMax_returnsAll", () => {
-    const raw = Array.from({ length: PROFILELESS_LOOKUP_MAX }, (_, index) => index + 1).join(",");
-
-    expect(parseProfilelessLookup(raw)).toHaveLength(PROFILELESS_LOOKUP_MAX);
+    expect(parseProfilelessLookup(players(PROFILELESS_LOOKUP_MAX))).toHaveLength(PROFILELESS_LOOKUP_MAX);
   });
 
   it("parseProfilelessLookup_overMax_returnsNull", () => {
-    const raw = Array.from({ length: PROFILELESS_LOOKUP_MAX + 1 }, (_, index) => index + 1).join(",");
+    expect(parseProfilelessLookup(players(PROFILELESS_LOOKUP_MAX + 1))).toBeNull();
+  });
 
-    expect(parseProfilelessLookup(raw)).toBeNull();
+  it("parseProfilelessLookup_zeroId_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 0, name: "Alpha" }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_negativeId_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: -1, name: "Alpha" }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_fractionalId_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 1.5, name: "Alpha" }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_stringId_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: "3", name: "Alpha" }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_unsafeIntegerId_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 2 ** 53, name: "Alpha" }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_entryNotObject_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [3] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_missingName_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 3 }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_blankName_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 3, name: "   " }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_nonStringName_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 3, name: 42 }] })).toBeNull();
+  });
+
+  it("parseProfilelessLookup_nameAtMax_accepted", () => {
+    const name = "a".repeat(PROFILELESS_NAME_MAX);
+
+    expect(parseProfilelessLookup({ players: [{ id: 3, name }] })).toEqual([{ id: 3, name }]);
+  });
+
+  it("parseProfilelessLookup_nameOverMax_returnsNull", () => {
+    expect(parseProfilelessLookup({ players: [{ id: 3, name: "a".repeat(PROFILELESS_NAME_MAX + 1) }] })).toBeNull();
   });
 });
 
 describe("formatProfilelessLookup", () => {
-  it("formatProfilelessLookup_ids_joinedByComma", () => {
-    expect(formatProfilelessLookup([3, 8])).toBe("3,8");
+  it("formatProfilelessLookup_entries_wrapsInPlayers", () => {
+    expect(formatProfilelessLookup([{ id: 3, name: "Alpha" }])).toEqual({ players: [{ id: 3, name: "Alpha" }] });
   });
 });

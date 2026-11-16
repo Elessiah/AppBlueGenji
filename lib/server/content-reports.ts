@@ -1301,21 +1301,31 @@ export async function purgeExpiredReports(): Promise<number> {
     deleted += Number(result.affectedRows);
   }
   // Les décisions closes suivent leur signalement (D87) : seulement quand un
-  // signalement vient de partir — le panneau et chaque signalement envoyé
-  // n'attendent pas un balayage sans objet. Celles qu'une passe en échec
-  // aurait laissées, l'entretien horaire les reprend
-  // (`schedulePurgeExpiredReports`).
-  if (deleted > 0) await purgeClosedQuarantinesSafely();
+  // signalement vient de partir, et **détachée** — le panneau et chaque
+  // signalement envoyé n'attendent ni un balayage sans objet, ni les paquets
+  // d'un arriéré (premier déploiement). Celles qu'une passe en échec aurait
+  // laissées, l'entretien horaire les reprend (`schedulePurgeExpiredReports`).
+  if (deleted > 0) void purgeClosedQuarantinesSafely();
   return deleted;
 }
 
-/** Purge des décisions closes (D87) ; une panne ne fait tomber ni la purge des signalements ni le panneau. */
-async function purgeClosedQuarantinesSafely(): Promise<void> {
-  try {
-    await purgeClosedQuarantines();
-  } catch (error) {
-    console.error("[moderation] purge des décisions closes impossible", failureReason(error));
-  }
+/** Passe de purge des décisions closes en cours (une seule par processus). */
+let closedQuarantinePurge: Promise<void> | null = null;
+
+/**
+ * Purge des décisions closes (D87) ; une panne ne fait tomber ni la purge des
+ * signalements ni le panneau. Une passe déjà en cours est rendue telle quelle :
+ * deux déclencheurs rapprochés ne balaient pas deux fois l'arriéré.
+ */
+export function purgeClosedQuarantinesSafely(): Promise<void> {
+  closedQuarantinePurge ??= Promise.resolve()
+    .then(() => purgeClosedQuarantines())
+    .then(() => undefined)
+    .catch((error) => console.error("[moderation] purge des décisions closes impossible", failureReason(error)))
+    .finally(() => {
+      closedQuarantinePurge = null;
+    });
+  return closedQuarantinePurge;
 }
 
 /** Signalements effacés par instruction : borne la taille d'une liste `IN`. */
@@ -1344,7 +1354,7 @@ export function schedulePurgeExpiredReports(now: number = Date.now()): void {
     .then(() => purgeExpiredReports())
     // Et, une fois l'heure, les décisions closes dont le signalement est déjà
     // parti (passe en échec, ou parti avant D87), même sans signalement purgé :
-    // sauf si `purgeExpiredReports` vient d'en balayer, une seule fois suffit.
+    // si `purgeExpiredReports` vient d'en lancer une (détachée), elle suffit.
     .then(
       (deleted) => (deleted > 0 ? undefined : purgeClosedQuarantinesSafely()),
       (error) => {

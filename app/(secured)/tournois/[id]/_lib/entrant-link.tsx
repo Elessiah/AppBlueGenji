@@ -91,12 +91,20 @@ export function useParticipantWording() {
  */
 export function EntrantLink({
   teamId,
+  entrantName,
   ...rest
-}: Readonly<EntityLinkProps & { teamId: number }>) {
+}: Readonly<EntityLinkProps & {
+  teamId: number;
+  /** Le nom de l'engagé quand le contenu n'est pas ce texte (voir `PlayerLink.playerName`). */
+  entrantName?: string;
+}>) {
   const { soloUserIds } = useContext(EntrantContext);
   const entrantLink = useEntrantLink();
   const podium = useEntrantPodium(teamId, soloUserIds[teamId]);
   // Une entrée solo d'un compte supprimé sans fiche (D13) : le nom, sans lien.
-  const linked = useHasPlayerPage(soloUserIds[teamId]);
+  const linked = useHasPlayerPage(
+    soloUserIds[teamId],
+    entrantName ?? (typeof rest.children === "string" ? rest.children : undefined),
+  );
   return <EntityLink href={entrantLink(teamId)} podium={podium} linked={linked} {...rest} />;
 }

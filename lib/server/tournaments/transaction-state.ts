@@ -11,9 +11,12 @@
  * branchée pour partir (`tests/lib/server/transaction-state.test.ts` le
  * vérifie). Et quoi qu'il en soit, `flushBotLogs` comme `discardBotLogs`
  * finissent par {@link clearTransactionStates}, qui efface **toutes** les files
- * créées ici : une file oubliée au vidage ne part pas, mais ne reste jamais sur
- * une connexion rendue au pool pour partir avec la transaction étrangère qui la
- * reprendrait.
+ * créées ici : une file oubliée au vidage ne part pas, et ne reste pas sur la
+ * connexion pour partir avec la transaction **suivante sur le même objet**
+ * connexion (un appelant qui enchaîne deux transactions sans la rendre). Le
+ * pool, lui, ne transmet rien : `mysql2/promise` enveloppe chaque
+ * `getConnection()` dans un objet neuf, et la `WeakMap` ne retrouve jamais
+ * l'état d'une emprise précédente.
  */
 import type { PoolConnection } from "mysql2/promise";
 
@@ -35,7 +38,8 @@ const registry = new Set<WeakMap<PoolConnection, unknown>>();
 /**
  * Efface, pour cette connexion, l'état de **toutes** les files créées ici —
  * appelée en fin de `flushBotLogs` (après que chaque file a pris le sien) et de
- * `discardBotLogs` : rien ne reste sur une connexion rendue au pool. Une file
+ * `discardBotLogs` : rien ne reste pour une transaction suivante sur le même
+ * objet connexion (voir le module — le pool, lui, en rend un neuf). Une file
  * qui y est encore garnie est signalée au journal (`console.error`) : l'oubli
  * de branchement se voit, il ne se perd pas en silence.
  */

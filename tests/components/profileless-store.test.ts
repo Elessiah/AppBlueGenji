@@ -12,6 +12,7 @@ import {
   PROFILELESS_RETRY_MS,
   type ProfilelessStore,
 } from "@/components/profileless-players";
+import { PROFILELESS_NAME_MAX, type ProfilelessLookupEntry } from "@/lib/shared/profileless-lookup";
 
 /**
  * D86 : les liens demandent eux-mêmes leurs comptes, regroupés par rendu,
@@ -24,17 +25,28 @@ let scheduled: (() => void)[] = [];
 let delays: number[] = [];
 let fetchIds: jest.Mock<FetchIds>;
 
+/** Le nom qu'un lien de ces tests affiche pour un compte. */
+const nameOf = (userId: number) => `Joueur${userId}`;
+
+/** Les questions de la mémoire, vues par leurs seuls identifiants (`fetchIds`) ; `asked` garde les comptes nommés. */
+let asked: jest.Mock<(players: readonly ProfilelessLookupEntry[]) => Promise<number[] | null>>;
+
+/**
+ * Une mémoire dont chaque lien affiche « Joueur<id> » (sauf nom donné) : les
+ * tests d'avant le nom (EF-65) gardent leur forme.
+ */
 function store(options: { seed?: readonly number[]; lookup?: boolean } = {}): ProfilelessStore {
-  return createProfilelessStore({
+  const inner = createProfilelessStore({
     seed: options.seed,
     lookup: options.lookup ?? true,
-    fetchIds,
+    fetchIds: asked,
     now: () => clock,
     schedule: (run, ms) => {
       delays.push(ms);
       scheduled.push(run);
     },
   });
+  return { ...inner, watch: (userId, name = nameOf(userId)) => inner.watch(userId, name) };
 }
 
 /** Lance le regroupement en attente puis laisse les réponses arriver. */
@@ -50,6 +62,7 @@ beforeEach(() => {
   scheduled = [];
   delays = [];
   fetchIds = jest.fn<FetchIds>(async () => []);
+  asked = jest.fn(async (players: readonly ProfilelessLookupEntry[]) => fetchIds(players.map(({ id }) => id)));
 });
 
 describe("createProfilelessStore", () => {
@@ -291,7 +304,7 @@ describe("createProfilelessStore : reprises et salves", () => {
     const cancel = jest.fn();
     const profileless = createProfilelessStore({
       lookup: true,
-      fetchIds,
+      fetchIds: asked,
       now: () => clock,
       schedule: (run, ms) => {
         delays.push(ms);
@@ -299,7 +312,7 @@ describe("createProfilelessStore : reprises et salves", () => {
         return cancel;
       },
     });
-    const release = profileless.watch(3);
+    const release = profileless.watch(3, nameOf(3));
     await flush();
     expect(delays).toContain(PROFILELESS_RETRY_MS);
 
@@ -334,14 +347,70 @@ describe("createProfilelessStore : reprises et salves", () => {
   });
 });
 
+describe("createProfilelessStore names (EF-65)", () => {
+  it("watch_withName_sendsIdAndShownName", async () => {
+    const profileless = store();
+
+    profileless.watch(3, " ApexTV ");
+    await flush();
+
+    expect(asked).toHaveBeenCalledWith([{ id: 3, name: "ApexTV" }]);
+  });
+
+  it("watch_withoutName_notAsked", async () => {
+    const profileless = createProfilelessStore({ lookup: true, fetchIds: asked, now: () => clock, schedule: (run) => { scheduled.push(run); } });
+
+    profileless.watch(3);
+    await flush();
+
+    expect(asked).not.toHaveBeenCalled();
+  });
+
+  it("watch_nameOverMax_notAsked", async () => {
+    const profileless = store();
+
+    profileless.watch(3, "a".repeat(PROFILELESS_NAME_MAX + 1));
+    await flush();
+
+    expect(asked).not.toHaveBeenCalled();
+  });
+
+  it("watch_nameAtMax_asked", async () => {
+    const profileless = store();
+    const name = "a".repeat(PROFILELESS_NAME_MAX);
+
+    profileless.watch(3, name);
+    await flush();
+
+    expect(asked).toHaveBeenCalledWith([{ id: 3, name }]);
+  });
+
+  it("watch_nameChangedWithinWindow_reaskedWithNewName", async () => {
+    const profileless = store();
+    profileless.watch(3, "Ancien");
+    await flush();
+
+    profileless.watch(3, "ApexTV");
+    await flush();
+
+    expect(asked).toHaveBeenLastCalledWith([{ id: 3, name: "ApexTV" }]);
+    expect(asked).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("fetchProfilelessIds", () => {
-  it("fetchProfilelessIds_request_carriesTimeoutSignal", async () => {
+  it("fetchProfilelessIds_request_postsNamesInBodyWithTimeoutSignal", async () => {
     const fetchImpl = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ ids: [3] })));
 
-    const ids = await fetchProfilelessIds([3, 8], fetchImpl);
+    const ids = await fetchProfilelessIds([{ id: 3, name: "ApexTV" }, { id: 8, name: "Beta" }], fetchImpl);
 
     expect(ids).toEqual([3]);
-    expect(fetchImpl.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+    const [url, init] = fetchImpl.mock.calls[0];
+    // Les noms affichés ne passent pas par l'adresse (journaux d'accès).
+    expect(url).toBe("/api/players/profileless");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBe(JSON.stringify({ players: [{ id: 3, name: "ApexTV" }, { id: 8, name: "Beta" }] }));
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("fetchProfilelessIds_rejectedFetch_returnsNull", async () => {
@@ -349,6 +418,6 @@ describe("fetchProfilelessIds", () => {
       throw new Error("aborted");
     });
 
-    expect(await fetchProfilelessIds([3], fetchImpl)).toBeNull();
+    expect(await fetchProfilelessIds([{ id: 3, name: "ApexTV" }], fetchImpl)).toBeNull();
   });
 });

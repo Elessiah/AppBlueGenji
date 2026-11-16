@@ -506,7 +506,8 @@ export function flushBotLogs(connection: PoolConnection): void {
   );
   const settled = resolvedMatches.take(connection) ?? new Set<number>();
   // Chaque file a pris le sien : une file qui n'aurait pas été vidée ici ne
-  // reste pas sur la connexion rendue au pool (`./transaction-state`).
+  // part pas avec une transaction suivante sur le même objet connexion
+  // (`./transaction-state`).
   clearTransactionStates(connection);
   if (queue.length === 0 && settled.size === 0) return;
   // Le tour de ce passage, pris **au commit** (synchrone) : l'ordre des commits.

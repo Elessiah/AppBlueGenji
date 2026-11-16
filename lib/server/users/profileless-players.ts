@@ -19,7 +19,9 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { cached, cachedStale } from "@/lib/server/cache";
 import { PROFILELESS_PLAYERS_CACHE_KEY } from "@/lib/server/ranking-cache";
+import type { ProfilelessLookupEntry } from "@/lib/shared/profileless-lookup";
 import { sortedIdsInclude } from "@/lib/shared/sorted-ids";
+import { visibleText } from "@/lib/shared/visible-text";
 import { accountTraceSql } from "./account-deletion";
 
 async function computeProfilelessPlayerIds(): Promise<number[]> {
@@ -84,18 +86,63 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
   }
 }
 
+/** Forme comparée d'un nom : visible, espaces réduits, sans casse. */
+function nameKey(raw: string): string {
+  return visibleText(raw).toLowerCase();
+}
+
 /**
- * Ceux de `ids` qui sont sans fiche, dans leur ordre — la seule réponse qui
- * part au navigateur (`/api/players/profileless`, décision D86) : jamais la
- * liste entière, seulement les comptes que la page affiche. **Lève** si la
- * liste ne se lit pas (ni fraîche, ni périmée gardée) : la route répond alors
- * 503, et les liens gardent leur dernière réponse au lieu de prendre une liste
- * vide pour « tous ont une fiche ».
+ * Les noms d'aujourd'hui de ces comptes : leur pseudo, et le nom de leur
+ * entrée solo (renommée avec le compte, `syncSoloEntryIdentityOn`) — les deux
+ * noms sous lesquels une page montre un joueur.
  */
-export async function profilelessAmong(ids: readonly number[]): Promise<number[]> {
-  if (ids.length === 0) return [];
+async function loadCurrentNames(ids: readonly number[]): Promise<Map<number, Set<string>>> {
+  const db = await getDatabase();
+  const placeholders = ids.map(() => "?").join(", ");
+  const [rows] = await db.execute<(RowDataPacket & { id: number; name: string | null })[]>(
+    `SELECT u.id, u.pseudo AS name FROM bg_users u WHERE u.id IN (${placeholders})
+     UNION ALL
+     SELECT t.solo_user_id AS id, t.name FROM bg_teams t WHERE t.solo_user_id IN (${placeholders})`,
+    [...ids, ...ids],
+  );
+  const names = new Map<number, Set<string>>();
+  for (const row of rows) {
+    if (row.name === null) continue;
+    const id = Number(row.id);
+    const known = names.get(id) ?? new Set<string>();
+    known.add(nameKey(String(row.name)));
+    names.set(id, known);
+  }
+  return names;
+}
+
+/**
+ * Ceux des comptes demandés qui sont sans fiche, dans leur ordre — la seule
+ * réponse qui part au navigateur (`/api/players/profileless`, décision D86) :
+ * jamais la liste entière, seulement les comptes que la page affiche.
+ *
+ * Un compte n'est dit sans fiche que si le nom envoyé est **son nom
+ * d'aujourd'hui** (pseudo, ou nom de son entrée solo ; casse et invisibles
+ * ignorés) : le pseudo d'emprunt d'un compte supprimé ne se lit que sur une
+ * page qui le montre. Qui balaie des identifiants au hasard (revue sécurité
+ * EF-65) n'apprend donc rien — ni la liste des comptes supprimés, ni l'instant
+ * d'une demande de suppression en attente — sans deviner, compte par compte,
+ * un pseudo parmi un millier. Un nom périmé (page restée ouverte avant un
+ * renommage) laisse au pire le nom en lien, vers la fiche 404. Seuls les
+ * comptes déjà sans fiche sont relus : la question ordinaire ne coûte aucune
+ * requête.
+ *
+ * **Lève** si la liste ou les noms ne se lisent pas (ni fraîche, ni périmée
+ * gardée) : la route répond alors 503, et les liens gardent leur dernière
+ * réponse au lieu de prendre une liste vide pour « tous ont une fiche ».
+ */
+export async function profilelessAmong(players: readonly ProfilelessLookupEntry[]): Promise<number[]> {
+  if (players.length === 0) return [];
   const profileless = await readProfilelessPlayerIds();
-  return ids.filter((id) => sortedIdsInclude(profileless, id));
+  const candidates = players.filter(({ id }) => sortedIdsInclude(profileless, id));
+  if (candidates.length === 0) return [];
+  const names = await loadCurrentNames(candidates.map(({ id }) => id));
+  return candidates.filter(({ id, name }) => names.get(id)?.has(nameKey(name)) === true).map(({ id }) => id);
 }
 
 /** Levée pendant le délai de grâce qui suit une panne de lecture (rien n'est relancé). */

@@ -182,6 +182,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
             <PlayerLink
               key={m.userId}
               userId={m.userId}
+              playerName={m.pseudo}
               className={s.rosterItem}
               // Lien-avatar sans texte : la marche peinte sur le texte effacerait
               // l'initiale de repli. Le nom de l'équipe, au-dessus, la porte déjà.

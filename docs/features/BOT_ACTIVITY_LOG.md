@@ -156,7 +156,11 @@ retirées, validations d'office, casters et arbitres retirés d'office — suive
 s'y branche dans la même PR ; `tests/lib/server/transaction-state.test.ts`
 refuse une file non branchée et toute `WeakMap<PoolConnection, …>` écrite à la main ;
 `clearTransactionStates` (filet de fin de vidage) **journalise** (`console.error`) toute
-file encore garnie qu'il jette : un oubli de branchement se lit dans pm2.
+file encore garnie qu'il jette : un oubli de branchement se lit dans pm2. Ce
+filet ne protège que la transaction suivante **sur le même objet connexion**
+(deux transactions enchaînées sans la rendre) : le pool ne transmet rien d'une
+emprise à l'autre, `mysql2/promise` enveloppant chaque `getConnection()` dans un
+objet neuf, que la `WeakMap` ne connaît pas.
 
 ```ts
 try {

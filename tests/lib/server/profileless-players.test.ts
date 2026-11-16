@@ -393,11 +393,26 @@ describe("invalidateProfilelessPlayers", () => {
 
 });
 
-describe("profilelessAmong (D86)", () => {
-  it("profilelessAmong_mixedIds_returnsOnlyProfilelessInAskedOrder", async () => {
-    mockDb(() => [[{ id: 3 }, { id: 8 }, { id: 12 }]]);
+/** Réponse simulée : la liste des comptes sans fiche, puis leurs noms d'aujourd'hui. */
+function lookupDb(
+  listIds: number[],
+  names: { id: number; name: string }[],
+  { failList = (): boolean => false }: { failList?: () => boolean } = {},
+) {
+  return mockDb((sql) => {
+    if (sql.includes("UNION ALL")) return [names];
+    if (failList()) throw new Error("LOCK_WAIT");
+    return [listIds.map((id) => ({ id }))];
+  });
+}
 
-    expect(await profilelessAmong([12, 5, 3])).toEqual([12, 3]);
+describe("profilelessAmong (D86)", () => {
+  it("profilelessAmong_mixedIdsWithCurrentNames_returnsOnlyProfilelessInAskedOrder", async () => {
+    lookupDb([3, 8, 12], [{ id: 12, name: "AlphaFX" }, { id: 3, name: "ApexTV" }]);
+
+    const asked = [{ id: 12, name: "AlphaFX" }, { id: 5, name: "Vivant" }, { id: 3, name: "ApexTV" }];
+
+    expect(await profilelessAmong(asked)).toEqual([12, 3]);
   });
 
   it("profilelessAmong_noIds_noQuery", async () => {
@@ -407,28 +422,62 @@ describe("profilelessAmong (D86)", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("profilelessAmong_noAskedIdInList_skipsNameQuery", async () => {
+    // La question ordinaire (aucun compte supprimé affiché) ne lit aucun nom.
+    const execute = lookupDb([3], []);
+
+    expect(await profilelessAmong([{ id: 5, name: "Vivant" }])).toEqual([]);
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("UNION ALL"))).toBe(false);
+  });
+
+  it("profilelessAmong_wrongName_omitsId", async () => {
+    // Revue sécurité EF-65 : un identifiant pris au hasard, sans le pseudo
+    // d'emprunt que seule une page qui le montre donne, n'apprend rien.
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "x" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloEntryName_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV" }, { id: 3, name: "Entrée renommée" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Entrée renommée" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_caseAndInvisiblesDiffer_stillMatches", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: " apex​tv " }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_nameReadFails_throws", async () => {
+    mockDb((sql) => {
+      if (sql.includes("UNION ALL")) throw new Error("LOCK_WAIT");
+      return [[{ id: 3 }]];
+    });
+
+    await expect(profilelessAmong([{ id: 3, name: "ApexTV" }])).rejects.toThrow("LOCK_WAIT");
+  });
+
   it("profilelessAmong_readFailureWithoutStale_throws", async () => {
     // Jamais une liste vide (« tous ont une fiche ») : la route répond 503.
     mockDb(() => {
       throw new Error("LOCK_WAIT");
     });
 
-    await expect(profilelessAmong([3])).rejects.toThrow("LOCK_WAIT");
+    await expect(profilelessAmong([{ id: 3, name: "ApexTV" }])).rejects.toThrow("LOCK_WAIT");
   });
 
   it("profilelessAmong_readFailureWithStale_answersFromStaleList", async () => {
     let fail = false;
-    mockDb(() => {
-      if (fail) throw new Error("LOCK_WAIT");
-      return [[{ id: 3 }]];
-    });
+    lookupDb([3], [{ id: 3, name: "ApexTV" }], { failList: () => fail });
     const start = Date.now();
-    expect(await profilelessAmong([3])).toEqual([3]);
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV" }])).toEqual([3]);
     // Échue mais gardée (périmée) : une panne de relecture répond encore d'elle.
     const now = jest.spyOn(Date, "now").mockReturnValue(start + PROFILELESS_PLAYERS_TTL_MS + 1);
     fail = true;
 
-    expect(await profilelessAmong([3, 4])).toEqual([3]);
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV" }, { id: 4, name: "Autre" }])).toEqual([3]);
     now.mockRestore();
   });
 });

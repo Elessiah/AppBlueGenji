@@ -2,7 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
-import { formatProfilelessLookup, PROFILELESS_LOOKUP_MAX } from "@/lib/shared/profileless-lookup";
+import {
+  formatProfilelessLookup,
+  PROFILELESS_LOOKUP_MAX,
+  PROFILELESS_NAME_MAX,
+  type ProfilelessLookupEntry,
+} from "@/lib/shared/profileless-lookup";
 
 /**
  * Les comptes supprimés **sans fiche** (décision D13, `lib/server/users/profileless-players.ts`),
@@ -10,10 +15,13 @@ import { formatProfilelessLookup, PROFILELESS_LOOKUP_MAX } from "@/lib/shared/pr
  * leur nom reste un nom, aucun lien ne mène à une fiche qui répond 404.
  *
  * **Seuls les comptes affichés** sont demandés (décision D86) : chaque lien
- * monté inscrit son compte (`useHasPlayerPage`), et les comptes d'un même rendu
- * partent ensemble (`/api/players/profileless?ids=…`, par paquets de
- * {@link PROFILELESS_LOOKUP_MAX}) — la liste entière des comptes supprimés ne
- * part plus dans chaque page. Un compte inscrit est redemandé à la navigation
+ * monté inscrit son compte **avec le nom qu'il affiche** (`useHasPlayerPage`),
+ * et les comptes d'un même rendu partent ensemble (`POST
+ * /api/players/profileless`, par paquets de {@link PROFILELESS_LOOKUP_MAX}) —
+ * la liste entière des comptes supprimés ne part plus dans chaque page, et la
+ * route ne répond que pour un nom qui est bien celui du compte. Un lien sans
+ * nom lisible (contenu composé sans `playerName`) n'est pas demandé : il reste
+ * un lien. Un compte inscrit est redemandé à la navigation
  * client, au plus une fois par {@link PROFILELESS_REFRESH_MS} : un compte
  * supprimé entre-temps ne garde pas son lien jusqu'au rechargement. Tant que la
  * réponse n'est pas là (ou en panne), le nom reste un lien — au pire vers une
@@ -52,13 +60,14 @@ export function isLookupId(userId: unknown): userId is number {
 export const PROFILELESS_BATCH_MS = 50;
 
 /**
- * Questions envoyées d'un coup, au plus : la route compte 30 questions par
- * minute (`PROFILELESS_LOOKUP_RULE`), et un affichage de milliers de joueurs
- * (classement, annuaire) ne doit pas la vider en une salve. Le reste attend.
+ * Questions envoyées d'un coup, au plus : la route compte 60 questions par
+ * minute et par compte (`PROFILELESS_LOOKUP_RULE`), et un affichage de
+ * milliers de joueurs (classement, annuaire) ne doit pas la vider en une salve.
+ * Le reste attend.
  */
 export const PROFILELESS_CHUNKS_PER_BURST = 4;
 
-/** Attente entre deux salves : quatre questions par dix secondes, soit 24 par minute, sous la borne. */
+/** Attente entre deux salves : quatre questions par dix secondes, soit 24 par minute — deux onglets tiennent sous la borne. */
 export const PROFILELESS_BURST_GAP_MS = 10_000;
 
 /** Les ids d'une réponse de `/api/players/profileless`, ou `null` si elle n'en porte pas. */
@@ -69,13 +78,17 @@ export function parseProfilelessIds(body: unknown): number[] | null {
   return ids.filter((id): id is number => Number.isSafeInteger(id) && id > 0);
 }
 
-/** Ceux de `ids` qui sont sans fiche, ou `null` (hors ligne, refus, corps illisible). */
+/** Ceux des comptes demandés qui sont sans fiche, ou `null` (hors ligne, refus, corps illisible). */
 export async function fetchProfilelessIds(
-  ids: readonly number[],
+  players: readonly ProfilelessLookupEntry[],
   fetchImpl: typeof fetch = fetch,
 ): Promise<number[] | null> {
   try {
-    const response = await fetchImpl(`/api/players/profileless?ids=${formatProfilelessLookup(ids)}`, {
+    // Un `POST` : les noms affichés ne passent pas par l'adresse (journaux d'accès).
+    const response = await fetchImpl("/api/players/profileless", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formatProfilelessLookup(players)),
       cache: "no-store",
       // Une connexion qui cale sans erreur ne garde pas ses comptes « en vol » à jamais.
       signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(PROFILELESS_TIMEOUT_MS) : undefined,
@@ -93,8 +106,12 @@ export type ProfilelessStore = {
   isProfileless(userId: number): boolean;
   /** Même question pour le rendu serveur et l'hydratation : les seuls comptes donnés d'emblée. */
   isSeeded(userId: number): boolean;
-  /** Un lien affiche ce compte : il est demandé s'il ne l'a pas été dans la fenêtre. Rend le retrait. */
-  watch(userId: number): () => void;
+  /**
+   * Un lien affiche ce compte sous ce nom : il est demandé s'il ne l'a pas été
+   * dans la fenêtre (ou sous un autre nom). Sans nom, il n'est pas demandé.
+   * Rend le retrait.
+   */
+  watch(userId: number, name?: string): () => void;
   /** Navigation client : les comptes affichés dont la réponse a passé la fenêtre sont redemandés. */
   refreshStale(): void;
 };
@@ -102,7 +119,7 @@ export type ProfilelessStore = {
 type StoreOptions = {
   seed?: readonly number[];
   lookup: boolean;
-  fetchIds?: (ids: readonly number[]) => Promise<number[] | null>;
+  fetchIds?: (players: readonly ProfilelessLookupEntry[]) => Promise<number[] | null>;
   now?: () => number;
   /** Lance `run` dans `ms` ; rend, si possible, de quoi l'annuler. */
   schedule?: (run: () => void, ms: number) => (() => void) | void;
@@ -125,6 +142,9 @@ export function createProfilelessStore({
   /** Échecs de suite par compte : l'essai suivant attend d'autant plus. */
   const failures = new Map<number, number>();
   const shown = new Map<number, number>();
+  /** Le nom affiché de chaque compte (le dernier lien monté l'emporte), et celui de la dernière question. */
+  const names = new Map<number, string>();
+  const askedName = new Map<number, string>();
   const queued = new Set<number>();
   const inFlight = new Set<number>();
   const listeners = new Set<() => void>();
@@ -141,7 +161,9 @@ export function createProfilelessStore({
   };
 
   const due = (userId: number): boolean => {
-    if (seeded.has(userId) || queued.has(userId) || inFlight.has(userId)) return false;
+    if (seeded.has(userId) || queued.has(userId) || inFlight.has(userId) || !names.has(userId)) return false;
+    // Un autre nom affiché (renommage, réponse fraîche) se redemande sans attendre.
+    if (askedName.has(userId) && askedName.get(userId) !== names.get(userId)) return true;
     const at = askedAt.get(userId);
     if (at === undefined) return true;
     return now() - at >= wait(userId);
@@ -169,18 +191,20 @@ export function createProfilelessStore({
   const flush = () => {
     flushArmed = false;
     // Un compte qui n'est plus affiché n'est plus demandé.
-    const ids = [...queued].filter((userId) => shown.has(userId));
+    const ids = [...queued].filter((userId) => shown.has(userId) && names.has(userId));
     queued.clear();
     const at = now();
     const sent = ids.slice(0, PROFILELESS_CHUNKS_PER_BURST * PROFILELESS_LOOKUP_MAX);
     for (let start = 0; start < sent.length; start += PROFILELESS_LOOKUP_MAX) {
       const chunk = sent.slice(start, start + PROFILELESS_LOOKUP_MAX);
-      for (const userId of chunk) {
+      const entries = chunk.map((userId) => ({ id: userId, name: names.get(userId) ?? "" }));
+      for (const { id: userId, name } of entries) {
         inFlight.add(userId);
         // La fenêtre est prise avant l'envoi : jamais deux questions en vol.
         askedAt.set(userId, at);
+        askedName.set(userId, name);
       }
-      void fetchIds(chunk).then(
+      void fetchIds(entries).then(
         (profileless) => settle(chunk, profileless),
         () => settle(chunk, null),
       );
@@ -244,14 +268,20 @@ export function createProfilelessStore({
     },
     isProfileless: (userId) => answers.get(userId) === true,
     isSeeded: (userId) => seeded.has(userId),
-    watch(userId) {
+    watch(userId, name) {
       shown.set(userId, (shown.get(userId) ?? 0) + 1);
+      // Un nom que la route refuserait (vide, trop long) ferait refuser tout son paquet : pas demandé.
+      const shownName = name?.trim();
+      if (shownName && shownName.length <= PROFILELESS_NAME_MAX) names.set(userId, shownName);
       ask(userId);
       armRetry();
       return () => {
         const count = (shown.get(userId) ?? 1) - 1;
         if (count > 0) shown.set(userId, count);
-        else shown.delete(userId);
+        else {
+          shown.delete(userId);
+          names.delete(userId);
+        }
         if (shown.size === 0) stopRetry();
       };
     },
@@ -261,6 +291,7 @@ export function createProfilelessStore({
       for (const [userId, at] of askedAt) {
         if (shown.has(userId) || seeded.has(userId) || now() - at < PROFILELESS_REFRESH_MS) continue;
         askedAt.delete(userId);
+        askedName.delete(userId);
         answers.delete(userId);
         failures.delete(userId);
       }
@@ -302,10 +333,18 @@ function ProfilelessNavigation({ store }: Readonly<{ store: ProfilelessStore }>)
 
 const noSubscription = () => () => undefined;
 
-/** La fiche `/joueurs/<id>` de ce compte existe-t-elle ? `undefined` (pas un joueur) : oui. */
-export function useHasPlayerPage(userId: number | undefined): boolean {
+/**
+ * La fiche `/joueurs/<id>` de ce compte existe-t-elle ? `undefined` (pas un
+ * joueur) : oui. `name` : le nom que le lien affiche, envoyé avec la question
+ * (la route ne répond que pour le nom du compte) ; sans lui, le compte n'est
+ * pas demandé et le nom reste un lien.
+ */
+export function useHasPlayerPage(userId: number | undefined, name?: string): boolean {
   const store = useContext(ProfilelessPlayersContext);
-  useEffect(() => (userId === undefined || store === null ? undefined : store.watch(userId)), [store, userId]);
+  useEffect(
+    () => (userId === undefined || store === null ? undefined : store.watch(userId, name)),
+    [store, userId, name],
+  );
   const profileless = useSyncExternalStore(
     store?.subscribe ?? noSubscription,
     () => userId !== undefined && store !== null && store.isProfileless(userId),

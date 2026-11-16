@@ -351,16 +351,17 @@ export const DIRECTORY_READ_RULE: RateLimitRule = {
 
 /**
  * Questions « ces comptes ont-ils une fiche ? » des liens de joueur
- * (`/api/players/profileless?ids=`, décision D86), par compte. Un seau à part de
+ * (`POST /api/players/profileless`, décision D86), par compte. Un seau à part de
  * {@link DIRECTORY_READ_RULE} : chaque chargement de page en pose une (une par
  * centaine de noms affichés), et elles ne doivent pas épuiser celui de
- * l'annuaire. Trente par minute couvrent une navigation soutenue (un compte
- * affiché n'est redemandé qu'une fois par minute) et bornent à 3 000
- * identifiants par minute qui voudrait reconstituer la liste entière.
+ * l'annuaire. Soixante par minute : chaque onglet en pose au plus 24
+ * (`PROFILELESS_BURST_GAP_MS`), deux onglets de classement ouverts ensemble
+ * tiennent dessous. La borne ne protège pas la liste des comptes supprimés :
+ * c'est le nom exigé avec chaque compte (`profilelessAmong`) qui la ferme.
  */
 export const PROFILELESS_LOOKUP_RULE: RateLimitRule = {
   name: "profileless-lookup",
-  limit: 30,
+  limit: 60,
   windowMs: 60_000,
 };
 

@@ -142,7 +142,13 @@ export function EntrantName({
     <span className={joinClasses(styles.label, className)} style={style}>
       {plain && teamId === null ? null : <EntrantLogo teamId={teamId} name={shownName} size={logoSize} />}
       {linked ? (
-        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={shownTitle} truncate={truncate}>
+        <EntrantLink teamId={teamId}
+          entrantName={typeof content === "string" ? content : (shownName ?? undefined)}
+          className={textClass}
+          style={textStyle}
+          title={shownTitle}
+          truncate={truncate}
+        >
           {content}
         </EntrantLink>
       ) : (

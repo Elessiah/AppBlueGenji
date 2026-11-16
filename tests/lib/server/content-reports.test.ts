@@ -830,6 +830,26 @@ describe("conservation", () => {
     expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
   });
 
+  it("purgeExpiredReports_reportsDeleted_doesNotAwaitClosedQuarantineBacklog", async () => {
+    // Un arriéré (premier déploiement) ne retarde ni le panneau ni un signalement envoyé.
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    let finish: ((count: number) => void) | undefined;
+    jest.mocked(purgeClosedQuarantines).mockReturnValue(new Promise<number>((resolve) => { finish = resolve; }));
+
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    // Une seconde purge pendant la passe la rejoint, sans relancer le balayage.
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+    await flush();
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    finish?.(0);
+    await flush();
+  });
+
   it("purgeExpiredReports_nothingDeleted_skipsClosedQuarantineScan", async () => {
     // Le panneau et chaque signalement envoyé n'attendent pas un balayage sans objet.
     install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
@@ -858,6 +878,7 @@ describe("conservation", () => {
     jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("LOCK_WAIT"));
 
     await expect(purgeExpiredReports()).resolves.toBe(1);
+    await flush();
 
     expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
     error.mockRestore();

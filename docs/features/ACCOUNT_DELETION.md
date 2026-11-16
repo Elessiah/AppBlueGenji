@@ -336,17 +336,26 @@ Son nom, lui, reste un **nom sans lien** partout où il s'affiche :
 `loadProfilelessPlayerIds` (cache de classement `list:profileless-players`,
 vidé à chaque score et à chaque suppression par `invalidateTeamIdentityViews`)
 n'est **plus envoyé entier** dans chaque page (D86) : chaque `PlayerLink` /
-`EntrantLink` monté inscrit son compte auprès de `ProfilelessPlayersProvider`
-(`useHasPlayerPage`), qui pose une seule question par rendu
-(`GET /api/players/profileless?ids=3,8`, connecté seulement, au plus 100
-identifiants par question, `lib/shared/profileless-lookup.ts`, seau propre
-`PROFILELESS_LOOKUP_RULE` de 30 questions par minute, distinct de l'annuaire) ;
-la route ne répond que ceux des identifiants demandés qui sont sans fiche
-(`profilelessAmong`), ou 503 (`PROFILELESS_UNAVAILABLE`) si la liste ne se lit
-pas — jamais une réponse vide que les liens prendraient pour « tous ont une
-fiche ». Limite acceptée avec D86 : un compte connecté peut questionner
-n'importe quels identifiants, et qui interroge en masse reconstitue la liste
-(au plus 3 000 identifiants par minute) — identifiants seuls, jamais un pseudo. Un compte dit sans fiche rend `<span class="entity-name">`. Les liens se rendant
+`EntrantLink` monté inscrit son compte **avec le nom qu'il affiche** auprès de
+`ProfilelessPlayersProvider` (`useHasPlayerPage` ; `playerName` / `entrantName`
+quand le contenu n'est pas ce texte, comme l'avatar d'une carte d'équipe), qui
+pose une seule question par rendu (`POST /api/players/profileless`, corps
+`{ players: [{ id, name }] }`, connecté seulement, origine vérifiée, au plus 100
+comptes par question, `lib/shared/profileless-lookup.ts`, seau propre
+`PROFILELESS_LOOKUP_RULE` de 60 questions par minute, distinct de l'annuaire) ;
+la route ne répond que ceux des comptes demandés qui sont sans fiche **et dont
+le nom envoyé est le nom d'aujourd'hui** — pseudo, ou nom de l'entrée solo,
+casse et invisibles ignorés (`profilelessAmong`) —, ou 503
+(`PROFILELESS_UNAVAILABLE`) si la liste ne se lit pas — jamais une réponse vide
+que les liens prendraient pour « tous ont une fiche ». Le pseudo d'emprunt d'un
+compte supprimé ne se lit que sur une page qui montre ce joueur : balayer des
+identifiants au hasard ne reconstitue donc ni la liste des comptes supprimés,
+ni l'instant d'une demande de suppression en attente (revue sécurité EF-65),
+sauf à deviner, compte par compte, un pseudo parmi un millier. Les noms
+partent dans le corps, jamais dans l'adresse : les journaux d'accès ne gardent
+pas, par visiteur, les joueurs qui lui ont été montrés. Un lien sans nom
+lisible n'est pas demandé, et un nom périmé (page ouverte avant un renommage)
+laisse au pire un lien vers la fiche 404. Un compte dit sans fiche rend `<span class="entity-name">`. Les liens se rendant
 côté client, les deux portes du direct (flux SSE et REST de secours) sont
 couvertes sans toucher au `TournamentSnapshot`. La carte du direct de l'accueil
 (`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. La mise en
@@ -359,7 +368,7 @@ minute (`PROFILELESS_REFRESH_MS`) ; après un échec (hors ligne, 429, 503), une
 minuterie unique (réarmée sur le prochain essai dû, annulée quand plus aucun lien n'est affiché) redemande d'elle-même tant que le compte reste affiché (15 s,
 doublé à chaque échec de suite, plafonné à 2 min : une page de direct reste
 ouverte sans navigation), et une question sans réponse est coupée au bout de
-10 s (`PROFILELESS_TIMEOUT_MS`). Les questions partent par salves de 4 paquets au plus (`PROFILELESS_CHUNKS_PER_BURST`), dix secondes entre deux (`PROFILELESS_BURST_GAP_MS`), sous la borne de 30 par minute ; un compte retiré de l'écran avant son tour n'est pas demandé. Seuls des identifiants entiers positifs sont
+10 s (`PROFILELESS_TIMEOUT_MS`). Les questions partent par salves de 4 paquets au plus (`PROFILELESS_CHUNKS_PER_BURST`), dix secondes entre deux (`PROFILELESS_BURST_GAP_MS`), 24 par minute et par onglet, deux onglets sous la borne de 60 ; un compte retiré de l'écran avant son tour n'est pas demandé. Seuls des identifiants entiers positifs sont
 posés (un seul invalide ferait refuser le paquet entier). Les réponses d'un
 compte qui n'est plus affiché sont oubliées une fenêtre plus tard. Au pire,
 un lien mène à la page introuvable. Le passage de lien à texte au premier
@@ -1125,7 +1134,7 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   classement que chaque score vide. La fiche lit la même liste
   (`anonymizedAccountHasNoPage`) ; liste illisible, elle interroge le seul
   compte en base (jamais une fiche rouverte par une panne). Les liens affichés
-  la questionnent par identifiants (`/api/players/profileless?ids=`, D86) ;
+  la questionnent par identifiant et nom affiché (`POST /api/players/profileless`, D86, nom exigé depuis la revue sécurité EF-65) ;
   `/rgpd` dit qu'une page déjà ouverte garde son lien jusqu'au rechargement.
 - **Revue standard cycle 1** : les traces du plan rendu se lisent après le
   journal et les suites, et une panne ne fait plus passer la demande pour un
