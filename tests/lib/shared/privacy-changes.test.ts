@@ -2871,6 +2871,8 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     expect(fr).toContain("un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site");
     expect(en).toContain("ask for it again (about once every 5 minutes, from 15 minutes before the match time to 24 hours after it");
     expect(en).toContain("a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site");
+    expect(fr).toContain("sans appel au site, sauf au-delà de 48 heures ou de 3 recréations en 10 minutes)");
+    expect(en).toContain("without calling the site, except beyond 48 hours or 3 recreations within 10 minutes)");
     expect(fr).not.toContain("le redemander (environ une fois par minute");
     expect(en).not.toContain("ask for it again (about once a minute");
   });
@@ -2878,8 +2880,8 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   it("rgpdPage_voiceChannelDeletedByModeration_recreatedAtOnceFrAndEn", () => {
     const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
     const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
-    expect(fr).toContain("un salon supprimé par la modération avant d&apos;être rendu au bot est, lui, recréé aussitôt par le bot sans ces conditions, sous le nom qu&apos;il portait (celui de l&apos;équipe, sauf si la modération l&apos;a renommé), puis rendu et supprimé comme tout autre salon — à défaut (bot arrêté, recréation en échec), le site en rouvre un aux conditions ci-dessus");
-    expect(en).toContain("a channel deleted by moderation before being handed back to the bot is instead recreated at once by the bot, without these conditions, under the name it had (the team&apos;s, unless moderation renamed it), then handed back and deleted like any other channel — failing that (bot stopped, recreation failed), the site reopens one under the conditions above");
+    expect(fr).toContain("un salon supprimé par la modération avant d&apos;être rendu au bot est, lui, recréé aussitôt par le bot sans ces conditions, sous le nom qu&apos;il portait (celui de l&apos;équipe, sauf si la modération l&apos;a renommé), puis rendu et supprimé comme tout autre salon, sauf s&apos;il a plus de {VOICE_BOT_UNRELEASED_MAX_HOURS} heures ou qu&apos;il a déjà été recréé {VOICE_BOT_RECREATE_MAX} fois en {VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes — à défaut (bot arrêté, recréation en échec ou écartée), le site en rouvre un aux conditions ci-dessus");
+    expect(en).toContain("a channel deleted by moderation before being handed back to the bot is instead recreated at once by the bot, without these conditions, under the name it had (the team&apos;s, unless moderation renamed it), then handed back and deleted like any other channel, unless it is more than {VOICE_BOT_UNRELEASED_MAX_HOURS} hours old or has already been recreated {VOICE_BOT_RECREATE_MAX} times within {VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes — failing that (bot stopped, recreation failed or ruled out), the site reopens one under the conditions above");
   });
 
   it("processingRegister_t18_clearDeclaredWithoutOccupantDataFrAndEn", () => {

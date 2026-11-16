@@ -47,7 +47,12 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   retirés quand le salon neuf cesse d'être suivi, perdue à son redémarrage). Le site ne garde qu'une
   **revérification de sécurité toutes les 5 minutes** (`VOICE_RECHECK_MINUTES`, décision D16 : par
   sondage, aucun signal du bot vers le site), qui lui apprend l'identifiant du salon neuf et
-  rattrape ce que le bot a manqué (arrêté pendant la suppression, recréation en échec). Limite
+  rattrape ce que le bot a manqué (arrêté pendant la suppression, recréation en échec ou écartée).
+  **Pas de recréation** (le salon cesse d'être suivi) pour un salon jamais rendu de plus de 48 h, ni
+  au-delà de 3 recréations d'une même clé en 10 minutes (`RECREATE_MAX`, revue sécurité : aucune
+  boucle suppression/recréation contre la limite de débit de Discord ni contre la mémoire des
+  alias) ; un salon que le bot supprime lui-même sans réponse de Discord (réseau, délai) reste
+  marqué « supprimé par le bot » et n'est pas recréé à son événement. Limite
   connue : un rendu par l'ancien identifiant après un redémarrage du bot (ou l'oubli de son alias,
   plus de 200 recréations plus tard), dans ces 5 minutes,
   clôt la ligne du site sans rendre le salon neuf, alors supprimé par le bot une fois vide

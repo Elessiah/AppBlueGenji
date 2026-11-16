@@ -64,11 +64,17 @@ export const VOICE_RECHECK_MINUTES = 5;
  *   jamais rendu est supprimé s'il est vide au-delà.
  * - `VOICE_BOT_ABANDONED_MAX_HOURS` : `ABANDONED_MAX_AGE_MS` — la fiche d'un
  *   salon auquel le bot n'a plus accès est oubliée au-delà.
+ * - `VOICE_BOT_RECREATE_MAX` / `VOICE_BOT_RECREATE_WINDOW_MINUTES` :
+ *   `RECREATE_MAX` / `RECREATE_WINDOW_MS` — au-delà de ce nombre de recréations
+ *   d'une même clé dans la fenêtre, un salon supprimé par la modération n'est
+ *   plus recréé par le bot (il cesse d'être suivi).
  */
 export const VOICE_BOT_RELEASED_MAX_HOURS = 24;
 export const VOICE_BOT_SWEEP_MINUTES = 30;
 export const VOICE_BOT_UNRELEASED_MAX_HOURS = 48;
 export const VOICE_BOT_ABANDONED_MAX_HOURS = 96;
+export const VOICE_BOT_RECREATE_MAX = 3;
+export const VOICE_BOT_RECREATE_WINDOW_MINUTES = 10;
 
 /**
  * Clé d'idempotence d'un salon côté bot : la même clé rend le même salon, si
