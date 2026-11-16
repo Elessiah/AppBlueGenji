@@ -126,5 +126,42 @@
     "points": "pts",
     "teamFallback": "Team #{id}",
     "places": ["1st", "2nd", "3rd"]
+  },
+  "embed": {
+    "tournamentFallback": "Tournament",
+    "teamFallback": "Team #{id}",
+    "format": "Format",
+    "entrants": {
+      "TEAM": "Teams",
+      "SOLO": "Players"
+    },
+    "schedule": {
+      "FINISHED": "Played on",
+      "RUNNING": "Running since",
+      "REGISTRATION": "Registration until",
+      "OPENS": "Registration from",
+      "KICKOFF": "Kick-off on"
+    },
+    "winner": "Winner: {name}",
+    "leader": "Leading: {name}",
+    "playerSide": "Player {number}",
+    "tbd": "To be decided",
+    "matchStates": {
+      "UPCOMING": "Upcoming",
+      "IN_PROGRESS": "Match in progress",
+      "RUNNING": "Result pending",
+      "COMPLETED": "Match over"
+    },
+    "map": "Map {number}",
+    "noCode": "No code",
+    "forfeit": "Forfeit: {name}",
+    "doubleForfeit": "Double forfeit",
+    "versus": "{team1} vs {team2}",
+    "scoreboardVersus": "VS",
+    "moreMaps": "+{count} maps",
+    "mapLine": "Map {number}{name}: {score}",
+    "mapCode": "code {code}",
+    "tournamentAlt": "Preview of the tournament {name}",
+    "matchAlt": "Preview of the match {team1} vs {team2}"
   }
 }

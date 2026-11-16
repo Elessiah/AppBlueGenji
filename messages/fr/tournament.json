@@ -359,5 +359,12 @@
       "killcamOff": "Killcam désactivée",
       "pauseOnDisconnect": "Pause lors de la déconnexion d'un joueur"
     }
+  },
+  "shareLink": {
+    "tournament": "Partager",
+    "tournamentAria": "Partager le lien public du tournoi",
+    "copied": "Lien public copié",
+    "shared": "Lien public partagé",
+    "copyFailed": "Impossible de copier le lien : {url}"
   }
 }

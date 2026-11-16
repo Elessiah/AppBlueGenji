@@ -40,6 +40,8 @@ import {
   type SpectatorLoadLevel,
 } from "@/lib/shared/spectator-view";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
+import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
+import { buildTournamentShareSummary, tournamentMayHaveLeader, type TournamentShareSummary } from "@/lib/shared/share-embeds";
 import type { TournamentCard, TournamentSnapshot, TournamentState } from "@/lib/shared/types";
 
 /**
@@ -52,8 +54,10 @@ export type PublicTournamentView = Pick<TournamentSnapshot, "card" | "phases" | 
 /**
  * Ce que la route sert : l'empreinte, l'état (pour la cadence) et le corps prêt
  * à écrire. L'empreinte est celle du **corps public**, et non la version de
- * l'instantané des membres : un code de replay corrigé ne change rien de ce que
- * lit le visiteur, il garde son `304`.
+ * l'instantané des membres : ce qui n'est pas public (propositions en attente,
+ * contacts…) ne change pas l'`ETag`. Depuis D74 (`SHARE_EMBEDS.md`), les codes
+ * de replay d'un résultat retenu **sont** dans le corps public : un code
+ * corrigé change l'empreinte et invalide les `304`.
  */
 export type SpectatorPayload = {
   version: string;
@@ -63,6 +67,14 @@ export type SpectatorPayload = {
   ttlMs: number;
   /** Carte et réglages du corps public (encart, page des règles) — jamais l'instantané des membres. */
   snapshot: PublicTournamentView;
+  /**
+   * Résumé du corps public pour les cartes d'aperçu (`SHARE_EMBEDS.md`) :
+   * engagé en tête, score et maps de chaque match. Tiré de l'objet public déjà
+   * construit (sans relire `body`), il ne montre rien de plus que lui. Calculé
+   * avec la copie : la fiche des membres le lit à chaque vue pour versionner
+   * son image, le différer ne ferait rien gagner.
+   */
+  share: TournamentShareSummary;
 };
 
 /**
@@ -232,6 +244,7 @@ export async function getSpectatorPayload(
             endurance: publicSnapshot.endurance,
             seedingSource: publicSnapshot.seedingSource,
           },
+          share: buildTournamentShareSummary(publicSnapshot),
         };
       },
       {
@@ -289,6 +302,66 @@ export async function publicTournamentSnapshot(
   }
 }
 
+/**
+ * Carte (état recalculé depuis les dates) et résumé d'aperçu d'un tournoi
+ * public. `stale` : tiré d'une copie **échue** (plafond de lecture atteint ou
+ * reconstruction refusée) — ce qu'il dessine peut avoir un score de retard, et
+ * l'image rendue ne doit pas être gardée sous l'adresse versionnée suivante.
+ */
+export type PublicTournamentShare = { card: TournamentCard; share: TournamentShareSummary; stale: boolean };
+
+function shareOf(payload: SpectatorPayload | null | undefined, stale: boolean): PublicTournamentShare | null {
+  if (!payload) return null;
+  const card = publicCardNow(payload.snapshot.card);
+  return card ? { card, share: payload.share, stale } : null;
+}
+
+/**
+ * Une carte gardée (copie, cache de carte), telle que le public la voit
+ * **maintenant** : état recalculé depuis les dates, `null` si elle n'est plus
+ * publiée (date de visibilité repoussée) — une copie de 150 s, ou une carte
+ * de 10 s, ne dessine pas un tournoi que `/suivre/` dit déjà introuvable.
+ */
+function publicCardNow(card: TournamentCard): TournamentCard | null {
+  return isTournamentPublished(card) ? { ...card, state: computeTournamentState(card) } : null;
+}
+
+/**
+ * Le tournoi tel que ses cartes d'aperçu le dessinent (`SHARE_EMBEDS.md`) : la
+ * même réponse publique mutualisée que la page sans compte, au même prix pour
+ * le réseau qui la demande — et, comme {@link publicTournamentSnapshot}, la
+ * copie échue de moins de 150 s au plafond. `null` : introuvable (non publié
+ * compris), lecture refusée sans copie, ou base injoignable.
+ *
+ * @param admit Comme pour {@link publicTournamentSnapshot}, **obligatoire**.
+ */
+export async function publicTournamentShare(
+  tournamentId: number,
+  level: SpectatorLoadLevel,
+  client: string | null,
+  admit: () => boolean,
+): Promise<PublicTournamentShare | null> {
+  if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) {
+    return shareOf(staleSpectatorPayload(tournamentId), true);
+  }
+  try {
+    return shareOf(await getSpectatorPayload(tournamentId, level, client), false);
+  } catch (error) {
+    if (error instanceof SpectatorRebuildRefused) return shareOf(staleSpectatorPayload(tournamentId), true);
+    return null;
+  }
+}
+
+/**
+ * Le résumé d'aperçu de la copie **déjà en mémoire**, sans lecture ni jeton :
+ * l'encart d'une fiche s'en sert pour versionner l'adresse de son image sans
+ * jamais provoquer de reconstruction.
+ */
+export function cachedTournamentShare(tournamentId: number): PublicTournamentShare | null {
+  // `stale` : l'âge de la copie n'est pas jugé ici (l'encart ne s'en sert pas).
+  return shareOf(staleSpectatorPayload(tournamentId), false);
+}
+
 /** Durée de garde de la carte d'un tournoi lue pour un encart de lien. */
 export const SPECTATOR_CARD_TTL_MS = 10_000;
 
@@ -315,21 +388,74 @@ export async function publicTournamentCard(
   admit: () => boolean,
 ): Promise<TournamentCard | null> {
   const copy = staleSpectatorPayload(tournamentId);
-  if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };
+  if (copy) return publicCardNow(copy.snapshot.card);
+  const read = await readPublicTournamentCard(tournamentId, admit);
+  return read === CARD_READ_REFUSED ? null : read;
+}
+
+/** Lecture de la carte refusée par `admit` (plafond) : distincte d'un « introuvable ». */
+const CARD_READ_REFUSED = Symbol("card-read-refused");
+
+/**
+ * La carte seule (cache de carte, sinon la base), **sans** la copie de la
+ * réponse publique : {@link CARD_READ_REFUSED} si `admit` refuse la lecture en
+ * base, `null` introuvable ou base injoignable.
+ */
+async function readPublicTournamentCard(
+  tournamentId: number,
+  admit: () => boolean,
+): Promise<TournamentCard | null | typeof CARD_READ_REFUSED> {
   const key = spectatorCardCacheKey(tournamentId);
   // `admit` (le plafond des lectures publiques) n'est consulté que quand la
   // lecture **touche la base** : ni une carte déjà en cache, ni une lecture déjà
   // en vol (qu'on rejoint) ne prennent de jeton. Consulté **avant** `cached`,
   // sans attente entre les deux : un refus ne devient jamais le résultat commun
   // d'une lecture en vol que d'autres, non plafonnés, auraient rejointe.
-  if (!isCachedOrLoading(key) && !admit()) return null;
+  if (!isCachedOrLoading(key) && !admit()) return CARD_READ_REFUSED;
   try {
-    return await cached(
+    const card = await cached(
       key,
       (card: TournamentCard | null) => (card ? SPECTATOR_CARD_TTL_MS : 0),
       () => getVisibleTournamentCard(tournamentId),
     );
+    // Gardée jusqu'à 10 s : l'état lu à l'ouverture des inscriptions ou au
+    // lancement serait sinon celui d'avant.
+    return card ? publicCardNow(card) : null;
   } catch {
     return null;
   }
+}
+
+/** Résumé vide d'un tournoi dont l'image ne nomme aucune équipe en tête. */
+const NO_SHARE_SUMMARY: TournamentShareSummary = { leader: null, matches: new Map() };
+
+/**
+ * Ce que l'**image d'un tournoi** dessine (`SHARE_EMBEDS.md`), au plus juste
+ * prix et jamais en retard sans le dire :
+ *
+ * - réponse publique fraîche (ou en vol) : son résumé, sans jeton ;
+ * - sinon la **carte seule**, fraîche (cache de carte ou base, jamais la copie
+ *   échue : une inscription de plus ne doit pas être dessinée avec l'ancien
+ *   effectif sous une adresse versionnée neuve) — et, pour un tournoi qui ne
+ *   peut pas nommer d'équipe en tête (`tournamentMayHaveLeader`), rien de plus ;
+ * - pour les autres, la réponse publique ({@link publicTournamentShare}).
+ *   `admit` est appelé au plus pour chaque lecture en base : l'appelant le rend
+ *   idempotent pour qu'une même requête ne paie qu'un jeton du plafond.
+ *
+ * Lecture de carte refusée au plafond : la copie échue, marquée `stale`.
+ */
+export async function publicTournamentImageView(
+  tournamentId: number,
+  level: SpectatorLoadLevel,
+  client: string | null,
+  admit: () => boolean,
+): Promise<PublicTournamentShare | null> {
+  if (isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId))) {
+    return publicTournamentShare(tournamentId, level, client, admit);
+  }
+  const card = await readPublicTournamentCard(tournamentId, admit);
+  if (card === CARD_READ_REFUSED) return shareOf(staleSpectatorPayload(tournamentId), true);
+  if (!card) return null;
+  if (!tournamentMayHaveLeader(card)) return { card, share: NO_SHARE_SUMMARY, stale: false };
+  return publicTournamentShare(tournamentId, level, client, admit);
 }

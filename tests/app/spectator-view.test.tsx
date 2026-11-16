@@ -304,11 +304,13 @@ describe("page sans compte — mise en page", () => {
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
-  it("a sa version anglaise et son image d'aperçu", () => {
+  it("a sa version anglaise et son image d'aperçu, par langue (SHARE_EMBEDS.md)", async () => {
     expect(isMigratedRoute("/suivre/tournois/12")).toBe(true);
-    const og = readSource("app/suivre/tournois/[id]/opengraph-image.tsx");
-    expect(og).toContain('export { default, alt, size, contentType } from "@/app/(secured)/tournois/[id]/opengraph-image";');
-    expect(og).toContain("export const revalidate = 300");
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 12, name: "Cup" }));
+    const meta = await generateMetadata(params("12"));
+    const images = (meta.openGraph as { images?: { url: string }[] }).images ?? [];
+    expect(images[0]?.url).toMatch(/^\/og\/fr\/tournament-12\.png\?v=[0-9a-z]+(?:\.[0-9a-z]+)?$/);
+    expect((meta.twitter as { images?: { url: string }[] }).images?.[0]?.url).toBe(images[0]?.url);
   });
 
   it("ne lit que la route publique, jamais une route de l'espace connecté", () => {
@@ -370,16 +372,15 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(deletion).toMatch(/publishUpdatedEvent\(tournamentId\);[\s\S]{0,200}invalidateSpectatorSnapshot\(tournamentId\);/);
   });
 
-  it("tait les codes de replay, réservés aux membres connectés", () => {
+  it("montre les codes de replay du résultat, publics depuis D74", () => {
     const maps = [
       { mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 1 },
       { mapNumber: 2, replayCode: "", team1Score: 0, team2Score: 2 },
     ];
     const html = spectator(<MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps" />);
     expect(html).toContain("2 – 1");
-    expect(html).not.toContain("ABC123");
-    expect(html).not.toContain(frTournament.match.maps.noReplayCode);
-    expect(html).not.toContain("<button");
+    expect(html).toContain("ABC123");
+    expect(html).toContain(frTournament.match.maps.noReplayCode);
     const memberHtml = member(<MapResultList maps={maps} team1Name="Alpha" team2Name="Bravo" label="Maps" />);
     expect(memberHtml).toContain("ABC123");
     expect(memberHtml).toContain(frTournament.match.maps.noReplayCode);
@@ -463,7 +464,11 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     // La cadence accordée, hors du seul `title` du témoin : lisible au toucher.
     expect(html).toMatch(/<p>[^<]*toutes les 2 minutes au plus[^<]*<\/p>/);
     expect(html).not.toContain(`title="${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}"`);
-    expect(withoutInfoHintButtons(html)).not.toContain("<button");
+    // Seul geste : « Partager » le lien public (SHARE_EMBEDS.md), aucune écriture.
+    const shareButton = /<button class="root ghost" aria-label="[^"]*"[^>]*>[\s\S]*?<\/button>/g;
+    expect(withoutInfoHintButtons(html).match(shareButton)?.length).toBe(1);
+    expect(withoutInfoHintButtons(html).replace(shareButton, "")).not.toContain("<button");
+    expect(html).toContain(frTournament.shareLink.tournamentAria);
     expect(html).not.toContain("/connexion");
     expect(html).toContain("toutes les 2 minutes au plus");
   });

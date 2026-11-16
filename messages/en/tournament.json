@@ -359,5 +359,12 @@
       "killcamOff": "Killcam disabled",
       "pauseOnDisconnect": "Pause when a player disconnects"
     }
+  },
+  "shareLink": {
+    "tournament": "Share",
+    "tournamentAria": "Share the tournament's public link",
+    "copied": "Public link copied",
+    "shared": "Public link shared",
+    "copyFailed": "Couldn't copy the link: {url}"
   }
 }

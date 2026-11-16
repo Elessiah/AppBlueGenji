@@ -49,6 +49,75 @@ function bucketOf(rule: RateLimitRule): Map<string, Counter> {
 }
 
 /**
+ * Délai entre deux balayages des clés **épuisées** : fenêtre close, seau de
+ * jetons rempli. Une telle clé vaut une clé absente ; la garder ne servait
+ * qu'à retenir l'identité (une adresse IP, pour un visiteur sans compte) bien
+ * au-delà de ce que le plafond exige — jusqu'à ce que le seau déborde, des
+ * jours sans redémarrage. Une clé reste donc au plus sa fenêtre (ou le temps
+ * de remplir son seau) **après la dernière requête**, plus un intervalle. Le
+ * registre (T03) promet deux minutes au plus pour les plafonds de la fiche
+ * publique et des images d'aperçu (fenêtres d'une minute au plus,
+ * `rate-limit-sweep.test.ts`) ; un plafond à fenêtre plus longue garde sa
+ * clé d'autant (code Discord : 15 min, signalement sans compte : 30 min),
+ * durées déclarées à part au registre (T17, T02, T11).
+ */
+export const RATE_LIMIT_SWEEP_INTERVAL_MS = 30_000;
+
+let lastSweepAt = Number.NEGATIVE_INFINITY;
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Efface toute clé qui ne retient plus rien : compteur dont la fenêtre est
+ * close, seau de jetons revenu plein. Sans effet sur aucun plafond (ces états
+ * valent l'absence de clé). Exporté pour les tests.
+ */
+export function sweepSpentRateKeys(now: number = Date.now()): void {
+  lastSweepAt = now;
+  for (const bucket of counters.values()) {
+    for (const [key, counter] of bucket) {
+      if (now >= counter.resetAt) bucket.delete(key);
+    }
+  }
+  for (const [name, bucket] of tokenBuckets) {
+    const rule = tokenRules.get(name);
+    if (!rule) continue;
+    for (const [key, state] of bucket) {
+      if (tokensAt(rule, state, now) >= rule.capacity) bucket.delete(key);
+    }
+  }
+}
+
+/**
+ * Arme le minuteur détaché du balayage (idempotent, `unref` : il ne retient pas
+ * le processus). C'est lui qui borne la durée même quand plus rien n'arrive.
+ */
+export function armRateLimitSweepTimer(): void {
+  if (sweepTimer !== null) return;
+  sweepTimer = setInterval(() => sweepSpentRateKeys(), RATE_LIMIT_SWEEP_INTERVAL_MS);
+  sweepTimer.unref?.();
+}
+
+/** Désarme le minuteur du balayage. */
+export function disarmRateLimitSweepTimer(): void {
+  if (sweepTimer !== null) clearInterval(sweepTimer);
+  sweepTimer = null;
+}
+
+/**
+ * Hors tests, arme le minuteur détaché, qui fait seul le balayage : aucune
+ * requête ne paie le parcours de toutes les clés. Sous les tests (sans
+ * minuteur), balayage paresseux, au plus un par intervalle, à l'heure de l'appel.
+ */
+function sweepWhenDue(now: number): void {
+  if (sweepTimer !== null) return;
+  if (process.env.NODE_ENV !== "test") {
+    armRateLimitSweepTimer();
+    return;
+  }
+  if (now - lastSweepAt >= RATE_LIMIT_SWEEP_INTERVAL_MS) sweepSpentRateKeys(now);
+}
+
+/**
  * Clé rendue pour une identité absente ou vide. Les appelants qui ne peuvent
  * pas distinguer leurs clients doivent la reconnaître plutôt que de tout
  * compter ensemble — voir `api-guard.enforceRateLimit`.
@@ -67,6 +136,7 @@ export function checkRateLimit(
   key: string,
   now: number = Date.now(),
 ): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  sweepWhenDue(now);
   const counter = bucketOf(rule).get(key);
   if (!counter || now >= counter.resetAt) {
     return { allowed: true, remaining: rule.limit, retryAfterMs: 0 };
@@ -86,6 +156,7 @@ export function chargeRateLimit(
   key: string,
   now: number = Date.now(),
 ): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  sweepWhenDue(now);
   const bucket = bucketOf(rule);
   const counter = bucket.get(key);
 
@@ -179,8 +250,11 @@ export type TokenBucketRule = {
 type Tokens = { tokens: number; updatedAt: number };
 
 const tokenBuckets = new Map<string, Map<string, Tokens>>();
+/** Dernier réglage vu par seau, pour que le balayage sache quand il est plein. */
+const tokenRules = new Map<string, TokenBucketRule>();
 
 function tokenBucketOf(rule: TokenBucketRule): Map<string, Tokens> {
+  tokenRules.set(rule.name, rule);
   let bucket = tokenBuckets.get(rule.name);
   if (!bucket) {
     bucket = new Map<string, Tokens>();
@@ -240,6 +314,7 @@ export function takeTokenBucket(
   key: string,
   now: number = Date.now(),
 ): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  sweepWhenDue(now);
   const bucket = tokenBucketOf(rule);
   const tracked = bucket.get(key);
   const tokens = tokensAt(rule, tracked, now);
@@ -271,11 +346,19 @@ export function refundTokenBucket(rule: TokenBucketRule, key: string, now: numbe
   else bucket.set(key, { tokens, updatedAt: now });
 }
 
+/** Nombre de clés qu'un seau (fenêtre ou jetons) retient en mémoire. Réservé aux tests. */
+export function trackedRateKeyCount(ruleName: string): number {
+  return (counters.get(ruleName)?.size ?? 0) + (tokenBuckets.get(ruleName)?.size ?? 0);
+}
+
 /** Vide un seau, ou tous les seaux. Réservé aux tests. */
 export function resetRateLimit(ruleName?: string): void {
   if (ruleName === undefined) {
     counters.clear();
     tokenBuckets.clear();
+    tokenRules.clear();
+    lastSweepAt = Number.NEGATIVE_INFINITY;
+    disarmRateLimitSweepTimer();
     return;
   }
   counters.delete(ruleName);

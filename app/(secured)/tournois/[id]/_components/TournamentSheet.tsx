@@ -1,5 +1,6 @@
 "use client";
 
+import { useTournamentPublished } from "../_lib/use-tournament-published";
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { useCallback, useMemo, useState, useEffect, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
@@ -538,6 +539,7 @@ function TournamentSheetView({
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
+  const published = useTournamentPublished(detail?.card ?? null);
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
   // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
@@ -1254,6 +1256,7 @@ function TournamentSheetView({
         myTeamId={detail.myTeamId}
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}
+        publicShare={published}
         refereeNames={detail.refereeNames}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché
@@ -1294,6 +1297,7 @@ function TournamentSheetView({
           onAdvance={() => setAdvanceDialogOpen(true)}
           onLiveSaved={() => void refresh()}
           onEditImage={() => setImageDialogOpen(true)}
+          published={published}
         />
 
         {/* La frise complète l'en-tête : elle situe le tournoi sur son cycle de

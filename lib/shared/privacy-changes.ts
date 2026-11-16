@@ -2080,6 +2080,32 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de plus n'est collecté sur toi, et ce que la suppression emporte reste le même.",
     ],
   },
+  {
+    // Bouton « Partager » et aperçus riches (`SHARE_EMBEDS.md`, décisions D73
+    // et D74) : les codes de replay des maps jouées deviennent publics, sur la
+    // page sans compte et dans l'aperçu d'un lien partagé. /rgpd § « Suivre un
+    // tournoi sans compte » et paragraphe des scores map par map (FR et EN),
+    // registre T03. Pour tous les comptes ; datée du lendemain de la nuit de
+    // déploiement prévue.
+    id: "2026-11-apercus-partage-codes-replay",
+    publishedAt: "2026-11-18",
+    title: "Liens partagés : un aperçu, et des codes de replay publics",
+    links: [
+      { href: "/rgpd#suivi-sans-compte", label: "Lire ce que montre la page sans compte" },
+      { href: "/rgpd#vos-droits", label: "Lire tes droits, dont l'opposition" },
+    ],
+    summary:
+      "Un bouton « Partager » donne le lien public d'un tournoi ou d'un match, avec un aperçu (image et texte) sous le lien. Le code de replay de chaque map, jusqu'ici réservé aux membres connectés, est désormais public dès que l'arbitrage enregistre la map jouée ou que le résultat est retenu, matchs déjà joués compris.",
+    details: [
+      "L'aperçu d'un tournoi montre son nom, son jeu, son format, son état, ses dates, son effectif et l'équipe en tête ou victorieuse, à défaut sa description publiée par l'organisation ; celui d'un match, la manche, les noms et logos des équipes, le score ou le forfait et chaque map jouée avec son nom, son score et son code de replay (le score de chaque map était déjà public sur la page sans compte).",
+      "Jamais de pseudo de joueur tiré de son compte dans un aperçu : dans un tournoi individuel, les engagés y sont « Joueur 1 » et « Joueur 2 », sans avatar. Un tournoi non publié n'a pas d'aperçu.",
+      "Un code de replay permet de revoir la partie en jeu, où apparaissent les identifiants de jeu des joueurs présents, BattleTag masqué sur le site compris. Il devient public map par map, dès que l'arbitrage enregistre la map ou que le résultat est retenu, avant même la fin du match ; une proposition de score en attente reste aux deux équipes du match et à l'arbitrage. Les codes déjà enregistrés deviennent publics eux aussi : tu peux t'opposer à la publication du code d'un match auquel tu as pris part (lien « Lire tes droits »), l'association examine la demande et, si elle l'accepte, retire le code.",
+      "L'adresse IP de qui lit la page sans compte ou les règles d'un tournoi (/regles/…?tournoi=…), ou fait produire une image d'aperçu, connecté ou non, service d'aperçu compris (son réseau /64 en IPv6), sert à plafonner ces lectures et ces images, et à mesurer la charge du serveur sans qu'un seul réseau puisse la fausser ; elle est gardée en mémoire seulement, deux minutes au plus après sa dernière requête. /rgpd et son registre n'annonçaient jusqu'ici que le visiteur sans compte de cette page, pour une minute, alors que l'adresse restait en mémoire plus longtemps : elle s'efface désormais dans ce délai.",
+      "Les autres plafonds du site par adresse IP, en mémoire seulement, sont désormais décrits eux aussi (registre, T17) : deux minutes au plus après la dernière requête pour les données de la page d'accueil, la page du bot et les rapports de sécurité du navigateur ; trente et une minutes pour un signalement sans compte ; seize pour un code de connexion Discord ; et en outre tant que le direct de la page du bot reste ouvert.",
+      "Le service qui affiche l'aperçu (Discord, X, une messagerie) en garde une copie selon ses propres règles.",
+      "Ce qui ne change pas : rien de nouveau n'est écrit sur toi en base ni dans un journal, et ce que la suppression emporte reste le même.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

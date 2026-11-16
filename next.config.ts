@@ -53,6 +53,15 @@ const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
 ];
 
+/** Anciennes adresses d'image d'un tournoi → la route `/og/`, dans la langue du chemin. */
+const OLD_TOURNAMENT_IMAGE_REDIRECTS = (["", "/suivre"] as const).flatMap((area) =>
+  (["fr", "en"] as const).map((locale) => ({
+    source: `${locale === "en" ? "/en" : ""}${area}/tournois/:id([0-9]{1,10})/opengraph-image:hash(-[A-Za-z0-9]+)?`,
+    destination: `/og/${locale}/tournament-:id.png`,
+    permanent: false,
+  })),
+);
+
 const nextConfig: NextConfig = {
   /**
    * Ne pas annoncer le serveur qui rend la page.
@@ -106,6 +115,18 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
+
+  /**
+   * Les anciennes images d'un tournoi (`/tournois/<id>/opengraph-image[-<empreinte>]`
+   * et `/suivre/tournois/<id>/…`), supprimées avec les images versionnées de
+   * `/og/<langue>/tournament-<id>.png` (`SHARE_EMBEDS.md`) : les liens déjà
+   * collés dans Discord ou X ne retombent pas sur une 404, qui ferait perdre
+   * l'image de l'encart au prochain rechargement. Temporaire (307) : la carte
+   * vit, elle change avec le tournoi.
+   */
+  async redirects() {
+    return OLD_TOURNAMENT_IMAGE_REDIRECTS;
   },
 
   /**

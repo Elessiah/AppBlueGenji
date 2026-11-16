@@ -2,12 +2,22 @@ import type { Metadata } from "next";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { requestCache } from "@/lib/server/request-cache";
 import type { TournamentCard } from "@/lib/shared/types";
-import { SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
+import { SHARE_CARD_SIZE, SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { localeAlternates, localeHref, OPEN_GRAPH_LOCALE } from "@/lib/shared/locales";
 import { localizedTournamentShareDescription } from "@/lib/shared/tournament-share-text";
 import { parseTournamentId } from "@/lib/shared/spectator-view";
+import { cachedTournamentShare, type PublicTournamentShare } from "@/lib/server/spectator-snapshot";
+import { tournamentEmbedAlt } from "@/lib/shared/share-embed-cards";
+import {
+  embedShareImagePath,
+  tournamentShareCardKey,
+  tournamentShareVersion,
+  tournamentShareVersionWithoutSummary,
+} from "@/lib/shared/share-embeds";
+import type { Locale } from "@/lib/shared/locales";
+import { pageShareImagePath } from "@/lib/shared/page-share-cards";
 
 /** Droits du lecteur qui pèsent sur la visibilité d'un tournoi. */
 export type TournamentMetadataRights = { canManage: boolean };
@@ -32,6 +42,21 @@ export const loadVisibleTournamentCard: TournamentMetadataCardLoader = (tourname
   visibleCardForRequest(tournamentId, rights.canManage);
 
 /**
+ * Lecture du résumé d'aperçu public d'un tournoi (`SHARE_EMBEDS.md`) : engagé
+ * en tête, matchs. `null` : rien en mémoire, ou tournoi non public.
+ */
+export type TournamentShareLoader = (tournamentId: number) => Promise<PublicTournamentShare | null>;
+
+/** Lecteur par défaut : la copie publique **déjà en mémoire**, sans lecture ni jeton. */
+export const cachedTournamentShareLoader: TournamentShareLoader = async (tournamentId) =>
+  cachedTournamentShare(tournamentId);
+
+/** L'image d'aperçu publiée par un encart : adresse versionnée, taille, texte alternatif. */
+export function embedImageMetadata(key: string, locale: Locale, version: string, alt: string) {
+  return { url: embedShareImagePath(key, locale, version), ...SHARE_CARD_SIZE, alt };
+}
+
+/**
  * Ce qu'un lien de tournoi raconte là où on le colle — titre, description,
  * `og:locale`, canonique et `hreflang` dans la langue de l'adresse.
  *
@@ -50,8 +75,11 @@ export const loadVisibleTournamentCard: TournamentMetadataCardLoader = (tourname
  * et non l'instantané entier (matchs, inscrites, classements, voire une
  * transaction d'entretien) dont seuls le titre et la description servent ici.
  *
- * La carte d'aperçu, dessinée par `opengraph-image.tsx` (même adresse pour les
- * deux langues), reste française.
+ * L'image d'aperçu est celle du tournoi (`/og/<langue>/tournament-<id>.png`,
+ * `SHARE_EMBEDS.md`), dans la langue de l'adresse et versionnée par ce qu'elle
+ * dessine : l'équipe en tête vient du résumé public (`loadShare`), jamais de
+ * l'instantané des membres. La route de l'image applique seule la règle de
+ * visibilité publique : un tournoi non publié y rend la carte neutre.
  *
  * @param rawId Segment `[id]` tel que reçu.
  * @param pathOf Chemin (sans préfixe de langue) de la page décrite.
@@ -63,23 +91,37 @@ export const loadVisibleTournamentCard: TournamentMetadataCardLoader = (tourname
  *   La page sans compte lit celle de la réponse publique mutualisée
  *   (`publicTournamentSnapshot`) : une rafale de F5 ou une annonce Discord ne
  *   coûte plus une requête par vue.
+ * @param loadShare Résumé d'aperçu public : par défaut la copie déjà en
+ *   mémoire (`cachedTournamentShareLoader`), jamais une reconstruction payée
+ *   par un robot d'aperçu ; la page d'un match lit la réponse publique
+ *   (`publicTournamentShareForRequest`).
  */
 export async function tournamentPageMetadata(
   rawId: string,
   pathOf: (tournamentId: number) => string,
   rights: () => Promise<TournamentMetadataRights | null>,
   loadCard: TournamentMetadataCardLoader = loadVisibleTournamentCard,
+  loadShare: TournamentShareLoader = cachedTournamentShareLoader,
 ): Promise<Metadata> {
   const locale = await requestLocale();
   const messages = messagesFor(locale);
   // L'encart du site, posé en entier : sans lui, la fiche hériterait de la
   // carte générique de `/tournois` (mise en page parente), dont le texte ne
-  // correspond pas à l'image du site que `opengraph-image.tsx` dessine ici.
+  // correspond pas à l'image du site. Celle-ci est posée ici : un `openGraph`
+  // de page remplace celui du parent, image comprise.
+  const siteImage = { url: pageShareImagePath("home", locale), ...SHARE_CARD_SIZE, alt: SITE_NAME };
   const fallback: Metadata = {
     title: messages.tournamentServer.meta.fallbackTitle,
     description: SITE_DESCRIPTION,
-    openGraph: { type: "website", siteName: SITE_NAME, locale: OPEN_GRAPH_LOCALE[locale], title: SITE_NAME, description: SITE_DESCRIPTION },
-    twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION },
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: OPEN_GRAPH_LOCALE[locale],
+      title: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      images: [siteImage],
+    },
+    twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION, images: [siteImage] },
   };
 
   const tournamentId = parseTournamentId(rawId);
@@ -99,6 +141,21 @@ export async function tournamentPageMetadata(
   const path = pathOf(tournamentId);
   const canonical = localeHref(path, locale);
   const languages = localeAlternates(path);
+  const share = await loadShare(tournamentId).catch(() => null);
+  // Le texte (titre, description, texte alternatif) vient de la carte lue
+  // (`card`). L'équipe en tête vient de la copie publique en mémoire, mais
+  // seulement quand celle-ci dit la **même** carte : une copie restée d'avant un
+  // renommage ou une inscription n'apparie pas son équipe en tête à un nom
+  // qu'elle ne dessine plus. Sans copie conforme, l'équipe en tête est inconnue
+  // et l'empreinte change par fenêtre (`tournamentShareVersionWithoutSummary`).
+  const copyMatchesCard =
+    share !== null && tournamentShareVersion(share.card, null) === tournamentShareVersion(card, null);
+  const image = embedImageMetadata(
+    tournamentShareCardKey(tournamentId),
+    locale,
+    copyMatchesCard ? tournamentShareVersion(card, share.share.leader) : tournamentShareVersionWithoutSummary(card),
+    tournamentEmbedAlt(card, messages),
+  );
 
   return {
     // Le gabarit de la racine ajouterait « · BlueGenji Esport » derrière un
@@ -114,7 +171,8 @@ export async function tournamentPageMetadata(
       title,
       description,
       url: canonical,
+      images: [image],
     },
-    twitter: { card: "summary_large_image", title, description },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
   };
 }

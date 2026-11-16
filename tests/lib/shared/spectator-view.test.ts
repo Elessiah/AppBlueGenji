@@ -296,17 +296,25 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(spectatorSnapshot(snapshot).matches[0].officialBroadcastLink).toBe(false);
   });
 
-  it("retire les codes de replay, réservés aux membres connectés", () => {
+  it("garde les codes de replay du résultat retenu (D74), vide ceux d'une proposition", () => {
+    const pendingMaps = [{ mapNumber: 1, replayCode: "PENDING9", team1Score: 2, team2Score: 0 }];
     const snapshot = tournamentSnapshot({
-      matches: [bracketMatch({ id: 1, maps, team1Report: report, team2Report: null })],
+      matches: [bracketMatch({ id: 1, maps, team1Report: { ...report, maps: pendingMaps }, team2Report: null })],
     });
     const out = spectatorSnapshot(snapshot);
-    expect(out.matches[0].maps.map((map) => map.replayCode)).toEqual(["", ""]);
+    // Résultat retenu : codes publics, map sans code laissée vide.
+    expect(out.matches[0].maps.map((map) => map.replayCode)).toEqual(["ABC123", ""]);
     // Les scores restent : c'est le résultat du match.
     expect(out.matches[0].maps.map((map) => [map.team1Score, map.team2Score])).toEqual([[2, 1], [0, 2]]);
+    // Une proposition en attente n'est pas un résultat : son détail ne sort pas.
     expect(out.matches[0].team1Report?.maps).toEqual([]);
     expect(out.matches[0].team2Report).toBeNull();
-    expect(JSON.stringify(out)).not.toContain("ABC123");
+    expect(JSON.stringify(out)).not.toContain("PENDING9");
+  });
+
+  it("ne publie aucun code avant que la map soit jouée", () => {
+    const out = spectatorSnapshot(tournamentSnapshot({ matches: [bracketMatch({ id: 1, maps: [] })] }));
+    expect(out.matches[0].maps).toEqual([]);
   });
 
   it("retire les « Prêt » d'un lancement, engagés et casters, et l'empreinte de l'arbitre", () => {

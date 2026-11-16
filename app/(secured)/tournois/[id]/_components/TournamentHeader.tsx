@@ -1,5 +1,7 @@
 "use client";
 
+import { ShareLinkButton } from "@/components/share/ShareLinkButton";
+import { spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import { useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -19,6 +21,7 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { canReturnInSite, isPlainLeftClick, previousSitePathname } from "@/lib/shared/site-back";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
 import { STREAM_NOTICE_PRIVACY_PATH } from "@/lib/shared/stream-notice";
+import { useTournamentPublished } from "../_lib/use-tournament-published";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
 import { registerBlockedNotice } from "../_lib/register-entry";
@@ -89,6 +92,11 @@ interface TournamentHeaderProps {
   onLiveSaved: () => void;
   /** Ouvre le réglage de l'image (illustration ou logo) (staff `tournaments`). */
   onEditImage: () => void;
+  /**
+   * Le tournoi est-il publié ? La fiche le calcule déjà (une seule horloge) ;
+   * sans cette valeur, l'en-tête le calcule lui-même.
+   */
+  published?: boolean;
 }
 
 /**
@@ -124,8 +132,11 @@ export function TournamentHeader({
   onAdvance,
   onLiveSaved,
   onEditImage,
+  published: publishedByPage,
 }: Readonly<TournamentHeaderProps>) {
   const { card } = detail;
+  const ownPublished = useTournamentPublished(publishedByPage === undefined ? card : null);
+  const published = publishedByPage ?? ownPublished;
   const text = useTournamentPageText();
   const labels = useTournamentsText();
   const { t } = text;
@@ -262,6 +273,16 @@ export function TournamentHeader({
             >
               {a(`wording.${entrantType}.registerCta`)}
             </CyberButton>
+          )}
+          {/* Partage du lien public (`SHARE_EMBEDS.md`) : seulement un tournoi
+              publié (après l'action principale, qui garde la tête de ligne) — non publié, sa page sans compte n'existe pas encore. */}
+          {published && (
+            <ShareLinkButton
+              path={spectatorTournamentPath(card.id)}
+              title={card.name}
+              label={t("shareLink.tournament")}
+              ariaLabel={t("shareLink.tournamentAria")}
+            />
           )}
           {/* Information sur la retransmission, à l'endroit où l'on s'engage —
               sans case à cocher : la diffusion fait partie du tournoi

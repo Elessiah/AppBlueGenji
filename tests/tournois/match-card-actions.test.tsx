@@ -593,3 +593,21 @@ describe("concludedCastGesture — le geste de cast que l'instantané conclut", 
     expect(concludedCastGesture({ pending: false, done: true }, { pending: false, done: true })).toBeNull();
   });
 });
+
+describe("« Partager » dans le pied d'action (SHARE_EMBEDS.md)", () => {
+  const list = (input: Partial<MatchCardActionInput>) => matchCardActionList({ ...NOTHING, ...input });
+
+  it("matchCardActionList_showShare_offersNeutralShare", () => {
+    expect(list({ showShare: true }).map((a) => ({ id: a.id, label: a.label, tone: a.tone }))).toEqual([
+      { id: "share", label: "Partager", tone: "neutral" },
+    ]);
+  });
+
+  it("matchCardActionList_shareNotOffered_absent", () => {
+    expect(ids({ showMatchPage: true })).not.toContain("share");
+  });
+
+  it("matchCardActionList_withMatchPage_shareFollowsIt", () => {
+    expect(ids({ showMatchPage: true, showShare: true })).toEqual(["matchPage", "share"]);
+  });
+});

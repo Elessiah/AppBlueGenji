@@ -23,6 +23,13 @@ import { participantWording } from "./participants";
 import type { TournamentCard, TournamentState } from "./types";
 import { visibleText } from "./visible-text";
 
+/**
+ * Format canonique d'une image d'aperçu (1,91:1), attendu par Open Graph. Ici,
+ * et non dans la carte, pour que les métadonnées d'une page ne tirent pas le
+ * composant d'image dans leur module.
+ */
+export const SHARE_CARD_SIZE = { width: 1200, height: 630 } as const;
+
 /** Nom du site, tel qu'il doit apparaître dans un encart de partage. */
 export const SITE_NAME = "BlueGenji Esport";
 
@@ -89,6 +96,20 @@ const SHARE_CARD_TITLE_MAX_LENGTH = 90;
 
 /** Titre de repli d'un tournoi dont le nom ne contient aucun caractère visible. */
 const SHARE_CARD_TITLE_FALLBACK = "Tournoi";
+
+/**
+ * Remplit les variables `{nom}` d'un texte des cartes de partage ; une
+ * variable inconnue reste telle quelle. Commun aux cartes de pages
+ * (`page-share-cards.ts`) et d'aperçu (`share-embed-cards.ts`).
+ */
+export function fillShareTemplate(template: string, values: Readonly<Record<string, string | number>>): string {
+  return template.replace(/\{(\w+)\}/gu, (whole, name: string) => (name in values ? String(values[name]) : whole));
+}
+
+/** Initiale du repli de logo d'une carte de partage : premier caractère en capitale, « ? » sans nom. */
+export function shareInitial(name: string): string {
+  return Array.from(name)[0]?.toUpperCase() ?? "?";
+}
 
 /**
  * Coupe un texte sans couper un mot, et signale la coupe par une ellipse.

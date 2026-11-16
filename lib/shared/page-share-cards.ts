@@ -17,7 +17,7 @@ import type frShare from "@/messages/fr/share.json";
 import { RULE_MODE_DEFINITIONS } from "./rule-mode-definitions";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "./locales";
 import { PODIUM_TIER_COUNT, type PodiumTier } from "./podium-tiers";
-import { truncateForShare } from "./share-metadata";
+import { fillShareTemplate as fill, shareInitial, truncateForShare } from "./share-metadata";
 import { withoutInvisibles } from "./visible-text";
 
 export type ShareMessages = typeof frShare;
@@ -280,7 +280,7 @@ export function podiumShareEntries(
       place,
       placeLabel: messages.podium.places[index] ?? String(place),
       name,
-      initial: Array.from(name)[0]?.toUpperCase() ?? "?",
+      initial: shareInitial(name),
       // Sans séparateur de milliers : la page affiche « 1240 », pas « 1 240 ».
       points: `${Math.round(row.points)} ${messages.podium.points}`,
       logoSrc: row.logoSrc,
@@ -325,10 +325,6 @@ function shareTeamName(rawName: string, teamId: number, fallback: string, maxLen
   return cleaned === "" ? fallback.replace("{id}", String(teamId)) : truncateForShare(cleaned, maxLength);
 }
 
-function fill(template: string, values: Readonly<Record<string, number>>): string {
-  return template.replace(/\{(\w+)\}/gu, (whole, name: string) => (name in values ? String(values[name]) : whole));
-}
-
 /**
  * Rédige la carte nominative d'une équipe : nom saisi repassé par
  * `withoutInvisibles` puis borné, cote et bilan **tels que `/classement` les
@@ -342,7 +338,7 @@ export function teamShareCard(team: TeamShareInput, messages: ShareMessages): Te
   return {
     eyebrow: texts.eyebrow,
     title,
-    initial: Array.from(title)[0]?.toUpperCase() ?? "?",
+    initial: shareInitial(title),
     subtitle: texts.subtitle,
     facts: [
       { label: texts.rating, value: `${Math.round(team.points)} ${messages.podium.points}` },

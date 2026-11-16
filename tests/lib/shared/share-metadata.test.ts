@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  fillShareTemplate,
+  shareInitial,
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_SHARE_CARD,
@@ -305,5 +307,19 @@ describe("tournamentShareState", () => {
     expect(tournamentShareState(card({ state: "REGISTRATION" }))).toBe("Inscriptions ouvertes");
     expect(tournamentShareState(card({ state: "RUNNING" }))).toBe("Tournoi en cours");
     expect(tournamentShareState(card({ state: "FINISHED" }))).toBe("Tournoi terminé");
+  });
+});
+
+describe("fillShareTemplate / shareInitial", () => {
+  it("fillShareTemplate_knownAndUnknownVariables_fillsKnownKeepsUnknown", () => {
+    expect(fillShareTemplate("{name} · {missing} · {count}", { name: "Alpha", count: 3 })).toBe("Alpha · {missing} · 3");
+  });
+
+  it("shareInitial_lowercaseName_capitalised", () => {
+    expect(shareInitial("épée")).toBe("É");
+  });
+
+  it("shareInitial_emptyName_questionMark", () => {
+    expect(shareInitial("")).toBe("?");
   });
 });

@@ -26,10 +26,9 @@
  * passait pour éteinte au milieu d'un salon.
  */
 import type { ReactElement, ReactNode } from "react";
-import type { ShareStateTone } from "@/lib/shared/share-metadata";
+import { SHARE_CARD_SIZE, type ShareStateTone } from "@/lib/shared/share-metadata";
 
-/** Format canonique d'une image d'aperçu (1,91:1), attendu par Open Graph. */
-export const SHARE_CARD_SIZE = { width: 1200, height: 630 } as const;
+export { SHARE_CARD_SIZE };
 
 /** Type MIME du rendu, repris tel quel par les routes `opengraph-image`. */
 export const SHARE_CARD_CONTENT_TYPE = "image/png";

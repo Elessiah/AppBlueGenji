@@ -250,11 +250,12 @@ export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number
 /**
  * Ce que le visiteur sans compte lit de l'instantané partagé.
  *
- * Les **codes de replay** restent aux membres connectés : la politique de
- * confidentialité les leur réserve (ils permettent de lire en jeu les
- * identifiants des joueurs, BattleTag masqué compris). Le détail des
- * propositions en attente est déjà vide dans l'instantané diffusé ; il l'est
- * ici aussi, explicitement.
+ * Les **codes de replay** des maps jouées partent avec le résultat retenu
+ * (décision D74, `SHARE_EMBEDS.md`) : une map n'a de code qu'une fois jouée et
+ * saisie, et `/rgpd` déclare qu'il est public dès lors (il permet de revoir la
+ * partie en jeu, identifiants des joueurs compris). Le détail des
+ * propositions en attente, lui, reste vide — dans l'instantané diffusé comme
+ * ici, explicitement : une proposition n'est pas un résultat.
  *
  * Ce que `/rgpd` ne déclare pas public n'y part pas non plus : ni les **« prêts »**
  * d'un lancement (engagés, arbitre, casters), ni les **scores proposés** par
@@ -317,7 +318,7 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       // Le lien de rediffusion que l'interface masque (match rouvert…) ne part
       // pas non plus dans la réponse publique.
       replayUrl: visibleReplayUrl(match),
-      maps: match.maps.map((map) => ({ ...map, replayCode: "" })),
+      // D74 : les maps du résultat retenu partent telles quelles, code de replay compris.
       team1Report: hiddenReport(match.team1Report),
       team2Report: hiddenReport(match.team2Report),
     })),

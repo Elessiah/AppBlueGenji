@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { clearCache } from "@/lib/server/cache";
 import {
   MAX_CONCURRENT_RENDERS,
+  MAX_QUEUED_EMBED_RENDERS,
+  MAX_RENDER_WAIT_CLIENT_MS,
+  queuedShareRenderClients,
+  MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
+  queuedShareRenders,
+  type ShareRenderAdmission,
   SHARE_IMAGE_POOL_LIMITS,
   cachedShareImage,
   clearShareImageCache,
@@ -64,6 +70,10 @@ describe("cachedShareImage", () => {
     }
     await cachedShareImage("fr:association", 60_000, fixed);
     expect(fixed).toHaveBeenCalledTimes(1);
+  });
+
+  it("garde un tableau de 63 matchs en deux langues dans la réserve des aperçus", () => {
+    expect(SHARE_IMAGE_POOL_LIMITS.embed).toBeGreaterThanOrEqual(63 * 2 + 2);
   });
 
   it("borne la réserve des équipes (LRU)", async () => {
@@ -169,5 +179,210 @@ describe("invalidateRankingShareImages", () => {
 
     expect(Buffer.from(served!.body).toString("utf8")).toBe("ancien");
     expect(Buffer.from(next!.body).toString("utf8")).toBe("neuf");
+  });
+});
+
+describe("cachedShareImage — garde des nouveaux rendus", () => {
+  const admitting = (
+    admit: () => boolean,
+    overrides: Partial<ShareRenderAdmission> = {},
+  ): ShareRenderAdmission => ({
+    client: "203.0.113.1",
+    admit,
+    refund: () => undefined,
+    maxQueued: MAX_QUEUED_EMBED_RENDERS,
+    maxQueuedPerClient: MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
+    ...overrides,
+  });
+
+  /** Rendus bloqués jusqu'à `drain` : occupent les places, puis la file. */
+  function blocker() {
+    const releases: Array<() => void> = [];
+    const blocked = (key: string) => async () => {
+      await new Promise<void>((resolve) => releases.push(resolve));
+      return new Response(key);
+    };
+    const drain = async () => {
+      while (releases.length > 0 || queuedShareRenders() > 0) {
+        releases.splice(0).forEach((release) => release());
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    };
+    return { blocked, drain };
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("cachedShareImage_waitedPastClientLimit_dropsNetworkKey", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate"] });
+    const { blocked, drain } = blocker();
+    try {
+      const pending = Array.from({ length: MAX_CONCURRENT_RENDERS + 1 }, (_, index) =>
+        cachedShareImage(`k${index}`, 60_000, blocked(`k${index}`), "embed", false, admitting(() => true)),
+      );
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(MAX_RENDER_WAIT_CLIENT_MS);
+
+      expect(queuedShareRenderClients()).toEqual([null]);
+      jest.useRealTimers();
+      await drain();
+      await Promise.all(pending);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("cachedShareImage_waitingBeforeClientLimit_keepsNetworkKey", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate"] });
+    const { blocked, drain } = blocker();
+    try {
+      const pending = Array.from({ length: MAX_CONCURRENT_RENDERS + 1 }, (_, index) =>
+        cachedShareImage(`k${index}`, 60_000, blocked(`k${index}`), "embed", false, admitting(() => true)),
+      );
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(MAX_RENDER_WAIT_CLIENT_MS - 1);
+
+      expect(queuedShareRenderClients()).toEqual(["203.0.113.1"]);
+      jest.useRealTimers();
+      await drain();
+      await Promise.all(pending);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("cachedShareImage_otherPoolQueueFull_stillAdmitsEmbed", async () => {
+    const { blocked, drain } = blocker();
+    const pending = Array.from({ length: MAX_CONCURRENT_RENDERS + MAX_QUEUED_EMBED_RENDERS }, (_, index) =>
+      cachedShareImage(`fr:team-${index}`, 60_000, blocked(`t${index}`), "team"),
+    );
+    await tick();
+    expect(queuedShareRenders("team")).toBe(MAX_QUEUED_EMBED_RENDERS);
+    const admit = jest.fn(() => true);
+
+    const embed = cachedShareImage("fr:match-1", 60_000, png("m"), "embed", false, admitting(admit));
+    await tick();
+
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(queuedShareRenders("embed")).toBe(1);
+    await drain();
+    expect(await embed).not.toBeNull();
+    await Promise.all(pending);
+  });
+
+  it("cachedShareImage_clientAlreadyHasTwoQueued_refusesWithoutToken", async () => {
+    const { blocked, drain } = blocker();
+    const running = Array.from({ length: MAX_CONCURRENT_RENDERS }, (_, index) =>
+      cachedShareImage(`fr:run-${index}`, 60_000, blocked(`r${index}`), "embed"),
+    );
+    await tick();
+    const queued = Array.from({ length: MAX_QUEUED_EMBED_RENDERS_PER_CLIENT }, (_, index) =>
+      cachedShareImage(`fr:a-${index}`, 60_000, blocked(`a${index}`), "embed", false, admitting(() => true)),
+    );
+    await tick();
+    const admit = jest.fn(() => true);
+
+    const refused = await cachedShareImage("fr:a-extra", 60_000, png("x"), "embed", false, admitting(admit));
+
+    expect(refused).toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+    await drain();
+    await Promise.all([...running, ...queued]);
+  });
+
+  it("cachedShareImage_otherClientWhileOneHasTwoQueued_isAdmitted", async () => {
+    const { blocked, drain } = blocker();
+    const running = Array.from({ length: MAX_CONCURRENT_RENDERS }, (_, index) =>
+      cachedShareImage(`fr:run-${index}`, 60_000, blocked(`r${index}`), "embed"),
+    );
+    await tick();
+    const queued = Array.from({ length: MAX_QUEUED_EMBED_RENDERS_PER_CLIENT }, (_, index) =>
+      cachedShareImage(`fr:a-${index}`, 60_000, blocked(`a${index}`), "embed", false, admitting(() => true)),
+    );
+    await tick();
+    const admit = jest.fn(() => true);
+
+    const other = cachedShareImage("fr:b-1", 60_000, png("b"), "embed", false, admitting(admit, { client: "198.51.100.7" }));
+    await tick();
+
+    expect(admit).toHaveBeenCalledTimes(1);
+    await drain();
+    expect(await other).not.toBeNull();
+    await Promise.all([...running, ...queued]);
+  });
+
+  it("cachedShareImage_buildReturnsNull_refundsToken", async () => {
+    const refund = jest.fn();
+
+    const image = await cachedShareImage("fr:gone", 60_000, async () => null, "embed", false, admitting(() => true, { refund }));
+
+    expect(image).toBeNull();
+    expect(refund).toHaveBeenCalledTimes(1);
+  });
+
+  it("cachedShareImage_buildThrows_doesNotRefund", async () => {
+    const refund = jest.fn();
+    const failing = async (): Promise<Response | null> => {
+      throw new Error("satori");
+    };
+
+    await expect(cachedShareImage("fr:broken", 60_000, failing, "embed", false, admitting(() => true, { refund }))).rejects.toThrow("satori");
+
+    expect(refund).not.toHaveBeenCalled();
+  });
+
+  it("cachedShareImage_admissionRefuses_returnsNullWithoutBuild", async () => {
+    const build = jest.fn(png("a"));
+
+    const image = await cachedShareImage("fr:t-1", 1000, build, "embed", false, admitting(() => false));
+
+    expect(image).toBeNull();
+    expect(build).not.toHaveBeenCalled();
+  });
+
+  it("cachedShareImage_hitInMemory_neverCallsAdmit", async () => {
+    await cachedShareImage("fr:t-1", 60_000, png("a"), "embed");
+    const admit = jest.fn(() => false);
+
+    const image = await cachedShareImage("fr:t-1", 60_000, png("b"), "embed", false, admitting(admit));
+
+    expect(image).not.toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+  });
+
+  it("cachedShareImage_joiningInFlight_neverCallsAdmit", async () => {
+    let finish: () => void = () => undefined;
+    const slow = async () => {
+      await new Promise<void>((resolve) => { finish = resolve; });
+      return new Response("a");
+    };
+    const first = cachedShareImage("fr:t-1", 60_000, slow, "embed", false, admitting(() => true));
+    await Promise.resolve();
+    const admit = jest.fn(() => false);
+    const joiner = cachedShareImage("fr:t-1", 60_000, slow, "embed", false, admitting(admit));
+    finish();
+
+    expect(await joiner).not.toBeNull();
+    expect(await first).not.toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+  });
+
+  it("cachedShareImage_queueFull_refusesWithoutTakingToken", async () => {
+    const { blocked, drain } = blocker();
+    const pending = Array.from({ length: MAX_CONCURRENT_RENDERS + MAX_QUEUED_EMBED_RENDERS }, (_, index) =>
+      cachedShareImage(`fr:busy-${index}`, 60_000, blocked(`b${index}`), "embed"),
+    );
+    await tick();
+    expect(queuedShareRenders()).toBe(MAX_QUEUED_EMBED_RENDERS);
+    const admit = jest.fn(() => true);
+
+    const refused = await cachedShareImage("fr:extra", 60_000, png("x"), "embed", false, admitting(admit));
+
+    expect(refused).toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+    await drain();
+    await Promise.all(pending);
   });
 });

@@ -83,9 +83,10 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   comme celle, adoucie, des joueurs d'une entrée solo : le podium est public)
   : leurs fiches sont dans l'espace connecté, un lien mènerait à la page de
   connexion ;
-- **codes de replay masqués** (`MatchMapDetails`) — et retirés de la réponse
-  publique (`spectatorSnapshot`) : la politique de confidentialité les réserve
-  aux membres connectés. L'identifiant du caster devient
+- **codes de replay publics** depuis la décision D74 (`SHARE_EMBEDS.md`) :
+  ceux du résultat retenu partent dans la réponse publique et s'affichent
+  (`MapResultList`), comme sur la fiche connectée ; ceux d'une proposition en
+  attente restent vides (`spectatorSnapshot`). L'identifiant du caster devient
   `SPECTATOR_HIDDEN_USER_ID` (−1) : la fiche sait qu'un caster est inscrit (son
   pseudo s'affiche) sans savoir qui.
   Sur une sanction BlueGenji Survie, l'arbitre et le motif (texte libre du
@@ -277,9 +278,8 @@ available. ». Le squelette d'une première lecture échouée ne miroite plus
 La route publique passe par `getVisibleTournamentSnapshot` **sans aucun
 droit** : un tournoi pas encore publié (`start_visibility_at`) n'existe pas
 pour elle. L'encart (`tournamentPageMetadata`, `lib/server/tournament-metadata.ts`,
-commun aux deux espaces) et l'image d'aperçu (réexport de
-`app/(secured)/tournois/[id]/opengraph-image.tsx`, identifiant lu par
-`parseTournamentId` comme la page et la route) appliquent la même règle. Sur la
+commun aux deux espaces) et l'image d'aperçu (`/og/<langue>/tournament-<id>.png`,
+tirée de la réponse publique, `SHARE_EMBEDS.md`) appliquent la même règle. Sur la
 page sans compte, l'encart lit la **carte seule**
 (`publicTournamentCardForRequest`, `lib/server/spectator-request.ts` →
 `publicTournamentCard`) : la copie de la réponse publique si elle a moins de
@@ -321,8 +321,9 @@ tournoi sur la page sans compte.
 Changement de **qui lit** la fiche : entrée `2026-10-suivi-tournoi-sans-compte`
 de `PRIVACY_CHANGES` (et son anglais), paragraphe « Suivre un tournoi sans
 compte » de `/rgpd` (`#suivi-sans-compte`), sous-finalité ajoutée au registre
-(T03, avec l'adresse IP du visiteur, gardée en mémoire le temps du plafond). Les codes de replay restent aux membres, comme l'arbitre et le motif d'une
-sanction, l'identité du caster, les « Prêt », les scores proposés et la date
+(T03, avec l'adresse IP du visiteur, gardée en mémoire le temps du plafond). Les codes de replay du résultat retenu sont publics depuis D74
+(`SHARE_EMBEDS.md`, entrée `2026-11-apercus-partage-codes-replay`). Restent aux
+membres l'arbitre et le motif d'une sanction, l'identité du caster, les « Prêt », les scores proposés et la date
 d'inscription d'un joueur solo — champs que `/rgpd` n'avait jamais déclarés
 publics : leur retrait aligne la réponse sur le texte publié, sans le changer. Le numéro de compte interne d'un joueur engagé
 en individuel est public (`soloUserIds`, il porte sa marque du podium, publique)

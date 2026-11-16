@@ -22,7 +22,7 @@ import { useLiveControls, useViewerRefereesMatch } from "./live-context";
 import { useOnMatchPage } from "./match-page-context";
 import { singlePendingReport } from "./score-form";
 import { launchStripControls, type LaunchStripControls } from "./launch-strip";
-import { matchCardActionList, offersMatchPage, type MatchCardAction } from "./match-card-actions";
+import { isPublicMatch, matchCardActionList, offersMatchPage, type MatchCardAction } from "./match-card-actions";
 import { useActionsText } from "./actions-text";
 
 /**
@@ -95,6 +95,7 @@ export function useMatchCardModel(
     canManage,
     canSchedule,
     viewerUserId,
+    publicShare,
   } = useLiveControls();
   // Lu à part (`useViewerRefereesMatch`) : une relecture des pseudos ne
   // redessine que les cartes dont la réponse change.
@@ -176,6 +177,8 @@ export function useMatchCardModel(
       hasReplay: match.replayUrl !== null,
       canReport: canReportMatch,
       showMatchPage,
+      // Le lien public du match, sur la carte comme sur sa page : tournoi publié, match à jouer.
+      showShare: publicShare && isPublicMatch(match),
     },
     actionText,
   );

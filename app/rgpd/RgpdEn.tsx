@@ -315,6 +315,12 @@ export function RgpdEn({
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
           ).
+          The site also keeps, in memory only, never in the database or in a log, the IP address of
+          whoever calls its routes open without an account or before logging in (home page data, the bot
+          page and its live feed, the browser&apos;s security reports, report without an account, Discord
+          login code), to cap their requests: two minutes at most after its last request, thirty-one
+          minutes for a report without an account, sixteen for a Discord code, and also as long as the
+          bot page&apos;s live feed stays open (same register, T17).
         </p>
         <p id="suppression-du-compte" style={{ marginTop: 8, ...NOTE_STYLE }}>
           <strong>Account deletion.</strong> Requested from “My profile”, it only becomes final after{" "}
@@ -361,14 +367,18 @@ export function RgpdEn({
             <strong>replay code</strong> of the game (the referees may do without it when the replay is lost), which
             makes it possible to watch it again in game — and so
             to read there the in-game identifiers of the players present, including a BattleTag hidden on the
-            site. These codes are visible to the site&apos;s logged-in members on the tournament page once
-            recorded by the referees or retained as the result, so that a match streamed live and one that is not
-            offer the same information — while a team proposal is pending, only the two teams of the match and
-            the referees can read it —, and kept with the result they document (a detail that no longer explains
+            site. Since November 2026, these codes are <strong>public</strong>, map by map, as soon as the
+            referees record the map played or the result is retained — even before the match ends, and for
+            matches already played too: visible to everyone on the tournament page, on its page
+            without an account and in the preview of a shared match link (see below), so that a match streamed
+            live and one that is not offer the same information — never before: while a team proposal is
+            pending, only the two teams of the match and the referees can read it —, and kept with the result they document (a detail that no longer explains
             it is erased); the account that entered them is only linked internally, and that link disappears
             when the account is deleted. The game itself is kept by the game&apos;s publisher: deleting your
             account here does not erase your in-game identifiers from a replay, and the codes remain attached to
-            the result they document. The maps you entered appear in the export of your data.
+            the result they document. The maps you entered appear in the export of your data. You can object to
+            the publication of the replay code of a match you took part in (see “Your rights”): the association
+            examines the request and, if it accepts it, removes the code from the result.
           </p>
           <p id="suivi-sans-compte">
             <strong>Following a tournament without an account.</strong> Since October 2026, the page of a
@@ -377,13 +387,26 @@ export function RgpdEn({
             match&apos;s casters — what streams and Discord already show —, as well as team logos and, for a solo
             tournament, the avatar of each player taking part (unless they hid it) and their internal account
             number, which carries their podium mark, and BlueGenji Survival penalties (entrant, round, points),
-            without their reason or the referee who imposed them. Replay codes are not shown there: they
-            remain reserved to logged-in members. The page is served from a shared copy, renewed at
+            without their reason or the referee who imposed them. The score of each map is shown there, and since
+            November 2026 its replay code too (see above). Each match has its own page there
+            (<code>/suivre/tournois/…/matchs/…</code>), and the “Share” button of a tournament or a match gives
+            the link to its page without an account. Its <strong>preview</strong> — the image and text that
+            Discord, X or a messaging app display under the link — shows the tournament&apos;s name, game,
+            format, state, dates and number of entrants and the leading or winning team, otherwise its
+            description published by the organizers; for a match, the round, the teams&apos; names and logos,
+            the score or the forfeit and each map played with its name, score and replay code. It{" "}
+            <strong>never takes a player&apos;s username</strong> from their account: in a solo tournament, the entrants are “Player 1” and “Player 2”,
+            with no avatar. An unpublished tournament has no preview. The service that displays the preview
+            keeps a copy of it under its own rules. The page is served from a shared copy, renewed at
             least every two and a half minutes: a username change, a hidden avatar or an account deletion
             may show up there with that delay. This page is excluded from search engines (<code>noindex</code>)
             and opens no session. Like any page of the site, its visit is counted by the audience measurement,
-            unless you object (see “Audience measurement”); beyond that, the visitor&apos;s IP address is only used
-            there, in memory, to limit the number of reads. You can object to your username being displayed (see
+            unless you object (see “Audience measurement”); beyond that, the IP address of whoever reads it,
+            signed in or not (its /64 network in IPv6) — like that of whoever reads a tournament&apos;s rules
+            (<code>/regles/…?tournoi=…</code>) or causes a preview image to be rendered, preview services
+            included — is only used there to limit the number of reads and of preview images rendered, and to
+            measure the server&apos;s load without a single network being able to skew it; it stays in memory
+            only, two minutes at most after its last request. You can object to your username being displayed (see
             “Your rights”).
           </p>
         </div>
@@ -431,7 +454,7 @@ export function RgpdEn({
       </section>
 
       {/* SECTION 04 — YOUR RIGHTS */}
-      <section className={styles.section}>
+      <section id="vos-droits" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 04</span>

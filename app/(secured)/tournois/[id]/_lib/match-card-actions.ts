@@ -20,6 +20,7 @@ export type MatchCardActionId =
   | "openLaunch"
   | "contacts"
   | "matchPage"
+  | "share"
   | "plan"
   | "adminScore"
   | "schedule"
@@ -86,6 +87,11 @@ export type MatchCardActionInput = {
    * exemption (un seul engagé, rien à jouer) — `MatchRow` en décide.
    */
   showMatchPage: boolean;
+  /**
+   * « Partager » : tournoi publié et match qui se joue (pas une exemption) —
+   * le lien public du match (`SHARE_EMBEDS.md`). Facultatif : absent, rien.
+   */
+  showShare?: boolean;
 };
 
 /**
@@ -97,6 +103,9 @@ export type MatchCardActionInput = {
 // qui caste ou joue le match garde « Score » en principal. « Page du match »
 // ferme la marche : aucun geste attendu de ce lecteur, elle tient le pied (un
 // lien, jamais derrière un menu quand rien d'autre ne le précède).
+// « Partager » n'y figure pas, à dessein : jamais l'action visible quand une
+// autre est offerte (elle ne remplace pas « Page du match » en pied de carte),
+// elle seule reste ouverte (`groupMatchCardActions`), sinon elle va au menu.
 const PRIMARY_ORDER: readonly MatchCardActionId[] = ["playerScore", "openLaunch", "plan", "adminScore", "contacts", "matchPage"];
 
 /** Toutes les actions offertes, dans l'ordre du menu. */
@@ -113,6 +122,7 @@ export function matchCardActionList(
     [launch.showOpen, "openLaunch", either(input.inLobby, t("cardActions.openLaunch"), t("cardActions.matchInfo")), "primary"],
     [launch.showContacts, "contacts", t("cardActions.contacts"), "neutral"],
     [input.showMatchPage, "matchPage", t("cardActions.matchPage"), "neutral"],
+    [input.showShare === true, "share", t("cardActions.share"), "neutral"],
     [launch.showPlan, "plan", t("cardActions.plan"), "warn"],
     [input.adminScoreLabel !== null, "adminScore", input.adminScoreLabel ?? "", "staff"],
     [input.showSchedule, "schedule", either(input.hasStartAt, t("cardActions.editDate"), t("cardActions.setDate")), "staff"],
@@ -149,6 +159,15 @@ export function offersMatchPage(
   onMatchPage: boolean,
 ): boolean {
   return !onMatchPage && !isByeMatch(match);
+}
+
+/**
+ * Le match a-t-il une page publique à partager (`SHARE_EMBEDS.md`) ? Tout match
+ * sauf une exemption : « Partager » ne dépend pas de « Page du match », dont la
+ * règle (`offersMatchPage`) peut changer sans que le partage le suive.
+ */
+export function isPublicMatch(match: Pick<BracketMatch, "team1Id" | "team2Id" | "status">): boolean {
+  return !isByeMatch(match);
 }
 
 export type MatchCardActionGroups = {

@@ -46,6 +46,19 @@ describe("en-têtes de sécurité", () => {
   });
 });
 
+describe("anciennes images d'un tournoi", () => {
+  it("renvoient vers la route /og/<langue>/tournament-<id>.png, dans la langue du chemin", async () => {
+    const rules = await nextConfig.redirects!();
+    const bySource = new Map(rules.map((rule) => [rule.source, rule.destination]));
+
+    expect(bySource.get("/tournois/:id([0-9]{1,10})/opengraph-image:hash(-[A-Za-z0-9]+)?")).toBe("/og/fr/tournament-:id.png");
+    expect(bySource.get("/suivre/tournois/:id([0-9]{1,10})/opengraph-image:hash(-[A-Za-z0-9]+)?")).toBe("/og/fr/tournament-:id.png");
+    expect(bySource.get("/en/tournois/:id([0-9]{1,10})/opengraph-image:hash(-[A-Za-z0-9]+)?")).toBe("/og/en/tournament-:id.png");
+    expect(bySource.get("/en/suivre/tournois/:id([0-9]{1,10})/opengraph-image:hash(-[A-Za-z0-9]+)?")).toBe("/og/en/tournament-:id.png");
+    expect(rules.every((rule) => rule.permanent === false)).toBe(true);
+  });
+});
+
 describe("indicateur de développement de Next", () => {
   it("quitte le coin bas-gauche, où il masquait le bouton d'accessibilité", () => {
     expect(nextConfig.devIndicators).toEqual({ position: "top-right" });

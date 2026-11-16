@@ -13,6 +13,7 @@ import {
   SPECTATOR_READS_PER_CLIENT,
   spectatorLoadSignals,
   spectatorReadsPerMinute,
+  trackedSpectatorClientCount,
 } from "@/lib/server/spectator-load";
 import { SPECTATOR_LOAD_THRESHOLDS } from "@/lib/shared/spectator-view";
 
@@ -131,5 +132,75 @@ describe("signaux et niveau", () => {
     // Des clients distincts : la part de chacun est plafonnée.
     for (let i = 0; i < SPECTATOR_LOAD_THRESHOLDS.spectatorReadsPerMinute[0]; i += 1) recordSpectatorRead(T0, `client-${i}`);
     expect(currentSpectatorLoadLevel(T0 + 1)).toBe(1);
+  });
+});
+
+describe("oubli des réseaux comptés (adresse IP, deux minutes au plus)", () => {
+  it("oublie un réseau à la fin de sa fenêtre, même sans lecture suivante", () => {
+    jest.useFakeTimers();
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+
+      jest.advanceTimersByTime(SPECTATOR_READ_WINDOW_MS);
+
+      expect(trackedSpectatorClientCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("garde le réseau tant que sa fenêtre est ouverte", () => {
+    jest.useFakeTimers();
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+
+      jest.advanceTimersByTime(SPECTATOR_READ_WINDOW_MS - 1);
+
+      expect(trackedSpectatorClientCount()).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("scheduleForgetClients_windowRolledBeforeStaleTimer_keepsNewWindowShares", () => {
+    jest.useFakeTimers({ now: T0 });
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+      recordSpectatorRead(T0 + SPECTATOR_READ_WINDOW_MS, "198.51.100.9");
+
+      jest.advanceTimersByTime(SPECTATOR_READ_WINDOW_MS);
+
+      expect(trackedSpectatorClientCount()).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("scheduleForgetClients_windowRolledBeforeStaleTimer_forgetsNewSharesAtNewWindowEnd", () => {
+    jest.useFakeTimers({ now: T0 });
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+      recordSpectatorRead(T0 + SPECTATOR_READ_WINDOW_MS, "198.51.100.9");
+
+      jest.advanceTimersByTime(2 * SPECTATOR_READ_WINDOW_MS);
+
+      expect(trackedSpectatorClientCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("la remise à zéro efface les réseaux et l'oubli en attente", () => {
+    jest.useFakeTimers();
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+
+      resetSpectatorLoad();
+
+      expect(trackedSpectatorClientCount()).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
