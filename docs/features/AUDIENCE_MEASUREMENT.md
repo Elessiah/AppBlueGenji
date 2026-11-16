@@ -34,10 +34,28 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   **et** avant chaque envoi) et côté serveur (`audienceOptOutFromHeaders`,
   avant tout calcul, plafond compris). Les robots connus (user-agent) sont
   écartés de même.
-- **IP en mémoire ≤ 2 min** : seul le plafond `AUDIENCE_REQUEST_RULE`
-  (120 envois/min, fenêtre de 60 s, balayage du module `rate-limit`) la tient.
-  Large à dessein : une adresse partagée (NAT d'opérateur mobile, réseau local
-  d'un événement) ne doit pas faire disparaître ses visiteurs des chiffres.
+- **IP en mémoire ≤ 2 min** : seuls les plafonds par **réseau**
+  (`audienceNetworkKey` : IPv4, ou préfixe IPv6 `/64` ; adresse illisible =
+  un réseau commun) la tiennent, fenêtres de 60 s, balayage du module
+  `rate-limit` : `AUDIENCE_REQUEST_RULE` (120 envois/min),
+  `AUDIENCE_IDENTITY_RULE` (30 navigateurs distincts/min, clé réseau +
+  condensé court du user-agent) et `AUDIENCE_VIEW_RULE` (120 pages vues/min ;
+  les suites n'y comptent pas). Larges à dessein : une adresse partagée (NAT
+  d'opérateur mobile, réseau local d'un événement) ne doit pas faire
+  disparaître ses visiteurs des chiffres.
+- **Contre les signalements fabriqués** (chiffres gonflés devant les
+  partenaires) : seul un `fetch()` de page est lu (`isAudienceScriptRequest` :
+  `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty`), puis les plafonds
+  par réseau ci-dessus (`admitAudienceViews`) bornent ce qu'un client ajoute,
+  même en changeant de user-agent ou d'adresse dans son `/64`. Le temps d'une
+  page vue est ignoré (il arrive par ses suites) et, au repli, une suite ne
+  compte que la part de sa lecture postérieure au début de la visite et au
+  dernier temps déjà compté du visiteur : des suites forgées qui se
+  chevauchent ne s'additionnent pas. Passé la moitié de `MAX_PENDING`, un
+  envoi n'ajoute plus qu'une ligne à la file. Le référent égal à l'hôte
+  d'`APP_URL` compte en accès direct.
+- **Pages jamais mesurées** : `/admin/*` et `/signalements/*` (personnel et
+  auteurs de signalements, trop peu nombreux pour des chiffres anonymes).
 
 ## Chemin de la donnée
 
@@ -46,7 +64,7 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
    │  file en mémoire de la page, lots de ≤ 20 : 10 pages, 1 min, onglet masqué, départ
    ▼
 POST /api/audience  { v: [{ p, t, a, d, r?, f?, c?, o? }] }   fetch keepalive ; 200, ou 429 au-delà du plafond
-   │  opposition → robot → plafond IP → corps ≤ 32 Ko → parseAudienceBatch
+   │  opposition → robot / pas un fetch de page → plafond réseau → corps ≤ 32 Ko → parseAudienceBatch → admitAudienceViews
    ▼
 recordAudienceViews : sel du jour de la page (lu une fois par jour ; échec resservi 30 s) + empreinte + file serveur (≤ 5 000)
    │  toutes les 10 s ou par 200 lignes (INSERT multi-lignes)

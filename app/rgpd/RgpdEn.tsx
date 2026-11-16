@@ -727,12 +727,15 @@ export function RgpdEn({
             <strong>What is recorded.</strong> The server computes a daily hash (HMAC-SHA256) of your
             IP address and your browser, with a random salt drawn for the day (Paris time), kept in the
             database for the day and erased the next day, as soon as the day is counted (from 1:15
-            a.m.): after that, no one, the association included, can recompute your hash, and you are
-            only recognised for one day. It records
+            a.m.): after that, no one, the association included, can recompute your hash (apart from an
+            encrypted backup copy made in the meantime, which may contain the salt and your page views
+            of the day, {BACKUP_RETENTION_DAYS} days at most), and you are only recognised for one day.
+            It records
             this hash with the type of page, its language, the date and hour, the device class, the
             time spent and a referral family (direct access, search engine, Discord, social network,
             video platform, other website); never the page&apos;s exact address, nor the referring
-            site, nor your IP address or browser as such. Known bots are not counted.
+            site, nor your IP address or browser as such. Known bots are not counted, and the
+            administration and report pages are not measured.
           </p>
           <p>
             <strong>Legal basis and consent exemption.</strong> The association&apos;s legitimate
@@ -750,8 +753,9 @@ export function RgpdEn({
             any hash, are kept with no limit: they no longer concern anyone. The daily salt is erased
             from the database the next day, as soon as the day is counted (from 1:15 a.m., Paris
             time); it is written in no log, but an encrypted backup copy made in the meantime may
-            contain it ({BACKUP_RETENTION_DAYS} days at most). Your IP address is only kept in memory,
-            to cap the submissions: two minutes at most after your last request.
+            contain it ({BACKUP_RETENTION_DAYS} days at most). Your IP address (your network in IPv6)
+            and a short digest of your browser are only kept in memory, to cap each network&apos;s
+            submissions: two minutes at most after your last request.
           </p>
           <p>
             <strong>Recipients.</strong> Anyone who has the link to the {AUDIENCE_PAGE_PATH} page, for

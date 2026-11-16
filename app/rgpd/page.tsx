@@ -900,13 +900,16 @@ function RgpdFr({
             (HMAC-SHA256) de votre adresse IP et de votre navigateur, avec un sel aléatoire tiré pour la
             journée (heure de Paris), gardé en base le temps de la journée et effacé le lendemain, dès
             la journée comptée (à partir de 1 h 15) : passé ce moment, plus personne, l&apos;association
-            comprise, ne peut recalculer votre empreinte, et vous n&apos;êtes reconnu que le temps
+            comprise, ne peut recalculer votre empreinte (hors une copie de sauvegarde chiffrée faite
+            entre-temps, qui peut contenir le sel et vos pages vues de la journée,{" "}
+            {BACKUP_RETENTION_DAYS} jours au plus), et vous n&apos;êtes reconnu que le temps
             d&apos;une journée. Il enregistre cette empreinte avec
             le type de page, sa langue, la date et l&apos;heure, la classe d&apos;appareil, le temps
             passé et une famille de provenance (accès direct, moteur de recherche, Discord, réseau
             social, plateforme vidéo, autre site) ; jamais l&apos;adresse précise de la page, ni le
             site d&apos;origine, ni votre adresse IP ou votre navigateur tels quels. Les robots connus
-            ne sont pas comptés.
+            ne sont pas comptés, et les pages d&apos;administration et de signalements ne sont pas
+            mesurées.
           </p>
           <p>
             <strong>Base légale et dispense de consentement.</strong> L&apos;intérêt légitime de
@@ -925,8 +928,9 @@ function RgpdFr({
             effacé de la base le lendemain, dès la journée comptée (à partir de 1 h 15, heure de
             Paris) ; il n&apos;est écrit dans aucun journal, mais une copie de sauvegarde chiffrée faite
             entre-temps peut le contenir ({BACKUP_RETENTION_DAYS} jours au plus). Votre
-            adresse IP n&apos;est gardée qu&apos;en mémoire, pour plafonner les envois : deux minutes au
-            plus après votre dernière requête.
+            adresse IP (votre réseau en IPv6) et un condensé court de votre navigateur ne sont gardés
+            qu&apos;en mémoire, pour plafonner les envois de chaque réseau : deux minutes au plus après
+            votre dernière requête.
           </p>
           <p>
             <strong>Destinataires.</strong> Toute personne qui a le lien de la page{" "}

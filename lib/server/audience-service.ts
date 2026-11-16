@@ -40,6 +40,7 @@ import {
   emptyHeatmap,
   mergeAudienceAggregates,
   parisClock,
+  publicPageStats,
   rangeStart,
   shiftDay,
   shiftMonths,
@@ -59,7 +60,10 @@ import { visitorIdentitySource } from "@/lib/shared/site-visits";
 export const FLUSH_DELAY_MS = 10_000;
 /** Taille de file qui déclenche l'écriture sans attendre. */
 export const FLUSH_SIZE = 200;
-/** Au-delà, les pages vues reçues sont écartées (base en panne). */
+/**
+ * Au-delà, les pages vues reçues sont écartées (base en panne) ; passé la
+ * moitié, chaque envoi n'en ajoute plus qu'une.
+ */
 export const MAX_PENDING = 5_000;
 /** Marge après minuit avant de replier la veille (les pages signalées en différé). */
 export const ROLLUP_GRACE_MINUTES = 75;
@@ -250,11 +254,15 @@ async function recordViews(input: AudienceRecordInput): Promise<number> {
   // L'entretien attend ce signalement avant de replier, puis vide la file : un
   // jour devenu clos pendant la lecture des sels est encore compté. Seul un
   // jour que l'entretien a déjà commencé à replier (attente dépassée) est écarté.
+  // File à moitié pleine (base lente, rafale d'un client) : chaque envoi n'y
+  // ajoute plus qu'une ligne, pour qu'un seul client ne prenne pas toute la
+  // place restante aux autres visiteurs.
+  const room = pending.length >= MAX_PENDING / 2 ? 1 : rows.length;
   let kept = 0;
   for (const row of rows) {
     const visitorKey = keys.get(row.day);
     if (!visitorKey || (rolledThrough !== null && row.day <= rolledThrough)) continue;
-    if (pending.length >= MAX_PENDING) break;
+    if (pending.length >= MAX_PENDING || kept >= room) break;
     pending.push({ ...row, visitorKey });
     kept += 1;
   }
@@ -610,7 +618,10 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
     if (weekday >= 0 && weekday < 7 && hour >= 0 && hour < 24) heatmap[weekday][hour] += num(row.views);
   }
   return {
-    pages: pages.map((row) => ({ key: row.page_key, views: num(row.views), visitors: num(row.visitors), engagedMs: num(row.engaged_ms) })),
+    // Petits nombres et types qui ne se mesurent plus fondus dans « Autres pages » (page publique).
+    pages: publicPageStats(
+      pages.map((row) => ({ key: row.page_key, views: num(row.views), visitors: num(row.visitors), engagedMs: num(row.engaged_ms) })),
+    ),
     heatmap,
     devices: shares(dims, "device"),
     sources: shares(dims, "source"),

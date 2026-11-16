@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/audience-service");
 
 import { POST } from "@/app/api/audience/route";
-import { AUDIENCE_REQUEST_RULE } from "@/lib/server/api-guard";
+import { AUDIENCE_IDENTITY_RULE, AUDIENCE_REQUEST_RULE } from "@/lib/server/api-guard";
 import { maintainAudience, recordAudienceViews } from "@/lib/server/audience-service";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 
@@ -15,14 +15,22 @@ const BATCH = { v: [{ p: "/regles", t: 4000, a: 4000, d: "mobile", f: 1, r: "dis
 function audienceReq(body: unknown, headers: Record<string, string> = {}) {
   return new Request("http://localhost/api/audience", {
     method: "POST",
-    headers: { "content-type": "application/json", "user-agent": BROWSER, "x-forwarded-for": "203.0.113.7", ...headers },
+    headers: {
+      "content-type": "application/json",
+      "user-agent": BROWSER,
+      "x-forwarded-for": "203.0.113.7",
+      // Ce que pose le `fetch()` d'une page du site.
+      "sec-fetch-site": "same-origin",
+      "sec-fetch-dest": "empty",
+      ...headers,
+    },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  resetRateLimit(AUDIENCE_REQUEST_RULE.name);
+  resetRateLimit();
   jest.mocked(recordAudienceViews).mockResolvedValue(1);
 });
 
@@ -44,22 +52,14 @@ describe("POST /api/audience", () => {
     expect(maintainAudience).toHaveBeenCalledTimes(1);
   });
 
-  it("n'enregistre rien sous Global Privacy Control", async () => {
-    const res = await POST(audienceReq(BATCH, { "sec-gpc": "1" }));
+  const optOuts: { signal: string; headers: Record<string, string> }[] = [
+    { signal: "Global Privacy Control", headers: { "sec-gpc": "1" } },
+    { signal: "Do Not Track", headers: { dnt: "1" } },
+    { signal: "le choix fait sur /rgpd", headers: { cookie: "bg_audience_optout=1" } },
+  ];
 
-    expect(await res.json()).toEqual({ recorded: 0 });
-    expect(recordAudienceViews).not.toHaveBeenCalled();
-  });
-
-  it("n'enregistre rien sous Do Not Track", async () => {
-    const res = await POST(audienceReq(BATCH, { dnt: "1" }));
-
-    expect(await res.json()).toEqual({ recorded: 0 });
-    expect(recordAudienceViews).not.toHaveBeenCalled();
-  });
-
-  it("n'enregistre rien après le choix fait sur /rgpd", async () => {
-    const res = await POST(audienceReq(BATCH, { cookie: "bg_audience_optout=1" }));
+  it.each(optOuts)("n'enregistre rien sous $signal", async ({ headers }) => {
+    const res = await POST(audienceReq(BATCH, headers));
 
     expect(await res.json()).toEqual({ recorded: 0 });
     expect(recordAudienceViews).not.toHaveBeenCalled();
@@ -104,5 +104,50 @@ describe("POST /api/audience", () => {
 
     expect(await res.json()).toEqual({ recorded: 0 });
     expect(recordAudienceViews).not.toHaveBeenCalled();
+  });
+
+  it("POST_withoutFetchMetadata_recordsNothing", async () => {
+    const res = await POST(audienceReq(BATCH, { "sec-fetch-site": "", "sec-fetch-dest": "" }));
+
+    expect(await res.json()).toEqual({ recorded: 0 });
+    expect(recordAudienceViews).not.toHaveBeenCalled();
+  });
+
+  it("POST_crossSiteFetch_recordsNothing", async () => {
+    const res = await POST(audienceReq(BATCH, { "sec-fetch-site": "cross-site" }));
+
+    expect(await res.json()).toEqual({ recorded: 0 });
+    expect(recordAudienceViews).not.toHaveBeenCalled();
+  });
+
+  it("POST_ownHostReferrer_countedDirect", async () => {
+    const previous = process.env.APP_URL;
+    process.env.APP_URL = "https://bluegenji.example";
+    try {
+      await POST(audienceReq({ v: [{ p: "/", t: 0, a: 0, d: "mobile", f: 1, r: "www.bluegenji.example" }] }));
+    } finally {
+      process.env.APP_URL = previous;
+    }
+
+    expect(jest.mocked(recordAudienceViews).mock.calls[0][0].views[0].source).toBe("direct");
+  });
+
+  it("POST_rotatingUserAgents_cappedAtIdentityLimit", async () => {
+    for (let i = 0; i < AUDIENCE_IDENTITY_RULE.limit; i += 1) await POST(audienceReq(BATCH, { "user-agent": `${BROWSER} n${i}` }));
+
+    const res = await POST(audienceReq(BATCH, { "user-agent": `${BROWSER} other` }));
+
+    expect(await res.json()).toEqual({ recorded: 0 });
+    expect(recordAudienceViews).toHaveBeenCalledTimes(AUDIENCE_IDENTITY_RULE.limit);
+  });
+
+  it("POST_rotatingAddressesOfOneIpv6Slash64_shareRequestLimit", async () => {
+    for (let i = 0; i < AUDIENCE_REQUEST_RULE.limit; i += 1) {
+      await POST(audienceReq({ v: [{ p: "/regles", t: 0, a: 0, d: "mobile", c: 1 }] }, { "x-forwarded-for": `2001:db8:1:2::${(i + 1).toString(16)}` }));
+    }
+
+    const res = await POST(audienceReq(BATCH, { "x-forwarded-for": "2001:db8:1:2::ffff" }));
+
+    expect(res.status).toBe(429);
   });
 });

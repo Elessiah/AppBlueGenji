@@ -10,10 +10,12 @@ import {
   formatDuration,
   groupDaily,
   heatmapMargins,
+  isAudienceScriptRequest,
   isBotUserAgent,
   kpisOf,
   parseAudienceBatch,
   percentShares,
+  publicPageStats,
   rangeStart,
   relativeChange,
   sourceFromReferrerHost,
@@ -142,7 +144,7 @@ describe("parseAudienceBatch", () => {
     const views = parseAudienceBatch({ v: [{ p: "/", t: 5000, a: 9000, d: "mobile", f: 1, r: "discord.gg" }] });
 
     expect(views).toEqual([
-      { pageKey: "home", locale: "fr", device: "mobile", source: "discord", isView: true, engagedMs: 5000, ageMs: 9000, openedAgeMs: 9000 },
+      { pageKey: "home", locale: "fr", device: "mobile", source: "discord", isView: true, engagedMs: 0, ageMs: 9000, openedAgeMs: 9000 },
     ]);
   });
 
@@ -152,10 +154,16 @@ describe("parseAudienceBatch", () => {
     expect(views[0]).toMatchObject({ isView: false, source: "internal" });
   });
 
-  it("borne le temps à 30 minutes et ramène une ancienneté négative à zéro", () => {
-    const views = parseAudienceBatch({ v: [{ p: "/", t: 99_999_999, a: -5, d: "?" }] });
+  it("ignore le temps d'une page vue, borne celui d'une suite à 30 minutes et ramène une ancienneté négative à zéro", () => {
+    const views = parseAudienceBatch({
+      v: [
+        { p: "/", t: 99_999_999, a: -5, d: "?" },
+        { p: "/", t: 99_999_999, a: 0, d: "?", c: 1 },
+      ],
+    });
 
-    expect(views[0]).toMatchObject({ engagedMs: 1_800_000, ageMs: 0, device: "desktop", source: "internal" });
+    expect(views[0]).toMatchObject({ engagedMs: 0, ageMs: 0, device: "desktop", source: "internal" });
+    expect(views[1]).toMatchObject({ engagedMs: 1_800_000, isView: false });
   });
 
   it("parseAudienceBatch_ageExactlyOneHour_kept", () => {
@@ -187,7 +195,8 @@ describe("aggregateAudienceDay", () => {
       row({ viewedAt: new Date("2026-11-10T10:29:00Z"), pageKey: "ranking" }),
     ]);
 
-    expect(result.totals).toEqual({ views: 2, visitors: 1, visits: 1, bounces: 0, engagedMs: 2000 });
+    // Le temps d'une page vue est ignoré : il n'arrive que par ses suites.
+    expect(result.totals).toEqual({ views: 2, visitors: 1, visits: 1, bounces: 0, engagedMs: 0 });
   });
 
   it("ouvre une nouvelle visite à 30 minutes d'écart, chacune rebondie", () => {
@@ -205,8 +214,8 @@ describe("aggregateAudienceDay", () => {
       row({ pageKey: "rules", isView: false, engagedMs: 6000, viewedAt: new Date("2026-11-10T10:05:00Z") }),
     ]);
 
-    expect(result.pages).toEqual([{ pageKey: "rules", views: 1, visitors: 1, engagedMs: 10_000 }]);
-    expect(result.totals).toMatchObject({ views: 1, engagedMs: 10_000 });
+    expect(result.pages).toEqual([{ pageKey: "rules", views: 1, visitors: 1, engagedMs: 6000 }]);
+    expect(result.totals).toMatchObject({ views: 1, engagedMs: 6000 });
   });
 
   it("aggregateAudienceDay_longReadThenNextPage_oneVisitNoBounce", () => {
@@ -481,5 +490,108 @@ describe("mergeAudienceAggregates", () => {
 
   it("mergeAudienceAggregates_noParts_isEmpty", () => {
     expect(mergeAudienceAggregates([])).toEqual({ totals: { views: 0, visitors: 0, visits: 0, bounces: 0, engagedMs: 0 }, pages: [], hours: [], dims: [] });
+  });
+});
+
+describe("sécurité, cycle 1", () => {
+  const headers = (values: Record<string, string>) => new Headers(values);
+
+  it("isAudienceScriptRequest_sameOriginFetch_true", () => {
+    expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "same-origin", "sec-fetch-dest": "empty" }))).toBe(true);
+  });
+
+  it("isAudienceScriptRequest_noFetchMetadata_false", () => {
+    expect(isAudienceScriptRequest(headers({}))).toBe(false);
+  });
+
+  it("isAudienceScriptRequest_crossSite_false", () => {
+    expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "cross-site", "sec-fetch-dest": "empty" }))).toBe(false);
+  });
+
+  it("isAudienceScriptRequest_documentNavigation_false", () => {
+    expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "same-origin", "sec-fetch-dest": "document" }))).toBe(false);
+  });
+
+  it("audiencePageKey_adminAndReports_unmeasured", () => {
+    expect(audiencePageKey("/admin")).toBeNull();
+    expect(audiencePageKey("/admin/utilisateurs")).toBeNull();
+    expect(audiencePageKey("/signalements/12")).toBeNull();
+    expect(audiencePageKey("/en/signalements")).toBeNull();
+  });
+
+  it("audiencePageKey_adminLikePrefix_measuredAsOther", () => {
+    expect(audiencePageKey("/administration")).toEqual({ key: "other", locale: "fr" });
+  });
+
+  it("aggregateAudienceDay_overlappingForgedContinuations_countedOnce", () => {
+    const at = new Date("2026-11-10T10:30:00Z");
+    const result = aggregateAudienceDay([
+      row({ viewedAt: new Date("2026-11-10T10:00:00Z"), engagedMs: 0 }),
+      row({ viewedAt: at, isView: false, engagedMs: 1_800_000 }),
+      row({ viewedAt: at, isView: false, engagedMs: 1_800_000 }),
+      row({ viewedAt: at, isView: false, engagedMs: 1_800_000 }),
+    ]);
+
+    expect(result.totals.engagedMs).toBe(1_800_000);
+  });
+
+  it("aggregateAudienceDay_continuationStartingBeforeVisit_clampedToVisitStart", () => {
+    const result = aggregateAudienceDay([
+      row({ viewedAt: new Date("2026-11-10T10:00:00Z"), engagedMs: 0 }),
+      row({ viewedAt: new Date("2026-11-10T10:00:00Z"), isView: false, engagedMs: 1_800_000 }),
+    ]);
+
+    expect(result.totals.engagedMs).toBe(0);
+  });
+
+  it("aggregateAudienceDay_sequentialChunks_allCounted", () => {
+    const result = aggregateAudienceDay([
+      row({ viewedAt: new Date("2026-11-10T10:00:00Z"), engagedMs: 0 }),
+      row({ viewedAt: new Date("2026-11-10T10:10:00Z"), isView: false, engagedMs: 600_000 }),
+      row({ viewedAt: new Date("2026-11-10T10:20:00Z"), isView: false, engagedMs: 600_000 }),
+    ]);
+
+    expect(result.totals.engagedMs).toBe(1_200_000);
+  });
+
+  it("aggregateAudienceDay_viewCarryingTime_pageListedWithZeroTime", () => {
+    const result = aggregateAudienceDay([row({ pageKey: "rules", engagedMs: 5000 })]);
+
+    expect(result.pages).toEqual([{ pageKey: "rules", views: 1, visitors: 1, engagedMs: 0 }]);
+  });
+
+  it("publicPageStats_pageUnderThreshold_foldedIntoOther", () => {
+    const pages = publicPageStats([
+      { key: "home", views: 50, visitors: 5, engagedMs: 10 },
+      { key: "rules", views: 8, visitors: 4, engagedMs: 3 },
+      { key: "teams", views: 7, visitors: 1, engagedMs: 2 },
+    ]);
+
+    expect(pages).toEqual([
+      { key: "home", views: 50, visitors: 5, engagedMs: 10 },
+      { key: "other", views: 15, visitors: 5, engagedMs: 5 },
+    ]);
+  });
+
+  it("publicPageStats_retiredPageKey_foldedIntoOther", () => {
+    const pages = publicPageStats([
+      { key: "reports", views: 30, visitors: 9, engagedMs: 1 },
+      { key: "other", views: 1, visitors: 1, engagedMs: 1 },
+    ]);
+
+    expect(pages).toEqual([{ key: "other", views: 31, visitors: 10, engagedMs: 2 }]);
+  });
+
+  it("publicPageStats_otherUnderThreshold_hidden", () => {
+    expect(publicPageStats([{ key: "admin", views: 3, visitors: 2, engagedMs: 1 }])).toEqual([]);
+  });
+
+  it("publicPageStats_shownPages_sortedByViewsDesc", () => {
+    const pages = publicPageStats([
+      { key: "rules", views: 10, visitors: 6, engagedMs: 0 },
+      { key: "home", views: 90, visitors: 30, engagedMs: 0 },
+    ]);
+
+    expect(pages.map((page) => page.key)).toEqual(["home", "rules"]);
   });
 });

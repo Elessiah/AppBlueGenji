@@ -40,6 +40,9 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
    chiffres montrés aux partenaires ne doivent jamais paraître plus forts
    qu'ils ne sont.
 6. Pages les plus consultées : par type de page, vues, part, temps moyen.
+   Un type vu par moins de `AUDIENCE_MIN_PAGE_VISITORS` (5) visiteurs sur la
+   période rejoint « Autres pages », elle-même cachée sous ce seuil
+   (`publicPageStats`) : aucune ligne ne décrit une poignée de personnes.
 7. Moments de visite : carte de chaleur jour × heure (rampe bleue à 5 paliers,
    lecture au survol, pic annoncé), barres par jour de la semaine et par heure.
 8. Qui nous consulte : appareils, provenance, langue — barres segmentées,

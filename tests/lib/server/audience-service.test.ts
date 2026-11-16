@@ -316,7 +316,8 @@ describe("rollUpAudienceDays", () => {
       "INSERT INTO bg_audience_day_dims",
       "INSERT INTO bg_audience_days",
     ]);
-    expect(connection.execute.mock.calls[9][1]).toEqual(["2026-11-14", 1, 1, 1, 1, 3000]);
+    // Le temps d'une page vue n'est pas compté (il n'arrive que par ses suites).
+    expect(connection.execute.mock.calls[9][1]).toEqual(["2026-11-14", 1, 1, 1, 1, 0]);
   });
 
   it("ne replie rien quand aucun jour clos n'attend", async () => {

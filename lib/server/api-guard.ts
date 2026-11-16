@@ -12,6 +12,7 @@
  * Les plafonds sont **larges** : personne n'y touche en naviguant normalement.
  * Ils bornent l'anormal, ils ne disciplinent pas l'usage.
  */
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   ANONYMOUS_IDENTITY,
@@ -496,7 +497,9 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
- * Signalements de pages vues (`/api/audience`, registre T19), par IP.
+ * Signalements de pages vues (`/api/audience`, registre T19), par réseau
+ * (`clientNetworkKey` : une adresse IPv4, un préfixe IPv6 `/64` — sans quoi un
+ * hôte IPv6 tirerait une adresse, donc un plafond neuf, à chaque envoi).
  *
  * Un navigateur envoie sa file au plus toutes les minutes, ou à chaque dixième
  * entrée, ou quand l'onglet passe en arrière-plan : deux envois par minute
@@ -504,7 +507,7 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
  * derrière un NAT d'opérateur, salle d'un événement en réseau local), dont
  * les visiteurs ne doivent pas disparaître des chiffres ; il borne seulement
  * un client qui fabrique des signalements (20 entrées par envoi au plus). La
- * clé (l'IP) ne vit qu'en mémoire, deux minutes au plus après sa dernière
+ * clé (le réseau) ne vit qu'en mémoire, deux minutes au plus après sa dernière
  * requête.
  */
 export const AUDIENCE_REQUEST_RULE: RateLimitRule = {
@@ -512,6 +515,67 @@ export const AUDIENCE_REQUEST_RULE: RateLimitRule = {
   limit: 120,
   windowMs: 60_000,
 };
+
+/**
+ * Pages vues retenues par réseau et par minute (les suites, qui n'apportent que
+ * du temps borné par la visite, n'y comptent pas). Un visiteur en ouvre
+ * quelques-unes par minute ; cent vingt laissent passer une salle entière et
+ * bornent ce qu'un client qui fabrique des signalements ajoute aux chiffres.
+ */
+export const AUDIENCE_VIEW_RULE: RateLimitRule = {
+  name: "audience-view",
+  limit: 120,
+  windowMs: 60_000,
+};
+
+/**
+ * Navigateurs distincts (user-agents) par réseau et par minute. L'empreinte
+ * d'un visiteur est celle du couple IP + navigateur : sans ce plafond, un
+ * client qui change de user-agent à chaque envoi se ferait passer pour autant
+ * de visiteurs. Une salle de LAN n'a que quelques versions de navigateur.
+ */
+export const AUDIENCE_IDENTITY_RULE: RateLimitRule = {
+  name: "audience-identity",
+  limit: 30,
+  windowMs: 60_000,
+};
+
+/**
+ * Navigateurs déjà vus dans la minute, par réseau (clé : réseau + condensé
+ * court du user-agent, en mémoire seulement, effacée avec la fenêtre).
+ */
+const AUDIENCE_IDENTITY_SEEN_RULE: RateLimitRule = {
+  name: "audience-identity-seen",
+  limit: Number.MAX_SAFE_INTEGER,
+  windowMs: 60_000,
+  maxKeys: 50_000,
+};
+
+/** Réseau d'un envoi dont l'adresse est illisible : tous partagent un même plafond. */
+export const AUDIENCE_UNKNOWN_NETWORK = "unknown-network";
+
+/** Identité de débit d'un envoi de mesure d'audience : son réseau, ou un réseau commun s'il est illisible. */
+export function audienceNetworkKey(ip: string | null): string {
+  return clientNetworkKey(ip) ?? AUDIENCE_UNKNOWN_NETWORK;
+}
+
+/**
+ * Pages vues qu'un réseau peut encore ajouter aux chiffres (`/api/audience`) :
+ * aucune si ce navigateur est au-delà de {@link AUDIENCE_IDENTITY_RULE} pour
+ * ce réseau, sinon les suites et les pages vues sous
+ * {@link AUDIENCE_VIEW_RULE}. Les entrées refusées sont écartées sans bruit.
+ */
+export function admitAudienceViews<T extends { isView: boolean }>(
+  network: string,
+  userAgent: string,
+  views: readonly T[],
+): T[] {
+  const seenKey = `${network}\u0000${createHash("sha256").update(userAgent).digest("base64url").slice(0, 16)}`;
+  const firstSeen = checkRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey).remaining === AUDIENCE_IDENTITY_SEEN_RULE.limit;
+  if (firstSeen && !consumeRateLimit(AUDIENCE_IDENTITY_RULE, network).allowed) return [];
+  consumeRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
+  return views.filter((view) => !view.isView || consumeRateLimit(AUDIENCE_VIEW_RULE, network).allowed);
+}
 
 /**
  * Lectures relayées vers le bot (`/api/bot/*`), par IP.

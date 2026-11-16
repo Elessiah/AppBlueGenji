@@ -12,7 +12,7 @@
  *   un **sel tiré au hasard chaque jour**, effacé le lendemain dès le jour
  *   replié : deux jours ne se relient pas, et une fois le sel effacé, plus
  *   personne — l'association comprise — ne peut recalculer l'empreinte d'une
- *   adresse ;
+ *   adresse (hors une copie de sauvegarde chiffrée faite entre-temps, T09) ;
  * - la page vue est réduite à son **gabarit** (`/joueurs/[pseudo]`, jamais le
  *   pseudo), la provenance à une **famille** (moteur de recherche, Discord…),
  *   l'écran à une **classe** (mobile, tablette, ordinateur) ;
@@ -113,9 +113,14 @@ const PAGE_PATTERNS: readonly (readonly [string, RegExp])[] = [
   ["volunteers", /^\/benevoles$/],
   ["recruitment", /^\/recrutement$/],
   ["legal", /^\/(rgpd|mentions-legales|conditions-utilisation|accessibilite|privacy-policy-bot|terms-of-service-bot)(\/.*)?$/],
-  ["reports", /^\/signalements(\/.*)?$/],
-  ["admin", /^\/admin(\/.*)?$/],
 ];
+
+/**
+ * Pages **jamais mesurées** : l'administration (le seul personnel du site) et
+ * les signalements (le seul fait d'en ouvrir un). Peu de visiteurs les ouvrent :
+ * leurs chiffres, même agrégés, désigneraient presque des personnes.
+ */
+const UNMEASURED_PAGES = /^\/(admin|signalements)(\/|$)/;
 
 /** Toutes les clés de page possibles, `other` compris (pour les libellés). */
 export const AUDIENCE_PAGE_KEYS: readonly string[] = [...PAGE_PATTERNS.map(([key]) => key), "other"];
@@ -141,7 +146,7 @@ export function audiencePageKey(rawPath: unknown): { key: string; locale: Audien
   const split = splitLocalePath(path);
   const bare = split.path;
   if (bare === AUDIENCE_PAGE_PATH || bare.startsWith(`${AUDIENCE_PAGE_PATH}/`)) return null;
-  if (/^\/(api|og|_next)(\/|$)/.test(bare)) return null;
+  if (/^\/(api|og|_next)(\/|$)/.test(bare) || UNMEASURED_PAGES.test(bare)) return null;
   const match = PAGE_PATTERNS.find(([, pattern]) => pattern.test(bare));
   return { key: match ? match[0] : "other", locale: split.locale };
 }
@@ -191,6 +196,18 @@ const BOT_USER_AGENT = /bot|crawl|spider|slurp|headless|lighthouse|preview|faceb
 export function isBotUserAgent(userAgent: string | null | undefined): boolean {
   if (typeof userAgent !== "string" || !userAgent.trim()) return true;
   return BOT_USER_AGENT.test(userAgent);
+}
+
+/**
+ * L'envoi vient-il du script d'une page du site ? Un `fetch()` lancé par une
+ * page pose toujours `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty`
+ * (tout navigateur courant depuis 2023) ; un client sans navigateur, un
+ * aperçu de lien ou une page tierce, non. Un filtre bon marché, pas une
+ * preuve : un script qui forge ces en-têtes reste borné par les plafonds par
+ * réseau (`admitAudienceViews`).
+ */
+export function isAudienceScriptRequest(headers: Pick<Headers, "get">): boolean {
+  return headers.get("sec-fetch-site") === "same-origin" && headers.get("sec-fetch-dest") === "empty";
 }
 
 /** Une page vue telle que le navigateur la signale. */
@@ -284,7 +301,8 @@ function parseAudienceEntry(raw: unknown, ownHost?: string | null): AudienceView
     device: parseDevice(entry.d),
     source: isView && entry.f === 1 ? sourceFromReferrerHost(entry.r, ownHost) : "internal",
     isView,
-    engagedMs: clampInt(entry.t, 0, AUDIENCE_MAX_ENGAGED_MS),
+    // Une page vue est signalée à son affichage : son temps arrive par ses suites.
+    engagedMs: isView ? 0 : clampInt(entry.t, 0, AUDIENCE_MAX_ENGAGED_MS),
     ageMs,
     openedAgeMs,
   };
@@ -381,7 +399,11 @@ function tally<K>(map: Map<K, Tally>, key: K, visitor: string): Tally {
  * date) : voir {@link aggregateAudienceDay}.
  */
 class VisitCounter {
-  private readonly lastSeen = new Map<string, { at: number; views: number }>();
+  /**
+   * Par visiteur : dernière activité (`at`), pages vues de la visite, début de
+   * la visite et fin du dernier temps compté (`timeEnd`).
+   */
+  private readonly lastSeen = new Map<string, { at: number; views: number; start: number; timeEnd: number }>();
   visits = 0;
   bounces = 0;
 
@@ -390,33 +412,38 @@ class VisitCounter {
   /**
    * Fin d'une lecture (`engagedMs` de temps) datée de sa clôture `at`.
    *
-   * @returns `true` si la lecture prolonge une visite (son temps lui revient).
+   * @returns Le temps que la visite en retient : `0` hors de toute visite ;
+   *   sinon la part de la lecture qui tient entre le début de la visite, la
+   *   fin du temps déjà compté et `at`. Un visiteur n'a qu'un onglet visible à
+   *   la fois : des lectures qui se chevauchent (suites forgées, toutes datées
+   *   du même instant) ne s'additionnent pas.
    */
-  continuation(visitor: string, at: number, engagedMs: number): boolean {
+  continuation(visitor: string, at: number, engagedMs: number): number {
     const previous = this.lastSeen.get(visitor);
-    if (!previous || previous.views === 0) return false;
+    if (!previous || previous.views === 0) return 0;
     if (at - engagedMs - previous.at < this.gapMs) {
       // Lecture commencée dans la visite : la prolonge.
-      this.lastSeen.set(visitor, { at: Math.max(at, previous.at), views: previous.views });
-      return true;
+      const from = Math.max(at - engagedMs, previous.start, previous.timeEnd);
+      this.lastSeen.set(visitor, { ...previous, at: Math.max(at, previous.at), timeEnd: Math.max(previous.timeEnd, at) });
+      return Math.max(0, at - from);
     }
     // Retour sur l'onglet après une longue pause : la visite d'avant est close,
     // cette lecture n'en ouvre aucune (aucune page vue) et son temps n'est pas compté.
     if (previous.views === 1) this.bounces += 1;
-    this.lastSeen.set(visitor, { at, views: 0 });
-    return false;
+    this.lastSeen.set(visitor, { at, views: 0, start: at, timeEnd: at });
+    return 0;
   }
 
   /** Ouverture d'une page à `at`. */
   view(visitor: string, at: number): void {
     const previous = this.lastSeen.get(visitor);
     if (previous && previous.views > 0 && at - previous.at < this.gapMs) {
-      this.lastSeen.set(visitor, { at: Math.max(at, previous.at), views: previous.views + 1 });
+      this.lastSeen.set(visitor, { ...previous, at: Math.max(at, previous.at), views: previous.views + 1 });
       return;
     }
     if (previous?.views === 1) this.bounces += 1;
     this.visits += 1;
-    this.lastSeen.set(visitor, { at, views: 1 });
+    this.lastSeen.set(visitor, { at, views: 1, start: at, timeEnd: at });
   }
 
   /** Clôt les visites encore ouvertes en fin de journée. */
@@ -455,10 +482,13 @@ export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceD
   };
   for (const row of rows) {
     if (!row.isView) {
-      if (visitCounter.continuation(row.visitorKey, row.viewedAt.getTime(), row.engagedMs)) addTime(row.pageKey, row.engagedMs);
+      const counted = visitCounter.continuation(row.visitorKey, row.viewedAt.getTime(), row.engagedMs);
+      if (counted > 0) addTime(row.pageKey, counted);
       continue;
     }
-    addTime(row.pageKey, row.engagedMs);
+    // Le temps d'une page vue (toujours nul depuis le navigateur) n'est jamais compté :
+    // il arrive par ses suites, bornées par la visite.
+    addTime(row.pageKey, 0);
 
     views += 1;
     visitors.add(row.visitorKey);
@@ -545,6 +575,36 @@ export interface AudiencePageStat {
   views: number;
   visitors: number;
   engagedMs: number;
+}
+
+/**
+ * Visiteurs qu'il faut au moins à un type de page pour apparaître seul sur la
+ * page publique : en dessous, il rejoint « Autres pages », pour qu'aucune ligne
+ * ne décrive une poignée de personnes.
+ */
+export const AUDIENCE_MIN_PAGE_VISITORS = 5;
+
+/**
+ * Ce que la page publique montre des types de page d'une période : les types
+ * connus vus par au moins {@link AUDIENCE_MIN_PAGE_VISITORS} visiteurs, le reste
+ * (petits nombres, types qui ne se mesurent plus) fondu dans `other`, lui-même
+ * retiré s'il reste sous ce seuil. Les visiteurs fondus s'additionnent (comme
+ * ceux de plusieurs jours) : `other` peut en compter un même deux fois.
+ */
+export function publicPageStats(pages: readonly AudiencePageStat[]): AudiencePageStat[] {
+  const shown: AudiencePageStat[] = [];
+  const other: AudiencePageStat = { key: "other", views: 0, visitors: 0, engagedMs: 0 };
+  for (const page of pages) {
+    if (page.key !== "other" && AUDIENCE_PAGE_KEYS.includes(page.key) && page.visitors >= AUDIENCE_MIN_PAGE_VISITORS) {
+      shown.push({ ...page });
+      continue;
+    }
+    other.views += page.views;
+    other.visitors += page.visitors;
+    other.engagedMs += page.engagedMs;
+  }
+  if (other.visitors >= AUDIENCE_MIN_PAGE_VISITORS) shown.push(other);
+  return shown.sort((a, b) => b.views - a.views);
 }
 
 export interface AudienceRangeStats {
