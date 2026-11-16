@@ -424,6 +424,13 @@ function RgpdFr({
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
           T17</Link>).
+          Le site garde aussi, en mémoire seulement, jamais en base ni dans un journal, l&apos;adresse IP
+          de qui appelle ses routes ouvertes sans compte ou avant la connexion (données de la page
+          d&apos;accueil, page du bot et son direct, rapports de sécurité du navigateur, signalement sans
+          compte, code de connexion Discord), pour en plafonner les requêtes : deux minutes au plus
+          après sa dernière requête, trente et une minutes pour un signalement sans compte, seize pour
+          un code Discord, et en outre tant que le direct de la page du bot reste ouvert (même
+          registre, T17).
         </p>
         <p id="suppression-du-compte" style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           <strong>Suppression du compte.</strong> Demandée depuis « Mon profil », elle ne devient définitive
@@ -579,7 +586,7 @@ function RgpdFr({
       </section>
 
       {/* SECTION 04 — VOS DROITS */}
-      <section className={styles.section}>
+      <section id="vos-droits" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 04</span>

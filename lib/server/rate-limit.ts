@@ -57,9 +57,9 @@ function bucketOf(rule: RateLimitRule): Map<string, Counter> {
  * de remplir son seau) **après la dernière requête**, plus un intervalle. Le
  * registre (T03) promet deux minutes au plus pour les plafonds de la fiche
  * publique et des images d'aperçu (fenêtres d'une minute au plus,
- * `rate-limit-sweep.test.ts`) ; un plafond à fenêtre plus longue (code
- * Discord, signalement : 15 min) garde sa clé d'autant — ces textes ne le
- * couvrent pas.
+ * `rate-limit-sweep.test.ts`) ; un plafond à fenêtre plus longue garde sa
+ * clé d'autant (code Discord : 15 min, signalement sans compte : 30 min),
+ * durées déclarées à part au registre (T17, T02, T11).
  */
 export const RATE_LIMIT_SWEEP_INTERVAL_MS = 30_000;
 

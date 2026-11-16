@@ -162,6 +162,34 @@ describe("oubli des réseaux comptés (adresse IP, deux minutes au plus)", () =>
     }
   });
 
+  it("scheduleForgetClients_windowRolledBeforeStaleTimer_keepsNewWindowShares", () => {
+    jest.useFakeTimers({ now: T0 });
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+      recordSpectatorRead(T0 + SPECTATOR_READ_WINDOW_MS, "198.51.100.9");
+
+      jest.advanceTimersByTime(SPECTATOR_READ_WINDOW_MS);
+
+      expect(trackedSpectatorClientCount()).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("scheduleForgetClients_windowRolledBeforeStaleTimer_forgetsNewSharesAtNewWindowEnd", () => {
+    jest.useFakeTimers({ now: T0 });
+    try {
+      recordSpectatorRead(T0, "203.0.113.7");
+      recordSpectatorRead(T0 + SPECTATOR_READ_WINDOW_MS, "198.51.100.9");
+
+      jest.advanceTimersByTime(2 * SPECTATOR_READ_WINDOW_MS);
+
+      expect(trackedSpectatorClientCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("la remise à zéro efface les réseaux et l'oubli en attente", () => {
     jest.useFakeTimers();
     try {

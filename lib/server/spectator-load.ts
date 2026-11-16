@@ -77,10 +77,15 @@ const MAX_TRACKED_CLIENTS = 10_000;
  */
 function scheduleForgetClients(now: number): void {
   if (forgetClientsTimer !== null) return;
-  const wait = Math.max(0, windowStartedAt + SPECTATOR_READ_WINDOW_MS - now);
+  const targetWindow = windowStartedAt;
+  const wait = Math.max(0, targetWindow + SPECTATOR_READ_WINDOW_MS - now);
   forgetClientsTimer = setTimeout(() => {
     forgetClientsTimer = null;
-    readsByClient.clear();
+    // Une lecture arrivée juste à la fin de la fenêtre l'a déjà refermée
+    // (`rollWindow` a vidé les parts) et compté la suivante : ne pas effacer
+    // ses parts, mais viser la fin de cette nouvelle fenêtre.
+    if (windowStartedAt === targetWindow) readsByClient.clear();
+    else if (readsByClient.size > 0) scheduleForgetClients(Date.now());
   }, wait);
   forgetClientsTimer.unref?.();
 }

@@ -1,5 +1,20 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { SHARE_EMBED_RENDER_RULE, SPECTATOR_READ_RULE, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
+
+jest.mock("@/lib/server/tournament-broadcast", () => ({ openStreamCount: jest.fn(() => 0) }));
+
+import {
+  BOT_FEED_OPEN_RULE,
+  BOT_READ_RULE,
+  CSP_REPORT_RULE,
+  DISCORD_CODE_REQUEST_IP_RULE,
+  DISCORD_CODE_VERIFY_RULE,
+  LANDING_READ_RULE,
+  REPORT_SUBMIT_RULE,
+  SHARE_EMBED_RENDER_RULE,
+  SPECTATOR_READ_RULE,
+  SPECTATOR_REBUILD_RULE,
+} from "@/lib/server/api-guard";
+import { SPECTATOR_READ_WINDOW_MS } from "@/lib/server/spectator-load";
 import {
   RATE_LIMIT_SWEEP_INTERVAL_MS,
   armRateLimitSweepTimer,
@@ -144,5 +159,41 @@ describe("durée déclarée au registre", () => {
   it("le plafond des images d'aperçu se remet à zéro en deux minutes au plus", () => {
     expect(SHARE_EMBED_RENDER_RULE.capacity * SHARE_EMBED_RENDER_RULE.refillMs + RATE_LIMIT_SWEEP_INTERVAL_MS)
       .toBeLessThanOrEqual(TWO_MINUTES);
+  });
+});
+
+describe("durées déclarées au registre (T03, T17, T02, T11)", () => {
+  const TWO_MINUTES = 120_000;
+
+  it("la part d'un réseau dans la mesure de charge s'oublie en deux minutes au plus", () => {
+    expect(SPECTATOR_READ_WINDOW_MS).toBeLessThanOrEqual(TWO_MINUTES);
+  });
+
+  it("les données de la page d'accueil se remettent à zéro en deux minutes au plus", () => {
+    expect(LANDING_READ_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(TWO_MINUTES);
+  });
+
+  it("la page du bot se remet à zéro en deux minutes au plus", () => {
+    expect(BOT_READ_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(TWO_MINUTES);
+  });
+
+  it("l'ouverture du direct du bot se remet à zéro en deux minutes au plus", () => {
+    expect(BOT_FEED_OPEN_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(TWO_MINUTES);
+  });
+
+  it("les rapports de sécurité du navigateur se remettent à zéro en deux minutes au plus", () => {
+    expect(CSP_REPORT_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(TWO_MINUTES);
+  });
+
+  it("un signalement sans compte se remet à zéro en trente et une minutes au plus", () => {
+    expect(REPORT_SUBMIT_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(31 * 60_000);
+  });
+
+  it("la demande d'un code Discord se remet à zéro en seize minutes au plus", () => {
+    expect(DISCORD_CODE_REQUEST_IP_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(16 * 60_000);
+  });
+
+  it("la saisie d'un code Discord se remet à zéro en seize minutes au plus", () => {
+    expect(DISCORD_CODE_VERIFY_RULE.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS).toBeLessThanOrEqual(16 * 60_000);
   });
 });

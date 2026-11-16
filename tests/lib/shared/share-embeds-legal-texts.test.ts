@@ -59,7 +59,7 @@ describe("entrée « liens partagés » : déclencheur et droits", () => {
   });
 
   it("mène à la section des droits, avec un libellé anglais par lien", () => {
-    expect(entry?.links?.map((link) => link.href)).toContain("/rgpd#exercer-vos-droits");
+    expect(entry?.links?.map((link) => link.href)).toContain("/rgpd#vos-droits");
     expect(entryEn?.linkLabels).toHaveLength(entry?.links?.length ?? -1);
   });
 
@@ -82,9 +82,17 @@ describe("registre T03", () => {
     expect(t03).toContain("two minutes at most after its last request");
   });
 
-  it("dit qu'un aperçu partagé n'est pas un transfert de l'association", () => {
-    expect(t03).toContain("donc aucun transfert hors UE de sa part, même vers un service établi aux États-Unis (X, Discord)");
-    expect(t03).toContain("so no transfer outside the EU on its part, even to a service established in the United States (X, Discord)");
+  it("ne tranche pas l'absence de transfert : renvoie aux règles des services d'aperçu", () => {
+    expect(t03).not.toContain("aucun transfert hors UE de sa part");
+    expect(t03).not.toContain("no transfer outside the EU on its part");
+    expect(t03).toContain("hors UE pour certains, comme X ou Discord");
+    expect(t03).toContain("outside the EU for some, such as X or Discord");
+  });
+
+  it("fonde les plafonds par adresse IP sur la sécurité du service", () => {
+    expect(t03).toContain("pour l'adresse IP des lecteurs, intérêt légitime à la sécurité et à la disponibilité du service (art. 32)");
+    expect(t03).toContain("for the readers' IP address, legitimate interest in the security and availability of the service (art. 32)");
+    expect(t03).toContain("Protéger la fiche publique, les règles d'un tournoi et les images d'aperçu contre les abus");
   });
 
   it("garde l'adresse IP d'un visiteur sans compte deux minutes au plus, pour les lectures et les aperçus", () => {
@@ -123,5 +131,72 @@ describe("/rgpd", () => {
     expect(fr).toMatch(/deux minutes au plus après sa dernière requête/);
     expect(en).toMatch(/measure the server&apos;s load/);
     expect(en).toMatch(/two minutes at most after its last request/);
+  });
+});
+
+describe("entrée « liens partagés » : portée complète", () => {
+  it("nomme les règles d'un tournoi et la mesure de charge", () => {
+    expect(frText).toContain("/regles/…?tournoi=…");
+    expect(frText).toContain("mesurer la charge du serveur");
+    expect(enText).toContain("/regles/…?tournoi=…");
+    expect(enText).toContain("measure the server's load");
+  });
+
+  it("dit que l'ancienne durée annoncée (une minute) n'était pas tenue", () => {
+    expect(frText).toContain("pour une minute, alors que l'adresse restait en mémoire plus longtemps");
+    expect(enText).toContain("for one minute, while the address stayed in memory longer");
+  });
+
+  it("ne dit plus que rien de plus n'est collecté", () => {
+    expect(frText).not.toContain("rien de plus n'est collecté");
+    expect(enText).not.toContain("nothing more is collected");
+    expect(frText).toContain("rien de nouveau n'est écrit sur toi en base ni dans un journal");
+    expect(enText).toContain("nothing new about you is written to the database or to a log");
+  });
+
+  it("annonce les autres plafonds par adresse IP et leurs durées", () => {
+    expect(frText).toContain("trente et une minutes pour un signalement sans compte");
+    expect(frText).toContain("seize pour un code de connexion Discord");
+    expect(enText).toContain("thirty-one minutes for a report without an account");
+    expect(enText).toContain("sixteen for a Discord login code");
+  });
+});
+
+describe("autres plafonds par adresse IP au registre", () => {
+  const byRef = (ref: string) => JSON.stringify([
+    PROCESSING_ACTIVITIES.find((activity) => activity.ref === ref),
+    PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === ref),
+  ]);
+
+  it("T17 déclare les plafonds en mémoire et leurs durées", () => {
+    const t17 = byRef("T17");
+    expect(t17).toContain("deux minutes au plus après sa dernière requête ; trente et une minutes pour un signalement sans compte, seize pour un code de connexion Discord");
+    expect(t17).toContain("two minutes at most after its last request; thirty-one minutes for a report without an account, sixteen for a Discord login code");
+    expect(t17).toContain("tant que le flux reste ouvert");
+  });
+
+  it("T02 déclare la durée de l'adresse IP des essais de code", () => {
+    expect(byRef("T02")).toContain("seize minutes au plus après sa dernière requête (T17)");
+    expect(byRef("T02")).toContain("sixteen minutes at most after its last request (T17)");
+  });
+
+  it("T11 déclare l'adresse IP du signalant sans compte", () => {
+    expect(byRef("T11")).toContain("Adresse IP du signalant sans compte, en mémoire seulement");
+    expect(byRef("T11")).toContain("IP address of a reporter without an account, in memory only");
+  });
+});
+
+describe("/rgpd : plafonds par adresse IP et section des droits", () => {
+  const fr = readSource("app/rgpd/page.tsx");
+  const en = readSource("app/rgpd/RgpdEn.tsx");
+
+  it("décrit les autres plafonds par adresse IP, FR et EN", () => {
+    expect(fr).toMatch(/trente et une minutes pour un signalement sans\s+compte/);
+    expect(en).toMatch(/thirty-one\s+minutes for a report without an account/);
+  });
+
+  it("porte l'ancre de la section « Vos droits » visée par l'entrée", () => {
+    expect(fr).toContain('<section id="vos-droits"');
+    expect(en).toContain('<section id="vos-droits"');
   });
 });

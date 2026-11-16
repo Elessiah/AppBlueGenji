@@ -116,9 +116,15 @@ de replay publics).
   (`spectator-load.ts`, `readsByClient`) est oubliée à la fin de sa fenêtre
   d'une minute par son propre minuteur. Pour **ces** plafonds, une adresse ne
   reste pas plus de deux minutes après sa dernière requête — durée déclarée au
-  registre T03 et dans /rgpd. Un plafond à fenêtre plus longue (code Discord,
-  signalement : 15 min) n'est pas couvert par cette durée ; un plafond public
-  plus long doit faire revoir ces textes (`rate-limit-sweep.test.ts`).
+  registre T03 et dans /rgpd. Les autres plafonds par IP (accueil, page du bot,
+  rapports CSP : deux minutes ; signalement sans compte : 30 min, soit 31 min
+  avec le balayage ; code Discord : 15 min, soit 16 ; direct de `/bot` : tant
+  que le flux est ouvert) sont déclarés au registre T17 (et T02, T11 pour les
+  deux longs) et dans /rgpd ; changer une de ces fenêtres doit faire revoir ces
+  textes (`rate-limit-sweep.test.ts` les vérifie, `SPECTATOR_READ_WINDOW_MS`
+  compris). La file d'attente des rendus (`share-image-cache.ts`) garde la clé
+  réseau d'une requête en attente au plus `MAX_RENDER_WAIT_CLIENT_MS` (30 s) :
+  passé ce délai (rendu bloqué), l'attente continue sans clé réseau.
 
 ## Cache
 

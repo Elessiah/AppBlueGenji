@@ -1097,17 +1097,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-apercus-partage-codes-replay": {
-    linkLabels: ["Read what the page without an account shows", "Exercise your rights, including objection"],
+    linkLabels: ["Read what the page without an account shows", "Read your rights, including objection"],
     title: "Shared links: a preview, and public replay codes",
     summary:
       "A “Share” button gives the public link of a tournament or a match, with a preview (image and text) under the link. The replay code of each map, until now reserved to logged-in members, is now public as soon as the referees record the map played or the result is retained, matches already played included.",
     details: [
       "A tournament's preview shows its name, game, format, state, dates, number of entrants and the leading or winning team, otherwise its description published by the organizers; a match's, the round, the teams' names and logos, the score or the forfeit and each map played with its name, score and replay code (the score of each map was already public on the page without an account).",
       "Never a player's username taken from their account in a preview: in a solo tournament, the entrants are “Player 1” and “Player 2”, with no avatar. An unpublished tournament has no preview.",
-      "A replay code lets anyone watch the game again in game, where the in-game identifiers of the players present appear, including a BattleTag hidden on the site. It becomes public map by map, as soon as the referees record the map or the result is retained, even before the match ends; a pending score proposal stays with the match's two teams and the referees. Codes already recorded become public too: you can object to the publication of the code of a match you took part in (see “Your rights” in /rgpd); the association examines the request and, if it accepts it, removes the code.",
-      "To cap the preview images rendered, the IP address of whoever causes them to be rendered, signed in or not, preview services included (its /64 network in IPv6), is kept in memory only, two minutes at most after its last request, as for the reads of the page without an account.",
+      "A replay code lets anyone watch the game again in game, where the in-game identifiers of the players present appear, including a BattleTag hidden on the site. It becomes public map by map, as soon as the referees record the map or the result is retained, even before the match ends; a pending score proposal stays with the match's two teams and the referees. Codes already recorded become public too: you can object to the publication of the code of a match you took part in (link “Read your rights”); the association examines the request and, if it accepts it, removes the code.",
+      "The IP address of whoever reads the page without an account or a tournament's rules (/regles/…?tournoi=…), or causes a preview image to be rendered, signed in or not, preview services included (its /64 network in IPv6), is used to cap these reads and images, and to measure the server's load without a single network being able to skew it; it is kept in memory only, two minutes at most after its last request. /rgpd and its register so far only mentioned the visitor without an account of that page, for one minute, while the address stayed in memory longer: it is now erased within that time.",
+      "The site's other caps per IP address, in memory only, are now described too (register, T17): two minutes at most after the last request for the home page data, the bot page and the browser's security reports; thirty-one minutes for a report without an account; sixteen for a Discord login code; and also as long as the bot page's live feed stays open.",
       "The service that displays the preview (Discord, X, a messaging app) keeps a copy of it under its own rules.",
-      "What does not change: nothing more is collected about you, and what deletion removes stays the same.",
+      "What does not change: nothing new about you is written to the database or to a log, and what deletion removes stays the same.",
     ],
   },
 };

@@ -315,6 +315,12 @@ export function RgpdEn({
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
           ).
+          The site also keeps, in memory only, never in the database or in a log, the IP address of
+          whoever calls its routes open without an account or before logging in (home page data, the bot
+          page and its live feed, the browser&apos;s security reports, report without an account, Discord
+          login code), to cap their requests: two minutes at most after its last request, thirty-one
+          minutes for a report without an account, sixteen for a Discord code, and also as long as the
+          bot page&apos;s live feed stays open (same register, T17).
         </p>
         <p id="suppression-du-compte" style={{ marginTop: 8, ...NOTE_STYLE }}>
           <strong>Account deletion.</strong> Requested from “My profile”, it only becomes final after{" "}
@@ -448,7 +454,7 @@ export function RgpdEn({
       </section>
 
       {/* SECTION 04 — YOUR RIGHTS */}
-      <section className={styles.section}>
+      <section id="vos-droits" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 04</span>

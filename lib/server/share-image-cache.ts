@@ -96,13 +96,44 @@ let rankingGeneration = 0;
 /** Préfixe du vol unique des cartes tirées du classement (vidé avec elles). */
 const RANKING_FLIGHT_PREFIX = "share-image:ranking:";
 
+/**
+ * Durée au plus pendant laquelle une attente garde le réseau de sa requête
+ * (`client`, une adresse IP ou un /64) : un rendu bloqué (Satori, `sharp`)
+ * ne doit pas le retenir au-delà des deux minutes promises par le registre
+ * (T03). Passé ce délai, l'attente continue mais n'est plus rattachée à aucun
+ * réseau (elle ne compte plus dans sa part de la file).
+ */
+export const MAX_RENDER_WAIT_CLIENT_MS = 30_000;
+
 let activeRenders = 0;
 type Waiter = { resolve: () => void; pool: ShareImagePool; client: string | null };
 const waiting: Waiter[] = [];
 
+/** Réseaux encore rattachés à une attente (tests). */
+export function queuedShareRenderClients(): (string | null)[] {
+  return waiting.map((entry) => entry.client);
+}
+
+function waitForRenderSlot(pool: ShareImagePool, client: string | null): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const waiter: Waiter = { resolve, pool, client };
+    if (client !== null) {
+      const forget = setTimeout(() => {
+        waiter.client = null;
+      }, MAX_RENDER_WAIT_CLIENT_MS);
+      forget.unref?.();
+      waiter.resolve = () => {
+        clearTimeout(forget);
+        resolve();
+      };
+    }
+    waiting.push(waiter);
+  });
+}
+
 async function withRenderSlot<T>(task: () => Promise<T>, pool: ShareImagePool, client: string | null): Promise<T> {
   if (activeRenders >= MAX_CONCURRENT_RENDERS) {
-    await new Promise<void>((resolve) => waiting.push({ resolve, pool, client }));
+    await waitForRenderSlot(pool, client);
   } else {
     activeRenders += 1;
   }

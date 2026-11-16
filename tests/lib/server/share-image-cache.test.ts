@@ -3,6 +3,8 @@ import { clearCache } from "@/lib/server/cache";
 import {
   MAX_CONCURRENT_RENDERS,
   MAX_QUEUED_EMBED_RENDERS,
+  MAX_RENDER_WAIT_CLIENT_MS,
+  queuedShareRenderClients,
   MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
   queuedShareRenders,
   type ShareRenderAdmission,
@@ -210,6 +212,46 @@ describe("cachedShareImage — garde des nouveaux rendus", () => {
   }
 
   const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("cachedShareImage_waitedPastClientLimit_dropsNetworkKey", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate"] });
+    const { blocked, drain } = blocker();
+    try {
+      const pending = Array.from({ length: MAX_CONCURRENT_RENDERS + 1 }, (_, index) =>
+        cachedShareImage(`k${index}`, 60_000, blocked(`k${index}`), "embed", false, admitting(() => true)),
+      );
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(MAX_RENDER_WAIT_CLIENT_MS);
+
+      expect(queuedShareRenderClients()).toEqual([null]);
+      jest.useRealTimers();
+      await drain();
+      await Promise.all(pending);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("cachedShareImage_waitingBeforeClientLimit_keepsNetworkKey", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate"] });
+    const { blocked, drain } = blocker();
+    try {
+      const pending = Array.from({ length: MAX_CONCURRENT_RENDERS + 1 }, (_, index) =>
+        cachedShareImage(`k${index}`, 60_000, blocked(`k${index}`), "embed", false, admitting(() => true)),
+      );
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(MAX_RENDER_WAIT_CLIENT_MS - 1);
+
+      expect(queuedShareRenderClients()).toEqual(["203.0.113.1"]);
+      jest.useRealTimers();
+      await drain();
+      await Promise.all(pending);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   it("cachedShareImage_otherPoolQueueFull_stillAdmitsEmbed", async () => {
     const { blocked, drain } = blocker();
