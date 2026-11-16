@@ -407,12 +407,28 @@ describe("profilelessAmong (D86)", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("profilelessAmong_readFailure_returnsEmpty", async () => {
-    jest.spyOn(console, "error").mockImplementation(() => {});
+  it("profilelessAmong_readFailureWithoutStale_throws", async () => {
+    // Jamais une liste vide (« tous ont une fiche ») : la route répond 503.
     mockDb(() => {
       throw new Error("LOCK_WAIT");
     });
 
-    expect(await profilelessAmong([3])).toEqual([]);
+    await expect(profilelessAmong([3])).rejects.toThrow("LOCK_WAIT");
+  });
+
+  it("profilelessAmong_readFailureWithStale_answersFromStaleList", async () => {
+    let fail = false;
+    mockDb(() => {
+      if (fail) throw new Error("LOCK_WAIT");
+      return [[{ id: 3 }]];
+    });
+    const start = Date.now();
+    expect(await profilelessAmong([3])).toEqual([3]);
+    // Échue mais gardée (périmée) : une panne de relecture répond encore d'elle.
+    const now = jest.spyOn(Date, "now").mockReturnValue(start + PROFILELESS_PLAYERS_TTL_MS + 1);
+    fail = true;
+
+    expect(await profilelessAmong([3, 4])).toEqual([3]);
+    now.mockRestore();
   });
 });

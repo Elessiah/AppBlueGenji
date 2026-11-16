@@ -818,11 +818,33 @@ describe("conservation", () => {
     expect(pool.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("purgeExpiredReports_afterReports_purgesClosedQuarantines", async () => {
-    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+  it("purgeExpiredReports_reportsDeleted_purgesClosedQuarantines", async () => {
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
     jest.mocked(purgeClosedQuarantines).mockResolvedValue(2);
 
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_nothingDeleted_skipsClosedQuarantineScan", async () => {
+    // Le panneau et chaque signalement envoyé n'attendent pas un balayage sans objet.
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+
     await expect(purgeExpiredReports()).resolves.toBe(0);
+
+    expect(purgeClosedQuarantines).not.toHaveBeenCalled();
+  });
+
+  it("schedulePurgeExpiredReports_nothingDeleted_stillPurgesLeftoverClosedQuarantines", async () => {
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(1);
+
+    schedulePurgeExpiredReports(500_000_000_000);
+    await flush();
 
     expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
   });
@@ -836,6 +858,18 @@ describe("conservation", () => {
     jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("LOCK_WAIT"));
 
     await expect(purgeExpiredReports()).resolves.toBe(1);
+
+    expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
+    error.mockRestore();
+  });
+
+  it("schedulePurgeExpiredReports_closedQuarantinePurgeFails_logsWithoutThrowing", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+    jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("LOCK_WAIT"));
+
+    schedulePurgeExpiredReports(700_000_000_000);
+    await flush();
 
     expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
     error.mockRestore();

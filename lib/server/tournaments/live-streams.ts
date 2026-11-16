@@ -887,10 +887,11 @@ export async function setMatchOnAir(
     await connection.beginTransaction();
     try {
       const { row, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
-      // Le mode d'abord : sur un match qui n'est pas en manuel, le refus dit
-      // pourquoi, quel que soit l'auteur.
-      if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
+      // Le rôle d'abord : la porte admet tout porteur de `tournaments`, et seul
+      // l'arbitre retenu de ce match (ou `live`) apprend son mode (`live-access.ts`).
       if (!access.live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
+      // Puis le mode : sur un match qui n'est pas en manuel, le refus dit pourquoi.
+      if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
       // L'antenne suit la règle du mode : sur un mode sans maître, tout caster montré la bascule.
       if (!mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
       // L'antenne du mode du staff qui porte le lien de l'organisation non plus.

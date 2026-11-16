@@ -8,9 +8,12 @@
  * n'empêche pas son état d'être collecté) et n'a qu'un seul cycle de vie — vidée
  * par `flushBotLogs` après le commit, jetée par `discardBotLogs` si la
  * transaction échoue (`./bot-logs`), où **toute** file créée ici doit être
- * branchée (`tests/lib/server/transaction-state.test.ts` le vérifie). Une file
- * oubliée là resterait sur une connexion rendue au pool, et partirait avec la
- * transaction étrangère qui la reprendrait.
+ * branchée pour partir (`tests/lib/server/transaction-state.test.ts` le
+ * vérifie). Et quoi qu'il en soit, `flushBotLogs` comme `discardBotLogs`
+ * finissent par {@link clearTransactionStates}, qui efface **toutes** les files
+ * créées ici : une file oubliée au vidage ne part pas, mais ne reste jamais sur
+ * une connexion rendue au pool pour partir avec la transaction étrangère qui la
+ * reprendrait.
  */
 import type { PoolConnection } from "mysql2/promise";
 
@@ -26,6 +29,18 @@ export type TransactionState<S> = {
   discard(connection: PoolConnection): void;
 };
 
+/** Toutes les files créées par {@link createTransactionState}, pour {@link clearTransactionStates}. */
+const registry = new Set<WeakMap<PoolConnection, unknown>>();
+
+/**
+ * Efface, pour cette connexion, l'état de **toutes** les files créées ici —
+ * appelée en fin de `flushBotLogs` (après que chaque file a pris le sien) et de
+ * `discardBotLogs` : rien ne reste sur une connexion rendue au pool.
+ */
+export function clearTransactionStates(connection: PoolConnection): void {
+  for (const states of registry) states.delete(connection);
+}
+
 /**
  * Crée l'état « après commit » d'un module.
  *
@@ -34,6 +49,7 @@ export type TransactionState<S> = {
  */
 export function createTransactionState<S>(create: () => S): TransactionState<S> {
   const states = new WeakMap<PoolConnection, S>();
+  registry.add(states);
   return {
     peek: (connection) => states.get(connection),
     ensure(connection) {

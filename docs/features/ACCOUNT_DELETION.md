@@ -335,17 +335,25 @@ pas ; celles d'un compte qui a joué appartiennent aussi à ses adversaires.
 Son nom, lui, reste un **nom sans lien** partout où il s'affiche :
 `loadProfilelessPlayerIds` (cache de classement `list:profileless-players`,
 vidé à chaque score et à chaque suppression par `invalidateTeamIdentityViews`)
-n'est **jamais envoyé entier** au navigateur (D86) : chaque `PlayerLink` /
+n'est **plus envoyé entier** dans chaque page (D86) : chaque `PlayerLink` /
 `EntrantLink` monté inscrit son compte auprès de `ProfilelessPlayersProvider`
 (`useHasPlayerPage`), qui pose une seule question par rendu
 (`GET /api/players/profileless?ids=3,8`, connecté seulement, au plus 100
-identifiants par question, `lib/shared/profileless-lookup.ts`) ; la route ne
-répond que ceux des identifiants demandés qui sont sans fiche
-(`profilelessAmong`). Un compte dit sans fiche rend `<span class="entity-name">`. Les liens se rendant
+identifiants par question, `lib/shared/profileless-lookup.ts`, seau propre
+`PROFILELESS_LOOKUP_RULE` de 30 questions par minute, distinct de l'annuaire) ;
+la route ne répond que ceux des identifiants demandés qui sont sans fiche
+(`profilelessAmong`), ou 503 (`PROFILELESS_UNAVAILABLE`) si la liste ne se lit
+pas — jamais une réponse vide que les liens prendraient pour « tous ont une
+fiche ». Limite acceptée avec D86 : un compte connecté peut questionner
+n'importe quels identifiants, et qui interroge en masse reconstitue la liste
+(au plus 3 000 identifiants par minute) — identifiants seuls, jamais un pseudo. Un compte dit sans fiche rend `<span class="entity-name">`. Les liens se rendant
 côté client, les deux portes du direct (flux SSE et REST de secours) sont
 couvertes sans toucher au `TournamentSnapshot`. La carte du direct de l'accueil
-(`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. Le layout
-Tant que la réponse n'est pas là (ou en panne), le nom reste un lien ; un
+(`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. La mise en
+page racine ne pose plus la liste : le rendu serveur (premier affichage, ou
+JavaScript bloqué) montre donc chaque nom en lien, jusqu'à la réponse
+(regroupée en 50 ms, `PROFILELESS_BATCH_MS`, plus un aller-retour) — compromis
+de D86. Tant que la réponse n'est pas là (ou en panne), le nom reste un lien ; un
 compte affiché est redemandé à la navigation client au plus une fois par
 minute (`PROFILELESS_REFRESH_MS`, 15 s après un échec) : au pire, un lien mène
 à la page introuvable.

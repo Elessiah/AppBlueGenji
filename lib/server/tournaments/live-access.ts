@@ -38,7 +38,9 @@ export function parseStreamLinks(raw: unknown): MatchStreamLinkEdit[] | undefine
  * Sans lecture de la base : que l'appelant soit bien l'arbitre retenu de ce
  * match se juge **une fois**, sous le verrou du match, par le service
  * (`assertLiveActor` / `setMatchOnAir`, `NOT_MATCH_REFEREE`, 403), avant tout
- * autre refus qui dirait l'état du match. Une porte qui relisait l'arbitre
+ * autre refus qui dirait l'état du match (mode, date, statut) — seule son
+ * existence (`MATCH_NOT_FOUND`, 404) se dit avant, à un staff `tournaments`
+ * qui voit déjà tous les matchs. Une porte qui relisait l'arbitre
  * avant le verrou doublait cette lecture à chaque geste de l'arbitre (revue
  * CAST-FOLLOWUP #560).
  */

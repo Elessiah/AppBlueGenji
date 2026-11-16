@@ -1072,11 +1072,13 @@ async function runLobbyBriefSweep(): Promise<number> {
 }
 
 /**
- * Matchs briefés en même temps par un balayage, au plus : assez pour qu'un bot
- * lent sur un match ne retienne pas les autres (une ronde suisse ouvre ses
- * salons d'un coup), assez borné pour le Raspberry Pi et le bot.
+ * Matchs briefés en même temps par un balayage, au plus : deux, pour qu'un bot
+ * lent sur un match ne retienne pas tous les autres (une ronde suisse ouvre ses
+ * salons d'un coup), sans qu'un balayage déclenché par le trafic ne prenne plus
+ * de deux connexions du pool (25) ni n'ouvre plus de deux rafales de messages
+ * au bot sur le Raspberry Pi.
  */
-const LOBBY_BRIEF_CONCURRENCY = 4;
+export const LOBBY_BRIEF_CONCURRENCY = 2;
 
 /** Étranglement : celui des départs de match (dix secondes). */
 const LOBBY_BRIEF_THROTTLE_MS = 10_000;

@@ -1703,8 +1703,20 @@ describe("setMatchLiveConfig", () => {
       );
     }
 
-    it("setMatchOnAir_notManualByNonReferee_throwsNotManualFirst", async () => {
+    it("setMatchOnAir_notManualByNonReferee_throwsNotMatchRefereeBeforeMode", async () => {
+      // La porte admet tout porteur de `tournaments` : le mode du match ne se dit
+      // qu'à son arbitre retenu (ou à `live`), le rôle se juge d'abord.
       const world = ownedWorld({ live_trigger: "AUTO" });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(
+        "NOT_MATCH_REFEREE",
+      );
+      expect(world.state.matchWrites).toEqual([]);
+    });
+
+    it("setMatchOnAir_notManualByDesignatedReferee_throwsNotManual", async () => {
+      const world = ownedWorld({ live_trigger: "AUTO", kept_referee_user_id: 9 });
       await mockLiveDb(world);
 
       await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(

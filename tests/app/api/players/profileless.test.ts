@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/api-guard", () => ({
-  DIRECTORY_READ_RULE: { name: "directory-read", limit: 60, windowMs: 60_000 },
+  PROFILELESS_LOOKUP_RULE: { name: "profileless-lookup", limit: 30, windowMs: 60_000 },
   enforceRateLimit: jest.fn(),
 }));
 jest.mock("@/lib/server/users/profileless-players");
@@ -10,7 +10,7 @@ jest.mock("@/lib/server/users/profileless-players");
 import { NextRequest, NextResponse } from "next/server";
 import { GET } from "@/app/api/players/profileless/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { enforceRateLimit } from "@/lib/server/api-guard";
+import { enforceRateLimit, PROFILELESS_LOOKUP_RULE } from "@/lib/server/api-guard";
 import { profilelessAmong } from "@/lib/server/users/profileless-players";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -56,6 +56,24 @@ describe("GET /api/players/profileless", () => {
     const res = await get("?ids=3,abc");
 
     expect(res.status).toBe(400);
+  });
+
+  it("GET_signedIn_usesOwnBucketNotDirectory", async () => {
+    await get("?ids=3");
+
+    // Un seau à part : les questions des liens n'épuisent pas celui de l'annuaire.
+    expect(enforceRateLimit).toHaveBeenCalledWith(PROFILELESS_LOOKUP_RULE, 7);
+    expect(PROFILELESS_LOOKUP_RULE.name).toBe("profileless-lookup");
+  });
+
+  it("GET_listUnreadable_returns503NotEmptyAnswer", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(profilelessAmong).mockRejectedValue(new Error("ECONNREFUSED"));
+
+    const res = await get("?ids=3,8");
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "PROFILELESS_UNAVAILABLE" });
   });
 
   it("GET_rateLimited_returns429", async () => {

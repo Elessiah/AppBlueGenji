@@ -82,7 +82,7 @@ import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { DeadlineError, createInFlightGate, createLimiter, mapInBatches, withDeadline, type InFlightGate } from "@/lib/shared/in-batches";
-import { createTransactionState } from "./transaction-state";
+import { clearTransactionStates, createTransactionState } from "./transaction-state";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -390,6 +390,8 @@ export function discardBotLogs(connection: PoolConnection): void {
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.discard(connection);
   staffValidatedMatches.discard(connection);
+  // Et toute autre file « après commit » (`./transaction-state`), branchée ici ou non.
+  clearTransactionStates(connection);
 }
 
 /**
@@ -503,6 +505,9 @@ export function flushBotLogs(connection: PoolConnection): void {
     entry.kind === "match_finished" && validated?.has(entry.matchId) ? { ...entry, staffValidated: true } : entry,
   );
   const settled = resolvedMatches.take(connection) ?? new Set<number>();
+  // Chaque file a pris le sien : une file qui n'aurait pas été vidée ici ne
+  // reste pas sur la connexion rendue au pool (`./transaction-state`).
+  clearTransactionStates(connection);
   if (queue.length === 0 && settled.size === 0) return;
   // Le tour de ce passage, pris **au commit** (synchrone) : l'ordre des commits.
   // Un passage qui ne porte que des alertes n'a aucune ligne à ranger : il ne

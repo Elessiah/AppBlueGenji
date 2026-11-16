@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { createTransactionState } from "@/lib/server/tournaments/transaction-state";
+import { clearTransactionStates, createTransactionState } from "@/lib/server/tournaments/transaction-state";
 import { fakeConnection } from "../../helpers/sql-double";
 
 /**
@@ -62,6 +62,25 @@ describe("createTransactionState", () => {
   });
 });
 
+describe("clearTransactionStates", () => {
+  it("clearTransactionStates_twoStates_dropsBothForThatConnectionOnly", () => {
+    const first = createTransactionState<number[]>(() => []);
+    const second = createTransactionState<Set<number>>(() => new Set());
+    const connection = fakeConnection({});
+    const other = fakeConnection({});
+    first.ensure(connection).push(1);
+    second.ensure(connection).add(2);
+    first.ensure(other).push(3);
+
+    clearTransactionStates(connection);
+
+    // Une file que personne n'a vidée ne reste pas sur la connexion rendue au pool.
+    expect(first.peek(connection)).toBeUndefined();
+    expect(second.peek(connection)).toBeUndefined();
+    expect(first.peek(other)).toEqual([3]);
+  });
+});
+
 /** Sources TypeScript de `lib/`, chemin relatif en `/`. */
 function libSources(): { path: string; source: string }[] {
   const root = join(process.cwd(), "lib");
@@ -117,5 +136,12 @@ describe("un seul cycle de vie pour les files « après commit »", () => {
       .map(({ path }) => path);
 
     expect(raw).toEqual(["lib/server/tournaments/transaction-state.ts"]);
+  });
+
+  it("botLogs_flushAndDiscard_endWithClearTransactionStates", () => {
+    const body = (name: string) => botLogs.slice(botLogs.indexOf(`export function ${name}(`)).split(/\n\}\n/)[0];
+
+    expect(body("flushBotLogs")).toContain("clearTransactionStates(connection)");
+    expect(body("discardBotLogs")).toContain("clearTransactionStates(connection)");
   });
 });

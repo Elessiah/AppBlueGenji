@@ -27,6 +27,7 @@ import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
   dispatchLobbyBriefs,
+  LOBBY_BRIEF_CONCURRENCY,
   LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
   LOBBY_BRIEF_MUTED_PHASE,
@@ -782,6 +783,24 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(secondStartedWhileFirstHeld).toBe(true);
     expect(sent).toBe(4);
+  });
+
+  it("dispatchLobbyBriefs_manyMatches_neverMoreThanConcurrencyInFlight", async () => {
+    mockDb([MATCH, { ...MATCH, id: 41 }, { ...MATCH, id: 42 }, { ...MATCH, id: 43 }]);
+    let inFlight = 0;
+    let peak = 0;
+    jest.mocked(notifyUsers).mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
+    });
+
+    await dispatchLobbyBriefs();
+
+    expect(LOBBY_BRIEF_CONCURRENCY).toBe(2);
+    expect(peak).toBeLessThanOrEqual(LOBBY_BRIEF_CONCURRENCY);
   });
 
   it("suit l'hôte choisi, la tête de série en BG Survie et le cast", async () => {

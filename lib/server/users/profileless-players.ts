@@ -87,12 +87,14 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
 /**
  * Ceux de `ids` qui sont sans fiche, dans leur ordre — la seule réponse qui
  * part au navigateur (`/api/players/profileless`, décision D86) : jamais la
- * liste entière, seulement les comptes que la page affiche. Ne lève jamais (une
- * panne rend des liens, au pire vers une fiche 404).
+ * liste entière, seulement les comptes que la page affiche. **Lève** si la
+ * liste ne se lit pas (ni fraîche, ni périmée gardée) : la route répond alors
+ * 503, et les liens gardent leur dernière réponse au lieu de prendre une liste
+ * vide pour « tous ont une fiche ».
  */
 export async function profilelessAmong(ids: readonly number[]): Promise<number[]> {
   if (ids.length === 0) return [];
-  const profileless = await loadProfilelessPlayerIds();
+  const profileless = await readProfilelessPlayerIds();
   return ids.filter((id) => sortedIdsInclude(profileless, id));
 }
 

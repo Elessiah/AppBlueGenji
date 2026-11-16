@@ -350,6 +350,21 @@ export const DIRECTORY_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Questions « ces comptes ont-ils une fiche ? » des liens de joueur
+ * (`/api/players/profileless?ids=`, décision D86), par compte. Un seau à part de
+ * {@link DIRECTORY_READ_RULE} : chaque chargement de page en pose une (une par
+ * centaine de noms affichés), et elles ne doivent pas épuiser celui de
+ * l'annuaire. Trente par minute couvrent une navigation soutenue (un compte
+ * affiché n'est redemandé qu'une fois par minute) et bornent à 3 000
+ * identifiants par minute qui voudrait reconstituer la liste entière.
+ */
+export const PROFILELESS_LOOKUP_RULE: RateLimitRule = {
+  name: "profileless-lookup",
+  limit: 30,
+  windowMs: 60_000,
+};
+
+/**
  * Créations et dissolutions d'équipe, par compte (un seul seau pour les deux).
  *
  * Chaque dissolution d'une équipe inscrite vide la liste du classement et les

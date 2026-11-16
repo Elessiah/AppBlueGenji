@@ -282,8 +282,10 @@ resté ouvert après la fin devant encore être rendu).
   ne part de ce côté, rien à rendre, le balayage suivant le reprend), envoi,
   puis le côté suivant — un arrêt du processus
   ne laisse au plus qu'une réservation sans envoi par match en cours. Les matchs
-  sont briefés **quatre à la fois** au plus (`LOBBY_BRIEF_CONCURRENCY`, `mapInBatches`) :
-  un bot lent sur un match ne retient pas les autres (ronde suisse ouverte d'un coup) ;
+  sont briefés **deux à la fois** au plus (`LOBBY_BRIEF_CONCURRENCY`, `mapInBatches`) :
+  un bot lent sur un match ne retient pas tous les autres (ronde suisse ouverte d'un coup),
+  sans qu'un balayage tiré par le trafic ne prenne plus de deux connexions du pool ni
+  n'ouvre plus de deux rafales au bot ;
   le bilan (réservations à rendre, relances) se lit ensuite dans l'ordre des matchs. Un match reste candidat tant
   qu'un côté est libre. Un réappariement est un autre appariement (nouveau
   brief) ; un lancement défait (horaire changé, retour à planifier) **ou un

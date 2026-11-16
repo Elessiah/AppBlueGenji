@@ -1300,15 +1300,22 @@ export async function purgeExpiredReports(): Promise<number> {
     );
     deleted += Number(result.affectedRows);
   }
-  // Les décisions closes suivent leur signalement (D87) : celles dont il vient
-  // de partir, ou qu'une passe en échec avait laissées. Une panne ici ne fait
-  // pas tomber la purge des signalements (ni le panneau qui l'attend).
+  // Les décisions closes suivent leur signalement (D87) : seulement quand un
+  // signalement vient de partir — le panneau et chaque signalement envoyé
+  // n'attendent pas un balayage sans objet. Celles qu'une passe en échec
+  // aurait laissées, l'entretien horaire les reprend
+  // (`schedulePurgeExpiredReports`).
+  if (deleted > 0) await purgeClosedQuarantinesSafely();
+  return deleted;
+}
+
+/** Purge des décisions closes (D87) ; une panne ne fait tomber ni la purge des signalements ni le panneau. */
+async function purgeClosedQuarantinesSafely(): Promise<void> {
   try {
     await purgeClosedQuarantines();
   } catch (error) {
     console.error("[moderation] purge des décisions closes impossible", failureReason(error));
   }
-  return deleted;
 }
 
 /** Signalements effacés par instruction : borne la taille d'une liste `IN`. */
@@ -1335,5 +1342,8 @@ export function schedulePurgeExpiredReports(now: number = Date.now()): void {
   void purgeDueQuarantines()
     .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", failureReason(error)))
     .then(() => purgeExpiredReports())
-    .catch((error) => console.error("[reports] purge impossible", failureReason(error)));
+    .catch((error) => console.error("[reports] purge impossible", failureReason(error)))
+    // Et, une fois l'heure, les décisions closes dont le signalement est déjà
+    // parti (passe en échec, ou parti avant D87), même sans signalement purgé.
+    .then(() => purgeClosedQuarantinesSafely());
 }

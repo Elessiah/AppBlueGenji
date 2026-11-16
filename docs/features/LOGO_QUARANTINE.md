@@ -133,7 +133,11 @@ celle des signalements ensuite (`schedulePurgeExpiredReports`).
 ## Conservation de la décision (D87)
 
 Une ligne de `bg_logo_quarantines` **close** (image rétablie ou supprimée) suit
-son signalement : à la fin de `purgeExpiredReports`, `purgeClosedQuarantines`
+son signalement : à la fin de `purgeExpiredReports` **quand un signalement
+vient d'y partir** (le panneau de modération et chaque envoi de signalement ne
+paient pas un balayage sans objet), et à chaque entretien horaire
+(`schedulePurgeExpiredReports`, même sans signalement purgé : reprise d'une
+passe en échec, lignes antérieures à D87), `purgeClosedQuarantines`
 efface celles dont le signalement n'est plus là (`report_id` mis à `NULL` par
 la clé étrangère, ou signalement absent d'une base ancienne). Toute ligne naît
 d'un signalement : sans lui, plus rien ne se conteste. Dans la même transaction

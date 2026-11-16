@@ -297,7 +297,9 @@ refusé, 403), tant que le match est à jouer (`PENDING`/`READY` : un score
 déclaré clôt la médiation, comme à l'interface), entre sur `/api/admin/matches/[id]/live` sans la permission
 `live` (porte `mayConfigureMatchLive`, `lib/server/tournaments/live-access.ts` :
 `live` ou `tournaments`, **sans lecture de la base**), et n'est jugé arbitre de
-ce match **qu'une fois**, sous le verrou du match (`NOT_MATCH_REFEREE` sinon) ; la
+ce match **qu'une fois**, sous le verrou du match (`NOT_MATCH_REFEREE` sinon,
+jugé **avant** tout refus qui dirait l'état du match — mode non manuel de
+l'antenne compris : seule l'existence du match, 404, se dit avant) ; la
 rediff (`…/replay`) reste à la permission `live` :
 il configure la diffusion de l'organisation et modifie ou retire le lien d'un
 caster (`streamLinks: [{ streamId, liveUrl }]`, lu par `parseStreamLinks`,
