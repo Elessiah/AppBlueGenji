@@ -100,6 +100,11 @@ qu'un objet `{ fr, en }` sur quatre.
   sortent du même `ACTIVITIES`), nombres d'éléments par rubrique :
   `tests/lib/shared/privacy-legal-en.test.ts` ; numérotation des sections :
   `tests/app/bot-legal-pages.test.ts`.
+- Texte oublié en anglais (`Localizable<T>` accepte une chaîne simple) :
+  `tests/lib/shared/bilingual-untranslated.test.ts` refuse tout texte
+  identique dans les deux langues des fiches du registre, du responsable de
+  traitement et des documents du bot — hors clés de structure (`ref`, `num`,
+  `kind`) et d'une courte liste blanche de mots communs aux deux langues.
 - Seul le **français** rendu des pages du site est épinglé à l'octet
   (`tests/fixtures/legal-fr/` : conditions, `/rgpd`, registre, mentions,
   accessibilité — pas les pages du bot) ;
