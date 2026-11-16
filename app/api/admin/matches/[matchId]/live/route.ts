@@ -16,15 +16,12 @@ function parseMatchId(raw: string): number | null {
 }
 
 /**
- * La porte de la route : `live`, ou l'arbitre désigné du match. Elle lit la
- * base pour l'arbitre : une panne y rend un code (500), jamais une erreur nue.
+ * La porte de la route : `live`, ou `tournaments` (condition de l'arbitrage) —
+ * sans lecture : l'arbitre désigné de **ce** match se vérifie sous le verrou
+ * du match (`NOT_MATCH_REFEREE`, `mayConfigureMatchLive`).
  */
-async function liveGate(user: AuthUser, matchId: number): Promise<Response | null> {
-  try {
-    return (await mayConfigureMatchLive(user, matchId)) ? null : fail("FORBIDDEN", 403);
-  } catch {
-    return fail("MATCH_LIVE_UPDATE_FAILED", 500);
-  }
+function liveGate(user: AuthUser): Response | null {
+  return mayConfigureMatchLive(user) ? null : fail("FORBIDDEN", 403);
 }
 
 /** Statut de chaque refus connu du réglage ; tout autre motif est une panne (500). */
@@ -149,7 +146,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const { matchId: rawMatchId } = await context.params;
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
-  const gate = await liveGate(user, matchId);
+  const gate = liveGate(user);
   if (gate !== null) return gate;
 
   const parsed = await readMatchLiveBody(req);
@@ -198,7 +195,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const { matchId: rawMatchId } = await context.params;
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
-  const gate = await liveGate(user, matchId);
+  const gate = liveGate(user);
   if (gate !== null) return gate;
 
   const body = await readLiveRecord(req);

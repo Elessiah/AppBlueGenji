@@ -676,20 +676,6 @@ async function refereeQualifies(
 }
 
 /**
- * L'arbitre désigné du match est-il ce compte ? Lecture ordinaire, pour la
- * porte des routes de diffusion (le verdict qui compte se relit sous verrou).
- * `manages` : la permission `tournaments` de l'appelant (`can`), condition de
- * l'arbitrage.
- */
-export async function isDesignatedMatchReferee(matchId: number, userId: number, manages: boolean): Promise<boolean> {
-  if (!manages) return false;
-  const db = await getDatabase();
-  const kept = await loadKeptReferee(db, matchId);
-  if (kept?.refereeId !== userId) return false;
-  return refereeQualifies(db, userId, kept.game);
-}
-
-/**
  * Qui règle quoi, sous le verrou du match. Sans `live`, l'appelant n'a passé
  * la porte qu'en arbitre de ce match : il doit l'être encore (désignation
  * changée entre la porte et le verrou, `NOT_MATCH_REFEREE`). Puis le match

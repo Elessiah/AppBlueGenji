@@ -10,7 +10,6 @@ jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({
 
 import {
   findBroadcastingTournament,
-  isDesignatedMatchReferee,
   setMatchLiveConfig,
   setMatchOnAir,
   setTournamentLiveUrl,
@@ -1875,63 +1874,6 @@ describe("setMatchLiveConfig", () => {
     await expect(setMatchLiveConfig(999, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF })).rejects.toThrow(
       "MATCH_NOT_FOUND",
     );
-  });
-});
-
-describe("isDesignatedMatchReferee", () => {
-  it("isDesignatedMatchReferee_refereeOfAnotherMatch_false", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9 }], []]);
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(43, 3, true)).resolves.toBe(false);
-    expect(execute.mock.calls[0][1]).toEqual([43]);
-  });
-
-  it("isDesignatedMatchReferee_playedMatch_queryRestrictsToMatchToPlay", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: null }], []]);
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(String(execute.mock.calls[0][0])).toContain("m.status IN ('PENDING', 'READY')");
-  });
-
-  it("isDesignatedMatchReferee_keptReferee_true", async () => {
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: "9", tournament_id: 7, game: "OW" }], []]));
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(true);
-    expect(loadRefereeStanding).toHaveBeenCalledWith(expect.anything(), 9, "OW");
-  });
-
-  it("isDesignatedMatchReferee_keptRefereeIneligible_false", async () => {
-    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, tournament_id: 7, game: "OW" }], []]));
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-  });
-
-  it("isDesignatedMatchReferee_keptRefereeWithObjection_false", async () => {
-    // L'opposition retenue se relit avec la condition d'arbitrage, plus dans le SQL.
-    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: null, objection: true });
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, game: "OW" }], []]);
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(String(execute.mock.calls[0][0])).not.toContain("referee_objection_at");
-  });
-
-  it("isDesignatedMatchReferee_unknownMatch_false", async () => {
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[], []]));
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(loadRefereeStanding).not.toHaveBeenCalled();
-  });
-
-  it("isDesignatedMatchReferee_withoutTournamentsPermission_falseWithoutRead", async () => {
-    const execute = jest.fn<SqlQuery>();
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(42, 9, false)).resolves.toBe(false);
-    expect(execute).not.toHaveBeenCalled();
   });
 });
 
