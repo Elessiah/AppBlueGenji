@@ -94,10 +94,11 @@ async function loadLandingStats(): Promise<LandingStats> {
 
 type SiteCounts = Omit<LandingStats, "discord">;
 
-/** Compteurs de la plateforme (`site-counts.ts`, mêmes chiffres que `/frequentation`) ; zéros si la base ne répond pas. */
+/** Compteurs de la plateforme (`site-counts.ts`, comptes et équipes identiques à `/frequentation`) ; zéros si la base ne répond pas. */
 async function loadSiteCounts(): Promise<SiteCounts> {
   try {
-    return await readSiteCounts();
+    const { players, teams, tournaments } = await readSiteCounts();
+    return { players, teams, tournaments };
   } catch {
     return DEFAULT_SITE_COUNTS;
   }

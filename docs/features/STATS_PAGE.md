@@ -32,6 +32,8 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
    mesurée (flèche + texte, couleur neutre : une hausse n'est pas jugée).
 4. Évolution (courbe visiteurs + pages vues ; à la semaine au-delà de 92 jours,
    au mois au-delà de 731).
+   Regroupée à la semaine ou au mois, la série s'appelle « Visiteurs quotidiens
+   cumulés » (« Daily visitors, summed ») et la bulle d'aide le dit.
 5. Visiteurs quotidiens cumulés par semaine (26 dernières), mois (24) et
    année — **somme des visiteurs uniques de chaque jour**, dit dans le titre
    et son « i » : une personne venue trois jours compte trois fois. Les

@@ -8,9 +8,12 @@
  *   les garde dans `bg_audience_salts` : un redémarrage du site reprend le même
  *   sel, et un visiteur ne compte pas deux fois. Chaque page vue prend le sel
  *   de **son** jour (une page ouverte à 23 h 58 et reçue à 0 h 02 garde celui
- *   de la veille). Le jour replié, son sel est effacé (base et mémoire) et ses
+ *   de la veille), et la suite d'une lecture celui du jour où sa page s'est
+ *   ouverte. Le jour replié, son sel est effacé (base et mémoire de chaque
+ *   processus, au plus {@link MAINTENANCE_INTERVAL_MS} ms plus tard) et ses
  *   entrées tardives sont écartées : une empreinte d'un jour passé ne se
- *   recalcule plus, même par l'association.
+ *   recalcule plus, même par l'association. L'entretien attend les
+ *   signalements en cours avant de replier : aucun n'écrit dans un jour clos.
  * - **Aucune adresse IP gardée.** L'IP sert au HMAC, à l'instant, puis au seul
  *   plafond de débit (`AUDIENCE_REQUEST_RULE`, en mémoire, deux minutes au plus) ;
  *   la file d'écriture ne porte que l'empreinte.
@@ -61,6 +64,8 @@ export const ROLLUP_GRACE_MINUTES = 75;
 export const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000;
 /** Durée de vie de la lecture mise en cache pour la page. */
 export const STATS_CACHE_MS = 10 * 60 * 1000;
+/** Délai avant de relire un sel dont la lecture a échoué (base en panne). */
+export const SALT_RETRY_MS = 30_000;
 /** Lignes effacées par passe de purge. */
 const PURGE_BATCH = 10_000;
 /** Jours repliés au plus par entretien (rattrapage progressif). */
@@ -76,6 +81,10 @@ interface PendingRow {
 
 /** Sels lus ou tirés, par jour : la veille tant qu'elle n'est pas repliée, et le jour. */
 const salts = new Map<string, Promise<Buffer>>();
+/** Balayage des sels en mémoire, actif tant qu'il en reste : un processus sans trafic les oublie aussi. */
+let saltSweep: ReturnType<typeof setInterval> | null = null;
+/** Signalements en cours : l'entretien les attend avant de replier. */
+const recording = new Set<Promise<number>>();
 let pending: PendingRow[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing: Promise<void> | null = null;
@@ -110,11 +119,32 @@ export function dailySalt(day: string): Promise<Buffer> {
   if (known) return known;
   const value = loadSalt(day);
   salts.set(day, value);
-  // Une lecture ratée n'est pas gardée : le signalement suivant réessaie.
-  value.catch(() => {
-    if (salts.get(day) === value) salts.delete(day);
+  startSaltSweep();
+  // Une lecture ratée reste en échec SALT_RETRY_MS ms (une ligne au journal,
+  // pas une requête par signalement), puis le signalement suivant réessaie.
+  value.catch((error: unknown) => {
+    console.error(`[audience] Sel du ${day} illisible : pages vues de ce jour écartées.`, failureReason(error));
+    const retry = setTimeout(() => {
+      if (salts.get(day) === value) salts.delete(day);
+    }, SALT_RETRY_MS);
+    retry.unref?.();
   });
   return value;
+}
+
+/** Oublie en mémoire les sels des jours clos (`day <= until`). */
+function dropClosedSalts(until: string): void {
+  for (const day of [...salts.keys()]) if (day <= until) salts.delete(day);
+  if (salts.size === 0 && saltSweep) {
+    clearInterval(saltSweep);
+    saltSweep = null;
+  }
+}
+
+function startSaltSweep(): void {
+  if (saltSweep) return;
+  saltSweep = setInterval(() => dropClosedSalts(lastRollableDay(new Date())), MAINTENANCE_INTERVAL_MS);
+  saltSweep.unref?.();
 }
 
 /** Empreinte d'un visiteur pour la journée : HMAC-SHA-256 de l'IP et du navigateur sous le sel du jour. */
@@ -127,7 +157,7 @@ export async function audienceVisitorKey(day: string, ip: string | null, userAge
 export async function forgetSalts(until: string): Promise<void> {
   const db = await getDatabase();
   await db.execute(`DELETE FROM bg_audience_salts WHERE day <= ?`, [until]);
-  for (const day of [...salts.keys()]) if (day <= until) salts.delete(day);
+  dropClosedSalts(until);
 }
 
 /** `AAAA-MM-JJ HH:MM:SS` en temps universel, pour une colonne `DATETIME`. */
@@ -141,34 +171,56 @@ function utcDateTime(date: Date): string {
  * {@link flushAudienceViews}) ; seul le sel du jour peut être lu ou tiré.
  *
  * Une entrée d'un jour déjà repliable est écartée : elle ne serait jamais
- * comptée, et le sel de ce jour est effacé.
+ * comptée, et le sel de ce jour est effacé. Un jour dont le sel est illisible
+ * perd ses seules entrées, pas celles des autres jours de l'envoi.
  *
  * @returns Le nombre de pages vues retenues.
  */
-export async function recordAudienceViews(input: {
+export function recordAudienceViews(input: AudienceRecordInput): Promise<number> {
+  const job = recordViews(input);
+  recording.add(job);
+  const done = () => {
+    recording.delete(job);
+  };
+  job.then(done, done);
+  return job;
+}
+
+interface AudienceRecordInput {
   ip: string | null;
   userAgent: string | null;
   views: readonly AudienceView[];
   now?: Date;
-}): Promise<number> {
+}
+
+async function recordViews(input: AudienceRecordInput): Promise<number> {
   const now = input.now ?? new Date();
+  const started = Date.now();
   const closed = lastRollableDay(now);
+  dropClosedSalts(closed);
   const rows: Omit<PendingRow, "visitorKey">[] = [];
   for (const view of input.views) {
     const viewedAt = new Date(now.getTime() - view.ageMs);
-    const clock = parisClock(viewedAt);
+    // Le jour (et le sel) d'une suite est celui où sa page s'est ouverte.
+    const clock = parisClock(new Date(now.getTime() - view.openedAgeMs));
     if (clock.day <= closed) continue;
     rows.push({ day: clock.day, hour: clock.hour, viewedAt: utcDateTime(viewedAt), view });
   }
   // Le sel est celui du jour de la page vue, pas celui du jour de réception.
+  const days = [...new Set(rows.map((row) => row.day))];
+  const settled = await Promise.allSettled(days.map((day) => audienceVisitorKey(day, input.ip, input.userAgent)));
   const keys = new Map<string, string>();
-  for (const day of new Set(rows.map((row) => row.day))) {
-    keys.set(day, await audienceVisitorKey(day, input.ip, input.userAgent));
-  }
+  settled.forEach((result, index) => {
+    if (result.status === "fulfilled") keys.set(days[index], result.value);
+  });
+  // Le temps a passé pendant la lecture des sels : un jour devenu clos entre-temps
+  // (repli d'un autre processus) est écarté plutôt qu'écrit après son repli.
+  const closedNow = lastRollableDay(new Date(now.getTime() + Math.max(0, Date.now() - started)));
   let kept = 0;
   for (const row of rows) {
     const visitorKey = keys.get(row.day);
-    if (pending.length >= MAX_PENDING || !visitorKey) break;
+    if (!visitorKey || row.day <= closedNow) continue;
+    if (pending.length >= MAX_PENDING) break;
     pending.push({ ...row, visitorKey });
     kept += 1;
   }
@@ -261,7 +313,13 @@ export function maintainAudience(now: Date = new Date()): void {
 
 /** Repli, effacement des sels des jours repliés, puis purge (attendus : tests, et `maintainAudience`). */
 export async function runMaintenance(now: Date = new Date()): Promise<void> {
-  await flushAudienceViews();
+  // Les signalements commencés avant l'entretien finissent, puis toute la file
+  // part : rien d'un jour replié n'arrive après son repli. Ceux qui commencent
+  // ensuite voient ce jour clos et l'écartent.
+  await Promise.allSettled([...recording]);
+  for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
+    await flushAudienceViews();
+  }
   const rolled = await rollUpAudienceDays(now);
   // Un jour clos n'a plus besoin de son sel : ses entrées tardives sont écartées.
   await forgetSalts(lastRollableDay(now));
@@ -476,8 +534,8 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
 
 /**
  * Chiffres publics de la communauté, sans aucune donnée d'une personne :
- * tournois publiés terminés, matchs joués, et — même définition que
- * l'accueil (`site-counts.ts`) — équipes de l'annuaire et comptes du site.
+ * tournois publiés terminés, matchs joués, équipes de l'annuaire et comptes
+ * du site — tout sauf les matchs lu par `site-counts.ts`, comme l'accueil.
  * `null` si la lecture échoue.
  */
 async function readCommunity(): Promise<AudienceCommunity | null> {
@@ -487,8 +545,7 @@ async function readCommunity(): Promise<AudienceCommunity | null> {
       const [rows] = await db.execute<CountRow[]>(sql);
       return num(rows[0]?.n);
     };
-    const [tournaments, matches, site] = await Promise.all([
-      count(`SELECT COUNT(*) AS n FROM bg_tournaments WHERE state = 'FINISHED' AND start_visibility_at <= NOW()`),
+    const [matches, site] = await Promise.all([
       count(
         `SELECT COUNT(*) AS n FROM bg_matches m
            JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -496,7 +553,7 @@ async function readCommunity(): Promise<AudienceCommunity | null> {
       ),
       readSiteCounts(),
     ]);
-    return { tournaments, matches, teams: site.teams, players: site.players };
+    return { tournaments: site.tournamentsPlayed, matches, teams: site.teams, players: site.players };
   } catch (error) {
     console.error("[audience] Chiffres de la communauté illisibles.", failureReason(error));
     return null;
@@ -561,6 +618,9 @@ export async function getAudienceStats(now: Date = new Date()): Promise<Audience
 /** Remet l'état du module à zéro (tests). */
 export function resetAudienceState(): void {
   salts.clear();
+  if (saltSweep) clearInterval(saltSweep);
+  saltSweep = null;
+  recording.clear();
   pending = [];
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = null;

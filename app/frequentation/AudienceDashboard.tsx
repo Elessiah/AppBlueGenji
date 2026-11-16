@@ -426,6 +426,10 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
 
 function Evolution({ m, f, points, formatNumber }: { m: AudienceMessages; f: Formatters; points: AudienceDailyPoint[]; formatNumber: (value: number) => string }) {
   const bucket = evolutionBucket(points.length);
+  // Regroupés par semaine ou par mois, les visiteurs quotidiens s'additionnent : le libellé le dit.
+  const visitorsLabel = bucket === "day" ? m.evolution.visitors : m.evolution.visitorsSummed;
+  const hints: Record<AudienceBucket, string> = { day: m.evolution.hint, week: m.evolution.hintWeekly, month: m.evolution.hintMonthly, year: m.evolution.hintMonthly };
+  const hint = hints[bucket];
   const chart = useMemo(() => {
     const grouped = bucket === "day" ? points.map((point) => ({ ...point, key: point.day })) : groupDaily(points, bucket);
     const labels = grouped.map((point) => bucketLabels(point.key, bucket, m, f));
@@ -433,14 +437,14 @@ function Evolution({ m, f, points, formatNumber }: { m: AudienceMessages; f: For
       labels: labels.map((label) => label.short),
       long: labels.map((label) => label.long),
       series: [
-        { label: m.evolution.visitors, data: grouped.map((point) => point.visitors), tone: "--st-series-1" },
+        { label: visitorsLabel, data: grouped.map((point) => point.visitors), tone: "--st-series-1" },
         { label: m.evolution.views, data: grouped.map((point) => point.views), tone: "--st-series-2" },
       ],
       rows: grouped.map((point, index) => [labels[index].long, f.number(point.visitors), f.number(point.views)]),
     };
-  }, [points, bucket, m, f]);
+  }, [points, bucket, m, f, visitorsLabel]);
   return (
-    <Card title={m.evolution.title} hint={m.evolution.hint} wide>
+    <Card title={m.evolution.title} hint={hint} wide>
       <ul className={styles.legend} aria-hidden="true">
         {chart.series.map((serie) => (
           <li key={serie.label}>
@@ -460,7 +464,7 @@ function Evolution({ m, f, points, formatNumber }: { m: AudienceMessages; f: For
         formatValue={formatNumber}
         height={260}
       />
-      <DataTable m={m} caption={m.evolution.title} columns={[m.table.period, m.evolution.visitors, m.evolution.views]} rows={chart.rows} />
+      <DataTable m={m} caption={m.evolution.title} columns={[m.table.period, visitorsLabel, m.evolution.views]} rows={chart.rows} />
     </Card>
   );
 }

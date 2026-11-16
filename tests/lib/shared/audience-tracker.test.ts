@@ -38,9 +38,9 @@ describe("AudienceTracker", () => {
 
     expect(send.mock.calls[0][0]).toEqual([
       { p: "/", t: 0, a: 7000, d: "mobile", f: 1, r: "discord.com" },
-      { p: "/", t: 5000, a: 2000, d: "mobile", c: 1 },
+      { p: "/", t: 5000, a: 2000, d: "mobile", c: 1, o: 7000 },
       { p: "/classement", t: 0, a: 2000, d: "mobile" },
-      { p: "/classement", t: 2000, a: 0, d: "mobile", c: 1 },
+      { p: "/classement", t: 2000, a: 0, d: "mobile", c: 1, o: 2000 },
     ]);
   });
 
@@ -50,7 +50,7 @@ describe("AudienceTracker", () => {
     clock = 3 * 60 * 60 * 1000;
     t.hidden();
 
-    expect(send.mock.calls[0][0][1]).toEqual({ p: "/regles", t: 1_800_000, a: 0, d: "mobile", c: 1 });
+    expect(send.mock.calls[0][0][1]).toEqual({ p: "/regles", t: 1_800_000, a: 0, d: "mobile", c: 1, o: 10_800_000 });
   });
 
   it("finish_zeroVisibleTime_sendsNoTimeEntry", () => {
@@ -81,7 +81,7 @@ describe("AudienceTracker", () => {
 
     expect(send.mock.calls[0][0]).toEqual([
       { p: "/regles", t: 0, a: 3000, d: "mobile", f: 1, r: null },
-      { p: "/regles", t: 3000, a: 0, d: "mobile", c: 1 },
+      { p: "/regles", t: 3000, a: 0, d: "mobile", c: 1, o: 3000 },
     ]);
   });
 
@@ -95,7 +95,8 @@ describe("AudienceTracker", () => {
     clock = 61_000;
     t.leave();
 
-    expect(send.mock.calls[1][0]).toEqual([{ p: "/equipes", t: 1000, a: 0, d: "mobile", c: 1 }]);
+    // La suite garde l'ouverture de la page (instant 0) : elle se range à son jour.
+    expect(send.mock.calls[1][0]).toEqual([{ p: "/equipes", t: 1000, a: 0, d: "mobile", c: 1, o: 61_000 }]);
   });
 
   it("navigate_frequentationPage_sendsNothing", () => {
@@ -126,5 +127,28 @@ describe("AudienceTracker", () => {
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][0]).toHaveLength(10);
+  });
+});
+
+describe("AudienceTracker — tranches d'une longue lecture", () => {
+  it("tick_visibleReadingPastCheckpoint_sendsChunkAndKeepsReading", () => {
+    const t = tracker();
+    t.navigate("/regles");
+    clock = 600_000;
+    t.tick();
+    clock = 660_000;
+    t.leave();
+
+    expect(send.mock.calls[0][0].slice(1)).toEqual([{ p: "/regles", t: 600_000, a: 0, d: "mobile", c: 1, o: 600_000 }]);
+    expect(send.mock.calls[1][0]).toEqual([{ p: "/regles", t: 60_000, a: 0, d: "mobile", c: 1, o: 660_000 }]);
+  });
+
+  it("tick_readingUnderCheckpoint_sendsNoChunk", () => {
+    const t = tracker();
+    t.navigate("/regles");
+    clock = 540_000;
+    t.tick();
+
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/regles", t: 0, a: 540_000, d: "mobile", f: 1, r: "discord.com" }]);
   });
 });

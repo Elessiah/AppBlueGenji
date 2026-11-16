@@ -45,15 +45,16 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
 <AudienceBeacon /> (layout racine) ── AudienceTracker (lib/shared/audience-tracker.ts)
    │  file en mémoire de la page, lots de ≤ 20 : 10 pages, 1 min, onglet masqué, départ
    ▼
-POST /api/audience  { v: [{ p, t, a, d, r?, f?, c? }] }   fetch keepalive ; 200, ou 429 au-delà du plafond
+POST /api/audience  { v: [{ p, t, a, d, r?, f?, c?, o? }] }   fetch keepalive ; 200, ou 429 au-delà du plafond
    │  opposition → robot → plafond IP → corps ≤ 32 Ko → parseAudienceBatch
    ▼
-recordAudienceViews : sel du jour de l'entrée (lu une fois par jour) + empreinte + file serveur (≤ 5 000)
+recordAudienceViews : sel du jour de la page (lu une fois par jour ; échec resservi 30 s) + empreinte + file serveur (≤ 5 000)
    │  toutes les 10 s ou par 200 lignes (INSERT multi-lignes)
    ▼
 bg_audience_views (détail, 13 mois)
    │  maintainAudience, au fil du trafic (au plus toutes les 10 min) :
-   │  repli des jours clos (veille, 75 min de grâce), effacement de leur sel, puis purge
+   │  attente des signalements en cours et vidage de la file, repli des jours clos
+   │  (veille, 75 min de grâce), effacement de leur sel, puis purge
    ▼
 bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 ```
@@ -61,8 +62,15 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - Une page vue part **à son affichage** (`t: 0`, datée de son début : la
   carte de chaleur garde l'heure d'ouverture, même pour une page lue des
   heures) ; son temps visible part **à sa clôture** (navigation, onglet
-  masqué, départ) en suite `c: 1`, datée de cette clôture. Un retour au
-  premier plan ouvre une nouvelle suite sur la même page.
+  masqué, départ) en suite `c: 1`, datée de cette clôture. Une lecture qui
+  dure part **par tranches** de 10 min (`AUDIENCE_CHECKPOINT_MS`, au tic d'une
+  minute) : chaque tranche reste sous le plafond de 30 min et commence où
+  finit la précédente. Un retour au premier plan ouvre une nouvelle suite sur
+  la même page.
+- Une suite porte `o`, l'âge de l'ouverture de sa page : elle prend le **jour
+  et le sel de cette page**, même lue après minuit (sans `o`, ancien script :
+  le jour de sa clôture ; `o` > 48 h : écartée). Le temps lu après 1 h 15 le
+  lendemain, jour déjà replié, n'est pas compté.
 - `p` chemin affiché (réduit côté serveur à `audiencePageKey` : `/frequentation`,
   `/api`, `/_next`, `/og` ne comptent pas), `t` temps visible (ms), `a` âge,
   à l'envoi, de l'instant que l'entrée date (ms) — au-delà d'une heure,
@@ -73,6 +81,8 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   page ou fin d'une lecture : une longue lecture ne coupe pas la visite) ; un
   retour sur l'onglet après plus de 30 min de pause clôt la visite d'avant sans
   en ouvrir une. Un **rebond** = visite d'une seule vue (`aggregateAudienceDay`).
+  Un temps hors de toute visite (ce retour, ou une suite sans sa page vue)
+  n'est **pas compté** : il gonflerait le temps par visite et par page.
 - Le repli d'un jour est transactionnel (efface puis réécrit ses agrégats, la
   ligne `bg_audience_days` en dernier) : rejouable sans double compte.
 
@@ -83,6 +93,12 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   n'est possible — c'est le prix de la dispense. La page le dit.
 - **Un seul processus** pour la file et l'entretien (pm2 en lance un) ; le
   sel, lui, est en base : un redémarrage ne compte pas deux fois un visiteur.
+  L'entretien attend les signalements en cours de son processus avant de
+  replier ; un signalement qui voit son jour devenir clos pendant la lecture
+  du sel l'écarte. Chaque processus oublie en mémoire les sels des jours clos
+  au plus 10 min après la clôture, même sans trafic.
+- Un sel illisible (base en panne) écarte les seules entrées de son jour, et
+  n'est relu qu'au bout de 30 s (une ligne de journal par essai).
 - **Adresse partagée** : deux visiteurs derrière la même IP avec le même
   navigateur ne font qu'une empreinte ce jour-là (sous-compte assumé).
 - La file serveur (≤ 10 s) est perdue à un arrêt brutal.
@@ -97,8 +113,8 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - `lib/server/audience-service.ts` — sel, écriture, repli, purge, lecture en
   cache (10 min, une seule lecture à la fois ; périodes lues en parallèle,
   carte de chaleur groupée par la base, `WEEKDAY(day)`).
-- `lib/server/site-counts.ts` — équipes et comptes de la plateforme, même
-  définition que l'accueil.
+- `lib/server/site-counts.ts` — équipes et comptes de la plateforme (même
+  définition que l'accueil) et tournois joués, en une requête.
 - Schéma : `lib/server/database/schema/compliance.ts` (tables neuves, aucune
   entrée `RECENT_SCHEMA_CHANGES`).
 - Légal : registre T19 (et T17 pour le plafond IP), `/rgpd#audience-detaillee`

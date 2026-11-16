@@ -36,6 +36,9 @@
     "title": "Évolution de la fréquentation",
     "hint": "Visiteurs et pages vues jour par jour sur la période choisie.",
     "visitors": "Visiteurs",
+    "visitorsSummed": "Visiteurs quotidiens cumulés",
+    "hintWeekly": "Visiteurs quotidiens cumulés et pages vues, semaine par semaine : une personne venue trois jours d'une semaine y compte trois fois.",
+    "hintMonthly": "Visiteurs quotidiens cumulés et pages vues, mois par mois : une personne venue trois jours d'un mois y compte trois fois.",
     "views": "Pages vues"
   },
   "buckets": {

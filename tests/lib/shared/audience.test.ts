@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  AUDIENCE_MAX_OPEN_AGE_MS,
   aggregateAudienceDay,
   audiencePageKey,
   deviceFromWidth,
@@ -140,7 +141,7 @@ describe("parseAudienceBatch", () => {
     const views = parseAudienceBatch({ v: [{ p: "/", t: 5000, a: 9000, d: "mobile", f: 1, r: "discord.gg" }] });
 
     expect(views).toEqual([
-      { pageKey: "home", locale: "fr", device: "mobile", source: "discord", isView: true, engagedMs: 5000, ageMs: 9000 },
+      { pageKey: "home", locale: "fr", device: "mobile", source: "discord", isView: true, engagedMs: 5000, ageMs: 9000, openedAgeMs: 9000 },
     ]);
   });
 
@@ -224,13 +225,15 @@ describe("aggregateAudienceDay", () => {
       row({ viewedAt: new Date("2026-11-10T13:10:00Z"), pageKey: "ranking", engagedMs: 0 }),
     ]);
 
-    expect(result.totals).toMatchObject({ views: 2, visits: 2, bounces: 2, engagedMs: 2 * 60_000 });
+    // Le temps lu au retour n'appartient à aucune visite : il n'est pas compté.
+    expect(result.totals).toMatchObject({ views: 2, visits: 2, bounces: 2, engagedMs: 0 });
   });
 
   it("aggregateAudienceDay_continuationWithoutPriorView_opensNoVisit", () => {
     const result = aggregateAudienceDay([row({ isView: false, engagedMs: 5000 })]);
 
-    expect(result.totals).toEqual({ views: 0, visitors: 0, visits: 0, bounces: 0, engagedMs: 5000 });
+    expect(result.totals).toEqual({ views: 0, visitors: 0, visits: 0, bounces: 0, engagedMs: 0 });
+    expect(result.pages).toEqual([]);
   });
 
   it("ne range pas la navigation interne parmi les provenances", () => {
@@ -375,5 +378,55 @@ describe("heatmapMargins", () => {
     expect(margins.weekdays).toEqual([4, 0, 0, 0, 0, 0, 3]);
     expect(margins.hours[20]).toBe(5);
     expect(margins.hours[9]).toBe(2);
+  });
+});
+
+describe("parseAudienceBatch — ouverture de la page d'une suite (o)", () => {
+  it("parseAudienceBatch_continuationWithOpenAge_setsOpenedAgeMs", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 1000, d: "mobile", c: 1, o: 600_000 }] });
+
+    expect(views[0]).toMatchObject({ ageMs: 1000, openedAgeMs: 600_000 });
+  });
+
+  it("parseAudienceBatch_openAgeBelowAge_clampedToAge", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 5000, d: "mobile", c: 1, o: 1000 }] });
+
+    expect(views[0].openedAgeMs).toBe(5000);
+  });
+
+  it("parseAudienceBatch_openAgeExactlyMax_kept", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: AUDIENCE_MAX_OPEN_AGE_MS }] });
+
+    expect(views[0].openedAgeMs).toBe(AUDIENCE_MAX_OPEN_AGE_MS);
+  });
+
+  it("parseAudienceBatch_openAgeOverMax_dropped", () => {
+    expect(parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: AUDIENCE_MAX_OPEN_AGE_MS + 1 }] })).toEqual([]);
+  });
+
+  it("parseAudienceBatch_continuationWithoutOpenAge_fallsBackToAge", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 2000, d: "mobile", c: 1 }] });
+
+    expect(views[0].openedAgeMs).toBe(2000);
+  });
+
+  it("parseAudienceBatch_viewWithOpenAge_ignored", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 0, a: 2000, d: "mobile", o: 900_000 }] });
+
+    expect(views[0].openedAgeMs).toBe(2000);
+  });
+});
+
+describe("aggregateAudienceDay — lecture par tranches", () => {
+  it("aggregateAudienceDay_longReadInCheckpoints_oneVisitNoExtraBounce", () => {
+    const result = aggregateAudienceDay([
+      row({ viewedAt: new Date("2026-11-10T19:00:00Z"), engagedMs: 0 }),
+      ...Array.from({ length: 9 }, (_, index) =>
+        row({ viewedAt: new Date(Date.UTC(2026, 10, 10, 19, 10 * (index + 1))), isView: false, engagedMs: 600_000 }),
+      ),
+      row({ viewedAt: new Date("2026-11-10T20:30:00Z"), pageKey: "ranking", engagedMs: 0 }),
+    ]);
+
+    expect(result.totals).toEqual({ views: 2, visitors: 1, visits: 1, bounces: 0, engagedMs: 5_400_000 });
   });
 });

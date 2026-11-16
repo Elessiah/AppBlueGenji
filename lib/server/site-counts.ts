@@ -11,16 +11,26 @@ export interface SiteCounts {
    * figure, comme à l'annuaire (`GHOST_TEAMS.md`).
    */
   teams: number;
-  /** Tournois publiés (visibles). */
+  /** Tournois publiés (visibles), terminés ou non — le chiffre de l'accueil. */
   tournaments: number;
+  /** Tournois publiés et terminés — les « tournois joués » de `/frequentation`. */
+  tournamentsPlayed: number;
 }
 
-type CountsRow = RowDataPacket & { players: number | string; teams: number | string; tournaments: number | string };
+type CountsRow = RowDataPacket & {
+  players: number | string;
+  teams: number | string;
+  tournaments: number | string;
+  tournaments_played: number | string;
+};
 
 /**
- * Lit les compteurs de la plateforme — l'accueil (`landing-service.ts`) et la
- * page de fréquentation (`audience-service.ts`) publient ainsi les mêmes
- * chiffres. Lève si la base ne répond pas : chaque page choisit son repli.
+ * Lit les compteurs de la plateforme en une requête — l'accueil
+ * (`landing-service.ts`) et la page de fréquentation (`audience-service.ts`)
+ * publient ainsi les mêmes comptes et équipes. Les tournois diffèrent par
+ * leur libellé : l'accueil montre les tournois publiés, `/frequentation` les
+ * tournois joués (terminés). Lève si la base ne répond pas : chaque page
+ * choisit son repli.
  */
 export async function readSiteCounts(): Promise<SiteCounts> {
   const db = await getDatabase();
@@ -28,12 +38,14 @@ export async function readSiteCounts(): Promise<SiteCounts> {
       SELECT
         (SELECT COUNT(*) FROM bg_users) AS players,
         (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL AND deleted_at IS NULL) AS teams,
-        (SELECT COUNT(*) FROM bg_tournaments WHERE start_visibility_at <= NOW()) AS tournaments
+        (SELECT COUNT(*) FROM bg_tournaments WHERE start_visibility_at <= NOW()) AS tournaments,
+        (SELECT COUNT(*) FROM bg_tournaments WHERE state = 'FINISHED' AND start_visibility_at <= NOW()) AS tournaments_played
     `);
   const row = rows[0];
   return {
     players: Number(row?.players ?? 0),
     teams: Number(row?.teams ?? 0),
     tournaments: Number(row?.tournaments ?? 0),
+    tournamentsPlayed: Number(row?.tournaments_played ?? 0),
   };
 }

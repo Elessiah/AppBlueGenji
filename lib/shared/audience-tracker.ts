@@ -7,11 +7,16 @@
  * lue des heures). Son **temps** onglet visible part à sa clôture (navigation
  * suivante, onglet en arrière-plan, départ) dans une **suite** (`c: 1`), datée
  * de cette clôture : le repli y lit la fin de la lecture, d'où se mesure
- * l'écart avant une nouvelle visite. Revenu au premier plan, l'onglet ouvre
- * une nouvelle suite sur la même page. Rien n'est gardé dans le navigateur :
+ * l'écart avant une nouvelle visite. Une longue lecture part par tranches
+ * (`AUDIENCE_CHECKPOINT_MS`, au tic d'envoi) : chaque tranche part entière,
+ * sous le plafond de temps, et commence où finit la précédente. Chaque suite
+ * porte l'ancienneté de l'ouverture de sa page (`o`) : le serveur la range au
+ * jour de cette page, même lue après minuit. Revenu au premier plan, l'onglet
+ * ouvre une nouvelle suite sur la même page. Rien n'est gardé dans le navigateur :
  * la file vit en mémoire de la page et part par lots.
  */
 import {
+  AUDIENCE_CHECKPOINT_MS,
   AUDIENCE_CLIENT_FLUSH_SIZE,
   AUDIENCE_MAX_BATCH,
   AUDIENCE_MAX_ENGAGED_MS,
@@ -33,16 +38,21 @@ interface Segment {
   path: string;
   engagedMs: number;
   visibleSince: number | null;
+  /** Ouverture de la page vue que ce segment prolonge (ou ouvre). */
+  openedAt: number;
 }
 
 export class AudienceTracker {
   private current: Segment | null = null;
-  /** File de la page : l'ancienneté `a` se calcule à l'envoi, d'après l'instant que l'entrée date. */
-  private queue: { entry: AudienceBeaconEntry; at: number }[] = [];
+  /**
+   * File de la page : les anciennetés `a` (et `o` d'une suite) se calculent à
+   * l'envoi, d'après l'instant que l'entrée date (et l'ouverture de sa page).
+   */
+  private queue: { entry: AudienceBeaconEntry; at: number; openedAt: number | null }[] = [];
   private hiddenPath: string | null = null;
   private arrived = false;
-  /** Page comptée en dernier : un retour au premier plan sur elle ouvre une suite. */
-  private readonly wasCounted = new Set<string>();
+  /** Page comptée en dernier et son ouverture : un retour au premier plan sur elle ouvre une suite. */
+  private counted: { path: string; openedAt: number } | null = null;
 
   constructor(private readonly deps: AudienceTrackerDeps) {}
 
@@ -74,7 +84,7 @@ export class AudienceTracker {
     const path = this.hiddenPath;
     this.hiddenPath = null;
     // Une page déjà comptée reprend en suite ; une page jamais vue s'ouvre pour de bon.
-    this.start(path, this.wasCounted.has(path));
+    this.start(path, this.counted?.path === path);
   }
 
   /** Départ de la page (fermeture, rechargement) : tout part. */
@@ -83,26 +93,37 @@ export class AudienceTracker {
     this.flush();
   }
 
-  /** Envoi périodique de ce qui attend. */
+  /** Envoi périodique de ce qui attend ; une lecture en cours depuis longtemps part en tranche. */
   tick(): void {
+    this.checkpoint();
     this.flush();
+  }
+
+  /** Tranche d'une lecture qui dure : son temps part en suite, la lecture continue. */
+  private checkpoint(): void {
+    const segment = this.current;
+    if (!segment || segment.visibleSince === null || !audiencePageKey(segment.path)) return;
+    const now = this.deps.now();
+    if (segment.engagedMs + now - segment.visibleSince < AUDIENCE_CHECKPOINT_MS) return;
+    this.finish();
+    this.current = { path: segment.path, engagedMs: 0, visibleSince: now, openedAt: segment.openedAt };
   }
 
   private start(path: string, continuation: boolean): void {
     const now = this.deps.now();
     const first = !continuation && !this.arrived;
     if (!continuation) this.arrived = true;
-    this.current = { path, engagedMs: 0, visibleSince: now };
+    const openedAt = continuation && this.counted ? this.counted.openedAt : now;
+    this.current = { path, engagedMs: 0, visibleSince: now, openedAt };
     if (continuation || !audiencePageKey(path)) return;
     // La page vue part dès son affichage, datée de son début.
-    this.wasCounted.clear();
-    this.wasCounted.add(path);
+    this.counted = { path, openedAt };
     const entry: AudienceBeaconEntry = { p: path, t: 0, a: 0, d: this.deps.device() };
     if (first) {
       entry.f = 1;
       entry.r = this.deps.referrerHost();
     }
-    this.enqueue(entry, now);
+    this.enqueue(entry, now, null);
   }
 
   /** Clôt la page en cours : son temps onglet visible part en suite, datée de cette clôture. */
@@ -115,11 +136,11 @@ export class AudienceTracker {
     if (!audiencePageKey(segment.path)) return;
     const time = Math.max(0, Math.min(AUDIENCE_MAX_ENGAGED_MS, Math.round(engaged)));
     if (time === 0) return;
-    this.enqueue({ p: segment.path, t: time, a: 0, d: this.deps.device(), c: 1 }, now);
+    this.enqueue({ p: segment.path, t: time, a: 0, d: this.deps.device(), c: 1 }, now, segment.openedAt);
   }
 
-  private enqueue(entry: AudienceBeaconEntry, at: number): void {
-    this.queue.push({ entry, at });
+  private enqueue(entry: AudienceBeaconEntry, at: number, openedAt: number | null): void {
+    this.queue.push({ entry, at, openedAt });
     if (this.queue.length >= AUDIENCE_CLIENT_FLUSH_SIZE) this.flush();
   }
 
@@ -128,7 +149,11 @@ export class AudienceTracker {
     const now = this.deps.now();
     while (this.queue.length > 0) {
       this.deps.send(
-        this.queue.splice(0, AUDIENCE_MAX_BATCH).map(({ entry, at }) => ({ ...entry, a: Math.max(0, Math.round(now - at)) })),
+        this.queue.splice(0, AUDIENCE_MAX_BATCH).map(({ entry, at, openedAt }) => {
+          const sent: AudienceBeaconEntry = { ...entry, a: Math.max(0, Math.round(now - at)) };
+          if (openedAt !== null) sent.o = Math.max(0, Math.round(now - openedAt));
+          return sent;
+        }),
       );
     }
   }

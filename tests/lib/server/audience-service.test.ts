@@ -10,6 +10,7 @@ import {
   forgetSalts,
   getAudienceStats,
   lastRollableDay,
+  MAINTENANCE_INTERVAL_MS,
   pendingAudienceCount,
   purgeAudienceViews,
   rawRetentionStart,
@@ -17,6 +18,7 @@ import {
   resetAudienceState,
   rollUpAudienceDays,
   runMaintenance,
+  SALT_RETRY_MS,
 } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
@@ -28,7 +30,8 @@ import { connectionMock, fakeConnection, fakePool, type SqlMock, type SqlQuery }
 const NOW = new Date("2026-11-16T12:00:00Z");
 
 function view(overrides: Partial<AudienceView> = {}): AudienceView {
-  return { pageKey: "home", locale: "fr", device: "mobile", source: "direct", isView: true, engagedMs: 4000, ageMs: 0, ...overrides };
+  const ageMs = overrides.ageMs ?? 0;
+  return { pageKey: "home", locale: "fr", device: "mobile", source: "direct", isView: true, engagedMs: 4000, ageMs, openedAgeMs: ageMs, ...overrides };
 }
 
 function mockDb(execute: SqlMock) {
@@ -43,7 +46,7 @@ const SALT = Buffer.alloc(32, 7);
  */
 function emptyDatabase(salt: Buffer = SALT): SqlMock {
   return jest.fn<SqlQuery>(async (sql: string) => {
-    if (sql.includes("AS players")) return [[{ players: 5, teams: 4, tournaments: 9 }]];
+    if (sql.includes("AS players")) return [[{ players: 5, teams: 4, tournaments: 9, tournaments_played: 2 }]];
     if (sql.includes("COUNT(*)")) return [[{ n: 3 }]];
     if (sql.includes("SELECT salt")) return [[{ salt }]];
     if (sql.startsWith("DELETE") || sql.startsWith("INSERT IGNORE")) return [{ affectedRows: 0 }];
@@ -93,13 +96,22 @@ describe("dailySalt", () => {
     expect(salt).toHaveLength(32);
   });
 
-  it("dailySalt_databaseFails_retriesNextCall", async () => {
+  it("dailySalt_databaseFails_retriesAfterBackoffAndLogsOnce", async () => {
+    jest.useFakeTimers();
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const execute = emptyDatabase();
     execute.mockRejectedValueOnce(new Error("down"));
     mockDb(execute);
 
     await expect(dailySalt("2026-11-16")).rejects.toThrow("down");
+    // Pendant le délai, l'échec est resservi sans relire la base.
+    await expect(dailySalt("2026-11-16")).rejects.toThrow("down");
+    expect(saltWrites(execute)).toHaveLength(1);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(SALT_RETRY_MS);
     await expect(dailySalt("2026-11-16")).resolves.toEqual(SALT);
+    jest.useRealTimers();
   });
 
   it("dailySalt_wrongLength_rejects", async () => {
@@ -316,7 +328,7 @@ describe("getAudienceStats", () => {
 
     expect(stats.lastDay).toBeNull();
     expect(stats.daily).toEqual([]);
-    expect(stats.community).toEqual({ tournaments: 3, matches: 3, teams: 4, players: 5 });
+    expect(stats.community).toEqual({ tournaments: 2, matches: 3, teams: 4, players: 5 });
   });
 
   it("getAudienceStats_hourRows_fillWeekdayHourGrid", async () => {
@@ -370,5 +382,93 @@ describe("getAudienceStats", () => {
     );
 
     expect((await getAudienceStats(NOW)).community).toBeNull();
+  });
+});
+
+describe("recordAudienceViews — jour de la page ouverte, sels par jour", () => {
+  it("recordAudienceViews_continuationOpenedYesterday_usesOpenDaySalt", async () => {
+    const execute = emptyDatabase();
+    mockDb(execute);
+
+    // 0 h 20 à Paris ; la page lue s'est ouverte à 23 h 50 la veille.
+    const kept = await recordAudienceViews({
+      ip: "203.0.113.7",
+      userAgent: "Firefox",
+      views: [view({ isView: false, ageMs: 0, openedAgeMs: 30 * 60_000 })],
+      now: new Date("2026-11-15T23:20:00Z"),
+    });
+    await flushAudienceViews();
+
+    expect(kept).toBe(1);
+    expect(saltWrites(execute).map(([, params]) => (params as unknown[])[0])).toEqual(["2026-11-15"]);
+    const insert = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_audience_views"));
+    expect((insert?.[1] as unknown[]).slice(0, 3)).toEqual(["2026-11-15", 23, "2026-11-15 23:20:00"]);
+  });
+
+  it("recordAudienceViews_oneDaySaltFails_keepsOtherDaysRows", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb(
+      jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+        if (sql.includes("SELECT salt")) {
+          if ((params as string[])[0] === "2026-11-15") throw new Error("down");
+          return [[{ salt: SALT }]];
+        }
+        return [{ affectedRows: 1 }];
+      }),
+    );
+
+    const kept = await recordAudienceViews({
+      ip: "203.0.113.7",
+      userAgent: "Firefox",
+      views: [view({ ageMs: 4 * 60_000 }), view()],
+      now: new Date("2026-11-15T23:02:00Z"),
+    });
+
+    expect(kept).toBe(1);
+    expect(pendingAudienceCount()).toBe(1);
+  });
+});
+
+describe("runMaintenance — signalements en cours", () => {
+  it("runMaintenance_recordInFlight_waitsBeforeRollup", async () => {
+    let releaseSalt: () => void = () => undefined;
+    const saltReady = new Promise<void>((resolve) => {
+      releaseSalt = resolve;
+    });
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("SELECT salt")) {
+        await saltReady;
+        return [[{ salt: SALT }]];
+      }
+      if (sql.startsWith("DELETE") || sql.startsWith("INSERT")) return [{ affectedRows: 0 }];
+      return [[]];
+    });
+    mockDb(execute);
+
+    const record = recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view()], now: NOW });
+    const maintenance = runMaintenance(NOW);
+    releaseSalt();
+    await Promise.all([record, maintenance]);
+
+    const sqls = execute.mock.calls.map(([sql]) => sql);
+    const insertAt = sqls.findIndex((sql) => sql.startsWith("INSERT INTO bg_audience_views"));
+    const rollupAt = sqls.findIndex((sql) => sql.includes("FROM bg_audience_views") && sql.includes("GROUP BY day"));
+    expect(insertAt).toBeGreaterThanOrEqual(0);
+    expect(insertAt).toBeLessThan(rollupAt);
+  });
+});
+
+describe("dailySalt — balayage en mémoire", () => {
+  it("dailySalt_idleProcess_sweepForgetsClosedSalt", async () => {
+    jest.useFakeTimers();
+    const execute = emptyDatabase();
+    mockDb(execute);
+    await dailySalt("2020-01-01");
+
+    jest.advanceTimersByTime(MAINTENANCE_INTERVAL_MS);
+    await dailySalt("2020-01-01");
+
+    expect(saltWrites(execute)).toHaveLength(2);
+    jest.useRealTimers();
   });
 });

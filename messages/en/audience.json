@@ -36,6 +36,9 @@
     "title": "Traffic over time",
     "hint": "Visitors and page views day by day over the chosen period.",
     "visitors": "Visitors",
+    "visitorsSummed": "Daily visitors, summed",
+    "hintWeekly": "Daily visitors summed and page views, week by week: someone who came on three days of a week counts three times.",
+    "hintMonthly": "Daily visitors summed and page views, month by month: someone who came on three days of a month counts three times.",
     "views": "Page views"
   },
   "buckets": {

@@ -44,8 +44,8 @@ export async function POST(req: Request) {
   try {
     return ok({ recorded: await recordAudienceViews({ ip, userAgent, views }) });
   } catch (error) {
-    // Sel du jour illisible (base injoignable) : l'envoi est perdu, sans bruit chez le visiteur.
-    console.error("[audience] Pages vues écartées : sel du jour illisible.", failureReason(error));
+    // Erreur imprévue : l'envoi est perdu, sans bruit chez le visiteur (un sel illisible ne lève pas).
+    console.error("[audience] Pages vues écartées.", failureReason(error));
     return ok({ recorded: 0 });
   }
 }

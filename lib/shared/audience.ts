@@ -38,6 +38,19 @@ export const AUDIENCE_VISIT_GAP_MINUTES = 30;
  */
 export const AUDIENCE_MAX_AGE_MS = 60 * 60 * 1000;
 
+/**
+ * Ancienneté maximale de l'ouverture d'une page dont une suite arrive : au-delà,
+ * le jour de cette page est replié depuis longtemps, la suite est écartée.
+ */
+export const AUDIENCE_MAX_OPEN_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Une lecture qui dure part par tranches d'au plus ce temps (plus le délai du
+ * tic d'envoi) : chaque tranche reste sous {@link AUDIENCE_MAX_ENGAGED_MS}, et
+ * son début se déduit exactement de sa fin.
+ */
+export const AUDIENCE_CHECKPOINT_MS = 10 * 60 * 1000;
+
 /** Nombre maximal de pages vues par envoi du navigateur. */
 export const AUDIENCE_MAX_BATCH = 20;
 
@@ -192,6 +205,11 @@ export interface AudienceBeaconEntry {
   f?: 0 | 1;
   /** 1 = suite d'une page déjà comptée (son temps de lecture, à sa clôture) : temps seul. */
   c?: 0 | 1;
+  /**
+   * Suite seulement : ancienneté, au moment de l'envoi, de l'ouverture de la
+   * page vue qu'elle prolonge — la suite se range au jour de cette page.
+   */
+  o?: number;
 }
 
 /** Une page vue validée, prête pour le serveur. */
@@ -203,12 +221,27 @@ export interface AudienceView {
   /** `false` : suite d'une page déjà comptée, qui n'apporte que du temps. */
   isView: boolean;
   engagedMs: number;
+  /** Ancienneté de l'instant daté (début de la page vue, ou clôture de la lecture). */
   ageMs: number;
+  /** Ancienneté de l'ouverture de la page vue (égale à `ageMs` pour une page vue) : fixe son jour. */
+  openedAgeMs: number;
 }
 
 function clampInt(value: unknown, min: number, max: number): number {
   const parsed = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : min;
   return Math.min(max, Math.max(min, parsed));
+}
+
+/**
+ * Ancienneté de l'ouverture de la page qu'une suite prolonge : jamais après sa
+ * clôture (`ageMs`) ; absente (ancien script) ou illisible, la suite se range
+ * au jour de sa clôture. `null` au-delà de {@link AUDIENCE_MAX_OPEN_AGE_MS}.
+ */
+function continuationOpenAge(raw: unknown, ageMs: number): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return ageMs;
+  const opened = Math.round(raw);
+  if (opened > AUDIENCE_MAX_OPEN_AGE_MS) return null;
+  return Math.max(ageMs, opened);
 }
 
 /**
@@ -221,26 +254,35 @@ export function parseAudienceBatch(body: unknown, ownHost?: string | null): Audi
   if (!Array.isArray(list)) return [];
   const views: AudienceView[] = [];
   for (const raw of list.slice(0, AUDIENCE_MAX_BATCH)) {
-    if (!raw || typeof raw !== "object") continue;
-    const entry = raw as Partial<Record<keyof AudienceBeaconEntry, unknown>>;
-    const page = audiencePageKey(entry.p);
-    if (!page) continue;
-    // Trop ancienne pour être datée juste : écartée plutôt que redatée.
-    const age = typeof entry.a === "number" && Number.isFinite(entry.a) ? Math.round(entry.a) : 0;
-    if (age > AUDIENCE_MAX_AGE_MS) continue;
-    const isView = entry.c !== 1;
-    const first = entry.f === 1;
-    views.push({
-      pageKey: page.key,
-      locale: page.locale,
-      device: parseDevice(entry.d),
-      source: isView && first ? sourceFromReferrerHost(entry.r, ownHost) : "internal",
-      isView,
-      engagedMs: clampInt(entry.t, 0, AUDIENCE_MAX_ENGAGED_MS),
-      ageMs: Math.max(0, age),
-    });
+    const view = parseAudienceEntry(raw, ownHost);
+    if (view) views.push(view);
   }
   return views;
+}
+
+/** Une entrée de l'envoi, ou `null` si elle est illisible ou trop ancienne. */
+function parseAudienceEntry(raw: unknown, ownHost?: string | null): AudienceView | null {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = raw as Partial<Record<keyof AudienceBeaconEntry, unknown>>;
+  const page = audiencePageKey(entry.p);
+  if (!page) return null;
+  // Trop ancienne pour être datée juste : écartée plutôt que redatée.
+  const age = typeof entry.a === "number" && Number.isFinite(entry.a) ? Math.round(entry.a) : 0;
+  if (age > AUDIENCE_MAX_AGE_MS) return null;
+  const isView = entry.c !== 1;
+  const ageMs = Math.max(0, age);
+  const openedAgeMs = isView ? ageMs : continuationOpenAge(entry.o, ageMs);
+  if (openedAgeMs === null) return null;
+  return {
+    pageKey: page.key,
+    locale: page.locale,
+    device: parseDevice(entry.d),
+    source: isView && entry.f === 1 ? sourceFromReferrerHost(entry.r, ownHost) : "internal",
+    isView,
+    engagedMs: clampInt(entry.t, 0, AUDIENCE_MAX_ENGAGED_MS),
+    ageMs,
+    openedAgeMs,
+  };
 }
 
 const PARIS_CLOCK = new Intl.DateTimeFormat("en-CA", {
@@ -340,19 +382,24 @@ class VisitCounter {
 
   constructor(private readonly gapMs: number) {}
 
-  /** Fin d'une lecture (`engagedMs` de temps) datée de sa clôture `at`. */
-  continuation(visitor: string, at: number, engagedMs: number): void {
+  /**
+   * Fin d'une lecture (`engagedMs` de temps) datée de sa clôture `at`.
+   *
+   * @returns `true` si la lecture prolonge une visite (son temps lui revient).
+   */
+  continuation(visitor: string, at: number, engagedMs: number): boolean {
     const previous = this.lastSeen.get(visitor);
-    if (!previous) return;
+    if (!previous || previous.views === 0) return false;
     if (at - engagedMs - previous.at < this.gapMs) {
       // Lecture commencée dans la visite : la prolonge.
       this.lastSeen.set(visitor, { at: Math.max(at, previous.at), views: previous.views });
-      return;
+      return true;
     }
     // Retour sur l'onglet après une longue pause : la visite d'avant est close,
-    // cette lecture n'en ouvre aucune (aucune page vue).
+    // cette lecture n'en ouvre aucune (aucune page vue) et son temps n'est pas compté.
     if (previous.views === 1) this.bounces += 1;
     this.lastSeen.set(visitor, { at, views: 0 });
+    return false;
   }
 
   /** Ouverture d'une page à `at`. */
@@ -380,9 +427,12 @@ class VisitCounter {
  * visiteur dont chacune s'ouvre moins de {@link AUDIENCE_VISIT_GAP_MINUTES}
  * minutes après la **dernière activité** de la visite — l'ouverture d'une page
  * ou la fin d'une lecture (une suite est datée de sa clôture) : une longue
- * lecture ne coupe pas la visite. Un **rebond** est une visite d'une seule
- * page. Le temps d'une suite (`isView = false`) s'ajoute à sa page sans
- * compter de page vue.
+ * lecture ne coupe pas la visite (le navigateur l'envoie par tranches d'au
+ * plus {@link AUDIENCE_CHECKPOINT_MS}). Un **rebond** est une visite d'une
+ * seule page. Le temps d'une suite (`isView = false`) s'ajoute à sa page sans
+ * compter de page vue — s'il prolonge une visite ; un temps hors de toute
+ * visite (retour après une longue pause, suite sans sa page vue) n'est pas
+ * compté, pour ne gonfler ni le temps par visite ni le temps par page.
  */
 export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceDayAggregate {
   const visitors = new Set<string>();
@@ -394,13 +444,16 @@ export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceD
   let views = 0;
   let engagedMs = 0;
 
+  const addTime = (pageKey: string, time: number) => {
+    engagedMs += time;
+    pageTime.set(pageKey, (pageTime.get(pageKey) ?? 0) + time);
+  };
   for (const row of rows) {
-    engagedMs += row.engagedMs;
-    pageTime.set(row.pageKey, (pageTime.get(row.pageKey) ?? 0) + row.engagedMs);
     if (!row.isView) {
-      visitCounter.continuation(row.visitorKey, row.viewedAt.getTime(), row.engagedMs);
+      if (visitCounter.continuation(row.visitorKey, row.viewedAt.getTime(), row.engagedMs)) addTime(row.pageKey, row.engagedMs);
       continue;
     }
+    addTime(row.pageKey, row.engagedMs);
 
     views += 1;
     visitors.add(row.visitorKey);
