@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/audience-service");
 
@@ -23,7 +23,11 @@ function audienceReq(body: unknown, headers: Record<string, string> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit(AUDIENCE_REQUEST_RULE.name);
-  jest.mocked(recordAudienceViews).mockReturnValue(1);
+  jest.mocked(recordAudienceViews).mockResolvedValue(1);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe("POST /api/audience", () => {
@@ -68,13 +72,23 @@ describe("POST /api/audience", () => {
     expect(recordAudienceViews).not.toHaveBeenCalled();
   });
 
-  it("répond 429 au-delà de 30 envois par minute d'une même adresse", async () => {
-    for (let i = 0; i < 30; i += 1) await POST(audienceReq(BATCH));
+  it("POST_overLimit_returns429AfterLimitSends", async () => {
+    for (let i = 0; i < AUDIENCE_REQUEST_RULE.limit; i += 1) await POST(audienceReq(BATCH));
 
     const res = await POST(audienceReq(BATCH));
 
     expect(res.status).toBe(429);
-    expect(recordAudienceViews).toHaveBeenCalledTimes(30);
+    expect(recordAudienceViews).toHaveBeenCalledTimes(120);
+  });
+
+  it("POST_saltUnreadable_returnsRecordedZero", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(recordAudienceViews).mockRejectedValue(new Error("down"));
+
+    const res = await POST(audienceReq(BATCH));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ recorded: 0 });
   });
 
   it("rend zéro pour un corps illisible", async () => {

@@ -499,13 +499,17 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
  * Signalements de pages vues (`/api/audience`, registre T19), par IP.
  *
  * Un navigateur envoie sa file au plus toutes les minutes, ou à chaque dixième
- * page, ou quand l'onglet passe en arrière-plan : trente envois par minute ne
- * gênent qu'un client qui fabrique des signalements. La clé (l'IP) ne vit
- * qu'en mémoire, deux minutes au plus après sa dernière requête.
+ * entrée, ou quand l'onglet passe en arrière-plan : deux envois par minute
+ * environ. Le plafond est large pour une adresse partagée (réseau mobile
+ * derrière un NAT d'opérateur, salle d'un événement en réseau local), dont
+ * les visiteurs ne doivent pas disparaître des chiffres ; il borne seulement
+ * un client qui fabrique des signalements (20 entrées par envoi au plus). La
+ * clé (l'IP) ne vit qu'en mémoire, deux minutes au plus après sa dernière
+ * requête.
  */
 export const AUDIENCE_REQUEST_RULE: RateLimitRule = {
   name: "audience-request",
-  limit: 30,
+  limit: 120,
   windowMs: 60_000,
 };
 

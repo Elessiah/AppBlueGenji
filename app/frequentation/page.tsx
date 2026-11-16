@@ -31,9 +31,8 @@ export default async function FrequentationPage() {
     // Base injoignable : la page reste lisible, sur son état vide.
     console.error("[audience] lecture des statistiques impossible", error);
   }
-  return (
-    <main id="contenu">
-      <AudienceDashboard stats={stats} messages={messagesFor(locale).audience} locale={locale} />
-    </main>
-  );
+  // Le tableau de bord pose lui-même `<main id="contenu">`, entre son en-tête et
+  // son pied de page (repères `banner` et `contentinfo` hors de `main`). Pas de
+  // `PublicPageShell` : page formelle hors du site vitrine (D76).
+  return <AudienceDashboard stats={stats} messages={messagesFor(locale).audience} locale={locale} />;
 }

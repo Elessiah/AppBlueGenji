@@ -3,6 +3,7 @@
 import { useCallback, useId, useMemo, useState, type ReactNode } from "react";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
   AUDIENCE_RANGES,
   fillDailySeries,
@@ -168,14 +169,29 @@ function DataTable({ m, caption, columns, rows }: { m: AudienceMessages; caption
   );
 }
 
+/** Titre suivi, s'il y a lieu, de son explication derrière le bouton « i » (`INFO_HINTS.md`). */
+function Titled({ children, hint, subject }: { children: ReactNode; hint?: string; subject: string }) {
+  const id = useId();
+  if (!hint) return <>{children}</>;
+  return (
+    <InfoHintRow>
+      {children}
+      <InfoHint id={`${id}-hint`} subject={subject}>
+        <p>{hint}</p>
+      </InfoHint>
+    </InfoHintRow>
+  );
+}
+
 function Card({ title, hint, children, wide = false }: { title: string; hint?: string; children: ReactNode; wide?: boolean }) {
   const id = useId();
   return (
     <section className={`${styles.card} ${wide ? styles.wide : ""}`} aria-labelledby={id}>
-      <h2 id={id} className={styles.cardTitle}>
-        {title}
-      </h2>
-      {hint && <p className={styles.cardHint}>{hint}</p>}
+      <Titled hint={hint} subject={title}>
+        <h2 id={id} className={styles.cardTitle}>
+          {title}
+        </h2>
+      </Titled>
       {children}
     </section>
   );
@@ -187,8 +203,9 @@ function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: A
   const percents = percentShares(known.map((share) => share.views));
   return (
     <div className={styles.share}>
-      <h3 className={styles.shareTitle}>{title}</h3>
-      {hint && <p className={styles.cardHint}>{hint}</p>}
+      <Titled hint={hint} subject={title}>
+        <h3 className={styles.shareTitle}>{title}</h3>
+      </Titled>
       <div className={styles.shareBar} aria-hidden="true">
         {known.map((share, index) =>
           percents[index] > 0 ? (
@@ -306,13 +323,15 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
       <div className={styles.page}>
         <div className={styles.inner}>
           {header}
-          <section className={`${styles.card} ${styles.empty}`} aria-labelledby="audience-empty">
-            <h2 id="audience-empty" className={styles.cardTitle}>
-              {m.empty.title}
-            </h2>
-            <p className={styles.cardHint}>{m.empty.body}</p>
-          </section>
-          {stats?.community && <Community m={m} community={stats.community} f={f} />}
+          <main id="contenu" className={styles.main}>
+            <section className={`${styles.card} ${styles.empty}`} aria-labelledby="audience-empty">
+              <h2 id="audience-empty" className={styles.cardTitle}>
+                {m.empty.title}
+              </h2>
+              <p className={styles.cardHint}>{m.empty.body}</p>
+            </section>
+            {stats?.community && <Community m={m} community={stats.community} f={f} />}
+          </main>
           {footer}
         </div>
       </div>
@@ -339,6 +358,7 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
       <div className={styles.inner}>
         {header}
 
+        <main id="contenu" className={styles.main}>
         <div className={styles.toolbar}>
           <Segmented
             label={m.ranges.label}
@@ -351,7 +371,9 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
         <section aria-label={m.kpis.label} className={styles.kpis}>
           {tiles.map((tile) => (
             <div key={tile.key} className={styles.kpi}>
-              <p className={styles.kpiLabel}>{tile.label}</p>
+              <Titled hint={tile.hint} subject={tile.label}>
+                <p className={styles.kpiLabel}>{tile.label}</p>
+              </Titled>
               <p className={styles.kpiValue}>{tile.value}</p>
               <p className={styles.kpiChange}>
                 {tile.change === null ? (
@@ -363,7 +385,6 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
                   </>
                 )}
               </p>
-              {tile.hint && <p className={styles.kpiHint}>{tile.hint}</p>}
             </div>
           ))}
         </section>
@@ -396,6 +417,7 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
         </div>
 
         {stats.community && <Community m={m} community={stats.community} f={f} />}
+        </main>
         {footer}
       </div>
     </div>
@@ -465,7 +487,7 @@ function Buckets({
     return {
       labels: labels.map((label) => label.short),
       long: labels.map((label) => label.long),
-      series: [{ label: m.evolution.visitors, data: grouped.map((point) => point.visitors), tone: "--st-series-1" }],
+      series: [{ label: m.kpis.visitors, data: grouped.map((point) => point.visitors), tone: "--st-series-1" }],
       rows: grouped.map((point, index) => [labels[index].long, f.number(point.visitors)]),
     };
   }, [stats, bucket, m, f]);
@@ -487,7 +509,7 @@ function Buckets({
         tooltipTemplate={m.chart.tooltip}
         formatValue={formatNumber}
       />
-      <DataTable m={m} caption={m.buckets.title} columns={[m.table.period, m.evolution.visitors]} rows={chart.rows} />
+      <DataTable m={m} caption={m.buckets.title} columns={[m.table.period, m.kpis.visitors]} rows={chart.rows} />
     </Card>
   );
 }
@@ -540,8 +562,19 @@ function Heatmap({
   formatNumber: (value: number) => string;
 }) {
   const max = Math.max(0, ...heatmap.flat());
-  const margins = heatmapMargins(heatmap);
-  const hourLabel = (hour: number) => fillTemplate(m.timing.hourLabel, { hour });
+  const hourLabel = useCallback((hour: number) => fillTemplate(m.timing.hourLabel, { hour }), [m]);
+  // Stables d'un survol à l'autre : un tableau neuf recréerait les deux graphiques à chaque case survolée.
+  const marginCharts = useMemo(() => {
+    const margins = heatmapMargins(heatmap);
+    return {
+      weekdayLabels: [...m.timing.weekdaysShort],
+      weekdayTooltips: [...m.timing.weekdays],
+      weekdaySeries: [{ label: m.evolution.views, data: margins.weekdays, tone: "--st-series-1" }],
+      hourLabels: Array.from({ length: 24 }, (_, hour) => String(hour)),
+      hourTooltips: Array.from({ length: 24 }, (_, hour) => hourLabel(hour)),
+      hourSeries: [{ label: m.evolution.views, data: margins.hours, tone: "--st-series-1" }],
+    };
+  }, [heatmap, m, hourLabel]);
   let peak: { day: number; hour: number } | null = null;
   let peakViews = 0;
   for (let day = 0; day < heatmap.length; day += 1) {
@@ -591,9 +624,9 @@ function Heatmap({
           <h3 className={styles.shareTitle}>{m.timing.weekdaysTitle}</h3>
           <AudienceChart
             type="bar"
-            labels={[...m.timing.weekdaysShort]}
-            tooltipLabels={[...m.timing.weekdays]}
-            series={[{ label: m.evolution.views, data: margins.weekdays, tone: "--st-series-1" }]}
+            labels={marginCharts.weekdayLabels}
+            tooltipLabels={marginCharts.weekdayTooltips}
+            series={marginCharts.weekdaySeries}
             ariaLabel={m.timing.weekdaysTitle}
             loadingLabel={m.chart.loading}
             tooltipTemplate={m.chart.tooltip}
@@ -605,9 +638,9 @@ function Heatmap({
           <h3 className={styles.shareTitle}>{m.timing.hoursTitle}</h3>
           <AudienceChart
             type="bar"
-            labels={Array.from({ length: 24 }, (_, hour) => String(hour))}
-            tooltipLabels={Array.from({ length: 24 }, (_, hour) => hourLabel(hour))}
-            series={[{ label: m.evolution.views, data: margins.hours, tone: "--st-series-1" }]}
+            labels={marginCharts.hourLabels}
+            tooltipLabels={marginCharts.hourTooltips}
+            series={marginCharts.hourSeries}
             ariaLabel={m.timing.hoursTitle}
             loadingLabel={m.chart.loading}
             tooltipTemplate={m.chart.tooltip}
@@ -658,10 +691,11 @@ function Community({ m, community, f }: { m: AudienceMessages; community: NonNul
   ];
   return (
     <section className={styles.community} aria-labelledby="audience-community">
-      <h2 id="audience-community" className={styles.cardTitle}>
-        {m.community.title}
-      </h2>
-      <p className={styles.cardHint}>{m.community.hint}</p>
+      <Titled hint={m.community.hint} subject={m.community.title}>
+        <h2 id="audience-community" className={styles.cardTitle}>
+          {m.community.title}
+        </h2>
+      </Titled>
       <dl className={styles.communityGrid}>
         {items.map((item) => (
           <div key={item.key} className={styles.communityItem}>

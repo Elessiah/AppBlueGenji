@@ -20,8 +20,8 @@
   },
   "kpis": {
     "label": "Key figures",
-    "visitors": "Visitors",
-    "visitorsHint": "Unique visitors of each day, added up over the period.",
+    "visitors": "Daily visitors, summed",
+    "visitorsHint": "Sum of each day's unique visitors: someone who came on three days counts three times.",
     "views": "Page views",
     "visits": "Visits",
     "avgVisitorsPerDay": "Visitors per day",
@@ -39,8 +39,8 @@
     "views": "Page views"
   },
   "buckets": {
-    "title": "Visitors per week, month and year",
-    "hint": "Sum of each day's unique visitors: someone who came on three days counts three times.",
+    "title": "Daily visitors summed per week, month and year",
+    "hint": "Sum of each day's unique visitors, not of distinct people: someone who came on three days counts three times.",
     "label": "Grouping",
     "week": "Week",
     "month": "Month",

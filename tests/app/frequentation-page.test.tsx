@@ -83,13 +83,38 @@ describe("FrequentationPage", () => {
     expect(html).not.toContain("Les premières mesures arrivent");
   });
 
-  it("parle anglais et garde ses liens sous /en", async () => {
+  it("page_headerAndFooter_outsideMain", async () => {
     jest.mocked(getAudienceStats).mockResolvedValue(STATS);
 
-    const html = await render("en");
+    const html = await render("fr");
+    const main = html.slice(html.indexOf("<main"), html.indexOf("</main>"));
 
-    expect(html).toContain("Key figures");
-    expect(html).toContain('href="/en/rgpd#audience-detaillee"');
+    expect(html.indexOf("<header")).toBeLessThan(html.indexOf("<main"));
+    expect(html.indexOf("<footer")).toBeGreaterThan(html.indexOf("</main>"));
+    expect(main).not.toContain("<header");
+    expect(main).not.toContain("<footer");
+  });
+
+  it.each<["fr" | "en", string, string, string]>([
+    ["fr", "Visiteurs quotidiens cumulés", "Visiteurs quotidiens cumulés par semaine, mois et année", 'href="/rgpd#audience-detaillee"'],
+    ["en", "Daily visitors, summed", "Daily visitors summed per week, month and year", 'href="/en/rgpd#audience-detaillee"'],
+  ])("page_%s_labelsCumulativeVisitorsAsDailySumsAndLinksInLocale", async (locale, kpi, buckets, privacyLink) => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS);
+
+    const html = await render(locale);
+
+    expect(html).toContain(kpi);
+    expect(html).toContain(buckets);
+    expect(html).toContain(privacyLink);
+  });
+
+  it("page_explanations_behindInfoHint", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS);
+
+    const html = await render("fr");
+
+    expect(html).toContain("Plus d&#x27;infos : Visiteurs quotidiens cumulés");
+    expect(html).toMatch(/<div[^>]*hidden[^>]*><p>Somme des visiteurs uniques de chaque jour/);
   });
 
   it("montre l'état vide tant qu'aucun jour n'est replié", async () => {

@@ -66,8 +66,8 @@ const COMPLIANCE_TABLES: readonly string[] = [
   // Statistiques de fréquentation détaillées (`lib/shared/audience.ts`,
   // `docs/features/AUDIENCE_MEASUREMENT.md`, registre T19) : une ligne par page
   // vue, gardée `AUDIENCE_RAW_RETENTION_MONTHS` mois. `visitor_key` est un HMAC
-  // sous un sel du **jour**, tenu en mémoire seulement et jeté au changement de
-  // jour : passé ce jour, il ne se recalcule plus. `page_key` est un gabarit
+  // sous un sel du **jour** (`bg_audience_salts`), effacé une fois le jour
+  // replié : passé ce jour, il ne se recalcule plus. `page_key` est un gabarit
   // (`player`, jamais un pseudo). Tables neuves : créées telles quelles sur une
   // base qui tourne, aucune entrée de migration n'est due.
   `
@@ -84,6 +84,15 @@ const COMPLIANCE_TABLES: readonly string[] = [
       is_view TINYINT(1) NOT NULL DEFAULT 1,
       engaged_ms INT UNSIGNED NOT NULL DEFAULT 0,
       INDEX idx_bg_audience_views_day (day, viewed_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  // Sel du jour de la mesure : tiré au premier signalement du jour (un
+  // redémarrage du site le relit), effacé par l'entretien dès le jour replié
+  // (`forgetSalts`, une heure et quart après minuit au plus tôt).
+  `
+      CREATE TABLE IF NOT EXISTS bg_audience_salts (
+      day DATE PRIMARY KEY,
+      salt BINARY(32) NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
   // Compteurs d'une journée révolue, repliés depuis le détail ; gardés sans

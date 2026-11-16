@@ -24,21 +24,28 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
 2. Période : 7 jours, 30 jours (défaut), 12 mois, depuis le début. Tout se
    recalcule côté client à partir des agrégats quotidiens : changer de période
    ne fait aucune requête.
-3. Indicateurs : visiteurs, pages vues, visites, visiteurs par jour, temps par
+3. Indicateurs : visiteurs quotidiens cumulés (jamais appelés « visiteurs
+   uniques » : somme des visiteurs de chaque jour), pages vues, visites,
+   visiteurs par jour, temps par
    visite, temps par page, pages par visite, visites d'une seule page — chacun
    comparé à la période précédente de même durée quand elle est entièrement
    mesurée (flèche + texte, couleur neutre : une hausse n'est pas jugée).
 4. Évolution (courbe visiteurs + pages vues ; à la semaine au-delà de 92 jours,
    au mois au-delà de 731).
-5. Visiteurs par semaine (26 dernières), mois (24) et année — **somme des
-   visiteurs uniques de chaque jour**, dit sous le titre.
+5. Visiteurs quotidiens cumulés par semaine (26 dernières), mois (24) et
+   année — **somme des visiteurs uniques de chaque jour**, dit dans le titre
+   et son « i » : une personne venue trois jours compte trois fois. Les
+   chiffres montrés aux partenaires ne doivent jamais paraître plus forts
+   qu'ils ne sont.
 6. Pages les plus consultées : par type de page, vues, part, temps moyen.
 7. Moments de visite : carte de chaleur jour × heure (rampe bleue à 5 paliers,
    lecture au survol, pic annoncé), barres par jour de la semaine et par heure.
 8. Qui nous consulte : appareils, provenance, langue — barres segmentées,
    couleur fixée par catégorie (jamais par rang), légende chiffrée.
 9. La communauté : tournois terminés publiés, matchs joués (hors exemptions),
-   équipes (hors entrées solo, fantômes, supprimées), comptes actifs.
+   équipes et comptes **avec la définition de l'accueil**
+   (`lib/server/site-counts.ts` : équipes de l'annuaire, comptes du site) —
+   deux pages publiques ne publient pas deux chiffres différents.
 10. Pied : méthode (4 points), lien `/rgpd#audience-detaillee`, « Code source »
     (AGPL), nom de l'association, retour au site.
 
@@ -62,6 +69,18 @@ communauté restant affichée. Base injoignable : même état vide.
   `AudienceChart` : aucune autre page n'en charge rien. Pas d'animation.
 - Mobile (375 px) : indicateurs sur deux colonnes, cartes empilées, carte de
   chaleur resserrée (24 colonnes tiennent sans défilement).
+
+## Structure et explications
+
+- En-tête (`<header>`), `<main id="contenu">` puis pied (`<footer>`) **en
+  frères** : les repères `banner` et `contentinfo` ne sont pas noyés dans
+  `main`. Pas de `PublicPageShell` (D76 : page formelle hors du site vitrine).
+- Les explications (sous-titres de cartes, indicateur cumulé, provenance,
+  communauté) sont derrière `<InfoHint>` (`INFO_HINTS.md`) ; la page redéfinit
+  les jetons qu'il lit (`--blue-*`, `--cyber-bg-2`, `--ink-soft`) aux teintes
+  de la page blanche. Seul l'état vide garde sa phrase visible.
+- Les graphiques en marge de la carte de chaleur reçoivent des tableaux
+  mémorisés : survoler une case ne recrée pas les graphiques.
 
 ## Textes
 

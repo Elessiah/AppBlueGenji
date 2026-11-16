@@ -10,11 +10,17 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
 
 - **Aucun cookie, aucun stockage** dans le navigateur ; la session n'est jamais
   lue (`/api/audience` ne touche pas à `bg_user_sessions`).
-- **Empreinte du jour** : `HMAC-SHA256(sel_du_jour, ip|user-agent)`. Le sel est
-  tiré au hasard (`randomBytes(32)`) pour la journée de Paris, **en mémoire
-  seulement**, remplacé au changement de jour, perdu au redémarrage. Passé le
-  jour, plus personne ne peut recalculer une empreinte : un visiteur n'est
-  reconnu que le temps d'une journée.
+- **Empreinte du jour** : `HMAC-SHA256(sel_du_jour, visitorIdentitySource({ ip, userAgent }))`.
+  Le sel est tiré au hasard (`randomBytes(32)`) au premier signalement d'une
+  journée de Paris et gardé dans `bg_audience_salts` (`INSERT IGNORE` puis
+  relecture : un redémarrage ou un envoi concurrent reprend le même sel, un
+  visiteur ne compte pas deux fois). Chaque entrée prend le sel de **son**
+  jour, pas du jour de réception. Une fois le jour replié (75 min après
+  minuit, au premier entretien), `forgetSalts` efface son sel (base et
+  mémoire) et `recordAudienceViews` écarte les entrées tardives de ce jour :
+  plus personne ne peut recalculer une empreinte, hors une copie de
+  sauvegarde chiffrée faite entre-temps (T09, 30 jours) — les textes légaux
+  le disent.
 - **Rien d'identifiant n'est gardé tel quel** : type de page (gabarit, jamais
   l'adresse, un numéro ni un nom), langue, classe d'appareil (largeur de
   fenêtre), famille de provenance (le site d'origine est réduit aussitôt :
@@ -29,7 +35,9 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   avant tout calcul, plafond compris). Les robots connus (user-agent) sont
   écartés de même.
 - **IP en mémoire ≤ 2 min** : seul le plafond `AUDIENCE_REQUEST_RULE`
-  (30 envois/min, fenêtre de 60 s, balayage du module `rate-limit`) la tient.
+  (120 envois/min, fenêtre de 60 s, balayage du module `rate-limit`) la tient.
+  Large à dessein : une adresse partagée (NAT d'opérateur mobile, réseau local
+  d'un événement) ne doit pas faire disparaître ses visiteurs des chiffres.
 
 ## Chemin de la donnée
 
@@ -40,24 +48,31 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
 POST /api/audience  { v: [{ p, t, a, d, r?, f?, c? }] }   fetch keepalive ; 200, ou 429 au-delà du plafond
    │  opposition → robot → plafond IP → corps ≤ 32 Ko → parseAudienceBatch
    ▼
-recordAudienceViews : empreinte du jour + file serveur (≤ 5 000), écriture groupée
+recordAudienceViews : sel du jour de l'entrée (lu une fois par jour) + empreinte + file serveur (≤ 5 000)
    │  toutes les 10 s ou par 200 lignes (INSERT multi-lignes)
    ▼
 bg_audience_views (détail, 13 mois)
    │  maintainAudience, au fil du trafic (au plus toutes les 10 min) :
-   │  repli des jours clos (veille, 75 min de grâce) puis purge
+   │  repli des jours clos (veille, 75 min de grâce), effacement de leur sel, puis purge
    ▼
 bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 ```
 
+- Une page vue part **à son affichage** (`t: 0`, datée de son début : la
+  carte de chaleur garde l'heure d'ouverture, même pour une page lue des
+  heures) ; son temps visible part **à sa clôture** (navigation, onglet
+  masqué, départ) en suite `c: 1`, datée de cette clôture. Un retour au
+  premier plan ouvre une nouvelle suite sur la même page.
 - `p` chemin affiché (réduit côté serveur à `audiencePageKey` : `/frequentation`,
-  `/api`, `/_next`, `/og` ne comptent pas), `t` temps visible (ms), `a` âge de
-  la page vue au moment de l'envoi (ms, pour la dater ; plafonné à 1 h), `d` appareil,
-  `f` première page de l'arrivée (porte `r`, l'hôte du référent externe),
-  `c` suite : retour au premier plan sur une page déjà comptée — n'ajoute que
-  du temps.
-- Une **visite** = suite de vues d'une même empreinte espacées de moins de
-  30 min ; un **rebond** = visite d'une seule vue (`aggregateAudienceDay`).
+  `/api`, `/_next`, `/og` ne comptent pas), `t` temps visible (ms), `a` âge,
+  à l'envoi, de l'instant que l'entrée date (ms) — au-delà d'une heure,
+  l'entrée est **écartée**, jamais redatée —, `d` appareil, `f` première page
+  de l'arrivée (porte `r`, l'hôte du référent externe), `c` suite (temps seul).
+- Une **visite** = suite de vues d'une même empreinte dont chacune s'ouvre
+  moins de 30 min après la **dernière activité** de la visite (ouverture d'une
+  page ou fin d'une lecture : une longue lecture ne coupe pas la visite) ; un
+  retour sur l'onglet après plus de 30 min de pause clôt la visite d'avant sans
+  en ouvrir une. Un **rebond** = visite d'une seule vue (`aggregateAudienceDay`).
 - Le repli d'un jour est transactionnel (efface puis réécrit ses agrégats, la
   ligne `bg_audience_days` en dernier) : rejouable sans double compte.
 
@@ -66,10 +81,10 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - **Visiteurs par semaine / mois / an = somme des visiteurs uniques de chaque
   jour** : l'empreinte change chaque jour, aucun dédoublonnage entre jours
   n'est possible — c'est le prix de la dispense. La page le dit.
-- **Un seul processus** : le sel et la file vivent en mémoire du processus
-  (pm2 en lance un). Plusieurs processus compteraient deux fois un visiteur.
-  Un redémarrage en cours de journée tire un nouveau sel : les visiteurs déjà
-  vus ce jour-là comptent une seconde fois.
+- **Un seul processus** pour la file et l'entretien (pm2 en lance un) ; le
+  sel, lui, est en base : un redémarrage ne compte pas deux fois un visiteur.
+- **Adresse partagée** : deux visiteurs derrière la même IP avec le même
+  navigateur ne font qu'une empreinte ce jour-là (sous-compte assumé).
 - La file serveur (≤ 10 s) est perdue à un arrêt brutal.
 
 ## Fichiers
@@ -80,7 +95,10 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - `components/audience-beacon.tsx` — branchement navigateur.
 - `app/api/audience/route.ts` — réception.
 - `lib/server/audience-service.ts` — sel, écriture, repli, purge, lecture en
-  cache (10 min, une seule lecture à la fois).
+  cache (10 min, une seule lecture à la fois ; périodes lues en parallèle,
+  carte de chaleur groupée par la base, `WEEKDAY(day)`).
+- `lib/server/site-counts.ts` — équipes et comptes de la plateforme, même
+  définition que l'accueil.
 - Schéma : `lib/server/database/schema/compliance.ts` (tables neuves, aucune
   entrée `RECENT_SCHEMA_CHANGES`).
 - Légal : registre T19 (et T17 pour le plafond IP), `/rgpd#audience-detaillee`

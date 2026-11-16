@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { AudienceBeaconEntry } from "@/lib/shared/audience";
 import { AudienceTracker } from "@/lib/shared/audience-tracker";
 
-/** Suivi des pages vues dans le navigateur (`<AudienceBeacon />`, registre T19). */
+/**
+ * Suivi des pages vues dans le navigateur (`<AudienceBeacon />`, registre T19) :
+ * la page vue part à son affichage (`t: 0`), son temps à sa clôture (`c: 1`).
+ */
 
 let clock = 0;
 let visible = true;
@@ -25,7 +28,7 @@ beforeEach(() => {
 });
 
 describe("AudienceTracker", () => {
-  it("signale la première page avec son référent, puis la suivante en navigation interne", () => {
+  it("navigate_firstPage_sendsViewAtDisplayWithReferrer", () => {
     const t = tracker();
     t.navigate("/");
     clock = 5000;
@@ -34,12 +37,31 @@ describe("AudienceTracker", () => {
     t.leave();
 
     expect(send.mock.calls[0][0]).toEqual([
-      { p: "/", t: 5000, a: 7000, d: "mobile", f: 1, r: "discord.com" },
-      { p: "/classement", t: 2000, a: 2000, d: "mobile" },
+      { p: "/", t: 0, a: 7000, d: "mobile", f: 1, r: "discord.com" },
+      { p: "/", t: 5000, a: 2000, d: "mobile", c: 1 },
+      { p: "/classement", t: 0, a: 2000, d: "mobile" },
+      { p: "/classement", t: 2000, a: 0, d: "mobile", c: 1 },
     ]);
   });
 
-  it("ignore une navigation vers la page déjà affichée", () => {
+  it("leave_afterReading_sendsTimeAsContinuationDatedAtClose", () => {
+    const t = tracker();
+    t.navigate("/regles");
+    clock = 3 * 60 * 60 * 1000;
+    t.hidden();
+
+    expect(send.mock.calls[0][0][1]).toEqual({ p: "/regles", t: 1_800_000, a: 0, d: "mobile", c: 1 });
+  });
+
+  it("finish_zeroVisibleTime_sendsNoTimeEntry", () => {
+    const t = tracker();
+    t.navigate("/");
+    t.leave();
+
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/", t: 0, a: 0, d: "mobile", f: 1, r: "discord.com" }]);
+  });
+
+  it("navigate_samePage_ignored", () => {
     const t = tracker();
     t.navigate("/");
     t.navigate("/");
@@ -48,7 +70,7 @@ describe("AudienceTracker", () => {
     expect(send.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it("ne compte une page ouverte en arrière-plan qu'à son premier passage au premier plan", () => {
+  it("navigate_backgroundOpenedPage_viewSentAtFirstVisible", () => {
     visible = false;
     const t = tracker(null);
     t.navigate("/regles");
@@ -57,10 +79,13 @@ describe("AudienceTracker", () => {
     clock = 13_000;
     t.leave();
 
-    expect(send.mock.calls[0][0]).toEqual([{ p: "/regles", t: 3000, a: 3000, d: "mobile", f: 1, r: null }]);
+    expect(send.mock.calls[0][0]).toEqual([
+      { p: "/regles", t: 0, a: 3000, d: "mobile", f: 1, r: null },
+      { p: "/regles", t: 3000, a: 0, d: "mobile", c: 1 },
+    ]);
   });
 
-  it("envoie la page en passant en arrière-plan, puis n'ajoute qu'une suite au retour", () => {
+  it("visible_sameCountedPage_sendsOnlyContinuation", () => {
     const t = tracker();
     t.navigate("/equipes");
     clock = 4000;
@@ -70,20 +95,10 @@ describe("AudienceTracker", () => {
     clock = 61_000;
     t.leave();
 
-    expect(send.mock.calls[0][0]).toEqual([{ p: "/equipes", t: 4000, a: 4000, d: "mobile", f: 1, r: "discord.com" }]);
-    expect(send.mock.calls[1][0]).toEqual([{ p: "/equipes", t: 1000, a: 1000, d: "mobile", c: 1 }]);
+    expect(send.mock.calls[1][0]).toEqual([{ p: "/equipes", t: 1000, a: 0, d: "mobile", c: 1 }]);
   });
 
-  it("plafonne le temps d'une page à 30 minutes", () => {
-    const t = tracker();
-    t.navigate("/");
-    clock = 3 * 60 * 60 * 1000;
-    t.leave();
-
-    expect(send.mock.calls[0][0][0].t).toBe(1_800_000);
-  });
-
-  it("ne signale pas la page de fréquentation", () => {
+  it("navigate_frequentationPage_sendsNothing", () => {
     const t = tracker();
     t.navigate("/frequentation");
     clock = 1000;
@@ -92,10 +107,9 @@ describe("AudienceTracker", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("garde la file jusqu'au tick tant qu'elle compte moins de dix pages", () => {
+  it("tick_queueUnderTen_sendsOnTick", () => {
     const t = tracker();
     t.navigate("/");
-    t.navigate("/classement");
 
     expect(t.pendingCount).toBe(1);
     expect(send).not.toHaveBeenCalled();
@@ -106,9 +120,9 @@ describe("AudienceTracker", () => {
     expect(t.pendingCount).toBe(0);
   });
 
-  it("envoie la file dès la dixième page", () => {
+  it("enqueue_tenthEntry_sendsAtOnce", () => {
     const t = tracker();
-    for (const path of ["/", "/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h", "/i", "/j"]) t.navigate(path);
+    for (const path of ["/", "/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h", "/i"]) t.navigate(path);
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][0]).toHaveLength(10);

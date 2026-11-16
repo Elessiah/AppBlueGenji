@@ -9,10 +9,10 @@
  *
  * - **aucun cookie, aucun stockage** dans le navigateur ;
  * - l'empreinte d'un visiteur est un HMAC de l'adresse IP et du navigateur sous
- *   un **sel tiré au hasard chaque jour**, gardé en mémoire seulement et jeté
- *   au changement de jour : deux jours ne se relient pas, et une fois le jour
- *   passé, plus personne — l'association comprise — ne peut recalculer
- *   l'empreinte d'une adresse ;
+ *   un **sel tiré au hasard chaque jour**, effacé le lendemain dès le jour
+ *   replié : deux jours ne se relient pas, et une fois le sel effacé, plus
+ *   personne — l'association comprise — ne peut recalculer l'empreinte d'une
+ *   adresse ;
  * - la page vue est réduite à son **gabarit** (`/joueurs/[pseudo]`, jamais le
  *   pseudo), la provenance à une **famille** (moteur de recherche, Discord…),
  *   l'écran à une **classe** (mobile, tablette, ordinateur) ;
@@ -32,7 +32,10 @@ export const AUDIENCE_MAX_ENGAGED_MS = 30 * 60 * 1000;
 /** Écart entre deux pages vues d'un même visiteur au-delà duquel commence une nouvelle visite. */
 export const AUDIENCE_VISIT_GAP_MINUTES = 30;
 
-/** Ancienneté maximale acceptée pour une page vue signalée en différé. */
+/**
+ * Ancienneté maximale acceptée pour une entrée signalée en différé : au-delà,
+ * l'entrée est écartée (jamais redatée, ce qui fausserait son heure).
+ */
 export const AUDIENCE_MAX_AGE_MS = 60 * 60 * 1000;
 
 /** Nombre maximal de pages vues par envoi du navigateur. */
@@ -174,9 +177,12 @@ export function isBotUserAgent(userAgent: string | null | undefined): boolean {
 export interface AudienceBeaconEntry {
   /** Chemin de la page (sans paramètres). */
   p: string;
-  /** Temps passé onglet visible, en millisecondes. */
+  /** Temps passé onglet visible, en millisecondes (`0` pour une page vue, signalée à son affichage). */
   t: number;
-  /** Ancienneté du début de la page vue au moment de l'envoi, en millisecondes. */
+  /**
+   * Ancienneté, au moment de l'envoi, de l'instant que l'entrée date : le
+   * début de la page vue, ou la clôture de la lecture pour une suite.
+   */
   a: number;
   /** Classe d'écran. */
   d: AudienceDevice;
@@ -184,7 +190,7 @@ export interface AudienceBeaconEntry {
   r?: string | null;
   /** 1 = première page de l'arrivée ; 0 = navigation interne. */
   f?: 0 | 1;
-  /** 1 = suite d'une page déjà comptée (onglet revenu au premier plan) : temps seul. */
+  /** 1 = suite d'une page déjà comptée (son temps de lecture, à sa clôture) : temps seul. */
   c?: 0 | 1;
 }
 
@@ -219,6 +225,9 @@ export function parseAudienceBatch(body: unknown, ownHost?: string | null): Audi
     const entry = raw as Partial<Record<keyof AudienceBeaconEntry, unknown>>;
     const page = audiencePageKey(entry.p);
     if (!page) continue;
+    // Trop ancienne pour être datée juste : écartée plutôt que redatée.
+    const age = typeof entry.a === "number" && Number.isFinite(entry.a) ? Math.round(entry.a) : 0;
+    if (age > AUDIENCE_MAX_AGE_MS) continue;
     const isView = entry.c !== 1;
     const first = entry.f === 1;
     views.push({
@@ -228,7 +237,7 @@ export function parseAudienceBatch(body: unknown, ownHost?: string | null): Audi
       source: isView && first ? sourceFromReferrerHost(entry.r, ownHost) : "internal",
       isView,
       engagedMs: clampInt(entry.t, 0, AUDIENCE_MAX_ENGAGED_MS),
-      ageMs: clampInt(entry.a, 0, AUDIENCE_MAX_AGE_MS),
+      ageMs: Math.max(0, age),
     });
   }
   return views;
@@ -321,11 +330,59 @@ function tally<K>(map: Map<K, Tally>, key: K, visitor: string): Tally {
 }
 
 /**
+ * Découpe en visites l'activité des visiteurs d'une journée (lignes triées par
+ * date) : voir {@link aggregateAudienceDay}.
+ */
+class VisitCounter {
+  private readonly lastSeen = new Map<string, { at: number; views: number }>();
+  visits = 0;
+  bounces = 0;
+
+  constructor(private readonly gapMs: number) {}
+
+  /** Fin d'une lecture (`engagedMs` de temps) datée de sa clôture `at`. */
+  continuation(visitor: string, at: number, engagedMs: number): void {
+    const previous = this.lastSeen.get(visitor);
+    if (!previous) return;
+    if (at - engagedMs - previous.at < this.gapMs) {
+      // Lecture commencée dans la visite : la prolonge.
+      this.lastSeen.set(visitor, { at: Math.max(at, previous.at), views: previous.views });
+      return;
+    }
+    // Retour sur l'onglet après une longue pause : la visite d'avant est close,
+    // cette lecture n'en ouvre aucune (aucune page vue).
+    if (previous.views === 1) this.bounces += 1;
+    this.lastSeen.set(visitor, { at, views: 0 });
+  }
+
+  /** Ouverture d'une page à `at`. */
+  view(visitor: string, at: number): void {
+    const previous = this.lastSeen.get(visitor);
+    if (previous && previous.views > 0 && at - previous.at < this.gapMs) {
+      this.lastSeen.set(visitor, { at: Math.max(at, previous.at), views: previous.views + 1 });
+      return;
+    }
+    if (previous?.views === 1) this.bounces += 1;
+    this.visits += 1;
+    this.lastSeen.set(visitor, { at, views: 1 });
+  }
+
+  /** Clôt les visites encore ouvertes en fin de journée. */
+  finish(): void {
+    for (const last of this.lastSeen.values()) if (last.views === 1) this.bounces += 1;
+    this.lastSeen.clear();
+  }
+}
+
+/**
  * Replie les pages vues d'une journée en compteurs. Les lignes doivent être
  * triées par `viewedAt`. Une **visite** est une suite de pages d'un même
- * visiteur séparées de moins de {@link AUDIENCE_VISIT_GAP_MINUTES} minutes ; un
- * **rebond**, une visite d'une seule page. Le temps d'une suite (`isView =
- * false`) s'ajoute à sa page sans compter de page vue.
+ * visiteur dont chacune s'ouvre moins de {@link AUDIENCE_VISIT_GAP_MINUTES}
+ * minutes après la **dernière activité** de la visite — l'ouverture d'une page
+ * ou la fin d'une lecture (une suite est datée de sa clôture) : une longue
+ * lecture ne coupe pas la visite. Un **rebond** est une visite d'une seule
+ * page. Le temps d'une suite (`isView = false`) s'ajoute à sa page sans
+ * compter de page vue.
  */
 export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceDayAggregate {
   const visitors = new Set<string>();
@@ -333,17 +390,17 @@ export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceD
   const pageTime = new Map<string, number>();
   const hours = new Map<number, Tally>();
   const dims = new Map<string, Tally>();
-  const lastSeen = new Map<string, { at: number; views: number }>();
+  const visitCounter = new VisitCounter(AUDIENCE_VISIT_GAP_MINUTES * 60_000);
   let views = 0;
-  let visits = 0;
-  let bounces = 0;
   let engagedMs = 0;
-  const gapMs = AUDIENCE_VISIT_GAP_MINUTES * 60_000;
 
   for (const row of rows) {
     engagedMs += row.engagedMs;
     pageTime.set(row.pageKey, (pageTime.get(row.pageKey) ?? 0) + row.engagedMs);
-    if (!row.isView) continue;
+    if (!row.isView) {
+      visitCounter.continuation(row.visitorKey, row.viewedAt.getTime(), row.engagedMs);
+      continue;
+    }
 
     views += 1;
     visitors.add(row.visitorKey);
@@ -352,21 +409,12 @@ export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceD
     tally(dims, `device\u0000${row.device}`, row.visitorKey);
     tally(dims, `locale\u0000${row.locale}`, row.visitorKey);
     if (row.source !== "internal") tally(dims, `source\u0000${row.source}`, row.visitorKey);
-
-    const at = row.viewedAt.getTime();
-    const previous = lastSeen.get(row.visitorKey);
-    if (!previous || at - previous.at >= gapMs) {
-      if (previous?.views === 1) bounces += 1;
-      visits += 1;
-      lastSeen.set(row.visitorKey, { at, views: 1 });
-    } else {
-      lastSeen.set(row.visitorKey, { at, views: previous.views + 1 });
-    }
+    visitCounter.view(row.visitorKey, row.viewedAt.getTime());
   }
-  for (const last of lastSeen.values()) if (last.views === 1) bounces += 1;
+  visitCounter.finish();
 
   return {
-    totals: { views, visitors: visitors.size, visits, bounces, engagedMs },
+    totals: { views, visitors: visitors.size, visits: visitCounter.visits, bounces: visitCounter.bounces, engagedMs },
     pages: [...pageTime.entries()].map(([pageKey, time]) => {
       const entry = pageViews.get(pageKey);
       return { pageKey, views: entry?.views ?? 0, visitors: entry?.visitors.size ?? 0, engagedMs: time };

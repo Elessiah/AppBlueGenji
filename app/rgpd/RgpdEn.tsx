@@ -725,9 +725,10 @@ export function RgpdEn({
           </p>
           <p>
             <strong>What is recorded.</strong> The server computes a daily hash (HMAC-SHA256) of your
-            IP address and your browser, with a random salt drawn for the day (Paris time), held in
-            memory only and replaced every day: once the day is over, no one, the association
-            included, can recompute your hash, and you are only recognised for one day. It records
+            IP address and your browser, with a random salt drawn for the day (Paris time), kept in the
+            database for the day and erased the next day, as soon as the day is counted (from 1:15
+            a.m.): after that, no one, the association included, can recompute your hash, and you are
+            only recognised for one day. It records
             this hash with the type of page, its language, the date and hour, the device class, the
             time spent and a referral family (direct access, search engine, Discord, social network,
             video platform, other website); never the page&apos;s exact address, nor the referring
@@ -746,8 +747,10 @@ export function RgpdEn({
             <strong>Retention period.</strong> Detailed page views are erased after{" "}
             <strong>{monthsEn(AUDIENCE_RAW_RETENTION_MONTHS)}</strong> (apart from the encrypted
             backup copies, {BACKUP_RETENTION_DAYS} days at most). Aggregate figures per day, without
-            any hash, are kept with no limit: they no longer concern anyone. The daily salt is never
-            written, in the database, in a log or in a backup. Your IP address is only kept in memory,
+            any hash, are kept with no limit: they no longer concern anyone. The daily salt is erased
+            from the database the next day, as soon as the day is counted (from 1:15 a.m., Paris
+            time); it is written in no log, but an encrypted backup copy made in the meantime may
+            contain it ({BACKUP_RETENTION_DAYS} days at most). Your IP address is only kept in memory,
             to cap the submissions: two minutes at most after your last request.
           </p>
           <p>

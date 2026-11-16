@@ -3,26 +3,31 @@
  *
  * Règles (`docs/features/AUDIENCE_MEASUREMENT.md`, registre T19) :
  *
- * - **Sel du jour, en mémoire seulement.** {@link dailySalt} tire 32 octets au
- *   hasard au premier signalement d'un jour (heure de Paris) et les remplace au
- *   jour suivant : l'ancien sel n'est écrit nulle part, si bien qu'une empreinte
- *   d'hier ne se recalcule plus, même par l'association. Un redémarrage tire un
- *   sel neuf : un visiteur de ce jour peut alors compter deux fois.
+ * - **Sel du jour, effacé une fois le jour replié.** {@link dailySalt} tire
+ *   32 octets au hasard au premier signalement d'un jour (heure de Paris) et
+ *   les garde dans `bg_audience_salts` : un redémarrage du site reprend le même
+ *   sel, et un visiteur ne compte pas deux fois. Chaque page vue prend le sel
+ *   de **son** jour (une page ouverte à 23 h 58 et reçue à 0 h 02 garde celui
+ *   de la veille). Le jour replié, son sel est effacé (base et mémoire) et ses
+ *   entrées tardives sont écartées : une empreinte d'un jour passé ne se
+ *   recalcule plus, même par l'association.
  * - **Aucune adresse IP gardée.** L'IP sert au HMAC, à l'instant, puis au seul
  *   plafond de débit (`AUDIENCE_REQUEST_RULE`, en mémoire, deux minutes au plus) ;
  *   la file d'écriture ne porte que l'empreinte.
  * - **Écritures groupées.** Les pages vues attendent en mémoire (au plus
  *   {@link FLUSH_DELAY_MS} ms ou {@link FLUSH_SIZE} lignes) puis partent en un
- *   seul `INSERT` : un signalement ne fait jamais attendre la base.
+ *   seul `INSERT` : un signalement n'attend la base que pour lire le sel du
+ *   jour, une fois par jour et par processus.
  * - **Repli** des jours révolus (une fois la marge {@link ROLLUP_GRACE_MINUTES}
- *   passée après minuit), puis **purge** du détail au-delà de
- *   `AUDIENCE_RAW_RETENTION_MONTHS` mois ; entraînés par le trafic (au plus
- *   toutes les {@link MAINTENANCE_INTERVAL_MS} ms), sans ordonnanceur.
+ *   passée après minuit), effacement de leur sel, puis **purge** du détail
+ *   au-delà de `AUDIENCE_RAW_RETENTION_MONTHS` mois ; entraînés par le trafic
+ *   (au plus toutes les {@link MAINTENANCE_INTERVAL_MS} ms), sans ordonnanceur.
  */
 import { createHmac, randomBytes } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
+import { readSiteCounts } from "./site-counts";
 import { inTransaction } from "./tournaments/transaction";
 import {
   AUDIENCE_RANGES,
@@ -33,7 +38,6 @@ import {
   rangeStart,
   shiftDay,
   shiftMonths,
-  weekdayIndex,
   type AudienceCommunity,
   type AudienceDailyPoint,
   type AudienceRange,
@@ -43,6 +47,7 @@ import {
   type AudienceStats,
   type AudienceView,
 } from "@/lib/shared/audience";
+import { visitorIdentitySource } from "@/lib/shared/site-visits";
 
 /** Délai maximal d'attente d'une page vue en mémoire avant écriture. */
 export const FLUSH_DELAY_MS = 10_000;
@@ -69,7 +74,8 @@ interface PendingRow {
   view: AudienceView;
 }
 
-let salt: { day: string; value: Buffer } | null = null;
+/** Sels lus ou tirés, par jour : la veille tant qu'elle n'est pas repliée, et le jour. */
+const salts = new Map<string, Promise<Buffer>>();
 let pending: PendingRow[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing: Promise<void> | null = null;
@@ -80,19 +86,48 @@ let statsLoad: Promise<AudienceStats> | null = null;
 /** Avancée à chaque repli : une lecture commencée avant n'est pas mise en cache. */
 let statsGeneration = 0;
 
+interface SaltRow extends RowDataPacket {
+  salt: Buffer;
+}
+
+async function loadSalt(day: string): Promise<Buffer> {
+  const db = await getDatabase();
+  // Le premier signalement du jour tire le sel ; un signalement concurrent, ou
+  // le site redémarré, relit celui qui est en base.
+  await db.execute(`INSERT IGNORE INTO bg_audience_salts (day, salt) VALUES (?, ?)`, [day, randomBytes(32)]);
+  const [rows] = await db.execute<SaltRow[]>(`SELECT salt FROM bg_audience_salts WHERE day = ?`, [day]);
+  const value = rows[0]?.salt;
+  if (!Buffer.isBuffer(value) || value.length !== 32) throw new Error("audience salt unreadable");
+  return value;
+}
+
 /**
- * Sel du jour `day` : tiré au hasard la première fois, remplacé (et l'ancien
- * oublié) dès qu'un autre jour est demandé.
+ * Sel du jour `day` : tiré au hasard la première fois, gardé en base jusqu'au
+ * repli du jour, puis effacé (voir {@link forgetSalts}).
  */
-export function dailySalt(day: string): Buffer {
-  if (salt?.day !== day) salt = { day, value: randomBytes(32) };
-  return salt.value;
+export function dailySalt(day: string): Promise<Buffer> {
+  const known = salts.get(day);
+  if (known) return known;
+  const value = loadSalt(day);
+  salts.set(day, value);
+  // Une lecture ratée n'est pas gardée : le signalement suivant réessaie.
+  value.catch(() => {
+    if (salts.get(day) === value) salts.delete(day);
+  });
+  return value;
 }
 
 /** Empreinte d'un visiteur pour la journée : HMAC-SHA-256 de l'IP et du navigateur sous le sel du jour. */
-export function audienceVisitorKey(day: string, ip: string | null, userAgent: string | null): string {
-  const source = `${(ip ?? "").trim() || "unknown-ip"}|${(userAgent ?? "").trim() || "unknown-ua"}`;
-  return createHmac("sha256", dailySalt(day)).update(source).digest("hex");
+export async function audienceVisitorKey(day: string, ip: string | null, userAgent: string | null): Promise<string> {
+  const salt = await dailySalt(day);
+  return createHmac("sha256", salt).update(visitorIdentitySource({ ip, userAgent })).digest("hex");
+}
+
+/** Efface les sels des jours repliés (`day <= until`), en base puis en mémoire. */
+export async function forgetSalts(until: string): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(`DELETE FROM bg_audience_salts WHERE day <= ?`, [until]);
+  for (const day of [...salts.keys()]) if (day <= until) salts.delete(day);
 }
 
 /** `AAAA-MM-JJ HH:MM:SS` en temps universel, pour une colonne `DATETIME`. */
@@ -101,38 +136,40 @@ function utcDateTime(date: Date): string {
 }
 
 /**
- * Met en file des pages vues signalées par un navigateur. Ne touche pas la
- * base : l'écriture part groupée (voir {@link flushAudienceViews}).
+ * Met en file des pages vues signalées par un navigateur. Les pages vues ne
+ * sont pas écrites ici : l'écriture part groupée (voir
+ * {@link flushAudienceViews}) ; seul le sel du jour peut être lu ou tiré.
  *
- * Une page vue datée d'un jour antérieur à la veille est écartée (elle
- * arriverait après le repli de son jour).
+ * Une entrée d'un jour déjà repliable est écartée : elle ne serait jamais
+ * comptée, et le sel de ce jour est effacé.
  *
  * @returns Le nombre de pages vues retenues.
  */
-export function recordAudienceViews(input: {
+export async function recordAudienceViews(input: {
   ip: string | null;
   userAgent: string | null;
   views: readonly AudienceView[];
   now?: Date;
-}): number {
+}): Promise<number> {
   const now = input.now ?? new Date();
-  const today = parisClock(now).day;
-  const oldest = shiftDay(today, -1);
-  let kept = 0;
+  const closed = lastRollableDay(now);
+  const rows: Omit<PendingRow, "visitorKey">[] = [];
   for (const view of input.views) {
-    if (pending.length >= MAX_PENDING) break;
     const viewedAt = new Date(now.getTime() - view.ageMs);
     const clock = parisClock(viewedAt);
-    if (clock.day < oldest) continue;
-    pending.push({
-      day: clock.day,
-      hour: clock.hour,
-      viewedAt: utcDateTime(viewedAt),
-      // Le sel est celui du jour de **réception** : une page vue juste avant
-      // minuit et reçue juste après prend l'empreinte du nouveau jour.
-      visitorKey: audienceVisitorKey(today, input.ip, input.userAgent),
-      view,
-    });
+    if (clock.day <= closed) continue;
+    rows.push({ day: clock.day, hour: clock.hour, viewedAt: utcDateTime(viewedAt), view });
+  }
+  // Le sel est celui du jour de la page vue, pas celui du jour de réception.
+  const keys = new Map<string, string>();
+  for (const day of new Set(rows.map((row) => row.day))) {
+    keys.set(day, await audienceVisitorKey(day, input.ip, input.userAgent));
+  }
+  let kept = 0;
+  for (const row of rows) {
+    const visitorKey = keys.get(row.day);
+    if (pending.length >= MAX_PENDING || !visitorKey) break;
+    pending.push({ ...row, visitorKey });
     kept += 1;
   }
   if (pending.length >= FLUSH_SIZE) void flushAudienceViews();
@@ -206,9 +243,9 @@ export function rawRetentionStart(now: Date): string {
 }
 
 /**
- * Entretien entraîné par le trafic : repli des jours révolus, puis purge du
- * détail trop ancien. Au plus une fois par {@link MAINTENANCE_INTERVAL_MS} ;
- * jamais attendu par l'appelant, jamais levé.
+ * Entretien entraîné par le trafic : repli des jours révolus, effacement de
+ * leur sel, puis purge du détail trop ancien. Au plus une fois par
+ * {@link MAINTENANCE_INTERVAL_MS} ; jamais attendu par l'appelant, jamais levé.
  */
 export function maintainAudience(now: Date = new Date()): void {
   if (now.getTime() - lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || maintaining) return;
@@ -222,10 +259,12 @@ export function maintainAudience(now: Date = new Date()): void {
     });
 }
 
-/** Repli puis purge, attendus (tests, et `maintainAudience`). */
+/** Repli, effacement des sels des jours repliés, puis purge (attendus : tests, et `maintainAudience`). */
 export async function runMaintenance(now: Date = new Date()): Promise<void> {
   await flushAudienceViews();
   const rolled = await rollUpAudienceDays(now);
+  // Un jour clos n'a plus besoin de son sel : ses entrées tardives sont écartées.
+  await forgetSalts(lastRollableDay(now));
   await purgeAudienceViews(now);
   if (rolled > 0) {
     statsCache = null;
@@ -366,8 +405,8 @@ interface PageRow extends RowDataPacket {
 }
 
 interface HourRow extends RowDataPacket {
-  day: string;
-  hour: number;
+  weekday: number | string;
+  hour: number | string;
   views: number | string;
 }
 
@@ -398,27 +437,33 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
   const db = await getDatabase();
   const where = from ? "WHERE day >= ?" : "";
   const params = from ? [from] : [];
-  const [pages] = await db.execute<PageRow[]>(
-    `SELECT page_key, SUM(views) AS views, SUM(visitors) AS visitors, SUM(engaged_ms) AS engaged_ms
-       FROM bg_audience_day_pages ${where}
-      GROUP BY page_key
-      ORDER BY views DESC`,
-    params,
-  );
-  const [hours] = await db.execute<HourRow[]>(
-    `SELECT DATE_FORMAT(day, '%Y-%m-%d') AS day, hour, views FROM bg_audience_day_hours ${where}`,
-    params,
-  );
-  const [dims] = await db.execute<DimRow[]>(
-    `SELECT dim, dim_value, SUM(views) AS views, SUM(visitors) AS visitors
-       FROM bg_audience_day_dims ${where}
-      GROUP BY dim, dim_value`,
-    params,
-  );
+  const [[pages], [hours], [dims]] = await Promise.all([
+    db.execute<PageRow[]>(
+      `SELECT page_key, SUM(views) AS views, SUM(visitors) AS visitors, SUM(engaged_ms) AS engaged_ms
+         FROM bg_audience_day_pages ${where}
+        GROUP BY page_key
+        ORDER BY views DESC`,
+      params,
+    ),
+    // Grille 7 × 24 faite par la base (`WEEKDAY` : lundi = 0) : 168 lignes au plus.
+    db.execute<HourRow[]>(
+      `SELECT WEEKDAY(day) AS weekday, hour, SUM(views) AS views
+         FROM bg_audience_day_hours ${where}
+        GROUP BY WEEKDAY(day), hour`,
+      params,
+    ),
+    db.execute<DimRow[]>(
+      `SELECT dim, dim_value, SUM(views) AS views, SUM(visitors) AS visitors
+         FROM bg_audience_day_dims ${where}
+        GROUP BY dim, dim_value`,
+      params,
+    ),
+  ]);
   const heatmap = emptyHeatmap();
   for (const row of hours) {
+    const weekday = Number(row.weekday);
     const hour = Number(row.hour);
-    if (hour >= 0 && hour < 24) heatmap[weekdayIndex(row.day)][hour] += num(row.views);
+    if (weekday >= 0 && weekday < 7 && hour >= 0 && hour < 24) heatmap[weekday][hour] += num(row.views);
   }
   return {
     pages: pages.map((row) => ({ key: row.page_key, views: num(row.views), visitors: num(row.visitors), engagedMs: num(row.engaged_ms) })),
@@ -431,8 +476,9 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
 
 /**
  * Chiffres publics de la communauté, sans aucune donnée d'une personne :
- * tournois publiés terminés, matchs joués, équipes actives (ni entrée solo,
- * ni fantôme), comptes actifs. `null` si la lecture échoue.
+ * tournois publiés terminés, matchs joués, et — même définition que
+ * l'accueil (`site-counts.ts`) — équipes de l'annuaire et comptes du site.
+ * `null` si la lecture échoue.
  */
 async function readCommunity(): Promise<AudienceCommunity | null> {
   try {
@@ -441,17 +487,16 @@ async function readCommunity(): Promise<AudienceCommunity | null> {
       const [rows] = await db.execute<CountRow[]>(sql);
       return num(rows[0]?.n);
     };
-    const [tournaments, matches, teams, players] = await Promise.all([
+    const [tournaments, matches, site] = await Promise.all([
       count(`SELECT COUNT(*) AS n FROM bg_tournaments WHERE state = 'FINISHED' AND start_visibility_at <= NOW()`),
       count(
         `SELECT COUNT(*) AS n FROM bg_matches m
            JOIN bg_tournaments t ON t.id = m.tournament_id
           WHERE m.status = 'COMPLETED' AND m.is_bye = FALSE AND t.start_visibility_at <= NOW()`,
       ),
-      count(`SELECT COUNT(*) AS n FROM bg_teams WHERE solo_user_id IS NULL AND is_ghost = 0 AND deleted_at IS NULL`),
-      count(`SELECT COUNT(*) AS n FROM bg_users WHERE is_deleted = 0`),
+      readSiteCounts(),
     ]);
-    return { tournaments, matches, teams, players };
+    return { tournaments, matches, teams: site.teams, players: site.players };
   } catch (error) {
     console.error("[audience] Chiffres de la communauté illisibles.", failureReason(error));
     return null;
@@ -475,16 +520,17 @@ async function loadStats(): Promise<AudienceStats> {
   }));
   const lastDay = points.at(-1)?.day ?? null;
   const firstDay = points[0]?.day ?? null;
-  const entries: [AudienceRange, AudienceRangeStats][] = [];
-  for (const range of AUDIENCE_RANGES) {
-    entries.push([range, await readRange(lastDay ? rangeStart(range, lastDay) : null)]);
-  }
+  // Les quatre périodes et la communauté, lues en parallèle.
+  const [community, ranges] = await Promise.all([
+    readCommunity(),
+    Promise.all(AUDIENCE_RANGES.map((range) => readRange(lastDay ? rangeStart(range, lastDay) : null))),
+  ]);
   return {
     lastDay,
     firstDay,
     daily: points,
-    ranges: Object.fromEntries(entries) as Record<AudienceRange, AudienceRangeStats>,
-    community: await readCommunity(),
+    ranges: Object.fromEntries(AUDIENCE_RANGES.map((range, index) => [range, ranges[index]])) as Record<AudienceRange, AudienceRangeStats>,
+    community,
   };
 }
 
@@ -514,7 +560,7 @@ export async function getAudienceStats(now: Date = new Date()): Promise<Audience
 
 /** Remet l'état du module à zéro (tests). */
 export function resetAudienceState(): void {
-  salt = null;
+  salts.clear();
   pending = [];
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = null;

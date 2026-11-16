@@ -20,8 +20,8 @@
   },
   "kpis": {
     "label": "Indicateurs clés",
-    "visitors": "Visiteurs",
-    "visitorsHint": "Visiteurs uniques de chaque jour, additionnés sur la période.",
+    "visitors": "Visiteurs quotidiens cumulés",
+    "visitorsHint": "Somme des visiteurs uniques de chaque jour : une personne venue trois jours compte trois fois.",
     "views": "Pages vues",
     "visits": "Visites",
     "avgVisitorsPerDay": "Visiteurs par jour",
@@ -39,8 +39,8 @@
     "views": "Pages vues"
   },
   "buckets": {
-    "title": "Visiteurs par semaine, mois et année",
-    "hint": "Somme des visiteurs uniques de chaque jour : une personne venue trois jours compte trois fois.",
+    "title": "Visiteurs quotidiens cumulés par semaine, mois et année",
+    "hint": "Somme des visiteurs uniques de chaque jour, et non des personnes distinctes : une personne venue trois jours compte trois fois.",
     "label": "Regroupement",
     "week": "Semaine",
     "month": "Mois",

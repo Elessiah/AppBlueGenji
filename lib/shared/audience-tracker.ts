@@ -2,10 +2,13 @@
  * Suivi des pages vues dans le navigateur — sans DOM ni horloge propres (tout
  * est injecté), pour être testé seul. Monté par `<AudienceBeacon />`.
  *
- * Une **page vue** court de son affichage à la navigation suivante, ou au
- * passage de l'onglet en arrière-plan ; seul le temps **onglet visible** est
- * compté. Revenu au premier plan, l'onglet ouvre une **suite** (`c: 1`), qui
- * n'apporte que du temps à la même page. Rien n'est gardé dans le navigateur :
+ * Une **page vue** est signalée **à son affichage** (`t: 0`, datée de son
+ * début : l'heure de la carte de chaleur est celle où la page s'ouvre, même
+ * lue des heures). Son **temps** onglet visible part à sa clôture (navigation
+ * suivante, onglet en arrière-plan, départ) dans une **suite** (`c: 1`), datée
+ * de cette clôture : le repli y lit la fin de la lecture, d'où se mesure
+ * l'écart avant une nouvelle visite. Revenu au premier plan, l'onglet ouvre
+ * une nouvelle suite sur la même page. Rien n'est gardé dans le navigateur :
  * la file vit en mémoire de la page et part par lots.
  */
 import {
@@ -28,17 +31,14 @@ export interface AudienceTrackerDeps {
 
 interface Segment {
   path: string;
-  startedAt: number;
   engagedMs: number;
   visibleSince: number | null;
-  first: boolean;
-  continuation: boolean;
 }
 
 export class AudienceTracker {
   private current: Segment | null = null;
-  /** File de la page : l'ancienneté `a` se calcule à l'envoi, d'après le début de la page vue. */
-  private queue: { entry: AudienceBeaconEntry; startedAt: number }[] = [];
+  /** File de la page : l'ancienneté `a` se calcule à l'envoi, d'après l'instant que l'entrée date. */
+  private queue: { entry: AudienceBeaconEntry; at: number }[] = [];
   private hiddenPath: string | null = null;
   private arrived = false;
   /** Page comptée en dernier : un retour au premier plan sur elle ouvre une suite. */
@@ -92,9 +92,20 @@ export class AudienceTracker {
     const now = this.deps.now();
     const first = !continuation && !this.arrived;
     if (!continuation) this.arrived = true;
-    this.current = { path, startedAt: now, engagedMs: 0, visibleSince: now, first, continuation };
+    this.current = { path, engagedMs: 0, visibleSince: now };
+    if (continuation || !audiencePageKey(path)) return;
+    // La page vue part dès son affichage, datée de son début.
+    this.wasCounted.clear();
+    this.wasCounted.add(path);
+    const entry: AudienceBeaconEntry = { p: path, t: 0, a: 0, d: this.deps.device() };
+    if (first) {
+      entry.f = 1;
+      entry.r = this.deps.referrerHost();
+    }
+    this.enqueue(entry, now);
   }
 
+  /** Clôt la page en cours : son temps onglet visible part en suite, datée de cette clôture. */
   private finish(): void {
     const segment = this.current;
     this.current = null;
@@ -102,22 +113,13 @@ export class AudienceTracker {
     const now = this.deps.now();
     const engaged = segment.engagedMs + (segment.visibleSince === null ? 0 : now - segment.visibleSince);
     if (!audiencePageKey(segment.path)) return;
-    const entry: AudienceBeaconEntry = {
-      p: segment.path,
-      t: Math.max(0, Math.min(AUDIENCE_MAX_ENGAGED_MS, Math.round(engaged))),
-      a: 0,
-      d: this.deps.device(),
-    };
-    if (segment.continuation) entry.c = 1;
-    else {
-      this.wasCounted.clear();
-      this.wasCounted.add(segment.path);
-    }
-    if (segment.first) {
-      entry.f = 1;
-      entry.r = this.deps.referrerHost();
-    }
-    this.queue.push({ entry, startedAt: segment.startedAt });
+    const time = Math.max(0, Math.min(AUDIENCE_MAX_ENGAGED_MS, Math.round(engaged)));
+    if (time === 0) return;
+    this.enqueue({ p: segment.path, t: time, a: 0, d: this.deps.device(), c: 1 }, now);
+  }
+
+  private enqueue(entry: AudienceBeaconEntry, at: number): void {
+    this.queue.push({ entry, at });
     if (this.queue.length >= AUDIENCE_CLIENT_FLUSH_SIZE) this.flush();
   }
 
@@ -126,7 +128,7 @@ export class AudienceTracker {
     const now = this.deps.now();
     while (this.queue.length > 0) {
       this.deps.send(
-        this.queue.splice(0, AUDIENCE_MAX_BATCH).map(({ entry, startedAt }) => ({ ...entry, a: Math.max(0, Math.round(now - startedAt)) })),
+        this.queue.splice(0, AUDIENCE_MAX_BATCH).map(({ entry, at }) => ({ ...entry, a: Math.max(0, Math.round(now - at)) })),
       );
     }
   }

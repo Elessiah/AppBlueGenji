@@ -898,9 +898,10 @@ function RgpdFr({
           <p>
             <strong>Ce qui est enregistré.</strong> Le serveur calcule une empreinte du jour
             (HMAC-SHA256) de votre adresse IP et de votre navigateur, avec un sel aléatoire tiré pour la
-            journée (heure de Paris), tenu en mémoire seulement et remplacé chaque jour : la journée
-            passée, plus personne, l&apos;association comprise, ne peut recalculer votre empreinte, et
-            vous n&apos;êtes reconnu que le temps d&apos;une journée. Il enregistre cette empreinte avec
+            journée (heure de Paris), gardé en base le temps de la journée et effacé le lendemain, dès
+            la journée comptée (à partir de 1 h 15) : passé ce moment, plus personne, l&apos;association
+            comprise, ne peut recalculer votre empreinte, et vous n&apos;êtes reconnu que le temps
+            d&apos;une journée. Il enregistre cette empreinte avec
             le type de page, sa langue, la date et l&apos;heure, la classe d&apos;appareil, le temps
             passé et une famille de provenance (accès direct, moteur de recherche, Discord, réseau
             social, plateforme vidéo, autre site) ; jamais l&apos;adresse précise de la page, ni le
@@ -920,8 +921,10 @@ function RgpdFr({
             <strong>Durée de conservation.</strong> Les pages vues détaillées sont effacées au bout de{" "}
             <strong>{AUDIENCE_RAW_RETENTION_MONTHS} mois</strong> (hors les copies de sauvegarde
             chiffrées, {BACKUP_RETENTION_DAYS} jours au plus). Les chiffres agrégés par jour, sans
-            empreinte, sont gardés sans limite : ils ne concernent plus personne. Le sel du jour
-            n&apos;est jamais écrit, ni en base, ni dans un journal, ni dans une sauvegarde. Votre
+            empreinte, sont gardés sans limite : ils ne concernent plus personne. Le sel du jour est
+            effacé de la base le lendemain, dès la journée comptée (à partir de 1 h 15, heure de
+            Paris) ; il n&apos;est écrit dans aucun journal, mais une copie de sauvegarde chiffrée faite
+            entre-temps peut le contenir ({BACKUP_RETENTION_DAYS} jours au plus). Votre
             adresse IP n&apos;est gardée qu&apos;en mémoire, pour plafonner les envois : deux minutes au
             plus après votre dernière requête.
           </p>

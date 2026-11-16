@@ -16,11 +16,12 @@ describe("registre T19", () => {
     expect(PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T19")?.name).toBe("Detailed audience statistics");
   });
 
-  it("register_t19Retention_thirteenMonthsAndSaltInMemory", () => {
+  it("register_t19Retention_thirteenMonthsAndSaltErasedNextDay", () => {
     const retention = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T19")?.retention.join(" | ") ?? "";
 
     expect(retention).toContain("13 mois");
-    expect(retention).toContain("Sel du jour : en mémoire seulement");
+    expect(retention).toContain("Sel du jour : en base le temps de la journée");
+    expect(retention).toContain("effacé le lendemain");
     expect(retention).toContain("deux minutes au plus");
   });
 

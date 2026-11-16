@@ -150,14 +150,18 @@ describe("parseAudienceBatch", () => {
     expect(views[0]).toMatchObject({ isView: false, source: "internal" });
   });
 
-  it("borne le temps à 30 minutes et l'ancienneté à une heure", () => {
+  it("borne le temps à 30 minutes et ramène une ancienneté négative à zéro", () => {
     const views = parseAudienceBatch({ v: [{ p: "/", t: 99_999_999, a: -5, d: "?" }] });
 
     expect(views[0]).toMatchObject({ engagedMs: 1_800_000, ageMs: 0, device: "desktop", source: "internal" });
   });
 
-  it("borne l'ancienneté à une heure", () => {
-    expect(parseAudienceBatch({ v: [{ p: "/", t: 0, a: 7_200_000, d: "mobile" }] })[0].ageMs).toBe(3_600_000);
+  it("parseAudienceBatch_ageExactlyOneHour_kept", () => {
+    expect(parseAudienceBatch({ v: [{ p: "/", t: 0, a: 3_600_000, d: "mobile" }] })[0].ageMs).toBe(3_600_000);
+  });
+
+  it("parseAudienceBatch_ageOverOneHour_droppedNotRedated", () => {
+    expect(parseAudienceBatch({ v: [{ p: "/", t: 0, a: 3_600_001, d: "mobile" }] })).toEqual([]);
   });
 
   it("ne lit que les 20 premières entrées d'un envoi", () => {
@@ -201,6 +205,32 @@ describe("aggregateAudienceDay", () => {
 
     expect(result.pages).toEqual([{ pageKey: "rules", views: 1, visitors: 1, engagedMs: 10_000 }]);
     expect(result.totals).toMatchObject({ views: 1, engagedMs: 10_000 });
+  });
+
+  it("aggregateAudienceDay_longReadThenNextPage_oneVisitNoBounce", () => {
+    const result = aggregateAudienceDay([
+      row({ viewedAt: new Date("2026-11-10T10:00:00Z"), engagedMs: 0 }),
+      row({ viewedAt: new Date("2026-11-10T10:35:00Z"), isView: false, engagedMs: 35 * 60_000 }),
+      row({ viewedAt: new Date("2026-11-10T10:35:00Z"), pageKey: "tournaments", engagedMs: 0 }),
+    ]);
+
+    expect(result.totals).toMatchObject({ views: 2, visits: 1, bounces: 0 });
+  });
+
+  it("aggregateAudienceDay_returnAfterLongPause_closesPreviousVisit", () => {
+    const result = aggregateAudienceDay([
+      row({ viewedAt: new Date("2026-11-10T10:00:00Z"), engagedMs: 0 }),
+      row({ viewedAt: new Date("2026-11-10T13:02:00Z"), isView: false, engagedMs: 2 * 60_000 }),
+      row({ viewedAt: new Date("2026-11-10T13:10:00Z"), pageKey: "ranking", engagedMs: 0 }),
+    ]);
+
+    expect(result.totals).toMatchObject({ views: 2, visits: 2, bounces: 2, engagedMs: 2 * 60_000 });
+  });
+
+  it("aggregateAudienceDay_continuationWithoutPriorView_opensNoVisit", () => {
+    const result = aggregateAudienceDay([row({ isView: false, engagedMs: 5000 })]);
+
+    expect(result.totals).toEqual({ views: 0, visitors: 0, visits: 0, bounces: 0, engagedMs: 5000 });
   });
 
   it("ne range pas la navigation interne parmi les provenances", () => {
