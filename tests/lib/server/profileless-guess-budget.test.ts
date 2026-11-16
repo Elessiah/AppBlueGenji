@@ -1,60 +1,93 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
-  admitProfilelessGuesses,
-  PROFILELESS_ACCOUNTS_PER_VIEWER,
+  admitProfilelessName,
   PROFILELESS_GUESS_WINDOW_MS,
+  PROFILELESS_PRUNE_SLACK,
   resetProfilelessGuessesForTests,
+  trackedProfilelessBudgetsForTests,
 } from "@/lib/server/users/profileless-guess-budget";
 
 /**
- * Revue sécurité EF-65 cycle 2 : les pseudos d'emprunt viennent d'une liste
- * publique de mille ; les noms essayés par compte et par visiteur sont bornés,
- * hors borne le couple est tu (jamais refusé, pour tout id).
+ * Revue sécurité EF-65 cycles 2 et 3 : les pseudos d'emprunt viennent d'une
+ * liste publique de mille ; les noms faux essayés sont bornés par compte
+ * demandé, tous visiteurs confondus (plusieurs comptes n'ajoutent aucun essai).
  */
 const T0 = 1_000_000;
+const LISTED = new Map<number, ReadonlySet<string>>([[3, new Set(["apextv"])]]);
+const WRONG = ["alphafx", "alphagod", "alphaone", "alphapro"];
 
 beforeEach(() => {
   resetProfilelessGuessesForTests();
 });
 
-describe("admitProfilelessGuesses", () => {
-  it("admitProfilelessGuesses_newPairs_admitsAllInOrder", () => {
-    const players = [{ id: 3, name: "ApexTV" }, { id: 8, name: "Beta" }, { id: 3, name: "ApexTV solo" }];
-
-    expect(admitProfilelessGuesses(7, players, T0)).toEqual(players);
+describe("admitProfilelessName", () => {
+  it("admitProfilelessName_idNotListed_admittedWithoutTracking", () => {
+    expect(admitProfilelessName(5, "anything", LISTED, T0)).toBe(true);
+    expect(trackedProfilelessBudgetsForTests()).toBe(0);
   });
 
-  it("admitProfilelessGuesses_fourthNameSameAccount_droppedSilently", () => {
-    admitProfilelessGuesses(7, [{ id: 3, name: "AlphaFX" }, { id: 3, name: "AlphaGod" }, { id: 3, name: "AlphaOne" }], T0);
-
-    expect(admitProfilelessGuesses(7, [{ id: 3, name: "AlphaPRO" }], T0)).toEqual([]);
+  it("admitProfilelessName_fourWrongNames_allAdmitted", () => {
+    expect(WRONG.map((key) => admitProfilelessName(3, key, LISTED, T0))).toEqual([true, true, true, true]);
   });
 
-  it("admitProfilelessGuesses_samePairAgainAfterCap_stillAdmitted", () => {
-    admitProfilelessGuesses(7, [{ id: 3, name: "AlphaFX" }, { id: 3, name: "AlphaGod" }, { id: 3, name: "AlphaOne" }], T0);
+  it("admitProfilelessName_fifthWrongName_refused", () => {
+    for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
 
-    // Casse et invisibles ignorés, comme la comparaison de la route.
-    expect(admitProfilelessGuesses(7, [{ id: 3, name: " alphafx " }], T0)).toEqual([{ id: 3, name: " alphafx " }]);
+    expect(admitProfilelessName(3, "alphazen", LISTED, T0)).toBe(false);
   });
 
-  it("admitProfilelessGuesses_accountsCapReached_newAccountDropped", () => {
-    const filling = Array.from({ length: PROFILELESS_ACCOUNTS_PER_VIEWER }, (_, index) => ({ id: index + 1, name: "Nom" }));
-    admitProfilelessGuesses(7, filling, T0);
+  it("admitProfilelessName_correctNameAfterCapNeverJudged_refused", () => {
+    for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
 
-    expect(admitProfilelessGuesses(7, [{ id: PROFILELESS_ACCOUNTS_PER_VIEWER + 1, name: "Nom" }], T0)).toEqual([]);
+    expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(false);
   });
 
-  it("admitProfilelessGuesses_windowExpired_budgetReset", () => {
-    admitProfilelessGuesses(7, [{ id: 3, name: "AlphaFX" }, { id: 3, name: "AlphaGod" }, { id: 3, name: "AlphaOne" }], T0);
+  it("admitProfilelessName_correctNameJudgedBeforeCap_stillAdmittedAfterCap", () => {
+    admitProfilelessName(3, "apextv", LISTED, T0);
+    for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
 
-    expect(admitProfilelessGuesses(7, [{ id: 3, name: "AlphaPRO" }], T0 + PROFILELESS_GUESS_WINDOW_MS)).toEqual([
-      { id: 3, name: "AlphaPRO" },
-    ]);
+    expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(true);
   });
 
-  it("admitProfilelessGuesses_otherViewer_hasOwnBudget", () => {
-    admitProfilelessGuesses(7, [{ id: 3, name: "AlphaFX" }, { id: 3, name: "AlphaGod" }, { id: 3, name: "AlphaOne" }], T0);
+  it("admitProfilelessName_sameWrongNameRepeated_notCountedTwice", () => {
+    admitProfilelessName(3, "alphafx", LISTED, T0);
+    admitProfilelessName(3, "alphafx", LISTED, T0);
+    admitProfilelessName(3, "alphagod", LISTED, T0);
+    admitProfilelessName(3, "alphaone", LISTED, T0);
 
-    expect(admitProfilelessGuesses(9, [{ id: 3, name: "AlphaPRO" }], T0)).toEqual([{ id: 3, name: "AlphaPRO" }]);
+    expect(admitProfilelessName(3, "alphafx", LISTED, T0)).toBe(true);
+    expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(true);
+  });
+
+  it("admitProfilelessName_budgetSharedAcrossViewers_noExtraGuesses", () => {
+    // La borne ne connaît aucun visiteur : un autre compte n'a pas d'essai à lui.
+    for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
+
+    expect(admitProfilelessName(3, "alphazen", LISTED, T0 + 1)).toBe(false);
+  });
+
+  it("admitProfilelessName_windowExpired_wrongCountReset", () => {
+    for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
+
+    expect(admitProfilelessName(3, "alphazen", LISTED, T0 + PROFILELESS_GUESS_WINDOW_MS)).toBe(true);
+  });
+
+  it("admitProfilelessName_knownNameRenamed_droppedFromKnown", () => {
+    admitProfilelessName(3, "apextv", LISTED, T0);
+    const renamed = new Map<number, ReadonlySet<string>>([[3, new Set(["novatv"])]]);
+    for (const key of WRONG) admitProfilelessName(3, key, renamed, T0);
+
+    expect(admitProfilelessName(3, "apextv", renamed, T0)).toBe(false);
+  });
+
+  it("admitProfilelessName_manyIdsLeftList_prunedBeyondSlack", () => {
+    const everyone = new Map<number, ReadonlySet<string>>(
+      Array.from({ length: PROFILELESS_PRUNE_SLACK + 2 }, (_, index) => [index + 1, new Set(["nom"])]),
+    );
+    for (const id of everyone.keys()) admitProfilelessName(id, "nom", everyone, T0);
+
+    admitProfilelessName(1, "nom", new Map([[1, new Set(["nom"])]]), T0);
+
+    expect(trackedProfilelessBudgetsForTests()).toBe(1);
   });
 });

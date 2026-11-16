@@ -4,7 +4,6 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { bodyReadRefusal, PAYLOAD_TOO_LARGE, readJsonBody, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
-import { admitProfilelessGuesses } from "@/lib/server/users/profileless-guess-budget";
 import { profilelessAmong } from "@/lib/server/users/profileless-players";
 import { parseProfilelessLookup } from "@/lib/shared/profileless-lookup";
 
@@ -14,8 +13,9 @@ import { parseProfilelessLookup } from "@/lib/shared/profileless-lookup";
  * que `ProfilelessPlayersProvider` rende leur nom en texte. Jamais la liste
  * entière (D86), et seulement pour un compte nommé comme la page le montre
  * (`profilelessAmong`) : des identifiants pris au hasard ne la reconstituent
- * pas, et les noms essayés par compte sont bornés (`admitProfilelessGuesses` :
- * un couple hors borne est tu, jamais refusé). Au seul visiteur connecté, le seul à qui un nom mène quelque part,
+ * pas, et les noms faux essayés par compte demandé sont bornés, tous visiteurs
+ * confondus (`admitProfilelessName` : un nom hors borne est tu, jamais refusé).
+ * Au seul visiteur connecté, le seul à qui un nom mène quelque part,
  * sous son propre seau (`PROFILELESS_LOOKUP_RULE`, distinct de l'annuaire).
  * Liste illisible : 503 (`PROFILELESS_UNAVAILABLE`), jamais une réponse vide
  * que les liens prendraient pour « tous ont une fiche ». Un `POST` sans
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   if (players === null) return fail("INVALID_PLAYER_IDS", 400);
 
   try {
-    return ok({ ids: await profilelessAmong(admitProfilelessGuesses(user.id, players)) });
+    return ok({ ids: await profilelessAmong(players) });
   } catch (error) {
     console.error("[profileless-players] liste illisible", failureReason(error));
     return fail("PROFILELESS_UNAVAILABLE", 503);

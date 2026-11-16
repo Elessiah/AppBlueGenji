@@ -24,6 +24,7 @@ import {
   listContestableReports,
   listReports,
   listReportsByAuthor,
+  purgeClosedQuarantinesSafely,
   purgeExpiredReports,
   resolveReportTargets,
   schedulePurgeExpiredReports,
@@ -870,6 +871,65 @@ describe("conservation", () => {
     await flush();
 
     expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue sécurité EF-65 cycle 3 : la passe se libère dans le même pas que sa
+  // sortie de boucle, et un déclencheur pendant une passe en échec est honoré une fois.
+  it("purgeClosedQuarantinesSafely_triggerRightAfterPassEnds_startsNewPass", async () => {
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(0);
+    const first = purgeClosedQuarantinesSafely();
+    let second: Promise<void> | undefined;
+    void first.then(() => {
+      second = purgeClosedQuarantinesSafely();
+    });
+
+    await first;
+    await second;
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_triggerDuringFailedPass_rerunsOnce", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    let fail: ((error: Error) => void) | undefined;
+    jest.mocked(purgeClosedQuarantines)
+      .mockReturnValueOnce(new Promise<number>((_resolve, reject) => { fail = reject; }))
+      .mockResolvedValue(0);
+    const pass = purgeClosedQuarantinesSafely();
+    void purgeClosedQuarantinesSafely();
+
+    fail?.(new Error("deadlock"));
+    await pass;
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_failedRerunWithTrigger_stops", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const rejecters: ((error: Error) => void)[] = [];
+    jest.mocked(purgeClosedQuarantines).mockImplementation(
+      () => new Promise<number>((_resolve, reject) => { rejecters.push(reject); }),
+    );
+    const pass = purgeClosedQuarantinesSafely();
+    void purgeClosedQuarantinesSafely();
+    rejecters[0]?.(new Error("deadlock"));
+    await flush();
+    void purgeClosedQuarantinesSafely();
+    rejecters[1]?.(new Error("deadlock"));
+
+    await pass;
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_failureWithoutTrigger_noRerun", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("deadlock"));
+
+    await purgeClosedQuarantinesSafely();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
   });
 
   it("purgeExpiredReports_nothingDeleted_skipsClosedQuarantineScan", async () => {

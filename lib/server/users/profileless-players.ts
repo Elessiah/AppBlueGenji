@@ -23,6 +23,7 @@ import type { ProfilelessLookupEntry } from "@/lib/shared/profileless-lookup";
 import { sortedIdsInclude } from "@/lib/shared/sorted-ids";
 import { visibleText } from "@/lib/shared/visible-text";
 import { accountTraceSql } from "./account-deletion";
+import { admitProfilelessName } from "./profileless-guess-budget";
 
 /**
  * Les comptes sans fiche, **avec leurs noms d'aujourd'hui** : leur pseudo, et
@@ -129,8 +130,8 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
  * sur une page qui le montre. Qui balaie des identifiants au hasard (revue
  * sécurité EF-65) n'apprend donc rien — ni la liste des comptes supprimés, ni
  * l'instant d'une demande de suppression en attente — sans deviner un pseudo
- * d'emprunt, ce que borne `admitProfilelessGuesses` (quelques noms par compte
- * et par jour). Noms et liste se lisent de la même mémoire : aucune requête ni
+ * d'emprunt, ce que borne `admitProfilelessName` (quelques noms faux par
+ * compte demandé et par jour, tous visiteurs confondus). Noms et liste se lisent de la même mémoire : aucune requête ni
  * aucun refus ne dépend du compte demandé. Un nom périmé (page restée ouverte
  * avant un renommage) laisse au pire le nom en lien, vers la fiche 404.
  *
@@ -144,7 +145,9 @@ export async function profilelessAmong(players: readonly ProfilelessLookupEntry[
   const { names } = await readProfilelessDirectory();
   const found = new Set<number>();
   for (const { id, name } of players) {
-    if (!found.has(id) && names.get(id)?.has(nameKey(name)) === true) found.add(id);
+    if (found.has(id)) continue;
+    const key = nameKey(name);
+    if (admitProfilelessName(id, key, names) && names.get(id)?.has(key) === true) found.add(id);
   }
   return [...found];
 }

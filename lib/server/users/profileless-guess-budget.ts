@@ -1,108 +1,84 @@
 /**
  * Borne des noms essayés par la question des liens (`POST
- * /api/players/profileless`, revue sécurité EF-65, cycle 2).
+ * /api/players/profileless`, revue sécurité EF-65, cycles 2 et 3).
  *
  * La route ne dit « sans fiche » que d'un compte nommé de son nom
  * d'aujourd'hui. Or le pseudo d'un compte supprimé est tiré d'une liste
  * publique de mille (`lib/shared/anonymous-pseudos.ts`) : sans borne, essayer
- * pour chaque identifiant les pseudos d'emprunt déjà portés rebâtirait la liste
- * des comptes supprimés (D86) en quelques centaines de questions. Une page ne
- * montre un compte que sous un ou deux noms (pseudo, nom d'entrée solo) : au
- * plus {@link PROFILELESS_NAMES_PER_ACCOUNT} noms distincts par compte et par
- * visiteur sur {@link PROFILELESS_GUESS_WINDOW_MS}, et au plus
- * {@link PROFILELESS_ACCOUNTS_PER_VIEWER} comptes. Au-delà, le couple n'est
- * **pas jugé** : la réponse le tait comme un compte qui a sa fiche — la borne
- * s'applique à tout identifiant, supprimé ou non, et ne dit donc rien.
+ * pour un identifiant les pseudos d'emprunt possibles dirait s'il est celui
+ * d'un compte supprimé (D86).
  *
- * Mémoire d'un seul processus (le site tourne en un processus pm2), bornée à
- * {@link PROFILELESS_GUESS_MAX_PAIRS} couples : au-delà, les fenêtres échues
- * puis les plus anciennes sont oubliées.
+ * La borne est tenue **par compte demandé, tous visiteurs confondus** — et non
+ * par visiteur : multiplier les comptes ou les sessions n'ajoute aucun essai,
+ * et le serveur ne garde rien de ce qu'un visiteur a vu. Pour chaque compte de
+ * la liste des comptes sans fiche, au plus {@link PROFILELESS_WRONG_NAMES_PER_ACCOUNT}
+ * noms **faux** distincts sont jugés par {@link PROFILELESS_GUESS_WINDOW_MS} ;
+ * au-delà, un nom nouveau n'est **pas jugé** : la réponse le tait comme un
+ * compte qui a sa fiche. Un nom déjà jugé l'est de nouveau sans rien compter,
+ * et un nom juste, une fois jugé, le reste tant qu'il est le nom du compte : la
+ * page qui montre ce joueur continue de le rendre en texte après la borne.
+ *
+ * Un compte hors de la liste n'a pas de borne : sa réponse est « a sa fiche »
+ * quel que soit le nom — l'épuiser ne dirait rien. La mémoire (d'un seul
+ * processus, le site tourne en un processus pm2) ne suit donc que les comptes
+ * de la liste, quelques noms chacun : elle ne croît pas avec les identifiants
+ * envoyés. Un redémarrage la remet à zéro (au plus quelques essais de plus par
+ * déploiement). Qui épuise la borne d'un compte avant toute page qui le montre
+ * ne fait que laisser son nom en lien (vers la fiche 404) jusqu'à la fenêtre
+ * suivante — sans rien apprendre.
  */
-import { profilelessNameKey } from "./profileless-players";
-import type { ProfilelessLookupEntry } from "@/lib/shared/profileless-lookup";
 
-/** Noms distincts jugés par compte et par visiteur, dans une fenêtre. */
-export const PROFILELESS_NAMES_PER_ACCOUNT = 3;
+/** Noms faux distincts jugés par compte demandé, dans une fenêtre, tous visiteurs confondus. */
+export const PROFILELESS_WRONG_NAMES_PER_ACCOUNT = 4;
 
-/** Comptes distincts jugés par visiteur, dans une fenêtre (bien plus qu'une journée de pages). */
-export const PROFILELESS_ACCOUNTS_PER_VIEWER = 3_000;
-
-/** Durée d'une fenêtre, par visiteur. */
+/** Durée d'une fenêtre, par compte demandé. */
 export const PROFILELESS_GUESS_WINDOW_MS = 24 * 60 * 60_000;
 
-/** Couples gardés au plus, tous visiteurs confondus. */
-export const PROFILELESS_GUESS_MAX_PAIRS = 200_000;
+/** Comptes suivis au-delà de la liste avant de faire le ménage (comptes sortis de la liste). */
+export const PROFILELESS_PRUNE_SLACK = 256;
 
-type ViewerWindow = { resetAt: number; accounts: Map<number, Set<string>>; pairs: number };
+type AccountBudget = { resetAt: number; wrong: Set<string>; known: Set<string> };
 
-const viewers = new Map<number, ViewerWindow>();
-let totalPairs = 0;
-
-function forget(viewerId: number, window: ViewerWindow): void {
-  viewers.delete(viewerId);
-  totalPairs -= window.pairs;
-}
+const budgets = new Map<number, AccountBudget>();
 
 /**
- * Fait de la place : les fenêtres échues d'abord, puis les plus anciennes —
- * jamais celle du visiteur servi (`keep`), dont le décompte doit tenir.
+ * Ce nom (forme comparée) de ce compte est-il jugé ? `names` : la liste des
+ * comptes sans fiche et de leurs noms d'aujourd'hui. Hors liste : `true`
+ * (rien à borner, la réponse y est « a sa fiche »).
  */
-function makeRoom(now: number, keep: number): void {
-  if (totalPairs < PROFILELESS_GUESS_MAX_PAIRS) return;
-  for (const [viewerId, window] of viewers) {
-    if (viewerId !== keep && window.resetAt <= now) forget(viewerId, window);
-  }
-  for (const [viewerId, window] of viewers) {
-    if (totalPairs < PROFILELESS_GUESS_MAX_PAIRS) break;
-    if (viewerId !== keep) forget(viewerId, window);
-  }
-}
-
-/**
- * Les couples `{ id, name }` de ce visiteur qui seront jugés, dans leur ordre ;
- * les autres sont tus (aucun refus). Un couple déjà jugé dans la fenêtre l'est
- * de nouveau sans rien compter.
- */
-export function admitProfilelessGuesses(
-  viewerId: number,
-  players: readonly ProfilelessLookupEntry[],
+export function admitProfilelessName(
+  id: number,
+  key: string,
+  names: ReadonlyMap<number, ReadonlySet<string>>,
   now: number = Date.now(),
-): ProfilelessLookupEntry[] {
-  let window = viewers.get(viewerId);
-  if (window !== undefined && window.resetAt <= now) {
-    forget(viewerId, window);
-    window = undefined;
+): boolean {
+  const current = names.get(id);
+  if (current === undefined) return true;
+  if (budgets.size > names.size + PROFILELESS_PRUNE_SLACK) {
+    for (const tracked of budgets.keys()) if (!names.has(tracked)) budgets.delete(tracked);
   }
-  if (window === undefined) {
-    makeRoom(now, viewerId);
-    window = { resetAt: now + PROFILELESS_GUESS_WINDOW_MS, accounts: new Map(), pairs: 0 };
-    viewers.set(viewerId, window);
+  let budget = budgets.get(id);
+  if (budget === undefined) {
+    budget = { resetAt: now + PROFILELESS_GUESS_WINDOW_MS, wrong: new Set(), known: new Set() };
+    budgets.set(id, budget);
+  } else if (budget.resetAt <= now) {
+    budget.wrong.clear();
+    budget.resetAt = now + PROFILELESS_GUESS_WINDOW_MS;
   }
-  const admitted: ProfilelessLookupEntry[] = [];
-  for (const player of players) {
-    const key = profilelessNameKey(player.name);
-    let names = window.accounts.get(player.id);
-    if (names?.has(key)) {
-      admitted.push(player);
-      continue;
-    }
-    if (names === undefined) {
-      if (window.accounts.size >= PROFILELESS_ACCOUNTS_PER_VIEWER) continue;
-      names = new Set();
-      window.accounts.set(player.id, names);
-    }
-    if (names.size >= PROFILELESS_NAMES_PER_ACCOUNT) continue;
-    makeRoom(now, viewerId);
-    names.add(key);
-    window.pairs += 1;
-    totalPairs += 1;
-    admitted.push(player);
-  }
-  return admitted;
+  // Un nom juste d'hier qui ne l'est plus (renommage) ne se garde pas.
+  for (const known of budget.known) if (!current.has(known)) budget.known.delete(known);
+  if (budget.known.has(key) || budget.wrong.has(key)) return true;
+  if (budget.wrong.size >= PROFILELESS_WRONG_NAMES_PER_ACCOUNT) return false;
+  (current.has(key) ? budget.known : budget.wrong).add(key);
+  return true;
 }
 
-/** Tests : oublie toutes les fenêtres. */
+/** Comptes suivis (tests). */
+export function trackedProfilelessBudgetsForTests(): number {
+  return budgets.size;
+}
+
+/** Tests : oublie toutes les bornes. */
 export function resetProfilelessGuessesForTests(): void {
-  viewers.clear();
-  totalPairs = 0;
+  budgets.clear();
 }

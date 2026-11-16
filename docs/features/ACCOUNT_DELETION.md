@@ -353,10 +353,16 @@ compte supprimé ne se lit que sur une page qui montre ce joueur : balayer des
 identifiants au hasard ne reconstitue donc ni la liste des comptes supprimés,
 ni l'instant d'une demande de suppression en attente (revue sécurité EF-65).
 Les pseudos d'emprunt venant d'une liste publique de mille, les noms essayés
-sont bornés (`admitProfilelessGuesses`, `profileless-guess-budget.ts`) : 3
-noms distincts par compte et 3 000 comptes par visiteur et par 24 h ; un couple
-hors borne est **tu** (traité comme un compte qui a sa fiche), jamais refusé,
-pour tout identifiant. Les noms d'aujourd'hui sont lus **avec** la liste et
+sont bornés **par compte demandé, tous visiteurs confondus**
+(`admitProfilelessName`, `profileless-guess-budget.ts`, revue sécurité EF-65,
+cycle 3) : 4 noms faux distincts par compte de la liste et par 24 h ; un nom
+hors borne est **tu** (traité comme un compte qui a sa fiche), jamais refusé.
+Multiplier les comptes ou les sessions n'ajoute aucun essai, et le serveur ne
+garde rien, par visiteur, des joueurs qui lui ont été montrés : la mémoire ne
+suit que les comptes de la liste (quelques noms chacun), remise à zéro à chaque
+redémarrage. Un nom juste déjà jugé le reste après la borne ; qui épuise la
+borne d'un compte avant toute page qui le montre laisse seulement son nom en
+lien (fiche 404) jusqu'à la fenêtre suivante. Les noms d'aujourd'hui sont lus **avec** la liste et
 gardés avec elle (une seule requête, `LEFT JOIN` des entrées solo) : aucune
 requête, aucun délai ni aucun 503 ne dépend du compte demandé (revue sécurité
 EF-65, cycle 2). Les noms

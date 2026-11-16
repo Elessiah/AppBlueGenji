@@ -9,6 +9,7 @@ import { clearCache } from "@/lib/server/cache";
 import { invalidateProfilelessPlayers, invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, profilelessAmong, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
+import { resetProfilelessGuessesForTests } from "@/lib/server/users/profileless-guess-budget";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
 import { emptyDeepStats } from "@/lib/shared/stats";
@@ -63,6 +64,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   clearCache();
   resetProfilelessFailureForTests();
+  resetProfilelessGuessesForTests();
   jest.mocked(getPlayerEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
 });
 
@@ -453,6 +455,16 @@ describe("profilelessAmong (D86)", () => {
     lookupDb([3], [{ id: 3, name: "ApexTV" }]);
 
     expect(await profilelessAmong([{ id: 3, name: "x" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_wrongNamesExhaustBudget_correctNameUntold", async () => {
+    // Revue sécurité EF-65 cycle 3 : la borne tient par compte demandé, pour
+    // tout visiteur — passé quatre noms faux, même le bon n'est plus jugé.
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+    await profilelessAmong([{ id: 3, name: "AlphaFX" }, { id: 3, name: "AlphaGod" }, { id: 3, name: "AlphaOne" }]);
+    await profilelessAmong([{ id: 3, name: "AlphaPro" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV" }])).toEqual([]);
   });
 
   it("profilelessAmong_soloEntryName_returnsId", async () => {

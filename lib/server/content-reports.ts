@@ -1318,8 +1318,9 @@ let closedQuarantinePurgeAgain = false;
  * Purge des décisions closes (D87) ; une panne ne fait tomber ni la purge des
  * signalements ni le panneau. Une passe déjà en cours est rendue, mais
  * **rejouée une fois** à sa fin : un signalement effacé après sa dernière
- * lecture ne laisse pas sa décision close jusqu'à l'entretien suivant. Deux
- * déclencheurs rapprochés ne lancent jamais deux passes à la fois.
+ * lecture ne laisse pas sa décision close jusqu'à l'entretien suivant (même
+ * après une passe en échec, une fois). Deux déclencheurs rapprochés ne lancent
+ * jamais deux passes à la fois.
  */
 export function purgeClosedQuarantinesSafely(): Promise<void> {
   if (closedQuarantinePurge !== null) {
@@ -1327,20 +1328,29 @@ export function purgeClosedQuarantinesSafely(): Promise<void> {
     return closedQuarantinePurge;
   }
   const run = async (): Promise<void> => {
-    do {
-      closedQuarantinePurgeAgain = false;
-      try {
-        await purgeClosedQuarantines();
-      } catch (error) {
-        console.error("[moderation] purge des décisions closes impossible", failureReason(error));
-        // Une panne ne se rejoue pas en boucle : l'entretien horaire reprendra.
+    let failed = false;
+    try {
+      do {
         closedQuarantinePurgeAgain = false;
-      }
-    } while (closedQuarantinePurgeAgain);
+        try {
+          await purgeClosedQuarantines();
+        } catch (error) {
+          console.error("[moderation] purge des décisions closes impossible", failureReason(error));
+          // Un déclencheur arrivé pendant la passe en échec est honoré une
+          // fois ; une seconde panne ne se rejoue pas en boucle : l'entretien
+          // horaire reprendra.
+          if (failed) closedQuarantinePurgeAgain = false;
+          failed = true;
+        }
+      } while (closedQuarantinePurgeAgain);
+    } finally {
+      // Libérée dans le même pas que la sortie de boucle : un déclencheur qui
+      // arrive après ne tombe jamais sur une passe déjà finie (revue sécurité
+      // EF-65, cycle 3).
+      closedQuarantinePurge = null;
+    }
   };
-  closedQuarantinePurge = run().finally(() => {
-    closedQuarantinePurge = null;
-  });
+  closedQuarantinePurge = run();
   return closedQuarantinePurge;
 }
 

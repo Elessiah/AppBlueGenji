@@ -358,8 +358,8 @@ export const DIRECTORY_READ_RULE: RateLimitRule = {
  * (`PROFILELESS_BURST_GAP_MS`), deux onglets de classement ouverts ensemble
  * tiennent dessous. La borne ne protège pas la liste des comptes supprimés :
  * c'est le nom exigé avec chaque compte (`profilelessAmong`), et la borne des
- * noms essayés par compte et par jour (`admitProfilelessGuesses`), qui la
- * ferment.
+ * noms faux essayés par compte demandé et par jour, tous visiteurs confondus
+ * (`admitProfilelessName`), qui la ferment.
  */
 export const PROFILELESS_LOOKUP_RULE: RateLimitRule = {
   name: "profileless-lookup",
