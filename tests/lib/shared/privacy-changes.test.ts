@@ -2864,6 +2864,17 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     expect(t18En().retention[0]).not.toContain("if the bot does not take it back, 48 hours");
   });
 
+  it("processingRegister_t18_recheckEveryFiveMinutesAndBotRecreatesFrAndEn", () => {
+    const fr = t18().security.join(" ");
+    const en = t18En().security.join(" ");
+    expect(fr).toContain("le redemander (au plus une fois toutes les 5 minutes dès 15 minutes avant l'horaire du match");
+    expect(fr).toContain("un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site");
+    expect(en).toContain("ask for it again (at most once every 5 minutes from 15 minutes before the match time");
+    expect(en).toContain("a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site");
+    expect(fr).not.toContain("le redemander (environ une fois par minute");
+    expect(en).not.toContain("ask for it again (about once a minute");
+  });
+
   it("processingRegister_t18_clearDeclaredWithoutOccupantDataFrAndEn", () => {
     expect(t18().subPurposes.join(" ")).toContain("de vider le salon ouvert d'une équipe : le bot en déconnecte tous les occupants");
     expect(t18().subPurposes.join(" ")).toContain("sans garder, journaliser ni rendre au site qui, ni combien");

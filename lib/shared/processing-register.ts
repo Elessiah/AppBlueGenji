@@ -46,6 +46,7 @@ import {
   VOICE_CHANNEL_LEAD_MINUTES,
   VOICE_CHANNEL_LATE_HOURS,
   VOICE_ROW_RETENTION_DAYS,
+  VOICE_RECHECK_MINUTES,
   VOICE_SWEEP_THROTTLE_SECONDS,
 } from "@/lib/shared/match-voice";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
@@ -1629,8 +1630,8 @@ const ACTIVITIES = registerActivities({
       ...COMMON_SECURITY,
       frEn("Aucune présence : ni identifiant, ni pseudo, ni nombre des personnes présentes n'est demandé au bot, reçu ou journalisé par le site",
         "No presence data: neither the identifier, the username nor the number of the people present is requested from the bot, received or logged by the site"),
-      frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes par processus du site (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois par minute dès ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'horaire du match, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — en dehors du vidage demandé par l'arbitrage ou par l'équipe, dont la réponse ne donne que l'issue — jamais pour savoir qui s'y trouve, ni combien`,
-        `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds per site process (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (about once a minute from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before the match time, which opens a new one if it was deleted) or hand it back — apart from a clearing requested by the referees or by the team, whose answer only gives its outcome — never to know who is in it, nor how many`),
+      frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes par processus du site (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (au plus une fois toutes les ${VOICE_RECHECK_MINUTES} minutes dès ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'horaire du match, ce qui en ouvre un neuf s'il a été supprimé et que le bot ne l'a pas déjà recréé — un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site) ou le rendre — en dehors du vidage demandé par l'arbitrage ou par l'équipe, dont la réponse ne donne que l'issue — jamais pour savoir qui s'y trouve, ni combien`,
+        `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds per site process (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (at most once every ${VOICE_RECHECK_MINUTES} minutes from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before the match time, which opens a new one if it was deleted and the bot has not already recreated it — a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site) or hand it back — apart from a clearing requested by the referees or by the team, whose answer only gives its outcome — never to know who is in it, nor how many`),
     ],
   },
 });

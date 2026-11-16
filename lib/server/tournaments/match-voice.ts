@@ -40,6 +40,7 @@ import type { TournamentState } from "@/lib/shared/types";
 import {
   VOICE_CHANNEL_LATE_HOURS,
   VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_RECHECK_MINUTES,
   VOICE_RETRY_SECONDS,
   VOICE_ROW_RETENTION_DAYS,
   VOICE_SWEEP_THROTTLE_SECONDS,
@@ -726,9 +727,9 @@ const VOICE_RECHECK_FORGET_MS = 10 * 60_000;
 
 /**
  * Salons ouverts des matchs dus : redemandés au bot par leur clé au plus une
- * fois par `VOICE_RECHECK_MS` et par salon. Le bot rend le même salon, ou un
- * neuf s'il a été supprimé à la main — seul moyen pour le site de le savoir,
- * sans jamais demander qui s'y trouve.
+ * fois par `VOICE_RECHECK_MS` et par salon. Le bot rend le même salon, ou le
+ * neuf qu'il a recréé (ou crée) s'il a été supprimé à la main — seul moyen pour
+ * le site d'en apprendre l'identifiant, sans jamais demander qui s'y trouve.
  */
 export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament_id,
        IF(v.team_id <=> m.team1_id, t1.name, t2.name) AS team_name
@@ -749,8 +750,12 @@ export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id
  ORDER BY (v.match_id > ? OR (v.match_id = ? AND v.team_id > ?)) DESC, v.match_id, v.team_id
  LIMIT ${VOICE_RECHECK_WINDOW}`;
 
-/** Un salon ouvert n'est redemandé qu'une fois par minute. */
-const VOICE_RECHECK_MS = 60_000;
+/**
+ * Un salon ouvert n'est redemandé qu'une fois par `VOICE_RECHECK_MINUTES` (5 min, décision D97) :
+ * le bot recrée lui-même un salon supprimé par la modération ; cette relecture de sécurité
+ * rattrape ce qu'il a manqué et apprend au site l'identifiant du salon neuf.
+ */
+const VOICE_RECHECK_MS = VOICE_RECHECK_MINUTES * 60_000;
 /**
  * Horodatage donné à un salon dont la vérification a échoué : « vu il y a
  * `VOICE_RECHECK_MS - VOICE_RECHECK_RETRY_MS` », donc dû dans `VOICE_RECHECK_RETRY_MS`
@@ -850,8 +855,8 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>, sameId: Sam
 /**
  * Revérifie les salons ouverts dus ; s'arrête à la première panne du bot ou au budget de
  * la passe (`deadline`). Rend `true` si le bot est indisponible. La lecture des salons
- * ouverts est sautée tant qu'aucun n'est dû (`nextRecheckAt`, une minute au plus : un
- * salon ouvert par un autre processus est atteint dans la minute). Le rendu qui suit
+ * ouverts est sautée tant qu'aucun n'est dû (`nextRecheckAt`, `VOICE_RECHECK_MS` au plus :
+ * un salon ouvert par un autre processus est atteint dans ce délai). Le rendu qui suit
  * n'en dépend pas (il a son propre arrêt sur panne).
  */
 async function recheckOpenChannels(touched: Set<number>, deadline: number): Promise<boolean> {
@@ -931,7 +936,7 @@ function forgetRecheckStamps(full: boolean, seen: ReadonlySet<string>): void {
   }
 }
 
-/** Prochain salon dû parmi ceux lus (une minute au plus) : avant, la lecture est sautée. */
+/** Prochain salon dû parmi ceux lus (`VOICE_RECHECK_MS` au plus) : avant, la lecture est sautée. */
 function nextRecheckDue(seen: ReadonlySet<string>): number {
   let next = Date.now() + VOICE_RECHECK_MS;
   for (const key of seen) next = Math.min(next, (sweep.checkedAt.get(key) ?? 0) + VOICE_RECHECK_MS);

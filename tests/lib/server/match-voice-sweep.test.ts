@@ -1112,7 +1112,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     await dispatchMatchVoiceChannels(true);
     const failedKey = jest.mocked(ensureVoiceChannel).mock.calls.at(-1)![0];
     jest.mocked(ensureVoiceChannel).mockReset().mockResolvedValue({ kind: "ok", value: "90" });
-    clock.mockReturnValue(start + 66_000);
+    clock.mockReturnValue(start + 306_000);
     await dispatchMatchVoiceChannels(true);
     const keys = jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key);
     expect(keys).toHaveLength(2);
@@ -1191,7 +1191,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     const start = Date.now();
     const clock = jest.spyOn(Date, "now").mockReturnValue(start);
     await dispatchMatchVoiceChannels();
-    clock.mockReturnValue(start + 61_000);
+    clock.mockReturnValue(start + 301_000);
     await dispatchMatchVoiceChannels(true);
     expect(openDueParams(execute)).toEqual([
       [0, 0, 0],
@@ -1314,7 +1314,7 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("dispatchMatchVoiceChannels_recheckWithinMinute_skipsOpenRowsRead", async () => {
+  it("dispatchMatchVoiceChannels_recheckWithinFiveMinutes_skipsOpenRowsRead", async () => {
     const { execute } = database({ openDue: [open] });
     const start = Date.now();
     const clock = jest.spyOn(Date, "now").mockReturnValue(start);
@@ -1323,6 +1323,28 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     clock.mockReturnValue(start + 11_000);
     await dispatchMatchVoiceChannels(true);
     expect(openDueReads(execute)).toBe(1);
+  });
+
+  it("dispatchMatchVoiceChannels_openChannelJustUnderFiveMinutes_notAskedAgain", async () => {
+    database({ openDue: [open] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 299_999);
+    await dispatchMatchVoiceChannels(true);
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchMatchVoiceChannels_openChannelAtFiveMinutes_askedAgain", async () => {
+    database({ openDue: [open] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 300_000);
+    await dispatchMatchVoiceChannels(true);
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
   });
 
   it("dispatchMatchVoiceChannels_nothingDueThenDueAgain_rechecksImmediately", async () => {
@@ -1346,7 +1368,7 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     const clock = jest.spyOn(Date, "now").mockReturnValue(start);
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
     await dispatchMatchVoiceChannels();
-    clock.mockReturnValue(start + 61_000);
+    clock.mockReturnValue(start + 301_000);
     await dispatchMatchVoiceChannels(true);
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
     expect(jest.mocked(console.warn).mock.calls).toEqual([

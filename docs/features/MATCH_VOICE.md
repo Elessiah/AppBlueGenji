@@ -10,7 +10,7 @@ et rien n'est compté.
 
 | Fichier | Rôle |
 | --- | --- |
-| `lib/shared/match-voice.ts` | Pur : constantes (`VOICE_CHANNEL_LEAD_MINUTES` = 15, `VOICE_CHANNEL_CAPACITY` = 5, `VOICE_ROW_RETENTION_DAYS` = 7, `VOICE_RETRY_SECONDS` = 60, `VOICE_CHANNEL_LATE_HOURS` = 24, durées du bot `VOICE_BOT_*`), clé `match:<matchId>:team:<teamId>`, échéance (`voiceChannelsDue`), option active (`voiceOptionLive` : allumée, tournoi en cours **et** publié — même règle pour l'instantané et la porte REST), suivi (`voiceTracked`), forme publique (`matchVoiceInfo`, `shownVoiceSide`, `parseMatchVoiceInfo`) |
+| `lib/shared/match-voice.ts` | Pur : constantes (`VOICE_CHANNEL_LEAD_MINUTES` = 15, `VOICE_CHANNEL_CAPACITY` = 5, `VOICE_ROW_RETENTION_DAYS` = 7, `VOICE_RETRY_SECONDS` = 60, `VOICE_RECHECK_MINUTES` = 5, `VOICE_CHANNEL_LATE_HOURS` = 24, durées du bot `VOICE_BOT_*`), clé `match:<matchId>:team:<teamId>`, échéance (`voiceChannelsDue`), option active (`voiceOptionLive` : allumée, tournoi en cours **et** publié — même règle pour l'instantané et la porte REST), suivi (`voiceTracked`), forme publique (`matchVoiceInfo`, `shownVoiceSide`, `parseMatchVoiceInfo`) |
 | `app/(secured)/tournois/[id]/_lib/match-voice-view.ts` | Page du match : source qui fait foi entre instantané et relecture REST (`currentMatchVoice`, `voiceStreamKey`), relecture flux coupé seulement (`voicePollActive`, `useMatchVoice`) |
 | `lib/server/tournaments/match-voice.ts` | Balayage (`dispatchMatchVoiceChannels`, `DUE_CHANNELS_SQL`, `RELEASABLE_SQL`), bascule (`setTeamVoiceChannels`), lectures (`loadMatchVoiceInfos`, `readMatchVoice`) |
 | `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `releaseVoiceChannel`, `releaseVoiceChannelByKey` (`VoiceCallOutcome` : `ok` / `gone` / `failed` — refus propre au salon — / `unavailable` — bot indisponible pour tous les salons, `VOICE_UNAVAILABLE_CODES`, transport, coupe-circuit, réponse illisible) |
@@ -39,8 +39,17 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   équipe, salon, horodatages) ni le bot (`MatchVoiceChannel` : salon, clé, horodatages) ne
   gardent ni ne journalisent qui est dans un salon, ni combien ; le vidage lit les occupants
   pour les déconnecter, sans rien en garder.
-- **Revérification par sondage** (décision D16) : le site redemande les salons ouverts au bot ;
-  aucun signal du bot vers le site.
+- **Salon supprimé par la modération : le bot réagit lui-même** (décision D97, lot VOICE-EVENT) :
+  aucun canal bot → site n'existe (`BOT_INTEGRATION.md` : les appels vont toujours du site au
+  bot), et aucun n'est créé. Sur `channelDelete`, le bot recrée **aussitôt** un salon suivi et pas
+  encore rendu (même clé, même nom, même catégorie) ; l'ancien identifiant y mène encore 15 min
+  pour le rendu et le vidage (mémoire du bot, perdue à son redémarrage). Le site ne garde qu'une
+  **revérification de sécurité toutes les 5 minutes** (`VOICE_RECHECK_MINUTES`, décision D16 : par
+  sondage, aucun signal du bot vers le site), qui lui apprend l'identifiant du salon neuf et
+  rattrape ce que le bot a manqué (arrêté pendant la suppression, recréation en échec). Limite
+  connue : un rendu par l'ancien identifiant après un redémarrage du bot, dans ces 5 minutes,
+  clôt la ligne du site sans rendre le salon neuf, alors supprimé par le bot une fois vide
+  48 h après sa création.
 
 - **Jamais** pour une entrée solo (son nom serait un pseudo) ni une équipe fantôme :
   un match qui en a une n'est pas suivi ; si l'une y entre après coup, les salons
@@ -58,9 +67,10 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   un appel au bot**. Une passe vérifie d'abord qu'il y a quelque chose à faire
   (`SWEEP_NEEDED_SQL`). Une bascule pendant une passe en demande une de plus
   (`dispatchMatchVoiceChannels(true)`), jouée à la fin de la passe en cours.
-- **Salon supprimé à la main** : les salons ouverts des matchs dus sont redemandés au
-  bot par leur clé au plus une fois par minute et par salon (`OPEN_DUE_CHANNELS_SQL`) ;
-  le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
+- **Salon supprimé à la main** : recréé aussitôt par le bot (ci-dessus) ; les salons ouverts
+  des matchs dus sont redemandés au bot par leur clé au plus une fois toutes les 5 minutes et
+  par salon (`OPEN_DUE_CHANNELS_SQL`, `VOICE_RECHECK_MINUTES`) ; le bot rend le même, le neuf
+  qu'il a recréé, ou un neuf s'il a disparu sans être recréé — jamais qui s'y trouve.
   Un match où entre une entrée solo ou une fantôme n'est plus revérifié (il est rendu).
   Le salon neuf s'écrit par l'upsert de création, qui rouvre une ligne rendue
   entre-temps (autre processus, rechargement pm2) : le salon existe déjà sur
@@ -73,8 +83,8 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   annonces), la ligne reste ouverte. Un rendu refusé pour `INVALID_CHANNEL_ID` ou `INVALID_VOICE_KEY` clôt la
   ligne (le bot ne suivra jamais cet identifiant ni cette clé) au lieu d'être redemandé sans fin. Un code du bot
   n'est repris que s'il a la forme `[A-Z0-9_]{1,64}` — jamais une phrase.
-  Coût borné : la lecture des salons ouverts est sautée tant qu'aucun n'est dû (une
-  minute au plus, `nextRecheckAt` ; ses horodatages sont oubliés dès qu'aucun tournoi
+  Coût borné : la lecture des salons ouverts est sautée tant qu'aucun n'est dû (5 minutes
+  au plus, `nextRecheckAt` ; ses horodatages sont oubliés dès qu'aucun tournoi
   n'a de salon dû) ; un premier appel seul, puis au plus 5 en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
@@ -198,9 +208,9 @@ Comportements gardés et documentés (décisions du 2026-11-05) :
 
 - un rendu ou une revérification **refusés** par le bot pour ce salon
   laissent la ligne **ouverte** (`failed_at` noté), redemandée après
-  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, au plus une fois par minute) ;
-- un salon **supprimé par la modération** est recréé à la revérification
-  suivante, dans la fenêtre du match ;
+  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, au plus une fois toutes les 5 minutes) ;
+- un salon **supprimé par la modération** est recréé aussitôt par le bot (D97), ou à
+  défaut à la revérification suivante, dans la fenêtre du match ;
 - le bot répond **succès** au rendu d'un salon déjà disparu ou jamais suivi
   (`{ released: true }` — le champ `deleted` est retiré : le site n'apprend pas si
   le salon était vide) : la ligne se clôt (PR du bot).
@@ -239,7 +249,8 @@ Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
 (`676735851119640577`). Les salons héritent des permissions de la catégorie (aucune
 permission propre à une équipe : le bot ne reçoit aucun compte de joueur) — qui peut les
 rejoindre se règle sur la catégorie (décision requise, `ERREUR.txt`) ; il supprime un salon vide une fois rendu (au plus tard
-24 h après), et un salon jamais rendu resté vide 48 h. La route de comptage
+24 h après), et un salon jamais rendu resté vide 48 h. Il recrée aussitôt un salon suivi, pas
+encore rendu, que la modération supprime (D97, `doc/internal-api.md` du bot). La route de comptage
 (`/internal/voice/channels/:id/count`) est retirée (EF-43). Le rendu par clé
 (`POST /internal/voice/keys/release`) arrive avec la PR du bot de ce lot. Déployer le bot avant
 le site : un bot plus ancien répond `INTERNAL_ROUTE_NOT_FOUND` et les lignes sans
