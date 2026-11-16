@@ -22,7 +22,9 @@ import { clientIpFromHeaders, clientNetworkKey, enforceRateLimit, SPECTATOR_READ
 import { currentSpectatorLoadLevel } from "@/lib/server/spectator-load";
 import {
   publicTournamentCard,
+  publicTournamentShare,
   publicTournamentSnapshot,
+  type PublicTournamentShare,
   type PublicTournamentView,
 } from "@/lib/server/spectator-snapshot";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -44,4 +46,15 @@ export async function publicTournamentSnapshotForRequest(tournamentId: number): 
   // Même règle que la carte : un jeton seulement quand la réponse publique
   // n'est pas déjà en cache — naviguer d'un mode à l'autre n'épuise pas le plafond.
   return publicTournamentSnapshot(tournamentId, currentSpectatorLoadLevel(), client, () => !enforceRateLimit(SPECTATOR_READ_RULE, client));
+}
+
+/**
+ * Carte et résumé d'aperçu d'un tournoi pour l'encart d'une page de match ou
+ * l'image d'un tournoi ou d'un match (`SHARE_EMBEDS.md`), ou `null`. Même
+ * règle que les réglages : la réponse publique mutualisée, un jeton du plafond
+ * seulement quand elle n'est pas déjà en cache.
+ */
+export async function publicTournamentShareForRequest(tournamentId: number): Promise<PublicTournamentShare | null> {
+  const client = clientNetworkKey(clientIpFromHeaders(await headers()));
+  return publicTournamentShare(tournamentId, currentSpectatorLoadLevel(), client, () => !enforceRateLimit(SPECTATOR_READ_RULE, client));
 }

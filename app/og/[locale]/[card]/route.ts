@@ -1,4 +1,7 @@
+import { renderEmbedShareImage } from "@/lib/server/embed-share-image";
 import { renderPageShareImage } from "@/lib/server/page-share-image";
+import { isLocale } from "@/lib/shared/locales";
+import { parseEmbedShareCardKey } from "@/lib/shared/share-embeds";
 import { parseShareImageSegments } from "@/lib/shared/page-share-cards";
 
 /**
@@ -14,6 +17,9 @@ import { parseShareImageSegments } from "@/lib/shared/page-share-cards";
  * L'extension `.png` fait aussi passer la requête à côté du middleware (son
  * `matcher` écarte les images) : pas de nonce ni de CSP à fabriquer pour un
  * robot d'aperçu. Clé ou langue inconnue : 404.
+ *
+ * Un tournoi (`tournament-<id>`) ou un match (`tournament-<tid>-match-<mid>`) partagé a
+ * sa propre carte, tirée de la réponse publique (`SHARE_EMBEDS.md`).
  */
 export const dynamic = "force-dynamic";
 
@@ -22,6 +28,12 @@ export async function GET(
   { params }: Readonly<{ params: Promise<{ locale: string; card: string }> }>,
 ): Promise<Response> {
   const { locale, card } = await params;
+  if (isLocale(locale) && card.endsWith(".png")) {
+    const key = card.slice(0, -".png".length);
+    if (parseEmbedShareCardKey(key) !== null) {
+      return (await renderEmbedShareImage(key, locale)) ?? new Response(null, { status: 404 });
+    }
+  }
   const parsed = parseShareImageSegments(locale, card);
   const image = parsed ? await renderPageShareImage(parsed.key, parsed.locale) : null;
   return image ?? new Response(null, { status: 404 });

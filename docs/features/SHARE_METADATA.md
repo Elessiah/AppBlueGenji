@@ -188,13 +188,12 @@ prennent ce néon sur tout le site, au-dessus d'un fond noir. Le fond
 (`APP_BACKGROUND_COLOR`, `#05060a`) reste celui du manifeste
 (`background_color`) et des écrans de lancement.
 
-Trois routes la servent :
+Deux routes la servent :
 
 | Route | Portée |
 | --- | --- |
 | `app/opengraph-image.tsx` | La carte du site (repli de toute page sans carte propre) |
-| `app/(secured)/tournois/[id]/opengraph-image.tsx` | La carte d'un tournoi |
-| `app/og/[locale]/[card]/route.ts` | La carte de chaque page, par langue (voir « Une carte par page ») |
+| `app/og/[locale]/[card]/route.ts` | La carte de chaque page, par langue (voir « Une carte par page ») ; celle d'un tournoi ou d'un match partagé (`SHARE_EMBEDS.md`) |
 
 **Piège vérifié : la convention `opengraph-image` ne vaut que pour son propre
 segment.** Contrairement à `icon`, celle de la racine n'habille que `/` — les

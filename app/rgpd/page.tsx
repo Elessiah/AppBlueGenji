@@ -473,10 +473,12 @@ function RgpdFr({
             porte le <strong>code de replay</strong> de la partie (l'arbitrage peut s'en passer
             quand le replay est perdu), qui permet de la revoir en
             jeu — et donc d'y lire les identifiants de jeu des joueurs présents, y compris un
-            BattleTag masqué sur le site. Ces codes
-            sont visibles des membres connectés du site sur la fiche du tournoi une fois
-            enregistrés par l'arbitrage ou retenus comme résultat, pour qu'un match diffusé en
-            direct et un match qui ne l'est pas offrent les mêmes informations — tant qu'une proposition d'équipe attend, seules les deux équipes du match
+            BattleTag masqué sur le site. Depuis novembre 2026, ces codes sont{" "}
+            <strong>publics</strong> une fois la map jouée et son résultat enregistré par
+            l'arbitrage ou retenu : visibles de tous sur la fiche du tournoi, sur sa page sans
+            compte et dans l&apos;aperçu d&apos;un lien de match partagé (voir ci-dessous), pour qu'un match diffusé en
+            direct et un match qui ne l'est pas offrent les mêmes informations — jamais avant :
+            tant qu'une proposition d'équipe attend, seules les deux équipes du match
             et l'arbitrage la lisent —, et gardés avec le
             résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le
             compte qui les a saisis n'est lié qu'en interne, et ce lien disparaît à la
@@ -493,8 +495,17 @@ function RgpdFr({
             et Discord montrent déjà —, ainsi que les logos des équipes et, pour un tournoi individuel,
             l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
             interne, qui porte sa marque du podium, et les pénalités d&apos;une BlueGenji Survie (engagé, manche,
-            points), sans leur motif ni l&apos;arbitre qui les a posées. Les codes de replay n&apos;y figurent pas : ils restent réservés
-            aux membres connectés. La page est servie depuis une copie partagée, renouvelée au plus
+            points), sans leur motif ni l&apos;arbitre qui les a posées. Depuis novembre 2026, les
+            scores de chaque map et leurs codes de replay y figurent aussi (voir ci-dessus), et le
+            bouton « Partager » d&apos;un tournoi ou d&apos;un match donne le lien de cette page. Son{" "}
+            <strong>aperçu</strong> — l&apos;image et le texte qu&apos;affichent Discord, X ou une
+            messagerie sous le lien — reprend le nom, le jeu, le format, l&apos;état, les dates et
+            l&apos;effectif du tournoi et l&apos;équipe en tête ou victorieuse ; pour un match, les
+            noms et logos des équipes, le score et chaque map jouée avec son score et son code de
+            replay. Il ne porte <strong>jamais le pseudo d&apos;un joueur</strong> : dans un
+            tournoi individuel, les engagés y sont « Joueur 1 » et « Joueur 2 », sans avatar. Un
+            tournoi non publié n&apos;a pas d&apos;aperçu. Le service qui affiche l&apos;aperçu en
+            garde une copie selon ses propres règles. La page est servie depuis une copie partagée, renouvelée au plus
             tard toutes les deux minutes et demie : un changement de pseudo, un avatar masqué ou une
             suppression de compte peut y apparaître avec ce délai. Cette page est exclue des moteurs de recherche (<code>noindex</code>)
             et n&apos;ouvre aucune session. Comme toute page du site, sa visite est comptée par la

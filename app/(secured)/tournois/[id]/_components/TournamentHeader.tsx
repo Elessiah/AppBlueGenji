@@ -1,5 +1,8 @@
 "use client";
 
+import { ShareLinkButton } from "@/components/share/ShareLinkButton";
+import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
+import { spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import { useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -246,6 +249,16 @@ export function TournamentHeader({
         </dl>
 
         <div className={s.actions}>
+          {/* Partage du lien public (`SHARE_EMBEDS.md`) : seulement un tournoi
+              publié — non publié, sa page sans compte n'existe pas encore. */}
+          {isTournamentPublished(card) && (
+            <ShareLinkButton
+              path={spectatorTournamentPath(card.id)}
+              title={card.name}
+              label={t("shareLink.tournament")}
+              ariaLabel={t("shareLink.tournamentAria")}
+            />
+          )}
           {/* Chaîne officielle : antenne permanente du tournoi, distincte de
               l'état « en direct » qui, lui, se joue au niveau des matchs. */}
           <TournamentLiveLink

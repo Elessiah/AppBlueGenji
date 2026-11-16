@@ -58,8 +58,10 @@ describe("détail map par map — affichage", () => {
 
   it("une map posée sans code dit « Pas de code de replay » au lieu d'un code vide à copier", () => {
     const details = readSource("app/(secured)/tournois/[id]/_components/MapResultList.tsx");
-    expect(details).toMatch(/\{!spectator && map\.replayCode === "" && \(\s*<span className=\{styles\.noCode\}>\{t\("match\.maps\.noReplayCode"\)\}<\/span>\s*\)\}/);
-    expect(details).toContain('{!spectator && map.replayCode !== "" && (');
+    expect(details).toMatch(/\{map\.replayCode === "" && \(\s*<span className=\{styles\.noCode\}>\{t\("match\.maps\.noReplayCode"\)\}<\/span>\s*\)\}/);
+    // D74 : le code d'un résultat est public, sans compte compris (SHARE_EMBEDS.md).
+    expect(details).toContain('{map.replayCode !== "" && (');
+    expect(details).not.toContain("useSpectatorView");
     expect(frTournament.match.maps.noReplayCode).toBe("Pas de code de replay");
     expect(enTournament.match.maps.noReplayCode).toBe("No replay code");
     const css = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.module.css");

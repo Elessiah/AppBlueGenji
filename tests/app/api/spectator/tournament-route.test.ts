@@ -76,7 +76,7 @@ afterEach(() => {
 });
 
 describe("GET /api/spectator/tournaments/[id]", () => {
-  it("sert l'instantané sans les codes de replay, avec son empreinte et la cadence accordée", async () => {
+  it("sert l'instantané, codes de replay du résultat compris (D74), avec son empreinte et la cadence accordée", async () => {
     mockedSnapshot.mockResolvedValue(snapshot());
 
     const res = await GET(req(), params("5"));
@@ -90,8 +90,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
     const body = (await res.json()) as TournamentSnapshot;
     expect(body.card.id).toBe(5);
-    expect(body.matches[0].maps[0]).toMatchObject({ replayCode: "", team1Score: 3, team2Score: 1 });
-    expect(JSON.stringify(body)).not.toContain("SECRET1");
+    expect(body.matches[0].maps[0]).toMatchObject({ replayCode: "SECRET1", team1Score: 3, team2Score: 1 });
   });
 
   it("passe par la porte de visibilité sans aucun droit, et ne lit jamais la session", async () => {
@@ -128,7 +127,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     mockedSnapshot.mockResolvedValueOnce(snapshot());
     const first = (await GET(req(), params("5"))).headers.get("etag");
     clearCache();
-    // Code de replay corrigé : nouvelle version pour les membres, rien de neuf pour le public.
+    // Salons vocaux ouverts : nouvelle version pour les membres, rien de neuf pour le public.
     mockedSnapshot.mockResolvedValueOnce(
       snapshot({
         version: "v43",
@@ -137,7 +136,8 @@ describe("GET /api/spectator/tournaments/[id]", () => {
             id: 1,
             tournamentId: 5,
             status: "COMPLETED",
-            maps: [{ mapNumber: 1, replayCode: "SECRET2", team1Score: 3, team2Score: 1 }],
+            maps: [{ mapNumber: 1, replayCode: "SECRET1", team1Score: 3, team2Score: 1 }],
+            voice: { team1State: "OPEN", team2State: "FAILED" },
           }),
         ],
       }),

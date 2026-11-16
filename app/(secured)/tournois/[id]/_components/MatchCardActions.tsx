@@ -18,6 +18,7 @@ import {
   Radio,
   Scale,
   Settings,
+  Share2,
   Film,
   TriangleAlert,
   Users,
@@ -27,6 +28,8 @@ import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation
 import { useSpectatorView } from "@/components/spectator-view";
 import { matchPagePath } from "@/lib/shared/match-page";
 import { useToast } from "@/components/ui/toast";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { absoluteShareUrl, shareLink } from "@/lib/shared/share-link";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   MATCH_LAUNCH_OPEN_EVENT,
@@ -87,6 +90,7 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   openLaunch: Info,
   contacts: Users,
   matchPage: FileText,
+  share: Share2,
   plan: CalendarPlus,
   adminScore: Pencil,
   schedule: CalendarClock,
@@ -453,6 +457,7 @@ export function MatchCardActions({
   const errorsText = useErrorsText();
   const actionText = useActionsText();
   const { t } = actionText;
+  const pageText = useTournamentPageText();
   const launchError = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
   // Le refus d'identité dit ce qui manque pour le jeu du tournoi (Battle.net en Overwatch seulement).
   const castIdentityNotice = castBlock && castBlock !== "NOT_CASTER" ? launchError(castBlock) : undefined;
@@ -640,12 +645,25 @@ export function MatchCardActions({
     }
   };
 
+  // « Partager » : le lien **public** du match (`/suivre/…`), qui s'ouvre sans
+  // compte et porte l'aperçu riche (`SHARE_EMBEDS.md`) — feuille de partage du
+  // système, sinon copie ; le résultat se dit en notification.
+  const shareMatch = async () => {
+    const path = matchPagePath(match.tournamentId, match.id, true);
+    const url = absoluteShareUrl(window.location.origin, path, pageText.locale);
+    const outcome = await shareLink(typeof navigator === "undefined" ? undefined : navigator, url);
+    if (outcome === "shared") showSuccess(pageText.t("shareLink.shared"));
+    else if (outcome === "copied") showSuccess(pageText.t("shareLink.copied"));
+    else if (outcome === "failed") showError(pageText.t("shareLink.copyFailed"));
+  };
+
   // « Page du match » n'agit pas : c'est un lien (`renderButton`), sans geste.
   const handlers: Record<Exclude<MatchCardActionId, "matchPage">, () => void> = {
     playerScore: onPlayerScore,
     openLaunch: () =>
       window.dispatchEvent(new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } })),
     contacts: () => setContactsOpen(true),
+    share: () => void shareMatch(),
     plan: () => openSchedule(match),
     adminScore: onAdminScore,
     schedule: () => openSchedule(match),

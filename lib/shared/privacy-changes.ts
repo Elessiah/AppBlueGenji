@@ -2080,6 +2080,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de plus n'est collecté sur toi, et ce que la suppression emporte reste le même.",
     ],
   },
+  {
+    // Bouton « Partager » et aperçus riches (`SHARE_EMBEDS.md`, décisions D73
+    // et D74) : les codes de replay des maps jouées deviennent publics, sur la
+    // page sans compte et dans l'aperçu d'un lien partagé. /rgpd § « Suivre un
+    // tournoi sans compte » et paragraphe des scores map par map (FR et EN),
+    // registre T03. Pour tous les comptes ; datée du lendemain de la nuit de
+    // déploiement prévue.
+    id: "2026-11-apercus-partage-codes-replay",
+    publishedAt: "2026-11-18",
+    title: "Liens partagés : un aperçu, et des codes de replay publics",
+    links: [{ href: "/rgpd#suivi-sans-compte", label: "Lire ce que montre la page sans compte" }],
+    summary:
+      "Un bouton « Partager » donne le lien public d'un tournoi ou d'un match, avec un aperçu (image et texte) sous le lien. Le score de chaque map et son code de replay, jusqu'ici réservés aux membres connectés, sont désormais publics une fois la map jouée et son résultat enregistré.",
+    details: [
+      "L'aperçu d'un tournoi montre son nom, son jeu, son format, son état, ses dates, son effectif et l'équipe en tête ou victorieuse ; celui d'un match, les noms et logos des équipes, le score et chaque map jouée avec son score et son code de replay.",
+      "Jamais de pseudo de joueur dans un aperçu : dans un tournoi individuel, les engagés y sont « Joueur 1 » et « Joueur 2 », sans avatar. Un tournoi non publié n'a pas d'aperçu.",
+      "Un code de replay permet de revoir la partie en jeu, où apparaissent les identifiants de jeu des joueurs présents, BattleTag masqué sur le site compris. Il n'est jamais montré avant que la map soit jouée et son résultat enregistré ; une proposition de score en attente reste aux deux équipes du match et à l'arbitrage.",
+      "Le service qui affiche l'aperçu (Discord, X, une messagerie) en garde une copie selon ses propres règles.",
+      "Ce qui ne change pas : rien de plus n'est collecté sur toi, et ce que la suppression emporte reste le même.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

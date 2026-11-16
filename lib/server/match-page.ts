@@ -5,11 +5,16 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { requestCache } from "@/lib/server/request-cache";
 import {
+  cachedTournamentShareLoader,
+  embedImageMetadata,
   loadVisibleTournamentCard,
   tournamentPageMetadata,
   type TournamentMetadataCardLoader,
   type TournamentMetadataRights,
+  type TournamentShareLoader,
 } from "@/lib/server/tournament-metadata";
+import { matchEmbedCard, matchEmbedDescription, matchEmbedTitle } from "@/lib/shared/share-embed-cards";
+import { matchShareCardKey, matchShareVersion } from "@/lib/shared/share-embeds";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
 import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
@@ -84,6 +89,12 @@ function prefixedTitle(title: Metadata["title"], prefix: string): string {
  * sa manche et de son numéro. Un match introuvable (identifiant illisible, ou
  * match d'un autre tournoi) garde l'encart du tournoi **et sa canonique** —
  * celle de la vue lue (`/suivre/…` sans compte), jamais une page en 404.
+ *
+ * Quand le résumé public du tournoi porte le match (`loadShare`,
+ * `SHARE_EMBEDS.md`), l'encart devient celui du match : « A contre B · Manche 2
+ * · Match 3 — tournoi », le score et chaque map jouée (code de replay compris,
+ * D74) en description, et l'image du match. Un engagé solo y est « Joueur 1 »
+ * ou « Joueur 2 », jamais son pseudo.
  */
 export async function matchPageMetadata(
   rawTournamentId: string,
@@ -91,6 +102,7 @@ export async function matchPageMetadata(
   spectator: boolean,
   rights: () => Promise<TournamentMetadataRights | null>,
   loadCard?: TournamentMetadataCardLoader,
+  loadShare: TournamentShareLoader = cachedTournamentShareLoader,
 ): Promise<Metadata> {
   const matchId = parseEntityPageId(rawMatchId);
   const tournamentId = parseEntityPageId(rawTournamentId);
@@ -108,16 +120,38 @@ export async function matchPageMetadata(
     (id) => (missing || matchId === null ? tournamentPath(id) : matchPagePath(id, matchId, spectator)),
     async () => granted,
     loadCard,
+    loadShare,
   );
   if (!position || metadata.alternates === undefined) return metadata;
   const locale = await requestLocale();
   const text = tournamentPageText(locale, tournamentPageMessages(messagesFor(locale)));
   const prefix = matchPositionText(text, position);
-  const title = prefixedTitle(metadata.title, prefix);
+  // `tournamentId` et `matchId` sont lus : sans eux, `position` serait `null`.
+  const view = await loadShare(tournamentId as number).catch(() => null);
+  const match = view?.share.matches.get(matchId as number);
+  if (!view || !match) {
+    const title = prefixedTitle(metadata.title, prefix);
+    return {
+      ...metadata,
+      title: { absolute: title },
+      openGraph: { ...metadata.openGraph, title },
+      twitter: { ...metadata.twitter, title },
+    };
+  }
+  const messages = messagesFor(locale);
+  const title = prefixedTitle(metadata.title, matchEmbedTitle(match, prefix, messages));
+  const description = matchEmbedDescription(match, messages) ?? metadata.description ?? undefined;
+  const image = embedImageMetadata(
+    matchShareCardKey(tournamentId as number, matchId as number),
+    locale,
+    matchShareVersion(view.card, match),
+    matchEmbedCard(view.card, match, prefix, messages).alt,
+  );
   return {
     ...metadata,
     title: { absolute: title },
-    openGraph: { ...metadata.openGraph, title },
-    twitter: { ...metadata.twitter, title },
+    description,
+    openGraph: { ...metadata.openGraph, title, description, images: [image] },
+    twitter: { ...metadata.twitter, title, description, images: [image] },
   };
 }

@@ -361,10 +361,11 @@ export function RgpdEn({
             <strong>replay code</strong> of the game (the referees may do without it when the replay is lost), which
             makes it possible to watch it again in game — and so
             to read there the in-game identifiers of the players present, including a BattleTag hidden on the
-            site. These codes are visible to the site&apos;s logged-in members on the tournament page once
-            recorded by the referees or retained as the result, so that a match streamed live and one that is not
-            offer the same information — while a team proposal is pending, only the two teams of the match and
-            the referees can read it —, and kept with the result they document (a detail that no longer explains
+            site. Since November 2026, these codes are <strong>public</strong> once the map is played and its
+            result recorded by the referees or retained: visible to everyone on the tournament page, on its page
+            without an account and in the preview of a shared match link (see below), so that a match streamed
+            live and one that is not offer the same information — never before: while a team proposal is
+            pending, only the two teams of the match and the referees can read it —, and kept with the result they document (a detail that no longer explains
             it is erased); the account that entered them is only linked internally, and that link disappears
             when the account is deleted. The game itself is kept by the game&apos;s publisher: deleting your
             account here does not erase your in-game identifiers from a replay, and the codes remain attached to
@@ -377,8 +378,15 @@ export function RgpdEn({
             match&apos;s casters — what streams and Discord already show —, as well as team logos and, for a solo
             tournament, the avatar of each player taking part (unless they hid it) and their internal account
             number, which carries their podium mark, and BlueGenji Survival penalties (entrant, round, points),
-            without their reason or the referee who imposed them. Replay codes are not shown there: they
-            remain reserved to logged-in members. The page is served from a shared copy, renewed at
+            without their reason or the referee who imposed them. Since November 2026, the scores of each map
+            and their replay codes are shown there too (see above), and the “Share” button of a tournament or a
+            match gives the link to this page. Its <strong>preview</strong> — the image and text that Discord,
+            X or a messaging app display under the link — shows the tournament&apos;s name, game, format, state,
+            dates and number of entrants and the leading or winning team; for a match, the teams&apos; names and
+            logos, the score and each map played with its score and replay code. It <strong>never carries a
+            player&apos;s username</strong>: in a solo tournament, the entrants are “Player 1” and “Player 2”,
+            with no avatar. An unpublished tournament has no preview. The service that displays the preview
+            keeps a copy of it under its own rules. The page is served from a shared copy, renewed at
             least every two and a half minutes: a username change, a hidden avatar or an account deletion
             may show up there with that delay. This page is excluded from search engines (<code>noindex</code>)
             and opens no session. Like any page of the site, its visit is counted by the audience measurement,

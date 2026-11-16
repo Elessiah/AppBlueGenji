@@ -51,6 +51,9 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     spectatorTournamentPath,
     async () => ((await getCurrentUser().catch(() => null)) ? null : { canManage: false }),
     publicTournamentCardForRequest,
+    // Équipe en tête de l'image : la copie publique déjà en mémoire seulement
+    // (`cachedTournamentShareLoader` par défaut) — jamais une reconstruction
+    // payée par un robot d'aperçu pour un simple `?v=`.
   );
   return { ...metadata, robots: { index: false, follow: false } };
 }

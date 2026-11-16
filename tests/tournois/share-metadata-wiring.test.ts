@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 jest.mock("@/lib/server/auth");
@@ -38,7 +38,7 @@ const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8");
 const TOURNAMENT_DIR = ["app", "(secured)", "tournois", "[id]"];
 const SECURED_LAYOUT = read("app", "(secured)", "layout.tsx");
 const AUTH_GATE = read("app", "(secured)", "_shared", "AuthGate.tsx");
-const OG_ROUTE = read(...TOURNAMENT_DIR, "opengraph-image.tsx");
+const EMBED_IMAGE = read("lib", "server", "embed-share-image.tsx");
 const AUTH = read("lib", "server", "auth.ts");
 
 const mockedUser = jest.mocked(getCurrentUser);
@@ -177,9 +177,10 @@ describe("generateMetadata de la fiche", () => {
     expect(meta.title).toBe("Tournoi");
     // Posé en entier : sinon la carte générique de `/tournois` descendrait ici.
     expect(meta.openGraph).toMatchObject({ title: "BlueGenji Esport" });
-    expect(meta.openGraph).not.toHaveProperty("images");
+    // L'image du site est posée : un `openGraph` de page remplace celui de la racine.
+    expect(meta.openGraph).toMatchObject({ images: [{ url: "/og/fr/home.png", width: 1200, height: 630 }] });
     expect(meta.twitter).toMatchObject({ card: "summary_large_image", title: "BlueGenji Esport" });
-    expect(meta.twitter).not.toHaveProperty("images");
+    expect(meta.twitter).toMatchObject({ images: [{ url: "/og/fr/home.png" }] });
   });
 
   it("n'interroge même pas la base sur un identifiant qui n'en est pas un", async () => {
@@ -199,29 +200,31 @@ describe("generateMetadata de la fiche", () => {
 });
 
 describe("route d'image d'un tournoi", () => {
-  it("refait le contrôle de visibilité, n'ayant aucune mise en page au-dessus", () => {
-    expect(OG_ROUTE).toContain("getVisibleTournamentCard(tournamentId)");
+  it("n'a plus d'`opengraph-image` par fiche : l'image vit sous `/og/<langue>/…` (SHARE_EMBEDS.md)", () => {
+    expect(existsSync(join(ROOT, ...TOURNAMENT_DIR, "opengraph-image.tsx"))).toBe(false);
+    expect(existsSync(join(ROOT, "app", "suivre", "tournois", "[id]", "opengraph-image.tsx"))).toBe(false);
   });
 
-  it("retombe sur la carte du site plutôt que de rendre une erreur", () => {
-    // Une image d'erreur ferait un encart cassé ; une 404 laisserait Discord
-    // afficher un encart sans image.
-    expect(OG_ROUTE).toContain("catch(() => null)");
-    expect(OG_ROUTE).toContain("if (!card)");
-    expect(OG_ROUTE).toContain("<ShareCard {...SITE_SHARE_CARD} logoSrc={logoSrc} />");
+  it("ne lit que la réponse publique, n'ayant aucune mise en page au-dessus", () => {
+    expect(EMBED_IMAGE).toContain("publicTournamentShareForRequest(target.tournamentId)");
+    expect(EMBED_IMAGE).not.toContain("getTournamentDetail");
   });
 
-  it("garde la même revalidation de cinq minutes", () => {
-    expect(OG_ROUTE).toContain("export const revalidate = 300");
+  it("retombe sur la carte neutre du site plutôt que de rendre une erreur", () => {
+    expect(EMBED_IMAGE).toContain(".catch(() => null)");
+    expect(EMBED_IMAGE).toContain("if (!view) return neutralImage(locale);");
+  });
+
+  it("garde un cache de cinq minutes", () => {
+    expect(EMBED_IMAGE).toContain('"public, max-age=300"');
   });
 
   it("lit le logo sur le disque, jamais par une requête réseau", () => {
-    expect(OG_ROUTE).toContain("await shareCardLogo()");
-    expect(OG_ROUTE).not.toMatch(/\bfetch\(/);
+    expect(EMBED_IMAGE).toContain("await shareCardLogo()");
+    expect(EMBED_IMAGE).not.toMatch(/\bfetch\(/);
   });
 
   it("annonce la taille attendue d'un aperçu Open Graph", () => {
-    expect(OG_ROUTE).toContain("export const size = SHARE_CARD_SIZE");
-    expect(OG_ROUTE).toContain("export const contentType = SHARE_CARD_CONTENT_TYPE");
+    expect(EMBED_IMAGE).toContain("...SHARE_CARD_SIZE");
   });
 });

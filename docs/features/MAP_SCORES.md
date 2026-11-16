@@ -457,6 +457,11 @@ jeu) — dit sur `/rgpd`, dans l'entrée `PRIVACY_CHANGES` (datée du 2026-10-06
 jour de mise en ligne) et au registre. Entrée `2026-10-scores-map-par-map` en fin de
 `PRIVACY_CHANGES`, paragraphe sur `/rgpd` (section 03), catégorie et durée
 ajoutées à la fiche T03 du registre (`REGISTER_UPDATED_AT` avancé).
+Depuis la décision D74 (`SHARE_EMBEDS.md`), le code de replay d'une map **jouée
+et retenue** est public : page sans compte `/suivre/`, aperçu d'un lien de
+match partagé (image et description). Jamais avant la saisie ; une proposition
+en attente reste aux membres. Déclaré sur `/rgpd`, au registre (T03) et dans
+l'entrée `2026-11-apercus-partage-codes-replay` de `PRIVACY_CHANGES`.
 
 ## Seed
 

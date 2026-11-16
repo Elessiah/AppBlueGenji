@@ -1,5 +1,6 @@
 "use client";
 
+import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { useCallback, useMemo, useState, useEffect, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
@@ -1254,6 +1255,7 @@ function TournamentSheetView({
         myTeamId={detail.myTeamId}
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}
+        publicShare={isTournamentPublished(detail.card)}
         refereeNames={detail.refereeNames}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché

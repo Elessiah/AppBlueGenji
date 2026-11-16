@@ -40,6 +40,11 @@ type LiveControls = {
    * (`canManage`), dont la rediff est la suite.
    */
   openReplay: (match: BracketMatch) => void;
+  /**
+   * Tournoi publié : sa page sans compte existe, chaque match offre
+   * « Partager » (`SHARE_EMBEDS.md`). Faux hors fournisseur.
+   */
+  publicShare: boolean;
 };
 
 const NO_REFEREE_NAMES: readonly MatchRefereeName[] = [];
@@ -109,6 +114,7 @@ const LiveContext = createContext<LiveControls>({
   myTeamId: null,
   castBlock: "NOT_CASTER",
   openReplay: () => undefined,
+  publicShare: false,
 });
 
 /**
@@ -132,10 +138,12 @@ export function LiveProvider({
   myTeamId,
   castBlock,
   openReplay,
+  publicShare = false,
   refereeNames = NO_REFEREE_NAMES,
   children,
 }: Readonly<
-  LiveControls & {
+  Omit<LiveControls, "publicShare"> & {
+    publicShare?: boolean;
     refereeNames?: readonly MatchRefereeName[];
     children: ReactNode;
   }
@@ -155,6 +163,7 @@ export function LiveProvider({
       myTeamId,
       castBlock,
       openReplay,
+      publicShare,
     }),
     [
       canManage,
@@ -167,6 +176,7 @@ export function LiveProvider({
       myTeamId,
       castBlock,
       openReplay,
+      publicShare,
     ],
   );
   return (

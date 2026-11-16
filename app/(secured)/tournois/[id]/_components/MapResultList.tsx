@@ -2,7 +2,6 @@
 
 import { Copy } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
-import { useSpectatorView } from "@/components/spectator-view";
 import { mapWinnerSide, type MatchMapResult } from "@/lib/shared/match-maps";
 import { hasPerMapTargets, mapPointTargetAt } from "@/lib/shared/map-points";
 import styles from "./MatchMapDetails.module.css";
@@ -14,9 +13,11 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
  * arbitres vérifient en jeu. Une map posée sans code par l'arbitrage le dit
  * (« Pas de code de replay »).
  *
- * Sans compte (`useSpectatorView`), les codes ne s'affichent pas : la politique
- * de confidentialité les réserve aux membres connectés, et la lecture publique
- * ne les transmet de toute façon pas (`spectatorSnapshot`).
+ * Les codes d'un résultat retenu sont **publics** (décision D74,
+ * `SHARE_EMBEDS.md`) : la page sans compte les montre aussi, et `/rgpd` le
+ * déclare. Une map n'a de code qu'une fois jouée et saisie : rien n'est montré
+ * avant. Les propositions en attente, elles, ne sortent pas de l'espace membre
+ * (`spectatorSnapshot` les vide).
  *
  * Format Duel / Arcade (`pointTarget`) : le score de chaque carte est en
  * points ; la règle (« premier à 5 ») est dite par le nom de la liste — ou,
@@ -41,7 +42,6 @@ export function MapResultList({
 }>) {
   const { showError, showSuccess } = useToast();
   const { t } = useTournamentPageText();
-  const spectator = useSpectatorView();
   const copy = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -78,11 +78,11 @@ export function MapResultList({
                 <span className="sr-only"> : {outcome}</span>
               </span>
               {/* L'arbitrage peut poser une map sans code (replay perdu) : rien à
-                  copier. Sans compte, la colonne n'existe pas. */}
-              {!spectator && map.replayCode === "" && (
+                  copier. */}
+              {map.replayCode === "" && (
                 <span className={styles.noCode}>{t("match.maps.noReplayCode")}</span>
               )}
-              {!spectator && map.replayCode !== "" && (
+              {map.replayCode !== "" && (
                 <>
                   <code className={styles.code}>{map.replayCode}</code>
                   <button

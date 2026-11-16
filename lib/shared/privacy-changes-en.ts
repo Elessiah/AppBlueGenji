@@ -1096,6 +1096,19 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing more is collected about you, and what deletion removes stays the same.",
     ],
   },
+  "2026-11-apercus-partage-codes-replay": {
+    linkLabels: ["Read what the page without an account shows"],
+    title: "Shared links: a preview, and public replay codes",
+    summary:
+      "A “Share” button gives the public link of a tournament or a match, with a preview (image and text) under the link. The score of each map and its replay code, until now reserved to logged-in members, are now public once the map is played and its result recorded.",
+    details: [
+      "A tournament's preview shows its name, game, format, state, dates, number of entrants and the leading or winning team; a match's, the teams' names and logos, the score and each map played with its score and replay code.",
+      "Never a player's username in a preview: in a solo tournament, the entrants are “Player 1” and “Player 2”, with no avatar. An unpublished tournament has no preview.",
+      "A replay code lets anyone watch the game again in game, where the in-game identifiers of the players present appear, including a BattleTag hidden on the site. It is never shown before the map is played and its result recorded; a pending score proposal stays with the match's two teams and the referees.",
+      "The service that displays the preview (Discord, X, a messaging app) keeps a copy of it under its own rules.",
+      "What does not change: nothing more is collected about you, and what deletion removes stays the same.",
+    ],
+  },
 };
 
 /**

@@ -20,6 +20,7 @@ export type MatchCardActionId =
   | "openLaunch"
   | "contacts"
   | "matchPage"
+  | "share"
   | "plan"
   | "adminScore"
   | "schedule"
@@ -86,6 +87,11 @@ export type MatchCardActionInput = {
    * exemption (un seul engagé, rien à jouer) — `MatchRow` en décide.
    */
   showMatchPage: boolean;
+  /**
+   * « Partager » : tournoi publié et match qui se joue (pas une exemption) —
+   * le lien public du match (`SHARE_EMBEDS.md`). Facultatif : absent, rien.
+   */
+  showShare?: boolean;
 };
 
 /**
@@ -113,6 +119,7 @@ export function matchCardActionList(
     [launch.showOpen, "openLaunch", either(input.inLobby, t("cardActions.openLaunch"), t("cardActions.matchInfo")), "primary"],
     [launch.showContacts, "contacts", t("cardActions.contacts"), "neutral"],
     [input.showMatchPage, "matchPage", t("cardActions.matchPage"), "neutral"],
+    [input.showShare === true, "share", t("cardActions.share"), "neutral"],
     [launch.showPlan, "plan", t("cardActions.plan"), "warn"],
     [input.adminScoreLabel !== null, "adminScore", input.adminScoreLabel ?? "", "staff"],
     [input.showSchedule, "schedule", either(input.hasStartAt, t("cardActions.editDate"), t("cardActions.setDate")), "staff"],

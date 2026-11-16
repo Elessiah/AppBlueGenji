@@ -9,10 +9,12 @@
  * stockage dans le cache général : des PNG de 100 Ko y chasseraient les
  * agrégats partagés).
  *
- * **Deux réserves bornées**, éviction LRU chacune :
+ * **Trois réserves bornées**, éviction LRU chacune :
  * - `fixed` : les cartes en nombre fini (pages, modes de règles, podium, carte
  *   générique d'équipe, dans chaque langue) — jamais chassées par les autres ;
- * - `team` : les cartes nominatives, une par équipe du classement public.
+ * - `team` : les cartes nominatives, une par équipe du classement public ;
+ * - `embed` : les cartes d'un tournoi ou d'un match partagé (`SHARE_EMBEDS.md`),
+ *   une par contenu dessiné (l'empreinte est dans la clé).
  *
  * Et **au plus `MAX_CONCURRENT_RENDERS` rendus à la fois** : un robot qui fait
  * tourner plus d'équipes que la réserve n'en garde n'obtient que des réponses
@@ -20,10 +22,10 @@
  */
 import { cached, invalidateCachedPrefix } from "./cache";
 
-export type ShareImagePool = "fixed" | "team";
+export type ShareImagePool = "fixed" | "team" | "embed";
 
 /** Plafond de chaque réserve : une centaine de Ko par carte. */
-export const SHARE_IMAGE_POOL_LIMITS: Readonly<Record<ShareImagePool, number>> = { fixed: 128, team: 64 };
+export const SHARE_IMAGE_POOL_LIMITS: Readonly<Record<ShareImagePool, number>> = { fixed: 128, team: 64, embed: 64 };
 
 /** Rendus simultanés au plus (Satori + `sharp`), toutes cartes confondues. */
 export const MAX_CONCURRENT_RENDERS = 2;
@@ -32,7 +34,7 @@ export type CachedShareImage = { body: ArrayBuffer; cacheControl: string };
 
 type Entry = CachedShareImage & { expiresAt: number; followsRanking: boolean };
 
-const pools: Record<ShareImagePool, Map<string, Entry>> = { fixed: new Map(), team: new Map() };
+const pools: Record<ShareImagePool, Map<string, Entry>> = { fixed: new Map(), team: new Map(), embed: new Map() };
 
 /**
  * Compteur d'invalidation des cartes tirées du classement : un rendu lancé
@@ -127,4 +129,5 @@ export function invalidateRankingShareImages(): void {
 export function clearShareImageCache(): void {
   pools.fixed.clear();
   pools.team.clear();
+  pools.embed.clear();
 }

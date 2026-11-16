@@ -126,5 +126,40 @@
     "points": "pts",
     "teamFallback": "Équipe #{id}",
     "places": ["1re", "2e", "3e"]
+  },
+  "embed": {
+    "tournamentFallback": "Tournoi",
+    "teamFallback": "Équipe #{id}",
+    "format": "Format",
+    "entrants": {
+      "TEAM": "Équipes",
+      "SOLO": "Joueurs"
+    },
+    "schedule": {
+      "FINISHED": "Joué le",
+      "RUNNING": "En cours depuis le",
+      "REGISTRATION": "Inscriptions jusqu'au",
+      "OPENS": "Inscriptions dès le",
+      "KICKOFF": "Coup d'envoi le"
+    },
+    "winner": "Vainqueur : {name}",
+    "leader": "En tête : {name}",
+    "playerSide": "Joueur {number}",
+    "tbd": "À déterminer",
+    "matchStates": {
+      "UPCOMING": "À venir",
+      "RUNNING": "Résultat en attente",
+      "COMPLETED": "Match terminé"
+    },
+    "map": "Map {number}",
+    "noCode": "Sans code",
+    "forfeit": "Forfait : {name}",
+    "doubleForfeit": "Double forfait",
+    "versus": "{team1} contre {team2}",
+    "moreMaps": "+{count} maps",
+    "mapLine": "Map {number}{name} : {score}",
+    "mapCode": "code {code}",
+    "tournamentAlt": "Aperçu du tournoi {name}",
+    "matchAlt": "Aperçu du match {team1} contre {team2}"
   }
 }

@@ -40,6 +40,7 @@ import {
   type SpectatorLoadLevel,
 } from "@/lib/shared/spectator-view";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
+import { buildTournamentShareSummary, type TournamentShareSummary } from "@/lib/shared/share-embeds";
 import type { TournamentCard, TournamentSnapshot, TournamentState } from "@/lib/shared/types";
 
 /**
@@ -63,6 +64,12 @@ export type SpectatorPayload = {
   ttlMs: number;
   /** Carte et réglages du corps public (encart, page des règles) — jamais l'instantané des membres. */
   snapshot: PublicTournamentView;
+  /**
+   * Résumé du corps public pour les cartes d'aperçu (`SHARE_EMBEDS.md`) :
+   * engagé en tête, score et maps de chaque match — tiré du corps public, il ne
+   * montre rien de plus que lui.
+   */
+  share: TournamentShareSummary;
 };
 
 /**
@@ -232,6 +239,7 @@ export async function getSpectatorPayload(
             endurance: publicSnapshot.endurance,
             seedingSource: publicSnapshot.seedingSource,
           },
+          share: buildTournamentShareSummary(publicSnapshot),
         };
       },
       {
@@ -287,6 +295,50 @@ export async function publicTournamentSnapshot(
     if (error instanceof SpectatorRebuildRefused) return staleSpectatorPayload(tournamentId)?.snapshot ?? null;
     return null;
   }
+}
+
+/** Carte (état recalculé depuis les dates) et résumé d'aperçu d'un tournoi public. */
+export type PublicTournamentShare = { card: TournamentCard; share: TournamentShareSummary };
+
+function shareOf(payload: SpectatorPayload | null | undefined): PublicTournamentShare | null {
+  if (!payload) return null;
+  const card = payload.snapshot.card;
+  return { card: { ...card, state: computeTournamentState(card) }, share: payload.share };
+}
+
+/**
+ * Le tournoi tel que ses cartes d'aperçu le dessinent (`SHARE_EMBEDS.md`) : la
+ * même réponse publique mutualisée que la page sans compte, au même prix pour
+ * le réseau qui la demande — et, comme {@link publicTournamentSnapshot}, la
+ * copie échue de moins de 150 s au plafond. `null` : introuvable (non publié
+ * compris), lecture refusée sans copie, ou base injoignable.
+ *
+ * @param admit Comme pour {@link publicTournamentSnapshot}, **obligatoire**.
+ */
+export async function publicTournamentShare(
+  tournamentId: number,
+  level: SpectatorLoadLevel,
+  client: string | null,
+  admit: () => boolean,
+): Promise<PublicTournamentShare | null> {
+  if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) {
+    return shareOf(staleSpectatorPayload(tournamentId));
+  }
+  try {
+    return shareOf(await getSpectatorPayload(tournamentId, level, client));
+  } catch (error) {
+    if (error instanceof SpectatorRebuildRefused) return shareOf(staleSpectatorPayload(tournamentId));
+    return null;
+  }
+}
+
+/**
+ * Le résumé d'aperçu de la copie **déjà en mémoire**, sans lecture ni jeton :
+ * l'encart d'une fiche s'en sert pour versionner l'adresse de son image sans
+ * jamais provoquer de reconstruction.
+ */
+export function cachedTournamentShare(tournamentId: number): PublicTournamentShare | null {
+  return shareOf(staleSpectatorPayload(tournamentId));
 }
 
 /** Durée de garde de la carte d'un tournoi lue pour un encart de lien. */

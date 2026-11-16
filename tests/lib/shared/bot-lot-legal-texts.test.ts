@@ -15,8 +15,8 @@ const entryEn = PRIVACY_CHANGES_EN[ENTRY_ID];
 describe("entrée PRIVACY_CHANGES de l'avis d'exclusion du bot", () => {
   it("privacyChange_botExclusionNotice_isLastEntryForAllAccounts", () => {
     // Suivie du rectificatif de la marque de session (EF-63), daté du déploiement suivant, puis des deux entrées d'EF-65.
-    expect(PRIVACY_CHANGES.at(-5)).toMatchObject({ id: ENTRY_ID, publishedAt: "2026-11-13" });
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe("2026-11-marque-de-session-rectificatif");
+    expect(PRIVACY_CHANGES.at(-6)).toMatchObject({ id: ENTRY_ID, publishedAt: "2026-11-13" });
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe("2026-11-marque-de-session-rectificatif");
     expect(entryFr).not.toHaveProperty("audience");
     expect(entryFr).not.toHaveProperty("asksTermsAcceptance");
   });
