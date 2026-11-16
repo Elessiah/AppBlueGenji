@@ -507,7 +507,7 @@ function RgpdFr({
           la suppression du compte. En revanche, tout ce qui désigne la personne est effacé
           (tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles — seule réserve,
           les codes de replay décrits ci-dessus) et le pseudo
-          est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
+          est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard (un nom suivi de six caractères aléatoires, par exemple « AlphaFX-7f3k2q ») : le palmarès
           subsiste sous ce faux nom, et la fiche du joueur, gardée seulement s&apos;il a joué au moins un
           match, indique que le compte a été supprimé ; sans match joué, la fiche disparaît (page
           introuvable) et les liens qui y menaient deviennent du texte simple au fil de la navigation (une page déjà ouverte garde le sien jusqu&apos;à son rechargement).

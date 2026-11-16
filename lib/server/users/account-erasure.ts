@@ -3,8 +3,7 @@ import { retireAccountQuarantinesOn } from "@/lib/server/blocked-images";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
-import { pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
-import { loadTakenAnonymousPseudos } from "./account-deletion-hold";
+import { pickAnonymousPseudo, SUFFIXED_ANONYMOUS_PSEUDO } from "@/lib/shared/anonymous-pseudos";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import type { SoloRegistrationFact } from "@/lib/shared/account-deletion";
 import { withdrawRegistrationOn } from "@/lib/server/tournaments/registration-removal";
@@ -145,15 +144,19 @@ async function readBorrowedPseudo(connection: PoolConnection, userId: number): P
 }
 
 export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
-  // Pseudos portés, et pseudos réservés par un compte en attente de suppression
-  // (`account-deletion-hold.ts`) : sa réactivation doit pouvoir le lui rendre.
-  const taken = await loadTakenAnonymousPseudos(connection, userId);
+  // Pseudo d'emprunt suffixé d'un aléa cryptographique (D99) : une collision —
+  // avec un compte, ou avec un vrai pseudo mis de côté par un compte en attente
+  // — n'arrive pas en pratique ; l'index unique départage la première.
+  const taken = new Set<string>();
   // Compte en attente : il porte depuis la demande le pseudo d'emprunt sous
   // lequel ses adversaires le voient depuis trente jours (`holdAccountIdentity`)
   // — il le garde, au lieu d'en changer une seconde fois au jour 30.
   const borrowed = await readBorrowedPseudo(connection, userId);
   for (let attempt = 0; ; attempt += 1) {
-    const pseudo = attempt === 0 && borrowed !== null ? borrowed : pickAnonymousPseudo(taken);
+    // Un emprunt resté nu (posé avant D99, migration pas encore passée) est
+    // remplacé : seul un pseudo suffixé est indevinable.
+    const keepBorrowed = attempt === 0 && borrowed !== null && SUFFIXED_ANONYMOUS_PSEUDO.test(borrowed);
+    const pseudo = keepBorrowed ? borrowed : pickAnonymousPseudo(taken);
     try {
       await connection.execute(
         `UPDATE bg_users

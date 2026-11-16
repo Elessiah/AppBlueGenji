@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { isContentionError, isSchemaNoOpError } from "@/lib/server/mysql-errors";
+import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
 import { reportSchemaFailure } from "./report-schema-failure";
 
@@ -578,10 +579,48 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // arrêt, nul (`docs/features/MATCH_CHECK_IN_SETTING.md`).
     `ALTER TABLE bg_tournaments ADD COLUMN match_check_in TINYINT(1) NOT NULL DEFAULT 1 AFTER team_voice_channels`,
     `ALTER TABLE bg_tournaments ADD COLUMN match_check_in_paused_at DATETIME NULL AFTER match_check_in`,
+    // EF-65 / D99 — les pseudos d'emprunt reçoivent un suffixe aléatoire
+    // (`pickAnonymousPseudo`, « AlphaFX-7f3k2q ») : nus, ils venaient d'une
+    // liste publique de mille et se devinaient. Les comptes déjà anonymisés ou
+    // en attente de suppression (`is_deleted = 1`) sous un nom nu de la liste
+    // reçoivent le leur ici — six caractères base 36 tirés de `RANDOM_BYTES`
+    // (MySQL 8 et MariaDB ≥ 10.10), même forme que `SUFFIXED_ANONYMOUS_PSEUDO`.
+    // Idempotent : un pseudo suffixé n'est plus dans la liste ; les noms de la
+    // liste ne portent que `[A-Za-z0-9_]` (test de la liste), d'où leur
+    // écriture en clair. L'ancien `compte_supprime_<id>` est laissé au
+    // rattrapage du démarrage (`reconcileDeletedAccounts`), qui le
+    // ré-anonymise sous un pseudo suffixé. Une collision sur l'index unique
+    // (improbable) fait échouer le pas, rejoué au démarrage suivant avec
+    // d'autres tirages. Puis le nom des entrées solo de ces comptes suit le
+    // pseudo (`syncSoloEntryIdentityOn`, son premier candidat), sauf repli
+    // « <pseudo> #<id> » ou « Joueur #<id> » déjà posé. Sur une base neuve,
+    // rien ne correspond. Se retire une fois joué en production.
+    {
+      steps: [
+        `UPDATE bg_users
+            SET pseudo = CONCAT(pseudo, '-', LOWER(LPAD(RIGHT(CONV(HEX(RANDOM_BYTES(8)), 16, 36), 6), 6, '0')))
+          WHERE is_deleted = 1
+            AND pseudo IN (${ANONYMOUS_PSEUDO_LITERALS})`,
+        `UPDATE bg_teams s
+           JOIN bg_users u ON u.id = s.solo_user_id
+            SET s.name = u.pseudo
+          WHERE u.is_deleted = 1
+            AND u.pseudo REGEXP '-[0-9a-z]{6}$'
+            AND s.name <> u.pseudo
+            AND s.name <> CONCAT(u.pseudo, ' #', u.id)
+            AND s.name <> CONCAT('Joueur #', u.id)`,
+      ],
+    },
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);
 }
+
+/**
+ * Les mille noms de la liste des pseudos d'emprunt, en littéraux SQL (D99).
+ * Écrits en clair : ils ne portent que `[A-Za-z0-9_]` (test de la liste).
+ */
+const ANONYMOUS_PSEUDO_LITERALS = ANONYMOUS_PSEUDOS.map((pseudo) => "'" + pseudo + "'").join(", ");
 
 /** Tentatives d'une instruction en échec passager (verrou, interblocage). */
 const TRANSIENT_ATTEMPTS = 3;

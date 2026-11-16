@@ -7,16 +7,18 @@
  * historique partagé le permet : les statistiques demeurent, plus rien ne
  * remonte à la personne.
  *
- * Le faux nom est tiré de cette liste plutôt que fabriqué (`compte_supprime_412`
+ * Le faux nom part de cette liste plutôt que d'être fabriqué (`compte_supprime_412`
  * portait l'identifiant du compte, et se lisait comme une erreur dans un
- * plateau). Il se lit comme un pseudo ordinaire : c'est la **fiche** du joueur
+ * plateau), suivi d'un suffixe aléatoire qui le rend indevinable (D99).
+ * Il se lit comme un pseudo ordinaire : c'est la **fiche** du joueur
  * et sa carte d'annuaire qui disent que le compte est supprimé, jamais le nom
  * lui-même, qu'un bracket affiche sans contexte.
  *
- * Module **pur** : le tirage prend son aléa en argument.
+ * Module **pur** : le tirage prend son aléa en argument (cryptographique par
+ * défaut).
  */
 
-/** Les mille pseudos d'emprunt, dans l'ordre de la liste d'origine. */
+/** Les mille noms de base des pseudos d'emprunt, dans l'ordre de la liste d'origine. */
 export const ANONYMOUS_PSEUDOS: readonly string[] = [
   "AlphaFX", "AlphaFury", "AlphaGod", "AlphaOne", "AlphaPRO", "AlphaReaperFX",
   "AlphaWarlord", "AlphaXL", "AlphaZero", "Alpha_Blade149", "Alpha_Nova753", "Alpha_Ranger",
@@ -198,41 +200,74 @@ export function isLegacyDeletedPseudo(pseudo: string): boolean {
   return /^compte_supprime_\d+$/.test(pseudo);
 }
 
-/** Nombre de suffixes essayés avant de s'en remettre à un suffixe long. */
+/** Longueur du suffixe aléatoire d'un pseudo d'emprunt (base 36, minuscules). */
+export const ANONYMOUS_SUFFIX_LENGTH = 6;
+
+/** Base du suffixe : chiffres puis lettres minuscules. */
+const SUFFIX_RADIX = 36;
+
+/**
+ * Forme d'un pseudo d'emprunt suffixé : `<nom de la liste>-<6 caractères>`.
+ * C'est elle que la migration des comptes déjà anonymisés reconnaît
+ * (`recent-schema-changes.ts`, même motif écrit en SQL).
+ */
+export const SUFFIXED_ANONYMOUS_PSEUDO = /-[0-9a-z]{6}$/;
+
+/** Tirages essayés avant de s'en remettre au compteur (aléa figé d'un test). */
 const SUFFIX_ATTEMPTS = 50;
 
 /**
- * Tire un pseudo d'emprunt **libre**.
+ * Un aléa **cryptographique** dans [0, 1) : le suffixe est ce qui rend le
+ * pseudo d'emprunt indevinable (décision D99, revue sécurité EF-65), un
+ * `Math.random` prévisible ne le ferait pas. `crypto.getRandomValues` existe
+ * côté serveur (Node ≥ 19) comme dans le navigateur.
+ */
+export function cryptoRandom(): number {
+  const buffer = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(buffer);
+  return buffer[0] / 0x1_0000_0000;
+}
+
+/** Un suffixe aléatoire de {@link ANONYMOUS_SUFFIX_LENGTH} caractères base 36. */
+export function anonymousPseudoSuffix(random: () => number = cryptoRandom): string {
+  let suffix = "";
+  for (let i = 0; i < ANONYMOUS_SUFFIX_LENGTH; i += 1) {
+    suffix += randomIndex(SUFFIX_RADIX, random).toString(SUFFIX_RADIX);
+  }
+  return suffix;
+}
+
+/**
+ * Tire un pseudo d'emprunt : un nom de la liste suivi d'un suffixe aléatoire
+ * (« AlphaFX-7f3k2q »).
  *
- * `taken` liste les pseudos déjà portés, par un compte vivant comme par un
- * compte supprimé : `bg_users.pseudo` est unique, et sa collation l'est **sans
- * casse** — `alphafury` bloque donc `AlphaFury`, d'où la comparaison en
- * minuscules. Un joueur qui s'appelle déjà comme un pseudo de la liste le
- * garde, le tirage passe simplement à côté.
+ * Le nom seul venait d'une liste publique de mille : essayer ces mille noms
+ * pour un identifiant disait, à la longue, s'il était celui d'un compte
+ * supprimé (revue sécurité EF-65, cycle 4, décision D99). Le suffixe — six
+ * caractères base 36 tirés d'un aléa cryptographique, plus de deux milliards
+ * de valeurs par nom — rend le pseudo indevinable ; le nom de la liste le garde
+ * lisible dans un plateau.
  *
- * La liste épuisée (mille comptes supprimés, ou autant de joueurs qui portent
- * ses noms), un pseudo tiré reçoit un suffixe numérique : l'anonymisation ne
- * doit jamais échouer faute de nom. Le résultat tient toujours dans la colonne
- * (les pseudos de la liste font au plus 23 caractères).
+ * `taken` liste les pseudos déjà écartés (un tirage refusé par l'index unique,
+ * qui est **sans casse** — d'où la comparaison en minuscules). Une collision
+ * n'arrive pas avec un aléa honnête ; avec un aléa figé (un test), un compteur
+ * garantit malgré tout un nom libre. Le résultat tient toujours dans la
+ * colonne : 23 caractères au plus pour le nom, 7 pour le suffixe.
  */
 export function pickAnonymousPseudo(
-  taken: Iterable<string>,
-  random: () => number = Math.random,
+  taken: Iterable<string> = [],
+  random: () => number = cryptoRandom,
 ): string {
   const used = new Set(Array.from(taken, (pseudo) => pseudo.toLowerCase()));
-  const free = ANONYMOUS_PSEUDOS.filter((pseudo) => !used.has(pseudo.toLowerCase()));
-  if (free.length > 0) return free[randomIndex(free.length, random)];
-
   const base = ANONYMOUS_PSEUDOS[randomIndex(ANONYMOUS_PSEUDOS.length, random)];
   for (let attempt = 0; attempt < SUFFIX_ATTEMPTS; attempt += 1) {
-    const candidate = `${base}${100 + randomIndex(9900, random)}`;
+    const candidate = `${base}-${anonymousPseudoSuffix(random)}`;
     if (!used.has(candidate.toLowerCase())) return candidate;
   }
-  // Cinquante collisions de suite ne se produisent pas avec un aléa honnête ;
-  // avec un aléa figé (un test), le compteur garantit malgré tout un nom libre.
-  let counter = 10_000;
-  while (used.has(`${base}${counter}`.toLowerCase())) counter += 1;
-  return `${base}${counter}`;
+  let counter = 0;
+  const numbered = () => `${base}-${counter.toString(36).padStart(ANONYMOUS_SUFFIX_LENGTH, "0")}`;
+  while (used.has(numbered().toLowerCase())) counter += 1;
+  return numbered();
 }
 
 function randomIndex(length: number, random: () => number): number {

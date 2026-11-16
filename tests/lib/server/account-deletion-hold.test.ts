@@ -6,12 +6,11 @@ import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import {
   holdAccountIdentity,
   isPseudoHeldByOther,
-  loadTakenAnonymousPseudos,
   restoreAccountIdentity,
   readModeratableAvatar,
   setHeldAvatar,
 } from "@/lib/server/users/account-deletion-hold";
-import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
+import { ANONYMOUS_PSEUDOS, SUFFIXED_ANONYMOUS_PSEUDO } from "@/lib/shared/anonymous-pseudos";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 /*
@@ -129,19 +128,6 @@ describe("isPseudoHeldByOther", () => {
   });
 });
 
-describe("loadTakenAnonymousPseudos", () => {
-  it("loadTakenAnonymousPseudos_accountsAndHolds_readsBothExcludingSelf", async () => {
-    const connection = transaction({ taken: [{ pseudo: "AlphaFX" }, { pseudo: "AlphaGod" }] });
-
-    const taken = await loadTakenAnonymousPseudos(fakeConnection(connection), 7);
-
-    expect(taken).toEqual(new Set(["AlphaFX", "AlphaGod"]));
-    const [read] = sqlOf(connection);
-    expect(read.sql).toContain("UNION SELECT pseudo FROM bg_account_deletion_holds WHERE user_id <> ?");
-    expect(read.params).toEqual([7, ...ANONYMOUS_PSEUDOS, 7, ...ANONYMOUS_PSEUDOS]);
-  });
-});
-
 describe("holdAccountIdentity", () => {
   it("holdAccountIdentity_living_parksRealPseudoAndAvatar", async () => {
     const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
@@ -160,9 +146,20 @@ describe("holdAccountIdentity", () => {
     const [mark] = updatesOf(connection);
     expect(mark.sql).toContain("SET pseudo = ?, avatar_url = NULL, is_deleted = 1, deletion_requested_at = ?");
     expect(mark.sql).toContain("WHERE id = ? AND is_deleted = 0");
-    expect(ANONYMOUS_PSEUDOS).toContain(mark.params[0]);
+    expect(mark.params[0]).toMatch(SUFFIXED_ANONYMOUS_PSEUDO);
+    expect(ANONYMOUS_PSEUDOS).toContain(String(mark.params[0]).slice(0, -7));
     expect(mark.params.slice(1)).toEqual([REQUESTED, 7]);
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
+  });
+
+  // D99 : le suffixe aléatoire rend la collision improbable — aucune relecture
+  // des pseudos portés (2 000 paramètres) avant l'écriture.
+  it("holdAccountIdentity_living_noTakenPseudoPreRead", async () => {
+    const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
+
+    await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED);
+
+    expect(sqlOf(connection).some((q) => q.sql.startsWith("SELECT pseudo FROM bg_users WHERE id <> ?"))).toBe(false);
   });
 
   it("holdAccountIdentity_noRequestDate_datesTheRequestWithTheDatabaseClock", async () => {
@@ -262,9 +259,9 @@ describe("holdAccountIdentity", () => {
 
   it("holdAccountIdentity_borrowedPseudoTaken_retriesWithAnotherPseudo", async () => {
     const connection = transaction({ live: { pseudo: "Kerya", avatar_url: null } });
-    // Lecture du compte, ancien masque retiré, masque, pseudos pris, puis le
+    // Lecture du compte, lecture d'un ancien masque, masque posé, puis le
     // premier UPDATE refusé.
-    failCall(connection, 5, duplicate());
+    failCall(connection, 4, duplicate());
 
     expect(await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).toBe(true);
 

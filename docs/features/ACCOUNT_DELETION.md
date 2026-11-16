@@ -289,16 +289,29 @@ conditions (`deletion-without-terms.test.ts`).
 
 Un compte conservé l'est **sous un faux nom** : c'est le droit à l'oubli tel
 qu'un historique partagé le permet — les statistiques restent, plus rien ne
-remonte à la personne. Le faux nom est tiré au hasard dans une liste de mille
-pseudos (`lib/shared/anonymous-pseudos.ts`, pur) : `compte_supprime_412` portait
-l'identifiant du compte et se lisait comme une erreur dans un plateau.
+remonte à la personne. Le faux nom est un nom tiré au hasard dans une liste de
+mille (`lib/shared/anonymous-pseudos.ts`, pur), **suivi d'un suffixe aléatoire**
+de six caractères base 36 (« AlphaFX-7f3k2q », `pickAnonymousPseudo`, aléa
+cryptographique `crypto.getRandomValues`) : `compte_supprime_412` portait
+l'identifiant du compte et se lisait comme une erreur dans un plateau, et le nom
+nu de la liste, publique, se devinait (décision D99, revue sécurité EF-65 : en
+essayant les mille noms pour un identifiant, on finissait par savoir s'il était
+celui d'un compte supprimé). Le suffixe donne plus de deux milliards de valeurs
+par nom ; le nom de la liste garde le pseudo lisible dans un plateau.
 
 - **Libre au moment du tirage** : `bg_users.pseudo` est unique et sa collation
-  l'est sans casse. Les pseudos déjà portés sont relus sur la transaction, puis
-  l'écriture est tentée ; deux suppressions simultanées qui tirent le même nom
-  sont départagées par l'index unique, le perdant retire son tirage et
-  recommence (cinq fois au plus). Liste épuisée, un suffixe numérique prend le
-  relais — l'anonymisation n'échoue jamais faute de nom.
+  l'est sans casse. Aucun pseudo porté n'est relu (le suffixe rend la collision
+  improbable) : l'écriture est tentée, et une collision est départagée par
+  l'index unique — le perdant retire son tirage et recommence (cinq fois au
+  plus). Une collision avec un vrai pseudo mis de côté par un compte en attente
+  ne coûterait à ce dernier, au pire, que le suffixe « OG » de la réactivation.
+- **Comptes anonymisés avant D99** : un pas de `RECENT_SCHEMA_CHANGES` suffixe
+  au démarrage (`RANDOM_BYTES`, même forme) le pseudo de tout compte
+  `is_deleted = 1` qui porte encore un nom nu de la liste — anonymisé ou en
+  attente —, puis aligne le nom de son entrée solo ; idempotent (un pseudo
+  suffixé n'est plus dans la liste), sans effet sur une base neuve. Un compte en
+  attente qui porterait encore un nom nu au jour 30 en reçoit un neuf au lieu de
+  le garder.
 - **Posé dans la même instruction** que tout le reste (`is_deleted = 1`
   compris) : le balayage de `tests/lib/server/deleted-account-write-guards.test.ts`
   exige que toute écriture de `bg_users` porte `is_deleted = 0`, sauf celle qui
@@ -352,8 +365,8 @@ que les liens prendraient pour « tous ont une fiche ». Le pseudo d'emprunt d'u
 compte supprimé ne se lit que sur une page qui montre ce joueur : balayer des
 identifiants au hasard ne reconstitue donc ni la liste des comptes supprimés,
 ni l'instant d'une demande de suppression en attente (revue sécurité EF-65).
-Les pseudos d'emprunt venant d'une liste publique de mille, les noms essayés
-sont bornés **par compte demandé, tous visiteurs confondus**
+Les pseudos d'emprunt ayant longtemps été des noms nus d'une liste publique de
+mille, les noms essayés sont bornés **par compte demandé, tous visiteurs confondus**
 (`admitProfilelessName`, `profileless-guess-budget.ts`, revue sécurité EF-65,
 cycle 3) : 4 noms faux distincts par compte de la liste et par 24 h ; le nom
 juste ne compte pas. Borne atteinte, **plus aucun nom** de ce compte n'est
@@ -369,9 +382,10 @@ ouvert, n'y reste pas lisible) ; chaque nouvelle liste oublie les comptes qui
 en sont sortis et les fenêtres échues, et un redémarrage remet tout à zéro.
 Limite assumée : qui épuise la borne d'un compte laisse son nom en lien
 (fiche 404) jusqu'à la fenêtre suivante, pour tous — gêne d'affichage, sans
-rien apprendre. Limite de fond : la borne ralentit la devinette sans la
-rendre impossible (4 essais par jour et par redémarrage, contre au plus mille
-pseudos d'emprunt). Les noms d'aujourd'hui sont lus **avec** la liste et
+rien apprendre. La borne ne faisait que ralentir la devinette (4 essais par
+jour et par redémarrage, contre mille noms) : c'est le **suffixe aléatoire** du
+pseudo d'emprunt (D99, ci-dessus) qui la rend vaine — elle reste, en défense en
+profondeur. Les noms d'aujourd'hui sont lus **avec** la liste et
 gardés avec elle (une seule requête, `LEFT JOIN` des entrées solo) : aucune
 requête ni aucun 503 ne dépend du compte demandé, et le travail d'une question
 n'en dépend que de quelques accès à une table (revue sécurité EF-65, cycles 2

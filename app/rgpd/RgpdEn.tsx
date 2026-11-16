@@ -390,7 +390,7 @@ export function RgpdEn({
           placements) are not erased when the account is deleted. On the other hand, everything that identifies
           the person is erased (Discord and game tags, login accounts, avatar, adulthood, roles — the only
           exception being the replay codes described above) and the username is replaced by a randomly drawn{" "}
-          <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
+          <strong>borrowed username</strong> (a name followed by six random characters, for example “AlphaFX-7f3k2q”): the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
           match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). An account that has never played a match has no record
           to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a

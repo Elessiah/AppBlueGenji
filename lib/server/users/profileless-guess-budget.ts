@@ -3,10 +3,12 @@
  * /api/players/profileless`, revue sécurité EF-65, cycles 2 à 4).
  *
  * La route ne dit « sans fiche » que d'un compte nommé de son nom
- * d'aujourd'hui. Or le pseudo d'un compte supprimé est tiré d'une liste
- * publique de mille (`lib/shared/anonymous-pseudos.ts`) : sans borne, essayer
- * pour un identifiant les pseudos d'emprunt possibles dirait s'il est celui
- * d'un compte supprimé (D86).
+ * d'aujourd'hui. Le pseudo d'un compte supprimé a longtemps été un nom nu
+ * d'une liste publique de mille (`lib/shared/anonymous-pseudos.ts`) : sans
+ * borne, essayer pour un identifiant les pseudos d'emprunt possibles disait
+ * s'il était celui d'un compte supprimé (D86). Depuis D99, le pseudo d'emprunt
+ * porte un suffixe aléatoire (six caractères base 36) qui rend la devinette
+ * vaine ; la borne reste, en défense en profondeur.
  *
  * La borne est tenue **par compte demandé, tous visiteurs confondus** — et non
  * par visiteur : multiplier les comptes ou les sessions n'ajoute aucun essai,
