@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { requestCache } from "@/lib/server/request-cache";
 import type { TournamentCard } from "@/lib/shared/types";
-import { SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
+import { SHARE_CARD_SIZE, SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { localeAlternates, localeHref, OPEN_GRAPH_LOCALE } from "@/lib/shared/locales";
 import { localizedTournamentShareDescription } from "@/lib/shared/tournament-share-text";
 import { parseTournamentId } from "@/lib/shared/spectator-view";
 import { cachedTournamentShare, type PublicTournamentShare } from "@/lib/server/spectator-snapshot";
-import { SHARE_CARD_SIZE } from "@/components/og/share-card";
 import { tournamentEmbedAlt } from "@/lib/shared/share-embed-cards";
 import {
   embedShareImagePath,

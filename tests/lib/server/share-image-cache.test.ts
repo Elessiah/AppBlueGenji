@@ -66,6 +66,10 @@ describe("cachedShareImage", () => {
     expect(fixed).toHaveBeenCalledTimes(1);
   });
 
+  it("garde un tableau de 63 matchs en deux langues dans la réserve des aperçus", () => {
+    expect(SHARE_IMAGE_POOL_LIMITS.embed).toBeGreaterThanOrEqual(63 * 2 + 2);
+  });
+
   it("borne la réserve des équipes (LRU)", async () => {
     const first = jest.fn(png("t0"));
     await cachedShareImage("fr:team-0", 60_000, first, "team");

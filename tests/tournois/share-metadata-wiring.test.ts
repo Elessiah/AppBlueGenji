@@ -208,6 +208,18 @@ describe("route d'image d'un tournoi", () => {
     expect(existsSync(join(ROOT, "app", "suivre", "tournois", "[id]", "opengraph-image.tsx"))).toBe(false);
   });
 
+  it("les métadonnées d'une page ne tirent pas le composant d'image dans leur module", () => {
+    const metadata = readFileSync(join(ROOT, "lib", "server", "tournament-metadata.ts"), "utf8");
+    expect(metadata).not.toContain("components/og/");
+    expect(metadata).toContain("SHARE_CARD_SIZE");
+  });
+
+  it("l'image d'un tournoi sans équipe en tête ne lit que la carte, et la route ne lit la clé qu'une fois", () => {
+    expect(EMBED_IMAGE).toContain("tournamentMayHaveLeader(card)");
+    const route = readFileSync(join(ROOT, "app", "og", "[locale]", "[card]", "route.ts"), "utf8");
+    expect(route).not.toContain("parseEmbedShareCardKey");
+  });
+
   it("ne lit que la réponse publique, n'ayant aucune mise en page au-dessus", () => {
     expect(EMBED_IMAGE).toContain("publicTournamentShareForRequest(target.tournamentId)");
     expect(EMBED_IMAGE).not.toContain("getTournamentDetail");
@@ -237,7 +249,7 @@ describe("empreinte `?v=` de l'image d'un tournoi", () => {
 
   it("tournamentPageMetadata_copyMatchesCard_versionFromCardAndLeader", async () => {
     const running = card({ state: "RUNNING", registeredTeams: 9 });
-    const loadShare: TournamentShareLoader = async () => ({ card: running, share: { leader: LEADER, matches: new Map() } });
+    const loadShare: TournamentShareLoader = async () => ({ card: running, share: { leader: LEADER, matches: new Map() }, stale: false });
 
     const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => running, loadShare);
 
@@ -249,7 +261,7 @@ describe("empreinte `?v=` de l'image d'un tournoi", () => {
   it("tournamentPageMetadata_copyFromBeforeRename_leaderIgnoredWindowVersion", async () => {
     const renamed = card({ state: "RUNNING", name: "Cup B" });
     const oldCopy = card({ state: "RUNNING", name: "Cup A" });
-    const loadShare: TournamentShareLoader = async () => ({ card: oldCopy, share: { leader: LEADER, matches: new Map() } });
+    const loadShare: TournamentShareLoader = async () => ({ card: oldCopy, share: { leader: LEADER, matches: new Map() }, stale: false });
 
     const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => renamed, loadShare);
     const image = (meta.openGraph as { images: { url: string; alt: string }[] }).images[0];

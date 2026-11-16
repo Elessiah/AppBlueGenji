@@ -169,9 +169,24 @@ function leaderOf(snapshot: ShareSummarySource, logos: ReadonlyMap<number, strin
  */
 export function buildTournamentShareSummary(snapshot: ShareSummarySource): TournamentShareSummary {
   const logos = new Map(snapshot.registrations.map((registration) => [registration.teamId, registration.logoUrl]));
-  const matches = new Map<number, MatchShareSummary>();
-  for (const match of snapshot.matches) matches.set(match.id, matchSummary(snapshot, logos, match));
-  return { leader: leaderOf(snapshot, logos), matches };
+  const leader = leaderOf(snapshot, logos);
+  // Les matchs ne servent qu'à la page et à l'image d'un match, rarement
+  // demandées : le résumé de chacun n'est construit qu'à la première lecture
+  // (puis gardé), et non à chaque reconstruction de la réponse publique. Le
+  // résumé ne retient que ce que cette construction relit.
+  const source = { card: snapshot.card, soloUserIds: snapshot.soloUserIds, mapRules: snapshot.mapRules, matches: snapshot.matches };
+  let matches: ReadonlyMap<number, MatchShareSummary> | null = null;
+  return {
+    leader,
+    get matches() {
+      if (matches === null) {
+        const built = new Map<number, MatchShareSummary>();
+        for (const match of source.matches) built.set(match.id, matchSummary(source, logos, match));
+        matches = built;
+      }
+      return matches;
+    },
+  };
 }
 
 /**
@@ -208,6 +223,15 @@ export function tournamentShareVersion(card: TournamentCard, leader: ShareLeader
   ]);
 }
 
+/**
+ * L'image du tournoi peut-elle nommer une équipe en tête ? Seulement un tournoi
+ * par équipes, en cours ou terminé (`leaderOf`) : ailleurs la carte ne dépend
+ * que de la carte du tournoi, sans réponse publique à reconstruire.
+ */
+export function tournamentMayHaveLeader(card: Pick<TournamentCard, "participantType" | "state">): boolean {
+  return !isSoloTournament(card.participantType) && (card.state === "RUNNING" || card.state === "FINISHED");
+}
+
 /** Fenêtre d'une empreinte de tournoi **en cours** lue sans sa réponse publique : celle du cache de l'image. */
 export const UNSETTLED_SHARE_VERSION_MS = 5 * 60_000;
 
@@ -230,7 +254,7 @@ export const FINISHED_SHARE_VERSION_MS = 24 * 60 * 60_000;
  */
 export function tournamentShareVersionWithoutSummary(card: TournamentCard, now: number = Date.now()): string {
   const base = tournamentShareVersion(card, null);
-  if (isSoloTournament(card.participantType)) return base;
+  if (!tournamentMayHaveLeader(card)) return base;
   let windowMs: number | null = null;
   if (card.state === "RUNNING") windowMs = UNSETTLED_SHARE_VERSION_MS;
   else if (card.state === "FINISHED") windowMs = FINISHED_SHARE_VERSION_MS;

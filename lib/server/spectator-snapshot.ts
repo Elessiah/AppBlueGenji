@@ -301,13 +301,18 @@ export async function publicTournamentSnapshot(
   }
 }
 
-/** Carte (état recalculé depuis les dates) et résumé d'aperçu d'un tournoi public. */
-export type PublicTournamentShare = { card: TournamentCard; share: TournamentShareSummary };
+/**
+ * Carte (état recalculé depuis les dates) et résumé d'aperçu d'un tournoi
+ * public. `stale` : tiré d'une copie **échue** (plafond de lecture atteint ou
+ * reconstruction refusée) — ce qu'il dessine peut avoir un score de retard, et
+ * l'image rendue ne doit pas être gardée sous l'adresse versionnée suivante.
+ */
+export type PublicTournamentShare = { card: TournamentCard; share: TournamentShareSummary; stale: boolean };
 
-function shareOf(payload: SpectatorPayload | null | undefined): PublicTournamentShare | null {
+function shareOf(payload: SpectatorPayload | null | undefined, stale: boolean): PublicTournamentShare | null {
   if (!payload) return null;
   const card = payload.snapshot.card;
-  return { card: { ...card, state: computeTournamentState(card) }, share: payload.share };
+  return { card: { ...card, state: computeTournamentState(card) }, share: payload.share, stale };
 }
 
 /**
@@ -326,12 +331,12 @@ export async function publicTournamentShare(
   admit: () => boolean,
 ): Promise<PublicTournamentShare | null> {
   if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) {
-    return shareOf(staleSpectatorPayload(tournamentId));
+    return shareOf(staleSpectatorPayload(tournamentId), true);
   }
   try {
-    return shareOf(await getSpectatorPayload(tournamentId, level, client));
+    return shareOf(await getSpectatorPayload(tournamentId, level, client), false);
   } catch (error) {
-    if (error instanceof SpectatorRebuildRefused) return shareOf(staleSpectatorPayload(tournamentId));
+    if (error instanceof SpectatorRebuildRefused) return shareOf(staleSpectatorPayload(tournamentId), true);
     return null;
   }
 }
@@ -342,7 +347,8 @@ export async function publicTournamentShare(
  * jamais provoquer de reconstruction.
  */
 export function cachedTournamentShare(tournamentId: number): PublicTournamentShare | null {
-  return shareOf(staleSpectatorPayload(tournamentId));
+  // `stale` : l'âge de la copie n'est pas jugé ici (l'encart ne s'en sert pas).
+  return shareOf(staleSpectatorPayload(tournamentId), false);
 }
 
 /** Durée de garde de la carte d'un tournoi lue pour un encart de lien. */

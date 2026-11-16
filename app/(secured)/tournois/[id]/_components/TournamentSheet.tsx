@@ -1297,6 +1297,7 @@ function TournamentSheetView({
           onAdvance={() => setAdvanceDialogOpen(true)}
           onLiveSaved={() => void refresh()}
           onEditImage={() => setImageDialogOpen(true)}
+          published={published}
         />
 
         {/* La frise complète l'en-tête : elle situe le tournoi sur son cycle de

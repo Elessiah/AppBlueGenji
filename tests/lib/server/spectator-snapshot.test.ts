@@ -570,6 +570,26 @@ describe("publicTournamentShare / cachedTournamentShare", () => {
     expect(mockedSnapshot).not.toHaveBeenCalled();
   });
 
+  it("publicTournamentShare_freshRead_isNotStale", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ matches: [MATCH] }));
+
+    expect((await publicTournamentShare(5, 0, CLIENT, () => true))?.stale).toBe(false);
+  });
+
+  it("publicTournamentShare_expiredCopyAndRefused_isStaleWithoutLoading", async () => {
+    jest.useFakeTimers({ now: 3_000_000, ...FAKE_CLOCK });
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ matches: [MATCH] }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.setSystemTime(3_000_000 + 20_000);
+    mockedSnapshot.mockClear();
+
+    const view = await publicTournamentShare(5, 0, CLIENT, () => false);
+
+    expect(view?.stale).toBe(true);
+    expect(view?.share.matches.get(31)).toBeDefined();
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
   it("cachedTournamentShare_noCopy_returnsNullWithoutReading", () => {
     expect(cachedTournamentShare(5)).toBeNull();
     expect(mockedSnapshot).not.toHaveBeenCalled();

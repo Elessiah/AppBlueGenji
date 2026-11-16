@@ -24,8 +24,13 @@ import { cached, invalidateCachedPrefix } from "./cache";
 
 export type ShareImagePool = "fixed" | "team" | "embed";
 
-/** Plafond de chaque réserve : une centaine de Ko par carte. */
-export const SHARE_IMAGE_POOL_LIMITS: Readonly<Record<ShareImagePool, number>> = { fixed: 128, team: 64, embed: 64 };
+/**
+ * Plafond de chaque réserve : une centaine de Ko par carte. `embed` en garde
+ * plus : un tableau de 63 matchs partagé en deux langues fait déjà 126 cartes,
+ * et chaque score saisi laisse l'ancienne version dans la réserve jusqu'à son
+ * éviction (192 cartes : une vingtaine de Mo au plus).
+ */
+export const SHARE_IMAGE_POOL_LIMITS: Readonly<Record<ShareImagePool, number>> = { fixed: 128, team: 64, embed: 192 };
 
 /** Rendus simultanés au plus (Satori + `sharp`), toutes cartes confondues. */
 export const MAX_CONCURRENT_RENDERS = 2;

@@ -1,7 +1,6 @@
 import { renderEmbedShareImage } from "@/lib/server/embed-share-image";
 import { renderPageShareImage } from "@/lib/server/page-share-image";
 import { isLocale } from "@/lib/shared/locales";
-import { parseEmbedShareCardKey } from "@/lib/shared/share-embeds";
 import { parseShareImageSegments } from "@/lib/shared/page-share-cards";
 
 /**
@@ -29,10 +28,9 @@ export async function GET(
 ): Promise<Response> {
   const { locale, card } = await params;
   if (isLocale(locale) && card.endsWith(".png")) {
-    const key = card.slice(0, -".png".length);
-    if (parseEmbedShareCardKey(key) !== null) {
-      return (await renderEmbedShareImage(key, locale)) ?? new Response(null, { status: 404 });
-    }
+    // `null` : pas une clé de tournoi ni de match (la clé n'est lue qu'une fois, ici).
+    const embed = await renderEmbedShareImage(card.slice(0, -".png".length), locale);
+    if (embed) return embed;
   }
   const parsed = parseShareImageSegments(locale, card);
   const image = parsed ? await renderPageShareImage(parsed.key, parsed.locale) : null;

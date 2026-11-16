@@ -4,7 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { GET } from "@/app/og/[locale]/[card]/route";
 import {
   EMBED_CARD_CACHE_CONTROL,
+  EMBED_CARD_TTL_MS,
   NEUTRAL_CARD_CACHE_CONTROL,
+  STALE_CARD_CACHE_CONTROL,
   buildEmbedShareImage,
   renderEmbedShareImage,
 } from "@/lib/server/embed-share-image";
@@ -12,7 +14,7 @@ import { renderPageShareImage } from "@/lib/server/page-share-image";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { clearShareImageCache } from "@/lib/server/share-image-cache";
 import { teamLogoDataUrl } from "@/lib/server/share-podium";
-import { publicTournamentShareForRequest } from "@/lib/server/spectator-request";
+import { publicTournamentCardForRequest, publicTournamentShareForRequest } from "@/lib/server/spectator-request";
 import type { PublicTournamentShare } from "@/lib/server/spectator-snapshot";
 import type { MatchShareSummary } from "@/lib/shared/share-embeds";
 import { tournamentCard } from "../../helpers/tournament-card";
@@ -36,7 +38,10 @@ jest.mock("next/og", () => ({
     }
   },
 }));
-jest.mock("@/lib/server/spectator-request", () => ({ publicTournamentShareForRequest: jest.fn() }));
+jest.mock("@/lib/server/spectator-request", () => ({
+  publicTournamentCardForRequest: jest.fn(),
+  publicTournamentShareForRequest: jest.fn(),
+}));
 jest.mock("@/lib/server/page-share-image", () => ({ renderPageShareImage: jest.fn() }));
 jest.mock("@/lib/server/share-podium", () => ({ teamLogoDataUrl: jest.fn() }));
 jest.mock("@/lib/server/share-card-logo");
@@ -61,6 +66,7 @@ function view(overrides: Partial<MatchShareSummary> = {}): PublicTournamentShare
   return {
     card: tournamentCard({ id: 4, name: "Spring Cup", state: "RUNNING" }),
     share: { leader: null, matches: new Map([[7, { ...MATCH, ...overrides }]]) },
+    stale: false,
   };
 }
 
@@ -74,6 +80,7 @@ async function get(locale: string, card: string): Promise<Response> {
 
 beforeEach(() => {
   clearShareImageCache();
+  jest.mocked(publicTournamentCardForRequest).mockReset().mockResolvedValue(view().card);
   jest.mocked(publicTournamentShareForRequest).mockReset().mockResolvedValue(view());
   jest.mocked(renderPageShareImage).mockReset().mockImplementation(async () => neutral());
   jest.mocked(teamLogoDataUrl).mockReset().mockResolvedValue(null);
@@ -89,6 +96,44 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
     expect(publicTournamentShareForRequest).toHaveBeenCalledWith(4);
   });
 
+  it("GET_tournamentNotYetRunning_readsOnlyTheCard", async () => {
+    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(tournamentCard({ id: 4, state: "REGISTRATION" }));
+
+    const response = await get("fr", "tournament-4.png");
+
+    expect(await response.text()).toBe("png");
+    expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
+    expect(publicTournamentShareForRequest).not.toHaveBeenCalled();
+  });
+
+  it("GET_soloTournamentRunning_readsOnlyTheCard", async () => {
+    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(
+      tournamentCard({ id: 4, state: "RUNNING", participantType: "SOLO" }),
+    );
+
+    await get("en", "tournament-4.png");
+
+    expect(publicTournamentShareForRequest).not.toHaveBeenCalled();
+  });
+
+  it("GET_matchKey_neverUsesTheLightCardRead", async () => {
+    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(tournamentCard({ id: 4, state: "REGISTRATION" }));
+
+    await get("en", "tournament-4-match-7.png");
+
+    expect(publicTournamentCardForRequest).not.toHaveBeenCalled();
+    expect(publicTournamentShareForRequest).toHaveBeenCalledWith(4);
+  });
+
+  it("GET_copyExpired_servesNoStore", async () => {
+    jest.mocked(publicTournamentShareForRequest).mockResolvedValue({ ...view(), stale: true });
+
+    const response = await get("fr", "tournament-4-match-7.png");
+
+    expect(await response.text()).toBe("png");
+    expect(response.headers.get("cache-control")).toBe(STALE_CARD_CACHE_CONTROL);
+  });
+
   it("GET_matchKey_rendersPng", async () => {
     const response = await get("en", "tournament-4-match-7.png");
 
@@ -96,7 +141,7 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
   });
 
   it("GET_unpublishedTournament_servesNeutralCard", async () => {
-    jest.mocked(publicTournamentShareForRequest).mockResolvedValue(null);
+    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(null);
 
     const response = await get("en", "tournament-4.png");
 
@@ -112,7 +157,7 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
   });
 
   it("GET_loaderThrows_servesNeutralCard", async () => {
-    jest.mocked(publicTournamentShareForRequest).mockRejectedValue(new Error("db down"));
+    jest.mocked(publicTournamentCardForRequest).mockRejectedValue(new Error("db down"));
 
     const response = await get("fr", "tournament-4.png");
 
@@ -156,6 +201,22 @@ describe("renderEmbedShareImage — cache", () => {
     await renderEmbedShareImage("tournament-4", "en");
 
     expect(shareCardLogo).toHaveBeenCalledTimes(2);
+  });
+
+  it("renderEmbedShareImage_unchangedContentAfterTenMinutes_isStillServedFromMemory", async () => {
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    try {
+      await renderEmbedShareImage("tournament-4-match-7", "fr");
+      clock.mockReturnValue(start + 10 * 60_000);
+      await renderEmbedShareImage("tournament-4-match-7", "fr");
+    } finally {
+      clock.mockRestore();
+    }
+
+    // Une carte dont l'empreinte (donc la clé) n'a pas bougé n'est pas redessinée.
+    expect(teamLogoDataUrl).toHaveBeenCalledTimes(2);
+    expect(EMBED_CARD_TTL_MS).toBeGreaterThanOrEqual(60 * 60_000);
   });
 });
 

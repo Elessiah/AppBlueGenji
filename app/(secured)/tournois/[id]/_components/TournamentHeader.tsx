@@ -92,6 +92,11 @@ interface TournamentHeaderProps {
   onLiveSaved: () => void;
   /** Ouvre le réglage de l'image (illustration ou logo) (staff `tournaments`). */
   onEditImage: () => void;
+  /**
+   * Le tournoi est-il publié ? La fiche le calcule déjà (une seule horloge) ;
+   * sans cette valeur, l'en-tête le calcule lui-même.
+   */
+  published?: boolean;
 }
 
 /**
@@ -127,9 +132,11 @@ export function TournamentHeader({
   onAdvance,
   onLiveSaved,
   onEditImage,
+  published: publishedByPage,
 }: Readonly<TournamentHeaderProps>) {
   const { card } = detail;
-  const published = useTournamentPublished(card);
+  const ownPublished = useTournamentPublished(publishedByPage === undefined ? card : null);
+  const published = publishedByPage ?? ownPublished;
   const text = useTournamentPageText();
   const labels = useTournamentsText();
   const { t } = text;

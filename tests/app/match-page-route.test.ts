@@ -210,7 +210,7 @@ describe("encart du lien partagé", () => {
   it("matchPageMetadata_spectatorWithShare_cardFromShareNotLoader", async () => {
     const shared = tournamentCard({ id: 12, name: "Coupe partagée" });
     const loadCard = jest.fn(async () => tournamentCard({ id: 12 }));
-    const loadShare = jest.fn(async () => ({ card: shared, share: { leader: null, matches: new Map() } }));
+    const loadShare = jest.fn(async () => ({ card: shared, share: { leader: null, matches: new Map() }, stale: false }));
 
     const meta = await matchPageMetadata("12", "34", true, async () => ({ canManage: false }), loadCard, loadShare);
 
@@ -234,6 +234,7 @@ describe("encart du lien partagé", () => {
     const loadShare = jest.fn(async () => ({
       card: tournamentCard({ id: 12, name: "Copie publique" }),
       share: { leader: null, matches: new Map() },
+      stale: false,
     }));
 
     const meta = await matchPageMetadata("12", "34", false, async () => ({ canManage: false }), loadCard, loadShare);

@@ -24,9 +24,10 @@ de replay publics).
   (`/en/suivre/…` en anglais) — jamais celle de l'espace membre.
 - Offert seulement pour un tournoi **publié** (`isTournamentPublished`) ; sur
   un match, pas sur une exemption. `LiveProvider` porte `publicShare`.
-- Publication relue toutes les 30 s (`useTournamentPublished`, `useClock`) : le
-  bouton et l'action des matchs apparaissent à l'instant où le tournoi devient
-  public. Le bouton de l'en-tête vient **après** l'inscription (l'action
+- Publication relue toutes les 30 s tant que le tournoi n'est pas publié
+  (`useTournamentPublished`, `useClock` : l'horloge s'**arrête** une fois publié,
+  la fiche passe `published` à l'en-tête — une seule horloge) : le bouton et
+  l'action des matchs apparaissent à l'instant où le tournoi devient public. Le bouton de l'en-tête vient **après** l'inscription (l'action
   principale garde la tête de ligne). Sur une carte de match, « Partager » n'est
   jamais l'action visible quand une autre est offerte (décision : « Page du
   match » tient le pied) ; elle va au menu, ou reste ouverte si elle est seule.
@@ -44,7 +45,9 @@ de replay publics).
   rendu `lib/server/embed-share-image.tsx`, carte de match
   `components/og/match-share-card.tsx`). Les anciens
   `opengraph-image.tsx` des fiches sont retirés : leur adresse ne changeait pas
-  avec la langue.
+  avec la langue. Leurs anciennes adresses (`/[en/][suivre/]tournois/<id>/opengraph-image[-<empreinte>]`)
+  **redirigent** (307, `redirects` de `next.config.ts`) vers la nouvelle : un
+  lien déjà collé ne perd pas son image.
 - Tournoi : jeu, état, nom, équipe victorieuse (rang final 1) ou en tête
   (seule première d'un classement suisse / Survie / BlueGenji Survie après un
   match joué), à défaut la description ; faits format, effectif, échéance ; le
@@ -70,7 +73,11 @@ de replay publics).
   `buildTournamentShareSummary`, `lib/shared/share-embeds.ts`) — une carte ne
   montre rien que `/suivre/` ne montre déjà. Lue par
   `publicTournamentShareForRequest` (plafond de lecture et copie périmée de la
-  page sans compte).
+  page sans compte). L'image d'un tournoi qui ne peut pas nommer d'équipe en
+  tête (individuel, à venir, inscriptions : `tournamentMayHaveLeader`) ne lit que
+  **la carte** (lecture légère de l'encart, sans reconstruire la réponse
+  publique) ; celle d'un tournoi par équipes en cours ou terminé, et celle d'un
+  match, lisent la réponse publique.
 - **Aucun pseudo** : un engagé solo est « Joueur 1 » / « Joueur 2 », sans
   avatar ; un tournoi individuel n'a pas de ligne « en tête ».
 - Tournoi non publié, introuvable, match d'un autre tournoi, base injoignable,
@@ -85,9 +92,12 @@ de replay publics).
 
 ## Cache
 
-- PNG en mémoire, réserve `embed` de `share-image-cache.ts` (64 cartes), clé
-  `<langue>:<clé>:<empreinte>` : l'empreinte (`shareVersion`, FNV-1a) couvre ce
-  que la carte dessine, un score saisi donne donc une nouvelle clé.
+- PNG en mémoire, réserve `embed` de `share-image-cache.ts` (192 cartes : un tableau de 63
+  matchs en deux langues), clé `<langue>:<clé>:<empreinte>` : l'empreinte
+  (`shareVersion`, FNV-1a) couvre ce que la carte dessine, un score saisi donne
+  donc une nouvelle clé. Une carte inchangée reste **6 h** en mémoire
+  (`EMBED_CARD_TTL_MS`), seule l'éviction LRU la chasse : pas de rendu Satori
+  de plus toutes les cinq minutes.
 - L'adresse publiée porte la même empreinte en `?v=` pour que Discord ou X ne
   resservent pas une ancienne image ; le paramètre reçu n'est jamais lu.
   L'encart d'un tournoi lit la copie publique **déjà en mémoire** (jamais une
@@ -100,5 +110,10 @@ de replay publics).
   Une page de match lit la réponse publique une seule fois pour ses deux
   encarts ; sans compte, sa carte en vient aussi (un seul jeton du plafond).
 - Le résumé d'aperçu est calculé avec la copie publique, depuis l'objet déjà
-  construit (sans relire le corps) : la fiche des membres le lit à chaque vue.
-- `Cache-Control: public, max-age=300` (carte neutre : `no-store`).
+  construit (sans relire le corps) : l'équipe en tête tout de suite (la fiche
+  des membres la lit à chaque vue), le résumé des **matchs** à la première
+  lecture seulement (page ou image d'un match), puis gardé.
+- `Cache-Control: public, max-age=300` (carte neutre : `no-store`). Une image
+  dessinée depuis une copie **échue** (plafond de lecture atteint, 150 s au
+  plus : `PublicTournamentShare.stale`) part aussi en `no-store` : un robot ne la
+  garde pas sous l'adresse `?v=` d'un score plus récent.

@@ -7,14 +7,15 @@ import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
 const PUBLISHED_CLOCK_MS = 30_000;
 
 /**
- * Le tournoi est-il publié **maintenant** (`SHARE_EMBEDS.md`) ? Relu toutes les
- * 30 s (`useClock`) : le bouton « Partager » et l'action des matchs apparaissent
- * à l'instant de la publication, sans recharger — et tous deux lisent la même
- * horloge. Avant le montage, l'heure du rendu serveur (pas de divergence
- * d'hydratation).
+ * Le tournoi est-il publié **maintenant** (`SHARE_EMBEDS.md`) ? Tant qu'il ne
+ * l'est pas, l'horloge (`useClock`, 30 s) relance le rendu : le bouton
+ * « Partager » et l'action des matchs apparaissent à l'instant de la
+ * publication, sans recharger. **Une fois publié, l'horloge s'arrête** : un
+ * tournoi publié ne se dépublie pas, et un battement de plus ne ferait que
+ * redessiner toute la fiche pour rien. Sans carte, aucune horloge.
  */
 export function useTournamentPublished(card: Parameters<typeof isTournamentPublished>[0] | null): boolean {
-  const now = useClock(PUBLISHED_CLOCK_MS);
-  if (card === null) return false;
-  return isTournamentPublished(card, now === null ? undefined : new Date(now));
+  const published = card !== null && isTournamentPublished(card);
+  useClock(PUBLISHED_CLOCK_MS, card !== null && !published);
+  return published;
 }

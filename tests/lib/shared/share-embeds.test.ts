@@ -6,6 +6,7 @@ import {
   matchShareVersion,
   parseEmbedShareCardKey,
   tournamentShareCardKey,
+  tournamentMayHaveLeader,
   tournamentShareVersion,
   tournamentShareVersionWithoutSummary,
   UNSETTLED_SHARE_VERSION_MS,
@@ -348,5 +349,42 @@ describe("tournamentShareVersionWithoutSummary", () => {
     const card = tournamentCard({ state: "FINISHED", participantType: "SOLO" });
 
     expect(tournamentShareVersionWithoutSummary(card, NOW)).toBe(tournamentShareVersion(card, null));
+  });
+});
+
+describe("buildTournamentShareSummary — matchs différés", () => {
+  it("buildTournamentShareSummary_matches_builtOnFirstReadThenKept", () => {
+    const summary = buildTournamentShareSummary(source({ matches: [PLAYED] }));
+
+    const first = summary.matches;
+
+    expect(first.get(7)?.score).toEqual({ team1: 2, team2: 1 });
+    expect(summary.matches).toBe(first);
+  });
+
+  it("buildTournamentShareSummary_leader_doesNotNeedTheMatches", () => {
+    const summary = buildTournamentShareSummary(
+      source({ card: tournamentCard({ state: "FINISHED" }), registrations: [registration(10, "Alpha", 1)] }),
+    );
+
+    expect(summary.leader?.kind).toBe("WINNER");
+  });
+});
+
+describe("tournamentMayHaveLeader", () => {
+  it.each([
+    ["TEAM", "RUNNING", true],
+    ["TEAM", "FINISHED", true],
+    ["TEAM", "UPCOMING", false],
+    ["TEAM", "REGISTRATION", false],
+    ["SOLO", "RUNNING", false],
+    ["SOLO", "FINISHED", false],
+  ])("tournamentMayHaveLeader_%s_%s_is_%s", (participantType, state, expected) => {
+    const card = tournamentCard({
+      participantType: participantType === "SOLO" ? "SOLO" : "TEAM",
+      state: state === "RUNNING" || state === "FINISHED" || state === "REGISTRATION" ? state : "UPCOMING",
+    });
+
+    expect(tournamentMayHaveLeader(card)).toBe(expected);
   });
 });

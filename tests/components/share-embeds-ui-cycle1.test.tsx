@@ -91,16 +91,18 @@ describe("isPublicMatch", () => {
 describe("wiring", () => {
   it("useTournamentPublished_reads_theClockAndAcceptsNoCard", () => {
     const source = readSource("app/(secured)/tournois/[id]/_lib/use-tournament-published.ts");
-    expect(source).toContain("useClock(PUBLISHED_CLOCK_MS)");
-    expect(source).toMatch(/if \(card === null\) return false;/);
-    expect(source).toContain("new Date(now)");
+    // L'horloge ne tourne que tant que le tournoi n'est pas publié (et jamais sans carte).
+    expect(source).toContain("useClock(PUBLISHED_CLOCK_MS, card !== null && !published)");
+    expect(source).toContain("card !== null && isTournamentPublished(card)");
   });
 
   it("TournamentHeader_shareButton_comesAfterTheRegisterButton", () => {
     const source = readSource("app/(secured)/tournois/[id]/_components/TournamentHeader.tsx");
     expect(source.indexOf("registerCta")).toBeGreaterThan(-1);
     expect(source.indexOf("<ShareLinkButton")).toBeGreaterThan(source.indexOf("registerCta"));
-    expect(source).toContain("useTournamentPublished(card)");
+    // Une seule horloge : la fiche passe `published`, l'en-tête ne calcule que sans lui.
+    expect(source).toContain("useTournamentPublished(publishedByPage === undefined ? card : null)");
+    expect(readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx")).toContain("published={published}");
   });
 
   it("useShareLink_failed_toastCarriesTheUrl", () => {

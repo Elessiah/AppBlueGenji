@@ -23,6 +23,13 @@ import { participantWording } from "./participants";
 import type { TournamentCard, TournamentState } from "./types";
 import { visibleText } from "./visible-text";
 
+/**
+ * Format canonique d'une image d'aperçu (1,91:1), attendu par Open Graph. Ici,
+ * et non dans la carte, pour que les métadonnées d'une page ne tirent pas le
+ * composant d'image dans leur module.
+ */
+export const SHARE_CARD_SIZE = { width: 1200, height: 630 } as const;
+
 /** Nom du site, tel qu'il doit apparaître dans un encart de partage. */
 export const SITE_NAME = "BlueGenji Esport";
 
