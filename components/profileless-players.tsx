@@ -1,32 +1,41 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { formatProfilelessLookup, PROFILELESS_LOOKUP_MAX } from "@/lib/shared/profileless-lookup";
 
 /**
  * Les comptes supprimés **sans fiche** (décision D13, `lib/server/users/profileless-players.ts`),
- * posés par la mise en page racine (`app/layout.tsx`) et lus par les liens de
- * joueur (`PlayerLink`, `EntrantLink` d'une entrée solo) : leur nom reste un
- * nom, aucun lien ne mène à une fiche qui répond 404.
+ * lus par les liens de joueur (`PlayerLink`, `EntrantLink` d'une entrée solo) :
+ * leur nom reste un nom, aucun lien ne mène à une fiche qui répond 404.
  *
- * La mise en page racine n'est pas re-rendue d'un lien à l'autre : pour un
- * visiteur connecté (`refresh`), la liste est relue (`/api/players/profileless`)
- * à la navigation client, au plus une fois par {@link PROFILELESS_REFRESH_MS} —
- * un compte supprimé entre-temps ne garde pas son lien jusqu'au rechargement.
+ * **Seuls les comptes affichés** sont demandés (décision D86) : chaque lien
+ * monté inscrit son compte (`useHasPlayerPage`), et les comptes d'un même rendu
+ * partent ensemble (`/api/players/profileless?ids=…`, par paquets de
+ * {@link PROFILELESS_LOOKUP_MAX}) — la liste entière des comptes supprimés ne
+ * part plus dans chaque page. Un compte inscrit est redemandé à la navigation
+ * client, au plus une fois par {@link PROFILELESS_REFRESH_MS} : un compte
+ * supprimé entre-temps ne garde pas son lien jusqu'au rechargement. Tant que la
+ * réponse n'est pas là (ou en panne), le nom reste un lien — au pire vers une
+ * fiche 404.
  *
- * Hors fournisseur (tests, aperçus), toute fiche existe : un nom reste un lien.
+ * Hors fournisseur, ou sans recherche (`lookup`, visiteur connecté seulement),
+ * toute fiche existe sauf celles données d'emblée (`ids`, rendu serveur des
+ * tests et aperçus) : un nom reste un lien.
  */
-const ProfilelessPlayersContext = createContext<ReadonlySet<number>>(new Set());
 
-/** Intervalle minimal entre deux relectures de la liste à la navigation. */
+/** Intervalle minimal entre deux questions sur un même compte. */
 export const PROFILELESS_REFRESH_MS = 60_000;
 
 /**
- * Délai avant de réessayer après un échec (hors ligne, 429, 5xx) : plus court
+ * Délai avant de redemander après un échec (hors ligne, 429, 5xx) : plus court
  * qu'une fenêtre, mais jamais un essai par changement de page — un refus
  * (`DIRECTORY_READ_RULE`) que l'on martèlerait resterait déclenché.
  */
 export const PROFILELESS_RETRY_MS = 15_000;
+
+/** Regroupement des comptes inscrits par un même rendu en une seule question. */
+export const PROFILELESS_BATCH_MS = 50;
 
 /** Les ids d'une réponse de `/api/players/profileless`, ou `null` si elle n'en porte pas. */
 export function parseProfilelessIds(body: unknown): number[] | null {
@@ -36,98 +45,175 @@ export function parseProfilelessIds(body: unknown): number[] | null {
   return ids.filter((id): id is number => Number.isSafeInteger(id) && id > 0);
 }
 
-export function ProfilelessPlayersProvider({
-  ids,
-  refresh = false,
-  children,
-}: Readonly<{ ids: readonly number[]; refresh?: boolean; children: ReactNode }>) {
-  // Relecture tenue avec la liste du serveur qu'elle remplace : une nouvelle
-  // liste du serveur (rechargement, `router.refresh()`) prime aussitôt.
-  const [fresh, setFresh] = useState<{ from: readonly number[]; ids: readonly number[] } | null>(null);
-  const current = fresh?.from === ids ? fresh.ids : ids;
-  const set = useMemo(() => new Set(current), [current]);
-  return (
-    <ProfilelessPlayersContext.Provider value={set}>
-      {refresh ? (
-        <ProfilelessRefresh
-          onIds={(next) => {
-            // Liste inchangée : rien n'est posé, les liens ne se re-rendent pas.
-            if (sameIds(next, current)) return;
-            setFresh({ from: ids, ids: next });
-          }}
-        />
-      ) : null}
-      {children}
-    </ProfilelessPlayersContext.Provider>
-  );
-}
-
-/** La liste fraîche, ou `null` (hors ligne, refus, corps illisible). */
-export async function fetchProfilelessIds(fetchImpl: typeof fetch = fetch): Promise<number[] | null> {
+/** Ceux de `ids` qui sont sans fiche, ou `null` (hors ligne, refus, corps illisible). */
+export async function fetchProfilelessIds(
+  ids: readonly number[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<number[] | null> {
   try {
-    const response = await fetchImpl("/api/players/profileless", { cache: "no-store" });
+    const response = await fetchImpl(`/api/players/profileless?ids=${formatProfilelessLookup(ids)}`, {
+      cache: "no-store",
+    });
     return response.ok ? parseProfilelessIds(await response.json()) : null;
   } catch {
     return null;
   }
 }
 
-/**
- * Relit la liste à chaque navigation client, au plus une fois par fenêtre. Monté
- * pour le seul visiteur connecté (`usePathname` n'existe que sous le routeur).
- */
-function ProfilelessRefresh({ onIds }: Readonly<{ onIds: (ids: number[]) => void }>) {
+/** Ce que les liens lisent : la réponse connue de chaque compte affiché. */
+export type ProfilelessStore = {
+  subscribe(listener: () => void): () => void;
+  /** Ce compte est-il sans fiche, d'après la dernière réponse ? */
+  isProfileless(userId: number): boolean;
+  /** Même question pour le rendu serveur et l'hydratation : les seuls comptes donnés d'emblée. */
+  isSeeded(userId: number): boolean;
+  /** Un lien affiche ce compte : il est demandé s'il ne l'a pas été dans la fenêtre. Rend le retrait. */
+  watch(userId: number): () => void;
+  /** Navigation client : les comptes affichés dont la réponse a passé la fenêtre sont redemandés. */
+  refreshStale(): void;
+};
+
+type StoreOptions = {
+  seed?: readonly number[];
+  lookup: boolean;
+  fetchIds?: (ids: readonly number[]) => Promise<number[] | null>;
+  now?: () => number;
+  schedule?: (run: () => void, ms: number) => void;
+};
+
+/** Crée la mémoire des réponses d'une page (une par fournisseur). */
+export function createProfilelessStore({
+  seed = [],
+  lookup,
+  fetchIds = fetchProfilelessIds,
+  now = Date.now,
+  schedule = (run, ms) => {
+    setTimeout(run, ms);
+  },
+}: StoreOptions): ProfilelessStore {
+  const seeded = new Set(seed);
+  const answers = new Map<number, boolean>(seed.map((id) => [id, true]));
+  const askedAt = new Map<number, number>();
+  const failed = new Set<number>();
+  const shown = new Map<number, number>();
+  const queued = new Set<number>();
+  const inFlight = new Set<number>();
+  const listeners = new Set<() => void>();
+  let flushArmed = false;
+
+  const due = (userId: number): boolean => {
+    if (seeded.has(userId) || queued.has(userId) || inFlight.has(userId)) return false;
+    const at = askedAt.get(userId);
+    if (at === undefined) return true;
+    return now() - at >= (failed.has(userId) ? PROFILELESS_RETRY_MS : PROFILELESS_REFRESH_MS);
+  };
+
+  const settle = (chunk: readonly number[], profileless: number[] | null) => {
+    let changed = false;
+    for (const userId of chunk) {
+      inFlight.delete(userId);
+      if (profileless === null) {
+        failed.add(userId);
+        continue;
+      }
+      failed.delete(userId);
+      const next = profileless.includes(userId);
+      if ((answers.get(userId) === true) !== next) changed = true;
+      answers.set(userId, next);
+    }
+    // Rien de changé : les liens ne se re-rendent pas.
+    if (changed) for (const listener of listeners) listener();
+  };
+
+  const flush = () => {
+    flushArmed = false;
+    const ids = [...queued];
+    queued.clear();
+    for (let start = 0; start < ids.length; start += PROFILELESS_LOOKUP_MAX) {
+      const chunk = ids.slice(start, start + PROFILELESS_LOOKUP_MAX);
+      const at = now();
+      for (const userId of chunk) {
+        inFlight.add(userId);
+        // La fenêtre est prise avant l'envoi : jamais deux questions en vol.
+        askedAt.set(userId, at);
+      }
+      void fetchIds(chunk).then(
+        (profileless) => settle(chunk, profileless),
+        () => settle(chunk, null),
+      );
+    }
+  };
+
+  const ask = (userId: number) => {
+    if (!lookup || !due(userId)) return;
+    queued.add(userId);
+    if (flushArmed) return;
+    flushArmed = true;
+    schedule(flush, PROFILELESS_BATCH_MS);
+  };
+
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    isProfileless: (userId) => answers.get(userId) === true,
+    isSeeded: (userId) => seeded.has(userId),
+    watch(userId) {
+      shown.set(userId, (shown.get(userId) ?? 0) + 1);
+      ask(userId);
+      return () => {
+        const count = (shown.get(userId) ?? 1) - 1;
+        if (count > 0) shown.set(userId, count);
+        else shown.delete(userId);
+      };
+    },
+    refreshStale() {
+      for (const userId of shown.keys()) ask(userId);
+    },
+  };
+}
+
+const ProfilelessPlayersContext = createContext<ProfilelessStore | null>(null);
+
+const NO_IDS: readonly number[] = [];
+
+export function ProfilelessPlayersProvider({
+  ids = NO_IDS,
+  lookup = false,
+  children,
+}: Readonly<{ ids?: readonly number[]; lookup?: boolean; children: ReactNode }>) {
+  const store = useMemo(() => createProfilelessStore({ seed: ids, lookup }), [ids, lookup]);
+  return (
+    <ProfilelessPlayersContext.Provider value={store}>
+      {lookup ? <ProfilelessNavigation store={store} /> : null}
+      {children}
+    </ProfilelessPlayersContext.Provider>
+  );
+}
+
+/** Redemande, à chaque navigation client, les comptes affichés dont la réponse a vieilli. */
+function ProfilelessNavigation({ store }: Readonly<{ store: ProfilelessStore }>) {
   const pathname = usePathname();
   const firstPath = useRef(pathname);
-  const loadedAt = useRef(Date.now());
-  const latest = useRef(onIds);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    latest.current = onIds;
-  });
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
   useEffect(() => {
     if (pathname === firstPath.current) return;
     firstPath.current = pathname;
-    const now = Date.now();
-    if (now - loadedAt.current < PROFILELESS_REFRESH_MS) return;
-    loadedAt.current = now;
-    // Un essai qui échoue ne garde pas toute la fenêtre, mais pas aucune : le
-    // suivant attend `PROFILELESS_RETRY_MS` (jamais un essai par page, ni deux
-    // en vol — la fenêtre est prise avant l'envoi).
-    const retryLater = () => {
-      if (loadedAt.current === now) loadedAt.current = Date.now() - (PROFILELESS_REFRESH_MS - PROFILELESS_RETRY_MS);
-    };
-    // Jamais annulée par la navigation suivante : la fenêtre est déjà prise,
-    // la réponse doit servir.
-    // Hors ligne ou refus : la liste connue reste (au pire un lien vers une 404), et un changement de page après le délai réessaie.
-    void fetchProfilelessIds().then((next) => {
-      if (!next) retryLater();
-      else if (mounted.current) latest.current(next);
-    });
-  }, [pathname]);
-
+    store.refreshStale();
+  }, [pathname, store]);
   return null;
 }
 
+const noSubscription = () => () => undefined;
+
 /** La fiche `/joueurs/<id>` de ce compte existe-t-elle ? `undefined` (pas un joueur) : oui. */
 export function useHasPlayerPage(userId: number | undefined): boolean {
-  const profileless = useContext(ProfilelessPlayersContext);
-  return userId === undefined || !profileless.has(userId);
-}
-
-/** Deux listes d'identifiants identiques, dans le même ordre. */
-export function sameIds(a: readonly number[], b: readonly number[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return false;
-  return true;
+  const store = useContext(ProfilelessPlayersContext);
+  useEffect(() => (userId === undefined || store === null ? undefined : store.watch(userId)), [store, userId]);
+  const profileless = useSyncExternalStore(
+    store?.subscribe ?? noSubscription,
+    () => userId !== undefined && store !== null && store.isProfileless(userId),
+    () => userId !== undefined && store !== null && store.isSeeded(userId),
+  );
+  return !profileless;
 }

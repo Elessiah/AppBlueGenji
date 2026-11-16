@@ -33,15 +33,7 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
   );
   // Trié ici aussi, sans se fier au seul `ORDER BY` : la recherche
   // dichotomique (`sortedIdsInclude`) en dépend.
-  const ids = rows.map((row) => Number(row.id)).sort((a, b) => a - b);
-  // Gardée entière côté serveur (fiche, annuaire, accueil) ; seule la copie
-  // envoyée au navigateur est tronquée (`loadProfilelessPlayerIdsForClient`).
-  if (ids.length > PROFILELESS_PLAYERS_MAX) {
-    console.warn(
-      `[profileless-players] ${ids.length} comptes sans fiche : liste envoyée au navigateur tronquée à ${PROFILELESS_PLAYERS_MAX}.`,
-    );
-  }
-  return ids;
+  return rows.map((row) => Number(row.id)).sort((a, b) => a - b);
 }
 
 /**
@@ -57,16 +49,6 @@ export const PROFILELESS_PLAYERS_TTL_MS = 10 * 60_000;
 // Cache d'un seul processus : le site tourne en un processus pm2
 // (`REALTIME_REFRESH.md`, flux SSE en mémoire), où chaque invalidation porte.
 // Passer à plusieurs instances demanderait d'y diffuser l'invalidation.
-
-/**
- * Au-delà, la copie envoyée au navigateur est tronquée (les plus anciens
- * d'abord retranchés, les suppressions récentes restent) : elle voyage dans la charge de **chaque** page d'un
- * visiteur connecté. Un lien au-delà mène au pire à une fiche 404, comme sur
- * une panne de lecture ; un avertissement le dit, pour qu'on revoie la forme
- * de la liste avant d'y arriver. Les décisions du serveur (la fiche elle-même,
- * l'annuaire) lisent la liste entière : la troncature ne rouvre aucune fiche.
- */
-export const PROFILELESS_PLAYERS_MAX = 20_000;
 
 /** Après une lecture en échec, aucune relance avant ce délai : la base en peine n'est pas martelée. */
 export const PROFILELESS_FAILURE_BACKOFF_MS = 15_000;
@@ -88,8 +70,7 @@ export function resetProfilelessFailureForTests(): void {
  * Mutualisé hors du préfixe du classement (que chaque score vide) :
  * le balayage des comptes supprimés n'est rejoué qu'à une écriture d'identité
  * ou à l'échéance. Ne lève jamais : une panne de lecture rend des liens (au
- * pire vers une fiche 404) plutôt qu'une page tombée — il est lu par la mise en
- * page racine.
+ * pire vers une fiche 404) plutôt qu'une page tombée.
  */
 export async function loadProfilelessPlayerIds(): Promise<number[]> {
   try {
@@ -104,16 +85,15 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
 }
 
 /**
- * La liste telle qu'elle part au navigateur (mise en page racine, relecture
- * `/api/players/profileless`) : tronquée à {@link PROFILELESS_PLAYERS_MAX}.
- * Ne lève jamais.
+ * Ceux de `ids` qui sont sans fiche, dans leur ordre — la seule réponse qui
+ * part au navigateur (`/api/players/profileless`, décision D86) : jamais la
+ * liste entière, seulement les comptes que la page affiche. Ne lève jamais (une
+ * panne rend des liens, au pire vers une fiche 404).
  */
-export async function loadProfilelessPlayerIdsForClient(): Promise<number[]> {
-  const ids = await loadProfilelessPlayerIds();
-  // Les plus récents gardés (ids croissants : la fin de la liste) : une
-  // suppression du jour voit ses liens tomber, comme `/rgpd` le dit ; ce sont
-  // les plus anciennes qui retombent au pire sur une fiche 404.
-  return ids.length <= PROFILELESS_PLAYERS_MAX ? ids : ids.slice(-PROFILELESS_PLAYERS_MAX);
+export async function profilelessAmong(ids: readonly number[]): Promise<number[]> {
+  if (ids.length === 0) return [];
+  const profileless = await loadProfilelessPlayerIds();
+  return ids.filter((id) => sortedIdsInclude(profileless, id));
 }
 
 /** Levée pendant le délai de grâce qui suit une panne de lecture (rien n'est relancé). */
@@ -126,8 +106,8 @@ class ProfilelessBackoffError extends Error {
 
 /**
  * La liste, mutualisée. Une lecture en échec n'est pas gardée par le cache :
- * sans ce garde-fou, chaque page d'un visiteur connecté (mise en page racine) et
- * chaque rafraîchissement client relançaient le balayage complet sur une base
+ * sans ce garde-fou, chaque fiche, l'annuaire et
+ * chaque question des liens relançaient le balayage complet sur une base
  * déjà en peine. Pendant {@link PROFILELESS_FAILURE_BACKOFF_MS} on sert donc la
  * dernière liste connue (périmée, conservée une heure), ou on refuse sans
  * requête.

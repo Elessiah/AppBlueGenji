@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateProfilelessPlayers, invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
-import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, loadProfilelessPlayerIdsForClient, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_PLAYERS_MAX, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
+import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, profilelessAmong, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
@@ -283,10 +283,11 @@ describe("branchements D13", () => {
     expect(landing).toContain("entrantHrefFor(row.team2_id, row.team2_solo_user_id, profileless)");
   });
 
-  it("layout_signedInVisitor_providesProfilelessPlayers", () => {
+  it("layout_signedInVisitor_linksAskWithoutShippedList", () => {
     const layout = readSource("app/layout.tsx");
-    expect(layout).toContain("user ? loadProfilelessPlayerIdsForClient() : Promise.resolve(NO_PROFILELESS_PLAYERS)");
-    expect(layout).toContain("<ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>");
+    // D86 : la liste entière ne part plus dans la page.
+    expect(layout).toContain("<ProfilelessPlayersProvider lookup={user !== null}>");
+    expect(layout).not.toContain("loadProfilelessPlayerIds");
   });
 });
 
@@ -342,36 +343,6 @@ describe("loadProfilelessPlayerIds — panne de lecture (EF-62, revue performanc
     now.mockRestore();
   });
 
-  // Revue sécurité EF-62 cycle 1 : seule la copie du navigateur est tronquée.
-  it("loadProfilelessPlayerIds_overCap_keepsFullListAndWarns", async () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
-
-    const ids = await loadProfilelessPlayerIds();
-
-    expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX + 3);
-    expect(warn).toHaveBeenCalledTimes(1);
-  });
-
-  it("loadProfilelessPlayerIdsForClient_overCap_truncatedToMax", async () => {
-    jest.spyOn(console, "warn").mockImplementation(() => {});
-    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
-
-    const ids = await loadProfilelessPlayerIdsForClient();
-
-    expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX);
-    // Les plus récents (ids les plus hauts) restent, les plus anciens tombent.
-    expect(ids[0]).toBe(4);
-    expect(ids[ids.length - 1]).toBe(PROFILELESS_PLAYERS_MAX + 3);
-  });
-
-  it("anonymizedAccountHasNoPage_idBeyondClientCap_returnsTrue", async () => {
-    jest.spyOn(console, "warn").mockImplementation(() => {});
-    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
-
-    expect(await anonymizedAccountHasNoPage(PROFILELESS_PLAYERS_MAX + 2)).toBe(true);
-  });
-
   it("anonymizedAccountHasNoPage_duringBackoff_readsTheAccountAloneWithoutLogSpam", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     const execute = mockDb((sql) => {
@@ -399,19 +370,6 @@ describe("ranking-cache — clé de la liste", () => {
   });
 });
 
-describe("ProfilelessRefresh — nouvel essai après un échec", () => {
-  it("profilelessRefresh_failedFetch_waitsRetryDelayInsteadOfRetryingAtEveryPage", async () => {
-    const { readFileSync } = await import("node:fs");
-    const source = readFileSync("components/profileless-players.tsx", "utf8");
-    const { PROFILELESS_REFRESH_MS, PROFILELESS_RETRY_MS } = await import("@/components/profileless-players");
-
-    expect(PROFILELESS_RETRY_MS).toBeGreaterThan(0);
-    expect(PROFILELESS_RETRY_MS).toBeLessThan(PROFILELESS_REFRESH_MS);
-    expect(source).toContain("PROFILELESS_REFRESH_MS - PROFILELESS_RETRY_MS");
-    expect(source).not.toContain("giveBack");
-  });
-});
-
 // Revue juridique EF-62 cycle 1 : une correction d'arbitrage oublie la liste.
 describe("invalidateProfilelessPlayers", () => {
   it("invalidateProfilelessPlayers_cachedList_nextReadRecomputes", async () => {
@@ -433,11 +391,28 @@ describe("invalidateProfilelessPlayers", () => {
     expect(commit).toBeGreaterThan(0);
   });
 
-  it("loadProfilelessPlayerIdsForClient_underCap_returnsAll", async () => {
-    mockDb(() => [[{ id: 3 }, { id: 8 }]]);
+});
 
-    const ids = await loadProfilelessPlayerIdsForClient();
+describe("profilelessAmong (D86)", () => {
+  it("profilelessAmong_mixedIds_returnsOnlyProfilelessInAskedOrder", async () => {
+    mockDb(() => [[{ id: 3 }, { id: 8 }, { id: 12 }]]);
 
-    expect(ids).toEqual([3, 8]);
+    expect(await profilelessAmong([12, 5, 3])).toEqual([12, 3]);
+  });
+
+  it("profilelessAmong_noIds_noQuery", async () => {
+    const execute = mockDb(() => [[{ id: 3 }]]);
+
+    expect(await profilelessAmong([])).toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("profilelessAmong_readFailure_returnsEmpty", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    mockDb(() => {
+      throw new Error("LOCK_WAIT");
+    });
+
+    expect(await profilelessAmong([3])).toEqual([]);
   });
 });

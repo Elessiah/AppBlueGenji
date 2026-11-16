@@ -335,15 +335,20 @@ pas ; celles d'un compte qui a joué appartiennent aussi à ses adversaires.
 Son nom, lui, reste un **nom sans lien** partout où il s'affiche :
 `loadProfilelessPlayerIds` (cache de classement `list:profileless-players`,
 vidé à chaque score et à chaque suppression par `invalidateTeamIdentityViews`)
-est lu par le layout racine pour un visiteur connecté et transmis à
-`ProfilelessPlayersProvider` ; `PlayerLink` et `EntrantLink` lisent
-`useHasPlayerPage` et rendent `<span class="entity-name">`. Les liens se rendant
+n'est **jamais envoyé entier** au navigateur (D86) : chaque `PlayerLink` /
+`EntrantLink` monté inscrit son compte auprès de `ProfilelessPlayersProvider`
+(`useHasPlayerPage`), qui pose une seule question par rendu
+(`GET /api/players/profileless?ids=3,8`, connecté seulement, au plus 100
+identifiants par question, `lib/shared/profileless-lookup.ts`) ; la route ne
+répond que ceux des identifiants demandés qui sont sans fiche
+(`profilelessAmong`). Un compte dit sans fiche rend `<span class="entity-name">`. Les liens se rendant
 côté client, les deux portes du direct (flux SSE et REST de secours) sont
 couvertes sans toucher au `TournamentSnapshot`. La carte du direct de l'accueil
 (`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. Le layout
-racine n'étant pas rejoué à la navigation client, la liste peut dater d'avant
-une suppression jusqu'au prochain chargement : au pire, un lien mène à la page
-introuvable.
+Tant que la réponse n'est pas là (ou en panne), le nom reste un lien ; un
+compte affiché est redemandé à la navigation client au plus une fois par
+minute (`PROFILELESS_REFRESH_MS`, 15 s après un échec) : au pire, un lien mène
+à la page introuvable.
 
 ## Les comptes déjà supprimés
 
@@ -1103,10 +1108,9 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   suppression de tournoi, `invalidateTeamRanking`), plus sous le préfixe du
   classement que chaque score vide. La fiche lit la même liste
   (`anonymizedAccountHasNoPage`) ; liste illisible, elle interroge le seul
-  compte en base (jamais une fiche rouverte par une panne). Le fournisseur la
-  relit à la navigation client (`/api/players/profileless`, connecté, au plus
-  une fois par minute) ; `/rgpd` dit qu'une page déjà ouverte garde son lien
-  jusqu'au rechargement.
+  compte en base (jamais une fiche rouverte par une panne). Les liens affichés
+  la questionnent par identifiants (`/api/players/profileless?ids=`, D86) ;
+  `/rgpd` dit qu'une page déjà ouverte garde son lien jusqu'au rechargement.
 - **Revue standard cycle 1** : les traces du plan rendu se lisent après le
   journal et les suites, et une panne ne fait plus passer la demande pour un
   échec (plan confirmé ou aperçu gardé) ; le rejeu d'une restauration ne
@@ -1157,11 +1161,6 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   entrées jouées par la passe horaire (filtrée par les candidats).
 
 ## Décisions requises (ouvertes)
-
-- Comptes sans fiche dans la charge RSC (EF-62) : la liste entière part sur
-  chaque page connectée et dit quels identifiants sont des comptes supprimés —
-  l'accepter (identifiants seuls) ou n'envoyer que ceux de la page ? Recommandé :
-  l'accepter tant qu'elle reste sous quelques milliers.
 
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
   en attente n'en reçoit **aucun avis** (`userRecipient` écarte
@@ -1225,8 +1224,7 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 - **Liste des comptes sans fiche** : une lecture en échec n'est pas gardée par
   le cache ; pendant `PROFILELESS_FAILURE_BACKOFF_MS` (15 s) la dernière liste
   connue (conservée une heure) est servie, ou rien n'est demandé (une ligne de
-  journal par panne). Plafond `PROFILELESS_PLAYERS_MAX` (20 000, avertissement
-  au-delà, copie du navigateur seulement : un lien en trop mène à une 404). La clé de cache est déclarée en tête
+  journal par panne). La clé de cache est déclarée en tête
   de `ranking-cache.ts`. Côté client, un essai en échec attend
   `PROFILELESS_RETRY_MS` (15 s) au lieu de repartir à chaque page.
 - **Coup d'envoi tardif** : `startDueTournaments` (`tournament-start-sync.ts`)
@@ -1248,12 +1246,9 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 
 ## Revue sécurité (EF-62, cycle 1)
 
-- **Plafond de la liste sans fiche** : seule la copie envoyée au navigateur
-  (`loadProfilelessPlayerIdsForClient` : mise en page racine,
-  `/api/players/profileless`) est tronquée à `PROFILELESS_PLAYERS_MAX` ; la
-  fiche, l'annuaire, l'accueil et la redirection d'équipe solo lisent la liste
-  entière — la troncature ne rouvre aucune fiche. Cache d'un seul processus
-  (le site tourne en un processus pm2).
+- **Liste sans fiche** : cache d'un seul processus (le site tourne en un
+  processus pm2). Sa copie tronquée envoyée au navigateur a disparu avec D86
+  (EF-65) : seuls les identifiants affichés sont questionnés.
 - **Motif rendu par la demande** : les traces se relisent après le commit et le
   journal mais **avant** les suites, dont les forfaits en tâche de fond
   compteraient comme des matchs joués.
@@ -1263,11 +1258,11 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 - `syncOpenSoloTournamentsOn` vit dans `tournament-start-sync.ts`, partagé par
   la demande et la suppression définitive ; `listNamingTournamentIds` lit les
   équipes quittées par une requête de forme fixe par équipe ; le relevé complet
-  horaire ne relit pas son marqueur ; une relecture client identique ne
-  re-rend pas les liens (`sameIds`).
+  horaire ne relit pas son marqueur ; une réponse qui ne change rien ne
+  re-rend pas les liens.
 - La liste compte aussi les comptes en attente (leur fiche répond 404 pendant
-  les trente jours) : la question de son exposition reste une décision ouverte
-  dans `ERREUR.txt`.
+  les trente jours) ; depuis D86, seule la réponse pour les comptes affichés
+  part au navigateur.
 
 ## Revue juridique (EF-62, cycle 1)
 
@@ -1281,8 +1276,6 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
   comptes sans fiche (`invalidateProfilelessPlayers`) quand l'issue d'un match
   clos change — la fiche d'un compte anonymisé privé de son seul match joué
   tombe aussitôt. Un score ordinaire ne la vide toujours pas.
-- **Copie du navigateur au-delà du plafond** : les identifiants les plus
-  récents restent (`slice(-PROFILELESS_PLAYERS_MAX)`), les plus anciens tombent.
 - **Réactivation** : `keptLead` nomme l'avatar masqué **ou supprimé** et dit à
   part qu'un compte suspendu revient suspendu ; `kept` (derrière le « i »)
   tient en deux phrases.

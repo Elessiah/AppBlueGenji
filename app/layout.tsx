@@ -57,14 +57,10 @@ import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { PodiumTiersProvider } from "@/components/podium-tiers";
 import { loadPodiumTiers } from "@/lib/server/podium-tiers";
 import { ProfilelessPlayersProvider } from "@/components/profileless-players";
-import { loadProfilelessPlayerIdsForClient } from "@/lib/server/users/profileless-players";
 import { visiblePodiumTiers } from "@/lib/shared/podium-tiers";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { DEFAULT_LOCALE, LOCALE_HEADER, localeFromHeader } from "@/lib/shared/locales";
-
-/** Aucun compte sans fiche à taire (visiteur sans compte). */
-const NO_PROFILELESS_PLAYERS: readonly number[] = [];
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -252,15 +248,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Mutualisées avec le classement, elles ne lèvent jamais ; les membres ne
   // partent qu'à un visiteur connecté. Comme la mise en page racine n'est pas
   // re-rendue d'un lien à l'autre, elles suivent au chargement suivant.
-  // Et les comptes supprimés sans fiche (D13), dont les liens de joueur rendent
-  // le nom en texte : au seul visiteur connecté, le seul à qui un nom mène
-  // quelque part. Sous leur propre clé de cache (dix minutes, vidée à chaque
-  // écriture d'identité), ils ne lèvent jamais.
-  const [privacyChanges, rawPodiumTiers, profilelessPlayers] = await Promise.all([
-    privacyChangesLoad,
-    loadPodiumTiers(),
-    user ? loadProfilelessPlayerIdsForClient() : Promise.resolve(NO_PROFILELESS_PLAYERS),
-  ]);
+  const [privacyChanges, rawPodiumTiers] = await Promise.all([privacyChangesLoad, loadPodiumTiers()]);
   const podiumTiers = visiblePodiumTiers(rawPodiumTiers, user !== null);
   // L'annonce Discord des mêmes changements, entraînée par le trafic comme les
   // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
@@ -328,7 +316,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <AppLocaleProvider locale={locale}>
         <ShellTextProvider locale={locale} messages={shellMessages}>
         <PodiumTiersProvider tiers={podiumTiers}>
-        <ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>
+        {/* Les comptes supprimés sans fiche (D13) : les liens de joueur affichés
+            les demandent eux-mêmes (D86), au seul visiteur connecté — le seul à
+            qui un nom mène quelque part. */}
+        <ProfilelessPlayersProvider lookup={user !== null}>
         <ToastProvider>
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}

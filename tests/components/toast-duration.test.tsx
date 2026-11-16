@@ -23,17 +23,29 @@ describe("fetchProfilelessIds", () => {
   const respond = (status: number, body: unknown) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
 
   it("fetchProfilelessIds_nonOk_returnsNull", async () => {
-    expect(await fetchProfilelessIds(respond(500, {}))).toBeNull();
+    expect(await fetchProfilelessIds([3], respond(500, {}))).toBeNull();
   });
 
   it("fetchProfilelessIds_networkError_returnsNull", async () => {
     const failing = (async () => {
       throw new TypeError("offline");
     }) as unknown as typeof fetch;
-    expect(await fetchProfilelessIds(failing)).toBeNull();
+    expect(await fetchProfilelessIds([3], failing)).toBeNull();
   });
 
   it("fetchProfilelessIds_badBody_returnsNull", async () => {
-    expect(await fetchProfilelessIds(respond(200, { nope: true }))).toBeNull();
+    expect(await fetchProfilelessIds([3], respond(200, { nope: true }))).toBeNull();
+  });
+
+  // D86 : seuls les comptes affichés partent.
+  it("fetchProfilelessIds_ids_asksForThoseIdsOnly", async () => {
+    const urls: string[] = [];
+    const recording = (async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify({ ids: [8] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    expect(await fetchProfilelessIds([3, 8], recording)).toEqual([8]);
+    expect(urls).toEqual(["/api/players/profileless?ids=3,8"]);
   });
 });
