@@ -42,8 +42,8 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
 - **Salon supprimé par la modération : le bot réagit lui-même** (décision D97, lot VOICE-EVENT) :
   aucun canal bot → site n'existe (`BOT_INTEGRATION.md` : les appels vont toujours du site au
   bot), et aucun n'est créé. Sur `channelDelete`, le bot recrée **aussitôt** un salon suivi et pas
-  encore rendu (même clé, même nom, même catégorie) ; l'ancien identifiant y mène encore 15 min
-  pour le rendu et le vidage (mémoire du bot, perdue à son redémarrage). Le site ne garde qu'une
+  encore rendu (même clé, même catégorie, le nom que portait le salon) ; l'ancien identifiant y mène encore, sans limite de durée,
+  pour le rendu et le vidage (mémoire du bot, 200 alias au plus, perdue à son redémarrage). Le site ne garde qu'une
   **revérification de sécurité toutes les 5 minutes** (`VOICE_RECHECK_MINUTES`, décision D16 : par
   sondage, aucun signal du bot vers le site), qui lui apprend l'identifiant du salon neuf et
   rattrape ce que le bot a manqué (arrêté pendant la suppression, recréation en échec). Limite
@@ -68,7 +68,7 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   (`SWEEP_NEEDED_SQL`). Une bascule pendant une passe en demande une de plus
   (`dispatchMatchVoiceChannels(true)`), jouée à la fin de la passe en cours.
 - **Salon supprimé à la main** : recréé aussitôt par le bot (ci-dessus) ; les salons ouverts
-  des matchs dus sont redemandés au bot par leur clé au plus une fois toutes les 5 minutes et
+  des matchs dus sont redemandés au bot par leur clé environ une fois toutes les 5 minutes (par processus du site ; 10 s après une panne du bot) et
   par salon (`OPEN_DUE_CHANNELS_SQL`, `VOICE_RECHECK_MINUTES`) ; le bot rend le même, le neuf
   qu'il a recréé, ou un neuf s'il a disparu sans être recréé — jamais qui s'y trouve.
   Un match où entre une entrée solo ou une fantôme n'est plus revérifié (il est rendu).
@@ -208,7 +208,7 @@ Comportements gardés et documentés (décisions du 2026-11-05) :
 
 - un rendu ou une revérification **refusés** par le bot pour ce salon
   laissent la ligne **ouverte** (`failed_at` noté), redemandée après
-  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, au plus une fois toutes les 5 minutes) ;
+  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, environ une fois toutes les 5 minutes) ;
 - un salon **supprimé par la modération** est recréé aussitôt par le bot (D97), ou à
   défaut à la revérification suivante, dans la fenêtre du match ;
 - le bot répond **succès** au rendu d'un salon déjà disparu ou jamais suivi
