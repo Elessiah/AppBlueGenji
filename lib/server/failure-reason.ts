@@ -23,6 +23,51 @@ export function failureReason(error: unknown): string {
   return "erreur inconnue";
 }
 
+/**
+ * {@link failureReason}, et pour une erreur **imprévue** (erreur de
+ * programmation réduite à son nom, valeur levée qui n'est pas une `Error`) de
+ * quoi la retrouver : les premiers cadres de la pile (fichier, ligne,
+ * fonction), **sans** sa première ligne, qui recopie le message ; le type de la
+ * valeur levée sinon. Rien de lu en base ni saisi n'y passe. Pour pm2
+ * seulement (moteur de tournoi, balayages) — jamais un journal du staff ni un
+ * message Discord, qui gardent {@link failureReason}.
+ */
+export function failureDiagnostic(error: unknown): string {
+  const reason = failureReason(error);
+  if (!(error instanceof Error)) {
+    if (reason !== "erreur inconnue") return reason;
+    return `${reason} (${error === null ? "null" : typeof error})`;
+  }
+  if (reason !== error.name) return reason;
+  const frames = stackFrames(error);
+  return frames.length > 0 ? `${reason} ${frames.join(" < ")}` : reason;
+}
+
+/** Nombre de cadres de pile gardés par {@link failureDiagnostic}. */
+const DIAGNOSTIC_FRAMES = 3;
+
+/** Un cadre de pile V8 nommé : `at [async ]fonction (fichier:ligne:colonne)`. */
+const NAMED_FRAME = /^at (?:async |new )?[^\s()]+(?: \[as [^\]\s]+\])? \([^()\s]+:\d+:\d+\)$/;
+
+/** Un cadre de pile V8 anonyme : `at fichier:ligne:colonne`. */
+const ANONYMOUS_FRAME = /^at (?:async )?[^()\s]+:\d+:\d+$/;
+
+/**
+ * Les premiers cadres de la pile de `error`. Les lignes de tête, qui recopient
+ * le nom **et le message** (sur autant de lignes que lui), sont écartées avant
+ * tout : un message ne peut pas se faire passer pour un cadre.
+ */
+function stackFrames(error: Error): string[] {
+  if (typeof error.stack !== "string") return [];
+  const headerLines = `${error.name}: ${error.message}`.split("\n").length;
+  return error.stack
+    .split("\n")
+    .slice(headerLines)
+    .map((line) => line.trim())
+    .filter((line) => NAMED_FRAME.test(line) || ANONYMOUS_FRAME.test(line))
+    .slice(0, DIAGNOSTIC_FRAMES);
+}
+
 /** Forme d'un code d'erreur du site : majuscules, chiffres et soulignés. */
 const ERROR_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 

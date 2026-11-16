@@ -6,8 +6,10 @@ import { getDatabase } from "@/lib/server/database";
 import {
   accountLocaleForDiscordId,
   accountLocaleFromRow,
+  readWithLocaleColumn,
   recordAccountLocale,
   recordLoginLocale,
+  withRowLocale,
 } from "@/lib/server/users/account-locale";
 import type { Locale } from "@/lib/shared/locales";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -107,5 +109,52 @@ describe("accountLocaleForDiscordId", () => {
     expect(spy.mock.calls[0]).toEqual([expect.any(String), "ER_BAD_FIELD_ERROR"]);
     expect(JSON.stringify(spy.mock.calls)).not.toContain("900000000000000002");
     spy.mockRestore();
+  });
+});
+
+describe("withRowLocale", () => {
+  it("withRowLocale_knownLocale_addsIt", () => {
+    expect(withRowLocale({ userId: 3 }, "en")).toEqual({ userId: 3, locale: "en" });
+  });
+
+  it("withRowLocale_unknownLocale_fallsBackToFrench", () => {
+    expect(withRowLocale({ userId: 3 }, "xx")).toEqual({ userId: 3, locale: "fr" });
+  });
+
+  it("withRowLocale_undefined_returnsSameRecipient", () => {
+    const recipient = { userId: 3 };
+
+    expect(withRowLocale(recipient, undefined)).toBe(recipient);
+  });
+});
+
+describe("readWithLocaleColumn", () => {
+  const unknownColumn = () => Object.assign(new Error("Unknown column 'locale'"), { code: "ER_BAD_FIELD_ERROR" });
+
+  it("readWithLocaleColumn_columnExists_readsOnceWithLocale", async () => {
+    const read = jest.fn(async (withLocale: boolean) => (withLocale ? "with" : "without"));
+
+    await expect(readWithLocaleColumn(read)).resolves.toBe("with");
+    expect(read.mock.calls).toEqual([[true]]);
+  });
+
+  it("readWithLocaleColumn_unknownColumn_retriesWithoutLocale", async () => {
+    const read = jest.fn(async (withLocale: boolean) => {
+      if (withLocale) throw unknownColumn();
+      return "without";
+    });
+
+    await expect(readWithLocaleColumn(read)).resolves.toBe("without");
+    expect(read.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("readWithLocaleColumn_otherError_rethrowsWithoutRetry", async () => {
+    const deadlock = Object.assign(new Error("Deadlock"), { code: "ER_LOCK_DEADLOCK" });
+    const read = jest.fn(async (_withLocale: boolean): Promise<string> => {
+      throw deadlock;
+    });
+
+    await expect(readWithLocaleColumn(read)).rejects.toBe(deadlock);
+    expect(read).toHaveBeenCalledTimes(1);
   });
 });

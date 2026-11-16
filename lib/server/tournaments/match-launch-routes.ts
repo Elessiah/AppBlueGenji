@@ -1,5 +1,5 @@
 import { fail } from "@/lib/server/http";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { isContentionError } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { isMatchLiveTrigger, parseOrganisationLink } from "@/lib/shared/live-streams";
@@ -31,7 +31,7 @@ export function launchFailure(
     return fail(CONCURRENT_UPDATE_RETRY, 409);
   }
   // Code seul : l'erreur d'un pilote porte sa requête et la valeur en cause.
-  console.error("[match-launch] échec", failureReason(error));
+  console.error("[match-launch] échec", failureDiagnostic(error));
   return fail(fallback, 500);
 }
 

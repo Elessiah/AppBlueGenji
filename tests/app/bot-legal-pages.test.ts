@@ -73,7 +73,7 @@ describe("bot legal content is fully bilingual", () => {
         s.blocks.flatMap((block) => [block.text ?? "", ...(block.items ?? [])]),
       );
       for (const text of [lang.intro, ...texts]) {
-        for (const match of text.matchAll(/\bsections? (0\d|1\d)\b/gi)) expect(nums).toContain(match[1]);
+        for (const ref of sectionRefs(text)) expect(nums).toContain(ref);
       }
     }
   });
@@ -95,6 +95,25 @@ describe("bot legal content is fully bilingual", () => {
         }
       }
     }
+  });
+});
+
+/**
+ * Les numéros cités par les renvois « section 0n » d'un texte, listes
+ * comprises (« sections 04 et 05 », « sections 02, 03 and 06 ») : chaque numéro
+ * de la liste est un renvoi.
+ */
+function sectionRefs(text: string): string[] {
+  const list = /\bsections? ((?:0\d|1\d)(?:(?:\s*,\s*|\s+(?:et|and|ou|or)\s+)(?:0\d|1\d))*)\b/gi;
+  return [...text.matchAll(list)].flatMap((match) => match[1].match(/\d{2}/g) ?? []);
+}
+
+describe("section cross-reference parsing", () => {
+  it("reads every number of a list, in both languages", () => {
+    expect(sectionRefs("aux sections 04 et 05 de la présente politique")).toEqual(["04", "05"]);
+    expect(sectionRefs("listed in sections 02, 03 and 06 of this policy")).toEqual(["02", "03", "06"]);
+    expect(sectionRefs("(section 03)")).toEqual(["03"]);
+    expect(sectionRefs("Article 37 du RGPD, sans renvoi")).toEqual([]);
   });
 });
 

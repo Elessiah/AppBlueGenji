@@ -1,4 +1,4 @@
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Ce que produit un horaire de match posé ou changé par l'arbitrage
  * (`setMatchStartAt`) : l'annonce aux joueurs, la notification aux arbitres et
@@ -384,7 +384,7 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
       );
       for (const row of rows) names.set(Number(row.id), String(row.name));
     } catch (error) {
-      if (!isMissingTableError(error)) console.error("[notify] noms des engagées illisibles", failureReason(error));
+      if (!isMissingTableError(error)) console.error("[notify] noms des engagées illisibles", failureDiagnostic(error));
     }
   }
   const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
@@ -415,7 +415,7 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
           ),
       });
     } catch (error) {
-      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", failureReason(error));
+      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", failureDiagnostic(error));
     }
   });
 }
@@ -441,7 +441,7 @@ const STAFF_REMOVAL_CONCURRENCY = 4;
 /** Un avis manqué se dit dans pm2 ; une table absente (base en création) se tait. */
 function reportFailures(results: PromiseSettledResult<unknown>[], label: string): void {
   for (const result of results) {
-    if (result.status === "rejected" && !isMissingTableError(result.reason)) console.error(label, failureReason(result.reason));
+    if (result.status === "rejected" && !isMissingTableError(result.reason)) console.error(label, failureDiagnostic(result.reason));
   }
 }
 

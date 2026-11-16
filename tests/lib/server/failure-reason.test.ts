@@ -1,5 +1,11 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { failureReason, isErrorCode, serviceErrorCode, unexpectedFailureCode } from "@/lib/server/failure-reason";
+import {
+  failureDiagnostic,
+  failureReason,
+  isErrorCode,
+  serviceErrorCode,
+  unexpectedFailureCode,
+} from "@/lib/server/failure-reason";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 
 describe("failureReason", () => {
@@ -150,5 +156,72 @@ describe("unexpectedFailureCode", () => {
 
     expect(logged).toHaveBeenCalledWith("[thing] : Error");
     logged.mockRestore();
+  });
+});
+
+/** Une erreur dont la pile est écrite à la main (cinq cadres V8). */
+function withStack<E extends Error>(error: E, header: string): E {
+  error.stack = [
+    header,
+    "    at replayRound (/app/lib/server/tournaments/swiss.ts:10:5)",
+    "    at async syncTournament (/app/lib/server/tournaments/index.ts:20:7)",
+    "    at /app/lib/server/tournaments/lobby-brief.ts:30:9",
+    "    at runSweep (/app/lib/server/sweeps.ts:40:3)",
+    "    at tick (/app/lib/server/sweeps.ts:50:3)",
+  ].join("\n");
+  return error;
+}
+
+describe("failureDiagnostic", () => {
+  it("failureDiagnostic_codedError_returnsCodeOnly", () => {
+    const error = withStack(
+      Object.assign(new Error("Duplicate entry 'nova@example.test'"), { code: "ER_DUP_ENTRY" }),
+      "Error: Duplicate entry 'nova@example.test'",
+    );
+
+    expect(failureDiagnostic(error)).toBe("ER_DUP_ENTRY");
+  });
+
+  it("failureDiagnostic_siteCodeMessage_returnsMessage", () => {
+    expect(failureDiagnostic(new Error("BOT_DOWN"))).toBe("BOT_DOWN");
+  });
+
+  it("failureDiagnostic_unexpectedError_appendsUpToThreeFramesWithoutMessage", () => {
+    const error = withStack(new TypeError("Cannot read 'NovaSecretPseudo'"), "TypeError: Cannot read 'NovaSecretPseudo'");
+
+    expect(failureDiagnostic(error)).toBe(
+      "TypeError at replayRound (/app/lib/server/tournaments/swiss.ts:10:5)" +
+        " < at async syncTournament (/app/lib/server/tournaments/index.ts:20:7)" +
+        " < at /app/lib/server/tournaments/lobby-brief.ts:30:9",
+    );
+  });
+
+  it("failureDiagnostic_forgedFrameInMessage_ignored", () => {
+    const message = "boom\n    at evil (/secret/nova.ts:1:1)";
+    const error = withStack(new Error(message), `Error: ${message}`);
+
+    const diagnostic = failureDiagnostic(error);
+
+    expect(diagnostic).not.toContain("evil");
+    expect(diagnostic).toContain("at replayRound (/app/lib/server/tournaments/swiss.ts:10:5)");
+  });
+
+  it("failureDiagnostic_noStack_returnsNameOnly", () => {
+    const error = new RangeError("index 12 out of range");
+    error.stack = undefined;
+
+    expect(failureDiagnostic(error)).toBe("RangeError");
+  });
+
+  it("failureDiagnostic_thrownString_returnsUnknownWithType", () => {
+    expect(failureDiagnostic("NovaSecretPseudo")).toBe("erreur inconnue (string)");
+  });
+
+  it("failureDiagnostic_thrownNull_returnsUnknownWithNull", () => {
+    expect(failureDiagnostic(null)).toBe("erreur inconnue (null)");
+  });
+
+  it("failureDiagnostic_plainObjectWithCode_returnsCode", () => {
+    expect(failureDiagnostic({ code: "ECONNREFUSED" })).toBe("ECONNREFUSED");
   });
 });

@@ -25,6 +25,7 @@
  */
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/shared/locales";
 
 /** Code de refus d'une langue inconnue (`PUT /api/profile/locale`). */
@@ -58,6 +59,30 @@ export async function recordLoginLocale(userId: number, locale: Locale): Promise
 /** Une valeur lue en base (ou absente) ramenée à une langue connue. */
 export function accountLocaleFromRow(value: unknown): Locale {
   return isLocale(value) ? value : DEFAULT_LOCALE;
+}
+
+/**
+ * Le destinataire avec la langue lue sur sa ligne (`value`), inchangé quand la
+ * ligne ne la portait pas (colonne absente, ligne simulée) : `notifyUsers` la
+ * relit alors, bilingue au pire.
+ */
+export function withRowLocale<R extends object>(recipient: R, value: unknown): R | (R & { locale: Locale }) {
+  return value === undefined ? recipient : { ...recipient, locale: accountLocaleFromRow(value) };
+}
+
+/**
+ * Joue une lecture **avec** la colonne `locale`, puis **sans** si la base ne
+ * la connaît pas encore (`ALTER` récent en échec, rejoué au démarrage
+ * suivant) : une langue absente ne coupe jamais ce qui lit la ligne — au pire
+ * le message part bilingue. Toute autre erreur est levée.
+ */
+export async function readWithLocaleColumn<T>(read: (withLocale: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await read(true);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    return read(false);
+  }
 }
 
 /**

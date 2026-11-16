@@ -257,8 +257,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
-    // Renvoi vers la réactivation : le formulaire reste fermé pendant la
-    // navigation, le code — déjà consommé — ne se renvoie pas.
+    // Connexion réussie ou renvoi vers la réactivation : le formulaire reste
+    // fermé pendant la navigation, le code — déjà consommé — ne se renvoie pas.
     let leaving = false;
     try {
       const response = await fetch("/api/auth/discord/verify", {
@@ -296,13 +296,14 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       }
       // Rien de retenu pour un compte précédent ne doit s'adresser à celui-ci.
       signalSessionChanged();
+      leaving = true;
       router.push(redirect);
       router.refresh();
     } catch (e) {
       fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
     } finally {
-      // Renvoi vers la réactivation : la garde reste posée pendant la navigation.
+      // Connexion réussie ou réactivation : la garde reste posée pendant la navigation.
       if (!leaving) {
         inFlight.current = false;
         setLoading(false);

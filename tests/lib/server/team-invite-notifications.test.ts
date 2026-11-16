@@ -124,6 +124,23 @@ describe("notifyTeamInvite", () => {
     expect(resolvePush(content).url).toBe("/profil#invitations");
   });
 
+  it("notifyTeamInvite_localeColumnMissing_noticeStillSent", async () => {
+    const execute = mockDb({ locale: "en" });
+    const original = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.includes("u.locale")) throw Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+      return original(sql, params);
+    });
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    // Ligne relue sans la langue ; `notifyUsers` la relit (anglais ici) : l'avis part.
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("Les Glaciers");
+    const accountReads = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_users u"));
+    expect(accountReads.map(([sql]) => sql.includes("u.locale"))).toEqual([true, false]);
+  });
+
   it("notifyTeamInvite_englishAccount_dmInEnglishWithEnglishLink", async () => {
     mockDb({ locale: "en" });
 

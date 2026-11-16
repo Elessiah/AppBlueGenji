@@ -36,7 +36,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
-import { accountLocaleForDiscordId, accountLocaleFromRow } from "@/lib/server/users/account-locale";
+import { accountLocaleForDiscordId, accountLocaleFromRow, readWithLocaleColumn } from "@/lib/server/users/account-locale";
 import type { Locale } from "@/lib/shared/locales";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
@@ -104,12 +104,16 @@ type UserDiscordRow = RowDataPacket & {
  */
 async function loadDiscordRow(userId: number): Promise<UserDiscordRow | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<UserDiscordRow[]>(
-    `SELECT discord_id, discord_pseudo, discord_verified_at, discord_pseudo_from_discord, locale
-     FROM bg_users
-     WHERE id = ? AND is_deleted = 0
-     LIMIT 1`,
-    [userId],
+  // Langue lue avec la ligne, jamais au prix du parcours : sans la colonne,
+  // la lecture se rejoue sans elle (message privé relu ou bilingue).
+  const [rows] = await readWithLocaleColumn((withLocale) =>
+    db.execute<UserDiscordRow[]>(
+      `SELECT discord_id, discord_pseudo, discord_verified_at, discord_pseudo_from_discord${withLocale ? ", locale" : ""}
+       FROM bg_users
+       WHERE id = ? AND is_deleted = 0
+       LIMIT 1`,
+      [userId],
+    ),
   );
   return rows[0] ?? null;
 }

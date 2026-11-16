@@ -71,7 +71,7 @@ async function runSweep(options: {
       hasPendingStateTransition: async () => false,
       syncTournamentState: jest.fn(async (_conn: unknown, tournamentId: number) => {
         synced.push(tournamentId);
-        if (options.failOn?.includes(tournamentId)) throw new Error("BOOM");
+        if (options.failOn?.includes(tournamentId)) throw new Error("boom on pseudo Nova");
         const coded = options.failWithCode?.[tournamentId];
         if (coded && coded.times > 0) {
           coded.times -= 1;
@@ -203,8 +203,8 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     const { synced } = await runSweep({ candidates: [2], failOn: [2] });
 
     expect(synced).toEqual([2]);
-    expect(String(warn.mock.calls[0][0])).toContain("Error");
-    expect(String(warn.mock.calls[0][0])).not.toContain("BOOM");
+    expect(String(warn.mock.calls[0][0])).toContain("abandonnée : Error at ");
+    expect(String(warn.mock.calls[0][0])).not.toContain("Nova");
   });
 
   it("syncVisibleTournaments_deadlockWithFailedRollback_noReplayAndStopsPass", async () => {

@@ -1,4 +1,4 @@
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Suppression définitive d'un tournoi (réservée aux administrateurs).
  *
@@ -191,7 +191,7 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
     try {
       await deleteStoredImage(imagePath);
     } catch (error) {
-      console.error(`[tournaments] image du tournoi ${tournamentId} non effacée`, failureReason(error));
+      console.error(`[tournaments] image du tournoi ${tournamentId} non effacée`, failureDiagnostic(error));
     }
 
     // Même point de passage que toute autre écriture (`./notifications`), et il

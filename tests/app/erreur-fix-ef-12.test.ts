@@ -103,6 +103,14 @@ describe("boutons en attente : aria-disabled, pas disabled", () => {
     expect(login).toMatch(/if \(!leaving\) \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
   });
 
+  it("verifyCode_success_keepsGuardWhileRedirecting", () => {
+    const login = readSource("app/connexion/_components/LoginForm.tsx");
+    // Code accepté : la garde reste posée pendant la navigation, un second
+    // envoi ne renvoie pas le code déjà consommé.
+    expect(login).toMatch(/signalSessionChanged\(\);\s+leaving = true;\s+router\.push\(redirect\);/);
+    expect(login).toMatch(/leaving = true;\s+router\.push\(REACTIVATION_PATH\);/);
+  });
+
   it("le profil (avatar, suppression du compte) garde le focus et garde le clic", () => {
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).not.toMatch(/(?<!aria-)disabled=\{(avatarBusy|accountDeletion\.deleting)\}/);

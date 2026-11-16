@@ -40,7 +40,7 @@ import {
   type NotificationRecipient,
   type UserNotification,
 } from "@/lib/server/notify";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush, pushRoundLabel } from "@/lib/shared/push-messages";
 import type { LocalizedDm } from "@/lib/shared/dm-language";
@@ -298,7 +298,7 @@ function startRefereeDigest(now: Date): void {
       await dispatchRefereeDigest(now);
     } catch (error) {
       // Table absente (création avalée au démarrage) : rien à dire à chaque passage.
-      if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", failureReason(error));
+      if (!isMissingTableError(error)) console.error("[match-reminders] programme d'arbitrage en échec", failureDiagnostic(error));
     } finally {
       lastDigestAt = Date.now();
       pendingDigest = null;
@@ -338,7 +338,7 @@ async function loadRecipientsByTeam(
     // Lecture en échec : chacun est tenu pour atteignable, comme avant ce
     // filtre — perdre le message privé d'un joueur pour une lecture
     // d'abonnements serait pire qu'une marque posée de trop.
-    console.error("[match-reminders] abonnements push illisibles", failureReason(error));
+    console.error("[match-reminders] abonnements push illisibles", failureDiagnostic(error));
     pushable = new Set(withoutDiscord);
   }
   const reachable = recipients.filter((recipient) => recipient.discord !== null || pushable.has(recipient.userId));
@@ -894,7 +894,7 @@ function scheduleDmRetry(retries: readonly DmRetry[]): void {
             );
           }
         })
-        .catch((error: unknown) => console.error("[match-reminders] reprise des messages privés impossible", failureReason(error))),
+        .catch((error: unknown) => console.error("[match-reminders] reprise des messages privés impossible", failureDiagnostic(error))),
     );
   }, MATCH_DM_RETRY_DELAY_MS);
   timer.unref?.();
@@ -969,7 +969,7 @@ async function dispatchPlannedSend(
   } catch (error) {
     // La marque garde l'horaire écrit avant l'envoi : pm2 le dit, et l'échec
     // de l'envoi lui-même reste celui qui remonte.
-    console.error("[match-reminders] marque d'horaire reçu non rendue", failureReason(error));
+    console.error("[match-reminders] marque d'horaire reçu non rendue", failureDiagnostic(error));
   }
   const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
   if (failure) throw failure.reason;
@@ -1211,7 +1211,7 @@ export async function announceEntrantsWithdrawn(departures: readonly DepartedEnt
       await sendWithdrawnNotice(departure, outcome, String(names.get(departure.teamId)), opponentName, recipients);
       dispatched += 1;
     } catch (error) {
-      console.error("[notify] avis de match retiré non envoyé", failureReason(error));
+      console.error("[notify] avis de match retiré non envoyé", failureDiagnostic(error));
     }
   });
   return dispatched;
@@ -1387,7 +1387,7 @@ async function runSweep(now: Date): Promise<number> {
     try {
       planned.push(...(await planMatchSends(match, now, sentKeysOf(match))));
     } catch (error) {
-      console.error("[match-reminders] réservation de rappel en échec", failureReason(error));
+      console.error("[match-reminders] réservation de rappel en échec", failureDiagnostic(error));
     }
   });
   if (planned.length === 0) return 0;
@@ -1408,7 +1408,7 @@ async function runSweep(now: Date): Promise<number> {
       const sent = await dispatchPlannedSend(send, recipientsByTeam);
       dispatched += sent;
     } catch (error) {
-      console.error("[match-reminders] envoi de rappel en échec", failureReason(error));
+      console.error("[match-reminders] envoi de rappel en échec", failureDiagnostic(error));
     }
   });
   return dispatched;

@@ -104,7 +104,7 @@ function fakeDb(
     throw new Error(`requête inattendue : ${q}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-  return { state, writes };
+  return { state, writes, execute };
 }
 
 const LINKED_BY_CODE: UserState = {
@@ -176,6 +176,25 @@ describe("startDiscordHandleUpdate", () => {
 
     // Destinataire = ce compte : sa langue vient de la ligne déjà lue.
     expect(accountLocaleForDiscordId).not.toHaveBeenCalled();
+    expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000001", "123456", "en", "handle");
+  });
+
+  it("startDiscordHandleUpdate_localeColumnMissing_codeStillSent", async () => {
+    const { execute: inner } = fakeDb({ ...LINKED_BY_CODE });
+    const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
+      if (/discord_pseudo_from_discord, locale/.test(sql)) {
+        throw Object.assign(new Error("Unknown column 'locale'"), { code: "ER_BAD_FIELD_ERROR" });
+      }
+      return inner(sql, params);
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000001");
+    jest.mocked(accountLocaleForDiscordId).mockResolvedValueOnce("en");
+
+    await startDiscordHandleUpdate(7, "keryan_neuf");
+
+    // Sans la colonne, la ligne est relue sans elle ; la langue vient de la lecture par Discord.
+    expect(execute.mock.calls.map(([sql]) => sql.includes(", locale"))).toEqual([true, false]);
     expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000001", "123456", "en", "handle");
   });
 

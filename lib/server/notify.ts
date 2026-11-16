@@ -39,7 +39,7 @@ import {
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import { renderDm, type LocalizedDm } from "@/lib/shared/dm-language";
 import type { Locale } from "@/lib/shared/locales";
-import { accountLocaleFromRow } from "./users/account-locale";
+import { accountLocaleFromRow, withRowLocale } from "./users/account-locale";
 import {
   PUSH_TOPICS,
   type LocalizedPushContent,
@@ -296,7 +296,7 @@ export function toNotificationRecipient(row: RecipientRow, reach: DiscordReach):
   const discordId = reach === "proven" || certified ? row.discord_id : null;
   const discord = discordId || handle ? { discordId, handle, label: row.pseudo } : null;
   const recipient = { userId: Number(row.id), discord };
-  return row.locale === undefined ? recipient : { ...recipient, locale: accountLocaleFromRow(row.locale) };
+  return withRowLocale(recipient, row.locale);
 }
 
 /**

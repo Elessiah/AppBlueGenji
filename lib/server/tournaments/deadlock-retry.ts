@@ -1,4 +1,4 @@
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { randomInt } from "node:crypto";
 import { isAutoIncrementContention, isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 
@@ -64,7 +64,7 @@ export function isReplayableContention(error: unknown, elapsedMs: number): boole
  * (`CONCURRENT_UPDATE_RETRY`).
  */
 export function reportUnresolvedContention(error: unknown): void {
-  if (isAutoIncrementContention(error)) console.error("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", failureReason(error));
+  if (isAutoIncrementContention(error)) console.error("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", failureDiagnostic(error));
 }
 
 /**
