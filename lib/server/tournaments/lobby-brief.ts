@@ -72,6 +72,7 @@ import {
 } from "@/lib/server/notify";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
+import { mapInBatches } from "@/lib/shared/in-batches";
 import { LOBBY_BRIEF_LEAD_MINUTES, type LobbyBriefKickoff, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { LOCALES, type Locale } from "@/lib/shared/locales";
 import type { PushContent } from "@/lib/shared/push-notifications";
@@ -1040,8 +1041,14 @@ async function runLobbyBriefSweep(): Promise<number> {
   const toRelease: number[] = [];
   const closed: number[] = [];
   const toRetry: string[] = [];
-  for (const row of rows) {
-    const brief = await briefMatch(db, row, { managers, recipients, briefSides });
+  // Matchs briefés à plusieurs à la fois (`LOBBY_BRIEF_CONCURRENCY`) : chacun
+  // attend ses allers-retours (réservation, relecture, bot) sans retenir les
+  // autres ; ses réservations sont les siennes (par match et par côté), et le
+  // bilan se lit ensuite dans l'ordre des matchs. `briefMatch` ne lève jamais.
+  const context: SweepContext = { managers, recipients, briefSides };
+  const briefs = await mapInBatches(rows, LOBBY_BRIEF_CONCURRENCY, (row) => briefMatch(db, row, context));
+  for (const [index, row] of rows.entries()) {
+    const brief = briefs[index];
     sent += brief.sent;
     toRelease.push(...brief.retry);
     closed.push(...brief.closed);
@@ -1063,6 +1070,13 @@ async function runLobbyBriefSweep(): Promise<number> {
   scheduleRetrySweep(toRetry);
   return sent;
 }
+
+/**
+ * Matchs briefés en même temps par un balayage, au plus : assez pour qu'un bot
+ * lent sur un match ne retienne pas les autres (une ronde suisse ouvre ses
+ * salons d'un coup), assez borné pour le Raspberry Pi et le bot.
+ */
+const LOBBY_BRIEF_CONCURRENCY = 4;
 
 /** Étranglement : celui des départs de match (dix secondes). */
 const LOBBY_BRIEF_THROTTLE_MS = 10_000;
