@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  AUDIENCE_MAX_OPEN_AGE_MS,
   aggregateAudienceDay,
   audiencePageKey,
   deviceFromWidth,
@@ -394,14 +393,11 @@ describe("parseAudienceBatch — ouverture de la page d'une suite (o)", () => {
     expect(views[0].openedAgeMs).toBe(5000);
   });
 
-  it("parseAudienceBatch_openAgeExactlyMax_kept", () => {
-    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: AUDIENCE_MAX_OPEN_AGE_MS }] });
+  it("parseAudienceBatch_veryOldOpenAge_keptForServerDayCheck", () => {
+    // Le serveur, seul juge, écarte la suite d'un jour déjà replié (lastRollableDay).
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: 72 * 3_600_000 }] });
 
-    expect(views[0].openedAgeMs).toBe(AUDIENCE_MAX_OPEN_AGE_MS);
-  });
-
-  it("parseAudienceBatch_openAgeOverMax_dropped", () => {
-    expect(parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: AUDIENCE_MAX_OPEN_AGE_MS + 1 }] })).toEqual([]);
+    expect(views[0].openedAgeMs).toBe(72 * 3_600_000);
   });
 
   it("parseAudienceBatch_continuationWithoutOpenAge_fallsBackToAge", () => {

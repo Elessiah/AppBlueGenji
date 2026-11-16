@@ -65,11 +65,16 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   masqué, départ) en suite `c: 1`, datée de cette clôture. Une lecture qui
   dure part **par tranches** de 10 min (`AUDIENCE_CHECKPOINT_MS`, au tic d'une
   minute) : chaque tranche reste sous le plafond de 30 min et commence où
-  finit la précédente. Un retour au premier plan ouvre une nouvelle suite sur
-  la même page.
+  finit la précédente. Un retour au premier plan après une pause de moins de
+  30 min, le même jour, ouvre une nouvelle suite sur la même page ; après une
+  pause plus longue ou un changement de jour, il compte une **nouvelle page
+  vue** (une suite hors de toute visite ne serait pas comptée). Une machine en
+  veille onglet visible se voit au tic suivant (retard de plus de 3 min,
+  `AUDIENCE_SUSPEND_GAP_MS`) : la lecture s'arrête au dernier tic, la reprise
+  suit la même règle — le sommeil n'est jamais du temps de lecture.
 - Une suite porte `o`, l'âge de l'ouverture de sa page : elle prend le **jour
   et le sel de cette page**, même lue après minuit (sans `o`, ancien script :
-  le jour de sa clôture ; `o` > 48 h : écartée). Le temps lu après 1 h 15 le
+  le jour de sa clôture). Le temps lu après 1 h 15 le
   lendemain, jour déjà replié, n'est pas compté.
 - `p` chemin affiché (réduit côté serveur à `audiencePageKey` : `/frequentation`,
   `/api`, `/_next`, `/og` ne comptent pas), `t` temps visible (ms), `a` âge,
@@ -93,9 +98,11 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   n'est possible — c'est le prix de la dispense. La page le dit.
 - **Un seul processus** pour la file et l'entretien (pm2 en lance un) ; le
   sel, lui, est en base : un redémarrage ne compte pas deux fois un visiteur.
-  L'entretien attend les signalements en cours de son processus avant de
-  replier ; un signalement qui voit son jour devenir clos pendant la lecture
-  du sel l'écarte. Chaque processus oublie en mémoire les sels des jours clos
+  L'entretien attend les signalements en cours de son processus (15 s au
+  plus, `RECORDING_WAIT_MS`) et vide la file avant de replier ; un signalement
+  qui finit après cette attente écarte ses lignes des jours que l'entretien a
+  commencé à replier. Une lecture de sel sans réponse échoue au bout de 10 s
+  (`SALT_READ_TIMEOUT_MS`) : rien n'attend une base figée sans fin. Chaque processus oublie en mémoire les sels des jours clos
   au plus 10 min après la clôture, même sans trafic.
 - Un sel illisible (base en panne) écarte les seules entrées de son jour, et
   n'est relu qu'au bout de 30 s (une ligne de journal par essai).
@@ -114,7 +121,8 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   cache (10 min, une seule lecture à la fois ; périodes lues en parallèle,
   carte de chaleur groupée par la base, `WEEKDAY(day)`).
 - `lib/server/site-counts.ts` — équipes et comptes de la plateforme (même
-  définition que l'accueil) et tournois joués, en une requête.
+  définition que l'accueil) ; tournois joués et matchs lus ensemble par
+  `audience-service.ts`.
 - Schéma : `lib/server/database/schema/compliance.ts` (tables neuves, aucune
   entrée `RECENT_SCHEMA_CHANGES`).
 - Légal : registre T19 (et T17 pour le plafond IP), `/rgpd#audience-detaillee`

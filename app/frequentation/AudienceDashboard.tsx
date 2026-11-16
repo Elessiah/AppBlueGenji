@@ -424,12 +424,20 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
   );
 }
 
-function Evolution({ m, f, points, formatNumber }: { m: AudienceMessages; f: Formatters; points: AudienceDailyPoint[]; formatNumber: (value: number) => string }) {
-  const bucket = evolutionBucket(points.length);
-  // Regroupés par semaine ou par mois, les visiteurs quotidiens s'additionnent : le libellé le dit.
+/**
+ * Regroupement de l'évolution pour `days` jours, son libellé de visiteurs et
+ * son explication : regroupés par semaine ou par mois, les visiteurs
+ * quotidiens s'additionnent, et le libellé le dit.
+ */
+export function evolutionLabels(days: number, m: AudienceMessages): { bucket: AudienceBucket; visitorsLabel: string; hint: string } {
+  const bucket = evolutionBucket(days);
   const visitorsLabel = bucket === "day" ? m.evolution.visitors : m.evolution.visitorsSummed;
   const hints: Record<AudienceBucket, string> = { day: m.evolution.hint, week: m.evolution.hintWeekly, month: m.evolution.hintMonthly, year: m.evolution.hintMonthly };
-  const hint = hints[bucket];
+  return { bucket, visitorsLabel, hint: hints[bucket] };
+}
+
+function Evolution({ m, f, points, formatNumber }: { m: AudienceMessages; f: Formatters; points: AudienceDailyPoint[]; formatNumber: (value: number) => string }) {
+  const { bucket, visitorsLabel, hint } = evolutionLabels(points.length, m);
   const chart = useMemo(() => {
     const grouped = bucket === "day" ? points.map((point) => ({ ...point, key: point.day })) : groupDaily(points, bucket);
     const labels = grouped.map((point) => bucketLabels(point.key, bucket, m, f));

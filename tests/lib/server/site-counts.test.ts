@@ -13,19 +13,19 @@ beforeEach(() => {
 });
 
 describe("readSiteCounts", () => {
-  it("readSiteCounts_row_returnsTournamentsPlayed", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ players: "90", teams: 12, tournaments: 9, tournaments_played: "4" }]]);
+  it("readSiteCounts_row_returnsNumericCounts", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ players: "90", teams: 12, tournaments: 9 }]]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    expect(await readSiteCounts()).toEqual({ players: 90, teams: 12, tournaments: 9, tournamentsPlayed: 4 });
+    expect(await readSiteCounts()).toEqual({ players: 90, teams: 12, tournaments: 9 });
   });
 
-  it("readSiteCounts_playedTournaments_finishedAndPublishedOnly", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ players: 0, teams: 0, tournaments: 0, tournaments_played: 0 }]]);
+  it("readSiteCounts_query_noPlayedTournamentsSubquery", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ players: 0, teams: 0, tournaments: 0 }]]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     await readSiteCounts();
 
-    expect(execute.mock.calls[0][0]).toContain("state = 'FINISHED' AND start_visibility_at <= NOW()) AS tournaments_played");
+    expect(execute.mock.calls[0][0]).not.toContain("tournaments_played");
   });
 });

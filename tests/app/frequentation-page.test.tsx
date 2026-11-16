@@ -11,11 +11,14 @@ jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => moc
 jest.mock("@/lib/server/audience-service");
 
 import { renderToStaticMarkup } from "react-dom/server";
+import { evolutionLabels } from "@/app/frequentation/AudienceDashboard";
 import FrequentationPage, { generateMetadata } from "@/app/frequentation/page";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { getAudienceStats } from "@/lib/server/audience-service";
 import { emptyHeatmap, type AudienceRangeStats, type AudienceStats } from "@/lib/shared/audience";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
+import enAudience from "@/messages/en/audience.json";
+import frAudience from "@/messages/fr/audience.json";
 
 function rangeStats(): AudienceRangeStats {
   return {
@@ -134,5 +137,29 @@ describe("FrequentationPage", () => {
 describe("diffusion", () => {
   it("n'est pas listée dans le plan du site", () => {
     expect(publicSitemapRoutes().map((route) => route.path)).not.toContain("/frequentation");
+  });
+});
+
+describe("evolutionLabels — visiteurs regroupés", () => {
+  it("evolutionLabels_ninetyTwoDays_dailyVisitorsLabel", () => {
+    const labels = evolutionLabels(92, frAudience);
+
+    expect(labels).toEqual({ bucket: "day", visitorsLabel: frAudience.evolution.visitors, hint: frAudience.evolution.hint });
+  });
+
+  it("evolutionLabels_weekGrouping_saysDailyVisitorsSummed", () => {
+    const labels = evolutionLabels(93, enAudience);
+
+    expect(labels.bucket).toBe("week");
+    expect(labels.visitorsLabel).toBe("Daily visitors, summed");
+    expect(labels.hint).toBe(enAudience.evolution.hintWeekly);
+  });
+
+  it("evolutionLabels_monthGrouping_saysVisiteursQuotidiensCumules", () => {
+    const labels = evolutionLabels(732, frAudience);
+
+    expect(labels.bucket).toBe("month");
+    expect(labels.visitorsLabel).toBe("Visiteurs quotidiens cumulés");
+    expect(labels.hint).toBe(frAudience.evolution.hintMonthly);
   });
 });

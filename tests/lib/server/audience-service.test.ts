@@ -11,6 +11,8 @@ import {
   getAudienceStats,
   lastRollableDay,
   MAINTENANCE_INTERVAL_MS,
+  RECORDING_WAIT_MS,
+  SALT_READ_TIMEOUT_MS,
   pendingAudienceCount,
   purgeAudienceViews,
   rawRetentionStart,
@@ -46,7 +48,8 @@ const SALT = Buffer.alloc(32, 7);
  */
 function emptyDatabase(salt: Buffer = SALT): SqlMock {
   return jest.fn<SqlQuery>(async (sql: string) => {
-    if (sql.includes("AS players")) return [[{ players: 5, teams: 4, tournaments: 9, tournaments_played: 2 }]];
+    if (sql.includes("AS players")) return [[{ players: 5, teams: 4, tournaments: 9 }]];
+    if (sql.includes("AS matches")) return [[{ matches: 3, tournaments: 2 }]];
     if (sql.includes("COUNT(*)")) return [[{ n: 3 }]];
     if (sql.includes("SELECT salt")) return [[{ salt }]];
     if (sql.startsWith("DELETE") || sql.startsWith("INSERT IGNORE")) return [{ affectedRows: 0 }];
@@ -470,5 +473,82 @@ describe("dailySalt — balayage en mémoire", () => {
 
     expect(saltWrites(execute)).toHaveLength(2);
     jest.useRealTimers();
+  });
+});
+
+describe("délais bornés et jours repliés", () => {
+  it("dailySalt_readHangs_rejectsAfterTimeout", async () => {
+    jest.useFakeTimers();
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb(
+      jest.fn<SqlQuery>(async (sql: string) => {
+        if (sql.includes("SELECT salt")) return new Promise<never>(() => undefined);
+        return [{ affectedRows: 1 }];
+      }),
+    );
+
+    const salt = dailySalt("2026-11-16");
+    const outcome = expect(salt).rejects.toThrow("timed out");
+    await jest.advanceTimersByTimeAsync(SALT_READ_TIMEOUT_MS);
+    await outcome;
+    jest.useRealTimers();
+  });
+
+  it("runMaintenance_recordStuck_rollsUpAfterWaitAndDropsLateRows", async () => {
+    jest.useFakeTimers();
+    let releaseSalt: () => void = () => undefined;
+    const saltReady = new Promise<void>((resolve) => {
+      releaseSalt = resolve;
+    });
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("SELECT salt")) {
+        await saltReady;
+        return [[{ salt: SALT }]];
+      }
+      if (sql.startsWith("DELETE") || sql.startsWith("INSERT")) return [{ affectedRows: 0 }];
+      return [[]];
+    });
+    mockDb(execute);
+    // 1 h 20 à Paris : la veille (15) est repliable ; la page date de la veille au soir.
+    const now = new Date("2026-11-16T00:20:00Z");
+
+    const record = recordAudienceViews({
+      ip: "203.0.113.7",
+      userAgent: "Firefox",
+      views: [view({ ageMs: 30 * 60_000 })],
+      now,
+    });
+    const maintenance = runMaintenance(now);
+    await jest.advanceTimersByTimeAsync(RECORDING_WAIT_MS);
+    await maintenance;
+    releaseSalt();
+    jest.useRealTimers();
+
+    expect(await record).toBe(0);
+    expect(pendingAudienceCount()).toBe(0);
+  });
+
+  it("recordAudienceViews_noMaintenanceYet_keepsRowOfOpenDay", async () => {
+    mockDb(emptyDatabase());
+
+    const kept = await recordAudienceViews({
+      ip: "203.0.113.7",
+      userAgent: "Firefox",
+      views: [view()],
+      // 1 h 14 à Paris : la veille n'est pas encore repliable.
+      now: new Date("2026-11-16T00:14:00Z"),
+    });
+
+    expect(kept).toBe(1);
+  });
+
+  it("getAudienceStats_community_countsRunningAndFinishedTournaments", async () => {
+    const execute = emptyDatabase();
+    mockDb(execute);
+
+    const stats = await getAudienceStats(NOW);
+
+    expect(stats.community?.tournaments).toBe(2);
+    expect(execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS matches"))).toContain("state IN ('RUNNING', 'FINISHED')");
   });
 });

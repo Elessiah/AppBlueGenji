@@ -32,6 +32,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { readSiteCounts } from "./site-counts";
 import { inTransaction } from "./tournaments/transaction";
+import { PLAYED_STATES } from "@/lib/shared/stats";
 import {
   AUDIENCE_RANGES,
   AUDIENCE_RAW_RETENTION_MONTHS,
@@ -66,6 +67,10 @@ export const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000;
 export const STATS_CACHE_MS = 10 * 60 * 1000;
 /** Délai avant de relire un sel dont la lecture a échoué (base en panne). */
 export const SALT_RETRY_MS = 30_000;
+/** Une lecture de sel sans réponse passé ce délai échoue (puis {@link SALT_RETRY_MS}) : rien ne l'attend sans fin. */
+export const SALT_READ_TIMEOUT_MS = 10_000;
+/** L'entretien attend au plus ce délai les signalements en cours avant de replier. */
+export const RECORDING_WAIT_MS = 15_000;
 /** Lignes effacées par passe de purge. */
 const PURGE_BATCH = 10_000;
 /** Jours repliés au plus par entretien (rattrapage progressif). */
@@ -89,6 +94,12 @@ let pending: PendingRow[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing: Promise<void> | null = null;
 let lastMaintenanceAt = 0;
+/**
+ * Dernier jour que l'entretien de ce processus a commencé à replier : un
+ * signalement qui finit après (attente de l'entretien dépassée) écarte ses
+ * lignes de ces jours plutôt que de les écrire après leur repli.
+ */
+let rolledThrough: string | null = null;
 let maintaining: Promise<void> | null = null;
 let statsCache: { at: number; value: AudienceStats } | null = null;
 let statsLoad: Promise<AudienceStats> | null = null;
@@ -117,7 +128,7 @@ async function loadSalt(day: string): Promise<Buffer> {
 export function dailySalt(day: string): Promise<Buffer> {
   const known = salts.get(day);
   if (known) return known;
-  const value = loadSalt(day);
+  const value = withTimeout(loadSalt(day), SALT_READ_TIMEOUT_MS, "audience salt read timed out");
   salts.set(day, value);
   startSaltSweep();
   // Une lecture ratée reste en échec SALT_RETRY_MS ms (une ligne au journal,
@@ -130,6 +141,16 @@ export function dailySalt(day: string): Promise<Buffer> {
     retry.unref?.();
   });
   return value;
+}
+
+/** `promise`, ou un échec `message` passé `ms` ms. */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+    timer.unref?.();
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** Oublie en mémoire les sels des jours clos (`day <= until`). */
@@ -195,7 +216,6 @@ interface AudienceRecordInput {
 
 async function recordViews(input: AudienceRecordInput): Promise<number> {
   const now = input.now ?? new Date();
-  const started = Date.now();
   const closed = lastRollableDay(now);
   dropClosedSalts(closed);
   const rows: Omit<PendingRow, "visitorKey">[] = [];
@@ -213,13 +233,13 @@ async function recordViews(input: AudienceRecordInput): Promise<number> {
   settled.forEach((result, index) => {
     if (result.status === "fulfilled") keys.set(days[index], result.value);
   });
-  // Le temps a passé pendant la lecture des sels : un jour devenu clos entre-temps
-  // (repli d'un autre processus) est écarté plutôt qu'écrit après son repli.
-  const closedNow = lastRollableDay(new Date(now.getTime() + Math.max(0, Date.now() - started)));
+  // L'entretien attend ce signalement avant de replier, puis vide la file : un
+  // jour devenu clos pendant la lecture des sels est encore compté. Seul un
+  // jour que l'entretien a déjà commencé à replier (attente dépassée) est écarté.
   let kept = 0;
   for (const row of rows) {
     const visitorKey = keys.get(row.day);
-    if (!visitorKey || row.day <= closedNow) continue;
+    if (!visitorKey || (rolledThrough !== null && row.day <= rolledThrough)) continue;
     if (pending.length >= MAX_PENDING) break;
     pending.push({ ...row, visitorKey });
     kept += 1;
@@ -315,14 +335,17 @@ export function maintainAudience(now: Date = new Date()): void {
 export async function runMaintenance(now: Date = new Date()): Promise<void> {
   // Les signalements commencés avant l'entretien finissent, puis toute la file
   // part : rien d'un jour replié n'arrive après son repli. Ceux qui commencent
-  // ensuite voient ce jour clos et l'écartent.
-  await Promise.allSettled([...recording]);
+  // ensuite voient ce jour clos et l'écartent. L'attente est bornée : un
+  // signalement qui la dépasse écarte ensuite ses lignes des jours repliés.
+  await withTimeout(Promise.allSettled([...recording]), RECORDING_WAIT_MS, "audience recording wait timed out").catch(() => undefined);
   for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
     await flushAudienceViews();
   }
+  const until = lastRollableDay(now);
+  if (rolledThrough === null || until > rolledThrough) rolledThrough = until;
   const rolled = await rollUpAudienceDays(now);
   // Un jour clos n'a plus besoin de son sel : ses entrées tardives sont écartées.
-  await forgetSalts(lastRollableDay(now));
+  await forgetSalts(until);
   await purgeAudienceViews(now);
   if (rolled > 0) {
     statsCache = null;
@@ -475,10 +498,6 @@ interface DimRow extends RowDataPacket {
   visitors: number | string;
 }
 
-interface CountRow extends RowDataPacket {
-  n: number | string;
-}
-
 const num = (value: unknown): number => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -532,28 +551,38 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
   };
 }
 
+interface CommunityRow extends RowDataPacket {
+  matches: number | string;
+  tournaments: number | string;
+}
+
+/** États « joué » de `stats.ts`, en littéraux SQL (constantes du code, jamais une saisie). */
+const PLAYED_STATES_SQL = [...PLAYED_STATES].map((state) => `'${state}'`).join(", ");
+
 /**
  * Chiffres publics de la communauté, sans aucune donnée d'une personne :
- * tournois publiés terminés, matchs joués, équipes de l'annuaire et comptes
- * du site — tout sauf les matchs lu par `site-counts.ts`, comme l'accueil.
- * `null` si la lecture échoue.
+ * tournois publiés joués (en cours ou terminés, comme les fiches d'équipe et
+ * les profils : `PLAYED_STATES`), matchs joués de ces tournois publiés,
+ * équipes de l'annuaire et comptes du site — ces deux derniers lus par
+ * `site-counts.ts`, comme l'accueil. `null` si la lecture échoue.
  */
 async function readCommunity(): Promise<AudienceCommunity | null> {
   try {
     const db = await getDatabase();
-    const count = async (sql: string) => {
-      const [rows] = await db.execute<CountRow[]>(sql);
-      return num(rows[0]?.n);
-    };
-    const [matches, site] = await Promise.all([
-      count(
-        `SELECT COUNT(*) AS n FROM bg_matches m
-           JOIN bg_tournaments t ON t.id = m.tournament_id
-          WHERE m.status = 'COMPLETED' AND m.is_bye = FALSE AND t.start_visibility_at <= NOW()`,
-      ),
+    const [[played], site] = await Promise.all([
+      db
+        .execute<CommunityRow[]>(
+          `SELECT
+             (SELECT COUNT(*) FROM bg_matches m
+                JOIN bg_tournaments t ON t.id = m.tournament_id
+               WHERE m.status = 'COMPLETED' AND m.is_bye = FALSE AND t.start_visibility_at <= NOW()) AS matches,
+             (SELECT COUNT(*) FROM bg_tournaments
+               WHERE state IN (${PLAYED_STATES_SQL}) AND start_visibility_at <= NOW()) AS tournaments`,
+        )
+        .then(([rows]) => rows),
       readSiteCounts(),
     ]);
-    return { tournaments: site.tournamentsPlayed, matches, teams: site.teams, players: site.players };
+    return { tournaments: num(played?.tournaments), matches: num(played?.matches), teams: site.teams, players: site.players };
   } catch (error) {
     console.error("[audience] Chiffres de la communauté illisibles.", failureReason(error));
     return null;
@@ -626,6 +655,7 @@ export function resetAudienceState(): void {
   flushTimer = null;
   flushing = null;
   lastMaintenanceAt = 0;
+  rolledThrough = null;
   maintaining = null;
   statsCache = null;
   statsLoad = null;

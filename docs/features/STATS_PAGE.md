@@ -44,7 +44,8 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
    lecture au survol, pic annoncé), barres par jour de la semaine et par heure.
 8. Qui nous consulte : appareils, provenance, langue — barres segmentées,
    couleur fixée par catégorie (jamais par rang), légende chiffrée.
-9. La communauté : tournois terminés publiés, matchs joués (hors exemptions),
+9. La communauté : tournois publiés joués (en cours ou terminés, `PLAYED_STATES`
+   comme les fiches d'équipe et les profils), matchs joués (hors exemptions),
    équipes et comptes **avec la définition de l'accueil**
    (`lib/server/site-counts.ts` : équipes de l'annuaire, comptes du site) —
    deux pages publiques ne publient pas deux chiffres différents.

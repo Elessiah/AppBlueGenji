@@ -163,8 +163,8 @@ export type TeamRankingPosition = {
   placementPoints: number;
 };
 
-/** États d'un tournoi effectivement disputé : un plateau existe. */
-const PLAYED_STATES: ReadonlySet<TournamentState> = new Set(["RUNNING", "FINISHED"]);
+/** États d'un tournoi effectivement disputé : un plateau existe (fiches, profils et `/frequentation`). */
+export const PLAYED_STATES: ReadonlySet<TournamentState> = new Set(["RUNNING", "FINISHED"]);
 
 export type DeepStats = {
   // — Palmarès

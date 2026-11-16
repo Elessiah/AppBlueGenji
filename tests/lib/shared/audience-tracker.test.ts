@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { AudienceBeaconEntry } from "@/lib/shared/audience";
+import { AUDIENCE_SUSPEND_GAP_MS, type AudienceBeaconEntry } from "@/lib/shared/audience";
 import { AudienceTracker } from "@/lib/shared/audience-tracker";
 
 /**
@@ -19,6 +19,16 @@ function tracker(referrer: string | null = "discord.com") {
     referrerHost: () => referrer,
     send,
   });
+}
+
+/** Avance l'horloge de `ms`, avec le tic d'une minute de `<AudienceBeacon />`. */
+function readFor(t: AudienceTracker, ms: number) {
+  const end = clock + ms;
+  while (clock + 60_000 <= end) {
+    clock += 60_000;
+    t.tick();
+  }
+  clock = end;
 }
 
 beforeEach(() => {
@@ -47,10 +57,10 @@ describe("AudienceTracker", () => {
   it("leave_afterReading_sendsTimeAsContinuationDatedAtClose", () => {
     const t = tracker();
     t.navigate("/regles");
-    clock = 3 * 60 * 60 * 1000;
+    clock = 90_000;
     t.hidden();
 
-    expect(send.mock.calls[0][0][1]).toEqual({ p: "/regles", t: 1_800_000, a: 0, d: "mobile", c: 1, o: 10_800_000 });
+    expect(send.mock.calls[0][0][1]).toEqual({ p: "/regles", t: 90_000, a: 0, d: "mobile", c: 1, o: 90_000 });
   });
 
   it("finish_zeroVisibleTime_sendsNoTimeEntry", () => {
@@ -134,13 +144,22 @@ describe("AudienceTracker — tranches d'une longue lecture", () => {
   it("tick_visibleReadingPastCheckpoint_sendsChunkAndKeepsReading", () => {
     const t = tracker();
     t.navigate("/regles");
-    clock = 600_000;
-    t.tick();
-    clock = 660_000;
+    readFor(t, 600_000);
+    send.mockClear();
+    readFor(t, 60_000);
     t.leave();
 
-    expect(send.mock.calls[0][0].slice(1)).toEqual([{ p: "/regles", t: 600_000, a: 0, d: "mobile", c: 1, o: 600_000 }]);
-    expect(send.mock.calls[1][0]).toEqual([{ p: "/regles", t: 60_000, a: 0, d: "mobile", c: 1, o: 660_000 }]);
+    expect(send.mock.calls.flatMap(([entries]) => entries)).toEqual([{ p: "/regles", t: 60_000, a: 0, d: "mobile", c: 1, o: 660_000 }]);
+  });
+
+  it("tick_tenMinutesRead_chunkSentWithItsTime", () => {
+    const t = tracker();
+    t.navigate("/regles");
+    readFor(t, 600_000);
+
+    expect(send.mock.calls.flatMap(([entries]) => entries).filter((entry) => entry.c === 1)).toEqual([
+      { p: "/regles", t: 600_000, a: 0, d: "mobile", c: 1, o: 600_000 },
+    ]);
   });
 
   it("tick_readingUnderCheckpoint_sendsNoChunk", () => {
@@ -150,5 +169,92 @@ describe("AudienceTracker — tranches d'une longue lecture", () => {
     t.tick();
 
     expect(send.mock.calls[0][0]).toEqual([{ p: "/regles", t: 0, a: 540_000, d: "mobile", f: 1, r: "discord.com" }]);
+  });
+});
+
+describe("AudienceTracker — retour après une pause", () => {
+  // 2026-11-16 10:00 à Paris (09:00 UTC).
+  const MORNING = Date.parse("2026-11-16T09:00:00Z");
+
+  it("visible_shortPauseSameDay_sendsContinuationOnly", () => {
+    clock = MORNING;
+    const t = tracker();
+    t.navigate("/equipes");
+    clock += 4000;
+    t.hidden();
+    send.mockClear();
+    clock += 30 * 60_000 - 1;
+    t.visible();
+    clock += 1000;
+    t.leave();
+
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/equipes", t: 1000, a: 0, d: "mobile", c: 1, o: 1_804_999 }]);
+  });
+
+  it("visible_pauseOfThirtyMinutes_sendsNewView", () => {
+    clock = MORNING;
+    const t = tracker();
+    t.navigate("/equipes");
+    clock += 4000;
+    t.hidden();
+    send.mockClear();
+    clock += 30 * 60_000;
+    t.visible();
+    t.tick();
+
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/equipes", t: 0, a: 0, d: "mobile" }]);
+  });
+
+  it("visible_afterParisMidnight_sendsNewView", () => {
+    // 23:55 à Paris, retour à 00:05.
+    clock = Date.parse("2026-11-16T22:55:00Z");
+    const t = tracker();
+    t.navigate("/equipes");
+    clock += 60_000;
+    t.hidden();
+    send.mockClear();
+    clock += 9 * 60_000;
+    t.visible();
+    t.tick();
+
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/equipes", t: 0, a: 0, d: "mobile" }]);
+  });
+});
+
+describe("AudienceTracker — veille onglet visible", () => {
+  it("tick_afterSuspendGap_closesReadingAtLastTickAndResumesAsNewView", () => {
+    clock = Date.parse("2026-11-16T09:00:00Z");
+    const t = tracker();
+    t.navigate("/regles");
+    readFor(t, 120_000);
+    send.mockClear();
+    clock += 2 * 60 * 60_000;
+    t.tick();
+
+    expect(send.mock.calls[0][0]).toEqual([
+      { p: "/regles", t: 120_000, a: 7_200_000, d: "mobile", c: 1, o: 7_320_000 },
+      { p: "/regles", t: 0, a: 0, d: "mobile" },
+    ]);
+  });
+
+  it("tick_exactlySuspendGap_keepsReading", () => {
+    const t = tracker();
+    t.navigate("/regles");
+    clock = AUDIENCE_SUSPEND_GAP_MS;
+    t.tick();
+
+    // Seule la page vue part : ni tranche close, ni nouvelle page vue.
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/regles", t: 0, a: AUDIENCE_SUSPEND_GAP_MS, d: "mobile", f: 1, r: "discord.com" }]);
+  });
+
+  it("hidden_afterSilentSuspend_timeStopsAtLastTick", () => {
+    const t = tracker();
+    t.navigate("/regles");
+    readFor(t, 60_000);
+    send.mockClear();
+    clock = 3 * 60 * 60_000;
+    t.hidden();
+
+    expect(send.mock.calls[0][0]).toEqual([{ p: "/regles", t: 60_000, a: 10_740_000, d: "mobile", c: 1, o: 10_800_000 }]);
   });
 });

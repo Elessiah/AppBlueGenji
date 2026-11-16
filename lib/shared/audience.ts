@@ -38,11 +38,6 @@ export const AUDIENCE_VISIT_GAP_MINUTES = 30;
  */
 export const AUDIENCE_MAX_AGE_MS = 60 * 60 * 1000;
 
-/**
- * Ancienneté maximale de l'ouverture d'une page dont une suite arrive : au-delà,
- * le jour de cette page est replié depuis longtemps, la suite est écartée.
- */
-export const AUDIENCE_MAX_OPEN_AGE_MS = 48 * 60 * 60 * 1000;
 
 /**
  * Une lecture qui dure part par tranches d'au plus ce temps (plus le délai du
@@ -59,6 +54,12 @@ export const AUDIENCE_CLIENT_FLUSH_SIZE = 10;
 
 /** …ou au plus tard après ce délai. */
 export const AUDIENCE_CLIENT_FLUSH_MS = 60_000;
+
+/**
+ * Retard du tic d'envoi au-delà duquel le navigateur a dormi (machine en
+ * veille onglet visible) : le temps de ce sommeil n'est pas un temps de lecture.
+ */
+export const AUDIENCE_SUSPEND_GAP_MS = 3 * AUDIENCE_CLIENT_FLUSH_MS;
 
 /** Adresse publique (non référencée) de la page de fréquentation. */
 export const AUDIENCE_PAGE_PATH = "/frequentation";
@@ -235,13 +236,12 @@ function clampInt(value: unknown, min: number, max: number): number {
 /**
  * Ancienneté de l'ouverture de la page qu'une suite prolonge : jamais après sa
  * clôture (`ageMs`) ; absente (ancien script) ou illisible, la suite se range
- * au jour de sa clôture. `null` au-delà de {@link AUDIENCE_MAX_OPEN_AGE_MS}.
+ * au jour de sa clôture. Le jour d'une ouverture trop ancienne est déjà replié :
+ * le serveur écarte alors la suite (`lastRollableDay`).
  */
-function continuationOpenAge(raw: unknown, ageMs: number): number | null {
+function continuationOpenAge(raw: unknown, ageMs: number): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return ageMs;
-  const opened = Math.round(raw);
-  if (opened > AUDIENCE_MAX_OPEN_AGE_MS) return null;
-  return Math.max(ageMs, opened);
+  return Math.max(ageMs, Math.round(raw));
 }
 
 /**
@@ -272,7 +272,6 @@ function parseAudienceEntry(raw: unknown, ownHost?: string | null): AudienceView
   const isView = entry.c !== 1;
   const ageMs = Math.max(0, age);
   const openedAgeMs = isView ? ageMs : continuationOpenAge(entry.o, ageMs);
-  if (openedAgeMs === null) return null;
   return {
     pageKey: page.key,
     locale: page.locale,
