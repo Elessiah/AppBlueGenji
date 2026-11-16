@@ -27,7 +27,7 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://si
 
 import { copyFile, rename, unlink } from "node:fs/promises";
 import { getDatabase } from "@/lib/server/database";
-import { blockImageHashOn, blockImageHashesSafely, readImageSha256, unblockImageHashOn } from "@/lib/server/blocked-images";
+import { blockImageHashOn, blockImageHashesSafely, pinClosedQuarantineHashesOn, readImageSha256, unblockImageHashOn } from "@/lib/server/blocked-images";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
@@ -45,6 +45,7 @@ import {
   logoFileLocations,
   notifyTeamLogoRemoved,
   notifyUserAvatarRemoved,
+  purgeClosedQuarantines,
   purgeDueQuarantines,
   removeModeratedAvatarFile,
   purgeQuarantinedLogo,
@@ -1547,5 +1548,121 @@ describe("modération d'un logo d'équipe — vues de l'accueil", () => {
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
 
     expect(loader).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("purgeClosedQuarantines (D87)", () => {
+  /** Pool simulé : `candidates` pour la relève, `locked` sous verrou, `deleted` à l'effacement. */
+  function closedPool(candidates: number[], locked: number[], deleted: () => unknown = () => [{ affectedRows: locked.length }]) {
+    const poolExecute = jest.fn<SqlQuery>(async () => [candidates.map((id) => ({ id }))]);
+    const tx = connectionMock();
+    tx.execute.mockImplementation(async (sql) => {
+      if (/FOR UPDATE/.test(sql)) return [locked.map((id) => ({ id }))];
+      if (/DELETE FROM bg_logo_quarantines/.test(sql)) return deleted();
+      throw new Error(`requête inattendue : ${sql}`);
+    });
+    const getConnection = jest.fn(async () => fakeConnection(tx));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: poolExecute, getConnection }));
+    return { poolExecute, tx, getConnection };
+  }
+
+  it("purgeClosedQuarantines_orphanedClosedRows_pinsThenDeletesInOneTransaction", async () => {
+    const { tx } = closedPool([4, 9], [4, 9]);
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(2);
+
+    expect(pinClosedQuarantineHashesOn).toHaveBeenCalledWith(expect.anything(), [4, 9]);
+    const deleteCall = tx.execute.mock.calls.find(([sql]) => /DELETE FROM bg_logo_quarantines/.test(sql));
+    expect(deleteCall?.[1]).toEqual([4, 9]);
+    expect(jest.mocked(pinClosedQuarantineHashesOn).mock.invocationCallOrder[0]).toBeLessThan(
+      tx.execute.mock.invocationCallOrder[1],
+    );
+    expect(tx.commit).toHaveBeenCalledTimes(1);
+    expect(tx.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeClosedQuarantines_candidateSql_closedRowsWhoseReportIsGone", async () => {
+    const { poolExecute } = closedPool([], []);
+
+    await purgeClosedQuarantines();
+
+    const [sql] = poolExecute.mock.calls[0];
+    expect(sql).toMatch(/status IN \('RESTORED', 'PURGED'\)/);
+    expect(sql).toMatch(/report_id IS NULL OR NOT EXISTS \(SELECT 1 FROM bg_reports r WHERE r\.id = bg_logo_quarantines\.report_id\)/);
+    expect(sql).not.toMatch(/HIDDEN/);
+  });
+
+  it("purgeClosedQuarantines_candidateRead_isBoundedByLimit", async () => {
+    const { poolExecute } = closedPool([], []);
+
+    await purgeClosedQuarantines();
+
+    expect(poolExecute.mock.calls[0][0]).toMatch(/ORDER BY id LIMIT 500/);
+  });
+
+  it("purgeClosedQuarantines_backlogOverOneSlice_readsSliceBySliceUntilShort", async () => {
+    const full = Array.from({ length: 500 }, (_, index) => index + 1);
+    const { poolExecute, tx } = closedPool([], []);
+    poolExecute
+      .mockResolvedValueOnce([full.map((id) => ({ id }))])
+      .mockResolvedValueOnce([[{ id: 501 }, { id: 502 }]]);
+    tx.execute.mockImplementation(async (sql, params) => {
+      if (/FOR UPDATE/.test(sql)) return [(params as number[]).filter((id) => id <= 502).map((id) => ({ id }))];
+      return [{ affectedRows: (params as number[]).length }];
+    });
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(502);
+
+    expect(poolExecute).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantines_fullSliceNothingDeleted_stopsInsteadOfLooping", async () => {
+    const full = Array.from({ length: 500 }, (_, index) => ({ id: index + 1 }));
+    const { poolExecute } = closedPool([], []);
+    poolExecute.mockResolvedValue([full]);
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(0);
+
+    expect(poolExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeClosedQuarantines_lockingRead_noJoinNorReportTable", async () => {
+    const { tx } = closedPool([4], [4]);
+
+    await purgeClosedQuarantines();
+
+    const [lockSql] = tx.execute.mock.calls[0];
+    expect(lockSql).toMatch(/FOR UPDATE/);
+    expect(lockSql).not.toMatch(/JOIN|bg_reports/);
+  });
+
+  it("purgeClosedQuarantines_rowGoneUnderLock_noPinNoDelete", async () => {
+    const { tx } = closedPool([4], []);
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(0);
+
+    expect(pinClosedQuarantineHashesOn).not.toHaveBeenCalled();
+    expect(tx.execute).toHaveBeenCalledTimes(1);
+    expect(tx.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeClosedQuarantines_noCandidate_noConnection", async () => {
+    const { getConnection } = closedPool([], []);
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(0);
+
+    expect(getConnection).not.toHaveBeenCalled();
+  });
+
+  it("purgeClosedQuarantines_deleteFails_rollsBackReleasesAndThrows", async () => {
+    const { tx } = closedPool([4], [4], () => {
+      throw new Error("LOCK_WAIT");
+    });
+
+    await expect(purgeClosedQuarantines()).rejects.toThrow("LOCK_WAIT");
+
+    expect(tx.rollback).toHaveBeenCalledTimes(1);
+    expect(tx.commit).not.toHaveBeenCalled();
+    expect(tx.release).toHaveBeenCalledTimes(1);
   });
 });

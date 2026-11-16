@@ -72,6 +72,7 @@ import {
 } from "@/lib/server/notify";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
+import { createLimiter } from "@/lib/shared/in-batches";
 import { LOBBY_BRIEF_LEAD_MINUTES, type LobbyBriefKickoff, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { LOCALES, type Locale } from "@/lib/shared/locales";
 import type { PushContent } from "@/lib/shared/push-notifications";
@@ -1040,8 +1041,18 @@ async function runLobbyBriefSweep(): Promise<number> {
   const toRelease: number[] = [];
   const closed: number[] = [];
   const toRetry: string[] = [];
-  for (const row of rows) {
-    const brief = await briefMatch(db, row, { managers, recipients, briefSides });
+  // Matchs briefés à plusieurs à la fois (`LOBBY_BRIEF_CONCURRENCY`) : chacun
+  // attend ses allers-retours (réservation, relecture, bot) sans retenir les
+  // autres ; ses réservations sont les siennes (par match et par côté), et le
+  // bilan se lit ensuite dans l'ordre des matchs. `briefMatch` ne lève jamais.
+  const context: SweepContext = { managers, recipients, briefSides };
+  // Borne glissante (`createLimiter`), non des lots fixes : un bot lent sur un
+  // match ne retient pas les suivants, `LOBBY_BRIEF_CONCURRENCY` restent en
+  // cours tant qu'il en reste à briefer.
+  const slot = createLimiter(LOBBY_BRIEF_CONCURRENCY);
+  const briefs = await Promise.all(rows.map((row) => slot(() => briefMatch(db, row, context))));
+  for (const [index, row] of rows.entries()) {
+    const brief = briefs[index];
     sent += brief.sent;
     toRelease.push(...brief.retry);
     closed.push(...brief.closed);
@@ -1063,6 +1074,15 @@ async function runLobbyBriefSweep(): Promise<number> {
   scheduleRetrySweep(toRetry);
   return sent;
 }
+
+/**
+ * Matchs briefés en même temps par un balayage, au plus : deux, pour qu'un bot
+ * lent sur un match ne retienne pas tous les autres (une ronde suisse ouvre ses
+ * salons d'un coup), sans qu'un balayage déclenché par le trafic ne prenne plus
+ * de deux connexions du pool (25) ni n'ouvre plus de deux rafales de messages
+ * au bot sur le Raspberry Pi.
+ */
+export const LOBBY_BRIEF_CONCURRENCY = 2;
 
 /** Étranglement : celui des départs de match (dix secondes). */
 const LOBBY_BRIEF_THROTTLE_MS = 10_000;

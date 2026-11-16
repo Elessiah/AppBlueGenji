@@ -1064,6 +1064,38 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Nothing else changes: the mark contains nothing else, goes with the session and isn't included in the export of your data; “Don't show again” is still kept on your account, with its date.",
     ],
   },
+  "2026-11-suppression-du-compte-bons-passages": {
+    linkLabels: ["Read when an account is erased completely", "Read what becomes of the player's page"],
+    title: "Account deletion: links to the right sections of the privacy page",
+    summary:
+      "The information of November 4, 2026 on account deletion (upcoming solo registrations and the player's page) pointed to the note on connection data on the privacy page, not to the passages it announced. Here they are.",
+    details: [
+      "The first link leads to the note saying when an account is erased completely; the second, to the “Tournament history & achievements” passage, which says what becomes of a deleted account's page and its links.",
+      "Nothing changes: neither what is collected nor what deletion removes; only the reference is corrected.",
+    ],
+  },
+  "2026-11-decisions-sur-image-et-signalement": {
+    linkLabels: ["Read the “Reports” section"],
+    title: "Moderated logos and avatars: the decision goes with its report",
+    summary:
+      "The decision taken on a reported team logo or avatar (hiding, restoring or deleting) had no retention period of its own. Once the image is restored or deleted, it is now erased with the report that prompted it, at the end of that report's retention period.",
+    details: [
+      "What goes: the decision itself — the moderation member who took it, its dates, the outcome of its challenge and, for a deleted avatar, its hash (SHA-256). The report is only erased once the decision can no longer be contested (see the “Reports” section); erasing the account still removes its decisions earlier.",
+      "For an avatar whose deletion blocked the image, the hash then only stays in the list of blocked images, with no link to any account, and the block becomes permanent, as on the erasure of the account.",
+      "What does not change: nothing new is collected — the moderation member who took the decision was already recorded on it, and the record of processing activities (T11) now lists it; a logo or avatar still hidden keeps its decision for as long as it is hidden.",
+    ],
+  },
+  "2026-11-pseudo-emprunt-suffixe": {
+    linkLabels: ["Read what becomes of a deleted account"],
+    title: "Deleted accounts: a borrowed username that can't be guessed",
+    summary:
+      "The borrowed username that replaces that of a deleted account is now a name followed by six random characters (for example “AlphaFX-7f3k2q”), no longer a bare name from a public list: it can no longer be guessed. Accounts already deleted get theirs, and the name of their solo registration follows.",
+    details: [
+      "What the form says: to anyone who knows it, that an account was deleted — as its page already said; nothing about the person.",
+      "For a link to the vanished page of a deleted account to become text, the page submits the names it displays to the site, and the site only answers for the current name. Against anyone trying to guess which accounts are in that case, it keeps, in memory only and for 24 hours at most, a never-written fingerprint of the wrong names submitted for such an account; past four, the link stays, to the page not found, until the end of that period.",
+      "What does not change: nothing more is collected about you, and what deletion removes stays the same.",
+    ],
+  },
 };
 
 /**

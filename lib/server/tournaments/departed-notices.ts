@@ -39,6 +39,7 @@ import { HELD_TIME_GRACE_MS } from "./reminder-marks";
 import { queueDeletedMatchCasts } from "./cast-notices";
 import { announceDeletedMatchesToStaff } from "./schedule-notices";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
+import { createTransactionState } from "./transaction-state";
 
 export type { Poster } from "./match-poster";
 
@@ -89,15 +90,16 @@ export type DeletedStaffTime = {
   team2Id: number | null;
 };
 
-const states = new WeakMap<PoolConnection, TransactionState>();
+const states = createTransactionState<TransactionState>(() => ({
+  pending: [],
+  settledLater: new Set(),
+  heldRead: new Map(),
+  heldBy: new Map(),
+  staffRemovals: [],
+}));
 
 function stateOf(connection: PoolConnection): TransactionState {
-  let state = states.get(connection);
-  if (!state) {
-    state = { pending: [], settledLater: new Set(), heldRead: new Map(), heldBy: new Map(), staffRemovals: [] };
-    states.set(connection, state);
-  }
-  return state;
+  return states.ensure(connection);
 }
 
 type HeldRow = RowDataPacket & { match_id: number; start_at: Date | string | null };
@@ -161,7 +163,7 @@ export async function noteDepartedEntrants(
   connection: PoolConnection,
   departures: readonly Departure[],
 ): Promise<void> {
-  const owned = states.get(connection)?.settledLater;
+  const owned = states.peek(connection)?.settledLater;
   const noted = owned ? departures.filter((departure) => !owned.has(departure.matchId)) : departures;
   if (noted.length === 0) return;
   const held = await readHeldTimes(connection, [...new Set(noted.map((departure) => departure.matchId))]);
@@ -187,13 +189,13 @@ export async function holdDepartures(connection: PoolConnection, matchIds: reado
  * pose intermédiaire — l'appelant les effacera si l'affiche d'arrivée a changé.
  */
 export function withoutSettledLater(connection: PoolConnection, matchIds: readonly number[]): number[] {
-  const owned = states.get(connection)?.settledLater;
+  const owned = states.peek(connection)?.settledLater;
   return owned ? matchIds.filter((id) => !owned.has(id)) : [...matchIds];
 }
 
 /** Note les sorties constatées à l'arrivée, sur les horaires relevés par {@link holdDepartures}. */
 export function settleDepartures(connection: PoolConnection, times: HeldTimes, departures: readonly Departure[]): void {
-  const owned = states.get(connection)?.settledLater;
+  const owned = states.peek(connection)?.settledLater;
   for (const id of times.matchIds) owned?.delete(id);
   enqueue(connection, times.held, departures);
 }
@@ -442,7 +444,7 @@ async function noteStaffRemovals(connection: PoolConnection, rows: readonly Doom
 
 /** Jette les avis notés : le changement n'a pas abouti. */
 export function discardDepartedNotices(connection: PoolConnection): void {
-  states.delete(connection);
+  states.discard(connection);
 }
 
 /**
@@ -450,8 +452,7 @@ export function discardDepartedNotices(connection: PoolConnection): void {
  * attendre** (comme `flushBotLogs`). Ne lève jamais.
  */
 export function flushDepartedNotices(connection: PoolConnection): void {
-  const state = states.get(connection);
-  states.delete(connection);
+  const state = states.take(connection);
   const notices = state?.pending ?? [];
   const removals = state?.staffRemovals ?? [];
   if (removals.length > 0) {

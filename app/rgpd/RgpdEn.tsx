@@ -277,7 +277,7 @@ export function RgpdEn({
             <DataRow entry={DONNEE_CONNEXIONS_EN} accent mark=" ***" />
           </tbody>
         </table>
-        <p style={{ marginTop: 16, ...NOTE_STYLE }}>
+        <p id="effacement-complet" style={{ marginTop: 16, ...NOTE_STYLE }}>
           * An account that has played no match, is an entrant in no solo tournament that has started and organized no tournament that no one on the staff could take over is{" "}
           <strong>entirely erased</strong> at the end of the {ACCOUNT_REACTIVATION_DAYS} days following its deletion request, apart from
           connection data (***); its registrations for solo tournaments that have not started yet are withdrawn as soon as it is
@@ -340,7 +340,7 @@ export function RgpdEn({
       </section>
 
       {/* SECTION 03 — HISTORY & ACHIEVEMENTS */}
-      <section className={styles.section}>
+      <section id="suppression-et-palmares" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 03</span>
@@ -390,9 +390,9 @@ export function RgpdEn({
           placements) are not erased when the account is deleted. On the other hand, everything that identifies
           the person is erased (Discord and game tags, login accounts, avatar, adulthood, roles — the only
           exception being the replay codes described above) and the username is replaced by a randomly drawn{" "}
-          <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
+          <strong>borrowed username</strong> (a name followed by six random characters, for example “AlphaFX-7f3k2q” — a form that marks a deleted account, without saying anything about the person): the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
-          match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). An account that has never played a match has no record
+          match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). To do so, the page submits the names it displays to the site; against anyone trying to guess which accounts are in that case, the site keeps, in memory only and for 24 hours at most, a never-written fingerprint of the wrong names submitted for such an account: past four, its link stays, to the page not found, until the end of that period. An account that has never played a match has no record
           to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a
           tournament that no one on the staff could take over, or if it is an entrant in a{" "}
           <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. Its teams no longer keep the row:
@@ -737,7 +737,7 @@ export function RgpdEn({
               days after archiving — extended as long as a logo or avatar hidden or deleted on the basis of the report
               can still be contested by its team or player, and raised to {LOGO_QUARANTINE_MONTHS} calendar months
               after archiving for a copyright or moderation report sent from an account, so that its author can
-              contest the decision. A deleted account does not leave its username there.
+              contest the decision. A deleted account does not leave its username there. Once the logo or avatar is restored or deleted, the decision taken on it (point 4: moderation member who took it, outcome of its challenge) is erased with the report that prompted it, at the end of that report's retention period.
             </li>
           </ul>
 
@@ -800,11 +800,9 @@ export function RgpdEn({
               account is active or pending deletion, the hash (SHA-256) of the image is kept without time limit in
               the list of blocked images, which designates no account and only dates a block to the day, to refuse
               it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
-              erased if nothing else on the site points to it. As long as the account exists (anonymized included),
-              the hash is also kept on the deletion decision taken on a report or after a hiding, with the
+              erased if nothing else on the site points to it. As long as the deletion decision taken on a report or after a hiding is kept, the hash is also kept on it, with the
               outcome of its challenge: upheld, the block stays; accepted, it is lifted, unless another deletion of
-              the same image still justifies it. When the account is erased, those decisions are erased and the
-              block becomes permanent: only the hash remains, with no link to any account. An automatic deletion
+              the same image still justifies it. Those decisions are erased with the report that prompted them, at the end of its retention period (point 1), or earlier when the account is erased (anonymized, it keeps them until then); the block then becomes permanent: only the hash remains, with no link to any account. An automatic deletion
               made while its challenge was still awaiting its outcome only blocks the image once upheld, or on the erasure of
               the account if that comes first, then permanently. Hashes set on the erasure of an account before
               November 11, 2026 — then also those of an avatar that was only hidden — stay blocked, dated to the

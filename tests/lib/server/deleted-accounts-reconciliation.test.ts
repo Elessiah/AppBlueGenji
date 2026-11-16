@@ -15,7 +15,7 @@ import { reconcileDeletedAccounts } from "@/lib/server/users/deleted-accounts";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
+import { ANONYMOUS_PSEUDOS, SUFFIXED_ANONYMOUS_PSEUDO } from "@/lib/shared/anonymous-pseudos";
 import { fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
@@ -226,7 +226,8 @@ describe("reconcileDeletedAccounts", () => {
 
     expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0, withdrawn: 0, forfeited: 0 });
     const update = writesFor(queries, 5123).find((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"))!;
-    expect(ANONYMOUS_PSEUDOS).toContain(update.params[0]);
+    expect(update.params[0]).toMatch(SUFFIXED_ANONYMOUS_PSEUDO);
+    expect(ANONYMOUS_PSEUDOS).toContain(String(update.params[0]).slice(0, -7));
     // [pseudo, DEFAULT_LOCALE (langue remise au défaut, lot 9-3), id]
     expect(update.params[2]).toBe(5123);
     expect(writesFor(queries, 5123).some((q) => q.sql.startsWith("DELETE FROM bg_users"))).toBe(false);

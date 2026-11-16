@@ -148,6 +148,20 @@ transaction pouvant atteindre un point de réservation doit donc porter la paire
 `reorderSeeding` compris (réordonner un tournoi démarré rejoue son
 orchestration, qui peut le clore).
 
+Les autres files « après commit » d'une transaction — avis aux engagées
+retirées, validations d'office, casters et arbitres retirés d'office — suivent
+**le même couple** : elles naissent toutes de la même fabrique
+(`createTransactionState`, `lib/server/tournaments/transaction-state.ts`) et
+`flushBotLogs` / `discardBotLogs` les vident ou les jettent. Une file de plus
+s'y branche dans la même PR ; `tests/lib/server/transaction-state.test.ts`
+refuse une file non branchée et toute `WeakMap<PoolConnection, …>` écrite à la main ;
+`clearTransactionStates` (filet de fin de vidage) **journalise** (`console.error`) toute
+file encore garnie qu'il jette : un oubli de branchement se lit dans pm2. Ce
+filet ne protège que la transaction suivante **sur le même objet connexion**
+(deux transactions enchaînées sans la rendre) : le pool ne transmet rien d'une
+emprise à l'autre, `mysql2/promise` enveloppant chaque `getConnection()` dans un
+objet neuf, que la `WeakMap` ne connaît pas.
+
 ```ts
 try {
   await connection.beginTransaction();

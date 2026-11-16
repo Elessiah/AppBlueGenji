@@ -66,7 +66,9 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   `releaseIneligibleCast`, pas la phase affichée). Un caster **devenu joueur** du
   match (roster rejoint après l'inscription, `CASTER_IS_PLAYER` n'étant contrôlé
   qu'à l'inscription) est traité de même **avant le lancement**, dès qu'une
-  lecture le constate (la sienne, ou les rosters lus pour les contacts) : tu,
+  lecture le constate (la sienne, les rosters lus pour les contacts, ou — match arbitré
+  dont les contacts ne sortent pas encore — la seule appartenance de l'arbitre et des
+  casters aux deux équipes, `loadMemberships`, sans les effectifs entiers) : tu,
   inscription retirée (`casterPlays`, rejoué sous verrou par
   `releaseIneligibleCast`) — son « Prêt » de caster ne viendrait jamais. Lancé,
   il garde sa place (`viewer.isCaster` le dit caster malgré son rôle de joueur).
@@ -490,6 +492,9 @@ une fois (`castersOnUnreadStream`), jamais rendu sur un stream absent.
   le match n'attend plus un « Prêt » qui ne viendra pas, et un lancement d'office ne rend pas
   publics son pseudo ni le lien de sa chaîne. Un retrait par l'entretien publie avec
   `landingLive` : l'accueil et #live perdent le lien tout de suite, sans attendre leur cache.
+  L'entretien verrouille d'abord tous ses candidats (par id croissant), puis relit la condition
+  du cast de **tous** leurs casters en une lecture courante (`loadMaintenanceCastBlocks`) — une
+  lecture `bg_users` par passe, non plus une par match en lobby.
   Un caster devenu joueur de l'appariement qui arrive se repère en deux lectures pour tous les
   casters du match (`playingUserIds`). Un match déjà lancé garde ses casters. Retirer un
   caster d'un match **joué** est refusé (`MATCH_CAST_CLOSED`, 409, comme l'inscription et les réglages) ; une inscription déjà acquise (double clic) ou un retrait qui ne

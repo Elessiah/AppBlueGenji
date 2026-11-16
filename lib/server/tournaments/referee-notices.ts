@@ -24,6 +24,7 @@ import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatMapPickBurstLog, formatRefereeChangeLog, type RefereeLogChange } from "@/lib/shared/bot-logs";
 import { refereeObjectionReleasedPush, refereeReleasedPush, type RefereeReleaseReason } from "@/lib/shared/push-messages";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
+import { createTransactionState } from "./transaction-state";
 
 /** Un changement d'arbitrage ou d'organisation, constaté sous verrou. */
 export type RefereeChange =
@@ -372,16 +373,14 @@ export function resetMapPickLogs(): void {
 }
 
 /** Changements constatés au fond d'une transaction, annoncés après son commit (`./cast-notices`, même cycle). */
-const pendingChanges = new WeakMap<PoolConnection, RefereeChange[]>();
+const pendingChanges = createTransactionState<RefereeChange[]>(() => []);
 
 export function queueRefereeChange(connection: PoolConnection, change: RefereeChange): void {
-  const queued = pendingChanges.get(connection);
-  if (queued) queued.push(change);
-  else pendingChanges.set(connection, [change]);
+  pendingChanges.ensure(connection).push(change);
 }
 
 export function discardRefereeChanges(connection: PoolConnection): void {
-  pendingChanges.delete(connection);
+  pendingChanges.discard(connection);
 }
 
 /**
@@ -389,7 +388,5 @@ export function discardRefereeChanges(connection: PoolConnection): void {
  * d'un arbitre inéligible part avant la reprise du match (revue sécurité #536).
  */
 export function flushRefereeChanges(connection: PoolConnection): void {
-  const queued = pendingChanges.get(connection);
-  pendingChanges.delete(connection);
-  announceRefereeChanges(queued ?? []);
+  announceRefereeChanges(pendingChanges.take(connection) ?? []);
 }

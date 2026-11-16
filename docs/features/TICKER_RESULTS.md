@@ -129,7 +129,16 @@ technologies d'assistance) portent `user-select: none`.
 La requête des résultats trie les matchs terminés par `updated_at` : index
 `idx_bg_matches_status_updated (status, updated_at)` (schéma + `RECENT_SCHEMA_CHANGES`,
 `docs/DATABASE_SCHEMA.md`), pour ne pas lire puis trier tout l'historique terminé
-à chaque recalcul du cache.
+à chaque recalcul du cache. Pour que l'index fasse aussi l'ordre sous MariaDB 11.8
+(production), `m` est la première table et toutes les autres s'y joignent en
+`LEFT JOIN` sur leur clé primaire (`eq_ref`, sans tampon de jointure) ; la
+publication du tournoi (`start_visibility_at <= NOW()`) se juge au `HAVING`. Une
+condition sur `bg_tournaments` dans le `WHERE` rendait la jointure interne :
+MariaDB lisait alors le tournoi par plage, en jointure BNL, et triait le tout
+(« Using temporary; Using filesort », EXPLAIN de production du 2026-11-14 — D92).
+Coût du `HAVING` : le parcours de l'index ne s'arrête qu'après `LIMIT` lignes visibles ; les matchs récents d'un tournoi non publié (tests, brouillons) y coûtent trois lectures par clé primaire chacun — accepté, le résultat est en cache. Plan attendu : `m` en `ref`/`range` sur l'index, parcours inverse, ni table
+temporaire ni tri (vérifié sous MySQL 8.0 ; à revérifier par `EXPLAIN` en
+production après déploiement).
 
 ## API
 

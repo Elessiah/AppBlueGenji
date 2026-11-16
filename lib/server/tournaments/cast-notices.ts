@@ -31,6 +31,7 @@ import { nullableId } from "@/lib/shared/nullable-id";
 import { castReleasedPush } from "@/lib/shared/push-messages";
 import { formatCastReleasedNotice } from "./cast-release-message";
 import { loadMatchLogRow, MATCH_LOG_COLUMNS_SQL, matchLogSubject, type MatchLogRow } from "./match-log-subject";
+import { createTransactionState } from "./transaction-state";
 
 /**
  * L'appariement du match tel que la transaction du geste l'a lu sous verrou.
@@ -305,25 +306,21 @@ function chainAfter(keys: readonly string[], announce: () => Promise<void>): Pro
  * (`./bot-logs`) : partis après le commit (`flushCastChanges`), jetés si la
  * transaction échoue (`discardCastChanges`). Rien n'est annoncé qui ne soit écrit.
  */
-const pendingChanges = new WeakMap<PoolConnection, CastChange[]>();
+const pendingChanges = createTransactionState<CastChange[]>(() => []);
 
 /** Note un changement à annoncer si — et seulement si — la transaction en cours aboutit. */
 export function queueCastChange(connection: PoolConnection, change: CastChange): void {
-  const queued = pendingChanges.get(connection);
-  if (queued) queued.push(change);
-  else pendingChanges.set(connection, [change]);
+  pendingChanges.ensure(connection).push(change);
 }
 
 /** La transaction n'a pas abouti : rien ne part. */
 export function discardCastChanges(connection: PoolConnection): void {
-  pendingChanges.delete(connection);
+  pendingChanges.discard(connection);
 }
 
 /** Annonce, sans attendre, les changements de la transaction qui vient d'aboutir. Ne lève jamais. */
 export function flushCastChanges(connection: PoolConnection): void {
-  const queued = pendingChanges.get(connection);
-  pendingChanges.delete(connection);
-  for (const change of queued ?? []) announceCastChange(change);
+  for (const change of pendingChanges.take(connection) ?? []) announceCastChange(change);
 }
 
 /**

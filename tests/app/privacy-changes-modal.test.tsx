@@ -490,9 +490,9 @@ describe("mise en page racine", () => {
   it("lit les changements sur toutes les pages et fait taire la modale de recrutement", () => {
     // Le silence de `/rgpd` est décidé côté client : décidé ici, il suivrait le
     // joueur d'un lien à l'autre (la mise en page n'est pas re-rendue).
-    // Lue en parallèle des marches du podium et des comptes sans fiche.
+    // Lue en parallèle des marches du podium (les comptes sans fiche se demandent par page, D86).
     expect(layout).toContain("const privacyChangesLoad = pendingChangesFor(user?.id);");
-    expect(layout).toMatch(/const \[privacyChanges, rawPodiumTiers, profilelessPlayers\] = await Promise\.all\(\[\s*privacyChangesLoad,/);
+    expect(layout).toMatch(/const \[privacyChanges, rawPodiumTiers\] = await Promise\.all\(\[\s*privacyChangesLoad,/);
     expect(layout).not.toContain("PRIVACY_POLICY_PAGE");
     // Seule la modale d'arrivée se tait : la banderole n'est pas modale et reste.
     expect(layout).toMatch(

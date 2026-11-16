@@ -35,7 +35,7 @@ import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tour
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_STATS_KEY, LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
-import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
+import { ANONYMOUS_PSEUDOS, SUFFIXED_ANONYMOUS_PSEUDO } from "@/lib/shared/anonymous-pseudos";
 
 /**
  * L'écriture de la suppression : ce qu'elle efface, ce qu'elle garde, et ce
@@ -414,29 +414,30 @@ describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => 
   const anonymization = (queries: Query[]) =>
     queries.find((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"))!;
 
-  it("remplace le pseudo par un pseudo de la liste, jamais par l'identifiant", async () => {
+  /** Aléa cryptographique figé à 0 : le tirage rend « AlphaFX-000000 », puis le compteur. */
+  const zeroRandom = () =>
+    jest.spyOn(globalThis.crypto, "getRandomValues").mockImplementation((array) => array);
+
+  it("remplace le pseudo par un pseudo de la liste suffixé d'un aléa, jamais par l'identifiant", async () => {
     const { queries } = fakeDb({ ...EMPTY, played: 1 });
 
     await deleteOwnAccount(7);
 
     const update = anonymization(queries);
-    expect(ANONYMOUS_PSEUDOS).toContain(update.params[0]);
+    expect(update.params[0]).toMatch(SUFFIXED_ANONYMOUS_PSEUDO);
+    expect(ANONYMOUS_PSEUDOS).toContain(String(update.params[0]).slice(0, -7));
     // [pseudo, DEFAULT_LOCALE (langue remise au défaut, lot 9-3), id]
     expect(update.params[2]).toBe(7);
     expect(update.sql).not.toContain("compte_supprime_");
   });
 
-  it("relit les pseudos déjà portés par les autres comptes, sur la transaction", async () => {
-    const { queries, connection } = fakeDb({ ...EMPTY, played: 1 });
+  // D99 : le suffixe rend la collision improbable, l'index unique la départage.
+  it("ne relit aucun pseudo porté avant d'écrire", async () => {
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
 
     await deleteOwnAccount(7);
 
-    const taken = queries.find((q) => q.sql.startsWith("SELECT pseudo FROM bg_users WHERE id <> ?"))!;
-    expect(taken.params[0]).toBe(7);
-    // Les pseudos portés par les autres comptes et ceux mis de côté par une
-    // demande en attente (`bg_account_deletion_holds`).
-    expect(taken.params).toHaveLength(2 * ANONYMOUS_PSEUDOS.length + 2);
-    expect(connection.execute).toHaveBeenCalled();
+    expect(has(queries, "SELECT pseudo FROM bg_users WHERE id <> ?")).toBe(false);
   });
 
   it("efface tags, identités, majorité, rôles de plateforme et avatar dans la même instruction", async () => {
@@ -488,23 +489,30 @@ describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => 
     // qui le refuse — la course qu'une suppression simultanée ouvre.
     const { queries } = fakeDb(
       { ...EMPTY, played: 1 },
-      { duplicatePseudos: [ANONYMOUS_PSEUDOS[0]] },
+      { duplicatePseudos: ["AlphaFX-000000"] },
     );
-    const random = jest.spyOn(Math, "random");
-    random.mockReturnValueOnce(0).mockReturnValueOnce(0.5);
+    // Premier tirage (nom + six caractères = sept aléas) à zéro, le suivant à 1/36.
+    let draws = 0;
+    const random = jest.spyOn(globalThis.crypto, "getRandomValues").mockImplementation((array) => {
+      if (array instanceof Uint32Array) array[0] = draws++ < 7 ? 0 : Math.ceil(0x1_0000_0000 / 36);
+      return array;
+    });
 
     await deleteOwnAccount(7);
 
     const writes = queries.filter((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"));
-    expect(writes.map((w) => w.params[0])).toEqual([ANONYMOUS_PSEUDOS[0], ANONYMOUS_PSEUDOS[500]]);
+    expect(writes.map((w) => w.params[0])).toEqual(["AlphaFX-000000", `${ANONYMOUS_PSEUDOS[27]}-111111`]);
     random.mockRestore();
   });
 
   it("renonce après cinq collisions plutôt que de boucler", async () => {
-    const random = jest.spyOn(Math, "random").mockReturnValue(0);
-    // Tirage figé sur le premier pseudo libre : chaque refus le retire, le
-    // suivant est tiré — cinq refus de suite épuisent les tentatives.
-    const { connection } = fakeDb({ ...EMPTY, played: 1 }, { duplicatePseudos: ANONYMOUS_PSEUDOS.slice(0, 5) });
+    const random = zeroRandom();
+    // Tirage figé : chaque tirage rend le même nom, refusé cinq fois de suite —
+    // les tentatives s'épuisent.
+    const { connection } = fakeDb(
+      { ...EMPTY, played: 1 },
+      { duplicatePseudos: Array.from({ length: 5 }, () => "AlphaFX-000000") },
+    );
 
     await expect(deleteOwnAccount(7)).rejects.toThrow("Duplicate entry");
     expect(connection.rollback).toHaveBeenCalled();

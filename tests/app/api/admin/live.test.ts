@@ -21,7 +21,6 @@ import {
   setTournamentLiveUrl,
   StreamLinkError,
 } from "@/lib/server/tournaments/live-streams";
-import * as liveAccess from "@/lib/server/tournaments/live-access";
 import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -348,27 +347,26 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", undefined);
   });
 
-  it("PUT_gateReadFails_returns500Code", async () => {
-    // Panne de la lecture de l'arbitre à la porte : un code, jamais une erreur nue.
+  it("PUT_playerWithoutPermission_403BeforeAnyServiceRead", async () => {
+    // La porte ne lit plus la base : sans `live` ni `tournaments`, refus sans appeler le service.
     jest.mocked(getCurrentUser).mockResolvedValue(player);
-    jest.spyOn(liveAccess, "mayConfigureMatchLive").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
 
     const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO", liveUrl: null }), matchParams("42"));
 
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LIVE_UPDATE_FAILED" });
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "FORBIDDEN" });
     expect(setMatchLiveConfig).not.toHaveBeenCalled();
   });
 
-  it("POST_gateReadFails_returns500Code", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(player);
-    jest.spyOn(liveAccess, "mayConfigureMatchLive").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+  it("POST_notMatchRefereeUnderLock_returns403", async () => {
+    // L'arbitre désigné se juge sous le verrou du match, une seule fois (CAST-FOLLOWUP #560).
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchOnAir).mockRejectedValue(new Error("NOT_MATCH_REFEREE"));
 
     const res = await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"));
 
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LIVE_UPDATE_FAILED" });
-    expect(setMatchOnAir).not.toHaveBeenCalled();
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_MATCH_REFEREE" });
   });
 
   it("PUT_nothingWritten_noAnnouncement", async () => {

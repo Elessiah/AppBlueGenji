@@ -3,8 +3,7 @@ import { retireAccountQuarantinesOn } from "@/lib/server/blocked-images";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
-import { pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
-import { loadTakenAnonymousPseudos } from "./account-deletion-hold";
+import { pickAnonymousPseudo, SUFFIXED_ANONYMOUS_PSEUDO } from "@/lib/shared/anonymous-pseudos";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import type { SoloRegistrationFact } from "@/lib/shared/account-deletion";
 import { withdrawRegistrationOn } from "@/lib/server/tournaments/registration-removal";
@@ -121,12 +120,13 @@ async function resetOptionalColumn(
  * relie plus la ligne à quelqu'un ; c'est la fiche du joueur qui annonce le
  * compte supprimé, jamais le nom, qu'un plateau affiche sans contexte.
  *
- * Le pseudo est posé **dans la même instruction** que le reste : les pseudos
- * déjà portés sont relus sur la connexion de la transaction, puis l'écriture
- * est tentée. Deux suppressions simultanées peuvent tirer le même nom, et
- * c'est l'index unique de `bg_users.pseudo` qui tranche — le perdant retire
- * son tirage et recommence. Sous MySQL, une instruction refusée n'annule pas
- * la transaction, seulement elle-même.
+ * Le pseudo est posé **dans la même instruction** que le reste. Suffixé d'un
+ * aléa cryptographique (D99), il n'est confronté à aucun pseudo porté avant
+ * l'écriture : une collision — avec un compte, ou avec un vrai pseudo mis de
+ * côté par un compte en attente, qui n'y perdrait au pire que le suffixe « OG »
+ * de sa réactivation — n'arrive pas en pratique, et c'est l'index unique de
+ * `bg_users.pseudo` qui tranche — le perdant tire de nouveau. Sous MySQL, une
+ * instruction refusée n'annule pas la transaction, seulement elle-même.
  *
  * Rend les matchs touchés (casts, liens, arbitrages), comme `eraseAccount`.
  */
@@ -145,15 +145,15 @@ async function readBorrowedPseudo(connection: PoolConnection, userId: number): P
 }
 
 export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
-  // Pseudos portés, et pseudos réservés par un compte en attente de suppression
-  // (`account-deletion-hold.ts`) : sa réactivation doit pouvoir le lui rendre.
-  const taken = await loadTakenAnonymousPseudos(connection, userId);
   // Compte en attente : il porte depuis la demande le pseudo d'emprunt sous
   // lequel ses adversaires le voient depuis trente jours (`holdAccountIdentity`)
   // — il le garde, au lieu d'en changer une seconde fois au jour 30.
   const borrowed = await readBorrowedPseudo(connection, userId);
   for (let attempt = 0; ; attempt += 1) {
-    const pseudo = attempt === 0 && borrowed !== null ? borrowed : pickAnonymousPseudo(taken);
+    // Un emprunt resté nu (posé avant D99, migration pas encore passée) est
+    // remplacé : seul un pseudo suffixé est indevinable.
+    const keepBorrowed = attempt === 0 && borrowed !== null && SUFFIXED_ANONYMOUS_PSEUDO.test(borrowed);
+    const pseudo = keepBorrowed ? borrowed : pickAnonymousPseudo();
     try {
       await connection.execute(
         `UPDATE bg_users
@@ -202,7 +202,6 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
       break;
     } catch (error) {
       if (!isDuplicateEntryError(error) || attempt + 1 >= ANONYMOUS_PSEUDO_ATTEMPTS) throw error;
-      taken.add(pseudo);
     }
   }
   await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);

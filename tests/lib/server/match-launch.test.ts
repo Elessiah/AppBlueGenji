@@ -2547,6 +2547,41 @@ describe("maintainMatchLaunches — éligibilité des casters relue en lecture c
   });
 });
 
+describe("maintainMatchLaunches — éligibilité des casters groupée par passe (EF-65)", () => {
+  it("maintainMatchLaunches_twoCandidatesWithCasters_readsEligibilityOnceAfterAllMatchLocks", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ lobby_opened_at: new Date().toISOString(), caster_user_id: CASTER });
+    state.issued = [];
+    const base = executeFor(state);
+    const connection = fakeConnection({
+      execute: async (sql: string, params: unknown[] = []) => {
+        const [rows, fields] = await base(sql, params);
+        // Deux candidats : le même match relu deux fois par la lecture des candidats.
+        const twice = sql.includes("WHERE m.tournament_id = ?") && Array.isArray(rows) ? [...rows, ...rows] : rows;
+        return [twice, fields];
+      },
+    });
+
+    await maintainMatchLaunches(connection, 7);
+
+    const issued = state.issued;
+    const eligibilityReads = issued.filter((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql));
+    const lastMatchLock = issued.map((sql) => /FROM bg_matches m WHERE m\.id = \? LIMIT 1 FOR UPDATE/.test(sql)).lastIndexOf(true);
+    expect(eligibilityReads).toHaveLength(1);
+    expect(issued.indexOf(eligibilityReads[0])).toBeGreaterThan(lastMatchLock);
+    expect(casterOf(state)).toBe(CASTER);
+  });
+
+  it("maintainMatchLaunches_noCasters_noEligibilityRead", async () => {
+    state.match = matchState({ lobby_opened_at: new Date().toISOString() });
+    state.issued = [];
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.issued.some((sql) => sql.includes("FROM bg_users WHERE id IN"))).toBe(false);
+  });
+});
+
 describe("maintainMatchLaunches — retrait d'un caster inéligible publié (EF-29)", () => {
   const INELIGIBLE = { ...ELIGIBLE_CASTER, platform_roles_json: JSON.stringify([]) };
 

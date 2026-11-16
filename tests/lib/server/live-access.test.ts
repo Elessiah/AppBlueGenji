@@ -1,19 +1,12 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-
-jest.mock("@/lib/server/tournaments/live-streams");
+import { describe, expect, it } from "@jest/globals";
 
 import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournaments/live-access";
-import { isDesignatedMatchReferee } from "@/lib/server/tournaments/live-streams";
 import { authUser } from "../../helpers/auth-user";
 
 /**
  * Porte des routes de diffusion d'un match (`docs/features/CAST_SETTINGS.md`
  * § L'arbitre désigné, médiateur de la diffusion).
  */
-
-beforeEach(() => {
-  jest.clearAllMocks();
-});
 
 describe("parseStreamLinks", () => {
   it("parseStreamLinks_absent_undefined", () => {
@@ -50,26 +43,24 @@ describe("parseStreamLinks", () => {
 });
 
 describe("mayConfigureMatchLive", () => {
-  it("mayConfigureMatchLive_livePermission_trueWithoutRefereeRead", async () => {
-    const caster = authUser({ id: 4, roles: ["CASTER"] });
-
-    await expect(mayConfigureMatchLive(caster, 42)).resolves.toBe(true);
-    expect(isDesignatedMatchReferee).not.toHaveBeenCalled();
+  it("mayConfigureMatchLive_livePermission_true", () => {
+    expect(mayConfigureMatchLive(authUser({ id: 4, roles: ["CASTER"] }))).toBe(true);
   });
 
-  it("mayConfigureMatchLive_notThisMatchReferee_false", async () => {
-    jest.mocked(isDesignatedMatchReferee).mockResolvedValue(false);
-    const player = authUser({ id: 2, roles: [] });
-
-    await expect(mayConfigureMatchLive(player, 43)).resolves.toBe(false);
-    // Le match demandé, et le lecteur lui-même : jamais l'arbitre d'un autre match.
-    expect(isDesignatedMatchReferee).toHaveBeenCalledWith(43, 2, false);
+  it("mayConfigureMatchLive_arbitre_trueRefereeJudgedUnderLock", () => {
+    // `tournaments` : condition de l'arbitrage ; l'arbitre de ce match se juge sous verrou.
+    expect(mayConfigureMatchLive(authUser({ id: 6, roles: ["ARBITRE"] }))).toBe(true);
   });
 
-  it("mayConfigureMatchLive_thisMatchReferee_true", async () => {
-    jest.mocked(isDesignatedMatchReferee).mockResolvedValue(true);
-    const player = authUser({ id: 2, roles: [] });
+  it("mayConfigureMatchLive_admin_true", () => {
+    expect(mayConfigureMatchLive(authUser({ id: 7, isAdmin: true }))).toBe(true);
+  });
 
-    await expect(mayConfigureMatchLive(player, 42)).resolves.toBe(true);
+  it("mayConfigureMatchLive_otherPlatformRole_false", () => {
+    expect(mayConfigureMatchLive(authUser({ id: 8, roles: ["COMMUNITY_MANAGER", "RECRUTEUR"] }))).toBe(false);
+  });
+
+  it("mayConfigureMatchLive_neither_false", () => {
+    expect(mayConfigureMatchLive(authUser({ id: 2, roles: [] }))).toBe(false);
   });
 });

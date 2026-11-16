@@ -1,7 +1,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { isDuplicateEntryError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
-import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { reactivationPseudoCandidate } from "@/lib/shared/pseudo";
 
 /*
@@ -44,18 +44,6 @@ export async function isPseudoHeldByOther(runner: Runner, pseudo: string, userId
   return rows.length > 0 && Number(rows[0].user_id) !== userId;
 }
 
-/** Les pseudos d'emprunt déjà portés (comptes) ou réservés (masques) : à ne pas tirer. */
-export async function loadTakenAnonymousPseudos(runner: Runner, userId: number): Promise<Set<string>> {
-  const placeholders = ANONYMOUS_PSEUDOS.map(() => "?").join(", ");
-  const [rows] = await runner.execute<(RowDataPacket & { pseudo: string })[]>(
-    `SELECT pseudo FROM bg_users WHERE id <> ? AND pseudo IN (${placeholders})
-     UNION
-     SELECT pseudo FROM bg_account_deletion_holds WHERE user_id <> ? AND pseudo IN (${placeholders})`,
-    [userId, ...ANONYMOUS_PSEUDOS, userId, ...ANONYMOUS_PSEUDOS],
-  );
-  return new Set(rows.map((row) => row.pseudo));
-}
-
 /**
  * Pose le masque sur la transaction de la demande, qui tient déjà la ligne du
  * compte : vrai pseudo et avatar mis de côté, pseudo d'emprunt et avatar retiré
@@ -88,9 +76,10 @@ export async function holdAccountIdentity(
     await connection.execute(`DELETE FROM bg_account_deletion_holds WHERE user_id = ?`, [userId]);
   }
   await insertDeletionHold(connection, userId, current.pseudo, current.avatar_url ?? null);
-  const taken = await loadTakenAnonymousPseudos(connection, userId);
+  // Pseudo d'emprunt suffixé d'un aléa (D99) : aucune relecture des pseudos
+  // portés, une collision est départagée par l'index unique et retirée.
   for (let attempt = 0; ; attempt += 1) {
-    const pseudo = pickAnonymousPseudo(taken);
+    const pseudo = pickAnonymousPseudo();
     try {
       const [result] = await connection.execute<ResultSetHeader>(
         `UPDATE bg_users
@@ -102,7 +91,6 @@ export async function holdAccountIdentity(
       break;
     } catch (error) {
       if (!isDuplicateEntryError(error) || attempt + 1 >= HOLD_PSEUDO_ATTEMPTS) throw error;
-      taken.add(pseudo);
     }
   }
   await syncSoloEntryIdentityOn(connection, userId);

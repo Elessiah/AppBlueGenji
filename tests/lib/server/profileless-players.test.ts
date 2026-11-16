@@ -7,8 +7,9 @@ import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateProfilelessPlayers, invalidateTeamIdentityViews, invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
-import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, loadProfilelessPlayerIdsForClient, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_PLAYERS_MAX, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
+import { anonymizedAccountHasNoPage, loadProfilelessPlayerIds, profilelessAmong, PROFILELESS_PLAYERS_TTL_MS, PROFILELESS_FAILURE_BACKOFF_MS, resetProfilelessFailureForTests } from "@/lib/server/users/profileless-players";
 import { getFullProfile, getPlayerPageIdentity } from "@/lib/server/users/full-profile";
+import { resetProfilelessGuessesForTests } from "@/lib/server/users/profileless-guess-budget";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { readSource } from "../../helpers/read-source";
 import { emptyDeepStats } from "@/lib/shared/stats";
@@ -63,6 +64,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   clearCache();
   resetProfilelessFailureForTests();
+  resetProfilelessGuessesForTests();
   jest.mocked(getPlayerEntityStats).mockResolvedValue({ stats: emptyDeepStats(), tournaments: [] });
 });
 
@@ -283,10 +285,11 @@ describe("branchements D13", () => {
     expect(landing).toContain("entrantHrefFor(row.team2_id, row.team2_solo_user_id, profileless)");
   });
 
-  it("layout_signedInVisitor_providesProfilelessPlayers", () => {
+  it("layout_signedInVisitor_linksAskWithoutShippedList", () => {
     const layout = readSource("app/layout.tsx");
-    expect(layout).toContain("user ? loadProfilelessPlayerIdsForClient() : Promise.resolve(NO_PROFILELESS_PLAYERS)");
-    expect(layout).toContain("<ProfilelessPlayersProvider ids={profilelessPlayers} refresh={user !== null}>");
+    // D86 : la liste entière ne part plus dans la page.
+    expect(layout).toContain("<ProfilelessPlayersProvider lookup={user !== null}>");
+    expect(layout).not.toContain("loadProfilelessPlayerIds");
   });
 });
 
@@ -342,36 +345,6 @@ describe("loadProfilelessPlayerIds — panne de lecture (EF-62, revue performanc
     now.mockRestore();
   });
 
-  // Revue sécurité EF-62 cycle 1 : seule la copie du navigateur est tronquée.
-  it("loadProfilelessPlayerIds_overCap_keepsFullListAndWarns", async () => {
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
-
-    const ids = await loadProfilelessPlayerIds();
-
-    expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX + 3);
-    expect(warn).toHaveBeenCalledTimes(1);
-  });
-
-  it("loadProfilelessPlayerIdsForClient_overCap_truncatedToMax", async () => {
-    jest.spyOn(console, "warn").mockImplementation(() => {});
-    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
-
-    const ids = await loadProfilelessPlayerIdsForClient();
-
-    expect(ids).toHaveLength(PROFILELESS_PLAYERS_MAX);
-    // Les plus récents (ids les plus hauts) restent, les plus anciens tombent.
-    expect(ids[0]).toBe(4);
-    expect(ids[ids.length - 1]).toBe(PROFILELESS_PLAYERS_MAX + 3);
-  });
-
-  it("anonymizedAccountHasNoPage_idBeyondClientCap_returnsTrue", async () => {
-    jest.spyOn(console, "warn").mockImplementation(() => {});
-    mockDb(() => [Array.from({ length: PROFILELESS_PLAYERS_MAX + 3 }, (_, index) => ({ id: index + 1 }))]);
-
-    expect(await anonymizedAccountHasNoPage(PROFILELESS_PLAYERS_MAX + 2)).toBe(true);
-  });
-
   it("anonymizedAccountHasNoPage_duringBackoff_readsTheAccountAloneWithoutLogSpam", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     const execute = mockDb((sql) => {
@@ -399,19 +372,6 @@ describe("ranking-cache — clé de la liste", () => {
   });
 });
 
-describe("ProfilelessRefresh — nouvel essai après un échec", () => {
-  it("profilelessRefresh_failedFetch_waitsRetryDelayInsteadOfRetryingAtEveryPage", async () => {
-    const { readFileSync } = await import("node:fs");
-    const source = readFileSync("components/profileless-players.tsx", "utf8");
-    const { PROFILELESS_REFRESH_MS, PROFILELESS_RETRY_MS } = await import("@/components/profileless-players");
-
-    expect(PROFILELESS_RETRY_MS).toBeGreaterThan(0);
-    expect(PROFILELESS_RETRY_MS).toBeLessThan(PROFILELESS_REFRESH_MS);
-    expect(source).toContain("PROFILELESS_REFRESH_MS - PROFILELESS_RETRY_MS");
-    expect(source).not.toContain("giveBack");
-  });
-});
-
 // Revue juridique EF-62 cycle 1 : une correction d'arbitrage oublie la liste.
 describe("invalidateProfilelessPlayers", () => {
   it("invalidateProfilelessPlayers_cachedList_nextReadRecomputes", async () => {
@@ -433,11 +393,154 @@ describe("invalidateProfilelessPlayers", () => {
     expect(commit).toBeGreaterThan(0);
   });
 
-  it("loadProfilelessPlayerIdsForClient_underCap_returnsAll", async () => {
-    mockDb(() => [[{ id: 3 }, { id: 8 }]]);
+});
 
-    const ids = await loadProfilelessPlayerIdsForClient();
+/** Réponse simulée : la liste des comptes sans fiche, puis leurs noms d'aujourd'hui. */
+function lookupDb(
+  listIds: number[],
+  names: { id: number; name: string }[],
+  { failList = (): boolean => false }: { failList?: () => boolean } = {},
+) {
+  // Une ligne par nom (pseudo d'abord, puis noms d'entrée solo), comme la jointure.
+  return mockDb(() => {
+    if (failList()) throw new Error("LOCK_WAIT");
+    return [
+      listIds.flatMap((id): { id: number; pseudo: string | null; solo_name: string | null }[] => {
+        const own = names.filter((entry) => entry.id === id).map((entry) => entry.name);
+        if (own.length === 0) return [{ id, pseudo: null, solo_name: null }];
+        return own.map((name, index) => (index === 0 ? { id, pseudo: name, solo_name: null } : { id, pseudo: own[0], solo_name: name }));
+      }),
+    ];
+  });
+}
 
-    expect(ids).toEqual([3, 8]);
+describe("profilelessAmong (D86)", () => {
+  it("profilelessAmong_mixedIdsWithCurrentNames_returnsOnlyProfilelessInAskedOrder", async () => {
+    lookupDb([3, 8, 12], [{ id: 12, name: "AlphaFX" }, { id: 3, name: "ApexTV" }]);
+
+    const asked = [{ id: 12, name: "AlphaFX" }, { id: 5, name: "Vivant" }, { id: 3, name: "ApexTV" }];
+
+    expect(await profilelessAmong(asked)).toEqual([12, 3]);
+  });
+
+  it("profilelessAmong_noIds_noQuery", async () => {
+    const execute = mockDb(() => [[{ id: 3 }]]);
+
+    expect(await profilelessAmong([])).toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("profilelessAmong_deletedOrNotAsked_sameSingleListQuery", async () => {
+    // Revue sécurité EF-65 cycle 2 : aucune requête ne dépend du compte demandé
+    // (le temps de réponse ne dit pas qu'un id est supprimé).
+    const execute = lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    await profilelessAmong([{ id: 5, name: "Vivant" }]);
+    await profilelessAmong([{ id: 3, name: "x" }]);
+    await profilelessAmong([{ id: 3, name: "ApexTV" }]);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(String(execute.mock.calls[0][0])).toContain("LEFT JOIN bg_teams st ON st.solo_user_id = u.id");
+  });
+
+  it("profilelessAmong_twoNamesOneMatches_returnsIdOnce", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Faux" }, { id: 3, name: "ApexTV" }, { id: 3, name: "apextv" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_wrongName_omitsId", async () => {
+    // Revue sécurité EF-65 : un identifiant pris au hasard, sans le pseudo
+    // d'emprunt que seule une page qui le montre donne, n'apprend rien.
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "x" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_wrongNamesExhaustBudget_correctNameUntold", async () => {
+    // Revue sécurité EF-65 cycle 3 : la borne tient par compte demandé, pour
+    // tout visiteur — passé quatre noms faux, même le bon n'est plus jugé.
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+    await profilelessAmong([{ id: 3, name: "AlphaFX" }, { id: 3, name: "AlphaGod" }, { id: 3, name: "AlphaOne" }]);
+    await profilelessAmong([{ id: 3, name: "AlphaPro" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloEntryNameWithIdSuffix_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "ApexTV-7f3k2q #3" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV-7f3k2q #3" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_soloEntryFallbackJoueurId_omitsId", async () => {
+    // Revue sécurité EF-65 cycle 5 : « Joueur #<id> » se déduit de
+    // l'identifiant ; l'accepter dirait qu'un id est celui d'un compte supprimé.
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "Joueur #3" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Joueur #3" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloEntryStaleListName_omitsId", async () => {
+    // Entrée restée sous le nom nu d'avant (renommage refusé) : devinable
+    // dans la liste publique, il n'est pas un nom du jour.
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "AlphaFX" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "AlphaFX" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloNameWithoutPseudo_omitsId", async () => {
+    mockDb(() => [[{ id: 3, pseudo: null, solo_name: "Joueur #3" }]]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Joueur #3" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloNameDiffersOnlyByCase_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "APEXTV-7F3K2Q #3" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "apextv-7f3k2q #3" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_soloEntryNameEqualsPseudo_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "apextv-7f3k2q" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV-7f3k2q" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_caseAndInvisiblesDiffer_stillMatches", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: " apex​tv " }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_readFailure_throwsWhateverIdAsked", async () => {
+    // Revue sécurité EF-65 cycle 2 : un 503 ne dit pas qu'un id est supprimé.
+    mockDb(() => {
+      throw new Error("LOCK_WAIT");
+    });
+
+    await expect(profilelessAmong([{ id: 5, name: "Vivant" }])).rejects.toThrow("LOCK_WAIT");
+  });
+
+  it("profilelessAmong_readFailureWithoutStale_throws", async () => {
+    // Jamais une liste vide (« tous ont une fiche ») : la route répond 503.
+    mockDb(() => {
+      throw new Error("LOCK_WAIT");
+    });
+
+    await expect(profilelessAmong([{ id: 3, name: "ApexTV" }])).rejects.toThrow("LOCK_WAIT");
+  });
+
+  it("profilelessAmong_readFailureWithStale_answersFromStaleList", async () => {
+    let fail = false;
+    lookupDb([3], [{ id: 3, name: "ApexTV" }], { failList: () => fail });
+    const start = Date.now();
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV" }])).toEqual([3]);
+    // Échue mais gardée (périmée) : une panne de relecture répond encore d'elle.
+    const now = jest.spyOn(Date, "now").mockReturnValue(start + PROFILELESS_PLAYERS_TTL_MS + 1);
+    fail = true;
+
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV" }, { id: 4, name: "Autre" }])).toEqual([3]);
+    now.mockRestore();
   });
 });

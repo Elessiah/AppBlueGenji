@@ -10,7 +10,6 @@ jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({
 
 import {
   findBroadcastingTournament,
-  isDesignatedMatchReferee,
   setMatchLiveConfig,
   setMatchOnAir,
   setTournamentLiveUrl,
@@ -257,7 +256,7 @@ describe("setMatchLiveConfig", () => {
       commit: async () => undefined,
       rollback: async () => undefined,
     });
-    return { state, execute, connection };
+    return { state, execute, connection, row };
   }
 
   /** Pose lien et fournisseur ; `link_user_id` n'apparaît que s'il désigne un compte. */
@@ -319,7 +318,13 @@ describe("setMatchLiveConfig", () => {
 
   async function mockLiveDb(world: ReturnType<typeof liveWorld>) {
     const { getDatabase, withConnection } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: world.execute }));
+    // Premier tri sans verrou (`assertMayReachMatchLive`), sur le pool : l'arbitre désigné.
+    const poolExecute = jest.fn<SqlQuery>(async (sql, params) =>
+      sql === "SELECT referee_user_id FROM bg_matches WHERE id = ? LIMIT 1"
+        ? [[{ referee_user_id: world.row.referee_user_id ?? null }]]
+        : world.execute(sql, params),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: poolExecute }));
     jest.mocked(withConnection).mockImplementation((run) => run(world.connection));
   }
 
@@ -513,27 +518,6 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([]);
   });
 
-  it("rejuge sous le verrou du match : un score validé entre la première lecture et le verrou ferme la porte", async () => {
-    const row = matchRow();
-    const world = liveWorld(row);
-    await mockLiveDb(world);
-    const real = world.execute.getMockImplementation()!;
-    let reads = 0;
-    world.execute.mockImplementation(async (sql, params) => {
-      const result = await real(sql, params);
-      reads += 1;
-      // Le match est joué dès que la lecture ordinaire a rendu sa ligne.
-      if (reads === 1) row.status = "COMPLETED";
-      return result;
-    });
-
-    await expect(
-      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: ORGANISER_5, access: STAFF }),
-    ).rejects.toThrow("MATCH_NOT_CASTABLE");
-    expect(world.state.streams).toEqual([]);
-    expect(world.state.matchWrites).toEqual([]);
-  });
-
   it("setMatchLiveConfig_playedMatchAlreadyMarked_refusesNewLinkOrMode", async () => {
     const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)]);
     await mockLiveDb(world);
@@ -563,6 +547,19 @@ describe("setMatchLiveConfig", () => {
     });
 
     expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 12 }]);
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_noModeSentBadUrlOnUnmarkedMatch_refusedByModeUnderLockNotByUrl", async () => {
+    // Revue sécurité EF-65 cycle 2 : sans mode envoyé, le lien ne se juge pas
+    // avant le verrou — le refus qui dit l'état du match (sans mode) ne vient
+    // qu'après le rôle, à un appelant qui a droit sur ce match.
+    const world = liveWorld(matchRow({ live_trigger: null }), [dbStream(4, "https://kick.com/voix")], [{ user_id: 12, stream_id: 4 }]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: "pas une adresse", setter: ORGANISER_5, access: STAFF }),
+    ).rejects.toThrow("MATCH_NOT_STREAMED");
     expect(world.state.matchWrites).toEqual([]);
   });
 
@@ -611,26 +608,6 @@ describe("setMatchLiveConfig", () => {
       }),
     ).rejects.toThrow("MATCH_NOT_CASTABLE");
     expect(world.state.streams[0]?.live_url).toBe("https://kick.com/voix");
-  });
-
-  it("setMatchLiveConfig_startAtClearedBeforeLock_rejectsStartTimeUnderLock", async () => {
-    const row = matchRow({ start_at: "2026-11-02 20:00:00" });
-    const world = liveWorld(row);
-    await mockLiveDb(world);
-    const real = world.execute.getMockImplementation()!;
-    let reads = 0;
-    world.execute.mockImplementation(async (sql, params) => {
-      const result = await real(sql, params);
-      reads += 1;
-      // La date de début est retirée dès que la lecture ordinaire a rendu sa ligne.
-      if (reads === 1) row.start_at = null;
-      return result;
-    });
-
-    await expect(
-      setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5, access: STAFF }),
-    ).rejects.toThrow("MATCH_START_AT_REQUIRED");
-    expect(world.state.matchWrites).toEqual([]);
   });
 
   it("laisse démarquer un match terminé encore casté : une diffusion posée ne devient pas ineffaçable", async () => {
@@ -934,6 +911,19 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(3, null)]);
   });
 
+  it("setMatchLiveConfig_liveHolder_readsMatchStateOnlyUnderLock", async () => {
+    // Plus de lecture ordinaire de l'état avant le verrou (revue sécurité EF-65) :
+    // statut, date et mode ne se jugent que sur la ligne verrouillée, sans course possible.
+    const world = liveWorld(matchRow());
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: ORGANISER_5, access: STAFF });
+
+    const matchReads = world.execute.mock.calls.map(([sql]) => String(sql)).filter((sql) => /FROM bg_matches\s+WHERE id = \?/.test(sql));
+    expect(matchReads).toHaveLength(1);
+    expect(matchReads[0]).toContain("FOR UPDATE");
+  });
+
   it("annule tout sur une panne en cours de transaction", async () => {
     const world = liveWorld(matchRow());
     const rollback = jest.fn(async () => undefined);
@@ -958,13 +948,13 @@ describe("setMatchLiveConfig", () => {
   it("refuse START_TIME sur un match sans date de début", async () => {
     // Accepter ce couple poserait une diffusion qui ne s'ouvrirait jamais, et
     // l'échec ne se verrait qu'à l'heure du match.
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow({ start_at: null })]]);
-    await mockDb(execute);
+    const world = liveWorld(matchRow({ start_at: null }));
+    await mockLiveDb(world);
 
     await expect(setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5, access: STAFF })).rejects.toThrow(
       "MATCH_START_AT_REQUIRED",
     );
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(world.state.matchWrites).toEqual([]);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
@@ -980,13 +970,46 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("refuse une URL hors liste blanche sans rien écrire", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow()]]);
+    const execute = jest.fn<SqlQuery>();
     await mockDb(execute);
 
     await expect(
       setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "https://exemple.com/live", setter: ORGANISER_5, access: STAFF }),
     ).rejects.toThrow("INVALID_STREAM_URL");
+    // Le lien se juge tel qu'envoyé, avant toute lecture.
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_nonRefereeWithoutLive_refusedBeforeUrlOrState", async () => {
+    // Match en mode posé, lien invalide sans mode dans le corps : un `tournaments`
+    // qui n'arbitre pas ce match reçoit le refus du rôle, jamais celui du lien
+    // (qui dirait qu'un mode est posé), sans transaction.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ referee_user_id: 3 }]]);
+    await mockDb(execute);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: undefined,
+        liveUrl: "x",
+        setter: { userId: 9, asOrganisation: false },
+        access: { oversees: false, manages: true, live: false },
+      }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("setMatchLiveConfig_missingMatchWithoutLive_throwsNotMatchReferee", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await expect(
+      setMatchLiveConfig(999, {
+        trigger: "AUTO",
+        liveUrl: undefined,
+        setter: { userId: 9, asOrganisation: false },
+        access: { oversees: false, manages: true, live: false },
+      }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
   });
 
   it("refuse un mode inconnu", async () => {
@@ -1704,8 +1727,42 @@ describe("setMatchLiveConfig", () => {
       );
     }
 
-    it("setMatchOnAir_notManualByNonReferee_throwsNotManualFirst", async () => {
+    it("setMatchOnAir_notManualByNonReferee_throwsNotMatchRefereeBeforeMode", async () => {
+      // La porte admet tout porteur de `tournaments` : le mode du match ne se dit
+      // qu'à son arbitre retenu (ou à `live`), le rôle se juge d'abord.
       const world = ownedWorld({ live_trigger: "AUTO" });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(
+        "NOT_MATCH_REFEREE",
+      );
+      expect(world.state.matchWrites).toEqual([]);
+    });
+
+    it("setMatchOnAir_nonRefereeWithoutLive_refusedWithoutTakingMatchLock", async () => {
+      const world = ownedWorld({ kept_referee_user_id: 3 });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(
+        "NOT_MATCH_REFEREE",
+      );
+      // Premier tri sans verrou : ni transaction, ni verrou de la ligne du match.
+      expect(world.execute.mock.calls.some(([sql]) => String(sql).includes("FOR UPDATE"))).toBe(false);
+    });
+
+    it("setMatchOnAir_missingMatchWithoutLive_throwsNotMatchRefereeNotNotFound", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      // Un match absent ne se distingue pas d'un match qu'il n'arbitre pas.
+      await expect(setMatchOnAir(999, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(
+        "NOT_MATCH_REFEREE",
+      );
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+
+    it("setMatchOnAir_notManualByDesignatedReferee_throwsNotManual", async () => {
+      const world = ownedWorld({ live_trigger: "AUTO", kept_referee_user_id: 9 });
       await mockLiveDb(world);
 
       await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(
@@ -1821,11 +1878,13 @@ describe("setMatchLiveConfig", () => {
       await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).resolves.toBe(true);
     });
 
-    it("setMatchOnAir_ownerlessModeLiveNonCaster_throwsNotOwned", async () => {
+    it("setMatchOnAir_ownerlessModeLiveNonCaster_throwsNotMatchCasterBeforeMode", async () => {
+      // Ni arbitre, ni staff `tournaments`, ni caster du match : refusé comme
+      // par `setMatchLiveConfig` (`NOT_MATCH_CASTER`), sans apprendre le mode.
       const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: null }));
       await mockLiveDb(world);
 
-      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("NOT_MATCH_CASTER");
       expect(world.state.matchWrites).toEqual([]);
     });
 
@@ -1844,10 +1903,15 @@ describe("setMatchLiveConfig", () => {
       const world = ownedWorld();
       await mockLiveDb(world);
       const real = world.execute.getMockImplementation()!;
-      world.execute.mockImplementationOnce(async () => {
-        throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+      let deadlocked = false;
+      world.execute.mockImplementation(async (sql, params) => {
+        // Le premier verrou du match tombe sur un interblocage ; la transaction se rejoue.
+        if (!deadlocked && String(sql).includes("FOR UPDATE")) {
+          deadlocked = true;
+          throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+        }
+        return real(sql, params);
       });
-      world.execute.mockImplementation(real);
 
       await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(true);
       expect(world.state.matchWrites).toHaveLength(1);
@@ -1869,69 +1933,20 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("refuse un match inconnu", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
+    const { withConnection } = await import("@/lib/server/database");
+    const connection = fakeConnection({
+      execute,
+      beginTransaction: async () => undefined,
+      commit: async () => undefined,
+      rollback: async () => undefined,
+    });
+    jest.mocked(withConnection).mockImplementation((run) => run(connection));
 
     await expect(setMatchLiveConfig(999, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF })).rejects.toThrow(
       "MATCH_NOT_FOUND",
     );
-  });
-});
-
-describe("isDesignatedMatchReferee", () => {
-  it("isDesignatedMatchReferee_refereeOfAnotherMatch_false", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9 }], []]);
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(43, 3, true)).resolves.toBe(false);
-    expect(execute.mock.calls[0][1]).toEqual([43]);
-  });
-
-  it("isDesignatedMatchReferee_playedMatch_queryRestrictsToMatchToPlay", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: null }], []]);
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(String(execute.mock.calls[0][0])).toContain("m.status IN ('PENDING', 'READY')");
-  });
-
-  it("isDesignatedMatchReferee_keptReferee_true", async () => {
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: "9", tournament_id: 7, game: "OW" }], []]));
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(true);
-    expect(loadRefereeStanding).toHaveBeenCalledWith(expect.anything(), 9, "OW");
-  });
-
-  it("isDesignatedMatchReferee_keptRefereeIneligible_false", async () => {
-    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, tournament_id: 7, game: "OW" }], []]));
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-  });
-
-  it("isDesignatedMatchReferee_keptRefereeWithObjection_false", async () => {
-    // L'opposition retenue se relit avec la condition d'arbitrage, plus dans le SQL.
-    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: null, objection: true });
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, game: "OW" }], []]);
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(String(execute.mock.calls[0][0])).not.toContain("referee_objection_at");
-  });
-
-  it("isDesignatedMatchReferee_unknownMatch_false", async () => {
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[], []]));
-
-    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(loadRefereeStanding).not.toHaveBeenCalled();
-  });
-
-  it("isDesignatedMatchReferee_withoutTournamentsPermission_falseWithoutRead", async () => {
-    const execute = jest.fn<SqlQuery>();
-    await mockDb(execute);
-
-    await expect(isDesignatedMatchReferee(42, 9, false)).resolves.toBe(false);
-    expect(execute).not.toHaveBeenCalled();
   });
 });
 

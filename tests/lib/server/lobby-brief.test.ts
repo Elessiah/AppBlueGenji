@@ -27,6 +27,7 @@ import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
   dispatchLobbyBriefs,
+  LOBBY_BRIEF_CONCURRENCY,
   LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
   LOBBY_BRIEF_MUTED_PHASE,
@@ -756,6 +757,73 @@ describe("dispatchLobbyBriefs", () => {
     expect(dm).toContain("* Préviens les casters inscrits");
   });
 
+  it("dispatchLobbyBriefs_slowBotOnFirstMatch_secondMatchBriefedMeanwhile", async () => {
+    mockDb([MATCH, { ...MATCH, id: 41 }]);
+    let releaseFirst: () => void = () => undefined;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let secondStartedWhileFirstHeld = false;
+    let firstPending = false;
+    jest.mocked(notifyUsers).mockImplementation(async (_recipients, notification) => {
+      const dm = renderDm(notification.discord!.message, "fr");
+      if (dm.includes("/matchs/41")) {
+        secondStartedWhileFirstHeld ||= firstPending;
+        releaseFirst();
+      } else if (!firstPending) {
+        // Le bot tarde sur le match 40 : il ne répond qu'une fois le match 41 entamé.
+        firstPending = true;
+        await Promise.race([firstHeld, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+        firstPending = false;
+      }
+      return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
+    });
+
+    const sent = await dispatchLobbyBriefs();
+
+    expect(secondStartedWhileFirstHeld).toBe(true);
+    expect(sent).toBe(4);
+  });
+
+  it("dispatchLobbyBriefs_slowFirstMatch_thirdMatchStartsWhenSecondFinishes", async () => {
+    // Borne glissante, non lots fixes : le match 42 n'attend pas la fin du lent 40.
+    mockDb([MATCH, { ...MATCH, id: 41 }, { ...MATCH, id: 42 }]);
+    let slowPending = false;
+    let thirdStartedWhileSlowPending = false;
+    jest.mocked(notifyUsers).mockImplementation(async (_recipients, notification) => {
+      const dm = renderDm(notification.discord!.message, "fr");
+      if (dm.includes("/matchs/42")) thirdStartedWhileSlowPending ||= slowPending;
+      if (dm.includes("/matchs/40") && !slowPending) {
+        slowPending = true;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        slowPending = false;
+      }
+      return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
+    });
+
+    await dispatchLobbyBriefs();
+
+    expect(thirdStartedWhileSlowPending).toBe(true);
+  });
+
+  it("dispatchLobbyBriefs_manyMatches_neverMoreThanConcurrencyInFlight", async () => {
+    mockDb([MATCH, { ...MATCH, id: 41 }, { ...MATCH, id: 42 }, { ...MATCH, id: 43 }]);
+    let inFlight = 0;
+    let peak = 0;
+    jest.mocked(notifyUsers).mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
+    });
+
+    await dispatchLobbyBriefs();
+
+    expect(LOBBY_BRIEF_CONCURRENCY).toBe(2);
+    expect(peak).toBeLessThanOrEqual(LOBBY_BRIEF_CONCURRENCY);
+  });
+
   it("suit l'hôte choisi, la tête de série en BG Survie et le cast", async () => {
     jest.mocked(readMatchCasters).mockResolvedValue(new Map([[40, [7]]]));
     mockDb([
@@ -763,7 +831,10 @@ describe("dispatchLobbyBriefs", () => {
       { ...MATCH, id: 41, team1_seed: 4, team2_seed: 1 },
     ]);
     await dispatchLobbyBriefs();
-    const [m40, , m41] = sends();
+    // Les matchs sont briefés en parallèle : chaque envoi se retrouve par son lien.
+    const [m40, m41] = ["/matchs/40", "/matchs/41"].map(
+      (path) => sends().find((send) => send.dm().includes(path))!,
+    );
     expect(m40.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
     // Règle par défaut : celle qui n'héberge pas bannit la première.
     expect(m40.dm()).toContain("* Bans de la carte 1 : « Renards » d'abord, puis « Nova ».");

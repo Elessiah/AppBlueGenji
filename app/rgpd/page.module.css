@@ -509,3 +509,18 @@
     display: none;
   }
 }
+
+/* Cible d'une ancre de la page (`#effacement-complet`, `#donnees-connexion`…) :
+   un repère visible pour qui vient d'un lien (annonce de changement, renvoi),
+   sans couleur nouvelle — l'arrivée n'est jamais « perdue » au milieu d'un texte.
+   La section ciblée met son titre en avant ; le décalage sous l'en-tête collant
+   vient de `scroll-padding-top` (globals.css). */
+.section :target {
+  outline: 1px solid var(--blue-300, #93deff);
+  outline-offset: 6px;
+  border-radius: 4px;
+}
+
+.section:target .sectionTitle {
+  color: var(--blue-300, #93deff);
+}

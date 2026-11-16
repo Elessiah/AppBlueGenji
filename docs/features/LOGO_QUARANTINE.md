@@ -130,6 +130,29 @@ Un signalement archivé qui tient encore une image masquée n'est **pas** purgé
 page, qui doit exister jusqu'à l'échéance. La purge des images tourne d'abord,
 celle des signalements ensuite (`schedulePurgeExpiredReports`).
 
+## Conservation de la décision (D87)
+
+Une ligne de `bg_logo_quarantines` **close** (image rétablie ou supprimée) suit
+son signalement : à la fin de `purgeExpiredReports` **quand un signalement
+vient d'y partir**, **détachée** (`purgeClosedQuarantinesSafely`, une seule
+passe à la fois par processus, rejouée une fois si un déclencheur arrive
+pendant qu'elle tourne — un signalement effacé après sa dernière lecture
+n'attend pas l'entretien suivant ; un déclencheur pendant une passe en échec la rejoue une fois, une seconde panne de suite ne se rejoue pas (une passe réussie remet le compte à zéro) : le panneau de modération et chaque envoi de
+signalement n'attendent ni un balayage sans objet, ni les tranches d'un
+arriéré), et à chaque entretien horaire
+(`schedulePurgeExpiredReports`, même sans signalement purgé : reprise d'une
+passe en échec, lignes antérieures à D87), `purgeClosedQuarantines`
+efface celles dont le signalement n'est plus là (`report_id` mis à `NULL` par
+la clé étrangère, ou signalement absent d'une base ancienne). Toute ligne naît
+d'un signalement : sans lui, plus rien ne se conteste. Dans la même transaction
+(tranches de 500 lues avec `LIMIT`, jusqu'à une tranche courte : un arriéré ne se charge pas d'un coup ; lignes reverrouillées sans jointure), les empreintes qu'une
+suppression **a bloquées** (`PURGED`, `hash_blocked = 1`) sont figées **non
+levables** (`pinClosedQuarantineHashesOn`), comme à l'effacement d'un compte
+(`pinAccountBlockedHashesOn`) : sans la ligne, plus rien ne justifierait de
+lever le blocage. Une ligne encore masquée reste ; une panne de cette purge ne
+fait pas échouer celle des signalements. Registre T01/T11, `/rgpd`
+§ Signalements et entrée `2026-11-decisions-sur-image-et-signalement`.
+
 ## Retrait immédiat
 
 Depuis le panneau, « Supprimer le logo » (ou « Supprimer l'avatar ») d'une

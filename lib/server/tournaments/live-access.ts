@@ -5,7 +5,7 @@
  */
 import type { AuthUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
-import { isDesignatedMatchReferee, type MatchStreamLinkEdit } from "./live-streams";
+import type { MatchStreamLinkEdit } from "./live-streams";
 
 /** Au plus autant de liens de streams par envoi (un match n'en porte jamais tant). */
 const MAX_STREAM_LINK_EDITS = 20;
@@ -31,11 +31,17 @@ export function parseStreamLinks(raw: unknown): MatchStreamLinkEdit[] | undefine
 }
 
 /**
- * Qui règle la diffusion d'un match : la permission `live`, ou l'arbitre
- * désigné **de ce match** (médiateur, `docs/features/CAST_SETTINGS.md`) — la
- * permission `tournaments` est la condition de son arbitrage.
+ * Qui passe la porte de la route de diffusion d'un match : la permission
+ * `live`, ou la permission `tournaments` — condition de l'arbitrage, pour
+ * l'arbitre désigné **de ce match** (médiateur, `docs/features/CAST_SETTINGS.md`).
+ *
+ * Sans lecture de la base : que l'appelant soit bien l'arbitre retenu de ce
+ * match se juge par le service — d'abord sans verrou pour qui n'a pas `live`
+ * (`assertMayReachMatchLive`, `NOT_MATCH_REFEREE`, 403, même refus pour un
+ * match absent), puis sous le verrou du match (`assertLiveActor`), avant tout
+ * autre refus qui dirait l'état du match (mode, date, statut). Seul un porteur
+ * de `live` apprend qu'un match n'existe pas (`MATCH_NOT_FOUND`, 404).
  */
-export async function mayConfigureMatchLive(user: AuthUser, matchId: number): Promise<boolean> {
-  if (can(user, "live")) return true;
-  return isDesignatedMatchReferee(matchId, user.id, can(user, "tournaments"));
+export function mayConfigureMatchLive(user: AuthUser): boolean {
+  return can(user, "live") || can(user, "tournaments");
 }

@@ -160,11 +160,20 @@ export function TeamLink({
 export function PlayerLink({
   userId,
   podiumTier,
+  playerName,
   children,
   ...rest
-}: Readonly<EntityLinkProps & PodiumTierOverride & { userId: number }>) {
+}: Readonly<EntityLinkProps & PodiumTierOverride & {
+  userId: number;
+  /**
+   * Le nom du joueur, quand le contenu n'est pas ce texte (avatar seul) : il
+   * part avec la question « a-t-il une fiche ? » (`useHasPlayerPage`). Par
+   * défaut, le contenu s'il est un texte.
+   */
+  playerName?: string;
+}>) {
   const podium = linkPodium(podiumTier, useMemberPodiumTier(userId), "member");
-  const linked = useHasPlayerPage(userId);
+  const linked = useHasPlayerPage(userId, playerName ?? (typeof children === "string" ? children : undefined));
   const shown = useShownChildren(children, "player", userId);
   return (
     <EntityLink href={`/joueurs/${userId}`} podium={podium} linked={linked} {...rest}>

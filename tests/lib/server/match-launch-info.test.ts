@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { listViewerMatchLaunches, loadViewerMatchContacts, shownName } from "@/lib/server/tournaments/match-launch-info";
+import { listViewerMatchLaunches, loadMemberships, loadViewerMatchContacts, shownName } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import * as castNotices from "@/lib/server/tournaments/cast-notices";
 import { isUnsettled } from "@/lib/server/tournaments/lock-wait";
@@ -1295,6 +1295,44 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
   });
 
+  it("listViewerMatchLaunches_refereedMatchBeforeContactsWindow_readsOnlyRefereeAndCasterMembership", async () => {
+    // Contacts pas encore exposés : seule l'appartenance de l'arbitre et du
+    // caster aux deux équipes se lit, jamais les effectifs entiers (EF-65).
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, caster_user_id: CASTER, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser(), casterUser(CASTER)];
+
+    await listViewerMatchLaunches(viewer);
+
+    const teamMemberReads = state.reads.filter((sql) => sql.includes("FROM bg_team_members tm JOIN bg_users u"));
+    expect(teamMemberReads).toHaveLength(1);
+    expect(teamMemberReads[0]).toContain("tm.user_id IN (?, ?)");
+    expect(teamMemberReads[0]).not.toContain("u.pseudo");
+  });
+
+  it("listViewerMatchLaunches_casterJoinedTeamOfRefereedMatchBeforeWindow_isReleased", async () => {
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, caster_user_id: CASTER, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser(), casterUser(CASTER)];
+    state.members = [member(TEAM2, CASTER)];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(info.casters).toEqual([]);
+    expect(state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?")).toHaveLength(1);
+  });
+
+  it("listViewerMatchLaunches_noRefereeBeforeWindow_noTeamMembersRead", async () => {
+    state.candidates = [candidate({ referee_user_id: null, start_at: new Date(Date.now() + 30 * 60_000).toISOString() })];
+
+    await listViewerMatchLaunches(viewer);
+
+    expect(state.reads.some((sql) => sql.includes("FROM bg_team_members tm JOIN bg_users u"))).toBe(false);
+  });
+
   it("listViewerMatchLaunches_refereeObjectionUpheld_isHiddenAndReleasedByObjection", async () => {
     state.candidates = [candidate({ referee_user_id: REFEREE })];
     state.users = [refereeUser({ referee_objection_at: OPENED })];
@@ -1810,5 +1848,41 @@ describe("listViewerMatchLaunches — noms nettoyés des fiches de contact", () 
     expect(info.team2.name).toBe("Bravo");
     expect(info.team1.contacts[0]?.pseudo).toBe("Capitaine");
     expect(info.casters[0]?.pseudo).toBe("Voix");
+  });
+});
+
+describe("loadMemberships — listes bornées (EF-65)", () => {
+  it("loadMemberships_noTeamOrNoUser_noQuery", async () => {
+    const execute = jest.fn(async () => [[], []]);
+
+    await expect(loadMemberships(fakeConnection({ execute }), new Set(), new Set([1]))).resolves.toEqual(new Set());
+    await expect(loadMemberships(fakeConnection({ execute }), new Set([1]), new Set())).resolves.toEqual(new Set());
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("loadMemberships_smallLists_oneQueryKeysTeamAndUser", async () => {
+    const execute = jest.fn(async () => [[{ team_id: 4, user_id: 9 }], []]);
+
+    const found = await loadMemberships(fakeConnection({ execute }), new Set([4, 5]), new Set([9]));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(found).toEqual(new Set(["4:9"]));
+  });
+
+  it("loadMemberships_manyTeamsAndUsers_everyListChunkedAt500", async () => {
+    const lists: number[] = [];
+    const execute = jest.fn(async (_sql: string, params: unknown[] = []) => {
+      lists.push(params.length);
+      return [[], []];
+    });
+    const teams = new Set(Array.from({ length: 1_100 }, (_, index) => index + 1));
+    const users = new Set(Array.from({ length: 600 }, (_, index) => index + 1));
+
+    await loadMemberships(fakeConnection({ execute }), teams, users);
+
+    // 3 tranches d'équipes (500, 500, 100) × 2 de comptes (500, 100) : jamais plus de 1 000 paramètres.
+    expect(execute).toHaveBeenCalledTimes(6);
+    expect(Math.max(...lists)).toBeLessThanOrEqual(1_000);
   });
 });

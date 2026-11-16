@@ -21,8 +21,9 @@ export const TEAM_PAGE_FALLBACK_TITLE = "Équipe";
 export const PLAYER_PAGE_FALLBACK_TITLE = "Joueur";
 
 /**
- * Ce qui remplace le pseudo d'un compte anonymisé. Son pseudo d'emprunt se lit
- * comme un pseudo ordinaire : l'écrire dans l'onglet ferait passer la fiche
+ * Ce qui remplace le pseudo d'un compte anonymisé. Son pseudo d'emprunt ne
+ * trahit la suppression que par sa forme (« nom-6 caractères »), pour qui la
+ * connaît : l'écrire dans l'onglet ferait passer la fiche
  * d'un compte supprimé pour celle d'un joueur, là où la page l'annonce.
  */
 export const DELETED_PLAYER_PAGE_TITLE = "Compte supprimé";

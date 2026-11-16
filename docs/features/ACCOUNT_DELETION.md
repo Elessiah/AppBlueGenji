@@ -289,16 +289,44 @@ conditions (`deletion-without-terms.test.ts`).
 
 Un compte conservé l'est **sous un faux nom** : c'est le droit à l'oubli tel
 qu'un historique partagé le permet — les statistiques restent, plus rien ne
-remonte à la personne. Le faux nom est tiré au hasard dans une liste de mille
-pseudos (`lib/shared/anonymous-pseudos.ts`, pur) : `compte_supprime_412` portait
-l'identifiant du compte et se lisait comme une erreur dans un plateau.
+remonte à la personne. Le faux nom est un nom tiré au hasard dans une liste de
+mille (`lib/shared/anonymous-pseudos.ts`, pur), **suivi d'un suffixe aléatoire**
+de six caractères base 36 (« AlphaFX-7f3k2q », `pickAnonymousPseudo`, aléa
+cryptographique `crypto.getRandomValues`) : `compte_supprime_412` portait
+l'identifiant du compte et se lisait comme une erreur dans un plateau, et le nom
+nu de la liste, publique, se devinait (décision D99, revue sécurité EF-65 : en
+essayant les mille noms pour un identifiant, on finissait par savoir s'il était
+celui d'un compte supprimé). Le suffixe donne plus de deux milliards de valeurs
+par nom ; le nom de la liste garde le pseudo lisible dans un plateau. Sa forme
+(« nom-6 caractères ») désigne un compte supprimé ou en attente pour qui la
+connaît, comme sa fiche le dit déjà : la suppression n'est pas un secret, et le
+changement de nom à la demande se voyait déjà avant D99. Ce qui reste caché,
+c'est la personne derrière, et quels identifiants n'ont plus de fiche.
 
 - **Libre au moment du tirage** : `bg_users.pseudo` est unique et sa collation
-  l'est sans casse. Les pseudos déjà portés sont relus sur la transaction, puis
-  l'écriture est tentée ; deux suppressions simultanées qui tirent le même nom
-  sont départagées par l'index unique, le perdant retire son tirage et
-  recommence (cinq fois au plus). Liste épuisée, un suffixe numérique prend le
-  relais — l'anonymisation n'échoue jamais faute de nom.
+  l'est sans casse. Aucun pseudo porté n'est relu (le suffixe rend la collision
+  improbable) : l'écriture est tentée, et une collision est départagée par
+  l'index unique — le perdant tire de nouveau (cinq fois au plus). Une collision avec un vrai pseudo mis de côté par un compte en attente
+  ne coûterait à ce dernier, au pire, que le suffixe « OG » de la réactivation.
+- **Comptes anonymisés avant D99** : un pas de `RECENT_SCHEMA_CHANGES` suffixe
+  au démarrage le pseudo de tout compte `is_deleted = 1` qui porte encore un
+  nom de la liste — nu, ou suivi des 3 à 5 chiffres de l'ancien tirage de
+  secours (« AlphaFX4821 », liste épuisée) —, anonymisé ou en attente. Le
+  suffixe vient d'une empreinte `SHA2` de `RANDOM_BYTES(16)` et de
+  l'identifiant : propre à chaque ligne même si le moteur ne tirait l'aléa
+  qu'une fois par instruction, indevinable puisque l'aléa n'est écrit nulle
+  part. `UPDATE IGNORE` : une collision (improbable) ne laisse de côté que sa
+  ligne, reprise au démarrage suivant. Puis le nom de l'entrée solo suit — le
+  pseudo, sinon « <pseudo> #<id> », jamais « Joueur #<id> » (déductible de
+  l'identifiant), `IGNORE` aussi. Idempotent (un pseudo suffixé n'est plus un
+  nom de la liste), sans effet sur une base neuve. Un compte en attente qui
+  porterait encore un nom nu au jour 30 en reçoit un neuf au lieu de le
+  garder. **Avant de retirer ce pas** de `RECENT_SCHEMA_CHANGES`, vérifier en
+  production qu'il n'a laissé personne : aucune ligne `is_deleted = 1` dont le
+  pseudo, sous collation binaire, ne finit pas par `-[0-9a-z]{6}` et n'est pas
+  `compte_supprime_<id>` (rattrapage du démarrage) — une ligne laissée par
+  `IGNORE` n'aurait plus rien pour la suffixer, et `/rgpd` promet le suffixe à
+  tout pseudo d'emprunt.
 - **Posé dans la même instruction** que tout le reste (`is_deleted = 1`
   compris) : le balayage de `tests/lib/server/deleted-account-write-guards.test.ts`
   exige que toute écriture de `bg_users` porte `is_deleted = 0`, sauf celle qui
@@ -309,8 +337,10 @@ l'identifiant du compte et se lisait comme une erreur dans un plateau.
   consentements (`bg_privacy_acknowledgments`,
   `bg_privacy_change_notifications`).
 
-Le nom se lit comme un pseudo ordinaire, et c'est voulu : un plateau l'affiche
-sans contexte. C'est **la fiche** qui dit le compte supprimé.
+Le nom reste lisible, et c'est voulu : un plateau l'affiche sans contexte. Sa
+forme (« nom-6 caractères », D99) trahit la suppression pour qui la connaît —
+`/rgpd` le dit, la suppression n'est pas un secret, l'identité derrière l'est ;
+c'est **la fiche** qui l'annonce à tous.
 
 ## La fiche d'un compte supprimé
 
@@ -335,15 +365,79 @@ pas ; celles d'un compte qui a joué appartiennent aussi à ses adversaires.
 Son nom, lui, reste un **nom sans lien** partout où il s'affiche :
 `loadProfilelessPlayerIds` (cache de classement `list:profileless-players`,
 vidé à chaque score et à chaque suppression par `invalidateTeamIdentityViews`)
-est lu par le layout racine pour un visiteur connecté et transmis à
-`ProfilelessPlayersProvider` ; `PlayerLink` et `EntrantLink` lisent
-`useHasPlayerPage` et rendent `<span class="entity-name">`. Les liens se rendant
+n'est **plus envoyé entier** dans chaque page (D86) : chaque `PlayerLink` /
+`EntrantLink` monté inscrit son compte **avec le nom qu'il affiche** auprès de
+`ProfilelessPlayersProvider` (`useHasPlayerPage` ; `playerName` / `entrantName`
+quand le contenu n'est pas ce texte, comme l'avatar d'une carte d'équipe), qui
+pose une seule question par rendu (`POST /api/players/profileless`, corps
+`{ players: [{ id, name }] }`, connecté seulement, origine vérifiée, au plus 100
+couples par question et 3 noms par compte — un compte montré sous son pseudo
+et sous le nom de son entrée solo part avec les deux, `lib/shared/profileless-lookup.ts`, seau propre
+`PROFILELESS_LOOKUP_RULE` de 60 questions par minute, distinct de l'annuaire) ;
+la route ne répond que ceux des comptes demandés qui sont sans fiche **et dont
+le nom envoyé est le nom d'aujourd'hui** — pseudo, ou nom de l'entrée solo
+quand il suit le pseudo (le pseudo même ou « <pseudo> #<id> »,
+`soloNameFollowsPseudo`), casse et invisibles ignorés (`profilelessAmong`) —, ou 503
+(`PROFILELESS_UNAVAILABLE`) si la liste ne se lit pas — jamais une réponse vide
+que les liens prendraient pour « tous ont une fiche ». Le pseudo d'emprunt d'un
+compte supprimé ne se lit que sur une page qui montre ce joueur : balayer des
+identifiants au hasard ne reconstitue donc ni la liste des comptes supprimés,
+ni l'instant d'une demande de suppression en attente (revue sécurité EF-65).
+Les pseudos d'emprunt ayant longtemps été des noms nus d'une liste publique de
+mille, les noms essayés sont bornés **par compte demandé, tous visiteurs confondus**
+(`admitProfilelessName`, `profileless-guess-budget.ts`, revue sécurité EF-65,
+cycle 3) : 4 noms faux distincts par compte de la liste et par 24 h ; le nom
+juste ne compte pas. Borne atteinte, **plus aucun nom** de ce compte n'est
+jugé jusqu'à la fenêtre suivante, le nom juste compris (cycle 4 : un nom juste
+encore jugé après la borne laissait balayer les mille pseudos jusqu'à lui) ;
+un nom hors borne est **tu** (traité comme un compte qui a sa fiche), jamais
+refusé. Multiplier les comptes ou les sessions n'ajoute aucun essai, et le
+serveur ne garde rien, par visiteur, des joueurs qui lui ont été montrés : la
+mémoire ne suit que les comptes de la liste, au plus quatre noms faux chacun,
+**jamais en clair** (empreinte HMAC sous une clé tirée au démarrage, jamais
+écrite : l'ancien pseudo d'un compte supprimé, envoyé par un onglet resté
+ouvert, n'y reste pas lisible) ; chaque nouvelle liste oublie les comptes qui
+en sont sortis et les fenêtres échues, et un redémarrage remet tout à zéro.
+Limite assumée : qui épuise la borne d'un compte laisse son nom en lien
+(fiche 404) jusqu'à la fenêtre suivante, pour tous — gêne d'affichage, sans
+rien apprendre. La borne ne faisait que ralentir la devinette (4 essais par
+jour et par redémarrage, contre mille noms) : c'est le **suffixe aléatoire** du
+pseudo d'emprunt (D99, ci-dessus) qui la rend vaine — elle reste, en défense en
+profondeur. Déclarée comme traitement (revue juridique EF-65) :
+registre T01 (catégorie et durée — en mémoire, 24 h au plus, jamais écrite),
+`/rgpd` § Historique de tournois & palmarès (FR et EN, limite du lien 404
+comprise) et entrée `2026-11-pseudo-emprunt-suffixe` de `PRIVACY_CHANGES`. Les noms d'aujourd'hui sont lus **avec** la liste et
+gardés avec elle (une seule requête, `LEFT JOIN` des entrées solo) : aucune
+requête ni aucun 503 ne dépend du compte demandé, et le travail d'une question
+n'en dépend que de quelques accès à une table (revue sécurité EF-65, cycles 2
+et 4). Les noms
+partent dans le corps, jamais dans l'adresse : les journaux d'accès ne gardent
+pas, par visiteur, les joueurs qui lui ont été montrés. Un nom d'entrée solo
+qui ne suit pas le pseudo n'est jamais un nom du jour (revue sécurité EF-65,
+cycle 5) : « Joueur #<id> », dernier recours du renommage, se déduit de
+l'identifiant, et un nom resté d'avant peut être un nom nu de la liste
+publique — l'accepter dirait, pour qui l'essaie, qu'un identifiant est celui
+d'un compte supprimé ; un tel nom reste en lien (fiche 404). Un lien sans nom
+lisible n'est pas demandé, et un nom périmé (page ouverte avant un renommage)
+laisse au pire un lien vers la fiche 404. Un compte dit sans fiche rend `<span class="entity-name">`. Les liens se rendant
 côté client, les deux portes du direct (flux SSE et REST de secours) sont
 couvertes sans toucher au `TournamentSnapshot`. La carte du direct de l'accueil
-(`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. Le layout
-racine n'étant pas rejoué à la navigation client, la liste peut dater d'avant
-une suppression jusqu'au prochain chargement : au pire, un lien mène à la page
-introuvable.
+(`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. La mise en
+page racine ne pose plus la liste : le rendu serveur (premier affichage, ou
+JavaScript bloqué) montre donc chaque nom en lien, jusqu'à la réponse
+(regroupée en 50 ms, `PROFILELESS_BATCH_MS`, plus un aller-retour) — compromis
+de D86. Tant que la réponse n'est pas là (ou en panne), le nom reste un lien ; un
+compte affiché est redemandé à la navigation client au plus une fois par
+minute (`PROFILELESS_REFRESH_MS`) ; après un échec (hors ligne, 429, 503), une
+minuterie unique (réarmée sur le prochain essai dû, annulée quand plus aucun lien n'est affiché) redemande d'elle-même tant que le compte reste affiché (15 s,
+doublé à chaque échec de suite, plafonné à 2 min : une page de direct reste
+ouverte sans navigation), et une question sans réponse est coupée au bout de
+10 s (`PROFILELESS_TIMEOUT_MS`). Les questions partent par salves de 4 paquets au plus (`PROFILELESS_CHUNKS_PER_BURST`), dix secondes entre deux (`PROFILELESS_BURST_GAP_MS`), 24 par minute et par onglet, deux onglets sous la borne de 60 ; un compte retiré de l'écran avant son tour n'est pas demandé. Seuls des identifiants entiers positifs sont
+posés (un seul invalide ferait refuser le paquet entier). Les réponses d'un
+compte qui n'est plus affiché sont oubliées une fenêtre plus tard. Au pire,
+un lien mène à la page introuvable. Le passage de lien à texte au premier
+affichage est le compromis de D86 : l'un et l'autre se lisent pareil au repos
+(`.entity-link` ne se distingue qu'au survol et au focus).
 
 ## Les comptes déjà supprimés
 
@@ -625,8 +719,9 @@ Dès la demande, le compte est **montré anonyme partout** — résultats passé
 classements, effectifs, pages de tournoi, entrée solo. Plutôt que de filtrer
 chaque lecture, `holdAccountIdentity` met le vrai pseudo et le chemin de
 l'avatar de côté (`bg_account_deletion_holds`, une ligne par compte) et pose
-sur `bg_users` un pseudo d'emprunt (`pickAnonymousPseudo`, en écartant ceux des
-comptes et des masques) et `avatar_url = NULL` **dans l'instruction même** qui
+sur `bg_users` un pseudo d'emprunt (`pickAnonymousPseudo`, nom de la liste
+suffixé d'un aléa, sans relecture des pseudos portés : l'index unique départage
+une collision) et `avatar_url = NULL` **dans l'instruction même** qui
 pose `is_deleted = 1` (le balayage des gardes d'écriture n'en dispense qu'elle),
 puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
 `bg_users` montre donc déjà le faux nom, sans lien de fiche.
@@ -1103,10 +1198,9 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   suppression de tournoi, `invalidateTeamRanking`), plus sous le préfixe du
   classement que chaque score vide. La fiche lit la même liste
   (`anonymizedAccountHasNoPage`) ; liste illisible, elle interroge le seul
-  compte en base (jamais une fiche rouverte par une panne). Le fournisseur la
-  relit à la navigation client (`/api/players/profileless`, connecté, au plus
-  une fois par minute) ; `/rgpd` dit qu'une page déjà ouverte garde son lien
-  jusqu'au rechargement.
+  compte en base (jamais une fiche rouverte par une panne). Les liens affichés
+  la questionnent par identifiant et nom affiché (`POST /api/players/profileless`, D86, nom exigé depuis la revue sécurité EF-65) ;
+  `/rgpd` dit qu'une page déjà ouverte garde son lien jusqu'au rechargement.
 - **Revue standard cycle 1** : les traces du plan rendu se lisent après le
   journal et les suites, et une panne ne fait plus passer la demande pour un
   échec (plan confirmé ou aperçu gardé) ; le rejeu d'une restauration ne
@@ -1158,11 +1252,6 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 
 ## Décisions requises (ouvertes)
 
-- Comptes sans fiche dans la charge RSC (EF-62) : la liste entière part sur
-  chaque page connectée et dit quels identifiants sont des comptes supprimés —
-  l'accepter (identifiants seuls) ou n'envoyer que ceux de la page ? Recommandé :
-  l'accepter tant qu'elle reste sous quelques milliers.
-
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
   en attente n'en reçoit **aucun avis** (`userRecipient` écarte
   `is_deleted = 1`), alors que `/rgpd` § Signalements promet motifs et voies de
@@ -1201,7 +1290,7 @@ requises » (avatar mis de côté, conditions v9) sont ainsi soldées.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Suppression d'un compte** (`lib/shared/account-deletion.ts` pur + `deleteOwnAccount`) : la suppression n'avait qu'un geste — **anonymiser** —, juste pour un joueur qui a joué (ses matchs, son palmarès et le bilan de ses équipes se lisent sur des lignes qui le référencent : l'effacer réécrirait l'histoire de gens qui ne l'ont pas demandé), faux pour un compte qui n'a **rien laissé** : un joueur inscrit un soir et jamais engagé repartait en laissant « compte_supprime_412 » à l'annuaire pour toujours. Un seul critère, quatre traces : **a joué un match** (un match compté — `playedMatchSql` — d'une équipe dont il était membre pendant le tournoi, fenêtre d'appartenance des statistiques, ou de son entrée solo ; être au roster d'une équipe engagée ne suffit pas), **entrée solo inscrite**, jouée ou non (son nom d'engagé est son pseudo et `bg_teams.solo_user_id` n'a volontairement aucune clé étrangère ; trace et motif `SOLO_REGISTRATIONS` à part, sa phrase ne promettant aucune statistique ; une entrée solo jamais inscrite part avec le compte), **organisateur** d'un tournoi (`organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT`, la base refuserait) et **`OWNER`** d'une équipe vivante (`bg_team_members` cascade, l'équipe resterait sans titulaire). Les deux dernières n'élargissent rien : ce sont les cas où « effacer » ne veut rien dire. Décision **conservatrice** — dans le doute on anonymise, les deux erreurs ne se valant pas. Les cascades font l'effacement ; ce qu'aucune clé étrangère ne couvre demande un geste — les visites, elles, n'ont rien à détacher : `bg_site_visits` ne garde aucun lien vers un compte, seulement une empreinte salée. D'abord le **fichier de l'avatar**, que `avatar_url` ne fait que désigner : les photos OAuth étant **copiées** chez nous à la connexion, presque tout compte effaçable en a un, et la ligne partie son chemin est perdu tandis que l'image reste servie par `/api/uploads/avatars/…` — chemin relevé **avant** l'écriture, fichier supprimé **après le commit** (un `unlink` ne se défait pas), à l'anonymisation comme à l'effacement. Traces et écriture vivent dans **une seule transaction**, ouverte par un `SELECT … FOR UPDATE` sur la ligne du compte en toute première instruction (même piège `REPEATABLE READ` qu'ailleurs) : elle ferme l'état intermédiaire des deux écritures *et* la seule course qu'aucune clé étrangère ne tranche — l'**entrée solo**, `ensureSoloEntry` posant le **même** verrou avant d'en créer une. Les trois questions tiennent en **une** requête : un `await` entre elles laisserait créer un tournoi entre la deuxième et la troisième. La confirmation **décrit ce qui va se passer** (`GET /api/profile/deletion`, lecture seule, appelée sur le chemin de la suppression et jamais au chargement du profil) et `DELETE /api/profile` **rend le plan appliqué**, l'écriture reposant la question sur son propre instantané. Le **mode ne suffit pas** à rédiger la phrase : « tes statistiques resteront, elles appartiennent aussi aux équipes que tu as affrontées » est faux de qui n'est retenu que par une équipe possédée ou un tournoi organisé — d'où un **motif** (`AccountRetentionReason`), une phrase par motif, et celle du propriétaire d'équipe qui nomme le geste levant la conservation (transférer ou dissoudre). `accountDeletionPlan` construit mode et motif **ensemble**, deux calculs séparés pouvant se contredire dans une même réponse. Le bouton se ferme **avant** l'aperçu : `window.confirm` ne bloque le second clic que tant qu'il est la première instruction, un `await` devant lui rouvrant la fenêtre du double envoi. Une clé étrangère peut refuser **malgré** le verrou (ses contrôles lisent la dernière version commitée, pas l'instantané) : `isReferencedRowError` traduit le message brut de MySQL — qui nomme base, table et contrainte, et partirait tel quel dans la notification — en `ACCOUNT_STILL_REFERENCED`, rendu en français par `accountDeletionErrorMessage`, qui nomme la suite (réessayer, le second passage anonymise). **Le compte conservé l'est sous un pseudo d'emprunt** (`lib/shared/anonymous-pseudos.ts`, mille pseudos, tirage libre sans casse, départagé par l'index unique en cas de course, posé dans la même instruction que `is_deleted = 1`) et perd aussi ses rôles de plateforme et ses consentements ; `getFullProfile` rend `isDeleted` et la fiche l'annonce (en-tête gris en tirets, avatar barré, étiquette « Compte supprimé »). `reconcileDeletedAccounts` applique la règle du jour aux comptes **déjà** supprimés, une fois par processus du serveur (`NEXT_RUNTIME`), en tâche de fond après les migrations : sans match → effacés, ancien `compte_supprime_<id>` ou rôles restants → ré-anonymisés. Côté annuaire, `/joueurs` masque les comptes anonymisés **par défaut** derrière une **icône seule**, volontairement discrète (`UserX`, `aria-pressed`), qui remplace la case qui les comptait, sans jamais les retirer de la réponse — c'est le seul moyen de retrouver un adversaire d'un tournoi passé ; leur carte est en retrait, mais **jamais** par une opacité posée sur la carte (elle emporterait la mention qui l'explique) ni sur `.plTeam` (un contexte d'empilement y ferait passer le lien d'équipe sous la plaque `.cardOverlay`, menant à la fiche du joueur). Le verrou ne couvre pas ce qui **reprend après lui** : une sauvegarde de profil ou un téléversement d'avatar déjà partis attendent le commit puis reposaient l'identité réelle sur la ligne anonymisée (et, par `syncSoloEntryIdentity`, jusque sur la carte de match en direct de la vitrine) — d'où un `AND is_deleted = 0` sur les deux écritures, relu sur `affectedRows` (mysql2 pose `FOUND_ROWS`, le nombre compte les lignes **appariées**) : l'avatar rend un booléen que la route traduit en ménage du fichier déjà écrit, le profil lève `ACCOUNT_DELETED` → **409**, rendu en français par le registre de `/profil` (`ACCOUNT_DELETED_WRITE_MESSAGE`). Et une ligne anonymisée garde un pseudo : `getUserIdByPseudo`, unique traduction « pseudo → compte à rattacher » (invitation dans une équipe, reprise d'une fantôme), filtre `is_deleted = 0` — sans quoi une demande d'adhésion déposée avant la suppression faisait **rejoindre** le roster à un compte qui ne peut plus ouvrir de session. La même seconde d'écart vaut pour ce qui repose une **porte d'entrée** : `writeVerifiedTag` et les cinq écritures de `linkOAuthIdentity` (`discord_id`, `google_sub`, `blizzard_sub` — les colonnes mêmes par lesquelles on se connecte) portent la condition, comme le **détachement** l'avait déjà ; sans elle, un compte « supprimé de façon irréversible » redevenait joignable par OAuth, tag certifié republié à l'arbitrage. Dernier chemin refermé, celui qui ne passe par aucun pseudo : une **demande d'adhésion** restée `PENDING` s'accepte sur un identifiant, et faisait rejoindre un roster vivant à un compte supprimé — `anonymizeAccount` passe donc en `CANCELLED`, dans sa transaction, tout ce qui pend au nom du compte (le mode « effacement » n'a rien à faire, la cascade l'emporte). `adoptRemoteAvatar` est la plus longue de ces courses (un téléchargement sortant sépare sa lecture de son écriture) et la seule qui laisse un **fichier** derrière elle : l'écriture refusée reprend donc la photo qu'elle vient de poser. Enfin la confirmation ne part plus d'une hypothèse : l'aperçu injoignable donnait la phrase de `TOURNAMENTS` (« le compte devient anonyme, tes statistiques restent ») quand le serveur, qui re-décide sur son instantané, pouvait **effacer entièrement** — d'où `RETENTION_UNKNOWN`, une troisième phrase qui ne promet ni conservation ni effacement, et qui porte le `default` du `switch` (une valeur inattendue doit mener à la description la plus prudente, pas à la plus définitive). **L'effacement réveille des cascades que l'anonymisation n'exécutait jamais** : `bg_team_invitations.created_by` était `NOT NULL ON DELETE CASCADE`, si bien qu'un gérant sans historique emportait en partant les invitations encore en attente chez des tiers — la colonne devient nullable en `SET NULL` (l'invitation est l'acte de l'**équipe**, la colonne n'est lue nulle part, et `bg_endurance_penalties.created_by` tranche déjà ainsi) ; à l'inverse `bg_discord_login_challenges` n'a **aucune** clé étrangère (elle est indexée sur un identifiant Discord) et n'est purgée que par la demande d'un autre joueur — ses lignes sont donc effacées dans la transaction, l'identifiant relevé **sous le verrou** avec le chemin de l'avatar. Enfin la suppression d'avatar écrit **la base avant le fichier** et refuse en 409 comme le téléversement : l'ordre inverse laissait `avatar_url` pointer sur un fichier disparu quand l'écriture échouait. Voir `docs/features/ACCOUNT_DELETION.md`.
+- **Suppression d'un compte** (`lib/shared/account-deletion.ts` pur + `deleteOwnAccount`) : la suppression n'avait qu'un geste — **anonymiser** —, juste pour un joueur qui a joué (ses matchs, son palmarès et le bilan de ses équipes se lisent sur des lignes qui le référencent : l'effacer réécrirait l'histoire de gens qui ne l'ont pas demandé), faux pour un compte qui n'a **rien laissé** : un joueur inscrit un soir et jamais engagé repartait en laissant « compte_supprime_412 » à l'annuaire pour toujours. Un seul critère, quatre traces : **a joué un match** (un match compté — `playedMatchSql` — d'une équipe dont il était membre pendant le tournoi, fenêtre d'appartenance des statistiques, ou de son entrée solo ; être au roster d'une équipe engagée ne suffit pas), **entrée solo inscrite**, jouée ou non (son nom d'engagé est son pseudo et `bg_teams.solo_user_id` n'a volontairement aucune clé étrangère ; trace et motif `SOLO_REGISTRATIONS` à part, sa phrase ne promettant aucune statistique ; une entrée solo jamais inscrite part avec le compte), **organisateur** d'un tournoi (`organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT`, la base refuserait) et **`OWNER`** d'une équipe vivante (`bg_team_members` cascade, l'équipe resterait sans titulaire). Les deux dernières n'élargissent rien : ce sont les cas où « effacer » ne veut rien dire. Décision **conservatrice** — dans le doute on anonymise, les deux erreurs ne se valant pas. Les cascades font l'effacement ; ce qu'aucune clé étrangère ne couvre demande un geste — les visites, elles, n'ont rien à détacher : `bg_site_visits` ne garde aucun lien vers un compte, seulement une empreinte salée. D'abord le **fichier de l'avatar**, que `avatar_url` ne fait que désigner : les photos OAuth étant **copiées** chez nous à la connexion, presque tout compte effaçable en a un, et la ligne partie son chemin est perdu tandis que l'image reste servie par `/api/uploads/avatars/…` — chemin relevé **avant** l'écriture, fichier supprimé **après le commit** (un `unlink` ne se défait pas), à l'anonymisation comme à l'effacement. Traces et écriture vivent dans **une seule transaction**, ouverte par un `SELECT … FOR UPDATE` sur la ligne du compte en toute première instruction (même piège `REPEATABLE READ` qu'ailleurs) : elle ferme l'état intermédiaire des deux écritures *et* la seule course qu'aucune clé étrangère ne tranche — l'**entrée solo**, `ensureSoloEntry` posant le **même** verrou avant d'en créer une. Les trois questions tiennent en **une** requête : un `await` entre elles laisserait créer un tournoi entre la deuxième et la troisième. La confirmation **décrit ce qui va se passer** (`GET /api/profile/deletion`, lecture seule, appelée sur le chemin de la suppression et jamais au chargement du profil) et `DELETE /api/profile` **rend le plan appliqué**, l'écriture reposant la question sur son propre instantané. Le **mode ne suffit pas** à rédiger la phrase : « tes statistiques resteront, elles appartiennent aussi aux équipes que tu as affrontées » est faux de qui n'est retenu que par une équipe possédée ou un tournoi organisé — d'où un **motif** (`AccountRetentionReason`), une phrase par motif, et celle du propriétaire d'équipe qui nomme le geste levant la conservation (transférer ou dissoudre). `accountDeletionPlan` construit mode et motif **ensemble**, deux calculs séparés pouvant se contredire dans une même réponse. Le bouton se ferme **avant** l'aperçu : `window.confirm` ne bloque le second clic que tant qu'il est la première instruction, un `await` devant lui rouvrant la fenêtre du double envoi. Une clé étrangère peut refuser **malgré** le verrou (ses contrôles lisent la dernière version commitée, pas l'instantané) : `isReferencedRowError` traduit le message brut de MySQL — qui nomme base, table et contrainte, et partirait tel quel dans la notification — en `ACCOUNT_STILL_REFERENCED`, rendu en français par `accountDeletionErrorMessage`, qui nomme la suite (réessayer, le second passage anonymise). **Le compte conservé l'est sous un pseudo d'emprunt** (`lib/shared/anonymous-pseudos.ts`, un nom de la liste de mille suivi d'un suffixe aléatoire de six caractères — D99 —, sans relecture des pseudos portés, départagé par l'index unique en cas de collision, posé dans la même instruction que `is_deleted = 1`) et perd aussi ses rôles de plateforme et ses consentements ; `getFullProfile` rend `isDeleted` et la fiche l'annonce (en-tête gris en tirets, avatar barré, étiquette « Compte supprimé »). `reconcileDeletedAccounts` applique la règle du jour aux comptes **déjà** supprimés, une fois par processus du serveur (`NEXT_RUNTIME`), en tâche de fond après les migrations : sans match → effacés, ancien `compte_supprime_<id>` ou rôles restants → ré-anonymisés. Côté annuaire, `/joueurs` masque les comptes anonymisés **par défaut** derrière une **icône seule**, volontairement discrète (`UserX`, `aria-pressed`), qui remplace la case qui les comptait, sans jamais les retirer de la réponse — c'est le seul moyen de retrouver un adversaire d'un tournoi passé ; leur carte est en retrait, mais **jamais** par une opacité posée sur la carte (elle emporterait la mention qui l'explique) ni sur `.plTeam` (un contexte d'empilement y ferait passer le lien d'équipe sous la plaque `.cardOverlay`, menant à la fiche du joueur). Le verrou ne couvre pas ce qui **reprend après lui** : une sauvegarde de profil ou un téléversement d'avatar déjà partis attendent le commit puis reposaient l'identité réelle sur la ligne anonymisée (et, par `syncSoloEntryIdentity`, jusque sur la carte de match en direct de la vitrine) — d'où un `AND is_deleted = 0` sur les deux écritures, relu sur `affectedRows` (mysql2 pose `FOUND_ROWS`, le nombre compte les lignes **appariées**) : l'avatar rend un booléen que la route traduit en ménage du fichier déjà écrit, le profil lève `ACCOUNT_DELETED` → **409**, rendu en français par le registre de `/profil` (`ACCOUNT_DELETED_WRITE_MESSAGE`). Et une ligne anonymisée garde un pseudo : `getUserIdByPseudo`, unique traduction « pseudo → compte à rattacher » (invitation dans une équipe, reprise d'une fantôme), filtre `is_deleted = 0` — sans quoi une demande d'adhésion déposée avant la suppression faisait **rejoindre** le roster à un compte qui ne peut plus ouvrir de session. La même seconde d'écart vaut pour ce qui repose une **porte d'entrée** : `writeVerifiedTag` et les cinq écritures de `linkOAuthIdentity` (`discord_id`, `google_sub`, `blizzard_sub` — les colonnes mêmes par lesquelles on se connecte) portent la condition, comme le **détachement** l'avait déjà ; sans elle, un compte « supprimé de façon irréversible » redevenait joignable par OAuth, tag certifié republié à l'arbitrage. Dernier chemin refermé, celui qui ne passe par aucun pseudo : une **demande d'adhésion** restée `PENDING` s'accepte sur un identifiant, et faisait rejoindre un roster vivant à un compte supprimé — `anonymizeAccount` passe donc en `CANCELLED`, dans sa transaction, tout ce qui pend au nom du compte (le mode « effacement » n'a rien à faire, la cascade l'emporte). `adoptRemoteAvatar` est la plus longue de ces courses (un téléchargement sortant sépare sa lecture de son écriture) et la seule qui laisse un **fichier** derrière elle : l'écriture refusée reprend donc la photo qu'elle vient de poser. Enfin la confirmation ne part plus d'une hypothèse : l'aperçu injoignable donnait la phrase de `TOURNAMENTS` (« le compte devient anonyme, tes statistiques restent ») quand le serveur, qui re-décide sur son instantané, pouvait **effacer entièrement** — d'où `RETENTION_UNKNOWN`, une troisième phrase qui ne promet ni conservation ni effacement, et qui porte le `default` du `switch` (une valeur inattendue doit mener à la description la plus prudente, pas à la plus définitive). **L'effacement réveille des cascades que l'anonymisation n'exécutait jamais** : `bg_team_invitations.created_by` était `NOT NULL ON DELETE CASCADE`, si bien qu'un gérant sans historique emportait en partant les invitations encore en attente chez des tiers — la colonne devient nullable en `SET NULL` (l'invitation est l'acte de l'**équipe**, la colonne n'est lue nulle part, et `bg_endurance_penalties.created_by` tranche déjà ainsi) ; à l'inverse `bg_discord_login_challenges` n'a **aucune** clé étrangère (elle est indexée sur un identifiant Discord) et n'est purgée que par la demande d'un autre joueur — ses lignes sont donc effacées dans la transaction, l'identifiant relevé **sous le verrou** avec le chemin de l'avatar. Enfin la suppression d'avatar écrit **la base avant le fichier** et refuse en 409 comme le téléversement : l'ordre inverse laissait `avatar_url` pointer sur un fichier disparu quand l'écriture échouait. Voir `docs/features/ACCOUNT_DELETION.md`.
 
 ## Alertes AutoMod d'un compte supprimé (D56b)
 
@@ -1225,8 +1314,7 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 - **Liste des comptes sans fiche** : une lecture en échec n'est pas gardée par
   le cache ; pendant `PROFILELESS_FAILURE_BACKOFF_MS` (15 s) la dernière liste
   connue (conservée une heure) est servie, ou rien n'est demandé (une ligne de
-  journal par panne). Plafond `PROFILELESS_PLAYERS_MAX` (20 000, avertissement
-  au-delà, copie du navigateur seulement : un lien en trop mène à une 404). La clé de cache est déclarée en tête
+  journal par panne). La clé de cache est déclarée en tête
   de `ranking-cache.ts`. Côté client, un essai en échec attend
   `PROFILELESS_RETRY_MS` (15 s) au lieu de repartir à chaque page.
 - **Coup d'envoi tardif** : `startDueTournaments` (`tournament-start-sync.ts`)
@@ -1248,12 +1336,9 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 
 ## Revue sécurité (EF-62, cycle 1)
 
-- **Plafond de la liste sans fiche** : seule la copie envoyée au navigateur
-  (`loadProfilelessPlayerIdsForClient` : mise en page racine,
-  `/api/players/profileless`) est tronquée à `PROFILELESS_PLAYERS_MAX` ; la
-  fiche, l'annuaire, l'accueil et la redirection d'équipe solo lisent la liste
-  entière — la troncature ne rouvre aucune fiche. Cache d'un seul processus
-  (le site tourne en un processus pm2).
+- **Liste sans fiche** : cache d'un seul processus (le site tourne en un
+  processus pm2). Sa copie tronquée envoyée au navigateur a disparu avec D86
+  (EF-65) : seuls les identifiants affichés sont questionnés.
 - **Motif rendu par la demande** : les traces se relisent après le commit et le
   journal mais **avant** les suites, dont les forfaits en tâche de fond
   compteraient comme des matchs joués.
@@ -1263,11 +1348,11 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
 - `syncOpenSoloTournamentsOn` vit dans `tournament-start-sync.ts`, partagé par
   la demande et la suppression définitive ; `listNamingTournamentIds` lit les
   équipes quittées par une requête de forme fixe par équipe ; le relevé complet
-  horaire ne relit pas son marqueur ; une relecture client identique ne
-  re-rend pas les liens (`sameIds`).
+  horaire ne relit pas son marqueur ; une réponse qui ne change rien ne
+  re-rend pas les liens.
 - La liste compte aussi les comptes en attente (leur fiche répond 404 pendant
-  les trente jours) : la question de son exposition reste une décision ouverte
-  dans `ERREUR.txt`.
+  les trente jours) ; depuis D86, seule la réponse pour les comptes affichés
+  part au navigateur.
 
 ## Revue juridique (EF-62, cycle 1)
 
@@ -1281,8 +1366,6 @@ lecture en échec → « vérifier le salon d'alertes ». Détail :
   comptes sans fiche (`invalidateProfilelessPlayers`) quand l'issue d'un match
   clos change — la fiche d'un compte anonymisé privé de son seul match joué
   tombe aussitôt. Un score ordinaire ne la vide toujours pas.
-- **Copie du navigateur au-delà du plafond** : les identifiants les plus
-  récents restent (`slice(-PROFILELESS_PLAYERS_MAX)`), les plus anciens tombent.
 - **Réactivation** : `keptLead` nomme l'avatar masqué **ou supprimé** et dit à
   part qu'un compte suspendu revient suspendu ; `kept` (derrière le « i »)
   tient en deux phrases.

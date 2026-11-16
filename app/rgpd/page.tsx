@@ -379,7 +379,7 @@ function RgpdFr({
             </tr>
           </tbody>
         </table>
-        <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
+        <p id="effacement-complet" style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           * Un compte qui n'a joué aucun match, n'est engagé dans aucun tournoi individuel commencé et n'a organisé aucun tournoi que personne au staff n'a pu reprendre est{" "}
           <strong>entièrement effacé</strong> au terme des {ACCOUNT_REACTIVATION_DAYS} jours qui suivent sa demande de suppression, hors données de connexion (***) ;
           ses inscriptions à des tournois individuels pas encore commencés sont retirées dès la demande.
@@ -451,7 +451,7 @@ function RgpdFr({
       </section>
 
       {/* SECTION 03 — HISTORIQUE & PALMARÈS */}
-      <section className={styles.section}>
+      <section id="suppression-et-palmares" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 03</span>
@@ -507,10 +507,10 @@ function RgpdFr({
           la suppression du compte. En revanche, tout ce qui désigne la personne est effacé
           (tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles — seule réserve,
           les codes de replay décrits ci-dessus) et le pseudo
-          est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
+          est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard (un nom suivi de six caractères aléatoires, par exemple « AlphaFX-7f3k2q » — une forme qui signale un compte supprimé, sans rien dire de la personne) : le palmarès
           subsiste sous ce faux nom, et la fiche du joueur, gardée seulement s&apos;il a joué au moins un
           match, indique que le compte a été supprimé ; sans match joué, la fiche disparaît (page
-          introuvable) et les liens qui y menaient deviennent du texte simple au fil de la navigation (une page déjà ouverte garde le sien jusqu&apos;à son rechargement).
+          introuvable) et les liens qui y menaient deviennent du texte simple au fil de la navigation (une page déjà ouverte garde le sien jusqu&apos;à son rechargement). Pour cela, la page soumet au site les noms qu&apos;elle affiche ; contre qui voudrait deviner quels comptes sont dans ce cas, le site retient, en mémoire seulement et au plus 24 heures, une empreinte jamais écrite des noms erronés soumis pour un tel compte : passé quatre, son lien demeure, vers la page introuvable, jusqu&apos;à la fin de ce délai.
           Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
           <strong>organisé</strong> un tournoi que personne au staff n'a pu reprendre, ou s'il est
           engagé dans un <strong>tournoi individuel</strong> déjà commencé ou terminé, dont l'engagé
@@ -908,8 +908,7 @@ function RgpdFr({
               qu&apos;un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être
               contesté par son équipe ou son joueur, et portée à {LOGO_QUARANTINE_MONTHS} mois civils
               après l&apos;archivage pour un signalement de droit d&apos;auteur ou de modération envoyé
-              depuis un compte, le temps que son auteur puisse contester la décision. Un compte
-              supprimé n&apos;y laisse pas son pseudo.
+              depuis un compte, le temps que son auteur puisse contester la décision. Un compte supprimé n&apos;y laisse pas son pseudo. Une fois le logo ou l&apos;avatar rétabli ou supprimé, la décision prise sur lui (point 4 : membre de la modération qui l&apos;a prise, issue de sa contestation) est effacée avec le signalement qui l&apos;a motivée, au terme de la durée de garde de celui-ci.
             </li>
           </ul>
 
@@ -977,12 +976,8 @@ function RgpdFr({
               (SHA-256) de l&apos;image est gardée sans limite de durée dans la liste des images bloquées, qui ne
               désigne aucun compte et ne date un blocage qu&apos;au jour près, pour en refuser la remise en ligne,
               comme avatar ou comme logo d&apos;équipe ; supprimé sans délai, son fichier n&apos;est effacé que si
-              rien d&apos;autre sur le site ne le désigne. Tant que le compte existe (anonymisé compris),
-              l&apos;empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou après
-              un masquage, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
-              est levé, sauf si une autre suppression de la même image le justifie encore. À l&apos;effacement du
-              compte, ces décisions sont effacées et le blocage devient définitif : seule l&apos;empreinte reste,
-              sans lien avec aucun compte. Une suppression d&apos;office faite alors que sa contestation attendait
+              rien d&apos;autre sur le site ne le désigne. Tant que la décision de suppression prise sur un signalement ou après un masquage est gardée, l&apos;empreinte l&apos;est aussi sur elle, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
+              est levé, sauf si une autre suppression de la même image le justifie encore. Ces décisions sont effacées avec le signalement qui les a motivées, au terme de sa durée de garde (point 1), ou plus tôt à l&apos;effacement du compte (anonymisé, il les garde jusque-là) ; le blocage devient alors définitif : seule l&apos;empreinte reste, sans lien avec aucun compte. Une suppression d&apos;office faite alors que sa contestation attendait
               encore son issue ne bloque l&apos;image qu&apos;une fois maintenue, ou à l&apos;effacement du compte s&apos;il
               vient avant, alors définitivement. Les empreintes posées à l&apos;effacement d&apos;un compte avant le
               11 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées, datées

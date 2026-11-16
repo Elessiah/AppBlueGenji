@@ -14,7 +14,7 @@ jest.mock("@/lib/server/named-lock", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages, pushLeadershipAlert } from "@/lib/server/bot-integration";
 import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
-import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
+import { listQuarantinesForReports, purgeClosedQuarantines, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
   applyReportAction,
@@ -24,6 +24,7 @@ import {
   listContestableReports,
   listReports,
   listReportsByAuthor,
+  purgeClosedQuarantinesSafely,
   purgeExpiredReports,
   resolveReportTargets,
   schedulePurgeExpiredReports,
@@ -816,6 +817,234 @@ describe("conservation", () => {
     await expect(purgeExpiredReports()).resolves.toBe(0);
     // Rien à effacer : aucune instruction `DELETE`.
     expect(pool.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_reportsDeleted_purgesClosedQuarantines", async () => {
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(2);
+
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_reportsDeleted_doesNotAwaitClosedQuarantineBacklog", async () => {
+    // Un arriéré (premier déploiement) ne retarde ni le panneau ni un signalement envoyé.
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    let finish: ((count: number) => void) | undefined;
+    jest.mocked(purgeClosedQuarantines).mockReturnValue(new Promise<number>((resolve) => { finish = resolve; }));
+
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    // Une seconde purge pendant la passe la rejoint, sans balayage parallèle.
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+    await flush();
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    finish?.(0);
+    await flush();
+  });
+
+  it("purgeClosedQuarantinesSafely_triggerDuringPass_rerunsOnceAfter", async () => {
+    // Revue sécurité EF-65 cycle 2 : un signalement effacé après la dernière
+    // lecture de la passe en cours ne laisse pas sa décision close.
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    let finish: ((count: number) => void) | undefined;
+    jest.mocked(purgeClosedQuarantines)
+      .mockReturnValueOnce(new Promise<number>((resolve) => { finish = resolve; }))
+      .mockResolvedValue(0);
+    await purgeExpiredReports();
+    await purgeExpiredReports();
+    await purgeExpiredReports();
+
+    finish?.(0);
+    await flush();
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue sécurité EF-65 cycle 3 : la passe se libère dans le même pas que sa
+  // sortie de boucle, et un déclencheur pendant une passe en échec est honoré une fois.
+  it("purgeClosedQuarantinesSafely_triggerRightAfterLoopExit_startsNewPass", async () => {
+    // Le déclencheur s'exécute juste après la reprise de la passe sur ce même
+    // résultat : sortie de boucle faite, promesse de la passe pas encore
+    // propagée. Une place libérée plus tard (`.finally`) l'avalait.
+    const settled = Promise.resolve(0);
+    jest.mocked(purgeClosedQuarantines).mockReturnValueOnce(settled).mockResolvedValue(0);
+    const first = purgeClosedQuarantinesSafely();
+    let second: Promise<void> | undefined;
+    void settled.then(() => {
+      second = purgeClosedQuarantinesSafely();
+    });
+
+    await first;
+    await second;
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_synchronousThrow_slotReleased", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.mocked(purgeClosedQuarantines)
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockResolvedValue(0);
+    await purgeClosedQuarantinesSafely();
+
+    await purgeClosedQuarantinesSafely();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_failureAfterSuccessfulRerun_triggerHonoured", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const settlers: { resolve: (value: number) => void; reject: (error: Error) => void }[] = [];
+    jest.mocked(purgeClosedQuarantines).mockImplementation(
+      () => new Promise<number>((resolve, reject) => { settlers.push({ resolve, reject }); }),
+    );
+    const pass = purgeClosedQuarantinesSafely();
+    void purgeClosedQuarantinesSafely();
+    settlers[0]?.reject(new Error("deadlock"));
+    await flush();
+    void purgeClosedQuarantinesSafely();
+    settlers[1]?.resolve(0);
+    await flush();
+    void purgeClosedQuarantinesSafely();
+    settlers[2]?.reject(new Error("deadlock"));
+    await flush();
+    settlers[3]?.resolve(0);
+
+    await pass;
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(4);
+  });
+
+  it("purgeClosedQuarantinesSafely_triggerDuringFailedPass_rerunsOnce", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    let fail: ((error: Error) => void) | undefined;
+    jest.mocked(purgeClosedQuarantines)
+      .mockReturnValueOnce(new Promise<number>((_resolve, reject) => { fail = reject; }))
+      .mockResolvedValue(0);
+    const pass = purgeClosedQuarantinesSafely();
+    void purgeClosedQuarantinesSafely();
+
+    fail?.(new Error("deadlock"));
+    await pass;
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_failedRerunWithTrigger_stops", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const rejecters: ((error: Error) => void)[] = [];
+    jest.mocked(purgeClosedQuarantines).mockImplementation(
+      () => new Promise<number>((_resolve, reject) => { rejecters.push(reject); }),
+    );
+    const pass = purgeClosedQuarantinesSafely();
+    void purgeClosedQuarantinesSafely();
+    rejecters[0]?.(new Error("deadlock"));
+    await flush();
+    void purgeClosedQuarantinesSafely();
+    rejecters[1]?.(new Error("deadlock"));
+
+    await pass;
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_failureWithoutTrigger_noRerun", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("deadlock"));
+
+    await purgeClosedQuarantinesSafely();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_nothingDeleted_skipsClosedQuarantineScan", async () => {
+    // Le panneau et chaque signalement envoyé n'attendent pas un balayage sans objet.
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+
+    await expect(purgeExpiredReports()).resolves.toBe(0);
+
+    expect(purgeClosedQuarantines).not.toHaveBeenCalled();
+  });
+
+  it("schedulePurgeExpiredReports_nothingDeleted_stillPurgesLeftoverClosedQuarantines", async () => {
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(1);
+
+    schedulePurgeExpiredReports(500_000_000_000);
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_closedQuarantinePurgeFails_stillReturnsCountAndLogs", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("LOCK_WAIT"));
+
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+    await flush();
+
+    // Une panne ne se rejoue pas en boucle.
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
+    error.mockRestore();
+  });
+
+  it("schedulePurgeExpiredReports_closedQuarantinePurgeFails_logsWithoutThrowing", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+    jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("LOCK_WAIT"));
+
+    schedulePurgeExpiredReports(700_000_000_000);
+    await flush();
+
+    expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
+    error.mockRestore();
+  });
+
+  it("schedulePurgeExpiredReports_reportsDeleted_scansClosedQuarantinesOnce", async () => {
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(1);
+
+    schedulePurgeExpiredReports(800_000_000_000);
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("schedulePurgeExpiredReports_reportPurgeFails_stillPurgesClosedQuarantines", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => { throw new Error("DOWN"); }]]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(0);
+
+    schedulePurgeExpiredReports(850_000_000_000);
+    await flush();
+
+    expect(error).toHaveBeenCalledWith("[reports] purge impossible", expect.anything());
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 
   it("purge au plus une fois par heure, les logos échus avant les signalements", async () => {

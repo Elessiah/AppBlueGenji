@@ -183,18 +183,28 @@ export async function setTournamentLiveUrl(
   return url;
 }
 
-/** Charge un match avec ses seules colonnes de diffusion. */
-async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
+/**
+ * Premier tri, **sans verrou** : un appelant sans `live` n'a passé la porte de
+ * la route (`tournaments`) qu'en arbitre possible du match. S'il n'en est pas
+ * l'arbitre désigné, il est refusé ici (`NOT_MATCH_REFEREE`) — même refus pour
+ * un match absent —, avant toute transaction : il ne prend pas le verrou du
+ * match en boucle (lancement, casters) et n'apprend rien de son état. Rejugé
+ * sous le verrou (`assertLiveActor`, désignation changée entre-temps). Un
+ * porteur de `live` ne lit rien ici : tout se juge sous le verrou.
+ *
+ * @throws `NOT_MATCH_REFEREE`
+ */
+async function assertMayReachMatchLive(matchId: number, actor: LiveTriggerActor, live: boolean): Promise<void> {
+  if (live) return;
   const db = await getDatabase();
-  const [rows] = await db.execute<MatchLiveRow[]>(
-    `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at
-     FROM bg_matches
-     WHERE id = ?
-     LIMIT 1`,
+  const [rows] = await db.execute<(RowDataPacket & { referee_user_id: number | null })[]>(
+    `SELECT referee_user_id FROM bg_matches WHERE id = ? LIMIT 1`,
     [matchId],
   );
-  if (rows.length === 0) throw new Error("MATCH_NOT_FOUND");
-  return rows[0];
+  const row = rows[0];
+  if (row === undefined || !actor.manages || nullableId(row.referee_user_id ?? null) !== actor.userId) {
+    throw new Error("NOT_MATCH_REFEREE");
+  }
 }
 
 /**
@@ -261,13 +271,19 @@ export async function setMatchLiveConfig(
     throw new Error("INVALID_LIVE_TRIGGER");
   }
 
-  // Premier tri sur une lecture ordinaire : le lien seul (un refus ne coûte
-  // rien). Les refus qui disent l'état du match (`assertConfigurable`, date
-  // requise) ne se jugent que sous le verrou, **après** le rôle
-  // (`assertLiveActor`) : un appelant sans droit sur ce match n'apprend rien
-  // de son état. Un mode absent (`undefined`) reste celui du match.
-  const row = await loadMatchLiveRow(matchId);
-  const requested = config.trigger === undefined ? (row.live_trigger ?? null) : config.trigger;
+  const actor: LiveTriggerActor = {
+    userId: config.setter.userId,
+    oversees: config.access.oversees,
+    manages: config.access.manages,
+  };
+  // Premier tri sur une lecture ordinaire : l'arbitre désigné, pour qui n'a
+  // pas `live` (`assertMayReachMatchLive`), puis le lien seul, jugé **sans**
+  // l'état du match (un refus ne coûte rien). Les refus qui disent l'état du
+  // match (`assertConfigurable`, date requise, mode) ne se jugent que sous le
+  // verrou, **après** le rôle (`assertLiveActor`) : un appelant sans droit sur
+  // ce match n'apprend rien de son état. Un mode absent (`undefined`) reste
+  // celui du match.
+  await assertMayReachMatchLive(matchId, actor, config.access.live);
   // Ni mode ni lien du staff envoyés, mais des liens de casters : seuls eux
   // changent. Un corps qui ne change rien n'ouvre pas un match joué.
   const keepsMode =
@@ -276,15 +292,12 @@ export async function setMatchLiveConfig(
   // Lien absent : le lien du staff n'est pas touché (sauf démarquage).
   const keepStaffLink = config.liveUrl === undefined;
   const editsStreamLinks = (config.streamLinks?.length ?? 0) > 0;
-  // Lu d'abord sur le mode demandé (un refus ne coûte rien), puis rejugé sous
-  // le verrou sur le mode appliqué : un mode posé entre les deux lectures ne
-  // fait pas perdre le lien envoyé.
-  parseStreamUrlInput(requested === null ? null : (config.liveUrl ?? null));
-  const actor: LiveTriggerActor = {
-    userId: config.setter.userId,
-    oversees: config.access.oversees,
-    manages: config.access.manages,
-  };
+  // Lu d'abord avec le seul mode **envoyé** — jamais celui du match, qu'un
+  // refus dirait sinon —, puis rejugé sous le verrou sur le mode appliqué. Sans
+  // mode envoyé (`undefined`, celui du match) ou démarquage (`null`), rien ici :
+  // le mode du match ne se juge que sous le verrou, après le rôle
+  // (`lockedTrigger` : un lien sur un match sans mode y est refusé).
+  parseStreamUrlInput(typeof config.trigger === "string" ? (config.liveUrl ?? null) : null);
 
   // Les verrous d'intervalle des streams et des casters peuvent opposer deux
   // matchs voisins (inscription, ménage) : la transaction se rejoue.
@@ -352,7 +365,7 @@ export async function setMatchLiveConfig(
       // relus : deux lectures verrouillantes, non quatre.
       await pruneMatchStreams(connection, matchId, { streams, held: true });
       await connection.commit();
-      return { previousTrigger: hold.trigger, changed };
+      return { previousTrigger: hold.trigger, changed, tournamentId: Number(current.tournament_id) };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -360,8 +373,8 @@ export async function setMatchLiveConfig(
   }));
 
   // Rien d'écrit : aucun instantané à rebâtir ni à pousser.
-  if (outcome.changed) publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
-  return outcome;
+  if (outcome.changed) publishMatchUpdatedEvent(outcome.tournamentId, { landingLive: true });
+  return { previousTrigger: outcome.previousTrigger, changed: outcome.changed };
 }
 
 /**
@@ -676,20 +689,6 @@ async function refereeQualifies(
 }
 
 /**
- * L'arbitre désigné du match est-il ce compte ? Lecture ordinaire, pour la
- * porte des routes de diffusion (le verdict qui compte se relit sous verrou).
- * `manages` : la permission `tournaments` de l'appelant (`can`), condition de
- * l'arbitrage.
- */
-export async function isDesignatedMatchReferee(matchId: number, userId: number, manages: boolean): Promise<boolean> {
-  if (!manages) return false;
-  const db = await getDatabase();
-  const kept = await loadKeptReferee(db, matchId);
-  if (kept?.refereeId !== userId) return false;
-  return refereeQualifies(db, userId, kept.game);
-}
-
-/**
  * Qui règle quoi, sous le verrou du match. Sans `live`, l'appelant n'a passé
  * la porte qu'en arbitre de ce match : il doit l'être encore (désignation
  * changée entre la porte et le verrou, `NOT_MATCH_REFEREE`). Puis le match
@@ -885,7 +884,7 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  *
  * @returns `true` quand l'antenne a changé d'état — un second clic sur « à
  *   l'antenne » ne change rien, et le journal du staff ne le note pas.
- * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_REFEREE` | `LIVE_TRIGGER_NOT_MANUAL`
+ * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_REFEREE` | `NOT_MATCH_CASTER` | `LIVE_TRIGGER_NOT_MANUAL`
  *   | `LIVE_TRIGGER_NOT_OWNED` | `STAFF_STREAM_FORBIDDEN` | `MATCH_NOT_LIVE_READY`
  */
 export async function setMatchOnAir(
@@ -895,16 +894,21 @@ export async function setMatchOnAir(
   access: MatchLiveAccess,
 ): Promise<boolean> {
   const actor: LiveTriggerActor = { userId, oversees: access.oversees, manages: access.manages };
+  // Qui n'a pas `live` et n'arbitre pas ce match s'arrête là, sans verrou.
+  await assertMayReachMatchLive(matchId, actor, access.live);
   // Le verrou du match puis la lecture de ses casters : l'ordre de
   // `setMatchLiveConfig`, rejoué comme lui sur un interblocage.
   const result = await retryOnDeadlock(() => withConnection(async (connection) => {
     await connection.beginTransaction();
     try {
       const { row, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
-      // Le mode d'abord : sur un match qui n'est pas en manuel, le refus dit
-      // pourquoi, quel que soit l'auteur.
+      // Le rôle d'abord, comme `setMatchLiveConfig` : la porte admet tout
+      // porteur de `tournaments`, et seul l'arbitre retenu de ce match, le
+      // staff `tournaments` + `live` ou un caster montré du match apprend son
+      // mode (`NOT_MATCH_REFEREE`, `NOT_MATCH_CASTER`, `live-access.ts`).
+      assertLiveActor(hold, actor, access.live, actorShown);
+      // Puis le mode : sur un match qui n'est pas en manuel, le refus dit pourquoi.
       if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
-      if (!access.live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
       // L'antenne suit la règle du mode : sur un mode sans maître, tout caster montré la bascule.
       if (!mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
       // L'antenne du mode du staff qui porte le lien de l'organisation non plus.

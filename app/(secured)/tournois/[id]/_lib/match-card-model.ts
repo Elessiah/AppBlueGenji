@@ -146,7 +146,9 @@ export function useMatchCardModel(
   // La diffusion de l'organisation reste au staff `tournaments` ; ses routes
   // (`/api/admin/matches/[id]/live`, rediff) demandent aussi `live` : sans les
   // deux, le bouton ne mènerait qu'à des refus. L'arbitre désigné du match
-  // (médiateur) y est admis pour **ce** match (`mayConfigureMatchLive`).
+  // (médiateur) y voit le bouton : la porte de la route (`mayConfigureMatchLive`)
+  // admet tout porteur de `tournaments`, et seul le service, sous le verrou du
+  // match, vérifie qu'il en est bien l'arbitre (`NOT_MATCH_REFEREE`).
   const showLiveConfig =
     canConfigureLive(match) && ((canSchedule && canManage) || viewerReferees);
   // Toutes les actions, rangées par `MatchCardActions` : une principale

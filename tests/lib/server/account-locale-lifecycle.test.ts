@@ -9,7 +9,7 @@ import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { anonymizeAccount } from "@/lib/server/users/account-erasure";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
-import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
+import { ANONYMOUS_PSEUDOS, SUFFIXED_ANONYMOUS_PSEUDO } from "@/lib/shared/anonymous-pseudos";
 import { getFullProfile } from "@/lib/server/users/full-profile";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -231,21 +231,43 @@ describe("anonymizeAccount — pseudo d'emprunt", () => {
 
   it("anonymizeAccount_pendingAccount_keepsBorrowedPseudo", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = connectionWith("AlphaFX-7f3k2q");
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    expect(writtenPseudos(execute)).toEqual(["AlphaFX-7f3k2q"]);
+  });
+
+  // D99 : un emprunt nu (posé avant le suffixe) se devine — il est remplacé.
+  it("anonymizeAccount_pendingBareBorrowed_drawsSuffixedPseudo", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = connectionWith("AlphaFX");
 
     await anonymizeAccount(fakeConnection({ execute }), 42);
 
-    expect(writtenPseudos(execute)).toEqual(["AlphaFX"]);
+    const [pseudo] = writtenPseudos(execute);
+    expect(pseudo).not.toBe("AlphaFX");
+    expect(pseudo).toMatch(SUFFIXED_ANONYMOUS_PSEUDO);
   });
 
-  it("anonymizeAccount_notPending_drawsPseudoFromPool", async () => {
+  it("anonymizeAccount_notPending_drawsSuffixedPseudoFromPool", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = connectionWith(null);
 
     await anonymizeAccount(fakeConnection({ execute }), 42);
 
     const [pseudo] = writtenPseudos(execute);
-    expect(ANONYMOUS_PSEUDOS).toContain(pseudo);
+    expect(pseudo).toMatch(SUFFIXED_ANONYMOUS_PSEUDO);
+    expect(ANONYMOUS_PSEUDOS).toContain(String(pseudo).slice(0, -7));
+  });
+
+  it("anonymizeAccount_notPending_noTakenPseudoPreRead", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = connectionWith(null);
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("SELECT pseudo FROM bg_users WHERE id <> ?"))).toBe(false);
   });
 
   it("anonymizeAccount_pendingWithoutHold_readRequiresHold", async () => {
@@ -261,12 +283,13 @@ describe("anonymizeAccount — pseudo d'emprunt", () => {
 
   it("anonymizeAccount_borrowedPseudoClash_drawsAnother", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
-    const execute = connectionWith("AlphaFX", true);
+    const execute = connectionWith("AlphaFX-7f3k2q", true);
 
     await anonymizeAccount(fakeConnection({ execute }), 42);
 
     const pseudos = writtenPseudos(execute);
-    expect(pseudos[0]).toBe("AlphaFX");
-    expect(pseudos[1]).not.toBe("AlphaFX");
+    expect(pseudos[0]).toBe("AlphaFX-7f3k2q");
+    expect(pseudos[1]).not.toBe("AlphaFX-7f3k2q");
+    expect(pseudos[1]).toMatch(SUFFIXED_ANONYMOUS_PSEUDO);
   });
 });

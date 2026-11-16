@@ -177,7 +177,7 @@ export async function getFullProfile(
   const targetIsAdmin = Boolean(userRows[0].is_admin);
   const targetRoles = resolveRoles(targetIsAdmin, userRows[0].platform_roles_json);
   // `isDeleted` voyage jusqu'à la fiche, qui doit **annoncer** le compte
-  // supprimé : son pseudo d'emprunt se lit comme un pseudo ordinaire.
+  // supprimé : son pseudo d'emprunt ne le trahit que par sa forme.
   const profile: PublicUserProfile = { ...mapPublicUser(userRows[0]), isDeleted };
   const discordVerified = userRows[0].discord_verified_at != null;
   // Lu **avant** `applyVisibility`, qui efface le BattleTag masqué : la pastille

@@ -11,8 +11,14 @@ import { resetBotLogShutdownState } from "@/tests/helpers/bot-log-batches";
 /** Arrêt propre : les lots du journal en attente partent (`docs/features/LOG_BATCHING.md`). */
 let onceSpy: jest.SpiedFunction<typeof process.once>;
 let handlers: Map<string, () => void>;
+/** `process.exitCode` du processus Jest (posé à 1 par un échec ou une trace tardive d'un autre fichier du même worker). */
+let runnerExitCode: typeof process.exitCode;
 
 beforeEach(() => {
+  // `process.exit()` sans argument lit `process.exitCode` : un code laissé
+  // par le lanceur ferait passer une sortie demandée sans code pour un échec.
+  runnerExitCode = process.exitCode;
+  process.exitCode = undefined;
   jest.clearAllMocks();
   resetBotLogShutdownState();
   jest.mocked(flushAllBotLogBatches).mockResolvedValue();
@@ -27,6 +33,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.useRealTimers();
   jest.restoreAllMocks();
+  process.exitCode = runnerExitCode;
 });
 
 describe("flushBotLogsBeforeExit", () => {

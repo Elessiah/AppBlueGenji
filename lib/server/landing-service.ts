@@ -775,6 +775,25 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     ];
     try {
       settled = await Promise.allSettled([
+        // Plan voulu, par construction : `m` lu dans l'ordre de
+        // `idx_bg_matches_status_updated` (statut constant, `updated_at`
+        // décroissant), arrêt au `LIMIT`, sans table temporaire ni tri. Toutes
+        // les autres tables sont en `LEFT JOIN` sur leur clé primaire : `m`
+        // reste la première table et chacune s'y lit en `eq_ref`, jamais par un
+        // tampon de jointure (BNL), qui défait l'ordre de l'index — c'est ce
+        // que MariaDB 11.8 choisissait pour `bg_tournaments` avec la visibilité
+        // dans le `WHERE` (« Using temporary; Using filesort », EXPLAIN de
+        // production du 2026-11-14). La visibilité du tournoi se juge donc au
+        // `HAVING`, ligne à ligne : une condition du `WHERE` sur `t` changerait
+        // la jointure externe en jointure interne, que l'optimiseur réordonne.
+        // Un tournoi absent ou pas encore publié (`NULL <= NOW()` faux) écarte
+        // la ligne, comme l'ancienne jointure interne. Le coût : le parcours de
+        // l'index ne s'arrête qu'après `LIMIT` lignes **visibles**, et chaque
+        // ligne d'un tournoi non publié (tests, brouillons) compte trois
+        // lectures par clé primaire en plus — borné par la taille de ces
+        // matchs récents (un tournoi se publie avant d'être joué), et le
+        // résultat se met en cache (`TICKER_RESULTS.md`) : accepté, pas de
+        // retour à la jointure interne qui ramène le tri temporaire.
         connection.execute<MatchResultRow[]>(
           `SELECT
             m.updated_at,
@@ -794,9 +813,10 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
             t.match_format_type,
             t.match_format_value,
             t.match_format_max_maps,
-            t.match_format_draws
+            t.match_format_draws,
+            t.start_visibility_at AS tournament_visible_at
            FROM bg_matches m
-           JOIN bg_tournaments t ON t.id = m.tournament_id
+           LEFT JOIN bg_tournaments t ON t.id = m.tournament_id
            LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
            LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
            WHERE m.status = 'COMPLETED'
@@ -813,7 +833,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
                  AND m.team1_score = m.team2_score
                )
              )
-             AND t.start_visibility_at <= NOW()
+           HAVING tournament_visible_at <= NOW()
            ORDER BY m.updated_at DESC
            LIMIT ${TICKER_RESULT_FETCH}`,
         ),

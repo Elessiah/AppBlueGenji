@@ -22,6 +22,7 @@
  * Voir `docs/features/MATCH_LAUNCH.md`.
  */
 import { failureDiagnostic } from "@/lib/server/failure-reason";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { battletagFromBlizzard } from "@/lib/server/battletag-origin";
@@ -493,32 +494,102 @@ function rowSide(row: CandidateRow, index: 1 | 2) {
 }
 
 /**
- * Comptes et rosters à lire : les casters de tout match présenté, les joueurs
- * des matchs dont les contacts sont exposés, et les rosters des matchs à
- * arbitre désigné — « l'arbitre joue-t-il le match » s'y lit
- * (`keepEligibleReferees`), même hors fenêtre, comme le verrou du lancement.
+ * Comptes et rosters à lire : les casters de tout match présenté, et les
+ * joueurs des matchs dont les contacts sont exposés (rosters entiers). Pour un
+ * match à arbitre désigné dont les contacts ne sortent pas, seule compte
+ * l'**appartenance** de son arbitre et de ses casters aux deux équipes —
+ * « l'arbitre (ou le caster) joue-t-il le match » (`keepEligibleReferees`,
+ * `keepEligibleCasters`), même hors fenêtre, comme le verrou du lancement :
+ * elle se lit pour ces seuls comptes (`membershipTeamIds` × `membershipUserIds`),
+ * sans charger les effectifs entiers.
  */
 function collectContactIds(visible: readonly VisibleLaunch[]): {
   rosterTeamIds: Set<number>;
   userIds: Set<number>;
+  membershipTeamIds: Set<number>;
+  membershipUserIds: Set<number>;
 } {
-  const exposed = visible.filter(({ exposes }) => exposes);
   const rosterTeamIds = new Set<number>();
   const userIds = new Set<number>();
+  const membershipTeamIds = new Set<number>();
+  const membershipUserIds = new Set<number>();
   for (const { row } of visible) {
     for (const caster of row.casters) userIds.add(caster.userId);
     if (row.referee_user_id !== null) userIds.add(Number(row.referee_user_id));
   }
+  for (const { row } of visible.filter(({ exposes }) => exposes)) {
+    collectExposedSides(row, rosterTeamIds, userIds);
+  }
   const refereed = visible.filter(({ row, exposes }) => !exposes && row.referee_user_id !== null);
-  for (const { row } of [...exposed, ...refereed]) {
-    for (const index of [1, 2] as const) {
-      const { teamId, isGhost, soloUserId } = rowSide(row, index);
-      if (teamId === null || isGhost) continue;
-      if (soloUserId !== null) userIds.add(Number(soloUserId));
-      else rosterTeamIds.add(Number(teamId));
+  for (const { row } of refereed) {
+    collectStaffMemberships(row, rosterTeamIds, membershipTeamIds, membershipUserIds);
+  }
+  return { rosterTeamIds, userIds, membershipTeamIds, membershipUserIds };
+}
+
+/** Côtés d'un match aux contacts exposés : roster entier, ou compte d'une entrée solo. */
+function collectExposedSides(row: CandidateRow, rosterTeamIds: Set<number>, userIds: Set<number>): void {
+  for (const index of [1, 2] as const) {
+    const { teamId, isGhost, soloUserId } = rowSide(row, index);
+    if (teamId === null || isGhost) continue;
+    if (soloUserId !== null) userIds.add(Number(soloUserId));
+    else rosterTeamIds.add(Number(teamId));
+  }
+}
+
+/**
+ * Match à arbitre désigné, contacts non exposés : appartenance de son arbitre
+ * et de ses casters aux équipes dont le roster n'est pas déjà lu.
+ */
+function collectStaffMemberships(
+  row: CandidateRow,
+  rosterTeamIds: ReadonlySet<number>,
+  membershipTeamIds: Set<number>,
+  membershipUserIds: Set<number>,
+): void {
+  for (const index of [1, 2] as const) {
+    const { teamId, isGhost, soloUserId } = rowSide(row, index);
+    // Une entrée solo se juge sur la ligne (`soloUserId`), sans lecture.
+    if (teamId === null || isGhost || soloUserId !== null || rosterTeamIds.has(Number(teamId))) continue;
+    membershipTeamIds.add(Number(teamId));
+    membershipUserIds.add(Number(row.referee_user_id));
+    for (const caster of row.casters) membershipUserIds.add(caster.userId);
+  }
+}
+
+/** Clé d'appartenance d'un compte à une équipe (`loadMemberships`). */
+function membershipKey(teamId: number, userId: number): string {
+  return `${teamId}:${userId}`;
+}
+
+/**
+ * Appartenance en cours de ces comptes à ces équipes, comptes supprimés exclus
+ * (même règle que `loadRosters`), en une lecture bornée aux comptes cherchés.
+ */
+export async function loadMemberships(
+  connection: Pick<PoolConnection, "execute">,
+  teamIds: ReadonlySet<number>,
+  userIds: ReadonlySet<number>,
+): Promise<Set<string>> {
+  const memberships = new Set<string>();
+  if (teamIds.size === 0 || userIds.size === 0) return memberships;
+  // Les deux listes croissent avec le nombre de matchs lus : chacune se lit
+  // par tranches (`chunkIds`), jamais en une liste `IN` sans borne.
+  for (const teams of chunkIds([...teamIds])) {
+    for (const users of chunkIds([...userIds])) {
+      const [rows] = await connection.execute<(RowDataPacket & { team_id: number; user_id: number })[]>(
+        `SELECT tm.team_id, tm.user_id
+         FROM bg_team_members tm
+         JOIN bg_users u ON u.id = tm.user_id
+         WHERE tm.team_id IN (${sqlPlaceholders(teams.length)})
+           AND tm.user_id IN (${sqlPlaceholders(users.length)})
+           AND tm.left_at IS NULL AND u.is_deleted = 0`,
+        [...teams, ...users],
+      );
+      for (const row of rows) memberships.add(membershipKey(Number(row.team_id), Number(row.user_id)));
     }
   }
-  return { rosterTeamIds, userIds };
+  return memberships;
 }
 
 /** Rosters en cours des équipes, comptes supprimés exclus (aussi lus par `certification-prompt.ts`). */
@@ -983,8 +1054,9 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       return [];
     }
 
-    const { rosterTeamIds, userIds } = collectContactIds(checked);
+    const { rosterTeamIds, userIds, membershipTeamIds, membershipUserIds } = collectContactIds(checked);
     const rosters = await loadRosters(connection, rosterTeamIds);
+    const memberships = await loadMemberships(connection, membershipTeamIds, membershipUserIds);
     const users = await loadUsers(connection, userIds);
     // Le caster joue-t-il le match ? Pour le lecteur, ses équipes ; pour un
     // autre, les rosters et entrées solo lus pour les contacts.
@@ -993,7 +1065,11 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       ([1, 2] as const).some((index) => {
         const side = rowSide(row, index);
         if (side.soloUserId !== null) return Number(side.soloUserId) === casterId;
-        return (rosters.get(Number(side.teamId)) ?? []).some((member) => Number(member.user_id) === casterId);
+        if (side.teamId === null) return false;
+        return (
+          memberships.has(membershipKey(Number(side.teamId), casterId)) ||
+          (rosters.get(Number(side.teamId)) ?? []).some((member) => Number(member.user_id) === casterId)
+        );
       });
     const kept = keepEligibleCasters(checked, users, revokedCasts, casterPlays);
     keepEligibleReferees(checked, users, revokedReferees, casterPlays);

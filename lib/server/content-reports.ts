@@ -23,7 +23,7 @@ import { withNamedLock } from "@/lib/server/named-lock";
 import { contentReportPush, staffReportPush, staffReportSaturatedPush } from "@/lib/shared/push-messages";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
+import { listQuarantinesForReports, purgeClosedQuarantines, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
 import { toIso } from "@/lib/server/serialization";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { localAvatarUrl, visibleAvatarUrl } from "@/lib/shared/avatar";
@@ -1300,7 +1300,69 @@ export async function purgeExpiredReports(): Promise<number> {
     );
     deleted += Number(result.affectedRows);
   }
+  // Les décisions closes suivent leur signalement (D87) : seulement quand un
+  // signalement vient de partir, et **détachée** — le panneau et chaque
+  // signalement envoyé n'attendent ni un balayage sans objet, ni les paquets
+  // d'un arriéré (premier déploiement). Celles qu'une passe en échec aurait
+  // laissées, l'entretien horaire les reprend (`schedulePurgeExpiredReports`).
+  if (deleted > 0) void purgeClosedQuarantinesSafely();
   return deleted;
+}
+
+/** Passe de purge des décisions closes en cours (une seule par processus). */
+let closedQuarantinePurge: Promise<void> | null = null;
+/** Un déclencheur est arrivé pendant la passe en cours : elle se rejoue une fois finie. */
+let closedQuarantinePurgeAgain = false;
+
+/**
+ * Purge des décisions closes (D87) ; une panne ne fait tomber ni la purge des
+ * signalements ni le panneau. Une passe déjà en cours est rendue, mais
+ * **rejouée une fois** à sa fin : un signalement effacé après sa dernière
+ * lecture ne laisse pas sa décision close jusqu'à l'entretien suivant (même
+ * après une passe en échec, une fois). Deux déclencheurs rapprochés ne lancent
+ * jamais deux passes à la fois.
+ */
+export function purgeClosedQuarantinesSafely(): Promise<void> {
+  if (closedQuarantinePurge !== null) {
+    closedQuarantinePurgeAgain = true;
+    return closedQuarantinePurge;
+  }
+  // La place est prise avant que la passe ne commence : même une passe qui
+  // finit sans attendre (levée synchrone) la libère après l'avoir prise, et
+  // jamais ne laisse une passe finie occuper la place (revue sécurité EF-65,
+  // cycle 4).
+  let release!: () => void;
+  const pass = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  closedQuarantinePurge = pass;
+  void (async (): Promise<void> => {
+    let failed = false;
+    try {
+      do {
+        closedQuarantinePurgeAgain = false;
+        try {
+          await purgeClosedQuarantines();
+          // Seules deux pannes **de suite** arrêtent les reprises.
+          failed = false;
+        } catch (error) {
+          console.error("[moderation] purge des décisions closes impossible", failureReason(error));
+          // Un déclencheur arrivé pendant la passe en échec est honoré une
+          // fois ; une seconde panne de suite ne se rejoue pas en boucle :
+          // l'entretien horaire reprendra.
+          if (failed) closedQuarantinePurgeAgain = false;
+          failed = true;
+        }
+      } while (closedQuarantinePurgeAgain);
+    } finally {
+      // Libérée dans le même pas que la sortie de boucle : un déclencheur qui
+      // arrive après ne tombe jamais sur une passe déjà finie (revue sécurité
+      // EF-65, cycle 3).
+      closedQuarantinePurge = null;
+      release();
+    }
+  })();
+  return pass;
 }
 
 /** Signalements effacés par instruction : borne la taille d'une liste `IN`. */
@@ -1327,5 +1389,14 @@ export function schedulePurgeExpiredReports(now: number = Date.now()): void {
   void purgeDueQuarantines()
     .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", failureReason(error)))
     .then(() => purgeExpiredReports())
-    .catch((error) => console.error("[reports] purge impossible", failureReason(error)));
+    // Et, une fois l'heure, les décisions closes dont le signalement est déjà
+    // parti (passe en échec, ou parti avant D87), même sans signalement purgé :
+    // si `purgeExpiredReports` vient d'en lancer une (détachée), elle suffit.
+    .then(
+      (deleted) => (deleted > 0 ? undefined : purgeClosedQuarantinesSafely()),
+      (error) => {
+        console.error("[reports] purge impossible", failureReason(error));
+        return purgeClosedQuarantinesSafely();
+      },
+    );
 }

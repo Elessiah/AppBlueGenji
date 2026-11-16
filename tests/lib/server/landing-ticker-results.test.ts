@@ -102,10 +102,28 @@ describe("getLandingTicker — résultats", () => {
   it("aucune requête du bandeau ne lit un tournoi pas encore publié (start_visibility_at)", async () => {
     const execute = await mockTicker([resultRow({}, 1)]);
     await getLandingTicker();
-    // Résultats, inscriptions, champions : chacune filtre la publication.
-    for (const index of [0, 1, 2]) {
+    // Inscriptions, champions : dans le `WHERE` ; résultats : au `HAVING` (plan ci-dessous).
+    for (const index of [1, 2]) {
       expect(String(execute.mock.calls[index][0])).toMatch(/AND t\.start_visibility_at <= NOW\(\)/);
     }
+    const resultsSql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(resultsSql).toContain("t.start_visibility_at AS tournament_visible_at");
+    expect(resultsSql).toContain("HAVING tournament_visible_at <= NOW() ORDER BY m.updated_at DESC LIMIT 12");
+  });
+
+  it("résultats lus dans l'ordre de l'index des matchs : tournoi et équipes en LEFT JOIN, aucune condition sur eux au WHERE (D92)", async () => {
+    const execute = await mockTicker([resultRow({}, 1)]);
+    await getLandingTicker();
+    const sql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    // `m` reste la première table : chaque jointure est externe, sur une clé primaire.
+    expect(sql).toContain("FROM bg_matches m LEFT JOIN bg_tournaments t ON t.id = m.tournament_id");
+    expect(sql).toContain("LEFT JOIN bg_teams t1 ON t1.id = m.team1_id");
+    expect(sql).toContain("LEFT JOIN bg_teams t2 ON t2.id = m.team2_id");
+    expect(sql).not.toMatch(/\bSTRAIGHT_JOIN\b|(?<!LEFT )JOIN bg_tournaments/);
+    // Le WHERE ne nomme que `m` : une condition sur `t` rendrait la jointure interne, réordonnable.
+    const where = sql.slice(sql.indexOf(" WHERE "), sql.indexOf(" HAVING "));
+    expect(where).not.toMatch(/\bt1?2?\./);
+    expect(where).toMatch(/^ WHERE m\.status = 'COMPLETED'/);
   });
 
   it("match tranché : vainqueur et perdant nommés pour le lecteur d'écran, dans l'ordre du match", async () => {
