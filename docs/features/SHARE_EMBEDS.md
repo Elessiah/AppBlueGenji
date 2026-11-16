@@ -24,6 +24,18 @@ de replay publics).
   (`/en/suivre/…` en anglais) — jamais celle de l'espace membre.
 - Offert seulement pour un tournoi **publié** (`isTournamentPublished`) ; sur
   un match, pas sur une exemption. `LiveProvider` porte `publicShare`.
+- Publication relue toutes les 30 s (`useTournamentPublished`, `useClock`) : le
+  bouton et l'action des matchs apparaissent à l'instant où le tournoi devient
+  public. Le bouton de l'en-tête vient **après** l'inscription (l'action
+  principale garde la tête de ligne). Sur une carte de match, « Partager » n'est
+  jamais l'action visible quand une autre est offerte (décision : « Page du
+  match » tient le pied) ; elle va au menu, ou reste ouverte si elle est seule.
+  Sans feuille de partage ni presse-papiers, la notification d'échec contient
+  l'adresse, à copier à la main.
+- Carte de match : noms en retrait seulement quand un camp a gagné ; « Forfait :
+  X » borné à 240 px et deux lignes ; libellé de map et sous-titre sur une ligne
+  (points de suspension) ; un code de replay long (> 14 signes) passe à la ligne
+  en corps 20, jamais rogné.
 
 ## L'aperçu
 

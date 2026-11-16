@@ -1,7 +1,6 @@
 "use client";
 
 import { ShareLinkButton } from "@/components/share/ShareLinkButton";
-import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
 import { spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import { useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
@@ -22,6 +21,7 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { canReturnInSite, isPlainLeftClick, previousSitePathname } from "@/lib/shared/site-back";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
 import { STREAM_NOTICE_PRIVACY_PATH } from "@/lib/shared/stream-notice";
+import { useTournamentPublished } from "../_lib/use-tournament-published";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
 import { registerBlockedNotice } from "../_lib/register-entry";
@@ -129,6 +129,7 @@ export function TournamentHeader({
   onEditImage,
 }: Readonly<TournamentHeaderProps>) {
   const { card } = detail;
+  const published = useTournamentPublished(card);
   const text = useTournamentPageText();
   const labels = useTournamentsText();
   const { t } = text;
@@ -249,16 +250,6 @@ export function TournamentHeader({
         </dl>
 
         <div className={s.actions}>
-          {/* Partage du lien public (`SHARE_EMBEDS.md`) : seulement un tournoi
-              publié — non publié, sa page sans compte n'existe pas encore. */}
-          {isTournamentPublished(card) && (
-            <ShareLinkButton
-              path={spectatorTournamentPath(card.id)}
-              title={card.name}
-              label={t("shareLink.tournament")}
-              ariaLabel={t("shareLink.tournamentAria")}
-            />
-          )}
           {/* Chaîne officielle : antenne permanente du tournoi, distincte de
               l'état « en direct » qui, lui, se joue au niveau des matchs. */}
           <TournamentLiveLink
@@ -275,6 +266,16 @@ export function TournamentHeader({
             >
               {a(`wording.${entrantType}.registerCta`)}
             </CyberButton>
+          )}
+          {/* Partage du lien public (`SHARE_EMBEDS.md`) : seulement un tournoi
+              publié (après l'action principale, qui garde la tête de ligne) — non publié, sa page sans compte n'existe pas encore. */}
+          {published && (
+            <ShareLinkButton
+              path={spectatorTournamentPath(card.id)}
+              title={card.name}
+              label={t("shareLink.tournament")}
+              ariaLabel={t("shareLink.tournamentAria")}
+            />
           )}
           {/* Information sur la retransmission, à l'endroit où l'on s'engage —
               sans case à cocher : la diffusion fait partie du tournoi

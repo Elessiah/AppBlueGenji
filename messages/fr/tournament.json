@@ -365,6 +365,6 @@
     "tournamentAria": "Partager le lien public du tournoi",
     "copied": "Lien public copié",
     "shared": "Lien public partagé",
-    "copyFailed": "Impossible de copier le lien"
+    "copyFailed": "Impossible de copier le lien : {url}"
   }
 }

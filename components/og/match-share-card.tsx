@@ -43,7 +43,8 @@ function Side({
   team,
   color,
   align,
-}: Readonly<{ team: MatchShareCardProps["team1"]; color: string; align: "left" | "right" }>): ReactElement {
+  dimLoser,
+}: Readonly<{ team: MatchShareCardProps["team1"]; color: string; align: "left" | "right"; dimLoser: boolean }>): ReactElement {
   const mark = <ShareTeamMark logoSrc={team.logoSrc} initial={team.initial} color={color} size={MATCH_SHARE_LOGO_SIZE} />;
   const name = (
     <div
@@ -54,14 +55,15 @@ function Side({
         textOverflow: "ellipsis",
         overflow: "hidden",
         wordBreak: "break-word",
-        maxWidth: 300,
+        maxWidth: 290,
         margin: align === "left" ? "0 0 0 22px" : "0 22px 0 0",
         fontSize: 34,
         lineHeight: 1.12,
         fontWeight: 700,
         textAlign: align,
-        // Le vainqueur garde l'encre pleine, l'autre passe en retrait.
-        color: team.winner ? SHARE_CARD_COLORS.ink : SHARE_CARD_COLORS.inkMute,
+        // Le vainqueur garde l'encre pleine, l'autre passe en retrait — mais
+        // seulement quand il y en a un : sans vainqueur, personne n'a perdu.
+        color: team.winner || !dimLoser ? SHARE_CARD_COLORS.ink : SHARE_CARD_COLORS.inkMute,
       }}
     >
       {team.name}
@@ -93,8 +95,25 @@ function Center({ center }: Readonly<{ center: EmbedScoreCenter }>): ReactElemen
     );
   }
   if (center.kind === "label") {
+    // Largeur bornée (1056 − 2 × 400) et deux lignes au plus : un nom long
+    // dans « Forfait : … » ne dilate pas le tableau d'affichage.
     return (
-      <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: SHARE_CARD_COLORS.ink, textAlign: "center" }}>
+      <div
+        style={{
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 2,
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          wordBreak: "break-word",
+          width: 240,
+          fontSize: 26,
+          lineHeight: 1.15,
+          fontWeight: 700,
+          color: SHARE_CARD_COLORS.ink,
+          textAlign: "center",
+        }}
+      >
         {center.text}
       </div>
     );
@@ -103,6 +122,9 @@ function Center({ center }: Readonly<{ center: EmbedScoreCenter }>): ReactElemen
 }
 
 function MapCell({ cell, noCode }: Readonly<{ cell: EmbedMapCell; noCode: string }>): ReactElement {
+  const longCode = cell.code !== null && cell.code.length > 14;
+  let letterSpacing = 0;
+  if (cell.code !== null) letterSpacing = longCode ? 1 : 2;
   const color = cell.winnerSide === null ? SHARE_CARD_COLORS.inkMute : MATCH_SIDE_COLORS[cell.winnerSide - 1];
   return (
     <div
@@ -118,7 +140,17 @@ function MapCell({ cell, noCode }: Readonly<{ cell: EmbedMapCell; noCode: string
         backgroundColor: rgba(color, 0.08),
       }}
     >
-      <div style={{ display: "flex", fontSize: 22, color: SHARE_CARD_COLORS.inkMute, overflow: "hidden", whiteSpace: "nowrap" }}>
+      <div
+        style={{
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 1,
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          fontSize: 22,
+          color: SHARE_CARD_COLORS.inkMute,
+        }}
+      >
         {cell.label}
       </div>
       <div style={{ display: "flex", alignItems: "baseline", marginTop: 2 }}>
@@ -128,9 +160,14 @@ function MapCell({ cell, noCode }: Readonly<{ cell: EmbedMapCell; noCode: string
         <div
           style={{
             display: "flex",
-            fontSize: 24,
+            flexShrink: 1,
+            minWidth: 0,
+            // Un code long (jusqu'à 32 signes) passe à la ligne plutôt que
+            // d'être rogné : c'est lui qu'on vient chercher.
+            wordBreak: "break-all",
+            fontSize: longCode ? 20 : 24,
             fontWeight: cell.code ? 700 : 400,
-            letterSpacing: cell.code ? 2 : 0,
+            letterSpacing,
             color: cell.code ? SHARE_CARD_COLORS.blueSoft : SHARE_CARD_COLORS.inkMute,
           }}
         >
@@ -156,6 +193,8 @@ export function MatchShareCard({
   footer,
   logoSrc,
 }: Readonly<MatchShareCardProps>): ReactElement {
+  // Les noms ne se mettent en retrait que lorsqu'un camp a gagné.
+  const dimLoser = team1.winner || team2.winner;
   const rows: EmbedMapCell[][] = [];
   for (let index = 0; index < maps.length; index += MAPS_PER_ROW) rows.push(maps.slice(index, index + MAPS_PER_ROW));
   return (
@@ -171,6 +210,8 @@ export function MatchShareCard({
               textOverflow: "ellipsis",
               overflow: "hidden",
               maxWidth: 680,
+              flexShrink: 1,
+              minWidth: 0,
               fontSize: 34,
               fontWeight: 700,
               paddingBottom: 6,
@@ -178,16 +219,29 @@ export function MatchShareCard({
           >
             {title}
           </div>
-          <div style={{ display: "flex", marginLeft: 18, fontSize: 26, color: SHARE_CARD_COLORS.inkMute }}>
+          <div
+            style={{
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 1,
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              flexShrink: 0,
+              maxWidth: 470,
+              marginLeft: 18,
+              fontSize: 26,
+              color: SHARE_CARD_COLORS.inkMute,
+            }}
+          >
             {/* Maps au-delà des cases : comptées ici, les trois lignes sont pleines. */}
             {moreMaps ? `${subtitle} · ${moreMaps}` : subtitle}
           </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18 }}>
-          <Side team={team1} color={MATCH_SIDE_COLORS[0]} align="left" />
+          <Side team={team1} color={MATCH_SIDE_COLORS[0]} align="left" dimLoser={dimLoser} />
           <Center center={center} />
-          <Side team={team2} color={MATCH_SIDE_COLORS[1]} align="right" />
+          <Side team={team2} color={MATCH_SIDE_COLORS[1]} align="right" dimLoser={dimLoser} />
         </div>
 
         {rows.map((row, rowIndex) => (

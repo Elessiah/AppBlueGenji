@@ -31,7 +31,8 @@ export function useShareLink(): (path: string, title?: string) => Promise<void> 
       const outcome = await shareLink(typeof navigator === "undefined" ? undefined : navigator, url, shownTitle);
       if (outcome === "shared") showSuccess(t("shareLink.shared"));
       else if (outcome === "copied") showSuccess(t("shareLink.copied"));
-      else if (outcome === "failed") showError(t("shareLink.copyFailed"));
+      // Sans feuille de partage ni presse-papiers : l'adresse est dans la notification, à copier à la main.
+      else if (outcome === "failed") showError(t("shareLink.copyFailed", { url }));
     },
     [t, locale, showError, showSuccess],
   );
