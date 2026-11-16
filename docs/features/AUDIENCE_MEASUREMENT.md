@@ -107,7 +107,8 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   file avant de replier ; un signalement qui finit après cette attente écarte
   ses lignes des jours que l'entretien a commencé à replier (rouverts si le
   repli échoue). Quel que soit le processus, l'écriture de la file écarte les
-  lignes d'un jour déjà replié (`MAX(bg_audience_days.day)`), et le sel d'un
+  lignes d'un jour déjà replié (`MAX(bg_audience_days.day)`, relu seulement si
+  une ligne est d'un jour repliable à cet instant), et le sel d'un
   jour replié n'est jamais recréé (lecture lente finie après l'entretien). Une lecture de sel sans réponse échoue au bout de 10 s
   (`SALT_READ_TIMEOUT_MS`) : rien n'attend une base figée sans fin. Chaque processus oublie en mémoire les sels des jours clos
   au plus 10 min après la clôture, même sans trafic.
@@ -116,6 +117,23 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - **Adresse partagée** : deux visiteurs derrière la même IP avec le même
   navigateur ne font qu'une empreinte ce jour-là (sous-compte assumé).
 - La file serveur (≤ 10 s) est perdue à un arrêt brutal.
+
+## Coût (performance, cycle 1)
+
+- **Navigateur** : `<AudienceBeacon />` s'installe au repos (`requestIdleCallback`,
+  repli `setTimeout`) ; son battement d'une minute suit `powerPolicy(...).clocks`
+  par abonnement sans rendu (éteint onglet masqué ou en économie, rallumé au
+  retour). Chart.js n'est chargé que sur `/frequentation`.
+- **Écriture** : `INSERT` par tranches de `INSERT_CHUNK` (1 000) lignes ; une file
+  déjà au seuil à la fin d'une écriture repart aussitôt (pas de minuteur de 10 s).
+- **Repli** : un jour de plus de `ROLLUP_SHARD_ROWS` (50 000) lignes est lu par
+  tranches de visiteurs (`MOD(CRC32(visitor_key), n)`), chaque tranche repliée
+  puis sommée (`mergeAudienceAggregates`) : mémoire bornée.
+- **Lecture** : `getAudienceStats` n'attend jamais l'entretien (cache, sinon lecture
+  directe des jours déjà repliés) ; l'entretien n'est entraîné que par un envoi
+  mesuré (ni opposition, ni robot, ni plafond) ou par la page.
+- Les points quotidiens de la page (≈ 100 octets par jour, ≈ 36 Ko par an) ne sont
+  pas bornés : la période « tout » les exige, la charge utile reste négligeable.
 
 ## Fichiers
 

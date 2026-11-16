@@ -18,9 +18,6 @@ export const dynamic = "force-dynamic";
  * dans la console d'un visiteur. Ni session lue, ni cookie posé.
  */
 export async function POST(req: Request) {
-  // Repli et purge entraînés par le trafic, que l'envoi soit retenu ou non.
-  maintainAudience();
-
   // Opposition (GPC, DNT, bouton de `/rgpd#audience`) relue avant tout calcul :
   // ni empreinte, ni décompte du plafond (qui garderait l'IP en mémoire).
   if (audienceOptOutFromHeaders(req.headers)) return ok({ recorded: 0 });
@@ -31,6 +28,10 @@ export async function POST(req: Request) {
   const ip = requestClientIp(req);
   const throttled = enforceRateLimit(AUDIENCE_REQUEST_RULE, ip);
   if (throttled) return throttled;
+
+  // Repli et purge entraînés par le trafic mesuré (ni opposition, ni robot, ni
+  // plafond dépassé) : ces envois-là n'ont aucun effet de bord, même rares.
+  maintainAudience();
 
   let body: unknown = null;
   try {

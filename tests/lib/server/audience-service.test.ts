@@ -219,10 +219,11 @@ describe("flushAudienceViews", () => {
     await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view(), view({ pageKey: "rules" })], now: NOW });
     execute.mockClear();
 
-    await flushAudienceViews();
+    await flushAudienceViews(NOW);
 
-    expect(execute).toHaveBeenCalledTimes(2);
-    const [sql, params] = execute.mock.calls[1];
+    // Aucune ligne d'un jour repliable : pas de lecture du dernier jour replié.
+    expect(execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("INSERT INTO bg_audience_views");
     expect(params).toHaveLength(20);
     expect(params).not.toContain("203.0.113.7");
@@ -277,7 +278,9 @@ describe("rollUpAudienceDays", () => {
     mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ day: "2026-11-14" }]]));
     const connection = connectionMock();
     connection.execute.mockImplementation(async (sql: string) =>
-      sql.includes("SELECT viewed_at")
+      sql.includes("COUNT(*) AS total")
+        ? [[{ total: 1 }]]
+        : sql.includes("SELECT viewed_at")
         ? [
             [
               {
@@ -302,6 +305,7 @@ describe("rollUpAudienceDays", () => {
     expect(rolled).toBe(1);
     const statements = connection.execute.mock.calls.map(([sql]) => sql.trim().split(/\s+/).slice(0, 3).join(" "));
     expect(statements).toEqual([
+      "SELECT COUNT(*) AS",
       "SELECT viewed_at, hour,",
       "DELETE FROM bg_audience_day_pages",
       "DELETE FROM bg_audience_day_hours",
@@ -312,7 +316,7 @@ describe("rollUpAudienceDays", () => {
       "INSERT INTO bg_audience_day_dims",
       "INSERT INTO bg_audience_days",
     ]);
-    expect(connection.execute.mock.calls[8][1]).toEqual(["2026-11-14", 1, 1, 1, 1, 3000]);
+    expect(connection.execute.mock.calls[9][1]).toEqual(["2026-11-14", 1, 1, 1, 1, 3000]);
   });
 
   it("ne replie rien quand aucun jour clos n'attend", async () => {
@@ -586,7 +590,8 @@ describe("cycle 4 — jours repliés, quel que soit le processus", () => {
     mockDb(execute);
     await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view()], now: NOW });
 
-    await flushAudienceViews();
+    // Lendemain 3 h (Paris) : le 16 est devenu repliable, un autre processus l'a replié.
+    await flushAudienceViews(new Date("2026-11-17T02:00:00Z"));
 
     expect(viewInserts(execute)).toHaveLength(0);
   });
@@ -596,7 +601,7 @@ describe("cycle 4 — jours repliés, quel que soit le processus", () => {
     mockDb(execute);
     await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view()], now: NOW });
 
-    await flushAudienceViews();
+    await flushAudienceViews(new Date("2026-11-17T02:00:00Z"));
 
     expect(viewInserts(execute)).toHaveLength(1);
   });

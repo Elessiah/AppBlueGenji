@@ -87,6 +87,10 @@ export function AudienceChart({
   height = 240,
 }: AudienceChartProps) {
   const toast = useOptionalToast();
+  // Lu au moment de l'échec : sa valeur change à chaque notification, et un
+  // graphique ne doit pas être recréé pour cela.
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<ChartInstance | null>(null);
   const [ready, setReady] = useState(false);
@@ -184,14 +188,14 @@ export function AudienceChart({
       .catch(() => {
         if (cancelled) return;
         setFailed(true);
-        toast?.showError(failedLabel, { once: true });
+        toastRef.current?.showError(failedLabel, { once: true });
       });
     return () => {
       cancelled = true;
       chartRef.current?.destroy();
       chartRef.current = null;
     };
-  }, [type, labels, tooltipLabels, series, formatValue, tooltipTemplate, failedLabel, toast]);
+  }, [type, labels, tooltipLabels, series, formatValue, tooltipTemplate, failedLabel]);
 
   return (
     <div className={styles.chartBox} style={{ height }}>

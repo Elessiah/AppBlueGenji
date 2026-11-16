@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { browserAudienceOptOut } from "@/components/visit-tracker";
 import { AUDIENCE_CLIENT_FLUSH_MS, deviceFromWidth, type AudienceBeaconEntry } from "@/lib/shared/audience";
 import { AudienceTracker } from "@/lib/shared/audience-tracker";
+import { powerPolicy } from "@/lib/shared/client-power";
+import { getClientPowerInput, subscribeClientPower } from "@/lib/shared/hooks/useClientPower";
 
 /** Nom d'hôte du référent s'il est extérieur au site, sinon `null` (jamais son chemin). */
 function externalReferrerHost(): string | null {
@@ -37,7 +39,7 @@ function send(entries: AudienceBeaconEntry[]): void {
  * Monté dans le layout racine. Aucun cookie, aucun stockage, aucun identifiant
  * fabriqué ici ; rien ne part en cas d'opposition (GPC, DNT, bouton de
  * `/rgpd#audience`), que le serveur relit de son côté. Les envois sont groupés
- * (dix pages, une minute, ou l'onglet qui passe en arrière-plan). Le cookie
+ * (dix pages, une minute d'onglet visible, ou l'onglet qui passe en arrière-plan). Le cookie
  * d'opposition accompagne l'envoi pour que le serveur le relise ; la session,
  * elle, n'est jamais lue : la mesure ignore si le visiteur est connecté.
  */
@@ -47,33 +49,64 @@ export function AudienceBeacon() {
 
   useEffect(() => {
     if (browserAudienceOptOut()) return;
-    const instance = new AudienceTracker({
-      // Horloge murale : le tracker y lit le jour de Paris (reprise un autre jour)
-      // et une veille de la machine (performance.now() s'y arrête parfois).
-      now: () => Date.now(),
-      isVisible: () => document.visibilityState === "visible",
-      device: () => deviceFromWidth(window.innerWidth),
-      referrerHost: externalReferrerHost,
-      send,
-    });
-    tracker.current = instance;
-    instance.navigate(window.location.pathname);
+    let teardown: (() => void) | null = null;
+    // Installé au repos du navigateur (comme `visit-tracker`) : le premier rendu
+    // et l'hydratation ne se disputent pas le fil avec la mesure.
+    const install = () => {
+      const instance = new AudienceTracker({
+        // Horloge murale : le tracker y lit le jour de Paris (reprise un autre jour)
+        // et une veille de la machine (performance.now() s'y arrête parfois).
+        now: () => Date.now(),
+        isVisible: () => document.visibilityState === "visible",
+        device: () => deviceFromWidth(window.innerWidth),
+        referrerHost: externalReferrerHost,
+        send,
+      });
+      tracker.current = instance;
+      instance.navigate(window.location.pathname);
 
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") instance.hidden();
-      else instance.visible();
+      const onVisibility = () => {
+        if (document.visibilityState === "hidden") instance.hidden();
+        else instance.visible();
+      };
+      const onPageHide = () => instance.leave();
+      document.addEventListener("visibilitychange", onVisibility);
+      window.addEventListener("pagehide", onPageHide);
+
+      // Le battement d'une minute suit le régime de charge (`CLIENT_POWER_MODES.md`) :
+      // éteint onglet masqué (la lecture est close alors) et en économie, il se
+      // rallume au retour. Abonnement sans rendu : aucun re-rendu du site.
+      let timer: number | null = null;
+      const syncTimer = () => {
+        const run = powerPolicy(getClientPowerInput()).clocks;
+        if (run && timer === null) {
+          timer = window.setInterval(() => instance.tick(), AUDIENCE_CLIENT_FLUSH_MS);
+        } else if (!run && timer !== null) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+      };
+      syncTimer();
+      const unsubscribe = subscribeClientPower(syncTimer);
+
+      teardown = () => {
+        document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("pagehide", onPageHide);
+        unsubscribe();
+        if (timer !== null) window.clearInterval(timer);
+        instance.leave();
+        tracker.current = null;
+      };
     };
-    const onPageHide = () => instance.leave();
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", onPageHide);
-    const timer = window.setInterval(() => instance.tick(), AUDIENCE_CLIENT_FLUSH_MS);
+    // `requestIdleCallback` manque sur Safari historique : le repli en
+    // `setTimeout` laisse passer le premier rendu. Le délai borne l'attente.
+    const supportsIdle = typeof window.requestIdleCallback === "function";
+    const handle = supportsIdle ? window.requestIdleCallback(install, { timeout: 1000 }) : window.setTimeout(install, 300);
 
     return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", onPageHide);
-      window.clearInterval(timer);
-      instance.leave();
-      tracker.current = null;
+      if (supportsIdle) window.cancelIdleCallback(handle);
+      else window.clearTimeout(handle);
+      teardown?.();
     };
   }, []);
 

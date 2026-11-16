@@ -485,6 +485,36 @@ export function aggregateAudienceDay(rows: readonly AudienceRawRow[]): AudienceD
   };
 }
 
+/**
+ * Somme des repliements de **tranches de visiteurs** d'une même journée (chaque
+ * visiteur dans une seule tranche) : toute grandeur d'`aggregateAudienceDay`
+ * (pages vues, visiteurs, visites, rebonds, temps) est alors additive. Permet
+ * de replier une très grosse journée sans tout garder en mémoire.
+ */
+export function mergeAudienceAggregates(parts: readonly AudienceDayAggregate[]): AudienceDayAggregate {
+  const totals: AudienceDayTotals = { views: 0, visitors: 0, visits: 0, bounces: 0, engagedMs: 0 };
+  const pages = new Map<string, AudienceDayAggregate["pages"][number]>();
+  const hours = new Map<number, AudienceDayAggregate["hours"][number]>();
+  const dims = new Map<string, AudienceDayAggregate["dims"][number]>();
+  for (const part of parts) {
+    for (const field of Object.keys(totals) as (keyof AudienceDayTotals)[]) totals[field] += part.totals[field];
+    for (const page of part.pages) addInto(pages, page.pageKey, page, ["views", "visitors", "engagedMs"]);
+    for (const hour of part.hours) addInto(hours, hour.hour, hour, ["views", "visitors"]);
+    for (const dim of part.dims) addInto(dims, `${dim.dim}\u0000${dim.value}`, dim, ["views", "visitors"]);
+  }
+  return { totals, pages: [...pages.values()], hours: [...hours.values()], dims: [...dims.values()] };
+}
+
+/** Ajoute `entry` à celle de `key` (copie à la première rencontre), champ numérique par champ. */
+function addInto<K, T extends object>(map: Map<K, T>, key: K, entry: T, fields: readonly (keyof T)[]): void {
+  const known = map.get(key);
+  if (!known) {
+    map.set(key, { ...entry });
+    return;
+  }
+  for (const field of fields) (known[field] as number) += entry[field] as number;
+}
+
 // ---------------------------------------------------------------------------
 // Lecture : ce que la page reçoit, et les calculs qu'elle en fait.
 // ---------------------------------------------------------------------------

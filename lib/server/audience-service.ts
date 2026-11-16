@@ -38,11 +38,13 @@ import {
   AUDIENCE_RAW_RETENTION_MONTHS,
   aggregateAudienceDay,
   emptyHeatmap,
+  mergeAudienceAggregates,
   parisClock,
   rangeStart,
   shiftDay,
   shiftMonths,
   type AudienceCommunity,
+  type AudienceDayAggregate,
   type AudienceDailyPoint,
   type AudienceRange,
   type AudienceRangeStats,
@@ -166,7 +168,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 
 /** Oublie en mémoire les sels des jours clos (`day <= until`). */
 function dropClosedSalts(until: string): void {
-  for (const day of [...salts.keys()]) if (day <= until) salts.delete(day);
+  // Supprimer pendant le parcours d'une `Map` est permis : pas de copie des clés.
+  for (const day of salts.keys()) if (day <= until) salts.delete(day);
   if (salts.size === 0 && saltSweep) {
     clearInterval(saltSweep);
     saltSweep = null;
@@ -269,8 +272,8 @@ function scheduleFlush(): void {
   flushTimer.unref?.();
 }
 
-/** Écrit la file en un seul `INSERT`. Un échec perd ce lot (mesure d'agrément), jamais plus. */
-export function flushAudienceViews(): Promise<void> {
+/** Écrit la file par `INSERT` groupés. Un échec perd ce lot (mesure d'agrément), jamais plus. */
+export function flushAudienceViews(now: Date = new Date()): Promise<void> {
   if (flushing) return flushing;
   if (flushTimer) {
     clearTimeout(flushTimer);
@@ -279,13 +282,16 @@ export function flushAudienceViews(): Promise<void> {
   const batch = pending;
   pending = [];
   if (batch.length === 0) return Promise.resolve();
-  flushing = writeBatch(batch)
+  flushing = writeBatch(batch, now)
     .catch((error: unknown) => {
       console.error(`[audience] ${batch.length} page(s) vue(s) non enregistrée(s).`, failureReason(error));
     })
     .finally(() => {
       flushing = null;
-      if (pending.length > 0) scheduleFlush();
+      // Une file déjà au seuil pendant l'écriture repart tout de suite : sans
+      // cela, une rafale attendrait le minuteur et gonflerait vers `MAX_PENDING`.
+      if (pending.length >= FLUSH_SIZE) void flushAudienceViews();
+      else if (pending.length > 0) scheduleFlush();
     });
   return flushing;
 }
@@ -294,34 +300,45 @@ interface LastDayRow extends RowDataPacket {
   day: string | null;
 }
 
-async function writeBatch(all: readonly PendingRow[]): Promise<void> {
+/** Lignes par `INSERT` : une rafale ne fait pas une requête de plusieurs Mo. */
+export const INSERT_CHUNK = 1_000;
+
+async function writeBatch(all: readonly PendingRow[], now: Date): Promise<void> {
   const db = await getDatabase();
   // Un jour déjà replié (par ce processus ou un autre) ne reçoit plus rien :
   // ses lignes ne seraient jamais comptées (le repli ne reprend que les jours
-  // postérieurs au dernier replié).
-  const [last] = await db.execute<LastDayRow[]>(`SELECT DATE_FORMAT(MAX(day), '%Y-%m-%d') AS day FROM bg_audience_days`);
-  const lastRolled = last[0]?.day ?? null;
-  const batch = lastRolled ? all.filter((row) => row.day > lastRolled) : all;
-  if (batch.length === 0) return;
-  const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
-  const values = batch.flatMap((row) => [
-    row.day,
-    row.hour,
-    row.viewedAt,
-    row.visitorKey,
-    row.view.pageKey,
-    row.view.locale,
-    row.view.device,
-    row.view.source,
-    row.view.isView ? 1 : 0,
-    row.view.engagedMs,
-  ]);
-  await db.execute(
-    `INSERT INTO bg_audience_views
-       (day, hour, viewed_at, visitor_key, page_key, locale, device, source, is_view, engaged_ms)
-     VALUES ${placeholders}`,
-    values,
-  );
+  // postérieurs au dernier replié). Le dernier jour replié ne se relit que si
+  // une ligne est d'un jour repliable : un autre processus a pu le replier ;
+  // sinon aucun repli n'a pu l'atteindre, et la requête est épargnée.
+  let batch = all;
+  const rollable = lastRollableDay(now);
+  if (all.some((row) => row.day <= rollable)) {
+    const [last] = await db.execute<LastDayRow[]>(`SELECT DATE_FORMAT(MAX(day), '%Y-%m-%d') AS day FROM bg_audience_days`);
+    const lastRolled = last[0]?.day ?? null;
+    if (lastRolled) batch = all.filter((row) => row.day > lastRolled);
+  }
+  for (let from = 0; from < batch.length; from += INSERT_CHUNK) {
+    const chunk = batch.slice(from, from + INSERT_CHUNK);
+    const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+    const values = chunk.flatMap((row) => [
+      row.day,
+      row.hour,
+      row.viewedAt,
+      row.visitorKey,
+      row.view.pageKey,
+      row.view.locale,
+      row.view.device,
+      row.view.source,
+      row.view.isView ? 1 : 0,
+      row.view.engagedMs,
+    ]);
+    await db.execute(
+      `INSERT INTO bg_audience_views
+         (day, hour, viewed_at, visitor_key, page_key, locale, device, source, is_view, engaged_ms)
+       VALUES ${placeholders}`,
+      values,
+    );
+  }
 }
 
 /** Dernier jour qu'on peut replier à cet instant (inclus). */
@@ -368,7 +385,7 @@ export async function runMaintenance(now: Date = new Date()): Promise<void> {
   let rolled: number;
   try {
     for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
-      await flushAudienceViews();
+      await flushAudienceViews(now);
     }
     rolled = await rollUpAudienceDays(now);
   } catch (error) {
@@ -428,27 +445,45 @@ interface RawRow extends RowDataPacket {
   engaged_ms: number;
 }
 
+/** Lignes brutes gardées en mémoire à la fois pour replier un jour : au-delà, le jour est replié par tranches de visiteurs. */
+export const ROLLUP_SHARD_ROWS = 50_000;
+
+interface CountRow extends RowDataPacket {
+  total: number | string;
+}
+
 async function rollUpDay(connection: PoolConnection, day: string): Promise<void> {
-  const [rows] = await connection.execute<RawRow[]>(
-    `SELECT viewed_at, hour, visitor_key, page_key, locale, device, source, is_view, engaged_ms
-       FROM bg_audience_views
-      WHERE day = ?
-      ORDER BY viewed_at, id`,
-    [day],
-  );
-  const aggregate = aggregateAudienceDay(
-    rows.map<AudienceRawRow>((row) => ({
-      viewedAt: new Date(`${String(row.viewed_at).replace(" ", "T")}Z`),
-      hour: Number(row.hour),
-      visitorKey: row.visitor_key,
-      pageKey: row.page_key,
-      locale: row.locale,
-      device: row.device,
-      source: row.source,
-      isView: Number(row.is_view) === 1,
-      engagedMs: Number(row.engaged_ms),
-    })),
-  );
+  const [counted] = await connection.execute<CountRow[]>(`SELECT COUNT(*) AS total FROM bg_audience_views WHERE day = ?`, [day]);
+  // Un visiteur reste dans une seule tranche (CRC32 de son empreinte) : les
+  // compteurs de chaque tranche s'additionnent (`mergeAudienceAggregates`) et
+  // la mémoire reste bornée sur une journée très fréquentée.
+  const shards = Math.max(1, Math.ceil(num(counted[0]?.total) / ROLLUP_SHARD_ROWS));
+  const parts: AudienceDayAggregate[] = [];
+  for (let shard = 0; shard < shards; shard += 1) {
+    const [rows] = await connection.execute<RawRow[]>(
+      `SELECT viewed_at, hour, visitor_key, page_key, locale, device, source, is_view, engaged_ms
+         FROM bg_audience_views
+        WHERE day = ?${shards > 1 ? " AND MOD(CRC32(visitor_key), ?) = ?" : ""}
+        ORDER BY viewed_at, id`,
+      shards > 1 ? [day, shards, shard] : [day],
+    );
+    parts.push(
+      aggregateAudienceDay(
+        rows.map<AudienceRawRow>((row) => ({
+          viewedAt: new Date(`${String(row.viewed_at).replace(" ", "T")}Z`),
+          hour: Number(row.hour),
+          visitorKey: row.visitor_key,
+          pageKey: row.page_key,
+          locale: row.locale,
+          device: row.device,
+          source: row.source,
+          isView: Number(row.is_view) === 1,
+          engagedMs: Number(row.engaged_ms),
+        })),
+      ),
+    );
+  }
+  const aggregate = parts.length === 1 ? parts[0] : mergeAudienceAggregates(parts);
   for (const table of ["bg_audience_day_pages", "bg_audience_day_hours", "bg_audience_day_dims", "bg_audience_days"]) {
     await connection.execute(`DELETE FROM ${table} WHERE day = ?`, [day]);
   }
@@ -659,8 +694,9 @@ async function loadStats(): Promise<AudienceStats> {
  */
 export async function getAudienceStats(now: Date = new Date()): Promise<AudienceStats> {
   maintainAudience(now);
-  // Un repli en cours change ce qu'on lirait : il est attendu (il ne lève jamais).
-  if (maintaining) await maintaining;
+  // Jamais d'attente du repli : la page sert le cache, ou lit les compteurs déjà
+  // repliés (un jour = une transaction) ; un repli qui finit pendant la lecture
+  // la rend périmée sans la mettre en cache (`statsGeneration`).
   if (statsCache && now.getTime() - statsCache.at < STATS_CACHE_MS) return statsCache.value;
   if (!statsLoad) {
     const generation = statsGeneration;

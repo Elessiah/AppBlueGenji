@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { memo, useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -636,7 +636,7 @@ function Heatmap({
   } else if (shown) {
     readout = fillTemplate(m.timing.peak, { day: m.timing.weekdays[shown.day], hour: shown.hour });
   }
-  const level = (views: number) => (views <= 0 || max <= 0 ? 0 : Math.max(1, Math.ceil((views / max) * HEAT_LEVELS)));
+  const level = useCallback((views: number) => (views <= 0 || max <= 0 ? 0 : Math.max(1, Math.ceil((views / max) * HEAT_LEVELS))), [max]);
   // Une seule case dans l'ordre de tabulation : les flèches font le reste.
   const tabStop: HeatCoord = cursor ?? peak ?? { day: 0, hour: 0 };
 
@@ -667,8 +667,10 @@ function Heatmap({
             row={row}
             day={day}
             level={level}
-            tabStop={tabStop}
-            cellLabel={(hour, views) => fillTemplate(m.timing.cell, { day: m.timing.weekdays[day], hour, views: f.number(views) })}
+            tabHour={tabStop.day === day ? tabStop.hour : -1}
+            cellTemplate={m.timing.cell}
+            dayName={m.timing.weekdays[day]}
+            formatViews={f.number}
             onHover={setHovered}
             onPick={setCursor}
           />
@@ -730,13 +732,20 @@ function Heatmap({
   );
 }
 
-function HeatRow({
+/**
+ * Une rangée de la carte de chaleur. Mémoïsée, props stables : un survol ne
+ * refait ni les 168 cases ni leurs libellés, seule la rangée dont la case
+ * tabulable change se redessine.
+ */
+const HeatRow = memo(function HeatRow({
   label,
   row,
   day,
   level,
-  tabStop,
-  cellLabel,
+  tabHour,
+  cellTemplate,
+  dayName,
+  formatViews,
   onHover,
   onPick,
 }: {
@@ -744,8 +753,11 @@ function HeatRow({
   row: number[];
   day: number;
   level: (views: number) => number;
-  tabStop: HeatCoord;
-  cellLabel: (hour: number, views: number) => string;
+  /** Heure de la case tabulable de cette rangée, `-1` si elle est ailleurs. */
+  tabHour: number;
+  cellTemplate: string;
+  dayName: string;
+  formatViews: (value: number) => string;
   onHover: (cell: HeatCoord) => void;
   onPick: (cell: HeatCoord) => void;
 }) {
@@ -764,8 +776,8 @@ function HeatRow({
           data-hour={hour}
           data-level={level(views)}
           data-tap-zone
-          tabIndex={tabStop.day === day && tabStop.hour === hour ? 0 : -1}
-          aria-label={cellLabel(hour, views)}
+          tabIndex={tabHour === hour ? 0 : -1}
+          aria-label={fillTemplate(cellTemplate, { day: dayName, hour, views: formatViews(views) })}
           onMouseEnter={() => onHover({ day, hour })}
           onFocus={() => onPick({ day, hour })}
           onClick={() => onPick({ day, hour })}
@@ -773,7 +785,7 @@ function HeatRow({
       ))}
     </>
   );
-}
+});
 
 function Community({ m, community, f }: { m: AudienceMessages; community: NonNullable<AudienceStats["community"]>; f: Formatters }) {
   const items = [

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   aggregateAudienceDay,
+  mergeAudienceAggregates,
   AUDIENCE_MAX_OPEN_AGE_MS,
   audiencePageKey,
   deviceFromWidth,
@@ -437,5 +438,48 @@ describe("aggregateAudienceDay — lecture par tranches", () => {
     ]);
 
     expect(result.totals).toEqual({ views: 2, visitors: 1, visits: 1, bounces: 0, engagedMs: 5_400_000 });
+  });
+});
+
+describe("mergeAudienceAggregates", () => {
+  const rawRow = (visitorKey: string, minute: number, overrides: Partial<AudienceRawRow> = {}): AudienceRawRow => ({
+    viewedAt: new Date(Date.UTC(2026, 10, 14, 10, minute)),
+    hour: 11,
+    visitorKey,
+    pageKey: minute % 2 === 0 ? "home" : "rules",
+    locale: "fr",
+    device: "mobile",
+    source: minute % 3 === 0 ? "discord" : "internal",
+    isView: true,
+    engagedMs: 1000,
+    ...overrides,
+  });
+
+  it("mergeAudienceAggregates_visitorPartition_equalsWholeDay", () => {
+    const rows = [
+      rawRow("a", 0),
+      rawRow("b", 1),
+      rawRow("a", 5),
+      rawRow("c", 6, { isView: false, engagedMs: 3000 }),
+      rawRow("c", 2, { hour: 12 }),
+      rawRow("a", 50),
+      rawRow("b", 51, { device: "desktop", locale: "en" }),
+    ].sort((x, y) => x.viewedAt.getTime() - y.viewedAt.getTime());
+    const whole = aggregateAudienceDay(rows);
+
+    const merged = mergeAudienceAggregates([
+      aggregateAudienceDay(rows.filter((row) => row.visitorKey === "a")),
+      aggregateAudienceDay(rows.filter((row) => row.visitorKey !== "a")),
+    ]);
+
+    const sorted = <T,>(list: T[]) => [...list].sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)));
+    expect(merged.totals).toEqual(whole.totals);
+    expect(sorted(merged.pages)).toEqual(sorted(whole.pages));
+    expect(sorted(merged.hours)).toEqual(sorted(whole.hours));
+    expect(sorted(merged.dims)).toEqual(sorted(whole.dims));
+  });
+
+  it("mergeAudienceAggregates_noParts_isEmpty", () => {
+    expect(mergeAudienceAggregates([])).toEqual({ totals: { views: 0, visitors: 0, visits: 0, bounces: 0, engagedMs: 0 }, pages: [], hours: [], dims: [] });
   });
 });
