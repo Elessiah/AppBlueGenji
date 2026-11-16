@@ -393,8 +393,59 @@ describe("createProfilelessStore names (EF-65)", () => {
     profileless.watch(3, "ApexTV");
     await flush();
 
-    expect(asked).toHaveBeenLastCalledWith([{ id: 3, name: "ApexTV" }]);
+    // Les deux liens restent montés : les deux noms partent ensemble.
+    expect(asked).toHaveBeenLastCalledWith([{ id: 3, name: "Ancien" }, { id: 3, name: "ApexTV" }]);
     expect(asked).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue sécurité EF-65 cycle 2 : un compte montré sous deux noms.
+  it("watch_twoLinksDifferentNames_sendsBothInOneQuestion", async () => {
+    const profileless = store();
+    profileless.watch(3, "ApexTV");
+    profileless.watch(3, "ApexTV solo");
+    await flush();
+
+    expect(asked).toHaveBeenCalledTimes(1);
+    expect(asked).toHaveBeenCalledWith([{ id: 3, name: "ApexTV" }, { id: 3, name: "ApexTV solo" }]);
+  });
+
+  it("watch_remountAlternatingNames_noReaskWithinWindow", async () => {
+    const profileless = store();
+    profileless.watch(3, "ApexTV");
+    const second = profileless.watch(3, "ApexTV solo");
+    await flush();
+
+    second();
+    profileless.watch(3, "ApexTV solo");
+    await flush();
+
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("unwatch_lastMountedLink_remainingLinkKeepsOwnName", async () => {
+    const profileless = store();
+    profileless.watch(3, "ApexTV");
+    const stale = profileless.watch(3, "Ancien");
+    await flush();
+    stale();
+
+    clock += PROFILELESS_REFRESH_MS;
+    profileless.refreshStale();
+    await flush();
+
+    expect(asked).toHaveBeenLastCalledWith([{ id: 3, name: "ApexTV" }]);
+  });
+
+  it("watch_newNameDuringFailureBackoff_waitsForRetry", async () => {
+    asked.mockResolvedValue(null);
+    const profileless = store();
+    profileless.watch(3, "ApexTV");
+    await flush();
+
+    profileless.watch(3, "Renomme");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(asked).toHaveBeenCalledTimes(1);
   });
 });
 

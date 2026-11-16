@@ -143,7 +143,9 @@ export function EntrantName({
       {plain && teamId === null ? null : <EntrantLogo teamId={teamId} name={shownName} size={logoSize} />}
       {linked ? (
         <EntrantLink teamId={teamId}
-          entrantName={typeof content === "string" ? content : (shownName ?? undefined)}
+          // Le nom de l'engagé, jamais le contenu (mis en forme, raccourci) :
+          // la question « a-t-il une fiche ? » ne répond que pour son nom.
+          entrantName={shownName ?? undefined}
           className={textClass}
           style={textStyle}
           title={shownTitle}

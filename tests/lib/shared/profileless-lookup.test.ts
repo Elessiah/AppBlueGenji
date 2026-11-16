@@ -4,6 +4,7 @@ import {
   parseProfilelessLookup,
   PROFILELESS_LOOKUP_MAX,
   PROFILELESS_NAME_MAX,
+  PROFILELESS_NAMES_PER_ID,
 } from "@/lib/shared/profileless-lookup";
 
 /** Une question de `max` comptes nommés. */
@@ -19,10 +20,22 @@ describe("parseProfilelessLookup", () => {
     expect(parseProfilelessLookup(body)).toEqual([{ id: 3, name: "Alpha" }, { id: 8, name: "Beta" }]);
   });
 
-  it("parseProfilelessLookup_duplicateId_keepsFirstNameInOrder", () => {
+  it("parseProfilelessLookup_sameIdTwoNames_keepsBothInOrder", () => {
     const body = { players: [{ id: 8, name: "Beta" }, { id: 3, name: "Alpha" }, { id: 8, name: "Autre" }] };
 
-    expect(parseProfilelessLookup(body)).toEqual([{ id: 8, name: "Beta" }, { id: 3, name: "Alpha" }]);
+    expect(parseProfilelessLookup(body)).toEqual([{ id: 8, name: "Beta" }, { id: 3, name: "Alpha" }, { id: 8, name: "Autre" }]);
+  });
+
+  it("parseProfilelessLookup_duplicatePair_keptOnce", () => {
+    const body = { players: [{ id: 8, name: "Beta" }, { id: 8, name: "Beta" }] };
+
+    expect(parseProfilelessLookup(body)).toEqual([{ id: 8, name: "Beta" }]);
+  });
+
+  it("parseProfilelessLookup_moreNamesThanCapForOneId_returnsNull", () => {
+    const players = Array.from({ length: PROFILELESS_NAMES_PER_ID + 1 }, (_, index) => ({ id: 8, name: `Nom${index}` }));
+
+    expect(parseProfilelessLookup({ players })).toBeNull();
   });
 
   it("parseProfilelessLookup_nullBody_returnsNull", () => {

@@ -341,7 +341,8 @@ n'est **plus envoyé entier** dans chaque page (D86) : chaque `PlayerLink` /
 quand le contenu n'est pas ce texte, comme l'avatar d'une carte d'équipe), qui
 pose une seule question par rendu (`POST /api/players/profileless`, corps
 `{ players: [{ id, name }] }`, connecté seulement, origine vérifiée, au plus 100
-comptes par question, `lib/shared/profileless-lookup.ts`, seau propre
+couples par question et 3 noms par compte — un compte montré sous son pseudo
+et sous le nom de son entrée solo part avec les deux, `lib/shared/profileless-lookup.ts`, seau propre
 `PROFILELESS_LOOKUP_RULE` de 60 questions par minute, distinct de l'annuaire) ;
 la route ne répond que ceux des comptes demandés qui sont sans fiche **et dont
 le nom envoyé est le nom d'aujourd'hui** — pseudo, ou nom de l'entrée solo,
@@ -350,8 +351,15 @@ casse et invisibles ignorés (`profilelessAmong`) —, ou 503
 que les liens prendraient pour « tous ont une fiche ». Le pseudo d'emprunt d'un
 compte supprimé ne se lit que sur une page qui montre ce joueur : balayer des
 identifiants au hasard ne reconstitue donc ni la liste des comptes supprimés,
-ni l'instant d'une demande de suppression en attente (revue sécurité EF-65),
-sauf à deviner, compte par compte, un pseudo parmi un millier. Les noms
+ni l'instant d'une demande de suppression en attente (revue sécurité EF-65).
+Les pseudos d'emprunt venant d'une liste publique de mille, les noms essayés
+sont bornés (`admitProfilelessGuesses`, `profileless-guess-budget.ts`) : 3
+noms distincts par compte et 3 000 comptes par visiteur et par 24 h ; un couple
+hors borne est **tu** (traité comme un compte qui a sa fiche), jamais refusé,
+pour tout identifiant. Les noms d'aujourd'hui sont lus **avec** la liste et
+gardés avec elle (une seule requête, `LEFT JOIN` des entrées solo) : aucune
+requête, aucun délai ni aucun 503 ne dépend du compte demandé (revue sécurité
+EF-65, cycle 2). Les noms
 partent dans le corps, jamais dans l'adresse : les journaux d'accès ne gardent
 pas, par visiteur, les joueurs qui lui ont été montrés. Un lien sans nom
 lisible n'est pas demandé, et un nom périmé (page ouverte avant un renommage)

@@ -303,7 +303,9 @@ même refus pour un match absent) avant toute transaction : il ne prend pas le
 verrou du match en boucle et n'apprend rien de son état. L'arbitre est rejugé
 sous le verrou du match (`NOT_MATCH_REFEREE` sinon, jugé **avant** tout refus
 qui dirait l'état du match — mode non manuel de l'antenne et lien refusé
-compris : le lien n'est pré-lu qu'après ce tri, sans le mode du match). Un
+compris : le lien n'est pré-lu qu'après ce tri, et seulement avec un mode
+envoyé — jamais avec celui du match ; sans mode envoyé, il ne se juge que sous
+le verrou, après le rôle). Un
 porteur de la seule `live` qui ne caste pas le match reçoit, à l'antenne
 manuelle comme au réglage, `NOT_MATCH_CASTER` avant le mode
 (`assertLiveActor`) ; la

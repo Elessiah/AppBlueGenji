@@ -20,6 +20,9 @@ export const PROFILELESS_LOOKUP_MAX = 100;
 /** Longueur au plus d'un nom envoyé (pseudo ou nom d'entrée solo, largement). */
 export const PROFILELESS_NAME_MAX = 100;
 
+/** Noms au plus envoyés pour un même compte (ceux sous lesquels la page le montre). */
+export const PROFILELESS_NAMES_PER_ID = 3;
+
 /** Un compte affiché, avec le nom sous lequel la page le montre. */
 export type ProfilelessLookupEntry = { id: number; name: string };
 
@@ -29,26 +32,32 @@ export function formatProfilelessLookup(entries: readonly ProfilelessLookupEntry
 }
 
 /**
- * Les comptes d'une question, sans doublon d'identifiant (le premier nom
- * l'emporte), dans l'ordre reçu — ou `null` si la question est mal formée :
+ * Les comptes d'une question, sans doublon de couple (un compte montré sous
+ * plusieurs noms — pseudo, nom d'entrée solo — part avec chacun, au plus
+ * {@link PROFILELESS_NAMES_PER_ID}), dans l'ordre reçu — ou `null` si la question est mal formée :
  * corps sans tableau `players`, liste vide ou de plus de
  * {@link PROFILELESS_LOOKUP_MAX} comptes, identifiant qui n'est pas un entier
  * positif sûr, nom absent, vide ou de plus de {@link PROFILELESS_NAME_MAX}
- * caractères.
+ * caractères, plus de {@link PROFILELESS_NAMES_PER_ID} noms pour un compte.
  */
 export function parseProfilelessLookup(body: unknown): ProfilelessLookupEntry[] | null {
   if (typeof body !== "object" || body === null) return null;
   const players = (body as { players?: unknown }).players;
   if (!Array.isArray(players) || players.length === 0 || players.length > PROFILELESS_LOOKUP_MAX) return null;
   const entries: ProfilelessLookupEntry[] = [];
-  const seen = new Set<number>();
+  const seen = new Set<string>();
+  const perId = new Map<number, number>();
   for (const player of players as unknown[]) {
     if (typeof player !== "object" || player === null) return null;
     const { id, name } = player as { id?: unknown; name?: unknown };
     if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) return null;
     if (typeof name !== "string" || name.trim() === "" || name.length > PROFILELESS_NAME_MAX) return null;
-    if (seen.has(id)) continue;
-    seen.add(id);
+    const pair = `${id}:${name}`;
+    if (seen.has(pair)) continue;
+    seen.add(pair);
+    const count = (perId.get(id) ?? 0) + 1;
+    if (count > PROFILELESS_NAMES_PER_ID) return null;
+    perId.set(id, count);
     entries.push({ id, name });
   }
   return entries;

@@ -6,6 +6,7 @@ import {
   formatProfilelessLookup,
   PROFILELESS_LOOKUP_MAX,
   PROFILELESS_NAME_MAX,
+  PROFILELESS_NAMES_PER_ID,
   type ProfilelessLookupEntry,
 } from "@/lib/shared/profileless-lookup";
 
@@ -108,7 +109,7 @@ export type ProfilelessStore = {
   isSeeded(userId: number): boolean;
   /**
    * Un lien affiche ce compte sous ce nom : il est demandé s'il ne l'a pas été
-   * dans la fenêtre (ou sous un autre nom). Sans nom, il n'est pas demandé.
+   * dans la fenêtre (ou pas sous ce nom). Sans nom, il n'est pas demandé.
    * Rend le retrait.
    */
   watch(userId: number, name?: string): () => void;
@@ -142,9 +143,15 @@ export function createProfilelessStore({
   /** Échecs de suite par compte : l'essai suivant attend d'autant plus. */
   const failures = new Map<number, number>();
   const shown = new Map<number, number>();
-  /** Le nom affiché de chaque compte (le dernier lien monté l'emporte), et celui de la dernière question. */
-  const names = new Map<number, string>();
-  const askedName = new Map<number, string>();
+  /**
+   * Les noms affichés de chaque compte, avec le nombre de liens qui montrent
+   * chacun (un compte peut paraître sous son pseudo et sous le nom de son
+   * entrée solo) ; et ceux de la dernière question.
+   */
+  const names = new Map<number, Map<string, number>>();
+  const askedNames = new Map<number, ReadonlySet<string>>();
+  /** Les noms envoyés pour ce compte : ceux qui sont affichés, au plus {@link PROFILELESS_NAMES_PER_ID}. */
+  const namesToSend = (userId: number): string[] => [...(names.get(userId)?.keys() ?? [])].slice(0, PROFILELESS_NAMES_PER_ID);
   const queued = new Set<number>();
   const inFlight = new Set<number>();
   const listeners = new Set<() => void>();
@@ -162,9 +169,13 @@ export function createProfilelessStore({
 
   const due = (userId: number): boolean => {
     if (seeded.has(userId) || queued.has(userId) || inFlight.has(userId) || !names.has(userId)) return false;
-    // Un autre nom affiché (renommage, réponse fraîche) se redemande sans attendre.
-    if (askedName.has(userId) && askedName.get(userId) !== names.get(userId)) return true;
     const at = askedAt.get(userId);
+    // Un nom affiché pas encore demandé (renommage) se redemande sans attendre
+    // la fenêtre — mais jamais pendant l'attente d'après un échec. Deux liens
+    // qui montrent le même compte sous deux noms ne relancent rien : les deux
+    // partent ensemble.
+    const asked = askedNames.get(userId);
+    if (asked !== undefined && !failures.has(userId) && namesToSend(userId).some((name) => !asked.has(name))) return true;
     if (at === undefined) return true;
     return now() - at >= wait(userId);
   };
@@ -194,23 +205,35 @@ export function createProfilelessStore({
     const ids = [...queued].filter((userId) => shown.has(userId) && names.has(userId));
     queued.clear();
     const at = now();
-    const sent = ids.slice(0, PROFILELESS_CHUNKS_PER_BURST * PROFILELESS_LOOKUP_MAX);
-    for (let start = 0; start < sent.length; start += PROFILELESS_LOOKUP_MAX) {
-      const chunk = sent.slice(start, start + PROFILELESS_LOOKUP_MAX);
-      const entries = chunk.map((userId) => ({ id: userId, name: names.get(userId) ?? "" }));
-      for (const { id: userId, name } of entries) {
+    // Paquets d'au plus PROFILELESS_LOOKUP_MAX couples, un compte entier par paquet.
+    const chunks: { ids: number[]; entries: ProfilelessLookupEntry[] }[] = [];
+    let sentCount = 0;
+    for (const userId of ids) {
+      const shownNames = namesToSend(userId);
+      let chunk = chunks[chunks.length - 1] as (typeof chunks)[number] | undefined;
+      if (chunk === undefined || chunk.entries.length + shownNames.length > PROFILELESS_LOOKUP_MAX) {
+        if (chunks.length >= PROFILELESS_CHUNKS_PER_BURST) break;
+        chunk = { ids: [], entries: [] };
+        chunks.push(chunk);
+      }
+      chunk.ids.push(userId);
+      for (const name of shownNames) chunk.entries.push({ id: userId, name });
+      sentCount += 1;
+    }
+    for (const chunk of chunks) {
+      for (const userId of chunk.ids) {
         inFlight.add(userId);
         // La fenêtre est prise avant l'envoi : jamais deux questions en vol.
         askedAt.set(userId, at);
-        askedName.set(userId, name);
+        askedNames.set(userId, new Set(namesToSend(userId)));
       }
-      void fetchIds(entries).then(
-        (profileless) => settle(chunk, profileless),
-        () => settle(chunk, null),
+      void fetchIds(chunk.entries).then(
+        (profileless) => settle(chunk.ids, profileless),
+        () => settle(chunk.ids, null),
       );
     }
     // Le reste part à la salve suivante, sous la borne de la route.
-    for (const userId of ids.slice(sent.length)) queued.add(userId);
+    for (const userId of ids.slice(sentCount)) queued.add(userId);
     if (queued.size > 0) {
       flushArmed = true;
       schedule(flush, PROFILELESS_BURST_GAP_MS);
@@ -271,11 +294,24 @@ export function createProfilelessStore({
     watch(userId, name) {
       shown.set(userId, (shown.get(userId) ?? 0) + 1);
       // Un nom que la route refuserait (vide, trop long) ferait refuser tout son paquet : pas demandé.
-      const shownName = name?.trim();
-      if (shownName && shownName.length <= PROFILELESS_NAME_MAX) names.set(userId, shownName);
+      const trimmed = name?.trim();
+      const shownName = trimmed && trimmed.length <= PROFILELESS_NAME_MAX ? trimmed : undefined;
+      if (shownName !== undefined) {
+        const counts = names.get(userId) ?? new Map<string, number>();
+        counts.set(shownName, (counts.get(shownName) ?? 0) + 1);
+        names.set(userId, counts);
+      }
       ask(userId);
       armRetry();
       return () => {
+        // Chaque lien retire son propre nom : ceux qui restent gardent le leur.
+        const counts = names.get(userId);
+        if (shownName !== undefined && counts !== undefined) {
+          const left = (counts.get(shownName) ?? 1) - 1;
+          if (left > 0) counts.set(shownName, left);
+          else counts.delete(shownName);
+          if (counts.size === 0) names.delete(userId);
+        }
         const count = (shown.get(userId) ?? 1) - 1;
         if (count > 0) shown.set(userId, count);
         else {
@@ -291,7 +327,7 @@ export function createProfilelessStore({
       for (const [userId, at] of askedAt) {
         if (shown.has(userId) || seeded.has(userId) || now() - at < PROFILELESS_REFRESH_MS) continue;
         askedAt.delete(userId);
-        askedName.delete(userId);
+        askedNames.delete(userId);
         answers.delete(userId);
         failures.delete(userId);
       }

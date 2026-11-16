@@ -550,6 +550,19 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([]);
   });
 
+  it("setMatchLiveConfig_noModeSentBadUrlOnUnmarkedMatch_refusedByModeUnderLockNotByUrl", async () => {
+    // Revue sécurité EF-65 cycle 2 : sans mode envoyé, le lien ne se juge pas
+    // avant le verrou — le refus qui dit l'état du match (sans mode) ne vient
+    // qu'après le rôle, à un appelant qui a droit sur ce match.
+    const world = liveWorld(matchRow({ live_trigger: null }), [dbStream(4, "https://kick.com/voix")], [{ user_id: 12, stream_id: 4 }]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: "pas une adresse", setter: ORGANISER_5, access: STAFF }),
+    ).rejects.toThrow("MATCH_NOT_STREAMED");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
   it("setMatchLiveConfig_playedMarkedMatchEmptyBody_throwsMatchNotCastable", async () => {
     // Un corps qui ne change rien (ni mode, ni lien du staff, ni lien de caster) n'ouvre pas un match joué.
     const world = liveWorld(

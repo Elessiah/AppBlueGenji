@@ -399,10 +399,16 @@ function lookupDb(
   names: { id: number; name: string }[],
   { failList = (): boolean => false }: { failList?: () => boolean } = {},
 ) {
-  return mockDb((sql) => {
-    if (sql.includes("UNION ALL")) return [names];
+  // Une ligne par nom (pseudo d'abord, puis noms d'entrée solo), comme la jointure.
+  return mockDb(() => {
     if (failList()) throw new Error("LOCK_WAIT");
-    return [listIds.map((id) => ({ id }))];
+    return [
+      listIds.flatMap((id): { id: number; pseudo: string | null; solo_name: string | null }[] => {
+        const own = names.filter((entry) => entry.id === id).map((entry) => entry.name);
+        if (own.length === 0) return [{ id, pseudo: null, solo_name: null }];
+        return own.map((name, index) => (index === 0 ? { id, pseudo: name, solo_name: null } : { id, pseudo: own[0], solo_name: name }));
+      }),
+    ];
   });
 }
 
@@ -422,12 +428,23 @@ describe("profilelessAmong (D86)", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("profilelessAmong_noAskedIdInList_skipsNameQuery", async () => {
-    // La question ordinaire (aucun compte supprimé affiché) ne lit aucun nom.
-    const execute = lookupDb([3], []);
+  it("profilelessAmong_deletedOrNotAsked_sameSingleListQuery", async () => {
+    // Revue sécurité EF-65 cycle 2 : aucune requête ne dépend du compte demandé
+    // (le temps de réponse ne dit pas qu'un id est supprimé).
+    const execute = lookupDb([3], [{ id: 3, name: "ApexTV" }]);
 
-    expect(await profilelessAmong([{ id: 5, name: "Vivant" }])).toEqual([]);
-    expect(execute.mock.calls.some(([sql]) => String(sql).includes("UNION ALL"))).toBe(false);
+    await profilelessAmong([{ id: 5, name: "Vivant" }]);
+    await profilelessAmong([{ id: 3, name: "x" }]);
+    await profilelessAmong([{ id: 3, name: "ApexTV" }]);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(String(execute.mock.calls[0][0])).toContain("LEFT JOIN bg_teams st ON st.solo_user_id = u.id");
+  });
+
+  it("profilelessAmong_twoNamesOneMatches_returnsIdOnce", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Faux" }, { id: 3, name: "ApexTV" }, { id: 3, name: "apextv" }])).toEqual([3]);
   });
 
   it("profilelessAmong_wrongName_omitsId", async () => {
@@ -450,13 +467,13 @@ describe("profilelessAmong (D86)", () => {
     expect(await profilelessAmong([{ id: 3, name: " apex​tv " }])).toEqual([3]);
   });
 
-  it("profilelessAmong_nameReadFails_throws", async () => {
-    mockDb((sql) => {
-      if (sql.includes("UNION ALL")) throw new Error("LOCK_WAIT");
-      return [[{ id: 3 }]];
+  it("profilelessAmong_readFailure_throwsWhateverIdAsked", async () => {
+    // Revue sécurité EF-65 cycle 2 : un 503 ne dit pas qu'un id est supprimé.
+    mockDb(() => {
+      throw new Error("LOCK_WAIT");
     });
 
-    await expect(profilelessAmong([{ id: 3, name: "ApexTV" }])).rejects.toThrow("LOCK_WAIT");
+    await expect(profilelessAmong([{ id: 5, name: "Vivant" }])).rejects.toThrow("LOCK_WAIT");
   });
 
   it("profilelessAmong_readFailureWithoutStale_throws", async () => {

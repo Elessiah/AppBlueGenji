@@ -842,12 +842,34 @@ describe("conservation", () => {
     await expect(purgeExpiredReports()).resolves.toBe(1);
 
     expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
-    // Une seconde purge pendant la passe la rejoint, sans relancer le balayage.
+    // Une seconde purge pendant la passe la rejoint, sans balayage parallèle.
     await expect(purgeExpiredReports()).resolves.toBe(1);
     await flush();
     expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
     finish?.(0);
     await flush();
+  });
+
+  it("purgeClosedQuarantinesSafely_triggerDuringPass_rerunsOnceAfter", async () => {
+    // Revue sécurité EF-65 cycle 2 : un signalement effacé après la dernière
+    // lecture de la passe en cours ne laisse pas sa décision close.
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    let finish: ((count: number) => void) | undefined;
+    jest.mocked(purgeClosedQuarantines)
+      .mockReturnValueOnce(new Promise<number>((resolve) => { finish = resolve; }))
+      .mockResolvedValue(0);
+    await purgeExpiredReports();
+    await purgeExpiredReports();
+    await purgeExpiredReports();
+
+    finish?.(0);
+    await flush();
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
   });
 
   it("purgeExpiredReports_nothingDeleted_skipsClosedQuarantineScan", async () => {
@@ -880,6 +902,8 @@ describe("conservation", () => {
     await expect(purgeExpiredReports()).resolves.toBe(1);
     await flush();
 
+    // Une panne ne se rejoue pas en boucle.
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
     error.mockRestore();
   });

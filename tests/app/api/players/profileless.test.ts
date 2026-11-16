@@ -6,12 +6,14 @@ jest.mock("@/lib/server/api-guard", () => ({
   enforceRateLimit: jest.fn(),
 }));
 jest.mock("@/lib/server/users/profileless-players");
+jest.mock("@/lib/server/users/profileless-guess-budget");
 
 import { NextResponse } from "next/server";
 import { POST } from "@/app/api/players/profileless/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, PROFILELESS_LOOKUP_RULE } from "@/lib/server/api-guard";
 import { profilelessAmong } from "@/lib/server/users/profileless-players";
+import { admitProfilelessGuesses } from "@/lib/server/users/profileless-guess-budget";
 import { authUser } from "../../../helpers/auth-user";
 
 const SAME_ORIGIN = { "sec-fetch-site": "same-origin", "content-type": "application/json" };
@@ -28,6 +30,7 @@ beforeEach(() => {
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(enforceRateLimit).mockReturnValue(null);
   jest.mocked(profilelessAmong).mockResolvedValue([8]);
+  jest.mocked(admitProfilelessGuesses).mockImplementation((_viewer, players) => [...players]);
 });
 
 describe("POST /api/players/profileless", () => {
@@ -54,6 +57,16 @@ describe("POST /api/players/profileless", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ids: [8] });
     expect(profilelessAmong).toHaveBeenCalledWith([{ id: 3, name: "Alpha" }, { id: 8, name: "Beta" }]);
+  });
+
+  it("POST_guessBudget_onlyAdmittedPairsJudged", async () => {
+    // Revue sécurité EF-65 cycle 2 : noms essayés bornés par compte et par visiteur.
+    jest.mocked(admitProfilelessGuesses).mockReturnValue([{ id: 3, name: "Alpha" }]);
+
+    await post(VALID);
+
+    expect(admitProfilelessGuesses).toHaveBeenCalledWith(7, [{ id: 3, name: "Alpha" }, { id: 8, name: "Beta" }]);
+    expect(profilelessAmong).toHaveBeenCalledWith([{ id: 3, name: "Alpha" }]);
   });
 
   it("POST_signedIn_usesOwnBucketNotDirectory", async () => {

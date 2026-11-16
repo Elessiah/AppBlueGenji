@@ -36,13 +36,11 @@ export function parseStreamLinks(raw: unknown): MatchStreamLinkEdit[] | undefine
  * l'arbitre désigné **de ce match** (médiateur, `docs/features/CAST_SETTINGS.md`).
  *
  * Sans lecture de la base : que l'appelant soit bien l'arbitre retenu de ce
- * match se juge **une fois**, sous le verrou du match, par le service
- * (`assertLiveActor` / `setMatchOnAir`, `NOT_MATCH_REFEREE`, 403), avant tout
- * autre refus qui dirait l'état du match (mode, date, statut) — seule son
- * existence (`MATCH_NOT_FOUND`, 404) se dit avant, à un staff `tournaments`
- * qui voit déjà tous les matchs. Une porte qui relisait l'arbitre
- * avant le verrou doublait cette lecture à chaque geste de l'arbitre (revue
- * CAST-FOLLOWUP #560).
+ * match se juge par le service — d'abord sans verrou pour qui n'a pas `live`
+ * (`assertMayReachMatchLive`, `NOT_MATCH_REFEREE`, 403, même refus pour un
+ * match absent), puis sous le verrou du match (`assertLiveActor`), avant tout
+ * autre refus qui dirait l'état du match (mode, date, statut). Seul un porteur
+ * de `live` apprend qu'un match n'existe pas (`MATCH_NOT_FOUND`, 404).
  */
 export function mayConfigureMatchLive(user: AuthUser): boolean {
   return can(user, "live") || can(user, "tournaments");

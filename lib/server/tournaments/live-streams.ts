@@ -292,10 +292,12 @@ export async function setMatchLiveConfig(
   // Lien absent : le lien du staff n'est pas touché (sauf démarquage).
   const keepStaffLink = config.liveUrl === undefined;
   const editsStreamLinks = (config.streamLinks?.length ?? 0) > 0;
-  // Lu d'abord tel qu'envoyé — sans le mode du match, qu'un refus dirait
-  // sinon —, puis rejugé sous le verrou sur le mode appliqué : un démarquage
-  // (`trigger: null`) ignore le lien, un match resté sans mode aussi.
-  parseStreamUrlInput(config.trigger === null ? null : (config.liveUrl ?? null));
+  // Lu d'abord avec le seul mode **envoyé** — jamais celui du match, qu'un
+  // refus dirait sinon —, puis rejugé sous le verrou sur le mode appliqué. Sans
+  // mode envoyé (`undefined`, celui du match) ou démarquage (`null`), rien ici :
+  // le mode du match ne se juge que sous le verrou, après le rôle
+  // (`lockedTrigger` : un lien sur un match sans mode y est refusé).
+  parseStreamUrlInput(typeof config.trigger === "string" ? (config.liveUrl ?? null) : null);
 
   // Les verrous d'intervalle des streams et des casters peuvent opposer deux
   // matchs voisins (inscription, ménage) : la transaction se rejoue.

@@ -135,7 +135,9 @@ celle des signalements ensuite (`schedulePurgeExpiredReports`).
 Une ligne de `bg_logo_quarantines` **close** (image rétablie ou supprimée) suit
 son signalement : à la fin de `purgeExpiredReports` **quand un signalement
 vient d'y partir**, **détachée** (`purgeClosedQuarantinesSafely`, une seule
-passe à la fois par processus : le panneau de modération et chaque envoi de
+passe à la fois par processus, rejouée une fois si un déclencheur arrive
+pendant qu'elle tourne — un signalement effacé après sa dernière lecture
+n'attend pas l'entretien suivant ; une panne ne se rejoue pas en boucle : le panneau de modération et chaque envoi de
 signalement n'attendent ni un balayage sans objet, ni les tranches d'un
 arriéré), et à chaque entretien horaire
 (`schedulePurgeExpiredReports`, même sans signalement purgé : reprise d'une

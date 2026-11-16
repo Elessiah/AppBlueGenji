@@ -1311,20 +1311,36 @@ export async function purgeExpiredReports(): Promise<number> {
 
 /** Passe de purge des décisions closes en cours (une seule par processus). */
 let closedQuarantinePurge: Promise<void> | null = null;
+/** Un déclencheur est arrivé pendant la passe en cours : elle se rejoue une fois finie. */
+let closedQuarantinePurgeAgain = false;
 
 /**
  * Purge des décisions closes (D87) ; une panne ne fait tomber ni la purge des
- * signalements ni le panneau. Une passe déjà en cours est rendue telle quelle :
- * deux déclencheurs rapprochés ne balaient pas deux fois l'arriéré.
+ * signalements ni le panneau. Une passe déjà en cours est rendue, mais
+ * **rejouée une fois** à sa fin : un signalement effacé après sa dernière
+ * lecture ne laisse pas sa décision close jusqu'à l'entretien suivant. Deux
+ * déclencheurs rapprochés ne lancent jamais deux passes à la fois.
  */
 export function purgeClosedQuarantinesSafely(): Promise<void> {
-  closedQuarantinePurge ??= Promise.resolve()
-    .then(() => purgeClosedQuarantines())
-    .then(() => undefined)
-    .catch((error) => console.error("[moderation] purge des décisions closes impossible", failureReason(error)))
-    .finally(() => {
-      closedQuarantinePurge = null;
-    });
+  if (closedQuarantinePurge !== null) {
+    closedQuarantinePurgeAgain = true;
+    return closedQuarantinePurge;
+  }
+  const run = async (): Promise<void> => {
+    do {
+      closedQuarantinePurgeAgain = false;
+      try {
+        await purgeClosedQuarantines();
+      } catch (error) {
+        console.error("[moderation] purge des décisions closes impossible", failureReason(error));
+        // Une panne ne se rejoue pas en boucle : l'entretien horaire reprendra.
+        closedQuarantinePurgeAgain = false;
+      }
+    } while (closedQuarantinePurgeAgain);
+  };
+  closedQuarantinePurge = run().finally(() => {
+    closedQuarantinePurge = null;
+  });
   return closedQuarantinePurge;
 }
 
