@@ -784,16 +784,27 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
       missingInBoth(
         [
           `Un salon que la modération supprime avant qu'il soit rendu est recréé aussitôt par le Bot lui-même, sans appel du site, sous le nom qu'il portait (celui de l'équipe, sauf si la modération l'a renommé) et la même clé, sauf si plus de ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures ont passé depuis sa création, sa reprise ou sa dernière recréation, ou s'il a déjà été recréé ${VOICE_BOT_RECREATE_MAX} fois en ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes`,
-          "jusqu'à un redémarrage, le Bot garde en mémoire l'ancien identifiant du salon pour désigner le salon neuf",
+          `ou s'il a déjà été recréé ${VOICE_BOT_RECREATE_MAX} fois en ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes (un compte que le Bot tient en mémoire : il repart de zéro à un redémarrage, ou quand beaucoup d'autres salons ont été recréés depuis)`,
+          "Le Bot garde en mémoire l'ancien identifiant du salon pour désigner le salon neuf, jusqu'à un redémarrage, jusqu'à ce qu'il cesse de suivre le salon neuf ou plus tôt si beaucoup d'identifiants plus récents s'y accumulent",
+          "un rendu ou un vidage demandé par l'ancien identifiant reste sans effet sur le salon neuf, que le Bot traite alors comme un salon jamais rendu",
           "sa fiche part avec lui (une recréation la reporte sur le salon neuf)",
         ],
         [
           `A channel that moderation deletes before it is handed back is recreated at once by the Bot itself, without any call from the website, under the name it had (the team's, unless moderation renamed it) and the same key, unless more than ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation, its reuse or its last recreation, or it has already been recreated ${VOICE_BOT_RECREATE_MAX} times within ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes`,
-          "until a restart, the Bot keeps the channel's old ID in memory to designate the new channel",
+          `or it has already been recreated ${VOICE_BOT_RECREATE_MAX} times within ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes (a count the Bot holds in memory: it starts again from zero after a restart, or once many other channels have been recreated since)`,
+          "The Bot keeps the channel's old ID in memory to designate the new channel until a restart, until it stops tracking the new channel, or sooner if many more recent IDs pile up",
+          "a hand-back or a clearing requested under the old ID has no effect on the new channel, which the Bot then treats as a channel never handed back",
           "its record goes with it (a recreation moves it to the new channel)",
         ],
       ),
     ).toEqual([]);
+  });
+
+  it("privacyPolicy_voiceChannels_oldIdNoLongerPromisedUntilRestartFrAndEn", () => {
+    const fr = JSON.stringify(PRIVACY_POLICY.fr);
+    const en = JSON.stringify(PRIVACY_POLICY.en);
+    expect(fr).not.toContain("jusqu'à un redémarrage, le Bot garde en mémoire l'ancien identifiant");
+    expect(en).not.toContain("until a restart, the Bot keeps the channel's old ID");
   });
 
   it("privacyPolicy_voiceChannels_retentionUsesBotConstantsFrAndEn", () => {
