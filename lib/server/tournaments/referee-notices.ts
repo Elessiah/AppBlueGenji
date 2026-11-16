@@ -1,4 +1,3 @@
-import { failureReason } from "@/lib/server/failure-reason";
 /**
  * Ce que le site dit quand l'arbitre désigné ou l'organisation d'un match
  * change (`docs/features/MATCH_REFEREE.md`) — sur le modèle des avis de cast
@@ -17,6 +16,7 @@ import { failureReason } from "@/lib/server/failure-reason";
  * Appelé **après le commit**, sans attendre. Ne lève jamais.
  */
 import type { PoolConnection } from "mysql2/promise";
+import { failureReason } from "@/lib/server/failure-reason";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer, createKeyedChain } from "@/lib/server/coalescer";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
