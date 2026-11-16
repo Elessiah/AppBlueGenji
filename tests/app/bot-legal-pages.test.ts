@@ -21,6 +21,8 @@ import {
 import { SITE_HOST } from "@/lib/shared/site-host";
 import {
   VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RECREATE_MAX,
+  VOICE_BOT_RECREATE_WINDOW_MINUTES,
   VOICE_BOT_RELEASED_MAX_HOURS,
   VOICE_BOT_SWEEP_MINUTES,
   VOICE_BOT_UNRELEASED_MAX_HOURS,
@@ -549,7 +551,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // LEGAL-LOT-1 : datée comme le rectificatif du site du 13 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["18 novembre 2026", "18 November 2026"]);
   });
 });
 
@@ -777,19 +779,36 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
     ).toEqual([]);
   });
 
+  it("privacyPolicy_voiceChannels_moderationDeletionRecreatedByBotFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          `Un salon que la modération supprime avant qu'il soit rendu est recréé aussitôt par le Bot lui-même, sans appel du site, sous le nom qu'il portait (celui de l'équipe, sauf si la modération l'a renommé) et la même clé, sauf si plus de ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures ont passé depuis sa création, sa reprise ou sa dernière recréation, ou s'il a déjà été recréé ${VOICE_BOT_RECREATE_MAX} fois en ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes`,
+          "jusqu'à un redémarrage, le Bot garde en mémoire l'ancien identifiant du salon pour désigner le salon neuf",
+          "sa fiche part avec lui (une recréation la reporte sur le salon neuf)",
+        ],
+        [
+          `A channel that moderation deletes before it is handed back is recreated at once by the Bot itself, without any call from the website, under the name it had (the team's, unless moderation renamed it) and the same key, unless more than ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation, its reuse or its last recreation, or it has already been recreated ${VOICE_BOT_RECREATE_MAX} times within ${VOICE_BOT_RECREATE_WINDOW_MINUTES} minutes`,
+          "until a restart, the Bot keeps the channel's old ID in memory to designate the new channel",
+          "its record goes with it (a recreation moves it to the new channel)",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
   it("privacyPolicy_voiceChannels_retentionUsesBotConstantsFrAndEn", () => {
     expect(
       missingInBoth(
         [
           `au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé`,
-          `il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise`,
-          `oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le Bot ne peut plus lire le salon`,
+          `il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création, sa reprise ou sa recréation`,
+          `oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création, sa reprise ou sa recréation si le Bot ne peut plus lire le salon`,
           "Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom",
         ],
         [
           `within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied`,
-          `it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse`,
-          `forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the Bot can no longer read the channel`,
+          `it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation, its reuse or its recreation`,
+          `forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation, its reuse or its recreation if the Bot can no longer read the channel`,
           "Discord's audit log keeps the creation and deletion of each channel, with its name",
         ],
       ),

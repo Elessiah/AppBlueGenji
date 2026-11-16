@@ -85,10 +85,10 @@ describe("/rgpd — salons vocaux", () => {
 
   it("rgpdPages_voiceParagraph_mentionsStaffLogMessagesFrAndEn", () => {
     expect(readSource("app/rgpd/page.tsx")).toContain(
-      "le bot écrit aussi au salon de journal privé du staff, que lit le staff, des messages techniques sur les salons (identifiant d&apos;un salon et erreur de Discord quand sa suppression ou son suivi échoue, bilan ou échec d&apos;un balayage, alerte de permission manquante), sans donnée de joueur, gardés un an.",
+      "le bot écrit aussi au salon de journal privé du staff, que lit le staff, des messages techniques sur les salons (identifiant d&apos;un salon et erreur de Discord quand sa suppression, sa recréation ou son suivi échouent, bilan ou échec d&apos;un balayage, alerte de permission manquante), sans donnée de joueur, gardés un an.",
     );
     expect(readSource("app/rgpd/RgpdEn.tsx")).toContain(
-      "the bot also writes to the staff&apos;s private log channel, read by staff, technical messages about the channels (identifier of a channel and Discord&apos;s error when its deletion or tracking fails, sweep report or failure, missing-permission alert), without any player data, kept for one year.",
+      "the bot also writes to the staff&apos;s private log channel, read by staff, technical messages about the channels (identifier of a channel and Discord&apos;s error when its deletion, recreation or tracking fails, sweep report or failure, missing-permission alert), without any player data, kept for one year.",
     );
   });
 });

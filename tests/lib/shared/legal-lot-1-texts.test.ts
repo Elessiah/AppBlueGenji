@@ -107,7 +107,7 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
   });
 
   it("botPrivacyPolicy_lastUpdated_datedWithSiteRectification", () => {
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["18 novembre 2026", "18 November 2026"]);
   });
 });
 

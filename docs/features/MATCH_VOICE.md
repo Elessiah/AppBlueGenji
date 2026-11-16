@@ -214,8 +214,9 @@ La page du match ne montre **aucun lien** vers les salons (décision du
 Comportements gardés et documentés (décisions du 2026-11-05) :
 
 - un rendu ou une revérification **refusés** par le bot pour ce salon
-  laissent la ligne **ouverte** (`failed_at` noté), redemandée après
-  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, environ une fois toutes les 5 minutes) ;
+  laissent la ligne **ouverte** (`failed_at` noté) : un rendu refusé est redemandé après
+  `VOICE_RETRY_SECONDS` (60 s, `RELEASABLE_SQL`), puis une fois par heure passé 48 h ; une
+  revérification refusée, à la suivante (`OPEN_DUE_CHANNELS_SQL`, environ toutes les 5 minutes) ;
 - un salon **supprimé par la modération** est recréé aussitôt par le bot (D97), ou à
   défaut à la revérification suivante, dans la fenêtre du match ;
 - le bot répond **succès** au rendu d'un salon déjà disparu ou jamais suivi
