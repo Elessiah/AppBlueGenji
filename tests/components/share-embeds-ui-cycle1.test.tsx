@@ -9,7 +9,12 @@ import { MatchShareCard, type MatchShareCardProps } from "@/components/og/match-
 import { SHARE_CARD_COLORS } from "@/components/og/share-card";
 import { isPublicMatch, offersMatchPage } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
 import {
+  nearPublication,
+  publishedForReader,
+  resetServerClockSkew,
+  SERVER_CLOCK_SAFETY_MS,
   SHARE_PUBLISHED_MARGIN_MS,
+  skewFromDateHeader,
   useTournamentPublished,
 } from "@/app/(secured)/tournois/[id]/_lib/use-tournament-published";
 import { readSource } from "../helpers/read-source";
@@ -97,7 +102,7 @@ describe("wiring", () => {
     const source = readSource("app/(secured)/tournois/[id]/_lib/use-tournament-published.ts");
     // L'horloge ne tourne que tant que le tournoi n'est pas publié (et jamais sans carte).
     expect(source).toContain("useClock(PUBLISHED_CLOCK_MS, card !== null && !published)");
-    expect(source).toContain("card !== null && isTournamentPublished(card, new Date(Date.now() - SHARE_PUBLISHED_MARGIN_MS))");
+    expect(source).toContain("card !== null && publishedForReader(card, Date.now(), skew)");
   });
 
   it("TournamentHeader_shareButton_comesAfterTheRegisterButton", () => {
@@ -126,6 +131,7 @@ describe("useTournamentPublished — marge d'horloge", () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    resetServerClockSkew();
   });
 
   it("useTournamentPublished_withinClockMargin_returnsFalse", () => {
@@ -138,5 +144,44 @@ describe("useTournamentPublished — marge d'horloge", () => {
     jest.useFakeTimers({ now: VISIBLE_AT + SHARE_PUBLISHED_MARGIN_MS });
 
     expect(renderToStaticMarkup(<Probe startVisibilityAt="2026-05-13T20:00:00.000Z" />)).toBe("<span>true</span>");
+  });
+});
+
+describe("useTournamentPublished — heure du serveur", () => {
+  const VISIBLE_AT = Date.parse("2026-05-13T20:00:00.000Z");
+  const CARD = { startVisibilityAt: "2026-05-13T20:00:00.000Z" };
+
+  it("publishedForReader_skewKnownPastSafety_returnsTrue", () => {
+    expect(publishedForReader(CARD, VISIBLE_AT + SERVER_CLOCK_SAFETY_MS, 0)).toBe(true);
+  });
+
+  it("publishedForReader_skewKnownWithinSafety_returnsFalse", () => {
+    expect(publishedForReader(CARD, VISIBLE_AT + SERVER_CLOCK_SAFETY_MS - 1, 0)).toBe(false);
+  });
+
+  it("publishedForReader_readerClockFiveMinutesAhead_followsServer", () => {
+    expect(publishedForReader(CARD, VISIBLE_AT + 5 * 60_000, -5 * 60_000)).toBe(false);
+  });
+
+  it("publishedForReader_skewUnknown_usesMargin", () => {
+    expect(publishedForReader(CARD, VISIBLE_AT + SHARE_PUBLISHED_MARGIN_MS - 1, null)).toBe(false);
+    expect(publishedForReader(CARD, VISIBLE_AT + SHARE_PUBLISHED_MARGIN_MS, null)).toBe(true);
+  });
+
+  it("skewFromDateHeader_readable_returnsServerMinusReceived", () => {
+    expect(skewFromDateHeader("Wed, 13 May 2026 20:00:00 GMT", VISIBLE_AT + 3_000)).toBe(-3_000);
+  });
+
+  it("skewFromDateHeader_missingOrUnreadable_returnsNull", () => {
+    expect(skewFromDateHeader(null, VISIBLE_AT)).toBeNull();
+    expect(skewFromDateHeader("pas une date", VISIBLE_AT)).toBeNull();
+  });
+
+  it("nearPublication_withinMargin_returnsTrue", () => {
+    expect(nearPublication(CARD, VISIBLE_AT + SHARE_PUBLISHED_MARGIN_MS)).toBe(true);
+  });
+
+  it("nearPublication_outsideMargin_returnsFalse", () => {
+    expect(nearPublication(CARD, VISIBLE_AT - SHARE_PUBLISHED_MARGIN_MS - 1)).toBe(false);
   });
 });

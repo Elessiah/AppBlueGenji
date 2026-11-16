@@ -40,6 +40,7 @@ import {
   type SpectatorLoadLevel,
 } from "@/lib/shared/spectator-view";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
+import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
 import { buildTournamentShareSummary, tournamentMayHaveLeader, type TournamentShareSummary } from "@/lib/shared/share-embeds";
 import type { TournamentCard, TournamentSnapshot, TournamentState } from "@/lib/shared/types";
 
@@ -311,8 +312,18 @@ export type PublicTournamentShare = { card: TournamentCard; share: TournamentSha
 
 function shareOf(payload: SpectatorPayload | null | undefined, stale: boolean): PublicTournamentShare | null {
   if (!payload) return null;
-  const card = payload.snapshot.card;
-  return { card: { ...card, state: computeTournamentState(card) }, share: payload.share, stale };
+  const card = publicCardNow(payload.snapshot.card);
+  return card ? { card, share: payload.share, stale } : null;
+}
+
+/**
+ * Une carte gardée (copie, cache de carte), telle que le public la voit
+ * **maintenant** : état recalculé depuis les dates, `null` si elle n'est plus
+ * publiée (date de visibilité repoussée) — une copie de 150 s, ou une carte
+ * de 10 s, ne dessine pas un tournoi que `/suivre/` dit déjà introuvable.
+ */
+function publicCardNow(card: TournamentCard): TournamentCard | null {
+  return isTournamentPublished(card) ? { ...card, state: computeTournamentState(card) } : null;
 }
 
 /**
@@ -377,7 +388,7 @@ export async function publicTournamentCard(
   admit: () => boolean,
 ): Promise<TournamentCard | null> {
   const copy = staleSpectatorPayload(tournamentId);
-  if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };
+  if (copy) return publicCardNow(copy.snapshot.card);
   const read = await readPublicTournamentCard(tournamentId, admit);
   return read === CARD_READ_REFUSED ? null : read;
 }
@@ -402,11 +413,14 @@ async function readPublicTournamentCard(
   // d'une lecture en vol que d'autres, non plafonnés, auraient rejointe.
   if (!isCachedOrLoading(key) && !admit()) return CARD_READ_REFUSED;
   try {
-    return await cached(
+    const card = await cached(
       key,
       (card: TournamentCard | null) => (card ? SPECTATOR_CARD_TTL_MS : 0),
       () => getVisibleTournamentCard(tournamentId),
     );
+    // Gardée jusqu'à 10 s : l'état lu à l'ouverture des inscriptions ou au
+    // lancement serait sinon celui d'avant.
+    return card ? publicCardNow(card) : null;
   } catch {
     return null;
   }

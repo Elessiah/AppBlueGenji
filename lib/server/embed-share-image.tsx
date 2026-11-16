@@ -36,7 +36,9 @@
  *
  * **Rendus.** Un rendu absent de la mémoire prend un jeton du réseau
  * (`SHARE_EMBED_RENDER_RULE`) et n'entre pas dans une file déjà longue
- * (`MAX_QUEUED_EMBED_RENDERS`) : refusé, la carte neutre.
+ * (`MAX_QUEUED_EMBED_RENDERS`, deux attentes par réseau au plus) : refusé, la
+ * carte neutre — gardée en mémoire une fois rendue, pour qu'un refus n'attende
+ * jamais derrière la file qu'il évite.
  */
 import { ImageResponse } from "next/og";
 import { MATCH_SHARE_LOGO_SIZE, MatchShareCard } from "@/components/og/match-share-card";
@@ -47,12 +49,13 @@ import { messagesFor } from "./i18n-messages";
 import { renderPageShareImage } from "./page-share-image";
 import { shareCardLogo } from "./share-card-logo";
 import { shareImageOptions } from "./share-card-fonts";
-import { cachedShareImage, MAX_QUEUED_EMBED_RENDERS } from "./share-image-cache";
+import { cachedShareImage } from "./share-image-cache";
 import { teamLogoDataUrl } from "./share-podium";
 import {
   publicTournamentImageViewForRequest,
   publicTournamentShareForRequest,
   shareEmbedRenderAdmission,
+  shareRequestClient,
 } from "./spectator-request";
 import { TEAM_SHARE_LOGO_SIZE } from "./share-team";
 import type { Locale } from "@/lib/shared/locales";
@@ -93,11 +96,29 @@ const NEUTRAL_CARD_KEY = "home";
  */
 export const NEUTRAL_CARD_CACHE_CONTROL = "no-store";
 
+/**
+ * La carte neutre de chaque langue, une fois rendue : elle ne change qu'au
+ * déploiement, et c'est la réponse d'un refus — elle ne doit jamais attendre
+ * une place derrière la file pleine (l'échéance de la réserve `fixed` la
+ * ferait sinon rendre de nouveau au pire moment).
+ */
+const neutralBodies = new Map<Locale, ArrayBuffer>();
+
+/** Oublie les cartes neutres gardées (tests). */
+export function clearNeutralShareImages(): void {
+  neutralBodies.clear();
+}
+
 /** La carte neutre, jamais gardée par un robot (`NEUTRAL_CARD_CACHE_CONTROL`). */
 async function neutralImage(locale: Locale): Promise<Response | null> {
-  const image = await renderPageShareImage(NEUTRAL_CARD_KEY, locale);
-  if (!image) return null;
-  return new Response(image.body, {
+  let body = neutralBodies.get(locale);
+  if (!body) {
+    const image = await renderPageShareImage(NEUTRAL_CARD_KEY, locale);
+    if (!image) return null;
+    body = await image.arrayBuffer();
+    neutralBodies.set(locale, body);
+  }
+  return new Response(body, {
     headers: { "content-type": "image/png", "cache-control": NEUTRAL_CARD_CACHE_CONTROL },
   });
 }
@@ -114,7 +135,8 @@ export async function renderEmbedShareImage(
 ): Promise<Response | null> {
   const target = parseEmbedShareCardKey(key);
   if (!target) return null;
-  const view = await readShareView(target);
+  const client = await shareRequestClient();
+  const view = await readShareView(target, client);
   if (!view) return neutralImage(locale);
   const match = target.kind === "match" ? view.share.matches.get(target.matchId) : undefined;
   if (target.kind === "match" && !match) return neutralImage(locale);
@@ -129,7 +151,7 @@ export async function renderEmbedShareImage(
     () => buildEmbedShareImage(target, view, locale),
     "embed",
     false,
-    { admit: await shareEmbedRenderAdmission(), maxQueued: MAX_QUEUED_EMBED_RENDERS },
+    shareEmbedRenderAdmission(client),
   );
   if (!image) return neutralImage(locale);
   const accepted =
@@ -152,10 +174,10 @@ type ShareView = NonNullable<Awaited<ReturnType<typeof publicTournamentShareForR
  * (carte seule s'il ne peut pas nommer d'équipe en tête, un seul jeton du
  * plafond par requête) ; un match lit la réponse publique.
  */
-async function readShareView(target: EmbedShareTarget): Promise<ShareView | null> {
+async function readShareView(target: EmbedShareTarget, client: string | null): Promise<ShareView | null> {
   const read =
     target.kind === "tournament" ? publicTournamentImageViewForRequest : publicTournamentShareForRequest;
-  return read(target.tournamentId).catch(() => null);
+  return read(target.tournamentId, client).catch(() => null);
 }
 
 /** Rend l'image de `target` depuis la réponse publique, sans cache. */

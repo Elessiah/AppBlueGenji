@@ -8,12 +8,19 @@ jest.mock("@/lib/server/spectator-snapshot");
 
 import { SHARE_EMBED_RENDER_RULE, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
-import { publicTournamentCard, publicTournamentImageView, publicTournamentSnapshot } from "@/lib/server/spectator-snapshot";
+import {
+  publicTournamentCard,
+  publicTournamentImageView,
+  publicTournamentShare,
+  publicTournamentSnapshot,
+} from "@/lib/server/spectator-snapshot";
 import {
   publicTournamentCardForRequest,
   publicTournamentImageViewForRequest,
+  publicTournamentShareForRequest,
   publicTournamentSnapshotForRequest,
   shareEmbedRenderAdmission,
+  shareRequestClient,
 } from "@/lib/server/spectator-request";
 import { tournamentCard } from "../../helpers/tournament-card";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
@@ -144,18 +151,47 @@ describe("publicTournamentImageViewForRequest", () => {
 });
 
 describe("shareEmbedRenderAdmission", () => {
-  it("shareEmbedRenderAdmission_bucketExhausted_refuses", async () => {
-    const admit = await shareEmbedRenderAdmission();
+  it("shareEmbedRenderAdmission_bucketExhausted_refuses", () => {
+    const { admit } = shareEmbedRenderAdmission("203.0.113.7");
     for (let i = 0; i < SHARE_EMBED_RENDER_RULE.capacity; i += 1) expect(admit()).toBe(true);
 
     expect(admit()).toBe(false);
   });
 
-  it("shareEmbedRenderAdmission_otherNetwork_keepsItsOwnBucket", async () => {
-    const admit = await shareEmbedRenderAdmission();
+  it("shareEmbedRenderAdmission_otherNetwork_keepsItsOwnBucket", () => {
+    const { admit } = shareEmbedRenderAdmission("203.0.113.7");
     for (let i = 0; i < SHARE_EMBED_RENDER_RULE.capacity; i += 1) admit();
-    mockForwardedFor = "198.51.100.9";
 
-    expect((await shareEmbedRenderAdmission())()).toBe(true);
+    expect(shareEmbedRenderAdmission("198.51.100.9").admit()).toBe(true);
+  });
+
+  it("shareEmbedRenderAdmission_unknownNetwork_sharesOneCappedBucket", () => {
+    for (let i = 0; i < SHARE_EMBED_RENDER_RULE.capacity; i += 1) shareEmbedRenderAdmission(null).admit();
+
+    expect(shareEmbedRenderAdmission(null).admit()).toBe(false);
+  });
+
+  it("shareEmbedRenderAdmission_refund_restoresAToken", () => {
+    const guard = shareEmbedRenderAdmission("203.0.113.7");
+    for (let i = 0; i < SHARE_EMBED_RENDER_RULE.capacity; i += 1) guard.admit();
+
+    guard.refund();
+
+    expect(guard.admit()).toBe(true);
+    expect(guard.admit()).toBe(false);
+  });
+});
+
+describe("shareRequestClient / client passé", () => {
+  it("shareRequestClient_forwardedFor_returnsNetworkKey", async () => {
+    expect(await shareRequestClient()).toBe("203.0.113.7");
+  });
+
+  it("publicTournamentShareForRequest_clientGiven_usesItInsteadOfHeaders", async () => {
+    jest.mocked(publicTournamentShare).mockResolvedValue(null);
+
+    await publicTournamentShareForRequest(5, "198.51.100.9");
+
+    expect(publicTournamentShare).toHaveBeenCalledWith(5, expect.anything(), "198.51.100.9", expect.any(Function));
   });
 });

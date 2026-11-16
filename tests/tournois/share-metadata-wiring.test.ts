@@ -224,7 +224,7 @@ describe("route d'image d'un tournoi", () => {
 
   it("ne lit que la réponse publique, n'ayant aucune mise en page au-dessus", () => {
     expect(EMBED_IMAGE).toContain("publicTournamentShareForRequest");
-    expect(EMBED_IMAGE).toContain("return read(target.tournamentId).catch(() => null);");
+    expect(EMBED_IMAGE).toContain("return read(target.tournamentId, client).catch(() => null);");
     expect(EMBED_IMAGE).not.toContain("getTournamentDetail");
   });
 

@@ -22,10 +22,13 @@ de replay publics).
 - L'adresse est toujours `/suivre/tournois/<id>` ou
   `/suivre/tournois/<id>/matchs/<mid>`, absolue, dans la langue de la fiche
   (`/en/suivre/…` en anglais) — jamais celle de l'espace membre.
-- Offert seulement pour un tournoi **publié** (`isTournamentPublished`, avec
-  une marge de cinq minutes sur l'horloge du lecteur,
-  `SHARE_PUBLISHED_MARGIN_MS` : une horloge en avance ne fait pas partager un
-  lien que le serveur dit encore introuvable) ; sur
+- Offert seulement pour un tournoi **publié** (`isTournamentPublished`) à
+  l'**heure du serveur** : près de l'heure de publication, l'en-tête `Date`
+  d'une ressource statique (`/favicon.png`, une lecture par page) donne
+  l'écart du poste (`publishedForReader`, deux secondes de marge) ; sans lui,
+  une marge de cinq minutes (`SHARE_PUBLISHED_MARGIN_MS`) — une horloge en
+  avance ne fait pas partager un lien que le serveur dit encore introuvable,
+  une horloge juste ne cache pas le bouton cinq minutes ; sur
   un match, pas sur une exemption. `LiveProvider` porte `publicShare`.
 - Publication relue toutes les 30 s tant que le tournoi n'est pas publié
   (`useTournamentPublished`, `useClock` : l'horloge s'**arrête** une fois publié,
@@ -83,6 +86,9 @@ de replay publics).
   nommer une équipe en tête (`tournamentMayHaveLeader`), la réponse publique —
   un seul jeton du plafond par requête (`publicTournamentImageViewForRequest`).
   Lecture de carte refusée au plafond : la copie échue, servie `no-store`.
+  Toute carte gardée (copie, cache de carte de 10 s) est relue **à l'instant** :
+  état recalculé depuis les dates, et plus rien si la date de visibilité a été
+  repoussée (`publicCardNow`).
   L'image d'un match lit la réponse publique.
 - **Aucun pseudo** : un engagé solo est « Joueur 1 » / « Joueur 2 », sans
   avatar ; un tournoi individuel n'a pas de ligne « en tête ».
@@ -129,11 +135,17 @@ de replay publics).
   plus : `PublicTournamentShare.stale`) part aussi en `no-store` : un robot ne la
   garde pas sous l'adresse `?v=` d'un score plus récent.
 - **Rendus bornés** : une image absente de la mémoire (ni rendue, ni en vol)
-  prend un jeton du réseau (`SHARE_EMBED_RENDER_RULE` : vingt d'avance, un
-  toutes les trois secondes) et n'entre pas dans une file de plus de
-  `MAX_QUEUED_EMBED_RENDERS` (8) rendus en attente ; refusée, la carte neutre
-  (`no-store`). Un client qui parcourt plus de couples (match, langue) que la
-  réserve n'en garde n'occupe donc pas le Raspberry.
+  prend un jeton du réseau (`SHARE_EMBED_RENDER_RULE` : quarante d'avance, un
+  toutes les deux secondes — large, les robots de Discord et de X viennent de
+  peu de réseaux ; une requête sans réseau lisible partage le seau
+  `unknown-network`, jamais hors plafond) et n'entre pas dans une file de plus
+  de `MAX_QUEUED_EMBED_RENDERS` (8) rendus **de la réserve `embed`** en
+  attente, dont deux au plus par réseau
+  (`MAX_QUEUED_EMBED_RENDERS_PER_CLIENT`) ; refusée, la carte neutre
+  (`no-store`), gardée en mémoire une fois rendue pour qu'un refus n'attende
+  jamais dans la file. Un rendu qui ne dessine rien rend son jeton ; un rendu
+  qui échoue le garde. Un client qui parcourt plus de couples (match, langue)
+  que la réserve n'en garde n'occupe donc pas le Raspberry, ni seul la file.
 - Le résumé ne retient de chaque match que les champs qu'il relit
   (`shareMatchSource`) : la copie publique en cache ne garde pas en plus tout
   l'arbre objet de ses matchs.

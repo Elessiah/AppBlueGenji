@@ -33,6 +33,15 @@ import type { TournamentSnapshot } from "@/lib/shared/types";
 
 const mockedSnapshot = jest.mocked(getVisibleTournamentSnapshot);
 const CLIENT = "203.0.113.7";
+/** Instant où la carte de test (`tournamentCard`) est publiée, inscriptions ouvertes. */
+const PUBLISHED_NOW = Date.parse("2026-05-03T00:00:00.000Z");
+/** Dates d'un tournoi publié, inscriptions ouvertes, quel que soit le jour où le test tourne. */
+const OPEN_REGISTRATION = {
+  startVisibilityAt: "2000-01-01T00:00:00.000Z",
+  registrationOpenAt: "2000-01-01T00:00:00.000Z",
+  registrationCloseAt: "2999-01-01T00:00:00.000Z",
+  startAt: "2999-02-01T00:00:00.000Z",
+} as const;
 
 /** Jetons de reconstruction restants au réseau. */
 function tokensLeft(client: string = CLIENT): number {
@@ -292,12 +301,12 @@ describe("publicTournamentSnapshot", () => {
   });
 
   it("refus : la copie récente s'il y en a une, sinon null", async () => {
-    jest.useFakeTimers({ now: 3_000_000, ...FAKE_CLOCK });
+    jest.useFakeTimers({ now: PUBLISHED_NOW + 3_000_000, ...FAKE_CLOCK });
     mockedSnapshot.mockResolvedValue(tournamentSnapshot());
     await getSpectatorPayload(100, 0, CLIENT);
     // La réponse du tournoi 100 a expiré (15 s au calme) mais reste dans l'âge
     // déclaré ; le seau, rempli entre-temps, est vidé ensuite.
-    jest.setSystemTime(3_000_000 + 20_000);
+    jest.setSystemTime(PUBLISHED_NOW + 3_000_000 + 20_000);
     await spendAllTokens();
 
     expect(await publicTournamentSnapshot(100, 0, CLIENT, () => true)).not.toBeNull();
@@ -331,11 +340,11 @@ describe("publicTournamentSnapshot", () => {
   });
 
   it("publicTournamentSnapshot_expiredCopyAndRefused_returnsCopyWithoutLoading", async () => {
-    jest.useFakeTimers({ now: 3_000_000, ...FAKE_CLOCK });
+    jest.useFakeTimers({ now: PUBLISHED_NOW + 3_000_000, ...FAKE_CLOCK });
     mockedSnapshot.mockResolvedValue(tournamentSnapshot());
     await getSpectatorPayload(5, 0, CLIENT);
     // Échue (15 s au calme), mais dans l'âge déclaré de la copie.
-    jest.setSystemTime(3_000_000 + 20_000);
+    jest.setSystemTime(PUBLISHED_NOW + 3_000_000 + 20_000);
     mockedSnapshot.mockClear();
     const admit = jest.fn(() => false);
 
@@ -533,6 +542,22 @@ describe("publicTournamentCard", () => {
     expect(card?.state).toBe("REGISTRATION");
     expect(getVisibleTournamentCard).not.toHaveBeenCalled();
   });
+
+  it("publicTournamentCard_cachedCardStateStale_recomputesState", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "UPCOMING", ...OPEN_REGISTRATION }));
+
+    const card = await publicTournamentCard(5, () => true);
+
+    expect(card?.state).toBe("REGISTRATION");
+  });
+
+  it("publicTournamentCard_copyNoLongerPublished_returnsNull", async () => {
+    const hidden = tournamentCard({ id: 5, ...OPEN_REGISTRATION, startVisibilityAt: "2999-01-01T00:00:00.000Z" });
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: hidden }));
+    await getSpectatorPayload(5, 0, CLIENT);
+
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
+  });
 });
 
 describe("publicTournamentShare / cachedTournamentShare", () => {
@@ -578,10 +603,10 @@ describe("publicTournamentShare / cachedTournamentShare", () => {
   });
 
   it("publicTournamentShare_expiredCopyAndRefused_isStaleWithoutLoading", async () => {
-    jest.useFakeTimers({ now: 3_000_000, ...FAKE_CLOCK });
+    jest.useFakeTimers({ now: PUBLISHED_NOW + 3_000_000, ...FAKE_CLOCK });
     mockedSnapshot.mockResolvedValue(tournamentSnapshot({ matches: [MATCH] }));
     await getSpectatorPayload(5, 0, CLIENT);
-    jest.setSystemTime(3_000_000 + 20_000);
+    jest.setSystemTime(PUBLISHED_NOW + 3_000_000 + 20_000);
     mockedSnapshot.mockClear();
 
     const view = await publicTournamentShare(5, 0, CLIENT, () => false);
@@ -619,12 +644,12 @@ describe("publicTournamentImageView", () => {
   });
 
   it("publicTournamentImageView_expiredCopyAndCardReadable_returnsFreshCardNotCopy", async () => {
-    jest.useFakeTimers({ now: 4_000_000, ...FAKE_CLOCK });
+    jest.useFakeTimers({ now: PUBLISHED_NOW + 4_000_000, ...FAKE_CLOCK });
     mockedSnapshot.mockResolvedValue(
       tournamentSnapshot({ card: tournamentCard({ id: 5, state: "REGISTRATION", registeredTeams: 8 }) }),
     );
     await getSpectatorPayload(5, 0, CLIENT);
-    jest.setSystemTime(4_000_000 + 20_000);
+    jest.setSystemTime(PUBLISHED_NOW + 4_000_000 + 20_000);
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "REGISTRATION", registeredTeams: 9 }));
 
     const view = await publicTournamentImageView(5, 0, CLIENT, () => true);
@@ -634,19 +659,29 @@ describe("publicTournamentImageView", () => {
   });
 
   it("publicTournamentImageView_cardReadRefusedWithCopy_returnsCopyMarkedStale", async () => {
-    jest.useFakeTimers({ now: 5_000_000, ...FAKE_CLOCK });
+    jest.useFakeTimers({ now: PUBLISHED_NOW + 5_000_000, ...FAKE_CLOCK });
     mockedSnapshot.mockResolvedValue(
       tournamentSnapshot({ card: tournamentCard({ id: 5, state: "REGISTRATION", registeredTeams: 8 }) }),
     );
     await getSpectatorPayload(5, 0, CLIENT);
     jest.mocked(getVisibleTournamentCard).mockClear();
-    jest.setSystemTime(5_000_000 + 20_000);
+    jest.setSystemTime(PUBLISHED_NOW + 5_000_000 + 20_000);
 
     const view = await publicTournamentImageView(5, 0, CLIENT, () => false);
 
     expect(view?.card.registeredTeams).toBe(8);
     expect(view?.stale).toBe(true);
     expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentImageView_refusedAndCopyUnpublished_returnsNull", async () => {
+    jest.useFakeTimers({ now: PUBLISHED_NOW, ...FAKE_CLOCK });
+    const hidden = tournamentCard({ id: 5, state: "REGISTRATION", startVisibilityAt: "2026-05-03T00:00:30.000Z" });
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: hidden }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.setSystemTime(PUBLISHED_NOW + 20_000);
+
+    expect(await publicTournamentImageView(5, 0, CLIENT, () => false)).toBeNull();
   });
 
   it("publicTournamentImageView_unknownTournament_returnsNull", async () => {
@@ -656,7 +691,7 @@ describe("publicTournamentImageView", () => {
   });
 
   it("publicTournamentImageView_upcomingTeamTournament_returnsEmptySummaryWithoutRebuild", async () => {
-    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "REGISTRATION" }));
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "REGISTRATION", ...OPEN_REGISTRATION }));
 
     const view = await publicTournamentImageView(5, 0, CLIENT, () => true);
 

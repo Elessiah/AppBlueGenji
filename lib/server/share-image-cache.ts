@@ -41,20 +41,45 @@ export type CachedShareImage = { body: ArrayBuffer; cacheControl: string };
  * Garde d'un **nouveau** rendu (ni en mémoire, ni en vol) : la réserve `embed`
  * a des clés en nombre ouvert (un tournoi, un match, une langue), qu'un client
  * peut parcourir plus vite que la réserve ne les garde.
+ * - `client` : réseau de la requête (`clientNetworkKey`, ou une clé commune
+ *   « inconnu ») ; sert au partage de la file.
  * - `admit` : le plafond du réseau (`SHARE_EMBED_RENDER_RULE`) ; `false` :
  *   refusé, aucun rendu.
- * - `maxQueued` : rendus déjà **en attente** d'une place au-delà desquels on
- *   refuse plutôt que d'allonger la file (sinon chaque requête s'y ajoute
- *   sans borne, et les autres cartes attendent derrière).
+ * - `refund` : rend le jeton pris par `admit` quand le rendu n'a rien produit
+ *   (`build` rend `null` : rien n'a été dessiné). Un rendu qui **échoue** a,
+ *   lui, coûté Satori : son jeton n'est pas rendu (sinon une carte cassée se
+ *   ferait rendre en boucle sans plafond).
+ * - `maxQueued` : rendus **de cette réserve** déjà en attente d'une place
+ *   au-delà desquels on refuse plutôt que d'allonger la file (les attentes des
+ *   autres réserves ne comptent pas : un parcours des cartes d'équipe ne fait
+ *   pas refuser l'aperçu d'un match).
+ * - `maxQueuedPerClient` : attentes d'un même réseau, au plus — un client qui
+ *   insiste ne remplit pas seul la file des autres.
  */
-export type ShareRenderAdmission = { admit: () => boolean; maxQueued: number };
+export type ShareRenderAdmission = {
+  client: string;
+  admit: () => boolean;
+  refund: () => void;
+  maxQueued: number;
+  maxQueuedPerClient: number;
+};
 
 /** Rendus d'aperçu de tournoi ou de match en attente d'une place, au plus. */
 export const MAX_QUEUED_EMBED_RENDERS = 8;
 
-/** Rendus en attente d'une place (tests). */
-export function queuedShareRenders(): number {
-  return waiting.length;
+/** Rendus d'aperçu en attente d'une place pour un même réseau, au plus. */
+export const MAX_QUEUED_EMBED_RENDERS_PER_CLIENT = 2;
+
+/** Rendus en attente d'une place, toutes réserves ou une seule (tests). */
+export function queuedShareRenders(pool?: ShareImagePool): number {
+  return pool === undefined ? waiting.length : waiting.filter((entry) => entry.pool === pool).length;
+}
+
+/** Attentes de `client` dans la réserve `pool`. */
+function queuedFor(pool: ShareImagePool, client: string): number {
+  let count = 0;
+  for (const entry of waiting) if (entry.pool === pool && entry.client === client) count += 1;
+  return count;
 }
 
 type Entry = CachedShareImage & { expiresAt: number; followsRanking: boolean };
@@ -72,11 +97,12 @@ let rankingGeneration = 0;
 const RANKING_FLIGHT_PREFIX = "share-image:ranking:";
 
 let activeRenders = 0;
-const waiting: Array<() => void> = [];
+type Waiter = { resolve: () => void; pool: ShareImagePool; client: string | null };
+const waiting: Waiter[] = [];
 
-async function withRenderSlot<T>(task: () => Promise<T>): Promise<T> {
+async function withRenderSlot<T>(task: () => Promise<T>, pool: ShareImagePool, client: string | null): Promise<T> {
   if (activeRenders >= MAX_CONCURRENT_RENDERS) {
-    await new Promise<void>((resolve) => waiting.push(resolve));
+    await new Promise<void>((resolve) => waiting.push({ resolve, pool, client }));
   } else {
     activeRenders += 1;
   }
@@ -85,9 +111,16 @@ async function withRenderSlot<T>(task: () => Promise<T>): Promise<T> {
   } finally {
     // La place passe directement au suivant : le compte ne bouge pas.
     const next = waiting.shift();
-    if (next) next();
+    if (next) next.resolve();
     else activeRenders -= 1;
   }
+}
+
+/** File de la réserve, part du réseau, puis jeton : un refus de file ne prend pas de jeton. */
+function admitsNewRender(pool: ShareImagePool, admission: ShareRenderAdmission): boolean {
+  if (queuedShareRenders(pool) >= admission.maxQueued) return false;
+  if (queuedFor(pool, admission.client) >= admission.maxQueuedPerClient) return false;
+  return admission.admit();
 }
 
 /**
@@ -115,15 +148,26 @@ export async function cachedShareImage(
   const flightKey = `${followsRanking ? RANKING_FLIGHT_PREFIX : "share-image:"}${pool}:${key}`;
   // Rejoindre un rendu en vol ne coûte rien ; un nouveau rendu passe la garde
   // (file d'abord : un refus pour file pleine ne prend pas de jeton).
+  // File de la réserve et part du réseau d'abord : un refus pour file pleine
+  // ne prend pas de jeton.
+  let guarded: ShareRenderAdmission | null = null;
   if (admission && !isCachedOrLoading(flightKey)) {
-    if (waiting.length >= admission.maxQueued || !admission.admit()) return null;
+    if (!admitsNewRender(pool, admission)) return null;
+    guarded = admission;
   }
   const image = await cached(flightKey, 0, () =>
-    withRenderSlot(async () => {
-      const response = await build();
-      if (!response) return null;
-      return { body: await response.arrayBuffer(), cacheControl: response.headers.get("cache-control") ?? "" };
-    }),
+    withRenderSlot(
+      async () => {
+        const response = await build();
+        if (!response) {
+          guarded?.refund();
+          return null;
+        }
+        return { body: await response.arrayBuffer(), cacheControl: response.headers.get("cache-control") ?? "" };
+      },
+      pool,
+      guarded?.client ?? null,
+    ),
   );
   if (!image) return null;
   // Invalidée pendant le rendu : servie à qui l'attendait, jamais gardée.

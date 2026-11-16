@@ -309,7 +309,7 @@ describe("page sans compte — mise en page", () => {
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 12, name: "Cup" }));
     const meta = await generateMetadata(params("12"));
     const images = (meta.openGraph as { images?: { url: string }[] }).images ?? [];
-    expect(images[0]?.url).toMatch(/^\/og\/fr\/tournament-12\.png\?v=[0-9a-z]+$/);
+    expect(images[0]?.url).toMatch(/^\/og\/fr\/tournament-12\.png\?v=[0-9a-z]+(?:\.[0-9a-z]+)?$/);
     expect((meta.twitter as { images?: { url: string }[] }).images?.[0]?.url).toBe(images[0]?.url);
   });
 

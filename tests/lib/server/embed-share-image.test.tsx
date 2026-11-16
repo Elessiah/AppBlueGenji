@@ -8,16 +8,23 @@ import {
   NEUTRAL_CARD_CACHE_CONTROL,
   STALE_CARD_CACHE_CONTROL,
   buildEmbedShareImage,
+  clearNeutralShareImages,
   renderEmbedShareImage,
 } from "@/lib/server/embed-share-image";
 import { renderPageShareImage } from "@/lib/server/page-share-image";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
-import { clearShareImageCache } from "@/lib/server/share-image-cache";
+import {
+  clearShareImageCache,
+  MAX_QUEUED_EMBED_RENDERS,
+  MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
+  type ShareRenderAdmission,
+} from "@/lib/server/share-image-cache";
 import { teamLogoDataUrl } from "@/lib/server/share-podium";
 import {
   publicTournamentImageViewForRequest,
   publicTournamentShareForRequest,
   shareEmbedRenderAdmission,
+  shareRequestClient,
 } from "@/lib/server/spectator-request";
 import type { PublicTournamentShare } from "@/lib/server/spectator-snapshot";
 import {
@@ -51,6 +58,7 @@ jest.mock("@/lib/server/spectator-request", () => ({
   publicTournamentImageViewForRequest: jest.fn(),
   publicTournamentShareForRequest: jest.fn(),
   shareEmbedRenderAdmission: jest.fn(),
+  shareRequestClient: jest.fn(),
 }));
 jest.mock("@/lib/server/page-share-image", () => ({ renderPageShareImage: jest.fn() }));
 jest.mock("@/lib/server/share-podium", () => ({ teamLogoDataUrl: jest.fn() }));
@@ -80,6 +88,18 @@ function view(overrides: Partial<MatchShareSummary> = {}): PublicTournamentShare
   };
 }
 
+const CLIENT = "203.0.113.7";
+
+function admission(admit: () => boolean): ShareRenderAdmission {
+  return {
+    client: CLIENT,
+    admit,
+    refund: () => undefined,
+    maxQueued: MAX_QUEUED_EMBED_RENDERS,
+    maxQueuedPerClient: MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
+  };
+}
+
 function neutral(): Response {
   return new Response("neutral", { headers: { "content-type": "image/png" } });
 }
@@ -90,9 +110,11 @@ async function get(locale: string, card: string, query = ""): Promise<Response> 
 
 beforeEach(() => {
   clearShareImageCache();
+  clearNeutralShareImages();
+  jest.mocked(shareRequestClient).mockReset().mockResolvedValue(CLIENT);
   jest.mocked(publicTournamentImageViewForRequest).mockReset().mockResolvedValue(view());
   jest.mocked(publicTournamentShareForRequest).mockReset().mockResolvedValue(view());
-  jest.mocked(shareEmbedRenderAdmission).mockReset().mockResolvedValue(() => true);
+  jest.mocked(shareEmbedRenderAdmission).mockReset().mockReturnValue(admission(() => true));
   jest.mocked(renderPageShareImage).mockReset().mockImplementation(async () => neutral());
   jest.mocked(teamLogoDataUrl).mockReset().mockResolvedValue(null);
   jest.mocked(shareCardLogo).mockReset().mockResolvedValue(null);
@@ -104,14 +126,14 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
 
     expect(await response.text()).toBe("png");
     expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
-    expect(publicTournamentImageViewForRequest).toHaveBeenCalledWith(4);
+    expect(publicTournamentImageViewForRequest).toHaveBeenCalledWith(4, CLIENT);
   });
 
   it("GET_matchKey_readsThePublicShare", async () => {
     await get("en", "tournament-4-match-7.png");
 
     expect(publicTournamentImageViewForRequest).not.toHaveBeenCalled();
-    expect(publicTournamentShareForRequest).toHaveBeenCalledWith(4);
+    expect(publicTournamentShareForRequest).toHaveBeenCalledWith(4, CLIENT);
   });
 
   it("GET_tournamentVersionMatches_servesPublicCache", async () => {
@@ -154,12 +176,31 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
   });
 
   it("GET_renderRefused_servesNeutralCard", async () => {
-    jest.mocked(shareEmbedRenderAdmission).mockResolvedValue(() => false);
+    jest.mocked(shareEmbedRenderAdmission).mockReturnValue(admission(() => false));
 
     const response = await get("fr", "tournament-4-match-7.png");
 
     expect(await response.text()).toBe("neutral");
     expect(response.headers.get("cache-control")).toBe(NEUTRAL_CARD_CACHE_CONTROL);
+  });
+
+  it("GET_neutralRenderedOnce_isServedFromMemoryAfterwards", async () => {
+    jest.mocked(shareEmbedRenderAdmission).mockReturnValue(admission(() => false));
+
+    const first = await get("fr", "tournament-4-match-7.png");
+    const second = await get("fr", "tournament-4.png");
+
+    expect(await first.text()).toBe("neutral");
+    expect(await second.text()).toBe("neutral");
+    expect(second.headers.get("cache-control")).toBe(NEUTRAL_CARD_CACHE_CONTROL);
+    expect(renderPageShareImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("GET_embedKey_readsClientOnceForReadAndAdmission", async () => {
+    await get("fr", "tournament-4.png");
+
+    expect(shareRequestClient).toHaveBeenCalledTimes(1);
+    expect(shareEmbedRenderAdmission).toHaveBeenCalledWith(CLIENT);
   });
 
   it("GET_copyExpired_servesNoStore", async () => {

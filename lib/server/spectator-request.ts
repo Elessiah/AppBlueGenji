@@ -24,8 +24,13 @@ import {
   enforceRateLimit,
   SHARE_EMBED_RENDER_RULE,
   SPECTATOR_READ_RULE,
-  takeRateToken,
 } from "@/lib/server/api-guard";
+import { refundTokenBucket, takeTokenBucket } from "@/lib/server/rate-limit";
+import {
+  MAX_QUEUED_EMBED_RENDERS,
+  MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
+  type ShareRenderAdmission,
+} from "@/lib/server/share-image-cache";
 import { currentSpectatorLoadLevel } from "@/lib/server/spectator-load";
 import {
   publicTournamentCard,
@@ -56,15 +61,24 @@ export async function publicTournamentSnapshotForRequest(tournamentId: number): 
   return publicTournamentSnapshot(tournamentId, currentSpectatorLoadLevel(), client, () => !enforceRateLimit(SPECTATOR_READ_RULE, client));
 }
 
+/** Réseau de la requête en cours (`clientNetworkKey`), `null` : inconnu. */
+export async function shareRequestClient(): Promise<string | null> {
+  return clientNetworkKey(clientIpFromHeaders(await headers()));
+}
+
 /**
  * Carte et résumé d'aperçu d'un tournoi pour l'encart d'une page de match ou
  * l'image d'un tournoi ou d'un match (`SHARE_EMBEDS.md`), ou `null`. Même
  * règle que les réglages : la réponse publique mutualisée, un jeton du plafond
- * seulement quand elle n'est pas déjà en cache.
+ * seulement quand elle n'est pas déjà en cache. `client` : le réseau déjà lu
+ * par l'appelant (sinon lu ici).
  */
-export async function publicTournamentShareForRequest(tournamentId: number): Promise<PublicTournamentShare | null> {
-  const client = clientNetworkKey(clientIpFromHeaders(await headers()));
-  return publicTournamentShare(tournamentId, currentSpectatorLoadLevel(), client, () => !enforceRateLimit(SPECTATOR_READ_RULE, client));
+export async function publicTournamentShareForRequest(
+  tournamentId: number,
+  client?: string | null,
+): Promise<PublicTournamentShare | null> {
+  const network = client === undefined ? await shareRequestClient() : client;
+  return publicTournamentShare(tournamentId, currentSpectatorLoadLevel(), network, () => !enforceRateLimit(SPECTATOR_READ_RULE, network));
 }
 
 /**
@@ -72,19 +86,37 @@ export async function publicTournamentShareForRequest(tournamentId: number): Pro
  * `null`. La carte et la réponse publique lues par une même requête ne paient
  * qu'**un** jeton du plafond des lectures : le verdict du premier est gardé.
  */
-export async function publicTournamentImageViewForRequest(tournamentId: number): Promise<PublicTournamentShare | null> {
-  const client = clientNetworkKey(clientIpFromHeaders(await headers()));
+export async function publicTournamentImageViewForRequest(
+  tournamentId: number,
+  client?: string | null,
+): Promise<PublicTournamentShare | null> {
+  const network = client === undefined ? await shareRequestClient() : client;
   let admitted: boolean | undefined;
-  const admitOnce = () => (admitted ??= !enforceRateLimit(SPECTATOR_READ_RULE, client));
-  return publicTournamentImageView(tournamentId, currentSpectatorLoadLevel(), client, admitOnce);
+  const admitOnce = () => (admitted ??= !enforceRateLimit(SPECTATOR_READ_RULE, network));
+  return publicTournamentImageView(tournamentId, currentSpectatorLoadLevel(), network, admitOnce);
 }
 
 /**
- * Autorisation de **rendre** une image d'aperçu absente de la mémoire pour le
- * réseau de la requête (`SHARE_EMBED_RENDER_RULE`) : à n'appeler qu'avant un
- * vrai rendu ; `false` : refusé (la route sert la carte neutre).
+ * Seau des requêtes **sans réseau lisible** (aucun relais de confiance :
+ * `next start` exposé, relais mal réglé) : ailleurs une identité inconnue
+ * n'est pas plafonnée, mais un rendu Satori est trop cher pour rester ouvert ;
+ * au pire, ces requêtes partagent un seau et reçoivent la carte neutre.
  */
-export async function shareEmbedRenderAdmission(): Promise<() => boolean> {
-  const client = clientNetworkKey(clientIpFromHeaders(await headers()));
-  return () => !takeRateToken(SHARE_EMBED_RENDER_RULE, client);
+export const UNKNOWN_NETWORK_RENDER_KEY = "unknown-network";
+
+/**
+ * Garde d'un **nouveau** rendu d'image d'aperçu pour le réseau `client`
+ * (`SHARE_EMBED_RENDER_RULE`, file bornée par réserve et par réseau) : `admit`
+ * n'est appelé qu'avant un vrai rendu ; `false` : refusé (la route sert la
+ * carte neutre). `refund` rend le jeton d'un rendu qui n'a rien dessiné.
+ */
+export function shareEmbedRenderAdmission(client: string | null): ShareRenderAdmission {
+  const key = client ?? UNKNOWN_NETWORK_RENDER_KEY;
+  return {
+    client: key,
+    admit: () => takeTokenBucket(SHARE_EMBED_RENDER_RULE, key).allowed,
+    refund: () => refundTokenBucket(SHARE_EMBED_RENDER_RULE, key),
+    maxQueued: MAX_QUEUED_EMBED_RENDERS,
+    maxQueuedPerClient: MAX_QUEUED_EMBED_RENDERS_PER_CLIENT,
+  };
 }
