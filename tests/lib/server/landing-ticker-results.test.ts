@@ -119,10 +119,10 @@ describe("getLandingTicker — résultats", () => {
     expect(sql).toContain("FROM bg_matches m LEFT JOIN bg_tournaments t ON t.id = m.tournament_id");
     expect(sql).toContain("LEFT JOIN bg_teams t1 ON t1.id = m.team1_id");
     expect(sql).toContain("LEFT JOIN bg_teams t2 ON t2.id = m.team2_id");
-    expect(sql).not.toMatch(/STRAIGHT_JOIN|(?<!LEFT )JOIN bg_tournaments/);
+    expect(sql).not.toMatch(/\bSTRAIGHT_JOIN\b|(?<!LEFT )JOIN bg_tournaments/);
     // Le WHERE ne nomme que `m` : une condition sur `t` rendrait la jointure interne, réordonnable.
     const where = sql.slice(sql.indexOf(" WHERE "), sql.indexOf(" HAVING "));
-    expect(where).not.toMatch(/t1?2?\./);
+    expect(where).not.toMatch(/\bt1?2?\./);
     expect(where).toMatch(/^ WHERE m\.status = 'COMPLETED'/);
   });
 

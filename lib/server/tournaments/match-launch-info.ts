@@ -508,7 +508,6 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
   membershipTeamIds: Set<number>;
   membershipUserIds: Set<number>;
 } {
-  const exposed = visible.filter(({ exposes }) => exposes);
   const rosterTeamIds = new Set<number>();
   const userIds = new Set<number>();
   const membershipTeamIds = new Set<number>();
@@ -517,26 +516,44 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
     for (const caster of row.casters) userIds.add(caster.userId);
     if (row.referee_user_id !== null) userIds.add(Number(row.referee_user_id));
   }
-  for (const { row } of exposed) {
-    for (const index of [1, 2] as const) {
-      const { teamId, isGhost, soloUserId } = rowSide(row, index);
-      if (teamId === null || isGhost) continue;
-      if (soloUserId !== null) userIds.add(Number(soloUserId));
-      else rosterTeamIds.add(Number(teamId));
-    }
+  for (const { row } of visible.filter(({ exposes }) => exposes)) {
+    collectExposedSides(row, rosterTeamIds, userIds);
   }
   const refereed = visible.filter(({ row, exposes }) => !exposes && row.referee_user_id !== null);
   for (const { row } of refereed) {
-    for (const index of [1, 2] as const) {
-      const { teamId, isGhost, soloUserId } = rowSide(row, index);
-      // Une entrée solo se juge sur la ligne (`soloUserId`), sans lecture.
-      if (teamId === null || isGhost || soloUserId !== null || rosterTeamIds.has(Number(teamId))) continue;
-      membershipTeamIds.add(Number(teamId));
-      membershipUserIds.add(Number(row.referee_user_id));
-      for (const caster of row.casters) membershipUserIds.add(caster.userId);
-    }
+    collectStaffMemberships(row, rosterTeamIds, membershipTeamIds, membershipUserIds);
   }
   return { rosterTeamIds, userIds, membershipTeamIds, membershipUserIds };
+}
+
+/** Côtés d'un match aux contacts exposés : roster entier, ou compte d'une entrée solo. */
+function collectExposedSides(row: CandidateRow, rosterTeamIds: Set<number>, userIds: Set<number>): void {
+  for (const index of [1, 2] as const) {
+    const { teamId, isGhost, soloUserId } = rowSide(row, index);
+    if (teamId === null || isGhost) continue;
+    if (soloUserId !== null) userIds.add(Number(soloUserId));
+    else rosterTeamIds.add(Number(teamId));
+  }
+}
+
+/**
+ * Match à arbitre désigné, contacts non exposés : appartenance de son arbitre
+ * et de ses casters aux équipes dont le roster n'est pas déjà lu.
+ */
+function collectStaffMemberships(
+  row: CandidateRow,
+  rosterTeamIds: ReadonlySet<number>,
+  membershipTeamIds: Set<number>,
+  membershipUserIds: Set<number>,
+): void {
+  for (const index of [1, 2] as const) {
+    const { teamId, isGhost, soloUserId } = rowSide(row, index);
+    // Une entrée solo se juge sur la ligne (`soloUserId`), sans lecture.
+    if (teamId === null || isGhost || soloUserId !== null || rosterTeamIds.has(Number(teamId))) continue;
+    membershipTeamIds.add(Number(teamId));
+    membershipUserIds.add(Number(row.referee_user_id));
+    for (const caster of row.casters) membershipUserIds.add(caster.userId);
+  }
 }
 
 /** Clé d'appartenance d'un compte à une équipe (`loadMemberships`). */

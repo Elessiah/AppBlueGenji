@@ -183,9 +183,9 @@ describe("revue juridique cycle 4", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
 
-    // D31 : sans lien dans la liste des images bloquées, lié au compte sur la décision tant qu'il existe.
-    expect(fr).toContain("Empreintes (SHA-256) des avatars supprimés par la modération : dans la liste des images bloquées, sans lien avec aucun compte, datée au jour près ; sur la décision de modération (registre T11), liée au compte tant qu'il existe, avec l'issue de sa contestation (maintenue ou acceptée)");
-    expect(en).toContain("Hashes (SHA-256) of avatars deleted by moderation: in the list of blocked images, with no link to any account, dated to the day; on the moderation decision (record T11), linked to the account as long as it exists, with the outcome of its challenge (upheld or accepted)");
+    // D31 : sans lien dans la liste des images bloquées, lié au compte sur la décision tant qu'elle est gardée (D87).
+    expect(fr).toContain("Empreintes (SHA-256) des avatars supprimés par la modération : dans la liste des images bloquées, sans lien avec aucun compte, datée au jour près ; sur la décision de modération (registre T11), liée au compte tant que cette décision est gardée, avec l'issue de sa contestation (maintenue ou acceptée)");
+    expect(en).toContain("Hashes (SHA-256) of avatars deleted by moderation: in the list of blocked images, with no link to any account, dated to the day; on the moderation decision (record T11), linked to the account as long as that decision is kept, with the outcome of its challenge (upheld or accepted)");
   });
 
   it("processingRegisterT01_avatarHash_legitimateInterestBasisFrAndEn", () => {
@@ -263,8 +263,8 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     const fr = PROCESSING_ACTIVITIES.flatMap((a) => a.dataCategories).join(" ");
     const en = PROCESSING_ACTIVITIES_EN.flatMap((a) => a.dataCategories).join(" ");
 
-    expect(fr).toContain("sur la décision de suppression d'un avatar, son empreinte (SHA-256) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant qu'il existe ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
-    expect(en).toContain("on the decision deleting an avatar, its hash (SHA-256) and the outcome of the challenge (upheld or accepted), linked to the account as long as it exists; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
+    expect(fr).toContain("sur la décision de suppression d'un avatar, son empreinte (SHA-256) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant que la décision est gardée ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
+    expect(en).toContain("on the decision deleting an avatar, its hash (SHA-256) and the outcome of the challenge (upheld or accepted), linked to the account as long as the decision is kept; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
   });
 
   it("deletionNotice_heldAvatar_reactivationMayNotReturnModeratedAvatarFrAndEn", () => {
@@ -313,11 +313,12 @@ const termsSectionEn = (id: string) => TERMS_SECTIONS_EN.find((section) => secti
 
 describe("D22, D30, D31 — empreinte liée à la décision tant que le compte existe", () => {
   it("registerT01_avatarHashRetention_linkedToDecisionUntilErasureFrAndEn", () => {
-    expect(t01Retention()).toContain("tant que le compte existe (anonymisé compris), elle est aussi gardée sur la décision de modération qui la consigne");
-    expect(t01Retention()).toContain("puis effacée avec ces décisions à l'effacement du compte, le blocage devenant définitif");
+    // D87 (EF-65) : la décision suit son signalement, ou le compte s'il est effacé avant.
+    expect(t01Retention()).toContain("tant que cette décision est gardée (registre T11 : jusqu'à l'effacement du signalement qui l'a motivée, ou plus tôt du compte ; anonymisé compris), elle est aussi gardée sur la décision de modération qui la consigne");
+    expect(t01Retention()).toContain("puis effacée avec cette décision, le blocage devenant définitif");
     expect(t01Retention()).toContain("qui ne désigne aucun compte et ne date un blocage qu'au jour près");
-    expect(t01RetentionEn()).toContain("as long as the account exists (anonymized included), it is also kept on the moderation decision that records it");
-    expect(t01RetentionEn()).toContain("then erased with those decisions when the account is erased, the block becoming permanent");
+    expect(t01RetentionEn()).toContain("as long as that decision is kept (record T11: until the report that prompted it is erased, or the account earlier; anonymized included), it is also kept on the moderation decision that records it");
+    expect(t01RetentionEn()).toContain("then erased with that decision, the block becoming permanent");
     expect(t01RetentionEn()).toContain("which designates no account and only dates a block to the day");
   });
 
@@ -331,12 +332,13 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
     expect(t01RetentionEn()).toContain("an avatar moderation never deleted leaves none (neither on the deletion request, nor on anonymization or erasure)");
   });
 
-  it("registerT11_decisionRetention_untilAccountErasedFrAndEn", () => {
+  it("registerT11_decisionRetention_untilReportOrAccountErasedFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T11")?.retention.join("\n") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T11")?.retention.join("\n") ?? "";
 
-    expect(fr).toContain("Décision de suppression d'un avatar (empreinte, issue de la contestation) : tant que le compte existe, anonymisé compris ; effacée avec le compte");
-    expect(en).toContain("Decision deleting an avatar (hash, outcome of the challenge): as long as the account exists, anonymized included; erased with the account");
+    // D87 (EF-65) : jusqu'à l'effacement du signalement lié, plus tôt avec le compte.
+    expect(fr).toContain("jusqu'à l'effacement du signalement qui l'a motivée (ci-dessus), même si le compte est anonymisé entre-temps ; effacée plus tôt avec le compte");
+    expect(en).toContain("until the report that prompted it is erased (above), even if the account is anonymized in the meantime; erased earlier with the account");
   });
 
   it("registerUpdatedAt_advancedWithThisChange", () => {
@@ -362,11 +364,13 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
     const fr = readFileSync(join(process.cwd(), "app/rgpd/page.tsx"), "utf8").replace(/\s+/g, " ");
     const en = readFileSync(join(process.cwd(), "app/rgpd/RgpdEn.tsx"), "utf8").replace(/\s+/g, " ");
 
-    expect(fr).toContain("Tant que le compte existe (anonymisé compris), l&apos;empreinte est aussi gardée sur la décision de suppression");
+    expect(fr).toContain("Tant que la décision de suppression prise sur un signalement ou après un masquage est gardée, l&apos;empreinte l&apos;est aussi sur elle");
+    expect(fr).toContain("Ces décisions sont effacées avec le signalement qui les a motivées");
     expect(fr).toContain("seule l&apos;empreinte reste, sans lien avec aucun compte");
     expect(fr).toContain("un avatar que la modération n&apos;a jamais supprimé part sans laisser d&apos;empreinte");
     expect(fr).not.toContain("est gardée, sans limite de durée et sans lien avec aucun compte");
-    expect(en).toContain("As long as the account exists (anonymized included), the hash is also kept on the deletion decision");
+    expect(en).toContain("As long as the deletion decision taken on a report or after a hiding is kept, the hash is also kept on it");
+    expect(en).toContain("Those decisions are erased with the report that prompted them");
     expect(en).toContain("only the hash remains, with no link to any account");
     expect(en).toContain("avatar moderation never deleted goes without leaving any hash");
     expect(en).not.toContain("when the staff after a hiding");
