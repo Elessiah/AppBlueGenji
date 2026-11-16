@@ -26,7 +26,7 @@ describe("EF-64 UI cycle 1 : connexion", () => {
 
   it("une navigation sans issue rouvre le formulaire", () => {
     expect(login).toContain("NAVIGATION_RELEASE_MS");
-    expect(login).toMatch(/if \(leaving\) \{\s*releaseTimer\.current = setTimeout/);
+    expect(login).toMatch(/if \(releaseTimer\.current\) clearTimeout\(releaseTimer\.current\);\s*releaseTimer\.current = setTimeout\(release, NAVIGATION_RELEASE_MS\)/);
     expect(login).toContain("clearTimeout(releaseTimer.current)");
   });
 });

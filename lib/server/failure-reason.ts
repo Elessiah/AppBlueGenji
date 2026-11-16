@@ -60,12 +60,14 @@ const ANONYMOUS_FRAME = /^at (?:async )?[^()\s]+:\d+:\d+$/;
 function stackFrames(error: Error): string[] {
   if (typeof error.stack !== "string") return [];
   const headerLines = `${error.name}: ${error.message}`.split("\n").length;
-  return error.stack
-    .split("\n")
-    .slice(headerLines)
-    .map((line) => line.trim())
-    .filter((line) => NAMED_FRAME.test(line) || ANONYMOUS_FRAME.test(line))
-    .slice(0, DIAGNOSTIC_FRAMES);
+  const lines = error.stack.split("\n");
+  const frames: string[] = [];
+  // S'arrête au troisième cadre : la pile entière n'est pas passée au crible.
+  for (let i = headerLines; i < lines.length && frames.length < DIAGNOSTIC_FRAMES; i++) {
+    const line = lines[i].trim();
+    if (NAMED_FRAME.test(line) || ANONYMOUS_FRAME.test(line)) frames.push(line);
+  }
+  return frames;
 }
 
 /** Forme d'un code d'erreur du site : majuscules, chiffres et soulignés. */

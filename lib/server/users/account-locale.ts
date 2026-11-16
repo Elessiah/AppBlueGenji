@@ -77,12 +77,27 @@ export function withRowLocale<R extends object>(recipient: R, value: unknown): R
  * le message part bilingue. Toute autre erreur est levée.
  */
 export async function readWithLocaleColumn<T>(read: (withLocale: boolean) => Promise<T>): Promise<T> {
+  if (Date.now() < localeColumnRetryAt) return read(false);
   try {
     return await read(true);
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
+    // Retenu pour un moment : sans cela, chaque lecture paierait un aller-retour
+    // refusé de plus. Retenté ensuite : l'`ALTER` peut avoir été rejoué.
+    localeColumnRetryAt = Date.now() + LOCALE_COLUMN_RECHECK_MS;
     return read(false);
   }
+}
+
+/** Durée pendant laquelle une colonne `locale` refusée n'est plus demandée. */
+const LOCALE_COLUMN_RECHECK_MS = 60_000;
+
+/** Instant avant lequel les lectures se passent de la colonne `locale` (0 : elle est demandée). */
+let localeColumnRetryAt = 0;
+
+/** Tests : oublie la colonne refusée. */
+export function resetLocaleColumnMemory(): void {
+  localeColumnRetryAt = 0;
 }
 
 /**

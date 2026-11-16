@@ -7,6 +7,7 @@ import {
   accountLocaleForDiscordId,
   accountLocaleFromRow,
   readWithLocaleColumn,
+  resetLocaleColumnMemory,
   recordAccountLocale,
   recordLoginLocale,
   withRowLocale,
@@ -129,6 +130,7 @@ describe("withRowLocale", () => {
 });
 
 describe("readWithLocaleColumn", () => {
+  beforeEach(() => resetLocaleColumnMemory());
   const unknownColumn = () => Object.assign(new Error("Unknown column 'locale'"), { code: "ER_BAD_FIELD_ERROR" });
 
   it("readWithLocaleColumn_columnExists_readsOnceWithLocale", async () => {
@@ -136,6 +138,33 @@ describe("readWithLocaleColumn", () => {
 
     await expect(readWithLocaleColumn(read)).resolves.toBe("with");
     expect(read.mock.calls).toEqual([[true]]);
+  });
+
+  it("readWithLocaleColumn_columnRefusedBefore_skipsTheFailingAttempt", async () => {
+    const read = jest.fn(async (withLocale: boolean) => {
+      if (withLocale) throw unknownColumn();
+      return "without";
+    });
+
+    await readWithLocaleColumn(read);
+    read.mockClear();
+    await expect(readWithLocaleColumn(read)).resolves.toBe("without");
+    expect(read.mock.calls).toEqual([[false]]);
+  });
+
+  it("readWithLocaleColumn_afterRecheckDelay_asksForTheColumnAgain", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const read = jest.fn(async (withLocale: boolean) => {
+      if (withLocale) throw unknownColumn();
+      return "without";
+    });
+    await readWithLocaleColumn(read);
+    read.mockClear();
+    now.mockReturnValue(1_000_000 + 61_000);
+    await readWithLocaleColumn(read);
+    now.mockRestore();
+
+    expect(read.mock.calls).toEqual([[true], [false]]);
   });
 
   it("readWithLocaleColumn_unknownColumn_retriesWithoutLocale", async () => {

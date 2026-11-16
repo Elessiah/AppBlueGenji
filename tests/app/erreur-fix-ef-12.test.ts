@@ -100,7 +100,7 @@ describe("boutons en attente : aria-disabled, pas disabled", () => {
     // Garde synchrone, posée avant tout envoi, rendue en fin d'envoi (sauf départ vers la réactivation).
     expect(login.match(/event\.preventDefault\(\);\s+if \(inFlight\.current\) return;\s+inFlight\.current = true;/g)).toHaveLength(2);
     expect(login).toMatch(/finally \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
-    expect(login).toMatch(/\} else \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
+    expect(login).toMatch(/const release = \(\) => \{\s+inFlight\.current = false;\s+setLoading\(false\);\s+\};/);
   });
 
   it("verifyCode_success_keepsGuardWhileRedirecting", () => {

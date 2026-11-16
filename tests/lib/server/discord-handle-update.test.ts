@@ -23,6 +23,7 @@ import {
   resolveDiscordUser,
   sendDiscordLoginCode,
 } from "@/lib/server/bot-integration";
+import { resetLocaleColumnMemory } from "@/lib/server/users/account-locale";
 import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 import {
   consumeDiscordLoginChallenge,
@@ -124,6 +125,7 @@ const GOOGLE_ACCOUNT: UserState = {
 };
 
 beforeEach(() => {
+  resetLocaleColumnMemory();
   jest.clearAllMocks();
   jest.mocked(createDiscordLoginChallenge).mockResolvedValue({
     challengeId: 77,

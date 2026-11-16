@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { resetLocaleColumnMemory } from "@/lib/server/users/account-locale";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -97,6 +98,7 @@ function mockDb({
 
 describe("notifyTeamInvite", () => {
   beforeEach(() => {
+    resetLocaleColumnMemory();
     jest.clearAllMocks();
     resetTeamNoticeSlots();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });

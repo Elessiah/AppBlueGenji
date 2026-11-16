@@ -225,6 +225,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     if (message) showError(message);
   }, [showError, suspensionNotice, text]);
 
+  /**
+   * Rouvre le formulaire. Après une navigation lancée (`leaving`), la garde
+   * reste posée jusqu'à `NAVIGATION_RELEASE_MS` : un seul minuteur à la fois.
+   */
+  const releaseGuard = (leaving: boolean) => {
+    const release = () => {
+      inFlight.current = false;
+      setLoading(false);
+    };
+    if (!leaving) return release();
+    if (releaseTimer.current) clearTimeout(releaseTimer.current);
+    releaseTimer.current = setTimeout(release, NAVIGATION_RELEASE_MS);
+  };
+
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
     if (inFlight.current) return;
@@ -313,15 +327,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       showError((e as Error).message);
     } finally {
       // Connexion réussie ou réactivation : la garde reste posée pendant la navigation.
-      if (leaving) {
-        releaseTimer.current = setTimeout(() => {
-          inFlight.current = false;
-          setLoading(false);
-        }, NAVIGATION_RELEASE_MS);
-      } else {
-        inFlight.current = false;
-        setLoading(false);
-      }
+      releaseGuard(leaving);
     }
   };
 
