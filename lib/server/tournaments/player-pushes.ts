@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Notifications des joueurs nées du moteur de tournoi : départ d'un match,
  * score à confirmer, coup d'envoi d'un tournoi.
@@ -20,6 +19,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * fait passer juste après toute écriture capable d'ouvrir un lancement, et par
  * la lecture de la liste des tournois, comme les rappels.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";

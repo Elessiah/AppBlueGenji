@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Ce que produit un horaire de match posé ou changé par l'arbitrage
  * (`setMatchStartAt`) : l'annonce aux joueurs, la notification aux arbitres et
@@ -25,6 +24,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * meilleur effort et après le commit : l'horaire est enregistré, une panne de
  * notification n'y change rien.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";

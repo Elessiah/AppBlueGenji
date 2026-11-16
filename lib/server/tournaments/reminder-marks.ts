@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Marques de rappel d'une manche (`bg_match_reminders` : observation, palier,
  * horaire reçu — `./match-reminders`).
@@ -8,6 +7,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * ses marques appartenaient à l'ancienne affiche. Les nouvelles engagées n'ont
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";

@@ -206,6 +206,30 @@ describe("failureDiagnostic", () => {
     expect(diagnostic).toContain("at replayRound (/app/lib/server/tournaments/swiss.ts:10:5)");
   });
 
+  it("failureDiagnostic_frameLocationWithSpacesAndParentheses_kept", () => {
+    const error = new TypeError("x");
+    error.stack = [
+      "TypeError: x",
+      "    at replayRound (webpack-internal:///(rsc)/./lib/server/swiss.ts:10:5)",
+      "    at C:\\Program Files\\app\\lib\\server\\sweeps.ts:20:7",
+    ].join("\n");
+
+    expect(failureDiagnostic(error)).toBe(
+      "TypeError at replayRound (webpack-internal:///(rsc)/./lib/server/swiss.ts:10:5)" +
+        " < at C:\\Program Files\\app\\lib\\server\\sweeps.ts:20:7",
+    );
+  });
+
+  it("failureDiagnostic_messageShortenedAfterConstruction_ignoresStaleHeaderLines", () => {
+    const error = withStack(new Error("short"), "Error: first line\nNovaSecretPseudo (at x.ts:1:2)\nat leak (/secret/nova.ts:1:1)");
+
+    const diagnostic = failureDiagnostic(error);
+
+    expect(diagnostic).not.toContain("Nova");
+    expect(diagnostic).not.toContain("leak");
+    expect(diagnostic).toContain("at replayRound (/app/lib/server/tournaments/swiss.ts:10:5)");
+  });
+
   it("failureDiagnostic_noStack_returnsNameOnly", () => {
     const error = new RangeError("index 12 out of range");
     error.stack = undefined;

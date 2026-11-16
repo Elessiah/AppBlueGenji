@@ -33,7 +33,8 @@ chaque langue de ses destinataires (`fr`, `en`, bilingue sans langue connue) **a
 fait échouer la notification sans qu'aucun push ne soit parti —, prend la langue
 que le chargeur a lue avec la ligne (`loadNotificationRecipients`,
 `NotificationRecipient.locale` ; aussi les chargeurs des invitations et demandes
-d'équipe, `team-invite-notifications.ts`, `team-join-notifications.ts`), relit `bg_users.locale` des seuls autres
+d'équipe, `team-invite-notifications.ts`, `team-join-notifications.ts`, et le code
+Discord), relit `bg_users.locale` des seuls autres
 destinataires en **une** requête, les groupe par langue et fait **un appel**
 `/internal/notify/dm` par groupe : le contrat du bot ne change pas. Les groupes
 partent **l'un après l'autre** et un appel perdu arrête les suivants : un bot
@@ -101,3 +102,8 @@ bilingue, appel perdu), `issue-reports`, `referee-alerts-routing`,
 `bot-integration` (corps envoyés), routes de code de connexion. Côté bot :
 `src/tests/notifications/dmLanguage.test.ts`, `routes.test.ts`,
 `notifications.test.ts`, `deliver.test.ts`.
+
+**Colonne `locale` absente** (`ALTER` en échec) : ces lectures passent par
+`readWithLocaleColumn` (`account-locale.ts`), qui relit sans la colonne (message
+bilingue) et ne la redemande plus pendant 60 s — seulement quand le refus nomme
+`locale` : une autre colonne absente ne coupe pas la langue des autres lectures.

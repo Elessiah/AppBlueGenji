@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Lecture de la modale de lancement : les matchs du lecteur — joueur d'une des
  * deux engagées ou un de leurs casters — qui approchent de leur heure, sont en
@@ -22,6 +21,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  *
  * Voir `docs/features/MATCH_LAUNCH.md`.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { battletagFromBlizzard } from "@/lib/server/battletag-origin";

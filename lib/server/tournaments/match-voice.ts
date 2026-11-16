@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Salons vocaux d'équipe des matchs (`docs/features/MATCH_VOICE.md`).
  *
@@ -20,6 +19,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * Le site ne garde que l'identifiant de chaque salon et ses horaires : il ne
  * demande jamais au bot qui s'y trouve, ni combien.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import {

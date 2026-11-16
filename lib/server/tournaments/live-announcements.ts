@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Annonce des lives sur Discord : au **début** d'un match diffusé, le bot poste
  * dans le salon #live du serveur BlueGenji le message de la soirée (`@everyone`
@@ -51,6 +50,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * `https` : il faut en plus `LIVE_ANNOUNCEMENTS_ENABLED=1`, que seul le `.env`
  * de production pose, et un `APP_URL` en `https` sur un nom de domaine.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";

@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Avis aux engagées **retirées** d'une manche dont elles tenaient l'horaire,
  * quand le tournoi change sous elles : correction de score (`./target-slot.ts`
@@ -28,6 +27,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
  * depuis plus de 12 h.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";

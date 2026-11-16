@@ -39,7 +39,7 @@ import {
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import { renderDm, type LocalizedDm } from "@/lib/shared/dm-language";
 import type { Locale } from "@/lib/shared/locales";
-import { accountLocaleFromRow, withRowLocale } from "./users/account-locale";
+import { accountLocaleFromRow, readWithLocaleColumn, withRowLocale } from "./users/account-locale";
 import {
   PUSH_TOPICS,
   type LocalizedPushContent,
@@ -171,10 +171,15 @@ async function loadAccountLocales(userIds: readonly number[]): Promise<Map<numbe
   if (ids.length === 0) return locales;
   try {
     const db = await getDatabase();
-    const [rows] = await db.query<(RowDataPacket & { id: number; locale: unknown })[]>(
-      `SELECT id, locale FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
-      ids,
-    );
+    // Colonne absente : langues inconnues, sans redemander la colonne à chaque envoi.
+    const rows = await readWithLocaleColumn(async (withLocale) => {
+      if (!withLocale) return [];
+      const [found] = await db.query<(RowDataPacket & { id: number; locale: unknown })[]>(
+        `SELECT id, locale FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+        ids,
+      );
+      return found;
+    });
     for (const row of rows) locales.set(Number(row.id), accountLocaleFromRow(row.locale));
   } catch (error) {
     console.error("[notify] langue des comptes illisible, messages privés bilingues", failureReason(error));

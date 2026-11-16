@@ -82,11 +82,19 @@ export async function readWithLocaleColumn<T>(read: (withLocale: boolean) => Pro
     return await read(true);
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
-    // Retenu pour un moment : sans cela, chaque lecture paierait un aller-retour
-    // refusé de plus. Retenté ensuite : l'`ALTER` peut avoir été rejoué.
-    localeColumnRetryAt = Date.now() + LOCALE_COLUMN_RECHECK_MS;
+    // Retenu pour un moment, et seulement quand le refus nomme `locale` : sans
+    // cela, chaque lecture paierait un aller-retour refusé de plus. Une autre
+    // colonne absente ne coupe pas la langue des autres lectures. Retenté
+    // ensuite : l'`ALTER` peut avoir été rejoué.
+    if (namesLocaleColumn(error)) localeColumnRetryAt = Date.now() + LOCALE_COLUMN_RECHECK_MS;
     return read(false);
   }
+}
+
+/** Le refus de colonne inconnue nomme-t-il `locale` (`'locale'`, `'u.locale'`) ? */
+function namesLocaleColumn(error: unknown): boolean {
+  const { message, sqlMessage } = (error ?? {}) as { message?: unknown; sqlMessage?: unknown };
+  return [message, sqlMessage].some((text) => typeof text === "string" && /'(?:\w+\.)?locale'/.test(text));
 }
 
 /** Durée pendant laquelle une colonne `locale` refusée n'est plus demandée. */
@@ -113,20 +121,17 @@ export async function accountLocaleForDiscordId(discordId: string): Promise<Loca
 async function readDmLocale(sql: string, key: number | string): Promise<Locale | null> {
   try {
     const db = await getDatabase();
-    const [rows] = await db.query(sql, [key]);
-    const row = (rows as { locale?: unknown }[])[0];
-    return row ? accountLocaleFromRow(row.locale) : null;
+    // Colonne absente : message bilingue, sans redemander la colonne à chaque envoi.
+    return await readWithLocaleColumn(async (withLocale) => {
+      if (!withLocale) return null;
+      const [rows] = await db.query(sql, [key]);
+      const row = (rows as { locale?: unknown }[])[0];
+      return row ? accountLocaleFromRow(row.locale) : null;
+    });
   } catch (error) {
     // Le code seul, jamais l'erreur entière : celle de mysql2 porte la requête
     // avec ses valeurs (`sql`), donc l'identifiant Discord de la personne visée.
-    console.error("[account-locale] langue du compte illisible, message privé bilingue", dbErrorCode(error));
+    console.error("[account-locale] langue du compte illisible, message privé bilingue", failureReason(error));
     return null;
   }
-}
-
-/** Code d'une erreur de base (`ER_BAD_FIELD_ERROR`…), sans son texte ni sa requête. */
-function dbErrorCode(error: unknown): string {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (typeof code === "string") return code;
-  return error instanceof Error ? error.name : "UNKNOWN";
 }

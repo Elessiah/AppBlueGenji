@@ -68,11 +68,21 @@ function callArguments(source: string, masked: string, open: number): string[] {
 }
 
 /**
- * Un argument qui livre l'erreur elle-même : la variable d'erreur nue, son
+ * Une valeur d'erreur nommée comme telle : `e`, ou une variable / un chemin
+ * de propriétés dont le dernier maillon parle d'erreur (`error`, `releaseError`,
+ * `failure`, `result.reason`, `ask.failure.error`, `cause`).
+ */
+const ERROR_VALUE = String.raw`(?:e|(?:[\w$]+(?:\?\.|!\.|\.))*[\w$]*(?:error|err|reason|failure|cause))`;
+
+/**
+ * Un argument qui livre l'erreur elle-même : la valeur d'erreur nue, son
  * `.message` ou sa `.stack` (texte du pilote, valeur en double citée), ou sa
  * conversion en texte.
  */
-const RAW_ERROR_ARGUMENT = /^\s*(?:error|err|e|reason|cause)\s*$|\.(?:message|stack)\b|String\(\s*(?:error|err|e|reason)\s*\)/;
+const RAW_ERROR_ARGUMENT = new RegExp(String.raw`^\s*${ERROR_VALUE}\s*$|\.(?:message|stack)\b|String\(\s*${ERROR_VALUE}\s*\)`, "i");
+
+/** Une interpolation de la valeur d'erreur ou d'un `.message` dans un gabarit. */
+const RAW_ERROR_INTERPOLATION = new RegExp(String.raw`\$\{\s*${ERROR_VALUE}\s*\}|\$\{[^}]*\.(?:message|stack)\b`, "i");
 
 /** Les appels d'échec de `source` qui passent l'erreur brute (après leur étiquette). */
 function rawErrorLogs(source: string): string[] {
@@ -80,7 +90,7 @@ function rawErrorLogs(source: string): string[] {
   const masked = maskStrings(source);
   for (const match of source.matchAll(/console\.(?:error|warn)\(/g)) {
     const args = callArguments(source, masked, (match.index ?? 0) + match[0].length - 1);
-    const interpolated = /\$\{\s*(?:error|err|e)\s*\}|\$\{[^}]*\.message\b/.test(args[0] ?? "");
+    const interpolated = args.some((arg) => RAW_ERROR_INTERPOLATION.test(arg));
     if (interpolated || args.slice(1).some((arg) => RAW_ERROR_ARGUMENT.test(arg))) offenders.push(args.join(",").trim());
   }
   return offenders;
@@ -109,6 +119,19 @@ describe("journaux d'échec : un code, jamais l'objet d'erreur", () => {
     expect(rawErrorLogs(`console.error("[x]", error instanceof Error ? error.message : error);`)).toHaveLength(1);
     expect(rawErrorLogs(`console.error("[x]", (error as Error).message);`)).toHaveLength(1);
     expect(rawErrorLogs("console.error(`[x] ${error}`);")).toHaveLength(1);
+  });
+
+  it("rawErrorLogs_namedErrorValues_detected", () => {
+    for (const value of ["failure", "releaseError", "giveUpError", "brief.error", "read.error", "ask.failure.error", "result.reason", "result?.reason", "cause"]) {
+      expect(rawErrorLogs(`console.error("[x] échec", ${value});`)).toHaveLength(1);
+      expect(rawErrorLogs("console.error(`[x] échec : ${" + value + "}`);")).toHaveLength(1);
+    }
+  });
+
+  it("rawErrorLogs_namedErrorValuesReduced_ignored", () => {
+    expect(rawErrorLogs(`console.error("[x] échec", failureDiagnostic(result.reason));`)).toEqual([]);
+    expect(rawErrorLogs(`console.error("[x] échec", failureReason(ask.failure.error));`)).toEqual([]);
+    expect(rawErrorLogs(`console.warn("[x] échecs", errorCount);`)).toEqual([]);
   });
 
   it("rawErrorLogs_codeOnly_ignored", () => {

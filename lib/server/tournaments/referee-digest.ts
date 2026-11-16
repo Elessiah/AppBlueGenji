@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Programme d'arbitrage : « en même temps » que le rappel de 10 h aux joueurs
  * (demande de l'association, 2026-10-09), les arbitres reçoivent **un** message
@@ -25,6 +24,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * Meilleur effort : le programme manqué (bot injoignable, aucun appareil) n'est
  * pas retenté — un programme envoyé en boucle ne se rattrape pas.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";

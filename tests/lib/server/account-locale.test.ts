@@ -99,17 +99,35 @@ describe("accountLocaleForDiscordId", () => {
   });
 
   it("rend null sur une lecture ratée, sans écrire la requête ni l'identifiant au journal", async () => {
+    resetLocaleColumnMemory();
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    const failure = Object.assign(new Error("Unknown column 'locale'"), {
-      code: "ER_BAD_FIELD_ERROR",
+    const failure = Object.assign(new Error("Lock wait timeout exceeded"), {
+      code: "ER_LOCK_WAIT_TIMEOUT",
       sql: "SELECT locale FROM bg_users WHERE discord_id = '900000000000000002'",
     });
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>().mockRejectedValue(failure) }));
     expect(await accountLocaleForDiscordId("900000000000000002")).toBeNull();
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy.mock.calls[0]).toEqual([expect.any(String), "ER_BAD_FIELD_ERROR"]);
+    expect(spy.mock.calls[0]).toEqual([expect.any(String), "ER_LOCK_WAIT_TIMEOUT"]);
     expect(JSON.stringify(spy.mock.calls)).not.toContain("900000000000000002");
     spy.mockRestore();
+  });
+
+  it("accountLocaleForDiscordId_localeColumnMissing_returnsNullWithoutLogAndRemembers", async () => {
+    resetLocaleColumnMemory();
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest.fn<SqlQuery>().mockRejectedValue(
+      Object.assign(new Error("Unknown column 'locale' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" }),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    expect(await accountLocaleForDiscordId("900000000000000002")).toBeNull();
+    expect(await accountLocaleForDiscordId("900000000000000002")).toBeNull();
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+    resetLocaleColumnMemory();
   });
 });
 
@@ -175,6 +193,33 @@ describe("readWithLocaleColumn", () => {
 
     await expect(readWithLocaleColumn(read)).resolves.toBe("without");
     expect(read.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("readWithLocaleColumn_otherColumnMissing_retriesWithoutRememberingLocale", async () => {
+    const otherColumn = Object.assign(new Error("Unknown column 'tm.left_at' in 'where clause'"), { code: "ER_BAD_FIELD_ERROR" });
+    const read = jest.fn(async (withLocale: boolean) => {
+      if (withLocale) throw otherColumn;
+      return "without";
+    });
+
+    await readWithLocaleColumn(read);
+    await readWithLocaleColumn(read);
+
+    expect(read.mock.calls).toEqual([[true], [false], [true], [false]]);
+  });
+
+  it("readWithLocaleColumn_prefixedLocaleColumnInSqlMessage_remembersRefusal", async () => {
+    const refused = Object.assign(new Error("x"), { code: "ER_BAD_FIELD_ERROR", sqlMessage: "Unknown column 'u.locale' in 'field list'" });
+    const read = jest.fn(async (withLocale: boolean) => {
+      if (withLocale) throw refused;
+      return "without";
+    });
+    await readWithLocaleColumn(read);
+    read.mockClear();
+
+    await readWithLocaleColumn(read);
+
+    expect(read.mock.calls).toEqual([[false]]);
   });
 
   it("readWithLocaleColumn_otherError_rethrowsWithoutRetry", async () => {

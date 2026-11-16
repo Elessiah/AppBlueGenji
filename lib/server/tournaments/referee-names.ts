@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Pseudo de l'arbitre désigné d'un match, **pour les membres connectés**
  * (décision 52, `docs/features/MATCH_REFEREE.md` § « Ce que chacun voit »).
@@ -18,6 +17,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * compte, et survit à un redémarrage (un déploiement ne change pas la version
  * de tous les instantanés arbitrés).
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { createHmac, randomBytes } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { cached, invalidateCached, invalidateCachedPrefix } from "@/lib/server/cache";

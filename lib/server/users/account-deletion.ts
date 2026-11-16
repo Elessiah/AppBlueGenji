@@ -502,11 +502,11 @@ async function applyDeletionMode(
 }
 
 /** Une suite après le commit ; une erreur est consignée, jamais propagée (la suppression est faite). */
-export function afterCommit(step: () => void, failure: string): void {
+export function afterCommit(step: () => void, label: string): void {
   try {
     step();
   } catch (error) {
-    console.error(`[account-deletion] ${failure} :`, failureReason(error));
+    console.error(`[account-deletion] ${label} :`, failureReason(error));
   }
 }
 

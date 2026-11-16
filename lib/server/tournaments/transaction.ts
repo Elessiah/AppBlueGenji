@@ -1,10 +1,10 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Transaction d'un geste de match ou de tournoi (lancement, arbitrage, cartes
  * par tour) : journal du staff, alertes d'arbitrage et avis de cast et
  * d'arbitrage partent **après** le commit (`flushBotLogs`), et sont jetés sur
  * annulation.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";

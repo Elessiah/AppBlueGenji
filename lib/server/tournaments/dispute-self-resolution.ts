@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Arbitre qui tranche **son propre** litige, ou qui suspend la validation
  * d'office d'un report seul sur un match qu'il joue
@@ -12,6 +11,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * Tout part **après** le commit et au meilleur effort : l'arbitrage est acquis,
  * une alerte perdue ne le défait pas.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { notifyStaff } from "@/lib/server/notify";

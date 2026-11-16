@@ -24,9 +24,9 @@ describe("EF-64 UI cycle 1 : connexion", () => {
     }
   });
 
-  it("une navigation sans issue rouvre le formulaire", () => {
+  it("une navigation sans issue est relancée en chargement complet, formulaire fermé", () => {
     expect(login).toContain("NAVIGATION_RELEASE_MS");
-    expect(login).toMatch(/if \(releaseTimer\.current\) clearTimeout\(releaseTimer\.current\);\s*releaseTimer\.current = setTimeout\(release, NAVIGATION_RELEASE_MS\)/);
+    expect(login).toMatch(/if \(releaseTimer\.current\) clearTimeout\(releaseTimer\.current\);\s*releaseTimer\.current = setTimeout\(\(\) => globalThis\.location\.assign\(target\), NAVIGATION_RELEASE_MS\)/);
     expect(login).toContain("clearTimeout(releaseTimer.current)");
   });
 });

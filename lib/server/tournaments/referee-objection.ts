@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Opposition d'un arbitre retenue par le staff (`docs/features/MATCH_REFEREE.md`,
  * décision 42b du 2026-10-28) : l'arbitre s'oppose (formulaire de signalement,
@@ -25,6 +24,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * refusée. Le balayage est rejouable : retenir de nouveau une opposition déjà
  * retenue le refait.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { trackAnnouncement } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";

@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Mémoire courte des invitations à certifier calculées, par lecteur
  * (utilisateur, équipe, rôle, jeu) — `docs/features/CERTIFICATION_PROMPT.md`.
@@ -21,6 +20,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * Clés : `userId:teamId:…` — l'équipe en second segment, pour oublier d'un
  * geste toutes les invitations d'une équipe (`forgetCertificationPromptsOfTeam`).
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 export const CERTIFICATION_PROMPT_TTL_MS = 60_000;

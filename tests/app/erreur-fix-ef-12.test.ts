@@ -100,15 +100,15 @@ describe("boutons en attente : aria-disabled, pas disabled", () => {
     // Garde synchrone, posée avant tout envoi, rendue en fin d'envoi (sauf départ vers la réactivation).
     expect(login.match(/event\.preventDefault\(\);\s+if \(inFlight\.current\) return;\s+inFlight\.current = true;/g)).toHaveLength(2);
     expect(login).toMatch(/finally \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
-    expect(login).toMatch(/const release = \(\) => \{\s+inFlight\.current = false;\s+setLoading\(false\);\s+\};/);
+    expect(login).toMatch(/if \(leavingTo === null\) \{\s+inFlight\.current = false;\s+setLoading\(false\);\s+return;\s+\}/);
   });
 
   it("verifyCode_success_keepsGuardWhileRedirecting", () => {
     const login = readSource("app/connexion/_components/LoginForm.tsx");
     // Code accepté : la garde reste posée pendant la navigation, un second
     // envoi ne renvoie pas le code déjà consommé.
-    expect(login).toMatch(/signalSessionChanged\(\);\s+leaving = true;\s+router\.push\(redirect\);/);
-    expect(login).toMatch(/leaving = true;\s+router\.push\(REACTIVATION_PATH\);/);
+    expect(login).toMatch(/signalSessionChanged\(\);\s+leavingTo = redirect;\s+router\.push\(redirect\);/);
+    expect(login).toMatch(/leavingTo = REACTIVATION_PATH;\s+router\.push\(REACTIVATION_PATH\);/);
   });
 
   it("le profil (avatar, suppression du compte) garde le focus et garde le clic", () => {

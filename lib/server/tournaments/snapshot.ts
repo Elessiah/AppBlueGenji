@@ -34,6 +34,7 @@ import {
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import { failureReason } from "@/lib/server/failure-reason";
 import { createHash } from "node:crypto";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { BracketMatch, TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
@@ -212,8 +213,8 @@ const MAINTENANCE_WARN_INTERVAL_MS = 60_000;
 const lastMaintenanceWarn = new Map<number, number>();
 
 /**
- * Journalise un entretien défait par un interblocage : une ligne (message, sans
- * pile) au plus par minute et par tournoi. Ce chemin est celui de **chaque**
+ * Journalise un entretien défait par un interblocage : une ligne (code, sans
+ * message ni pile) au plus par minute et par tournoi. Ce chemin est celui de **chaque**
  * lecture d'instantané : des centaines de lecteurs d'un tournoi en direct
  * perdraient tous la même course, et pm2 (qu'on n'efface jamais) enflerait
  * d'une pile par lecteur.
@@ -225,8 +226,7 @@ export function warnMaintenanceAborted(tournamentId: number, error: unknown, now
     if (now - at >= MAINTENANCE_WARN_INTERVAL_MS) lastMaintenanceWarn.delete(id);
   }
   lastMaintenanceWarn.set(tournamentId, now);
-  const reason = error instanceof Error ? error.message : String(error);
-  console.warn(`[snapshot] entretien du tournoi ${tournamentId} défait (interblocage), rejoué au prochain passage : ${reason}`);
+  console.warn(`[snapshot] entretien du tournoi ${tournamentId} défait (interblocage), rejoué au prochain passage : ${failureReason(error)}`);
 }
 
 /**

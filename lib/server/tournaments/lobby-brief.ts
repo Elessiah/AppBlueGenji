@@ -1,4 +1,3 @@
-import { failureDiagnostic } from "@/lib/server/failure-reason";
 /**
  * Check-in du match (`MATCH_LOBBY_BRIEF`, `docs/features/MATCH_LOBBY_BRIEF.md`) :
  * **15 minutes avant le coup d'envoi**, les joueurs des deux engagées reçoivent
@@ -54,6 +53,7 @@ import { failureDiagnostic } from "@/lib/server/failure-reason";
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import {
   clipMapPointTargets,
   effectiveMapPointTargets,

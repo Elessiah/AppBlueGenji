@@ -621,7 +621,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     const undo =
       shared || abandoned ? unlinkIfPresent(files.quarantined) : moveFile(files.quarantined, files.live);
     await undo.catch((moveError) => {
-      console.error("[moderation] logo non remis en place après échec", moveError);
+      console.error("[moderation] logo non remis en place après échec", failureReason(moveError));
     });
     throw error;
   } finally {
@@ -714,7 +714,7 @@ export async function hideUserAvatarForReport(
     const abandoned = (error as Error).message === "AVATAR_CHANGED";
     const undo = abandoned ? unlinkIfPresent(files.quarantined) : moveFile(files.quarantined, files.live);
     await undo.catch((moveError) => {
-      console.error("[moderation] avatar non remis en place après échec", moveError);
+      console.error("[moderation] avatar non remis en place après échec", failureReason(moveError));
     });
     throw error;
   } finally {

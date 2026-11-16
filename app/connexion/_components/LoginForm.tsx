@@ -2,7 +2,7 @@
 
 import { signalSessionChanged } from "@/lib/shared/session-change-signal";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocaleHref, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
@@ -78,7 +78,11 @@ function isEarlierTermsVersion(stored: string | null): boolean {
  */
 const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-code" } as const;
 
-/** Délai après lequel un formulaire resté verrouillé par une navigation sans issue se rouvre. */
+/**
+ * Délai après lequel une navigation d'après connexion restée sans issue est
+ * relancée en chargement complet. Le formulaire, lui, reste fermé : le code
+ * est déjà consommé et la session posée, le renvoyer ne ferait qu'un refus.
+ */
 const NAVIGATION_RELEASE_MS = 10_000;
 
 /**
@@ -91,6 +95,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // Navigation dans la langue de la page : une destination restée française
   // (route pas encore traduite) se rejoint par un chargement complet.
   const router = useLocaleRouter();
+  const localeHref = useLocaleHref();
   const text = useLoginText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
@@ -115,8 +120,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // doublée) liraient encore `loading` à faux. Les boutons restent focalisables
   // pendant l'envoi (`aria-disabled` + `aria-busy`, pas `disabled` natif).
   const inFlight = useRef(false);
-  // Navigation qui n'aboutit pas (hors ligne, échec du chargement) : le
-  // formulaire se rouvre au bout de ce délai au lieu de rester verrouillé.
+  // Navigation qui n'aboutit pas (serveur lent, échec du chargement) : elle
+  // est relancée en chargement complet au bout de ce délai, formulaire fermé.
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (releaseTimer.current) clearTimeout(releaseTimer.current);
@@ -226,17 +231,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   }, [showError, suspensionNotice, text]);
 
   /**
-   * Rouvre le formulaire. Après une navigation lancée (`leaving`), la garde
-   * reste posée jusqu'à `NAVIGATION_RELEASE_MS` : un seul minuteur à la fois.
+   * Rouvre le formulaire. Après une navigation lancée (`leavingTo`), la garde
+   * reste posée : le code est consommé. Si la page n'est toujours pas partie
+   * au bout de `NAVIGATION_RELEASE_MS`, la destination est rechargée en entier
+   * — un seul minuteur à la fois.
    */
-  const releaseGuard = (leaving: boolean) => {
-    const release = () => {
+  const releaseGuard = (leavingTo: string | null) => {
+    if (leavingTo === null) {
       inFlight.current = false;
       setLoading(false);
-    };
-    if (!leaving) return release();
+      return;
+    }
+    const target = localeHref(leavingTo);
     if (releaseTimer.current) clearTimeout(releaseTimer.current);
-    releaseTimer.current = setTimeout(release, NAVIGATION_RELEASE_MS);
+    releaseTimer.current = setTimeout(() => globalThis.location.assign(target), NAVIGATION_RELEASE_MS);
   };
 
   const requestCode = async (event: FormEvent) => {
@@ -282,7 +290,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     setLoading(true);
     // Connexion réussie ou renvoi vers la réactivation : le formulaire reste
     // fermé pendant la navigation, le code — déjà consommé — ne se renvoie pas.
-    let leaving = false;
+    let leavingTo: string | null = null;
     try {
       const response = await fetch("/api/auth/discord/verify", {
         method: "POST",
@@ -306,7 +314,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         // Suppression demandée il y a moins de trente jours : l'écran de
         // réactivation (ticket posé en cookie par le serveur), jamais en silence.
         if (code === ACCOUNT_PENDING_DELETION_CODE) {
-          leaving = true;
+          leavingTo = REACTIVATION_PATH;
           router.push(REACTIVATION_PATH);
           return;
         }
@@ -319,7 +327,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       }
       // Rien de retenu pour un compte précédent ne doit s'adresser à celui-ci.
       signalSessionChanged();
-      leaving = true;
+      leavingTo = redirect;
       router.push(redirect);
       router.refresh();
     } catch (e) {
@@ -327,7 +335,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       showError((e as Error).message);
     } finally {
       // Connexion réussie ou réactivation : la garde reste posée pendant la navigation.
-      releaseGuard(leaving);
+      releaseGuard(leavingTo);
     }
   };
 
