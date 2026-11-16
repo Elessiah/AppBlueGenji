@@ -596,7 +596,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`reconcileDeletedAccounts`), qui le ré-anonymise sous un pseudo
     // suffixé. `IGNORE` : une collision sur l'index unique (improbable) ne
     // laisse de côté que sa ligne, reprise au démarrage suivant avec un autre
-    // tirage, au lieu d'annuler toute l'instruction.
+    // tirage, au lieu d'annuler toute l'instruction — d'où, avant de retirer
+    // ce pas, la vérification en production qu'il n'a laissé aucune ligne
+    // (requête dans `docs/features/ACCOUNT_DELETION.md`) : rien d'autre ne
+    // suffixe un compte déjà anonymisé.
     // Puis le nom des entrées solo de ces comptes suit le pseudo, comme le
     // ferait `syncSoloEntryIdentityOn` : le pseudo, sinon « <pseudo> #<id> » —
     // jamais « Joueur #<id> », déductible de l'identifiant ; une entrée

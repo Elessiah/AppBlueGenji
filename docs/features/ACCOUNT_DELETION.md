@@ -321,7 +321,12 @@ c'est la personne derrière, et quels identifiants n'ont plus de fiche.
   l'identifiant), `IGNORE` aussi. Idempotent (un pseudo suffixé n'est plus un
   nom de la liste), sans effet sur une base neuve. Un compte en attente qui
   porterait encore un nom nu au jour 30 en reçoit un neuf au lieu de le
-  garder.
+  garder. **Avant de retirer ce pas** de `RECENT_SCHEMA_CHANGES`, vérifier en
+  production qu'il n'a laissé personne : aucune ligne `is_deleted = 1` dont le
+  pseudo, sous collation binaire, ne finit pas par `-[0-9a-z]{6}` et n'est pas
+  `compte_supprime_<id>` (rattrapage du démarrage) — une ligne laissée par
+  `IGNORE` n'aurait plus rien pour la suffixer, et `/rgpd` promet le suffixe à
+  tout pseudo d'emprunt.
 - **Posé dans la même instruction** que tout le reste (`is_deleted = 1`
   compris) : le balayage de `tests/lib/server/deleted-account-write-guards.test.ts`
   exige que toute écriture de `bg_users` porte `is_deleted = 0`, sauf celle qui
@@ -332,8 +337,10 @@ c'est la personne derrière, et quels identifiants n'ont plus de fiche.
   consentements (`bg_privacy_acknowledgments`,
   `bg_privacy_change_notifications`).
 
-Le nom se lit comme un pseudo ordinaire, et c'est voulu : un plateau l'affiche
-sans contexte. C'est **la fiche** qui dit le compte supprimé.
+Le nom reste lisible, et c'est voulu : un plateau l'affiche sans contexte. Sa
+forme (« nom-6 caractères », D99) trahit la suppression pour qui la connaît —
+`/rgpd` le dit, la suppression n'est pas un secret, l'identité derrière l'est ;
+c'est **la fiche** qui l'annonce à tous.
 
 ## La fiche d'un compte supprimé
 
@@ -396,7 +403,10 @@ Limite assumée : qui épuise la borne d'un compte laisse son nom en lien
 rien apprendre. La borne ne faisait que ralentir la devinette (4 essais par
 jour et par redémarrage, contre mille noms) : c'est le **suffixe aléatoire** du
 pseudo d'emprunt (D99, ci-dessus) qui la rend vaine — elle reste, en défense en
-profondeur. Les noms d'aujourd'hui sont lus **avec** la liste et
+profondeur. Déclarée comme traitement (revue juridique EF-65) :
+registre T01 (catégorie et durée — en mémoire, 24 h au plus, jamais écrite),
+`/rgpd` § Historique de tournois & palmarès (FR et EN, limite du lien 404
+comprise) et entrée `2026-11-pseudo-emprunt-suffixe` de `PRIVACY_CHANGES`. Les noms d'aujourd'hui sont lus **avec** la liste et
 gardés avec elle (une seule requête, `LEFT JOIN` des entrées solo) : aucune
 requête ni aucun 503 ne dépend du compte demandé, et le travail d'une question
 n'en dépend que de quelques accès à une table (revue sécurité EF-65, cycles 2

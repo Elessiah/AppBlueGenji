@@ -51,3 +51,54 @@ describe("D87 — décision close effacée avec son signalement", () => {
     expect(retention).not.toContain("Décision de suppression d'un avatar (empreinte, issue de la contestation) : tant que le compte existe");
   });
 });
+
+describe("revue juridique EF-65 — pseudo d'emprunt suffixé et borne des noms essayés", () => {
+  const SUFFIX_ID = "2026-11-pseudo-emprunt-suffixe";
+
+  it("privacyChanges_suffixEntry_datedLinkedWithEnglish", () => {
+    expect(entry(SUFFIX_ID)?.publishedAt).toBe("2026-11-18");
+    expect(entry(SUFFIX_ID)?.links?.map((link) => link.href)).toEqual(["/rgpd#suppression-et-palmares"]);
+    expect(PRIVACY_CHANGES_EN[SUFFIX_ID]?.linkLabels).toHaveLength(1);
+  });
+
+  it("privacyChanges_suffixEntry_declaresGuessFingerprints", () => {
+    const fr = (entry(SUFFIX_ID)?.details ?? []).join(" ");
+    const en = (PRIVACY_CHANGES_EN[SUFFIX_ID]?.details ?? []).join(" ");
+
+    expect(fr).toContain("en mémoire seulement et au plus 24 heures");
+    expect(fr).toContain("passé quatre");
+    expect(en).toContain("in memory only and for 24 hours at most");
+    expect(en).toContain("past four");
+  });
+
+  it("privacyChanges_decisionsEntry_namesModeratorInT11", () => {
+    expect((entry("2026-11-decisions-sur-image-et-signalement")?.details ?? []).join(" ")).toContain(
+      "le registre des traitements (T11) le cite désormais",
+    );
+    expect((PRIVACY_CHANGES_EN["2026-11-decisions-sur-image-et-signalement"]?.details ?? []).join(" ")).toContain(
+      "the record of processing activities (T11) now lists it",
+    );
+  });
+
+  it("register_t01_declaresWrongNameFingerprints", () => {
+    const t01 = [PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN]
+      .map((activities) => activities.find((activity) => activity.ref === "T01"))
+      .map((activity) => [...(activity?.dataCategories ?? []), ...(activity?.retention ?? [])].join(" | "))
+      .join(" || ");
+
+    expect(t01).toContain("sous une empreinte HMAC dont la clé n'est enregistrée nulle part");
+    expect(t01).toContain("as an HMAC fingerprint whose key is never written");
+    expect(t01).toContain("en mémoire seulement, 24 heures au plus");
+    expect(t01).toContain("in memory only, 24 hours at most");
+  });
+
+  it.each([
+    ["app/rgpd/page.tsx", "une forme qui signale un compte supprimé", "passé quatre, son lien demeure, vers la page introuvable"],
+    ["app/rgpd/RgpdEn.tsx", "a form that marks a deleted account", "past four, its link stays, to the page not found"],
+  ])("rgpd_%s_saysFormMarksDeletionAndLinkLimit", (path, form, limit) => {
+    const source = readSource(path);
+
+    expect(source).toContain(form);
+    expect(source).toContain(limit);
+  });
+});

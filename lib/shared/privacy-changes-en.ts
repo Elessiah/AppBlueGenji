@@ -1082,7 +1082,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     details: [
       "What goes: the decision itself — the moderation member who took it, its dates, the outcome of its challenge and, for a deleted avatar, its hash (SHA-256). The report is only erased once the decision can no longer be contested (see the “Reports” section); erasing the account still removes its decisions earlier.",
       "For an avatar whose deletion blocked the image, the hash then only stays in the list of blocked images, with no link to any account, and the block becomes permanent, as on the erasure of the account.",
-      "What does not change: nothing new is collected; a logo or avatar still hidden keeps its decision for as long as it is hidden.",
+      "What does not change: nothing new is collected — the moderation member who took the decision was already recorded on it, and the record of processing activities (T11) now lists it; a logo or avatar still hidden keeps its decision for as long as it is hidden.",
+    ],
+  },
+  "2026-11-pseudo-emprunt-suffixe": {
+    linkLabels: ["Read what becomes of a deleted account"],
+    title: "Deleted accounts: a borrowed username that can't be guessed",
+    summary:
+      "The borrowed username that replaces that of a deleted account is now a name followed by six random characters (for example “AlphaFX-7f3k2q”), no longer a bare name from a public list: it can no longer be guessed. Accounts already deleted get theirs, and the name of their solo registration follows.",
+    details: [
+      "What the form says: to anyone who knows it, that an account was deleted — as its page already said; nothing about the person.",
+      "For a link to the vanished page of a deleted account to become text, the page submits the names it displays to the site, and the site only answers for the current name. Against anyone trying to guess which accounts are in that case, it keeps, in memory only and for 24 hours at most, a never-written fingerprint of the wrong names submitted for such an account; past four, the link stays, to the page not found, until the end of that period.",
+      "What does not change: nothing more is collected about you, and what deletion removes stays the same.",
     ],
   },
 };

@@ -329,7 +329,7 @@ export type PublicUserProfile = {
    * derrière un bouton discret — la ligne restant nécessaire à qui remonte un
    * ancien match —, et par `getFullProfile`, dont la fiche doit **annoncer** le
    * compte supprimé : son pseudo d'emprunt (`lib/shared/anonymous-pseudos.ts`)
-   * se lit comme un pseudo ordinaire.
+   * ne le trahit que par sa forme, pour qui la connaît.
    *
    * Absent de `getUserById`, qui ne filtre pas `is_deleted`.
    */

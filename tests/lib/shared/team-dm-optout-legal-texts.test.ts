@@ -21,8 +21,8 @@ const teamParagraph = (source: string) =>
 
 describe("entrée PRIVACY_CHANGES du réglage des messages d'équipe", () => {
   it("privacyChange_teamDmOptOut_lastEntryDated20261113ForAllAccounts", () => {
-    // Suivie de l'avis d'exclusion du bot, du rectificatif de la marque de session (EF-63), les deux entrées d'EF-65 (2026-11-18).
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(ENTRY_ID);
+    // Suivie de l'avis d'exclusion du bot, du rectificatif de la marque de session (EF-63), les trois entrées d'EF-65 (2026-11-18).
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(ENTRY_ID);
     expect(entryFr?.publishedAt).toBe("2026-11-13");
     expect(entryFr?.audience).toBeUndefined();
     expect(entryFr?.asksTermsAcceptance).toBeUndefined();

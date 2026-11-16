@@ -390,9 +390,9 @@ export function RgpdEn({
           placements) are not erased when the account is deleted. On the other hand, everything that identifies
           the person is erased (Discord and game tags, login accounts, avatar, adulthood, roles — the only
           exception being the replay codes described above) and the username is replaced by a randomly drawn{" "}
-          <strong>borrowed username</strong> (a name followed by six random characters, for example “AlphaFX-7f3k2q”): the record remains under this false name, and the player&apos;s
+          <strong>borrowed username</strong> (a name followed by six random characters, for example “AlphaFX-7f3k2q” — a form that marks a deleted account, without saying anything about the person): the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
-          match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). An account that has never played a match has no record
+          match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). To do so, the page submits the names it displays to the site; against anyone trying to guess which accounts are in that case, the site keeps, in memory only and for 24 hours at most, a never-written fingerprint of the wrong names submitted for such an account: past four, its link stays, to the page not found, until the end of that period. An account that has never played a match has no record
           to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a
           tournament that no one on the staff could take over, or if it is an entrant in a{" "}
           <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. Its teams no longer keep the row:

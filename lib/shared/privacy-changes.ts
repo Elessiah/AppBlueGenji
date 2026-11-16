@@ -2057,7 +2057,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Ce qui part : la décision elle-même — le membre de la modération qui l'a prise, ses dates, l'issue de sa contestation et, pour un avatar supprimé, son empreinte (SHA-256). Le signalement n'est effacé qu'une fois la décision impossible à contester (voir la section « Signalements ») ; l'effacement du compte emporte toujours ses décisions plus tôt.",
       "Pour un avatar dont la suppression a bloqué l'image, l'empreinte ne reste alors que dans la liste des images bloquées, sans lien avec aucun compte, et le blocage devient définitif, comme à l'effacement du compte.",
-      "Ce qui ne change pas : rien de nouveau n'est collecté ; un logo ou un avatar encore masqué garde sa décision tant qu'il l'est.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté — le membre de la modération qui a pris la décision y figurait déjà, et le registre des traitements (T11) le cite désormais ; un logo ou un avatar encore masqué garde sa décision tant qu'il l'est.",
+    ],
+  },
+  {
+    // EF-65 (revue juridique, cycle 1) : D99 suffixe les pseudos d'emprunt
+    // (`pickAnonymousPseudo`, migration des comptes déjà supprimés dans
+    // `RECENT_SCHEMA_CHANGES`) et D86 fait demander par chaque page, noms
+    // affichés à l'appui, quels comptes n'ont plus de fiche, les noms faux
+    // étant bornés en mémoire (`profileless-guess-budget.ts`). Registre T01,
+    // /rgpd § Historique de tournois & palmarès (FR et EN). Pour tous les
+    // comptes ; datée du lendemain de la nuit de déploiement.
+    id: "2026-11-pseudo-emprunt-suffixe",
+    publishedAt: "2026-11-18",
+    title: "Comptes supprimés : un pseudo d'emprunt indevinable",
+    links: [{ href: "/rgpd#suppression-et-palmares", label: "Lire ce que devient un compte supprimé" }],
+    summary:
+      "Le pseudo d'emprunt qui remplace celui d'un compte supprimé est désormais un nom suivi de six caractères aléatoires (par exemple « AlphaFX-7f3k2q »), et non plus un nom nu d'une liste publique : il ne se devine plus. Les comptes déjà supprimés reçoivent le leur, et le nom de leur inscription individuelle suit.",
+    details: [
+      "Ce que la forme dit : à qui la connaît, qu'un compte a été supprimé — comme le disait déjà sa fiche ; rien sur la personne.",
+      "Pour qu'un lien vers la fiche disparue d'un compte supprimé devienne du texte, la page soumet au site les noms qu'elle affiche, et le site ne répond que pour le nom du jour. Contre qui voudrait deviner quels comptes sont dans ce cas, il retient, en mémoire seulement et au plus 24 heures, une empreinte jamais écrite des noms erronés soumis pour un tel compte ; passé quatre, le lien demeure, vers la page introuvable, jusqu'à la fin de ce délai.",
+      "Ce qui ne change pas : rien de plus n'est collecté sur toi, et ce que la suppression emporte reste le même.",
     ],
   },
 ];

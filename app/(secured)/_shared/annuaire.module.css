@@ -912,7 +912,8 @@
   color: var(--c, var(--blue-300));
 }
 
-/* Le pseudo d'emprunt se lit comme un pseudo ordinaire : c'est cette étiquette
+/* Le pseudo d'emprunt ne trahit la suppression que par sa forme (« nom-6
+   caractères »), pour qui la connaît : c'est cette étiquette
    qui dit le compte supprimé, d'où un cadre en tirets — la seule forme de la
    carte qu'aucune autre étiquette ne prend. */
 .plDeletedMark {

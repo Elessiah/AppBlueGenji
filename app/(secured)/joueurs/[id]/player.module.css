@@ -86,8 +86,9 @@
 }
 
 /* ---------- Compte supprimé ----------
-   La fiche d'un compte supprimé porte un pseudo d'emprunt, qui se lit comme
-   un pseudo ordinaire : c'est la page qui doit dire le compte supprimé, et le
+   La fiche d'un compte supprimé porte un pseudo d'emprunt, dont seule la
+   forme (« nom-6 caractères ») trahit la suppression, pour qui la connaît :
+   c'est la page qui doit dire le compte supprimé, et le
    dire au premier regard. Trois signes qui ne se confondent avec aucun état
    d'un compte vivant — la page quitte le bleu de la marque pour le gris,
    l'avatar s'éteint en une pastille barrée, et une étiquette en tirets nomme
