@@ -66,7 +66,9 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   `releaseIneligibleCast`, pas la phase affichée). Un caster **devenu joueur** du
   match (roster rejoint après l'inscription, `CASTER_IS_PLAYER` n'étant contrôlé
   qu'à l'inscription) est traité de même **avant le lancement**, dès qu'une
-  lecture le constate (la sienne, ou les rosters lus pour les contacts) : tu,
+  lecture le constate (la sienne, les rosters lus pour les contacts, ou — match arbitré
+  dont les contacts ne sortent pas encore — la seule appartenance de l'arbitre et des
+  casters aux deux équipes, `loadMemberships`, sans les effectifs entiers) : tu,
   inscription retirée (`casterPlays`, rejoué sous verrou par
   `releaseIneligibleCast`) — son « Prêt » de caster ne viendrait jamais. Lancé,
   il garde sa place (`viewer.isCaster` le dit caster malgré son rôle de joueur).

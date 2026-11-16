@@ -1295,6 +1295,44 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
   });
 
+  it("listViewerMatchLaunches_refereedMatchBeforeContactsWindow_readsOnlyRefereeAndCasterMembership", async () => {
+    // Contacts pas encore exposés : seule l'appartenance de l'arbitre et du
+    // caster aux deux équipes se lit, jamais les effectifs entiers (EF-65).
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, caster_user_id: CASTER, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser(), casterUser(CASTER)];
+
+    await listViewerMatchLaunches(viewer);
+
+    const teamMemberReads = state.reads.filter((sql) => sql.includes("FROM bg_team_members tm JOIN bg_users u"));
+    expect(teamMemberReads).toHaveLength(1);
+    expect(teamMemberReads[0]).toContain("tm.user_id IN (?, ?)");
+    expect(teamMemberReads[0]).not.toContain("u.pseudo");
+  });
+
+  it("listViewerMatchLaunches_casterJoinedTeamOfRefereedMatchBeforeWindow_isReleased", async () => {
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, caster_user_id: CASTER, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser(), casterUser(CASTER)];
+    state.members = [member(TEAM2, CASTER)];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(info.casters).toEqual([]);
+    expect(state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?")).toHaveLength(1);
+  });
+
+  it("listViewerMatchLaunches_noRefereeBeforeWindow_noTeamMembersRead", async () => {
+    state.candidates = [candidate({ referee_user_id: null, start_at: new Date(Date.now() + 30 * 60_000).toISOString() })];
+
+    await listViewerMatchLaunches(viewer);
+
+    expect(state.reads.some((sql) => sql.includes("FROM bg_team_members tm JOIN bg_users u"))).toBe(false);
+  });
+
   it("listViewerMatchLaunches_refereeObjectionUpheld_isHiddenAndReleasedByObjection", async () => {
     state.candidates = [candidate({ referee_user_id: REFEREE })];
     state.users = [refereeUser({ referee_objection_at: OPENED })];
