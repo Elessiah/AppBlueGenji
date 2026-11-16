@@ -116,7 +116,11 @@ describe("mises en page", () => {
 
   it("annuaire des joueurs et barre de navigation suivent la colonne élargie", () => {
     expect(readSource("app/(secured)/joueurs/PlayersList.tsx")).toContain('className="page-wide"');
-    expect(readSource("app/globals.css")).toMatch(/body:has\(\.page-wide\) \[data-sticky-header\] \.container \{/);
+    const globals = readSource("app/globals.css");
+    // Bornée à la sœur `main.page-shell` et à son enfant direct, jamais au `body` entier
+    // (réévalué à chaque mutation de la page).
+    expect(globals).toMatch(/\[data-sticky-header\]:has\(~ \.page-shell > \.page-wide\) \.container \{/);
+    expect(globals).not.toMatch(/body:has\(/);
   });
 
   it("phrases avec « i » en ligne : /connexion et fiche joueur", () => {
