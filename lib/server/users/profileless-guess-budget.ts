@@ -1,6 +1,6 @@
 /**
  * Borne des noms essayés par la question des liens (`POST
- * /api/players/profileless`, revue sécurité EF-65, cycles 2 et 3).
+ * /api/players/profileless`, revue sécurité EF-65, cycles 2 à 4).
  *
  * La route ne dit « sans fiche » que d'un compte nommé de son nom
  * d'aujourd'hui. Or le pseudo d'un compte supprimé est tiré d'une liste
@@ -13,20 +13,28 @@
  * et le serveur ne garde rien de ce qu'un visiteur a vu. Pour chaque compte de
  * la liste des comptes sans fiche, au plus {@link PROFILELESS_WRONG_NAMES_PER_ACCOUNT}
  * noms **faux** distincts sont jugés par {@link PROFILELESS_GUESS_WINDOW_MS} ;
- * au-delà, un nom nouveau n'est **pas jugé** : la réponse le tait comme un
- * compte qui a sa fiche. Un nom déjà jugé l'est de nouveau sans rien compter,
- * et un nom juste, une fois jugé, le reste tant qu'il est le nom du compte : la
- * page qui montre ce joueur continue de le rendre en texte après la borne.
+ * le nom juste ne compte pas. Borne atteinte, **plus aucun nom** de ce compte
+ * n'est jugé jusqu'à la fenêtre suivante, le nom juste compris (cycle 4 : un
+ * nom juste encore jugé après la borne laissait balayer les mille pseudos
+ * jusqu'à lui) : la réponse le tait comme un compte qui a sa fiche. Qui épuise
+ * la borne d'un compte ne fait donc que laisser son nom en lien (vers la fiche
+ * 404) jusqu'à la fenêtre suivante, sans rien apprendre ; c'est le prix,
+ * cosmétique, de la borne.
  *
  * Un compte hors de la liste n'a pas de borne : sa réponse est « a sa fiche »
- * quel que soit le nom — l'épuiser ne dirait rien. La mémoire (d'un seul
- * processus, le site tourne en un processus pm2) ne suit donc que les comptes
- * de la liste, quelques noms chacun : elle ne croît pas avec les identifiants
- * envoyés. Un redémarrage la remet à zéro (au plus quelques essais de plus par
- * déploiement). Qui épuise la borne d'un compte avant toute page qui le montre
- * ne fait que laisser son nom en lien (vers la fiche 404) jusqu'à la fenêtre
- * suivante — sans rien apprendre.
+ * quel que soit le nom. La mémoire (d'un seul processus, le site tourne en un
+ * processus pm2) ne suit que les comptes de la liste, au plus quatre noms
+ * chacun, et **jamais en clair** : chaque nom faux n'y est qu'une empreinte
+ * HMAC sous une clé tirée au démarrage et jamais écrite — l'ancien pseudo d'un
+ * compte supprimé, envoyé par un onglet resté ouvert, n'y reste pas lisible.
+ * Chaque nouvelle liste (échéance ou invalidation à une suppression) oublie
+ * les comptes qui en sont sortis et les fenêtres échues. Un redémarrage remet
+ * tout à zéro (au plus quatre essais de plus par déploiement).
+ *
+ * L'empreinte se calcule pour chaque couple, listé ou non : le travail d'une
+ * question ne dépend du compte demandé que de quelques accès à une table.
  */
+import { createHmac, randomBytes } from "node:crypto";
 
 /** Noms faux distincts jugés par compte demandé, dans une fenêtre, tous visiteurs confondus. */
 export const PROFILELESS_WRONG_NAMES_PER_ACCOUNT = 4;
@@ -34,12 +42,26 @@ export const PROFILELESS_WRONG_NAMES_PER_ACCOUNT = 4;
 /** Durée d'une fenêtre, par compte demandé. */
 export const PROFILELESS_GUESS_WINDOW_MS = 24 * 60 * 60_000;
 
-/** Comptes suivis au-delà de la liste avant de faire le ménage (comptes sortis de la liste). */
-export const PROFILELESS_PRUNE_SLACK = 256;
-
-type AccountBudget = { resetAt: number; wrong: Set<string>; known: Set<string> };
+type AccountBudget = { resetAt: number; wrong: Set<string> };
 
 const budgets = new Map<number, AccountBudget>();
+
+/** Clé des empreintes : propre au processus, jamais écrite ni journalisée. */
+const digestKey = randomBytes(32);
+
+/** Liste sur laquelle le ménage a été fait en dernier. */
+let prunedFor: ReadonlyMap<number, ReadonlySet<string>> | null = null;
+
+function nameDigest(id: number, key: string): string {
+  return createHmac("sha256", digestKey).update(`${id}\u0000${key}`).digest("base64url");
+}
+
+function pruneBudgets(names: ReadonlyMap<number, ReadonlySet<string>>, now: number): void {
+  for (const [id, budget] of budgets) {
+    if (!names.has(id) || budget.resetAt <= now) budgets.delete(id);
+  }
+  prunedFor = names;
+}
 
 /**
  * Ce nom (forme comparée) de ce compte est-il jugé ? `names` : la liste des
@@ -52,24 +74,20 @@ export function admitProfilelessName(
   names: ReadonlyMap<number, ReadonlySet<string>>,
   now: number = Date.now(),
 ): boolean {
+  const digest = nameDigest(id, key);
+  if (names !== prunedFor) pruneBudgets(names, now);
   const current = names.get(id);
   if (current === undefined) return true;
-  if (budgets.size > names.size + PROFILELESS_PRUNE_SLACK) {
-    for (const tracked of budgets.keys()) if (!names.has(tracked)) budgets.delete(tracked);
-  }
   let budget = budgets.get(id);
   if (budget === undefined) {
-    budget = { resetAt: now + PROFILELESS_GUESS_WINDOW_MS, wrong: new Set(), known: new Set() };
+    budget = { resetAt: now + PROFILELESS_GUESS_WINDOW_MS, wrong: new Set() };
     budgets.set(id, budget);
   } else if (budget.resetAt <= now) {
     budget.wrong.clear();
     budget.resetAt = now + PROFILELESS_GUESS_WINDOW_MS;
   }
-  // Un nom juste d'hier qui ne l'est plus (renommage) ne se garde pas.
-  for (const known of budget.known) if (!current.has(known)) budget.known.delete(known);
-  if (budget.known.has(key) || budget.wrong.has(key)) return true;
   if (budget.wrong.size >= PROFILELESS_WRONG_NAMES_PER_ACCOUNT) return false;
-  (current.has(key) ? budget.known : budget.wrong).add(key);
+  if (!current.has(key)) budget.wrong.add(digest);
   return true;
 }
 
@@ -78,7 +96,13 @@ export function trackedProfilelessBudgetsForTests(): number {
   return budgets.size;
 }
 
+/** Noms faux retenus, tels que gardés en mémoire (tests). */
+export function storedProfilelessWrongNamesForTests(id: number): string[] {
+  return [...(budgets.get(id)?.wrong ?? [])];
+}
+
 /** Tests : oublie toutes les bornes. */
 export function resetProfilelessGuessesForTests(): void {
   budgets.clear();
+  prunedFor = null;
 }

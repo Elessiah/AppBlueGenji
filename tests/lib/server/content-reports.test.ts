@@ -875,11 +875,15 @@ describe("conservation", () => {
 
   // Revue sécurité EF-65 cycle 3 : la passe se libère dans le même pas que sa
   // sortie de boucle, et un déclencheur pendant une passe en échec est honoré une fois.
-  it("purgeClosedQuarantinesSafely_triggerRightAfterPassEnds_startsNewPass", async () => {
-    jest.mocked(purgeClosedQuarantines).mockResolvedValue(0);
+  it("purgeClosedQuarantinesSafely_triggerRightAfterLoopExit_startsNewPass", async () => {
+    // Le déclencheur s'exécute juste après la reprise de la passe sur ce même
+    // résultat : sortie de boucle faite, promesse de la passe pas encore
+    // propagée. Une place libérée plus tard (`.finally`) l'avalait.
+    const settled = Promise.resolve(0);
+    jest.mocked(purgeClosedQuarantines).mockReturnValueOnce(settled).mockResolvedValue(0);
     const first = purgeClosedQuarantinesSafely();
     let second: Promise<void> | undefined;
-    void first.then(() => {
+    void settled.then(() => {
       second = purgeClosedQuarantinesSafely();
     });
 
@@ -888,6 +892,43 @@ describe("conservation", () => {
     await flush();
 
     expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_synchronousThrow_slotReleased", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.mocked(purgeClosedQuarantines)
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockResolvedValue(0);
+    await purgeClosedQuarantinesSafely();
+
+    await purgeClosedQuarantinesSafely();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantinesSafely_failureAfterSuccessfulRerun_triggerHonoured", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const settlers: { resolve: (value: number) => void; reject: (error: Error) => void }[] = [];
+    jest.mocked(purgeClosedQuarantines).mockImplementation(
+      () => new Promise<number>((resolve, reject) => { settlers.push({ resolve, reject }); }),
+    );
+    const pass = purgeClosedQuarantinesSafely();
+    void purgeClosedQuarantinesSafely();
+    settlers[0]?.reject(new Error("deadlock"));
+    await flush();
+    void purgeClosedQuarantinesSafely();
+    settlers[1]?.resolve(0);
+    await flush();
+    void purgeClosedQuarantinesSafely();
+    settlers[2]?.reject(new Error("deadlock"));
+    await flush();
+    settlers[3]?.resolve(0);
+
+    await pass;
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(4);
   });
 
   it("purgeClosedQuarantinesSafely_triggerDuringFailedPass_rerunsOnce", async () => {

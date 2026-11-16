@@ -31,8 +31,9 @@ import { admitProfilelessName } from "./profileless-guess-budget";
  * `syncSoloEntryIdentityOn`) — les deux noms sous lesquels une page montre un
  * joueur. Lus ensemble et gardés ensemble (revue sécurité EF-65, cycle 2) :
  * chaque question des liens se juge sur cette seule mémoire, sans requête ni
- * refus qui dépende du compte demandé — ni le temps de réponse, ni un 503 ne
- * disent qu'un identifiant est celui d'un compte supprimé.
+ * refus qui dépende du compte demandé — ni une requête de plus, ni un 503 ne
+ * disent qu'un identifiant est celui d'un compte supprimé (le reste du travail
+ * n'en dépend que de quelques accès à une table, `admitProfilelessName`).
  */
 type ProfilelessDirectory = {
   /** Par id croissant (`sortedIdsInclude`). */
@@ -131,7 +132,8 @@ export async function loadProfilelessPlayerIds(): Promise<number[]> {
  * sécurité EF-65) n'apprend donc rien — ni la liste des comptes supprimés, ni
  * l'instant d'une demande de suppression en attente — sans deviner un pseudo
  * d'emprunt, ce que borne `admitProfilelessName` (quelques noms faux par
- * compte demandé et par jour, tous visiteurs confondus). Noms et liste se lisent de la même mémoire : aucune requête ni
+ * compte demandé et par jour, tous visiteurs confondus ; borne atteinte, plus
+ * aucun nom de ce compte n'est jugé, le juste compris). Noms et liste se lisent de la même mémoire : aucune requête ni
  * aucun refus ne dépend du compte demandé. Un nom périmé (page restée ouverte
  * avant un renommage) laisse au pire le nom en lien, vers la fiche 404.
  *

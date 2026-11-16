@@ -1327,18 +1327,29 @@ export function purgeClosedQuarantinesSafely(): Promise<void> {
     closedQuarantinePurgeAgain = true;
     return closedQuarantinePurge;
   }
-  const run = async (): Promise<void> => {
+  // La place est prise avant que la passe ne commence : même une passe qui
+  // finit sans attendre (levée synchrone) la libère après l'avoir prise, et
+  // jamais ne laisse une passe finie occuper la place (revue sécurité EF-65,
+  // cycle 4).
+  let release!: () => void;
+  const pass = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  closedQuarantinePurge = pass;
+  void (async (): Promise<void> => {
     let failed = false;
     try {
       do {
         closedQuarantinePurgeAgain = false;
         try {
           await purgeClosedQuarantines();
+          // Seules deux pannes **de suite** arrêtent les reprises.
+          failed = false;
         } catch (error) {
           console.error("[moderation] purge des décisions closes impossible", failureReason(error));
           // Un déclencheur arrivé pendant la passe en échec est honoré une
-          // fois ; une seconde panne ne se rejoue pas en boucle : l'entretien
-          // horaire reprendra.
+          // fois ; une seconde panne de suite ne se rejoue pas en boucle :
+          // l'entretien horaire reprendra.
           if (failed) closedQuarantinePurgeAgain = false;
           failed = true;
         }
@@ -1348,10 +1359,10 @@ export function purgeClosedQuarantinesSafely(): Promise<void> {
       // arrive après ne tombe jamais sur une passe déjà finie (revue sécurité
       // EF-65, cycle 3).
       closedQuarantinePurge = null;
+      release();
     }
-  };
-  closedQuarantinePurge = run();
-  return closedQuarantinePurge;
+  })();
+  return pass;
 }
 
 /** Signalements effacés par instruction : borne la taille d'une liste `IN`. */

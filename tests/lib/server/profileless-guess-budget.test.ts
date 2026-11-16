@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
   admitProfilelessName,
   PROFILELESS_GUESS_WINDOW_MS,
-  PROFILELESS_PRUNE_SLACK,
   resetProfilelessGuessesForTests,
+  storedProfilelessWrongNamesForTests,
   trackedProfilelessBudgetsForTests,
 } from "@/lib/server/users/profileless-guess-budget";
 
@@ -42,11 +42,55 @@ describe("admitProfilelessName", () => {
     expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(false);
   });
 
-  it("admitProfilelessName_correctNameJudgedBeforeCap_stillAdmittedAfterCap", () => {
+  // Revue sécurité EF-65 cycle 4 : un nom juste encore jugé après la borne
+  // laissait balayer les mille pseudos jusqu'à lui.
+  it("admitProfilelessName_correctNameJudgedBeforeCap_refusedAfterCap", () => {
     admitProfilelessName(3, "apextv", LISTED, T0);
     for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
 
-    expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(true);
+    expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(false);
+  });
+
+  it("admitProfilelessName_correctNameBeforeCap_notCounted", () => {
+    admitProfilelessName(3, "apextv", LISTED, T0);
+    admitProfilelessName(3, "apextv", LISTED, T0);
+    admitProfilelessName(3, "apextv", LISTED, T0);
+
+    expect(WRONG.map((key) => admitProfilelessName(3, key, LISTED, T0))).toEqual([true, true, true, true]);
+  });
+
+  it("admitProfilelessName_wrongName_storedAsDigestNotClearText", () => {
+    admitProfilelessName(3, "realname", LISTED, T0);
+
+    const stored = storedProfilelessWrongNamesForTests(3);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).not.toContain("realname");
+  });
+
+  it("admitProfilelessName_newDirectoryWithoutId_budgetDropped", () => {
+    admitProfilelessName(3, "alphafx", LISTED, T0);
+    const erased = new Map<number, ReadonlySet<string>>([[4, new Set(["novatv"])]]);
+
+    admitProfilelessName(9, "anything", erased, T0);
+
+    expect(storedProfilelessWrongNamesForTests(3)).toEqual([]);
+    expect(trackedProfilelessBudgetsForTests()).toBe(0);
+  });
+
+  it("admitProfilelessName_newDirectoryWindowExpired_budgetDropped", () => {
+    admitProfilelessName(3, "alphafx", LISTED, T0);
+    const refreshed = new Map<number, ReadonlySet<string>>([[3, new Set(["apextv"])]]);
+
+    admitProfilelessName(9, "anything", refreshed, T0 + PROFILELESS_GUESS_WINDOW_MS);
+
+    expect(trackedProfilelessBudgetsForTests()).toBe(0);
+  });
+
+  it("admitProfilelessName_newDirectoryWithinWindow_keepsExhaustion", () => {
+    for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
+    const refreshed = new Map<number, ReadonlySet<string>>([[3, new Set(["apextv"])]]);
+
+    expect(admitProfilelessName(3, "alphazen", refreshed, T0 + 1)).toBe(false);
   });
 
   it("admitProfilelessName_sameWrongNameRepeated_notCountedTwice", () => {
@@ -56,7 +100,7 @@ describe("admitProfilelessName", () => {
     admitProfilelessName(3, "alphaone", LISTED, T0);
 
     expect(admitProfilelessName(3, "alphafx", LISTED, T0)).toBe(true);
-    expect(admitProfilelessName(3, "apextv", LISTED, T0)).toBe(true);
+    expect(admitProfilelessName(3, "alphapro", LISTED, T0)).toBe(true);
   });
 
   it("admitProfilelessName_budgetSharedAcrossViewers_noExtraGuesses", () => {
@@ -70,24 +114,5 @@ describe("admitProfilelessName", () => {
     for (const key of WRONG) admitProfilelessName(3, key, LISTED, T0);
 
     expect(admitProfilelessName(3, "alphazen", LISTED, T0 + PROFILELESS_GUESS_WINDOW_MS)).toBe(true);
-  });
-
-  it("admitProfilelessName_knownNameRenamed_droppedFromKnown", () => {
-    admitProfilelessName(3, "apextv", LISTED, T0);
-    const renamed = new Map<number, ReadonlySet<string>>([[3, new Set(["novatv"])]]);
-    for (const key of WRONG) admitProfilelessName(3, key, renamed, T0);
-
-    expect(admitProfilelessName(3, "apextv", renamed, T0)).toBe(false);
-  });
-
-  it("admitProfilelessName_manyIdsLeftList_prunedBeyondSlack", () => {
-    const everyone = new Map<number, ReadonlySet<string>>(
-      Array.from({ length: PROFILELESS_PRUNE_SLACK + 2 }, (_, index) => [index + 1, new Set(["nom"])]),
-    );
-    for (const id of everyone.keys()) admitProfilelessName(id, "nom", everyone, T0);
-
-    admitProfilelessName(1, "nom", new Map([[1, new Set(["nom"])]]), T0);
-
-    expect(trackedProfilelessBudgetsForTests()).toBe(1);
   });
 });

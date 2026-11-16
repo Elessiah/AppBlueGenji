@@ -355,17 +355,27 @@ ni l'instant d'une demande de suppression en attente (revue sécurité EF-65).
 Les pseudos d'emprunt venant d'une liste publique de mille, les noms essayés
 sont bornés **par compte demandé, tous visiteurs confondus**
 (`admitProfilelessName`, `profileless-guess-budget.ts`, revue sécurité EF-65,
-cycle 3) : 4 noms faux distincts par compte de la liste et par 24 h ; un nom
-hors borne est **tu** (traité comme un compte qui a sa fiche), jamais refusé.
-Multiplier les comptes ou les sessions n'ajoute aucun essai, et le serveur ne
-garde rien, par visiteur, des joueurs qui lui ont été montrés : la mémoire ne
-suit que les comptes de la liste (quelques noms chacun), remise à zéro à chaque
-redémarrage. Un nom juste déjà jugé le reste après la borne ; qui épuise la
-borne d'un compte avant toute page qui le montre laisse seulement son nom en
-lien (fiche 404) jusqu'à la fenêtre suivante. Les noms d'aujourd'hui sont lus **avec** la liste et
+cycle 3) : 4 noms faux distincts par compte de la liste et par 24 h ; le nom
+juste ne compte pas. Borne atteinte, **plus aucun nom** de ce compte n'est
+jugé jusqu'à la fenêtre suivante, le nom juste compris (cycle 4 : un nom juste
+encore jugé après la borne laissait balayer les mille pseudos jusqu'à lui) ;
+un nom hors borne est **tu** (traité comme un compte qui a sa fiche), jamais
+refusé. Multiplier les comptes ou les sessions n'ajoute aucun essai, et le
+serveur ne garde rien, par visiteur, des joueurs qui lui ont été montrés : la
+mémoire ne suit que les comptes de la liste, au plus quatre noms faux chacun,
+**jamais en clair** (empreinte HMAC sous une clé tirée au démarrage, jamais
+écrite : l'ancien pseudo d'un compte supprimé, envoyé par un onglet resté
+ouvert, n'y reste pas lisible) ; chaque nouvelle liste oublie les comptes qui
+en sont sortis et les fenêtres échues, et un redémarrage remet tout à zéro.
+Limite assumée : qui épuise la borne d'un compte laisse son nom en lien
+(fiche 404) jusqu'à la fenêtre suivante, pour tous — gêne d'affichage, sans
+rien apprendre. Limite de fond : la borne ralentit la devinette sans la
+rendre impossible (4 essais par jour et par redémarrage, contre au plus mille
+pseudos d'emprunt). Les noms d'aujourd'hui sont lus **avec** la liste et
 gardés avec elle (une seule requête, `LEFT JOIN` des entrées solo) : aucune
-requête, aucun délai ni aucun 503 ne dépend du compte demandé (revue sécurité
-EF-65, cycle 2). Les noms
+requête ni aucun 503 ne dépend du compte demandé, et le travail d'une question
+n'en dépend que de quelques accès à une table (revue sécurité EF-65, cycles 2
+et 4). Les noms
 partent dans le corps, jamais dans l'adresse : les journaux d'accès ne gardent
 pas, par visiteur, les joueurs qui lui ont été montrés. Un lien sans nom
 lisible n'est pas demandé, et un nom périmé (page ouverte avant un renommage)
