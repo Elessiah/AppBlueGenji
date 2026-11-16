@@ -34,28 +34,58 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   **et** avant chaque envoi) et côté serveur (`audienceOptOutFromHeaders`,
   avant tout calcul, plafond compris). Les robots connus (user-agent) sont
   écartés de même.
-- **IP en mémoire ≤ 2 min** : seuls les plafonds par **réseau**
+- **IP en mémoire ≤ 2 min** : seuls les plafonds la tiennent, fenêtres de
+  60 s, balayage du module `rate-limit`. Trois étages : le **réseau**
   (`audienceNetworkKey` : IPv4, ou préfixe IPv6 `/64` ; adresse illisible =
-  un réseau commun) la tiennent, fenêtres de 60 s, balayage du module
-  `rate-limit` : `AUDIENCE_REQUEST_RULE` (120 envois/min),
-  `AUDIENCE_IDENTITY_RULE` (30 navigateurs distincts/min, clé réseau +
-  condensé court du user-agent) et `AUDIENCE_VIEW_RULE` (120 pages vues/min ;
-  les suites n'y comptent pas). Larges à dessein : une adresse partagée (NAT
-  d'opérateur mobile, réseau local d'un événement) ne doit pas faire
-  disparaître ses visiteurs des chiffres.
+  un réseau commun, signalé une fois par 10 min dans les journaux quand il
+  est plafonné), le **`/48`** en IPv6 (`audienceWideNetworkKey` : un abonné
+  reçoit souvent un `/56`, un hébergeur un `/48`) et le **site entier**.
+  `throttleAudienceRequest` : `AUDIENCE_REQUEST_RULE` (120 envois/min par
+  réseau), `AUDIENCE_WIDE_REQUEST_RULE` (600 par `/48`). `admitAudienceViews` :
+  navigateurs nouveaux (clé : adresse complète + condensé court du
+  user-agent, `AUDIENCE_IDENTITY_SEEN_RULE`) plafonnés à 30/min par réseau
+  (`AUDIENCE_IDENTITY_RULE`), 150 par `/48`, 1 500 pour le site ; pages vues
+  à 120/min par réseau (`AUDIENCE_VIEW_RULE`), 600 par `/48`, 6 000 pour le
+  site (les suites n'y comptent pas). Larges à dessein : une adresse
+  partagée (NAT d'opérateur mobile, réseau local d'un événement) ne doit pas
+  faire disparaître ses visiteurs des chiffres. Ces seaux sont en
+  `overflow: "refuse"` : pleins de fenêtres actives, ils refusent les clés
+  nouvelles au lieu de se vider (un seau vidé rendrait leurs plafonds à
+  tous, l'attaquant compris).
 - **Contre les signalements fabriqués** (chiffres gonflés devant les
-  partenaires) : seul un `fetch()` de page est lu (`isAudienceScriptRequest` :
-  `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty`), puis les plafonds
-  par réseau ci-dessus (`admitAudienceViews`) bornent ce qu'un client ajoute,
-  même en changeant de user-agent ou d'adresse dans son `/64`. Le temps d'une
-  page vue est ignoré (il arrive par ses suites) et, au repli, une suite ne
-  compte que la part de sa lecture postérieure au début de la visite et au
-  dernier temps déjà compté du visiteur : des suites forgées qui se
-  chevauchent ne s'additionnent pas. Passé la moitié de `MAX_PENDING`, un
-  envoi n'ajoute plus qu'une ligne à la file. Le référent égal à l'hôte
-  d'`APP_URL` compte en accès direct.
-- **Pages jamais mesurées** : `/admin/*` et `/signalements/*` (personnel et
-  auteurs de signalements, trop peu nombreux pour des chiffres anonymes).
+  partenaires) : un envoi qui **déclare** une autre provenance est écarté
+  (`isAudienceScriptRequest` : `Sec-Fetch-Site` autre que `same-origin` ou
+  `Sec-Fetch-Dest` autre que `empty`) ; un navigateur qui ne pose pas ces
+  en-têtes (Safari avant iOS 16.4, vieilles vues web, proxy qui les retire)
+  reste compté. Ce filtre ne prouve rien : la vraie borne est celle des
+  plafonds ci-dessus, qui tiennent même quand un client change de
+  user-agent ou d'adresse dans son `/64` (chaque adresse est un navigateur
+  nouveau du réseau). Le temps d'une page vue est ignoré (il arrive par ses
+  suites) et, au repli, une suite ne compte que la part de sa lecture
+  postérieure au début de la visite et au dernier temps déjà compté du
+  visiteur : des suites forgées qui se chevauchent ne s'additionnent pas.
+  Revers assumé : deux lectures légitimes simultanées d'une même empreinte
+  (deux fenêtres visibles, ou deux personnes d'une même adresse avec le
+  même navigateur) ne comptent qu'un temps — les chiffres pèchent par
+  défaut, jamais par excès. Passé la moitié de `MAX_PENDING`, un envoi
+  n'ajoute plus qu'une ligne à la file. Le référent égal à l'hôte d'`APP_URL`
+  compte en accès direct.
+- **k-anonymat jour par jour** (`AUDIENCE_MIN_VISITORS` = 5) : à la lecture
+  (`readRange`), une ligne d'un jour sous 5 visiteurs rejoint « Autres
+  pages » (types de page) ou `small` (« Petits nombres », appareils,
+  provenance, langue), une heure d'un jour sous 5 visiteurs sort de la
+  carte de chaleur. Jour par jour et non sur la période : un visiteur n'est
+  reconnu que le temps d'une journée, la somme d'une période compterait
+  cinq fois une personne venue cinq jours. « Autres pages » est toujours
+  montrée : la cacher ne protégerait rien, les totaux quotidiens la
+  redonnent par soustraction. Les totaux du site par jour (visiteurs, pages
+  vues, visites, temps) restent publiés tels quels : ils ne disent ni qui,
+  ni quelle page, ni d'où.
+- **Pages jamais mesurées** : `/admin/*` et `/signalements/*`, avec ou sans
+  préfixe `/en` (personnel et auteurs de signalements, trop peu nombreux
+  pour des chiffres anonymes). Le navigateur ne les signale même pas
+  (`AudienceTracker` passe par `audiencePageKey`, qui les rend `null`) ; le
+  serveur les écarte de même.
 
 ## Chemin de la donnée
 
@@ -64,7 +94,7 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
    │  file en mémoire de la page, lots de ≤ 20 : 10 pages, 1 min, onglet masqué, départ
    ▼
 POST /api/audience  { v: [{ p, t, a, d, r?, f?, c?, o? }] }   fetch keepalive ; 200, ou 429 au-delà du plafond
-   │  opposition → robot / pas un fetch de page → plafond réseau → corps ≤ 32 Ko → parseAudienceBatch → admitAudienceViews
+   │  opposition → robot / provenance déclarée étrangère → plafond réseau + /48 → corps ≤ 32 Ko → parseAudienceBatch → admitAudienceViews
    ▼
 recordAudienceViews : sel du jour de la page (lu une fois par jour ; échec resservi 30 s) + empreinte + file serveur (≤ 5 000)
    │  toutes les 10 s ou par 200 lignes (INSERT multi-lignes)

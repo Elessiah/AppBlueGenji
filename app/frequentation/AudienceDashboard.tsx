@@ -6,6 +6,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
   AUDIENCE_RANGES,
+  AUDIENCE_SMALL_KEY,
   fillDailySeries,
   fillTemplate,
   formatDuration,
@@ -401,18 +402,23 @@ export function AudienceDashboard({ stats, unavailable = false, messages: m, loc
             <div className={styles.shares}>
               <ShareBar
                 title={m.audience.devices}
-                shares={inOrder(rangeStats.devices, ["desktop", "mobile", "tablet"])}
-                labels={m.audience.deviceLabels}
+                shares={inOrder(rangeStats.devices, ["desktop", "mobile", "tablet", AUDIENCE_SMALL_KEY])}
+                labels={{ ...m.audience.deviceLabels, [AUDIENCE_SMALL_KEY]: m.audience.small }}
                 f={f}
               />
               <ShareBar
                 title={m.audience.sources}
                 hint={m.audience.sourcesHint}
-                shares={inOrder(rangeStats.sources, ["direct", "search", "discord", "social", "video", "other"])}
-                labels={m.audience.sourceLabels}
+                shares={inOrder(rangeStats.sources, ["direct", "search", "discord", "social", "video", "other", AUDIENCE_SMALL_KEY])}
+                labels={{ ...m.audience.sourceLabels, [AUDIENCE_SMALL_KEY]: m.audience.small }}
                 f={f}
               />
-              <ShareBar title={m.audience.locales} shares={inOrder(rangeStats.locales, ["fr", "en"])} labels={m.audience.localeLabels} f={f} />
+              <ShareBar
+                title={m.audience.locales}
+                shares={inOrder(rangeStats.locales, ["fr", "en", AUDIENCE_SMALL_KEY])}
+                labels={{ ...m.audience.localeLabels, [AUDIENCE_SMALL_KEY]: m.audience.small }}
+                f={f}
+              />
             </div>
           </Card>
         </div>

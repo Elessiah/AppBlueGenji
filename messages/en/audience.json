@@ -52,7 +52,7 @@
   },
   "pages": {
     "title": "Most viewed pages",
-    "hint": "Pages are grouped by type: no exact address and no name is kept.",
+    "hint": "Pages are grouped by type, with no exact address and no name. A type seen by fewer than 5 visitors in a day joins \"Other pages\".",
     "page": "Page",
     "views": "Page views",
     "share": "Share",
@@ -83,7 +83,7 @@
   },
   "timing": {
     "heatmapTitle": "When people visit",
-    "heatmapHint": "Page views by day of the week and hour (Paris time). The darker the cell, the busier the site.",
+    "heatmapHint": "Page views by day of the week and hour (Paris time), leaving out hours with fewer than 5 visitors that day. The darker the cell, the busier the site.",
     "weekdaysTitle": "Days of the week",
     "hoursTitle": "Hours of the day",
     "hourLabel": "{hour}:00",
@@ -110,7 +110,8 @@
       "video": "Video platforms",
       "other": "Other websites"
     },
-    "localeLabels": { "fr": "French", "en": "English" }
+    "localeLabels": { "fr": "French", "en": "English" },
+    "small": "Small numbers (fewer than 5 visitors in a day)"
   },
   "community": {
     "title": "The community",
@@ -138,7 +139,8 @@
       "Measured by the site itself: no cookie, no third-party tool, no link to an account.",
       "A visitor is only recognised for one day: visitors of a week, a month or a year are the sum of each day's visitors.",
       "Time counted is the time the page is shown in the foreground, capped at 30 minutes per page.",
-      "Known bots and people who object to the measurement are not counted. Today's figures appear the next day."
+      "Known bots and people who object to the measurement are not counted. Today's figures appear the next day.",
+      "No breakdown (page, device, source, language, hour) shows a group of fewer than 5 visitors from the same day: these small numbers are grouped together."
     ],
     "privacy": "Privacy of the measurement",
     "sourceCode": "Source code",

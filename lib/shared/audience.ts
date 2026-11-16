@@ -199,15 +199,18 @@ export function isBotUserAgent(userAgent: string | null | undefined): boolean {
 }
 
 /**
- * L'envoi vient-il du script d'une page du site ? Un `fetch()` lancé par une
- * page pose toujours `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty`
- * (tout navigateur courant depuis 2023) ; un client sans navigateur, un
- * aperçu de lien ou une page tierce, non. Un filtre bon marché, pas une
- * preuve : un script qui forge ces en-têtes reste borné par les plafonds par
- * réseau (`admitAudienceViews`).
+ * L'envoi peut-il venir du script d'une page du site ? Un `fetch()` lancé par
+ * une page pose `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty` ; un
+ * envoi qui déclare une autre provenance (page tierce, aperçu de lien,
+ * navigation) est écarté. Un navigateur qui ne pose pas ces en-têtes (Safari
+ * avant iOS 16.4, vieilles vues web, proxy qui les retire) reste compté : ce
+ * filtre ne prouve rien — un script les forge sans peine —, la vraie borne
+ * est celle des plafonds par réseau (`admitAudienceViews`).
  */
 export function isAudienceScriptRequest(headers: Pick<Headers, "get">): boolean {
-  return headers.get("sec-fetch-site") === "same-origin" && headers.get("sec-fetch-dest") === "empty";
+  const site = headers.get("sec-fetch-site");
+  const dest = headers.get("sec-fetch-dest");
+  return (site === null || site === "same-origin") && (dest === null || dest === "empty");
 }
 
 /** Une page vue telle que le navigateur la signale. */
@@ -578,24 +581,33 @@ export interface AudiencePageStat {
 }
 
 /**
- * Visiteurs qu'il faut au moins à un type de page pour apparaître seul sur la
- * page publique : en dessous, il rejoint « Autres pages », pour qu'aucune ligne
- * ne décrive une poignée de personnes.
+ * Visiteurs qu'il faut au moins, **dans une même journée**, à une ligne d'une
+ * répartition (type de page, appareil, provenance, langue, heure) pour être
+ * montrée sur la page publique. Le seuil s'applique jour par jour, avant
+ * l'addition de la période : une personne venue cinq jours de suite sur une
+ * page rare n'y fait jamais une ligne à elle seule, et comparer deux périodes
+ * n'isole aucune ligne d'un jour sous le seuil.
  */
-export const AUDIENCE_MIN_PAGE_VISITORS = 5;
+export const AUDIENCE_MIN_VISITORS = 5;
 
 /**
- * Ce que la page publique montre des types de page d'une période : les types
- * connus vus par au moins {@link AUDIENCE_MIN_PAGE_VISITORS} visiteurs, le reste
- * (petits nombres, types qui ne se mesurent plus) fondu dans `other`, lui-même
- * retiré s'il reste sous ce seuil. Les visiteurs fondus s'additionnent (comme
- * ceux de plusieurs jours) : `other` peut en compter un même deux fois.
+ * Clé d'une répartition (appareils, provenance, langue) où se fondent les
+ * lignes d'un jour sous {@link AUDIENCE_MIN_VISITORS} : « petits nombres ».
+ */
+export const AUDIENCE_SMALL_KEY = "small";
+
+/**
+ * Ce que la page publique montre des types de page d'une période (lignes
+ * déjà fondues jour par jour sous le seuil par la lecture) : les types
+ * connus, le reste (types qui ne se mesurent plus, clés inconnues) fondu
+ * dans `other`. `other` est toujours montré : le cacher ne protégerait rien,
+ * les totaux publiés le redonnent par soustraction.
  */
 export function publicPageStats(pages: readonly AudiencePageStat[]): AudiencePageStat[] {
   const shown: AudiencePageStat[] = [];
   const other: AudiencePageStat = { key: "other", views: 0, visitors: 0, engagedMs: 0 };
   for (const page of pages) {
-    if (page.key !== "other" && AUDIENCE_PAGE_KEYS.includes(page.key) && page.visitors >= AUDIENCE_MIN_PAGE_VISITORS) {
+    if (page.key !== "other" && AUDIENCE_PAGE_KEYS.includes(page.key)) {
       shown.push({ ...page });
       continue;
     }
@@ -603,7 +615,7 @@ export function publicPageStats(pages: readonly AudiencePageStat[]): AudiencePag
     other.visitors += page.visitors;
     other.engagedMs += page.engagedMs;
   }
-  if (other.visitors >= AUDIENCE_MIN_PAGE_VISITORS) shown.push(other);
+  if (other.views > 0 || other.engagedMs > 0) shown.push(other);
   return shown.sort((a, b) => b.views - a.views);
 }
 

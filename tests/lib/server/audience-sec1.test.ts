@@ -137,7 +137,7 @@ describe("recordAudienceViews — file partagée", () => {
 });
 
 describe("getAudienceStats — petits nombres", () => {
-  it("getAudienceStats_smallAndRetiredPageTypes_foldedIntoOther", async () => {
+  it("getAudienceStats_retiredPageTypes_foldedIntoOther", async () => {
     mockDb(
       database((sql) =>
         sql.includes("FROM bg_audience_day_pages")
@@ -145,7 +145,7 @@ describe("getAudienceStats — petits nombres", () => {
               [
                 { page_key: "home", views: 40, visitors: 12, engaged_ms: 1000 },
                 { page_key: "admin", views: 9, visitors: 2, engaged_ms: 500 },
-                { page_key: "rules", views: 6, visitors: 4, engaged_ms: 300 },
+                { page_key: "other", views: 6, visitors: 4, engaged_ms: 300 },
               ],
             ])
           : undefined,

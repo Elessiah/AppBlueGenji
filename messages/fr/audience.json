@@ -52,7 +52,7 @@
   },
   "pages": {
     "title": "Pages les plus consultées",
-    "hint": "Les pages sont regroupées par type : aucune adresse précise, aucun nom n'est conservé.",
+    "hint": "Les pages sont regroupées par type, sans adresse précise ni nom. Un type vu par moins de 5 visiteurs dans la journée rejoint « Autres pages ».",
     "page": "Page",
     "views": "Pages vues",
     "share": "Part",
@@ -83,7 +83,7 @@
   },
   "timing": {
     "heatmapTitle": "Moments de visite",
-    "heatmapHint": "Pages vues par jour de la semaine et par heure (heure de Paris). Plus la case est foncée, plus le site est consulté.",
+    "heatmapHint": "Pages vues par jour de la semaine et par heure (heure de Paris), sans les heures de moins de 5 visiteurs dans la journée. Plus la case est foncée, plus le site est consulté.",
     "weekdaysTitle": "Jours de la semaine",
     "hoursTitle": "Heures de la journée",
     "hourLabel": "{hour} h",
@@ -110,7 +110,8 @@
       "video": "Plateformes vidéo",
       "other": "Autres sites"
     },
-    "localeLabels": { "fr": "Français", "en": "Anglais" }
+    "localeLabels": { "fr": "Français", "en": "Anglais" },
+    "small": "Petits nombres (moins de 5 visiteurs dans la journée)"
   },
   "community": {
     "title": "La communauté",
@@ -138,7 +139,8 @@
       "Mesure faite par le site lui-même : aucun cookie, aucun outil tiers, aucun lien avec un compte.",
       "Un visiteur est reconnu le temps d'une journée seulement : les visiteurs d'une semaine, d'un mois ou d'une année sont la somme des visiteurs de chaque jour.",
       "Le temps compté est celui où la page est affichée au premier plan, plafonné à 30 minutes par page.",
-      "Les robots connus et les personnes qui s'opposent à la mesure ne sont pas comptés. Les chiffres du jour en cours s'affichent le lendemain."
+      "Les robots connus et les personnes qui s'opposent à la mesure ne sont pas comptés. Les chiffres du jour en cours s'affichent le lendemain.",
+      "Aucune répartition (page, appareil, provenance, langue, heure) ne montre un groupe de moins de 5 visiteurs d'une même journée : ces petits nombres sont regroupés."
     ],
     "privacy": "Confidentialité de la mesure",
     "sourceCode": "Code source",

@@ -40,13 +40,16 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
    chiffres montrés aux partenaires ne doivent jamais paraître plus forts
    qu'ils ne sont.
 6. Pages les plus consultées : par type de page, vues, part, temps moyen.
-   Un type vu par moins de `AUDIENCE_MIN_PAGE_VISITORS` (5) visiteurs sur la
-   période rejoint « Autres pages », elle-même cachée sous ce seuil
-   (`publicPageStats`) : aucune ligne ne décrit une poignée de personnes.
+   Un type vu par moins de `AUDIENCE_MIN_VISITORS` (5) visiteurs **dans une
+   journée** rejoint, pour ce jour, « Autres pages », toujours montrée
+   (`readRange`, `publicPageStats` ; voir `AUDIENCE_MEASUREMENT.md`) : aucune
+   ligne ne décrit une poignée de personnes.
 7. Moments de visite : carte de chaleur jour × heure (rampe bleue à 5 paliers,
    lecture au survol, pic annoncé), barres par jour de la semaine et par heure.
+   Une heure d'un jour sous 5 visiteurs n'y est pas comptée.
 8. Qui nous consulte : appareils, provenance, langue — barres segmentées,
-   couleur fixée par catégorie (jamais par rang), légende chiffrée.
+   couleur fixée par catégorie (jamais par rang), légende chiffrée. Les
+   lignes d'un jour sous 5 visiteurs y forment « Petits nombres » (`small`).
 9. La communauté : tournois publiés joués (en cours ou terminés, `PLAYED_STATES`
    comme les fiches d'équipe et les profils), matchs joués de ces tournois (hors exemptions),
    équipes et comptes **avec la définition de l'accueil**

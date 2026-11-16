@@ -106,7 +106,18 @@ describe("POST /api/audience", () => {
     expect(recordAudienceViews).not.toHaveBeenCalled();
   });
 
-  it("POST_withoutFetchMetadata_recordsNothing", async () => {
+  it("POST_noFetchMetadataHeaders_recordsViews", async () => {
+    // Safari avant iOS 16.4 : ni Sec-Fetch-Site ni Sec-Fetch-Dest.
+    const req = audienceReq(BATCH);
+    req.headers.delete("sec-fetch-site");
+    req.headers.delete("sec-fetch-dest");
+
+    const res = await POST(req);
+
+    expect(await res.json()).toEqual({ recorded: 1 });
+  });
+
+  it("POST_emptyFetchMetadata_recordsNothing", async () => {
     const res = await POST(audienceReq(BATCH, { "sec-fetch-site": "", "sec-fetch-dest": "" }));
 
     expect(await res.json()).toEqual({ recorded: 0 });

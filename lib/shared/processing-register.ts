@@ -31,7 +31,7 @@
  * (`docs/features/LEGAL_DATA_FILES.md`).
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
@@ -1682,8 +1682,8 @@ const ACTIVITIES = registerActivities({
         "Referral family of a visit's first page (direct access, search engine, Discord, social network, video platform, other website), inferred from the referring site, which is not kept"),
       frEn(`Temps passé sur la page onglet visible, plafonné à ${AUDIENCE_MAX_ENGAGED_MINUTES} minutes par page`,
         `Time spent on the page with the tab visible, capped at ${AUDIENCE_MAX_ENGAGED_MINUTES} minutes per page`),
-      frEn("Adresse IP de qui envoie ces mesures (son réseau /64 en IPv6) et condensé court de son navigateur, en mémoire seulement, pour plafonner les envois, les navigateurs distincts et les pages vues de chaque réseau (avec T17), jamais enregistrés",
-        "IP address of whoever sends these measurements (its /64 network in IPv6) and a short digest of their browser, in memory only, to cap each network's submissions, distinct browsers and page views (with T17), never recorded"),
+      frEn("Adresse IP de qui envoie ces mesures (et, en IPv6, ses réseaux /64 et /48) et condensé court de son navigateur, en mémoire seulement, pour plafonner les envois, les navigateurs distincts et les pages vues de chaque réseau (avec T17), jamais enregistrés",
+        "IP address of whoever sends these measurements (and, in IPv6, its /64 and /48 networks) and a short digest of their browser, in memory only, to cap each network's submissions, distinct browsers and page views (with T17), never recorded"),
     ],
     sensitiveData: frEn("Aucune", "None"),
     retention: [
@@ -1693,12 +1693,12 @@ const ACTIVITIES = registerActivities({
         "Aggregate figures per day (totals, by type of page, by hour, by device, by language, by referral), without any hash: kept with no limit, they no longer concern anyone"),
       frEn(`Sel du jour : en base le temps de la journée (un redémarrage du site le reprend), effacé le lendemain dès la journée comptée (à partir de 1 h 15, heure de Paris, au premier entretien entraîné par l'activité du site) ; jamais dans un journal ; une copie de sauvegarde chiffrée faite entre-temps peut le contenir (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
         `Daily salt: in the database for the day (a restart of the site picks it up again), erased the next day as soon as the day is counted (from 1:15 a.m., Paris time, at the first upkeep driven by the site's activity); never in a log; an encrypted backup copy made in the meantime may contain it (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
-      frEn("Adresse IP (ou réseau) et condensé du navigateur des plafonds d'envois : deux minutes au plus après sa dernière requête, en mémoire ; pages vues reçues : quelques secondes en mémoire avant leur écriture groupée",
-        "IP address (or network) and browser digest of the submission caps: two minutes at most after its last request, in memory; page views received: a few seconds in memory before being written together"),
+      frEn("Adresse IP (et réseaux) et condensé du navigateur des plafonds d'envois : deux minutes au plus après sa dernière requête, en mémoire ; pages vues reçues : quelques secondes en mémoire avant leur écriture groupée",
+        "IP address (and networks) and browser digest of the submission caps: two minutes at most after its last request, in memory; page views received: a few seconds in memory before being written together"),
     ],
     recipients: [
-      frEn(`Toute personne qui a le lien de la page ${AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés (partenaires, annonceurs)`,
-        `Anyone who has the link to the ${AUDIENCE_PAGE_PATH} page, for the aggregate figures only (partners, advertisers)`),
+      frEn(`Toute personne qui a le lien de la page ${AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés, sans répartition de moins de ${AUDIENCE_MIN_VISITORS} visiteurs d'une même journée (partenaires, annonceurs)`,
+        `Anyone who has the link to the ${AUDIENCE_PAGE_PATH} page, for the aggregate figures only, with no breakdown of fewer than ${AUDIENCE_MIN_VISITORS} visitors from the same day (partners, advertisers)`),
       frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",
         "The association's technical manager, who is also the site's host (database)"),
     ],

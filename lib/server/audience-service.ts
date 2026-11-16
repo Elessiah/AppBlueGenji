@@ -15,7 +15,7 @@
  *   recalcule plus, même par l'association. L'entretien attend les
  *   signalements en cours avant de replier : aucun n'écrit dans un jour clos.
  * - **Aucune adresse IP gardée.** L'IP sert au HMAC, à l'instant, puis au seul
- *   plafond de débit (`AUDIENCE_REQUEST_RULE`, en mémoire, deux minutes au plus) ;
+ *   plafonds de débit (`throttleAudienceRequest`, `admitAudienceViews`, en mémoire, deux minutes au plus) ;
  *   la file d'écriture ne porte que l'empreinte.
  * - **Écritures groupées.** Les pages vues attendent en mémoire (au plus
  *   {@link FLUSH_DELAY_MS} ms ou {@link FLUSH_SIZE} lignes) puis partent en un
@@ -37,6 +37,8 @@ import {
   AUDIENCE_RANGES,
   AUDIENCE_RAW_RETENTION_MONTHS,
   aggregateAudienceDay,
+  AUDIENCE_MIN_VISITORS,
+  AUDIENCE_SMALL_KEY,
   emptyHeatmap,
   mergeAudienceAggregates,
   parisClock,
@@ -589,25 +591,34 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
   const db = await getDatabase();
   const where = from ? "WHERE day >= ?" : "";
   const params = from ? [from] : [];
+  // Seuil de k-anonymat jour par jour (`AUDIENCE_MIN_VISITORS`, constante du
+  // code) : une ligne d'un jour sous le seuil rejoint « Autres pages » ou
+  // « petits nombres », une heure sous le seuil sort de la grille. Les
+  // sous-requêtes nomment autrement la clé fondue : un GROUP BY sur un alias
+  // homonyme d'une colonne lirait la colonne.
   const [[pages], [hours], [dims]] = await Promise.all([
     db.execute<PageRow[]>(
-      `SELECT page_key, SUM(views) AS views, SUM(visitors) AS visitors, SUM(engaged_ms) AS engaged_ms
-         FROM bg_audience_day_pages ${where}
-        GROUP BY page_key
+      `SELECT page_group AS page_key, SUM(views) AS views, SUM(visitors) AS visitors, SUM(engaged_ms) AS engaged_ms
+         FROM (SELECT CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN page_key ELSE 'other' END AS page_group,
+                      views, visitors, engaged_ms
+                 FROM bg_audience_day_pages ${where}) AS folded
+        GROUP BY page_group
         ORDER BY views DESC`,
       params,
     ),
     // Grille 7 × 24 faite par la base (`WEEKDAY` : lundi = 0) : 168 lignes au plus.
     db.execute<HourRow[]>(
-      `SELECT WEEKDAY(day) AS weekday, hour, SUM(views) AS views
+      `SELECT WEEKDAY(day) AS weekday, hour, SUM(CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN views ELSE 0 END) AS views
          FROM bg_audience_day_hours ${where}
         GROUP BY WEEKDAY(day), hour`,
       params,
     ),
     db.execute<DimRow[]>(
-      `SELECT dim, dim_value, SUM(views) AS views, SUM(visitors) AS visitors
-         FROM bg_audience_day_dims ${where}
-        GROUP BY dim, dim_value`,
+      `SELECT dim, value_group AS dim_value, SUM(views) AS views, SUM(visitors) AS visitors
+         FROM (SELECT dim, CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN dim_value ELSE '${AUDIENCE_SMALL_KEY}' END AS value_group,
+                      views, visitors
+                 FROM bg_audience_day_dims ${where}) AS folded
+        GROUP BY dim, value_group`,
       params,
     ),
   ]);
@@ -618,7 +629,7 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
     if (weekday >= 0 && weekday < 7 && hour >= 0 && hour < 24) heatmap[weekday][hour] += num(row.views);
   }
   return {
-    // Petits nombres et types qui ne se mesurent plus fondus dans « Autres pages » (page publique).
+    // Types qui ne se mesurent plus fondus dans « Autres pages » (page publique).
     pages: publicPageStats(
       pages.map((row) => ({ key: row.page_key, views: num(row.views), visitors: num(row.visitors), engagedMs: num(row.engaged_ms) })),
     ),

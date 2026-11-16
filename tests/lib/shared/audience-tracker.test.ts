@@ -38,6 +38,17 @@ beforeEach(() => {
 });
 
 describe("AudienceTracker", () => {
+  it("navigate_reportsOrAdminPath_sendsNothing", () => {
+    const t = tracker();
+    t.navigate("/signalements/42");
+    clock = 120_000;
+    t.navigate("/en/admin/utilisateurs");
+    clock = 240_000;
+    t.leave();
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("navigate_firstPage_sendsViewAtDisplayWithReferrer", () => {
     const t = tracker();
     t.navigate("/");

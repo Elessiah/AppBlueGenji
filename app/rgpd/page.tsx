@@ -93,7 +93,7 @@ import {
 } from "@/lib/shared/site-visits";
 import { headers } from "next/headers";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
-import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
@@ -928,13 +928,14 @@ function RgpdFr({
             effacé de la base le lendemain, dès la journée comptée (à partir de 1 h 15, heure de
             Paris) ; il n&apos;est écrit dans aucun journal, mais une copie de sauvegarde chiffrée faite
             entre-temps peut le contenir ({BACKUP_RETENTION_DAYS} jours au plus). Votre
-            adresse IP (votre réseau en IPv6) et un condensé court de votre navigateur ne sont gardés
-            qu&apos;en mémoire, pour plafonner les envois de chaque réseau : deux minutes au plus après
-            votre dernière requête.
+            adresse IP (et, en IPv6, ses réseaux /64 et /48) et un condensé court de votre navigateur ne
+            sont gardés qu&apos;en mémoire, pour plafonner les envois de chaque réseau : deux minutes au
+            plus après votre dernière requête.
           </p>
           <p>
             <strong>Destinataires.</strong> Toute personne qui a le lien de la page{" "}
-            {AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés ; le responsable technique de
+            {AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés (aucune répartition n&apos;y montre un
+            groupe de moins de {AUDIENCE_MIN_VISITORS} visiteurs d&apos;une même journée) ; le responsable technique de
             l&apos;association, hébergeur du site, pour la base de données.
           </p>
           <p>

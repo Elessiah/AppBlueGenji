@@ -31,6 +31,13 @@ export type RateLimitRule = {
    * reste bornée face à des identités fabriquées.
    */
   maxKeys?: number;
+  /**
+   * Seau plein de fenêtres actives : `"reset"` (défaut) le vide et repart de
+   * zéro ; `"refuse"` refuse toute clé nouvelle jusqu'à ce qu'une fenêtre
+   * expire. À choisir quand saturer le seau ne doit rendre à personne ses
+   * plafonds (clés fabriquées en masse : réseaux, navigateurs).
+   */
+  overflow?: "reset" | "refuse";
 };
 
 const DEFAULT_MAX_KEYS = 10_000;
@@ -177,9 +184,13 @@ export function chargeRateLimit(
     for (const [trackedKey, tracked] of bucket) {
       if (now >= tracked.resetAt) bucket.delete(trackedKey);
     }
-    // Toujours plein de fenêtres actives : on repart de zéro plutôt que de
-    // laisser la mémoire filer.
-    if (bucket.size >= maxKeys) bucket.clear();
+    if (bucket.size >= maxKeys) {
+      // Toujours plein de fenêtres actives : un seau qui refuse garde les
+      // plafonds en cours (la clé nouvelle attend une place) ; les autres
+      // repartent de zéro plutôt que de laisser la mémoire filer.
+      if (rule.overflow === "refuse") return { allowed: false, remaining: 0, retryAfterMs: rule.windowMs };
+      bucket.clear();
+    }
   }
 
   bucket.set(key, { count: 1, resetAt: now + rule.windowMs });

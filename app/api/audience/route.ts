@@ -1,10 +1,4 @@
-import {
-  AUDIENCE_REQUEST_RULE,
-  admitAudienceViews,
-  audienceNetworkKey,
-  enforceRateLimit,
-  requestClientIp,
-} from "@/lib/server/api-guard";
+import { admitAudienceViews, requestClientIp, throttleAudienceRequest } from "@/lib/server/api-guard";
 import { maintainAudience, recordAudienceViews } from "@/lib/server/audience-service";
 import { failureReason } from "@/lib/server/failure-reason";
 import { ok } from "@/lib/server/http";
@@ -25,9 +19,10 @@ export const dynamic = "force-dynamic";
  * dans la console d'un visiteur. Ni session lue, ni cookie posé.
  *
  * Contre les signalements fabriqués (qui gonfleraient les chiffres montrés aux
- * partenaires) : seul le `fetch()` d'une page du site est lu
- * (`isAudienceScriptRequest`), et chaque réseau est plafonné en envois, en
- * navigateurs distincts et en pages vues (`admitAudienceViews`).
+ * partenaires) : un envoi qui se déclare d'une autre origine est écarté
+ * (`isAudienceScriptRequest`), et chaque réseau (puis son `/48` en IPv6, puis
+ * le site entier) est plafonné en envois, en navigateurs distincts et en
+ * pages vues (`throttleAudienceRequest`, `admitAudienceViews`).
  */
 export async function POST(req: Request) {
   // Opposition (GPC, DNT, bouton de `/rgpd#audience`) relue avant tout calcul :
@@ -38,8 +33,7 @@ export async function POST(req: Request) {
   if (isBotUserAgent(userAgent) || !isAudienceScriptRequest(req.headers)) return ok({ recorded: 0 });
 
   const ip = requestClientIp(req);
-  const network = audienceNetworkKey(ip);
-  const throttled = enforceRateLimit(AUDIENCE_REQUEST_RULE, network);
+  const throttled = throttleAudienceRequest(ip);
   if (throttled) return throttled;
 
   // Repli et purge entraînés par le trafic mesuré (ni opposition, ni robot, ni
@@ -53,7 +47,7 @@ export async function POST(req: Request) {
     return ok({ recorded: 0 });
   }
 
-  const views = admitAudienceViews(network, userAgent ?? "", parseAudienceBatch(body, siteHost()));
+  const views = admitAudienceViews(ip, userAgent ?? "", parseAudienceBatch(body, siteHost()));
   if (views.length === 0) return ok({ recorded: 0 });
   try {
     return ok({ recorded: await recordAudienceViews({ ip, userAgent, views }) });

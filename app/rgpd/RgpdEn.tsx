@@ -5,7 +5,7 @@ import { TranslationNotice } from "@/components/legal/TranslationNotice";
 import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
-import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
@@ -753,13 +753,14 @@ export function RgpdEn({
             any hash, are kept with no limit: they no longer concern anyone. The daily salt is erased
             from the database the next day, as soon as the day is counted (from 1:15 a.m., Paris
             time); it is written in no log, but an encrypted backup copy made in the meantime may
-            contain it ({BACKUP_RETENTION_DAYS} days at most). Your IP address (your network in IPv6)
-            and a short digest of your browser are only kept in memory, to cap each network&apos;s
-            submissions: two minutes at most after your last request.
+            contain it ({BACKUP_RETENTION_DAYS} days at most). Your IP address (and, in IPv6, its /64
+            and /48 networks) and a short digest of your browser are only kept in memory, to cap each
+            network&apos;s submissions: two minutes at most after your last request.
           </p>
           <p>
             <strong>Recipients.</strong> Anyone who has the link to the {AUDIENCE_PAGE_PATH} page, for
-            the aggregate figures only; the association&apos;s technical manager, who hosts the site,
+            the aggregate figures only (no breakdown there shows a group of fewer than{" "}
+            {AUDIENCE_MIN_VISITORS} visitors from the same day); the association&apos;s technical manager, who hosts the site,
             for the database.
           </p>
           <p>

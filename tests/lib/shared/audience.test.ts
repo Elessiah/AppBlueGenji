@@ -500,8 +500,16 @@ describe("sécurité, cycle 1", () => {
     expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "same-origin", "sec-fetch-dest": "empty" }))).toBe(true);
   });
 
-  it("isAudienceScriptRequest_noFetchMetadata_false", () => {
-    expect(isAudienceScriptRequest(headers({}))).toBe(false);
+  it("isAudienceScriptRequest_noFetchMetadata_true", () => {
+    expect(isAudienceScriptRequest(headers({}))).toBe(true);
+  });
+
+  it("isAudienceScriptRequest_onlySiteSameOrigin_true", () => {
+    expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "same-origin" }))).toBe(true);
+  });
+
+  it("isAudienceScriptRequest_onlySiteCrossSite_false", () => {
+    expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "cross-site" }))).toBe(false);
   });
 
   it("isAudienceScriptRequest_crossSite_false", () => {
@@ -560,16 +568,16 @@ describe("sécurité, cycle 1", () => {
     expect(result.pages).toEqual([{ pageKey: "rules", views: 1, visitors: 1, engagedMs: 0 }]);
   });
 
-  it("publicPageStats_pageUnderThreshold_foldedIntoOther", () => {
+  it("publicPageStats_knownTypeFromFoldedQuery_keptAsIs", () => {
+    // Le seuil est appliqué jour par jour par la lecture : plus de seuil sur la période.
     const pages = publicPageStats([
       { key: "home", views: 50, visitors: 5, engagedMs: 10 },
       { key: "rules", views: 8, visitors: 4, engagedMs: 3 },
-      { key: "teams", views: 7, visitors: 1, engagedMs: 2 },
     ]);
 
     expect(pages).toEqual([
       { key: "home", views: 50, visitors: 5, engagedMs: 10 },
-      { key: "other", views: 15, visitors: 5, engagedMs: 5 },
+      { key: "rules", views: 8, visitors: 4, engagedMs: 3 },
     ]);
   });
 
@@ -582,8 +590,11 @@ describe("sécurité, cycle 1", () => {
     expect(pages).toEqual([{ key: "other", views: 31, visitors: 10, engagedMs: 2 }]);
   });
 
-  it("publicPageStats_otherUnderThreshold_hidden", () => {
-    expect(publicPageStats([{ key: "admin", views: 3, visitors: 2, engagedMs: 1 }])).toEqual([]);
+  it("publicPageStats_otherSmall_stillShown", () => {
+    // La cacher ne protégerait rien : les totaux quotidiens la redonnent par soustraction.
+    expect(publicPageStats([{ key: "admin", views: 3, visitors: 2, engagedMs: 1 }])).toEqual([
+      { key: "other", views: 3, visitors: 2, engagedMs: 1 },
+    ]);
   });
 
   it("publicPageStats_shownPages_sortedByViewsDesc", () => {
