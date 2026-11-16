@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -241,6 +241,8 @@ function inOrder(shares: AudienceShare[], order: readonly string[]): AudienceSha
 
 export interface AudienceDashboardProps {
   stats: AudienceStats | null;
+  /** La lecture des statistiques a échoué (et non « pas encore de mesure »). */
+  unavailable?: boolean;
   messages: AudienceMessages;
   locale: Locale;
 }
@@ -250,11 +252,10 @@ export interface AudienceDashboardProps {
  * se calcule ici à partir des agrégats quotidiens remis par le serveur ;
  * changer de période ne refait aucune requête.
  */
-export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashboardProps) {
+export function AudienceDashboard({ stats, unavailable = false, messages: m, locale }: AudienceDashboardProps) {
   const f = useFormatters(locale);
   const [range, setRange] = useState<AudienceRange>("30d");
   const [bucket, setBucket] = useState<Exclude<AudienceBucket, "day">>("week");
-  const [hovered, setHovered] = useState<{ day: number; hour: number } | null>(null);
 
   const lastDay = stats?.lastDay ?? null;
   const firstDay = stats?.firstDay ?? null;
@@ -326,9 +327,9 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
           <main id="contenu" className={styles.main}>
             <section className={`${styles.card} ${styles.empty}`} aria-labelledby="audience-empty">
               <h2 id="audience-empty" className={styles.cardTitle}>
-                {m.empty.title}
+                {unavailable ? m.empty.errorTitle : m.empty.title}
               </h2>
-              <p className={styles.cardHint}>{m.empty.body}</p>
+              <p className={styles.cardHint}>{unavailable ? m.empty.errorBody : m.empty.body}</p>
             </section>
             {stats?.community && <Community m={m} community={stats.community} f={f} />}
           </main>
@@ -394,7 +395,7 @@ export function AudienceDashboard({ stats, messages: m, locale }: AudienceDashbo
           <Buckets m={m} f={f} stats={stats} bucket={bucket} onBucket={setBucket} formatNumber={formatNumber} />
           <Pages m={m} f={f} pages={rangeStats.pages} />
           <Card title={m.timing.heatmapTitle} hint={m.timing.heatmapHint} wide>
-            <Heatmap m={m} f={f} heatmap={rangeStats.heatmap} hovered={hovered} onHover={setHovered} formatNumber={formatNumber} />
+            <Heatmap m={m} f={f} heatmap={rangeStats.heatmap} formatNumber={formatNumber} />
           </Card>
           <Card title={m.audience.title} wide>
             <div className={styles.shares}>
@@ -468,6 +469,9 @@ function Evolution({ m, f, points, formatNumber }: { m: AudienceMessages; f: For
         series={chart.series}
         ariaLabel={m.evolution.title}
         loadingLabel={m.chart.loading}
+        failedLabel={m.chart.failed}
+        summaryTemplate={m.chart.summary}
+        seeTableLabel={m.chart.seeTable}
         tooltipTemplate={m.chart.tooltip}
         formatValue={formatNumber}
         height={260}
@@ -499,7 +503,7 @@ function Buckets({
     return {
       labels: labels.map((label) => label.short),
       long: labels.map((label) => label.long),
-      series: [{ label: m.kpis.visitors, data: grouped.map((point) => point.visitors), tone: "--st-series-1" }],
+      series: [{ label: m.evolution.visitorsSummed, data: grouped.map((point) => point.visitors), tone: "--st-series-1" }],
       rows: grouped.map((point, index) => [labels[index].long, f.number(point.visitors)]),
     };
   }, [stats, bucket, m, f]);
@@ -518,10 +522,13 @@ function Buckets({
         series={chart.series}
         ariaLabel={m.buckets.title}
         loadingLabel={m.chart.loading}
+        failedLabel={m.chart.failed}
+        summaryTemplate={m.chart.summary}
+        seeTableLabel={m.chart.seeTable}
         tooltipTemplate={m.chart.tooltip}
         formatValue={formatNumber}
       />
-      <DataTable m={m} caption={m.buckets.title} columns={[m.table.period, m.kpis.visitors]} rows={chart.rows} />
+      <DataTable m={m} caption={m.buckets.title} columns={[m.table.period, m.evolution.visitorsSummed]} rows={chart.rows} />
     </Card>
   );
 }
@@ -558,21 +565,44 @@ function Pages({ m, f, pages }: { m: AudienceMessages; f: Formatters; pages: Aud
   );
 }
 
+type HeatCoord = { day: number; hour: number };
+
+/** Case voisine selon la touche pressée (bornée à la grille), `null` si la touche ne déplace pas. */
+export function nextHeatCell(from: HeatCoord, key: string, days: number, hours = 24): HeatCoord | null {
+  const clamp = (value: number, size: number) => Math.min(size - 1, Math.max(0, value));
+  switch (key) {
+    case "ArrowRight":
+      return { day: from.day, hour: clamp(from.hour + 1, hours) };
+    case "ArrowLeft":
+      return { day: from.day, hour: clamp(from.hour - 1, hours) };
+    case "ArrowDown":
+      return { day: clamp(from.day + 1, days), hour: from.hour };
+    case "ArrowUp":
+      return { day: clamp(from.day - 1, days), hour: from.hour };
+    case "Home":
+      return { day: from.day, hour: 0 };
+    case "End":
+      return { day: from.day, hour: hours - 1 };
+    default:
+      return null;
+  }
+}
+
 function Heatmap({
   m,
   f,
   heatmap,
-  hovered,
-  onHover,
   formatNumber,
 }: {
   m: AudienceMessages;
   f: Formatters;
   heatmap: number[][];
-  hovered: { day: number; hour: number } | null;
-  onHover: (cell: { day: number; hour: number } | null) => void;
   formatNumber: (value: number) => string;
 }) {
+  // Survol, focus et toucher vivent ici : un survol ne refait pas tout le tableau de bord.
+  const [hovered, setHovered] = useState<HeatCoord | null>(null);
+  const [cursor, setCursor] = useState<HeatCoord | null>(null);
+  const gridRef = useRef<HTMLFieldSetElement | null>(null);
   const max = Math.max(0, ...heatmap.flat());
   const hourLabel = useCallback((hour: number) => fillTemplate(m.timing.hourLabel, { hour }), [m]);
   // Stables d'un survol à l'autre : un tableau neuf recréerait les deux graphiques à chaque case survolée.
@@ -587,7 +617,7 @@ function Heatmap({
       hourSeries: [{ label: m.evolution.views, data: margins.hours, tone: "--st-series-1" }],
     };
   }, [heatmap, m, hourLabel]);
-  let peak: { day: number; hour: number } | null = null;
+  let peak: HeatCoord | null = null;
   let peakViews = 0;
   for (let day = 0; day < heatmap.length; day += 1) {
     for (let hour = 0; hour < heatmap[day].length; hour += 1) {
@@ -597,32 +627,55 @@ function Heatmap({
       }
     }
   }
-  const shown: { day: number; hour: number } | null = hovered ?? peak;
+  // Survol, sinon case choisie au clavier ou au toucher, sinon le pic.
+  const picked = hovered ?? cursor;
+  const shown: HeatCoord | null = picked ?? peak;
   let readout = m.timing.peakNone;
-  if (shown && hovered) {
+  if (shown && picked) {
     readout = fillTemplate(m.timing.cell, { day: m.timing.weekdays[shown.day], hour: shown.hour, views: f.number(heatmap[shown.day][shown.hour]) });
   } else if (shown) {
     readout = fillTemplate(m.timing.peak, { day: m.timing.weekdays[shown.day], hour: shown.hour });
   }
   const level = (views: number) => (views <= 0 || max <= 0 ? 0 : Math.max(1, Math.ceil((views / max) * HEAT_LEVELS)));
+  // Une seule case dans l'ordre de tabulation : les flèches font le reste.
+  const tabStop: HeatCoord = cursor ?? peak ?? { day: 0, hour: 0 };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLFieldSetElement>) => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>("[data-heat]");
+    if (!target) return;
+    const next = nextHeatCell({ day: Number(target.dataset.day), hour: Number(target.dataset.hour) }, event.key, heatmap.length);
+    if (!next) return;
+    event.preventDefault();
+    setCursor(next);
+    gridRef.current?.querySelector<HTMLElement>(`[data-day="${next.day}"][data-hour="${next.hour}"]`)?.focus();
+  };
 
   return (
     <>
-      <div className={styles.heatmap} aria-hidden="true" onMouseLeave={() => onHover(null)}>
-        <span />
+      <fieldset ref={gridRef} className={styles.heatmap} onMouseLeave={() => setHovered(null)} onKeyDown={onKeyDown}>
+        <legend className="sr-only">{m.timing.heatmapTitle}</legend>
+        <span aria-hidden="true" />
         {Array.from({ length: 24 }, (_, hour) => (
-          <span key={hour} className={styles.heatHour}>
+          <span key={hour} className={styles.heatHour} aria-hidden="true">
             {hour % 3 === 0 ? hour : ""}
           </span>
         ))}
         {heatmap.map((row, day) => (
-          <HeatRow key={day} label={m.timing.weekdaysShort[day]} row={row} day={day} level={level} onHover={onHover} />
+          <HeatRow
+            key={day}
+            label={m.timing.weekdaysShort[day]}
+            row={row}
+            day={day}
+            level={level}
+            tabStop={tabStop}
+            cellLabel={(hour, views) => fillTemplate(m.timing.cell, { day: m.timing.weekdays[day], hour, views: f.number(views) })}
+            onHover={setHovered}
+            onPick={setCursor}
+          />
         ))}
-      </div>
+      </fieldset>
       <div className={styles.heatFoot}>
-        <p className={styles.readout} aria-live="polite">
-          {readout}
-        </p>
+        <p className={styles.readout}>{readout}</p>
         <span className={styles.heatScale} aria-hidden="true">
           {m.timing.less}
           {Array.from({ length: HEAT_LEVELS + 1 }, (_, index) => (
@@ -641,6 +694,9 @@ function Heatmap({
             series={marginCharts.weekdaySeries}
             ariaLabel={m.timing.weekdaysTitle}
             loadingLabel={m.chart.loading}
+            failedLabel={m.chart.failed}
+            summaryTemplate={m.chart.summary}
+            seeTableLabel={m.chart.seeTable}
             tooltipTemplate={m.chart.tooltip}
             formatValue={formatNumber}
             height={200}
@@ -655,6 +711,9 @@ function Heatmap({
             series={marginCharts.hourSeries}
             ariaLabel={m.timing.hoursTitle}
             loadingLabel={m.chart.loading}
+            failedLabel={m.chart.failed}
+            summaryTemplate={m.chart.summary}
+            seeTableLabel={m.chart.seeTable}
             tooltipTemplate={m.chart.tooltip}
             formatValue={formatNumber}
             height={200}
@@ -676,19 +735,41 @@ function HeatRow({
   row,
   day,
   level,
+  tabStop,
+  cellLabel,
   onHover,
+  onPick,
 }: {
   label: string;
   row: number[];
   day: number;
   level: (views: number) => number;
-  onHover: (cell: { day: number; hour: number }) => void;
+  tabStop: HeatCoord;
+  cellLabel: (hour: number, views: number) => string;
+  onHover: (cell: HeatCoord) => void;
+  onPick: (cell: HeatCoord) => void;
 }) {
   return (
     <>
-      <span className={styles.heatDay}>{label}</span>
+      <span className={styles.heatDay} aria-hidden="true">
+        {label}
+      </span>
       {row.map((views, hour) => (
-        <span key={hour} className={styles.heatCell} data-level={level(views)} onMouseEnter={() => onHover({ day, hour })} />
+        <button
+          key={hour}
+          type="button"
+          className={styles.heatCell}
+          data-heat=""
+          data-day={day}
+          data-hour={hour}
+          data-level={level(views)}
+          data-tap-zone
+          tabIndex={tabStop.day === day && tabStop.hour === hour ? 0 : -1}
+          aria-label={cellLabel(hour, views)}
+          onMouseEnter={() => onHover({ day, hour })}
+          onFocus={() => onPick({ day, hour })}
+          onClick={() => onPick({ day, hour })}
+        />
       ))}
     </>
   );

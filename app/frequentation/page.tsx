@@ -25,14 +25,16 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function FrequentationPage() {
   const locale = await requestLocale();
   let stats: AudienceStats | null = null;
+  let unavailable = false;
   try {
     stats = await getAudienceStats();
   } catch (error) {
-    // Base injoignable : la page reste lisible, sur son état vide.
+    // Base injoignable : la page reste lisible, avec un état « indisponible » distinct de l'état vide.
+    unavailable = true;
     console.error("[audience] lecture des statistiques impossible", error);
   }
   // Le tableau de bord pose lui-même `<main id="contenu">`, entre son en-tête et
   // son pied de page (repères `banner` et `contentinfo` hors de `main`). Pas de
   // `PublicPageShell` : page formelle hors du site vitrine (D76).
-  return <AudienceDashboard stats={stats} messages={messagesFor(locale).audience} locale={locale} />;
+  return <AudienceDashboard stats={stats} unavailable={unavailable} messages={messagesFor(locale).audience} locale={locale} />;
 }

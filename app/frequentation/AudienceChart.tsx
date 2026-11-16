@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Chart as ChartInstance, ChartConfiguration } from "chart.js";
+import { useOptionalToast } from "@/components/ui/toast";
 import { fillTemplate } from "@/lib/shared/audience";
 import styles from "./frequentation.module.css";
 
@@ -18,14 +19,45 @@ export interface AudienceChartProps {
   /** Libellés longs, pour l'info-bulle (« Semaine du 3 novembre »). Par défaut, {@link labels}. */
   tooltipLabels?: string[];
   series: AudienceChartSeries[];
-  /** Résumé du graphique pour les lecteurs d'écran ; le détail est dans le tableau voisin. */
+  /** Titre du graphique, en tête de son nom accessible ; le détail est dans le tableau voisin. */
   ariaLabel: string;
   loadingLabel: string;
+  /** Message de repli si Chart.js ne se charge pas (le tableau de données reste lisible). */
+  failedLabel: string;
+  /** Résumé d'une série pour les lecteurs d'écran : `{series}`, `{total}`, `{min}`, `{max}`, `{count}`. */
+  summaryTemplate: string;
+  /** Renvoi au tableau de données, ajouté à la fin du nom accessible. */
+  seeTableLabel: string;
   /** Ligne d'info-bulle, `{label}` et `{value}` (« {label} : {value} »). */
   tooltipTemplate: string;
   formatValue: (value: number) => string;
   /** Hauteur du tracé en px. */
   height?: number;
+}
+
+/**
+ * Nom accessible d'un graphique : son titre, puis pour chaque série le total,
+ * le minimum, le maximum et le nombre de points, puis le renvoi au tableau.
+ * Un graphique tracé sur canevas n'a pas d'autre texte à lire.
+ */
+export function chartAriaLabel(
+  title: string,
+  series: readonly AudienceChartSeries[],
+  summaryTemplate: string,
+  seeTableLabel: string,
+  formatValue: (value: number) => string,
+): string {
+  const summaries = series.map((serie) => {
+    const data = serie.data;
+    return fillTemplate(summaryTemplate, {
+      series: serie.label,
+      total: formatValue(data.reduce((sum, value) => sum + value, 0)),
+      min: formatValue(data.length > 0 ? Math.min(...data) : 0),
+      max: formatValue(data.length > 0 ? Math.max(...data) : 0),
+      count: data.length,
+    });
+  });
+  return [title, ...summaries, seeTableLabel].join(" ");
 }
 
 function token(element: Element, name: string): string {
@@ -47,10 +79,14 @@ export function AudienceChart({
   series,
   ariaLabel,
   loadingLabel,
+  failedLabel,
+  summaryTemplate,
+  seeTableLabel,
   tooltipTemplate,
   formatValue,
   height = 240,
 }: AudienceChartProps) {
+  const toast = useOptionalToast();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<ChartInstance | null>(null);
   const [ready, setReady] = useState(false);
@@ -146,18 +182,25 @@ export function AudienceChart({
         setReady(true);
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (cancelled) return;
+        setFailed(true);
+        toast?.showError(failedLabel, { once: true });
       });
     return () => {
       cancelled = true;
       chartRef.current?.destroy();
       chartRef.current = null;
     };
-  }, [type, labels, tooltipLabels, series, formatValue, tooltipTemplate]);
+  }, [type, labels, tooltipLabels, series, formatValue, tooltipTemplate, failedLabel, toast]);
 
   return (
     <div className={styles.chartBox} style={{ height }}>
-      <canvas ref={canvasRef} role="img" aria-label={ariaLabel} />
+      <canvas ref={canvasRef} role="img" aria-label={chartAriaLabel(ariaLabel, series, summaryTemplate, seeTableLabel, formatValue)} />
+      {failed && (
+        <p className={styles.chartFailed}>
+          {failedLabel}
+        </p>
+      )}
       {!ready && !failed && (
         <p className={styles.chartLoading} aria-hidden="true">
           {loadingLabel}

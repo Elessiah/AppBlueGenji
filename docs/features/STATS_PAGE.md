@@ -63,7 +63,8 @@ communauté restant affichée. Base injoignable : même état vide.
   11 px, Inter. Aucune couleur écrite dans le TSX : Chart.js lit les jetons sur
   la page (`getComputedStyle`).
 - Palette de la compétence dataviz : catégorielle dans l'ordre fixe (bleu,
-  orange, aqua, jaune, magenta, vert), séquentielle bleue pour la carte de
+  orange, sarcelle, violet, magenta, vert ; chaque teinte ≥ 3:1 sur le blanc,
+  test `palette_*`, segments de barre séparés d'un filet blanc), séquentielle bleue pour la carte de
   chaleur. Un seul axe, traits de 2 px, barres ≤ 24 px aux bouts arrondis,
   grille discrète, info-bulles, légende dès deux séries, **tableau de données**
   repliable sous chaque graphique (dans une `<ScrollArea>`).
@@ -96,3 +97,15 @@ par `Intl` dans la langue de la page.
 `app/frequentation/page.tsx` (serveur : métadonnées, lecture
 `getAudienceStats()` en cache 10 min), `AudienceDashboard.tsx`,
 `AudienceChart.tsx`, `chart-setup.ts`, `frequentation.module.css`.
+
+## Accessibilité des graphiques (UI/UX, cycle 1)
+
+- Nom accessible de chaque graphique : titre + total/minimum/maximum/nombre de
+  points de chaque série + renvoi au tableau (`chartAriaLabel`) ; si Chart.js ne
+  se charge pas, un message de repli et un toast d'erreur (`once`).
+- Carte de chaleur : 168 boutons étiquetés (« Lundi, 14 h : 12 pages vues »),
+  un seul arrêt de tabulation, flèches/Début/Fin (`nextHeatCell`), clic ou
+  focus = lecture de la case ; l'état de survol est local à la carte.
+- Base injoignable : état « Statistiques momentanément indisponibles », distinct
+  de l'état vide.
+- Graphique par semaine/mois/année : série « Visiteurs quotidiens cumulés ».

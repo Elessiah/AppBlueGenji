@@ -130,7 +130,9 @@
   },
   "empty": {
     "title": "Les premières mesures arrivent",
-    "body": "Les chiffres s'affichent dès le lendemain des premières visites mesurées."
+    "body": "Les chiffres s'affichent dès le lendemain des premières visites mesurées.",
+    "errorTitle": "Statistiques momentanément indisponibles",
+    "errorBody": "Les chiffres n'ont pas pu être lus. Réessayez dans quelques minutes."
   },
   "method": {
     "title": "Méthode",
@@ -145,6 +147,9 @@
     "association": "BlueGenji Esport, association loi 1901"
   },
   "chart": {
+    "failed": "Graphique indisponible. Les chiffres restent lisibles dans le tableau de données.",
+    "summary": "{series} : total {total}, minimum {min}, maximum {max}, sur {count} points.",
+    "seeTable": "Détail dans le tableau de données.",
     "tooltip": "{label} : {value}",
     "loading": "Chargement du graphique…"
   }

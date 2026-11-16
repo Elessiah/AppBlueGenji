@@ -130,7 +130,9 @@
   },
   "empty": {
     "title": "The first figures are on their way",
-    "body": "Figures appear the day after the first measured visits."
+    "body": "Figures appear the day after the first measured visits.",
+    "errorTitle": "Statistics temporarily unavailable",
+    "errorBody": "The figures could not be read. Please try again in a few minutes."
   },
   "method": {
     "title": "Method",
@@ -145,6 +147,9 @@
     "association": "BlueGenji Esport, French non-profit association (loi 1901)"
   },
   "chart": {
+    "failed": "Chart unavailable. The figures remain readable in the data table.",
+    "summary": "{series}: total {total}, minimum {min}, maximum {max}, over {count} points.",
+    "seeTable": "Details in the data table.",
     "tooltip": "{label}: {value}",
     "loading": "Loading the chart…"
   }

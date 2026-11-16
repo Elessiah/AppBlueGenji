@@ -10,8 +10,10 @@ let mockLocale: "fr" | "en" = "fr";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/lib/server/audience-service");
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { evolutionLabels } from "@/app/frequentation/AudienceDashboard";
+import { evolutionLabels, nextHeatCell } from "@/app/frequentation/AudienceDashboard";
 import FrequentationPage, { generateMetadata } from "@/app/frequentation/page";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { getAudienceStats } from "@/lib/server/audience-service";
@@ -126,11 +128,39 @@ describe("FrequentationPage", () => {
     expect(await render("fr")).toContain("Les premières mesures arrivent");
   });
 
-  it("montre l'état vide quand la base est injoignable", async () => {
+  it.each<["fr" | "en", string, string]>([
+    ["fr", "Statistiques momentanément indisponibles", "Les premières mesures arrivent"],
+    ["en", "Statistics temporarily unavailable", "The first figures are on their way"],
+  ])("page_%s_databaseDown_showsUnavailableNotEmptyState", async (locale, unavailable, empty) => {
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getAudienceStats).mockRejectedValue(new Error("down"));
 
-    expect(await render("fr")).toContain("Les premières mesures arrivent");
+    const html = await render(locale);
+
+    expect(html).toContain(unavailable);
+    expect(html).not.toContain(empty);
+  });
+
+  it("page_heatmap_hasOneButtonPerCellAndASingleTabStop", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS);
+
+    const html = await render("fr");
+
+    expect(html.match(/data-heat=""/g)).toHaveLength(168);
+    expect(html.match(/tabindex="0"[^>]*data-heat|data-heat[^>]*tabindex="0"/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Lundi, 0 h : 0 pages vues"');
+  });
+
+  it.each<["fr" | "en", string, string]>([
+    ["fr", "Visiteurs quotidiens cumulés : total 12", "Détail dans le tableau de données."],
+    ["en", "Daily visitors, summed: total 12", "Details in the data table."],
+  ])("page_%s_bucketsChart_isNamedWithSummedVisitorsAndSummary", async (locale, summary, seeTable) => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS);
+
+    const html = await render(locale);
+
+    expect(html).toContain(summary);
+    expect(html).toContain(seeTable);
   });
 });
 
@@ -161,5 +191,57 @@ describe("evolutionLabels — visiteurs regroupés", () => {
     expect(labels.bucket).toBe("month");
     expect(labels.visitorsLabel).toBe("Visiteurs quotidiens cumulés");
     expect(labels.hint).toBe(frAudience.evolution.hintMonthly);
+  });
+});
+
+describe("nextHeatCell", () => {
+  it("nextHeatCell_arrowsInside_movesOneCell", () => {
+    expect(nextHeatCell({ day: 2, hour: 5 }, "ArrowRight", 7)).toEqual({ day: 2, hour: 6 });
+    expect(nextHeatCell({ day: 2, hour: 5 }, "ArrowLeft", 7)).toEqual({ day: 2, hour: 4 });
+    expect(nextHeatCell({ day: 2, hour: 5 }, "ArrowDown", 7)).toEqual({ day: 3, hour: 5 });
+    expect(nextHeatCell({ day: 2, hour: 5 }, "ArrowUp", 7)).toEqual({ day: 1, hour: 5 });
+  });
+
+  it("nextHeatCell_arrowsAtEdges_staysInGrid", () => {
+    expect(nextHeatCell({ day: 0, hour: 0 }, "ArrowLeft", 7)).toEqual({ day: 0, hour: 0 });
+    expect(nextHeatCell({ day: 0, hour: 0 }, "ArrowUp", 7)).toEqual({ day: 0, hour: 0 });
+    expect(nextHeatCell({ day: 6, hour: 23 }, "ArrowRight", 7)).toEqual({ day: 6, hour: 23 });
+    expect(nextHeatCell({ day: 6, hour: 23 }, "ArrowDown", 7)).toEqual({ day: 6, hour: 23 });
+  });
+
+  it("nextHeatCell_homeAndEnd_firstAndLastHour", () => {
+    expect(nextHeatCell({ day: 3, hour: 9 }, "Home", 7)).toEqual({ day: 3, hour: 0 });
+    expect(nextHeatCell({ day: 3, hour: 9 }, "End", 7)).toEqual({ day: 3, hour: 23 });
+  });
+
+  it("nextHeatCell_otherKey_returnsNull", () => {
+    expect(nextHeatCell({ day: 3, hour: 9 }, "a", 7)).toBeNull();
+  });
+});
+
+describe("palette", () => {
+  function luminance(hex: string): number {
+    const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const [r, g, b] = channels.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  it.each<[string]>([["--st-series-1"], ["--st-series-2"], ["--st-series-3"], ["--st-series-4"], ["--st-series-5"], ["--st-series-6"]])(
+    "palette_%s_atLeastThreeToOneOnWhite",
+    (token) => {
+      const css = readFileSync(join(process.cwd(), "app/frequentation/frequentation.module.css"), "utf8");
+      const hex = new RegExp(`${token}: (#[0-9a-f]{6});`).exec(css)?.[1] ?? "#ffffff";
+
+      expect(1.05 / (luminance(hex) + 0.05)).toBeGreaterThanOrEqual(3);
+    },
+  );
+});
+
+describe("feuille de style", () => {
+  it("css_kpiChange_hasItsOwnRuleNotAGridSelector", () => {
+    const css = readFileSync(join(process.cwd(), "app/frequentation/frequentation.module.css"), "utf8");
+
+    expect(css).toMatch(/\.kpiChange \{[^}]*font-size: 12px/);
+    expect(css).not.toMatch(/\.kpiChange,\s*(\/\*[^*]*\*\/\s*)?\.grid/);
   });
 });
