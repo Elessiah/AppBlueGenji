@@ -35,6 +35,7 @@ import {
 } from "@/lib/shared/audience";
 
 export interface AudienceTrackerDeps {
+  /** Horloge murale en ms depuis l'époque (`Date.now`) : le jour de Paris s'y lit. */
   now(): number;
   isVisible(): boolean;
   device(): AudienceDevice;

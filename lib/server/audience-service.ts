@@ -69,8 +69,12 @@ export const STATS_CACHE_MS = 10 * 60 * 1000;
 export const SALT_RETRY_MS = 30_000;
 /** Une lecture de sel sans réponse passé ce délai échoue (puis {@link SALT_RETRY_MS}) : rien ne l'attend sans fin. */
 export const SALT_READ_TIMEOUT_MS = 10_000;
-/** L'entretien attend au plus ce délai les signalements en cours avant de replier. */
-export const RECORDING_WAIT_MS = 15_000;
+/**
+ * L'entretien attend au plus ce délai les signalements en cours avant de
+ * replier : la lecture de sel la plus longue ({@link SALT_READ_TIMEOUT_MS}) et
+ * une marge, pour qu'un signalement en cours finisse avant le repli.
+ */
+export const RECORDING_WAIT_MS = SALT_READ_TIMEOUT_MS + 5_000;
 /** Lignes effacées par passe de purge. */
 const PURGE_BATCH = 10_000;
 /** Jours repliés au plus par entretien (rattrapage progressif). */
@@ -113,8 +117,15 @@ interface SaltRow extends RowDataPacket {
 async function loadSalt(day: string): Promise<Buffer> {
   const db = await getDatabase();
   // Le premier signalement du jour tire le sel ; un signalement concurrent, ou
-  // le site redémarré, relit celui qui est en base.
-  await db.execute(`INSERT IGNORE INTO bg_audience_salts (day, salt) VALUES (?, ?)`, [day, randomBytes(32)]);
+  // le site redémarré, relit celui qui est en base. Jamais pour un jour déjà
+  // replié (une lecture lente qui finit après l'entretien, ou un autre
+  // processus) : son sel est effacé et doit le rester.
+  await db.execute(
+    `INSERT IGNORE INTO bg_audience_salts (day, salt)
+       SELECT ?, ? FROM DUAL
+        WHERE NOT EXISTS (SELECT 1 FROM bg_audience_days WHERE day >= ?)`,
+    [day, randomBytes(32), day],
+  );
   const [rows] = await db.execute<SaltRow[]>(`SELECT salt FROM bg_audience_salts WHERE day = ?`, [day]);
   const value = rows[0]?.salt;
   if (!Buffer.isBuffer(value) || value.length !== 32) throw new Error("audience salt unreadable");
@@ -279,8 +290,19 @@ export function flushAudienceViews(): Promise<void> {
   return flushing;
 }
 
-async function writeBatch(batch: readonly PendingRow[]): Promise<void> {
+interface LastDayRow extends RowDataPacket {
+  day: string | null;
+}
+
+async function writeBatch(all: readonly PendingRow[]): Promise<void> {
   const db = await getDatabase();
+  // Un jour déjà replié (par ce processus ou un autre) ne reçoit plus rien :
+  // ses lignes ne seraient jamais comptées (le repli ne reprend que les jours
+  // postérieurs au dernier replié).
+  const [last] = await db.execute<LastDayRow[]>(`SELECT DATE_FORMAT(MAX(day), '%Y-%m-%d') AS day FROM bg_audience_days`);
+  const lastRolled = last[0]?.day ?? null;
+  const batch = lastRolled ? all.filter((row) => row.day > lastRolled) : all;
+  if (batch.length === 0) return;
   const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
   const values = batch.flatMap((row) => [
     row.day,
@@ -338,12 +360,22 @@ export async function runMaintenance(now: Date = new Date()): Promise<void> {
   // ensuite voient ce jour clos et l'écartent. L'attente est bornée : un
   // signalement qui la dépasse écarte ensuite ses lignes des jours repliés.
   await withTimeout(Promise.allSettled([...recording]), RECORDING_WAIT_MS, "audience recording wait timed out").catch(() => undefined);
-  for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
-    await flushAudienceViews();
-  }
+  // Dès la fin de l'attente : un signalement attardé qui finit pendant le
+  // vidage écarte ses lignes des jours à replier au lieu de les mettre en file.
   const until = lastRollableDay(now);
+  const previous = rolledThrough;
   if (rolledThrough === null || until > rolledThrough) rolledThrough = until;
-  const rolled = await rollUpAudienceDays(now);
+  let rolled: number;
+  try {
+    for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
+      await flushAudienceViews();
+    }
+    rolled = await rollUpAudienceDays(now);
+  } catch (error) {
+    // Repli raté : ces jours restent ouverts, leurs entrées tardives sont encore reçues.
+    rolledThrough = previous;
+    throw error;
+  }
   // Un jour clos n'a plus besoin de son sel : ses entrées tardives sont écartées.
   await forgetSalts(until);
   await purgeAudienceViews(now);
@@ -575,7 +607,8 @@ async function readCommunity(): Promise<AudienceCommunity | null> {
           `SELECT
              (SELECT COUNT(*) FROM bg_matches m
                 JOIN bg_tournaments t ON t.id = m.tournament_id
-               WHERE m.status = 'COMPLETED' AND m.is_bye = FALSE AND t.start_visibility_at <= NOW()) AS matches,
+               WHERE m.status = 'COMPLETED' AND m.is_bye = FALSE
+                 AND t.state IN (${PLAYED_STATES_SQL}) AND t.start_visibility_at <= NOW()) AS matches,
              (SELECT COUNT(*) FROM bg_tournaments
                WHERE state IN (${PLAYED_STATES_SQL}) AND start_visibility_at <= NOW()) AS tournaments`,
         )

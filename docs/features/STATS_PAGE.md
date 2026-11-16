@@ -45,7 +45,7 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
 8. Qui nous consulte : appareils, provenance, langue — barres segmentées,
    couleur fixée par catégorie (jamais par rang), légende chiffrée.
 9. La communauté : tournois publiés joués (en cours ou terminés, `PLAYED_STATES`
-   comme les fiches d'équipe et les profils), matchs joués (hors exemptions),
+   comme les fiches d'équipe et les profils), matchs joués de ces tournois (hors exemptions),
    équipes et comptes **avec la définition de l'accueil**
    (`lib/server/site-counts.ts` : équipes de l'annuaire, comptes du site) —
    deux pages publiques ne publient pas deux chiffres différents.

@@ -71,11 +71,15 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   vue** (une suite hors de toute visite ne serait pas comptée). Une machine en
   veille onglet visible se voit au tic suivant (retard de plus de 3 min,
   `AUDIENCE_SUSPEND_GAP_MS`) : la lecture s'arrête au dernier tic, la reprise
-  suit la même règle — le sommeil n'est jamais du temps de lecture.
+  suit la même règle — le sommeil n'est jamais du temps de lecture. Le
+  tracker lit l'horloge murale (`Date.now()`) : le jour de Paris s'y lit, et
+  `performance.now()` s'arrête pendant la veille sur certains systèmes.
 - Une suite porte `o`, l'âge de l'ouverture de sa page : elle prend le **jour
   et le sel de cette page**, même lue après minuit (sans `o`, ancien script :
   le jour de sa clôture). Le temps lu après 1 h 15 le
-  lendemain, jour déjà replié, n'est pas compté.
+  lendemain, jour déjà replié, n'est pas compté. `o` est plafonné à 7 jours
+  (`AUDIENCE_MAX_OPEN_AGE_MS`) : une valeur démesurée tombe sur un jour
+  replié et n'écarte que son entrée, jamais le reste du lot.
 - `p` chemin affiché (réduit côté serveur à `audiencePageKey` : `/frequentation`,
   `/api`, `/_next`, `/og` ne comptent pas), `t` temps visible (ms), `a` âge,
   à l'envoi, de l'instant que l'entrée date (ms) — au-delà d'une heure,
@@ -99,9 +103,12 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - **Un seul processus** pour la file et l'entretien (pm2 en lance un) ; le
   sel, lui, est en base : un redémarrage ne compte pas deux fois un visiteur.
   L'entretien attend les signalements en cours de son processus (15 s au
-  plus, `RECORDING_WAIT_MS`) et vide la file avant de replier ; un signalement
-  qui finit après cette attente écarte ses lignes des jours que l'entretien a
-  commencé à replier. Une lecture de sel sans réponse échoue au bout de 10 s
+  plus, `RECORDING_WAIT_MS` = délai d'une lecture de sel + 5 s) et vide la
+  file avant de replier ; un signalement qui finit après cette attente écarte
+  ses lignes des jours que l'entretien a commencé à replier (rouverts si le
+  repli échoue). Quel que soit le processus, l'écriture de la file écarte les
+  lignes d'un jour déjà replié (`MAX(bg_audience_days.day)`), et le sel d'un
+  jour replié n'est jamais recréé (lecture lente finie après l'entretien). Une lecture de sel sans réponse échoue au bout de 10 s
   (`SALT_READ_TIMEOUT_MS`) : rien n'attend une base figée sans fin. Chaque processus oublie en mémoire les sels des jours clos
   au plus 10 min après la clôture, même sans trafic.
 - Un sel illisible (base en panne) écarte les seules entrées de son jour, et

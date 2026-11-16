@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   aggregateAudienceDay,
+  AUDIENCE_MAX_OPEN_AGE_MS,
   audiencePageKey,
   deviceFromWidth,
   fillDailySeries,
@@ -398,6 +399,18 @@ describe("parseAudienceBatch — ouverture de la page d'une suite (o)", () => {
     const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: 72 * 3_600_000 }] });
 
     expect(views[0].openedAgeMs).toBe(72 * 3_600_000);
+  });
+
+  it("parseAudienceBatch_continuationOpenAgeHuge_capsAtMaxOpenAge", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: 1e300 }] });
+
+    expect(views[0].openedAgeMs).toBe(AUDIENCE_MAX_OPEN_AGE_MS);
+  });
+
+  it("parseAudienceBatch_continuationOpenAgeAtCap_keptAsIs", () => {
+    const views = parseAudienceBatch({ v: [{ p: "/", t: 1000, a: 0, d: "mobile", c: 1, o: AUDIENCE_MAX_OPEN_AGE_MS }] });
+
+    expect(views[0].openedAgeMs).toBe(AUDIENCE_MAX_OPEN_AGE_MS);
   });
 
   it("parseAudienceBatch_continuationWithoutOpenAge_fallsBackToAge", () => {

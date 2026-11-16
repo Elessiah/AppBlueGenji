@@ -24,7 +24,7 @@ import {
 } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
-import type { AudienceView } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_OPEN_AGE_MS, type AudienceView } from "@/lib/shared/audience";
 import { connectionMock, fakeConnection, fakePool, type SqlMock, type SqlQuery } from "../../helpers/sql-double";
 
 /** Statistiques de fréquentation détaillées, registre T19 (`docs/features/AUDIENCE_MEASUREMENT.md`). */
@@ -221,8 +221,8 @@ describe("flushAudienceViews", () => {
 
     await flushAudienceViews();
 
-    expect(execute).toHaveBeenCalledTimes(1);
-    const [sql, params] = execute.mock.calls[0];
+    expect(execute).toHaveBeenCalledTimes(2);
+    const [sql, params] = execute.mock.calls[1];
     expect(sql).toContain("INSERT INTO bg_audience_views");
     expect(params).toHaveLength(20);
     expect(params).not.toContain("203.0.113.7");
@@ -550,5 +550,105 @@ describe("délais bornés et jours repliés", () => {
 
     expect(stats.community?.tournaments).toBe(2);
     expect(execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS matches"))).toContain("state IN ('RUNNING', 'FINISHED')");
+  });
+
+  it("getAudienceStats_matchesCount_restrictedToPlayedStates", async () => {
+    const execute = emptyDatabase();
+    mockDb(execute);
+
+    await getAudienceStats(NOW);
+
+    expect(execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS matches"))).toContain("t.state IN ('RUNNING', 'FINISHED')");
+  });
+
+  it("RECORDING_WAIT_MS_exceedsSaltReadTimeout", () => {
+    expect(RECORDING_WAIT_MS).toBeGreaterThan(SALT_READ_TIMEOUT_MS);
+  });
+});
+
+describe("cycle 4 — jours repliés, quel que soit le processus", () => {
+  /** Base dont le dernier jour replié est `lastRolled`. */
+  function rolledDatabase(lastRolled: string | null): SqlMock {
+    return jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("MAX(day)") && sql.includes("FROM bg_audience_days")) return [[{ day: lastRolled }]];
+      if (sql.includes("SELECT salt")) return [[{ salt: SALT }]];
+      if (sql.startsWith("DELETE") || sql.startsWith("INSERT")) return [{ affectedRows: 0 }];
+      return [[]];
+    });
+  }
+
+  function viewInserts(execute: SqlMock) {
+    return execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT INTO bg_audience_views"));
+  }
+
+  it("flushAudienceViews_rowsOfRolledDay_skipsThem", async () => {
+    const execute = rolledDatabase("2026-11-16");
+    mockDb(execute);
+    await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view()], now: NOW });
+
+    await flushAudienceViews();
+
+    expect(viewInserts(execute)).toHaveLength(0);
+  });
+
+  it("flushAudienceViews_rowsAfterRolledDay_inserted", async () => {
+    const execute = rolledDatabase("2026-11-15");
+    mockDb(execute);
+    await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view()], now: NOW });
+
+    await flushAudienceViews();
+
+    expect(viewInserts(execute)).toHaveLength(1);
+  });
+
+  it("dailySalt_insert_guardedAgainstRolledDay", async () => {
+    const execute = emptyDatabase();
+    mockDb(execute);
+
+    await dailySalt("2026-11-16");
+
+    const [sql, params] = saltWrites(execute)[0];
+    expect(sql).toContain("NOT EXISTS (SELECT 1 FROM bg_audience_days WHERE day >= ?)");
+    expect((params as unknown[])[2]).toBe("2026-11-16");
+  });
+
+  it("recordAudienceViews_hugeOpenAgeAmongValid_keepsValidEntries", async () => {
+    mockDb(emptyDatabase());
+
+    const kept = await recordAudienceViews({
+      ip: "203.0.113.7",
+      userAgent: "Firefox",
+      views: [view(), view({ isView: false, openedAgeMs: AUDIENCE_MAX_OPEN_AGE_MS })],
+      now: NOW,
+    });
+
+    expect(kept).toBe(1);
+  });
+
+  it("runMaintenance_rollupFails_lateRowsOfDayStillRecorded", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb(
+      jest.fn<SqlQuery>(async (sql: string) => {
+        if (sql.includes("GROUP BY day")) throw new Error("deadlock");
+        if (sql.includes("SELECT salt")) return [[{ salt: SALT }]];
+        return [{ affectedRows: 0 }];
+      }),
+    );
+    // Entretien à 1 h 20 à Paris (le 15 devient repliable), puis un signalement
+    // commencé à 1 h 14 (le 15 encore ouvert ; page de 23 h 54 le 15) qui finit après.
+    await expect(runMaintenance(new Date("2026-11-16T00:20:00Z"))).rejects.toThrow("deadlock");
+
+    const kept = await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view({ ageMs: 80 * 60_000 })], now: new Date("2026-11-16T00:14:00Z") });
+
+    expect(kept).toBe(1);
+  });
+
+  it("runMaintenance_rollupSucceeds_lateRowsOfRolledDayDropped", async () => {
+    mockDb(emptyDatabase());
+    await runMaintenance(new Date("2026-11-16T00:20:00Z"));
+
+    const kept = await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: [view({ ageMs: 80 * 60_000 })], now: new Date("2026-11-16T00:14:00Z") });
+
+    expect(kept).toBe(0);
   });
 });

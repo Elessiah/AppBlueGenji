@@ -38,6 +38,12 @@ export const AUDIENCE_VISIT_GAP_MINUTES = 30;
  */
 export const AUDIENCE_MAX_AGE_MS = 60 * 60 * 1000;
 
+/**
+ * Plafond de l'ancienneté d'ouverture (`o`) d'une suite : une valeur plus
+ * grande (script altéré) date une page d'un jour replié depuis longtemps, que
+ * le serveur écarte — jamais une date hors limites qui ferait échouer l'envoi.
+ */
+export const AUDIENCE_MAX_OPEN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Une lecture qui dure part par tranches d'au plus ce temps (plus le délai du
@@ -241,7 +247,7 @@ function clampInt(value: unknown, min: number, max: number): number {
  */
 function continuationOpenAge(raw: unknown, ageMs: number): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return ageMs;
-  return Math.max(ageMs, Math.round(raw));
+  return Math.max(ageMs, Math.min(AUDIENCE_MAX_OPEN_AGE_MS, Math.round(raw)));
 }
 
 /**

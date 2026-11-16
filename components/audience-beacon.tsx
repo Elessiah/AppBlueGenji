@@ -48,7 +48,9 @@ export function AudienceBeacon() {
   useEffect(() => {
     if (browserAudienceOptOut()) return;
     const instance = new AudienceTracker({
-      now: () => performance.now(),
+      // Horloge murale : le tracker y lit le jour de Paris (reprise un autre jour)
+      // et une veille de la machine (performance.now() s'y arrête parfois).
+      now: () => Date.now(),
       isVisible: () => document.visibilityState === "visible",
       device: () => deviceFromWidth(window.innerWidth),
       referrerHost: externalReferrerHost,
