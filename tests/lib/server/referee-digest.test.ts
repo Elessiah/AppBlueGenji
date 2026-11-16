@@ -226,7 +226,7 @@ describe("dispatchRefereeDigest", () => {
     const push = resolvePush(jest.mocked(notifyStaff).mock.calls[0][0].push);
     expect(push.body).not.toContain("Renards 1 ");
     expect(push.body).toContain("Renards 2 ");
-    expect(errors).toHaveBeenCalledWith("[referee-digest] réservation en échec", expect.any(Error));
+    expect(errors).toHaveBeenCalledWith("[referee-digest] réservation en échec", expect.any(String));
     errors.mockRestore();
   });
 
@@ -377,7 +377,7 @@ describe("dispatchRefereeDigest", () => {
 
     expect(await dispatchRefereeDigest(NOW)).toBe(1);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
-    expect(error).toHaveBeenCalledWith("[referee-digest] relecture avant envoi en échec", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[referee-digest] relecture avant envoi en échec", expect.any(String));
     error.mockRestore();
   });
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { resetLocaleColumnMemory } from "@/lib/server/users/account-locale";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -55,9 +56,38 @@ function row(overrides: Record<string, unknown> = {}) {
 
 describe("notifyTeamJoinRequest", () => {
   beforeEach(() => {
+    resetLocaleColumnMemory();
     jest.clearAllMocks();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
     jest.mocked(pushToUsers).mockResolvedValue(0);
+  });
+
+  it("notifyTeamJoinRequest_localeReadWithRow_noLocaleRereadAndDmInRowLocale", async () => {
+    const execute = mockDb({ members: [row({ locale: "en" })] });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    // Langue lue avec la ligne : anglais seul (la relecture simulée ne répond rien, ce qui donnerait un message bilingue).
+    expect(message).toContain("A player is asking to join your team");
+    expect(message).not.toContain("Un joueur demande");
+    expect(execute.mock.calls[2][0]).toContain("u.locale");
+  });
+
+  it("notifyTeamJoinRequest_localeColumnMissing_noticeStillSent", async () => {
+    const execute = mockDb({ members: [row()] });
+    const original = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.includes("u.locale")) throw Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+      return original(sql, params);
+    });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    // Migration de la langue en échec : l'avis part quand même (langue relue, bilingue au pire).
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const membersReads = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_team_members"));
+    expect(membersReads.map(([sql]) => sql.includes("u.locale"))).toEqual([true, false]);
   });
 
   it("écrit au propriétaire et aux managers, avec le lien de la fiche", async () => {

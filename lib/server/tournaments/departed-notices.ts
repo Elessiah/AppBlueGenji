@@ -27,6 +27,7 @@
  * `TOLD`, ou plus d'horaire après un retrait remis), ni pour un horaire passé
  * depuis plus de 12 h.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
@@ -455,11 +456,11 @@ export function flushDepartedNotices(connection: PoolConnection): void {
   const removals = state?.staffRemovals ?? [];
   if (removals.length > 0) {
     void announceDeletedMatchesToStaff(removals).catch((error: unknown) => {
-      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", error);
+      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", failureDiagnostic(error));
     });
   }
   if (notices.length === 0) return;
   void announceEntrantsWithdrawn(notices).catch((error: unknown) => {
-    if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", error);
+    if (!isMissingTableError(error)) console.error("[notify] avis de match retiré non envoyé", failureDiagnostic(error));
   });
 }

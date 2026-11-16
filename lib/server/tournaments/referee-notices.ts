@@ -16,6 +16,7 @@
  * Appelé **après le commit**, sans attendre. Ne lève jamais.
  */
 import type { PoolConnection } from "mysql2/promise";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer, createKeyedChain } from "@/lib/server/coalescer";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
@@ -215,7 +216,7 @@ export async function announceObjectionReleases(
       push: (locale) => refereeObjectionReleasedPush({ count, tournamentIds }, locale),
     });
   } catch (error) {
-    console.error("[referee] retraits sur opposition non annoncés", error);
+    console.error("[referee] retraits sur opposition non annoncés", failureDiagnostic(error));
   }
 }
 
@@ -230,7 +231,7 @@ export function announceRefereeChange(change: RefereeChange, options: RefereeAnn
 /** Le changement, erreurs journalisées : ne rejette jamais. */
 function deliverQuietly(change: RefereeChange, options: RefereeAnnounceOptions): Promise<void> {
   return deliverRefereeChange(change, options).catch((error) =>
-    console.error("[referee] changement d'arbitrage non annoncé", error),
+    console.error("[referee] changement d'arbitrage non annoncé", failureDiagnostic(error)),
   );
 }
 
@@ -330,7 +331,7 @@ const mapPickBursts = createCoalescer<MapPickTally>({
     if (openTallies.get(tally.matchId) === tally) openTallies.delete(tally.matchId);
     if (tally.picked + tally.cleared === 0) return;
     return matchAnnouncements.chain(tally.matchId, () =>
-      deliverMapPickBurst(tally).catch((error) => console.error("[referee] choix de cartes non annoncés", error)),
+      deliverMapPickBurst(tally).catch((error) => console.error("[referee] choix de cartes non annoncés", failureDiagnostic(error))),
     );
   },
 });

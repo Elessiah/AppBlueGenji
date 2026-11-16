@@ -64,6 +64,20 @@ describe("bot legal content is fully bilingual", () => {
     frNums.forEach((num, i) => expect(num).toBe(String(i + 1).padStart(2, "0")));
   });
 
+  it.each(DOCS)("%s cross-references name sections that exist, in both languages", (_name, doc) => {
+    // Les deux langues partagent `numberedSections` : l'égalité des numéros est vraie par
+    // construction ; ce qui peut se désaligner, ce sont les renvois « section 0n » écrits dans le texte.
+    for (const lang of [doc.fr, doc.en]) {
+      const nums = new Set(lang.sections.map((s) => s.num));
+      const texts = lang.sections.flatMap((s) =>
+        s.blocks.flatMap((block) => [block.text ?? "", ...(block.items ?? [])]),
+      );
+      for (const text of [lang.intro, ...texts]) {
+        for (const ref of sectionRefs(text)) expect(nums).toContain(ref);
+      }
+    }
+  });
+
   it.each(DOCS)("%s never ships an empty section or block", (_name, doc) => {
     for (const lang of [doc.fr, doc.en]) {
       expect(lang.title.trim().length).toBeGreaterThan(0);
@@ -81,6 +95,25 @@ describe("bot legal content is fully bilingual", () => {
         }
       }
     }
+  });
+});
+
+/**
+ * Les numéros cités par les renvois « section 0n » d'un texte, listes
+ * comprises (« sections 04 et 05 », « sections 02, 03 and 06 ») : chaque numéro
+ * de la liste est un renvoi.
+ */
+function sectionRefs(text: string): string[] {
+  const list = /\bsections? ((?:0\d|1\d)(?:(?:\s*,\s*|\s+(?:et|and|ou|or)\s+)(?:0\d|1\d))*)\b/gi;
+  return [...text.matchAll(list)].flatMap((match) => match[1].match(/\d{2}/g) ?? []);
+}
+
+describe("section cross-reference parsing", () => {
+  it("reads every number of a list, in both languages", () => {
+    expect(sectionRefs("aux sections 04 et 05 de la présente politique")).toEqual(["04", "05"]);
+    expect(sectionRefs("listed in sections 02, 03 and 06 of this policy")).toEqual(["02", "03", "06"]);
+    expect(sectionRefs("(section 03)")).toEqual(["03"]);
+    expect(sectionRefs("Article 37 du RGPD, sans renvoi")).toEqual([]);
   });
 });
 

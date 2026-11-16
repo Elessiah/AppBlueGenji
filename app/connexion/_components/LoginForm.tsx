@@ -2,7 +2,7 @@
 
 import { signalSessionChanged } from "@/lib/shared/session-change-signal";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocaleHref, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
@@ -79,6 +79,13 @@ function isEarlierTermsVersion(stored: string | null): boolean {
 const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-code" } as const;
 
 /**
+ * Délai après lequel une navigation d'après connexion restée sans issue est
+ * relancée en chargement complet. Le formulaire, lui, reste fermé : le code
+ * est déjà consommé et la session posée, le renvoyer ne ferait qu'un refus.
+ */
+const NAVIGATION_RELEASE_MS = 10_000;
+
+/**
  * Formulaire de connexion.
  *
  * `suspensionNotice` : l'exposé d'une suspension, relu par la page dans le
@@ -88,6 +95,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // Navigation dans la langue de la page : une destination restée française
   // (route pas encore traduite) se rejoint par un chargement complet.
   const router = useLocaleRouter();
+  const localeHref = useLocaleHref();
   const text = useLoginText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
@@ -108,6 +116,16 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Garde d'envoi synchrone : deux soumissions avant le rendu suivant (Entrée
+  // doublée) liraient encore `loading` à faux. Les boutons restent focalisables
+  // pendant l'envoi (`aria-disabled` + `aria-busy`, pas `disabled` natif).
+  const inFlight = useRef(false);
+  // Navigation qui n'aboutit pas (serveur lent, échec du chargement) : elle
+  // est relancée en chargement complet au bout de ce délai, formulaire fermé.
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (releaseTimer.current) clearTimeout(releaseTimer.current);
+  }, []);
   /** Un refus du code qui se lève en rejoignant le serveur : le lien d'invitation s'affiche sous le champ. */
   const [inviteAfterRefusal, setInviteAfterRefusal] = useState(false);
   // Exposé d'une suspension à afficher : retour OAuth (cookie relu par la
@@ -212,8 +230,27 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     if (message) showError(message);
   }, [showError, suspensionNotice, text]);
 
+  /**
+   * Rouvre le formulaire. Après une navigation lancée (`leavingTo`), la garde
+   * reste posée : le code est consommé. Si la page n'est toujours pas partie
+   * au bout de `NAVIGATION_RELEASE_MS`, la destination est rechargée en entier
+   * — un seul minuteur à la fois.
+   */
+  const releaseGuard = (leavingTo: string | null) => {
+    if (leavingTo === null) {
+      inFlight.current = false;
+      setLoading(false);
+      return;
+    }
+    const target = localeHref(leavingTo);
+    if (releaseTimer.current) clearTimeout(releaseTimer.current);
+    releaseTimer.current = setTimeout(() => globalThis.location.assign(target), NAVIGATION_RELEASE_MS);
+  };
+
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setInviteAfterRefusal(false);
     setLoading(true);
@@ -240,17 +277,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       setInviteAfterRefusal(refusalNeedsServerInvite(errorCode(e)));
       showError((e as Error).message);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
 
   const verifyCode = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
-    // Renvoi vers la réactivation : le formulaire reste fermé pendant la
-    // navigation, le code — déjà consommé — ne se renvoie pas.
-    let leaving = false;
+    // Connexion réussie ou renvoi vers la réactivation : le formulaire reste
+    // fermé pendant la navigation, le code — déjà consommé — ne se renvoie pas.
+    let leavingTo: string | null = null;
     try {
       const response = await fetch("/api/auth/discord/verify", {
         method: "POST",
@@ -274,7 +314,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         // Suppression demandée il y a moins de trente jours : l'écran de
         // réactivation (ticket posé en cookie par le serveur), jamais en silence.
         if (code === ACCOUNT_PENDING_DELETION_CODE) {
-          leaving = true;
+          leavingTo = REACTIVATION_PATH;
           router.push(REACTIVATION_PATH);
           return;
         }
@@ -287,15 +327,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       }
       // Rien de retenu pour un compte précédent ne doit s'adresser à celui-ci.
       signalSessionChanged();
+      leavingTo = redirect;
       router.push(redirect);
       router.refresh();
     } catch (e) {
       fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
     } finally {
-      if (!leaving) setLoading(false);
+      // Connexion réussie ou réactivation : la garde reste posée pendant la navigation.
+      releaseGuard(leavingTo);
     }
   };
+
+  let busyLabel = "";
+  if (loading) busyLabel = requested ? t("page.verifying") : t("page.sending");
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
@@ -309,6 +354,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           boxShadow: "0 30px 80px -40px rgba(var(--violet-400-rgb), 0.6), 0 0 40px -24px var(--blue-glow)",
         }}
       >
+        <output className="sr-only" aria-live="polite">
+          {busyLabel}
+        </output>
         {/*
           La page n'a pas d'en-tête : ce lien est la seule sortie vers le site.
           Il était en bas de carte, en mono 11 px — sous le pli sur mobile, et
@@ -417,7 +465,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
               <CyberButton
                 variant="ghost"
                 type="submit"
-                disabled={loading}
+                // Pendant l'envoi, focalisable et annoncé « occupé » : un refus
+                // (notification) se retente au clavier sans chercher le bouton.
+                aria-disabled={loading || undefined}
+                aria-busy={loading || undefined}
                 style={{ width: "100%" }}
               >
                 {loading ? t("page.sending") : t("page.requestCode")}
@@ -528,7 +579,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
               <CyberButton
                 variant="ghost"
                 type="submit"
-                disabled={loading}
+                // Pendant l'envoi, focalisable et annoncé « occupé » : un refus
+                // (notification) se retente au clavier sans chercher le bouton.
+                aria-disabled={loading || undefined}
+                aria-busy={loading || undefined}
                 style={{ width: "100%" }}
               >
                 {loading ? t("page.verifying") : t("page.submit")}
@@ -538,7 +592,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <div style={{ marginTop: 16, textAlign: "center" }}>
               <button
                 type="button"
+                aria-disabled={loading || undefined}
                 onClick={() => {
+                  // Pendant l'envoi du code, revenir à l'adresse laisserait la
+                  // réponse s'adresser à un champ qui n'est plus affiché.
+                  if (inFlight.current) return;
                   fieldErrors.clear();
                   setRequested(false);
                   setCode("");

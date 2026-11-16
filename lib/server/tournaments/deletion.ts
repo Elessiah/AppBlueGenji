@@ -32,6 +32,7 @@
  * oubliée ici reste rattrapée par sa cascade : la liste ne peut pas faire pire
  * que le schéma seul.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -190,7 +191,7 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
     try {
       await deleteStoredImage(imagePath);
     } catch (error) {
-      console.error(`[tournaments] image du tournoi ${tournamentId} non effacée`, error);
+      console.error(`[tournaments] image du tournoi ${tournamentId} non effacée`, failureDiagnostic(error));
     }
 
     // Même point de passage que toute autre écriture (`./notifications`), et il

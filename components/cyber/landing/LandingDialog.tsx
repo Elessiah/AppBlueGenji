@@ -1,5 +1,6 @@
 "use client";
 
+import { AmbientLang } from "@/components/i18n/ambient-lang";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -89,7 +90,7 @@ export function LandingDialog({
         >
           <span aria-hidden="true">×</span>
         </button>
-        {children}
+        <AmbientLang lang={lang}>{children}</AmbientLang>
       </div>
     </div>,
     document.body,

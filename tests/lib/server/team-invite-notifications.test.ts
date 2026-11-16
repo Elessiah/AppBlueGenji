@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { resetLocaleColumnMemory } from "@/lib/server/users/account-locale";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -97,6 +98,7 @@ function mockDb({
 
 describe("notifyTeamInvite", () => {
   beforeEach(() => {
+    resetLocaleColumnMemory();
     jest.clearAllMocks();
     resetTeamNoticeSlots();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
@@ -124,6 +126,23 @@ describe("notifyTeamInvite", () => {
     expect(resolvePush(content).url).toBe("/profil#invitations");
   });
 
+  it("notifyTeamInvite_localeColumnMissing_noticeStillSent", async () => {
+    const execute = mockDb({ locale: "en" });
+    const original = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.includes("u.locale")) throw Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+      return original(sql, params);
+    });
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    // Ligne relue sans la langue ; `notifyUsers` la relit (anglais ici) : l'avis part.
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("Les Glaciers");
+    const accountReads = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_users u"));
+    expect(accountReads.map(([sql]) => sql.includes("u.locale"))).toEqual([true, false]);
+  });
+
   it("notifyTeamInvite_englishAccount_dmInEnglishWithEnglishLink", async () => {
     mockDb({ locale: "en" });
 
@@ -132,6 +151,17 @@ describe("notifyTeamInvite", () => {
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("Ownership of your team “Les Glaciers”");
     expect(message).toContain("https://site.test/en/equipes/7");
+  });
+
+  it("notifyTeamInvite_localeReadWithRow_noLocaleRereadAndDmInRowLocale", async () => {
+    mockDb({ account: accountRow({ locale: "en" }), locale: "fr" });
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("Ownership of your team “Les Glaciers”");
+    // La relecture aurait répondu « fr » : la langue vient bien de la ligne du compte.
+    expect(message).not.toContain("La propriété");
   });
 
   // Le délai par joueur se compte sur les avis réellement partis (mémoire),

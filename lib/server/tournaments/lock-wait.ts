@@ -1,3 +1,4 @@
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection } from "mysql2/promise";
 
 /**
@@ -69,7 +70,7 @@ export async function rollbackKeepingError(connection: PoolConnection): Promise<
   } catch (error) {
     // Au journal : des verrous peuvent rester tenus jusqu'à ce que le serveur
     // constate la session morte — la trace relie les attentes qui suivent.
-    console.error(`[tournaments] ROLLBACK échoué, connexion ${connection.threadId} détruite :`, error);
+    console.error(`[tournaments] ROLLBACK échoué, connexion ${connection.threadId} détruite :`, failureDiagnostic(error));
     unsettled.add(connection);
   }
 }

@@ -21,6 +21,7 @@
  *
  * Voir `docs/features/MATCH_LAUNCH.md`.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { battletagFromBlizzard } from "@/lib/server/battletag-origin";
@@ -417,7 +418,7 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
       // lecture, dont la transaction la validerait) — la lecture échoue, la
       // connexion est détruite au retour (`withConnection`).
       if (error instanceof UnsettledConnectionError) throw error;
-      console.error("[match-launch] entretien impossible", error);
+      console.error("[match-launch] entretien impossible", failureDiagnostic(error));
     }
   }
   return due.size > 0;
@@ -1035,7 +1036,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     try {
       await releaseIneligibleCast(cast.matchId, cast.casterId);
     } catch (error) {
-      console.error("[match-launch] retrait d'un caster non éligible impossible", error);
+      console.error("[match-launch] retrait d'un caster non éligible impossible", failureDiagnostic(error));
     }
   }
   const undecided: NoRefereeCandidate[] = [];
@@ -1044,7 +1045,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       if (entry.objection) await releaseObjectingReferee(entry.matchId, entry.refereeId, undecided);
       else await releaseIneligibleReferee(entry.matchId, entry.refereeId, undecided);
     } catch (error) {
-      console.error("[match-launch] retrait d'un arbitre non éligible impossible", error);
+      console.error("[match-launch] retrait d'un arbitre non éligible impossible", failureDiagnostic(error));
     }
   }
   // Les matchs partis sans arbitre sont signalés ensemble, par manche.

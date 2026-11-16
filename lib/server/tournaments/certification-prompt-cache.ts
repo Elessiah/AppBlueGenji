@@ -20,6 +20,7 @@
  * Clés : `userId:teamId:…` — l'équipe en second segment, pour oublier d'un
  * geste toutes les invitations d'une équipe (`forgetCertificationPromptsOfTeam`).
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 export const CERTIFICATION_PROMPT_TTL_MS = 60_000;
@@ -255,7 +256,7 @@ function logCertificationPromptFailure(at: number, error: unknown): void {
     return;
   }
   const silenced = silencedFailures > 0 ? ` (${silencedFailures} autres tus)` : "";
-  console.error(`[tournaments] invitation à certifier indisponible${silenced} :`, error);
+  console.error(`[tournaments] invitation à certifier indisponible${silenced} :`, failureDiagnostic(error));
   lastFailureLogAt = at;
   silencedFailures = 0;
 }

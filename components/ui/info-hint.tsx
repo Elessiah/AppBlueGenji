@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
+import { useAmbientLang } from "@/components/i18n/ambient-lang";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import {
   infoHintLabel,
@@ -54,15 +55,17 @@ export function InfoHint({
   const pageLocale = useAppLocale();
   // La langue du nom du bouton suit l'élément ambiant qui en déclare une : une
   // modale de personnel `lang="fr"` sous `/en` garde « Plus d'infos », lu en
-  // français avec son sujet. Lue après le montage (le DOM seul la porte).
-  const [locale, setLocale] = useState(pageLocale);
+  // français avec son sujet. Dès le premier rendu quand la modale la fournit
+  // (`AmbientLang`) ; sinon relue dans le DOM après le montage.
+  const ambientLang = useAmbientLang();
+  const [locale, setLocale] = useState(() => infoHintLocale(ambientLang, pageLocale));
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setLocale(infoHintLocale(rootRef.current?.closest("[lang]")?.getAttribute("lang"), pageLocale));
-  }, [pageLocale]);
+    setLocale(infoHintLocale(ambientLang ?? rootRef.current?.closest("[lang]")?.getAttribute("lang"), pageLocale));
+  }, [pageLocale, ambientLang]);
 
   useEffect(() => {
     if (!open) return;

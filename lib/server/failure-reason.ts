@@ -23,6 +23,67 @@ export function failureReason(error: unknown): string {
   return "erreur inconnue";
 }
 
+/**
+ * {@link failureReason}, et pour une erreur **imprévue** (erreur de
+ * programmation réduite à son nom, valeur levée qui n'est pas une `Error`) de
+ * quoi la retrouver : les premiers cadres de la pile (fichier, ligne,
+ * fonction), **sans** sa première ligne, qui recopie le message ; le type de la
+ * valeur levée sinon. Rien de lu en base ni saisi n'y passe. Pour pm2
+ * seulement (moteur de tournoi, balayages, lignes `[staff-log]` de pm2 quand
+ * l'envoi d'un journal du staff échoue) — jamais le **texte** d'un journal du
+ * staff ni un message Discord, qui gardent {@link failureReason}.
+ */
+export function failureDiagnostic(error: unknown): string {
+  const reason = failureReason(error);
+  if (!(error instanceof Error)) {
+    if (reason !== "erreur inconnue") return reason;
+    return `${reason} (${error === null ? "null" : typeof error})`;
+  }
+  if (reason !== error.name) return reason;
+  const frames = stackFrames(error);
+  return frames.length > 0 ? `${reason} ${frames.join(" < ")}` : reason;
+}
+
+/** Nombre de cadres de pile gardés par {@link failureDiagnostic}. */
+const DIAGNOSTIC_FRAMES = 3;
+
+/**
+ * Un cadre de pile V8 nommé : `at [async ]fonction (emplacement:ligne:colonne)`.
+ * L'emplacement peut porter espaces et parenthèses (`C:\Program Files\…`,
+ * `webpack-internal:///(rsc)/…`).
+ */
+const NAMED_FRAME = /^at (?:async |new )?[^\s()]+(?: \[as [^\]\s]+\])? \(.+:\d+:\d+\)$/;
+
+/** Un cadre de pile V8 anonyme : `at emplacement:ligne:colonne`. */
+const ANONYMOUS_FRAME = /^at (?:async )?[^\s(].*:\d+:\d+$/;
+
+/** Indentation exacte que V8 donne à chaque cadre. */
+const FRAME_INDENT = "    at ";
+
+/**
+ * Les premiers cadres de la pile de `error`. Seul le **bloc final** de lignes
+ * indentées comme un cadre V8 est lu : la tête, qui recopie le nom et le
+ * message tels qu'ils étaient à la construction (un message réécrit depuis ne
+ * dit plus combien de lignes elle compte), est écartée en remontant depuis la
+ * fin jusqu'à la première ligne qui n'est pas un cadre ; la tête calculée sur
+ * le message courant l'est aussi. Un message ne peut pas se faire passer pour
+ * un cadre.
+ */
+function stackFrames(error: Error): string[] {
+  if (typeof error.stack !== "string") return [];
+  const lines = error.stack.split("\n");
+  const headerLines = `${error.name}: ${error.message}`.split("\n").length;
+  let start = lines.length;
+  while (start > headerLines && lines[start - 1].startsWith(FRAME_INDENT)) start--;
+  const frames: string[] = [];
+  // S'arrête au troisième cadre : la pile entière n'est pas passée au crible.
+  for (let i = start; i < lines.length && frames.length < DIAGNOSTIC_FRAMES; i++) {
+    const line = lines[i].trim();
+    if (NAMED_FRAME.test(line) || ANONYMOUS_FRAME.test(line)) frames.push(line);
+  }
+  return frames;
+}
+
 /** Forme d'un code d'erreur du site : majuscules, chiffres et soulignés. */
 const ERROR_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 

@@ -25,6 +25,7 @@
  */
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/shared/locales";
 
 /** Code de refus d'une langue inconnue (`PUT /api/profile/locale`). */
@@ -61,6 +62,53 @@ export function accountLocaleFromRow(value: unknown): Locale {
 }
 
 /**
+ * Le destinataire avec la langue lue sur sa ligne (`value`), inchangé quand la
+ * ligne ne la portait pas (colonne absente, ligne simulée) : `notifyUsers` la
+ * relit alors, bilingue au pire.
+ */
+export function withRowLocale<R extends object>(recipient: R, value: unknown): R | (R & { locale: Locale }) {
+  return value === undefined ? recipient : { ...recipient, locale: accountLocaleFromRow(value) };
+}
+
+/**
+ * Joue une lecture **avec** la colonne `locale`, puis **sans** si la base ne
+ * la connaît pas encore (`ALTER` récent en échec, rejoué au démarrage
+ * suivant) : une langue absente ne coupe jamais ce qui lit la ligne — au pire
+ * le message part bilingue. Toute autre erreur est levée.
+ */
+export async function readWithLocaleColumn<T>(read: (withLocale: boolean) => Promise<T>): Promise<T> {
+  if (Date.now() < localeColumnRetryAt) return read(false);
+  try {
+    return await read(true);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    // Retenu pour un moment, et seulement quand le refus nomme `locale` : sans
+    // cela, chaque lecture paierait un aller-retour refusé de plus. Une autre
+    // colonne absente ne coupe pas la langue des autres lectures. Retenté
+    // ensuite : l'`ALTER` peut avoir été rejoué.
+    if (namesLocaleColumn(error)) localeColumnRetryAt = Date.now() + LOCALE_COLUMN_RECHECK_MS;
+    return read(false);
+  }
+}
+
+/** Le refus de colonne inconnue nomme-t-il `locale` (`'locale'`, `'u.locale'`) ? */
+function namesLocaleColumn(error: unknown): boolean {
+  const { message, sqlMessage } = (error ?? {}) as { message?: unknown; sqlMessage?: unknown };
+  return [message, sqlMessage].some((text) => typeof text === "string" && /'(?:\w+\.)?locale'/.test(text));
+}
+
+/** Durée pendant laquelle une colonne `locale` refusée n'est plus demandée. */
+const LOCALE_COLUMN_RECHECK_MS = 60_000;
+
+/** Instant avant lequel les lectures se passent de la colonne `locale` (0 : elle est demandée). */
+let localeColumnRetryAt = 0;
+
+/** Tests : oublie la colonne refusée. */
+export function resetLocaleColumnMemory(): void {
+  localeColumnRetryAt = 0;
+}
+
+/**
  * Langue du compte du site rattaché à ce compte Discord, pour le code de
  * connexion : `null` sans compte rattaché (première connexion) — message
  * bilingue. Seul le bot la reçoit, pour rédiger le message : la réponse de la
@@ -73,20 +121,17 @@ export async function accountLocaleForDiscordId(discordId: string): Promise<Loca
 async function readDmLocale(sql: string, key: number | string): Promise<Locale | null> {
   try {
     const db = await getDatabase();
-    const [rows] = await db.query(sql, [key]);
-    const row = (rows as { locale?: unknown }[])[0];
-    return row ? accountLocaleFromRow(row.locale) : null;
+    // Colonne absente : message bilingue, sans redemander la colonne à chaque envoi.
+    return await readWithLocaleColumn(async (withLocale) => {
+      if (!withLocale) return null;
+      const [rows] = await db.query(sql, [key]);
+      const row = (rows as { locale?: unknown }[])[0];
+      return row ? accountLocaleFromRow(row.locale) : null;
+    });
   } catch (error) {
     // Le code seul, jamais l'erreur entière : celle de mysql2 porte la requête
     // avec ses valeurs (`sql`), donc l'identifiant Discord de la personne visée.
-    console.error("[account-locale] langue du compte illisible, message privé bilingue", dbErrorCode(error));
+    console.error("[account-locale] langue du compte illisible, message privé bilingue", failureReason(error));
     return null;
   }
-}
-
-/** Code d'une erreur de base (`ER_BAD_FIELD_ERROR`…), sans son texte ni sa requête. */
-function dbErrorCode(error: unknown): string {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (typeof code === "string") return code;
-  return error instanceof Error ? error.name : "UNKNOWN";
 }

@@ -19,10 +19,11 @@ jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
     ...actual,
-    useState: <T,>(initial: T) => {
+    useState: <T,>(initial: T | (() => T)) => {
       if (!hooks.live) return actual.useState(initial);
       const index = cursor++;
-      if (!(index in cells)) cells[index] = initial;
+      // Une valeur initiale paresseuse (fonction) se calcule au premier rendu, comme dans React.
+      if (!(index in cells)) cells[index] = typeof initial === "function" ? (initial as () => T)() : initial;
       const set = (next: T | ((value: T) => T)) => {
         cells[index] = typeof next === "function" ? (next as (value: T) => T)(cells[index] as T) : next;
       };
@@ -47,8 +48,14 @@ jest.mock("@/components/i18n/locale-context", () => {
   return { ...actual, useAppLocale: () => (hooks.live ? locale.current : actual.useAppLocale()) };
 });
 
+jest.mock("@/components/i18n/ambient-lang", () => {
+  const actual = jest.requireActual<typeof import("@/components/i18n/ambient-lang")>("@/components/i18n/ambient-lang");
+  return { ...actual, useAmbientLang: () => (hooks.live ? undefined : actual.useAmbientLang()) };
+});
+
 import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
+import { AmbientLang } from "@/components/i18n/ambient-lang";
 import { infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
 import frCommon from "@/messages/fr/common.json";
 import enCommon from "@/messages/en/common.json";
@@ -175,6 +182,41 @@ describe("InfoHint — balisage", () => {
       </AppLocaleProvider>,
     );
     expect(html).toContain('aria-label="More info: Discord username"');
+  });
+
+  it("se nomme dès le premier rendu dans la langue ambiante fournie (`AmbientLang`) : modale de personnel `lang=fr` sous /en", () => {
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <AmbientLang lang="fr">
+          <InfoHint id="x" subject="Valeur en anglais">
+            <p>Détail</p>
+          </InfoHint>
+        </AmbientLang>
+      </AppLocaleProvider>,
+    );
+    expect(html).toContain('aria-label="Plus d&#x27;infos : Valeur en anglais"');
+  });
+
+  it("garde la langue ambiante du parent quand un fournisseur intérieur n'en déclare pas", () => {
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <AmbientLang lang="fr">
+          <AmbientLang lang={undefined}>
+            <InfoHint id="x" subject="Sujet">
+              <p>Détail</p>
+            </InfoHint>
+          </AmbientLang>
+        </AmbientLang>
+      </AppLocaleProvider>,
+    );
+    expect(html).toContain('aria-label="Plus d&#x27;infos : Sujet"');
+  });
+
+  it("les modales de personnel fournissent leur `lang` à leur contenu (LandingDialog, ConfirmActionDialog)", () => {
+    expect(readSource("components/cyber/landing/LandingDialog.tsx")).toContain("<AmbientLang lang={lang}>{children}</AmbientLang>");
+    expect(readSource("components/ui/confirm-action-dialog.tsx")).toContain(
+      "<AmbientLang lang={foreign ? contentLang : undefined}>{children}</AmbientLang>",
+    );
   });
 
   it("pose les variantes de rangée : phrase en ligne, case enregistrée au changement", () => {

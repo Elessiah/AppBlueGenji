@@ -26,7 +26,7 @@ import { createHash } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { flushBotLogBatch, sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { isMissingTableError, isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
@@ -200,7 +200,7 @@ export async function queueRoundMapsNotice(
     } catch {
       throw error;
     }
-    console.error("[round-maps] annonce des cartes non mise en attente", failureReason(error));
+    console.error("[round-maps] annonce des cartes non mise en attente", failureDiagnostic(error));
   }
 }
 
@@ -329,7 +329,7 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
       // Une revendication refusée (ligne tenue par un enregistrement en cours,
       // conflit d'instantané) ne retient pas les annonces des autres tournois :
       // la ligne reste, le balayage suivant la reprend.
-      console.error("[round-maps] annonce non revendiquée, reprise au prochain balayage", error);
+      console.error("[round-maps] annonce non revendiquée, reprise au prochain balayage", failureDiagnostic(error));
       continue;
     }
     if (result.affectedRows !== 1) continue; // un autre l'a prise, ou un changement a rouvert la fenêtre
@@ -385,7 +385,7 @@ async function stillChanged(
       [tournamentId],
     );
   } catch (error) {
-    console.error("[round-maps] réglages des manches illisibles, annonce entière", failureReason(error));
+    console.error("[round-maps] réglages des manches illisibles, annonce entière", failureDiagnostic(error));
     return [...rounds];
   }
   const current = new Map(
@@ -432,7 +432,7 @@ export async function dispatchDueRoundMapsNotices(rerun = false): Promise<number
     } catch (error) {
       // Table pas encore créée (base neuve) : rien à annoncer, pas une ligne
       // pm2 à chaque balayage.
-      if (!isMissingTableError(error)) console.error("[round-maps] annonces en échec", failureReason(error));
+      if (!isMissingTableError(error)) console.error("[round-maps] annonces en échec", failureDiagnostic(error));
       return 0;
     }
   })();

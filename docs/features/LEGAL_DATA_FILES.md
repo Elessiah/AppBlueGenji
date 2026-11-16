@@ -47,7 +47,12 @@ CSV, objets exportés comparés avant et après) ; les références françaises
   suivante. Une valeur identique dans les deux langues (un nom, un nombre, une
   constante) s'écrit une fois, sans `frEn`.
 - **Textes encore écrits en deux constantes** (pas de `frEn` à côté) : le
-  jumeau anglais est à reprendre dans le même commit. Registre : les textes de
+  jumeau anglais est à reprendre dans le même commit. Règle générale : tout nom
+  en `…_EN` / `…En` a un jumeau français à reprendre avec lui — y compris les
+  jumeaux importés d'autres fichiers (`DATA_CONTACT_ROLE(_EN)`, `REPORT_FORM_NAME(_EN)`,
+  `WEB_ACCESS_LOG_FIELDS(_EN)`, `copyrightNoticeElementsText(En)`,
+  `SITE_HOST.status/statusEn`, `machine/machineEn`) ; la liste ci-dessous n'est
+  pas exhaustive. Registre : les textes de
   cadre (`HETZNER_BACKUP_FRAMEWORK`, `SPICEWORKS_*`, `OUTLOOK_MAIL_FRAMEWORK`,
   `ASSOCIATION_GMAIL_FRAMEWORK`, `HOST_ARRANGEMENT`,
   `STANDARD_CONTRACTUAL_CLAUSES`, `DPF_ADEQUACY_DECISION`, `REGISTER_SCOPE(_DETAIL)`,
@@ -91,9 +96,15 @@ qu'un objet `{ fr, en }` sur quatre.
   section du bot, mêmes clés de fiche dans le même ordre, renvois « section 0n »
   de la politique du bot, et `processing-register-en.ts` réexporte bien
   l'anglais du module français.
-- Références et ordre des fiches, nombres d'éléments par rubrique :
+- Références et ordre des fiches (liste T01…T18 épinglée contre une valeur écrite : les deux langues
+  sortent du même `ACTIVITIES`), nombres d'éléments par rubrique :
   `tests/lib/shared/privacy-legal-en.test.ts` ; numérotation des sections :
   `tests/app/bot-legal-pages.test.ts`.
+- Texte oublié en anglais (`Localizable<T>` accepte une chaîne simple) :
+  `tests/lib/shared/bilingual-untranslated.test.ts` refuse tout texte
+  identique dans les deux langues des fiches du registre, du responsable de
+  traitement et des documents du bot — hors clés de structure (`ref`, `num`,
+  `kind`) et d'une courte liste blanche de mots communs aux deux langues.
 - Seul le **français** rendu des pages du site est épinglé à l'octet
   (`tests/fixtures/legal-fr/` : conditions, `/rgpd`, registre, mentions,
   accessibilité — pas les pages du bot) ;

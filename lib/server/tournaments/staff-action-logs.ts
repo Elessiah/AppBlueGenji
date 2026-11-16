@@ -13,7 +13,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer, createKeyedChain } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import {
   formatStaffMatchActionLog,
   formatStaffTournamentActionLog,
@@ -101,7 +101,7 @@ export function announceStaffMatchAction(
   // leur ordre ; l'arrêt du serveur attend la ligne.
   void matchLines.chain(matchId, () =>
     deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
-      console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureReason(error)}`),
+      console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureDiagnostic(error)}`),
     ),
   );
 }
@@ -123,7 +123,7 @@ type TournamentActionBurst = { tournamentId: number; action: StaffTournamentActi
 
 function deliverTournamentAction({ tournamentId, action, details }: TournamentActionBurst): Promise<void> {
   return deliverStaffTournamentAction(tournamentId, action, details).catch((error) =>
-    console.error(`[staff-log] geste ${action} sur le tournoi #${tournamentId} non journalisé : ${failureReason(error)}`),
+    console.error(`[staff-log] geste ${action} sur le tournoi #${tournamentId} non journalisé : ${failureDiagnostic(error)}`),
   );
 }
 

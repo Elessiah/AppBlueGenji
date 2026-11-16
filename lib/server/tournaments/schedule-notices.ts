@@ -24,6 +24,7 @@
  * meilleur effort et après le commit : l'horaire est enregistré, une panne de
  * notification n'y change rien.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
@@ -383,7 +384,7 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
       );
       for (const row of rows) names.set(Number(row.id), String(row.name));
     } catch (error) {
-      if (!isMissingTableError(error)) console.error("[notify] noms des engagées illisibles", error);
+      if (!isMissingTableError(error)) console.error("[notify] noms des engagées illisibles", failureDiagnostic(error));
     }
   }
   const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
@@ -414,7 +415,7 @@ export async function announceDeletedMatchesToStaff(removals: readonly DeletedSt
           ),
       });
     } catch (error) {
-      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", error);
+      if (!isMissingTableError(error)) console.error("[notify] retrait aux arbitres non envoyé", failureDiagnostic(error));
     }
   });
 }
@@ -440,7 +441,7 @@ const STAFF_REMOVAL_CONCURRENCY = 4;
 /** Un avis manqué se dit dans pm2 ; une table absente (base en création) se tait. */
 function reportFailures(results: PromiseSettledResult<unknown>[], label: string): void {
   for (const result of results) {
-    if (result.status === "rejected" && !isMissingTableError(result.reason)) console.error(label, result.reason);
+    if (result.status === "rejected" && !isMissingTableError(result.reason)) console.error(label, failureDiagnostic(result.reason));
   }
 }
 

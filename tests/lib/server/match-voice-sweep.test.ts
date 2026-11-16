@@ -1,3 +1,4 @@
+import { failureReason } from "@/lib/server/failure-reason";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
@@ -1709,7 +1710,7 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
       return base(sql, params);
     });
     await dispatchMatchVoiceChannels();
-    expect(jest.mocked(console.error).mock.calls.some((call) => call.includes(createError))).toBe(true);
+    expect(jest.mocked(console.error).mock.calls.some((call) => call.includes(failureReason(createError)))).toBe(true);
   });
 });
 

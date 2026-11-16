@@ -6,6 +6,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { readWithLocaleColumn, withRowLocale } from "@/lib/server/users/account-locale";
 import { notifyUsers } from "@/lib/server/notify";
 import { withoutOptedOutDiscord } from "@/lib/server/users/match-dm-preference";
 import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
@@ -27,6 +28,8 @@ type ManagerRow = RowDataPacket & {
   discord_id: string | null;
   discord_pseudo: string | null;
   discord_verified_at: Date | string | null;
+  /** Langue du compte, lue avec la ligne (absente sans la colonne) : `notifyUsers` ne la relit pas. */
+  locale?: unknown;
 };
 
 /**
@@ -61,26 +64,34 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   );
   if (teams.length === 0) return;
 
-  const [rows] = await db.execute<ManagerRow[]>(
-    `SELECT u.id, u.pseudo, tm.roles_json, u.discord_id, u.discord_pseudo, u.discord_verified_at
-     FROM bg_team_members tm
-     JOIN bg_users u ON u.id = tm.user_id
-     WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?
-       AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                       WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
-    [teamId, requesterId],
+  // Sans la colonne de langue (migration en échec), la lecture se rejoue sans
+  // elle : l'avis part quand même, bilingue au pire.
+  const [rows] = await readWithLocaleColumn((withLocale) =>
+    db.execute<ManagerRow[]>(
+      `SELECT u.id, u.pseudo, tm.roles_json, u.discord_id, u.discord_pseudo, u.discord_verified_at${withLocale ? ", u.locale" : ""}
+       FROM bg_team_members tm
+       JOIN bg_users u ON u.id = tm.user_id
+       WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?
+         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
+                         WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
+      [teamId, requesterId],
+    ),
   );
   // Messages privés coupés dans « Mon profil » (D68) : le push seul.
-  const recipients = await withoutOptedOutDiscord(teamJoinNoticeRecipients(
-    rows.map((row) => ({
-      userId: Number(row.id),
-      pseudo: row.pseudo,
-      roles: parseRoles(row.roles_json),
-      discordId: row.discord_id,
-      discordPseudo: row.discord_pseudo,
-      discordVerified: Boolean(row.discord_verified_at),
-    })),
-  ));
+  // Langue lue avec la ligne (absente : relue par `notifyUsers`).
+  const locales = new Map(rows.map((row) => [Number(row.id), row.locale]));
+  const recipients = await withoutOptedOutDiscord(
+    teamJoinNoticeRecipients(
+      rows.map((row) => ({
+        userId: Number(row.id),
+        pseudo: row.pseudo,
+        roles: parseRoles(row.roles_json),
+        discordId: row.discord_id,
+        discordPseudo: row.discord_pseudo,
+        discordVerified: Boolean(row.discord_verified_at),
+      })),
+    ).map((recipient) => withRowLocale(recipient, locales.get(recipient.userId))),
+  );
   if (recipients.length === 0) return;
 
   const url = `${siteCanonicalBase()}/equipes/${teamId}`;

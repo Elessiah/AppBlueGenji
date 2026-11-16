@@ -7,6 +7,7 @@
  * ses marques appartenaient à l'ancienne affiche. Les nouvelles engagées n'ont
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
@@ -81,7 +82,7 @@ export async function releaseDatedMarks(
     );
   } catch (error) {
     // La marque attendra le changement d'horaire suivant ; pm2 le dit.
-    if (!isMissingTableError(error)) console.error("[match-reminders] marque non rendue", error);
+    if (!isMissingTableError(error)) console.error("[match-reminders] marque non rendue", failureDiagnostic(error));
   }
 }
 
@@ -160,7 +161,7 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
   }
   // Marque illisible : on pousse quand même (sans marque, le retrait ne sera
   // simplement pas poussé), et pm2 le dit — une fois.
-  console.error("[match-schedule] horaire poussé aux arbitres non retenu", failure);
+  console.error("[match-schedule] horaire poussé aux arbitres non retenu", failureDiagnostic(failure));
   return { kind: "unmarked" };
 }
 
@@ -294,7 +295,7 @@ async function writeStaffMark(sql: string, params: (number | string | Date)[]): 
     const db = await getDatabase();
     await db.execute(sql, params);
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non oublié", error);
+    if (!isMissingTableError(error)) console.error("[match-schedule] horaire poussé aux arbitres non oublié", failureDiagnostic(error));
   }
 }
 

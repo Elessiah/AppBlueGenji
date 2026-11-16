@@ -24,6 +24,7 @@
  * Meilleur effort : le programme manqué (bot injoignable, aucun appareil) n'est
  * pas retenté — un programme envoyé en boucle ne se rattrape pas.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -117,7 +118,7 @@ async function releaseDigestMarks(rows: readonly DigestRow[]): Promise<void> {
       ],
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[referee-digest] marques non rendues", error);
+    if (!isMissingTableError(error)) console.error("[referee-digest] marques non rendues", failureDiagnostic(error));
   }
 }
 
@@ -166,7 +167,7 @@ async function stillAsRead(rows: readonly DigestRow[]): Promise<DigestRow[]> {
     );
     byId = new Map(current.map((row) => [Number(row.id), row]));
   } catch (error) {
-    console.error("[referee-digest] relecture avant envoi en échec", error);
+    console.error("[referee-digest] relecture avant envoi en échec", failureDiagnostic(error));
     return [...rows];
   }
   const kept: DigestRow[] = [];
@@ -226,7 +227,7 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
       // programme suivant).
       if (await claimDatedMark(row, REFEREE_DIGEST_KEY)) won.add(Number(row.id));
     } catch (error) {
-      console.error("[referee-digest] réservation en échec", error);
+      console.error("[referee-digest] réservation en échec", failureDiagnostic(error));
     }
   });
   // L'ordre du coup d'envoi, quel que soit l'ordre des réservations ; puis

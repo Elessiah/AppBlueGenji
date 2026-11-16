@@ -89,6 +89,28 @@ describe("boutons en attente : aria-disabled, pas disabled", () => {
     expect(source).toContain("aria-disabled=");
   });
 
+  it("loginSubmitButtons_whileLoading_focusableAndBusy", () => {
+    const login = readSource("app/connexion/_components/LoginForm.tsx");
+    expect(login).not.toMatch(/(?<!aria-)disabled=\{loading\}/);
+    expect(login.match(/aria-disabled=\{loading \|\| undefined\}\s+aria-busy=\{loading \|\| undefined\}/g)).toHaveLength(2);
+  });
+
+  it("requestCodeAndVerifyCode_secondSubmitInFlight_ignored", () => {
+    const login = readSource("app/connexion/_components/LoginForm.tsx");
+    // Garde synchrone, posée avant tout envoi, rendue en fin d'envoi (sauf départ vers la réactivation).
+    expect(login.match(/event\.preventDefault\(\);\s+if \(inFlight\.current\) return;\s+inFlight\.current = true;/g)).toHaveLength(2);
+    expect(login).toMatch(/finally \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
+    expect(login).toMatch(/if \(leavingTo === null\) \{\s+inFlight\.current = false;\s+setLoading\(false\);\s+return;\s+\}/);
+  });
+
+  it("verifyCode_success_keepsGuardWhileRedirecting", () => {
+    const login = readSource("app/connexion/_components/LoginForm.tsx");
+    // Code accepté : la garde reste posée pendant la navigation, un second
+    // envoi ne renvoie pas le code déjà consommé.
+    expect(login).toMatch(/signalSessionChanged\(\);\s+leavingTo = redirect;\s+router\.push\(redirect\);/);
+    expect(login).toMatch(/leavingTo = REACTIVATION_PATH;\s+router\.push\(REACTIVATION_PATH\);/);
+  });
+
   it("le profil (avatar, suppression du compte) garde le focus et garde le clic", () => {
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).not.toMatch(/(?<!aria-)disabled=\{(avatarBusy|accountDeletion\.deleting)\}/);
@@ -116,7 +138,11 @@ describe("mises en page", () => {
 
   it("annuaire des joueurs et barre de navigation suivent la colonne élargie", () => {
     expect(readSource("app/(secured)/joueurs/PlayersList.tsx")).toContain('className="page-wide"');
-    expect(readSource("app/globals.css")).toMatch(/body:has\(\.page-wide\) \[data-sticky-header\] \.container \{/);
+    const globals = readSource("app/globals.css");
+    // Bornée à la sœur `main.page-shell` et à son enfant direct, jamais au `body` entier
+    // (réévalué à chaque mutation de la page).
+    expect(globals).toMatch(/\[data-sticky-header\]:has\(~ \.page-shell \.page-wide\) \.container \{/);
+    expect(globals).not.toMatch(/body:has\(/);
   });
 
   it("phrases avec « i » en ligne : /connexion et fiche joueur", () => {

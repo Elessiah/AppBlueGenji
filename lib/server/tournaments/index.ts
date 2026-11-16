@@ -1,3 +1,4 @@
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   FinishedTournamentTotals,
@@ -278,18 +279,13 @@ async function syncOneTournament(
         continue;
       }
       console.warn(
-        `[tournaments] synchronisation du tournoi ${tournamentId} abandonnée : ${errorCodeOf(error)}`,
+        `[tournaments] synchronisation du tournoi ${tournamentId} abandonnée : ${failureDiagnostic(error)}`,
       );
       return "failed";
     } finally {
       discardBotLogs(connection);
     }
   }
-}
-
-function errorCodeOf(error: unknown): string {
-  if (error && typeof error === "object" && "code" in error && typeof error.code === "string") return error.code;
-  return error instanceof Error ? error.name : "UNKNOWN";
 }
 
 /**
@@ -707,7 +703,7 @@ export async function listTournamentBuckets(
   // dit dans pm2 : sans trace, des rappels pourraient manquer en silence.
   void dispatchDueMatchReminders().catch((error: unknown) => {
     // Table absente (création avalée au démarrage) : rien à dire à chaque lecture.
-    if (!isMissingTableError(error)) console.error("[match-reminders] balayage en échec", error);
+    if (!isMissingTableError(error)) console.error("[match-reminders] balayage en échec", failureDiagnostic(error));
   });
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
@@ -870,7 +866,7 @@ async function loadTournamentBuckets(
   if (totalsRead) {
     const read = await totalsRead;
     if ("error" in read) {
-      console.error("[tournaments] décompte des tournois terminés indisponible :", read.error);
+      console.error("[tournaments] décompte des tournois terminés indisponible :", failureDiagnostic(read.error));
       return loadTournamentBuckets(searchTerm, scope, null);
     }
     finishedTotals = read.totals;
@@ -882,7 +878,7 @@ async function loadTournamentBuckets(
   // `null`).
   const runningMeta = new Map(rows.map((row) => [Number(row.id), row] as const));
   const summaries = await loadCardSummaries(db, cards, runningMeta).catch((error: unknown) => {
-    console.error("[tournaments] résumé des cartes indisponible :", error);
+    console.error("[tournaments] résumé des cartes indisponible :", failureDiagnostic(error));
     return new Map<number, Partial<CardSummary>>();
   });
 
@@ -1264,7 +1260,7 @@ export async function getTournamentViewerContext(
   // du flux ni la lecture REST — sans pseudo, l'écran dit « Arbitre désigné »,
   // et la relecture légère (`/referee-names`) les reprend.
   const namesRead = loadRefereeNames(snapshot).catch((error: unknown): RefereeNamesRead => {
-    console.error("[referee-names] pseudos d'arbitre illisibles, contexte servi sans eux :", error);
+    console.error("[referee-names] pseudos d'arbitre illisibles, contexte servi sans eux :", failureDiagnostic(error));
     return NO_REFEREE_NAMES;
   });
 

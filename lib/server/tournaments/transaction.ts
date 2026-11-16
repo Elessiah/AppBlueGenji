@@ -4,6 +4,7 @@
  * d'arbitrage partent **après** le commit (`flushBotLogs`), et sont jetés sur
  * annulation.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
@@ -34,7 +35,7 @@ export async function transact<T>(connection: PoolConnection, run: (connection: 
   try {
     flushBotLogs(connection);
   } catch (error) {
-    console.error("[transaction] journal non vidé après le commit :", error);
+    console.error("[transaction] journal non vidé après le commit :", failureDiagnostic(error));
     // Ce qui reste en attente ne doit pas partir avec la transaction suivante
     // de cette connexion, rendue au pool.
     try {

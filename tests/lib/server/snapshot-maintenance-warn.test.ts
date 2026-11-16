@@ -8,7 +8,7 @@ describe("warnMaintenanceAborted", () => {
   });
   afterEach(() => warn.mockRestore());
 
-  const deadlock = () => new Error("Deadlock found when trying to get lock");
+  const deadlock = () => Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
 
   it("warnMaintenanceAborted_firstCall_logsOneLineWithoutStack", () => {
     warnMaintenanceAborted(9001, deadlock(), 1_000_000);
@@ -17,7 +17,8 @@ describe("warnMaintenanceAborted", () => {
     const args = warn.mock.calls[0];
     expect(args).toHaveLength(1);
     expect(String(args[0])).toContain("9001");
-    expect(String(args[0])).toContain("Deadlock found");
+    expect(String(args[0])).toContain("ER_LOCK_DEADLOCK");
+    expect(String(args[0])).not.toContain("Deadlock found");
   });
 
   it("warnMaintenanceAborted_secondCallWithin60s_isSilent", () => {
@@ -41,9 +42,10 @@ describe("warnMaintenanceAborted", () => {
     expect(warn).toHaveBeenCalledTimes(2);
   });
 
-  it("warnMaintenanceAborted_nonErrorValue_logsItAsText", () => {
-    warnMaintenanceAborted(9006, "boom", 5_000_000);
+  it("warnMaintenanceAborted_nonErrorValue_logsNoText", () => {
+    warnMaintenanceAborted(9006, "NovaSecretPseudo", 5_000_000);
 
-    expect(String(warn.mock.calls[0][0])).toContain("boom");
+    expect(String(warn.mock.calls[0][0])).toContain("erreur inconnue");
+    expect(String(warn.mock.calls[0][0])).not.toContain("NovaSecretPseudo");
   });
 });

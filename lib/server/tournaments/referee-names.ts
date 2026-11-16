@@ -17,6 +17,7 @@
  * compte, et survit à un redémarrage (un déploiement ne change pas la version
  * de tous les instantanés arbitrés).
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { createHmac, randomBytes } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { cached, invalidateCached, invalidateCachedPrefix } from "@/lib/server/cache";
@@ -274,7 +275,7 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
     });
     for (const tournamentId of tournamentIds) invalidateCachedPrefix(`${REFEREE_NAMES_CACHE_PREFIX}${tournamentId}:`);
   } catch (error) {
-    console.error("[referee-names] lecture des matchs arbitrés impossible", error);
+    console.error("[referee-names] lecture des matchs arbitrés impossible", failureDiagnostic(error));
     forgetRefereeNames();
     return;
   }
@@ -284,14 +285,14 @@ export async function forgetRefereeNamesOf(userId: number): Promise<void> {
   try {
     ({ publishMatchUpdatedEvent: publish } = await import("./notifications"));
   } catch (error) {
-    console.error("[referee-names] republication des tournois arbitrés impossible", error);
+    console.error("[referee-names] republication des tournois arbitrés impossible", failureDiagnostic(error));
     return;
   }
   const publishBatch = (from: number) => {
     try {
       for (const tournamentId of tournamentIds.slice(from, from + REFEREE_RENAME_MAX_TOURNAMENTS)) publish(tournamentId);
     } catch (error) {
-      console.error("[referee-names] republication des tournois arbitrés impossible", error);
+      console.error("[referee-names] republication des tournois arbitrés impossible", failureDiagnostic(error));
     }
     const next = from + REFEREE_RENAME_MAX_TOURNAMENTS;
     if (next < tournamentIds.length) setTimeout(() => publishBatch(next), REFEREE_RENAME_BATCH_DELAY_MS).unref?.();

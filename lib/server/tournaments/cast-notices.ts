@@ -18,7 +18,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer, trackAnnouncement } from "@/lib/server/coalescer";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -136,7 +136,7 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
     notice
       ? loadNotificationRecipients([notice.casterId], "certified", { matchDm: true }).catch((error) => {
           console.error(
-            `[cast] destinataire de l'avis non lu : ${failureReason(error)}`,
+            `[cast] destinataire de l'avis non lu : ${failureDiagnostic(error)}`,
           );
           return null;
         })
@@ -182,7 +182,7 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
 function deliverInBackground(change: CastChange): Promise<void> {
   return deliverCastChange(change).catch((error) =>
     console.error(
-      `[cast] changement d'inscription non annoncé : ${failureReason(error)}`,
+      `[cast] changement d'inscription non annoncé : ${failureDiagnostic(error)}`,
     ),
   );
 }

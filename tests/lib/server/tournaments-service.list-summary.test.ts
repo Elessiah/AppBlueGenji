@@ -103,7 +103,7 @@ describe("listTournamentBuckets — résumé des cartes", () => {
     expect(buckets.running[0].runningProgress).toBeNull();
     expect(error).toHaveBeenCalledWith(
       "[tournaments] résumé des cartes indisponible :",
-      expect.any(Error),
+      expect.any(String),
     );
   });
 });

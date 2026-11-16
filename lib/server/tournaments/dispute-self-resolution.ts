@@ -11,6 +11,7 @@
  * Tout part **après** le commit et au meilleur effort : l'arbitrage est acquis,
  * une alerte perdue ne le défait pas.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { notifyStaff } from "@/lib/server/notify";
@@ -235,11 +236,11 @@ async function alertSelfAction(
     // Avant la réponse de `actorPlaysMatch`, rien ne dit que l'auteur joue : la
     // ligne ne doit pas l'en accuser.
     if (!plays) {
-      console.error(`[staff-audit] vérification « arbitre qui joue » interrompue (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
+      console.error(`[staff-audit] vérification « arbitre qui joue » interrompue (${kind}) — match #${match.matchId}, auteur #${actor.id}`, failureDiagnostic(error));
       return false;
     }
     const missing = logged ? "push non envoyé" : "ni journalisée ni envoyée";
-    console.error(`[staff-audit] alerte d'arbitre qui joue ${missing} (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
+    console.error(`[staff-audit] alerte d'arbitre qui joue ${missing} (${kind}) — match #${match.matchId}, auteur #${actor.id}`, failureDiagnostic(error));
     return false;
   }
 }

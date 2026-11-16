@@ -2191,8 +2191,16 @@ html {
   /* La barre de navigation (`[data-sticky-header]`, hors de `.page-shell`) suit
      la colonne élargie : sans elle, elle restait à 1280 px et ne s'alignait plus
      sur le contenu. Même largeur que `.page-wide .container` ci-dessus
-     (colonne de 1680 px moins ses 48 px de marge). */
-  body:has(.page-wide) [data-sticky-header] .container {
+     (colonne de 1680 px moins ses 48 px de marge). Relevée par un `:has()`
+     borné à la sœur `.page-shell` et à ses descendants (la barre la
+     précède dans `SiteShell` ; un habillage intercalé ne le casse pas) : la règle relevée sur tout le `body` se réévaluait à
+     chaque mutation de la page. Une classe posée par la mise en page ne
+     conviendrait pas : la mise en page sécurisée ne se rend pas de nouveau à
+     une navigation côté client (liste → fiche). `100vw` (ascenseur compris) ne
+     mord pas ici : à 1800 px et plus, `min()` retient 1680 px tant que la
+     gouttière d'accessibilité reste sous 120 px, et la barre suit la même
+     formule que la colonne. */
+  [data-sticky-header]:has(~ .page-shell .page-wide) .container {
     width: calc(min(1680px, 100vw - max(80px, var(--a11y-tab-gutter))) - 48px);
   }
 }

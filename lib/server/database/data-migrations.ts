@@ -1,6 +1,7 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { isDuplicateEntryError, isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { withoutInvisiblesKeepingSpaces } from "@/lib/shared/visible-text";
+import { failureReason } from "@/lib/server/failure-reason";
 import { reportSchemaFailure } from "./report-schema-failure";
 
 /*
@@ -111,7 +112,7 @@ export async function switchOpenToRecruitmentDefault(db: Pool): Promise<void> {
           console.error(
             "[migrations] Le passage « sans équipe » des joueurs a échoué et le défaut n'a pas pu " +
               "être remis à 1 : le remplissage ne sera pas rejoué, il est à jouer à la main.",
-            restoreError,
+            failureReason(restoreError),
           );
         }
       }
@@ -178,7 +179,7 @@ export async function dropUserEmail(db: Pool): Promise<void> {
       } catch (fallbackError) {
         console.error(
           `[migrations] Les adresses de bg_users.email n'ont pu être ni retirées ni vidées.`,
-          fallbackError,
+          failureReason(fallbackError),
         );
       }
     }
@@ -219,7 +220,7 @@ export async function dropSiteVisitUserId(db: Pool): Promise<void> {
       } catch (fallbackError) {
         console.error(
           "[migrations] bg_site_visits.user_id n'a pu être ni retirée ni vidée.",
-          fallbackError,
+          failureReason(fallbackError),
         );
       }
     }

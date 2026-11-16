@@ -16,6 +16,7 @@ import {
   notifyUsers,
   toNotificationRecipient,
 } from "@/lib/server/notify";
+import { resetLocaleColumnMemory } from "@/lib/server/users/account-locale";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { recipientRow } from "../../helpers/recipient-row";
 
@@ -32,6 +33,7 @@ function accountLocales(rows: { id: number; locale: string }[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetLocaleColumnMemory();
   jest.mocked(pushToUsers).mockResolvedValue(2);
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
   accountLocales([{ id: 1, locale: "fr" }]);
@@ -116,6 +118,20 @@ describe("notifyUsers", () => {
 
     const bilingual = "m-fr\n\n**— English —**\nm-en";
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls.map(([message]) => message)).toEqual([bilingual, bilingual]);
+  });
+
+  it("notifyUsers_localeColumnRefusedEarlier_skipsLocaleQuery", async () => {
+    const query = jest.fn<SqlQuery>().mockRejectedValue(
+      Object.assign(new Error("Unknown column 'locale' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" }),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    const options = { topic: "MODERATION", push: PUSH, discord: { message: DM, context: "ctx" } } as const;
+    await notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" } }], options);
+
+    await notifyUsers([{ userId: 2, discord: { discordId: "2", handle: null, label: "B" } }], options);
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls[1][0]).toBe("m-fr\n\n**— English —**\nm-en");
   });
 
   it("un appel perdu (une langue) nomme ses comptes, les autres restent remis", async () => {

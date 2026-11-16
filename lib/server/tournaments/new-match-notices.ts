@@ -31,7 +31,7 @@
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { isContentionError, isMissingTableError } from "@/lib/server/mysql-errors";
 import {
   loadEntrantPlayerIds,
@@ -318,7 +318,7 @@ async function announceSide(
     }
     return true;
   } catch (error) {
-    console.error(`[new-match] annonce en échec (match ${row.id}, engagée ${side})`, failureReason(error));
+    console.error(`[new-match] annonce en échec (match ${row.id}, engagée ${side})`, failureDiagnostic(error));
     return false;
   }
 }
@@ -379,18 +379,18 @@ const failures = new Map<number, number>();
 async function noteFailure(db: Pool, row: NewMatchCandidateRow, error: unknown): Promise<void> {
   // Une attente de verrou (le moteur écrivait) n'est pas une panne du match.
   if (isContentionError(error)) {
-    console.error(`[new-match] annonce différée (match ${row.id}, verrou)`, failureReason(error));
+    console.error(`[new-match] annonce différée (match ${row.id}, verrou)`, failureDiagnostic(error));
     return;
   }
   const count = (failures.get(Number(row.id)) ?? 0) + 1;
   failures.set(Number(row.id), count);
-  console.error(`[new-match] annonce en échec (match ${row.id}, essai ${count})`, failureReason(error));
+  console.error(`[new-match] annonce en échec (match ${row.id}, essai ${count})`, failureDiagnostic(error));
   if (count < NEW_MATCH_MAX_FAILURES) return;
   failures.delete(Number(row.id));
   try {
     await markSkipped(db, row);
   } catch (giveUpError) {
-    console.error(`[new-match] abandon non marqué (match ${row.id})`, failureReason(giveUpError));
+    console.error(`[new-match] abandon non marqué (match ${row.id})`, failureDiagnostic(giveUpError));
   }
 }
 
@@ -419,7 +419,7 @@ async function undoClaim(db: Pool, row: NewMatchCandidateRow, reserved: PlaceRow
     try {
       await dropReservation(db, reserved);
     } catch (error) {
-      console.error(`[new-match] réservation non rendue (match ${row.id})`, failureReason(error));
+      console.error(`[new-match] réservation non rendue (match ${row.id})`, failureDiagnostic(error));
     }
   }
   if (row.start_at !== null) await releaseDatedMarks(Number(row.id), covered, row.start_at);
@@ -517,7 +517,7 @@ const sweeps = throttledSweep({
   throttleMs: NEW_MATCH_THROTTLE_MS,
   sweep: sweepNewMatches,
   onError: (error) => {
-    if (!isMissingTableError(error)) console.error("[new-match] balayage en échec", failureReason(error));
+    if (!isMissingTableError(error)) console.error("[new-match] balayage en échec", failureDiagnostic(error));
   },
 });
 

@@ -53,6 +53,7 @@
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import {
   clipMapPointTargets,
   effectiveMapPointTargets,
@@ -536,7 +537,7 @@ async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot)
     try {
       await db.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?`, key);
     } catch (releaseError) {
-      console.error(`[lobby-brief] réservation interrompue du match ${key[0]} non rendue`, releaseError);
+      console.error(`[lobby-brief] réservation interrompue du match ${key[0]} non rendue`, failureDiagnostic(releaseError));
     }
     throw error;
   }
@@ -559,7 +560,7 @@ async function markBriefSent(db: Db, matchId: number, teamId: number): Promise<v
       [teamId, matchId],
     );
   } catch (error) {
-    console.error(`[lobby-brief] check-in du match ${matchId} parti sans marque durable`, error);
+    console.error(`[lobby-brief] check-in du match ${matchId} parti sans marque durable`, failureDiagnostic(error));
   }
 }
 
@@ -580,7 +581,7 @@ async function releaseQuietly(db: Db, claimIds: readonly number[]): Promise<bool
     );
     return true;
   } catch (error) {
-    console.error(`[lobby-brief] ${claimIds.length} réservation(s) non rendue(s), restée(s) en base`, error);
+    console.error(`[lobby-brief] ${claimIds.length} réservation(s) non rendue(s), restée(s) en base`, failureDiagnostic(error));
     return false;
   }
 }
@@ -729,7 +730,7 @@ async function sendSideBrief(
   try {
     rendered = renderSideBrief(side, url);
   } catch (error) {
-    console.error(`[lobby-brief] brief du match ${matchId} non rédigé, rien n'est parti`, error);
+    console.error(`[lobby-brief] brief du match ${matchId} non rédigé, rien n'est parti`, failureDiagnostic(error));
     return "retry";
   }
   // Le brief est rédigé : il part. La marque durable d'abord (`markBriefSent`).
@@ -751,7 +752,7 @@ async function sendSideBrief(
     );
     return "unreached";
   } catch (error) {
-    console.error(`[lobby-brief] brief du match ${matchId} non envoyé à une engagée, sans nouvel essai`, error);
+    console.error(`[lobby-brief] brief du match ${matchId} non envoyé à une engagée, sans nouvel essai`, failureDiagnostic(error));
     return "failed";
   }
 }
@@ -1046,7 +1047,7 @@ async function runLobbyBriefSweep(): Promise<number> {
     closed.push(...brief.closed);
     if (brief.error !== undefined) {
       // Un match en échec n'empêche pas les suivants ; il est rejoué au balayage suivant.
-      console.error(`[lobby-brief] brief du match ${Number(row.id)} interrompu, repris au balayage suivant`, brief.error);
+      console.error(`[lobby-brief] brief du match ${Number(row.id)} interrompu, repris au balayage suivant`, failureDiagnostic(brief.error));
     }
     if (brief.error !== undefined || brief.retry.length > 0 || brief.lost) toRetry.push(matchRetryKey(row));
     else retries.delete(matchRetryKey(row));
@@ -1085,7 +1086,7 @@ const sweeps = throttledSweep({
   sweep: runLobbyBriefSweep,
   onError: (error) => {
     if (isMissingTableError(error)) return;
-    console.error("[lobby-brief] briefs du salon non envoyés", error);
+    console.error("[lobby-brief] briefs du salon non envoyés", failureDiagnostic(error));
     scheduleRetrySweep([SWEEP_RETRY_KEY]);
   },
 });

@@ -50,6 +50,7 @@
  * `https` : il faut en plus `LIVE_ANNOUNCEMENTS_ENABLED=1`, que seul le `.env`
  * de production pose, et un `APP_URL` en `https` sur un nom de domaine.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -422,7 +423,7 @@ async function forgetEveningSend(
     await db.execute(`UPDATE bg_live_announcements SET refused = 1 WHERE ${claims.sql}`, claims.params);
   } catch (error) {
     // Au pire, le match suivant de la soirée part sans notification.
-    console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, error);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, failureDiagnostic(error));
   }
 }
 
@@ -438,7 +439,7 @@ async function closeEvening(evening: LiveEvening, rows: readonly LiveCandidateRo
     await db.execute(`UPDATE bg_live_evenings SET closed = 1 WHERE id = ?`, [Number(evening.id)]);
   } catch (error) {
     // Le match suivant retentera la modification, que le bot refusera de même.
-    console.error(`[live-announce] soirée ${Number(evening.id)} : fermeture non enregistrée`, error);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : fermeture non enregistrée`, failureDiagnostic(error));
   }
   await forgetEveningSend(evening, rows, false);
 }
@@ -478,7 +479,7 @@ async function rememberEveningMessage(
     ]);
   } catch (error) {
     // Le prochain match de la soirée partira dans un nouveau message.
-    console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, error);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, failureDiagnostic(error));
   }
 }
 
@@ -541,7 +542,7 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
     return true;
   } catch (error) {
     const lost = rows.length > 1 ? "annonces non réessayées" : "annonce non réessayée";
-    console.error(`[live-announce] ${label} : réservation non rendue, ${lost}`, error);
+    console.error(`[live-announce] ${label} : réservation non rendue, ${lost}`, failureDiagnostic(error));
     return false;
   }
 }
@@ -593,7 +594,8 @@ function pruneWarnings(now: number): void {
  * matchs, pour que chaque match reporté laisse sa trace sans que le balayage,
  * qui repasse toutes les dix secondes, n'inonde le journal.
  *
- * @param error Erreur jointe : la trace part alors en `console.error`.
+ * @param error Erreur jointe : la ligne part alors en `console.error`, réduite à
+ * son code (`failureDiagnostic` : premiers cadres de pile pour une erreur imprévue).
  */
 function warnOnce(kind: string, message: string, error?: unknown): void {
   const now = Date.now();
@@ -603,7 +605,7 @@ function warnOnce(kind: string, message: string, error?: unknown): void {
   lastWarnAt.set(kind, now);
   const text = `${message} (avertissement répété au plus une fois par heure)`;
   if (error === undefined) console.warn(text);
-  else console.error(text, error);
+  else console.error(text, failureDiagnostic(error));
 }
 
 /** Longueur maximale de la liste d'identifiants dans l'étiquette envoyée au bot (200 caractères en tout). */
@@ -1057,7 +1059,7 @@ function scheduleRefresh(): void {
   refreshTimer = setTimeout(() => {
     refreshTimer = null;
     void exclusive(() => refreshLiveEvenings()).catch((error: unknown) => {
-      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", error);
+      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", failureDiagnostic(error));
       retryRefresh();
     });
   }, LIVE_EVENING_REFRESH_DELAY_MS);
@@ -1416,7 +1418,7 @@ function rearmPendingRetries(): void {
  */
 export async function dispatchLiveAnnouncements(): Promise<number> {
   purgeEndedEvenings().catch((error: unknown) => {
-    if (!isMissingTableError(error)) console.error("[live-announce] purge des soirées finies impossible", error);
+    if (!isMissingTableError(error)) console.error("[live-announce] purge des soirées finies impossible", failureDiagnostic(error));
   });
   if (!liveAnnouncementsEnabled()) {
     // En production, une variable oubliée au déploiement se lit dans pm2.
@@ -1444,7 +1446,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
     return 0;
   }
   pendingSweep = exclusive(() => runLiveAnnouncementSweep()).catch((error: unknown) => {
-    if (!isMissingTableError(error)) console.error("[live-announce] balayage en échec", error);
+    if (!isMissingTableError(error)) console.error("[live-announce] balayage en échec", failureDiagnostic(error));
     return 0;
   });
   try {

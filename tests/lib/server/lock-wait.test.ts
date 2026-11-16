@@ -171,7 +171,7 @@ describe("rollbackKeepingError", () => {
     await rollbackKeepingError(asPool);
 
     expect(logged).toHaveBeenCalledTimes(1);
-    expect(logged).toHaveBeenCalledWith(expect.stringContaining("ROLLBACK"), lost);
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("ROLLBACK"), expect.any(String));
   });
 });
 

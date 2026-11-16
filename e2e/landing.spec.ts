@@ -22,8 +22,8 @@ test.describe("Header landing", () => {
     test.skip(!authConfigured, "Définir E2E_AUTH_USER pour le header connecté.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     await page.goto("/");
     const header = page.locator("header").first();
-    // Le nom du lien commence par le pseudo affiché (WCAG 2.5.3) : « <pseudo>, mon profil ».
-    await expect(header.getByRole("link", { name: /, mon profil$/ })).toBeVisible();
+    // Le menu du compte s'ouvre par un bouton dont le nom commence par le pseudo affiché (WCAG 2.5.3).
+    await expect(header.getByRole("button", { name: /, menu du compte$/ })).toBeVisible();
     await expect(header.getByRole("link", { name: /Rejoindre/ })).toHaveCount(0);
   });
 

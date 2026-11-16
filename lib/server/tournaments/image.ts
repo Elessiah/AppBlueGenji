@@ -31,7 +31,7 @@ import {
 import { localUploadUrl, toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 
 /**
  * Une image posée, recadrée ou retirée par le staff (bannière choquante) ne
@@ -84,7 +84,7 @@ async function discardFile(url: string | null): Promise<void> {
   try {
     await deleteStoredImage(toDiskUploadPath(url));
   } catch (error) {
-    console.error(`[tournaments] fichier d'image non effacé (${url}) : ${failureReason(error)}`);
+    console.error(`[tournaments] fichier d'image non effacé (${url}) : ${failureDiagnostic(error)}`);
   }
 }
 

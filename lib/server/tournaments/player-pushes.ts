@@ -19,6 +19,7 @@
  * fait passer juste après toute écriture capable d'ouvrir un lancement, et par
  * la lecture de la liste des tournois, comme les rappels.
  */
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -183,7 +184,7 @@ export async function readMatchCasters(
       ]),
     );
   } catch (error) {
-    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", error);
+    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", failureDiagnostic(error));
     return new Map();
   }
 }
@@ -298,7 +299,7 @@ const sweeps = throttledSweep({
     return runMatchStartSweep();
   },
   onError: (error) => {
-    if (!isMissingTableError(error)) console.error("[push] départs de match non annoncés", error);
+    if (!isMissingTableError(error)) console.error("[push] départs de match non annoncés", failureDiagnostic(error));
   },
 });
 
@@ -386,7 +387,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
       false,
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] score à confirmer non annoncé", error);
+    if (!isMissingTableError(error)) console.error("[push] score à confirmer non annoncé", failureDiagnostic(error));
     return 0;
   }
 }
@@ -452,7 +453,7 @@ export async function notifyScoreAutoValidated(
       false,
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] validation d'office non annoncée", error);
+    if (!isMissingTableError(error)) console.error("[push] validation d'office non annoncée", failureDiagnostic(error));
     return 0;
   }
 }
@@ -483,7 +484,7 @@ export async function notifyTournamentStart(tournamentId: number): Promise<numbe
       false,
     );
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] coup d'envoi non annoncé", error);
+    if (!isMissingTableError(error)) console.error("[push] coup d'envoi non annoncé", failureDiagnostic(error));
     return 0;
   }
 }

@@ -23,6 +23,7 @@ import {
   resolveDiscordUser,
   sendDiscordLoginCode,
 } from "@/lib/server/bot-integration";
+import { resetLocaleColumnMemory } from "@/lib/server/users/account-locale";
 import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 import {
   consumeDiscordLoginChallenge,
@@ -47,6 +48,8 @@ type UserState = {
   discord_pseudo_from_discord: number;
   discord_link_method: "OAUTH" | "DM_CODE" | null;
   is_deleted?: boolean;
+  /** Langue du compte, lue avec la ligne (absente : relue par l'identifiant Discord). */
+  locale?: string;
 };
 
 const CERTIFIED_AT = new Date("2026-09-20T12:00:00Z");
@@ -102,7 +105,7 @@ function fakeDb(
     throw new Error(`requête inattendue : ${q}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-  return { state, writes };
+  return { state, writes, execute };
 }
 
 const LINKED_BY_CODE: UserState = {
@@ -122,6 +125,7 @@ const GOOGLE_ACCOUNT: UserState = {
 };
 
 beforeEach(() => {
+  resetLocaleColumnMemory();
   jest.clearAllMocks();
   jest.mocked(createDiscordLoginChallenge).mockResolvedValue({
     challengeId: 77,
@@ -164,6 +168,48 @@ describe("startDiscordHandleUpdate", () => {
       "en",
       "handle",
     );
+  });
+
+  it("startDiscordHandleUpdate_ownDiscordWithRowLocale_usesRowLocaleWithoutLookup", async () => {
+    fakeDb({ ...LINKED_BY_CODE, locale: "en" });
+    jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000001");
+
+    await startDiscordHandleUpdate(7, "keryan_neuf");
+
+    // Destinataire = ce compte : sa langue vient de la ligne déjà lue.
+    expect(accountLocaleForDiscordId).not.toHaveBeenCalled();
+    expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000001", "123456", "en", "handle");
+  });
+
+  it("startDiscordHandleUpdate_localeColumnMissing_codeStillSent", async () => {
+    const { execute: inner } = fakeDb({ ...LINKED_BY_CODE });
+    const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
+      if (/discord_pseudo_from_discord, locale/.test(sql)) {
+        throw Object.assign(new Error("Unknown column 'locale'"), { code: "ER_BAD_FIELD_ERROR" });
+      }
+      return inner(sql, params);
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000001");
+    jest.mocked(accountLocaleForDiscordId).mockResolvedValueOnce("en");
+
+    await startDiscordHandleUpdate(7, "keryan_neuf");
+
+    // Sans la colonne, la ligne est relue sans elle ; la langue vient de la lecture par Discord.
+    expect(execute.mock.calls.map(([sql]) => sql.includes(", locale"))).toEqual([true, false]);
+    expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000001", "123456", "en", "handle");
+  });
+
+  it("startDiscordHandleUpdate_noLinkedDiscord_looksUpRecipientLocale", async () => {
+    fakeDb({ ...GOOGLE_ACCOUNT, locale: "en" });
+    jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000002");
+    jest.mocked(accountLocaleForDiscordId).mockResolvedValueOnce(null);
+
+    await startDiscordHandleUpdate(7, "quelquun");
+
+    // Le tag saisi n'est pas prouvé : la langue est celle du compte qui porte ce Discord, pas du demandeur.
+    expect(accountLocaleForDiscordId).toHaveBeenCalledWith("900000000000000002");
+    expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000002", "123456", null, "handle");
   });
 
   it("refuse un pseudo qui résout vers un autre compte Discord, sans rien envoyer", async () => {

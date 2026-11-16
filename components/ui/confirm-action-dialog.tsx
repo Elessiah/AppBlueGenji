@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { AmbientLang } from "@/components/i18n/ambient-lang";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { shellText } from "@/lib/shared/shell-text";
 import styles from "./confirm-action-dialog.module.css";
@@ -163,7 +164,7 @@ export function ConfirmActionDialog({
         </h3>
         <form onSubmit={submit}>
           <div id={bodyId} className={styles.body}>
-            {children}
+            <AmbientLang lang={foreign ? contentLang : undefined}>{children}</AmbientLang>
           </div>
           {requireText === undefined ? null : (
             <div className={`field ${styles.confirmField}`}>

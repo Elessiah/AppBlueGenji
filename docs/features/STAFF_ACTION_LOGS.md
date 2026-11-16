@@ -17,7 +17,7 @@ n'appellent l'intervention de personne.
   (`match-log-subject.ts`, partagé avec `CAST_NOTICES.md`) ou le nom du tournoi,
   n'attend pas, ne lève jamais (base indisponible : une ligne `[staff-log]`
   en erreur dans pm2, avec le geste, le numéro du match ou du tournoi et le
-  code de l'erreur (`failureReason`, `lib/server/failure-reason.ts` : code de l'erreur, sinon message qui est lui-même un code du site, sinon nom de l'erreur — jamais un texte libre) mais
+  code de l'erreur (`failureReason`, `lib/server/failure-reason.ts` : code de l'erreur, sinon message qui est lui-même un code du site, sinon nom de l'erreur — jamais un texte libre ; dans le moteur de tournoi, `failureDiagnostic` y ajoute, pour une erreur imprévue réduite à son nom, les trois premiers cadres de sa pile — fichier, ligne, fonction —, jamais son message) mais
   jamais l'auteur ; disjoncteur du bot ouvert (`isBotCircuitOpen`) : rien n'est relu — le registre et `/rgpd` le disent ; bot injoignable :
   `sendBotLog` abandonne en silence ; la réponse de la route ne change pas).
 - Appel : dans chaque route, **après** le geste réussi ; un refus (401, 403,
