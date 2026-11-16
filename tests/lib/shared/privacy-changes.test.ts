@@ -2837,6 +2837,27 @@ describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", (
   });
 });
 
+/** Sources FR et EN de `/rgpd`, lues telles quelles. */
+function rgpdSources(): [string, string] {
+  const read = (file: string) => readFileSync(join(process.cwd(), "app", "rgpd", file), "utf8");
+  return [read("page.tsx"), read("RgpdEn.tsx")];
+}
+
+/** Phrases FR/EN attendues (et retirées) des textes de recréation des salons vocaux, tenues hors du code. */
+const VOICE_PHRASES: Record<string, { fr: string[]; en: string[]; frGone: string[]; enGone: string[] }> = JSON.parse(
+  readFileSync(join(process.cwd(), "tests", "fixtures", "voice-recreation-legal-phrases.json"), "utf8"),
+);
+
+function expectVoicePhrases(name: string, [fr, en]: [string, string]): void {
+  const phrases = VOICE_PHRASES[name];
+  expect({
+    missingFr: phrases.fr.filter((phrase) => !fr.includes(phrase)),
+    missingEn: phrases.en.filter((phrase) => !en.includes(phrase)),
+    staleFr: phrases.frGone.filter((phrase) => fr.includes(phrase)),
+    staleEn: phrases.enGone.filter((phrase) => en.includes(phrase)),
+  }).toEqual({ missingFr: [], missingEn: [], staleFr: [], staleEn: [] });
+}
+
 // MATCH-VOICE (#572, décisions D13 à D15) : vidage par l'arbitrage, match reporté,
 // ligne du site jamais close tant que le salon peut exister, aucune donnée d'utilisateur.
 describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–D15)", () => {
@@ -2862,6 +2883,18 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     expect(t18En().retention[0]).toContain("then once an hour from 48 hours after the current channel was created, with no limit; if it is unavailable, as the site is used (at most about once a minute) for as long as it is");
     expect(t18().retention[0]).not.toContain("si le bot ne le reprend pas, 48 heures");
     expect(t18En().retention[0]).not.toContain("if the bot does not take it back, 48 hours");
+  });
+
+  it("processingRegister_t18_recheckEveryFiveMinutesAndBotRecreatesFrAndEn", () => {
+    expectVoicePhrases("processingRegister_t18_recheckEveryFiveMinutesAndBotRecreatesFrAndEn", [t18().security.join(" "), t18En().security.join(" ")]);
+  });
+
+  it("rgpdPage_voiceChannelDeletedByModeration_recreatedAtOnceFrAndEn", () => {
+    expectVoicePhrases("rgpdPage_voiceChannelDeletedByModeration_recreatedAtOnceFrAndEn", rgpdSources());
+  });
+
+  it("rgpdPage_voiceStaffLogAndRecordFollowRecreationFrAndEn", () => {
+    expectVoicePhrases("rgpdPage_voiceStaffLogAndRecordFollowRecreationFrAndEn", rgpdSources());
   });
 
   it("processingRegister_t18_clearDeclaredWithoutOccupantDataFrAndEn", () => {
