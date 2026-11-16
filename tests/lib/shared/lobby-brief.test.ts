@@ -53,6 +53,59 @@ describe("formatLobbyBriefDm", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 1 }), URL, "en")).toContain("each map is won by the first to 1 point.");
   });
 
+  it("formatLobbyBriefDm_perMapTargets_listsEachMapFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL);
+
+    expect(actual).toContain("Format Duel / Arcade : Map 1 au premier à 5 points, Map 2 au premier à 3 points, puis premier à 5 points pour les suivantes.");
+    expect(actual).not.toContain("chaque carte se gagne");
+  });
+
+  it("formatLobbyBriefDm_perMapTargets_listsEachMapEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3] }), URL, "en");
+
+    expect(actual).toContain("Duel / Arcade format: Map 1 first to 5 points, Map 2 first to 3 points, then first to 5 points for the next ones.");
+  });
+
+  it("formatLobbyBriefDm_perMapSinglePoint_singularFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [1, 7] }), URL);
+
+    expect(actual).toContain("Map 1 au premier à 1 point, Map 2 au premier à 7 points, puis premier à 5 points pour les suivantes.");
+  });
+
+  it("formatLobbyBriefDm_perMapSinglePoint_singularEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [1, 7] }), URL, "en");
+
+    expect(actual).toContain("Map 1 first to 1 point, Map 2 first to 7 points, then first to 5 points for the next ones.");
+  });
+
+  it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseFr", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL);
+
+    expect(actual).toContain("Format Duel / Arcade : Map 1 au premier à 5 points, Map 2 au premier à 3 points, Map 3 au premier à 7 points.");
+    expect(actual).not.toContain("pour les suivantes");
+  });
+
+  it("formatLobbyBriefDm_allMapsCovered_noNextOnesClauseEn", () => {
+    const actual = formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 3, 7], maxMaps: 3 }), URL, "en");
+
+    expect(actual).toContain("Duel / Arcade format: Map 1 first to 5 points, Map 2 first to 3 points, Map 3 first to 7 points.");
+    expect(actual).not.toContain("for the next ones");
+  });
+
+  it("formatLobbyBriefDm_perMapAllEqualRound_keepsSingleLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [5, 5] }), URL)).toContain(
+      "chaque carte se gagne au premier à 5 points.",
+    );
+  });
+
+  it("formatLobbyBriefDm_emptyPerMapTargets_keepsSingleLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: 5, pointTargets: [] }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
+  });
+
+  it("formatLobbyBriefDm_perMapWithoutPointTarget_omitsLine", () => {
+    expect(formatLobbyBriefDm(side({ pointTarget: null, pointTargets: [3] }), URL)).not.toContain("Duel / Arcade");
+  });
+
   it("formatLobbyBriefDm_pointTargetSeveral_pluralFrAndEn", () => {
     expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL)).toContain("chaque carte se gagne au premier à 5 points.");
     expect(formatLobbyBriefDm(side({ pointTarget: 5 }), URL, "en")).toContain("each map is won by the first to 5 points.");
@@ -611,13 +664,13 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
     expect(frBrief).toContain("15 minutes avant son coup d'envoi");
     expect(frBrief).toContain("ou à l'ouverture de son salon si elle vient plus tôt ou si le match n'a pas d'horaire");
     // Autogestion seulement, une seule fois, aux gérants (CAST-FOLLOWUP, décision du 2026-11-05).
-    expect(frBrief).toContain("pour un match en autogestion seulement (aucun pour un match arbitré ou sans décision d'arbitrage)");
+    expect(frBrief).toContain("pour un match en autogestion seulement (aucun pour un match arbitré ou sans décision d'arbitrage, ni dans un tournoi sans check-in)");
     expect(frBrief).toContain("une seule fois par match et par engagée (ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient");
     expect(frBrief).toContain("à ceux qui gèrent chacune de ses engagées (propriétaire et managers d'une équipe, joueur d'une entrée solo");
     expect(frBrief).not.toContain("tous les joueurs");
     expect(frBrief).toContain("sans BattleTag, tag Discord ni pseudo de joueur");
     expect(enBrief).toContain("15 minutes before it kicks off");
-    expect(enBrief).toContain("for a self-managed match only (none for a refereed match or one with no refereeing decision)");
+    expect(enBrief).toContain("for a self-managed match only (none for a refereed match or one with no refereeing decision, nor in a tournament without check-in)");
     expect(enBrief).toContain("once per match and per entrant (neither a change of time, nor a cancelled launch, nor a re-pairing sends it again");
     expect(enBrief).toContain("to those who manage each of its entrants (owner and managers of a team, the player of a solo entry");
     expect(enBrief).not.toContain("every player");

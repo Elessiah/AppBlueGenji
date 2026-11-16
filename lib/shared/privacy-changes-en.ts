@@ -36,7 +36,7 @@ import {
 import { DATA_CONTACT_ROLE_EN, REPORT_FORM_NAME_EN, WEB_ACCESS_LOG_FIELDS_EN, monthsEn } from "@/lib/shared/legal-text-en";
 import type { Locale } from "@/lib/shared/locales";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import type { PrivacyChange } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES, type PrivacyChange } from "@/lib/shared/privacy-changes";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
@@ -1052,6 +1052,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "When the exclusion is lifted, the notice is deleted with the rest. If Discord is temporarily unreachable, the ID of the excluded member, that of the message and the time it was queued are kept to retry during the bot's clean-up (every night, and when it restarts or after a restore; a limited number of notices each time), for 30 days at most, even after the exclusion is lifted; new: when it is lifted, up to ten of those replaced notices still queued are also retried at once, the others during the next clean-up. If lifting fails (the bot's database unavailable), the current notice may be deleted during a clean-up while the exclusion still applies. A notice that Discord refuses to delete for good (conversation or access closed), or that is still there after those 30 days, is no longer retried: the bot forgets its ID and the notice remains in the excluded member's direct conversation with the bot, like a notice sent before the bot kept its ID. If the bot's database is unavailable just after sending, or Discord's reply is lost, a notice may also remain without the bot keeping its ID; the same goes, after the bot's database is restored from a backup, for a notice sent since that backup.",
     ],
   },
+  "2026-11-marque-de-session-rectificatif": {
+    title: "Discord tag verification suggestion: when the window comes back (and two other clarifications)",
+    linkLabels: ["Read the “Data collected” section"],
+    summary:
+      "A clarification of the information of October 29, 2026: when the site doesn't receive your answer to the Discord tag verification window, or refuses it, your session's mark stays, and the window may come back as long as that session lasts — not only at the next page load. The only exception: a verification refused because your tag can no longer be verified, where the window answers “Later” by itself, which only clears the mark if the site receives it and does not refuse it. Two clarifications too on match contacts and the referee's “Ready”.",
+    details: [
+      "The information of October 29 only named two refusals (another account logged in since in that browser, or your account can't be found) and said the window could come back at the next page load. In fact, any answer that doesn't reach the site, or that it refuses (a site failure included), leaves the mark on your session — except, as it said, a verification refused because your Discord tag can no longer be verified from that window: the window then answers “Later” by itself, which clears it in turn if it reaches the site and is not refused there. The window may then come back as long as that session lasts; when the refusal is due to another account logged in since in that browser, there it only comes back on your account at a new login with Discord or Blizzard — each of your sessions has its own mark, which your other devices keep.",
+      "Match contacts: a caster who is also a referee of the site reads the contacts of the teams of their match (certified Discord tag and, in an Overwatch tournament, BattleTag, even when hidden) in the match card's “Contacts” window and in the match page's “Connection info”, as soon as both its opponents are known, like the other referees — and not only while the match is played, like the other casters.",
+      "The assigned referee's “Ready”: its record is also shown to the match's parties and the site's referees and admins on the match page, and not only in the “Contacts” and launch windows; the state of the launch, which is public, may also let one guess whether they are ready.",
+      "Nothing else changes: the mark contains nothing else, goes with the session and isn't included in the export of your data; “Don't show again” is still kept on your account, with its date.",
+    ],
+  },
 };
 
 /**
@@ -1072,4 +1084,24 @@ export function localizedPrivacyChanges(changes: readonly PrivacyChange[], local
       links: change.links?.map((link, index) => ({ href: link.href, label: english.linkLabels?.[index] ?? link.label })),
     };
   });
+}
+
+/**
+ * The entries as the root layout ships them to the privacy modal: everything
+ * but the `details` (#587 — every page of an account behind on several entries
+ * carried tens of kB of them). The modal fetches them once it opens
+ * (`privacyChangeDetailsFor`, `GET /api/profile/privacy-changes`).
+ */
+export function privacyChangeHeads(changes: readonly PrivacyChange[]): PrivacyChange[] {
+  return changes.map((change) => ({ ...change, details: [] }));
+}
+
+/**
+ * The `details` of the registry entries `ids`, in `locale`, by id. Unknown ids
+ * are skipped (the route has already refused them).
+ */
+export function privacyChangeDetailsFor(ids: readonly string[], locale: Locale): Record<string, readonly string[]> {
+  const wanted = new Set(ids);
+  const entries = localizedPrivacyChanges(PRIVACY_CHANGES.filter((change) => wanted.has(change.id)), locale);
+  return Object.fromEntries(entries.map((change) => [change.id, change.details]));
 }

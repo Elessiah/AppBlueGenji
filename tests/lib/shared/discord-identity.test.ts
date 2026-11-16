@@ -271,6 +271,8 @@ describe("les textes de consentement", () => {
   it("nomment les parties d'un match et la durée de l'exposition", () => {
     const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
     expect(joined).toContain("ses casters le temps du match seulement");
+    // Un caster arbitre du site lit les contacts dès que les adversaires sont connus.
+    expect(joined).toContain("un caster qui est aussi arbitre du site, dès que ses deux adversaires sont connus");
     expect(joined).toContain("dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement");
   });
 

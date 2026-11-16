@@ -18,7 +18,7 @@
 
 import { checkMatchScores, formatAllowsTiebreak, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
 import type { MatchFormat, MatchScoreViolation } from "./match-format";
-import { duelMapScoreFault } from "./map-points";
+import { duelMapScoreFault, mapPointTargetAt } from "./map-points";
 import type { TournamentGame } from "./types";
 
 /** Une map telle qu'on la saisit — orientation du plateau (équipe 1, équipe 2). */
@@ -224,6 +224,30 @@ export interface MapEntryRules {
    * N − 1 (`MAP_POINTS_INVALID` sinon). `null` / absent : format éteint.
    */
   pointTarget?: number | null;
+  /**
+   * N effectif carte par carte (carte 1 en tête, `BracketMatch.mapPointTargets`) ;
+   * une carte au-delà de la liste suit `pointTarget`. Sans effet format éteint.
+   */
+  pointTargets?: ReadonlyArray<number> | null;
+}
+
+/**
+ * N à citer dans le message d'un refus : celui de la carte que le refus
+ * désigne (réglage carte par carte), sinon celui du match.
+ */
+export function refusalPointTarget(
+  check: Pick<MapListCheck, "field">,
+  rules: Pick<MapEntryRules, "pointTarget" | "pointTargets">,
+): number | null {
+  return mapPointTargetAt(rules.pointTarget, rules.pointTargets, check.field?.index ?? 0);
+}
+
+/** Règles d'une carte précise (`index`, 0 = carte 1) : son propre N en `pointTarget`. */
+export function mapRulesAt(rules: MapEntryRules, index: number): MapEntryRules {
+  return {
+    requireReplayCode: rules.requireReplayCode,
+    pointTarget: mapPointTargetAt(rules.pointTarget, rules.pointTargets, index),
+  };
 }
 
 /** Contrôle d'une ligne seule : code (présent, au motif, unique) puis scores. */
@@ -273,10 +297,7 @@ export function checkMapList(
   maps: ReadonlyArray<MatchMapInput>,
   options: { decisive: boolean } & MapEntryRules,
 ): MapListCheck {
-  const entryRules = {
-    requireReplayCode: options.requireReplayCode !== false,
-    pointTarget: options.pointTarget ?? null,
-  };
+  const requireReplayCode = options.requireReplayCode !== false;
   const score = deriveMatchScore(
     maps.map((m) => ({
       team1Score: isValidMapScore(m.team1Score) ? m.team1Score : 0,
@@ -296,7 +317,10 @@ export function checkMapList(
   let team1 = 0;
   let team2 = 0;
   for (const [index, map] of maps.entries()) {
-    const entry = checkMapEntry(map, game, seen, entryRules);
+    const entry = checkMapEntry(map, game, seen, {
+      requireReplayCode,
+      pointTarget: mapPointTargetAt(options.pointTarget, options.pointTargets, index),
+    });
     if (entry) return refuse(entry.error, index, entry.field);
     // Une map jouée après que la rencontre est acquise n'a pas eu lieu.
     if (index > 0 && isSettled(format, team1, team2, index)) return refuse("MAP_AFTER_DECISION", index);
@@ -427,7 +451,8 @@ export function canAddMap(format: MatchFormat | null, maps: ReadonlyArray<MatchM
 
 /**
  * Une ligne est-elle complète : code de replay valable (ou absent, quand
- * l'arbitrage s'en passe) et deux scores de map valables ?
+ * l'arbitrage s'en passe) et deux scores de map valables ? `rules.pointTarget`
+ * est le N **de cette carte** (`mapRulesAt`) ; `pointTargets` n'est pas lu.
  */
 export function isMapComplete(
   map: MatchMapInput,
@@ -472,7 +497,9 @@ export function progressiveMapRows(
   const rows = trimTrailingBlankMaps(maps);
   if (rows.length === 0) return [emptyMap()];
   const last = rows.at(-1);
-  if (last && isMapComplete(last, game, rules) && canAddMap(format, rows)) rows.push(emptyMap());
+  if (last && isMapComplete(last, game, mapRulesAt(rules, rows.length - 1)) && canAddMap(format, rows)) {
+    rows.push(emptyMap());
+  }
   return rows;
 }
 

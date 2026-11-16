@@ -188,6 +188,7 @@ import { discardBotLogs, flushBotLogs, markResultValidatedByStaff, queueBotLog }
 import { isUnsettled, releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
+import { invalidateProfilelessPlayers } from "@/lib/server/ranking-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchVoiceChannels } from "./match-voice";
@@ -414,6 +415,8 @@ export async function createTournament(
     launchPhase?: boolean | null;
     /** Salons vocaux d'équipe ; absents = option éteinte (le défaut). */
     teamVoiceChannels?: boolean | null;
+    /** Check-in des matchs ; absent = allumé (le défaut), seul `false` l'éteint. */
+    matchCheckIn?: boolean | null;
     /** Format Duel / Arcade : points par carte ; absent / `null` = format éteint. */
     mapPointTarget?: number | null;
   },
@@ -547,8 +550,9 @@ export async function createTournament(
         referee_scheduling,
         match_launch_phase,
         team_voice_channels,
+        match_check_in,
         map_point_target
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -596,6 +600,7 @@ export async function createTournament(
         Number(payload.refereeScheduling === true),
         Number(payload.launchPhase === true),
         Number(payload.teamVoiceChannels === true),
+        Number(payload.matchCheckIn !== false),
         payload.mapPointTarget ?? null,
       ],
     );
@@ -831,6 +836,7 @@ async function loadTournamentBuckets(
       t.match_launch_phase,
       t.map_point_target,
       t.team_voice_channels,
+      t.match_check_in,
       t.live_url,
       t.image_url,
       t.image_fit,
@@ -2285,6 +2291,9 @@ async function adminResolveMatchOnce(
     // être lu, l'id du tournoi ne se découvrant qu'en cours de transaction. Un
     // arbitrage reste rare, contrairement au report de score.
     invalidateTournamentLists();
+    // Une correction peut retirer à un compte anonymisé son seul match joué :
+    // sa fiche tombe aussitôt (`/rgpd`), sans attendre l’échéance de la liste.
+    if (dispute?.kind === "corrected") invalidateProfilelessPlayers();
     return dispute;
   } catch (error) {
     await rollbackKeepingError(connection);

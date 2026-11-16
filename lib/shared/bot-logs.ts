@@ -871,6 +871,39 @@ export function formatRefereeChangeLog(context: {
 }
 
 /**
+ * Choix de cartes d'un match qui suivent le premier d'une rafale
+ * (`lib/server/tournaments/referee-notices.ts`) : **une** ligne, qui compte
+ * les cartes choisies et retirées et dit qui a agi — l'arbitrage (« le
+ * staff »), une équipe du match (autogestion), ou les deux. Ni la carte, ni
+ * le créneau : la page du match les dit.
+ */
+export function formatMapPickBurstLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  picked: number;
+  cleared: number;
+  byStaff: boolean;
+  byTeam: boolean;
+}): string {
+  const counts: string[] = [];
+  if (context.picked > 0) counts.push(`${context.picked} carte${context.picked > 1 ? "s" : ""} choisie${context.picked > 1 ? "s" : ""}`);
+  if (context.cleared > 0) counts.push(`${context.cleared} choix retiré${context.cleared > 1 ? "s" : ""}`);
+  const actors = [
+    ...(context.byStaff ? [ANONYMOUS_STAFF_LABEL] : []),
+    ...(context.byTeam ? ["une équipe du match (autogestion)"] : []),
+  ].join(" et ");
+  return (
+    `${lead("🧑‍⚖️", "Choix de cartes dans le pool", context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), ensuite ${counts.join(", ")}, par ${actors}.`
+  );
+}
+
+/**
  * Autogestion activée ou désactivée sur toute une manche, d'un geste
  * (`count` : matchs changés). Le tournoi seul, sans équipe.
  */
@@ -1040,7 +1073,9 @@ export function formatStaffMatchActionLog(context: {
  *   image en place, qu'elle supprime) ;
  * - `LIVE_URL_SET` / `LIVE_URL_REMOVED` — lien de diffusion du tournoi ;
  * - `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` — option « Salons vocaux d'équipe »
- *   (`docs/features/MATCH_VOICE.md`).
+ *   (`docs/features/MATCH_VOICE.md`) ;
+ * - `MATCH_CHECK_IN_ON` / `MATCH_CHECK_IN_OFF` — option « Check-in des matchs »
+ *   (`docs/features/MATCH_CHECK_IN_SETTING.md`).
  */
 export type StaffTournamentAction =
   | "EDITED"
@@ -1054,7 +1089,9 @@ export type StaffTournamentAction =
   | "LIVE_URL_SET"
   | "LIVE_URL_REMOVED"
   | "TEAM_VOICE_ON"
-  | "TEAM_VOICE_OFF";
+  | "TEAM_VOICE_OFF"
+  | "MATCH_CHECK_IN_ON"
+  | "MATCH_CHECK_IN_OFF";
 
 const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   EDITED: "Tournoi modifié",
@@ -1069,6 +1106,8 @@ const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   LIVE_URL_REMOVED: "Lien de diffusion du tournoi retiré",
   TEAM_VOICE_ON: "Salons vocaux d'équipe activés",
   TEAM_VOICE_OFF: "Salons vocaux d'équipe désactivés",
+  MATCH_CHECK_IN_ON: "Check-in des matchs activé",
+  MATCH_CHECK_IN_OFF: "Check-in des matchs désactivé",
 };
 
 /** Étape franchie par « Avancer l'étape suivante » (`ADVANCED`), telle que la ligne la nomme. */

@@ -10,11 +10,13 @@ import {
   announceEntrantsWithdrawn,
   announceMatchScheduleCleared,
   dispatchDueMatchReminders,
+  readCheckInState,
   MATCH_DM_RETRY_DELAY_MS,
   pendingRefereeDigest,
   resetMatchReminderThrottle,
   type MatchNotice,
 } from "@/lib/server/tournaments/match-reminders";
+import { noteCheckInToggle } from "@/lib/server/tournaments/check-in-toggles";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers, usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { fakePool, type SqlMock, type SqlQuery } from "../../helpers/sql-double";
@@ -125,8 +127,24 @@ function executeDouble(options: {
   poster?: [number | null, number | null];
   /** État actuel de la manche (relu par la reprise des messages privés). */
   status?: string;
+  /** Option « Check-in des matchs » relue à l'envoi et à la reprise (absente : celle du passage). */
+  checkIn?: { flag: number; pausedAt?: Date | null };
+  /** La relecture de l'option échoue. */
+  checkInReadFails?: boolean;
+  /** Paliers réservés pour l'horaire actuel, relus par la reprise (`GROUP_CONCAT`). */
+  takenOffsets?: string | null;
+  /** Appelé à chaque relecture de l'option (une bascule validée pendant le passage, par exemple). */
+  onCheckInRead?: () => void;
 }) {
+  const checkInColumns = options.checkIn
+    ? { match_check_in: options.checkIn.flag, match_check_in_paused_at: options.checkIn.pausedAt ?? null }
+    : {};
   return jest.fn(async (sql: string, params?: unknown[]) => {
+    if (sql.startsWith("SELECT match_check_in, match_check_in_paused_at FROM bg_tournaments")) {
+      options.onCheckInRead?.();
+      if (options.checkInReadFails) throw new Error("base injoignable");
+      return [options.checkIn ? [checkInColumns] : []];
+    }
     if (sql.startsWith("SELECT m.start_at AS match_start_at")) {
       const told = options.told === undefined ? { told_id: null, start_at: null } : { told_id: 1, start_at: options.told };
       const [team1, team2] = options.poster ?? [101, 102];
@@ -137,6 +155,8 @@ function executeDouble(options: {
             match_team1_id: team1,
             match_team2_id: team2,
             status: options.status ?? "READY",
+            ...checkInColumns,
+            taken_offsets: options.takenOffsets ?? null,
             ...told,
           },
         ],
@@ -350,6 +370,8 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(writes).toEqual([]);
   });
 
+  let retryExecute: ReturnType<typeof executeDouble>;
+
   /** Les reprises de messages privés programmées pendant l'appel (minuteur capturé, pas lancé). */
   function captureDmRetries(): (() => void)[] {
     const retries: (() => void)[] = [];
@@ -417,8 +439,15 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
       return [recipients.filter((r) => ids.has(r.id)).map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))];
     });
     const { getDatabase } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble(options) }));
+    retryExecute = executeDouble(options);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: retryExecute }));
     return query;
+  }
+
+  /** Relecture de la manche par la reprise : le SQL qu'elle a joué. */
+  function retryStateSql(): string {
+    const call = retryExecute.mock.calls.find(([sql]) => sql.startsWith("SELECT m.start_at AS match_start_at"));
+    return call ? call[0] : "";
   }
 
   /** Les comptes ont-ils été relus (la reprise a atteint sa décision) ? */
@@ -464,6 +493,107 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     await runRetry(retry);
 
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  /** Comme `dispatchWithLostSide`, mais pour l'envoi de `at` (manche et marques de `options`). */
+  async function dispatchWithLostSideAt(at: Date, options: Parameters<typeof mockDb>[0]): Promise<() => void> {
+    await mockDb(options);
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async (message) =>
+      message.includes("**Team Nova** contre") ? null : { sent: 2, unresolved: [], failed: [] },
+    );
+    const retries = captureDmRetries();
+    await dispatchDueMatchReminders(at);
+    expect(retries).toHaveLength(1);
+    jest.mocked(pushDiscordDirectMessages).mockReset();
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    return retries[0];
+  }
+
+  it("dispatchDueMatchReminders_checkInTurnedOffBeforeTenHourRetry_retryStaysSilent", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    await matchAtRetry({ checkIn: { flag: 0 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInStillOnAtTenHourRetry_retrySendsInvite", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).toContain("https://discord.gg/Sgdh3p4VhC");
+  });
+
+  it("dispatchDueMatchReminders_checkInTurnedOffBeforeAnnouncementRetry_retryDropsCheckIn", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [] });
+    await matchAtRetry({ checkIn: { flag: 0 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const [message] = sentMessages();
+    expect(message).toContain("**Match programmé**");
+    expect(message).not.toContain("check-in");
+    expect(message).not.toContain("https://discord.gg/Sgdh3p4VhC");
+  });
+
+  it("dispatchDueMatchReminders_checkInTurnedOffBeforeEarlyAnnouncementRetry_retryPromisesNoTenHourReminder", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), { sent: [] });
+    await matchAtRetry({ checkIn: { flag: 0 } });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).not.toContain("Prochain rappel : 10 heures");
+  });
+
+  it("dispatchDueMatchReminders_announcementSentOffRetriedOn_promisesTenHourReminder", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), {
+      matches: [{ ...MATCH, match_check_in: 0, match_check_in_paused_at: null }],
+      sent: [],
+    });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    // Rallumée pendant l'attente : le rappel 10 h partira, la reprise le promet.
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).toContain("Prochain rappel : 10 heures");
+  });
+
+  it("dispatchDueMatchReminders_tenHourMarkTakenBeforeAnnouncementRetry_retryPromisesNoTenHourReminder", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), { sent: [] });
+    // Entre-temps, le palier 10 h a été réservé (tu par une remise en marche, ou déjà parti).
+    await matchAtRetry({ checkIn: { flag: 1 }, takenOffsets: "SEEN,P1D,PT10H" });
+
+    await runRetry(retry);
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(sentMessages()[0]).not.toContain("Prochain rappel : 10 heures");
+  });
+
+  it("dispatchDueMatchReminders_announcementRetry_readsTakenOffsets", async () => {
+    const retry = await dispatchWithLostSideAt(new Date("2026-09-09T22:00:00Z"), { sent: [] });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    expect(retryStateSql()).toContain("GROUP_CONCAT");
+  });
+
+  it("dispatchDueMatchReminders_reminderRetry_skipsTakenOffsetsSubquery", async () => {
+    const retry = await dispatchWithLostSideAt(FIVE_HOURS_BEFORE, { sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+    await matchAtRetry({ checkIn: { flag: 1 } });
+
+    await runRetry(retry);
+
+    // Seule une annonce promet des paliers : un rappel ne relit pas ceux déjà réservés.
+    expect(retryStateSql()).not.toContain("GROUP_CONCAT");
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
   });
 
@@ -1279,6 +1409,23 @@ describe("announceMatchScheduleCleared — horaire retiré par l'arbitrage", () 
   });
 });
 
+describe("announceMatchScheduleCleared — option « Check-in des matchs » sans effet", () => {
+  it("announceMatchScheduleCleared_checkInRereadWouldFail_noticeStillSent", async () => {
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
+    const execute = executeDouble({ told: START, current: null, checkInReadFails: true });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
+
+    expect(await announceMatchScheduleCleared(notice({ start_at: null }), "2026-09-10T18:00:00.000Z")).toBe(2);
+
+    // Un avis de retrait ne parle pas du check-in : l'option n'est pas relue.
+    expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("SELECT match_check_in"))).toBe(false);
+  });
+});
+
 describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () => {
   // Après la correction : Les Renards (101) sont sortis ; Orion (109) a pris leur place.
   const CURRENT = {
@@ -1734,5 +1881,316 @@ describe("messages privés de match coupés par le joueur (droit d'opposition)",
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
     expect(calls.every((call) => (call[1] as { label: string }[]).every((r) => r.label === "Nova"))).toBe(true);
     expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toContainEqual([1, 2]);
+  });
+});
+
+describe("option « Check-in des matchs » éteinte ou rallumée (MATCH_CHECK_IN_SETTING.md)", () => {
+  const INVITE = "https://discord.gg/Sgdh3p4VhC";
+  const NO_CHECK_IN = { ...MATCH, match_check_in: 0, match_check_in_paused_at: null };
+  /** Le palier 10 h s'ouvre à 08:00 UTC pour un coup d'envoi à 18:00. */
+  const pausedAt = (iso: string) => ({ ...MATCH, match_check_in: 0, match_check_in_paused_at: new Date(iso) });
+  const CHECK_IN_ON = { ...MATCH, match_check_in: 1, match_check_in_paused_at: new Date("2026-09-10T07:00:00Z") };
+
+  it("dispatchDueMatchReminders_checkInOff_consumesTenHourMarkSilently", async () => {
+    const { execute } = await mockDb({ matches: [NO_CHECK_IN], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInOff_keepsTwentyFourHourReminder", async () => {
+    await mockDb({ matches: [NO_CHECK_IN] });
+
+    expect(await dispatchDueMatchReminders(TWELVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("dans moins de 24 heures");
+      expect(message).not.toContain("check-in");
+    }
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDueBeforePause_holdsWithoutClaim", async () => {
+    // Palier ouvert à 08:00, arrêt à 09:00 : dû avant l'arrêt, il attend la remise en marche.
+    const { execute } = await mockDb({
+      matches: [pausedAt("2026-09-10T09:00:00Z")],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual([]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDueAfterPause_claimsSilently", async () => {
+    const { execute } = await mockDb({
+      matches: [pausedAt("2026-09-10T07:00:00Z")],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }],
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInOnAfterPause_sendsReminder", async () => {
+    // Manche sans marque posée par la remise en marche : le rappel 10 h part.
+    await mockDb({ matches: [CHECK_IN_ON], sent: [...SEEN, { match_id: 31, offset_key: "P1D" }] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) expect(message).toContain(INVITE);
+  });
+
+  it("dispatchDueMatchReminders_tenHourMarkPreClaimedAtResume_staysSilent", async () => {
+    // La remise en marche a réservé le palier dû pendant l'arrêt : la manche n'est plus lue.
+    await mockDb({
+      matches: [CHECK_IN_ON],
+      sent: [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 31, offset_key: "PT10H" }],
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  /** Le balayage lit l'option allumée ; `checkIn` : sa valeur relue juste avant l'envoi. */
+  async function mockDbWithFreshCheckIn(
+    sent: { match_id: number; offset_key: string }[],
+    checkIn: Parameters<typeof executeDouble>[0]["checkIn"],
+    extra: Parameters<typeof executeDouble>[0] = {},
+  ) {
+    const db = await mockDb({ sent });
+    const execute = executeDouble({ checkIn, ...extra });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: db.query, execute }));
+    return { query: db.query, execute };
+  }
+
+  it("dispatchDueMatchReminders_checkInTurnedOffAfterSweepRead_tenHourReminderSilent", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([...SEEN, { match_id: 31, offset_key: "P1D" }], { flag: 0 });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    // Palier gardé réservé : rallumer l'option ne le fait pas partir après coup.
+    expect(claimedKeys(execute)).toEqual(["PT10H"]);
+    expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_turnedOffAfterReadDueBeforePause_releasesClaim", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([...SEEN, { match_id: 31, offset_key: "P1D" }], {
+      flag: 0,
+      pausedAt: new Date("2026-09-10T09:00:00Z"),
+    });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(0);
+
+    // Dû avant l'arrêt : la marque est rendue, le rappel partira à la remise en marche.
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE"))
+      .map(([, params]) => params[1]);
+    expect(releases).toEqual(["PT10H"]);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueMatchReminders_checkInTurnedOffAfterSweepRead_announcementDropsCheckIn", async () => {
+    await mockDbWithFreshCheckIn([], { flag: 0 });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain(INVITE);
+    }
+  });
+
+  it("dispatchDueMatchReminders_checkInRereadFails_releasesClaimsAndSendsNothing", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([...SEEN, { match_id: 31, offset_key: "P1D" }], undefined, {
+      checkInReadFails: true,
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await dispatchDueMatchReminders(FIVE_HOURS_BEFORE);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE"))
+      .map(([, params]) => params[1]);
+    expect(releases).toEqual(["PT10H"]);
+    error.mockRestore();
+  });
+
+  it("dispatchDueMatchReminders_sameTournamentTwoTenHourReminders_sharesOneCheckInReadPerBatch", async () => {
+    const second = { ...MATCH, id: 32 };
+    const sent = [...SEEN, { match_id: 31, offset_key: "P1D" }, { match_id: 32, offset_key: "SEEN" }, { match_id: 32, offset_key: "P1D" }];
+    const db = await mockDb({ matches: [MATCH, second], sent });
+    const execute = executeDouble({ checkIn: { flag: 1 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: db.query, execute }));
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(4);
+
+    // Les envois lancés ensemble partagent la lecture en vol : une par tournoi et par lot, pas par envoi.
+    const rereads = (execute.mock.calls as unknown as [string][]).filter(([sql]) => sql.startsWith("SELECT match_check_in"));
+    expect(rereads).toHaveLength(1);
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDiscoveredLate_announcesWithoutCheckIn", async () => {
+    const { execute } = await mockDb({ matches: [NO_CHECK_IN], sent: [] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain("check-in");
+      expect(message).not.toContain(INVITE);
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain(INVITE);
+  });
+
+  it("dispatchDueMatchReminders_firstObservationOffDueBeforePause_holdsTenHourReminder", async () => {
+    // Palier ouvert à 08:00, arrêt à 09:00, manche découverte à 13:00 : l'annonce part
+    // sans le check-in, le rappel 10 h n'est pas réservé — il partira à la remise en marche.
+    const { execute } = await mockDb({ matches: [pausedAt("2026-09-10T09:00:00Z")], sent: [] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "TOLD"]);
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain(INVITE);
+      expect(message).not.toContain("Prochain rappel : 10 heures");
+    }
+  });
+
+  it("dispatchDueMatchReminders_firstObservationOffDueDuringPause_claimsTenHourSilently", async () => {
+    const { execute } = await mockDb({ matches: [pausedAt("2026-09-10T07:00:00Z")], sent: [] });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect(claimedKeys(execute)).toEqual(["SEEN", "P1D", "PT10H", "TOLD"]);
+  });
+
+  it("dispatchDueMatchReminders_announcementTurnedOffBeforeSendDueBeforePause_releasesTenHourClaim", async () => {
+    // Préparée allumée (palier 10 h consommé par l'annonce), relue éteinte avec un arrêt
+    // après l'ouverture du palier : la marque 10 h est rendue, l'annonce part sans check-in.
+    const { execute } = await mockDbWithFreshCheckIn([], { flag: 0, pausedAt: new Date("2026-09-10T09:00:00Z") });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    const releases = (execute.mock.calls as unknown as [string, unknown[]][])
+      .filter(([sql]) => sql.startsWith("DELETE"))
+      .map(([, params]) => params[1]);
+    expect(releases).toEqual(["PT10H"]);
+    for (const message of sentMessages()) {
+      expect(message).not.toContain(INVITE);
+      expect(message).not.toContain("Prochain rappel : 10 heures");
+    }
+  });
+
+  it("dispatchDueMatchReminders_announcementTurnedOffBeforeSendDueDuringPause_keepsTenHourClaim", async () => {
+    const { execute } = await mockDbWithFreshCheckIn([], { flag: 0, pausedAt: new Date("2026-09-10T07:00:00Z") });
+
+    expect(await dispatchDueMatchReminders(FIVE_HOURS_BEFORE)).toBe(2);
+
+    expect((execute.mock.calls as unknown as [string][]).some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
+  });
+
+  it("dispatchDueMatchReminders_checkInOffDiscoveredAtTwentyHours_promisesNoTenHourReminder", async () => {
+    await mockDb({ matches: [NO_CHECK_IN], sent: [] });
+
+    await dispatchDueMatchReminders(new Date("2026-09-09T22:00:00Z"));
+
+    expect(sentMessages()).toHaveLength(2);
+    for (const message of sentMessages()) expect(message).not.toContain("Prochain rappel : 10 heures");
+  });
+
+  it("announceMatchSchedule_checkInOff_dropsCheckInLine", async () => {
+    const query = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+      .mockResolvedValueOnce([RECIPIENTS.map((r) => ({ ...r, discord_verified_at: certifiedAt(r) }))]);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute: executeDouble({}) }));
+
+    expect(
+      await announceMatchSchedule(notice({ match_check_in: 0 }), { rescheduled: false }, new Date("2026-09-10T17:50:00Z")),
+    ).toBe(2);
+
+    for (const message of sentMessages()) {
+      expect(message).toContain("**Match programmé**");
+      expect(message).not.toContain("check-in");
+    }
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2]).body).not.toContain("Check-in");
+    expect(resolvePush(jest.mocked(pushToUsers).mock.calls[0][2], "en").body).not.toContain("Check-in");
+  });
+});
+
+describe("readCheckInState (relecture de l'option avant l'envoi)", () => {
+  it("readCheckInState_twoReads_queriesEachTime", async () => {
+    const execute = executeDouble({ checkIn: { flag: 1 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    await readCheckInState(7);
+    await expect(readCheckInState(7)).resolves.toEqual({ match_check_in: 1, match_check_in_paused_at: null });
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_concurrentReadsOfOneTournament_shareOneQuery", async () => {
+    const execute = executeDouble({ checkIn: { flag: 0 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    const [first, second, other] = await Promise.all([readCheckInState(7), readCheckInState(7), readCheckInState(8)]);
+
+    expect(first).toBe(second);
+    expect(other).toEqual({ match_check_in: 0, match_check_in_paused_at: null });
+    // Un tournoi n'emprunte pas la lecture d'un autre.
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_toggleNotedDuringRead_nextSendRereads", async () => {
+    const execute = executeDouble({ checkIn: { flag: 1 } });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    const before = readCheckInState(7);
+    noteCheckInToggle();
+    const after = readCheckInState(7);
+    await Promise.all([before, after]);
+
+    // Un envoi lancé après la bascule ne reprend pas la lecture partie avant elle.
+    expect(after).not.toBe(before);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_failedRead_isNotKeptForTheNextRead", async () => {
+    const execute = jest.fn(async () => {
+      throw new Error("base injoignable");
+    });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    await expect(readCheckInState(7)).rejects.toThrow("base injoignable");
+    await expect(readCheckInState(7)).rejects.toThrow("base injoignable");
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("readCheckInState_unknownTournament_returnsUndefined", async () => {
+    const execute = executeDouble({});
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: jest.fn<SqlQuery>(), execute }));
+
+    await expect(readCheckInState(7)).resolves.toBeUndefined();
   });
 });

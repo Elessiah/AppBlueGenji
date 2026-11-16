@@ -5,7 +5,8 @@
  * (`snapshot.ts`), la diffusion (`live-streams.ts`) et l'effacement de compte.
  *
  * Un match a zéro, un ou plusieurs streams (`bg_match_streams`), chacun avec
- * son lien facultatif ; chaque caster (`bg_match_casters`) est rattaché à un
+ * son lien (obligatoire pour le stream qu'ouvre un caster, facultatif pour
+ * celui de la configuration du direct) ; chaque caster (`bg_match_casters`) est rattaché à un
  * stream de son match. Le **premier lien** — celui du staff, à défaut le
  * stream au plus petit identifiant qui en a un — est celui que montrent les vues compactes (carte,
  * bandeaux, accueil) et que lisent les annonces #live : une seule définition,

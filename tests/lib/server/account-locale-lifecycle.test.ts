@@ -80,12 +80,12 @@ describe("langue du compte — anonymisation", () => {
 });
 
 describe("messages privés de match — anonymisation", () => {
-  it("remet le choix au défaut par une instruction à part, sur la ligne supprimée", async () => {
+  it("remet le choix au défaut avec les autres réglages facultatifs (une instruction), sur la ligne supprimée", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => String(sql).includes("match_dm_enabled"));
-    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1 WHERE id = ? AND is_deleted = 1", [42]]);
+    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1", [42]]);
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
@@ -109,12 +109,12 @@ describe("messages privés de match — anonymisation", () => {
 });
 
 describe("« Ne plus afficher » du recrutement — anonymisation", () => {
-  it("remet le choix au défaut par une instruction à part, sur la ligne supprimée", async () => {
+  it("remet le choix au défaut avec les autres réglages facultatifs (une instruction), sur la ligne supprimée", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => String(sql).includes("recruitment_modal_off"));
-    expect(reset).toEqual(["UPDATE bg_users SET recruitment_modal_off = 0 WHERE id = ? AND is_deleted = 1", [42]]);
+    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1", [42]]);
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
@@ -143,13 +143,13 @@ describe("langue du compte — défaut de la colonne", () => {
 describe("« Ne plus voir » de la certification Discord — anonymisation", () => {
   const isReset = (sql: unknown) => String(sql).includes("discord_certify_prompt_dismissed_at");
 
-  it("efface le choix par une instruction à part, sur la ligne supprimée", async () => {
+  it("efface le choix avec les autres réglages facultatifs (une instruction), sur la ligne supprimée", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => isReset(sql));
     expect(reset && [String(reset[0]).replace(/\s+/g, " ").trim(), reset[1]]).toEqual([
-      "UPDATE bg_users SET discord_certify_prompt_dismissed_at = NULL WHERE id = ? AND is_deleted = 1",
+      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1",
       [42],
     ]);
   });
@@ -175,15 +175,15 @@ describe("« Ne plus voir » de la certification Discord — anonymisation", () 
 });
 
 describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi — anonymisation (EF-04)", () => {
-  const isReset = (sql: unknown) => String(sql).includes("certification_prompt_dismissed_at") && !String(sql).includes("discord_certify");
+  const isReset = (sql: unknown) => /(^|[ ,])certification_prompt_dismissed_at = NULL/.test(String(sql));
 
-  it("efface le choix par une instruction à part, sur la ligne supprimée", async () => {
+  it("efface le choix avec les autres réglages facultatifs (une instruction), sur la ligne supprimée", async () => {
     jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => isReset(sql));
     expect(reset && [String(reset[0]).replace(/\s+/g, " ").trim(), reset[1]]).toEqual([
-      "UPDATE bg_users SET certification_prompt_dismissed_at = NULL WHERE id = ? AND is_deleted = 1",
+      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1",
       [42],
     ]);
   });

@@ -24,6 +24,7 @@ function sameDeps(a: Deps, b: Deps): boolean {
 }
 
 jest.mock("react", () => ({
+  useCallback: <T>(callback: T) => callback,
   useState: (initial: unknown) => {
     const slot = bench.index.state++;
     if (!(slot in bench.states)) bench.states[slot] = initial;
@@ -281,6 +282,33 @@ describe("useProposalMaps", () => {
  * ne levaient pas l'attente, et les dialogues gardaient leurs boutons figés sur
  * « détail en attente » jusqu'au prochain report.
  */
+// Revue standard EF-61 cycle 2 : flux ouvert, un refus « état périmé » ne
+// relit plus le tournoi — `reload` rouvre la lecture du seul détail manquant.
+describe("useProposalMaps — reload", () => {
+  it("useProposalMaps_reloadAfterAttemptsExhausted_readsDetailAgain", async () => {
+    fetchMock.mockResolvedValue(failure(500));
+    render(match, NO_PROPOSALS);
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+    fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+
+    render(match, NO_PROPOSALS).reload();
+    const result = render(match, NO_PROPOSALS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(PROPOSAL_REFRESH_ATTEMPTS + 1);
+    expect(fetchMock.mock.calls[PROPOSAL_REFRESH_ATTEMPTS][0]).toBe("/api/tournaments/5/matches/70/proposals");
+    expect(result.detailPending).toBe(true);
+  });
+
+  it("useProposalMaps_reloadWithDetailPresent_neverFetches", () => {
+    const withDetail: MatchProposalMaps[] = [{ matchId: 70, team1: { reportedAt: at, maps: [map] }, team2: null }];
+
+    render(match, withDetail).reload();
+    render(match, withDetail);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("useProposalMaps — detailPending", () => {
   it("useProposalMaps_readInFlight_detailPending", () => {
     fetchMock.mockReturnValue(new Promise<Response>(() => undefined));

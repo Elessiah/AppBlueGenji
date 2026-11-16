@@ -70,7 +70,8 @@ export function createCoalescer<T>(options: {
    */
   deliverQueues?: boolean;
 }): Coalescer<T> {
-  type Burst = { first: T; last: T; startedAt: number; timer: Timer };
+  /** `lastAt` : dernier geste ; le minuteur armé une fois se réarme à l'échéance s'il en reste. */
+  type Burst = { first: T; last: T; startedAt: number; lastAt: number; timer: Timer };
   const bursts = new Map<string, Burst>();
   /** Annonces parties, pas encore finies : un `flush` les attend, sinon il les dépasserait. */
   const inFlight = new Map<string, Promise<void>>();
@@ -113,6 +114,17 @@ export function createCoalescer<T>(options: {
   };
 
   const fire = async (key: string): Promise<void> => {
+    const open = bursts.get(key);
+    if (!open) return;
+    // Un geste arrivé depuis l'armement repousse l'échéance (fenêtre de
+    // silence, bornée par l'âge maximal) : le minuteur se réarme pour le reste
+    // au lieu d'être recréé à chaque geste.
+    const dueAt = Math.min(open.lastAt + options.windowMs, open.startedAt + options.maxAgeMs);
+    const left = dueAt - Date.now();
+    if (left > 0) {
+      open.timer = arm(key, left);
+      return;
+    }
     const burst = take(key);
     if (burst) await start(key, burst);
   };
@@ -138,13 +150,17 @@ export function createCoalescer<T>(options: {
       const now = Date.now();
       const burst = bursts.get(key);
       if (!burst) {
-        bursts.set(key, { first: value, last: value, startedAt: now, timer: arm(key, options.windowMs) });
+        bursts.set(key, {
+          first: value,
+          last: value,
+          startedAt: now,
+          lastAt: now,
+          timer: arm(key, Math.min(options.windowMs, options.maxAgeMs)),
+        });
         return;
       }
-      clearTimeout(burst.timer);
       burst.last = value;
-      const left = burst.startedAt + options.maxAgeMs - now;
-      burst.timer = arm(key, Math.min(options.windowMs, left));
+      burst.lastAt = now;
     },
     pending: () => bursts.size,
     busy: (key) => bursts.has(key) || inFlight.has(key),

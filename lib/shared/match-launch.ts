@@ -574,6 +574,14 @@ export type LaunchReferee = {
    * Distingue « pas encore » de « aucun contact » pour la note de la fiche.
    */
   contactsShown: boolean;
+  /**
+   * Le départ ouvrira-t-il à ce lecteur au moins un contact de l'arbitre
+   * (tag Discord certifié, BattleTag en Overwatch) qu'il ne lit pas encore ?
+   * Posé par le serveur, qui seul connaît ces contacts : un lecteur caster face
+   * à un arbitre sans aucun contact (sans tag certifié en Marvel Rivals) n'a rien
+   * à relire au départ. Absent : non.
+   */
+  contactsPending?: boolean;
   /** Cette fiche est-elle celle du lecteur ? */
   isViewer: boolean;
 };
@@ -745,15 +753,12 @@ export function casterContactsPending(launch: {
  * Les contacts de l'arbitre désigné attendent-ils le départ pour ce lecteur ?
  * Un lecteur caster (rôle `CASTER`, staff compris) ne les lit que le temps du
  * match (`refereeContactsOpen`, serveur) : avant, la lecture doit se refaire
- * au départ, même si aucune fiche de caster n'attend (`casterRereadDelay`).
+ * au départ, même si aucune fiche de caster n'attend (`casterRereadDelay`) —
+ * seulement si le départ lui ouvrira quelque chose : le serveur le dit
+ * (`LaunchReferee.contactsPending`), le client ne recopie pas sa règle.
  */
-export function refereeContactsPending(launch: Pick<MatchLaunchInfo, "referee" | "viewer" | "phase">): boolean {
-  return (
-    launch.viewer.role === "CASTER" &&
-    launch.referee !== null &&
-    !launch.referee.isViewer &&
-    !matchUnderway(launch.phase)
-  );
+export function refereeContactsPending(launch: Pick<MatchLaunchInfo, "referee" | "phase">): boolean {
+  return launch.referee?.contactsPending === true && !matchUnderway(launch.phase);
 }
 
 /** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag, absent hors Overwatch) ? */

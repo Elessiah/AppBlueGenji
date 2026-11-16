@@ -116,7 +116,15 @@ de ce que le lecteur a fait :
 - **une saisie en cours** → elle est conservée, et un bandeau signale le
   désaccord (« Ce match a été modifié pendant ta saisie ») avec un bouton
   « Reprendre la valeur à jour ». On ne détruit pas le travail de l'un, on ne
-  laisse pas écraser celui de l'autre sans le dire.
+  laisse pas écraser celui de l'autre sans le dire ;
+- **format de la manche ou jeu changé** sous une saisie en cours → elle est
+  gardée, le bandeau le dit (« Le format de la manche a changé… »,
+  `score.admin.rulesChanged`, FR/EN) et le même bouton reconstruit les lignes
+  au nouveau format (`scoreFormSyncOutcome`, `rulesConflict`) — sans cela
+  l'envoi était refusé (`MAP_*`) sans explication. L'avis se tait quand le
+  format revient à celui de la saisie ou que les lignes passent la règle
+  courante (`rulesConflictShown`) ; il ferme la confirmation de correction, et
+  s'affiche avec l'avis de résultat changé quand les deux se cumulent.
 
 Le changement d'identifiant reste couvert par la même comparaison : ouvrir le
 dialogue sur un second match repart de son propre score, jamais de celui du

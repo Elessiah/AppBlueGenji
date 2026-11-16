@@ -7,7 +7,7 @@ import { pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { loadTakenAnonymousPseudos } from "./account-deletion-hold";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import type { SoloRegistrationFact } from "@/lib/shared/account-deletion";
-import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
+import { withdrawRegistrationOn } from "@/lib/server/tournaments/registration-removal";
 
 /**
  * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
@@ -20,8 +20,10 @@ import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
  *
  * Les inscriptions solo jamais jouées à un tournoi pas encore commencé
  * (`soloWithdrawals`, décision D12) sont retirées d'abord, comme le retrait
- * d'un engagé par le staff (`registration-removal.ts`) : ligne effacée, rangs
- * refermés. L'appelant tient déjà la ligne de chacun de ces tournois.
+ * d'un engagé par le staff, par le même geste (`withdrawRegistrationOn`) :
+ * ligne effacée, rangs refermés. L'appelant tient déjà la ligne de chacun de
+ * ces tournois, les a remis à l'heure (`syncTournamentState`) et envoie ou
+ * jette leurs lignes de journal selon l'issue de la transaction.
  *
  * Les lignes de quarantaine du compte partent par cascade : les blocages
  * d'empreinte qu'elles justifiaient deviennent d'abord non levables (revue
@@ -38,11 +40,7 @@ export async function eraseAccount(
   soloWithdrawals: readonly SoloRegistrationFact[] = [],
 ): Promise<MatchWithdrawal> {
   for (const registration of soloWithdrawals) {
-    await connection.execute(
-      `DELETE FROM bg_tournament_registrations WHERE tournament_id = ? AND team_id = ?`,
-      [registration.tournamentId, registration.teamId],
-    );
-    await resequenceSeeds(connection, registration.tournamentId);
+    await withdrawRegistrationOn(connection, registration.tournamentId, registration.teamId);
   }
   // Une entrée solo sans inscription (jamais inscrite, ou ses inscriptions
   // retirées ci-dessus) ni match part avec le compte : elle n'a pas
@@ -74,8 +72,8 @@ export async function eraseAccount(
 const ANONYMOUS_PSEUDO_ATTEMPTS = 5;
 
 /**
- * Réglages du compte remis au défaut à l'anonymisation, chacun par une
- * instruction à part (colonne tolérée, `resetOptionalColumn`).
+ * Réglages du compte remis au défaut à l'anonymisation, en une instruction
+ * (`resetOptionalColumns`), colonne par colonne si l'une manque.
  */
 const ANONYMIZED_OPTIONAL_COLUMNS = [
   "match_dm_enabled = 1",
@@ -84,6 +82,22 @@ const ANONYMIZED_OPTIONAL_COLUMNS = [
   "certification_prompt_dismissed_at = NULL",
   "referee_objection_at = NULL",
 ] as const;
+
+/**
+ * Remet ces réglages au défaut en **une** instruction ; si l'une des colonnes
+ * manque (migration en échec), colonne par colonne, chacune tolérée.
+ */
+async function resetOptionalColumns(connection: PoolConnection, userId: number): Promise<void> {
+  try {
+    await connection.execute(
+      `UPDATE bg_users SET ${ANONYMIZED_OPTIONAL_COLUMNS.join(", ")} WHERE id = ? AND is_deleted = 1`,
+      [userId],
+    );
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    for (const assignment of ANONYMIZED_OPTIONAL_COLUMNS) await resetOptionalColumn(connection, assignment, userId);
+  }
+}
 
 /** Remet une colonne du compte supprimé au défaut ; colonne absente = rien à effacer. */
 async function resetOptionalColumn(
@@ -201,9 +215,7 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // de certification du tag Discord et celui de l'invitation à certifier de la
   // fiche tournoi sont effacés. À part, et colonnes tolérées : une migration en
   // échec (`reportSchemaFailure`) ne doit pas empêcher l'effacement d'un compte.
-  for (const assignment of ANONYMIZED_OPTIONAL_COLUMNS) {
-    await resetOptionalColumn(connection, assignment, userId);
-  }
+  await resetOptionalColumns(connection, userId);
   // Les consentements aux changements de traitement et la trace des messages
   // privés envoyés : ils ne concernent plus personne, et le compte ne sera plus
   // jamais sollicité (`is_deleted = 0` borne les deux lectures).

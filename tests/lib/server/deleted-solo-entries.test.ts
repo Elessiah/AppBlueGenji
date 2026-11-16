@@ -5,6 +5,7 @@ jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/seeding");
+jest.mock("@/lib/server/tournaments/state", () => ({ syncTournamentState: jest.fn() }));
 jest.mock("@/lib/server/named-lock", () => ({
   ...jest.requireActual<typeof import("@/lib/server/named-lock")>("@/lib/server/named-lock"),
   withNamedLock: jest.fn(),
@@ -19,13 +20,17 @@ import { sendBotLog } from "@/lib/server/bot-integration";
 import { forfeitDeletedEntryMatch, forfeitTournamentTeam } from "@/lib/server/tournaments-service";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import type { PoolConnection } from "mysql2/promise";
+import { syncTournamentState } from "@/lib/server/tournaments/state";
 import {
   forfeitSoloEntriesAfterCommit,
   forfeitUnplayedSoloEntry,
+  resetSettleIdleForTests,
   SETTLE_BATCH_SIZE,
+  SETTLE_IDLE_MS,
   settleDeletedSoloEntries,
   soloEntryNeverPlayedSql,
   soloForfeitLockName,
+  syncOpenSoloTournamentsOn,
 } from "@/lib/server/users/deleted-solo-entries";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -49,7 +54,7 @@ type Options = {
 function fakeDb(options: Options) {
   const open = [...(options.openMatches ?? [])];
   const deletedReads = [...(options.deletedReads ?? [])];
-  const execute = jest.fn(async (sql: string) => {
+  const execute = jest.fn(async (sql: string, _params?: unknown) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     if (q.startsWith("SELECT u.is_deleted FROM bg_teams s")) return [[{ is_deleted: deletedReads.shift() ?? 1 }]];
     if (q.startsWith("SELECT t.format, p.format AS phase_format")) {
@@ -81,6 +86,7 @@ function lockFree() {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(sendBotLog).mockReturnValue(undefined);
+  resetSettleIdleForTests();
   lockFree();
 });
 
@@ -351,7 +357,9 @@ describe("settleDeletedSoloEntries — relevé des candidats", () => {
     expect(sql).toContain("t.state IN ('UPCOMING', 'REGISTRATION')");
     expect(sql).toContain("t.state = 'RUNNING' AND NOT EXISTS");
     expect(sql).toContain("om.status IN ('PENDING', 'READY')");
-    expect(sql).toContain(`LIMIT ${SETTLE_BATCH_SIZE}`);
+    // Lecture à texte fixe (aucun `NOT IN` de mille paramètres) : le lot se tranche ensuite.
+    expect(sql).toContain(`LIMIT ${SETTLE_BATCH_SIZE + 1000}`);
+    expect(sql).not.toContain("NOT IN (?");
     expect(SETTLE_BATCH_SIZE).toBe(200);
   });
 });
@@ -406,5 +414,129 @@ describe("forfeitSoloEntriesAfterCommit — un appel à la fois", () => {
     await expect(failed).resolves.toBe(0);
     await expect(next).resolves.toBe(1);
     log.mockRestore();
+  });
+});
+
+/** EF-62 : forfait sans match ouvert, tournois synchronisés, comptes mis de côté. */
+describe("settleDeletedSoloEntries — EF-62", () => {
+  const candidateCall = (execute: ReturnType<typeof fakeDb>, index: number) =>
+    execute.mock.calls.filter(([q]) => String(q).includes("SELECT DISTINCT u.id"))[index];
+  /** Combien de fois le compte a été repris par un passage (relevé de ses inscriptions ouvertes). */
+  const reads = (execute: ReturnType<typeof fakeDb>, userId: number) =>
+    execute.mock.calls.filter(
+      ([q, params]) =>
+        String(q).includes("t.state IN ('UPCOMING', 'REGISTRATION')") &&
+        String(q).includes("SELECT DISTINCT r.tournament_id") &&
+        JSON.stringify(params) === JSON.stringify([userId]),
+    ).length;
+
+  it("settleDeletedSoloEntries_candidateQuery_forfeitableNeedsBothSeatsOrActiveStanding", async () => {
+    const execute = fakeDb({ candidates: [] });
+
+    await settleDeletedSoloEntries();
+
+    const sql = String(candidateCall(execute, 0)[0]).replace(/\s+/g, " ");
+    expect(sql).toContain("om.team1_id IS NOT NULL AND om.team2_id IS NOT NULL");
+    expect(sql).toContain("ss.phase_id = (CASE WHEN t.format = 'MULTI' THEN t.current_phase_id ELSE 0 END) AND ss.status = 'ACTIVE'");
+    expect(sql).toContain("sv.status = 'ACTIVE'");
+    expect(sql).toContain("t.format = 'BG_SURVIE' AND t.endurance_playoffs_started = 0");
+  });
+
+  it("settleDeletedSoloEntries_passWithoutEffect_accountSetAsideNextPass", async () => {
+    const execute = fakeDb({ candidates: [7], forfeitable: [] });
+
+    await settleDeletedSoloEntries();
+    await settleDeletedSoloEntries();
+
+    // Le même texte à chaque passage, sans paramètre : le compte est écarté du lot, pas de la requête.
+    expect(String(candidateCall(execute, 1)[0])).toBe(String(candidateCall(execute, 0)[0]));
+    expect(candidateCall(execute, 1)[1]).toBeUndefined();
+    expect(reads(execute, 7)).toBe(1);
+  });
+
+  it("settleDeletedSoloEntries_effectivePass_accountNotSetAside", async () => {
+    const execute = fakeDb({ candidates: [7], forfeitable: [{ tournament_id: 4, team_id: 40 }], format: "SWISS" });
+
+    await settleDeletedSoloEntries();
+    await settleDeletedSoloEntries();
+
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_afterIdleWindow_accountReconsidered", async () => {
+    const execute = fakeDb({ candidates: [7], forfeitable: [] });
+    const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
+    try {
+      await settleDeletedSoloEntries();
+      now.mockReturnValue(5_000_000 + SETTLE_IDLE_MS + 1);
+      await settleDeletedSoloEntries();
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_firstIdle_shorterThanAnHourlyPass", async () => {
+    // Un forfait qui prend prise quelques minutes plus tard (appariement tiré) n'attend pas six heures.
+    expect(SETTLE_IDLE_MS).toBeLessThan(60 * 60 * 1000);
+    const execute = fakeDb({ candidates: [7], forfeitable: [] });
+    const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
+    try {
+      await settleDeletedSoloEntries();
+      now.mockReturnValue(5_000_000 + 60 * 60 * 1000);
+      await settleDeletedSoloEntries();
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_repeatedIdle_waitDoublesUpToCap", async () => {
+    const execute = fakeDb({ candidates: [7], forfeitable: [] });
+    const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
+    try {
+      await settleDeletedSoloEntries(); // échec 1 : écart SETTLE_IDLE_MS
+      now.mockReturnValue(5_000_000 + SETTLE_IDLE_MS + 1);
+      await settleDeletedSoloEntries(); // échec 2 : écart doublé
+      now.mockReturnValue(5_000_000 + SETTLE_IDLE_MS + 1 + SETTLE_IDLE_MS + 1);
+      await settleDeletedSoloEntries(); // encore à l'écart (2 x SETTLE_IDLE_MS)
+    } finally {
+      now.mockRestore();
+    }
+
+    expect(reads(execute, 7)).toBe(2);
+  });
+
+  it("settleDeletedSoloEntries_idleAccountsAmongCandidates_batchStillFull", async () => {
+    // Les comptes à l'écart sont écartés après lecture : le lot reste plein de comptes à traiter.
+    const ids = Array.from({ length: SETTLE_BATCH_SIZE + 5 }, (_, index) => index + 1);
+    const execute = fakeDb({ candidates: ids, forfeitable: [] });
+
+    await settleDeletedSoloEntries();
+    const firstPass = ids.filter((id) => reads(execute, id) > 0);
+    await settleDeletedSoloEntries();
+    const secondPass = ids.filter((id) => reads(execute, id) > 1);
+
+    expect(firstPass).toHaveLength(SETTLE_BATCH_SIZE);
+    // Seuls les cinq comptes laissés de côté par le premier lot passent au second.
+    expect(ids.filter((id) => reads(execute, id) === 1)).toHaveLength(SETTLE_BATCH_SIZE + 5);
+    expect(secondPass).toHaveLength(0);
+  });
+});
+
+describe("syncOpenSoloTournamentsOn", () => {
+  it("syncOpenSoloTournamentsOn_someStart_returnsStartedIdsAfterSyncingEach", async () => {
+    jest.mocked(syncTournamentState).mockImplementation(async (_c, id) => ({
+      row: null,
+      stateChanged: id === 4,
+      contentChanged: false,
+      launchesChanged: false,
+    }));
+    const connection = {} as PoolConnection;
+
+    expect(await syncOpenSoloTournamentsOn(connection, [3, 4])).toEqual([4]);
+    expect(jest.mocked(syncTournamentState).mock.calls.map(([, id]) => id)).toEqual([3, 4]);
   });
 });

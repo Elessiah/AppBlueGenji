@@ -116,6 +116,7 @@
     "INVALID_ENDURANCE_EARLY_EXIT": "Invalid value for the early “out of contention” exit: tick or untick the box.",
     "INVALID_LAUNCH_PHASE": "Invalid value for the match launch phase: tick or untick the box.",
     "INVALID_TEAM_VOICE_CHANNELS": "Invalid value for team voice channels: tick or untick the box.",
+    "INVALID_MATCH_CHECK_IN": "Invalid value for match check-in: tick or untick the box.",
     "INVALID_TEAM_ID": "Invalid team.",
     "VOICE_CHANNEL_NOT_OPEN": "This voice channel is not open: nothing to clear.",
     "VOICE_CLEAR_UNAVAILABLE": "The Discord bot could not clear the channel. Try again in a minute.",

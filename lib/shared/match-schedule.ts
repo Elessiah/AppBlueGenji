@@ -73,6 +73,9 @@ export function normalizeMatchStartAt(input: unknown): string | null {
  */
 export const PLAYED_MATCH_STATUSES = ["COMPLETED", "AWAITING_CONFIRMATION"] as const;
 
+/** {@link PLAYED_MATCH_STATUSES} en liste SQL (`'COMPLETED', 'AWAITING_CONFIRMATION'`), pour un `NOT IN (…)`. */
+export const PLAYED_MATCH_STATUS_SQL = PLAYED_MATCH_STATUSES.map((status) => `'${status}'`).join(", ");
+
 /** La rencontre a eu lieu (voir {@link PLAYED_MATCH_STATUSES}). */
 export function isPlayedMatchStatus(status: string): boolean {
   return (PLAYED_MATCH_STATUSES as readonly string[]).includes(status);

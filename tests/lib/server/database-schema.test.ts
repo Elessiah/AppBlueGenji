@@ -230,6 +230,16 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
+  // Check-in des matchs (`MATCH_CHECK_IN_SETTING.md`) : allumé sur tout tournoi existant.
+  it("schema_matchCheckIn_addedOnInBothPlacesWithPauseInstant", () => {
+    expect(table("bg_tournaments")).toMatch(/match_check_in TINYINT\(1\) NOT NULL DEFAULT 1/);
+    expect(table("bg_tournaments")).toMatch(/match_check_in_paused_at DATETIME NULL/);
+    expect(table("bg_tournaments")).not.toMatch(/match_check_in_resumed_at/);
+    expect(migrations).toMatch(/ALTER TABLE bg_tournaments ADD COLUMN match_check_in_paused_at DATETIME NULL/);
+    expect(migrations).toMatch(/ALTER TABLE bg_tournaments ADD COLUMN match_check_in TINYINT\(1\) NOT NULL DEFAULT 1/);
+    expect(migrations).not.toMatch(/match_check_in_resumed_at/);
+  });
+
   // Salons vocaux d'équipe (`MATCH_VOICE.md`) : éteints sur tout tournoi existant.
   it("schema_teamVoiceChannels_addedOffInBothPlacesWithItsTable", () => {
     expect(table("bg_tournaments")).toMatch(/team_voice_channels TINYINT\(1\) NOT NULL DEFAULT 0/);

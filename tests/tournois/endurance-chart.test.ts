@@ -15,6 +15,9 @@ import {
   chartGeometry,
   chartHitPath,
   chartLine,
+  chartLineAt,
+  lineDash,
+  chartLinePath,
   chartOrderAt,
   chartRankAt,
   chartRecordAt,
@@ -273,6 +276,61 @@ describe("tracés", () => {
     const line = chartLine(series[3], 1, 1, geometry);
     expect(line.hollow).toBe(false);
     expect(line.forfeit).toBe(false);
+  });
+
+  it("chartLinePath_completeSeries_sameTraceAsChartLine", () => {
+    const path = chartLinePath(series[0], 2, geometry);
+    expect(path.d).toBe(chartLine(series[0], 2, 2, geometry).d);
+    expect(path.lengths[0]).toBe(0);
+    expect(path.lengths[2]).toBeGreaterThan(path.lengths[1]);
+  });
+
+  it("chartLineAt_arrived_wholeLineAndChartLineHead", () => {
+    const frame = chartLineAt(chartLinePath(series[0], 2, geometry), 2);
+    expect(frame.visible).toBeNull();
+    expect(frame.head).toEqual(chartLine(series[0], 2, 2, geometry).head);
+  });
+
+  it("chartLineAt_midAnimation_interpolatedHeadAndPartialLength", () => {
+    const path = chartLinePath(series[0], 2, geometry);
+    const frame = chartLineAt(path, 1.5);
+    const expected = chartLine(series[0], 2, 1.5, geometry).head;
+    expect(frame.head.x).toBeCloseTo(expected.x);
+    expect(frame.head.y).toBeCloseTo(expected.y);
+    expect(frame.visible).toBeGreaterThan(path.lengths[1]);
+    expect(frame.visible).toBeLessThan(path.lengths[2]);
+  });
+
+  it("chartLineAt_start_zeroLengthAtStartPoint", () => {
+    const path = chartLinePath(series[0], 2, geometry);
+    const frame = chartLineAt(path, 0);
+    expect(frame.visible).toBe(0);
+    expect(frame.head).toEqual(path.points[0]);
+  });
+
+  it("chartLineAt_unplayedShownRound_hollowOnlyOnceArrived", () => {
+    const path = chartLinePath(series[1], 2, geometry);
+    expect(chartLineAt(path, 2).hollow).toBe(true);
+    expect(chartLineAt(path, 0.5).hollow).toBe(false);
+  });
+
+  it("lineDash_partialLength_dashesVisiblePart", () => {
+    expect(lineDash({ visible: 40, total: 100 })).toBe("40 101");
+  });
+
+  it("lineDash_wholeOrOverLength_noDash", () => {
+    expect(lineDash({ visible: null, total: 100 })).toBeUndefined();
+    expect(lineDash({ visible: 100, total: 100 })).toBeUndefined();
+  });
+
+  it("lineDash_zeroLengthPath_noDash", () => {
+    expect(lineDash({ visible: 0, total: 0 })).toBeUndefined();
+  });
+
+  it("chartLineAt_forfeitAtShownRound_flagsForfeit", () => {
+    const frame = chartLineAt(chartLinePath(series[3], 2, geometry), 2);
+    expect(frame.hollow).toBe(true);
+    expect(frame.forfeit).toBe(true);
   });
 });
 

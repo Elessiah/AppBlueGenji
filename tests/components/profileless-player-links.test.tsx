@@ -7,7 +7,7 @@ jest.mock("next/navigation", () => ({
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PlayerLink } from "@/components/entity-link";
-import { ProfilelessPlayersProvider } from "@/components/profileless-players";
+import { ProfilelessPlayersProvider, sameIds } from "@/components/profileless-players";
 import { EntrantLink, EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 
 /**
@@ -59,5 +59,19 @@ describe("EntrantLink — entrée solo d'un compte sans fiche", () => {
     );
 
     expect(html).toBe('<a class="entity-link" href="/equipes/5">Alpha</a>');
+  });
+});
+
+describe("sameIds (revue sécurité EF-62 cycle 1)", () => {
+  it("sameIds_equalLists_true", () => {
+    expect(sameIds([3, 8], [3, 8])).toBe(true);
+  });
+
+  it("sameIds_differentLength_false", () => {
+    expect(sameIds([3, 8], [3])).toBe(false);
+  });
+
+  it("sameIds_differentValue_false", () => {
+    expect(sameIds([3, 8], [3, 9])).toBe(false);
   });
 });

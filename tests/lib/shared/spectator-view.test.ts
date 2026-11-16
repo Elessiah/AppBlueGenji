@@ -516,6 +516,7 @@ const MATCH_FIELDS = {
   lobbyOpenedAt: "public",
   loserTeamId: "public",
   mapPointTarget: "public",
+  mapPointTargets: "public",
   // Score de la carte unique d'un BO1 : les scores des cartes sont publics.
   displayScore: "public",
   maps: "parcouru",
@@ -632,6 +633,7 @@ const CARD_FIELDS = {
   survivalRoundsBeforeFirstCut: "public",
   survivalRoundsPerCut: "public",
   teamVoiceChannels: "public",
+  matchCheckIn: "public",
 } as const satisfies Record<keyof TournamentCard, Disposition>;
 
 const PHASE_FIELDS = {

@@ -171,6 +171,16 @@ function readCastRows(world: World, sql: string, params: unknown[]): unknown[] |
   return [world.candidates.filter((c) => ids.has(Number(c.id))).flatMap(castersOf), []];
 }
 
+/** Lectures du tournoi : contexte d'un candidat, ou état seul (retrait allégé d'un arbitre sous opposition). */
+function readTournamentRows(world: World, sql: string, params: unknown[]): [unknown[], []] | null {
+  if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
+    return [candidateContextRows(world, params), []];
+  }
+  if (!sql.startsWith("SELECT state FROM bg_tournaments WHERE id = ?")) return null;
+  const owner = world.candidates.find((c) => c.tournament_id === Number(params[0]));
+  return [owner ? [{ state: owner.tournament_state }] : [], []];
+}
+
 function connectionFor(world: World): PoolConnection {
   const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
@@ -186,8 +196,9 @@ function connectionFor(world: World): PoolConnection {
       return [world.viewerMemberships, []];
     }
     if (sql.startsWith("SELECT id FROM bg_teams WHERE solo_user_id")) return [world.viewerSolo, []];
-    if (sql.includes("FOR UPDATE")) {
-      // Relecture sous verrou d'un candidat par l'entretien : le jeu n'y est
+    if (sql.includes("FOR UPDATE") || sql.startsWith("SELECT m.tournament_id, m.status, m.referee_user_id FROM bg_matches m")) {
+      // Relecture sous verrou d'un candidat, ou lecture du match d'un retrait
+      // sur opposition avant sa transaction (même ligne) : le jeu n'y est
       // pas (il se lit à part, dans le contexte).
       return [
         world.candidates
@@ -196,9 +207,8 @@ function connectionFor(world: World): PoolConnection {
         [],
       ];
     }
-    if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
-      return [candidateContextRows(world, params), []];
-    }
+    const tournamentRows = readTournamentRows(world, sql, params);
+    if (tournamentRows) return tournamentRows;
     if (sql.includes("WHERE m.tournament_id = ?")) {
       // Entretien : candidats au lancement du tournoi.
       return [world.candidates.filter((c) => c.launched_at === null), []];
@@ -1510,6 +1520,83 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       expect(info?.referee).toMatchObject({ discordTag: null, battletag: null, battletagVerified: false });
       expect(JSON.stringify(info?.referee)).not.toContain("juge");
       expect(JSON.stringify(info?.referee)).not.toContain("Arbitre#1");
+    });
+
+    // Le départ ouvrira-t-il quelque chose au lecteur caster ? Le serveur le dit
+    // (`contactsPending`) : sans rien à ouvrir, le client n'arme aucune relecture.
+    describe("contacts de l'arbitre en attente du départ", () => {
+      const later = () => new Date(Date.now() + 3 * 3_600_000).toISOString();
+
+      it("loadViewerMatchContacts_staffCasterScheduledOwMatch_flagsRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+        ];
+        state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
+
+        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+        expect(info?.referee).toMatchObject({ contactsShown: false, contactsPending: true });
+      });
+
+      it("listViewerMatchLaunches_casterScheduledMrMatch_noRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [
+          candidate({ tournament_game: "MR", match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+        ];
+        state.users = [casterUser(VIEWER), juge()];
+
+        const [info] = await listViewerMatchLaunches(viewer);
+
+        expect(info.viewer.role).toBe("CASTER");
+        expect(info.referee?.contactsShown).toBe(false);
+        expect(info.referee).not.toHaveProperty("contactsPending");
+      });
+
+      it("listViewerMatchLaunches_casterScheduledOwMatch_flagsRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+        ];
+        state.users = [casterUser(VIEWER), juge()];
+
+        const [info] = await listViewerMatchLaunches(viewer);
+
+        expect(info.referee).toMatchObject({ battletag: null, contactsPending: true });
+      });
+
+      it("loadViewerMatchContacts_playerReaderScheduled_noRefereeContactsPending", async () => {
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, self_managed: 0 }),
+        ];
+        state.users = [juge()];
+
+        const info = await loadViewerMatchContacts(viewer, 42);
+
+        expect(info?.referee).not.toHaveProperty("contactsPending");
+      });
+
+      it("loadViewerMatchContacts_staffCasterOpenedMatch_noRefereeContactsPending", async () => {
+        state.viewerMemberships = [];
+        state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
+        state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
+
+        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+        expect(info?.referee).toMatchObject({ contactsShown: true });
+        expect(info?.referee).not.toHaveProperty("contactsPending");
+      });
+
+      it("listViewerMatchLaunches_refereeAlsoCastsScheduled_noContactsPendingOnOwnCard", async () => {
+        state.candidates = [
+          candidate({ match_launch_phase: 0, start_at: later(), lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: REFEREE, self_managed: 0 }),
+        ];
+        state.users = [juge()];
+
+        const [info] = await listViewerMatchLaunches(viewer);
+
+        expect(info.referee).not.toHaveProperty("contactsPending");
+      });
     });
 
     it("loadViewerMatchContacts_staffCasterOpenedMatch_sendsRefereeContacts", async () => {

@@ -163,25 +163,25 @@
     },
     "noticesTitle": "Annonces de match",
     "noticesLine": "Tout membre reçoit les annonces de match de l'équipe.",
-    "noticesHint": "Nouveau match, horaires et rappels : message privé Discord (tag certifié, case cochée dans « Mon profil ») et push ; départ du match et coup d'envoi : push seulement. Le check-in et les demandes d'adhésion suivent la même règle de message privé, le score à confirmer part en push.",
+    "noticesHint": "Nouveau match, horaires et rappels : message privé Discord (tag certifié, case cochée dans « Mon profil ») et push ; départ du match et coup d'envoi : push seulement. Le check-in (si le tournoi en a un) et les demandes d'adhésion suivent la même règle de message privé, le score à confirmer part en push.",
     "roles": {
       "OWNER": {
         "team": "Tout : nom, sigle, description, logo, membres, rôles, inscriptions. Seul à transférer la propriété ou dissoudre l'équipe.",
         "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
-        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
+        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion (si le tournoi en a un), score à confirmer.",
         "hint": "Un seul par équipe : il ne se coche pas, il se transfère depuis les paramètres de l'équipe. Il ne peut ni quitter l'équipe ni en être exclu avant de l'avoir transféré."
       },
       "MANAGER": {
         "team": "Logo, invitations et demandes d'adhésion, exclusions, rôles des membres (sauf ceux du propriétaire), inscriptions aux tournois.",
         "matches": "« Prêt », saisie et confirmation du score, forfait d'un match, abandon d'un tournoi, vider le salon vocal de l'équipe.",
-        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion, score à confirmer.",
+        "messages": "Annonces de match, demandes d'adhésion, check-in des matchs en autogestion (si le tournoi en a un), score à confirmer.",
         "hint": "Donné par le propriétaire ou un manager. Lui échappent : le nom, le sigle, la description, le transfert, la dissolution, ainsi que les rôles du propriétaire et son exclusion."
       },
       "CAPITAINE": {
         "team": "Ses propres rôles de jeu seulement.",
         "matches": "« Prêt », saisie et confirmation du score, vider le salon vocal de l'équipe ; premier contact présenté pour le match.",
         "messages": "Annonces de match, score à confirmer.",
-        "hint": "Donné par le propriétaire ou un manager. Il déclare l'équipe prête et donne le résultat, sans l'engager (ni forfait, ni abandon, ni inscription) ; le check-in d'un match en autogestion (hôte, réglages de la partie) va au propriétaire et aux managers."
+        "hint": "Donné par le propriétaire ou un manager. Il déclare l'équipe prête et donne le résultat, sans l'engager (ni forfait, ni abandon, ni inscription) ; le check-in d'un match en autogestion (hôte, réglages de la partie ; si le tournoi en a un) va au propriétaire et aux managers."
       },
       "COACH": {
         "team": "Ses propres rôles de jeu seulement.",

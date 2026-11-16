@@ -53,6 +53,23 @@ export async function lockTournamentRow(
   await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
 }
 
+/**
+ * Verrou **partagé** du tournoi, en première instruction : il attend un
+ * réglage des cartes du tournoi en cours (verrou exclusif, `setRoundsMaps`) et
+ * le retient le temps du geste, sans mettre en file les gestes des autres
+ * matchs entre eux (choix d'une carte dans le pool, première carte). Écriture
+ * MariaDB (`LOCK IN SHARE MODE`, requête sans jointure — `CLAUDE.md`).
+ *
+ * @throws `TOURNAMENT_NOT_FOUND`
+ */
+export async function lockTournamentRowShared(connection: PoolConnection, tournamentId: number): Promise<void> {
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+    [tournamentId],
+  );
+  if (!rows[0]) throw new Error("TOURNAMENT_NOT_FOUND");
+}
+
 async function registerTeam(
   connection: PoolConnection,
   tournamentId: number,

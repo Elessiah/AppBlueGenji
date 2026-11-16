@@ -52,7 +52,7 @@ describe("replayAccountDeletions", () => {
   it("rejoue un compte revenu avec la sauvegarde, par le chemin ordinaire", async () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
     const report = await replayAccountDeletions([entry(7)], { log });
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED, replay: true });
     expect(report).toEqual({
       replayed: 1,
       absent: 0,
@@ -161,7 +161,7 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
     const report = await replayAccountDeletions([pending(requestedAt)], { log });
 
-    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date(requestedAt), accountCreatedAt: CREATED });
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date(requestedAt), accountCreatedAt: CREATED, replay: true });
     expect(deleteOwnAccount).not.toHaveBeenCalled();
     expect(report.replayed).toBe(1);
     expect(lines.join("\n")).toContain("demande de suppression rejouée");
@@ -177,8 +177,9 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
     expect(requestAccountDeletion).toHaveBeenCalledWith(7, {
       requestedAt: new Date("2026-09-20T10:00:00.000Z"),
       accountCreatedAt: CREATED,
+      replay: true,
     });
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED, replay: true });
     expect(jest.mocked(requestAccountDeletion).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deleteOwnAccount).mock.invocationCallOrder[0],
     );
@@ -190,7 +191,7 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
     const report = await replayAccountDeletions([entry(7)], { log });
 
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED, replay: true });
     expect(report.replayed).toBe(1);
   });
 
@@ -400,7 +401,7 @@ describe("replayAccountDeletions — demande à redater", () => {
 
     const report = await replayAccountDeletions([old], { log });
 
-    expect(finalizeAccountDeletion).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
+    expect(finalizeAccountDeletion).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED, replay: true });
     expect(report).toMatchObject({ replayed: 1, alreadyPending: 0 });
     expect(lines.join("\n")).toContain("anonymisé (fenêtre close)");
   });

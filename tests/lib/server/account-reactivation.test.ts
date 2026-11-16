@@ -6,7 +6,11 @@ jest.mock("@/lib/server/users/account-deletion-hold");
 jest.mock("@/lib/server/ranking-cache");
 jest.mock("@/lib/server/stats-cache");
 jest.mock("@/lib/server/tournaments/notifications");
-jest.mock("@/lib/server/users/account-deletion", () => ({ listSoloRegistrationTournamentIds: jest.fn() }));
+jest.mock("@/lib/server/users/account-deletion", () => ({
+  listNamingTournamentIds: jest.fn(),
+  listSoloRegistrationTournamentIds: jest.fn(),
+  mergeTournamentIds: (...lists: (readonly number[])[]) => [...new Set(lists.flat())].sort((a, b) => a - b),
+}));
 jest.mock("@/lib/server/bot-integration", () => ({ sendBotLog: jest.fn() }));
 
 import crypto from "node:crypto";
@@ -16,7 +20,7 @@ import { restoreAccountIdentity } from "@/lib/server/users/account-deletion-hold
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { listSoloRegistrationTournamentIds } from "@/lib/server/users/account-deletion";
+import { listNamingTournamentIds, listSoloRegistrationTournamentIds } from "@/lib/server/users/account-deletion";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import {
   createReactivationTicket,
@@ -83,6 +87,7 @@ beforeEach(() => {
   jest.mocked(restoreAccountIdentity).mockResolvedValue("RESTORED");
   jest.mocked(recordAccountReactivation).mockResolvedValue(undefined);
   jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([]);
+  jest.mocked(listNamingTournamentIds).mockResolvedValue([]);
 });
 
 describe("readPendingDeletion", () => {
@@ -359,6 +364,20 @@ describe("reactivateAccount", () => {
     await reactivateAccount(TOKEN);
 
     expect(jest.mocked(publishUpdatedEvent).mock.calls).toEqual([[8], [9]]);
+  });
+
+  // EF-62 (E68) : tout tournoi non terminé qui nomme le compte, pas seulement son entrée solo.
+  it("reactivateAccount_valid_republishesNamingTournamentsOnceEach", async () => {
+    transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([8]);
+    jest.mocked(listNamingTournamentIds).mockResolvedValue([8, 12]);
+
+    await reactivateAccount(TOKEN);
+
+    expect(jest.mocked(publishUpdatedEvent).mock.calls).toEqual([[8], [12]]);
   });
 
   it("reactivateAccount_republishFails_stillReturnsAccount", async () => {

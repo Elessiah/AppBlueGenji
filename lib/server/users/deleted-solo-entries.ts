@@ -6,9 +6,11 @@ import { formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
 import { toParticipantType } from "@/lib/shared/participants";
 import { soloRegistrationsWithdrawnOnRequest, type SoloRegistrationFact } from "@/lib/shared/account-deletion";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
-import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
+import { withdrawRegistrationOn } from "@/lib/server/tournaments/registration-removal";
+import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./account-deletion";
+import { startDueTournaments, syncOpenSoloTournamentsOn } from "./tournament-start-sync";
 import { failureReason } from "@/lib/server/failure-reason";
 
 /*
@@ -51,8 +53,68 @@ export function soloEntryNeverPlayedSql(entry = "s.id", tournament = "r.tourname
 /** Comptes relevés par passage de `settleDeletedSoloEntries`. */
 export const SETTLE_BATCH_SIZE = 200;
 
+/** Lignes lues : le lot, plus de quoi absorber toutes les mises à l'écart retenues. */
+const SETTLE_CANDIDATE_LIMIT = SETTLE_BATCH_SIZE + 1000;
+
+/**
+ * Première mise à l'écart d'un compte dont le passage n'a rien produit (échec,
+ * forfait sans prise) : une demi-heure, soit moins qu'un passage horaire — le
+ * compte est donc relu au passage suivant. Chaque échec de suite double la
+ * durée, jusqu'à {@link SETTLE_IDLE_MAX_MS} : un forfait qui prend prise
+ * quelques minutes plus tard (appariement tiré) n'attend pas six heures, et un
+ * compte qui échoue sans cesse ne pèse plus sur le lot.
+ */
+export const SETTLE_IDLE_MS = 30 * 60 * 1000;
+
+/** Plafond de la mise à l'écart. */
+export const SETTLE_IDLE_MAX_MS = 6 * 60 * 60 * 1000;
+
+/** Mises à l'écart retenues : les plus anciennes tombent, la mémoire reste bornée. */
+const SETTLE_IDLE_MAX = 1000;
+
+/**
+ * Comptes mis à l'écart par ce processus : jusqu'à quand, et combien d'échecs de
+ * suite (l'entrée échue reste, pour que le suivant double la durée). Un compte
+ * relevé dont le passage ne retire ni ne forfaite rien n'occupe plus le lot à
+ * chaque passage — comme `finalizeDueAccountDeletions` met à l'écart ses échecs.
+ * Perdue au redémarrage : les comptes reviennent alors tous au premier passage,
+ * ce que le lot borné absorbe.
+ */
+const settleIdle = new Map<number, { until: number; strikes: number }>();
+
+/** Les comptes encore à l'écart à `now`. */
+function idleAccountIds(now: number): Set<number> {
+  const idle = new Set<number>();
+  for (const [userId, entry] of settleIdle) if (entry.until > now) idle.add(userId);
+  return idle;
+}
+
+/** Met un compte à l'écart (durée doublée à chaque échec de suite ; la plus ancienne entrée tombe la première). */
+function setAside(userId: number, now: number): void {
+  const strikes = (settleIdle.get(userId)?.strikes ?? 0) + 1;
+  settleIdle.delete(userId);
+  settleIdle.set(userId, { until: now + Math.min(SETTLE_IDLE_MS * 2 ** (strikes - 1), SETTLE_IDLE_MAX_MS), strikes });
+  if (settleIdle.size > SETTLE_IDLE_MAX) {
+    const oldest = settleIdle.keys().next().value;
+    if (oldest !== undefined) settleIdle.delete(oldest);
+  }
+}
+
+/** Un compte qui a produit quelque chose repart de zéro. */
+function clearIdle(userId: number): void {
+  settleIdle.delete(userId);
+}
+
+/** Tests : oublie les mises à l'écart du processus. */
+export function resetSettleIdleForTests(): void {
+  settleIdle.clear();
+}
+
 /** Une inscription retirée par la suppression du compte. */
 export type DeletionWithdrawal = { tournamentId: number; teamId: number };
+
+/** Partagé avec la suppression définitive (`tournament-start-sync.ts`). */
+export { syncOpenSoloTournamentsOn };
 
 /**
  * Retire, sur la transaction de l'appelant (qui tient déjà la ligne de chacun
@@ -65,32 +127,62 @@ export async function withdrawSoloRegistrationsOn(
 ): Promise<DeletionWithdrawal[]> {
   const withdrawn: DeletionWithdrawal[] = [];
   for (const registration of soloRegistrationsWithdrawnOnRequest(registrations, locked)) {
-    await connection.execute(
-      `DELETE FROM bg_tournament_registrations WHERE tournament_id = ? AND team_id = ?`,
-      [registration.tournamentId, registration.teamId],
-    );
-    await resequenceSeeds(connection, registration.tournamentId);
+    await withdrawRegistrationOn(connection, registration.tournamentId, registration.teamId);
     withdrawn.push({ tournamentId: registration.tournamentId, teamId: registration.teamId });
   }
   return withdrawn;
 }
 
 /**
- * L'entrée solo `s` n'a jamais joué dans le tournoi `r.tournament_id` **et** y
- * a encore un match à jouer (« à planifier » ou « planifié ») : ce que le forfait
- * peut encore trancher.
+ * L'entrée solo `s` n'a jamais joué dans le tournoi `t` (`r.tournament_id`)
+ * **et** le forfait a encore prise sur elle :
+ *
+ * - un match à jouer (« à planifier » ou « planifié ») dont les **deux**
+ *   engagés sont connus — le seul que `forfeitDeletedEntryMatch` sait trancher
+ *   (`hasOpenDeletedEntryMatch`). Un match d'arbre qui attend encore son
+ *   adversaire ne compte pas : l'entrée serait relevée à chaque passage sans
+ *   que rien ne se forfaite, et occuperait le lot pour rien ;
+ * - ou, dans un format à classement de la phase en cours (survie, ronde
+ *   suisse, BG Survie avant ses phases finales), une place encore `ACTIVE` au
+ *   classement : l'abandon s'y pose d'un geste, entre deux rondes comme
+ *   pendant une ronde, sans attendre que la ronde suivante l'apparie.
+ *
+ * Une fois l'abandon posé, la place n'est plus `ACTIVE` : l'entrée sort du
+ * relevé. Lit `t.format`, `t.current_phase_id` et
+ * `t.endurance_playoffs_started` : `t` est le tournoi joint par l'appelant.
  */
 function forfeitableEntrySql(): string {
+  const phase = "(CASE WHEN t.format = 'MULTI' THEN t.current_phase_id ELSE 0 END)";
   return `${soloEntryNeverPlayedSql()}
-        AND EXISTS (
-          SELECT 1 FROM bg_matches om
-           WHERE om.tournament_id = r.tournament_id
-             AND (om.team1_id = s.id OR om.team2_id = s.id)
-             AND om.status IN ('PENDING', 'READY')
+        AND (
+          EXISTS (
+            SELECT 1 FROM bg_matches om
+             WHERE om.tournament_id = r.tournament_id
+               AND (om.team1_id = s.id OR om.team2_id = s.id)
+               AND om.team1_id IS NOT NULL AND om.team2_id IS NOT NULL
+               AND om.status IN ('PENDING', 'READY')
+          )
+          OR EXISTS (
+            SELECT 1 FROM bg_swiss_standings ss
+             WHERE ss.tournament_id = r.tournament_id AND ss.team_id = s.id
+               AND ss.phase_id = ${phase} AND ss.status = 'ACTIVE'
+          )
+          OR EXISTS (
+            SELECT 1 FROM bg_survival_standings sv
+             WHERE sv.tournament_id = r.tournament_id AND sv.team_id = s.id
+               AND sv.phase_id = ${phase} AND sv.status = 'ACTIVE'
+          )
+          OR (
+            t.format = 'BG_SURVIE' AND t.endurance_playoffs_started = 0
+            AND EXISTS (
+              SELECT 1 FROM bg_endurance_standings es
+               WHERE es.tournament_id = r.tournament_id AND es.team_id = s.id AND es.status = 'ACTIVE'
+            )
+          )
         )`;
 }
 
-/** Les tournois en cours où l'entrée solo du compte n'a jamais joué et a encore un match à jouer. */
+/** Les tournois en cours où l'entrée solo du compte n'a jamais joué et où le forfait a encore prise (`forfeitableEntrySql`). */
 export async function listForfeitableSoloEntries(
   runner: Pick<PoolConnection, "execute">,
   userId: number,
@@ -337,6 +429,30 @@ async function forfeitEntriesOneByOne(
 }
 
 /**
+ * Rediffuse puis journalise un retrait déjà commis par la passe horaire, chacun
+ * dans son `try` : l'un qui lève ne prive pas l'autre — le retrait ne sera plus
+ * jamais relu par une passe. Ne lève jamais.
+ */
+async function announceSettledWithdrawal(userId: number, tournamentId: number): Promise<void> {
+  try {
+    publishUpdatedEvent(tournamentId);
+  } catch (error) {
+    console.error(
+      `[deleted-accounts] retrait du compte #${userId} (tournoi ${tournamentId}) non rediffusé :`,
+      failureReason(error),
+    );
+  }
+  try {
+    await logDeletionWithdrawal(tournamentId, false);
+  } catch (error) {
+    console.error(
+      `[deleted-accounts] retrait du compte #${userId} (tournoi ${tournamentId}) non journalisé :`,
+      failureReason(error),
+    );
+  }
+}
+
+/**
  * Rattrapage (E2) : applique la règle du jour aux comptes **déjà** supprimés
  * (demande en cours ou suppression faite) — inscriptions solo à un tournoi pas
  * encore commencé retirées, entrées jamais jouées d'un tournoi en cours
@@ -347,6 +463,8 @@ async function forfeitEntriesOneByOne(
  */
 export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; forfeited: number }> {
   const db = await getDatabase();
+  const now = Date.now();
+  const idle = idleAccountIds(now);
   // Seuls les comptes qui ont **quelque chose** à faire : une inscription à
   // retirer (tournoi pas commencé) ou une entrée en cours à forfaiter. Un
   // compte dont l'entrée a joué reste inscrit à un tournoi en cours des
@@ -364,26 +482,50 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
           OR (t.state = 'RUNNING' AND ${forfeitableEntrySql()})
         )
       ORDER BY u.id
-      LIMIT ${SETTLE_BATCH_SIZE}`,
+      LIMIT ${SETTLE_CANDIDATE_LIMIT}`,
   );
   const outcome = { withdrawn: 0, forfeited: 0 };
-  for (const candidate of candidates) {
+  // Un tournoi n'est remis à l'heure qu'une fois par passage, quel que soit le
+  // nombre de comptes qui y sont inscrits (`startDueTournaments`).
+  const synced = new Set<number>();
+  // Les comptes à l'écart sont écartés ici et non par un `NOT IN` de mille
+  // paramètres : le texte de la requête reste le même d'un passage à l'autre
+  // (une seule entrée du cache d'instructions, un seul plan), et la marge de
+  // `SETTLE_CANDIDATE_LIMIT` garantit un lot plein malgré eux.
+  const batch = candidates.filter((candidate) => !idle.has(Number(candidate.id))).slice(0, SETTLE_BATCH_SIZE);
+  for (const candidate of batch) {
     const userId = Number(candidate.id);
+    let effective = false;
+    let withdrawals: Awaited<ReturnType<typeof withdrawDeletedAccountRegistrations>>;
     try {
-      const withdrawn = await withdrawDeletedAccountRegistrations(userId);
-      outcome.withdrawn += withdrawn.length;
-      for (const entry of withdrawn) {
-        publishUpdatedEvent(entry.tournamentId);
-        await logDeletionWithdrawal(entry.tournamentId, false);
-      }
-      // Un tournoi qui échoue n'empêche pas les suivants du même compte.
-      outcome.forfeited += await forfeitSoloEntriesAfterCommit(await listForfeitableSoloEntries(db, userId));
+      withdrawals = await withdrawDeletedAccountRegistrations(userId, synced);
     } catch (error) {
       console.error(
-        `[deleted-accounts] Inscriptions solo du compte #${userId} reportées au prochain passage :`,
+        `[deleted-accounts] Inscriptions solo du compte #${userId} reportées :`,
         failureReason(error),
       );
+      setAside(userId, now);
+      continue;
     }
+    const { withdrawn, started } = withdrawals;
+    outcome.withdrawn += withdrawn.length;
+    // Commis : ce qui suit ne défait rien. Une rediffusion ou un journal qui
+    // lève n'empêche ni les tournois suivants ni les forfaits, et le compte
+    // n'est pas mis à l'écart comme s'il n'avait rien produit.
+    effective = withdrawn.length > 0 || started > 0;
+    for (const entry of withdrawn) await announceSettledWithdrawal(userId, entry.tournamentId);
+    try {
+      // Un tournoi qui échoue n'empêche pas les suivants du même compte.
+      const forfeited = await forfeitSoloEntriesAfterCommit(await listForfeitableSoloEntries(db, userId));
+      outcome.forfeited += forfeited;
+      if (forfeited > 0) effective = true;
+    } catch (error) {
+      console.error(`[deleted-accounts] forfaits du compte #${userId} reportés :`, failureReason(error));
+    }
+    // Rien de produit (échec, ou forfait sans prise) : à l'écart, de plus en
+    // plus longtemps, pour que le lot serve aux comptes qui avancent.
+    if (effective) clearIdle(userId);
+    else setAside(userId, now);
   }
   return outcome;
 }
@@ -392,12 +534,20 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
  * Une transaction par compte supprimé : tournois verrouillés d'abord (id
  * croissant), puis le compte, relu supprimé sous son verrou.
  */
-async function withdrawDeletedAccountRegistrations(userId: number): Promise<DeletionWithdrawal[]> {
+async function withdrawDeletedAccountRegistrations(
+  userId: number,
+  synced: Set<number>,
+): Promise<{ withdrawn: DeletionWithdrawal[]; started: number }> {
   const db = await getDatabase();
   // Les seuls tournois pas encore commencés : une inscription ne part que de
   // ceux-là, et verrouiller un tournoi en cours le ferait attendre pour rien.
   const tournamentIds = await listSoloRegistrationTournamentIds(db, userId, true);
-  if (tournamentIds.length === 0) return [];
+  if (tournamentIds.length === 0) return { withdrawn: [], started: 0 };
+  // Un tournoi dont l'heure de début est passée sans synchronisation passe en
+  // cours ici, hors de la transaction du compte : son inscription se forfaite
+  // ensuite, au lieu d'être relevée à chaque passage sans rien produire. Une
+  // fois par tournoi et par passage ; un échec attend le passage suivant.
+  const started = await startDueTournaments(tournamentIds, synced);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -408,7 +558,7 @@ async function withdrawDeletedAccountRegistrations(userId: number): Promise<Dele
     );
     if (Number(locked[0]?.is_deleted ?? 0) !== 1) {
       await connection.rollback();
-      return [];
+      return { withdrawn: [], started: 0 };
     }
     const withdrawn = await withdrawSoloRegistrationsOn(
       connection,
@@ -416,11 +566,20 @@ async function withdrawDeletedAccountRegistrations(userId: number): Promise<Dele
       new Set(tournamentIds),
     );
     await connection.commit();
-    return withdrawn;
+    // Commis : une annonce ou un écouteur qui lève ne fait pas passer les
+    // retraits pour un échec (ni rediffusion ni journal ne suivraient, et le
+    // compte serait mis à l'écart comme s'il n'avait rien produit).
+    try {
+      flushBotLogs(connection);
+    } catch (error) {
+      console.error(`[deleted-accounts] annonces du compte #${userId} non envoyées :`, failureReason(error));
+    }
+    return { withdrawn, started: started.length };
   } catch (error) {
     await connection.rollback().catch(() => {});
     throw error;
   } finally {
+    discardBotLogs(connection);
     connection.release();
   }
 }

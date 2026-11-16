@@ -113,3 +113,13 @@ describe("le détail derrière le « i », toujours cité par son champ", () => 
     expect(page).toContain('"player-battletag-more": Boolean(battletagHint),');
   });
 });
+
+describe("revue UI cycle 1 : textes visibles compacts", () => {
+  it.each([
+    ["fr", frPlayers.page.battletagHiddenSelf, frProfile.battletagNotice.warning],
+    ["en", enPlayers.page.battletagHiddenSelf, enProfile.battletagNotice.warning],
+  ])("%s : ligne du BattleTag masqué ≤ 100 caractères, avertissement ≤ 700", (_l: string, line: string, warning: string) => {
+    expect(line.length).toBeLessThanOrEqual(100);
+    expect(warning.length).toBeLessThanOrEqual(700);
+  });
+});

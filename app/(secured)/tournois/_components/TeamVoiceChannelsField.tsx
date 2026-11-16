@@ -1,10 +1,9 @@
 "use client";
 
 import type { TournamentFormText } from "@/lib/shared/tournament-actions-text";
-import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { VOICE_CHANNEL_CAPACITY } from "@/lib/shared/match-voice";
-import { CHECKBOX_CARD_LAYOUT, CHECKBOX_CARD_TITLE, checkboxCardChrome, HINT } from "../_lib/form-styles";
 import { useFormText } from "../_lib/form-text";
+import { SettingToggleCard } from "./SettingToggleCard";
 
 /** Précision sous le titre, selon l'écran. */
 function scopeHint(text: TournamentFormText, mode: "create" | "edit", editable: boolean): string {
@@ -34,36 +33,15 @@ export function TeamVoiceChannelsField({
   onChange: (checked: boolean) => void;
 }>) {
   const text = useFormText();
-  const { t } = text;
   return (
-    <div className="checkbox-card" style={{ ...CHECKBOX_CARD_LAYOUT, ...checkboxCardChrome(checked, !editable) }}>
-      <input
-        id="team-voice-channels"
-        type="checkbox"
-        checked={checked}
-        disabled={!editable}
-        onChange={(e) => onChange(e.target.checked)}
-        aria-labelledby="team-voice-channels-label"
-        aria-describedby="team-voice-channels-more team-voice-channels-hint"
-        className="checkbox-card-input"
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <InfoHintRow>
-          <label
-            id="team-voice-channels-label"
-            htmlFor="team-voice-channels"
-            style={{ ...CHECKBOX_CARD_TITLE, cursor: editable ? "pointer" : "default" }}
-          >
-            {t("form.teamVoice.label")}
-          </label>
-          <InfoHint id="team-voice-channels-more" subject={t("form.teamVoice.label")}>
-            <p>{t("form.teamVoice.description", { capacity: VOICE_CHANNEL_CAPACITY })}</p>
-          </InfoHint>
-        </InfoHintRow>
-        <p id="team-voice-channels-hint" style={{ ...HINT, margin: "4px 0 0" }}>
-          {scopeHint(text, mode, editable)}
-        </p>
-      </div>
-    </div>
+    <SettingToggleCard
+      id="team-voice-channels"
+      checked={checked}
+      editable={editable}
+      label={text.t("form.teamVoice.label")}
+      description={<p>{text.t("form.teamVoice.description", { capacity: VOICE_CHANNEL_CAPACITY })}</p>}
+      scopeHint={scopeHint(text, mode, editable)}
+      onChange={onChange}
+    />
   );
 }

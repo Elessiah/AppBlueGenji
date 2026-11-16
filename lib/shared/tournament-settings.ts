@@ -44,6 +44,7 @@ export type TournamentSettingsInput = {
     | "registrationFilters"
     | "launchPhase"
     | "teamVoiceChannels"
+    | "matchCheckIn"
     | "mapPointTarget"
   >;
   phases: TournamentPhase[] | null;
@@ -196,6 +197,7 @@ export function tournamentSettingsGroups(input: TournamentSettingsInput): Tourna
     { label: "Ordre de départ", value: SEEDING_LABELS[input.seedingSource] },
     { label: "Phase de lancement des matchs", value: yesNo(card.launchPhase) },
     { label: "Salons vocaux d'équipe", value: yesNo(card.teamVoiceChannels) },
+    { label: "Check-in des matchs", value: yesNo(card.matchCheckIn) },
   ];
 
   const conditions: TournamentSetting[] = [];

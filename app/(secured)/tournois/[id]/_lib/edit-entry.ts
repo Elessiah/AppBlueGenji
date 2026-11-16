@@ -3,10 +3,8 @@ import {
   editWindowFor,
   type EditLockReason,
 } from "@/lib/shared/tournament-edit";
-import {
-  canToggleRefereeScheduling,
-  refereeSchedulingToggledMessage,
-} from "@/lib/shared/match-planning";
+import { refereeSchedulingToggledMessage } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { TournamentCard } from "@/lib/shared/types";
 import type { TournamentFormText } from "@/lib/shared/tournament-actions-text";
 import { INTL_LOCALE } from "@/lib/shared/locales";
@@ -24,7 +22,7 @@ export function canShowEditButton(
   now: number = Date.now(),
 ): boolean {
   if (!hasTournamentPermission) return false;
-  return editWindowFor(card, now) !== "LOCKED" || canToggleRefereeScheduling(card.state);
+  return editWindowFor(card, now) !== "LOCKED" || canToggleLiveTournamentOption(card.state);
 }
 
 /** Un tournoi terminé : plus rien ne se règle, planification comprise. */

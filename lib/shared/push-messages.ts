@@ -818,12 +818,17 @@ export function suspensionPush(kind: "SUSPENDED" | "LIFTED", locale: Locale = DE
  * Des changements du traitement des données sont à lire — une information,
  * aucun accord n'est demandé, hors des conditions d'utilisation qu'une entrée
  * annonce à accepter (fenêtre des conditions). `titles` : les titres **dans la langue du
- * destinataire** (`localizedPrivacyChanges`).
+ * destinataire** (`localizedPrivacyChanges`). `later` : les changements encore
+ * dus après ce lot, comptés comme dans le message privé du même envoi.
  */
-export function privacyChangePush(titles: readonly string[], locale: Locale = DEFAULT_LOCALE): PushContent {
+export function privacyChangePush(
+  titles: readonly string[],
+  locale: Locale = DEFAULT_LOCALE,
+  later = 0,
+): PushContent {
   const text = TEXT[locale];
   const first = titles[0] ?? text.t("privacyChange.fallback");
-  const others = titles.length - 1;
+  const others = Math.max(0, titles.length - 1) + Math.max(0, later);
   return {
     title: text.t("privacyChange.title"),
     body: others > 0 ? text.t("privacyChange.bodyMore", { first, others }) : text.t("privacyChange.body", { first }),
@@ -1096,6 +1101,26 @@ export function refereeReleasedPush(input: RefereeReleasedMatch, locale: Locale 
     }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
     tag: `${matchTag(input.matchId)}-referee`,
+  };
+}
+
+/**
+ * Récapitulatif à l'arbitre dont l'opposition vient d'être retenue : **un**
+ * avis pour tous les matchs dont il est retiré (`referee-objection.ts`), au
+ * lieu d'un par match. Aucun nom d'engagé ni de tournoi : le nombre suffit, la
+ * page du tournoi (un seul) ou la liste des tournois (plusieurs) détaille.
+ */
+export function refereeObjectionReleasedPush(
+  input: { count: number; tournamentIds: readonly number[] },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
+  const only = input.tournamentIds.length === 1 ? input.tournamentIds[0] : null;
+  return {
+    title: text.t("refereeObjectionReleased.title"),
+    body: text.t("refereeObjectionReleased.body", { count: input.count }),
+    url: localeHref(only !== null ? tournamentHref(only) : "/tournois", locale),
+    tag: "referee-objection-released",
   };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   mergeMatchProposals,
   parseMatchProposals,
@@ -38,6 +38,10 @@ export function proposalRetryDelayMs(retryAfterHeader: string | null): number {
  * cours ou prévue. Les tentatives épuisées sans détail (429, réseau, refus),
  * l'attente se lève : les dialogues rendent la main (« proposition sans
  * détail ») au lieu de garder leurs boutons figés jusqu'au prochain report.
+ *
+ * `reload` : rouvre une série de lectures du détail encore manquant (un refus
+ * « état périmé » du serveur, flux ouvert : l'instantané diffusé ne l'apportera
+ * pas, et `reportsKey` peut ne pas avoir changé). Détail déjà lu : sans effet.
  */
 export function useProposalMaps(
   liveMatch: BracketMatch,
@@ -48,8 +52,16 @@ export function useProposalMaps(
    * une requête pour rien, à chaque nouvelle proposition.
    */
   canRead = true,
-): { match: BracketMatch; proposals: ReadonlyArray<MatchProposalMaps>; detailPending: boolean } {
+): {
+  match: BracketMatch;
+  proposals: ReadonlyArray<MatchProposalMaps>;
+  detailPending: boolean;
+  reload: () => void;
+} {
   const [fetched, setFetched] = useState<MatchProposalMaps | null>(null);
+  // Chaque `reload` rouvre les tentatives, même à `reportsKey` inchangé.
+  const [reloadCount, setReloadCount] = useState(0);
+  const reload = useCallback(() => setReloadCount((count) => count + 1), []);
   // Les propositions (`reportsKey`) dont les tentatives ont pris fin : un
   // nouveau report change la clé et rouvre l'attente.
   const [settledKey, setSettledKey] = useState<string | null>(null);
@@ -125,6 +137,6 @@ export function useProposalMaps(
       // doit pas lever `detailPending` pendant qu'elle est en vol.
       setSettledKey(null);
     };
-  }, [needsRefresh, reportsKey, tournamentId, matchId]);
-  return { match, proposals: readable, detailPending: needsRefresh && settledKey !== reportsKey };
+  }, [needsRefresh, reportsKey, tournamentId, matchId, reloadCount]);
+  return { match, proposals: readable, detailPending: needsRefresh && settledKey !== reportsKey, reload };
 }

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { ROUND_MAP_SLOTS_MAX, type RoundKey } from "@/lib/shared/round-maps";
-import { plannedRoundKeys, roundMaxMaps, type RoundPlanInput } from "@/lib/shared/round-plan";
+import {
+  indexBuiltRounds,
+  plannedRoundKeys,
+  roundMaxMaps,
+  roundWithinBuiltBracket,
+  withoutUnbuiltRounds,
+  type RoundPlanInput,
+} from "@/lib/shared/round-plan";
 import type { TournamentPhase } from "@/lib/shared/types";
 
 /** Tours proposés par la fenêtre « Cartes et bans » (`docs/features/ROUND_MAPS.md`). */
@@ -172,5 +179,88 @@ describe("roundMaxMaps", () => {
     };
     expect(roundMaxMaps(endurance, 1)).toBe(1);
     expect(roundMaxMaps(endurance, PLAYOFF_ROUND_OFFSET)).toBe(3);
+  });
+});
+
+/** Réglages par tour sans les tours jamais créés (`docs/features/ROUND_MAPS.md`). */
+describe("withoutUnbuiltRounds", () => {
+  it("withoutUnbuiltRounds_noMatchYet_keepsEverything", () => {
+    const kept = withoutUnbuiltRounds([upper(1), upper(4)], { format: "SINGLE", phases: null }, indexBuiltRounds([]));
+    expect(kept).toEqual([upper(1), upper(4)]);
+  });
+
+  it("withoutUnbuiltRounds_single_dropsRoundsBeyondBuiltMax", () => {
+    const items = [upper(1), upper(2), upper(3), upper(4)];
+    const kept = withoutUnbuiltRounds(items, { format: "SINGLE", phases: null }, indexBuiltRounds([upper(1), upper(2)]));
+    expect(kept).toEqual([upper(1), upper(2)]);
+  });
+
+  it("withoutUnbuiltRounds_double_dropsLowerRoundBeyondBuiltLower", () => {
+    const lowerFour: RoundKey = { phaseId: 0, bracket: "LOWER", roundNumber: 4 };
+    const lowerFive: RoundKey = { phaseId: 0, bracket: "LOWER", roundNumber: 5 };
+    const index = indexBuiltRounds([upper(1), { phaseId: 0, bracket: "LOWER", roundNumber: 1 }, lowerFour]);
+    const kept = withoutUnbuiltRounds([lowerFour, lowerFive], { format: "DOUBLE", phases: null }, index);
+    expect(kept).toEqual([lowerFour]);
+  });
+
+  // Revue standard EF-61 cycle 2 : l'arbre d'une phase se crée d'un coup — un
+  // tableau sans match (petite finale retirée) n'aura jamais de tour.
+  it("withoutUnbuiltRounds_bracketWithoutMatchInBuiltPhase_dropsItsRounds", () => {
+    const third: RoundKey = { phaseId: 0, bracket: "THIRD_PLACE", roundNumber: 1 };
+    const kept = withoutUnbuiltRounds([third, upper(2)], { format: "SINGLE", phases: null }, indexBuiltRounds([upper(1), upper(2)]));
+    expect(kept).toEqual([upper(2)]);
+  });
+
+  it("withoutUnbuiltRounds_swiss_keepsFutureRounds", () => {
+    const kept = withoutUnbuiltRounds([upper(5)], { format: "SWISS", phases: null }, indexBuiltRounds([upper(1)]));
+    expect(kept).toEqual([upper(5)]);
+  });
+
+  it("withoutUnbuiltRounds_multiEliminationPhaseNotOpened_keepsItsRounds", () => {
+    const phases = [phase({ id: 11, format: "SWISS" }), phase({ id: 12, format: "SINGLE" })];
+    const kept = withoutUnbuiltRounds([upper(3, 12)], { format: "MULTI", phases }, indexBuiltRounds([upper(1, 11)]));
+    expect(kept).toEqual([upper(3, 12)]);
+  });
+
+  it("withoutUnbuiltRounds_multiOpenedEliminationPhase_dropsItsUnbuiltRounds", () => {
+    const phases = [phase({ id: 11, format: "SWISS" }), phase({ id: 12, format: "SINGLE" })];
+    const kept = withoutUnbuiltRounds(
+      [upper(1, 12), upper(3, 12)],
+      { format: "MULTI", phases },
+      indexBuiltRounds([upper(1, 11), upper(1, 12)]),
+    );
+    expect(kept).toEqual([upper(1, 12)]);
+  });
+
+  it("withoutUnbuiltRounds_multiUnknownPhase_keepsItem", () => {
+    const phases = [phase({ id: 11, format: "SINGLE" })];
+    const kept = withoutUnbuiltRounds([upper(4, 99)], { format: "MULTI", phases }, indexBuiltRounds([upper(1, 99)]));
+    expect(kept).toEqual([upper(4, 99)]);
+  });
+});
+
+describe("indexBuiltRounds", () => {
+  it("indexBuiltRounds_rounds_recordsBracketMaxAndPhases", () => {
+    const index = indexBuiltRounds([upper(1), upper(3), upper(2), upper(1, 12)]);
+    expect(index.brackets).toEqual(new Map([["0:UPPER", 3], ["12:UPPER", 1]]));
+    expect(index.phases).toEqual(new Set([0, 12]));
+  });
+});
+
+describe("roundWithinBuiltBracket", () => {
+  it("roundWithinBuiltBracket_roundAtBuiltMax_returnsTrue", () => {
+    expect(roundWithinBuiltBracket(upper(3), "SINGLE", indexBuiltRounds([upper(1), upper(3)]))).toBe(true);
+  });
+
+  it("roundWithinBuiltBracket_roundOverBuiltMax_returnsFalse", () => {
+    expect(roundWithinBuiltBracket(upper(4), "DOUBLE", indexBuiltRounds([upper(3)]))).toBe(false);
+  });
+
+  it("roundWithinBuiltBracket_phaseWithoutMatch_returnsTrue", () => {
+    expect(roundWithinBuiltBracket(upper(4, 12), "SINGLE", indexBuiltRounds([upper(1, 11)]))).toBe(true);
+  });
+
+  it("roundWithinBuiltBracket_unknownFormat_returnsTrue", () => {
+    expect(roundWithinBuiltBracket(upper(9), undefined, indexBuiltRounds([upper(1)]))).toBe(true);
   });
 });

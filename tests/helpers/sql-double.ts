@@ -56,3 +56,25 @@ export function poolWithConnection(execute: SqlMock) {
   const getConnection = jest.fn(async () => fakeConnection({ execute, release }));
   return { pool: fakePool({ execute, getConnection }), release, getConnection };
 }
+
+/**
+ * `withConnection` simulé comme le vrai (`lib/server/database.ts`) : une
+ * connexion par appel, prise au pool de `getDatabase` (simulé), rendue par
+ * le vrai `releaseWithServerLockWait` — rendue, remise au délai du serveur ou
+ * détruite selon ce qui s'y est passé.
+ */
+export function poolBackedWithConnection(
+  getDatabase: () => Promise<Pool>,
+): <T>(run: (connection: PoolConnection) => Promise<T>) => Promise<T> {
+  const { releaseWithServerLockWait } = jest.requireActual<typeof import("@/lib/server/tournaments/lock-wait")>(
+    "@/lib/server/tournaments/lock-wait",
+  );
+  return async (run) => {
+    const connection = await (await getDatabase()).getConnection();
+    try {
+      return await run(connection);
+    } finally {
+      await releaseWithServerLockWait(connection);
+    }
+  };
+}

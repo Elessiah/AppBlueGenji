@@ -70,7 +70,7 @@ describe("détail map par map — affichage", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<ProposalSection key=\{by\} text=\{text\} report=\{report\}/);
     // Chaque proposition rend son détail de maps (litige, ou report seul suspendu).
-    expect(dialog).toMatch(/function ProposalSection[\s\S]{0,800}<MapResultList maps=\{report\.maps\}/);
+    expect(dialog).toMatch(/function ProposalSection[\s\S]{0,1000}<MapResultList\s+maps=\{report\.maps\}/);
   });
 });
 
@@ -212,7 +212,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("l'infobulle d'un bouton actionnable sur une map refusée dit ce refus, pas « score incomplet »", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
     expect(hook).toContain("const resolve = checkMapList(format, game, maps, { decisive: true, ...mapRules });");
-    expect(hook).toContain("resolve: isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error,");
+    expect(hook).toContain("const resolveError = isStructuralBlocker(decision.resolveBlocker) ? null : resolve.error;");
   });
 
   it("un forfait ou une saisie fermée taisent les refus de map : la liste est masquée et ses maps ne partent pas", () => {
@@ -237,7 +237,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   it("un détail adverse encore en lecture est annoncé comme tel, sans inviter à ressaisir", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     // Le détail attendu, levé quand les relectures ont pris fin sans lui (`detailPending`).
-    expect(dialog).toContain("detailPending: detailLoading } = useProposalMaps(");
+    expect(dialog).toContain("detailPending: detailLoading, reload: reloadProposals } = useProposalMaps(");
     expect(dialog).toContain('if (reader.detailLoading) return text.t("score.player.theirs.loading", values);');
     expect(FR_SCORE.player.theirs.loading).toContain("Lecture du détail de ses maps…");
     expect(dialog.indexOf("if (opponentDetailKnown(theirs))")).toBeLessThan(dialog.indexOf("if (reader.detailLoading) return"));
@@ -336,7 +336,7 @@ describe("détail map par map — lecteur sans droit de report", () => {
 describe("détail map par map — ligne vierge ajoutée et refus corrigé ailleurs", () => {
   it("un refus qui désigne la ligne vierge qu'on vient d'ajouter se tait, dans les deux modales", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("onBlankRow: !refusalOnTouchedRow(resolve.error ? resolve : save, maps),");
+    expect(hook).toContain("onBlankRow: !refusalOnTouchedRow(shown, maps),");
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).toContain("return maps.some(isMapTouched) && refusalOnTouchedRow(check, maps);");
     expect(player).toContain("const touched = refusalWorthShowing(check, maps);");
@@ -368,11 +368,11 @@ describe("détail map par map — saisie du seul détail et libellé de confirma
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).not.toContain("replayCodeOptional");
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(hook).toContain("return { requireReplayCode: false, pointTarget };");
+    expect(hook).toContain("return { requireReplayCode: false, pointTarget, pointTargets };");
     expect(hook).toContain("const mapCheck = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });");
     expect(hook).toContain("const local = checkMapList(matchFormat, game, sentMaps, { decisive, ...mapRules });");
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
-    expect(list).toContain("progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget })");
+    expect(list).toContain("progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget, pointTargets })");
     expect(list).toContain('{replayCodeOptional ? t("score.maps.replayCodeOptional") : t("score.maps.replayCode")}');
     expect(list).toContain('{replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}');
     expect(FR_SCORE.maps.replayCodeOptional).toBe("Code de replay (facultatif)");
@@ -434,7 +434,7 @@ describe("détail map par map — blocages qui ne tiennent pas aux maps", () => 
     for (const blocker of ["ALREADY_DECIDED", "DOUBLE_FORFEIT", "NOT_IN_LAUNCH"]) {
       expect(hook).toContain(`"${blocker}",`);
     }
-    expect(hook).toContain("save: isStructuralBlocker(decision.saveBlocker) ? null : save.error,");
+    expect(hook).toContain("const saveError = isStructuralBlocker(decision.saveBlocker) ? null : save.error;");
   });
 });
 
@@ -442,7 +442,7 @@ describe("détail map par map — lignes progressives dans les modales", () => {
   const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
 
   it("toute modification passe par l'affichage progressif ; une ligne ajoutée s'annonce", () => {
-    expect(list()).toContain("const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget });");
+    expect(list()).toContain("const rows = progressiveMapRows(format, game, next, { requireReplayCode: !replayCodeOptional, pointTarget, pointTargets });");
     // Seule une croissance due à l'affichage progressif s'annonce (pas une liste reçue).
     expect(list()).toContain("autoGrown.current = rows.length > maps.length;");
     expect(list()).toContain('if (autoGrown.current) setAnnouncement(t("score.maps.added", { index: maps.length }));');
@@ -455,7 +455,7 @@ describe("détail map par map — lignes progressives dans les modales", () => {
 
   it("engagé comme arbitrage partent d'une ligne vierge ; ce qui part la retire", () => {
     const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
-    expect(player).toContain("progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), { pointTarget })");
+    expect(player).toContain("progressiveMapRows(matchFormat, game, playerReportInitialMaps(view), pointRules)");
     expect(player).toContain("const maps = useMemo(() => trimTrailingBlankMaps(rows), [rows]);");
     expect(player).toMatch(/maps=\{rows\}\s*onChange=\{setRows\}\s*format=\{matchFormat\}/);
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
@@ -534,7 +534,7 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
 
   it("useScoreForm_rulesChangeWhileOpen_realignsBaseline", () => {
     const form = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(form).toContain("const rules = rulesKey(matchFormat, game, pointTarget);");
+    expect(form).toContain("const rules = rulesKey(matchFormat, game, pointTarget, pointTargets);");
     expect(form).not.toContain("JSON.stringify(matchFormat)");
     expect(form).toContain("rules !== synced.rules");
     expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
@@ -579,7 +579,7 @@ describe("format Duel / Arcade — revue UI cycle 1", () => {
 
   it("MapScoreList_tieAtTarget_flaggedWhileTyping", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
-    expect(list).toContain("row.team1Score === pointTarget && row.team2Score === pointTarget");
+    expect(list).toContain("row.team1Score === rowTarget && row.team2Score === rowTarget");
     expect(list).not.toContain("score.maps.duelHint");
   });
 
@@ -587,5 +587,29 @@ describe("format Duel / Arcade — revue UI cycle 1", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapResultList.tsx");
     expect(list).not.toContain("styles.pointTarget");
     expect(list).toContain('t("match.maps.pointTarget"');
+  });
+});
+
+describe("Duel / Arcade carte par carte — refus cité et règle changée en cours de saisie", () => {
+  it("useScoreForm_structuralResolveBlocker_citesTheSaveRefusalMap", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+
+    expect(hook).toContain("const shown = resolveError || !saveError ? resolve : save;");
+    expect(hook).toContain("pointTarget: refusalPointTarget(shown, mapRules),");
+  });
+
+  it("PlayerScoreDialog_pointRulesChanged_regrowsRows", () => {
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+
+    expect(player).toContain("const regrown = progressiveMapRows(matchFormat, game, current.current, pointRules);");
+    expect(player).toContain("}, [pointsKey]);");
+  });
+
+  it("PlayerScoreDialog_pointRules_stableIdentityAndNoJsonCompare", () => {
+    const player = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+
+    expect(player).toContain("const pointRules = useMemo(() => ({ pointTarget, pointTargets }), [pointsKey]);");
+    expect(player).toContain("sameRows(current.current, baseline.current)");
+    expect(player).not.toContain("JSON.stringify(current.current)");
   });
 });

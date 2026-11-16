@@ -390,14 +390,14 @@ async function checkAdminMaps(
   maps: ReadonlyArray<MatchMapInput>,
   decisive: boolean,
 ): Promise<{ format: MatchFormat | null; score: { team1: number; team2: number } }> {
-  const { format, game, refereeScheduling, pointTarget } = await loadTournamentMatchRules(
+  const { format, game, refereeScheduling, pointTarget, pointTargets } = await loadTournamentMatchRules(
     connection,
     Number(match.tournament_id),
     Number(match.round_number),
     matchRoundKey(match),
   );
   assertScoreEntryOpen(match, refereeScheduling);
-  const check = checkMapList(format, game, maps, { decisive, requireReplayCode: false, pointTarget });
+  const check = checkMapList(format, game, maps, { decisive, requireReplayCode: false, pointTarget, pointTargets });
   if (check.error) throw new Error(check.error);
   return { format, score: check.score };
 }

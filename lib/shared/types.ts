@@ -501,6 +501,12 @@ export type TournamentCard = {
    */
   teamVoiceChannels: boolean;
   /**
+   * Check-in des matchs (`docs/features/MATCH_CHECK_IN_SETTING.md`) : éteint,
+   * ni check-in à H-15 ni rappel 10 h. Allumé par défaut ; modifiable à tout
+   * moment jusqu'à la clôture.
+   */
+  matchCheckIn: boolean;
+  /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
    */
@@ -655,6 +661,13 @@ export type BracketMatch = {
    * format éteint. Dans l'instantané commun, servi par les deux portes.
    */
   mapPointTarget?: number | null;
+  /**
+   * Format Duel / Arcade réglé **carte par carte** sur le tour
+   * (`mapRules.mapPointTargets`) : N effectif de chaque carte réglée, carte 1 en
+   * tête (une carte au-delà suit `mapPointTarget` — `mapPointTargetAt`). Absent
+   * quand aucune carte n'a de réglage propre. Servi par les deux portes.
+   */
+  mapPointTargets?: number[] | null;
   /**
    * Match joué sur une seule carte (BO1 / FT1) : score de cette carte (5–3),
    * que l'arbre et la carte du match montrent au lieu de 1–0
@@ -1263,7 +1276,8 @@ export type PersonalDataExport = {
   liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null; refused: boolean }[];
   /**
    * Inscriptions de caster du titulaire (`bg_match_casters`) : match, tournoi,
-   * stream tenu, « Prêt » et date d'inscription — gardées avec un match joué.
+   * stream tenu, « Prêt », date d'inscription et BattleTag donné pour ce cast
+   * (`castBattletag`) — gardées avec un match joué.
    */
   casts: {
     matchId: number;

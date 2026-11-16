@@ -32,6 +32,8 @@ const TOURNAMENT_ACTIONS: StaffTournamentAction[] = [
   "LIVE_URL_REMOVED",
   "TEAM_VOICE_ON",
   "TEAM_VOICE_OFF",
+  "MATCH_CHECK_IN_ON",
+  "MATCH_CHECK_IN_OFF",
 ];
 
 const tournament = { id: 7, name: "Coupe d'hiver" };

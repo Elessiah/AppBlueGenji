@@ -46,7 +46,8 @@ describe("ToastItem — comportement (source)", () => {
 
   it("garde cinq secondes d'affichage, décompte suspendu exclu", () => {
     expect(TOAST_DURATION_MS).toBe(5000);
-    expect(source).toMatch(/startCountdown\(TOAST_DURATION_MS, now\)/);
+    expect(source).toMatch(/const duration = toast\.durationMs \?\? TOAST_DURATION_MS/);
+    expect(source).toMatch(/startCountdown\(duration, now\)/);
   });
 
   it("dérive la suspension de la règle pure, choix explicite compris", () => {
@@ -88,7 +89,7 @@ describe("ToastItem — comportement (source)", () => {
 
   it("n'écrit plus aucun style en ligne, barre de progression exceptée", () => {
     expect(source.match(/style=\{/g)).toHaveLength(1);
-    expect(source).toMatch(/style=\{\{ animationDuration: `\$\{TOAST_DURATION_MS\}ms` \}\}/);
+    expect(source).toMatch(/style=\{\{ animationDuration: `\$\{duration\}ms` \}\}/);
   });
 });
 

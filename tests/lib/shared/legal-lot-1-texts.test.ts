@@ -26,8 +26,9 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
     expect(entry()?.audience).toBeUndefined();
     // L'entrée des conditions v11 puis le rectificatif de la reprise d'équipe
     // (#595), l'entrée des avis d'équipe (TEAMS-LOT) et celle de leur réglage
-    // (TEAM-DM-OPTOUT) et l'avis d'exclusion du bot (BOT-LOT), datés du même jour, la suivent.
-    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(ID);
+    // (TEAM-DM-OPTOUT) et l'avis d'exclusion du bot (BOT-LOT), datés du même jour, la suivent,
+    // puis le rectificatif de la marque de session (EF-63).
+    expect(PRIVACY_CHANGES.at(-7)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {

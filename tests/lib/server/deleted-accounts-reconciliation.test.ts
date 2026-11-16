@@ -70,6 +70,8 @@ function fakeDb(
     commitFails?: boolean;
     /** Le relevé des tournois de casts de ce compte échoue (avant toute transaction). */
     failCastListingFor?: number;
+    /** Un relevé complet a déjà été mené dans la journée (marqueur de `bg_settings`). */
+    fullScanFresh?: boolean;
   } = {},
 ) {
   const queries: Query[] = [];
@@ -89,6 +91,7 @@ function fakeDb(
       return [[...new Set(refereed.map((match) => match.tournamentId))].map((tournament_id) => ({ tournament_id }))];
     }
     if (options.failTermsCleanup && q.includes("SET terms_version = NULL")) throw new Error("DB_DOWN");
+    if (q.startsWith("SELECT 1 FROM bg_settings")) return [options.fullScanFresh ? [{ 1: 1 }] : []];
     if (q.startsWith("SELECT u.id FROM bg_users u WHERE u.is_deleted = 1")) {
       return [
         Object.entries(accounts)
@@ -307,7 +310,7 @@ describe("reconcileDeletedAccounts", () => {
     const { queries, connections } = fakeDb({ 14: { pseudo: "Nova", isDeleted: false } });
     // La liste ne le rend pas (filtrée) : on la force à le proposer.
     jest.mocked(getDatabase).mockResolvedValue(fakePool({
-      execute: jest.fn(async () => [[{ id: 14 }]]),
+      execute: jest.fn(async (sql: string) => (String(sql).includes("SELECT") && String(sql).includes("u.id") ? [[{ id: 14 }]] : [[]])),
       getConnection: (await getDatabase()).getConnection,
     }));
 
@@ -537,5 +540,39 @@ describe("la politique publiée annonce l'exception de l'entrée solo", () => {
       "utf8",
     );
     expect(register).toContain("aucun engagement dans un tournoi individuel déjà commencé ou terminé");
+  });
+});
+
+/** EF-62 (E66) : la question « ne laisse plus rien » ne se pose qu'une fois par jour. */
+describe("reconcileDeletedAccounts — relevé complet quotidien", () => {
+  const candidatesSql = (queries: Query[]) =>
+    queries.find((q) => q.sql.startsWith("SELECT u.id FROM bg_users u WHERE u.is_deleted = 1"))?.sql;
+  const markerWrites = (queries: Query[]) =>
+    queries.filter((q) => q.sql.startsWith("INSERT INTO bg_settings"));
+
+  it("reconcileDeletedAccounts_markerFresh_skipsCostlyBranchAndKeepsMarker", async () => {
+    const { queries } = fakeDb({}, { fullScanFresh: true });
+
+    await reconcileDeletedAccounts();
+
+    expect(candidatesSql(queries)).not.toContain("OR NOT (");
+    expect(markerWrites(queries)).toEqual([]);
+  });
+
+  it("reconcileDeletedAccounts_markerStale_fullScanThenMarks", async () => {
+    const { queries } = fakeDb({});
+
+    await reconcileDeletedAccounts();
+
+    expect(candidatesSql(queries)).toContain("OR NOT (");
+    expect(markerWrites(queries).map((q) => q.params)).toEqual([["deleted_accounts_full_scan_at"]]);
+  });
+
+  it("reconcileDeletedAccounts_fullScanWithFailure_markerNotWritten", async () => {
+    const { queries } = fakeDb({ 20: { pseudo: "compte_supprime_20", played: true } }, { failFor: 20 });
+
+    await reconcileDeletedAccounts();
+
+    expect(markerWrites(queries)).toEqual([]);
   });
 });

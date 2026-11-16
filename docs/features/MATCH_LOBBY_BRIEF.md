@@ -4,7 +4,9 @@
 gèrent ses deux engagées (propriétaire et managers, ou le joueur d'une entrée
 solo) reçoivent son **check-in** : un seul message, en message privé Discord
 et en notification push (sujet `MATCH_LOBBY_BRIEF`, « Check-in du match »),
-**une seule fois par match et par engagée**.
+**une seule fois par match et par engagée**. Rien ne part pour un tournoi
+dont l'option « Check-in des matchs » est décochée, ni pour une échéance
+antérieure à sa reprise (`MATCH_CHECK_IN_SETTING.md`).
 
 Spécification : décisions de l'utilisateur du 2026-10-26 et du 2026-10-27
 (`MATCH_REFEREE.md`), **refondues le 2026-11-04** — le brief du salon et le
@@ -69,6 +71,12 @@ lancé », **sans** la ligne du salon de check-in ni celle du vocal — tous deu
 n'ouvrent qu'au quart d'heure de l'horaire (`kickoff_state` vaut
 `UNSCHEDULED` au-delà de `LOBBY_BRIEF_LEAD_MINUTES`, `voice_tracked` est borné
 de même) — et rien ne repart à H-15 (même réservation).
+
+**Côté déjà réservé** (EF-61) : le balayage lit chaque côté réservé en colonne
+(`team1_briefed` / `team2_briefed`, `HAVING`) ; il n'y rejoue aucune réservation
+et n'en relit pas les destinataires — seules les appartenances du premier côté
+sont relues pour un second à briefer (`slotManagers`). Un match dont un seul
+côté attend un gérant ne coûte plus, par passe, que ce côté.
 
 **Destinataires relus juste avant l'envoi** (REFEREE-LOT-1) : chaque côté
 relit ses membres actifs (`loadEntrantManagerIds`) après sa réservation — un
@@ -225,7 +233,10 @@ portent) — la carte n'est jamais coupée sans le dire.
 partagé avec les départs de match), appelé aux mêmes endroits que les départs
 de match (publication d'un évènement de tournoi, entretien de l'instantané qui
 ouvre un lancement, lecture de la liste des tournois, et `GET /api/me/match-launches`,
-interrogée par les joueurs proches de leur match, comme les salons vocaux).
+interrogée par les joueurs proches de leur match, comme les salons vocaux — là,
+seulement si un tournoi est en cours : `anyTournamentRunning`, lecture
+mutualisée avec la modale ; les salons vocaux, eux, balaient toujours, un salon
+resté ouvert après la fin devant encore être rendu).
 
 - Candidats (`BRIEF_DUE_SQL`) : tournoi `RUNNING` **et publié**
   (`start_visibility_at` passé, comme les salons vocaux : un tournoi masqué de

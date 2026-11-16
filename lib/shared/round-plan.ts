@@ -277,3 +277,79 @@ export function applicableTiebreaks(
 ): RoundTiebreak[] {
   return tiebreaks.filter((round) => roundAllowsTiebreak(tournament, round));
 }
+
+
+/**
+ * Format dont l'arbre entier est créé d'un coup (au lancement, ou à
+ * l'ouverture de la phase) : élimination simple ou double. Ses tours sont
+ * alors tous connus ; en ronde suisse, survie ou BlueGenji Survie, ils se
+ * créent au fil de l'eau.
+ */
+export function isWholeBracketFormat(format: TournamentFormat | PhaseFormat | null | undefined): boolean {
+  return format != null && ELIMINATION_FORMATS.has(format);
+}
+
+/** Clé d'un tableau (`phaseId:bracket`) dans un {@link BuiltRoundIndex}. */
+export function builtBracketKey(phaseId: number, bracket: string): string {
+  return `${phaseId}:${bracket}`;
+}
+
+/**
+ * Tours créés : plus haut tour de chaque tableau (clé {@link builtBracketKey})
+ * et phases dont l'arbre existe (au moins un match).
+ */
+export type BuiltRoundIndex = {
+  readonly brackets: ReadonlyMap<string, number>;
+  readonly phases: ReadonlySet<number>;
+};
+
+/** Index des tours créés, à bâtir **une** fois par lecture des matchs. */
+export function indexBuiltRounds(built: readonly RoundKey[]): BuiltRoundIndex {
+  const brackets = new Map<string, number>();
+  const phases = new Set<number>();
+  for (const round of built) {
+    const key = builtBracketKey(round.phaseId, round.bracket);
+    brackets.set(key, Math.max(brackets.get(key) ?? 0, round.roundNumber));
+    phases.add(round.phaseId);
+  }
+  return { brackets, phases };
+}
+
+/**
+ * Règle **unique** du « tour jamais créé », partagée par le serveur (pose d'un
+ * réglage, `roundsFittingTournament`), l'instantané (`withoutUnbuiltRounds`) et
+ * la purge à la création de l'arbre (`purgeUnbuiltRoundSettings`) : en
+ * élimination (`isWholeBracketFormat`), l'arbre d'une phase se crée **d'un
+ * coup**, tous tableaux compris — une fois la phase créée, un tour au-delà du
+ * plus haut tour de son tableau, ou d'un tableau sans aucun match (petite
+ * finale retirée, repêchage d'un arbre à deux), n'existera pas. Phase sans
+ * aucun match (arbre pas encore créé) : tous ses tours comptent. Hors
+ * élimination, tout tour compte.
+ */
+export function roundWithinBuiltBracket(
+  round: RoundKey,
+  format: TournamentFormat | PhaseFormat | null | undefined,
+  index: BuiltRoundIndex,
+): boolean {
+  if (!isWholeBracketFormat(format) || !index.phases.has(round.phaseId)) return true;
+  const maxRound = index.brackets.get(builtBracketKey(round.phaseId, round.bracket));
+  return maxRound !== undefined && round.roundNumber <= maxRound;
+}
+
+/**
+ * Réglages par tour (cartes, maps de départage, points) sans ceux des tours
+ * que le tournoi ne jouera jamais ({@link roundWithinBuiltBracket}) : le plan,
+ * dimensionné avant le départ sur la capacité, a pu en régler au-delà des
+ * inscrites. Ils ne grossissent plus chaque instantané ; la création de
+ * l'arbre les retire de la base (`purgeUnbuiltRoundSettings`). Phase inconnue
+ * d'un multi-phases : gardé. `index` : {@link indexBuiltRounds}, bâti une fois.
+ */
+export function withoutUnbuiltRounds<T extends RoundKey>(
+  items: readonly T[],
+  tournament: { format: TournamentFormat; phases: ReadonlyArray<Pick<TournamentPhase, "id" | "format">> | null },
+  index: BuiltRoundIndex,
+): T[] {
+  const formatOf = (phaseId: number) =>
+    tournament.format === "MULTI" ? tournament.phases?.find((phase) => phase.id === phaseId)?.format : tournament.format;
+  return items.filter((item) => roundWithinBuiltBracket(item, formatOf(item.phaseId), index));
+}

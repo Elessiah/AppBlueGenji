@@ -29,6 +29,8 @@
     "planningDisabled": "Referee scheduling turned off: matches without a date move into launch.",
     "planningEnabled": "Referee scheduling turned on.",
     "planningEnabledMoved": "Scheduling turned on: {count, plural, =1 {1 match to schedule} other {# matches to schedule}}.",
+    "concurrentRetry": "Another save is in progress on this tournament. Try again in a moment.",
+    "tooManyRequests": "Too many option changes in a short time. Wait a few minutes before trying again.",
     "planningErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournament not found.",
       "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
@@ -73,6 +75,12 @@
       "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
       "INVALID_TEAM_VOICE_CHANNELS": "Invalid value for team voice channels.",
       "fallback": "Team voice channels couldn't be changed. Try again in a moment."
+    },
+    "checkInErrors": {
+      "TOURNAMENT_NOT_FOUND": "Tournament not found.",
+      "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
+      "INVALID_MATCH_CHECK_IN": "Invalid value for match check-in.",
+      "fallback": "Match check-in couldn't be changed. Try again in a moment."
     }
   },
   "form": {
@@ -210,6 +218,13 @@
       "description": "On: fifteen minutes before each match, the Discord bot opens a {capacity}-seat voice channel per team (none if either side is a solo entry or a ghost team); the match launch doesn't depend on the channels. For each team in the match, the site keeps the channel's ID and its times, never who is in it (details: GDPR page, “Team voice channels”).",
       "create": "Can be changed later, until the tournament closes — even while it runs.",
       "edit": "Can be changed until the tournament closes — even while it runs.",
+      "finished": "The tournament is finished: this option can no longer be changed."
+    },
+    "matchCheckIn": {
+      "label": "Match check-in",
+      "description": "Unticked, no check-in is sent 15 minutes before a match, no reminder 10 hours before, and no message mentions the check-in. The 24 h reminder, the schedule announcements and the Discord channels (check-in, voice) stay as usual.",
+      "create": "Ticked by default. Can be changed later, until the tournament closes — even while it runs.",
+      "edit": "Can be changed until the tournament closes — even while it runs. Turned back on, it doesn't catch up on what was due in the meantime.",
       "finished": "The tournament is finished: this option can no longer be changed."
     }
   },

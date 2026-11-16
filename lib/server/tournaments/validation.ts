@@ -192,6 +192,8 @@ export type TournamentInputBody = {
   launchPhase?: boolean | null;
   /** Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ; absent = éteint. */
   teamVoiceChannels?: boolean | null;
+  /** Check-in des matchs (`docs/features/MATCH_CHECK_IN_SETTING.md`) ; absent = allumé. */
+  matchCheckIn?: boolean | null;
   /**
    * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
    * une carte ; absent ou `null` = format éteint.
@@ -252,6 +254,8 @@ export type ValidatedTournamentInput = {
   launchPhase: boolean;
   /** Salons vocaux d'équipe avant chaque match (`docs/features/MATCH_VOICE.md`). */
   teamVoiceChannels: boolean;
+  /** Check-in des matchs à H-15 et rappel 10 h (`docs/features/MATCH_CHECK_IN_SETTING.md`). */
+  matchCheckIn: boolean;
   /** Points par carte du format Duel / Arcade ; `null` = format éteint. */
   mapPointTarget: number | null;
 };
@@ -337,6 +341,8 @@ export function validateTournamentInput(
       refereeScheduling: body.refereeScheduling === true,
       launchPhase: body.launchPhase === true,
       teamVoiceChannels: body.teamVoiceChannels === true,
+      // Allumé sauf refus explicite : le défaut est le comportement d'avant.
+      matchCheckIn: body.matchCheckIn !== false,
       mapPointTarget: mapPointTarget.value,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
@@ -485,6 +491,9 @@ function validateRegistrationSettings(body: TournamentInputBody): Checked<Regist
     typeof body.teamVoiceChannels !== "boolean"
   ) {
     return { error: "INVALID_TEAM_VOICE_CHANNELS" };
+  }
+  if (body.matchCheckIn !== undefined && body.matchCheckIn !== null && typeof body.matchCheckIn !== "boolean") {
+    return { error: "INVALID_MATCH_CHECK_IN" };
   }
   const registrationFilters: RegistrationFilters = {
     discordRequirement: isPlayerRequirement(body.registrationDiscordRequirement)

@@ -1,6 +1,7 @@
 import "./script-env";
 import { replayAccountDeletions } from "./account-deletion-replay";
 import { accountDeletionJournalPath, readAccountDeletionJournal } from "./account-deletion-journal";
+import { muteOutboundForProcess } from "./outbound-mute";
 
 /**
  * Après la restauration d'une sauvegarde de la base, rejoue les suppressions de
@@ -26,6 +27,9 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
   const filePath = args.find((arg) => !arg.startsWith("--")) ?? accountDeletionJournalPath();
+  // Rien ne part vers Discord ni en push pendant la remise en état : forfaits
+  // et retraits rejoués ont déjà été annoncés avant la sauvegarde perdue.
+  muteOutboundForProcess();
 
   try {
     const { entries, invalidLines } = await readAccountDeletionJournal(filePath);

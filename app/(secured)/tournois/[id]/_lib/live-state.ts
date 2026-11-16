@@ -68,6 +68,7 @@ function parseCertificationPromptMessage(message: Record<string, unknown>): Live
       // Absent (serveur d'avant le champ) : pas d'alerte « équipe injoignable »
       // au meneur ; le motif `TEAM_WITHOUT_CONTACT` la porte toujours.
       teamHasContact: prompt.reason === "MANAGER" && prompt.teamHasContact !== false,
+      ...(prompt.battletagUnfixable === true ? { battletagUnfixable: true as const } : {}),
     },
   };
 }

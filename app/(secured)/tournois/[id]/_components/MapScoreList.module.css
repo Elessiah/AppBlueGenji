@@ -68,6 +68,12 @@
   overflow-wrap: anywhere;
 }
 
+.mapTarget {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
 .code,
 .score {
   display: flex;

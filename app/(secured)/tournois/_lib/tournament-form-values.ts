@@ -129,6 +129,12 @@ export type TournamentFormValues = {
    */
   teamVoiceChannels: boolean;
   /**
+   * Check-in des matchs (`docs/features/MATCH_CHECK_IN_SETTING.md`) : même
+   * régime que les salons vocaux, route dédiée (`match-check-in`). Cochée par
+   * défaut.
+   */
+  matchCheckIn: boolean;
+  /**
    * Phase de lancement des matchs (« Prêt », modale — `MATCH_LAUNCH.md`).
    * Décochée par défaut : un match part dès son heure.
    */
@@ -237,6 +243,8 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     refereeScheduling: false,
     // Éteinte : aucun salon vocal n'est ouvert d'office.
     teamVoiceChannels: false,
+    // Allumé : check-in à H-15 et rappel 10 h, comme avant l'option.
+    matchCheckIn: true,
     phases: [createDefaultPhase(1, "SWISS"), createDefaultPhase(2, "DOUBLE")],
   };
 }
@@ -342,6 +350,8 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     refereeScheduling: values.refereeScheduling,
     // Même logique : lue par la création seulement (route `voice-channels` ensuite).
     teamVoiceChannels: values.teamVoiceChannels,
+    // Même logique (route `match-check-in` ensuite).
+    matchCheckIn: values.matchCheckIn,
     // Toujours envoyé (jamais `undefined`) : décocher doit éteindre l'option,
     // la liste blanche de l'édition ignorant un champ absent.
     launchPhase: values.launchPhase,
@@ -414,6 +424,7 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     // page d'édition la repose depuis la lecture, `refereeScheduling`.
     refereeScheduling: false,
     teamVoiceChannels: false,
+    matchCheckIn: true,
     phases: apiValues.phases ?? defaults.phases,
   };
 }

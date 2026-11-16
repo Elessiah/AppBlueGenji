@@ -370,7 +370,10 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * doit pas en déplacer les tendances. Le journal compte des lignes et, pour les
  * équipes et les tournois laissés tels quels, en donne les **identifiants** (de
  * quoi les renommer à la main) — jamais un nom ni l'identifiant d'un joueur
- * (`RGPD_LOGS_AND_VISITS.md`).
+ * (`RGPD_LOGS_AND_VISITS.md`). Un pseudo laissé tel quel, sans identifiant au
+ * journal, se retrouve par la requête staff de `UNTRUSTED_NAMES.md`
+ * (§ « Pseudos laissés tels quels ») : le marqueur est posé quand même, la
+ * passe ne rebalaie pas toutes les colonnes à chaque démarrage pour un doublon.
  */
 export async function cleanStoredNames(db: Pool): Promise<void> {
   if (await cleanNamesAlreadyDone(db)) return;
@@ -462,7 +465,10 @@ async function cleanNameColumn(
     } else cleaned += outcome;
   }
   if (cleaned > 0 || keptIds.length > 0) {
-    const ids = logIds && keptIds.length > 0 ? ` (id : ${keptIds.join(", ")})` : "";
+    let ids = "";
+    if (keptIds.length > 0) {
+      ids = logIds ? ` (id : ${keptIds.join(", ")})` : " (requête staff de UNTRUSTED_NAMES.md)";
+    }
     console.log(
       `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) sans caractère invisible, ` +
         `${keptIds.length} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou doublon)${ids}.`,

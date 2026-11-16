@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
   assertMapPointsUnlocked,
-  loadMatchPointTarget,
+  loadMatchPointRules,
   matchRoundKey,
 } from "@/lib/server/tournaments/map-points";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -49,39 +49,39 @@ describe("matchRoundKey", () => {
   });
 });
 
-describe("loadMatchPointTarget", () => {
-  it("loadMatchPointTarget_formatOff_returnsNullWithoutQuery", async () => {
-    const actual = await loadMatchPointTarget(fakeConnection(connection), 7, null, ROUND);
+describe("loadMatchPointRules (N du match)", () => {
+  it("loadMatchPointRules_formatOff_returnsNullWithoutQuery", async () => {
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, null, ROUND);
 
-    expect(actual).toBeNull();
+    expect(actual).toEqual({ pointTarget: null, pointTargets: null });
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("loadMatchPointTarget_roundOverride_returnsOverride", async () => {
+  it("loadMatchPointRules_roundOverride_returnsOverride", async () => {
     route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] }]);
 
-    const actual = await loadMatchPointTarget(fakeConnection(connection), 7, 5, ROUND);
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
 
-    expect(actual).toBe(3);
+    expect(actual.pointTarget).toBe(3);
     expect(connection.execute.mock.calls[0][1]).toEqual([7, 0, "UPPER", 2]);
   });
 
-  it("loadMatchPointTarget_roundOverride_readsWithLockInShareMode", async () => {
+  it("loadMatchPointRules_roundOverride_readsWithLockInShareMode", async () => {
     route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 3 }] }]);
 
-    await loadMatchPointTarget(fakeConnection(connection), 7, 5, ROUND);
+    await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
 
     const [sql] = connection.execute.mock.calls[0];
     expect(sql).toMatch(/LIMIT 1\s+LOCK IN SHARE MODE$/);
     expect(sql).not.toMatch(/FOR SHARE/);
   });
 
-  it("loadMatchPointTarget_noRoundRow_returnsTournamentTarget", async () => {
+  it("loadMatchPointRules_noRoundRow_returnsTournamentTarget", async () => {
     route([]);
 
-    const actual = await loadMatchPointTarget(fakeConnection(connection), 7, "5", ROUND);
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, "5", ROUND);
 
-    expect(actual).toBe(5);
+    expect(actual.pointTarget).toBe(5);
   });
 });
 
@@ -171,5 +171,49 @@ describe("assertMapPointsUnlocked", () => {
     expect(sql).toMatch(/FROM bg_match_maps WHERE match_id IN \(\?, \?\) LIMIT 1 LOCK IN SHARE MODE$/);
     expect(sql).not.toMatch(/JOIN|SELECT id FROM bg_matches/);
     expect(params).toEqual([4, 9]);
+  });
+});
+
+describe("loadMatchPointRules", () => {
+  it("loadMatchPointRules_formatOff_returnsNullsWithoutQuery", async () => {
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, null, ROUND);
+
+    expect(actual).toEqual({ pointTarget: null, pointTargets: null });
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
+  it("loadMatchPointRules_perMapRow_resolvesEachMapOnRoundTarget", async () => {
+    route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 4, map_point_targets: "[null,6]" }] }]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
+
+    expect(actual).toEqual({ pointTarget: 4, pointTargets: [4, 6] });
+    expect(connection.execute.mock.calls[0][0]).toMatch(/SELECT map_point_target, map_point_targets FROM/);
+  });
+
+  it("loadMatchPointRules_perMapWithoutRoundTarget_fallsBackOnTournament", async () => {
+    route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: null, map_point_targets: "[3]" }] }]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
+
+    expect(actual).toEqual({ pointTarget: 5, pointTargets: [3] });
+  });
+
+  // Même borne que l'instantané et le brief : la règle qui juge un score est
+  // celle que les deux portes montrent.
+  it("loadMatchPointRules_perMapLongerThanMaxMaps_clipsToMaxMaps", async () => {
+    route([{ pattern: /FROM bg_tournament_round_maps/, rows: [{ map_point_target: 5, map_point_targets: "[3,7,9]" }] }]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND, 2);
+
+    expect(actual).toEqual({ pointTarget: 5, pointTargets: [3, 7] });
+  });
+
+  it("loadMatchPointRules_noRow_returnsTournamentTargetOnly", async () => {
+    route([]);
+
+    const actual = await loadMatchPointRules(fakeConnection(connection), 7, 5, ROUND);
+
+    expect(actual).toEqual({ pointTarget: 5, pointTargets: null });
   });
 });

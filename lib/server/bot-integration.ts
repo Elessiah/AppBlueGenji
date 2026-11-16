@@ -13,6 +13,7 @@ import type { Locale } from "@/lib/shared/locales";
 import { BOT_LOG_CATEGORIES, botLogHeader, botLogKind, DEFAULT_BOT_LOG_CATEGORY, type BotLogCategory } from "@/lib/shared/bot-log-category";
 import { botLogBatchKey, botLogBatchScopeOfKey, botLogTournamentId } from "@/lib/shared/bot-log-batch";
 import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
+import { outboundMuted } from "@/lib/server/outbound-mute";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
@@ -34,6 +35,11 @@ const CIRCUIT_THRESHOLD = 3;
 const CIRCUIT_COOLDOWN_MS = 30_000;
 
 function isCircuitOpen(): boolean {
+  // Envois coupés (rejeu d'une restauration) : tout appel se dégrade comme
+  // devant un bot injoignable, chemin que chaque appelant sait déjà prendre.
+  // Les balayages qui réservent avant d'envoyer ne partent pas du tout
+  // (`throttled-sweep.ts`) : rien n'y est réservé puis perdu.
+  if (outboundMuted()) return true;
   return Date.now() < circuitOpenUntil;
 }
 
@@ -410,6 +416,7 @@ function scheduleAlertFlush(tournamentId: number | string | null | undefined, ca
  * l'appelant.
  */
 export function sendBotLog(message: string, scope: BotLogScope = {}): void {
+  if (outboundMuted()) return;
   try {
     const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
     const key = botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category);
@@ -507,7 +514,7 @@ async function postDiscordNotification(
   body: unknown,
   options: { timeoutMs: number; honourCircuit: boolean },
 ): Promise<DiscordDeliveryReport | null> {
-  if (options.honourCircuit && isCircuitOpen()) return null;
+  if (outboundMuted() || (options.honourCircuit && isCircuitOpen())) return null;
 
   const baseUrl = resolveBotInternalUrl();
 

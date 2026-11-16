@@ -57,6 +57,11 @@ export interface ConfirmActionDialogProps {
    * quoi elle s'ouvrirait dessous, focus piégé hors de vue.
    */
   layer?: "default" | "overBlocking";
+  /**
+   * Id d'un élément du contenu qui, seul, décrit la modale (le premier
+   * paragraphe d'un long contenu) — sans quoi tout le corps est lu d'un bloc.
+   */
+  describedById?: string;
 }
 
 /**
@@ -116,6 +121,7 @@ export function ConfirmActionDialog({
   onConfirm,
   contentLang,
   layer = "default",
+  describedById,
 }: Readonly<ConfirmActionDialogProps>) {
   const pageText = useShellText();
   const foreign = contentLang !== undefined && contentLang !== pageText.locale;
@@ -147,7 +153,7 @@ export function ConfirmActionDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         // Un contenu à remplir (motif, listes) se lit champ par champ, pas d'un bloc.
-        aria-describedby={focusContent ? undefined : bodyId}
+        aria-describedby={focusContent ? undefined : describedById ?? bodyId}
         tabIndex={-1}
         className={styles.dialog}
         lang={foreign ? contentLang : undefined}

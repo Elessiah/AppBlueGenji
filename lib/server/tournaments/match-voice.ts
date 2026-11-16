@@ -33,7 +33,7 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { visibleText } from "@/lib/shared/visible-text";
-import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import type { TournamentState } from "@/lib/shared/types";
@@ -70,11 +70,6 @@ function channelState(row: VoiceRow | undefined): VoiceChannelState | null {
   // Un rendu refusé note `failed_at` sur un salon encore ouvert : il reste « ouvert ».
   const channelId = row.channel_id ?? null;
   return { channelId, failed: channelId === null && row.failed_at !== null };
-}
-
-function rowFor<R extends VoiceRow>(rows: readonly R[], matchId: number, teamId: number | null): R | undefined {
-  if (teamId === null) return undefined;
-  return rows.find((row) => Number(row.match_id) === matchId && Number(row.team_id) === teamId);
 }
 
 /**
@@ -191,8 +186,14 @@ async function voiceInfosFromRows(
     `SELECT id, solo_user_id IS NOT NULL AS solo, is_ghost AS ghost FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
     teamIds,
   );
+  // Index par clé : l'instantané d'un gros tableau ne refait pas une recherche
+  // linéaire par engagée et par salon.
+  const teamsById = new Map(teamRows.map((row) => [Number(row.id), row]));
+  const channels = new Map(rows.map((row) => [`${Number(row.match_id)}:${Number(row.team_id)}`, row]));
+  const channel = (matchId: number, teamId: number | null) =>
+    teamId === null ? undefined : channels.get(`${matchId}:${teamId}`);
   const team = (teamId: number | null) => {
-    const row = teamRows.find((candidate) => Number(candidate.id) === teamId);
+    const row = teamId === null ? undefined : teamsById.get(teamId);
     // Équipe absente de `bg_teams` : `DUE_CHANNELS_SQL` (jointure interne) ne lui
     // ouvrira jamais de salon — aucun « en attente » sans fin, comme une fantôme.
     if (!row) return { isSolo: false, isGhost: true };
@@ -201,8 +202,8 @@ async function voiceInfosFromRows(
   for (const match of candidates) {
     const info = matchVoiceInfo(
       { enabled, startAt: match.startAt, team1: team(match.team1Id), team2: team(match.team2Id) },
-      channelState(rowFor(rows, match.id, match.team1Id)),
-      channelState(rowFor(rows, match.id, match.team2Id)),
+      channelState(channel(match.id, match.team1Id)),
+      channelState(channel(match.id, match.team2Id)),
     );
     if (info) result.set(match.id, info);
   }
@@ -1108,8 +1109,8 @@ export type TeamVoiceChannelsResult = {
 /**
  * Allume ou éteint l'option « Salons vocaux d'équipe », à tout moment jusqu'à
  * la clôture du tournoi, en cours compris (décision de l'utilisateur,
- * 2026-11-02) — même règle que la planification par l'arbitrage
- * (`canToggleRefereeScheduling`), que le formulaire applique déjà : un tournoi
+ * 2026-11-02) — règle commune des options d'organisation
+ * (`canToggleLiveTournamentOption`), que le formulaire applique déjà : un tournoi
  * terminé n'a plus de match à qui ouvrir un salon.
  *
  * - Allumée en cours de tournoi : les matchs à plus d'un quart d'heure ont
@@ -1132,7 +1133,7 @@ export async function setTeamVoiceChannels(tournamentId: number, enabled: boolea
     >(`SELECT name, state, team_voice_channels FROM bg_tournaments WHERE id = ? LIMIT 1`, [tournamentId]);
     const tournament = rows[0];
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-    if (!canToggleRefereeScheduling(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
+    if (!canToggleLiveTournamentOption(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
     const changed = (Number(tournament.team_voice_channels ?? 0) === 1) !== enabled;
     if (changed) {
       await connection.execute(`UPDATE bg_tournaments SET team_voice_channels = ? WHERE id = ?`, [

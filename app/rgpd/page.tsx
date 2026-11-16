@@ -97,6 +97,7 @@ import {
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
   TEAM_NOTICE_DMS_HOURLY_CAP,
 } from "@/lib/shared/team-invite-notice";
+import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
 /**
@@ -291,7 +292,7 @@ function RgpdFr({
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
             BattleTag par Blizzard (tenu à jour à chaque connexion tant que le compte
             Battle.net est rattaché ; s&apos;il n&apos;en donne aucun, le BattleTag saisi à la main reste,
-            sans être tenu pour vérifié), la photo par Google ou Discord (copiée, et masquée
+            sans être tenu pour vérifié — pour un Battle.net déjà rattaché avec un BattleTag avant ce changement (31 octobre 2026), à partir de votre prochaine connexion par Battle.net), la photo par Google ou Discord (copiée, et masquée
             tant que vous ne l&apos;affichez pas). Ce que vous renseignez vous-même (pseudos de jeu
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
             et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
@@ -341,12 +342,12 @@ function RgpdFr({
                   <span className={styles.badge}>{d.base}</span>
                   {/* Portées qui se suivent sous la même base : une seule pastille (`groupedExtraBases`). */}
                   {groupedExtraBases(d.extraBases).map((group) => (
-                    <span key={group.scopes.join("|")} className={styles.extraBase}>
+                    <div key={group.scopes.join("|")} className={styles.extraBase}>
                       {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
                           « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
                       {group.base === d.base ? "y compris : " : <><span className={styles.badge}>{group.base}</span> </>}
-                      {group.scopes.join(" ; ")}
-                    </span>
+                      <ExtraScopes scopes={group.scopes} />
+                    </div>
                   ))}
                 </DataCell>
                 <DataCell column={3}>{d.duree}</DataCell>
@@ -434,11 +435,11 @@ function RgpdFr({
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
-          ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
+          ramène pas le compte en attente de suppression ; une demande encore en attente dans la sauvegarde restaurée y reprend la date notée au journal (le délai court de la dernière demande). Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
           passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres et un membre dont la suppression du compte est elle-même demandée n&apos;étant pas compté ; une équipe où il ne reste aucun autre
           membre devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
-          cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
+          cours où il n&apos;a jamais joué sont perdus par forfait (abandon du classement dans un tournoi à classement ; un match qui attend encore son adversaire est perdu une fois celui-ci connu, au passage horaire qui suit). Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
           modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
           d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
@@ -509,7 +510,7 @@ function RgpdFr({
           est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
           subsiste sous ce faux nom, et la fiche du joueur, gardée seulement s&apos;il a joué au moins un
           match, indique que le compte a été supprimé ; sans match joué, la fiche disparaît (page
-          introuvable) et son nom ne mène plus nulle part.
+          introuvable) et les liens qui y menaient deviennent du texte simple au fil de la navigation (une page déjà ouverte garde le sien jusqu&apos;à son rechargement).
           Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
           <strong>organisé</strong> un tournoi que personne au staff n'a pu reprendre, ou s'il est
           engagé dans un <strong>tournoi individuel</strong> déjà commencé ou terminé, dont l'engagé
@@ -1047,7 +1048,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
@@ -1093,12 +1094,12 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match, quand un
+            rappels (24 h et 10 h avant ; 24 h seulement dans un tournoi sans check-in), quand vous êtes retiré d&apos;un match, quand un
             nouveau match vous attend (les deux adversaires d&apos;un match de votre équipe ou de votre tournoi individuel
             viennent d&apos;être connus, première manche comprise : adversaire, horaire s&apos;il est déjà
             posé — sans « Match programmé » en plus — et lien de la page du match, une seule fois par match et par affiche) et, si vous castez, quand votre
             inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, pour un match en autogestion seulement
-            (aucun pour un match arbitré ou sans décision d&apos;arbitrage), 15 minutes avant son coup d&apos;envoi
+            (aucun pour un match arbitré ou sans décision d&apos;arbitrage, ni dans un tournoi sans check-in), 15 minutes avant son coup d&apos;envoi
             — ou à l&apos;ouverture de son salon si elle vient plus tôt ou si le match n&apos;a pas d&apos;horaire —, une seule fois par match, le check-in du match
             (rejoindre le salon vocal de votre équipe — dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe », pour un match
             qui a un horaire, jamais en tournoi individuel ni contre une équipe fantôme — et le salon de check-in, équipe à gauche — l&apos;hôte — et à droite, paramètres de partie, déroulé
@@ -1167,8 +1168,8 @@ function RgpdFr({
             lancement montre le match. Son tag Discord certifié est aussi présenté, dans la fenêtre « Contacts » et sur la page du match, aux seules parties du match — à ses deux équipes dès que ses deux adversaires sont connus et jusqu&apos;à sa fin, à ses casters le temps du match — jamais aux arbitres sans rôle sur ce match ni dans la fenêtre de lancement (s&apos;il caste aussi le
             match, son tag et son BattleTag suivent la règle des casters : ses parties ne les lisent que le temps du match, fenêtre de lancement comprise, les autres arbitres dès que ses deux adversaires sont connus). Le staff qui gère les tournois lit à tout moment, dans la fenêtre « Arbitrage » d&apos;un match, le pseudo de son arbitre désigné et des comptes qui peuvent arbitrer. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
             d&apos;un match, jusqu&apos;à la déclaration de son score ou la fin du tournoi ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
-            « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres le lisent, dans les
-            fenêtres « Contacts » et de lancement. S&apos;il ne remplit plus ces conditions ou
+            « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres en lisent le relevé, dans les
+            fenêtres « Contacts » et de lancement et sur la page du match — l&apos;état du lancement, public, peut toutefois laisser deviner s&apos;il est prêt. S&apos;il ne remplit plus ces conditions ou
             devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
             un autre arbitre à qui le match est confié, l&apos;autogestion, son opposition retenue) ou qu&apos;il lui est retiré d&apos;office, il
@@ -1301,10 +1302,10 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec le lien de sa chaîne (obligatoire), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
-            plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
-            l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
-            son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
+            avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
+            plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du
+            match, par un membre de l&apos;organisation, reste au match quand ses casters s&apos;en vont. Le lien qu&apos;un caster a fourni en ouvrant
+            son stream ou dans « Configurer ma diffusion » part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
             tient encore ce stream ; un membre de l&apos;organisation y indique, en posant le lien, s&apos;il est celui de
             l&apos;organisation — il reste alors au match, même si ce membre le caste — ou sa propre chaîne,
             qui part avec son compte. Un caster ne l&apos;indique jamais en ouvrant son propre stream ni dans
@@ -1329,7 +1330,7 @@ function RgpdFr({
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
             « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties
-            du match et arbitres —, dans un tournoi Overwatch seulement) : il est gardé avec son inscription de caster, part avec elle, n&apos;est jamais
+            du match, ses autres casters et arbitres —, dans un tournoi Overwatch seulement) : il est gardé avec son inscription de caster, part avec elle et à la suppression du compte, n&apos;est jamais
             recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
             masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
             service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}

@@ -394,7 +394,7 @@
       "urlEmpty": "Le lien de ta chaîne est obligatoire : remets-le, ou annule pour garder l'ancien.",
       "playedTitle": "Match joué",
       "close": "Fermer",
-      "urlHint": "Obligatoire : sans lui, ton stream n'apparaît ni sur le match ni dans l'annonce du direct (plateformes acceptées : {platforms}). Il est retiré du match si ton compte est supprimé.",
+      "urlHint": "Obligatoire : sans lui, ton stream n'apparaît ni sur le match ni dans l'annonce du direct (plateformes acceptées : {platforms}). Il est retiré du match si ton compte est supprimé, ou avec ton stream quand plus aucun caster ne le tient.",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
       "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans « Diffusion officielle ».",
       "battletag": "BattleTag pour ce cast (facultatif)",

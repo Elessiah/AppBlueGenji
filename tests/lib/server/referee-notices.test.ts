@@ -9,6 +9,7 @@ import { getDatabase } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import {
+  announceObjectionReleases,
   announceRefereeChange,
   deliverRefereeChange,
   discardRefereeChanges,
@@ -18,6 +19,9 @@ import {
   refereeLogCategory,
   refereeReleaseNotice,
   announceRefereeChanges,
+  flushMapPickLogs,
+  MAP_PICK_LOG_WINDOW_MS,
+  resetMapPickLogs,
   type RefereeChange,
 } from "@/lib/server/tournaments/referee-notices";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
@@ -349,5 +353,160 @@ describe("avis à l'arbitre remplacé par lui-même, annonces d'une manche (EF-3
     await settle();
 
     expect(getDatabase).not.toHaveBeenCalled();
+  });
+});
+
+describe("announceObjectionReleases", () => {
+  it("announceObjectionReleases_count_sendsOneRefereeReleasedPush", async () => {
+    await announceObjectionReleases(REFEREE, 3, [7]);
+
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([REFEREE], "certified");
+    const sent = notification();
+    expect(sent.topic).toBe("REFEREE_RELEASED");
+    expect(resolvePush(sent.push).body).toContain("3 matchs");
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("announceObjectionReleases_zero_sendsNothing", async () => {
+    await announceObjectionReleases(REFEREE, 0, []);
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceObjectionReleases_notifyFails_doesNotThrow", async () => {
+    jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("push down"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(announceObjectionReleases(REFEREE, 2, [7])).resolves.toBeUndefined();
+  });
+});
+
+describe("announceRefereeChanges — choix de cartes regroupés par match", () => {
+  beforeEach(() => resetMapPickLogs());
+
+  function loggedLines(): string[] {
+    return jest.mocked(sendBotLog).mock.calls.map((call) => call[0]);
+  }
+
+  async function settleMany(): Promise<void> {
+    for (let tick = 0; tick < 12; tick += 1) await settle();
+  }
+
+  it("announceRefereeChanges_firstMapPick_logsAtOnce", async () => {
+    mockMatch(matchRow());
+
+    announceRefereeChanges([{ kind: "MAP_PICK", matchId: 42, set: true, byTeam: false }]);
+    await settleMany();
+
+    expect(loggedLine()).toContain("Carte choisie dans le pool");
+  });
+
+  it("announceRefereeChanges_singlePickBurstClosed_addsNoSummary", async () => {
+    mockMatch(matchRow());
+
+    announceRefereeChanges([{ kind: "MAP_PICK", matchId: 42, set: true, byTeam: false }]);
+    await flushMapPickLogs();
+    await settleMany();
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceRefereeChanges_refereePicksThenClears_summaryCountsBoth", async () => {
+    mockMatch(matchRow());
+
+    announceRefereeChanges([
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: false },
+      { kind: "MAP_PICK", matchId: 42, set: false, byTeam: false },
+    ]);
+    await flushMapPickLogs();
+    await settleMany();
+
+    const lines = loggedLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Carte choisie dans le pool");
+    expect(lines[1]).toContain("ensuite 1 choix retiré, par le staff.");
+  });
+
+  it("announceRefereeChanges_staffPickAfterTeamBurst_closesBurstThenLogsStaffPickInFull", async () => {
+    mockMatch(matchRow());
+
+    announceRefereeChanges([
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true },
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true },
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: false },
+    ]);
+    await flushMapPickLogs();
+    await settleMany();
+
+    const lines = loggedLines();
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("par une équipe du match (autogestion)");
+    expect(lines[1]).toContain("ensuite 1 carte choisie, par une équipe du match (autogestion).");
+    expect(lines[2]).toContain("Carte choisie dans le pool");
+    expect(lines[2]).toContain("par le staff");
+  });
+
+  it("announceRefereeChanges_releaseAfterOpenBurst_logsBurstBeforeRelease", async () => {
+    mockMatch(matchRow());
+
+    announceRefereeChanges([
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true },
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true },
+    ]);
+    announceRefereeChange({ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true });
+    await settleMany();
+
+    const lines = loggedLines();
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("Carte choisie dans le pool");
+    expect(lines[1]).toContain("ensuite 1 carte choisie");
+    expect(lines[2]).toContain("Arbitre retiré");
+  });
+
+  it("announceRefereeChanges_pickAfterClosedBurst_opensNewLeadingLine", async () => {
+    mockMatch(matchRow());
+    announceRefereeChanges([{ kind: "MAP_PICK", matchId: 42, set: true, byTeam: false }]);
+    await flushMapPickLogs();
+
+    announceRefereeChanges([{ kind: "MAP_PICK", matchId: 42, set: false, byTeam: false }]);
+    await settleMany();
+
+    const lines = loggedLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain("Choix de carte retiré");
+  });
+
+  it("announceRefereeChanges_mapPicksOnTwoMatches_logsOneLinePerMatch", async () => {
+    mockMatch(matchRow());
+
+    announceRefereeChanges([
+      { kind: "MAP_PICK", matchId: 42, set: true, byTeam: false },
+      { kind: "MAP_PICK", matchId: 43, set: true, byTeam: false },
+    ]);
+    await flushMapPickLogs();
+    await settleMany();
+
+    expect(sendBotLog).toHaveBeenCalledTimes(2);
+  });
+
+  it("announceRefereeChanges_windowElapsed_closesWithoutFlush", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate"] });
+    try {
+      mockMatch(matchRow());
+      announceRefereeChanges([
+        { kind: "MAP_PICK", matchId: 42, set: false, byTeam: false },
+        { kind: "MAP_PICK", matchId: 42, set: true, byTeam: false },
+      ]);
+
+      jest.advanceTimersByTime(MAP_PICK_LOG_WINDOW_MS);
+      await settleMany();
+
+      const lines = loggedLines();
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toContain("Choix de carte retiré");
+      expect(lines[1]).toContain("ensuite 1 carte choisie, par le staff.");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

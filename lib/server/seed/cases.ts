@@ -108,6 +108,7 @@ export interface TournamentDef extends ReportStateCounts {
    */
   refereeScheduling?: boolean;
   launchPhase?: boolean; // phase de lancement des matchs (absent = éteinte, le défaut de la colonne)
+  matchCheckIn?: boolean; // check-in des matchs, MATCH_CHECK_IN_SETTING.md (absent = allumé, le défaut de la colonne)
   /**
    * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
    * une carte ; absent = format éteint. Pas de `mapDetails` avec lui : le
@@ -231,7 +232,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Live Horaire (heure passée)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 84, matchSchedule: { firstRoundHours: -3, hoursPerRound: 1 }, live: { url: "https://www.twitch.tv/bluegenji", trigger: "START_TIME", matchUrl: "https://www.twitch.tv/bluegenji" } },
   // Même configuration, heure à venir : le match reste « programmé » et
   // basculera tout seul à l'horaire — sans requête, minuteur côté client.
-  { name: "Live Horaire (heure à venir)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
+  // Check-in des matchs éteint (`MATCH_CHECK_IN_SETTING.md`) : ses manches, à
+  // moins de 10 h, n'ont ni rappel 10 h ni check-in à H-15.
+  { name: "Live Horaire (heure à venir)", matchCheckIn: false, game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
   // Calendrier seul, sans diffusion : le cas le plus courant — l'arbitre
   // annonce les horaires d'un plateau étalé sur la journée.
   // Planification par l'arbitrage : un plateau entier à planifier (aucune
@@ -332,6 +335,10 @@ export const TOURNAMENTS: TournamentDef[] = [
   // carte au premier à 5 points. Aucun match joué : le premier tour attend un
   // report (« 5 – 3 »), refusé hors de la règle.
   { name: "Duel Arcade Widow (premier à 5)", game: "OW", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 4, maxTeams: 4, daysOffset: -1, playWaves: 0, teamOffset: 24, matchFormat: { type: "BO", value: 1 }, mapPointTarget: 5 },
+  // Points réglés carte par carte (DUEL-MAP-POINTS) : BO3 au premier à 5, dont
+  // le premier tour joue la carte 2 au premier à 3 et la décisive au premier à 7
+  // (`lib/server/seed/point-targets.ts`). Aucun match joué.
+  { name: "Duel Arcade BO3 (points par carte)", game: "OW", state: "RUNNING", participantType: "SOLO", format: "SINGLE", teamCount: 4, maxTeams: 4, daysOffset: -1, playWaves: 0, teamOffset: 20, matchFormat: { type: "BO", value: 3 }, mapPointTarget: 5 },
 
   // ---- MULTI : tournois multi-phases -------------------------------------------
   {

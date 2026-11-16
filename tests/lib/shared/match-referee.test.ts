@@ -10,7 +10,7 @@ import {
 import { allPartiesReady, readyCount } from "@/lib/shared/match-launch";
 import { noRefereeAlertKey, refereeAlertKey } from "@/lib/server/tournaments/bot-logs";
 import { botEventChannel, formatNoRefereeAlert } from "@/lib/shared/referee-alerts";
-import { formatRefereeChangeLog, formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
+import { formatMapPickBurstLog, formatRefereeChangeLog, formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
 import { launchStripControls, type LaunchStripViewer } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import {
   refereeConfirmTone,
@@ -360,5 +360,28 @@ describe("refereeFocusTarget (fenêtre « Arbitrage »)", () => {
 
   it("refereeFocusTarget_firstArrivalWithoutStatus_fallsBackToNormalRule", () => {
     expect(refereeFocusTarget({ active: node("Fermer"), body, trigger: null, status: null, firstArrival: true })).toBeNull();
+  });
+});
+
+describe("formatMapPickBurstLog", () => {
+  const context = {
+    tournament: { id: 7, name: "Coupe" },
+    matchId: 42,
+    bracket: "UPPER",
+    roundNumber: 1,
+    team1: { name: "Renards", participantType: "TEAM" as const },
+    team2: { name: "Nova", participantType: "TEAM" as const },
+  };
+
+  it("formatMapPickBurstLog_onlyPicks_pluralisesWithoutClearCount", () => {
+    const line = formatMapPickBurstLog({ ...context, picked: 2, cleared: 0, byStaff: false, byTeam: true });
+
+    expect(line).toContain("ensuite 2 cartes choisies, par une équipe du match (autogestion).");
+  });
+
+  it("formatMapPickBurstLog_onlyClears_omitsPickCount", () => {
+    const line = formatMapPickBurstLog({ ...context, picked: 0, cleared: 3, byStaff: true, byTeam: false });
+
+    expect(line).toContain("ensuite 3 choix retirés, par le staff.");
   });
 });

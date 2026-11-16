@@ -5,12 +5,18 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
+// La synchronisation des tournois ouverts (E61) a ses propres tests : ici, un tournoi
+// déjà à son état, sans requête qui brouille l'ordre des verrous.
+jest.mock("@/lib/server/tournaments/state", () => ({
+  syncTournamentState: jest.fn(async () => ({ row: null, stateChanged: false, contentChanged: false, launchesChanged: false })),
+}));
 jest.mock("@/lib/server/tournaments/referee-names", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names"),
   forgetRefereeNames: jest.fn(),
 }));
 
 import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
+import { syncTournamentState } from "@/lib/server/tournaments/state";
 import {
   assertSoloLockSetFresh,
   loadSoloRegistrations,
@@ -87,6 +93,8 @@ const STARTED_REGISTRATION: SoloRegistrationRow = {
 const BEFORE_TRANSACTION = [
   "SELECT DISTINCT r.tournament_id",
   "SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters",
+  // Remise à l'heure des tournois, avant la transaction (`startDueTournaments`).
+  "SELECT state, finished_at, registration_open_at",
 ];
 const inTransaction = (queries: Query[]) => queries.filter((q) => !BEFORE_TRANSACTION.some((prefix) => q.sql.startsWith(prefix)));
 
@@ -1128,5 +1136,53 @@ describe("deleteOwnAccount — accueil et #live", () => {
     await deleteOwnAccount(7);
 
     expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([[3, { landingLive: false }]]);
+  });
+});
+
+/** EF-62 (revue standard, cycle 1) : seuls les tournois passés en cours sont rediffusés. */
+describe("deleteOwnAccount — tournois ouverts synchronisés", () => {
+  beforeEach(() => {
+    // Une implémentation laissée par un test précédent ne doit pas lever ici.
+    jest.mocked(publishUpdatedEvent).mockReset();
+  });
+
+  it("deleteOwnAccount_openSoloTournamentUnchanged_notRepublished", async () => {
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7);
+
+    expect(syncTournamentState).toHaveBeenCalledWith(expect.anything(), 55);
+    expect(publishUpdatedEvent).not.toHaveBeenCalledWith(55);
+  });
+
+  it("deleteOwnAccount_openSoloTournamentStarted_republished", async () => {
+    jest.mocked(syncTournamentState).mockResolvedValueOnce({
+      row: null,
+      stateChanged: true,
+      contentChanged: false,
+      launchesChanged: false,
+    });
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7);
+
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(55);
+  });
+  // Revue standard cycle 2 : le rejeu d'une restauration ne lance aucun tournoi.
+  it("deleteOwnAccount_replay_neverSyncsTournaments", async () => {
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05", replay: true });
+
+    expect(syncTournamentState).not.toHaveBeenCalled();
+    expect(publishUpdatedEvent).not.toHaveBeenCalledWith(55);
+  });
+  // Revue standard cycle 3 : la vérification d'identité seule n'est pas un rejeu.
+  it("deleteOwnAccount_identityCheckWithoutReplay_stillSyncsTournaments", async () => {
+    fakeDb(EMPTY, { soloRegistrations: [], listedTournaments: [55] });
+
+    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05" });
+
+    expect(syncTournamentState).toHaveBeenCalled();
   });
 });

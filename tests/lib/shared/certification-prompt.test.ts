@@ -103,7 +103,20 @@ describe("Marvel Rivals : Discord seul", () => {
   it("invite un manager sans Discord certifié, et le dit à la modale", () => {
     expect(
       certificationPromptFor({ isManager: true, viewer: BATTLETAG_ONLY, teamHasContact: true, battletagRelevant: false }),
-    ).toEqual({ reason: "MANAGER", ...BATTLETAG_ONLY, battletagRelevant: false, teamHasContact: true });
+    ).toEqual({ reason: "MANAGER", discordVerified: false, battletagRelevant: false, teamHasContact: true });
+  });
+
+  // Revue sécurité #497 : hors Overwatch, le contexte du lecteur ne porte pas son BattleTag.
+  it("certificationPromptFor_battletagNotRelevant_omitsTheViewersBattletagState", () => {
+    const prompt = certificationPromptFor({ isManager: true, viewer: BATTLETAG_ONLY, teamHasContact: true, battletagRelevant: false });
+
+    expect(prompt).not.toHaveProperty("battletagVerified");
+  });
+
+  it("certificationPromptFor_battletagRelevant_keepsTheViewersBattletagState", () => {
+    const prompt = certificationPromptFor({ isManager: true, viewer: BATTLETAG_ONLY, teamHasContact: true, battletagRelevant: true });
+
+    expect(prompt).toHaveProperty("battletagVerified", true);
   });
 
   it("invite le joueur d'une équipe sans contact, sans Discord certifié", () => {

@@ -30,7 +30,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { isMissingTableError, isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
-import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
+import { parseStoredMapPointTarget, parseStoredMapPointTargets } from "@/lib/shared/map-points";
 import {
   ROUND_MAPS_NOTICE_KEYS_MAX,
   ROUND_MAPS_NOTICE_LISTED,
@@ -70,6 +70,16 @@ export type NoticeRound = {
  */
 export function roundMapsFingerprint(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex").slice(0, 12);
+}
+
+/**
+ * Empreinte des points par carte d'un tour (format Duel / Arcade) : celle du
+ * seul N du tour tant qu'aucune carte n'a de réglage propre — l'empreinte d'un
+ * réglage d'avant les points carte par carte ne change pas —, sinon celle du
+ * couple (tour, cartes).
+ */
+export function roundPointsFingerprint(target: number | null, mapTargets: ReadonlyArray<number | null>): string {
+  return roundMapsFingerprint(mapTargets.length === 0 ? target : { target, maps: mapTargets });
 }
 
 type NoticeRow = RowDataPacket & {
@@ -353,6 +363,7 @@ type RoundMapsRow = RowDataPacket & {
   slots_json: string | null;
   tiebreak_map: string | null;
   map_point_target?: number | null;
+  map_point_targets?: string | null;
 };
 
 /**
@@ -369,7 +380,7 @@ async function stillChanged(
   let rows: RoundMapsRow[];
   try {
     [rows] = await db.execute<RoundMapsRow[]>(
-      `SELECT phase_id, bracket, round_number, slots_json, tiebreak_map, map_point_target
+      `SELECT phase_id, bracket, round_number, slots_json, tiebreak_map, map_point_target, map_point_targets
          FROM bg_tournament_round_maps WHERE tournament_id = ?`,
       [tournamentId],
     );
@@ -384,7 +395,12 @@ async function stillChanged(
     if (round.before === undefined) return true;
     const row = current.get(roundKey(round));
     let now: string;
-    if (round.points) now = roundMapsFingerprint(parseStoredMapPointTarget(row?.map_point_target));
+    if (round.points) {
+      now = roundPointsFingerprint(
+        parseStoredMapPointTarget(row?.map_point_target),
+        parseStoredMapPointTargets(row?.map_point_targets),
+      );
+    }
     else if (round.tiebreak) now = roundMapsFingerprint(parseStoredTiebreak(row?.tiebreak_map));
     else now = roundMapsFingerprint(parseStoredSlots(row?.slots_json));
     return now !== round.before;

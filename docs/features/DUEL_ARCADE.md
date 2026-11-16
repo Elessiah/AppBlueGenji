@@ -36,11 +36,41 @@ Duels 1v1 en arcade (Widowmaker, « premier à 5 ») : chaque carte se gagne au
   `THIRD_PLACE` en élimination simple et BlueGenji Survie) — sinon
   `INVALID_ROUND`. Le changement part au journal du staff, regroupé avec les
   cartes de manche (« Manche 2 (points par carte) », `round-maps-notice.ts`).
+- **Carte par carte** (DUEL-MAP-POINTS) : sous le nombre du tour, la même
+  fenêtre montre « Carte par carte » (EN « Map by map »), un `<NumberInput>`
+  (1–99) par carte que le format du tour joue (`roundMaxMaps`, 9 au plus ; score
+  libre : 9 ; rien sur un tour à une seule carte), avec
+  `<InfoHint>` sur l'ordre des valeurs par défaut. Chaque champ est prérempli
+  du N **effectif** de la carte ; une carte jamais réglée, ou **ramenée à la
+  main** au nombre du tour, le **suit** (« suit le tour », rien n'est stocké
+  pour elle) ; une carte réglée garde son N même si le tour vient à valoir le
+  même nombre. Un refus `INVALID_MAP_POINT_TARGET` est rattaché au champ de la
+  carte fautive (`invalidPointField`), sinon à celui du tour. Stocké dans
+  `bg_tournament_round_maps.map_point_targets` (`VARCHAR(128) NULL`, JSON
+  `[null,3,7]` : carte 1 en tête, `null` = suit le tour, `null` de fin retirés,
+  `NULL` = aucun réglage) — une colonne plutôt que `slots_json`, pour régler les
+  points d'un tour sans cartes imposées et ne rien changer aux lecteurs des
+  cartes. Même route, corps `{ …, target, mapTargets }` (`mapTargets` absent =
+  inchangé, `[]` = tout retirer ; `normalizeMapPointTargets`, 9 entrées au
+  plus et pas plus que les cartes du format du tour — aucune sur un tour à une
+  seule carte —, sinon `INVALID_MAP_POINT_TARGET`). Seul un réglage **neuf**
+  exige un tour posable (format allumé, tournoi pas terminé, tour joué) :
+  garder le nombre du tour en retirant les cartes passe toujours ; une colonne
+  illisible renvoyée telle quelle est réécrite sous sa forme normale. Une édition qui raccourcit le format de match
+  (BO3 → BO1) coupe les réglages des cartes qu'il ne joue plus
+  (`pruneRoundPointTargets`, annoncé au journal) ; instantané et check-in
+  ignorent de toute façon une carte au-delà du format (`clipMapPointTargets`),
+  tout comme la règle qui juge un score (`loadMatchPointRules`, borne du format du match). « Revenir aux points du tournoi »
+  retire le nombre du tour et ceux des cartes. Même verrou, même journal
+  (l'empreinte `roundPointsFingerprint` couvre tour et cartes), audit pm2 avec
+  les deux listes.
 - **Format éteint** sur le tournoi : les points propres aux tours sont
   effacés dans la même transaction (`updateTournament`) — ils ne resurgissent
   pas au rallumage, l'écran des cartes ne les montrant que format allumé.
 - N effectif d'un match : `effectiveMapPointTarget` = celui du tour, sinon celui
-  du tournoi, et rien si le format est éteint sur le tournoi.
+  du tournoi, et rien si le format est éteint sur le tournoi. N de la carte k :
+  la carte, sinon le match (`effectiveMapPointTargets`, `mapPointTargetAt`) —
+  ordre **carte → tour → tournoi**.
 
 ### Verrou
 
@@ -63,8 +93,8 @@ part au journal Discord du staff, anonyme et regroupé avec les cartes
 (`round-maps-notice`), et nomme son auteur dans pm2 seulement
 (`auditStaffAction`, ligne `[staff-audit]`).
 
-Les saisies lisent le réglage du tour en **lecture verrouillante**
-(`loadMatchPointTarget`, `LOCK IN SHARE MODE`) : un report qui attendait le
+Les saisies lisent le réglage du tour (nombre et cartes) en **lecture verrouillante**
+(`loadMatchPointRules`, `LOCK IN SHARE MODE`) : un report qui attendait le
 verrou du match pendant qu'un arbitre changeait les points du tour juge le
 score sur la valeur commitée, jamais sur l'image figée plus tôt dans sa
 transaction. L'interblocage possible (match puis réglage, contre tournoi puis
@@ -74,7 +104,7 @@ matchs) est rejoué par `retryOnDeadlock`.
 
 | Code | Statut | Cause |
 |---|---|---|
-| `INVALID_MAP_POINT_TARGET` | 400 | N hors 1–99 ou corps sans `target` |
+| `INVALID_MAP_POINT_TARGET` | 400 | N hors 1–99, corps sans `target`, ou `mapTargets` invalide (pas une liste, plus de 9 cartes, N hors bornes) |
 | `MAP_POINTS_DISABLED` | 400 | points de tour alors que le format est éteint sur le tournoi |
 | `MAP_POINTS_LOCKED` | 409 | un match jouable concerné porte déjà un score ou a ouvert son lancement |
 | `MAP_POINTS_FINISHED` | 409 | points de tour posés sur un tournoi terminé |
@@ -83,12 +113,15 @@ matchs) est rejoué par `retryOnDeadlock`.
 
 ## Contrôle des scores
 
-Toutes les portes passent par `checkMapList(…, { pointTarget })` avec le N de
-la manche (`loadTournamentMatchRules(…, roundKey)`) : report et confirmation
+Toutes les portes passent par `checkMapList(…, { pointTarget, pointTargets })`
+avec le N de la manche et celui de chaque carte (`loadTournamentMatchRules(…,
+roundKey)`) : la carte k est jugée sur **son** N (`mapPointTargetAt`), une
+carte au-delà de la liste sur celui du match : report et confirmation
 d'un engagé (`scoring.ts`), « Enregistrer » et « Valider le résultat » de
 l'arbitrage, résolution d'un litige (`admin.ts`). Les modales rejouent le même
 contrôle (`useScoreForm`, `PlayerScoreDialog`, `MapScoreList`) : une ligne n'est
-complète qu'une fois N atteint (`isMapComplete`). La concordance des deux
+complète qu'une fois le N de sa carte atteint (`isMapComplete` sur `mapRulesAt`) ;
+un refus cite le N de la carte qu'il désigne (`refusalPointTarget`). La concordance des deux
 propositions (`sameMapLists`, `mapListDifferences`) compare déjà les points de
 chaque carte : 5–3 contre 5–2 est un écart.
 
@@ -96,6 +129,13 @@ chaque carte : 5–3 contre 5–2 est un écart.
 
 - `TournamentCard.mapPointTarget` et `BracketMatch.mapPointTarget` (N effectif)
   passent par l'instantané commun : flux SSE et REST de secours identiques.
+  `BracketMatch.mapPointTargets` (N effectif carte par carte, carte 1 en tête)
+  n'y figure que si une carte du tour a son propre N (`attachPointTargets`).
+- Carte par carte : chaque ligne de la saisie (« Map 2 · premier à 3 »), chaque
+  carte de la modale de détail et des propositions (« 3–1 · 3 ») et le fait
+  « Points par carte » de la page du match (« Map 1 : premier à 5 · Map 2 :
+  premier à 3 », détail « Maps suivantes : premier à 5. ») montrent le N de la
+  carte.
 - Carte de match (arbre, `/suivre`, panneau d'arbitrage) : le bouton de détail
   montre « Points : 5–3 · 2–5 » ; la modale de détail rappelle « Premier à N
   points ». Page du match : fait « Points par carte ». Réglages du tournoi :
@@ -109,20 +149,27 @@ chaque carte : 5–3 contre 5–2 est un écart.
   retour en arrière d'un tour lisent le même score affiché (`shownMatchScore`).
 - Check-in du match (message privé, `MATCH_LOBBY_BRIEF.md`) : « Format Duel /
   Arcade : chaque carte se gagne au premier à N points. » (N du tour, sinon du
-  tournoi ; FR et EN), sous les cartes.
+  tournoi ; FR et EN), sous les cartes ; carte par carte : « Map 1 au premier
+  à 5 points, Map 2 au premier à 3 points, puis premier à 5 points pour les suivantes. »
+  (`briefPointTargets`) — sans « puis … pour les suivantes » quand toutes les
+  cartes du format sont réglées, et une seule ligne quand elles valent toutes
+  le N du match (`hasPerMapTargets`, comme la page du match).
 - Discord (journal « Match terminé ») : « (points : 5–3) » après le score, des
   chiffres seulement, aucun pseudo ; rien sur un forfait.
 
 ## Seed
 
 « Duel Arcade Widow (premier à 5) » (`lib/server/seed/cases.ts`) : OW, individuel,
-4 joueurs, BO1, premier à 5, en cours.
+4 joueurs, BO1, premier à 5, en cours. « Duel Arcade BO3 (points par carte) » :
+OW, individuel, 4 joueurs, BO3, premier à 5, en cours ; son premier tour règle
+carte 2 au premier à 3 et carte 3 au premier à 7, carte 1 suivant le tournoi
+(`lib/server/seed/point-targets.ts`, échec si le tournoi manque).
 
 ## Fichiers
 
 | Rôle | Fichier |
 |---|---|
-| Règles pures | `lib/shared/map-points.ts`, `lib/shared/match-maps.ts` |
+| Règles pures | `lib/shared/map-points.ts`, `lib/shared/match-maps.ts`, `_lib/round-points-editor.ts` (saisie carte par carte) |
 | Serveur | `lib/server/tournaments/map-points.ts`, `round-maps.ts` (`setRoundPointTarget`), `repository.ts`, `scoring.ts`, `admin.ts`, `edit.ts`, `validation.ts`, `snapshot.ts`, `bot-logs.ts` |
 | Route | `app/api/admin/tournaments/[id]/round-points/route.ts` |
 | Interface | `_components/DuelArcadeField.tsx`, `RoundMapsDialog.tsx`, `MatchMapDetails.tsx`, `MapResultList.tsx`, `MatchPage.tsx` |
@@ -139,4 +186,8 @@ chaque carte : 5–3 contre 5–2 est un écart.
 `tests/lib/server/round-maps-notice.test.ts` (annonce des points),
 `tests/lib/shared/round-tiebreak.test.ts` (ligne du check-in),
 `tests/tournois/score-arrival-announcement.test.ts` (points cités par la modale),
-`tests/tournois/map-scores-wiring.test.ts` (refus rattaché à la case).
+`tests/tournois/map-scores-wiring.test.ts` (refus rattaché à la case),
+`tests/lib/shared/map-points-per-map.test.ts` (carte par carte : règles, saisie),
+`tests/lib/server/seed-map-point-target-cases.test.ts`, `tests/lib/server/tournament-snapshot.test.ts`
+(`attachPointTargets`), `tests/lib/shared/lobby-brief.test.ts` (ligne carte par carte),
+`tests/tournois/match-page-render.test.tsx` (`pointTargetFacts`).

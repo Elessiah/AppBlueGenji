@@ -90,6 +90,15 @@
   color: var(--ink-soft, #c3ccd8);
 }
 
+/* Une raison par paragraphe : résultat d'un tiers et format changé peuvent se cumuler. */
+.conflictText {
+  margin: 0;
+}
+
+.conflictText + .conflictText {
+  margin-top: 6px;
+}
+
 /* En bloc : le bouton est une action, pas la fin de la phrase — collé au texte,
    il se lisait « écraserait le sien.Reprendre la valeur à jour ». */
 .conflictAction {

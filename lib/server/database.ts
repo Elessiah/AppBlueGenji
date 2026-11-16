@@ -199,6 +199,19 @@ export async function runDueAccountDeletionsExclusively(): Promise<void> {
         );
       }
       try {
+        // Le relevé complet du jour, que le seul démarrage menait (au plus une
+        // tentative par jour et par processus ; une lecture sinon).
+        const { reconcileStaleFullScan } = await import("@/lib/server/users/deleted-accounts");
+        const outcome = await reconcileStaleFullScan();
+        if (outcome && outcome.erased + outcome.renamed + outcome.failed > 0) {
+          console.info(
+            `[deleted-accounts] Relevé complet : ${outcome.erased} effacé(s), ${outcome.renamed} renommé(s), ${outcome.failed} reporté(s).`,
+          );
+        }
+      } catch (error) {
+        console.error("[deleted-accounts] Relevé complet reporté :", failureReason(error));
+      }
+      try {
         const { finalizeDueAccountDeletions } = await import("@/lib/server/users/deleted-accounts");
         const { finalized, failed } = await finalizeDueAccountDeletions();
         if (finalized + failed > 0) {

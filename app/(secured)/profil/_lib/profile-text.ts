@@ -11,7 +11,12 @@
  */
 import frProfile from "@/messages/fr/profile.json";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { ACCOUNT_REACTIVATION_DAYS, SESSION_GONE_CODES, type ConfirmationSubject } from "@/lib/shared/account-deletion";
+import {
+  ACCOUNT_DELETION_PLAN_CHANGED,
+  ACCOUNT_REACTIVATION_DAYS,
+  SESSION_GONE_CODES,
+  type ConfirmationSubject,
+} from "@/lib/shared/account-deletion";
 import type {
   AccountConnection,
   ConnectionUnlinkRefusal,
@@ -110,9 +115,57 @@ export function deletionConsequencesParagraphs(text: ProfileText, subject: Confi
     logDays: CONNECTION_LOG_RETENTION_DAYS,
   });
   const kind = deletionCase(subject);
-  const consequence = t(`deletion.consequences.${kind}`);
+  const consequence = t(`deletion.consequences.${kind}`, { days: ACCOUNT_REACTIVATION_DAYS });
   const termsNote = fromTerms && kind === "OWNED_TEAMS" ? [t("deletion.ownedTeamsFromTerms")] : [];
   return [consequence, ...termsNote, t("deletion.handover"), t("deletion.irreversible", { days: ACCOUNT_REACTIVATION_DAYS }), residual];
+}
+
+/** La modale de suppression, découpée pour l'écran (`useAccountDeletion`). */
+export type DeletionDialogContent = {
+  /** Ce que la suppression fera du compte : la description de la modale (`aria-describedby`). */
+  consequence: string;
+  /** Ouverte depuis les conditions par un propriétaire d'équipe : la note qui s'y ajoute. */
+  termsNote: string | null;
+  /** Ce qui change tout de suite et ne se défait pas : une phrase d'entrée, puis une puce par geste. */
+  handoverLead: string;
+  handoverItems: string[];
+  /** Le délai de trente jours. */
+  window: string;
+  /** Ce qui reste de toute suppression : une ligne visible, le détail derrière le « i » (`InfoHint`). */
+  residualLead: string;
+  residualSubject: string;
+  residual: string;
+};
+
+/**
+ * Les mêmes informations que `deletionConsequencesParagraphs`, mises en forme
+ * pour une modale lue sur un téléphone : les gestes immédiats en puces courtes
+ * plutôt qu'une phrase d'une centaine de mots, et la liste des restes — la
+ * plus longue, la moins décisive pour le geste — repliée derrière un « i »,
+ * avec une ligne visible qui en dit l'essentiel (information en couches).
+ */
+export function deletionDialogContent(text: ProfileText, subject: ConfirmationSubject, fromTerms = false): DeletionDialogContent {
+  const { t } = text;
+  const kind = deletionCase(subject);
+  return {
+    consequence: t(`deletion.consequences.${kind}`, { days: ACCOUNT_REACTIVATION_DAYS }),
+    termsNote: fromTerms && kind === "OWNED_TEAMS" ? t("deletion.ownedTeamsFromTerms") : null,
+    handoverLead: t("deletion.handoverList.lead"),
+    handoverItems: [
+      t("deletion.handoverList.teams"),
+      t("deletion.handoverList.organized"),
+      t("deletion.handoverList.withdrawn"),
+      t("deletion.handoverList.forfeit"),
+    ],
+    window: t("deletion.irreversible", { days: ACCOUNT_REACTIVATION_DAYS }),
+    residualLead: t("deletion.residualLead"),
+    residualSubject: t("deletion.residualSubject"),
+    residual: t("deletion.residual", {
+      backupDays: BACKUP_RETENTION_DAYS,
+      journalDays: ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+      logDays: CONNECTION_LOG_RETENTION_DAYS,
+    }),
+  };
 }
 
 /** `accountDeletionOutcome` dans la langue du texte. */
@@ -124,6 +177,7 @@ export function deletionOutcomeText(text: ProfileText, subject: ConfirmationSubj
 export function deletionErrorText(text: ProfileText, code: string | undefined): string {
   if (code === "ACCOUNT_STILL_REFERENCED") return text.t("deletion.errors.ACCOUNT_STILL_REFERENCED");
   if (code === "LAST_ADMIN_ACCOUNT") return text.t("deletion.errors.LAST_ADMIN_ACCOUNT");
+  if (code === ACCOUNT_DELETION_PLAN_CHANGED) return text.t("deletion.errors.ACCOUNT_DELETION_PLAN_CHANGED");
   // Session ou compte déjà partis (une suppression faite dont la réponse s'est
   // perdue) : la page se recharge — cas propre à l'écran, sans sœur française.
   if (code !== undefined && SESSION_GONE_CODES.has(code)) return text.t("deletion.errors.sessionGone", { days: ACCOUNT_REACTIVATION_DAYS });

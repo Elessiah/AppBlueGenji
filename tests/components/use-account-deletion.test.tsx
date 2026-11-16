@@ -17,6 +17,7 @@ jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
     ...actual,
+    useId: () => "lead-id",
     useState: <T,>(initial: T) => {
       const index = cursor++;
       if (!(index in cells)) cells[index] = initial;
@@ -28,20 +29,22 @@ jest.mock("react", () => {
   };
 });
 
-const showError = jest.fn<(message: string, options?: { lang?: string }) => void>();
-const showSuccess = jest.fn<(message: string, options?: { lang?: string }) => void>();
-jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess }) }));
+const showError = jest.fn<(message: string, options?: { lang?: string; durationMs?: number }) => void>();
+const showSuccess = jest.fn<(message: string, options?: { lang?: string; durationMs?: number }) => void>();
+jest.mock("@/components/ui/toast", () => ({ TOAST_DURATION_MS: 5000, useToast: () => ({ showError, showSuccess }) }));
 jest.mock("@/components/i18n/locale-context", () => ({ useAppLocale: () => locale.current }));
 const locale: { current: "fr" | "en" } = { current: "fr" };
 
 import {
+  ACCOUNT_DELETED_REDIRECT_MAX_MS,
+  accountDeletedRedirectDelay,
   ACCOUNT_DELETED_REDIRECT_MS,
   ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS,
   previewAccountDeletion,
   requestAccountDeletion,
   useAccountDeletion,
 } from "@/components/account/use-account-deletion";
-import { FR_PROFILE } from "@/app/(secured)/profil/_lib/profile-text";
+import { deletionErrorText, FR_PROFILE } from "@/app/(secured)/profil/_lib/profile-text";
 import type { ConfirmActionDialogProps } from "@/components/ui/confirm-action-dialog";
 import { RETENTION_UNKNOWN } from "@/lib/shared/account-deletion";
 import { readSource } from "../helpers/read-source";
@@ -129,7 +132,17 @@ describe("requestAccountDeletion", () => {
     const calls: FetchCall[] = [];
     const fetchImpl = fakeFetch({ "DELETE /api/profile": () => jsonResponse(200, { deleted: true, mode: "ERASE", reason: null }) }, calls);
     expect(await requestAccountDeletion("TOURNAMENTS", fetchImpl)).toEqual({ ok: true, applied: null });
-    expect(calls).toEqual([{ url: "/api/profile", init: { method: "DELETE" } }]);
+    expect(calls).toEqual([{ url: "/api/profile", init: { method: "DELETE", headers: { "content-type": "application/json" }, body: '{"confirmedReason":"TOURNAMENTS"}' } }]);
+  });
+
+  // EF-62 (E46) : un aperçu inconnu ne confirme aucun motif — rien n'est comparé.
+  it("requestAccountDeletion_unknownPreview_sendsEmptyBody", async () => {
+    const calls: FetchCall[] = [];
+    const fetchImpl = fakeFetch({ "DELETE /api/profile": () => jsonResponse(200, { deleted: true, mode: "ERASE", reason: null }) }, calls);
+
+    await requestAccountDeletion(RETENTION_UNKNOWN, fetchImpl);
+
+    expect(calls[0].init).toEqual({ method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" });
   });
 
   it("sans `mode` dans la réponse, retombe sur l'aperçu", async () => {
@@ -205,6 +218,13 @@ describe("useAccountDeletion", () => {
     expect(props.confirmLabel).toBe("Supprimer mon compte");
     expect(props.layer).toBe("overBlocking");
     expect(props.closeOnSuccess).toBe(false);
+    // Seul le premier paragraphe décrit la modale (pas tout le corps d'un bloc).
+    expect(props.describedById).toBe("lead-id");
+    const blocks = props.children as Array<ReactElement<{ id?: string }> | null>;
+    expect(blocks[0]?.props.id).toBe("lead-id");
+    // Hors des conditions, pas de note : la place reste vide.
+    expect(blocks[1]).toBeNull();
+    expect(blocks.filter((block) => block?.props.id === "lead-id")).toHaveLength(1);
   });
 
   const englishProfileText: typeof FR_PROFILE = scopedText("en", enProfile);
@@ -267,6 +287,66 @@ describe("useAccountDeletion", () => {
     expect(calls.map((call) => call.init?.method ?? "GET")).toEqual(["GET"]);
   });
 
+  // EF-62 (E46) : le plan a changé entre l'aperçu et le clic — la modale se recharge, rien n'est fait.
+  it("onConfirm_planChanged_reloadsPreviewShowsErrorAndStaysOpen", async () => {
+    const preview = jest
+      .fn<() => Response>()
+      .mockReturnValueOnce(jsonResponse(200, { mode: "ERASE", reason: null }))
+      .mockReturnValueOnce(jsonResponse(200, { mode: "ANONYMIZE", reason: "TOURNAMENTS" }));
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": preview,
+        "DELETE /api/profile": () => jsonResponse(409, { error: "ACCOUNT_DELETION_PLAN_CHANGED" }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+
+    const ok = await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
+    rerender();
+
+    expect(ok).toBe(false);
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(showError).toHaveBeenCalledWith(FR_PROFILE.t("deletion.errors.ACCOUNT_DELETION_PLAN_CHANGED"), expect.anything());
+    expect(useAccountDeletion({ text: FR_PROFILE }).dialog).not.toBeNull();
+  });
+
+  it("onConfirm_planChangedAndFreshPreviewUnknown_showsGenericError", async () => {
+    const preview = jest
+      .fn<() => Response>()
+      .mockReturnValueOnce(jsonResponse(200, { mode: "ERASE", reason: null }))
+      .mockReturnValueOnce(jsonResponse(500, { error: "X" }));
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": preview,
+        "DELETE /api/profile": () => jsonResponse(409, { error: "ACCOUNT_DELETION_PLAN_CHANGED" }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+    await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
+    expect(showError).toHaveBeenCalledWith(deletionErrorText(FR_PROFILE, undefined), expect.anything());
+    expect(showError).not.toHaveBeenCalledWith(FR_PROFILE.t("deletion.errors.ACCOUNT_DELETION_PLAN_CHANGED"), expect.anything());
+  });
+
+  it("onConfirm_sessionGoneLongMessage_toastLastsAsLongAsRedirectDelay", async () => {
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }),
+        "DELETE /api/profile": () => jsonResponse(401, { error: "UNAUTHORIZED" }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+    await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
+    const [message, options] = showError.mock.calls.at(-1) ?? ["", {}];
+    expect(options?.durationMs).toBe(accountDeletedRedirectDelay(message));
+    expect(options?.durationMs).toBeGreaterThan(5000);
+  });
+
   it("confirmer appelle la route de suppression (qui ferme la session), dit l'issue puis ramène à l'accueil de la langue", async () => {
     locale.current = "en";
     globalThis.fetch = fakeFetch(
@@ -280,11 +360,11 @@ describe("useAccountDeletion", () => {
     rerender();
     const ok = await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
     expect(ok).toBe(true);
-    expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE" } });
+    expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE", headers: { "content-type": "application/json" }, body: '{"confirmedReason":null}' } });
     // Textes retombés sur le français sous /en : le toast le déclare aussi.
-    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr" });
+    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr", durationMs: expect.any(Number) });
     expect(fakeWindow.location.href).toBe("/tournois");
-    jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
+    jest.advanceTimersByTime(accountDeletedRedirectDelay(showSuccess.mock.calls.at(-1)?.[0] ?? ""));
     expect(fakeWindow.location.href).toBe("/en");
   });
 
@@ -304,9 +384,15 @@ describe("useAccountDeletion", () => {
     rerender();
     // `true` : la confirmation reste « en cours » (aucun second envoi) jusqu'au rechargement.
     expect(await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm()).toBe(true);
-    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Ta session est fermée/), { lang: undefined });
+    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Ta session est fermée/), { lang: undefined, durationMs: expect.any(Number) });
     expect(showSuccess).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
+    // Le délai suit la longueur de la notification : pas de rechargement à 1,2 s.
+    const message = showError.mock.calls.at(-1)?.[0] ?? "";
+    const delay = accountDeletedRedirectDelay(message);
+    expect(delay).toBeGreaterThan(ACCOUNT_DELETED_REDIRECT_MS);
+    jest.advanceTimersByTime(delay - 1);
+    expect(fakeWindow.location.href).toBe("/tournois");
+    jest.advanceTimersByTime(1);
     expect(fakeWindow.location.href).toBe("/");
   });
 
@@ -334,6 +420,19 @@ describe("useAccountDeletion", () => {
     expect(showError).toHaveBeenCalledWith(expect.stringMatching(/rattaché à un tournoi ou à une équipe/), { lang: undefined });
     jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS * 2);
     expect(fakeWindow.location.href).toBe("/tournois");
+  });
+});
+
+describe("accountDeletedRedirectDelay", () => {
+  it("un toast court garde le délai minimal", () => {
+    expect(accountDeletedRedirectDelay("")).toBe(ACCOUNT_DELETED_REDIRECT_MS);
+    expect(accountDeletedRedirectDelay("Compte supprimé.")).toBe(ACCOUNT_DELETED_REDIRECT_MS);
+  });
+  it("un toast long allonge le délai à proportion", () => {
+    expect(accountDeletedRedirectDelay("x".repeat(100))).toBe(4000);
+  });
+  it("le délai est plafonné", () => {
+    expect(accountDeletedRedirectDelay("x".repeat(10_000))).toBe(ACCOUNT_DELETED_REDIRECT_MAX_MS);
   });
 });
 

@@ -81,6 +81,7 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
 /** Column headings of the data table, repeated by each mobile card. */
@@ -109,11 +110,11 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {/* Scopes in a row under the same basis: one badge (`groupedExtraBases`, cf. page FR). */}
         {groupedExtraBases(entry.extraBases).map((group) => (
-          <span key={group.scopes.join("|")} className={styles.extraBase}>
+          <div key={group.scopes.join("|")} className={styles.extraBase}>
             {/* Même base que la principale : pas de second badge identique, mais « including » (cf. page FR). */}
             {group.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[group.base]}</span> </>}
-            {group.scopes.join("; ")}
-          </span>
+            <ExtraScopes scopes={group.scopes} />
+          </div>
         ))}
       </DataCell>
       <DataCell column={3}>
@@ -232,7 +233,7 @@ export function RgpdEn({
             sends what the table describes for it, which comes with the login: the Discord username from
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
             account is linked; if it gives none, a BattleTag typed in by hand stays, without being treated as
-            verified), the picture from Google or Discord (copied, and hidden until you show it). What
+            verified — for a Battle.net account already linked with a BattleTag before this change (October 31, 2026), from your next login with Battle.net), the picture from Google or Discord (copied, and hidden until you show it). What
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
             adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming
@@ -325,11 +326,11 @@ export function RgpdEn({
           of that time — a hidden avatar follows the reports rule instead. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
-          bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
+          bring the account back as pending deletion; a request still pending in the restored backup takes back the date recorded in the log (the period runs from the latest request). As soon as it is requested, and without being undone by reactivation, it leaves its
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others and a member whose own account deletion has been requested not being counted; a team left with
           no other member becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
-          tournament where it never played are lost by forfeit. At the end of that time, the account is erased
+          tournament where it never played are lost by forfeit (withdrawal from the standings in a standings-based tournament; a match still waiting for its opponent is lost once that opponent is known, at the following hourly pass). At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
           the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
@@ -391,7 +392,7 @@ export function RgpdEn({
           exception being the replay codes described above) and the username is replaced by a randomly drawn{" "}
           <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
-          match played, the page is gone (page not found) and their name no longer leads anywhere. An account that has never played a match has no record
+          match played, the page is gone (page not found) and the links that led to it become plain text as you browse (a page already open keeps its link until it is reloaded). An account that has never played a match has no record
           to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a
           tournament that no one on the staff could take over, or if it is an entrant in a{" "}
           <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. Its teams no longer keep the row:
@@ -865,7 +866,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, in a tournament that has check-in, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,
@@ -909,12 +910,12 @@ export function RgpdEn({
           <p id="messages-de-match">
             <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in your account&apos;s
             language, when
-            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
+            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before; 24 h only in a tournament without check-in),
             when you are removed from a match, when a new match
             awaits you (both opponents of a match of your team or of your solo tournament have just become known, first
             round included: opponent, time if already set — with no “Match scheduled” on top — and the match page link, once per match and pairing) and, if you cast, when your caster registration for a match is removed
             by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
-            a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision), 15 minutes before it kicks off — or when its lobby opens,
+            a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision, nor in a tournament without check-in), 15 minutes before it kicks off — or when its lobby opens,
             if that comes earlier or the match has no time —, once per match, the match check-in (joining your team&apos;s voice channel — in a tournament with the “Team voice channels” option, for a match that has a time, never in a solo tournament nor against a ghost team — and the check-in channel, team on the left — the host — and on the right, game settings, map order and
             ban order, sorting the players by role if the match is cast, self-management, the match&apos;s stream link when it is public,
             the reminder to enter the scores and who to report a problem to), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
@@ -977,8 +978,8 @@ export function RgpdEn({
             window shows the match. Their certified Discord tag is also presented, in the “Contacts” window and on the match page, to the parties to the match alone — to both its teams as soon as both its opponents are known until its end, to its casters while the match is being played — never to referees with no role in that match nor in the launch window (if they also
             cast the match, their tag and BattleTag follow the casters&apos; rule: its parties read them only while the match is being played, launch window included, the other referees from the moment both its opponents are known). The staff who manage tournaments read at any time, in a match&apos;s “Refereeing” window, the username of its assigned referee and of the accounts that can referee. Any signed-in member also reads their username alone (never their BattleTag) on the card and
             page of a match, until its score is reported or the tournament ends; visitors without an account only read “Referee assigned”. Their “Ready” is
-            expected like those of the teams and casters; only the parties to the match and the referees read it, in the
-            “Contacts” and launch windows. If they no longer meet these requirements or become
+            expected like those of the teams and casters; only the parties to the match and the referees read the record of it, in the
+            “Contacts” and launch windows and on the match page — the state of the launch, which is public, may still let one guess whether they are ready. If they no longer meet these requirements or become
             a player of the match before its launch, they are no longer shown (and are removed from it before the launch); the refereeing of a
             deleted account is removed from all its matches. When someone else removes it from them (the staff,
             another referee the match is assigned to, self-management, their upheld objection) or it is removed automatically, they are
@@ -1093,10 +1094,10 @@ export function RgpdEn({
           <p id="retransmission">
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
-            casters: each caster joins a stream of the match or opens their own, with their channel link (required),
+            casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it),
             published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
-            set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
-            caster provided, there or when opening their stream, also goes when their account is deleted, played
+            set in the match&apos;s live configuration, by a member of the organizers, stays with the match when its casters leave. The link a
+            caster provided when opening their stream or in “Configure my broadcast” also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
             member casts it — or their own channel, which goes with their account. A caster never states it when opening their own
@@ -1119,8 +1120,8 @@ export function RgpdEn({
             link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
-            page: to the same people at the same times — parties to the match and referees —, in an Overwatch tournament only): it is kept with their caster
-            registration, goes with it, is never copied onto their profile nor presented as proven, and the “OW
+            page: to the same people at the same times — parties to the match, its other casters and referees —, in an Overwatch tournament only): it is kept with their caster
+            registration, goes with it and when the account is deleted, is never copied onto their profile nor presented as proven, and the “OW
             BattleTag” setting of the profile does not hide it — the caster is the one giving it, for this match,
             as part of the performance of the service (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).{" "}
             {STREAM_NOTICE_SHOWN_EN} {STREAM_NOTICE_SERVICE_EN} Since version 11 of the terms of use

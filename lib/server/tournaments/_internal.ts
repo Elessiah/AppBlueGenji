@@ -82,6 +82,8 @@ export type TournamentRow = RowDataPacket & {
   map_point_target?: number | null;
   /** 1 = salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ; absent = éteinte. */
   team_voice_channels?: number | null;
+  /** 0 = check-in des matchs éteint (`MATCH_CHECK_IN_SETTING.md`) ; absent = allumé. */
+  match_check_in?: number | null;
   /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
   live_url: string | null;
   /**
@@ -302,6 +304,7 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     launchPhase: Number(row.match_launch_phase ?? 0) === 1,
     mapPointTarget: parseStoredMapPointTarget(row.map_point_target),
     teamVoiceChannels: Number(row.team_voice_channels ?? 0) === 1,
+    matchCheckIn: Number(row.match_check_in ?? 1) !== 0,
     // Revalidé à la lecture, comme dans `findBroadcastingTournament` : une ligne
     // posée avant la liste blanche (ou éditée à la main en base) ne doit jamais
     // ressortir en `href`. Une URL sans schéma, notamment, deviendrait un lien

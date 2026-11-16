@@ -35,7 +35,8 @@
       "mapPointTargetValue": "Premier à {count}",
       "seeding": "Ordre de départ",
       "launchPhase": "Phase de lancement des matchs",
-      "teamVoice": "Salons vocaux d'équipe"
+      "teamVoice": "Salons vocaux d'équipe",
+      "matchCheckIn": "Check-in des matchs"
     },
     "conditions": {
       "minRoster": "Effectif minimal du roster",

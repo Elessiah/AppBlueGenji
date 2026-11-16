@@ -1,8 +1,10 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import {
+  ACCOUNT_DELETION_PLAN_CHANGED,
   ACCOUNT_REACTIVATION_DAYS,
   type AccountDeletionPlan,
+  type AccountRetentionReason,
   accountDeletionPlan,
   ACTIVE_TOURNAMENT_STATES,
   ownedTeamFate,
@@ -44,6 +46,7 @@ import { holdAccountIdentity } from "./account-deletion-hold";
 import {
   assertSoloLockSetFresh,
   listCastTournamentIds,
+  listNamingTournamentIds,
   listSoloRegistrationTournamentIds,
   loadAccountTrace,
   loadSoloRegistrations,
@@ -55,8 +58,10 @@ import {
   forfeitSoloEntriesAfterCommit,
   listForfeitableSoloEntries,
   logDeletionWithdrawal,
+  syncOpenSoloTournamentsOn,
   withdrawSoloRegistrationsOn,
 } from "./deleted-solo-entries";
+import { startDueTournaments } from "./tournament-start-sync";
 import { failureReason } from "@/lib/server/failure-reason";
 
 /*
@@ -77,8 +82,12 @@ import { failureReason } from "@/lib/server/failure-reason";
  */
 
 /** Ce que la demande a fait, et quand la suppression deviendra définitive. */
-export type AccountDeletionRequestOutcome = AccountDeletionPlan & {
-  /** Fin de la fenêtre de réactivation (ISO). */
+export type AccountDeletionRequestOutcome = Partial<AccountDeletionPlan> & {
+  /**
+   * Fin de la fenêtre de réactivation (ISO). Le plan (`mode`, `reason`) manque
+   * quand les traces n'ont pu être relues après le commit et qu'aucun aperçu
+   * confirmé ne le remplace : l'écran garde alors ce que la modale a annoncé.
+   */
   finalAt: string;
 };
 
@@ -352,6 +361,17 @@ async function handOverOrganizedTournaments(
  * repose la question sous verrou.
  */
 export async function getAccountDeletionRequestPlan(userId: number): Promise<AccountDeletionPlan> {
+  return (await previewDeletionRequest(userId)).plan;
+}
+
+/**
+ * L'aperçu, et le repreneur qu'il a trouvé (`null` si aucun, `undefined` si
+ * le compte n'organise rien) : la demande confirmée le reprend comme indice
+ * plutôt que de rebalayer `bg_users`.
+ */
+async function previewDeletionRequest(
+  userId: number,
+): Promise<{ plan: AccountDeletionPlan; successor: number | null | undefined }> {
   const db = await getDatabase();
   const trace = await loadAccountTrace(db, userId);
   const registrations = trace.soloRegistrations ? await loadSoloRegistrations(db, userId) : [];
@@ -359,13 +379,14 @@ export async function getAccountDeletionRequestPlan(userId: number): Promise<Acc
     registrations,
     new Set(registrations.map((registration) => registration.tournamentId)),
   );
-  const organized = trace.organizedTournaments && (await findOrganizerSuccessor(db, userId)) === null;
-  return accountDeletionPlan({
+  const successor = trace.organizedTournaments ? await findOrganizerSuccessor(db, userId) : undefined;
+  const plan = accountDeletionPlan({
     ...trace,
     soloRegistrations: registrations.length > withdrawn.length,
-    organizedTournaments: organized,
+    organizedTournaments: trace.organizedTournaments && successor === null,
     ownedTeams: false,
   });
+  return { plan, successor };
 }
 
 /** Ce que la demande a changé, à diffuser une fois la transaction validée. */
@@ -402,10 +423,23 @@ async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAcco
   }
 }
 
+/** `listNamingTournamentIds`, au meilleur effort : un relevé en échec ne rediffuse rien de plus. */
+async function namingTournamentsOrNone(userId: number, leftTeamIds: readonly number[]): Promise<number[]> {
+  try {
+    return await listNamingTournamentIds(await getDatabase(), userId, leftTeamIds);
+  } catch (error) {
+    console.error("[account-deletion] tournois qui nomment le compte non relevés", failureReason(error));
+    return [];
+  }
+}
+
 /** Rafraîchit les lecteurs, notifie le successeur, journalise et joue les forfaits. */
 async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
   const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments, replay } = effects;
   const liveCast = new Set(effects.liveCastTournaments);
+  // Le relevé (une jointure à six branches) part tout de suite et se lit plus
+  // bas : il ne dépend ni de l'avatar ni des flux, et ne lève jamais.
+  const namingLoad = namingTournamentsOrNone(userId, departures.map((departure) => departure.teamId));
   closeUserStreams(userId);
   // L'avatar mis de côté change d'adresse : l'ancienne, connue de qui l'avait
   // vue, ne doit plus rien servir pendant les trente jours. En premier, avant
@@ -424,11 +458,14 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     );
   }
   // L'entrée solo restée inscrite (jouée, tournoi en cours ou terminé) porte
-  // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai.
+  // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai. De même
+  // tout tournoi pas terminé qui le nomme encore — effectif d'une équipe
+  // engagée, cast ou arbitrage d'un match joué (`listNamingTournamentIds`).
   for (const tournamentId of new Set([
     ...withdrawn.map((entry) => entry.tournamentId),
     ...organizedHandedOver,
     ...soloTournaments,
+    ...(await namingLoad),
   ])) {
     publishUpdatedEvent(tournamentId);
   }
@@ -528,8 +565,44 @@ async function assertAnotherAdminRemains(connection: PoolConnection, userId: num
  */
 export async function requestAccountDeletion(
   userId: number,
-  options: { requestedAt?: Date; requestedAtRaw?: string; accountCreatedAt?: string } = {},
+  options: {
+    requestedAt?: Date;
+    requestedAtRaw?: string;
+    accountCreatedAt?: string;
+    /**
+     * Rejeu d'une restauration (`account-deletion-replay.ts`), dit
+     * explicitement : ni lancement, ni annonce, ni garde du dernier
+     * administrateur. `accountCreatedAt` ne vérifie que l'identité du compte.
+     */
+    replay?: boolean;
+    /**
+     * Le motif que la confirmation a annoncé (`null` : effacement complet).
+     * Relu juste avant la transaction : différent, rien n'est écrit
+     * (`ACCOUNT_DELETION_PLAN_CHANGED`). Hors des verrous, comme l'aperçu :
+     * la fenêtre qui compte est celle de la modale, pas les quelques
+     * millisecondes jusqu'au verrou.
+     */
+    confirmedReason?: AccountRetentionReason | null;
+  } = {},
 ): Promise<AccountDeletionRequestOutcome> {
+  let confirmedPlan: AccountDeletionPlan | null = null;
+  // Repreneur trouvé par l'aperçu : réutilisé comme indice (relu sous verrou).
+  let previewSuccessor: number | null = null;
+  if (options.confirmedReason !== undefined) {
+    // Une panne de cette relecture ne suspend pas la demande (supprimer son
+    // compte est un droit) : la comparaison est sautée, la demande suit.
+    let preview: Awaited<ReturnType<typeof previewDeletionRequest>> | null = null;
+    try {
+      preview = await previewDeletionRequest(userId);
+    } catch (error) {
+      console.error("[account-deletion] aperçu non relu avant la demande", failureReason(error));
+    }
+    if (preview !== null) {
+      if (preview.plan.reason !== options.confirmedReason) throw new Error(ACCOUNT_DELETION_PLAN_CHANGED);
+      confirmedPlan = preview.plan;
+      previewSuccessor = preview.successor ?? null;
+    }
+  }
   const db = await getDatabase();
   let soloEntryTournaments: number[] = [];
   let withdrawn: DeletionWithdrawal[] = [];
@@ -541,12 +614,13 @@ export async function requestAccountDeletion(
   // Le rejeu d'une demande après restauration (`account-deletion-replay.ts`)
   // garde la date d'origine : la fenêtre de trente jours ne repart pas à zéro.
   const requestedAt = options.requestedAt ?? new Date();
+  const replay = options.replay === true;
   let accountCreatedAt = "";
   let requestedAtRaw: string | undefined;
   // Une transaction annulée par un interblocage (une désignation d'arbitre
   // verrouille le match puis le compte, la demande l'inverse) se rejoue
   // entière, relevés compris (`retryOnDeadlock`).
-  const transact = async (lastAttempt: boolean): Promise<AccountDeletionPlan> => {
+  const transact = async (lastAttempt: boolean): Promise<void> => {
     departures.length = 0;
     // Tous les tournois de l'entrée solo sont rediffusés (son nom d'engagé
     // change) ; seuls ceux pas encore commencés sont verrouillés — une
@@ -554,14 +628,21 @@ export async function requestAccountDeletion(
     // verrou ferait attendre un tournoi en cours pour rien.
     soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
     const organizedIds = await listOrganizedTournamentIds(db, userId);
+    const openSoloTournaments = await listSoloRegistrationTournamentIds(db, userId, true);
     const soloTournaments = mergeTournamentIds(
-      await listSoloRegistrationTournamentIds(db, userId, true),
+      openSoloTournaments,
       organizedIds,
       await listCastTournamentIds(db, userId),
     );
     // Le repreneur se cherche hors verrous (balayage de `bg_users`) ; la
     // transaction ne fait que le relire par sa clé.
-    const successorHint = organizedIds.length > 0 ? await findOrganizerSuccessor(db, userId) : null;
+    // Celui de l'aperçu confirmé, s'il en a trouvé un, évite un second balayage.
+    let successorHint: number | null = null;
+    if (organizedIds.length > 0) successorHint = previewSuccessor ?? (await findOrganizerSuccessor(db, userId));
+    // Le coup d'envoi tardif d'un tournoi se donne avant la transaction, sous le
+    // seul verrou du tournoi : dedans, il le ferait sous celui du compte
+    // (`startDueTournaments`). La synchronisation plus bas reste le filet.
+    if (!replay) await startDueTournaments(openSoloTournaments);
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -584,10 +665,22 @@ export async function requestAccountDeletion(
       // Le dernier administrateur vivant fermerait l'administration de la
       // plateforme (rattrapable seulement en base). Le rejeu d'une demande
       // journalisée n'est pas refusé : elle a eu lieu.
-      if (options.accountCreatedAt === undefined && Number(locked[0].is_admin) === 1) {
+      if (!replay && Number(locked[0].is_admin) === 1) {
         await assertAnotherAdminRemains(connection, userId);
       }
 
+      // Un tournoi dont l'heure de début est passée sans que personne ait
+      // ouvert sa page passe en cours ici : son inscription, que la fenêtre de
+      // retrait refuse, est alors forfaitée dès la demande comme dans tout
+      // tournoi en cours, au lieu de rester jusqu'à la passe horaire.
+      // Pas au rejeu d'une restauration : synchroniser lancerait des tournois
+      // et posterait leurs annonces pendant la remise en état (la passe
+      // horaire s'en charge une fois le site rouvert).
+      // Les tournois remis à l'heure n'ont pas à être retenus : tous ceux de
+      // l'entrée solo sont rediffusés après le commit (`soloTournaments`).
+      if (!replay) {
+        await syncOpenSoloTournamentsOn(connection, openSoloTournaments);
+      }
       withdrawn = await withdrawSoloRegistrationsOn(
         connection,
         await loadSoloRegistrations(connection, userId),
@@ -612,7 +705,7 @@ export async function requestAccountDeletion(
       const withdrawal = await withdrawUserCasts(connection, userId, false);
       castTournaments = withdrawal.tournamentIds;
       liveCastTournaments = withdrawal.liveTournamentIds;
-      if (options.accountCreatedAt === undefined) {
+      if (!replay) {
         await relaunchAfterRefereeWithdrawal(
           connection,
           withdrawal.releasedRefereeMatchIds,
@@ -652,7 +745,6 @@ export async function requestAccountDeletion(
         [userId],
       );
       await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-      const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
       await connection.commit();
       // Commis : une annonce qui ne part pas ne doit pas faire passer la
       // demande pour un échec (ni journal ni suites ne suivraient).
@@ -661,7 +753,6 @@ export async function requestAccountDeletion(
       } catch (error) {
         console.error("[account-deletion] annonces non envoyées", failureReason(error));
       }
-      return plan;
     } catch (error) {
       await connection.rollback().catch(() => {});
       discardBotLogs(connection);
@@ -672,8 +763,7 @@ export async function requestAccountDeletion(
   };
   // L'interblocage se rejoue **dans** chaque essai du jeu de verrous : sa
   // fenêtre de rejeu se mesure sur une transaction, pas sur plusieurs.
-  const plan = await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
-
+  await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
   // réactivation la retire ; la suppression définitive écrit la sienne.
@@ -688,6 +778,18 @@ export async function requestAccountDeletion(
     pending: true,
     ...(requestedAtRaw === undefined ? {} : { requestedAt: requestedAtRaw }),
   });
+  // Les traces (quatre `EXISTS`) ne servent qu'au plan rendu au client : lues
+  // après le commit et le journal, hors des verrous de tournois et d'équipes,
+  // mais **avant** les suites — les forfaits qu'elles lancent en tâche de fond
+  // compteraient comme des matchs joués, et le motif rendu dépendrait de leur
+  // vitesse. Une panne ici ne change pas la demande faite en échec : le plan
+  // confirmé la remplace, ou l'écran garde son aperçu.
+  let plan: Partial<AccountDeletionPlan> = confirmedPlan ?? {};
+  try {
+    plan = accountDeletionPlan(await loadAccountTrace(db, userId));
+  } catch (error) {
+    console.error("[account-deletion] traces non relues après la demande", failureReason(error));
+  }
   await afterDeletionRequest(userId, {
     withdrawn,
     forfeitable,
@@ -696,7 +798,7 @@ export async function requestAccountDeletion(
     castTournaments,
     liveCastTournaments,
     soloTournaments: soloEntryTournaments,
-    replay: options.accountCreatedAt !== undefined,
+    replay,
   });
 
   return { ...plan, finalAt: reactivationDeadline(stampedAt).toISOString() };

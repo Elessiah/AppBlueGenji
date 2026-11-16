@@ -394,7 +394,7 @@
       "urlEmpty": "Your channel link is required: put it back, or cancel to keep the old one.",
       "playedTitle": "Match played",
       "close": "Close",
-      "urlHint": "Required: without it, your stream shows neither on the match nor in the live announcement (accepted platforms: {platforms}). It is removed from the match if your account is deleted.",
+      "urlHint": "Required: without it, your stream shows neither on the match nor in the live announcement (accepted platforms: {platforms}). It is removed from the match if your account is deleted, or with your stream once no caster holds it any more.",
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
       "urlStaff": "You are co-casting the organisation's stream: its link is set in “Official broadcast”.",
       "battletag": "BattleTag for this cast (optional)",

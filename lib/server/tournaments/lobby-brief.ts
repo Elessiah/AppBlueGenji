@@ -54,7 +54,13 @@ import { failureReason } from "@/lib/server/failure-reason";
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
  */
-import { parseStoredMapPointTarget } from "@/lib/shared/map-points";
+import {
+  clipMapPointTargets,
+  effectiveMapPointTargets,
+  hasPerMapTargets,
+  parseStoredMapPointTarget,
+  parseStoredMapPointTargets,
+} from "@/lib/shared/map-points";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -84,7 +90,7 @@ import {
   parseStoredTiebreak,
   resolveMatchMaps,
 } from "@/lib/shared/round-maps";
-import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
+import { roundAllowsTiebreak, roundMaxMaps, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { streamUrlCandidatesSql } from "./match-casters";
 import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
@@ -147,7 +153,8 @@ function sideBriefedSql(team: string): string {
   return `(EXISTS (SELECT 1 FROM bg_match_start_notices n
               WHERE n.match_id = m.id
                 AND ((n.phase = ? AND n.pairing = CONCAT(${team}, '')) OR ${legacyBriefSql("n", team)}))
-            OR ${briefMarkSql(team)})`;
+            OR ${briefMarkSql(team)}
+            OR ${mutedBriefSql(team)})`;
 }
 
 /** Id de l'engagée de ce côté, clé de sa réservation. */
@@ -216,6 +223,7 @@ export type LobbyBriefRow = RowDataPacket & {
   /** Format Duel / Arcade : points du tournoi et réglage propre au tour (`DUEL_ARCADE.md`). */
   tournament_point_target?: number | null;
   round_point_target?: number | null;
+  round_point_targets?: string | null;
   phase_id?: number | null;
   phase_format?: PhaseFormat | null;
   tournament_format?: TournamentFormat | null;
@@ -225,6 +233,12 @@ export type LobbyBriefRow = RowDataPacket & {
   match_format_draws?: number | null;
   endurance_playoff_format_type?: "BO" | "FT" | null;
   endurance_playoff_format_value?: number | null;
+  /**
+   * Côté déjà réservé, lu par le balayage seul (`sideBriefedSql`) : ni
+   * réservation rejouée, ni destinataires relus pour lui. Absent : non.
+   */
+  team1_briefed?: number | null;
+  team2_briefed?: number | null;
 };
 
 /**
@@ -266,6 +280,37 @@ export function briefPointTarget(row: LobbyBriefRow): number | null {
   return tournament === null ? null : (parseStoredMapPointTarget(row.round_point_target) ?? tournament);
 }
 
+/** Cartes au plus d'un match de ce tour (`roundMaxMaps`), `null` en score libre ou format inconnu. */
+export function briefMaxMaps(row: LobbyBriefRow): number | null {
+  if (!row.tournament_format) return null;
+  return roundMaxMaps(tiebreakTournamentFromRow({ ...row, format: row.tournament_format }, null), Number(row.round_number));
+}
+
+/**
+ * Points réglés carte par carte sur le tour, effectifs (la carte, sinon
+ * {@link briefPointTarget}), limités aux cartes que le match joue ; `null`
+ * quand toutes les cartes ont le même N (la page du match dit alors un seul
+ * « premier à N », `hasPerMapTargets`).
+ */
+export function briefPointTargets(
+  row: LobbyBriefRow,
+  target: number | null = briefPointTarget(row),
+  /** Cartes au plus du match, si l'appelant l'a déjà calculé (`briefMaxMaps`). */
+  maxMaps?: number | null,
+): number[] | null {
+  // Sans réglage carte par carte (le cas courant) ou format éteint : rien à
+  // résoudre, ni le format du match à relire.
+  if (target === null || !row.round_point_targets) return null;
+  const perMap = effectiveMapPointTargets(
+    target,
+    clipMapPointTargets(
+      parseStoredMapPointTargets(row.round_point_targets),
+      maxMaps === undefined ? briefMaxMaps(row) : maxMaps,
+    ),
+  );
+  return hasPerMapTargets(target, perMap) ? perMap : null;
+}
+
 /**
  * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
  * allume l'arbitrage planifié le tient pour lancé (`lobby_opened_at` posé,
@@ -300,6 +345,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             rm.tiebreak_map AS round_tiebreak_map,
             t.map_point_target AS tournament_point_target,
             rm.map_point_target AS round_point_target,
+            rm.map_point_targets AS round_point_targets,
             m.phase_id, t.format AS tournament_format,
             (SELECT p.format FROM bg_tournament_phases p WHERE p.id = m.phase_id) AS phase_format,
             t.match_format_type, t.match_format_value, t.match_format_max_maps, t.match_format_draws,
@@ -312,6 +358,27 @@ const BRIEF_FROM = `FROM bg_matches m
        LEFT JOIN bg_tournament_round_maps rm ON rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
          AND rm.bracket = m.bracket AND rm.round_number = m.round_number
        ${seedJoins("m")}`;
+
+/**
+ * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
+ * relue à chaque lecture des candidats, dans la réservation **et** à la
+ * relecture de chaque côté juste avant l'envoi (`rereadBriefRow`) : éteinte,
+ * rien ne part ni n'est réservé (la réservation d'un côté relu éteint est rendue). Ce qui est devenu dû pendant l'arrêt est
+ * réservé sans message par la remise en marche ({@link silencePausedLobbyBriefs}) ;
+ * ce qui était dû avant l'arrêt reste libre et part, rallumée, dans sa fenêtre.
+ */
+const CHECK_IN_ON_SQL = `t.match_check_in = 1`;
+
+/** {@link BRIEF_WINDOW_SQL} par l'horaire : dans son quart d'heure, pas trop en retard. */
+const TIME_BRANCH_SQL = `m.start_at IS NOT NULL
+              AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
+              AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE`;
+
+/** {@link BRIEF_WINDOW_SQL} par le salon : ouvert pour l'appariement actuel, depuis peu. */
+const LOBBY_BRANCH_SQL = `m.lobby_opened_at IS NOT NULL
+              AND (m.start_at IS NULL OR m.start_at <= NOW() OR m.launched_at IS NOT NULL)
+              AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
+              AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE`;
 
 /**
  * Un match dû : jouable, pas un bye, sans score, et **dans son quart d'heure**
@@ -337,16 +404,99 @@ const BRIEF_FROM = `FROM bg_matches m
  * Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
  * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
-const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
+const BRIEF_WINDOW_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
         AND m.self_managed = 1 AND m.referee_user_id IS NULL
         AND t.start_visibility_at <= NOW()
-        AND ((m.start_at IS NOT NULL
-              AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
-              AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)
-          OR (m.lobby_opened_at IS NOT NULL
-              AND (m.start_at IS NULL OR m.start_at <= NOW() OR m.launched_at IS NOT NULL)
-              AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-              AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
+        AND ((${TIME_BRANCH_SQL}) OR (${LOBBY_BRANCH_SQL}))`;
+
+/** {@link BRIEF_WINDOW_SQL} d'un tournoi dont le check-in est allumé. */
+const BRIEF_DUE_SQL = `${BRIEF_WINDOW_SQL}
+        AND ${CHECK_IN_ON_SQL}`;
+
+/**
+ * Instant où le salon a fait entrer le match dans {@link LOBBY_BRANCH_SQL}
+ * (horloge de la base, comme `lobby_opened_at` et `launched_at`) : le
+ * lancement pour un match lancé, l'ouverture faute d'horaire, sinon le plus
+ * tard de l'ouverture et de l'horaire — un salon ouvert tôt sans lancement
+ * attend l'horaire, un salon ouvert en retard compte à son ouverture.
+ */
+const LOBBY_ENTRY_SQL = `CASE WHEN m.launched_at IS NOT NULL THEN GREATEST(m.lobby_opened_at, m.launched_at)
+              WHEN m.start_at IS NULL THEN m.lobby_opened_at
+              ELSE GREATEST(m.lobby_opened_at, m.start_at) END`;
+
+/**
+ * Phase des réservations **muettes** de la remise en marche (16 caractères au
+ * plus ; préfixe `LOBBY_BRIEF`, épargné comme le check-in par les retours
+ * arrière). Sa clé (`pairing`) porte l'engagée **et l'horaire** du match
+ * ({@link mutedBriefKeySql}) : une nouvelle heure n'est plus tue, son check-in
+ * part — la réservation d'un check-in parti, elle, vaut quelle que soit l'heure.
+ */
+export const LOBBY_BRIEF_MUTED_PHASE = "LOBBY_BRIEF_MUTE";
+
+/** Clé d'une réservation muette : `<engagée>@<horaire AAAAMMJJhhmmss>` (vide sans horaire). */
+function mutedBriefKeySql(team: string): string {
+  return `CONCAT(${team}, '@', COALESCE(DATE_FORMAT(m.start_at, '%Y%m%d%H%i%s'), ''))`;
+}
+
+/** L'engagée `team` du match `m` a-t-elle été tue par une remise en marche, pour l'horaire actuel ? */
+function mutedBriefSql(team: string): string {
+  return `EXISTS (SELECT 1 FROM bg_match_start_notices u
+              WHERE u.match_id = m.id AND u.phase = '${LOBBY_BRIEF_MUTED_PHASE}'
+                AND u.pairing = ${mutedBriefKeySql(team)})`;
+}
+
+/**
+ * Remise en marche du check-in (`setMatchCheckIn`, dans sa transaction) :
+ * tait, côté par côté, le check-in des matchs du tournoi qui est dû maintenant
+ * et l'est devenu **pendant l'arrêt** — aucune des branches qui le rendent dû
+ * (horaire : H-15 ; salon : {@link LOBBY_ENTRY_SQL}) n'y est entrée avant
+ * l'arrêt. Un check-in dû avant l'arrêt, encore dans sa fenêtre, reste libre (il
+ * part) ; un match devenu dû après la remise en marche n'est pas touché. La
+ * réservation muette ({@link LOBBY_BRIEF_MUTED_PHASE}) solde l'arrêt une fois
+ * pour toutes (un second arrêt ne le rouvre pas) mais pour l'horaire du moment
+ * seulement : déplacé, le match reçoit son check-in à la nouvelle heure.
+ * L'horaire se compare à l'arrêt (heure du processus, comme les horaires) ; le
+ * salon, à l'arrêt ramené sur l'horloge de la base (`NOW()` moins le temps
+ * écoulé depuis l'arrêt, `now` pris à chaque tentative de la transaction).
+ * Sans arrêt daté (tournoi créé sans check-in), tout ce qui est dû se tait.
+ * Une seule instruction pour les deux côtés.
+ */
+export async function silencePausedLobbyBriefs(
+  connection: Pick<Db, "execute">,
+  tournamentId: number,
+  pausedAt: Date | null,
+  now: Date,
+): Promise<void> {
+  const dueBeforePause =
+    pausedAt === null
+      ? ""
+      : `AND NOT (((${TIME_BRANCH_SQL}) AND m.start_at - INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE < ?)
+                OR ((${LOBBY_BRANCH_SQL}) AND ${LOBBY_ENTRY_SQL} < NOW() - INTERVAL ? SECOND))`;
+  const params =
+    pausedAt === null ? [] : [pausedAt, Math.max(0, Math.floor((now.getTime() - pausedAt.getTime()) / 1000))];
+  // Lecture sans verrou d'abord : l'`INSERT … SELECT` pose des verrous sur
+  // chaque ligne qu'il parcourt, et sur toute la liste des matchs du tournoi
+  // il ferait attendre les scores et les lancements sous le verrou du tournoi.
+  // Il ne parcourt plus que les matchs retenus (clé primaire) ; ses conditions
+  // restent les mêmes, relues sous le verrou.
+  const windowSql = `m.tournament_id = ? AND ${BRIEF_WINDOW_SQL} ${dueBeforePause}`;
+  const [due] = await connection.execute<RowDataPacket[]>(
+    `SELECT m.id FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
+      WHERE ${windowSql}`,
+    [tournamentId, ...params],
+  );
+  if (due.length === 0) return;
+  const ids = due.map((row) => Number(row.id));
+  await connection.execute(
+    `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
+     SELECT m.id, ${mutedBriefKeySql("IF(side.n = 1, m.team1_id, m.team2_id)")}, ? FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
+       JOIN (SELECT 1 AS n UNION ALL SELECT 2) side
+      WHERE m.id IN (${ids.map(() => "?").join(", ")}) AND ${windowSql}`,
+    [LOBBY_BRIEF_MUTED_PHASE, ...ids, tournamentId, ...params],
+  );
+}
 
 /**
  * Réserve un côté — clé (match, id de l'engagée, `LOBBY_BRIEF`), une seule
@@ -377,8 +527,9 @@ async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot)
         JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
         WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}
           AND NOT ${LEGACY_BRIEF_SQL}
-          AND NOT ${briefMarkSql("?")}`,
-      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey, teamKey],
+          AND NOT ${briefMarkSql("?")}
+          AND NOT ${mutedBriefSql("?")}`,
+      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey, teamKey, teamKey],
     );
     const { affectedRows, insertId } = result as { affectedRows?: number; insertId?: number };
     return affectedRows === 1 && insertId ? Number(insertId) : null;
@@ -453,6 +604,10 @@ export function lobbyBriefSides(
   const slots = parseStoredSlots(row.round_slots_json);
   const storedFirstMap = row.first_map === null || row.first_map === "" ? null : String(row.first_map);
   const banFirstTeamId = firstBanTeamFor(parseFirstBanRule(row.first_ban_rule), hostTeamId, team1Id, team2Id);
+  // Résolus une fois par ligne. Le format du match n'est relu que pour un tour
+  // réglé carte par carte (format allumé) : seul ce cas le lit (`briefPointTargets`, DM).
+  const pointTarget = briefPointTarget(row);
+  const maxMaps = pointTarget !== null && row.round_point_targets ? briefMaxMaps(row) : null;
   const base = {
     tournamentId: Number(row.tournament_id),
     tournamentName: String(row.tournament_name),
@@ -469,7 +624,9 @@ export function lobbyBriefSides(
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
     tiebreakMap: briefTiebreakMap(row),
-    pointTarget: briefPointTarget(row),
+    pointTarget,
+    pointTargets: briefPointTargets(row, pointTarget, maxMaps),
+    maxMaps,
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
     // Le bot n'ouvre de salon vocal que pour un match suivi (`MATCH_VOICE.md`) :
@@ -750,6 +907,8 @@ function slotManagers(
 ): { ghost: boolean; userIds: number[] } | null {
   const managers = sideManagers(row, slot, context);
   if (managers === null || managers.ghost || slot === 1) return managers;
+  // Gérants vivants du premier côté, lus même quand il est déjà réservé
+  // (`sweepTeamIds`) : même source que les destinataires du second.
   const first = new Set(context.managers.get(slotTeamId(row, 1)) ?? []);
   const userIds = managers.userIds.filter((userId) => !first.has(userId));
   return { ghost: userIds.length === 0, userIds };
@@ -767,36 +926,74 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Pr
   // l'appariement.
   const ghosts: number[] = [];
   for (const slot of [1, 2] as const) {
+    // Côté déjà réservé au balayage : sa réservation ne serait que refusée.
+    if (sideBriefed(row, slot)) continue;
     const managers = slotManagers(row, slot, context);
     if (managers === null) continue;
-    const { claimId, outcome, error } = await briefSlot(db, row, slot, managers, context);
-    if (claimId === null) {
-      if (outcome === "error") return { ...brief, error };
-      continue;
-    }
-    if (outcome === "ghost") ghosts.push(claimId);
-    else if (outcome === "error") return { ...brief, retry: [...brief.retry, claimId], error };
-    // Salon refermé depuis la réservation : rien de plus ne part de ce match,
-    // ses réservations sans envoi sont rendues, sans relance.
-    else if (outcome === "closed") return { sent: brief.sent, retry: [], closed: [...ghosts, ...brief.retry, claimId], lost: false };
-    else if (outcome === "sent") brief.sent += 1;
-    else if (outcome === "retry") brief.retry.push(claimId);
-    else if (outcome === "lost") {
-      console.error(
-        `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
-      );
-      brief.lost = true;
-    }
+    const result = await briefSlot(db, row, slot, managers, context);
+    const done = recordSlot(brief, ghosts, row, result);
+    if (done) return done;
   }
   return brief;
 }
 
+/**
+ * Porte l'issue d'un côté au bilan du match ; rend le bilan **final** quand
+ * elle arrête le match (panne, salon refermé), `null` pour passer au côté suivant.
+ */
+function recordSlot(brief: MatchBrief, ghosts: number[], row: LobbyBriefRow, result: SlotResult): MatchBrief | null {
+  const { claimId, outcome, error } = result;
+  if (claimId === null) return outcome === "error" ? { ...brief, error } : null;
+  if (outcome === "ghost") ghosts.push(claimId);
+  else if (outcome === "error") return { ...brief, retry: [...brief.retry, claimId], error };
+  // Salon refermé depuis la réservation : rien de plus ne part de ce match,
+  // ses réservations sans envoi sont rendues, sans relance.
+  else if (outcome === "closed") return { sent: brief.sent, retry: [], closed: [...ghosts, ...brief.retry, claimId], lost: false };
+  else if (outcome === "sent") brief.sent += 1;
+  else if (outcome === "retry") brief.retry.push(claimId);
+  else if (outcome === "lost") {
+    console.error(
+      `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
+    );
+    brief.lost = true;
+  }
+  return null;
+}
+
+/** Ce côté était-il déjà réservé à la lecture du balayage ? */
+function sideBriefed(row: LobbyBriefRow, slot: LobbyBriefSlot): boolean {
+  return Number((slot === 1 ? row.team1_briefed : row.team2_briefed) ?? 0) === 1;
+}
+
+/**
+ * Engagées dont le balayage lit les gérants : les côtés pas encore réservés,
+ * plus le premier côté d'un second à briefer (`slotManagers`) — un match
+ * dont un seul côté attend (équipe sans gérant actif, toute la fenêtre) ne
+ * relit plus à chaque passe celui déjà briefé.
+ */
+function sweepTeamIds(rows: readonly LobbyBriefRow[]): number[] {
+  const read = new Set<number>();
+  for (const row of rows) {
+    if (!sideBriefed(row, 1)) read.add(slotTeamId(row, 1));
+    if (!sideBriefed(row, 2)) {
+      read.add(slotTeamId(row, 2));
+      read.add(slotTeamId(row, 1));
+    }
+  }
+  return [...read];
+}
+
 async function runLobbyBriefSweep(): Promise<number> {
   const db = await getDatabase();
+  // Chaque côté réservé est lu une fois, en colonne : le filtre et le balayage
+  // jugent le même côté réservé.
   const [rows] = await db.query<LobbyBriefRow[]>(
-    `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM}
+    `SELECT ${BRIEF_COLUMNS},
+            ${sideBriefedSql("m.team1_id")} AS team1_briefed,
+            ${sideBriefedSql("m.team2_id")} AS team2_briefed
+       ${BRIEF_FROM}
       WHERE ${BRIEF_DUE_SQL}
-        AND NOT (${sideBriefedSql("m.team1_id")} AND ${sideBriefedSql("m.team2_id")})
+     HAVING NOT (team1_briefed = 1 AND team2_briefed = 1)
       ORDER BY m.id`,
     [LOBBY_BRIEF_PHASE, LOBBY_BRIEF_PHASE],
   );
@@ -809,7 +1006,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   // Destinataires de tous les côtés en deux lectures, **avant** toute
   // réservation : une panne ici ne réserve rien, et arme le balayage suivant
   // (`onError`, dans la limite des relances).
-  const memberships = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
+  const memberships = await loadEntrantManagerIds(sweepTeamIds(rows));
   const recipients = await loadNotificationRecipients([...memberships.values()].flat(), "certified", { matchDm: true });
   retries.delete(SWEEP_RETRY_KEY);
   // Gérants dont le compte vit encore : un compte supprimé (anonymisé) garde
@@ -824,11 +1021,11 @@ async function runLobbyBriefSweep(): Promise<number> {
   // actif, seules à attendre) ne coûte aucune lecture des casteurs : il
   // reste candidat toute la fenêtre, et ces lectures seraient refaites à
   // chaque balayage pour rien.
-  const hasRecipients = (teamId: number, ghost: number | null | undefined) =>
-    Number(ghost ?? 0) === 1 || (managers.get(teamId) ?? []).length > 0;
-  const briefable = rows.filter(
-    (row) => hasRecipients(Number(row.team1_id), row.team1_ghost) || hasRecipients(Number(row.team2_id), row.team2_ghost),
-  );
+  const hasRecipients = (row: LobbyBriefRow, slot: LobbyBriefSlot) =>
+    !sideBriefed(row, slot) &&
+    (Number((slot === 1 ? row.team1_ghost : row.team2_ghost) ?? 0) === 1 ||
+      (managers.get(slotTeamId(row, slot)) ?? []).length > 0);
+  const briefable = rows.filter((row) => hasRecipients(row, 1) || hasRecipients(row, 2));
   // Ces lectures ne lèvent pas : une panne envoie le brief sans la ligne.
   const castersByMatch = await readMatchCasters(
     db,

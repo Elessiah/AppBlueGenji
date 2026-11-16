@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
-import { canToggleRefereeScheduling, matchesToPlan } from "@/lib/shared/match-planning";
+import { matchesToPlan } from "@/lib/shared/match-planning";
+import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -43,7 +44,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
   const canManage = detail.isAdmin && !frozen;
-  const toggleable = canManage && canToggleRefereeScheduling(detail.card.state);
+  const toggleable = canManage && canToggleLiveTournamentOption(detail.card.state);
   // Activé ailleurs, ou geste retiré (droit, plateau figé) entre-temps : la
   // confirmation en attente est oubliée, pour ne pas se rouvrir seule plus tard.
   if (confirmEnable && (enabled || !toggleable)) setConfirmEnable(false);

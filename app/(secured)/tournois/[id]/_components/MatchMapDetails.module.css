@@ -57,8 +57,16 @@
 }
 
 .label {
+  display: flex;
+  flex-direction: column;
   color: var(--ink-quiet, #9aa4b2);
   white-space: nowrap;
+}
+
+/* Duel / Arcade réglé carte par carte : le N de la carte, sous son numéro (la
+   colonne du code de replay garde sa largeur à 375 px). */
+.target {
+  font-size: 12px;
 }
 
 .score {

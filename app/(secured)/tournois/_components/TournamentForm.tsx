@@ -33,6 +33,7 @@ import { EARLY_EXIT_FIELD_ID, EARLY_EXIT_HINT_ID, FormatSettings } from "./Forma
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
 import { TeamVoiceChannelsField } from "./TeamVoiceChannelsField";
+import { MatchCheckInField } from "./MatchCheckInField";
 import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LAUNCH_PHASE_MORE_ID, LaunchPhaseField } from "./LaunchPhaseField";
 import {
   DUEL_ARCADE_FIELD_ID,
@@ -118,10 +119,11 @@ export type TournamentFormProps = {
   explanationId?: string;
   /**
    * La planification par l'arbitrage survit à la fenêtre d'édition : modifiable
-   * jusqu'à la clôture (`canToggleRefereeScheduling`), tout comme les salons
-   * vocaux d'équipe (`MATCH_VOICE.md`). Défaut : modifiable.
+   * jusqu'à la clôture (`canToggleLiveTournamentOption`), tout comme les salons
+   * vocaux d'équipe (`MATCH_VOICE.md`) et le check-in des matchs
+   * (`MATCH_CHECK_IN_SETTING.md`). Défaut : modifiable.
    */
-  refereeSchedulingEditable?: boolean;
+  togglesEditable?: boolean;
   /** État du tournoi édité — en cours, cocher la planification défait des lancements. */
   tournamentState?: TournamentState;
 };
@@ -133,7 +135,7 @@ export function TournamentForm({
   submitLabel,
   onSubmit,
   explanationId,
-  refereeSchedulingEditable = true,
+  togglesEditable = true,
   tournamentState,
 }: Readonly<TournamentFormProps>) {
   const { showError } = useToast();
@@ -727,7 +729,7 @@ export function TournamentForm({
           <RefereeSchedulingField
             mode={mode}
             checked={values.refereeScheduling}
-            editable={refereeSchedulingEditable}
+            editable={togglesEditable}
             warnUndoesLaunches={
               tournamentState === "RUNNING" && values.refereeScheduling && !initialValues.refereeScheduling
             }
@@ -746,8 +748,15 @@ export function TournamentForm({
           <TeamVoiceChannelsField
             mode={mode}
             checked={values.teamVoiceChannels}
-            editable={refereeSchedulingEditable}
+            editable={togglesEditable}
             onChange={(checked) => set("teamVoiceChannels", checked)}
+          />
+
+          <MatchCheckInField
+            mode={mode}
+            checked={values.matchCheckIn}
+            editable={togglesEditable}
+            onChange={(checked) => set("matchCheckIn", checked)}
           />
         </section>
 

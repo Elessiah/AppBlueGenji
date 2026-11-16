@@ -734,7 +734,7 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
     expect(t04.legalBasis).toContain("exécution du service (strictement nécessaire à son fonctionnement minimum : sans lui, les parties du match ne peuvent pas joindre son arbitre) pour la présentation de son tag Discord certifié");
     // MATCH-UI-NAMES (décisions 47 et 52) : pseudo seul aux membres connectés, « Prêt » aux seules parties.
     expect(t04.subPurposes.join(" ")).toContain("montrer aussi son pseudo seul à tout membre connecté, sur la carte et la page d'un match, jusqu'à la déclaration de son score ou la fin du tournoi (les visiteurs sans compte ne lisent que « Arbitre désigné »)");
-    expect(t04.subPurposes.join(" ")).toContain("que seules ses parties et les arbitres lisent");
+    expect(t04.subPurposes.join(" ")).toContain("dont seules ses parties et les arbitres lisent le relevé");
     expect(t04.legalBasis).toContain("intérêt légitime (que les membres sachent qui arbitre un match) pour l'affichage de son pseudo à tout membre connecté");
     expect(t04.recipients.join(" ")).toContain("son pseudo seul à tout membre connecté, sur la carte et la page du match jusqu'à la déclaration de son score ou la fin du tournoi");
     expect(t04.subPurposes.join(" ")).toContain("en push seulement (jamais en message privé)");
