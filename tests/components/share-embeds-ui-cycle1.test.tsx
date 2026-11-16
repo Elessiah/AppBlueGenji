@@ -3,11 +3,15 @@
  * carte de match bornée, « Partager » après l'action principale, horloge de
  * publication, échec de copie qui montre l'adresse.
  */
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MatchShareCard, type MatchShareCardProps } from "@/components/og/match-share-card";
 import { SHARE_CARD_COLORS } from "@/components/og/share-card";
 import { isPublicMatch, offersMatchPage } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
+import {
+  SHARE_PUBLISHED_MARGIN_MS,
+  useTournamentPublished,
+} from "@/app/(secured)/tournois/[id]/_lib/use-tournament-published";
 import { readSource } from "../helpers/read-source";
 
 const MARK = { initial: "A", logoUrl: null, logoSrc: null };
@@ -93,7 +97,7 @@ describe("wiring", () => {
     const source = readSource("app/(secured)/tournois/[id]/_lib/use-tournament-published.ts");
     // L'horloge ne tourne que tant que le tournoi n'est pas publié (et jamais sans carte).
     expect(source).toContain("useClock(PUBLISHED_CLOCK_MS, card !== null && !published)");
-    expect(source).toContain("card !== null && isTournamentPublished(card)");
+    expect(source).toContain("card !== null && isTournamentPublished(card, new Date(Date.now() - SHARE_PUBLISHED_MARGIN_MS))");
   });
 
   it("TournamentHeader_shareButton_comesAfterTheRegisterButton", () => {
@@ -110,5 +114,29 @@ describe("wiring", () => {
     expect(source).toContain('showError(t("shareLink.copyFailed", { url }))');
     expect(readSource("messages/fr/tournament.json")).toContain("{url}");
     expect(readSource("messages/en/tournament.json")).toContain("copyFailed\": \"Couldn't copy the link: {url}");
+  });
+});
+
+describe("useTournamentPublished — marge d'horloge", () => {
+  const VISIBLE_AT = Date.parse("2026-05-13T20:00:00.000Z");
+
+  function Probe({ startVisibilityAt }: Readonly<{ startVisibilityAt: string }>) {
+    return <span>{String(useTournamentPublished({ startVisibilityAt }))}</span>;
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("useTournamentPublished_withinClockMargin_returnsFalse", () => {
+    jest.useFakeTimers({ now: VISIBLE_AT + SHARE_PUBLISHED_MARGIN_MS - 1 });
+
+    expect(renderToStaticMarkup(<Probe startVisibilityAt="2026-05-13T20:00:00.000Z" />)).toBe("<span>false</span>");
+  });
+
+  it("useTournamentPublished_pastClockMargin_returnsTrue", () => {
+    jest.useFakeTimers({ now: VISIBLE_AT + SHARE_PUBLISHED_MARGIN_MS });
+
+    expect(renderToStaticMarkup(<Probe startVisibilityAt="2026-05-13T20:00:00.000Z" />)).toBe("<span>true</span>");
   });
 });

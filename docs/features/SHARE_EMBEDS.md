@@ -22,7 +22,10 @@ de replay publics).
 - L'adresse est toujours `/suivre/tournois/<id>` ou
   `/suivre/tournois/<id>/matchs/<mid>`, absolue, dans la langue de la fiche
   (`/en/suivre/…` en anglais) — jamais celle de l'espace membre.
-- Offert seulement pour un tournoi **publié** (`isTournamentPublished`) ; sur
+- Offert seulement pour un tournoi **publié** (`isTournamentPublished`, avec
+  une marge de cinq minutes sur l'horloge du lecteur,
+  `SHARE_PUBLISHED_MARGIN_MS` : une horloge en avance ne fait pas partager un
+  lien que le serveur dit encore introuvable) ; sur
   un match, pas sur une exemption. `LiveProvider` porte `publicShare`.
 - Publication relue toutes les 30 s tant que le tournoi n'est pas publié
   (`useTournamentPublished`, `useClock` : l'horloge s'**arrête** une fois publié,
@@ -73,11 +76,14 @@ de replay publics).
   `buildTournamentShareSummary`, `lib/shared/share-embeds.ts`) — une carte ne
   montre rien que `/suivre/` ne montre déjà. Lue par
   `publicTournamentShareForRequest` (plafond de lecture et copie périmée de la
-  page sans compte). L'image d'un tournoi qui ne peut pas nommer d'équipe en
-  tête (individuel, à venir, inscriptions : `tournamentMayHaveLeader`) ne lit que
-  **la carte** (lecture légère de l'encart, sans reconstruire la réponse
-  publique) ; celle d'un tournoi par équipes en cours ou terminé, et celle d'un
-  match, lisent la réponse publique.
+  page sans compte). L'image d'un tournoi passe par
+  `publicTournamentImageView` (`spectator-snapshot.ts`) : réponse publique
+  fraîche en mémoire si elle existe (sans jeton), sinon **la carte fraîche**
+  (cache de carte ou base, jamais la copie échue), et, pour un tournoi qui peut
+  nommer une équipe en tête (`tournamentMayHaveLeader`), la réponse publique —
+  un seul jeton du plafond par requête (`publicTournamentImageViewForRequest`).
+  Lecture de carte refusée au plafond : la copie échue, servie `no-store`.
+  L'image d'un match lit la réponse publique.
 - **Aucun pseudo** : un engagé solo est « Joueur 1 » / « Joueur 2 », sans
   avatar ; un tournoi individuel n'a pas de ligne « en tête ».
 - Tournoi non publié, introuvable, match d'un autre tournoi, base injoignable,
@@ -99,7 +105,12 @@ de replay publics).
   (`EMBED_CARD_TTL_MS`), seule l'éviction LRU la chasse : pas de rendu Satori
   de plus toutes les cinq minutes.
 - L'adresse publiée porte la même empreinte en `?v=` pour que Discord ou X ne
-  resservent pas une ancienne image ; le paramètre reçu n'est jamais lu.
+  resservent pas une ancienne image. Le paramètre reçu ne choisit jamais ce qui
+  est rendu ; il ne décide que de l'en-tête : une empreinte qui n'est pas celle
+  de l'image servie (match : l'exacte ; tournoi :
+  `acceptedTournamentShareVersions`, l'exacte ou celle de la fenêtre courante ou
+  précédente) part en `no-store` — une adresse calculée d'avance (vainqueur
+  prédit, fenêtre future) ne garde jamais l'image d'aujourd'hui chez un robot.
   L'encart d'un tournoi lit la copie publique **déjà en mémoire** (jamais une
   reconstruction payée par un robot). Titre et texte alternatif viennent de la
   carte lue ; l'équipe en tête vient de la copie, seulement si elle dit la même
@@ -117,3 +128,12 @@ de replay publics).
   dessinée depuis une copie **échue** (plafond de lecture atteint, 150 s au
   plus : `PublicTournamentShare.stale`) part aussi en `no-store` : un robot ne la
   garde pas sous l'adresse `?v=` d'un score plus récent.
+- **Rendus bornés** : une image absente de la mémoire (ni rendue, ni en vol)
+  prend un jeton du réseau (`SHARE_EMBED_RENDER_RULE` : vingt d'avance, un
+  toutes les trois secondes) et n'entre pas dans une file de plus de
+  `MAX_QUEUED_EMBED_RENDERS` (8) rendus en attente ; refusée, la carte neutre
+  (`no-store`). Un client qui parcourt plus de couples (match, langue) que la
+  réserve n'en garde n'occupe donc pas le Raspberry.
+- Le résumé ne retient de chaque match que les champs qu'il relit
+  (`shareMatchSource`) : la copie publique en cache ne garde pas en plus tout
+  l'arbre objet de ses matchs.

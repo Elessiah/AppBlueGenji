@@ -21,14 +21,22 @@
  * score saisi change l'empreinte, donc la clé — la carte suivante est rendue à
  * neuf, sans attendre la fin d'une fenêtre. L'adresse publiée par l'encart
  * porte la même empreinte (`?v=`), pour que Discord ou X ne resservent pas
- * leur ancienne copie ; le paramètre reçu, lui, n'est jamais lu : un robot qui
- * en invente ne fait pas rendre une carte de plus. L'empreinte est dans la
+ * leur ancienne copie. Le paramètre reçu ne choisit jamais ce qui est rendu (un
+ * robot qui en invente ne fait pas rendre une carte de plus) ; il ne décide que
+ * de l'en-tête : une empreinte qui n'est pas celle de l'image servie (inventée,
+ * périmée, ou calculée d'avance sur un résultat à venir) part en `no-store`,
+ * pour qu'aucun robot ne garde l'image d'aujourd'hui sous l'adresse que
+ * l'encart publiera demain. L'empreinte est dans la
  * clé : une carte inchangée reste en mémoire des heures (`EMBED_CARD_TTL_MS`),
  * seule l'éviction de la réserve la chasse.
  *
  * **Copie échue.** Au plafond de lecture, la carte est dessinée depuis la copie
  * échue (150 s au plus) : elle est servie `no-store`, pour qu'un robot ne la
  * garde pas sous l'adresse `?v=` d'un score plus récent.
+ *
+ * **Rendus.** Un rendu absent de la mémoire prend un jeton du réseau
+ * (`SHARE_EMBED_RENDER_RULE`) et n'entre pas dans une file déjà longue
+ * (`MAX_QUEUED_EMBED_RENDERS`) : refusé, la carte neutre.
  */
 import { ImageResponse } from "next/og";
 import { MATCH_SHARE_LOGO_SIZE, MatchShareCard } from "@/components/og/match-share-card";
@@ -39,16 +47,20 @@ import { messagesFor } from "./i18n-messages";
 import { renderPageShareImage } from "./page-share-image";
 import { shareCardLogo } from "./share-card-logo";
 import { shareImageOptions } from "./share-card-fonts";
-import { cachedShareImage } from "./share-image-cache";
+import { cachedShareImage, MAX_QUEUED_EMBED_RENDERS } from "./share-image-cache";
 import { teamLogoDataUrl } from "./share-podium";
-import { publicTournamentCardForRequest, publicTournamentShareForRequest } from "./spectator-request";
+import {
+  publicTournamentImageViewForRequest,
+  publicTournamentShareForRequest,
+  shareEmbedRenderAdmission,
+} from "./spectator-request";
 import { TEAM_SHARE_LOGO_SIZE } from "./share-team";
 import type { Locale } from "@/lib/shared/locales";
 import { matchEmbedCard, tournamentEmbedCard } from "@/lib/shared/share-embed-cards";
 import {
+  acceptedTournamentShareVersions,
   matchShareVersion,
   parseEmbedShareCardKey,
-  tournamentMayHaveLeader,
   tournamentShareVersion,
   type EmbedShareTarget,
 } from "@/lib/shared/share-embeds";
@@ -95,7 +107,11 @@ async function neutralImage(locale: Locale): Promise<Response | null> {
  * qui n'en est pas une (la route répond 404). Tout le reste — tournoi non
  * publié, match d'un autre tournoi, base injoignable — rend la carte neutre.
  */
-export async function renderEmbedShareImage(key: string, locale: Locale): Promise<Response | null> {
+export async function renderEmbedShareImage(
+  key: string,
+  locale: Locale,
+  requestedVersion: string | null = null,
+): Promise<Response | null> {
   const target = parseEmbedShareCardKey(key);
   if (!target) return null;
   const view = await readShareView(target);
@@ -112,12 +128,19 @@ export async function renderEmbedShareImage(key: string, locale: Locale): Promis
     EMBED_CARD_TTL_MS,
     () => buildEmbedShareImage(target, view, locale),
     "embed",
+    false,
+    { admit: await shareEmbedRenderAdmission(), maxQueued: MAX_QUEUED_EMBED_RENDERS },
   );
   if (!image) return neutralImage(locale);
+  const accepted =
+    requestedVersion === null ||
+    (target.kind === "match"
+      ? requestedVersion === version
+      : acceptedTournamentShareVersions(view.card, view.share.leader).has(requestedVersion));
   return new Response(image.body, {
     headers: {
       "content-type": "image/png",
-      "cache-control": view.stale ? STALE_CARD_CACHE_CONTROL : EMBED_CARD_CACHE_CONTROL,
+      "cache-control": view.stale || !accepted ? STALE_CARD_CACHE_CONTROL : EMBED_CARD_CACHE_CONTROL,
     },
   });
 }
@@ -125,17 +148,14 @@ export async function renderEmbedShareImage(key: string, locale: Locale): Promis
 type ShareView = NonNullable<Awaited<ReturnType<typeof publicTournamentShareForRequest>>>;
 
 /**
- * Ce que l'image dessine. Un tournoi qui ne peut pas nommer d'équipe en tête
- * n'a besoin que de sa carte (lecture légère, sans reconstruire la réponse
- * publique ni prendre un jeton de plus) ; le reste lit la réponse publique.
+ * Ce que l'image dessine. Un tournoi passe par `publicTournamentImageView`
+ * (carte seule s'il ne peut pas nommer d'équipe en tête, un seul jeton du
+ * plafond par requête) ; un match lit la réponse publique.
  */
 async function readShareView(target: EmbedShareTarget): Promise<ShareView | null> {
-  if (target.kind === "tournament") {
-    const card = await publicTournamentCardForRequest(target.tournamentId).catch(() => null);
-    if (!card) return null;
-    if (!tournamentMayHaveLeader(card)) return { card, share: { leader: null, matches: new Map() }, stale: false };
-  }
-  return publicTournamentShareForRequest(target.tournamentId).catch(() => null);
+  const read =
+    target.kind === "tournament" ? publicTournamentImageViewForRequest : publicTournamentShareForRequest;
+  return read(target.tournamentId).catch(() => null);
 }
 
 /** Rend l'image de `target` depuis la réponse publique, sans cache. */

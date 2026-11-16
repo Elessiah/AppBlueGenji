@@ -292,6 +292,24 @@ export const SPECTATOR_REBUILD_RULE: TokenBucketRule = {
 };
 
 /**
+ * Rendus d'une image d'aperçu de tournoi ou de match **absente de la mémoire**
+ * (`/og/<langue>/tournament-…png`, `SHARE_EMBEDS.md`), par réseau : un seau à
+ * jetons, vingt d'avance puis un toutes les trois secondes. Une image servie
+ * depuis la mémoire, ou un rendu en vol qu'on rejoint, ne coûte rien.
+ *
+ * Satori et `sharp` sur le Raspberry : sans ce plafond, un client qui
+ * parcourt plus de couples (match, langue) que la réserve `embed` n'en garde
+ * ferait rendre une image par requête, sans que le plafond des lectures
+ * publiques ne le compte (la réponse publique, elle, est en cache). Un message
+ * Discord ou un tweet n'en fait rendre qu'une ; au plafond, la carte neutre.
+ */
+export const SHARE_EMBED_RENDER_RULE: TokenBucketRule = {
+  name: "share-embed-render",
+  capacity: 20,
+  refillMs: 3_000,
+};
+
+/**
  * Retire le port d'une adresse qui en porte un (`1.2.3.4:51234`,
  * `[2001:db8::1]:51234`) : un client qui change de port à chaque connexion
  * resterait sinon une clé par connexion, hors de tout plafond. Une adresse IPv6

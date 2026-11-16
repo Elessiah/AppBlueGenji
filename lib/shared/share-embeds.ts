@@ -91,14 +91,16 @@ function sideOf(
   return { teamId, name, logoUrl: localUploadUrl(logos.get(teamId) ?? null), solo: false };
 }
 
-function sideNumber(match: BracketMatch, teamId: number | null): 1 | 2 | null {
+function sideNumber(match: Pick<BracketMatch, "team1Id" | "team2Id">, teamId: number | null): 1 | 2 | null {
   if (teamId === null) return null;
   if (teamId === match.team1Id) return 1;
   if (teamId === match.team2Id) return 2;
   return null;
 }
 
-function displayedScore(match: BracketMatch): MatchShareSummary["score"] {
+function displayedScore(
+  match: Pick<BracketMatch, "doubleForfeit" | "displayScore" | "team1Score" | "team2Score">,
+): MatchShareSummary["score"] {
   if (match.doubleForfeit) return null;
   const shown = match.displayScore ?? null;
   if (shown) return { team1: shown.team1, team2: shown.team2 };
@@ -106,10 +108,58 @@ function displayedScore(match: BracketMatch): MatchShareSummary["score"] {
   return { team1: match.team1Score, team2: match.team2Score };
 }
 
+/** Ce que le résumé d'un match relit de lui (`matchSummary`, `matchMapNames`). */
+type ShareMatchSource = Pick<
+  BracketMatch,
+  | "id"
+  | "phaseId"
+  | "bracket"
+  | "roundNumber"
+  | "matchNumber"
+  | "status"
+  | "team1Id"
+  | "team2Id"
+  | "team1Name"
+  | "team2Name"
+  | "team1Score"
+  | "team2Score"
+  | "displayScore"
+  | "winnerTeamId"
+  | "forfeitTeamId"
+  | "doubleForfeit"
+  | "maps"
+  | "firstMap"
+  | "mapPicks"
+>;
+
+function shareMatchSource(match: BracketMatch): ShareMatchSource {
+  return {
+    id: match.id,
+    phaseId: match.phaseId,
+    bracket: match.bracket,
+    roundNumber: match.roundNumber,
+    matchNumber: match.matchNumber,
+    status: match.status,
+    team1Id: match.team1Id,
+    team2Id: match.team2Id,
+    team1Name: match.team1Name,
+    team2Name: match.team2Name,
+    team1Score: match.team1Score,
+    team2Score: match.team2Score,
+    displayScore: match.displayScore,
+    winnerTeamId: match.winnerTeamId,
+    forfeitTeamId: match.forfeitTeamId,
+    doubleForfeit: match.doubleForfeit,
+    maps: match.maps,
+    firstMap: match.firstMap,
+    mapPicks: match.mapPicks,
+  };
+}
+
 function matchSummary(
-  snapshot: Pick<TournamentSnapshot, "card" | "soloUserIds" | "mapRules">,
+  snapshot: { card: TournamentCard; soloUserIds: TournamentSnapshot["soloUserIds"]; mapRules: Pick<TournamentSnapshot["mapRules"], "rounds"> },
   logos: ReadonlyMap<number, string | null>,
-  match: BracketMatch,
+  match: ShareMatchSource,
 ): MatchShareSummary {
   const names = match.maps.length > 0 ? matchMapNames(snapshot.mapRules.rounds, match) : [];
   return {
@@ -174,7 +224,15 @@ export function buildTournamentShareSummary(snapshot: ShareSummarySource): Tourn
   // demandées : le résumé de chacun n'est construit qu'à la première lecture
   // (puis gardé), et non à chaque reconstruction de la réponse publique. Le
   // résumé ne retient que ce que cette construction relit.
-  const source = { card: snapshot.card, soloUserIds: snapshot.soloUserIds, mapRules: snapshot.mapRules, matches: snapshot.matches };
+  // Seuls les champs que `matchSummary` relit sont retenus (pas les casters,
+  // antennes, propositions… de chaque match) : la copie publique en cache ne
+  // garde pas en plus tout l'arbre objet de ses matchs.
+  const source = {
+    card: snapshot.card,
+    soloUserIds: snapshot.soloUserIds,
+    mapRules: { rounds: snapshot.mapRules.rounds },
+    matches: snapshot.matches.map(shareMatchSource),
+  };
   let matches: ReadonlyMap<number, MatchShareSummary> | null = null;
   return {
     leader,
@@ -259,6 +317,26 @@ export function tournamentShareVersionWithoutSummary(card: TournamentCard, now: 
   if (card.state === "RUNNING") windowMs = UNSETTLED_SHARE_VERSION_MS;
   else if (card.state === "FINISHED") windowMs = FINISHED_SHARE_VERSION_MS;
   return windowMs === null ? base : `${base}.${Math.floor(now / windowMs).toString(36)}`;
+}
+
+/**
+ * Les empreintes `?v=` qu'une image de tournoi peut **légitimement** porter à
+ * l'instant `now` : l'exacte (carte et équipe en tête), et celles de la
+ * fenêtre courante et de la précédente (`tournamentShareVersionWithoutSummary`,
+ * l'encart publié juste avant la bascule). Toute autre empreinte — inventée,
+ * périmée, ou calculée d'avance sur un résultat à venir — fait servir l'image
+ * `no-store` : un robot d'aperçu ne la garde jamais sous une adresse que
+ * l'encart publiera plus tard.
+ */
+export function acceptedTournamentShareVersions(
+  card: TournamentCard,
+  leader: ShareLeader | null,
+  now: number = Date.now(),
+): Set<string> {
+  const accepted = new Set([tournamentShareVersion(card, leader), tournamentShareVersionWithoutSummary(card, now)]);
+  if (card.state === "RUNNING") accepted.add(tournamentShareVersionWithoutSummary(card, now - UNSETTLED_SHARE_VERSION_MS));
+  else if (card.state === "FINISHED") accepted.add(tournamentShareVersionWithoutSummary(card, now - FINISHED_SHARE_VERSION_MS));
+  return accepted;
 }
 
 /** Empreinte de ce que l'image d'un match dessine. */

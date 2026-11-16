@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  acceptedTournamentShareVersions,
   buildTournamentShareSummary,
   embedShareImagePath,
   matchShareCardKey,
@@ -386,5 +387,60 @@ describe("tournamentMayHaveLeader", () => {
     });
 
     expect(tournamentMayHaveLeader(card)).toBe(expected);
+  });
+});
+
+describe("buildTournamentShareSummary — ce que le résumé retient", () => {
+  it("buildTournamentShareSummary_originalMatchChangedAfterBuild_lazySummaryUsesTheProjection", () => {
+    const original = { ...PLAYED };
+    const summary = buildTournamentShareSummary(source({ matches: [original] }));
+
+    original.team1Name = "Changed";
+
+    expect(summary.matches.get(7)?.team1.name).toBe("Alpha");
+  });
+});
+
+describe("acceptedTournamentShareVersions", () => {
+  const NOW = Date.parse("2026-05-13T10:02:00.000Z");
+  const RUNNING = tournamentCard({ id: 4, state: "RUNNING" });
+
+  it("acceptedTournamentShareVersions_exactVersion_accepted", () => {
+    expect(acceptedTournamentShareVersions(RUNNING, null, NOW).has(tournamentShareVersion(RUNNING, null))).toBe(true);
+  });
+
+  it("acceptedTournamentShareVersions_currentWindow_accepted", () => {
+    const current = tournamentShareVersionWithoutSummary(RUNNING, NOW);
+
+    expect(acceptedTournamentShareVersions(RUNNING, null, NOW).has(current)).toBe(true);
+  });
+
+  it("acceptedTournamentShareVersions_previousWindow_accepted", () => {
+    const previous = tournamentShareVersionWithoutSummary(RUNNING, NOW - UNSETTLED_SHARE_VERSION_MS);
+
+    expect(acceptedTournamentShareVersions(RUNNING, null, NOW).has(previous)).toBe(true);
+  });
+
+  it("acceptedTournamentShareVersions_nextWindow_rejected", () => {
+    const next = tournamentShareVersionWithoutSummary(RUNNING, NOW + UNSETTLED_SHARE_VERSION_MS);
+
+    expect(acceptedTournamentShareVersions(RUNNING, null, NOW).has(next)).toBe(false);
+  });
+
+  it("acceptedTournamentShareVersions_predictedWinner_rejected", () => {
+    const finished = tournamentCard({ id: 4, state: "FINISHED" });
+    const predicted = tournamentShareVersion(finished, {
+      kind: "WINNER",
+      side: { teamId: 10, name: "Alpha", logoUrl: null, solo: false },
+    });
+
+    expect(acceptedTournamentShareVersions(finished, null, NOW).has(predicted)).toBe(false);
+  });
+
+  it("acceptedTournamentShareVersions_finishedPreviousDay_accepted", () => {
+    const finished = tournamentCard({ id: 4, state: "FINISHED" });
+    const yesterday = tournamentShareVersionWithoutSummary(finished, NOW - FINISHED_SHARE_VERSION_MS);
+
+    expect(acceptedTournamentShareVersions(finished, null, NOW).has(yesterday)).toBe(true);
   });
 });

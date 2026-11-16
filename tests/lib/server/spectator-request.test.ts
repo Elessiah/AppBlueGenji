@@ -6,10 +6,15 @@ jest.mock("next/headers", () => ({
 }));
 jest.mock("@/lib/server/spectator-snapshot");
 
-import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
+import { SHARE_EMBED_RENDER_RULE, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
-import { publicTournamentCard, publicTournamentSnapshot } from "@/lib/server/spectator-snapshot";
-import { publicTournamentCardForRequest, publicTournamentSnapshotForRequest } from "@/lib/server/spectator-request";
+import { publicTournamentCard, publicTournamentImageView, publicTournamentSnapshot } from "@/lib/server/spectator-snapshot";
+import {
+  publicTournamentCardForRequest,
+  publicTournamentImageViewForRequest,
+  publicTournamentSnapshotForRequest,
+  shareEmbedRenderAdmission,
+} from "@/lib/server/spectator-request";
 import { tournamentCard } from "../../helpers/tournament-card";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
@@ -105,5 +110,52 @@ describe("publicTournamentSnapshotForRequest", () => {
 
     cardReadsDatabase();
     expect(await publicTournamentCardForRequest(5)).not.toBeNull();
+  });
+});
+
+describe("publicTournamentImageViewForRequest", () => {
+  it("publicTournamentImageViewForRequest_cardAndShareFromDb_chargesOneReadToken", async () => {
+    cardReadsDatabase();
+    for (let i = 0; i < SPECTATOR_READ_RULE.limit - 1; i += 1) await publicTournamentCardForRequest(i + 1);
+    const verdicts: boolean[] = [];
+    jest.mocked(publicTournamentImageView).mockImplementation(async (_id, _level, _client, admit) => {
+      verdicts.push(admit(), admit());
+      return null;
+    });
+
+    await publicTournamentImageViewForRequest(5);
+
+    expect(verdicts).toEqual([true, true]);
+    expect(await publicTournamentCardForRequest(999)).toBeNull();
+  });
+
+  it("publicTournamentImageViewForRequest_capReached_refusesBothReads", async () => {
+    await exhaustReadAllowance();
+    const verdicts: boolean[] = [];
+    jest.mocked(publicTournamentImageView).mockImplementation(async (_id, _level, _client, admit) => {
+      verdicts.push(admit(), admit());
+      return null;
+    });
+
+    await publicTournamentImageViewForRequest(5);
+
+    expect(verdicts).toEqual([false, false]);
+  });
+});
+
+describe("shareEmbedRenderAdmission", () => {
+  it("shareEmbedRenderAdmission_bucketExhausted_refuses", async () => {
+    const admit = await shareEmbedRenderAdmission();
+    for (let i = 0; i < SHARE_EMBED_RENDER_RULE.capacity; i += 1) expect(admit()).toBe(true);
+
+    expect(admit()).toBe(false);
+  });
+
+  it("shareEmbedRenderAdmission_otherNetwork_keepsItsOwnBucket", async () => {
+    const admit = await shareEmbedRenderAdmission();
+    for (let i = 0; i < SHARE_EMBED_RENDER_RULE.capacity; i += 1) admit();
+    mockForwardedFor = "198.51.100.9";
+
+    expect((await shareEmbedRenderAdmission())()).toBe(true);
   });
 });

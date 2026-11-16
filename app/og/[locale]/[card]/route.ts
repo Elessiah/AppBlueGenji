@@ -23,13 +23,15 @@ import { parseShareImageSegments } from "@/lib/shared/page-share-cards";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: Readonly<{ params: Promise<{ locale: string; card: string }> }>,
 ): Promise<Response> {
   const { locale, card } = await params;
   if (isLocale(locale) && card.endsWith(".png")) {
     // `null` : pas une clé de tournoi ni de match (la clé n'est lue qu'une fois, ici).
-    const embed = await renderEmbedShareImage(card.slice(0, -".png".length), locale);
+    // `?v=` ne décide que de l'en-tête de cache (`renderEmbedShareImage`).
+    const requested = new URL(request.url).searchParams.get("v");
+    const embed = await renderEmbedShareImage(card.slice(0, -".png".length), locale, requested);
     if (embed) return embed;
   }
   const parsed = parseShareImageSegments(locale, card);

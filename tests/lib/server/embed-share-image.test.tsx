@@ -14,9 +14,18 @@ import { renderPageShareImage } from "@/lib/server/page-share-image";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { clearShareImageCache } from "@/lib/server/share-image-cache";
 import { teamLogoDataUrl } from "@/lib/server/share-podium";
-import { publicTournamentCardForRequest, publicTournamentShareForRequest } from "@/lib/server/spectator-request";
+import {
+  publicTournamentImageViewForRequest,
+  publicTournamentShareForRequest,
+  shareEmbedRenderAdmission,
+} from "@/lib/server/spectator-request";
 import type { PublicTournamentShare } from "@/lib/server/spectator-snapshot";
-import type { MatchShareSummary } from "@/lib/shared/share-embeds";
+import {
+  matchShareVersion,
+  tournamentShareVersion,
+  tournamentShareVersionWithoutSummary,
+  type MatchShareSummary,
+} from "@/lib/shared/share-embeds";
 import { tournamentCard } from "../../helpers/tournament-card";
 
 /**
@@ -39,8 +48,9 @@ jest.mock("next/og", () => ({
   },
 }));
 jest.mock("@/lib/server/spectator-request", () => ({
-  publicTournamentCardForRequest: jest.fn(),
+  publicTournamentImageViewForRequest: jest.fn(),
   publicTournamentShareForRequest: jest.fn(),
+  shareEmbedRenderAdmission: jest.fn(),
 }));
 jest.mock("@/lib/server/page-share-image", () => ({ renderPageShareImage: jest.fn() }));
 jest.mock("@/lib/server/share-podium", () => ({ teamLogoDataUrl: jest.fn() }));
@@ -74,14 +84,15 @@ function neutral(): Response {
   return new Response("neutral", { headers: { "content-type": "image/png" } });
 }
 
-async function get(locale: string, card: string): Promise<Response> {
-  return GET(new Request(`http://127.0.0.1/og/${locale}/${card}`), { params: Promise.resolve({ locale, card }) });
+async function get(locale: string, card: string, query = ""): Promise<Response> {
+  return GET(new Request(`http://127.0.0.1/og/${locale}/${card}${query}`), { params: Promise.resolve({ locale, card }) });
 }
 
 beforeEach(() => {
   clearShareImageCache();
-  jest.mocked(publicTournamentCardForRequest).mockReset().mockResolvedValue(view().card);
+  jest.mocked(publicTournamentImageViewForRequest).mockReset().mockResolvedValue(view());
   jest.mocked(publicTournamentShareForRequest).mockReset().mockResolvedValue(view());
+  jest.mocked(shareEmbedRenderAdmission).mockReset().mockResolvedValue(() => true);
   jest.mocked(renderPageShareImage).mockReset().mockImplementation(async () => neutral());
   jest.mocked(teamLogoDataUrl).mockReset().mockResolvedValue(null);
   jest.mocked(shareCardLogo).mockReset().mockResolvedValue(null);
@@ -93,36 +104,62 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
 
     expect(await response.text()).toBe("png");
     expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
-    expect(publicTournamentShareForRequest).toHaveBeenCalledWith(4);
+    expect(publicTournamentImageViewForRequest).toHaveBeenCalledWith(4);
   });
 
-  it("GET_tournamentNotYetRunning_readsOnlyTheCard", async () => {
-    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(tournamentCard({ id: 4, state: "REGISTRATION" }));
-
-    const response = await get("fr", "tournament-4.png");
-
-    expect(await response.text()).toBe("png");
-    expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
-    expect(publicTournamentShareForRequest).not.toHaveBeenCalled();
-  });
-
-  it("GET_soloTournamentRunning_readsOnlyTheCard", async () => {
-    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(
-      tournamentCard({ id: 4, state: "RUNNING", participantType: "SOLO" }),
-    );
-
-    await get("en", "tournament-4.png");
-
-    expect(publicTournamentShareForRequest).not.toHaveBeenCalled();
-  });
-
-  it("GET_matchKey_neverUsesTheLightCardRead", async () => {
-    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(tournamentCard({ id: 4, state: "REGISTRATION" }));
-
+  it("GET_matchKey_readsThePublicShare", async () => {
     await get("en", "tournament-4-match-7.png");
 
-    expect(publicTournamentCardForRequest).not.toHaveBeenCalled();
+    expect(publicTournamentImageViewForRequest).not.toHaveBeenCalled();
     expect(publicTournamentShareForRequest).toHaveBeenCalledWith(4);
+  });
+
+  it("GET_tournamentVersionMatches_servesPublicCache", async () => {
+    const shown = view();
+    const version = tournamentShareVersion(shown.card, shown.share.leader);
+
+    const response = await get("fr", "tournament-4.png", `?v=${version}`);
+
+    expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
+  });
+
+  it("GET_tournamentWindowVersion_servesPublicCache", async () => {
+    const version = tournamentShareVersionWithoutSummary(view().card);
+
+    const response = await get("fr", "tournament-4.png", `?v=${version}`);
+
+    expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
+  });
+
+  it("GET_tournamentVersionMismatch_servesNoStore", async () => {
+    const response = await get("fr", "tournament-4.png", "?v=predicted");
+
+    expect(await response.text()).toBe("png");
+    expect(response.headers.get("cache-control")).toBe(STALE_CARD_CACHE_CONTROL);
+  });
+
+  it("GET_matchVersionMatches_servesPublicCache", async () => {
+    const shown = view();
+    const version = matchShareVersion(shown.card, shown.share.matches.get(7)!);
+
+    const response = await get("fr", "tournament-4-match-7.png", `?v=${version}`);
+
+    expect(response.headers.get("cache-control")).toBe(EMBED_CARD_CACHE_CONTROL);
+  });
+
+  it("GET_matchVersionMismatch_servesNoStore", async () => {
+    const response = await get("fr", "tournament-4-match-7.png", "?v=future");
+
+    expect(response.headers.get("cache-control")).toBe(STALE_CARD_CACHE_CONTROL);
+  });
+
+  it("GET_renderRefused_servesNeutralCard", async () => {
+    jest.mocked(shareEmbedRenderAdmission).mockResolvedValue(() => false);
+
+    const response = await get("fr", "tournament-4-match-7.png");
+
+    expect(await response.text()).toBe("neutral");
+    expect(response.headers.get("cache-control")).toBe(NEUTRAL_CARD_CACHE_CONTROL);
   });
 
   it("GET_copyExpired_servesNoStore", async () => {
@@ -141,7 +178,7 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
   });
 
   it("GET_unpublishedTournament_servesNeutralCard", async () => {
-    jest.mocked(publicTournamentCardForRequest).mockResolvedValue(null);
+    jest.mocked(publicTournamentImageViewForRequest).mockResolvedValue(null);
 
     const response = await get("en", "tournament-4.png");
 
@@ -157,7 +194,7 @@ describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
   });
 
   it("GET_loaderThrows_servesNeutralCard", async () => {
-    jest.mocked(publicTournamentCardForRequest).mockRejectedValue(new Error("db down"));
+    jest.mocked(publicTournamentImageViewForRequest).mockRejectedValue(new Error("db down"));
 
     const response = await get("fr", "tournament-4.png");
 

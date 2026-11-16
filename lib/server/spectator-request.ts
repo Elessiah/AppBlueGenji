@@ -18,10 +18,18 @@
  * elle existe (sans jeton, sans base), sinon `null` — l'encart ou la page générale.
  */
 import { headers } from "next/headers";
-import { clientIpFromHeaders, clientNetworkKey, enforceRateLimit, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
+import {
+  clientIpFromHeaders,
+  clientNetworkKey,
+  enforceRateLimit,
+  SHARE_EMBED_RENDER_RULE,
+  SPECTATOR_READ_RULE,
+  takeRateToken,
+} from "@/lib/server/api-guard";
 import { currentSpectatorLoadLevel } from "@/lib/server/spectator-load";
 import {
   publicTournamentCard,
+  publicTournamentImageView,
   publicTournamentShare,
   publicTournamentSnapshot,
   type PublicTournamentShare,
@@ -57,4 +65,26 @@ export async function publicTournamentSnapshotForRequest(tournamentId: number): 
 export async function publicTournamentShareForRequest(tournamentId: number): Promise<PublicTournamentShare | null> {
   const client = clientNetworkKey(clientIpFromHeaders(await headers()));
   return publicTournamentShare(tournamentId, currentSpectatorLoadLevel(), client, () => !enforceRateLimit(SPECTATOR_READ_RULE, client));
+}
+
+/**
+ * Ce que l'image d'un tournoi dessine (`publicTournamentImageView`), ou
+ * `null`. La carte et la réponse publique lues par une même requête ne paient
+ * qu'**un** jeton du plafond des lectures : le verdict du premier est gardé.
+ */
+export async function publicTournamentImageViewForRequest(tournamentId: number): Promise<PublicTournamentShare | null> {
+  const client = clientNetworkKey(clientIpFromHeaders(await headers()));
+  let admitted: boolean | undefined;
+  const admitOnce = () => (admitted ??= !enforceRateLimit(SPECTATOR_READ_RULE, client));
+  return publicTournamentImageView(tournamentId, currentSpectatorLoadLevel(), client, admitOnce);
+}
+
+/**
+ * Autorisation de **rendre** une image d'aperçu absente de la mémoire pour le
+ * réseau de la requête (`SHARE_EMBED_RENDER_RULE`) : à n'appeler qu'avant un
+ * vrai rendu ; `false` : refusé (la route sert la carte neutre).
+ */
+export async function shareEmbedRenderAdmission(): Promise<() => boolean> {
+  const client = clientNetworkKey(clientIpFromHeaders(await headers()));
+  return () => !takeRateToken(SHARE_EMBED_RENDER_RULE, client);
 }

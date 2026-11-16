@@ -215,13 +215,16 @@ describe("route d'image d'un tournoi", () => {
   });
 
   it("l'image d'un tournoi sans équipe en tête ne lit que la carte, et la route ne lit la clé qu'une fois", () => {
-    expect(EMBED_IMAGE).toContain("tournamentMayHaveLeader(card)");
+    expect(EMBED_IMAGE).toContain("publicTournamentImageViewForRequest");
+    const snapshot = readFileSync(join(ROOT, "lib", "server", "spectator-snapshot.ts"), "utf8");
+    expect(snapshot).toContain("if (!tournamentMayHaveLeader(card)) return { card, share: NO_SHARE_SUMMARY, stale: false };");
     const route = readFileSync(join(ROOT, "app", "og", "[locale]", "[card]", "route.ts"), "utf8");
     expect(route).not.toContain("parseEmbedShareCardKey");
   });
 
   it("ne lit que la réponse publique, n'ayant aucune mise en page au-dessus", () => {
-    expect(EMBED_IMAGE).toContain("publicTournamentShareForRequest(target.tournamentId)");
+    expect(EMBED_IMAGE).toContain("publicTournamentShareForRequest");
+    expect(EMBED_IMAGE).toContain("return read(target.tournamentId).catch(() => null);");
     expect(EMBED_IMAGE).not.toContain("getTournamentDetail");
   });
 

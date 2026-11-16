@@ -17,6 +17,7 @@ import {
   gzippedSpectatorBody,
   isSpectatorTournamentPublic,
   publicTournamentCard,
+  publicTournamentImageView,
   publicTournamentShare,
   publicTournamentSnapshot,
   SPECTATOR_MAX_CONCURRENT_REBUILDS,
@@ -600,5 +601,77 @@ describe("publicTournamentShare / cachedTournamentShare", () => {
     const built = await publicTournamentShare(5, 0, CLIENT, () => true);
 
     expect(cachedTournamentShare(5)?.share).toBe(built?.share);
+  });
+});
+
+describe("publicTournamentImageView", () => {
+  it("publicTournamentImageView_freshPayloadCached_returnsSummaryWithoutAdmit", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5, state: "RUNNING" }) }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.mocked(getVisibleTournamentCard).mockClear();
+    const admit = jest.fn(() => false);
+
+    const view = await publicTournamentImageView(5, 0, CLIENT, admit);
+
+    expect(view?.stale).toBe(false);
+    expect(admit).not.toHaveBeenCalled();
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentImageView_expiredCopyAndCardReadable_returnsFreshCardNotCopy", async () => {
+    jest.useFakeTimers({ now: 4_000_000, ...FAKE_CLOCK });
+    mockedSnapshot.mockResolvedValue(
+      tournamentSnapshot({ card: tournamentCard({ id: 5, state: "REGISTRATION", registeredTeams: 8 }) }),
+    );
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.setSystemTime(4_000_000 + 20_000);
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "REGISTRATION", registeredTeams: 9 }));
+
+    const view = await publicTournamentImageView(5, 0, CLIENT, () => true);
+
+    expect(view?.card.registeredTeams).toBe(9);
+    expect(view?.stale).toBe(false);
+  });
+
+  it("publicTournamentImageView_cardReadRefusedWithCopy_returnsCopyMarkedStale", async () => {
+    jest.useFakeTimers({ now: 5_000_000, ...FAKE_CLOCK });
+    mockedSnapshot.mockResolvedValue(
+      tournamentSnapshot({ card: tournamentCard({ id: 5, state: "REGISTRATION", registeredTeams: 8 }) }),
+    );
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.mocked(getVisibleTournamentCard).mockClear();
+    jest.setSystemTime(5_000_000 + 20_000);
+
+    const view = await publicTournamentImageView(5, 0, CLIENT, () => false);
+
+    expect(view?.card.registeredTeams).toBe(8);
+    expect(view?.stale).toBe(true);
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentImageView_unknownTournament_returnsNull", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
+
+    expect(await publicTournamentImageView(5, 0, CLIENT, () => true)).toBeNull();
+  });
+
+  it("publicTournamentImageView_upcomingTeamTournament_returnsEmptySummaryWithoutRebuild", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "REGISTRATION" }));
+
+    const view = await publicTournamentImageView(5, 0, CLIENT, () => true);
+
+    expect(view?.share.leader).toBeNull();
+    expect(view?.share.matches.size).toBe(0);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentImageView_runningTeamTournament_readsPublicShare", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, state: "RUNNING" }));
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5, state: "RUNNING" }) }));
+
+    const view = await publicTournamentImageView(5, 0, CLIENT, () => true);
+
+    expect(view?.stale).toBe(false);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(1);
   });
 });

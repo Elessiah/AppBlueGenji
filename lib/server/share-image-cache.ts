@@ -20,7 +20,7 @@
  * tourner plus d'équipes que la réserve n'en garde n'obtient que des réponses
  * plus lentes, jamais un processeur saturé (le site tourne sur un Raspberry Pi).
  */
-import { cached, invalidateCachedPrefix } from "./cache";
+import { cached, invalidateCachedPrefix, isCachedOrLoading } from "./cache";
 
 export type ShareImagePool = "fixed" | "team" | "embed";
 
@@ -36,6 +36,26 @@ export const SHARE_IMAGE_POOL_LIMITS: Readonly<Record<ShareImagePool, number>> =
 export const MAX_CONCURRENT_RENDERS = 2;
 
 export type CachedShareImage = { body: ArrayBuffer; cacheControl: string };
+
+/**
+ * Garde d'un **nouveau** rendu (ni en mémoire, ni en vol) : la réserve `embed`
+ * a des clés en nombre ouvert (un tournoi, un match, une langue), qu'un client
+ * peut parcourir plus vite que la réserve ne les garde.
+ * - `admit` : le plafond du réseau (`SHARE_EMBED_RENDER_RULE`) ; `false` :
+ *   refusé, aucun rendu.
+ * - `maxQueued` : rendus déjà **en attente** d'une place au-delà desquels on
+ *   refuse plutôt que d'allonger la file (sinon chaque requête s'y ajoute
+ *   sans borne, et les autres cartes attendent derrière).
+ */
+export type ShareRenderAdmission = { admit: () => boolean; maxQueued: number };
+
+/** Rendus d'aperçu de tournoi ou de match en attente d'une place, au plus. */
+export const MAX_QUEUED_EMBED_RENDERS = 8;
+
+/** Rendus en attente d'une place (tests). */
+export function queuedShareRenders(): number {
+  return waiting.length;
+}
 
 type Entry = CachedShareImage & { expiresAt: number; followsRanking: boolean };
 
@@ -72,8 +92,9 @@ async function withRenderSlot<T>(task: () => Promise<T>): Promise<T> {
 
 /**
  * Le PNG de la carte `key`, rendu par `build` au plus une fois par `ttlMs` ;
- * `null` si `build` n'en rend pas (rien n'est alors gardé). Un échec n'est
- * jamais gardé : la requête suivante retente.
+ * `null` si `build` n'en rend pas (rien n'est alors gardé), ou si
+ * `admission` refuse un nouveau rendu. Un échec n'est jamais gardé : la
+ * requête suivante retente.
  */
 export async function cachedShareImage(
   key: string,
@@ -81,6 +102,7 @@ export async function cachedShareImage(
   build: () => Promise<Response | null>,
   pool: ShareImagePool = "fixed",
   followsRanking = false,
+  admission?: ShareRenderAdmission,
 ): Promise<CachedShareImage | null> {
   const store = pools[pool];
   const hit = store.get(key);
@@ -91,6 +113,11 @@ export async function cachedShareImage(
   }
   const generationAtStart = rankingGeneration;
   const flightKey = `${followsRanking ? RANKING_FLIGHT_PREFIX : "share-image:"}${pool}:${key}`;
+  // Rejoindre un rendu en vol ne coûte rien ; un nouveau rendu passe la garde
+  // (file d'abord : un refus pour file pleine ne prend pas de jeton).
+  if (admission && !isCachedOrLoading(flightKey)) {
+    if (waiting.length >= admission.maxQueued || !admission.admit()) return null;
+  }
   const image = await cached(flightKey, 0, () =>
     withRenderSlot(async () => {
       const response = await build();
