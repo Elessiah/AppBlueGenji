@@ -73,7 +73,7 @@ describe("bot legal content is fully bilingual", () => {
         s.blocks.flatMap((block) => [block.text ?? "", ...(block.items ?? [])]),
       );
       for (const text of [lang.intro, ...texts]) {
-        for (const match of text.matchAll(/sections? (0\d|1\d)/gi)) expect(nums).toContain(match[1]);
+        for (const match of text.matchAll(/\bsections? (0\d|1\d)\b/gi)) expect(nums).toContain(match[1]);
       }
     }
   });
