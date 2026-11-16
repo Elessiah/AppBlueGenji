@@ -214,6 +214,29 @@ export async function pinAccountBlockedHashesOn(connection: Executor, userId: nu
 }
 
 /**
+ * Avant l'effacement de ces lignes de quarantaine closes (D87,
+ * `purgeClosedQuarantines`), dans sa transaction : les empreintes que leurs
+ * suppressions **ont bloquées** (`hash_blocked = 1`) deviennent **non
+ * levables** — sans quoi l'annulation d'une autre suppression de la même image
+ * lèverait un blocage que plus rien n'explique. Une empreinte neuve porte le
+ * **jour** de la suppression, jamais celui de l'effacement (D31).
+ */
+export async function pinClosedQuarantineHashesOn(connection: Executor, quarantineIds: readonly number[]): Promise<void> {
+  if (quarantineIds.length === 0) return;
+  await ignoreMissingTable(
+    connection.execute(
+      `INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)
+       SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines
+        WHERE id IN (${quarantineIds.map(() => "?").join(", ")})
+          AND status = 'PURGED' AND hash_blocked = 1 AND image_sha256 IS NOT NULL
+        GROUP BY image_sha256
+       ON DUPLICATE KEY UPDATE liftable = 0`,
+      [...quarantineIds],
+    ),
+  );
+}
+
+/**
  * À l'effacement d'un compte, dans sa transaction : fige les blocages que ses
  * lignes de quarantaine justifiaient (`pinAccountBlockedHashesOn`), puis retire
  * ces lignes — seul lien entre une empreinte et un compte (D31) —, sans

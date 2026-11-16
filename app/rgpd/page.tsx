@@ -379,7 +379,7 @@ function RgpdFr({
             </tr>
           </tbody>
         </table>
-        <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
+        <p id="effacement-complet" style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           * Un compte qui n'a joué aucun match, n'est engagé dans aucun tournoi individuel commencé et n'a organisé aucun tournoi que personne au staff n'a pu reprendre est{" "}
           <strong>entièrement effacé</strong> au terme des {ACCOUNT_REACTIVATION_DAYS} jours qui suivent sa demande de suppression, hors données de connexion (***) ;
           ses inscriptions à des tournois individuels pas encore commencés sont retirées dès la demande.
@@ -501,7 +501,7 @@ function RgpdFr({
             Vous pouvez vous opposer à l&apos;affichage de votre pseudo (voir « Vos droits »).
           </p>
         </div>
-        <div className={styles.highlight} style={{ marginTop: 20 }}>
+        <div id="suppression-et-palmares" className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>Ce que cela signifie concrètement :</strong> les statistiques
           (nombre de tournois joués, scores, placements) ne sont pas effacées lors de
           la suppression du compte. En revanche, tout ce qui désigne la personne est effacé
@@ -908,8 +908,7 @@ function RgpdFr({
               qu&apos;un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être
               contesté par son équipe ou son joueur, et portée à {LOGO_QUARANTINE_MONTHS} mois civils
               après l&apos;archivage pour un signalement de droit d&apos;auteur ou de modération envoyé
-              depuis un compte, le temps que son auteur puisse contester la décision. Un compte
-              supprimé n&apos;y laisse pas son pseudo.
+              depuis un compte, le temps que son auteur puisse contester la décision. Un compte supprimé n&apos;y laisse pas son pseudo. La décision prise sur un logo ou un avatar (point 4 : membre de la modération qui l&apos;a prise, issue de sa contestation) part avec lui une fois l&apos;image rétablie ou supprimée.
             </li>
           </ul>
 
@@ -977,12 +976,8 @@ function RgpdFr({
               (SHA-256) de l&apos;image est gardée sans limite de durée dans la liste des images bloquées, qui ne
               désigne aucun compte et ne date un blocage qu&apos;au jour près, pour en refuser la remise en ligne,
               comme avatar ou comme logo d&apos;équipe ; supprimé sans délai, son fichier n&apos;est effacé que si
-              rien d&apos;autre sur le site ne le désigne. Tant que le compte existe (anonymisé compris),
-              l&apos;empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou après
-              un masquage, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
-              est levé, sauf si une autre suppression de la même image le justifie encore. À l&apos;effacement du
-              compte, ces décisions sont effacées et le blocage devient définitif : seule l&apos;empreinte reste,
-              sans lien avec aucun compte. Une suppression d&apos;office faite alors que sa contestation attendait
+              rien d&apos;autre sur le site ne le désigne. Tant que la décision de suppression prise sur un signalement ou après un masquage est gardée, l&apos;empreinte l&apos;est aussi sur elle, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
+              est levé, sauf si une autre suppression de la même image le justifie encore. Ces décisions sont effacées avec le signalement qui les a motivées, au terme de sa durée de garde (point 1), ou plus tôt à l&apos;effacement du compte (anonymisé, il les garde jusque-là) ; le blocage devient alors définitif : seule l&apos;empreinte reste, sans lien avec aucun compte. Une suppression d&apos;office faite alors que sa contestation attendait
               encore son issue ne bloque l&apos;image qu&apos;une fois maintenue, ou à l&apos;effacement du compte s&apos;il
               vient avant, alors définitivement. Les empreintes posées à l&apos;effacement d&apos;un compte avant le
               11 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées, datées

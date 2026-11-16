@@ -130,6 +130,21 @@ Un signalement archivé qui tient encore une image masquée n'est **pas** purgé
 page, qui doit exister jusqu'à l'échéance. La purge des images tourne d'abord,
 celle des signalements ensuite (`schedulePurgeExpiredReports`).
 
+## Conservation de la décision (D87)
+
+Une ligne de `bg_logo_quarantines` **close** (image rétablie ou supprimée) suit
+son signalement : à la fin de `purgeExpiredReports`, `purgeClosedQuarantines`
+efface celles dont le signalement n'est plus là (`report_id` mis à `NULL` par
+la clé étrangère, ou signalement absent d'une base ancienne). Toute ligne naît
+d'un signalement : sans lui, plus rien ne se conteste. Dans la même transaction
+(par lots de 500, lignes reverrouillées sans jointure), les empreintes qu'une
+suppression **a bloquées** (`PURGED`, `hash_blocked = 1`) sont figées **non
+levables** (`pinClosedQuarantineHashesOn`), comme à l'effacement d'un compte
+(`pinAccountBlockedHashesOn`) : sans la ligne, plus rien ne justifierait de
+lever le blocage. Une ligne encore masquée reste ; une panne de cette purge ne
+fait pas échouer celle des signalements. Registre T01/T11, `/rgpd`
+§ Signalements et entrée `2026-11-decisions-sur-image-et-signalement`.
+
 ## Retrait immédiat
 
 Depuis le panneau, « Supprimer le logo » (ou « Supprimer l'avatar ») d'une

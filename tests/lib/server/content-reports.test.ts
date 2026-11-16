@@ -14,7 +14,7 @@ jest.mock("@/lib/server/named-lock", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages, pushLeadershipAlert } from "@/lib/server/bot-integration";
 import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
-import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
+import { listQuarantinesForReports, purgeClosedQuarantines, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
   applyReportAction,
@@ -816,6 +816,29 @@ describe("conservation", () => {
     await expect(purgeExpiredReports()).resolves.toBe(0);
     // Rien à effacer : aucune instruction `DELETE`.
     expect(pool.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_afterReports_purgesClosedQuarantines", async () => {
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(2);
+
+    await expect(purgeExpiredReports()).resolves.toBe(0);
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredReports_closedQuarantinePurgeFails_stillReturnsCountAndLogs", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    jest.mocked(purgeClosedQuarantines).mockRejectedValue(new Error("LOCK_WAIT"));
+
+    await expect(purgeExpiredReports()).resolves.toBe(1);
+
+    expect(error).toHaveBeenCalledWith("[moderation] purge des décisions closes impossible", expect.anything());
+    error.mockRestore();
   });
 
   it("purge au plus une fois par heure, les logos échus avant les signalements", async () => {

@@ -36,6 +36,7 @@ import {
   anonymousFileName,
   blockImageHashOn,
   blockImageHashesSafely,
+  pinClosedQuarantineHashesOn,
   readImageSha256,
   unblockImageHashOn,
 } from "@/lib/server/blocked-images";
@@ -1435,6 +1436,69 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
     }
   }
   return purged;
+}
+
+/**
+ * Lignes closes (image rétablie ou supprimée) dont le signalement n'est plus
+ * là : il a été purgé au terme de sa durée de garde (`purgeExpiredReports`,
+ * clé étrangère `ON DELETE SET NULL`, ou base ancienne sans elle). Toute ligne
+ * naît d'un signalement : sans lui, plus rien ne se conteste.
+ */
+const CLOSED_ORPHAN_QUARANTINE_SQL = `status IN ('RESTORED', 'PURGED')
+       AND (report_id IS NULL OR NOT EXISTS (SELECT 1 FROM bg_reports r WHERE r.id = bg_logo_quarantines.report_id))`;
+
+/** Lignes effacées par transaction : borne la taille d'une liste `IN`. */
+const CLOSED_QUARANTINE_BATCH_SIZE = 500;
+
+/**
+ * Efface les décisions closes dont le signalement a été purgé (D87) : la ligne
+ * de quarantaine (auteur du masquage, empreinte d'un avatar supprimé, issue de
+ * la contestation) suit la durée de garde du signalement lié, plus celle du
+ * compte ou de l'équipe. Une ligne encore masquée reste (sa purge à l'échéance
+ * la ferme, la passe suivante l'efface). Les blocages qu'une ligne justifiait
+ * sont figés dans la même transaction (`pinClosedQuarantineHashesOn`) : seule
+ * l'empreinte reste, sans lien avec aucun compte, comme à l'effacement d'un
+ * compte. Rend le nombre de lignes effacées.
+ */
+export async function purgeClosedQuarantines(): Promise<number> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_logo_quarantines WHERE ${CLOSED_ORPHAN_QUARANTINE_SQL}`,
+  );
+  const ids = rows.map((row) => Number(row.id));
+  let deleted = 0;
+  for (let start = 0; start < ids.length; start += CLOSED_QUARANTINE_BATCH_SIZE) {
+    const batch = ids.slice(start, start + CLOSED_QUARANTINE_BATCH_SIZE);
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      // Les lignes d'abord, sous verrou, sans jointure (MariaDB) : une ligne
+      // close le reste, et un signalement purgé ne revient pas — seule
+      // l'existence de la ligne est reposée.
+      const [locked] = await connection.execute<(RowDataPacket & { id: number })[]>(
+        `SELECT id FROM bg_logo_quarantines
+          WHERE id IN (${batch.map(() => "?").join(", ")}) AND status IN ('RESTORED', 'PURGED')
+          FOR UPDATE`,
+        batch,
+      );
+      const due = locked.map((row) => Number(row.id));
+      if (due.length > 0) {
+        await pinClosedQuarantineHashesOn(connection, due);
+        const [result] = await connection.execute<ResultSetHeader>(
+          `DELETE FROM bg_logo_quarantines WHERE id IN (${due.map(() => "?").join(", ")})`,
+          due,
+        );
+        deleted += Number(result.affectedRows);
+      }
+      await connection.commit();
+    } catch (error) {
+      await rollbackQuietly(connection);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+  return deleted;
 }
 
 /** Chemin du fichier d'une image en quarantaine, pour l'aperçu du panneau. */

@@ -23,7 +23,7 @@ import { withNamedLock } from "@/lib/server/named-lock";
 import { contentReportPush, staffReportPush, staffReportSaturatedPush } from "@/lib/shared/push-messages";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
+import { listQuarantinesForReports, purgeClosedQuarantines, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
 import { toIso } from "@/lib/server/serialization";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { localAvatarUrl, visibleAvatarUrl } from "@/lib/shared/avatar";
@@ -1299,6 +1299,14 @@ export async function purgeExpiredReports(): Promise<number> {
       batch,
     );
     deleted += Number(result.affectedRows);
+  }
+  // Les décisions closes suivent leur signalement (D87) : celles dont il vient
+  // de partir, ou qu'une passe en échec avait laissées. Une panne ici ne fait
+  // pas tomber la purge des signalements (ni le panneau qui l'attend).
+  try {
+    await purgeClosedQuarantines();
+  } catch (error) {
+    console.error("[moderation] purge des décisions closes impossible", failureReason(error));
   }
   return deleted;
 }

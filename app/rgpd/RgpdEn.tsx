@@ -277,7 +277,7 @@ export function RgpdEn({
             <DataRow entry={DONNEE_CONNEXIONS_EN} accent mark=" ***" />
           </tbody>
         </table>
-        <p style={{ marginTop: 16, ...NOTE_STYLE }}>
+        <p id="effacement-complet" style={{ marginTop: 16, ...NOTE_STYLE }}>
           * An account that has played no match, is an entrant in no solo tournament that has started and organized no tournament that no one on the staff could take over is{" "}
           <strong>entirely erased</strong> at the end of the {ACCOUNT_REACTIVATION_DAYS} days following its deletion request, apart from
           connection data (***); its registrations for solo tournaments that have not started yet are withdrawn as soon as it is
@@ -385,7 +385,7 @@ export function RgpdEn({
             “Your rights”).
           </p>
         </div>
-        <div className={styles.highlight} style={{ marginTop: 20 }}>
+        <div id="suppression-et-palmares" className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>What this means in practice:</strong> statistics (number of tournaments played, scores,
           placements) are not erased when the account is deleted. On the other hand, everything that identifies
           the person is erased (Discord and game tags, login accounts, avatar, adulthood, roles — the only
@@ -737,7 +737,7 @@ export function RgpdEn({
               days after archiving — extended as long as a logo or avatar hidden or deleted on the basis of the report
               can still be contested by its team or player, and raised to {LOGO_QUARANTINE_MONTHS} calendar months
               after archiving for a copyright or moderation report sent from an account, so that its author can
-              contest the decision. A deleted account does not leave its username there.
+              contest the decision. A deleted account does not leave its username there. The decision taken on a logo or avatar (point 4: moderation member who took it, outcome of its challenge) goes with it once the image is restored or deleted.
             </li>
           </ul>
 
@@ -800,11 +800,9 @@ export function RgpdEn({
               account is active or pending deletion, the hash (SHA-256) of the image is kept without time limit in
               the list of blocked images, which designates no account and only dates a block to the day, to refuse
               it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
-              erased if nothing else on the site points to it. As long as the account exists (anonymized included),
-              the hash is also kept on the deletion decision taken on a report or after a hiding, with the
+              erased if nothing else on the site points to it. As long as the deletion decision taken on a report or after a hiding is kept, the hash is also kept on it, with the
               outcome of its challenge: upheld, the block stays; accepted, it is lifted, unless another deletion of
-              the same image still justifies it. When the account is erased, those decisions are erased and the
-              block becomes permanent: only the hash remains, with no link to any account. An automatic deletion
+              the same image still justifies it. Those decisions are erased with the report that prompted them, at the end of its retention period (point 1), or earlier when the account is erased (anonymized, it keeps them until then); the block then becomes permanent: only the hash remains, with no link to any account. An automatic deletion
               made while its challenge was still awaiting its outcome only blocks the image once upheld, or on the erasure of
               the account if that comes first, then permanently. Hashes set on the erasure of an account before
               November 11, 2026 — then also those of an avatar that was only hidden — stay blocked, dated to the

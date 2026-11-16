@@ -13,6 +13,7 @@ import {
   imageSha256,
   isBlockedImage,
   pinAccountBlockedHashesOn,
+  pinClosedQuarantineHashesOn,
   readImageSha256,
   retireAccountQuarantinesOn,
   unblockImageHashOn,
@@ -410,5 +411,34 @@ describe("retireAccountQuarantinesOn (D31)", () => {
       .mockRejectedValueOnce(deadlock);
 
     await expect(retireAccountQuarantinesOn(fakeConnection({ execute }), 7)).rejects.toBe(deadlock);
+  });
+});
+
+describe("pinClosedQuarantineHashesOn (D87)", () => {
+  it("pinClosedQuarantineHashesOn_ids_pinsOnlyBlockedPurgedHashesNonLiftable", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await pinClosedQuarantineHashesOn(fakeConnection({ execute }), [4, 9]);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("WHERE id IN (?, ?)");
+    expect(sql).toContain("AND status = 'PURGED' AND hash_blocked = 1 AND image_sha256 IS NOT NULL");
+    expect(sql).toContain("SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at)))");
+    expect(sql).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
+    expect(params).toEqual([4, 9]);
+  });
+
+  it("pinClosedQuarantineHashesOn_noIds_noQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+
+    await pinClosedQuarantineHashesOn(fakeConnection({ execute }), []);
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("pinClosedQuarantineHashesOn_missingTable_ignored", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
+
+    await expect(pinClosedQuarantineHashesOn(fakeConnection({ execute }), [4])).resolves.toBeUndefined();
   });
 });

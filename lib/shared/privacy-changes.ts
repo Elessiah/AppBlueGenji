@@ -2021,6 +2021,45 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Rien d'autre ne change : la marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données ; « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },
+  {
+    // EF-65 (ERREUR.txt, revue juridique #539, décision D88) : l'entrée publiée
+    // `2026-11-suppression-inscription-solo-et-fiche` renvoyait à la note des
+    // données de connexion (`#donnees-connexion`), pas aux passages qu'elle
+    // annonçait. Publiée, elle ne se corrige pas : cette entrée pointe sur les
+    // ancres posées par ce lot. Rien ne change dans le traitement.
+    id: "2026-11-suppression-du-compte-bons-passages",
+    publishedAt: "2026-11-18",
+    title: "Suppression du compte : les bons passages de la page RGPD",
+    links: [
+      { href: "/rgpd#effacement-complet", label: "Lire quand un compte est effacé entièrement" },
+      { href: "/rgpd#suppression-et-palmares", label: "Lire ce que devient la fiche du joueur" },
+    ],
+    summary:
+      "L'information du 4 novembre 2026 sur la suppression du compte (inscriptions individuelles à venir et fiche du joueur) renvoyait à la note sur les données de connexion de la page RGPD, et non aux passages qu'elle annonçait. Les voici.",
+    details: [
+      "Le premier lien mène à la note qui dit quand un compte est effacé entièrement ; le second, au passage « Historique de tournois & palmarès », qui dit ce que devient la fiche d'un compte supprimé et ses liens.",
+      "Rien ne change : ni ce qui est collecté, ni ce que la suppression emporte ; seul le renvoi est corrigé.",
+    ],
+  },
+  {
+    // EF-65 (ERREUR.txt, revue juridique #571, décision D87) : une ligne de
+    // `bg_logo_quarantines` close (image rétablie ou supprimée) n'avait aucune
+    // purge ; elle part désormais avec son signalement (`purgeClosedQuarantines`,
+    // à la suite de `purgeExpiredReports`). Registre T01 et T11, /rgpd
+    // § Signalements (FR et EN). Pour tous les comptes ; datée du lendemain de
+    // la nuit de déploiement (comme `REGISTER_UPDATED_AT`).
+    id: "2026-11-decisions-sur-image-et-signalement",
+    publishedAt: "2026-11-18",
+    title: "Logos et avatars modérés : la décision part avec son signalement",
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+    summary:
+      "La décision prise sur un logo d'équipe ou un avatar signalé (masquage, rétablissement ou suppression) n'avait pas de durée de garde propre. Une fois l'image rétablie ou supprimée, elle est désormais effacée avec le signalement qui l'a motivée, au terme de la durée de garde de celui-ci.",
+    details: [
+      "Ce qui part : la décision elle-même — le membre de la modération qui l'a prise, ses dates, l'issue de sa contestation et, pour un avatar supprimé, son empreinte (SHA-256). Le signalement n'est effacé qu'une fois la décision impossible à contester (voir la section « Signalements ») ; l'effacement du compte emporte toujours ses décisions plus tôt.",
+      "Pour un avatar dont la suppression a bloqué l'image, l'empreinte ne reste alors que dans la liste des images bloquées, sans lien avec aucun compte, et le blocage devient définitif, comme à l'effacement du compte.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; un logo ou un avatar encore masqué garde sa décision tant qu'il l'est.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
