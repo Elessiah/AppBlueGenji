@@ -13,6 +13,7 @@ import { clearDatabase } from "./cleanup";
 import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./lock";
 import { applyMatchLaunchCases, applyNewMatchNoticeCases, applyTiebreakCases } from "./match-states";
 import { applyMapPointTargetCases } from "./point-targets";
+import { checkDiscordChallengeRules } from "./sql-checks";
 import {
   FICTIONAL_ABOUT_STATS,
   FICTIONAL_BUREAU,
@@ -135,6 +136,8 @@ async function seed(db: Pool): Promise<void> {
   await applyNewMatchNoticeCases(db);
   await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
   await acceptTermsForSeededAccounts(db);
+  // Requêtes que seule une base simulée exerçait : jouées ici sur la vraie.
+  await checkDiscordChallengeRules(db);
 
   const byState = (state: TournamentDef["state"]) =>
     TOURNAMENTS.filter((t) => t.state === state).length;
