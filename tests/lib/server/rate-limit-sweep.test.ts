@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { SHARE_EMBED_RENDER_RULE, SPECTATOR_READ_RULE, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
 import {
   RATE_LIMIT_SWEEP_INTERVAL_MS,
+  armRateLimitSweepTimer,
+  disarmRateLimitSweepTimer,
   chargeRateLimit,
   checkRateLimit,
   resetRateLimit,
@@ -76,6 +78,54 @@ describe("balayage des clés épuisées", () => {
     takeTokenBucket(BUCKET, "198.51.100.2", 20_000);
 
     expect(trackedRateKeyCount(BUCKET.name)).toBe(2);
+  });
+});
+
+describe("minuteur détaché du balayage (processus au repos)", () => {
+  afterEach(() => {
+    disarmRateLimitSweepTimer();
+    jest.useRealTimers();
+  });
+
+  it("efface une clé épuisée sans qu'aucune requête n'arrive", () => {
+    jest.useFakeTimers();
+    armRateLimitSweepTimer();
+    chargeRateLimit(WINDOW, "203.0.113.7", Date.now());
+
+    jest.advanceTimersByTime(WINDOW.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS);
+
+    expect(trackedRateKeyCount(WINDOW.name)).toBe(0);
+  });
+
+  it("garde une clé dont la fenêtre est encore ouverte", () => {
+    jest.useFakeTimers();
+    armRateLimitSweepTimer();
+    chargeRateLimit(WINDOW, "203.0.113.7", Date.now());
+
+    jest.advanceTimersByTime(RATE_LIMIT_SWEEP_INTERVAL_MS);
+
+    expect(trackedRateKeyCount(WINDOW.name)).toBe(1);
+  });
+
+  it("armé, le minuteur seul balaie : une requête ne paie pas le parcours", () => {
+    jest.useFakeTimers();
+    armRateLimitSweepTimer();
+    takeTokenBucket(BUCKET, "198.51.100.1", 0);
+
+    takeTokenBucket(BUCKET, "198.51.100.2", RATE_LIMIT_SWEEP_INTERVAL_MS);
+
+    expect(trackedRateKeyCount(BUCKET.name)).toBe(2);
+  });
+
+  it("désarmé, il ne balaie plus", () => {
+    jest.useFakeTimers();
+    armRateLimitSweepTimer();
+    chargeRateLimit(WINDOW, "203.0.113.7", Date.now());
+    disarmRateLimitSweepTimer();
+
+    jest.advanceTimersByTime(WINDOW.windowMs + RATE_LIMIT_SWEEP_INTERVAL_MS);
+
+    expect(trackedRateKeyCount(WINDOW.name)).toBe(1);
   });
 });
 

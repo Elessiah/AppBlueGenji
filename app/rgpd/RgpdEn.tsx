@@ -395,9 +395,12 @@ export function RgpdEn({
             least every two and a half minutes: a username change, a hidden avatar or an account deletion
             may show up there with that delay. This page is excluded from search engines (<code>noindex</code>)
             and opens no session. Like any page of the site, its visit is counted by the audience measurement,
-            unless you object (see “Audience measurement”); beyond that, the visitor&apos;s IP address (its /64
-            network in IPv6) is only used there to limit the number of reads and of preview images rendered, in
-            memory, two minutes at most. You can object to your username being displayed (see
+            unless you object (see “Audience measurement”); beyond that, the IP address of whoever reads it,
+            signed in or not (its /64 network in IPv6) — like that of whoever reads a tournament&apos;s rules
+            (<code>/regles/…?tournoi=…</code>) or causes a preview image to be rendered, preview services
+            included — is only used there to limit the number of reads and of preview images rendered, and to
+            measure the server&apos;s load without a single network being able to skew it; it stays in memory
+            only, two minutes at most after its last request. You can object to your username being displayed (see
             “Your rights”).
           </p>
         </div>

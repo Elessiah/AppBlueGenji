@@ -50,7 +50,43 @@ describe("entrée « liens partagés » de PRIVACY_CHANGES", () => {
   });
 });
 
+describe("entrée « liens partagés » : déclencheur et droits", () => {
+  it("dit que le résultat est retenu, pas la map", () => {
+    expect(entry?.summary).toContain("ou que le résultat est retenu");
+    expect(entry?.summary).not.toContain("enregistrée par l'arbitrage ou retenue");
+    expect(entryEn?.summary).toContain("or the result is retained");
+    expect(entryEn?.summary).not.toContain("recorded by the referees or retained");
+  });
+
+  it("mène à la section des droits, avec un libellé anglais par lien", () => {
+    expect(entry?.links?.map((link) => link.href)).toContain("/rgpd#exercer-vos-droits");
+    expect(entryEn?.linkLabels).toHaveLength(entry?.links?.length ?? -1);
+  });
+
+  it("dit que l'adresse IP reste deux minutes après la dernière requête", () => {
+    expect(frText).toContain("deux minutes au plus après sa dernière requête");
+    expect(enText).toContain("two minutes at most after its last request");
+  });
+});
+
 describe("registre T03", () => {
+  it("vise tout lecteur, connecté ou non, des règles et des aperçus compris", () => {
+    expect(t03).toContain("Lecteurs, connectés ou non, de la fiche publique d'un tournoi, de ses règles");
+    expect(t03).toContain("Readers, signed in or not, of a tournament's public page, its rules");
+  });
+
+  it("déclare la mesure de charge et la durée après la dernière requête", () => {
+    expect(t03).toContain("sa part dans la mesure de la charge du serveur");
+    expect(t03).toContain("their share in the measure of the server's load");
+    expect(t03).toContain("deux minutes au plus après sa dernière requête");
+    expect(t03).toContain("two minutes at most after its last request");
+  });
+
+  it("dit qu'un aperçu partagé n'est pas un transfert de l'association", () => {
+    expect(t03).toContain("donc aucun transfert hors UE de sa part, même vers un service établi aux États-Unis (X, Discord)");
+    expect(t03).toContain("so no transfer outside the EU on its part, even to a service established in the United States (X, Discord)");
+  });
+
   it("garde l'adresse IP d'un visiteur sans compte deux minutes au plus, pour les lectures et les aperçus", () => {
     expect(t03).toContain("deux minutes au plus");
     expect(t03).toContain("two minutes at most");
@@ -80,5 +116,12 @@ describe("/rgpd", () => {
     expect(fr).toMatch(/deux minutes au\s+plus/);
     expect(en).toContain("/suivre/tournois/…/matchs/…");
     expect(en).toMatch(/two minutes at most/);
+  });
+
+  it("déclare la mesure de charge et la durée après la dernière requête", () => {
+    expect(fr).toMatch(/mesurer la charge du\s+serveur/);
+    expect(fr).toMatch(/deux minutes au plus après sa dernière requête/);
+    expect(en).toMatch(/measure the server&apos;s load/);
+    expect(en).toMatch(/two minutes at most after its last request/);
   });
 });

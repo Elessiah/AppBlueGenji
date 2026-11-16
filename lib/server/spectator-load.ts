@@ -48,6 +48,13 @@ let currentReads = 0;
 let previousReads = 0;
 /** Lectures comptées par client dans la fenêtre courante (plafond `SPECTATOR_READS_PER_CLIENT`). */
 const readsByClient = new Map<string, number>();
+/**
+ * Oubli des clients à la fin de la fenêtre, même sans lecture suivante : la clé
+ * est un réseau (adresse IP), que le registre (T03) promet de ne garder que
+ * deux minutes au plus. Sans ce minuteur, elle restait jusqu'à la prochaine
+ * lecture publique — une nuit entière si personne ne revient.
+ */
+let forgetClientsTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Part d'un même client (réseau, `clientNetworkKey` : une adresse IPv4, un
@@ -62,6 +69,21 @@ export const SPECTATOR_READS_PER_CLIENT = 10;
 
 /** Au-delà, les clients ne sont plus suivis un à un (mémoire bornée) : ils comptent sans plafond. */
 const MAX_TRACKED_CLIENTS = 10_000;
+
+/**
+ * Arme (une fois par fenêtre) l'oubli des clients à la fin de la fenêtre
+ * courante. Un client compté reste ainsi au plus une fenêtre
+ * ({@link SPECTATOR_READ_WINDOW_MS}). Ne retient pas le processus (`unref`).
+ */
+function scheduleForgetClients(now: number): void {
+  if (forgetClientsTimer !== null) return;
+  const wait = Math.max(0, windowStartedAt + SPECTATOR_READ_WINDOW_MS - now);
+  forgetClientsTimer = setTimeout(() => {
+    forgetClientsTimer = null;
+    readsByClient.clear();
+  }, wait);
+  forgetClientsTimer.unref?.();
+}
 
 function disarmProbe(): void {
   histogram?.disable();
@@ -152,7 +174,10 @@ export function recordSpectatorRead(now: number = Date.now(), client: string | n
   const key = client ?? "";
   const counted = readsByClient.get(key) ?? 0;
   if (counted >= SPECTATOR_READS_PER_CLIENT) return;
-  if (counted > 0 || readsByClient.size < MAX_TRACKED_CLIENTS) readsByClient.set(key, counted + 1);
+  if (counted > 0 || readsByClient.size < MAX_TRACKED_CLIENTS) {
+    readsByClient.set(key, counted + 1);
+    scheduleForgetClients(now);
+  }
   currentReads += 1;
 }
 
@@ -188,4 +213,11 @@ export function resetSpectatorLoad(): void {
   currentReads = 0;
   previousReads = 0;
   readsByClient.clear();
+  if (forgetClientsTimer !== null) clearTimeout(forgetClientsTimer);
+  forgetClientsTimer = null;
+}
+
+/** Clients (réseaux) suivis en mémoire à l'instant. Réservé aux tests. */
+export function trackedSpectatorClientCount(): number {
+  return readsByClient.size;
 }

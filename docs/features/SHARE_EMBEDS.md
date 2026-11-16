@@ -108,12 +108,17 @@ de replay publics).
   tournoi publiée par l'organisation (déclarée) ; aucun pseudo n'est tiré d'un
   compte.
 - **Adresse IP** : les plafonds (lecture, reconstruction, rendu d'aperçu)
-  sont tenus par réseau, en mémoire seulement. `rate-limit.ts` efface toute
-  clé épuisée (fenêtre close, seau plein) toutes les 30 s
-  (`RATE_LIMIT_SWEEP_INTERVAL_MS`, balayage paresseux + minuteur détaché hors
-  tests) : une adresse ne reste pas plus de deux minutes, durée déclarée au
-  registre T03 et dans /rgpd. Un plafond public plus long doit faire revoir
-  ces textes (`rate-limit-sweep.test.ts`).
+  sont tenus par réseau, pour tout lecteur (connecté ou non, `/suivre/`,
+  `/regles/…?tournoi=`, `/og`), en mémoire seulement. `rate-limit.ts` efface
+  toute clé épuisée (fenêtre close, seau plein) toutes les 30 s
+  (`RATE_LIMIT_SWEEP_INTERVAL_MS`, minuteur détaché hors tests, balayage
+  paresseux sous les tests). La part par réseau du signal de charge
+  (`spectator-load.ts`, `readsByClient`) est oubliée à la fin de sa fenêtre
+  d'une minute par son propre minuteur. Pour **ces** plafonds, une adresse ne
+  reste pas plus de deux minutes après sa dernière requête — durée déclarée au
+  registre T03 et dans /rgpd. Un plafond à fenêtre plus longue (code Discord,
+  signalement : 15 min) n'est pas couvert par cette durée ; un plafond public
+  plus long doit faire revoir ces textes (`rate-limit-sweep.test.ts`).
 
 ## Cache
 

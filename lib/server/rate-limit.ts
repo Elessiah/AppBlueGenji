@@ -53,8 +53,13 @@ function bucketOf(rule: RateLimitRule): Map<string, Counter> {
  * jetons rempli. Une telle clé vaut une clé absente ; la garder ne servait
  * qu'à retenir l'identité (une adresse IP, pour un visiteur sans compte) bien
  * au-delà de ce que le plafond exige — jusqu'à ce que le seau déborde, des
- * jours sans redémarrage. Le registre (T03) promet au plus deux minutes en
- * mémoire pour une adresse de la fiche publique ou d'une image d'aperçu.
+ * jours sans redémarrage. Une clé reste donc au plus sa fenêtre (ou le temps
+ * de remplir son seau) **après la dernière requête**, plus un intervalle. Le
+ * registre (T03) promet deux minutes au plus pour les plafonds de la fiche
+ * publique et des images d'aperçu (fenêtres d'une minute au plus,
+ * `rate-limit-sweep.test.ts`) ; un plafond à fenêtre plus longue (code
+ * Discord, signalement : 15 min) garde sa clé d'autant — ces textes ne le
+ * couvrent pas.
  */
 export const RATE_LIMIT_SWEEP_INTERVAL_MS = 30_000;
 
@@ -83,15 +88,33 @@ export function sweepSpentRateKeys(now: number = Date.now()): void {
 }
 
 /**
- * Balayage paresseux (au plus un par intervalle, à l'heure de l'appel) et, hors
- * tests, un minuteur détaché qui borne la durée même quand plus rien n'arrive.
+ * Arme le minuteur détaché du balayage (idempotent, `unref` : il ne retient pas
+ * le processus). C'est lui qui borne la durée même quand plus rien n'arrive.
+ */
+export function armRateLimitSweepTimer(): void {
+  if (sweepTimer !== null) return;
+  sweepTimer = setInterval(() => sweepSpentRateKeys(), RATE_LIMIT_SWEEP_INTERVAL_MS);
+  sweepTimer.unref?.();
+}
+
+/** Désarme le minuteur du balayage. */
+export function disarmRateLimitSweepTimer(): void {
+  if (sweepTimer !== null) clearInterval(sweepTimer);
+  sweepTimer = null;
+}
+
+/**
+ * Hors tests, arme le minuteur détaché, qui fait seul le balayage : aucune
+ * requête ne paie le parcours de toutes les clés. Sous les tests (sans
+ * minuteur), balayage paresseux, au plus un par intervalle, à l'heure de l'appel.
  */
 function sweepWhenDue(now: number): void {
-  if (now - lastSweepAt >= RATE_LIMIT_SWEEP_INTERVAL_MS) sweepSpentRateKeys(now);
-  if (sweepTimer === null && process.env.NODE_ENV !== "test") {
-    sweepTimer = setInterval(() => sweepSpentRateKeys(), RATE_LIMIT_SWEEP_INTERVAL_MS);
-    sweepTimer.unref?.();
+  if (sweepTimer !== null) return;
+  if (process.env.NODE_ENV !== "test") {
+    armRateLimitSweepTimer();
+    return;
   }
+  if (now - lastSweepAt >= RATE_LIMIT_SWEEP_INTERVAL_MS) sweepSpentRateKeys(now);
 }
 
 /**
@@ -335,6 +358,7 @@ export function resetRateLimit(ruleName?: string): void {
     tokenBuckets.clear();
     tokenRules.clear();
     lastSweepAt = Number.NEGATIVE_INFINITY;
+    disarmRateLimitSweepTimer();
     return;
   }
   counters.delete(ruleName);

@@ -517,9 +517,12 @@ function RgpdFr({
             suppression de compte peut y apparaître avec ce délai. Cette page est exclue des moteurs de recherche (<code>noindex</code>)
             et n&apos;ouvre aucune session. Comme toute page du site, sa visite est comptée par la
             mesure d&apos;audience, sauf opposition (voir « Mesure d&apos;audience ») ; l&apos;adresse IP
-            du visiteur (son réseau /64 en IPv6) n&apos;y sert par ailleurs qu&apos;à limiter le
-            nombre de lectures et d&apos;images d&apos;aperçu produites, en mémoire, deux minutes au
-            plus.
+            de qui la lit, connecté ou non (son réseau /64 en IPv6) — comme celle de qui lit les
+            règles d&apos;un tournoi (<code>/regles/…?tournoi=…</code>) ou fait produire une image
+            d&apos;aperçu, service d&apos;aperçu compris — n&apos;y sert par ailleurs qu&apos;à limiter
+            le nombre de lectures et d&apos;images d&apos;aperçu produites, et à mesurer la charge du
+            serveur sans qu&apos;un seul réseau puisse la fausser ; elle reste en mémoire seulement,
+            deux minutes au plus après sa dernière requête.
             Vous pouvez vous opposer à l&apos;affichage de votre pseudo (voir « Vos droits »).
           </p>
         </div>
