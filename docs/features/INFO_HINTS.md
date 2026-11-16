@@ -91,8 +91,12 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
     lui-même).
 - **Langue du nom du bouton** : celle de l'élément ambiant le plus proche qui
   déclare un `lang` (`infoHintLocale`), sinon celle de la page : une modale de
-  personnel `lang="fr"` ouverte sous `/en` garde « Plus d'infos : … ». Lue après
-  le montage.
+  personnel `lang="fr"` ouverte sous `/en` garde « Plus d'infos : … ». Dès le
+  premier rendu (et côté serveur) quand la modale la fournit par
+  `<AmbientLang lang>` (`components/i18n/ambient-lang.tsx`, posé par
+  `LandingDialog` et `ConfirmActionDialog` à côté de leur `lang`) ; sinon relue
+  dans le DOM après le montage. Un nouveau conteneur `lang` qui porte des « i »
+  pose aussi `AmbientLang`.
 - **Rangée** (`InfoHintRow`) : le premier élément (libellé, titre) est borné à
   « rangée − bouton − écart » — un titre qui occupe la rangée à l'arrondi près
   passe à la ligne au lieu de laisser le « i » seul dessous. `inline` : une
