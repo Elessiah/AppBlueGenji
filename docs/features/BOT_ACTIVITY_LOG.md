@@ -148,6 +148,14 @@ transaction pouvant atteindre un point de réservation doit donc porter la paire
 `reorderSeeding` compris (réordonner un tournoi démarré rejoue son
 orchestration, qui peut le clore).
 
+Les autres files « après commit » d'une transaction — avis aux engagées
+retirées, validations d'office, casters et arbitres retirés d'office — suivent
+**le même couple** : elles naissent toutes de la même fabrique
+(`createTransactionState`, `lib/server/tournaments/transaction-state.ts`) et
+`flushBotLogs` / `discardBotLogs` les vident ou les jettent. Une file de plus
+s'y branche dans la même PR ; `tests/lib/server/transaction-state.test.ts`
+refuse une file non branchée et toute `WeakMap<PoolConnection, …>` écrite à la main.
+
 ```ts
 try {
   await connection.beginTransaction();

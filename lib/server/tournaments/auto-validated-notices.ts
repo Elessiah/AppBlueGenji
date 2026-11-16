@@ -8,6 +8,7 @@
  */
 import type { PoolConnection } from "mysql2/promise";
 import { notifyScoreAutoValidated } from "./player-pushes";
+import { createTransactionState } from "./transaction-state";
 
 /** Score écrit par la validation d'office : l'avis ne part que s'il tient toujours. */
 export interface AutoValidatedScore {
@@ -15,7 +16,7 @@ export interface AutoValidatedScore {
   team2Score: number;
 }
 
-const pending = new WeakMap<PoolConnection, Map<number, AutoValidatedScore>>();
+const pending = createTransactionState<Map<number, AutoValidatedScore>>(() => new Map());
 
 /** Note qu'une manche vient d'être validée d'office dans la transaction en cours. */
 export function queueAutoValidatedNotice(
@@ -23,17 +24,12 @@ export function queueAutoValidatedNotice(
   matchId: number,
   score: AutoValidatedScore,
 ): void {
-  const queued = pending.get(connection);
-  if (!queued) {
-    pending.set(connection, new Map([[matchId, score]]));
-    return;
-  }
-  queued.set(matchId, score);
+  pending.ensure(connection).set(matchId, score);
 }
 
 /** La transaction n'a pas abouti : rien ne part. */
 export function discardAutoValidatedNotices(connection: PoolConnection): void {
-  pending.delete(connection);
+  pending.discard(connection);
 }
 
 /**
@@ -51,8 +47,7 @@ let sending: Promise<void> = Promise.resolve();
  * tournois dans le même balayage, n'occupent qu'une connexion du pool à la fois.
  */
 export function flushAutoValidatedNotices(connection: PoolConnection): void {
-  const queued = pending.get(connection);
-  pending.delete(connection);
+  const queued = pending.take(connection);
   if (!queued) return;
   const notices = [...queued];
   sending = sending.then(() => sendInSequence(notices));

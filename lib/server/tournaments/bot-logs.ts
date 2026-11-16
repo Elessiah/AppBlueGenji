@@ -82,6 +82,7 @@ import { isSwissRound } from "./swiss-round-sql";
 import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { DeadlineError, createInFlightGate, createLimiter, mapInBatches, withDeadline, type InFlightGate } from "@/lib/shared/in-batches";
+import { createTransactionState } from "./transaction-state";
 
 /**
  * Évènement réservé pendant une transaction.
@@ -259,11 +260,11 @@ export const MAX_PENDING_PER_TRANSACTION = 32;
 /**
  * Files en attente, indexées par connexion.
  *
- * Une `WeakMap` : la file suit la transaction sans que le module ait à connaître
- * son cycle de vie, et une connexion oubliée n'empêche pas sa file d'être
- * collectée.
+ * Un état de transaction (`./transaction-state`) : la file suit la transaction
+ * sans que le module ait à connaître son cycle de vie, et une connexion oubliée
+ * n'empêche pas sa file d'être collectée.
  */
-const pending = new WeakMap<PoolConnection, PendingBotLog[]>();
+const pending = createTransactionState<PendingBotLog[]>(() => []);
 
 /**
  * Manches tranchées par la transaction en cours, dont les réservations d'alerte
@@ -276,13 +277,13 @@ const pending = new WeakMap<PoolConnection, PendingBotLog[]>();
  * plateau, et plus aucun désaccord né après cet arbitrage n'alerterait
  * quiconque. Le ménage n'a pas à dépendre du sort d'une ligne d'affichage.
  */
-const resolvedMatches = new WeakMap<PoolConnection, Set<number>>();
+const resolvedMatches = createTransactionState<Set<number>>(() => new Set());
 
 /**
  * Manches tranchées par « Valider le résultat » dans la transaction en cours :
  * leur ligne « Match terminé » le dit (`markResultValidatedByStaff`).
  */
-const staffValidatedMatches = new WeakMap<PoolConnection, Set<number>>();
+const staffValidatedMatches = createTransactionState<Set<number>>(() => new Set());
 
 /**
  * Ordre des passages : chaque `flushBotLogs` range ses lignes de journal
@@ -340,11 +341,7 @@ function entryKey(entry: PendingBotLog): string {
  *          qu'aucun message ne parte, et jamais rejouée.
  */
 export function queueBotLog(connection: PoolConnection, entry: PendingBotLog): boolean {
-  const queue = pending.get(connection);
-  if (!queue) {
-    pending.set(connection, [entry]);
-    return true;
-  }
+  const queue = pending.ensure(connection);
   // Le dédoublonnage passe **avant** le plafond : une entrée déjà en file est
   // retenue, elle n'est pas perdue, et l'annoncer perdue ferait rendre une
   // réservation encore utile.
@@ -363,9 +360,7 @@ export function queueBotLog(connection: PoolConnection, entry: PendingBotLog): b
  * commit, sur le pool (`clearRefereeAlertsOnPool`).
  */
 export function markMatchResolved(connection: PoolConnection, matchId: number): void {
-  const marked = resolvedMatches.get(connection);
-  if (marked) marked.add(matchId);
-  else resolvedMatches.set(connection, new Set([matchId]));
+  resolvedMatches.ensure(connection).add(matchId);
 }
 
 /**
@@ -375,18 +370,16 @@ export function markMatchResolved(connection: PoolConnection, matchId: number): 
  * quelconque. En mémoire et synchrone, comme `markMatchResolved`.
  */
 export function markResultValidatedByStaff(connection: PoolConnection, matchId: number): void {
-  const marked = staffValidatedMatches.get(connection);
-  if (marked) marked.add(matchId);
-  else staffValidatedMatches.set(connection, new Set([matchId]));
+  staffValidatedMatches.ensure(connection).add(matchId);
   // La manche tranchée a déjà sa ligne (`finalizeMatch`) ; sinon, elle l'obtient,
   // même file pleine : c'est la seule trace du geste au journal.
   const entry: PendingBotLog = { kind: "match_finished", matchId };
-  if (!queueBotLog(connection, entry)) pending.get(connection)?.push(entry);
+  if (!queueBotLog(connection, entry)) pending.peek(connection)?.push(entry);
 }
 
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
 export function discardBotLogs(connection: PoolConnection): void {
-  pending.delete(connection);
+  pending.discard(connection);
   // Les avis aux engagées retirées suivent la même transaction.
   discardDepartedNotices(connection);
   discardAutoValidatedNotices(connection);
@@ -395,8 +388,8 @@ export function discardBotLogs(connection: PoolConnection): void {
   discardRefereeChanges(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
-  resolvedMatches.delete(connection);
-  staffValidatedMatches.delete(connection);
+  resolvedMatches.discard(connection);
+  staffValidatedMatches.discard(connection);
 }
 
 /**
@@ -505,14 +498,11 @@ export function flushBotLogs(connection: PoolConnection): void {
   // Et les casters désinscrits d'office par l'entretien (`./cast-notices`).
   flushCastChanges(connection);
   flushRefereeChanges(connection);
-  const validated = staffValidatedMatches.get(connection);
-  staffValidatedMatches.delete(connection);
-  const queue = (pending.get(connection) ?? []).map((entry) =>
+  const validated = staffValidatedMatches.take(connection);
+  const queue = (pending.take(connection) ?? []).map((entry) =>
     entry.kind === "match_finished" && validated?.has(entry.matchId) ? { ...entry, staffValidated: true } : entry,
   );
-  pending.delete(connection);
-  const settled = resolvedMatches.get(connection) ?? new Set<number>();
-  resolvedMatches.delete(connection);
+  const settled = resolvedMatches.take(connection) ?? new Set<number>();
   if (queue.length === 0 && settled.size === 0) return;
   // Le tour de ce passage, pris **au commit** (synchrone) : l'ordre des commits.
   // Un passage qui ne porte que des alertes n'a aucune ligne à ranger : il ne
@@ -896,7 +886,7 @@ async function clearRefereeAlertsOnPool(matchIds: ReadonlySet<number>): Promise<
  * L'effacement en base suit le commit (`clearRefereeAlertsOnPool`).
  */
 export function dropQueuedRefereeAlerts(connection: PoolConnection, matchId: number): void {
-  const queue = pending.get(connection);
+  const queue = pending.peek(connection);
   if (!queue) return;
   const kept = queue.filter(
     (entry) =>
