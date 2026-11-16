@@ -467,10 +467,44 @@ describe("profilelessAmong (D86)", () => {
     expect(await profilelessAmong([{ id: 3, name: "ApexTV" }])).toEqual([]);
   });
 
-  it("profilelessAmong_soloEntryName_returnsId", async () => {
-    lookupDb([3], [{ id: 3, name: "ApexTV" }, { id: 3, name: "Entrée renommée" }]);
+  it("profilelessAmong_soloEntryNameWithIdSuffix_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "ApexTV-7f3k2q #3" }]);
 
-    expect(await profilelessAmong([{ id: 3, name: "Entrée renommée" }])).toEqual([3]);
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV-7f3k2q #3" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_soloEntryFallbackJoueurId_omitsId", async () => {
+    // Revue sécurité EF-65 cycle 5 : « Joueur #<id> » se déduit de
+    // l'identifiant ; l'accepter dirait qu'un id est celui d'un compte supprimé.
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "Joueur #3" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Joueur #3" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloEntryStaleListName_omitsId", async () => {
+    // Entrée restée sous le nom nu d'avant (renommage refusé) : devinable
+    // dans la liste publique, il n'est pas un nom du jour.
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "AlphaFX" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "AlphaFX" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloNameWithoutPseudo_omitsId", async () => {
+    mockDb(() => [[{ id: 3, pseudo: null, solo_name: "Joueur #3" }]]);
+
+    expect(await profilelessAmong([{ id: 3, name: "Joueur #3" }])).toEqual([]);
+  });
+
+  it("profilelessAmong_soloNameDiffersOnlyByCase_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "APEXTV-7F3K2Q #3" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "apextv-7f3k2q #3" }])).toEqual([3]);
+  });
+
+  it("profilelessAmong_soloEntryNameEqualsPseudo_returnsId", async () => {
+    lookupDb([3], [{ id: 3, name: "ApexTV-7f3k2q" }, { id: 3, name: "apextv-7f3k2q" }]);
+
+    expect(await profilelessAmong([{ id: 3, name: "ApexTV-7f3k2q" }])).toEqual([3]);
   });
 
   it("profilelessAmong_caseAndInvisiblesDiffer_stillMatches", async () => {

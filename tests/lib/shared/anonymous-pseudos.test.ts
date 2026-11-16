@@ -43,39 +43,22 @@ describe("ANONYMOUS_PSEUDOS — la liste", () => {
   });
 });
 
-/** Un aléa qui rend tour à tour les valeurs données, puis la dernière. */
-const sequence = (...values: number[]) => {
-  let index = 0;
-  return () => values[Math.min(index++, values.length - 1)];
-};
-
 describe("pickAnonymousPseudo", () => {
   it("pickAnonymousPseudo_freshDraw_returnsListNameDashSixBase36", () => {
-    expect(pickAnonymousPseudo([], fixed(0))).toBe("AlphaFX-000000");
-    expect(pickAnonymousPseudo([], fixed(0.9999))).toBe(`${ANONYMOUS_PSEUDOS[999]}-zzzzzz`);
+    expect(pickAnonymousPseudo(fixed(0))).toBe("AlphaFX-000000");
+    expect(pickAnonymousPseudo(fixed(0.9999))).toBe(`${ANONYMOUS_PSEUDOS[999]}-zzzzzz`);
   });
 
   it("pickAnonymousPseudo_randomReturnsOne_keepsUpperBound", () => {
-    expect(pickAnonymousPseudo([], fixed(1))).toBe(`${ANONYMOUS_PSEUDOS[999]}-zzzzzz`);
+    expect(pickAnonymousPseudo(fixed(1))).toBe(`${ANONYMOUS_PSEUDOS[999]}-zzzzzz`);
   });
 
-  it("pickAnonymousPseudo_candidateTaken_drawsAnotherSuffix", () => {
-    // Nom : 0 ; premier suffixe : six fois 0 ; second : 1/36 → « 1 » partout.
-    const random = sequence(0, 0, 0, 0, 0, 0, 0, 1 / 36);
+  it("pickAnonymousPseudo_sequenceRandom_nameFromFirstDrawSuffixFromNextSix", () => {
+    const values = [0.5, 0, 1 / 36, 2 / 36, 10 / 36, 35 / 36, 0];
+    let index = 0;
 
-    expect(pickAnonymousPseudo(["AlphaFX-000000"], random)).toBe("AlphaFX-111111");
-  });
-
-  it("pickAnonymousPseudo_takenCaseInsensitive_skipsCandidate", () => {
-    const random = sequence(0, 0, 0, 0, 0, 0, 0, 1 / 36);
-
-    expect(pickAnonymousPseudo(["alphafx-000000"], random)).toBe("AlphaFX-111111");
-  });
-
-  it("pickAnonymousPseudo_allDrawsTaken_fallsBackToCounter", () => {
-    // Aléa figé : chaque tirage rend « AlphaFX-000000 ». Pris, le compteur
-    // prend le relais plutôt que de tourner en rond.
-    expect(pickAnonymousPseudo(new Set(["AlphaFX-000000"]), fixed(0))).toBe("AlphaFX-000001");
+    expect(pickAnonymousPseudo(() => values[index++])).toBe(`${ANONYMOUS_PSEUDOS[500]}-012az0`);
+    expect(index).toBe(7);
   });
 
   it("pickAnonymousPseudo_defaultRandom_matchesSuffixedPatternAndFitsColumn", () => {
@@ -122,6 +105,8 @@ describe("SUFFIXED_ANONYMOUS_PSEUDO", () => {
     ["AlphaFX", false],
     ["AlphaFX-7f3k2", false],
     ["AlphaFX10001", false],
+    ["AlphaFX-7F3K2Q", false],
+    ["AlphaFX4821-ki0g96", true],
   ])("%s → %s", (pseudo, expected) => {
     expect(SUFFIXED_ANONYMOUS_PSEUDO.test(pseudo)).toBe(expected);
   });

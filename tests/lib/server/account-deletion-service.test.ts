@@ -491,22 +491,27 @@ describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => 
       { ...EMPTY, played: 1 },
       { duplicatePseudos: ["AlphaFX-000000"] },
     );
-    const random = zeroRandom();
+    // Premier tirage (nom + six caractères = sept aléas) à zéro, le suivant à 1/36.
+    let draws = 0;
+    const random = jest.spyOn(globalThis.crypto, "getRandomValues").mockImplementation((array) => {
+      if (array instanceof Uint32Array) array[0] = draws++ < 7 ? 0 : Math.ceil(0x1_0000_0000 / 36);
+      return array;
+    });
 
     await deleteOwnAccount(7);
 
     const writes = queries.filter((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"));
-    expect(writes.map((w) => w.params[0])).toEqual(["AlphaFX-000000", "AlphaFX-000001"]);
+    expect(writes.map((w) => w.params[0])).toEqual(["AlphaFX-000000", `${ANONYMOUS_PSEUDOS[27]}-111111`]);
     random.mockRestore();
   });
 
   it("renonce après cinq collisions plutôt que de boucler", async () => {
     const random = zeroRandom();
-    // Tirage figé : chaque refus le retire, le suivant est tiré — cinq refus
-    // de suite épuisent les tentatives.
+    // Tirage figé : chaque tirage rend le même nom, refusé cinq fois de suite —
+    // les tentatives s'épuisent.
     const { connection } = fakeDb(
       { ...EMPTY, played: 1 },
-      { duplicatePseudos: ["AlphaFX-000000", "AlphaFX-000001", "AlphaFX-000002", "AlphaFX-000003", "AlphaFX-000004"] },
+      { duplicatePseudos: Array.from({ length: 5 }, () => "AlphaFX-000000") },
     );
 
     await expect(deleteOwnAccount(7)).rejects.toThrow("Duplicate entry");

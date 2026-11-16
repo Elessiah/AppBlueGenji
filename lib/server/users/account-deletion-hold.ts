@@ -77,10 +77,9 @@ export async function holdAccountIdentity(
   }
   await insertDeletionHold(connection, userId, current.pseudo, current.avatar_url ?? null);
   // Pseudo d'emprunt suffixé d'un aléa (D99) : aucune relecture des pseudos
-  // portés, une collision est départagée par l'index unique.
-  const taken = new Set<string>();
+  // portés, une collision est départagée par l'index unique et retirée.
   for (let attempt = 0; ; attempt += 1) {
-    const pseudo = pickAnonymousPseudo(taken);
+    const pseudo = pickAnonymousPseudo();
     try {
       const [result] = await connection.execute<ResultSetHeader>(
         `UPDATE bg_users
@@ -92,7 +91,6 @@ export async function holdAccountIdentity(
       break;
     } catch (error) {
       if (!isDuplicateEntryError(error) || attempt + 1 >= HOLD_PSEUDO_ATTEMPTS) throw error;
-      taken.add(pseudo);
     }
   }
   await syncSoloEntryIdentityOn(connection, userId);

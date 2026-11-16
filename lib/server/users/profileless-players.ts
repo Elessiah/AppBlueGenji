@@ -20,6 +20,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { cached, cachedStale } from "@/lib/server/cache";
 import { PROFILELESS_PLAYERS_CACHE_KEY } from "@/lib/server/ranking-cache";
 import type { ProfilelessLookupEntry } from "@/lib/shared/profileless-lookup";
+import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import { sortedIdsInclude } from "@/lib/shared/sorted-ids";
 import { visibleText } from "@/lib/shared/visible-text";
 import { accountTraceSql } from "./account-deletion";
@@ -28,8 +29,8 @@ import { admitProfilelessName } from "./profileless-guess-budget";
 /**
  * Les comptes sans fiche, **avec leurs noms d'aujourd'hui** : leur pseudo, et
  * le nom de leur entrée solo (renommée avec le compte,
- * `syncSoloEntryIdentityOn`) — les deux noms sous lesquels une page montre un
- * joueur. Lus ensemble et gardés ensemble (revue sécurité EF-65, cycle 2) :
+ * `syncSoloEntryIdentityOn`) quand il suit le pseudo (`soloNameFollowsPseudo`)
+ * — les deux noms sous lesquels une page montre un joueur. Lus ensemble et gardés ensemble (revue sécurité EF-65, cycle 2) :
  * chaque question des liens se juge sur cette seule mémoire, sans requête ni
  * refus qui dépende du compte demandé — ni une requête de plus, ni un 503 ne
  * disent qu'un identifiant est celui d'un compte supprimé (le reste du travail
@@ -48,6 +49,25 @@ export function profilelessNameKey(raw: string): string {
 }
 const nameKey = profilelessNameKey;
 
+/**
+ * Le nom d'entrée solo n'est un nom du jour que s'il **suit le pseudo** : le
+ * pseudo lui-même, ou « <pseudo> #<id> » (`soloEntryNameCandidates`). Jamais
+ * « Joueur #<id> », le dernier recours du renommage, ni un nom resté d'avant
+ * (renommage refusé) : le premier se déduit de l'identifiant, le second peut
+ * être un nom nu de la liste publique — l'un ou l'autre, essayé pour un
+ * identifiant, dirait qu'il est celui d'un compte supprimé (revue sécurité
+ * EF-65, cycle 5). Un tel nom reste en lien (fiche 404) : gêne d'affichage,
+ * sans rien apprendre.
+ */
+function soloNameFollowsPseudo(solo: string, pseudo: string, id: number): boolean {
+  const key = nameKey(solo);
+  const fallback = nameKey(`Joueur #${id}`);
+  return soloEntryNameCandidates(pseudo, id).some((candidate) => {
+    const candidateKey = nameKey(candidate);
+    return candidateKey !== fallback && candidateKey === key;
+  });
+}
+
 async function computeProfilelessDirectory(): Promise<ProfilelessDirectory> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { id: number; pseudo?: string | null; solo_name?: string | null })[]>(
@@ -62,9 +82,10 @@ async function computeProfilelessDirectory(): Promise<ProfilelessDirectory> {
   for (const row of rows) {
     const id = Number(row.id);
     const known = names.get(id) ?? new Set<string>();
-    for (const name of [row.pseudo, row.solo_name]) {
-      if (typeof name === "string" && name !== "") known.add(nameKey(name));
-    }
+    const pseudo = typeof row.pseudo === "string" && row.pseudo !== "" ? row.pseudo : null;
+    if (pseudo !== null) known.add(nameKey(pseudo));
+    const solo = typeof row.solo_name === "string" && row.solo_name !== "" ? row.solo_name : null;
+    if (solo !== null && pseudo !== null && soloNameFollowsPseudo(solo, pseudo, id)) known.add(nameKey(solo));
     names.set(id, known);
   }
   // Trié ici aussi, sans se fier au seul `ORDER BY` : la recherche

@@ -10,9 +10,12 @@
  * Le faux nom part de cette liste plutôt que d'être fabriqué (`compte_supprime_412`
  * portait l'identifiant du compte, et se lisait comme une erreur dans un
  * plateau), suivi d'un suffixe aléatoire qui le rend indevinable (D99).
- * Il se lit comme un pseudo ordinaire : c'est la **fiche** du joueur
- * et sa carte d'annuaire qui disent que le compte est supprimé, jamais le nom
- * lui-même, qu'un bracket affiche sans contexte.
+ * Il reste lisible dans un plateau, sans rien dire de la personne ; le compte
+ * supprimé s'annonce sur sa **fiche** et sa carte d'annuaire. Sa forme
+ * (« nom-6 caractères ») le désigne pour qui la connaît — comme la fiche le
+ * fait déjà, la suppression d'un compte n'est pas un secret ; ce qui doit le
+ * rester, c'est l'identité derrière, et quels identifiants n'ont plus de fiche
+ * (`profileless-guess-budget.ts`), que le suffixe ne laisse plus deviner.
  *
  * Module **pur** : le tirage prend son aléa en argument (cryptographique par
  * défaut).
@@ -207,14 +210,13 @@ export const ANONYMOUS_SUFFIX_LENGTH = 6;
 const SUFFIX_RADIX = 36;
 
 /**
- * Forme d'un pseudo d'emprunt suffixé : `<nom de la liste>-<6 caractères>`.
- * C'est elle que la migration des comptes déjà anonymisés reconnaît
- * (`recent-schema-changes.ts`, même motif écrit en SQL).
+ * Forme d'un pseudo d'emprunt suffixé : `<nom>-<6 caractères base 36 en
+ * minuscules>`. Sensible à la casse ; la migration des comptes déjà anonymisés
+ * (`recent-schema-changes.ts`) écrit le même motif en SQL sous une collation
+ * binaire (`COLLATE utf8mb4_bin`), sans quoi la collation de la colonne, sans
+ * casse, l'élargirait aux majuscules.
  */
 export const SUFFIXED_ANONYMOUS_PSEUDO = /-[0-9a-z]{6}$/;
-
-/** Tirages essayés avant de s'en remettre au compteur (aléa figé d'un test). */
-const SUFFIX_ATTEMPTS = 50;
 
 /**
  * Un aléa **cryptographique** dans [0, 1) : le suffixe est ce qui rend le
@@ -248,26 +250,14 @@ export function anonymousPseudoSuffix(random: () => number = cryptoRandom): stri
  * de valeurs par nom — rend le pseudo indevinable ; le nom de la liste le garde
  * lisible dans un plateau.
  *
- * `taken` liste les pseudos déjà écartés (un tirage refusé par l'index unique,
- * qui est **sans casse** — d'où la comparaison en minuscules). Une collision
- * n'arrive pas avec un aléa honnête ; avec un aléa figé (un test), un compteur
- * garantit malgré tout un nom libre. Le résultat tient toujours dans la
- * colonne : 23 caractères au plus pour le nom, 7 pour le suffixe.
+ * Aucun pseudo porté n'est consulté : une collision (improbable) est refusée
+ * par l'index unique de `bg_users.pseudo`, et l'appelant tire de nouveau. Le
+ * résultat tient toujours dans la colonne : 23 caractères au plus pour le nom,
+ * 7 pour le suffixe.
  */
-export function pickAnonymousPseudo(
-  taken: Iterable<string> = [],
-  random: () => number = cryptoRandom,
-): string {
-  const used = new Set(Array.from(taken, (pseudo) => pseudo.toLowerCase()));
+export function pickAnonymousPseudo(random: () => number = cryptoRandom): string {
   const base = ANONYMOUS_PSEUDOS[randomIndex(ANONYMOUS_PSEUDOS.length, random)];
-  for (let attempt = 0; attempt < SUFFIX_ATTEMPTS; attempt += 1) {
-    const candidate = `${base}-${anonymousPseudoSuffix(random)}`;
-    if (!used.has(candidate.toLowerCase())) return candidate;
-  }
-  let counter = 0;
-  const numbered = () => `${base}-${counter.toString(36).padStart(ANONYMOUS_SUFFIX_LENGTH, "0")}`;
-  while (used.has(numbered().toLowerCase())) counter += 1;
-  return numbered();
+  return `${base}-${anonymousPseudoSuffix(random)}`;
 }
 
 function randomIndex(length: number, random: () => number): number {
