@@ -47,6 +47,8 @@ type UserState = {
   discord_pseudo_from_discord: number;
   discord_link_method: "OAUTH" | "DM_CODE" | null;
   is_deleted?: boolean;
+  /** Langue du compte, lue avec la ligne (absente : relue par l'identifiant Discord). */
+  locale?: string;
 };
 
 const CERTIFIED_AT = new Date("2026-09-20T12:00:00Z");
@@ -164,6 +166,29 @@ describe("startDiscordHandleUpdate", () => {
       "en",
       "handle",
     );
+  });
+
+  it("startDiscordHandleUpdate_ownDiscordWithRowLocale_usesRowLocaleWithoutLookup", async () => {
+    fakeDb({ ...LINKED_BY_CODE, locale: "en" });
+    jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000001");
+
+    await startDiscordHandleUpdate(7, "keryan_neuf");
+
+    // Destinataire = ce compte : sa langue vient de la ligne déjà lue.
+    expect(accountLocaleForDiscordId).not.toHaveBeenCalled();
+    expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000001", "123456", "en", "handle");
+  });
+
+  it("startDiscordHandleUpdate_noLinkedDiscord_looksUpRecipientLocale", async () => {
+    fakeDb({ ...GOOGLE_ACCOUNT, locale: "en" });
+    jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000002");
+    jest.mocked(accountLocaleForDiscordId).mockResolvedValueOnce(null);
+
+    await startDiscordHandleUpdate(7, "quelquun");
+
+    // Le tag saisi n'est pas prouvé : la langue est celle du compte qui porte ce Discord, pas du demandeur.
+    expect(accountLocaleForDiscordId).toHaveBeenCalledWith("900000000000000002");
+    expect(sendDiscordLoginCode).toHaveBeenCalledWith("900000000000000002", "123456", null, "handle");
   });
 
   it("refuse un pseudo qui résout vers un autre compte Discord, sans rien envoyer", async () => {

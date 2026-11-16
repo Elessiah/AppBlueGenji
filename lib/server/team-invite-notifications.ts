@@ -11,6 +11,8 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
+import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
+import type { Locale } from "@/lib/shared/locales";
 import { notifyUsers, type NotificationReport } from "@/lib/server/notify";
 import { siteCanonicalBase, siteUrl } from "@/lib/server/site-url";
 import { activeSuspensionSql } from "@/lib/server/suspension-sql";
@@ -37,6 +39,8 @@ type AccountRow = RowDataPacket & {
   discord_id: string | null;
   discord_pseudo: string | null;
   discord_verified_at: Date | string | null;
+  /** Langue du compte, lue avec la ligne : `notifyUsers` ne la relit pas. */
+  locale: unknown;
 };
 
 type TeamRow = RowDataPacket & {
@@ -120,7 +124,7 @@ export async function notifyTeamInvite(
   );
   if (teams.length === 0) return;
   const [accounts] = await db.execute<AccountRow[]>(
-    `SELECT u.id, u.pseudo, u.is_deleted, u.discord_id, u.discord_pseudo, u.discord_verified_at,
+    `SELECT u.id, u.pseudo, u.is_deleted, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.locale,
             EXISTS (SELECT 1 FROM bg_account_suspensions sus
                     WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")}) AS suspended
      FROM bg_users u WHERE u.id = ? LIMIT 1`,
@@ -154,7 +158,7 @@ export async function notifyTeamInvite(
   // Réservé une fois l'avis décidé : un compte suspendu ne consomme rien.
   const claimedAt = Date.now();
   if (!claimTeamNoticeSlot(kind, teamId, userId, claimedAt)) return;
-  const report = await sendTeamInviteNotice(kind, teamId, account, team.name, claimedAt);
+  const report = await sendTeamInviteNotice(kind, teamId, account, team.name, claimedAt, row.locale === undefined ? undefined : accountLocaleFromRow(row.locale));
   if (report.discord === null && report.discordUnreachedUserIds.length > 0) {
     console.warn(`[teams] bot injoignable : message privé d'équipe non remis (${kind})`);
   }
@@ -187,13 +191,16 @@ async function sendTeamInviteNotice(
   account: Parameters<typeof teamInviteNoticeRecipient>[0],
   teamName: string,
   claimedAt: number,
+  locale: Locale | undefined,
 ): Promise<NotificationReport> {
   const url = `${siteCanonicalBase()}${teamInviteNoticePath(kind, teamId)}`;
   // Racine inconnue : la phrase sans lien plutôt qu'un lien vers localhost.
   const settingsUrl = siteUrl(MATCH_DM_SETTINGS_PATH);
   // Messages privés coupés dans « Mon profil » (D68) : le push seul, sans
   // consommer le plafond horaire des messages privés.
-  const [proven] = await withoutOptedOutDiscord([teamInviteNoticeRecipient(account)]);
+  const [proven] = await withoutOptedOutDiscord([
+    locale === undefined ? teamInviteNoticeRecipient(account) : { ...teamInviteNoticeRecipient(account), locale },
+  ]);
   // Au-delà du plafond horaire du site, le push seul : rien ne part sur Discord.
   const dmClaimed = proven.discord !== null && claimTeamNoticeDmSlot(claimedAt);
   const recipient = proven.discord && !dmClaimed ? { ...proven, discord: null } : proven;

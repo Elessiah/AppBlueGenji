@@ -32,7 +32,8 @@ langues.
 chaque langue de ses destinataires (`fr`, `en`, bilingue sans langue connue) **avant** tout départ — un rédacteur qui lève
 fait échouer la notification sans qu'aucun push ne soit parti —, prend la langue
 que le chargeur a lue avec la ligne (`loadNotificationRecipients`,
-`NotificationRecipient.locale`), relit `bg_users.locale` des seuls autres
+`NotificationRecipient.locale` ; aussi les chargeurs des invitations et demandes
+d'équipe, `team-invite-notifications.ts`, `team-join-notifications.ts`), relit `bg_users.locale` des seuls autres
 destinataires en **une** requête, les groupe par langue et fait **un appel**
 `/internal/notify/dm` par groupe : le contrat du bot ne change pas. Les groupes
 partent **l'un après l'autre** et un appel perdu arrête les suivants : un bot
@@ -55,7 +56,9 @@ texte libre d'un joueur (signalement) n'est que dans la partie française.
 la langue du compte **destinataire**, celui qui porte déjà ce Discord
 (`accountLocaleForDiscordId`), pour la connexion comme pour la certification ou
 le changement de tag — jamais celle du demandeur : un tag saisi n'est pas encore
-prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, bilingue. La
+prouvé et peut désigner quelqu'un d'autre. Changement de tag vers le Discord
+déjà rattaché au compte : le destinataire est ce compte, sa langue vient de la
+ligne déjà lue, sans relecture. Sans compte rattaché, bilingue. La
 langue n'est lue qu'**après** l'insertion du défi : un refus de quota ne dépend
 pas de l'existence d'un compte rattaché. `purpose: "handle"` (certification ou
 changement de tag) fait rédiger au bot un texte qui dit que le code rattache un

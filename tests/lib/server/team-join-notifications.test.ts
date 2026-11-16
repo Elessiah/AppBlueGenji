@@ -60,6 +60,18 @@ describe("notifyTeamJoinRequest", () => {
     jest.mocked(pushToUsers).mockResolvedValue(0);
   });
 
+  it("notifyTeamJoinRequest_localeReadWithRow_noLocaleRereadAndDmInRowLocale", async () => {
+    const execute = mockDb({ members: [row({ locale: "en" })] });
+
+    await notifyTeamJoinRequest(5, 42);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    // Langue lue avec la ligne : anglais seul (la relecture simulée ne répond rien, ce qui donnerait un message bilingue).
+    expect(message).toContain("A player is asking to join your team");
+    expect(message).not.toContain("Un joueur demande");
+    expect(execute.mock.calls[2][0]).toContain("u.locale");
+  });
+
   it("écrit au propriétaire et aux managers, avec le lien de la fiche", async () => {
     mockDb({
       members: [

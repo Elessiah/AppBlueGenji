@@ -36,7 +36,8 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
-import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
+import { accountLocaleForDiscordId, accountLocaleFromRow } from "@/lib/server/users/account-locale";
+import type { Locale } from "@/lib/shared/locales";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
@@ -88,6 +89,8 @@ type UserDiscordRow = RowDataPacket & {
   discord_pseudo: string | null;
   discord_verified_at: Date | null;
   discord_pseudo_from_discord: number | boolean | null;
+  /** Langue du compte : celle du message privé quand ce compte en est le destinataire. */
+  locale?: unknown;
 };
 
 /**
@@ -102,7 +105,7 @@ type UserDiscordRow = RowDataPacket & {
 async function loadDiscordRow(userId: number): Promise<UserDiscordRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<UserDiscordRow[]>(
-    `SELECT discord_id, discord_pseudo, discord_verified_at, discord_pseudo_from_discord
+    `SELECT discord_id, discord_pseudo, discord_verified_at, discord_pseudo_from_discord, locale
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -370,17 +373,25 @@ export async function confirmDiscordVerification(
  * à son échec, sinon il masque comme « dernier émis » de son usage celui que le joueur
  * détient vraiment.
  */
-async function sendHandleChallenge(discordId: string, tag: string, binding: string): Promise<CodeSent> {
+async function sendHandleChallenge(
+  discordId: string,
+  tag: string,
+  binding: string,
+  recipientLocale?: Locale,
+): Promise<CodeSent> {
   // Dans la langue du compte **destinataire** — celui qui porte déjà ce
   // Discord —, jamais dans celle du demandeur : le tag saisi n'est pas encore
   // prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, message
   // bilingue (`BOT_DM_LANGUAGE.md`). Lue **après** le défi : une demande refusée
-  // (quota, avalanche) ne coûte aucune lecture de plus.
+  // (quota, avalanche) ne coûte aucune lecture de plus. Déjà connue
+  // (`recipientLocale`) quand le destinataire est le compte demandeur lui-même :
+  // aucune relecture.
   // « handle » : le message dit que ce code rattache un tag, qu'il ne connecte
   // pas — et le défi le retient, la connexion le refuse.
   const challenge = await createDiscordLoginChallenge(discordId, tag, "handle", binding);
   try {
-    await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId), "handle");
+    const locale = recipientLocale ?? (await accountLocaleForDiscordId(discordId));
+    await sendDiscordLoginCode(discordId, challenge.code, locale, "handle");
   } catch (error) {
     await discardDiscordChallenge(challenge.challengeId).catch(() => {});
     throw error;
@@ -432,7 +443,10 @@ export async function startDiscordHandleUpdate(
 
   // Avant le défi et avant l'envoi, comme pour la certification.
   guardBeforeSend?.(discordId);
-  return sendHandleChallenge(discordId, tag, challengeBinding(userId, "handle-update"));
+  // Le Discord visé est déjà celui de ce compte : il est le destinataire, sa
+  // langue est lue avec la ligne.
+  const ownLocale = row.discord_id === discordId && row.locale !== undefined ? accountLocaleFromRow(row.locale) : undefined;
+  return sendHandleChallenge(discordId, tag, challengeBinding(userId, "handle-update"), ownLocale);
 }
 
 /**

@@ -134,6 +134,17 @@ describe("notifyTeamInvite", () => {
     expect(message).toContain("https://site.test/en/equipes/7");
   });
 
+  it("notifyTeamInvite_localeReadWithRow_noLocaleRereadAndDmInRowLocale", async () => {
+    mockDb({ account: accountRow({ locale: "en" }), locale: "fr" });
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("Ownership of your team “Les Glaciers”");
+    // La relecture aurait répondu « fr » : la langue vient bien de la ligne du compte.
+    expect(message).not.toContain("La propriété");
+  });
+
   // Le délai par joueur se compte sur les avis réellement partis (mémoire),
   // plus sur les lignes d'invitation : un retrait-renvoi n'écrit qu'une fois.
   it("notifyTeamInvite_reinviteWithinCooldown_sendsOnce", async () => {
