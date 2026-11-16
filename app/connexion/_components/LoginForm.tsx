@@ -78,6 +78,9 @@ function isEarlierTermsVersion(stored: string | null): boolean {
  */
 const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-code" } as const;
 
+/** Délai après lequel un formulaire resté verrouillé par une navigation sans issue se rouvre. */
+const NAVIGATION_RELEASE_MS = 10_000;
+
 /**
  * Formulaire de connexion.
  *
@@ -112,6 +115,12 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   // doublée) liraient encore `loading` à faux. Les boutons restent focalisables
   // pendant l'envoi (`aria-disabled` + `aria-busy`, pas `disabled` natif).
   const inFlight = useRef(false);
+  // Navigation qui n'aboutit pas (hors ligne, échec du chargement) : le
+  // formulaire se rouvre au bout de ce délai au lieu de rester verrouillé.
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (releaseTimer.current) clearTimeout(releaseTimer.current);
+  }, []);
   /** Un refus du code qui se lève en rejoignant le serveur : le lien d'invitation s'affiche sous le champ. */
   const [inviteAfterRefusal, setInviteAfterRefusal] = useState(false);
   // Exposé d'une suspension à afficher : retour OAuth (cookie relu par la
@@ -304,12 +313,20 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       showError((e as Error).message);
     } finally {
       // Connexion réussie ou réactivation : la garde reste posée pendant la navigation.
-      if (!leaving) {
+      if (leaving) {
+        releaseTimer.current = setTimeout(() => {
+          inFlight.current = false;
+          setLoading(false);
+        }, NAVIGATION_RELEASE_MS);
+      } else {
         inFlight.current = false;
         setLoading(false);
       }
     }
   };
+
+  let busyLabel = "";
+  if (loading) busyLabel = requested ? t("page.verifying") : t("page.sending");
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
@@ -323,6 +340,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
           boxShadow: "0 30px 80px -40px rgba(var(--violet-400-rgb), 0.6), 0 0 40px -24px var(--blue-glow)",
         }}
       >
+        <output className="sr-only" aria-live="polite">
+          {busyLabel}
+        </output>
         {/*
           La page n'a pas d'en-tête : ce lien est la seule sortie vers le site.
           Il était en bas de carte, en mono 11 px — sous le pli sur mobile, et
@@ -558,7 +578,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
             <div style={{ marginTop: 16, textAlign: "center" }}>
               <button
                 type="button"
+                aria-disabled={loading || undefined}
                 onClick={() => {
+                  // Pendant l'envoi du code, revenir à l'adresse laisserait la
+                  // réponse s'adresser à un champ qui n'est plus affiché.
+                  if (inFlight.current) return;
                   fieldErrors.clear();
                   setRequested(false);
                   setCode("");

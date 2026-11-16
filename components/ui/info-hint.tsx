@@ -64,7 +64,7 @@ export function InfoHint({
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setLocale(infoHintLocale(rootRef.current?.closest("[lang]")?.getAttribute("lang") ?? ambientLang, pageLocale));
+    setLocale(infoHintLocale(ambientLang ?? rootRef.current?.closest("[lang]")?.getAttribute("lang"), pageLocale));
   }, [pageLocale, ambientLang]);
 
   useEffect(() => {

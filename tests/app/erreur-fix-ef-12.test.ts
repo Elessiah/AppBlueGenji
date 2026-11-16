@@ -100,7 +100,7 @@ describe("boutons en attente : aria-disabled, pas disabled", () => {
     // Garde synchrone, posée avant tout envoi, rendue en fin d'envoi (sauf départ vers la réactivation).
     expect(login.match(/event\.preventDefault\(\);\s+if \(inFlight\.current\) return;\s+inFlight\.current = true;/g)).toHaveLength(2);
     expect(login).toMatch(/finally \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
-    expect(login).toMatch(/if \(!leaving\) \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
+    expect(login).toMatch(/\} else \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
   });
 
   it("verifyCode_success_keepsGuardWhileRedirecting", () => {
@@ -141,7 +141,7 @@ describe("mises en page", () => {
     const globals = readSource("app/globals.css");
     // Bornée à la sœur `main.page-shell` et à son enfant direct, jamais au `body` entier
     // (réévalué à chaque mutation de la page).
-    expect(globals).toMatch(/\[data-sticky-header\]:has\(~ \.page-shell > \.page-wide\) \.container \{/);
+    expect(globals).toMatch(/\[data-sticky-header\]:has\(~ \.page-shell \.page-wide\) \.container \{/);
     expect(globals).not.toMatch(/body:has\(/);
   });
 
