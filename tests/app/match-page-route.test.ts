@@ -207,6 +207,41 @@ describe("encart du lien partagé", () => {
     expect(loadShare).toHaveBeenCalledTimes(1);
   });
 
+  it("matchPageMetadata_spectatorWithShare_cardFromShareNotLoader", async () => {
+    const shared = tournamentCard({ id: 12, name: "Coupe partagée" });
+    const loadCard = jest.fn(async () => tournamentCard({ id: 12 }));
+    const loadShare = jest.fn(async () => ({ card: shared, share: { leader: null, matches: new Map() } }));
+
+    const meta = await matchPageMetadata("12", "34", true, async () => ({ canManage: false }), loadCard, loadShare);
+
+    // Un seul jeton du plafond public : la carte vient de la même lecture.
+    expect(loadCard).not.toHaveBeenCalled();
+    expect(loadShare).toHaveBeenCalledTimes(1);
+    expect(String((meta.title as { absolute: string }).absolute)).toContain("Coupe partagée");
+  });
+
+  it("matchPageMetadata_spectatorShareNull_fallsBackToCardLoader", async () => {
+    const loadCard = jest.fn(async () => tournamentCard({ id: 12, name: "Coupe de repli" }));
+
+    const meta = await matchPageMetadata("12", "34", true, async () => ({ canManage: false }), loadCard, async () => null);
+
+    expect(loadCard).toHaveBeenCalledTimes(1);
+    expect(String((meta.title as { absolute: string }).absolute)).toContain("Coupe de repli");
+  });
+
+  it("matchPageMetadata_member_cardFromLoaderEvenWithCopy", async () => {
+    const loadCard = jest.fn(async () => tournamentCard({ id: 12, name: "Coupe des membres" }));
+    const loadShare = jest.fn(async () => ({
+      card: tournamentCard({ id: 12, name: "Copie publique" }),
+      share: { leader: null, matches: new Map() },
+    }));
+
+    const meta = await matchPageMetadata("12", "34", false, async () => ({ canManage: false }), loadCard, loadShare);
+
+    expect(loadCard).toHaveBeenCalledTimes(1);
+    expect(String((meta.title as { absolute: string }).absolute)).toContain("Coupe des membres");
+  });
+
   it("tournoi invisible, droits refusés ou identifiant de match invalide : l'encart du site", async () => {
     card.mockResolvedValueOnce(null);
     expect((await matchPageMetadata("12", "34", false, async () => ({ canManage: false }))).alternates).toBeUndefined();

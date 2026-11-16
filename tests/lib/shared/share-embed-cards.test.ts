@@ -191,18 +191,18 @@ describe("matchEmbedCard", () => {
     expect(card.center).toEqual({ kind: "label", text: "Forfait : Bravo" });
   });
 
-  it("matchEmbedCard_readyWithMaps_resultPending", () => {
+  it("matchEmbedCard_readyWithMaps_inProgress", () => {
     const match = summary({ status: "READY", score: null, winnerSide: null, maps: [mapRow(1)] });
 
     const card = matchEmbedCard(CARD, match, "Match 1", EN);
 
-    expect(card.state).toEqual({ label: "Result pending", tone: "info" });
+    expect(card.state).toEqual({ label: "Match in progress", tone: "info" });
   });
 
-  it("matchEmbedCard_pendingWithScore_resultPending", () => {
+  it("matchEmbedCard_pendingWithScore_inProgress", () => {
     const card = matchEmbedCard(CARD, summary({ status: "PENDING", winnerSide: null }), "Match 1", FR);
 
-    expect(card.state.label).toBe("Résultat en attente");
+    expect(card.state).toEqual({ label: "Match en cours", tone: "info" });
   });
 
   it("matchEmbedCard_readyWithoutScoreOrMaps_upcoming", () => {

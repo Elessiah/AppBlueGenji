@@ -148,6 +148,7 @@
     "tbd": "To be decided",
     "matchStates": {
       "UPCOMING": "Upcoming",
+      "IN_PROGRESS": "Match in progress",
       "RUNNING": "Result pending",
       "COMPLETED": "Match over"
     },

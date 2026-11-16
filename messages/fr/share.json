@@ -148,6 +148,7 @@
     "tbd": "À déterminer",
     "matchStates": {
       "UPCOMING": "À venir",
+      "IN_PROGRESS": "Match en cours",
       "RUNNING": "Résultat en attente",
       "COMPLETED": "Match terminé"
     },

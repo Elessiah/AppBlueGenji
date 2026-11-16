@@ -66,6 +66,14 @@ export type SpectatorPayload = {
   ttlMs: number;
   /** Carte et réglages du corps public (encart, page des règles) — jamais l'instantané des membres. */
   snapshot: PublicTournamentView;
+  /**
+   * Résumé du corps public pour les cartes d'aperçu (`SHARE_EMBEDS.md`) :
+   * engagé en tête, score et maps de chaque match. Tiré de l'objet public déjà
+   * construit (sans relire `body`), il ne montre rien de plus que lui. Calculé
+   * avec la copie : la fiche des membres le lit à chaque vue pour versionner
+   * son image, le différer ne ferait rien gagner.
+   */
+  share: TournamentShareSummary;
 };
 
 /**
@@ -235,6 +243,7 @@ export async function getSpectatorPayload(
             endurance: publicSnapshot.endurance,
             seedingSource: publicSnapshot.seedingSource,
           },
+          share: buildTournamentShareSummary(publicSnapshot),
         };
       },
       {
@@ -295,27 +304,10 @@ export async function publicTournamentSnapshot(
 /** Carte (état recalculé depuis les dates) et résumé d'aperçu d'un tournoi public. */
 export type PublicTournamentShare = { card: TournamentCard; share: TournamentShareSummary };
 
-/**
- * Résumé d'aperçu de chaque copie, calculé à la **première** demande (une
- * image ou un encart) puis gardé tant que la copie vit : une reconstruction
- * que personne ne partage ne paie ni le résumé ni sa mémoire. Tiré du corps
- * public (`body`), il ne montre rien de plus que lui.
- */
-const shareSummaries = new WeakMap<SpectatorPayload, TournamentShareSummary>();
-
-function shareSummaryOf(payload: SpectatorPayload): TournamentShareSummary {
-  let summary = shareSummaries.get(payload);
-  if (!summary) {
-    summary = buildTournamentShareSummary(JSON.parse(payload.body) as TournamentSnapshot);
-    shareSummaries.set(payload, summary);
-  }
-  return summary;
-}
-
 function shareOf(payload: SpectatorPayload | null | undefined): PublicTournamentShare | null {
   if (!payload) return null;
   const card = payload.snapshot.card;
-  return { card: { ...card, state: computeTournamentState(card) }, share: shareSummaryOf(payload) };
+  return { card: { ...card, state: computeTournamentState(card) }, share: payload.share };
 }
 
 /**

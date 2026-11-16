@@ -143,16 +143,19 @@ export async function tournamentPageMetadata(
   const canonical = localeHref(path, locale);
   const languages = localeAlternates(path);
   const share = await loadShare(tournamentId).catch(() => null);
-  // L'empreinte vient de la **même copie** que celle que la route de l'image
-  // dessine (carte et engagé en tête). Sans copie en mémoire, l'équipe en tête
-  // est inconnue : l'empreinte change alors par fenêtre de cinq minutes, pour
-  // qu'un changement d'équipe en tête ne reste pas indéfiniment chez Discord.
-  const imageCard = share?.card ?? card;
+  // Le texte (titre, description, texte alternatif) vient de la carte lue
+  // (`card`). L'équipe en tête vient de la copie publique en mémoire, mais
+  // seulement quand celle-ci dit la **même** carte : une copie restée d'avant un
+  // renommage ou une inscription n'apparie pas son équipe en tête à un nom
+  // qu'elle ne dessine plus. Sans copie conforme, l'équipe en tête est inconnue
+  // et l'empreinte change par fenêtre (`tournamentShareVersionWithoutSummary`).
+  const copyMatchesCard =
+    share !== null && tournamentShareVersion(share.card, null) === tournamentShareVersion(card, null);
   const image = embedImageMetadata(
     tournamentShareCardKey(tournamentId),
     locale,
-    share ? tournamentShareVersion(share.card, share.share.leader) : tournamentShareVersionWithoutSummary(card),
-    tournamentEmbedAlt(imageCard, messages),
+    copyMatchesCard ? tournamentShareVersion(card, share.share.leader) : tournamentShareVersionWithoutSummary(card),
+    tournamentEmbedAlt(card, messages),
   );
 
   return {

@@ -102,7 +102,6 @@ export type TournamentEmbedCard = {
   footer: string;
   /** Équipe en tête ou victorieuse : son logo occupe le motif de droite. */
   leader: EmbedTeamMark | null;
-  alt: string;
 };
 
 /**
@@ -151,13 +150,12 @@ export function tournamentEmbedCard(
     facts,
     footer: messages.share.footer,
     leader: mark,
-    alt: fill(text.tournamentAlt, { name: title }),
   };
 }
 
 type MatchStateBadge = { key: keyof EmbedText["matchStates"]; tone: ShareStateTone };
 
-/** Pastille d'état d'un match : à venir, résultat en attente, terminé. */
+/** Pastille d'état d'un match : à venir, en cours, résultat en attente, terminé. */
 const MATCH_STATE: Record<MatchStatus, MatchStateBadge> = {
   PENDING: { key: "UPCOMING", tone: "accent" },
   READY: { key: "UPCOMING", tone: "accent" },
@@ -165,14 +163,18 @@ const MATCH_STATE: Record<MatchStatus, MatchStateBadge> = {
   COMPLETED: { key: "COMPLETED", tone: "success" },
 };
 
+/** Un match qui n'attend pas encore de confirmation mais porte déjà un score ou des maps retenues. */
+const MATCH_IN_PROGRESS: MatchStateBadge = { key: "IN_PROGRESS", tone: "info" };
+
 /**
- * La pastille d'un match : un match pas encore terminé qui porte déjà un score
- * ou des maps retenues (saisie map par map) n'est plus « à venir » — son
- * résultat est en attente.
+ * La pastille d'un match : un match pas encore soumis qui porte déjà un score
+ * ou des maps retenues (saisie map par map) n'est plus « à venir » — il se
+ * joue. « Résultat en attente » reste réservé au résultat soumis
+ * (`AWAITING_CONFIRMATION`).
  */
 function matchStateOf(match: MatchShareSummary): MatchStateBadge {
   const base = MATCH_STATE[match.status];
-  if (base.key === "UPCOMING" && (match.score !== null || match.maps.length > 0)) return MATCH_STATE.AWAITING_CONFIRMATION;
+  if (base.key === "UPCOMING" && (match.score !== null || match.maps.length > 0)) return MATCH_IN_PROGRESS;
   return base;
 }
 
@@ -201,7 +203,6 @@ export type MatchEmbedCard = {
   /** Maps jouées au-delà des cases dessinées (« +2 maps »), `null` sinon. */
   moreMaps: string | null;
   footer: string;
-  alt: string;
 };
 
 function scoreCenter(match: MatchShareSummary, names: readonly [string, string], text: EmbedText): EmbedScoreCenter {
@@ -266,7 +267,6 @@ export function matchEmbedCard(
     })),
     moreMaps: extra > 0 ? fill(text.moreMaps, { count: extra }) : null,
     footer: messages.share.footer,
-    alt: matchEmbedAlt(match, messages),
   };
 }
 

@@ -104,10 +104,18 @@ export async function matchPageMetadata(
   loadCard?: TournamentMetadataCardLoader,
   loadShare: TournamentShareLoader = cachedTournamentShareLoader,
 ): Promise<Metadata> {
-  // Une seule lecture pour l'encart du tournoi et celui du match : un robot
-  // d'aperçu ne paie jamais deux fois le plafond de lecture publique.
+  // Une seule lecture pour l'encart du tournoi et celui du match. Sans compte,
+  // la carte vient aussi de cette lecture (`share.card`, la même copie
+  // publique) : un robot d'aperçu ne paie pas un jeton du plafond pour la
+  // carte puis un second pour le résumé. La lecture de la carte ne sert plus
+  // que de repli (réponse publique indisponible, reconstruction refusée).
   let shareRead: ReturnType<TournamentShareLoader> | null = null;
   const loadShareOnce: TournamentShareLoader = (id) => (shareRead ??= loadShare(id));
+  const loadCardOnce: TournamentMetadataCardLoader | undefined = spectator
+    ? async (id, cardRights) =>
+        (await loadShareOnce(id).catch(() => null))?.card ??
+        (loadCard ?? loadVisibleTournamentCard)(id, cardRights)
+    : loadCard;
   const matchId = parseEntityPageId(rawMatchId);
   const tournamentId = parseEntityPageId(rawTournamentId);
   const granted = await rights().catch(() => null);
@@ -123,7 +131,7 @@ export async function matchPageMetadata(
     rawTournamentId,
     (id) => (missing || matchId === null ? tournamentPath(id) : matchPagePath(id, matchId, spectator)),
     async () => granted,
-    loadCard,
+    loadCardOnce,
     loadShareOnce,
   );
   if (!position || metadata.alternates === undefined) return metadata;

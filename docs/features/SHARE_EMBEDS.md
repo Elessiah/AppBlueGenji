@@ -13,7 +13,8 @@ de replay publics).
   (`_lib/match-card-actions.ts`, rangée dans « Plus d'actions », offerte aussi
   sur la page du match qui reprend les mêmes gestes).
 - Le geste est un seul crochet, `useShareLink()` (même fichier que le bouton),
-  que l'action du match réutilise.
+  que l'action du match réutilise ; sa fonction reste la même d'un rendu à
+  l'autre (`useCallback`).
 - Règle pure `lib/shared/share-link.ts` : feuille de partage du système
   (`navigator.share`) si elle existe — la fermer (`AbortError`) ne notifie
   rien —, sinon copie dans le presse-papiers. Résultat en notification
@@ -39,8 +40,9 @@ de replay publics).
 - Match : tournoi et place du match, logos et noms des deux engagés, score —
   un forfait se dit « Forfait : X » même s'il porte un score complet
   (`forfeitMatchScores`), « VS » (`share.embed.scoreboardVersus`) sans score —,
-  pastille « À venir », « Résultat en attente » (dès qu'un score ou une map
-  retenue existe sur un match non terminé) ou « Match terminé », une case par map jouée (nom de la carte s'il est fixé, score, code
+  pastille « À venir », « Match en cours » (un score ou une map retenue sur
+  un match pas encore soumis), « Résultat en attente » (résultat soumis) ou
+  « Match terminé », une case par map jouée (nom de la carte s'il est fixé, score, code
   de replay ou « Sans code »), neuf au plus, la suite comptée.
 - Encart : `tournamentPageMetadata` / `matchPageMetadata` posent
   `openGraph.images` et `twitter.images` (adresse versionnée, 1200×630, texte
@@ -77,13 +79,14 @@ de replay publics).
 - L'adresse publiée porte la même empreinte en `?v=` pour que Discord ou X ne
   resservent pas une ancienne image ; le paramètre reçu n'est jamais lu.
   L'encart d'un tournoi lit la copie publique **déjà en mémoire** (jamais une
-  reconstruction payée par un robot) : avec elle, l'empreinte vient de la même
-  carte et de la même équipe en tête que l'image ; sans elle, l'équipe en tête
-  est inconnue, et l'empreinte d'un tournoi par équipes en cours ou terminé
-  change par fenêtre de cinq minutes (`tournamentShareVersionWithoutSummary`).
+  reconstruction payée par un robot). Titre et texte alternatif viennent de la
+  carte lue ; l'équipe en tête vient de la copie, seulement si elle dit la même
+  carte (sinon, copie d'avant un renommage, elle est ignorée). Sans copie
+  conforme, l'équipe en tête est inconnue, et l'empreinte d'un tournoi par
+  équipes change par fenêtre : cinq minutes en cours, un jour terminé
+  (`tournamentShareVersionWithoutSummary`).
   Une page de match lit la réponse publique une seule fois pour ses deux
-  encarts.
-- Le résumé d'aperçu d'une copie publique est calculé à la première demande et
-  gardé avec elle (`WeakMap`) : une reconstruction que personne ne partage ne
-  le paie pas.
+  encarts ; sans compte, sa carte en vient aussi (un seul jeton du plafond).
+- Le résumé d'aperçu est calculé avec la copie publique, depuis l'objet déjà
+  construit (sans relire le corps) : la fiche des membres le lit à chaque vue.
 - `Cache-Control: public, max-age=300` (carte neutre : `no-store`).

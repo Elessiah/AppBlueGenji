@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { Share2 } from "lucide-react";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -21,14 +22,19 @@ export function useShareLink(): (path: string, title?: string) => Promise<void> 
   // La langue de la fiche : le lien partagé reste dans la langue lue.
   const { t, locale } = useTournamentPageText();
   const { showError, showSuccess } = useToast();
-  return async (path, title) => {
-    const url = absoluteShareUrl(window.location.origin, path, locale);
-    const shownTitle = title === undefined ? undefined : visibleText(title) || undefined;
-    const outcome = await shareLink(typeof navigator === "undefined" ? undefined : navigator, url, shownTitle);
-    if (outcome === "shared") showSuccess(t("shareLink.shared"));
-    else if (outcome === "copied") showSuccess(t("shareLink.copied"));
-    else if (outcome === "failed") showError(t("shareLink.copyFailed"));
-  };
+  // Une seule fonction tant que la langue et les notifications ne changent
+  // pas : la carte d'un match se redessine à chaque mise à jour du flux.
+  return useCallback(
+    async (path: string, title?: string) => {
+      const url = absoluteShareUrl(window.location.origin, path, locale);
+      const shownTitle = title === undefined ? undefined : visibleText(title) || undefined;
+      const outcome = await shareLink(typeof navigator === "undefined" ? undefined : navigator, url, shownTitle);
+      if (outcome === "shared") showSuccess(t("shareLink.shared"));
+      else if (outcome === "copied") showSuccess(t("shareLink.copied"));
+      else if (outcome === "failed") showError(t("shareLink.copyFailed"));
+    },
+    [t, locale, showError, showSuccess],
+  );
 }
 
 /**

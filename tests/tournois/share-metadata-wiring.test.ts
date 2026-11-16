@@ -235,15 +235,27 @@ describe("route d'image d'un tournoi", () => {
 describe("empreinte `?v=` de l'image d'un tournoi", () => {
   const LEADER: ShareLeader = { kind: "LEADER", side: { teamId: 3, name: "Bravo", logoUrl: null, solo: false } };
 
-  it("tournamentPageMetadata_shareLoaded_versionFromShareCardAndLeader", async () => {
-    const shared = card({ state: "RUNNING", registeredTeams: 9 });
-    const loadShare: TournamentShareLoader = async () => ({ card: shared, share: { leader: LEADER, matches: new Map() } });
+  it("tournamentPageMetadata_copyMatchesCard_versionFromCardAndLeader", async () => {
+    const running = card({ state: "RUNNING", registeredTeams: 9 });
+    const loadShare: TournamentShareLoader = async () => ({ card: running, share: { leader: LEADER, matches: new Map() } });
 
-    const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => card(), loadShare);
+    const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => running, loadShare);
 
     expect(meta.openGraph).toMatchObject({
-      images: [{ url: `/og/fr/tournament-42.png?v=${tournamentShareVersion(shared, LEADER)}` }],
+      images: [{ url: `/og/fr/tournament-42.png?v=${tournamentShareVersion(running, LEADER)}` }],
     });
+  });
+
+  it("tournamentPageMetadata_copyFromBeforeRename_leaderIgnoredWindowVersion", async () => {
+    const renamed = card({ state: "RUNNING", name: "Cup B" });
+    const oldCopy = card({ state: "RUNNING", name: "Cup A" });
+    const loadShare: TournamentShareLoader = async () => ({ card: oldCopy, share: { leader: LEADER, matches: new Map() } });
+
+    const meta = await tournamentPageMetadata("42", (id) => `/suivre/tournois/${id}`, async () => ({ canManage: false }), async () => renamed, loadShare);
+    const image = (meta.openGraph as { images: { url: string; alt: string }[] }).images[0];
+
+    expect(image.url.startsWith(`/og/fr/tournament-42.png?v=${tournamentShareVersion(renamed, null)}.`)).toBe(true);
+    expect(image.alt).toBe("Aperçu du tournoi Cup B");
   });
 
   it("tournamentPageMetadata_shareUnavailable_versionFromPageCard", async () => {

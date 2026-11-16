@@ -9,6 +9,7 @@ import {
   tournamentShareVersion,
   tournamentShareVersionWithoutSummary,
   UNSETTLED_SHARE_VERSION_MS,
+  FINISHED_SHARE_VERSION_MS,
   type ShareSummarySource,
 } from "@/lib/shared/share-embeds";
 import { EMPTY_MAP_RULES } from "@/lib/shared/round-maps";
@@ -328,5 +329,24 @@ describe("tournamentShareVersionWithoutSummary", () => {
 
     expect(sameWindow).toBe(first);
     expect(nextWindow).not.toBe(first);
+  });
+
+  it("tournamentShareVersionWithoutSummary_teamFinished_stableForADay", () => {
+    const card = tournamentCard({ state: "FINISHED", participantType: "TEAM" });
+    const dayStart = Math.floor(NOW / FINISHED_SHARE_VERSION_MS) * FINISHED_SHARE_VERSION_MS;
+
+    const first = tournamentShareVersionWithoutSummary(card, dayStart);
+    const laterSameDay = tournamentShareVersionWithoutSummary(card, dayStart + 6 * UNSETTLED_SHARE_VERSION_MS);
+    const nextDay = tournamentShareVersionWithoutSummary(card, dayStart + FINISHED_SHARE_VERSION_MS);
+
+    expect(laterSameDay).toBe(first);
+    expect(nextDay).not.toBe(first);
+    expect(first.startsWith(`${tournamentShareVersion(card, null)}.`)).toBe(true);
+  });
+
+  it("tournamentShareVersionWithoutSummary_soloFinished_exactVersion", () => {
+    const card = tournamentCard({ state: "FINISHED", participantType: "SOLO" });
+
+    expect(tournamentShareVersionWithoutSummary(card, NOW)).toBe(tournamentShareVersion(card, null));
   });
 });
