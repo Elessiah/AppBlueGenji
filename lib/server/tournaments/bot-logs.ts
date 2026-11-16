@@ -895,7 +895,7 @@ export function dropQueuedRefereeAlerts(connection: PoolConnection, matchId: num
         entry.matchId === matchId
       ),
   );
-  if (kept.length !== queue.length) pending.set(connection, kept);
+  if (kept.length !== queue.length) queue.splice(0, queue.length, ...kept);
 }
 
 /**
