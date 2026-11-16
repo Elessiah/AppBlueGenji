@@ -1342,8 +1342,14 @@ export function schedulePurgeExpiredReports(now: number = Date.now()): void {
   void purgeDueQuarantines()
     .catch((error) => console.error("[moderation] purge des logos en quarantaine impossible", failureReason(error)))
     .then(() => purgeExpiredReports())
-    .catch((error) => console.error("[reports] purge impossible", failureReason(error)))
     // Et, une fois l'heure, les décisions closes dont le signalement est déjà
-    // parti (passe en échec, ou parti avant D87), même sans signalement purgé.
-    .then(() => purgeClosedQuarantinesSafely());
+    // parti (passe en échec, ou parti avant D87), même sans signalement purgé :
+    // sauf si `purgeExpiredReports` vient d'en balayer, une seule fois suffit.
+    .then(
+      (deleted) => (deleted > 0 ? undefined : purgeClosedQuarantinesSafely()),
+      (error) => {
+        console.error("[reports] purge impossible", failureReason(error));
+        return purgeClosedQuarantinesSafely();
+      },
+    );
 }

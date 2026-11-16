@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { listViewerMatchLaunches, loadViewerMatchContacts, shownName } from "@/lib/server/tournaments/match-launch-info";
+import { listViewerMatchLaunches, loadMemberships, loadViewerMatchContacts, shownName } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import * as castNotices from "@/lib/server/tournaments/cast-notices";
 import { isUnsettled } from "@/lib/server/tournaments/lock-wait";
@@ -1848,5 +1848,41 @@ describe("listViewerMatchLaunches — noms nettoyés des fiches de contact", () 
     expect(info.team2.name).toBe("Bravo");
     expect(info.team1.contacts[0]?.pseudo).toBe("Capitaine");
     expect(info.casters[0]?.pseudo).toBe("Voix");
+  });
+});
+
+describe("loadMemberships — listes bornées (EF-65)", () => {
+  it("loadMemberships_noTeamOrNoUser_noQuery", async () => {
+    const execute = jest.fn(async () => [[], []]);
+
+    await expect(loadMemberships(fakeConnection({ execute }), new Set(), new Set([1]))).resolves.toEqual(new Set());
+    await expect(loadMemberships(fakeConnection({ execute }), new Set([1]), new Set())).resolves.toEqual(new Set());
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("loadMemberships_smallLists_oneQueryKeysTeamAndUser", async () => {
+    const execute = jest.fn(async () => [[{ team_id: 4, user_id: 9 }], []]);
+
+    const found = await loadMemberships(fakeConnection({ execute }), new Set([4, 5]), new Set([9]));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(found).toEqual(new Set(["4:9"]));
+  });
+
+  it("loadMemberships_manyTeamsAndUsers_everyListChunkedAt500", async () => {
+    const lists: number[] = [];
+    const execute = jest.fn(async (_sql: string, params: unknown[] = []) => {
+      lists.push(params.length);
+      return [[], []];
+    });
+    const teams = new Set(Array.from({ length: 1_100 }, (_, index) => index + 1));
+    const users = new Set(Array.from({ length: 600 }, (_, index) => index + 1));
+
+    await loadMemberships(fakeConnection({ execute }), teams, users);
+
+    // 3 tranches d'équipes (500, 500, 100) × 2 de comptes (500, 100) : jamais plus de 1 000 paramètres.
+    expect(execute).toHaveBeenCalledTimes(6);
+    expect(Math.max(...lists)).toBeLessThanOrEqual(1_000);
   });
 });

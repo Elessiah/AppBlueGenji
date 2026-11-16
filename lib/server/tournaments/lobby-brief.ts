@@ -72,7 +72,7 @@ import {
 } from "@/lib/server/notify";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
-import { mapInBatches } from "@/lib/shared/in-batches";
+import { createLimiter } from "@/lib/shared/in-batches";
 import { LOBBY_BRIEF_LEAD_MINUTES, type LobbyBriefKickoff, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { LOCALES, type Locale } from "@/lib/shared/locales";
 import type { PushContent } from "@/lib/shared/push-notifications";
@@ -1046,7 +1046,11 @@ async function runLobbyBriefSweep(): Promise<number> {
   // autres ; ses réservations sont les siennes (par match et par côté), et le
   // bilan se lit ensuite dans l'ordre des matchs. `briefMatch` ne lève jamais.
   const context: SweepContext = { managers, recipients, briefSides };
-  const briefs = await mapInBatches(rows, LOBBY_BRIEF_CONCURRENCY, (row) => briefMatch(db, row, context));
+  // Borne glissante (`createLimiter`), non des lots fixes : un bot lent sur un
+  // match ne retient pas les suivants, `LOBBY_BRIEF_CONCURRENCY` restent en
+  // cours tant qu'il en reste à briefer.
+  const slot = createLimiter(LOBBY_BRIEF_CONCURRENCY);
+  const briefs = await Promise.all(rows.map((row) => slot(() => briefMatch(db, row, context))));
   for (const [index, row] of rows.entries()) {
     const brief = briefs[index];
     sent += brief.sent;

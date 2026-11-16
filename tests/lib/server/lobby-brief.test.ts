@@ -785,6 +785,27 @@ describe("dispatchLobbyBriefs", () => {
     expect(sent).toBe(4);
   });
 
+  it("dispatchLobbyBriefs_slowFirstMatch_thirdMatchStartsWhenSecondFinishes", async () => {
+    // Borne glissante, non lots fixes : le match 42 n'attend pas la fin du lent 40.
+    mockDb([MATCH, { ...MATCH, id: 41 }, { ...MATCH, id: 42 }]);
+    let slowPending = false;
+    let thirdStartedWhileSlowPending = false;
+    jest.mocked(notifyUsers).mockImplementation(async (_recipients, notification) => {
+      const dm = renderDm(notification.discord!.message, "fr");
+      if (dm.includes("/matchs/42")) thirdStartedWhileSlowPending ||= slowPending;
+      if (dm.includes("/matchs/40") && !slowPending) {
+        slowPending = true;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        slowPending = false;
+      }
+      return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
+    });
+
+    await dispatchLobbyBriefs();
+
+    expect(thirdStartedWhileSlowPending).toBe(true);
+  });
+
   it("dispatchLobbyBriefs_manyMatches_neverMoreThanConcurrencyInFlight", async () => {
     mockDb([MATCH, { ...MATCH, id: 41 }, { ...MATCH, id: 42 }, { ...MATCH, id: 43 }]);
     let inFlight = 0;

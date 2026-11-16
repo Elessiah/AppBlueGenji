@@ -356,10 +356,10 @@ JavaScript bloqué) montre donc chaque nom en lien, jusqu'à la réponse
 de D86. Tant que la réponse n'est pas là (ou en panne), le nom reste un lien ; un
 compte affiché est redemandé à la navigation client au plus une fois par
 minute (`PROFILELESS_REFRESH_MS`) ; après un échec (hors ligne, 429, 503), une
-minuterie redemande d'elle-même tant que le compte reste affiché (15 s,
+minuterie unique (réarmée sur le prochain essai dû, annulée quand plus aucun lien n'est affiché) redemande d'elle-même tant que le compte reste affiché (15 s,
 doublé à chaque échec de suite, plafonné à 2 min : une page de direct reste
 ouverte sans navigation), et une question sans réponse est coupée au bout de
-10 s (`PROFILELESS_TIMEOUT_MS`). Seuls des identifiants entiers positifs sont
+10 s (`PROFILELESS_TIMEOUT_MS`). Les questions partent par salves de 4 paquets au plus (`PROFILELESS_CHUNKS_PER_BURST`), dix secondes entre deux (`PROFILELESS_BURST_GAP_MS`), sous la borne de 30 par minute ; un compte retiré de l'écran avant son tour n'est pas demandé. Seuls des identifiants entiers positifs sont
 posés (un seul invalide ferait refuser le paquet entier). Les réponses d'un
 compte qui n'est plus affiché sont oubliées une fenêtre plus tard. Au pire,
 un lien mène à la page introuvable. Le passage de lien à texte au premier

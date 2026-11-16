@@ -35,10 +35,21 @@ const registry = new Set<WeakMap<PoolConnection, unknown>>();
 /**
  * Efface, pour cette connexion, l'état de **toutes** les files créées ici —
  * appelée en fin de `flushBotLogs` (après que chaque file a pris le sien) et de
- * `discardBotLogs` : rien ne reste sur une connexion rendue au pool.
+ * `discardBotLogs` : rien ne reste sur une connexion rendue au pool. Une file
+ * qui y est encore garnie est signalée au journal (`console.error`) : l'oubli
+ * de branchement se voit, il ne se perd pas en silence.
  */
 export function clearTransactionStates(connection: PoolConnection): void {
-  for (const states of registry) states.delete(connection);
+  let forgotten = 0;
+  for (const states of registry) {
+    if (states.delete(connection)) forgotten += 1;
+  }
+  // Le filet rattrape un oubli, il ne le tait pas : une file encore garnie ici
+  // n'a été ni vidée ni jetée par son module, un branchement manque dans
+  // `flushBotLogs` / `discardBotLogs` — au journal, pas en silence.
+  if (forgotten > 0) {
+    console.error(`[transaction-state] ${forgotten} file(s) après commit non branchée(s) à flushBotLogs / discardBotLogs, état jeté`);
+  }
 }
 
 /**

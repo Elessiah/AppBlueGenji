@@ -1592,6 +1592,40 @@ describe("purgeClosedQuarantines (D87)", () => {
     expect(sql).not.toMatch(/HIDDEN/);
   });
 
+  it("purgeClosedQuarantines_candidateRead_isBoundedByLimit", async () => {
+    const { poolExecute } = closedPool([], []);
+
+    await purgeClosedQuarantines();
+
+    expect(poolExecute.mock.calls[0][0]).toMatch(/ORDER BY id LIMIT 500/);
+  });
+
+  it("purgeClosedQuarantines_backlogOverOneSlice_readsSliceBySliceUntilShort", async () => {
+    const full = Array.from({ length: 500 }, (_, index) => index + 1);
+    const { poolExecute, tx } = closedPool([], []);
+    poolExecute
+      .mockResolvedValueOnce([full.map((id) => ({ id }))])
+      .mockResolvedValueOnce([[{ id: 501 }, { id: 502 }]]);
+    tx.execute.mockImplementation(async (sql, params) => {
+      if (/FOR UPDATE/.test(sql)) return [(params as number[]).filter((id) => id <= 502).map((id) => ({ id }))];
+      return [{ affectedRows: (params as number[]).length }];
+    });
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(502);
+
+    expect(poolExecute).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeClosedQuarantines_fullSliceNothingDeleted_stopsInsteadOfLooping", async () => {
+    const full = Array.from({ length: 500 }, (_, index) => ({ id: index + 1 }));
+    const { poolExecute } = closedPool([], []);
+    poolExecute.mockResolvedValue([full]);
+
+    await expect(purgeClosedQuarantines()).resolves.toBe(0);
+
+    expect(poolExecute).toHaveBeenCalledTimes(1);
+  });
+
   it("purgeClosedQuarantines_lockingRead_noJoinNorReportTable", async () => {
     const { tx } = closedPool([4], [4]);
 

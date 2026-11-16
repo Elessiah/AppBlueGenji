@@ -925,7 +925,7 @@ function holdsReleasableCasters(row: LaunchMatchRow): boolean {
 async function loadMaintenanceCastBlocks(
   connection: PoolConnection,
   rows: readonly LaunchMatchRow[],
-): Promise<Map<number, CastBlock | null>> {
+): Promise<Map<TournamentGame, Map<number, CastBlock | null>>> {
   const idsByGame = new Map<TournamentGame, number[]>();
   for (const row of rows) {
     if (!holdsReleasableCasters(row)) continue;
@@ -933,10 +933,9 @@ async function loadMaintenanceCastBlocks(
     ids.push(...row.casters.map((caster) => caster.userId));
     idsByGame.set(row.tournament_game, ids);
   }
-  const blocks = new Map<number, CastBlock | null>();
-  for (const [game, ids] of idsByGame) {
-    for (const [id, block] of await loadCastBlocks(connection, ids, game, true)) blocks.set(id, block);
-  }
+  // Par jeu : la condition du cast d'un même compte diffère d'un jeu à l'autre.
+  const blocks = new Map<TournamentGame, Map<number, CastBlock | null>>();
+  for (const [game, ids] of idsByGame) blocks.set(game, await loadCastBlocks(connection, ids, game, true));
   return blocks;
 }
 
@@ -968,14 +967,13 @@ async function releaseIneligibleCasters(
   known?: ReadonlyMap<number, CastBlock | null>,
 ): Promise<boolean> {
   if (!holdsReleasableCasters(row)) return false;
-  const blocks =
-    known ??
-    (await loadCastBlocks(
-      connection,
-      row.casters.map((caster) => caster.userId),
-      row.tournament_game,
-      currentRead,
-    ));
+  // Un caster absent de `known` (inscrit après sa lecture) se relit : jamais
+  // retiré faute d'avoir été lu.
+  const unread = row.casters.filter((caster) => known?.has(caster.userId) !== true).map((caster) => caster.userId);
+  const blocks = new Map(known);
+  if (unread.length > 0) {
+    for (const [id, block] of await loadCastBlocks(connection, unread, row.tournament_game, currentRead)) blocks.set(id, block);
+  }
   const leaving = row.casters.filter((caster) => blocks.get(caster.userId) !== null);
   if (leaving.length === 0) return false;
   await connection.execute(
@@ -1553,7 +1551,7 @@ export async function maintainMatchLaunches(
     // et le lien du stream) ne comptent un caster devenu inéligible.
     // Un retrait change ce que voient les lecteurs : il compte comme un
     // changement à publier, même sans lancement.
-    const released = await releaseIneligibleCasters(connection, row, true, castBlocks);
+    const released = await releaseIneligibleCasters(connection, row, true, castBlocks.get(row.tournament_game));
     // Un caster retiré emporte son lien de l'accueil et de #live : l'appelant
     // qui publie le dit (`landingLive`).
     if (report && (adopted || released)) report.castReleased = true;

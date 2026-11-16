@@ -79,6 +79,31 @@ describe("clearTransactionStates", () => {
     expect(second.peek(connection)).toBeUndefined();
     expect(first.peek(other)).toEqual([3]);
   });
+
+  it("clearTransactionStates_queueStillFilled_reportsTheWiringGap", () => {
+    const forgotten = createTransactionState<number[]>(() => []);
+    const connection = fakeConnection({});
+    forgotten.ensure(connection).push(1);
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    clearTransactionStates(connection);
+
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining("non branchée"));
+    errors.mockRestore();
+  });
+
+  it("clearTransactionStates_everyQueueTaken_staysSilent", () => {
+    const states = createTransactionState<number[]>(() => []);
+    const connection = fakeConnection({});
+    states.ensure(connection).push(1);
+    states.take(connection);
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    clearTransactionStates(connection);
+
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
 });
 
 /** Sources TypeScript de `lib/`, chemin relatif en `/`. */

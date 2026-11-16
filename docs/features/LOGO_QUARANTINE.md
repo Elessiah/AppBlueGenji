@@ -141,7 +141,7 @@ passe en échec, lignes antérieures à D87), `purgeClosedQuarantines`
 efface celles dont le signalement n'est plus là (`report_id` mis à `NULL` par
 la clé étrangère, ou signalement absent d'une base ancienne). Toute ligne naît
 d'un signalement : sans lui, plus rien ne se conteste. Dans la même transaction
-(par lots de 500, lignes reverrouillées sans jointure), les empreintes qu'une
+(tranches de 500 lues avec `LIMIT`, jusqu'à une tranche courte : un arriéré ne se charge pas d'un coup ; lignes reverrouillées sans jointure), les empreintes qu'une
 suppression **a bloquées** (`PURGED`, `hash_blocked = 1`) sont figées **non
 levables** (`pinClosedQuarantineHashesOn`), comme à l'effacement d'un compte
 (`pinAccountBlockedHashesOn`) : sans la ligne, plus rien ne justifierait de

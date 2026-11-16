@@ -5,6 +5,8 @@ jest.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import {
   createProfilelessStore,
   fetchProfilelessIds,
+  PROFILELESS_BURST_GAP_MS,
+  PROFILELESS_CHUNKS_PER_BURST,
   PROFILELESS_REFRESH_MS,
   PROFILELESS_RETRY_MAX_MS,
   PROFILELESS_RETRY_MS,
@@ -254,6 +256,81 @@ describe("createProfilelessStore", () => {
     profileless.refreshStale();
 
     expect(profileless.isProfileless(8)).toBe(false);
+  });
+});
+
+describe("createProfilelessStore : reprises et salves", () => {
+  it("retry_idsWithDifferentBackoffs_eachRetriedWhenDue", async () => {
+    // A échoue une fois (15 s), B a déjà échoué deux fois (30 s) : B n'est pas oublié.
+    fetchIds.mockResolvedValue(null);
+    const profileless = store();
+    profileless.watch(2);
+    await flush();
+    clock += PROFILELESS_RETRY_MAX_MS;
+    await flush();
+    await flush();
+    profileless.watch(1);
+    await flush();
+    const callsBefore = fetchIds.mock.calls.length;
+
+    clock += PROFILELESS_RETRY_MS;
+    await flush();
+    await flush();
+    const afterFirstDelay = fetchIds.mock.calls.slice(callsBefore).flat(2);
+    expect(afterFirstDelay).toContain(1);
+    expect(afterFirstDelay).not.toContain(2);
+
+    clock += PROFILELESS_RETRY_MAX_MS;
+    await flush();
+    await flush();
+    expect(fetchIds.mock.calls.slice(callsBefore).flat(2)).toContain(2);
+  });
+
+  it("retry_lastLinkRemoved_timerCancelled", async () => {
+    fetchIds.mockResolvedValueOnce(null);
+    const cancel = jest.fn();
+    const profileless = createProfilelessStore({
+      lookup: true,
+      fetchIds,
+      now: () => clock,
+      schedule: (run, ms) => {
+        delays.push(ms);
+        scheduled.push(run);
+        return cancel;
+      },
+    });
+    const release = profileless.watch(3);
+    await flush();
+    expect(delays).toContain(PROFILELESS_RETRY_MS);
+
+    release();
+
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it("flush_manyChunks_sentInPacedBursts", async () => {
+    const profileless = store();
+    const total = PROFILELESS_CHUNKS_PER_BURST * 100 + 120;
+
+    for (let id = 1; id <= total; id += 1) profileless.watch(id);
+    await flush();
+
+    expect(fetchIds).toHaveBeenCalledTimes(PROFILELESS_CHUNKS_PER_BURST);
+    expect(delays).toContain(PROFILELESS_BURST_GAP_MS);
+
+    await flush();
+
+    expect(fetchIds).toHaveBeenCalledTimes(PROFILELESS_CHUNKS_PER_BURST + 2);
+  });
+
+  it("flush_idUnshownBeforeItsBurst_notAsked", async () => {
+    const profileless = store();
+    const release = profileless.watch(5);
+    release();
+
+    await flush();
+
+    expect(fetchIds).not.toHaveBeenCalled();
   });
 });
 

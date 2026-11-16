@@ -787,7 +787,13 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         // `HAVING`, ligne à ligne : une condition du `WHERE` sur `t` changerait
         // la jointure externe en jointure interne, que l'optimiseur réordonne.
         // Un tournoi absent ou pas encore publié (`NULL <= NOW()` faux) écarte
-        // la ligne, comme l'ancienne jointure interne.
+        // la ligne, comme l'ancienne jointure interne. Le coût : le parcours de
+        // l'index ne s'arrête qu'après `LIMIT` lignes **visibles**, et chaque
+        // ligne d'un tournoi non publié (tests, brouillons) compte trois
+        // lectures par clé primaire en plus — borné par la taille de ces
+        // matchs récents (un tournoi se publie avant d'être joué), et le
+        // résultat se met en cache (`TICKER_RESULTS.md`) : accepté, pas de
+        // retour à la jointure interne qui ramène le tri temporaire.
         connection.execute<MatchResultRow[]>(
           `SELECT
             m.updated_at,

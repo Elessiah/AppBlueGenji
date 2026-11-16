@@ -22,6 +22,7 @@
  * Voir `docs/features/MATCH_LAUNCH.md`.
  */
 import { failureDiagnostic } from "@/lib/server/failure-reason";
+import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { battletagFromBlizzard } from "@/lib/server/battletag-origin";
@@ -565,24 +566,30 @@ function membershipKey(teamId: number, userId: number): string {
  * Appartenance en cours de ces comptes à ces équipes, comptes supprimés exclus
  * (même règle que `loadRosters`), en une lecture bornée aux comptes cherchés.
  */
-async function loadMemberships(
+export async function loadMemberships(
   connection: Pick<PoolConnection, "execute">,
   teamIds: ReadonlySet<number>,
   userIds: ReadonlySet<number>,
 ): Promise<Set<string>> {
-  if (teamIds.size === 0 || userIds.size === 0) return new Set();
-  const teams = [...teamIds];
-  const users = [...userIds];
-  const [rows] = await connection.execute<(RowDataPacket & { team_id: number; user_id: number })[]>(
-    `SELECT tm.team_id, tm.user_id
-     FROM bg_team_members tm
-     JOIN bg_users u ON u.id = tm.user_id
-     WHERE tm.team_id IN (${teams.map(() => "?").join(", ")})
-       AND tm.user_id IN (${users.map(() => "?").join(", ")})
-       AND tm.left_at IS NULL AND u.is_deleted = 0`,
-    [...teams, ...users],
-  );
-  return new Set(rows.map((row) => membershipKey(Number(row.team_id), Number(row.user_id))));
+  const memberships = new Set<string>();
+  if (teamIds.size === 0 || userIds.size === 0) return memberships;
+  // Les deux listes croissent avec le nombre de matchs lus : chacune se lit
+  // par tranches (`chunkIds`), jamais en une liste `IN` sans borne.
+  for (const teams of chunkIds([...teamIds])) {
+    for (const users of chunkIds([...userIds])) {
+      const [rows] = await connection.execute<(RowDataPacket & { team_id: number; user_id: number })[]>(
+        `SELECT tm.team_id, tm.user_id
+         FROM bg_team_members tm
+         JOIN bg_users u ON u.id = tm.user_id
+         WHERE tm.team_id IN (${sqlPlaceholders(teams.length)})
+           AND tm.user_id IN (${sqlPlaceholders(users.length)})
+           AND tm.left_at IS NULL AND u.is_deleted = 0`,
+        [...teams, ...users],
+      );
+      for (const row of rows) memberships.add(membershipKey(Number(row.team_id), Number(row.user_id)));
+    }
+  }
+  return memberships;
 }
 
 /** Rosters en cours des équipes, comptes supprimés exclus (aussi lus par `certification-prompt.ts`). */

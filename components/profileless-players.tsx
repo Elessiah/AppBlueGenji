@@ -51,6 +51,16 @@ export function isLookupId(userId: unknown): userId is number {
 /** Regroupement des comptes inscrits par un même rendu en une seule question. */
 export const PROFILELESS_BATCH_MS = 50;
 
+/**
+ * Questions envoyées d'un coup, au plus : la route compte 30 questions par
+ * minute (`PROFILELESS_LOOKUP_RULE`), et un affichage de milliers de joueurs
+ * (classement, annuaire) ne doit pas la vider en une salve. Le reste attend.
+ */
+export const PROFILELESS_CHUNKS_PER_BURST = 4;
+
+/** Attente entre deux salves : quatre questions par dix secondes, soit 24 par minute, sous la borne. */
+export const PROFILELESS_BURST_GAP_MS = 10_000;
+
 /** Les ids d'une réponse de `/api/players/profileless`, ou `null` si elle n'en porte pas. */
 export function parseProfilelessIds(body: unknown): number[] | null {
   if (typeof body !== "object" || body === null) return null;
@@ -94,7 +104,8 @@ type StoreOptions = {
   lookup: boolean;
   fetchIds?: (ids: readonly number[]) => Promise<number[] | null>;
   now?: () => number;
-  schedule?: (run: () => void, ms: number) => void;
+  /** Lance `run` dans `ms` ; rend, si possible, de quoi l'annuler. */
+  schedule?: (run: () => void, ms: number) => (() => void) | void;
 };
 
 /** Crée la mémoire des réponses d'une page (une par fournisseur). */
@@ -104,7 +115,8 @@ export function createProfilelessStore({
   fetchIds = fetchProfilelessIds,
   now = Date.now,
   schedule = (run, ms) => {
-    setTimeout(run, ms);
+    const timer = setTimeout(run, ms);
+    return () => clearTimeout(timer);
   },
 }: StoreOptions): ProfilelessStore {
   const seeded = new Set(seed);
@@ -117,6 +129,10 @@ export function createProfilelessStore({
   const inFlight = new Set<number>();
   const listeners = new Set<() => void>();
   let flushArmed = false;
+  /** Minuterie de reprise (une seule pour la mémoire) : quand, de quoi l'annuler, et sa génération. */
+  let retryAt = Number.POSITIVE_INFINITY;
+  let cancelRetry: (() => void) | undefined;
+  let retryGeneration = 0;
 
   const wait = (userId: number): number => {
     const count = failures.get(userId);
@@ -133,12 +149,10 @@ export function createProfilelessStore({
 
   const settle = (chunk: readonly number[], profileless: number[] | null) => {
     let changed = false;
-    const retryIds: number[] = [];
     for (const userId of chunk) {
       inFlight.delete(userId);
       if (profileless === null) {
         failures.set(userId, (failures.get(userId) ?? 0) + 1);
-        retryIds.push(userId);
         continue;
       }
       failures.delete(userId);
@@ -147,22 +161,20 @@ export function createProfilelessStore({
       answers.set(userId, next);
     }
     // Un échec se redemande de lui-même, tant que le compte est affiché.
-    if (retryIds.length > 0) {
-      schedule(() => {
-        for (const userId of retryIds) if (shown.has(userId)) ask(userId);
-      }, Math.min(...retryIds.map(wait)));
-    }
+    if (profileless === null) armRetry();
     // Rien de changé : les liens ne se re-rendent pas.
     if (changed) for (const listener of listeners) listener();
   };
 
   const flush = () => {
     flushArmed = false;
-    const ids = [...queued];
+    // Un compte qui n'est plus affiché n'est plus demandé.
+    const ids = [...queued].filter((userId) => shown.has(userId));
     queued.clear();
-    for (let start = 0; start < ids.length; start += PROFILELESS_LOOKUP_MAX) {
-      const chunk = ids.slice(start, start + PROFILELESS_LOOKUP_MAX);
-      const at = now();
+    const at = now();
+    const sent = ids.slice(0, PROFILELESS_CHUNKS_PER_BURST * PROFILELESS_LOOKUP_MAX);
+    for (let start = 0; start < sent.length; start += PROFILELESS_LOOKUP_MAX) {
+      const chunk = sent.slice(start, start + PROFILELESS_LOOKUP_MAX);
       for (const userId of chunk) {
         inFlight.add(userId);
         // La fenêtre est prise avant l'envoi : jamais deux questions en vol.
@@ -173,6 +185,48 @@ export function createProfilelessStore({
         () => settle(chunk, null),
       );
     }
+    // Le reste part à la salve suivante, sous la borne de la route.
+    for (const userId of ids.slice(sent.length)) queued.add(userId);
+    if (queued.size > 0) {
+      flushArmed = true;
+      schedule(flush, PROFILELESS_BURST_GAP_MS);
+    }
+  };
+
+  /**
+   * Arme la minuterie de reprise sur le prochain essai dû parmi les comptes
+   * affichés en échec : une seule pour la mémoire, réarmée après chaque
+   * passage — un compte dont l'attente est plus longue que celle des autres
+   * n'est pas oublié.
+   */
+  const armRetry = () => {
+    let soonest = Number.POSITIVE_INFINITY;
+    for (const userId of shown.keys()) {
+      if (!failures.has(userId) || inFlight.has(userId) || queued.has(userId)) continue;
+      soonest = Math.min(soonest, (askedAt.get(userId) ?? now()) + wait(userId));
+    }
+    if (soonest >= retryAt) return;
+    cancelRetry?.();
+    retryAt = soonest;
+    retryGeneration += 1;
+    const generation = retryGeneration;
+    cancelRetry =
+      schedule(() => {
+        // Annulée ou remplacée entre-temps : rien à faire.
+        if (generation !== retryGeneration) return;
+        retryAt = Number.POSITIVE_INFINITY;
+        cancelRetry = undefined;
+        for (const userId of shown.keys()) ask(userId);
+        armRetry();
+      }, Math.max(soonest - now(), 0)) ?? undefined;
+  };
+
+  /** Plus aucun lien : la reprise n'a plus d'objet. */
+  const stopRetry = () => {
+    retryGeneration += 1;
+    cancelRetry?.();
+    cancelRetry = undefined;
+    retryAt = Number.POSITIVE_INFINITY;
   };
 
   const ask = (userId: number) => {
@@ -193,10 +247,12 @@ export function createProfilelessStore({
     watch(userId) {
       shown.set(userId, (shown.get(userId) ?? 0) + 1);
       ask(userId);
+      armRetry();
       return () => {
         const count = (shown.get(userId) ?? 1) - 1;
         if (count > 0) shown.set(userId, count);
         else shown.delete(userId);
+        if (shown.size === 0) stopRetry();
       };
     },
     refreshStale() {
@@ -209,6 +265,7 @@ export function createProfilelessStore({
         failures.delete(userId);
       }
       for (const userId of shown.keys()) ask(userId);
+      armRetry();
     },
   };
 }

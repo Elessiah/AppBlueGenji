@@ -154,7 +154,9 @@ retirées, validations d'office, casters et arbitres retirés d'office — suive
 (`createTransactionState`, `lib/server/tournaments/transaction-state.ts`) et
 `flushBotLogs` / `discardBotLogs` les vident ou les jettent. Une file de plus
 s'y branche dans la même PR ; `tests/lib/server/transaction-state.test.ts`
-refuse une file non branchée et toute `WeakMap<PoolConnection, …>` écrite à la main.
+refuse une file non branchée et toute `WeakMap<PoolConnection, …>` écrite à la main ;
+`clearTransactionStates` (filet de fin de vidage) **journalise** (`console.error`) toute
+file encore garnie qu'il jette : un oubli de branchement se lit dans pm2.
 
 ```ts
 try {

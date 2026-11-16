@@ -136,7 +136,7 @@ publication du tournoi (`start_visibility_at <= NOW()`) se juge au `HAVING`. Une
 condition sur `bg_tournaments` dans le `WHERE` rendait la jointure interne :
 MariaDB lisait alors le tournoi par plage, en jointure BNL, et triait le tout
 (« Using temporary; Using filesort », EXPLAIN de production du 2026-11-14 — D92).
-Plan attendu : `m` en `ref`/`range` sur l'index, parcours inverse, ni table
+Coût du `HAVING` : le parcours de l'index ne s'arrête qu'après `LIMIT` lignes visibles ; les matchs récents d'un tournoi non publié (tests, brouillons) y coûtent trois lectures par clé primaire chacun — accepté, le résultat est en cache. Plan attendu : `m` en `ref`/`range` sur l'index, parcours inverse, ni table
 temporaire ni tri (vérifié sous MySQL 8.0 ; à revérifier par `EXPLAIN` en
 production après déploiement).
 

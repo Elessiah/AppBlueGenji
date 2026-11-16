@@ -875,6 +875,32 @@ describe("conservation", () => {
     error.mockRestore();
   });
 
+  it("schedulePurgeExpiredReports_reportsDeleted_scansClosedQuarantinesOnce", async () => {
+    install([
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[{ id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) }]]],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 1 }]],
+    ]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(1);
+
+    schedulePurgeExpiredReports(800_000_000_000);
+    await flush();
+
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+  });
+
+  it("schedulePurgeExpiredReports_reportPurgeFails_stillPurgesClosedQuarantines", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => { throw new Error("DOWN"); }]]);
+    jest.mocked(purgeClosedQuarantines).mockResolvedValue(0);
+
+    schedulePurgeExpiredReports(850_000_000_000);
+    await flush();
+
+    expect(error).toHaveBeenCalledWith("[reports] purge impossible", expect.anything());
+    expect(purgeClosedQuarantines).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
   it("purge au plus une fois par heure, les logos échus avant les signalements", async () => {
     install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
     const start = 1_000_000_000_000;

@@ -1462,13 +1462,17 @@ const CLOSED_QUARANTINE_BATCH_SIZE = 500;
  */
 export async function purgeClosedQuarantines(): Promise<number> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_logo_quarantines WHERE ${CLOSED_ORPHAN_QUARANTINE_SQL}`,
-  );
-  const ids = rows.map((row) => Number(row.id));
   let deleted = 0;
-  for (let start = 0; start < ids.length; start += CLOSED_QUARANTINE_BATCH_SIZE) {
-    const batch = ids.slice(start, start + CLOSED_QUARANTINE_BATCH_SIZE);
+  // Une tranche à la fois (`LIMIT`) : un arriéré après une longue panne ne
+  // charge pas tous ses identifiants d'un coup. On s'arrête sur une tranche
+  // courte, ou qui n'a rien effacé (rien de plus à y gagner).
+  for (;;) {
+    const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_logo_quarantines WHERE ${CLOSED_ORPHAN_QUARANTINE_SQL} ORDER BY id LIMIT ${CLOSED_QUARANTINE_BATCH_SIZE}`,
+    );
+    const batch = rows.map((row) => Number(row.id));
+    if (batch.length === 0) break;
+    const before = deleted;
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -1497,6 +1501,7 @@ export async function purgeClosedQuarantines(): Promise<number> {
     } finally {
       connection.release();
     }
+    if (batch.length < CLOSED_QUARANTINE_BATCH_SIZE || deleted === before) break;
   }
   return deleted;
 }

@@ -282,7 +282,7 @@ resté ouvert après la fin devant encore être rendu).
   ne part de ce côté, rien à rendre, le balayage suivant le reprend), envoi,
   puis le côté suivant — un arrêt du processus
   ne laisse au plus qu'une réservation sans envoi par match en cours. Les matchs
-  sont briefés **deux à la fois** au plus (`LOBBY_BRIEF_CONCURRENCY`, `mapInBatches`) :
+  sont briefés **deux à la fois** au plus (`LOBBY_BRIEF_CONCURRENCY`, borne glissante `createLimiter` : un bot lent sur un match ne retient pas les suivants) :
   un bot lent sur un match ne retient pas tous les autres (ronde suisse ouverte d'un coup),
   sans qu'un balayage tiré par le trafic ne prenne plus de deux connexions du pool ni
   n'ouvre plus de deux rafales au bot ;
