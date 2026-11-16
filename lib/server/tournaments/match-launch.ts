@@ -911,6 +911,35 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
   return (await loadEligibleCasterIds(connection, holders, row.tournament_game, true)).size > 0;
 }
 
+/** Le match a-t-il des casters que la condition du cast pourrait retirer (ni lancé, ni joué) ? */
+function holdsReleasableCasters(row: LaunchMatchRow): boolean {
+  return row.casters.length > 0 && row.launched_at === null && row.status !== "COMPLETED";
+}
+
+/**
+ * La condition du cast des casters de tous les matchs verrouillés de
+ * l'entretien, en **une** lecture courante par jeu (`LOCK IN SHARE MODE`,
+ * comme `releaseIneligibleCasters` en `currentRead`) : un tournoi n'a qu'un
+ * jeu, donc une lecture `bg_users` par passe au lieu d'une par candidat.
+ */
+async function loadMaintenanceCastBlocks(
+  connection: PoolConnection,
+  rows: readonly LaunchMatchRow[],
+): Promise<Map<number, CastBlock | null>> {
+  const idsByGame = new Map<TournamentGame, number[]>();
+  for (const row of rows) {
+    if (!holdsReleasableCasters(row)) continue;
+    const ids = idsByGame.get(row.tournament_game) ?? [];
+    ids.push(...row.casters.map((caster) => caster.userId));
+    idsByGame.set(row.tournament_game, ids);
+  }
+  const blocks = new Map<number, CastBlock | null>();
+  for (const [game, ids] of idsByGame) {
+    for (const [id, block] of await loadCastBlocks(connection, ids, game, true)) blocks.set(id, block);
+  }
+  return blocks;
+}
+
 /**
  * Retire les inscriptions des casters qui ne remplissent plus la condition du
  * cast (`castEligibilityBlock`, relue en une lecture), avec les streams qu'ils
@@ -926,20 +955,27 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
  * permission retirée depuis l'instantané ne serait pas vue et le lancement
  * rendrait public le caster.
  *
+ * `known` : la condition déjà relue (même lecture courante) pour les casters
+ * de tous les candidats de l'entretien (`maintainMatchLaunches`) — une
+ * lecture `bg_users` par passe au lieu d'une par match.
+ *
  * Rend `true` quand au moins un caster a été retiré.
  */
 async function releaseIneligibleCasters(
   connection: PoolConnection,
   row: LaunchMatchRow,
   currentRead = false,
+  known?: ReadonlyMap<number, CastBlock | null>,
 ): Promise<boolean> {
-  if (row.casters.length === 0 || row.launched_at !== null || row.status === "COMPLETED") return false;
-  const blocks = await loadCastBlocks(
-    connection,
-    row.casters.map((caster) => caster.userId),
-    row.tournament_game,
-    currentRead,
-  );
+  if (!holdsReleasableCasters(row)) return false;
+  const blocks =
+    known ??
+    (await loadCastBlocks(
+      connection,
+      row.casters.map((caster) => caster.userId),
+      row.tournament_game,
+      currentRead,
+    ));
   const leaving = row.casters.filter((caster) => blocks.get(caster.userId) !== null);
   if (leaving.length === 0) return false;
   await connection.execute(
@@ -1482,6 +1518,7 @@ export async function maintainMatchLaunches(
   const now = Date.now();
   let changed = 0;
   const undecided: NoRefereeCandidate[] = [];
+  const locked: { row: LaunchMatchRow; stale: boolean; adopted: boolean }[] = [];
   for (const candidate of rows) {
     // Les candidats sont parcourus par identifiant croissant (`ORDER BY`) : deux
     // entretiens du même tournoi — balayage passif et relève de la modale —
@@ -1502,11 +1539,21 @@ export async function maintainMatchLaunches(
     if (row?.status !== "READY" || !enteredLaunch(row, now)) continue;
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
     const adopted = await adoptCurrentPairing(connection, row);
+    locked.push({ row, stale, adopted });
+  }
+  // Tous les candidats sont verrouillés (par id croissant) : la condition du
+  // cast de leurs casters se relit en une fois, après les verrous des matchs
+  // — même ordre (match puis compte) que la lecture par match qu'elle remplace.
+  const castBlocks = await loadMaintenanceCastBlocks(
+    connection,
+    locked.map((entry) => entry.row),
+  );
+  for (const { row, stale, adopted } of locked) {
     // Ni le décompte des « Prêt » ni le lancement (qui rend publics le pseudo
     // et le lien du stream) ne comptent un caster devenu inéligible.
     // Un retrait change ce que voient les lecteurs : il compte comme un
     // changement à publier, même sans lancement.
-    const released = await releaseIneligibleCasters(connection, row, true);
+    const released = await releaseIneligibleCasters(connection, row, true, castBlocks);
     // Un caster retiré emporte son lien de l'accueil et de #live : l'appelant
     // qui publie le dit (`landingLive`).
     if (report && (adopted || released)) report.castReleased = true;
