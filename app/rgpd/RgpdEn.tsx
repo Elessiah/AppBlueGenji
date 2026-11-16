@@ -340,7 +340,7 @@ export function RgpdEn({
       </section>
 
       {/* SECTION 03 — HISTORY & ACHIEVEMENTS */}
-      <section className={styles.section}>
+      <section id="suppression-et-palmares" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 03</span>
@@ -385,7 +385,7 @@ export function RgpdEn({
             “Your rights”).
           </p>
         </div>
-        <div id="suppression-et-palmares" className={styles.highlight} style={{ marginTop: 20 }}>
+        <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>What this means in practice:</strong> statistics (number of tournaments played, scores,
           placements) are not erased when the account is deleted. On the other hand, everything that identifies
           the person is erased (Discord and game tags, login accounts, avatar, adulthood, roles — the only
@@ -737,7 +737,7 @@ export function RgpdEn({
               days after archiving — extended as long as a logo or avatar hidden or deleted on the basis of the report
               can still be contested by its team or player, and raised to {LOGO_QUARANTINE_MONTHS} calendar months
               after archiving for a copyright or moderation report sent from an account, so that its author can
-              contest the decision. A deleted account does not leave its username there. The decision taken on a logo or avatar (point 4: moderation member who took it, outcome of its challenge) goes with it once the image is restored or deleted.
+              contest the decision. A deleted account does not leave its username there. Once the logo or avatar is restored or deleted, the decision taken on it (point 4: moderation member who took it, outcome of its challenge) is erased with the report that prompted it, at the end of that report's retention period.
             </li>
           </ul>
 

@@ -28,11 +28,25 @@ import { formatProfilelessLookup, PROFILELESS_LOOKUP_MAX } from "@/lib/shared/pr
 export const PROFILELESS_REFRESH_MS = 60_000;
 
 /**
- * Délai avant de redemander après un échec (hors ligne, 429, 5xx) : plus court
- * qu'une fenêtre, mais jamais un essai par changement de page — un refus
- * (`DIRECTORY_READ_RULE`) que l'on martèlerait resterait déclenché.
+ * Délai avant de redemander après un premier échec (hors ligne, 429, 5xx) : plus
+ * court qu'une fenêtre, mais jamais un essai par changement de page — un refus
+ * (`PROFILELESS_LOOKUP_RULE`) que l'on martèlerait resterait déclenché. Une
+ * minuterie redemande d'elle-même (une page de direct reste ouverte des heures,
+ * sans navigation qui s'en charge) ; le délai double à chaque échec de suite,
+ * jusqu'à {@link PROFILELESS_RETRY_MAX_MS}.
  */
 export const PROFILELESS_RETRY_MS = 15_000;
+
+/** Plafond du délai entre deux essais après des échecs de suite. */
+export const PROFILELESS_RETRY_MAX_MS = 120_000;
+
+/** Durée au bout de laquelle une question restée sans réponse est tenue pour échouée. */
+export const PROFILELESS_TIMEOUT_MS = 10_000;
+
+/** Un identifiant de compte que la route accepte : entier positif sûr. */
+export function isLookupId(userId: unknown): userId is number {
+  return typeof userId === "number" && Number.isSafeInteger(userId) && userId > 0;
+}
 
 /** Regroupement des comptes inscrits par un même rendu en une seule question. */
 export const PROFILELESS_BATCH_MS = 50;
@@ -53,6 +67,8 @@ export async function fetchProfilelessIds(
   try {
     const response = await fetchImpl(`/api/players/profileless?ids=${formatProfilelessLookup(ids)}`, {
       cache: "no-store",
+      // Une connexion qui cale sans erreur ne garde pas ses comptes « en vol » à jamais.
+      signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(PROFILELESS_TIMEOUT_MS) : undefined,
     });
     return response.ok ? parseProfilelessIds(await response.json()) : null;
   } catch {
@@ -94,32 +110,47 @@ export function createProfilelessStore({
   const seeded = new Set(seed);
   const answers = new Map<number, boolean>(seed.map((id) => [id, true]));
   const askedAt = new Map<number, number>();
-  const failed = new Set<number>();
+  /** Échecs de suite par compte : l'essai suivant attend d'autant plus. */
+  const failures = new Map<number, number>();
   const shown = new Map<number, number>();
   const queued = new Set<number>();
   const inFlight = new Set<number>();
   const listeners = new Set<() => void>();
   let flushArmed = false;
 
+  const wait = (userId: number): number => {
+    const count = failures.get(userId);
+    if (count === undefined) return PROFILELESS_REFRESH_MS;
+    return Math.min(PROFILELESS_RETRY_MS * 2 ** (count - 1), PROFILELESS_RETRY_MAX_MS);
+  };
+
   const due = (userId: number): boolean => {
     if (seeded.has(userId) || queued.has(userId) || inFlight.has(userId)) return false;
     const at = askedAt.get(userId);
     if (at === undefined) return true;
-    return now() - at >= (failed.has(userId) ? PROFILELESS_RETRY_MS : PROFILELESS_REFRESH_MS);
+    return now() - at >= wait(userId);
   };
 
   const settle = (chunk: readonly number[], profileless: number[] | null) => {
     let changed = false;
+    const retryIds: number[] = [];
     for (const userId of chunk) {
       inFlight.delete(userId);
       if (profileless === null) {
-        failed.add(userId);
+        failures.set(userId, (failures.get(userId) ?? 0) + 1);
+        retryIds.push(userId);
         continue;
       }
-      failed.delete(userId);
+      failures.delete(userId);
       const next = profileless.includes(userId);
       if ((answers.get(userId) === true) !== next) changed = true;
       answers.set(userId, next);
+    }
+    // Un échec se redemande de lui-même, tant que le compte est affiché.
+    if (retryIds.length > 0) {
+      schedule(() => {
+        for (const userId of retryIds) if (shown.has(userId)) ask(userId);
+      }, Math.min(...retryIds.map(wait)));
     }
     // Rien de changé : les liens ne se re-rendent pas.
     if (changed) for (const listener of listeners) listener();
@@ -145,7 +176,7 @@ export function createProfilelessStore({
   };
 
   const ask = (userId: number) => {
-    if (!lookup || !due(userId)) return;
+    if (!lookup || !isLookupId(userId) || !due(userId)) return;
     queued.add(userId);
     if (flushArmed) return;
     flushArmed = true;
@@ -169,6 +200,14 @@ export function createProfilelessStore({
       };
     },
     refreshStale() {
+      // Une session d'une seule page dure des heures : ce qui n'est plus affiché
+      // et dont la réponse a vieilli est oublié (il serait redemandé de toute façon).
+      for (const [userId, at] of askedAt) {
+        if (shown.has(userId) || seeded.has(userId) || now() - at < PROFILELESS_REFRESH_MS) continue;
+        askedAt.delete(userId);
+        answers.delete(userId);
+        failures.delete(userId);
+      }
       for (const userId of shown.keys()) ask(userId);
     },
   };

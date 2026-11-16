@@ -1066,7 +1066,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   },
   "2026-11-suppression-du-compte-bons-passages": {
     linkLabels: ["Read when an account is erased completely", "Read what becomes of the player's page"],
-    title: "Account deletion: the right passages of the privacy page",
+    title: "Account deletion: links to the right sections of the privacy page",
     summary:
       "The information of November 4, 2026 on account deletion (upcoming solo registrations and the player's page) pointed to the note on connection data on the privacy page, not to the passages it announced. Here they are.",
     details: [

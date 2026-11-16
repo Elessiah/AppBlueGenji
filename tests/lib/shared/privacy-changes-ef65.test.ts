@@ -16,7 +16,7 @@ describe("D88 — renvoi de l'information du 4 novembre", () => {
     const source = readSource(path);
 
     expect(source).toContain('<p id="effacement-complet"');
-    expect(source).toContain('<div id="suppression-et-palmares"');
+    expect(source).toContain('<section id="suppression-et-palmares"');
   });
 
   it("privacyChanges_newEntry_linksToTheNewAnchors", () => {

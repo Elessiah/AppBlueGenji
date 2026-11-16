@@ -451,7 +451,7 @@ function RgpdFr({
       </section>
 
       {/* SECTION 03 — HISTORIQUE & PALMARÈS */}
-      <section className={styles.section}>
+      <section id="suppression-et-palmares" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 03</span>
@@ -501,7 +501,7 @@ function RgpdFr({
             Vous pouvez vous opposer à l&apos;affichage de votre pseudo (voir « Vos droits »).
           </p>
         </div>
-        <div id="suppression-et-palmares" className={styles.highlight} style={{ marginTop: 20 }}>
+        <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>Ce que cela signifie concrètement :</strong> les statistiques
           (nombre de tournois joués, scores, placements) ne sont pas effacées lors de
           la suppression du compte. En revanche, tout ce qui désigne la personne est effacé
@@ -908,7 +908,7 @@ function RgpdFr({
               qu&apos;un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être
               contesté par son équipe ou son joueur, et portée à {LOGO_QUARANTINE_MONTHS} mois civils
               après l&apos;archivage pour un signalement de droit d&apos;auteur ou de modération envoyé
-              depuis un compte, le temps que son auteur puisse contester la décision. Un compte supprimé n&apos;y laisse pas son pseudo. La décision prise sur un logo ou un avatar (point 4 : membre de la modération qui l&apos;a prise, issue de sa contestation) part avec lui une fois l&apos;image rétablie ou supprimée.
+              depuis un compte, le temps que son auteur puisse contester la décision. Un compte supprimé n&apos;y laisse pas son pseudo. Une fois le logo ou l&apos;avatar rétabli ou supprimé, la décision prise sur lui (point 4 : membre de la modération qui l&apos;a prise, issue de sa contestation) est effacée avec le signalement qui l&apos;a motivée, au terme de la durée de garde de celui-ci.
             </li>
           </ul>
 

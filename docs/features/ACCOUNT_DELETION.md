@@ -355,8 +355,16 @@ JavaScript bloqué) montre donc chaque nom en lien, jusqu'à la réponse
 (regroupée en 50 ms, `PROFILELESS_BATCH_MS`, plus un aller-retour) — compromis
 de D86. Tant que la réponse n'est pas là (ou en panne), le nom reste un lien ; un
 compte affiché est redemandé à la navigation client au plus une fois par
-minute (`PROFILELESS_REFRESH_MS`, 15 s après un échec) : au pire, un lien mène
-à la page introuvable.
+minute (`PROFILELESS_REFRESH_MS`) ; après un échec (hors ligne, 429, 503), une
+minuterie redemande d'elle-même tant que le compte reste affiché (15 s,
+doublé à chaque échec de suite, plafonné à 2 min : une page de direct reste
+ouverte sans navigation), et une question sans réponse est coupée au bout de
+10 s (`PROFILELESS_TIMEOUT_MS`). Seuls des identifiants entiers positifs sont
+posés (un seul invalide ferait refuser le paquet entier). Les réponses d'un
+compte qui n'est plus affiché sont oubliées une fenêtre plus tard. Au pire,
+un lien mène à la page introuvable. Le passage de lien à texte au premier
+affichage est le compromis de D86 : l'un et l'autre se lisent pareil au repos
+(`.entity-link` ne se distingue qu'au survol et au focus).
 
 ## Les comptes déjà supprimés
 

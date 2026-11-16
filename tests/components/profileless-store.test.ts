@@ -4,7 +4,9 @@ jest.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 import {
   createProfilelessStore,
+  fetchProfilelessIds,
   PROFILELESS_REFRESH_MS,
+  PROFILELESS_RETRY_MAX_MS,
   PROFILELESS_RETRY_MS,
   type ProfilelessStore,
 } from "@/components/profileless-players";
@@ -17,6 +19,7 @@ type FetchIds = (ids: readonly number[]) => Promise<number[] | null>;
 
 let clock = 0;
 let scheduled: (() => void)[] = [];
+let delays: number[] = [];
 let fetchIds: jest.Mock<FetchIds>;
 
 function store(options: { seed?: readonly number[]; lookup?: boolean } = {}): ProfilelessStore {
@@ -25,7 +28,8 @@ function store(options: { seed?: readonly number[]; lookup?: boolean } = {}): Pr
     lookup: options.lookup ?? true,
     fetchIds,
     now: () => clock,
-    schedule: (run) => {
+    schedule: (run, ms) => {
+      delays.push(ms);
       scheduled.push(run);
     },
   });
@@ -42,6 +46,7 @@ async function flush(): Promise<void> {
 beforeEach(() => {
   clock = 1_000_000;
   scheduled = [];
+  delays = [];
   fetchIds = jest.fn<FetchIds>(async () => []);
 });
 
@@ -183,5 +188,90 @@ describe("createProfilelessStore", () => {
     expect(profileless.isSeeded(5)).toBe(true);
     expect(profileless.isSeeded(6)).toBe(false);
     expect(fetchIds).not.toHaveBeenCalled();
+  });
+
+  it("watch_invalidIds_neverAsked", async () => {
+    const profileless = store();
+
+    for (const id of [0, -4, 2.5, Number.NaN, Number.MAX_SAFE_INTEGER + 2]) profileless.watch(id);
+    profileless.watch(3);
+    await flush();
+
+    expect(fetchIds).toHaveBeenCalledTimes(1);
+    expect(fetchIds).toHaveBeenCalledWith([3]);
+  });
+
+  it("settle_failure_retriesByItselfWhileShown", async () => {
+    fetchIds.mockResolvedValueOnce(null);
+    const profileless = store();
+    profileless.watch(3);
+    await flush();
+    expect(delays).toContain(PROFILELESS_RETRY_MS);
+
+    clock += PROFILELESS_RETRY_MS;
+    await flush();
+    await flush();
+
+    expect(fetchIds).toHaveBeenCalledTimes(2);
+  });
+
+  it("settle_failure_noRetryOnceUnshown", async () => {
+    fetchIds.mockResolvedValueOnce(null);
+    const profileless = store();
+    const release = profileless.watch(3);
+    await flush();
+    release();
+
+    clock += PROFILELESS_RETRY_MS;
+    await flush();
+
+    expect(fetchIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("settle_repeatedFailures_backoffDoublesUpToCap", async () => {
+    fetchIds.mockResolvedValue(null);
+    const profileless = store();
+    profileless.watch(3);
+    await flush();
+    for (let i = 0; i < 6; i++) {
+      clock += PROFILELESS_RETRY_MAX_MS;
+      await flush();
+      await flush();
+    }
+
+    expect(delays.filter((ms) => ms > 50).slice(0, 3)).toEqual([PROFILELESS_RETRY_MS, PROFILELESS_RETRY_MS * 2, PROFILELESS_RETRY_MS * 4]);
+    expect(Math.max(...delays.filter((ms) => ms > 50))).toBe(PROFILELESS_RETRY_MAX_MS);
+  });
+
+  it("refreshStale_unshownStaleAccount_forgotten", async () => {
+    fetchIds.mockResolvedValue([8]);
+    const profileless = store();
+    const release = profileless.watch(8);
+    await flush();
+    release();
+    clock += PROFILELESS_REFRESH_MS;
+
+    profileless.refreshStale();
+
+    expect(profileless.isProfileless(8)).toBe(false);
+  });
+});
+
+describe("fetchProfilelessIds", () => {
+  it("fetchProfilelessIds_request_carriesTimeoutSignal", async () => {
+    const fetchImpl = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ ids: [3] })));
+
+    const ids = await fetchProfilelessIds([3, 8], fetchImpl);
+
+    expect(ids).toEqual([3]);
+    expect(fetchImpl.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("fetchProfilelessIds_rejectedFetch_returnsNull", async () => {
+    const fetchImpl = jest.fn<typeof fetch>(async () => {
+      throw new Error("aborted");
+    });
+
+    expect(await fetchProfilelessIds([3], fetchImpl)).toBeNull();
   });
 });
