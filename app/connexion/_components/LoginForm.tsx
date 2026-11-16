@@ -108,6 +108,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Garde d'envoi synchrone : deux soumissions avant le rendu suivant (Entrée
+  // doublée) liraient encore `loading` à faux. Les boutons restent focalisables
+  // pendant l'envoi (`aria-disabled` + `aria-busy`, pas `disabled` natif).
+  const inFlight = useRef(false);
   /** Un refus du code qui se lève en rejoignant le serveur : le lien d'invitation s'affiche sous le champ. */
   const [inviteAfterRefusal, setInviteAfterRefusal] = useState(false);
   // Exposé d'une suspension à afficher : retour OAuth (cookie relu par la
@@ -214,6 +218,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setInviteAfterRefusal(false);
     setLoading(true);
@@ -240,12 +246,15 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       setInviteAfterRefusal(refusalNeedsServerInvite(errorCode(e)));
       showError((e as Error).message);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
 
   const verifyCode = async (event: FormEvent) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     fieldErrors.clear();
     setLoading(true);
     // Renvoi vers la réactivation : le formulaire reste fermé pendant la
@@ -293,7 +302,11 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
     } finally {
-      if (!leaving) setLoading(false);
+      // Renvoi vers la réactivation : la garde reste posée pendant la navigation.
+      if (!leaving) {
+        inFlight.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -417,7 +430,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
               <CyberButton
                 variant="ghost"
                 type="submit"
-                disabled={loading}
+                // Pendant l'envoi, focalisable et annoncé « occupé » : un refus
+                // (notification) se retente au clavier sans chercher le bouton.
+                aria-disabled={loading || undefined}
+                aria-busy={loading || undefined}
                 style={{ width: "100%" }}
               >
                 {loading ? t("page.sending") : t("page.requestCode")}
@@ -528,7 +544,10 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
               <CyberButton
                 variant="ghost"
                 type="submit"
-                disabled={loading}
+                // Pendant l'envoi, focalisable et annoncé « occupé » : un refus
+                // (notification) se retente au clavier sans chercher le bouton.
+                aria-disabled={loading || undefined}
+                aria-busy={loading || undefined}
                 style={{ width: "100%" }}
               >
                 {loading ? t("page.verifying") : t("page.submit")}

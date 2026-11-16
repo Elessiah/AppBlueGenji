@@ -89,6 +89,20 @@ describe("boutons en attente : aria-disabled, pas disabled", () => {
     expect(source).toContain("aria-disabled=");
   });
 
+  it("loginSubmitButtons_whileLoading_focusableAndBusy", () => {
+    const login = readSource("app/connexion/_components/LoginForm.tsx");
+    expect(login).not.toMatch(/(?<!aria-)disabled=\{loading\}/);
+    expect(login.match(/aria-disabled=\{loading \|\| undefined\}\s+aria-busy=\{loading \|\| undefined\}/g)).toHaveLength(2);
+  });
+
+  it("requestCodeAndVerifyCode_secondSubmitInFlight_ignored", () => {
+    const login = readSource("app/connexion/_components/LoginForm.tsx");
+    // Garde synchrone, posée avant tout envoi, rendue en fin d'envoi (sauf départ vers la réactivation).
+    expect(login.match(/event\.preventDefault\(\);\s+if \(inFlight\.current\) return;\s+inFlight\.current = true;/g)).toHaveLength(2);
+    expect(login).toMatch(/finally \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
+    expect(login).toMatch(/if \(!leaving\) \{\s+inFlight\.current = false;\s+setLoading\(false\);/);
+  });
+
   it("le profil (avatar, suppression du compte) garde le focus et garde le clic", () => {
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).not.toMatch(/(?<!aria-)disabled=\{(avatarBusy|accountDeletion\.deleting)\}/);
