@@ -763,7 +763,10 @@ const VOICE_RECHECK_MS = VOICE_RECHECK_MINUTES * 60_000;
  */
 const retryStamp = (): number => Date.now() - Math.max(VOICE_RECHECK_MS - VOICE_RECHECK_RETRY_MS, 0);
 
-/** Délai avant de redemander un salon dont la vérification a échoué sur le canal du bot. */
+/**
+ * Délai avant de redemander un salon dont la vérification a échoué (base en erreur). Un bot
+ * injoignable pose en plus l'attente `VOICE_BOT_BACKOFF_MS` (60 s), qui l'emporte alors.
+ */
 const VOICE_RECHECK_RETRY_MS = 10_000;
 /** Appels au bot en parallèle pendant la revérification : une passe ne s'éternise pas sur un bot lent. */
 const VOICE_RECHECK_CONCURRENCY = 5;

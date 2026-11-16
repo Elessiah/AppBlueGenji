@@ -43,11 +43,13 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   aucun canal bot → site n'existe (`BOT_INTEGRATION.md` : les appels vont toujours du site au
   bot), et aucun n'est créé. Sur `channelDelete`, le bot recrée **aussitôt** un salon suivi et pas
   encore rendu (même clé, même catégorie, le nom que portait le salon) ; l'ancien identifiant y mène encore, sans limite de durée,
-  pour le rendu et le vidage (mémoire du bot, 200 alias au plus, perdue à son redémarrage). Le site ne garde qu'une
+  pour le rendu et le vidage (mémoire du bot, 200 alias au plus — le plus ancien oublié au-delà —,
+  retirés quand le salon neuf cesse d'être suivi, perdue à son redémarrage). Le site ne garde qu'une
   **revérification de sécurité toutes les 5 minutes** (`VOICE_RECHECK_MINUTES`, décision D16 : par
   sondage, aucun signal du bot vers le site), qui lui apprend l'identifiant du salon neuf et
   rattrape ce que le bot a manqué (arrêté pendant la suppression, recréation en échec). Limite
-  connue : un rendu par l'ancien identifiant après un redémarrage du bot, dans ces 5 minutes,
+  connue : un rendu par l'ancien identifiant après un redémarrage du bot (ou l'oubli de son alias,
+  plus de 200 recréations plus tard), dans ces 5 minutes,
   clôt la ligne du site sans rendre le salon neuf, alors supprimé par le bot une fois vide
   48 h après sa création.
 
@@ -68,7 +70,7 @@ viennent du contexte du lecteur, servi par le flux comme par la lecture REST
   (`SWEEP_NEEDED_SQL`). Une bascule pendant une passe en demande une de plus
   (`dispatchMatchVoiceChannels(true)`), jouée à la fin de la passe en cours.
 - **Salon supprimé à la main** : recréé aussitôt par le bot (ci-dessus) ; les salons ouverts
-  des matchs dus sont redemandés au bot par leur clé environ une fois toutes les 5 minutes (par processus du site ; 10 s après une panne du bot) et
+  des matchs dus sont redemandés au bot par leur clé environ une fois toutes les 5 minutes (par processus du site ; environ 1 min — `VOICE_RETRY_SECONDS` — après une panne du bot) et
   par salon (`OPEN_DUE_CHANNELS_SQL`, `VOICE_RECHECK_MINUTES`) ; le bot rend le même, le neuf
   qu'il a recréé, ou un neuf s'il a disparu sans être recréé — jamais qui s'y trouve.
   Un match où entre une entrée solo ou une fantôme n'est plus revérifié (il est rendu).

@@ -2867,9 +2867,9 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   it("processingRegister_t18_recheckEveryFiveMinutesAndBotRecreatesFrAndEn", () => {
     const fr = t18().security.join(" ");
     const en = t18En().security.join(" ");
-    expect(fr).toContain("le redemander (environ une fois toutes les 5 minutes dès 15 minutes avant l'horaire du match");
+    expect(fr).toContain("le redemander (environ une fois toutes les 5 minutes, de 15 minutes avant l'horaire du match à 24 heures après");
     expect(fr).toContain("un salon supprimé par la modération, pas encore rendu, est recréé aussitôt par le bot lui-même, sans appel au site");
-    expect(en).toContain("ask for it again (about once every 5 minutes from 15 minutes before the match time");
+    expect(en).toContain("ask for it again (about once every 5 minutes, from 15 minutes before the match time to 24 hours after it");
     expect(en).toContain("a channel deleted by the moderators, not yet handed back, is recreated at once by the bot itself, without calling the site");
     expect(fr).not.toContain("le redemander (environ une fois par minute");
     expect(en).not.toContain("ask for it again (about once a minute");
@@ -2878,8 +2878,8 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   it("rgpdPage_voiceChannelDeletedByModeration_recreatedAtOnceFrAndEn", () => {
     const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
     const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
-    expect(fr).toContain("un salon supprimé par la modération avant d&apos;être rendu est recréé aussitôt par le bot, sous le nom qu&apos;il portait");
-    expect(en).toContain("a channel deleted by moderation before being handed back is recreated at once by the bot, under the name it had");
+    expect(fr).toContain("un salon supprimé par la modération avant d&apos;être rendu au bot est, lui, recréé aussitôt par le bot sans ces conditions, sous le nom qu&apos;il portait (celui de l&apos;équipe, sauf si la modération l&apos;a renommé), puis rendu et supprimé comme tout autre salon — à défaut (bot arrêté, recréation en échec), le site en rouvre un aux conditions ci-dessus");
+    expect(en).toContain("a channel deleted by moderation before being handed back to the bot is instead recreated at once by the bot, without these conditions, under the name it had (the team&apos;s, unless moderation renamed it), then handed back and deleted like any other channel — failing that (bot stopped, recreation failed), the site reopens one under the conditions above");
   });
 
   it("processingRegister_t18_clearDeclaredWithoutOccupantDataFrAndEn", () => {
