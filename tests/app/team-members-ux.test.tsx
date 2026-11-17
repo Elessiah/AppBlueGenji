@@ -110,7 +110,7 @@ describe("MyRolesBlock", () => {
   it("MyRolesBlock_unchanged_submitIsAriaDisabledButFocusable", () => {
     const html = render(<MyRolesBlock roles={["DPS"]} onSave={save} />);
 
-    expect(html).toMatch(/<button type="submit"[^>]*aria-disabled="true"/);
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
     expect(html).not.toMatch(/<button[^>]*\sdisabled=""/);
   });
 

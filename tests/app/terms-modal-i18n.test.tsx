@@ -30,6 +30,17 @@ jest.mock("react", () => {
   };
 });
 jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: () => ({ current: null }) }));
+// La garde d'envoi a son propre effet (montage) : simulée, pour que le seul
+// effet joué reste le `setMounted(true)` de la fenêtre.
+jest.mock("@/lib/shared/hooks/useBusyGuard", () => ({
+  useBusyGuard: () => ({
+    busy: false,
+    isBusy: () => false,
+    run: async <T,>(task: () => Promise<T>) => task(),
+    isMounted: () => true,
+    hold: () => undefined,
+  }),
+}));
 jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError: () => undefined, showSuccess: () => undefined }) }));
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -120,12 +131,12 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     const frHtml = render("fr");
     const fr = legalPageText(frHtml);
     // Au repos, le libellé d'attente occupe la même case, caché (hors du nom accessible) : le bouton ne change pas de largeur.
-    expect(frHtml).toMatch(/<button class="[^"]*deleteButton[^"]*" type="button"><span class="[^"]*labelStack[^"]*"><span>Supprimer mon compte<\/span><span data-hidden="true">Préparation…<\/span><\/span><\/button>/);
+    expect(frHtml).toMatch(/<button class="[^"]*deleteButton[^"]*" type="button"><span class="busy-label" data-alt="Préparation…"><span>Supprimer mon compte<\/span><\/span><\/button>/);
     expect(fr).not.toContain("Me déconnecter");
     expect(fr).not.toContain("Plus tard");
     const enHtml = render("en");
     const en = legalPageText(enHtml);
-    expect(enHtml).toMatch(/<button[^>]*class="[^"]*deleteButton[^"]*"[^>]*><span class="[^"]*labelStack[^"]*"><span>Delete my account<\/span><span data-hidden="true">Preparing…<\/span><\/span><\/button>/);
+    expect(enHtml).toMatch(/<button[^>]*class="[^"]*deleteButton[^"]*"[^>]*><span class="busy-label" data-alt="Preparing…"><span>Delete my account<\/span><\/span><\/button>/);
     expect(en).not.toContain("Log me out");
     expect(en).not.toContain("Later");
     // Au repos, la suppression n'est ni lancée ni montée.
@@ -140,12 +151,12 @@ describe("TermsAcceptanceModal — langue de la page", () => {
   it("dit comment partir sans accepter : supprimer d'ici, se déconnecter (lien-bouton), la politique et le profil liés, dans la langue de la page", () => {
     const fr = render("fr");
     expect(legalPageText(fr)).toContain("Tu ne veux pas les accepter ? Tu peux supprimer ton compte directement d'ici, te déconnecter, lire la politique de confidentialité ou ouvrir ton profil pour exporter tes données.");
-    expect(fr).toMatch(/<button type="button" class="[^"]*textButton[^"]*">te déconnecter<\/button>/);
+    expect(fr).toMatch(/<button class="[^"]*textButton[^"]*" type="button">te déconnecter<\/button>/);
     expect(fr).toContain('href="/rgpd"');
     expect(fr).toContain('href="/profil"');
     const en = render("en");
     expect(legalPageText(en)).toContain("Don't want to accept them? You can delete your account right here, log out, read the privacy policy or open your profile to export your data.");
-    expect(en).toMatch(/<button type="button" class="[^"]*textButton[^"]*">log out<\/button>/);
+    expect(en).toMatch(/<button class="[^"]*textButton[^"]*" type="button">log out<\/button>/);
     expect(en).toContain('href="/en/rgpd"');
     expect(en).toContain('href="/en/profil"');
   });
@@ -169,7 +180,8 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(rules[0]).not.toContain("background:");
     expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.actions \.deleteButton:hover[^{]*\{\s*background: rgba\(var\(--danger-rgb\), 0\.1\);/);
     expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.actions \.deleteButton:hover[^{]*\{[^}]*box-shadow: [^;]*--danger-rgb/);
-    expect(css).toMatch(/\.labelStack > \[data-hidden\] \{\s*visibility: hidden;/);
+    // Les deux libellés de la suppression : `BusyLabel` (largeur du plus long, `globals.css`), plus de pile à part.
+    expect(css).not.toContain(".labelStack");
     // Plus spécifique que le survol ghost (une classe de plus) : la règle rouge gagne quel que soit l'ordre des feuilles.
     expect(readSource("components/cyber/CyberButton.module.css")).toContain('.ghost:hover:not(:disabled):not([aria-disabled="true"])');
   });
@@ -177,18 +189,19 @@ describe("TermsAcceptanceModal — langue de la page", () => {
   it("la déconnexion garde `useLogout` ; la suppression ouvre celle du profil, empilée, et rend le focus à son bouton à l'annulation", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
     expect(modal).toContain("const { leaving, logout } = useLogout();");
-    expect(modal).toMatch(/if \(!busy && !deletionOpen\) void logout\(\);/);
-    expect(modal).toMatch(/if \(busy \|\| leaving \|\| deletionOpen\) return;\s*setDeletionOpen\(true\);/);
+    // Lien-bouton `BusyButton` : refusé pendant l'envoi et la suppression (`blocked`), en attente pendant la déconnexion.
+    expect(modal).toMatch(/<BusyButton\s+className=\{styles\.textButton\}\s+busy=\{leaving\}\s+blocked=\{busy \|\| deletionOpen\}/);
+    expect(modal).toMatch(/if \(!isBusy\(\)\) void logout\(\);/);
+    expect(modal).toMatch(/if \(isBusy\(\) \|\| leaving \|\| deletionOpen\) return;\s*setDeletionOpen\(true\);/);
     expect(modal).toMatch(/\{deletionOpen && DeletionFlow \? \(\s*<DeletionFlow\s+preview=\{deletionPreview\.current\}\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
     // Préparation (code, textes, aperçu) : le bouton dit qu'il travaille, jusqu'à l'ouverture de la confirmation.
     expect(modal).toContain("const preparing = deletionOpen && !deletionReady;");
     // Occupé pendant la préparation seulement : derrière la confirmation ouverte, le bouton est désarmé, pas « en attente ».
-    expect(modal).toContain("aria-busy={preparing || undefined}");
-    expect(modal).not.toContain("aria-busy={deletionOpen");
+    expect(modal).toMatch(/<BusyButton\s+busy=\{preparing\}\s+blocked=\{busy \|\| leaving \|\| \(deletionOpen && !preparing\)\}/);
+    expect(modal).not.toContain("busy={deletionOpen");
     // Annoncée aux lecteurs d'écran (le libellé d'un bouton focalisé qui change ne l'est pas).
     expect(modal).toMatch(/<output className="sr-only" aria-live="polite">\s*\{preparing \? t\("termsModal\.deleting"\) : ""\}\s*<\/output>/);
-    expect(modal).toContain('<span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>');
-    expect(modal).toContain('<span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>');
+    expect(modal).toContain('<BusyLabel busy={preparing} idle={t("termsModal.deleteAccount")} pending={t("termsModal.deleting")} />');
     // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
     expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*deletionAttempt\.current \+= 1;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open\]\);/);
     // Préparation bornée (morceau disparu, réseau figé) : la fenêtre retrouve ses issues, un toast le dit, le focus revient au bouton.
@@ -261,25 +274,28 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(enShell.termsModal.deleteAccount).toBe("Delete my account");
   });
 
-  it("pendant l'enregistrement, les boutons gardent le focus : aria-disabled + aria-busy, jamais disabled natif", () => {
+  it("pendant l'enregistrement, les boutons gardent le focus : BusyButton (aria-disabled + aria-busy), jamais disabled natif", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
-    // Aucun bouton nativement désactivé pendant l'envoi (la case, elle, peut l'être).
-    expect(modal).not.toMatch(/<CyberButton[^>]*[^-]disabled=\{busy/);
-    expect(modal).not.toContain("disabled={busy || !checked}");
-    expect(modal).not.toMatch(/aria-disabled=\{busy \|\| undefined\}/);
+    // Aucun `disabled` natif, ni sur un bouton ni sur la case : le focus ne tombe jamais sur la page.
+    expect(modal).not.toMatch(/[^-]disabled=\{/);
+    expect(modal).not.toMatch(/aria-(?:disabled|busy)=\{(?:busy|preparing|leaving)/);
     // Les trois gestes s'excluent : ni envoi pendant une déconnexion ou une suppression, ni l'inverse.
-    expect(modal.match(/aria-disabled=\{busy \|\| leaving \|\| deletionOpen \|\| undefined\}/g)).toHaveLength(3);
-    expect(modal).toContain("if (busy || leaving || deletionOpen || !checked) return;");
-    expect(modal).toContain("aria-busy={busy || undefined}");
-    // La case (sans le focus, qui est sur « J'accepte ») est figée pendant l'envoi, avec l'aspect éteint
-    // de `:disabled` : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.
-    expect(modal).toMatch(/type="checkbox"\s+checked=\{checked\}[\s\S]*?disabled=\{busy\}/);
-    expect(modal).toContain("disabled={!checked}");
+    expect(modal).toMatch(/<BusyButton busy=\{busy\} blocked=\{!checked \|\| leaving \|\| deletionOpen\} onClick=\{accept\}>/);
+    expect(modal).toContain("if (leaving || deletionOpen || !checked) return;");
+    // Garde synchrone : un double clic n'enregistre qu'une acceptation.
+    expect(modal).toContain("const { busy, isBusy, run } = useBusyGuard();");
+    expect(modal).toMatch(/void run\(async \(\) => \{\s*try \{\s*const response = await fetch\("\/api\/profile\/terms"/);
+    expect(modal).not.toContain("setBusy(");
+    // La case est figée pendant l'envoi sans perdre le focus : `aria-readonly`, geste ignoré.
+    expect(modal).toMatch(/type="checkbox"\s+checked=\{checked\}[\s\S]*?aria-readonly=\{busy \|\| undefined\}\s+onChange=\{\(event\) => \{\s*if \(!isBusy\(\)\) setChecked\(event\.target\.checked\);/);
+    // Libellé qui change sans changer la largeur.
+    expect(modal).toContain('<BusyLabel busy={busy} idle={t("termsModal.accept")} pending={t("termsModal.saving")} />');
   });
 
-  it("au repos, « J'accepte » reste désactivé tant que la case n'est pas cochée", () => {
+  it("au repos, « J'accepte » est refusé mais focalisable tant que la case n'est pas cochée", () => {
     const html = render("fr");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>J(?:'|&#x27;)accepte<\/button>/);
+    expect(html).toMatch(/<button class="root primary" type="button" aria-disabled="true"><span class="busy-label" data-alt="Enregistrement…"><span>J(?:'|&#x27;)accepte<\/span><\/span><\/button>/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""/);
     expect(html).not.toContain('aria-busy="true"');
   });
 });

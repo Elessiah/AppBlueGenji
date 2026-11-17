@@ -58,7 +58,7 @@ describe("modales de la fiche", () => {
   it("la modale des rôles ne se ferme que sur un succès", () => {
     const roles = stripComments(read("_components", "RolesDialog.tsx"));
     expect(roles).toContain("onSave: (selected: TeamRole[]) => Promise<boolean>");
-    expect(roles).toMatch(/if \(!ok\) setPending\(false\)/);
+    expect(roles).toMatch(/const ok = await onSave\(toSave\);\s*if \(ok\) hold\(\);/);
     const members = stripComments(read("_components", "MembersSection.tsx"));
     expect(members).toMatch(/const ok = await updateRoles[\s\S]*if \(ok\) setRolesTarget\(null\)/);
   });

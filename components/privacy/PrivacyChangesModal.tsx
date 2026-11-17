@@ -6,6 +6,9 @@ import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { crossesLocale, type Locale } from "@/lib/shared/locales";
 import {
@@ -226,7 +229,9 @@ export function PrivacyChangesModal({
   const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (`useBusyGuard`) : un double clic sur « J'ai pris
+  // connaissance » partait deux fois avant que `busy` soit rendu.
+  const { busy, isBusy, run } = useBusyGuard();
   // Détail lu, par langue et identifiant (`detailKey`).
   const [loadedDetails, setLoadedDetails] = useState<PrivacyChangeDetails>({});
   // Lecture (`privacyDetailsRequestKey`) en échec : le bouton se libère.
@@ -299,19 +304,19 @@ export function PrivacyChangesModal({
     window.dispatchEvent(privacyAnsweredEvent(followedLink));
   };
 
-  const acknowledge = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await record(changes.map((change) => change.id));
-      close();
-      if (!leftByLink.current) showSuccess(t("privacyModal.saved"));
-    } catch {
-      // Échec d'un enregistrement parti d'une modale déjà refermée : rien à réessayer ici.
-      showError(leftByLink.current ? t("privacyModal.replay") : t("privacyModal.failed"));
-    } finally {
-      setBusy(false);
-    }
+  const acknowledge = () => {
+    // Détail encore absent : on ne prend pas connaissance d'une entrée jamais montrée.
+    if (detailsPending) return;
+    void run(async () => {
+      try {
+        await record(changes.map((change) => change.id));
+        close();
+        if (!leftByLink.current) showSuccess(t("privacyModal.saved"));
+      } catch {
+        // Échec d'un enregistrement parti d'une modale déjà refermée : rien à réessayer ici.
+        showError(leftByLink.current ? t("privacyModal.replay") : t("privacyModal.failed"));
+      }
+    });
   };
 
   /**
@@ -326,7 +331,7 @@ export function PrivacyChangesModal({
    */
   const followLink = (changeId: string) => {
     close(true);
-    if (busy) {
+    if (isBusy()) {
       leftByLink.current = true;
       return;
     }
@@ -415,8 +420,14 @@ export function PrivacyChangesModal({
               {t("privacyModal.detailsLoading")}
             </output>
           )}
-          <CyberButton variant="primary" type="button" onClick={acknowledge} disabled={busy || detailsPending}>
-            {busy ? t("privacyModal.saving") : t("privacyModal.acknowledge")}
+          {/* `BusyButton` (`docs/features/BUSY_BUTTONS.md`) : jamais `disabled` natif —
+              le focus reste sur le bouton pendant l'envoi (un échec se retente au
+              clavier) et pendant la lecture du détail ; le même état pose
+              `aria-disabled` et annule le clic. */}
+          <CyberButton variant="primary" asChild>
+            <BusyButton busy={busy} blocked={detailsPending} onClick={acknowledge}>
+              <BusyLabel busy={busy} idle={t("privacyModal.acknowledge")} pending={t("privacyModal.saving")} />
+            </BusyButton>
           </CyberButton>
         </div>
       </div>

@@ -4,6 +4,9 @@ import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { MANAGER_ASSIGNABLE_ROLES } from "@/lib/shared/team-role-display";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { TeamDialog } from "./TeamDialog";
 import { RoleTable } from "./RoleTable";
 import { memberRolesToSave } from "../_lib/member-roles";
@@ -28,7 +31,8 @@ interface RolesDialogProps {
 
 export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogProps>) {
   const [selected, setSelected] = useState(target.selected);
-  const [pending, setPending] = useState(false);
+  // Garde synchrone : un double clic (ou Entrée répétée) enregistrait deux fois.
+  const { busy: pending, isBusy, run, hold } = useBusyGuard();
   const { t } = useTeamPageText();
 
   const toSave = memberRolesToSave(target.selected, selected);
@@ -41,14 +45,20 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
     target.selected.includes("MANAGER") &&
     !selected.includes("MANAGER");
 
-  const save = async () => {
+  const save = () => {
     // Une sélection vide est permise : un membre peut n'avoir aucun rôle
     // (décision D71, il choisit lui-même ses rôles de jeu).
-    if (toSave === null || pending) return;
-    setPending(true);
-    const ok = await onSave(toSave);
-    // Refus : la modale reste ouverte avec la sélection, pour corriger.
-    if (!ok) setPending(false);
+    if (toSave === null) return;
+    void run(async () => {
+      const ok = await onSave(toSave);
+      // Succès : en attente jusqu'à la fermeture par l'appelant. Refus : la
+      // modale se rend avec la sélection, pour corriger.
+      if (ok) hold();
+    });
+  };
+  // Cocher pendant l'envoi changerait l'écran sous la requête : ignoré.
+  const change = (roles: TeamRole[]) => {
+    if (!isBusy()) setSelected(roles);
   };
 
   return (
@@ -60,30 +70,20 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
       wide
       footer={
         <>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={pending ? undefined : onClose}
-            aria-disabled={pending || undefined}
-          >
+          <BusyButton className="btn ghost" busy={false} blocked={pending} onClick={onClose}>
             {t("roles.cancel")}
-          </button>
-          <button
-            type="submit"
-            className={`btn ${styles.primaryButton}`}
-            disabled={unchanged && !pending}
-            aria-disabled={pending || undefined}
-            aria-busy={pending || undefined}
-          >
-            {pending ? t("roles.saving") : t("roles.save")}
-          </button>
+          </BusyButton>
+          {/* Rien à enregistrer : refusé mais focalisable (`blocked`). */}
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending} blocked={unchanged}>
+            <BusyLabel busy={pending} idle={t("roles.save")} pending={t("roles.saving")} />
+          </BusyButton>
         </>
       }
     >
       {target.isOwner ? (
         <p>{t("roles.ownerNotice")}</p>
       ) : null}
-      <RoleTable selected={selected} onChange={setSelected} checkable={MANAGER_ASSIGNABLE_ROLES} />
+      <RoleTable selected={selected} onChange={change} checkable={MANAGER_ASSIGNABLE_ROLES} readOnly={pending} />
       {dropsOwnManagement ? (
         <p className={styles.help}>{t("roles.dropsManagement")}</p>
       ) : null}

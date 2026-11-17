@@ -5,8 +5,8 @@ import { join } from "node:path";
 /**
  * Pendant une requête, les boutons des écrans d'équipe restaient `disabled` :
  * le focus clavier tombait sur le `<body>` et un lecteur d'écran perdait sa
- * place. Ils restent focalisables (`aria-disabled`, `aria-busy`), et le
- * gestionnaire ignore un second clic.
+ * place. Ce sont des `BusyButton` (`aria-disabled`, `aria-busy`, focalisables),
+ * et une garde synchrone (`useBusyGuard`) ignore un second clic (EF-71).
  */
 const SCREENS = [
   "app/(secured)/equipes/creer/CreateTeamForm.tsx",
@@ -23,50 +23,57 @@ const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8")
 
 describe("écrans d'équipe — boutons pendant une requête", () => {
   it.each(SCREENS.map((path) => [path]))("%s ne désactive aucun bouton par l'état de la requête", (path) => {
-    // Seule une case à cocher garde `disabled={loading}` (CreateTeamForm) : un champ, pas un bouton.
-    const buttons = source(path).match(/<button[\s\S]*?<\/button>/g) ?? [];
-
-    for (const button of buttons) {
-      expect(button).not.toMatch(/\sdisabled=\{(?:pending|loading|busy|logoBusy|saving|inviting)\}/);
-      expect(button).not.toMatch(/\sdisabled=\{[^}]*\|\|\s*(?:pending|loading|busy|logoBusy|saving|inviting)\}/);
+    // Plus aucun `disabled` natif, ni bouton ni champ (les cases sont `aria-readonly`).
+    const code = source(path);
+    expect(code).not.toMatch(/(?:^|[^-])disabled=\{/m);
+    // Un bouton nu ne fait qu'ouvrir une modale : l'attente et le refus passent par `BusyButton`.
+    for (const button of code.match(/<button[\s\S]*?<\/button>/g) ?? []) {
+      expect(button).not.toMatch(/aria-(?:disabled|busy)=/);
     }
   });
 
-  it.each(SCREENS.map((path) => [path]))("%s annonce l'envoi par aria-busy", (path) => {
-    expect(source(path)).toMatch(/aria-busy=\{(?:pending|loading|busy|logoBusy|saving|inviting|cancellingId === invitation\.id) \|\| undefined\}/);
+  it.each(SCREENS.map((path) => [path]))("%s annonce l'envoi par BusyButton et une garde synchrone", (path) => {
+    const code = source(path);
+    expect(code).toContain('import { BusyButton } from "@/components/ui/busy-button";');
+    expect(code).toMatch(/<BusyButton[\s\S]*?busy=\{/);
+    expect(code).toMatch(/= useBusyGuard\(\);/);
+    expect(code).not.toMatch(/aria-busy=\{/);
   });
 
   // Enregistrer les réglages et inviter : jamais `disabled`, ni pendant
   // l'envoi ni après (formulaire redevenu propre) — le focus reste sur le bouton.
   it("TeamSettings_saveWhileSaving_staysFocusable", () => {
     const code = source("app/(secured)/equipes/[id]/_components/TeamSettings.tsx");
-    expect(code).toMatch(/aria-disabled=\{!canSave \|\| undefined\}\s+aria-busy=\{saving \|\| undefined\}/);
-    expect(code).not.toMatch(/\sdisabled=\{!canSave\}/);
+    expect(code).toMatch(/<BusyButton type="submit" className=\{`btn \$\{styles\.primaryButton\}`\} busy=\{saving\} blocked=\{!canSave\}>/);
+    expect(code).toContain('<BusyLabel busy={saving} idle={t("settings.save")} pending={t("settings.saving")} />');
   });
 
   it("MembersSection_inviteWhileInviting_staysFocusable", () => {
     const code = source("app/(secured)/equipes/[id]/_components/MembersSection.tsx");
     // L'envoi vit dans la modale des rôles (`InviteRolesDialog`) : le bouton
     // de la page ne fait que l'ouvrir, sans attente à montrer.
-    expect(code).toMatch(/aria-disabled=\{!canInvite \|\| undefined\}/);
+    expect(code).toMatch(/<BusyButton type="submit" className=\{`btn \$\{styles\.primaryButton\}`\} busy=\{false\} blocked=\{!canInvite\}>/);
     const dialog = source("app/(secured)/equipes/[id]/_components/InviteRolesDialog.tsx");
-    expect(dialog).toMatch(/aria-disabled=\{pending \|\| undefined\}\s+aria-busy=\{pending \|\| undefined\}/);
-    expect(dialog).toMatch(/if \(pending\) return;/);
-    expect(code).not.toMatch(/\sdisabled=\{!canInvite\}/);
+    expect(dialog).toContain("const { busy: pending, isBusy, run, hold } = useBusyGuard();");
+    expect(dialog).toMatch(/<BusyButton type="submit" className=\{`btn \$\{styles\.primaryButton\}`\} busy=\{pending\}>/);
+    expect(dialog).not.toMatch(/(?:^|[^-])disabled=\{/m);
   });
 
   it("RolesDialog_submitWhilePending_ignoredByHandler", () => {
-    expect(source("app/(secured)/equipes/[id]/_components/RolesDialog.tsx")).toMatch(/if \(toSave === null \|\| pending\) return;/);
+    const code = source("app/(secured)/equipes/[id]/_components/RolesDialog.tsx");
+    // `run` refuse un second envoi tant que le premier court ; `hold` garde l'attente jusqu'à la fermeture.
+    expect(code).toMatch(/if \(toSave === null\) return;\s+void run\(async \(\) => \{\s+const ok = await onSave\(toSave\);[\s\S]*?if \(ok\) hold\(\);/);
   });
 
-  it("teamModuleCss_ariaDisabledButton_isDimmedAndNotAllowed", () => {
+  it("teamModuleCss_ariaDisabledButton_isDimmedByColoursNotOpacity", () => {
     const css = source("app/(secured)/equipes/[id]/team.module.css");
-    expect(css).toMatch(/\.page :global\(\.btn\):where\(:disabled, \[aria-disabled="true"\]\) \{[^}]*cursor: not-allowed;[^}]*opacity: 0\.55;/);
+    expect(css).toMatch(/\.page :global\(\.btn\):where\(:disabled, \[aria-disabled="true"\]\) \{[^}]*cursor: not-allowed;[^}]*color: var\(--ink-dim\);/);
+    expect(css).not.toMatch(/opacity:/);
   });
 
   it("teamModuleCss_busyButton_keepsLabelReadable", () => {
     const css = source("app/(secured)/equipes/[id]/team.module.css");
-    expect(css).toMatch(/\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*opacity: 1;[^}]*cursor: progress;/);
+    expect(css).toMatch(/\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*cursor: progress;[^}]*color: var\(--ink-mute\);[^}]*border-style: dashed;/);
   });
 
   it("globalsCss_dimDisabledScope_definesDimmedAndBusyRules", () => {
@@ -88,9 +95,10 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
     expect(code).not.toMatch(/pseudo: (?:member|invitation|kickTarget)\.pseudo/);
   });
 
-  it("MembershipActions_act_usesSynchronousRefLock", () => {
+  it("MembershipActions_act_usesSynchronousGuardAndRescuesFocus", () => {
     const code = source("app/(secured)/equipes/[id]/_components/MembershipActions.tsx");
-    expect(code).toMatch(/if \(busyRef\.current\) return false;\s+busyRef\.current = true;\s+setBusy\(true\);/);
-    expect(code).toMatch(/finally \{\s+busyRef\.current = false;/);
+    expect(code).toContain("const outcome = await run(async () => {");
+    expect(code).toContain('rescueFocus(["button", "a[href]"]);');
+    expect(code).not.toContain("busyRef");
   });
 });

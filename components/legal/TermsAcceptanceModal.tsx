@@ -6,6 +6,9 @@ import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useLogout } from "@/components/use-logout";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
@@ -109,7 +112,9 @@ export function TermsAcceptanceModal({
   const [requested, setRequested] = useState(initiallyRequired);
   const [privacyAnswered, setPrivacyAnswered] = useState(!privacyPending);
   const [checked, setChecked] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (`useBusyGuard`) : un double clic sur « J'accepte » partait
+  // deux fois avant que `busy` soit rendu — deux preuves pour un geste.
+  const { busy, isBusy, run } = useBusyGuard();
   /** La suppression du compte est lancée (aperçu, puis confirmation par-dessus). */
   const [deletionOpen, setDeletionOpen] = useState(false);
   /** Sa confirmation est ouverte : la préparation (code, textes, aperçu) est finie. */
@@ -169,7 +174,7 @@ export function TermsAcceptanceModal({
   }, [deletionOpen, deletionReady, abandonDeletion]);
   const { leaving, logout } = useLogout();
   const startDeletion = () => {
-    if (busy || leaving || deletionOpen) return;
+    if (isBusy() || leaving || deletionOpen) return;
     setDeletionOpen(true);
     deletionAttempt.current += 1;
     const attempt = deletionAttempt.current;
@@ -192,24 +197,25 @@ export function TermsAcceptanceModal({
 
   const preparing = deletionOpen && !deletionReady;
 
-  const accept = async () => {
-    if (busy || leaving || deletionOpen || !checked) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/profile/terms", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ version: TERMS_VERSION }),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      setRequested(false);
-      window.dispatchEvent(new Event(TERMS_ACCEPTED_EVENT));
-      showSuccess(t("termsModal.accepted"));
-    } catch {
-      showError(t("termsModal.failed"));
-    } finally {
-      setBusy(false);
-    }
+  // Une acceptation n'est enregistrée qu'**une fois** par geste : la garde
+  // écarte le second clic (ou Entrée répétée) parti avant le rendu de `busy`.
+  const accept = () => {
+    if (leaving || deletionOpen || !checked) return;
+    void run(async () => {
+      try {
+        const response = await fetch("/api/profile/terms", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ version: TERMS_VERSION }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        setRequested(false);
+        window.dispatchEvent(new Event(TERMS_ACCEPTED_EVENT));
+        showSuccess(t("termsModal.accepted"));
+      } catch {
+        showError(t("termsModal.failed"));
+      }
+    });
   };
 
   return createPortal(
@@ -244,17 +250,16 @@ export function TermsAcceptanceModal({
               rich("termsModal.exits", {}, {
                 // Un geste, pas une adresse : un bouton à l'allure de lien (`useLogout`).
                 logout: (children) => (
-                  <button
-                    type="button"
+                  <BusyButton
                     className={styles.textButton}
+                    busy={leaving}
+                    blocked={busy || deletionOpen}
                     onClick={() => {
-                      if (!busy && !deletionOpen) void logout();
+                      if (!isBusy()) void logout();
                     }}
-                    aria-disabled={busy || leaving || deletionOpen || undefined}
-                    aria-busy={leaving || undefined}
                   >
                     {richNodes(children)}
-                  </button>
+                  </BusyButton>
                 ),
                 policy: (children) => <LocaleLink href="/rgpd">{richNodes(children)}</LocaleLink>,
                 profile: (children) => <LocaleLink href="/profil">{richNodes(children)}</LocaleLink>,
@@ -266,12 +271,14 @@ export function TermsAcceptanceModal({
           <input
             type="checkbox"
             checked={checked}
-            // Figée pendant l'envoi : décocher en cours de route rendrait « J'accepte »
-            // nativement désactivé au retour. `disabled` natif ici ne coûte aucun
-            // focus — il est sur « J'accepte », pressé pour lancer l'envoi — et
-            // donne à la case son aspect éteint (`globals.css`, `:disabled`).
-            disabled={busy}
-            onChange={(event) => setChecked(event.target.checked)}
+            // Figée pendant l'envoi, sans `disabled` natif (le focus y resterait
+            // s'il y était revenu) : `aria-readonly` la peint éteinte
+            // (`globals.css`) et le geste est ignoré — décocher en cours de
+            // route ne change pas ce qui part.
+            aria-readonly={busy || undefined}
+            onChange={(event) => {
+              if (!isBusy()) setChecked(event.target.checked);
+            }}
           />
           <span>
             {richNodes(
@@ -293,39 +300,29 @@ export function TermsAcceptanceModal({
             </a>
           </p>
         )}
-        {/* Pendant la requête, `aria-disabled` + `aria-busy` plutôt que `disabled` :
-            le focus reste sur le bouton pressé (un échec se retente au clavier) ;
-            `accept` ignore déjà un geste tant que `busy`, la déconnexion un
-            second clic (`useLogout`), la suppression un second lancement. */}
+        {/* `BusyButton` (`docs/features/BUSY_BUTTONS.md`) : jamais `disabled`
+            natif, ni pendant la requête ni case décochée — le focus reste sur
+            le bouton pressé (un échec se retente au clavier) ; le même état
+            pose `aria-disabled` et annule le clic. `accept` garde ses refus,
+            la déconnexion ignore un second clic (`useLogout`), la suppression
+            un second lancement. */}
         <div className={styles.actions}>
-          <CyberButton
-            ref={deleteButtonRef}
-            type="button"
-            variant="ghost"
-            className={styles.deleteButton}
-            onClick={startDeletion}
-            aria-disabled={busy || leaving || deletionOpen || undefined}
-            aria-busy={preparing || undefined}
-          >
-            {/* Pendant la préparation, le bouton dit qu'il travaille (« Préparation… ») :
-                sur un réseau lent, la fenêtre ne paraît pas figée. */}
-            {/* Les deux libellés occupent la même case (le plus large fixe la
-                largeur) : la ligne d'actions ne se replie pas d'un état à l'autre.
-                Le libellé caché (`visibility: hidden`) sort du nom accessible. */}
-            <span className={styles.labelStack}>
-              <span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>
-              <span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>
-            </span>
+          <CyberButton ref={deleteButtonRef} variant="ghost" className={styles.deleteButton} asChild>
+            <BusyButton
+              busy={preparing}
+              blocked={busy || leaving || (deletionOpen && !preparing)}
+              onClick={startDeletion}
+            >
+              {/* Pendant la préparation, le bouton dit qu'il travaille (« Préparation… ») :
+                  sur un réseau lent, la fenêtre ne paraît pas figée. `BusyLabel` réserve
+                  la largeur du plus long : la ligne d'actions ne se replie pas. */}
+              <BusyLabel busy={preparing} idle={t("termsModal.deleteAccount")} pending={t("termsModal.deleting")} />
+            </BusyButton>
           </CyberButton>
-          <CyberButton
-            type="button"
-            variant="primary"
-            onClick={accept}
-            disabled={!checked}
-            aria-disabled={busy || leaving || deletionOpen || undefined}
-            aria-busy={busy || undefined}
-          >
-            {busy ? t("termsModal.saving") : t("termsModal.accept")}
+          <CyberButton variant="primary" asChild>
+            <BusyButton busy={busy} blocked={!checked || leaving || deletionOpen} onClick={accept}>
+              <BusyLabel busy={busy} idle={t("termsModal.accept")} pending={t("termsModal.saving")} />
+            </BusyButton>
           </CyberButton>
         </div>
         {/* Le libellé d'un bouton déjà focalisé qui change n'est pas annoncé :

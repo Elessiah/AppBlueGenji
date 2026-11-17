@@ -182,20 +182,6 @@
   }
 }
 
-/* Deux libellés dans la même case de grille (« Supprimer mon compte » /
-   « Préparation… ») : le bouton garde la largeur du plus long. */
-.labelStack {
-  display: inline-grid;
-}
-
-.labelStack > span {
-  grid-area: 1 / 1;
-}
-
-.labelStack > [data-hidden] {
-  visibility: hidden;
-}
-
 /* Contraste élevé (Windows) : les couleurs posées ici sont ignorées. Le geste
    à l'allure de lien prend la couleur système des liens, comme ses voisins ; le
    gris système dit que le lien et les boutons (« J'accepte » pendant l'envoi

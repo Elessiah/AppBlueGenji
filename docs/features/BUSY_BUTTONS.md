@@ -223,4 +223,33 @@ annoncer de l'attente.
   qui échoue (`revalidate` rend `false`) le dit en notification, sans quoi les
   rôles affichés resteraient périmés en silence. Un enregistrement refusé par
   la garde le dit aussi (`BUSY_REFUSED_MESSAGE`). Ce refus s'affiche **une fois** (`once`) : un clic répété ou Entrée tenue n'empile pas le même message. `pending` n'est rendu qu'**après** la garde (jamais de rendu où tout est refusé sans bouton occupé), `ArmedButton` se désarme dès qu'un geste part (son libellé long ne reste pas) et « Rôles mis à jour, mais la fiche n'a pas pu être relue » tient en un seul message.
-- Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.
+- Reliquats (EF-71) — dernier lot, l'entrée « boutons grisés restants »
+  d'`ERREUR.txt` est close. Modales légales : `TermsAcceptanceModal`
+  (« J'accepte », « Supprimer mon compte », « te déconnecter » : trois gestes
+  qui s'excluent par `blocked`, la case en `aria-readonly`) et
+  `PrivacyChangesModal` (« J'ai pris connaissance » refusé tant que le détail
+  charge) — **comportement des boutons seul** : une acceptation n'est
+  enregistrée qu'au clic, une fois (`useBusyGuard`), jamais d'office ; ni texte
+  légal ni `TERMS_VERSION` touchés. Écrans d'équipe : `MembershipActions`
+  (un geste nommé, seul occupé, les autres refusés), `TeamSettings` (identité,
+  logo, demandes de reprise), `MembersSection`, `MyRolesBlock`, `RoleTable`
+  (prop `readOnly` : cases `aria-readonly` + `aria-busy`), `RolesDialog`,
+  `InviteRolesDialog`, `TransferOwnershipDialog` (radios `aria-disabled`),
+  `ClaimGhostTeamDialog` (`PlayerPseudoCombobox`, prop `readOnly`),
+  `GhostTeamDialog`, `CreateTeamForm` (`hold()` jusqu'à la page de l'équipe) ;
+  l'aspect désarmé de `team.module.css` passe de l'`opacity` aux couleurs.
+  Un bouton pressé qui **disparaît** au retour (« Rejoindre » devenu « Retirer
+  ma demande », invitation ou demande retirée, logo envoyé) : `useFocusRescue`
+  (`lib/shared/hooks/useFocusRescue.ts`, logique pure
+  `lib/shared/focus-rescue.ts`) rend le focus, avant la peinture, au premier
+  sélecteur trouvé dans l'écran — seulement si le focus est perdu
+  (`isFocusLost`) et dans les 4 s. Aucun texte nouveau (FR et EN existants) —
+  `tests/app/leftover-busy-buttons.test.tsx`, `tests/lib/shared/focus-rescue.test.ts`,
+  `tests/lib/shared/use-focus-rescue.test.ts`.
+- `disabled` natif encore lié à une requête — **à dessein**, des champs et non
+  des boutons, le focus étant sur le bouton qui envoie : listes de la date
+  (`MatchScheduleDialog` ×3) et de l'arbitre (`RefereeDialog` ×2, une liste
+  n'envoie pas le formulaire) ; `MapScoreList` des deux dialogues de score
+  (`AdminScoreDialog`, `PlayerScoreDialog` : Entrée n'y envoie pas). Le relevé
+  de l'ancienne entrée (`disabled={…}` nommant busy|pending|saving|loading|submitting)
+  ne trouve plus que ces 7 champs ; un nouveau doit s'y justifier.
