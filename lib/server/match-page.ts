@@ -76,7 +76,11 @@ export async function matchPageExists(
   }
 }
 
-/** Préfixe le titre de l'encart du tournoi (« Manche 2 · Match 3 — … »). */
+/**
+ * Préfixe le titre de l'encart du tournoi (« Quart de finale 2 — … »). Sans
+ * résumé public, le repli garde « Manche 2 · Match 3 » : nommer le tour lirait
+ * tous les matchs, la lecture même qui a manqué (`SHARE_EMBEDS.md`).
+ */
 function prefixedTitle(title: Metadata["title"], prefix: string): string {
   let base = "";
   if (typeof title === "string") base = title;
@@ -92,8 +96,8 @@ function prefixedTitle(title: Metadata["title"], prefix: string): string {
  * celle de la vue lue (`/suivre/…` sans compte), jamais une page en 404.
  *
  * Quand le résumé public du tournoi porte le match (`loadShare`,
- * `SHARE_EMBEDS.md`), l'encart devient celui du match : « A contre B · Manche 2
- * · Match 3 — tournoi », le score et chaque map jouée (code de replay compris,
+ * `SHARE_EMBEDS.md`), l'encart devient celui du match : « A contre B · Quart de
+ * finale 2 — tournoi » (nom du tour de la fiche, `shareRoundText`), le score et chaque map jouée (code de replay compris,
  * D74) en description, et l'image du match. Un engagé solo y est « Joueur 1 »
  * ou « Joueur 2 », jamais son pseudo.
  */
@@ -153,12 +157,15 @@ export async function matchPageMetadata(
   }
   const messages = messagesFor(locale);
   const roundName = shareRoundText(shareRoundPageText(locale, messages), match.round, match);
-  const title = prefixedTitle(metadata.title, matchEmbedTitle(match, roundName, messages, locale));
-  const description = matchEmbedDescription(match, messages, locale) ?? metadata.description ?? undefined;
+  // Un seul instant pour le titre, la description et l'empreinte de l'image :
+  // l'horaire d'un match n'y figure qu'à venir (`matchScheduledAt`).
+  const now = Date.now();
+  const title = prefixedTitle(metadata.title, matchEmbedTitle(match, roundName, messages, locale, now));
+  const description = matchEmbedDescription(match, messages, locale, now) ?? metadata.description ?? undefined;
   const image = embedImageMetadata(
     matchShareCardKey(tournamentId as number, matchId as number),
     locale,
-    matchShareVersion(view.card, match),
+    matchShareVersion(view.card, match, now),
     matchEmbedAlt(match, messages),
   );
   return {

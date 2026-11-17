@@ -351,9 +351,28 @@ export function acceptedTournamentShareVersions(
   return accepted;
 }
 
-/** Empreinte de ce que l'image d'un match dessine. */
-export function matchShareVersion(card: TournamentCard, match: MatchShareSummary): string {
-  return shareVersion([card.name, card.game, match]);
+/**
+ * L'horaire d'un match **à venir** : programmé (`startAt`) dans le futur, et
+ * ni score, ni map, ni forfait — un match joué, ou en cours de saisie, ne
+ * s'annonce plus. Un créneau **passé** non plus : un match en retard (« À
+ * venir » mais prévu hier soir) ne s'affiche pas en grand comme s'il restait à
+ * jouer. `null` sinon, ou si l'horaire est illisible.
+ */
+export function matchScheduledAt(match: MatchShareSummary, now: number = Date.now()): string | null {
+  if (match.startAt === null || match.doubleForfeit || match.forfeitSide !== null) return null;
+  if (match.status !== "PENDING" && match.status !== "READY") return null;
+  if (match.score !== null || match.maps.length > 0) return null;
+  const time = Date.parse(match.startAt);
+  return Number.isFinite(time) && time > now ? match.startAt : null;
+}
+
+/**
+ * Empreinte de ce que l'image d'un match dessine. L'horaire n'y est dessiné
+ * qu'à venir ({@link matchScheduledAt}) : son passage change l'empreinte, et
+ * l'adresse publiée ensuite ne ressert pas une image qui l'annonce encore.
+ */
+export function matchShareVersion(card: TournamentCard, match: MatchShareSummary, now: number = Date.now()): string {
+  return shareVersion([card.name, card.game, match, matchScheduledAt(match, now) !== null]);
 }
 
 const TOURNAMENT_KEY_PATTERN = /^tournament-([1-9]\d{0,9})$/u;

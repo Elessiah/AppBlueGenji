@@ -10,12 +10,12 @@
  * résumé, donc dans l'empreinte de l'image), {@link shareRoundText} le rédige
  * dans la langue de l'adresse.
  */
-import { endurancePlayoffRoundCount } from "./bg-survie/playoff-rounds";
+import { endurancePlayoffGhostSlots, endurancePlayoffRoundCount } from "./bg-survie/playoff-rounds";
 import { isEndurancePlayoffRound } from "./bg-survie/rounds";
 import { stageKey, type StageKey } from "./bracket-stage";
 import type { Locale } from "./locales";
 import type { Messages } from "./i18n-messages";
-import { tournamentPageText, type TournamentPageText } from "./tournament-page-text";
+import { tournamentPageMessages, tournamentPageText, type TournamentPageText } from "./tournament-page-text";
 import type { BracketMatch, TournamentPhase, TournamentSnapshot } from "./types";
 
 /** Mot de manche d'un mode à classement : « Ronde » (suisse), « Manche » (Survie, qualification). */
@@ -23,14 +23,24 @@ export type ShareRoundNoun = "swiss" | "survival" | "round";
 
 /** Ce qui nomme la manche d'un match, sans texte. */
 export type ShareRound =
-  /** Un tableau à élimination : le stade se lit depuis la finale (`stageKey`). */
-  | { kind: "stage"; stage: StageKey; lower: boolean }
+  /**
+   * Un tableau à élimination : le stade se lit depuis la finale (`stageKey`).
+   * `round` est le rang du tour dans son tableau (1 = le premier), celui que
+   * la colonne d'un premier tour affiche (« Manche 2 ») — jamais le numéro
+   * brut du moteur, qui commence à 1000 dans l'arbre final de BlueGenji Survie.
+   */
+  | { kind: "stage"; stage: StageKey; lower: boolean; round: number }
   /** Une manche numérotée (ronde suisse, Survie, qualification de BlueGenji Survie). */
   | { kind: "numbered"; noun: ShareRoundNoun; number: number };
 
 /** Ce que la lecture des manches relit du tournoi public. */
-export type ShareRoundSource = Pick<TournamentSnapshot, "card" | "phases"> & {
-  matches: readonly Pick<BracketMatch, "id" | "phaseId" | "bracket" | "roundNumber">[];
+export type ShareRoundSource = {
+  card: Pick<TournamentSnapshot["card"], "format" | "state">;
+  phases: TournamentSnapshot["phases"];
+  matches: readonly Pick<
+    BracketMatch,
+    "id" | "phaseId" | "bracket" | "roundNumber" | "matchNumber" | "status" | "doubleForfeit"
+  >[];
 };
 
 type RoundMatch = ShareRoundSource["matches"][number];
@@ -47,7 +57,11 @@ function groupBy<T>(items: readonly T[], keyOf: (item: T) => string): Map<string
 }
 
 /** Le format qui joue ce match : celui de sa phase (multi-mode), sinon celui du tournoi. */
-function formatOf(card: ShareRoundSource["card"], phases: readonly TournamentPhase[] | null, match: RoundMatch): string {
+function formatOf(
+  card: ShareRoundSource["card"],
+  phases: readonly Pick<TournamentPhase, "id" | "format">[] | null,
+  match: RoundMatch,
+): string {
   return phases?.find((item) => item.id === match.phaseId)?.format ?? card.format;
 }
 
@@ -67,17 +81,43 @@ function numberedOrFixedRound(format: string, match: RoundMatch): ShareRound | "
   if (format === "SWISS") return { kind: "numbered", noun: "swiss", number: match.roundNumber };
   if (format === "SURVIVAL") return { kind: "numbered", noun: "survival", number: match.roundNumber };
   if (format !== "BG_SURVIE") return null;
-  if (match.bracket === "THIRD_PLACE") return { kind: "stage", stage: "thirdPlace", lower: false };
+  if (match.bracket === "THIRD_PLACE") return { kind: "stage", stage: "thirdPlace", lower: false, round: 1 };
   if (isEndurancePlayoffRound(match.roundNumber)) return "playoff";
   return { kind: "numbered", noun: "round", number: match.roundNumber };
+}
+
+/** Un tableau à élimination, nommé depuis son dernier tour. */
+function nameEliminationBracket(group: readonly RoundMatch[], result: Map<number, ShareRound>): void {
+  const { indexOf, total } = roundIndexes(group);
+  for (const match of group) {
+    const index = indexOf.get(match.roundNumber) ?? 0;
+    const stage = stageKey(index, total, match.bracket);
+    result.set(match.id, { kind: "stage", stage, lower: match.bracket === "LOWER", round: index + 1 });
+  }
+}
+
+/**
+ * L'arbre final de BlueGenji Survie, compté comme la fiche (`EnduranceView`) :
+ * cases à pourvoir comprises tant que le tournoi vit ; sa finale est la
+ * « Grande Finale » (`grandFinalLabel`).
+ */
+function namePlayoffTree(group: readonly RoundMatch[], finished: boolean, result: Map<number, ShareRound>): void {
+  const { indexOf } = roundIndexes(group);
+  const total = endurancePlayoffRoundCount(group, finished ? undefined : endurancePlayoffGhostSlots(group));
+  for (const match of group) {
+    const index = indexOf.get(match.roundNumber) ?? 0;
+    const stage = stageKey(index, total, match.bracket);
+    result.set(match.id, { kind: "stage", stage: stage === "final" ? "grandFinal" : stage, lower: false, round: index + 1 });
+  }
 }
 
 /**
  * La manche de chaque match du tournoi, par identifiant. Les tableaux à
  * élimination se nomment depuis leur dernier tour (un tableau par phase et par
- * `bracket`, comme la fiche) ; l'arbre final de BlueGenji Survie sur le nombre
- * de tours qu'il comptera **complet** (`endurancePlayoffRoundCount`) ; les modes
- * à classement gardent un numéro.
+ * `bracket`, comme la fiche) ; l'arbre final de BlueGenji Survie sur le compte
+ * de tours de la fiche (`EnduranceView` : cases à pourvoir comprises tant que le
+ * tournoi vit, double forfait compris), et sa finale s'y appelle « Grande
+ * Finale » (`grandFinalLabel`) ; les modes à classement gardent un numéro.
  */
 export function buildShareRounds(source: ShareRoundSource): Map<number, ShareRound> {
   const result = new Map<number, ShareRound>();
@@ -91,31 +131,21 @@ export function buildShareRounds(source: ShareRoundSource): Map<number, ShareRou
   }
 
   for (const group of groupBy(elimination, (match) => `${match.phaseId}:${match.bracket}`).values()) {
-    const { indexOf, total } = roundIndexes(group);
-    for (const match of group) {
-      const stage = stageKey(indexOf.get(match.roundNumber) ?? 0, total, match.bracket);
-      result.set(match.id, { kind: "stage", stage, lower: match.bracket === "LOWER" });
-    }
+    nameEliminationBracket(group, result);
   }
-
+  const finished = source.card.state === "FINISHED";
   for (const group of groupBy(playoffs, (match) => String(match.phaseId)).values()) {
-    const { indexOf } = roundIndexes(group);
-    const total = endurancePlayoffRoundCount(group as BracketMatch[]);
-    for (const match of group) {
-      const stage = stageKey(indexOf.get(match.roundNumber) ?? 0, total, match.bracket);
-      result.set(match.id, { kind: "stage", stage, lower: false });
-    }
+    namePlayoffTree(group, finished, result);
   }
   return result;
 }
 
-/** Le texte de la fiche, avec les mots de manche des vues « suisse » et « survie ». */
+/** Le texte de la fiche dans `locale` (les mots de manche sont ceux de `bracket.*`). */
 export function shareRoundPageText(
   locale: Locale,
-  messages: Pick<Messages, "tournament" | "tournamentViews">,
+  messages: Pick<Messages, "tournament">,
 ): TournamentPageText {
-  const { swiss, survival } = messages.tournamentViews;
-  return tournamentPageText(locale, messages.tournament, { swiss, survival });
+  return tournamentPageText(locale, tournamentPageMessages(messages));
 }
 
 type NumberedStage = "semis" | "quarters" | "roundOf16";
@@ -125,10 +155,16 @@ function isNumberedStage(stage: StageKey): stage is NumberedStage {
   return stage === "semis" || stage === "quarters" || stage === "roundOf16";
 }
 
-function numberedRoundNoun(text: TournamentPageText, noun: ShareRoundNoun): string | null {
-  if (noun === "swiss") return text.t("swiss.roundNoun");
-  if (noun === "survival") return text.t("survival.roundNoun");
-  return null;
+/**
+ * « Ronde 3 » (suisse), « Manche 3 » (Survie, qualification). Lu dans
+ * `bracket.*` de la fiche, chargé partout — et non dans `swiss.*` /
+ * `survival.*`, que seules les vues chargées à la demande apportent (la page
+ * d'un match les rendrait en clé brute). Les deux textes sont tenus égaux à
+ * `<vue>.roundNoun` par un test.
+ */
+function numberedRoundLabel(text: TournamentPageText, noun: ShareRoundNoun, value: number): string {
+  const number = String(value);
+  return noun === "swiss" ? text.t("bracket.swissRoundN", { number }) : text.t("bracket.roundN", { number });
 }
 
 /**
@@ -149,14 +185,10 @@ export function shareRoundText(
   const matchN = text.t("bracket.matchN", { number });
   const roundN = (value: number) => text.t("bracket.roundN", { number: String(value) });
   if (round === null) return `${roundN(position.roundNumber)} · ${matchN}`;
-  if (round.kind === "numbered") {
-    const noun = numberedRoundNoun(text, round.noun);
-    const label = noun === null ? roundN(round.number) : `${noun} ${round.number}`;
-    return `${label} · ${matchN}`;
-  }
+  if (round.kind === "numbered") return `${numberedRoundLabel(text, round.noun, round.number)} · ${matchN}`;
   const lowerPrefix = round.lower && round.stage !== "lowerFinal" ? text.t("page.bracketLabels.LOWER") : null;
   let label: string;
-  if (round.stage === "early") label = `${roundN(position.roundNumber)} · ${matchN}`;
+  if (round.stage === "early") label = `${roundN(round.round)} · ${matchN}`;
   else if (isNumberedStage(round.stage)) label = text.t(`bracket.matchLabel.${round.stage}`, { number });
   else label = text.t(`bracket.stage.${round.stage}`);
   return lowerPrefix ? `${lowerPrefix} · ${label}` : label;

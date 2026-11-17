@@ -259,7 +259,9 @@ export function MatchShareCard({
               textOverflow: "ellipsis",
               overflow: "hidden",
               flexShrink: 0,
-              maxWidth: 470,
+              // Assez large pour « Tableau perdants · Quart de finale 12 · +3 maps » :
+              // c'est le titre (nom du tournoi) qui cède, pas le numéro du match.
+              maxWidth: 640,
               marginLeft: 18,
               fontSize: 26,
               color: SHARE_CARD_COLORS.inkMute,

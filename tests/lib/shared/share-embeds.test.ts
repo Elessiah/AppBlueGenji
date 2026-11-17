@@ -108,7 +108,7 @@ describe("buildTournamentShareSummary — matchs", () => {
       bracket: "UPPER",
       roundNumber: 1,
       matchNumber: 1,
-      round: { kind: "stage", stage: "final", lower: false },
+      round: { kind: "stage", stage: "final", lower: false, round: 1 },
       startAt: null,
       status: "COMPLETED",
       team1: { teamId: 10, name: "Alpha", logoUrl: "/uploads/teams/10.png", solo: false },
@@ -316,6 +316,30 @@ describe("empreintes", () => {
     const changed = { ...match, maps: [{ ...match.maps[0], team1Score: 3 }, match.maps[1]] };
 
     expect(matchShareVersion(card, changed)).not.toBe(matchShareVersion(card, match));
+  });
+
+  it("matchShareVersion_roundNameChanges_newVersion", () => {
+    const changed = { ...match, round: { kind: "stage" as const, stage: "semis" as const, lower: false, round: 2 } };
+
+    expect(matchShareVersion(card, changed)).not.toBe(matchShareVersion(card, match));
+  });
+
+  it("matchShareVersion_scheduledSlotPasses_newVersion", () => {
+    const start = "2026-11-17T20:00:00.000Z";
+    const upcoming = { ...match, status: "READY" as const, score: null, winnerSide: null, maps: [], startAt: start };
+    const before = Date.parse(start) - 60_000;
+    const after = Date.parse(start) + 60_000;
+
+    expect(matchShareVersion(card, upcoming, after)).not.toBe(matchShareVersion(card, upcoming, before));
+  });
+
+  it("matchShareVersion_sameInstantSide_sameVersion", () => {
+    const start = "2026-11-17T20:00:00.000Z";
+    const upcoming = { ...match, status: "READY" as const, score: null, winnerSide: null, maps: [], startAt: start };
+
+    expect(matchShareVersion(card, upcoming, Date.parse(start) - 120_000)).toBe(
+      matchShareVersion(card, upcoming, Date.parse(start) - 60_000),
+    );
   });
 
   it("matchShareVersion_replayCodeAdded_newVersion", () => {

@@ -21,7 +21,7 @@ import {
   truncateForShare,
   type ShareStateTone,
 } from "./share-metadata";
-import type { MatchShareSummary, ShareEntrantSide, ShareLeader } from "./share-embeds";
+import { matchScheduledAt, type MatchShareSummary, type ShareEntrantSide, type ShareLeader } from "./share-embeds";
 import { localizedTournamentLabel } from "./tournament-labels";
 import type { MatchStatus, TournamentCard } from "./types";
 import { visibleText } from "./visible-text";
@@ -60,13 +60,7 @@ export function embedShortDate(iso: string, locale: Locale): string | null {
     month: "short",
     year: "numeric",
   }).format(date);
-  const hour = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
-    timeZone: SHARE_TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(date);
-  return `${day} · ${hour}`;
+  return `${day} · ${embedHour(date, locale)}`;
 }
 
 /** Première lettre en capitale (« mardi » → « Mardi »), dans la langue. */
@@ -112,17 +106,7 @@ export function embedShortWhen(iso: string, locale: Locale): string | null {
   return `${day} ${embedHour(date, locale)}`;
 }
 
-/**
- * L'horaire d'un match **à venir** : programmé (`startAt`) et ni score, ni map,
- * ni forfait — un match joué, ou en cours de saisie, ne s'annonce plus.
- * `null` sinon, ou si l'horaire est illisible.
- */
-export function matchScheduledAt(match: MatchShareSummary): string | null {
-  if (match.startAt === null || match.doubleForfeit || match.forfeitSide !== null) return null;
-  if (match.status !== "PENDING" && match.status !== "READY") return null;
-  if (match.score !== null || match.maps.length > 0) return null;
-  return Number.isFinite(Date.parse(match.startAt)) ? match.startAt : null;
-}
+export { matchScheduledAt };
 
 type ScheduleKey = keyof EmbedText["schedule"];
 
@@ -306,13 +290,14 @@ export function matchEmbedCard(
   position: string,
   messages: ShareEmbedMessages,
   locale: Locale,
+  now: number = Date.now(),
 ): MatchEmbedCard {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
   const state = matchStateOf(match);
   const shownMaps = match.maps.slice(0, EMBED_MAX_MAPS);
   const extra = match.maps.length - shownMaps.length;
-  const scheduledAt = matchScheduledAt(match);
+  const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
   return {
     eyebrow: localizedTournamentLabel(messages.labels, "game", card.game),
@@ -355,13 +340,14 @@ export function matchEmbedTitle(
   position: string,
   messages: ShareEmbedMessages,
   locale: Locale,
+  now: number = Date.now(),
 ): string {
   const text = messages.share.embed;
   const versus = fill(text.versus, {
     team1: embedSideName(match.team1, 1, text),
     team2: embedSideName(match.team2, 2, text),
   });
-  const scheduledAt = matchScheduledAt(match);
+  const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
   return when === null ? `${versus} · ${position}` : `${versus} · ${position} · ${when}`;
 }
@@ -377,12 +363,13 @@ export function matchEmbedDescription(
   match: MatchShareSummary,
   messages: ShareEmbedMessages,
   locale: Locale,
+  now: number = Date.now(),
 ): string | null {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
   const center = scoreCenter(match, names, text);
   const parts: string[] = [];
-  const scheduledAt = matchScheduledAt(match);
+  const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
   if (when !== null) parts.push(`${when} (${text.timeZone})`);
   if (center.kind === "score") parts.push(`${names[0]} ${center.team1} – ${center.team2} ${names[1]}`);

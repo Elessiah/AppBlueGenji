@@ -42,10 +42,10 @@ import {
   localizedPlaceholder,
   matchFormatDescriptionText,
   matchFormatText,
-  matchPositionText,
   versusText,
   type TournamentPageText,
 } from "@/lib/shared/tournament-page-text";
+import { buildShareRounds, shareRoundText } from "@/lib/shared/share-round";
 import { visibleText } from "@/lib/shared/visible-text";
 import { shownTiebreakMap } from "@/lib/shared/match-maps";
 import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapName } from "@/lib/shared/round-maps";
@@ -267,6 +267,9 @@ function MatchHeader({
   const doubleForfeit = isMatchDoubleForfeit(match);
   const score = matchPageHeaderScore(match, sides, doubleForfeit);
   const phaseName = detail.phases?.find((item) => item.id === match.phaseId)?.name ?? null;
+  // Le nom du tour que l'arbre lui donne (« Quart de finale 2 »), comme son aperçu partagé.
+  const rounds = useMemo(() => buildShareRounds(detail), [detail]);
+  const roundName = shareRoundText(text, rounds.get(match.id) ?? null, match);
   const startAt = formatMatchStartAtFull(match.startAt, locale);
   const winner = sides.find((side) => side.teamId !== null && side.teamId === match.winnerTeamId) ?? null;
   // Même alerte que le bandeau d'horaire de la carte : un match casté à son
@@ -278,7 +281,7 @@ function MatchHeader({
   return (
     <header className={styles.header}>
       <p className={styles.meta}>
-        {[detail.card.name, phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
+        {[detail.card.name, phaseName, roundName].filter(Boolean).join(" · ")}
       </p>
       {/* Dans l'ordre du tableau d'affichage : l'hôte d'abord, à gauche. */}
       <h1 className={styles.title}>{versusText(text, left.displayName, right.displayName)}</h1>

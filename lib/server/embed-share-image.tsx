@@ -141,14 +141,16 @@ export async function renderEmbedShareImage(
   const match = target.kind === "match" ? view.share.matches.get(target.matchId) : undefined;
   if (target.kind === "match" && !match) return neutralImage(locale);
 
+  // Un seul instant pour l'empreinte et l'image : l'horaire n'y est dessiné qu'à venir.
+  const now = Date.now();
   const version =
     target.kind === "match" && match
-      ? matchShareVersion(view.card, match)
+      ? matchShareVersion(view.card, match, now)
       : tournamentShareVersion(view.card, view.share.leader);
   const image = await cachedShareImage(
     `${locale}:${key}:${version}`,
     EMBED_CARD_TTL_MS,
-    () => buildEmbedShareImage(target, view, locale),
+    () => buildEmbedShareImage(target, view, locale, now),
     "embed",
     false,
     shareEmbedRenderAdmission(client),
@@ -185,6 +187,7 @@ export async function buildEmbedShareImage(
   target: EmbedShareTarget,
   view: ShareView,
   locale: Locale,
+  now: number = Date.now(),
 ): Promise<ImageResponse | null> {
   const messages = messagesFor(locale);
   const logoSrc = await shareCardLogo();
@@ -225,7 +228,7 @@ export async function buildEmbedShareImage(
   const match = view.share.matches.get(target.matchId);
   if (!match) return null;
   const position = shareRoundText(shareRoundPageText(locale, messages), match.round, match);
-  const card = matchEmbedCard(view.card, match, position, messages, locale);
+  const card = matchEmbedCard(view.card, match, position, messages, locale, now);
   const [logo1, logo2] = await Promise.all([
     teamLogoDataUrl(card.team1.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
     teamLogoDataUrl(card.team2.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),

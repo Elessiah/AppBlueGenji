@@ -287,25 +287,68 @@ describe("match a venir : horaire programme", () => {
     summary({ status: "READY", score: null, winnerSide: null, startAt: START, ...overrides });
 
   it("matchScheduledAt_pendingWithStart_returnsStart", () => {
-    expect(matchScheduledAt(scheduled())).toBe(START);
-    expect(matchScheduledAt(scheduled({ status: "PENDING" }))).toBe(START);
+    expect(matchScheduledAt(scheduled(), NOW)).toBe(START);
+    expect(matchScheduledAt(scheduled({ status: "PENDING" }), NOW)).toBe(START);
   });
 
   it("matchScheduledAt_noStart_returnsNull", () => {
-    expect(matchScheduledAt(scheduled({ startAt: null }))).toBeNull();
+    expect(matchScheduledAt(scheduled({ startAt: null }), NOW)).toBeNull();
   });
 
   it("matchScheduledAt_unreadableStart_returnsNull", () => {
-    expect(matchScheduledAt(scheduled({ startAt: "nope" }))).toBeNull();
+    expect(matchScheduledAt(scheduled({ startAt: "nope" }), NOW)).toBeNull();
   });
 
   it("matchScheduledAt_playedOrInProgress_returnsNull", () => {
-    expect(matchScheduledAt(scheduled({ status: "COMPLETED" }))).toBeNull();
-    expect(matchScheduledAt(scheduled({ status: "AWAITING_CONFIRMATION" }))).toBeNull();
-    expect(matchScheduledAt(scheduled({ score: { team1: 1, team2: 0 } }))).toBeNull();
-    expect(matchScheduledAt(scheduled({ maps: [mapRow(1)] }))).toBeNull();
-    expect(matchScheduledAt(scheduled({ forfeitSide: 1 }))).toBeNull();
-    expect(matchScheduledAt(scheduled({ doubleForfeit: true }))).toBeNull();
+    expect(matchScheduledAt(scheduled({ status: "COMPLETED" }), NOW)).toBeNull();
+    expect(matchScheduledAt(scheduled({ status: "AWAITING_CONFIRMATION" }), NOW)).toBeNull();
+    expect(matchScheduledAt(scheduled({ score: { team1: 1, team2: 0 } }), NOW)).toBeNull();
+    expect(matchScheduledAt(scheduled({ maps: [mapRow(1)] }), NOW)).toBeNull();
+    expect(matchScheduledAt(scheduled({ forfeitSide: 1 }), NOW)).toBeNull();
+    expect(matchScheduledAt(scheduled({ doubleForfeit: true }), NOW)).toBeNull();
+  });
+
+  it("matchScheduledAt_pastSlot_returnsNull", () => {
+    const after = Date.parse(START) + 60_000;
+
+    expect(matchScheduledAt(scheduled(), after)).toBeNull();
+  });
+
+  it("matchScheduledAt_slotIsNow_returnsNull", () => {
+    expect(matchScheduledAt(scheduled(), Date.parse(START))).toBeNull();
+  });
+
+  it("matchScheduledAt_oneMinuteBefore_returnsStart", () => {
+    expect(matchScheduledAt(scheduled(), Date.parse(START) - 60_000)).toBe(START);
+  });
+
+  it("embedLongWhen_summerTime_parisIsUtcPlusTwo", () => {
+    // Samedi 18 juillet 2026, 19:00 UTC = 21:00 à Paris (heure d'été).
+    expect(embedLongWhen("2026-07-18T19:00:00.000Z", "fr")).toBe("Samedi 18 juillet · 21:00");
+    expect(embedShortWhen("2026-07-18T19:00:00.000Z", "en")).toBe("Sat, Jul 18 21:00");
+  });
+
+  it("embedLongWhen_dstSwitchNight_followsParisOffset", () => {
+    // 25 octobre 2026 : retour à l'heure d'hiver à 03:00 ; 02:30 UTC = 03:30 à Paris.
+    expect(embedShortWhen("2026-10-25T02:30:00.000Z", "fr")).toBe("dim. 25 oct. 03:30");
+  });
+
+  it("matchEmbedCard_pastSlot_hasNoSchedule", () => {
+    const after = Date.parse(START) + 60_000;
+
+    expect(matchEmbedCard(CARD, scheduled(), "Final", EN, "en", after).schedule).toBeNull();
+  });
+
+  it("matchEmbedTitle_pastSlot_hasNoDate", () => {
+    const after = Date.parse(START) + 60_000;
+
+    expect(matchEmbedTitle(scheduled(), "Final", EN, "en", after)).toBe("Alpha vs Bravo · Final");
+  });
+
+  it("matchEmbedDescription_pastSlot_staysNull", () => {
+    const after = Date.parse(START) + 60_000;
+
+    expect(matchEmbedDescription(scheduled(), EN, "en", after)).toBeNull();
   });
 
   it("embedLongWhen_french_capitalisedParisTime", () => {
@@ -327,46 +370,46 @@ describe("match a venir : horaire programme", () => {
   });
 
   it("matchEmbedCard_scheduled_carriesLargeScheduleWithZone", () => {
-    expect(matchEmbedCard(CARD, scheduled(), "Quart de finale 2", FR, "fr").schedule).toEqual({
+    expect(matchEmbedCard(CARD, scheduled(), "Quart de finale 2", FR, "fr", NOW).schedule).toEqual({
       when: "Mardi 17 novembre · 21:00",
       zone: "heure de Paris",
     });
-    expect(matchEmbedCard(CARD, scheduled(), "Quarterfinal 2", EN, "en").schedule).toEqual({
+    expect(matchEmbedCard(CARD, scheduled(), "Quarterfinal 2", EN, "en", NOW).schedule).toEqual({
       when: "Tuesday, November 17 · 21:00",
       zone: "Paris time",
     });
   });
 
   it("matchEmbedCard_playedOrNoDate_hasNoSchedule", () => {
-    expect(matchEmbedCard(CARD, summary({ startAt: START }), "Final", EN, "en").schedule).toBeNull();
-    expect(matchEmbedCard(CARD, scheduled({ startAt: null }), "Final", EN, "en").schedule).toBeNull();
+    expect(matchEmbedCard(CARD, summary({ startAt: START }), "Final", EN, "en", NOW).schedule).toBeNull();
+    expect(matchEmbedCard(CARD, scheduled({ startAt: null }), "Final", EN, "en", NOW).schedule).toBeNull();
   });
 
   it("matchEmbedTitle_scheduled_putsRoundThenDate", () => {
-    expect(matchEmbedTitle(scheduled(), "Quart de finale 2", FR, "fr")).toBe(
+    expect(matchEmbedTitle(scheduled(), "Quart de finale 2", FR, "fr", NOW)).toBe(
       "Alpha contre Bravo · Quart de finale 2 · mar. 17 nov. 21:00",
     );
-    expect(matchEmbedTitle(scheduled(), "Quarterfinal 2", EN, "en")).toBe(
+    expect(matchEmbedTitle(scheduled(), "Quarterfinal 2", EN, "en", NOW)).toBe(
       "Alpha vs Bravo · Quarterfinal 2 · Tue, Nov 17 21:00",
     );
   });
 
   it("matchEmbedTitle_played_hasNoDate", () => {
-    expect(matchEmbedTitle(summary({ startAt: START }), "Final", EN, "en")).toBe("Alpha vs Bravo · Final");
+    expect(matchEmbedTitle(summary({ startAt: START }), "Final", EN, "en", NOW)).toBe("Alpha vs Bravo · Final");
   });
 
   it("matchEmbedDescription_scheduled_opensOnDateAndZone", () => {
-    expect(matchEmbedDescription(scheduled(), FR, "fr")).toBe("Mardi 17 novembre · 21:00 (heure de Paris)");
-    expect(matchEmbedDescription(scheduled(), EN, "en")).toBe("Tuesday, November 17 · 21:00 (Paris time)");
+    expect(matchEmbedDescription(scheduled(), FR, "fr", NOW)).toBe("Mardi 17 novembre · 21:00 (heure de Paris)");
+    expect(matchEmbedDescription(scheduled(), EN, "en", NOW)).toBe("Tuesday, November 17 · 21:00 (Paris time)");
   });
 
   it("matchEmbedDescription_scheduledWithoutDate_staysNull", () => {
-    expect(matchEmbedDescription(scheduled({ startAt: null }), EN, "en")).toBeNull();
+    expect(matchEmbedDescription(scheduled({ startAt: null }), EN, "en", NOW)).toBeNull();
   });
 
   it("matchEmbedCard_longTeamNames_areBoundedAndScheduleKept", () => {
     const long = { ...ALPHA, name: "A".repeat(80) };
-    const card = matchEmbedCard(CARD, scheduled({ team1: long }), "Final", EN, "en");
+    const card = matchEmbedCard(CARD, scheduled({ team1: long }), "Final", EN, "en", NOW);
 
     expect(card.team1.name.length).toBeLessThanOrEqual(EMBED_TEAM_NAME_MAX_LENGTH);
     expect(card.schedule?.when).toBe("Tuesday, November 17 · 21:00");

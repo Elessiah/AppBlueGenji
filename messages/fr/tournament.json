@@ -214,6 +214,7 @@
       "roundOf16": "8ème de finale {number}"
     },
     "roundN": "Manche {number}",
+    "swissRoundN": "Ronde {number}",
     "matchN": "Match {number}",
     "roundsRange": "Tours {from} à {to}",
     "finalPhase": "Phase finale",

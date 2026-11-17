@@ -20,8 +20,12 @@ function match(bracket: BracketType, roundNumber: number, matchNumber = 1, phase
   return bracketMatch({ id: nextId, bracket, roundNumber, matchNumber, phaseId });
 }
 
-function roundsOf(card: Pick<TournamentCard, "format">, matches: BracketMatch[], phases: TournamentPhase[] | null = null) {
-  const rounds = buildShareRounds({ card: tournamentCard({ format: card.format }), phases, matches });
+function roundsOf(
+  card: Pick<TournamentCard, "format"> & Partial<Pick<TournamentCard, "state">>,
+  matches: BracketMatch[],
+  phases: TournamentPhase[] | null = null,
+) {
+  const rounds = buildShareRounds({ card: tournamentCard({ format: card.format, state: card.state ?? "RUNNING" }), phases, matches });
   return (m: BracketMatch): ShareRound | null => rounds.get(m.id) ?? null;
 }
 
@@ -69,6 +73,15 @@ describe("buildShareRounds / shareRoundText — simple élimination", () => {
     const of = roundsOf({ format: "SINGLE" }, [...all, third]);
     expect(textOf(third, of(third))).toBe("Petite Finale");
     expect(textOf(r3, of(r3))).toBe("Finale");
+  });
+});
+
+describe("buildShareRounds / shareRoundText — rang du tour", () => {
+  it("buildShareRounds_lowerEarlyRound_numberedByRankInItsBracket", () => {
+    const lower = [3, 4, 5, 6, 7, 8].map((round) => match("LOWER", round, 1));
+    const of = roundsOf({ format: "DOUBLE" }, lower);
+    expect(textOf(lower[1], of(lower[1]))).toBe("Tableau perdants · Manche 2 · Match 1");
+    expect(textOf(lower[1], of(lower[1]), "en")).toBe("Lower bracket · Round 2 · Match 1");
   });
 });
 
@@ -150,11 +163,64 @@ describe("buildShareRounds / shareRoundText — modes à classement", () => {
     expect(textOf(third, of(third))).toBe("Petite Finale");
   });
 
-  it("buildShareRounds_bgSurviePlayoffFinalAlone_isFinal", () => {
+  it("buildShareRounds_bgSurviePlayoffFinal_isGrandFinalLikeThePage", () => {
+    // La fiche sous-titre la finale de l'arbre final « Grande Finale » (`grandFinalLabel`).
     const final = match("UPPER", PLAYOFF_ROUND_OFFSET + 2, 1);
     const earlier = [match("UPPER", PLAYOFF_ROUND_OFFSET, 1), match("UPPER", PLAYOFF_ROUND_OFFSET + 1, 1)];
     const of = roundsOf({ format: "BG_SURVIE" }, [...earlier, final]);
-    expect(textOf(final, of(final))).toBe("Finale");
+    expect(textOf(final, of(final))).toBe("Grande Finale");
+    expect(textOf(final, of(final), "en")).toBe("Grand final");
+  });
+
+  it("buildShareRounds_bgSurvieFiveRoundTree_earlyRoundNumberedByRank", () => {
+    // 32 qualifiées : seize rencontres au premier tour, un tour avant les huitièmes.
+    const first = Array.from({ length: 16 }, (_, index) => match("UPPER", PLAYOFF_ROUND_OFFSET, index + 1));
+    const of = roundsOf({ format: "BG_SURVIE" }, first);
+    expect(textOf(first[2], of(first[2]))).toBe("Manche 1 · Match 3");
+    expect(textOf(first[2], of(first[2]), "en")).toBe("Round 1 · Match 3");
+  });
+
+  it("buildShareRounds_bgSurvieRunningDoubleForfeitPair_countsRoundsLikeThePage", () => {
+    // Les quarts 1 et 2 clos sur un double forfait : le tour suivant n'a qu'une
+    // rencontre, qui est la finale — les quarts restants sont des demi-finales.
+    const vacated = { status: "COMPLETED" as const, doubleForfeit: true };
+    const quarters = [
+      bracketMatch({ id: 501, roundNumber: PLAYOFF_ROUND_OFFSET, matchNumber: 1, ...vacated }),
+      bracketMatch({ id: 502, roundNumber: PLAYOFF_ROUND_OFFSET, matchNumber: 2, ...vacated }),
+      bracketMatch({ id: 503, roundNumber: PLAYOFF_ROUND_OFFSET, matchNumber: 3 }),
+      bracketMatch({ id: 504, roundNumber: PLAYOFF_ROUND_OFFSET, matchNumber: 4 }),
+    ];
+    const of = roundsOf({ format: "BG_SURVIE", state: "RUNNING" }, quarters);
+    expect(textOf(quarters[2], of(quarters[2]))).toBe("Demi-finale 3");
+  });
+
+  it("buildShareRounds_bgSurvieFinished_ignoresUnplayedRounds", () => {
+    const quarters = [1, 2, 3, 4].map((n) => match("UPPER", PLAYOFF_ROUND_OFFSET, n));
+    const of = roundsOf({ format: "BG_SURVIE", state: "FINISHED" }, quarters);
+    expect(textOf(quarters[0], of(quarters[0]))).toBe("Quart de finale 1");
+  });
+});
+
+describe("shareRoundText — mots de manche", () => {
+  // La page d'un match n'a pas les textes des vues : les mots de `bracket.*`
+  // doivent rester ceux que la vue suisse / survie affiche.
+  const fr = messagesFor("fr");
+  const en = messagesFor("en");
+
+  it("bracketSwissRoundN_equalsSwissViewNoun_french", () => {
+    expect(fr.tournament.bracket.swissRoundN).toBe(`${fr.tournamentViews.swiss.roundNoun} {number}`);
+  });
+
+  it("bracketSwissRoundN_equalsSwissViewNoun_english", () => {
+    expect(en.tournament.bracket.swissRoundN).toBe(`${en.tournamentViews.swiss.roundNoun} {number}`);
+  });
+
+  it("bracketRoundN_equalsSurvivalViewNoun_french", () => {
+    expect(fr.tournament.bracket.roundN).toBe(`${fr.tournamentViews.survival.roundNoun} {number}`);
+  });
+
+  it("bracketRoundN_equalsSurvivalViewNoun_english", () => {
+    expect(en.tournament.bracket.roundN).toBe(`${en.tournamentViews.survival.roundNoun} {number}`);
   });
 });
 

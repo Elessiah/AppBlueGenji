@@ -82,16 +82,28 @@ plus « Manche n · Match m » (`lib/shared/share-round.ts`) : « Quart de final
 de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-stage.ts`).
 - `buildShareRounds` (dans le résumé, donc dans l'empreinte `?v=` de l'image) nomme
   chaque tableau (par phase et par `bracket`) depuis son dernier tour ; l'arbre final
-  de BlueGenji Survie sur `endurancePlayoffRoundCount` (déplacé dans
-  `lib/shared/bg-survie/playoff-rounds.ts`).
-- Premiers tours d'un grand tableau : « Manche 1 · Match 7 » ; modes à classement :
-  « Ronde 3 · Match 2 » (suisse, mot `swiss.roundNoun`), « Manche 4 · Match 1 » (Survie,
+  de BlueGenji Survie sur le même compte que la fiche (`endurancePlayoffRoundCount`
+  avec les cases à pourvoir `endurancePlayoffGhostSlots` tant que le tournoi vit —
+  une paire vidée par double forfait raccourcit l'arbre —, tous deux dans
+  `lib/shared/bg-survie/playoff-rounds.ts`), et sa finale y est « Grande Finale »
+  comme sur la fiche (`grandFinalLabel`).
+- Premiers tours d'un grand tableau : « Manche 1 · Match 7 », le numéro étant le **rang
+  du tour dans son tableau** (celui de la colonne de la fiche), jamais le numéro brut
+  du moteur (1000 et plus dans l'arbre final de BlueGenji Survie) ; modes à classement :
+  « Ronde 3 · Match 2 » (suisse, `bracket.swissRoundN`, tenu égal à `swiss.roundNoun`
+  par un test : la page d'un match n'a pas les textes des vues), « Manche 4 · Match 1 » (Survie,
   qualification de BlueGenji Survie) — « Round » en anglais. Le numéro du match n'est
   écrit que si le nom seul est ambigu (jamais pour une finale).
-- Match absent du résumé (encart de repli, sans réponse publique) : « Manche n · Match m ».
-- Non changé : l'en-tête de la page du match garde « Manche n · Match m »
-  (`matchPositionText`), et la carte du direct de l'accueil (`landing.json` → `round`,
+- L'en-tête de la page du match (ligne de situation) porte le même nom
+  (`buildShareRounds` sur `detail.matches`).
+- Match absent du résumé (encart de repli) : « Manche n · Match m ». Ce repli ne sert
+  que quand la réponse publique n'est pas lue (tournoi non publié, lecture en échec ou
+  refusée par le plafond) : nommer le tour demande tous les matchs du tournoi, soit
+  précisément la lecture qui manque — la refaire à part contournerait le plafond.
+- Non changé : la carte du direct de l'accueil (`landing.json` → `round`,
   `phase.round`) n'est pas un aperçu partagé.
+- Image : le sous-titre (nom du tour, « +N maps ») a 640 px ; c'est le nom du tournoi
+  qui cède, pas le numéro du match.
 
 ## Match à venir : horaire en avant
 
@@ -102,7 +114,10 @@ son horaire en tête, à l'heure de Paris, dans les deux langues :
   `share.embed.timeZone`) ;
 - titre : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » ;
 - description : « Mardi 17 novembre · 21:00 (heure de Paris) ».
-Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant.
+Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant. Un créneau
+**passé** non plus (match en retard) : `matchScheduledAt(match, now)` ne rend l'horaire
+qu'à venir, et ce basculement entre dans l'empreinte (`matchShareVersion`), calculée au
+même instant que l'image, le titre et la description.
 
 ## Confidentialité
 
