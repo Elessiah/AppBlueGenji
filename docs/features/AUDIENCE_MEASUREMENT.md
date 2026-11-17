@@ -21,14 +21,22 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   visiteur ne compte pas deux fois). Chaque entrée prend le sel de **son**
   jour, pas du jour de réception. Une fois le jour replié (75 min après
   minuit, au premier entretien), `forgetSalts` efface son sel (base et
-  mémoire) et `recordAudienceViews` écarte les entrées tardives de ce jour :
+  mémoire) — **même si le repli échoue** (le repli lit l'empreinte gardée,
+  jamais le sel), et la purge des 13 mois tourne aussi — ; une lecture de
+  sel abandonnée (délai dépassé) qui écrit après l'entretien voit son sel
+  effacé dès qu'elle finit (`forgetSaltIfClosed`) ; et `recordAudienceViews`
+  écarte les entrées tardives de ce jour :
   plus personne ne peut recalculer une empreinte, hors une copie de
   sauvegarde chiffrée faite entre-temps (T09, 30 jours) — les textes légaux
   le disent.
 - **Rien d'identifiant n'est gardé tel quel** : type de page (gabarit, jamais
   l'adresse, un numéro ni un nom), langue, classe d'appareil (largeur de
   fenêtre), famille de provenance (le site d'origine est réduit aussitôt :
-  `sourceFromReferrerHost`), temps onglet visible plafonné à 30 min.
+  `sourceFromReferrerHost`), temps onglet visible envoyé par tranches, chacune
+  plafonnée à 30 min (`AUDIENCE_MAX_ENGAGED_MS` : un plafond par suite, pas
+  par page — une longue lecture en additionne plusieurs). Le navigateur
+  n'envoie que **l'adresse type du gabarit** (`audienceBeaconPath` :
+  `/joueurs/pseudo` → `/joueurs/0`), jamais l'adresse affichée.
 - **Agrégé seulement** à la lecture : la page ne lit que les tables
   `bg_audience_day*`, jamais `bg_audience_views`.
 - **13 mois** pour les lignes détaillées (`AUDIENCE_RAW_RETENTION_MONTHS`),
@@ -118,7 +126,8 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   (visiteurs, pages vues, visites, temps) restent publiés tels quels : ils
   ne disent ni quelle page, ni d'où, ni à quelle heure. Les jours repliés
   avant ce mécanisme (bases de développement) ne sont pas réécrits.
-- **Pages jamais mesurées** : `/admin/*` et `/signalements/*`, avec ou sans
+- **Pages jamais mesurées** : `/admin/*`, `/signalements/*`, la création et
+  la modification d'un tournoi (`/tournois/creer`, `/tournois/[id]/modifier`), avec ou sans
   préfixe `/en` (personnel et auteurs de signalements, trop peu nombreux
   pour des chiffres anonymes). Le navigateur ne les signale même pas
   (`AudienceTracker` passe par `audiencePageKey`, qui les rend `null`) ; le
@@ -165,7 +174,8 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   lendemain, jour déjà replié, n'est pas compté. `o` est plafonné à 7 jours
   (`AUDIENCE_MAX_OPEN_AGE_MS`) : une valeur démesurée tombe sur un jour
   replié et n'écarte que son entrée, jamais le reste du lot.
-- `p` chemin affiché (réduit côté serveur à `audiencePageKey` : `/frequentation`,
+- `p` adresse type du gabarit (`audienceBeaconPath`, jamais l'adresse affichée ;
+  réduite côté serveur à `audiencePageKey` : `/frequentation`,
   `/api`, `/_next`, `/og` ne comptent pas), `t` temps visible (ms), `a` âge,
   à l'envoi, de l'instant que l'entrée date (ms) — au-delà d'une heure,
   l'entrée est **écartée**, jamais redatée —, `d` appareil, `f` première page

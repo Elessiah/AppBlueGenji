@@ -26,7 +26,12 @@ import { SITE_TIME_ZONE } from "@/lib/shared/locales";
 /** Durée de conservation du détail (une ligne par page vue), en mois. */
 export const AUDIENCE_RAW_RETENTION_MONTHS = 13;
 
-/** Temps de lecture retenu au plus pour une page vue : au-delà, l'onglet est oublié ouvert. */
+/**
+ * Temps retenu au plus pour **une suite** (une tranche de lecture, signalée à
+ * sa clôture) : au-delà, l'onglet est oublié ouvert. Une longue lecture part
+ * en plusieurs tranches ({@link AUDIENCE_CHECKPOINT_MS}), dont les temps
+ * s'additionnent : ce plafond n'est pas un plafond par page.
+ */
 export const AUDIENCE_MAX_ENGAGED_MS = 30 * 60 * 1000;
 
 /** Écart entre deux pages vues d'un même visiteur au-delà duquel commence une nouvelle visite. */
@@ -116,11 +121,41 @@ const PAGE_PATTERNS: readonly (readonly [string, RegExp])[] = [
 ];
 
 /**
- * Pages **jamais mesurées** : l'administration (le seul personnel du site) et
- * les signalements (le seul fait d'en ouvrir un). Peu de visiteurs les ouvrent :
- * leurs chiffres, même agrégés, désigneraient presque des personnes.
+ * Pages **jamais mesurées** : l'administration (le seul personnel du site :
+ * `/admin`, la création et la modification d'un tournoi) et les signalements
+ * (le seul fait d'en ouvrir un). Peu de visiteurs les ouvrent : leurs chiffres,
+ * même agrégés, désigneraient presque des personnes.
  */
-const UNMEASURED_PAGES = /^\/(admin|signalements)(\/|$)/;
+const UNMEASURED_PAGES = /^\/(admin|signalements)(\/|$)|^\/tournois\/(creer|[^/]+\/modifier)(\/|$)/;
+
+/**
+ * Adresse type de chaque gabarit : le navigateur n'envoie qu'elle, jamais
+ * l'adresse affichée (numéro, pseudo, nom d'équipe). Chacune se range sous
+ * son propre gabarit (vérifié par les tests).
+ */
+const PAGE_SAMPLES: Readonly<Record<string, string>> = {
+  home: "/",
+  rules: "/regles",
+  rulesMode: "/regles/mode",
+  ranking: "/classement",
+  tournaments: "/tournois",
+  tournament: "/tournois/0",
+  match: "/tournois/0/matchs/0",
+  tournamentOther: "/tournois/0/autre",
+  follow: "/suivre",
+  teams: "/equipes",
+  team: "/equipes/0",
+  players: "/joueurs",
+  player: "/joueurs/0",
+  profile: "/profil",
+  login: "/connexion",
+  bot: "/bot",
+  association: "/association",
+  volunteers: "/benevoles",
+  recruitment: "/recrutement",
+  legal: "/rgpd",
+  other: "/autre",
+};
 
 /** Toutes les clés de page possibles, `other` compris (pour les libellés). */
 export const AUDIENCE_PAGE_KEYS: readonly string[] = [...PAGE_PATTERNS.map(([key]) => key), "other"];
@@ -149,6 +184,20 @@ export function audiencePageKey(rawPath: unknown): { key: string; locale: Audien
   if (/^\/(api|og|_next)(\/|$)/.test(bare) || UNMEASURED_PAGES.test(bare)) return null;
   const match = PAGE_PATTERNS.find(([, pattern]) => pattern.test(bare));
   return { key: match ? match[0] : "other", locale: split.locale };
+}
+
+/**
+ * Ce que le navigateur envoie pour la page `path` : l'adresse type de son
+ * gabarit, dans sa langue (`/joueurs/pseudo` → `/joueurs/0`, `/en/equipes/12`
+ * → `/en/equipes/0`), ou `null` pour une page qui ne se mesure pas. Le serveur
+ * la réduit au même gabarit : rien de plus précis ne quitte le navigateur.
+ */
+export function audienceBeaconPath(path: unknown): string | null {
+  const page = audiencePageKey(path);
+  if (!page) return null;
+  const sample = PAGE_SAMPLES[page.key] ?? PAGE_SAMPLES.other;
+  if (page.locale === "fr") return sample;
+  return sample === "/" ? "/en" : `/en${sample}`;
 }
 
 /** Classe d'écran d'après la largeur de la fenêtre (en pixels CSS). */
@@ -249,7 +298,7 @@ export function isAudienceScriptRequest(headers: Pick<Headers, "get">, userAgent
 
 /** Une page vue telle que le navigateur la signale. */
 export interface AudienceBeaconEntry {
-  /** Chemin de la page (sans paramètres). */
+  /** Adresse type du gabarit de la page ({@link audienceBeaconPath}), jamais l'adresse affichée. */
   p: string;
   /** Temps passé onglet visible, en millisecondes (`0` pour une page vue, signalée à son affichage). */
   t: number;

@@ -76,8 +76,9 @@ describe("dailySalt", () => {
     const execute = emptyDatabase();
     mockDb(execute);
 
-    await dailySalt("2026-11-16");
-    await dailySalt("2026-11-16");
+    // Un jour encore ouvert (horloge réelle) : le sel d'un jour clos est effacé dès sa lecture.
+    await dailySalt("2099-11-16");
+    await dailySalt("2099-11-16");
 
     expect(saltWrites(execute)).toHaveLength(1);
   });

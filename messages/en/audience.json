@@ -138,7 +138,7 @@
     "items": [
       "Measured by the site itself: no cookie, no third-party tool, no link to an account.",
       "A visitor is only recognised for one day: visitors of a week, a month or a year are the sum of each day's visitors.",
-      "Time counted is the time the page is shown in the foreground, capped at 30 minutes per page.",
+      "Time counted is the time the page is shown in the foreground, sent in slices, each capped at 30 minutes.",
       "Known bots and people who object to the measurement are not counted. Today's figures appear the next day.",
       "No row of a breakdown (page, device, source, language, hour) describes fewer than {min} visitors from the same day: small numbers are grouped, and a group still too small takes in the next row. Each day's totals are given as they are."
     ],

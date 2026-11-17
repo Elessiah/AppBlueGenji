@@ -149,7 +149,14 @@ async function loadSalt(day: string): Promise<Buffer> {
 export function dailySalt(day: string): Promise<Buffer> {
   const known = salts.get(day);
   if (known) return known;
-  const value = withTimeout(loadSalt(day), SALT_READ_TIMEOUT_MS, "audience salt read timed out");
+  const load = loadSalt(day);
+  // Une lecture abandonnée (délai dépassé) peut encore écrire le sel après
+  // l'entretien qui l'a effacé : celui d'un jour clos à sa fin est effacé aussitôt.
+  load.then(
+    () => forgetSaltIfClosed(day),
+    () => undefined,
+  );
+  const value = withTimeout(load, SALT_READ_TIMEOUT_MS, "audience salt read timed out");
   salts.set(day, value);
   startSaltSweep();
   // Une lecture ratée reste en échec SALT_RETRY_MS ms (une ligne au journal,
@@ -162,6 +169,22 @@ export function dailySalt(day: string): Promise<Buffer> {
     retry.unref?.();
   });
   return value;
+}
+
+/**
+ * Efface le sel de `day` si ce jour est clos à cet instant
+ * ({@link lastRollableDay}) : rattrape une écriture de sel finie après
+ * l'entretien. Jamais levé (une erreur est journalisée).
+ */
+async function forgetSaltIfClosed(day: string): Promise<void> {
+  if (day > lastRollableDay(new Date())) return;
+  try {
+    const db = await getDatabase();
+    await db.execute(`DELETE FROM bg_audience_salts WHERE day = ?`, [day]);
+    if (salts.has(day)) salts.delete(day);
+  } catch (error) {
+    console.error(`[audience] Sel du ${day} (jour clos) non effacé.`, failureReason(error));
+  }
 }
 
 /** `promise`, ou un échec `message` passé `ms` ms. */
@@ -401,24 +424,31 @@ export async function runMaintenance(now: Date = new Date()): Promise<void> {
   const until = lastRollableDay(now);
   const previous = rolledThrough;
   if (rolledThrough === null || until > rolledThrough) rolledThrough = until;
-  let rolled: number;
+  let rolled = 0;
+  let failure: unknown = null;
   try {
     for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
       await flushAudienceViews(now);
     }
     rolled = await rollUpAudienceDays(now);
   } catch (error) {
-    // Repli raté : ces jours restent ouverts, leurs entrées tardives sont encore reçues.
+    // Repli raté : ces jours se replieront plus tard (le repli lit l'empreinte
+    // gardée, jamais le sel), mais les signalements qui finissent maintenant
+    // en écartent encore les entrées (jours clos, comme `recordViews`).
     rolledThrough = previous;
-    throw error;
+    failure = error;
   }
-  // Un jour clos n'a plus besoin de son sel : ses entrées tardives sont écartées.
-  await forgetSalts(until);
-  await purgeAudienceViews(now);
+  // Un jour clos n'a plus besoin de son sel, même si son repli a échoué : ses
+  // entrées tardives sont écartées. La purge du détail ne dépend pas non plus
+  // du repli : ni le sel ni le détail ne restent au-delà des durées annoncées.
+  const cleanup = await Promise.allSettled([forgetSalts(until), purgeAudienceViews(now)]);
   if (rolled > 0) {
     statsCache = null;
     statsGeneration += 1;
   }
+  if (failure !== null) throw failure;
+  const failed = cleanup.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failed) throw failed.reason;
 }
 
 interface DayRow extends RowDataPacket {

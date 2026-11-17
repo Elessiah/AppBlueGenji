@@ -28,6 +28,7 @@ import {
   AUDIENCE_MAX_ENGAGED_MS,
   AUDIENCE_SUSPEND_GAP_MS,
   AUDIENCE_VISIT_GAP_MINUTES,
+  audienceBeaconPath,
   audiencePageKey,
   parisClock,
   type AudienceBeaconEntry,
@@ -157,7 +158,8 @@ export class AudienceTracker {
     if (continuation || !audiencePageKey(path)) return;
     // La page vue part dès son affichage, datée de son début.
     this.counted = { path, openedAt };
-    const entry: AudienceBeaconEntry = { p: path, t: 0, a: 0, d: this.deps.device() };
+    // Seule l'adresse type du gabarit part : jamais un numéro, un pseudo ni un nom.
+    const entry: AudienceBeaconEntry = { p: audienceBeaconPath(path) ?? "/autre", t: 0, a: 0, d: this.deps.device() };
     if (first) {
       entry.f = 1;
       entry.r = this.deps.referrerHost();
@@ -179,7 +181,7 @@ export class AudienceTracker {
     const end = now - segment.aliveAt > AUDIENCE_SUSPEND_GAP_MS ? segment.aliveAt : now;
     if (!audiencePageKey(segment.path)) return end;
     const time = Math.max(0, Math.min(AUDIENCE_MAX_ENGAGED_MS, Math.round(end - segment.visibleSince)));
-    if (time > 0) this.enqueue({ p: segment.path, t: time, a: 0, d: this.deps.device(), c: 1 }, end, segment.openedAt);
+    if (time > 0) this.enqueue({ p: audienceBeaconPath(segment.path) ?? "/autre", t: time, a: 0, d: this.deps.device(), c: 1 }, end, segment.openedAt);
     return end;
   }
 

@@ -428,7 +428,8 @@ function RgpdFr({
           Le site garde aussi, en mémoire seulement, jamais en base ni dans un journal, l&apos;adresse IP
           de qui appelle ses routes ouvertes sans compte ou avant la connexion (données de la page
           d&apos;accueil, page du bot et son direct, rapports de sécurité du navigateur, signalement sans
-          compte, code de connexion Discord, envoi des statistiques de fréquentation détaillées), pour en plafonner les requêtes : deux minutes au plus
+          compte, code de connexion Discord, envoi des statistiques de fréquentation détaillées — pour cet envoi, aussi ses réseaux
+          IPv6 /64 et /48 et un condensé court du navigateur), pour en plafonner les requêtes : deux minutes au plus
           après sa dernière requête, trente et une minutes pour un signalement sans compte, seize pour
           un code Discord, et en outre tant que le direct de la page du bot reste ouvert (même
           registre, T17).
@@ -721,6 +722,14 @@ function RgpdFr({
               décrit sous <Link href="#audience">Mesure d&apos;audience</Link>.
             </li>
             <li>
+              <strong>Statistiques de fréquentation détaillées</strong> — rien n&apos;est déposé
+              dans votre navigateur : le script de cette mesure y lit seulement, à chaque page, la
+              largeur de la fenêtre (classe d&apos;appareil), à la première page d&apos;une visite
+              l&apos;adresse du site d&apos;où vous venez (référent), les signaux Global Privacy
+              Control et Do Not Track et le cookie d&apos;opposition ci-dessous ; ce qui part au serveur est décrit sous{" "}
+              <Link href="#audience-detaillee">Statistiques de fréquentation détaillées</Link>.
+            </li>
+            <li>
               <strong>bg_audience_optout</strong> — déposé uniquement <strong>si vous vous
               opposez à la mesure d&apos;audience</strong> (bouton de la section{" "}
               <Link href="#audience">Mesure d&apos;audience</Link>), pour ne plus signaler ni
@@ -782,8 +791,9 @@ function RgpdFr({
             </li>
           </ul>
           <p>
-            <strong>bg:last-visit-ping</strong> relève de la mesure d&apos;audience, dont les
-            conditions sont décrites ci-dessous : il entre dans la dispense prévue par la
+            <strong>bg:last-visit-ping</strong> et la lecture faite par les statistiques de
+            fréquentation détaillées relèvent de la mesure d&apos;audience, dont les
+            conditions sont décrites ci-dessous : elles entrent dans la dispense prévue par la
             CNIL pour les traceurs de mesure d&apos;audience (lignes directrices du 17 septembre
             2020), qui suppose un moyen de s&apos;y opposer et des durées de conservation
             limitées — les deux sont décrits ci-dessous. Les autres éléments ne demandent pas votre
@@ -888,8 +898,9 @@ function RgpdFr({
           </p>
           <p>
             <strong>Ce qui est transmis.</strong> À chaque page affichée, votre navigateur note le
-            type de la page (accueil, fiche d&apos;un tournoi…), le temps passé onglet visible
-            (plafonné à {AUDIENCE_MAX_ENGAGED_MS / 60_000} minutes par page), la classe de votre
+            type de la page (accueil, fiche d&apos;un tournoi…), jamais son adresse précise, un numéro
+            ni un nom, le temps passé onglet visible (envoyé par tranches, chacune plafonnée à{" "}
+            {AUDIENCE_MAX_ENGAGED_MS / 60_000} minutes), la classe de votre
             appareil (mobile, tablette, ordinateur, d&apos;après la largeur de la fenêtre) et, pour la
             première page d&apos;une visite, le nom du site d&apos;où vous venez. Ces notes partent
             par lots vers le serveur. Aucun cookie n&apos;est déposé, rien n&apos;est gardé dans le
@@ -916,9 +927,10 @@ function RgpdFr({
             l&apos;association à faire connaître son audience à ses partenaires (art. 6.1.f du RGPD).
             Cette mesure est dispensée de consentement (art. 82 de la loi Informatique et Libertés) :
             elle se limite à la mesure d&apos;audience du site, ne produit que des chiffres agrégés,
-            ne vous suit pas d&apos;un site à l&apos;autre, n&apos;est rapprochée ni de votre compte ni
-            d&apos;aucun autre traitement, et ses données détaillées ne sont gardées que{" "}
-            {AUDIENCE_RAW_RETENTION_MONTHS} mois, conditions posées par la CNIL.
+            ne vous suit pas d&apos;un site à l&apos;autre et n&apos;est rapprochée ni de votre compte ni
+            d&apos;aucun autre traitement, conditions posées par la CNIL ; ses données détaillées ne
+            sont gardées que {AUDIENCE_RAW_RETENTION_MONTHS} mois, durée choisie par
+            l&apos;association, en deçà des 25 mois que la CNIL admet.
           </p>
           <p>
             <strong>Durée de conservation.</strong> Les pages vues détaillées sont effacées au bout de{" "}
@@ -942,8 +954,9 @@ function RgpdFr({
           <p>
             <strong>Votre droit d&apos;opposition.</strong> Le même que pour la mesure ci-dessus : les
             signaux Global Privacy Control et Do Not Track de votre navigateur, ou le bouton
-            ci-dessus, arrêtent aussi cette mesure-ci — rien ne part de votre navigateur, et le
-            serveur, qui relit ces signaux, n&apos;enregistre rien. Pour les pages vues déjà
+            ci-dessus, arrêtent aussi cette mesure-ci — un navigateur qui expose ces signaux, ou qui
+            porte le cookie d&apos;opposition, n&apos;envoie rien, et le serveur, qui relit les signaux
+            reçus et ce cookie, n&apos;enregistre rien. Pour les pages vues déjà
             enregistrées, l&apos;empreinte du jour ne permet plus de vous retrouver une fois la
             journée passée ; le droit s&apos;exerce comme vos autres droits (section{" "}
             <a href="#exercer-vos-droits">« Exercer vos droits »</a>).

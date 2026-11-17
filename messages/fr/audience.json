@@ -138,7 +138,7 @@
     "items": [
       "Mesure faite par le site lui-même : aucun cookie, aucun outil tiers, aucun lien avec un compte.",
       "Un visiteur est reconnu le temps d'une journée seulement : les visiteurs d'une semaine, d'un mois ou d'une année sont la somme des visiteurs de chaque jour.",
-      "Le temps compté est celui où la page est affichée au premier plan, plafonné à 30 minutes par page.",
+      "Le temps compté est celui où la page est affichée au premier plan, envoyé par tranches, chacune plafonnée à 30 minutes.",
       "Les robots connus et les personnes qui s'opposent à la mesure ne sont pas comptés. Les chiffres du jour en cours s'affichent le lendemain.",
       "Aucune ligne d'une répartition (page, appareil, provenance, langue, heure) ne décrit moins de {min} visiteurs d'une même journée : les petits nombres sont regroupés, et un groupe encore trop petit l'est avec la ligne suivante. Les totaux de chaque jour sont donnés tels quels."
     ],
