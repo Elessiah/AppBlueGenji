@@ -198,18 +198,49 @@ export function isBotUserAgent(userAgent: string | null | undefined): boolean {
   return BOT_USER_AGENT.test(userAgent);
 }
 
+/** Version `majeure.mineure` comparée à un seuil. */
+function atLeast(major: string | undefined, minor: string | undefined, wantMajor: number, wantMinor = 0): boolean {
+  const a = Number(major);
+  const b = Number(minor ?? 0);
+  return a > wantMajor || (a === wantMajor && b >= wantMinor);
+}
+
+/**
+ * Ce navigateur pose-t-il les en-têtes `Sec-Fetch-*` ? Chrome 76+, Firefox
+ * 90+, WebKit de Safari / iOS 16.4+. Un user-agent inconnu ou plus ancien :
+ * non (on ne peut pas exiger ce qu'il n'envoie pas).
+ */
+export function sendsFetchMetadata(userAgent: string | null | undefined): boolean {
+  const ua = userAgent ?? "";
+  // Tout navigateur iOS est un WebKit : la version du système fait foi.
+  if (/\b(?:iPhone|iPad|iPod)\b/.test(ua)) {
+    const ios = /\bOS (\d+)[_.](\d+)/.exec(ua);
+    return ios ? atLeast(ios[1], ios[2], 16, 4) : false;
+  }
+  const firefox = /\bFirefox\/(\d+)/.exec(ua);
+  if (firefox) return atLeast(firefox[1], "0", 90);
+  const chrome = /\b(?:Chrome|Chromium)\/(\d+)/.exec(ua);
+  if (chrome) return atLeast(chrome[1], "0", 76);
+  const safari = /\bVersion\/(\d+)(?:\.(\d+))?.*\bSafari\//.exec(ua);
+  if (safari) return atLeast(safari[1], safari[2], 16, 4);
+  return false;
+}
+
 /**
  * L'envoi peut-il venir du script d'une page du site ? Un `fetch()` lancé par
  * une page pose `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty` ; un
  * envoi qui déclare une autre provenance (page tierce, aperçu de lien,
- * navigation) est écarté. Un navigateur qui ne pose pas ces en-têtes (Safari
- * avant iOS 16.4, vieilles vues web, proxy qui les retire) reste compté : ce
- * filtre ne prouve rien — un script les forge sans peine —, la vraie borne
- * est celle des plafonds par réseau (`admitAudienceViews`).
+ * navigation) est écarté, comme un envoi sans ces en-têtes au nom d'un
+ * navigateur qui les pose toujours ({@link sendsFetchMetadata} : un script
+ * qui se dit Chrome sans les poser). Seul un navigateur qui ne les connaît pas
+ * (Safari avant iOS 16.4, vieilles vues web) est compté sans eux. Un filtre
+ * bon marché, pas une preuve — un script les forge sans peine — : la vraie
+ * borne est celle des plafonds par réseau (`admitAudienceViews`).
  */
-export function isAudienceScriptRequest(headers: Pick<Headers, "get">): boolean {
+export function isAudienceScriptRequest(headers: Pick<Headers, "get">, userAgent?: string | null): boolean {
   const site = headers.get("sec-fetch-site");
   const dest = headers.get("sec-fetch-dest");
+  if (site === null && dest === null) return !sendsFetchMetadata(userAgent);
   return (site === null || site === "same-origin") && (dest === null || dest === "empty");
 }
 
@@ -581,12 +612,12 @@ export interface AudiencePageStat {
 }
 
 /**
- * Visiteurs qu'il faut au moins, **dans une même journée**, à une ligne d'une
- * répartition (type de page, appareil, provenance, langue, heure) pour être
- * montrée sur la page publique. Le seuil s'applique jour par jour, avant
- * l'addition de la période : une personne venue cinq jours de suite sur une
- * page rare n'y fait jamais une ligne à elle seule, et comparer deux périodes
- * n'isole aucune ligne d'un jour sous le seuil.
+ * Visiteurs distincts qu'il faut au moins, **dans une même journée**, à une
+ * ligne d'une répartition (type de page, appareil, provenance, langue, heure)
+ * pour être gardée : voir {@link anonymizeAudienceDay}, appliqué au repli de
+ * chaque jour. Une personne venue cinq jours de suite sur une page rare n'y
+ * fait jamais une ligne à elle seule, et comparer deux périodes (ou deux
+ * relevés de la même) n'isole aucun groupe d'un jour sous le seuil.
  */
 export const AUDIENCE_MIN_VISITORS = 5;
 
@@ -596,9 +627,115 @@ export const AUDIENCE_MIN_VISITORS = 5;
  */
 export const AUDIENCE_SMALL_KEY = "small";
 
+/** Visiteurs distincts d'un jour sur un ensemble de valeurs d'une répartition (lu dans le détail par le repli). */
+export type AudienceDistinctCounter = (
+  dim: "page" | "hour" | AudienceDim,
+  values: readonly string[],
+) => Promise<number>;
+
+interface FoldableRow {
+  key: string;
+  views: number;
+  visitors: number;
+}
+
+/**
+ * Regroupe les lignes d'une répartition d'un jour : celles que `mustFold`
+ * désigne (sous le seuil, ou clé de regroupement), puis — tant que le groupe
+ * compte moins de {@link AUDIENCE_MIN_VISITORS} visiteurs distincts — la plus
+ * petite des autres (suppression complémentaire : le total du jour étant
+ * publié, le groupe s'en déduirait par soustraction).
+ */
+async function foldRows<T extends FoldableRow>(
+  rows: readonly T[],
+  mustFold: (row: T) => boolean,
+  distinct: (values: readonly string[]) => Promise<number>,
+): Promise<{ kept: T[]; folded: T[]; visitors: number }> {
+  const sorted = [...rows].sort((a, b) => a.visitors - b.visitors || a.views - b.views || a.key.localeCompare(b.key));
+  const folded = sorted.filter(mustFold);
+  const kept = sorted.filter((row) => !mustFold(row));
+  if (folded.length === 0) return { kept, folded, visitors: 0 };
+  const count = () => (folded.length === 1 ? Promise.resolve(folded[0].visitors) : distinct(folded.map((row) => row.key)));
+  let visitors = await count();
+  while (visitors < AUDIENCE_MIN_VISITORS && kept.length > 0) {
+    const next = kept.shift();
+    if (next) folded.push(next);
+    visitors = await count();
+  }
+  return { kept, folded, visitors };
+}
+
+function sumOf<T>(rows: readonly T[], field: (row: T) => number): number {
+  return rows.reduce((total, row) => total + field(row), 0);
+}
+
+/**
+ * k-anonymat d'un jour replié, **avant** l'écriture de ses compteurs : la page
+ * publique ne lit que ce qui en sort.
+ *
+ * - Types de page : un type vu par moins de {@link AUDIENCE_MIN_VISITORS}
+ *   visiteurs (ou inconnu, ou déjà `other`) rejoint `other`.
+ * - Appareils, provenance, langue : une valeur sous le seuil rejoint
+ *   {@link AUDIENCE_SMALL_KEY}.
+ * - Heures : une heure sous le seuil n'est pas gardée.
+ *
+ * Le groupe ainsi formé compte ses visiteurs **distincts** (`distinct`, lu
+ * dans le détail : une personne vue sur trois pages rares compte une fois) ;
+ * sous le seuil, il absorbe la plus petite ligne suivante, jusqu'à l'atteindre.
+ * S'il ne l'atteint pas même en prenant tout le jour, il n'est pas gardé : il
+ * ne dirait que le total du jour, publié à part. Aucune ligne gardée, ni aucun
+ * écart entre le total du jour et ses lignes, ne décrit donc moins de
+ * {@link AUDIENCE_MIN_VISITORS} visiteurs d'un jour. Les totaux du jour
+ * (`totals`) restent tels quels.
+ */
+export async function anonymizeAudienceDay(
+  aggregate: AudienceDayAggregate,
+  distinct: AudienceDistinctCounter,
+): Promise<AudienceDayAggregate> {
+  const k = AUDIENCE_MIN_VISITORS;
+  const pages = await foldRows(
+    aggregate.pages.map((page) => ({ ...page, key: page.pageKey })),
+    (page) => page.visitors < k || page.key === "other" || !AUDIENCE_PAGE_KEYS.includes(page.key),
+    (values) => distinct("page", values),
+  );
+  const hours = await foldRows(
+    aggregate.hours.map((hour) => ({ ...hour, key: String(hour.hour) })),
+    (hour) => hour.visitors < k,
+    (values) => distinct("hour", values),
+  );
+  const dims: AudienceDayAggregate["dims"] = [];
+  for (const dim of ["device", "source", "locale"] as const) {
+    const folded = await foldRows(
+      aggregate.dims.filter((row) => row.dim === dim).map((row) => ({ ...row, key: row.value })),
+      (row) => row.visitors < k,
+      (values) => distinct(dim, values),
+    );
+    for (const row of folded.kept) dims.push({ dim, value: row.value, views: row.views, visitors: row.visitors });
+    if (folded.folded.length > 0 && folded.visitors >= k) {
+      dims.push({ dim, value: AUDIENCE_SMALL_KEY, views: sumOf(folded.folded, (row) => row.views), visitors: folded.visitors });
+    }
+  }
+  const shownPages = pages.kept.map((page) => ({ pageKey: page.pageKey, views: page.views, visitors: page.visitors, engagedMs: page.engagedMs }));
+  if (pages.folded.length > 0 && pages.visitors >= k) {
+    shownPages.push({
+      pageKey: "other",
+      views: sumOf(pages.folded, (page) => page.views),
+      visitors: pages.visitors,
+      engagedMs: sumOf(pages.folded, (page) => page.engagedMs),
+    });
+  }
+  return {
+    totals: { ...aggregate.totals },
+    pages: shownPages,
+    hours: hours.kept.map((hour) => ({ hour: hour.hour, views: hour.views, visitors: hour.visitors })),
+    dims,
+  };
+}
+
 /**
  * Ce que la page publique montre des types de page d'une période (lignes
- * déjà fondues jour par jour sous le seuil par la lecture) : les types
+ * déjà regroupées jour par jour au repli, {@link anonymizeAudienceDay}) : les types
+
  * connus, le reste (types qui ne se mesurent plus, clés inconnues) fondu
  * dans `other`. `other` est toujours montré : le cacher ne protégerait rien,
  * les totaux publiés le redonnent par soustraction.

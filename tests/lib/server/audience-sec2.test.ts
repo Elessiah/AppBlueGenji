@@ -17,7 +17,7 @@ import {
 import { getAudienceStats, resetAudienceState } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
 import { chargeRateLimit, checkRateLimit, resetRateLimit, type RateLimitRule } from "@/lib/server/rate-limit";
-import { AUDIENCE_MIN_VISITORS, AUDIENCE_SMALL_KEY, type AudienceView } from "@/lib/shared/audience";
+import { AUDIENCE_SMALL_KEY, type AudienceView } from "@/lib/shared/audience";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -93,10 +93,11 @@ describe("audienceWideNetworkKey", () => {
 });
 
 describe("admitAudienceViews — étages", () => {
-  it("admitAudienceViews_newAddressesInOneSlash64_countAsNewBrowsers", () => {
-    for (let i = 1; i <= AUDIENCE_IDENTITY_RULE.limit; i += 1) admitAudienceViews(`2001:db8:1:2::${i.toString(16)}`, BROWSER, [view()]);
+  it("admitAudienceViews_newAddressesInOneSlash64_countAsOneBrowser", () => {
+    // Même empreinte (réseau /64 + navigateur) : changer d'adresse ne fait pas un navigateur de plus.
+    for (let i = 1; i <= AUDIENCE_IDENTITY_RULE.limit + 5; i += 1) admitAudienceViews(`2001:db8:1:2::${i.toString(16)}`, BROWSER, [view({ isView: false })]);
 
-    expect(admitAudienceViews("2001:db8:1:2::ffff", BROWSER, [view()])).toEqual([]);
+    expect(admitAudienceViews("2001:db8:1:2::ffff", `${BROWSER} other`, [view()])).toEqual([view()]);
   });
 
   it("admitAudienceViews_networksOfOneSlash48_sharedWideIdentityCap", () => {
@@ -176,28 +177,24 @@ describe("getAudienceStats — k-anonymat jour par jour", () => {
   const sqlOf = (execute: ReturnType<typeof captureSql>, table: string) =>
     execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes(table)) ?? "";
 
-  it("getAudienceStats_pageQuery_foldsDailyRowsUnderThresholdIntoOther", async () => {
+  // Les compteurs sont k-anonymes dès le repli (`anonymizeAudienceDay`) : la
+  // lecture additionne, sans seuil propre à la période (qui laisserait le
+  // groupe écarté se déduire des totaux).
+  it("getAudienceStats_queries_sumStoredDailyRowsWithoutPeriodThreshold", async () => {
     const execute = captureSql();
 
     await getAudienceStats(NOW);
 
-    expect(sqlOf(execute, "FROM bg_audience_day_pages")).toContain(`CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN page_key ELSE 'other' END`);
+    for (const table of ["FROM bg_audience_day_pages", "FROM bg_audience_day_dims", "FROM bg_audience_day_hours"]) {
+      expect(sqlOf(execute, table)).not.toContain("CASE WHEN");
+    }
   });
 
-  it("getAudienceStats_dimQuery_foldsDailyRowsIntoSmall", async () => {
-    const execute = captureSql();
+  it("getAudienceStats_storedSmallRow_shownAsIs", async () => {
+    captureSql();
 
     const stats = await getAudienceStats(NOW);
 
-    expect(sqlOf(execute, "FROM bg_audience_day_dims")).toContain(`ELSE '${AUDIENCE_SMALL_KEY}' END`);
     expect(stats.ranges["7d"].devices).toEqual([{ key: AUDIENCE_SMALL_KEY, views: 3, visitors: 2 }]);
-  });
-
-  it("getAudienceStats_hourQuery_dropsHoursUnderThreshold", async () => {
-    const execute = captureSql();
-
-    await getAudienceStats(NOW);
-
-    expect(sqlOf(execute, "FROM bg_audience_day_hours")).toContain(`CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN views ELSE 0 END`);
   });
 });

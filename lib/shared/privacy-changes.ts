@@ -45,6 +45,7 @@
  */
 
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
+import { AUDIENCE_MIN_VISITORS } from "@/lib/shared/audience";
 import {
   VOICE_BOT_RELEASED_MAX_HOURS,
   VOICE_BOT_UNRELEASED_MAX_HOURS,
@@ -2123,9 +2124,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le site mesure désormais sa fréquentation page par page (pages vues, visites, temps passé, jours et heures de visite) pour la présenter, en chiffres agrégés seulement, aux partenaires et annonceurs de l'association, sur une page publique non référencée. Aucun cookie, aucun outil tiers, aucun lien avec ton compte.",
     details: [
       "À chaque page affichée, ton navigateur note le type de la page (accueil, fiche d'un tournoi…), jamais son adresse précise, un numéro ni un nom ; le temps passé onglet visible, plafonné à 30 minutes ; la classe de ton appareil (mobile, tablette, ordinateur) ; et, pour la première page d'une visite, le site d'où tu viens, que le serveur réduit aussitôt à une famille (accès direct, moteur de recherche, Discord, réseau social, plateforme vidéo, autre site).",
-      "Le serveur y joint une empreinte du jour de ton adresse IP et de ton navigateur, calculée avec un sel aléatoire tiré pour la journée et effacé le lendemain, dès la journée comptée : passé ce moment, plus personne, l'association comprise, ne peut te reconnaître (hors une copie de sauvegarde chiffrée faite entre-temps, 30 jours au plus). Ta session n'est pas lue : la mesure ignore si tu es connecté.",
+      "Le serveur y joint une empreinte du jour de ton adresse IP (réduite à son réseau /64 en IPv6) et de ton navigateur, calculée avec un sel aléatoire tiré pour la journée et effacé le lendemain, dès la journée comptée : passé ce moment, plus personne, l'association comprise, ne peut te reconnaître (hors une copie de sauvegarde chiffrée faite entre-temps, 30 jours au plus). Ta session n'est pas lue : la mesure ignore si tu es connecté.",
       "Ces pages vues détaillées sont effacées au bout de 13 mois (hors copies de sauvegarde chiffrées) ; les chiffres agrégés par jour, sans empreinte, sont gardés sans limite. Ton adresse IP (et, en IPv6, ses réseaux /64 et /48) et un condensé court de ton navigateur ne sont gardés qu'en mémoire, deux minutes au plus, pour plafonner les envois de chaque réseau. Les pages d'administration et de signalements ne sont pas mesurées.",
-      "La page des statistiques (/frequentation) est publique mais absente des moteurs de recherche et des menus : elle ne montre que des totaux, sans répartition de moins de 5 visiteurs d'une même journée, avec le nombre de tournois joués, de matchs disputés, d'équipes et de comptes du site.",
+      `La page des statistiques (/frequentation) est publique mais absente des moteurs de recherche et des menus : elle ne montre que des totaux, sans répartition de moins de ${AUDIENCE_MIN_VISITORS} visiteurs d'une même journée (seuls les totaux de chaque jour sont donnés tels quels), avec le nombre de tournois joués, de matchs disputés, d'équipes et de comptes du site.`,
       "Mesure dispensée de consentement (art. 82 de la loi Informatique et Libertés, conditions de la CNIL pour la mesure d'audience). Tu peux t'y opposer comme à la mesure d'audience existante : les signaux Global Privacy Control et Do Not Track de ton navigateur, ou le bouton d'opposition de /rgpd, arrêtent les deux mesures.",
       "Ce qui ne change pas : rien de nouveau n'est rattaché à ton compte, et ce que sa suppression emporte reste le même (ces mesures, qui ne s'y rattachent pas, n'en dépendent pas).",
     ],

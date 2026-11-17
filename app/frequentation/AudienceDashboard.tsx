@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
+  AUDIENCE_MIN_VISITORS,
   AUDIENCE_RANGES,
   AUDIENCE_SMALL_KEY,
   fillDailySeries,
@@ -301,7 +302,7 @@ export function AudienceDashboard({ stats, unavailable = false, messages: m, loc
         </h2>
         <ul className={styles.methodList}>
           {m.method.items.map((item) => (
-            <li key={item}>{item}</li>
+            <li key={item}>{fillTemplate(item, { min: AUDIENCE_MIN_VISITORS })}</li>
           ))}
         </ul>
       </section>
@@ -395,7 +396,7 @@ export function AudienceDashboard({ stats, unavailable = false, messages: m, loc
           <Evolution m={m} f={f} points={period.points} formatNumber={formatNumber} />
           <Buckets m={m} f={f} stats={stats} bucket={bucket} onBucket={setBucket} formatNumber={formatNumber} />
           <Pages m={m} f={f} pages={rangeStats.pages} />
-          <Card title={m.timing.heatmapTitle} hint={m.timing.heatmapHint} wide>
+          <Card title={m.timing.heatmapTitle} hint={fillTemplate(m.timing.heatmapHint, { min: AUDIENCE_MIN_VISITORS })} wide>
             <Heatmap m={m} f={f} heatmap={rangeStats.heatmap} formatNumber={formatNumber} />
           </Card>
           <Card title={m.audience.title} wide>
@@ -545,7 +546,7 @@ function Pages({ m, f, pages }: { m: AudienceMessages; f: Formatters; pages: Aud
   const percents = percentShares(sorted.map((page) => page.views));
   const max = sorted[0]?.views ?? 0;
   return (
-    <Card title={m.pages.title} hint={m.pages.hint}>
+    <Card title={m.pages.title} hint={fillTemplate(m.pages.hint, { min: AUDIENCE_MIN_VISITORS })}>
       <ol className={styles.pages}>
         {sorted.map((page, index) => (
           <li key={page.key} className={styles.pageRow}>

@@ -897,7 +897,7 @@ function RgpdFr({
           </p>
           <p>
             <strong>Ce qui est enregistré.</strong> Le serveur calcule une empreinte du jour
-            (HMAC-SHA256) de votre adresse IP et de votre navigateur, avec un sel aléatoire tiré pour la
+            (HMAC-SHA256) de votre adresse IP (réduite à son réseau /64 en IPv6) et de votre navigateur, avec un sel aléatoire tiré pour la
             journée (heure de Paris), gardé en base le temps de la journée et effacé le lendemain, dès
             la journée comptée (à partir de 1 h 15) : passé ce moment, plus personne, l&apos;association
             comprise, ne peut recalculer votre empreinte (hors une copie de sauvegarde chiffrée faite
@@ -935,7 +935,8 @@ function RgpdFr({
           <p>
             <strong>Destinataires.</strong> Toute personne qui a le lien de la page{" "}
             {AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés (aucune répartition n&apos;y montre un
-            groupe de moins de {AUDIENCE_MIN_VISITORS} visiteurs d&apos;une même journée) ; le responsable technique de
+            groupe de moins de {AUDIENCE_MIN_VISITORS} visiteurs d&apos;une même journée ; seuls les
+            totaux de chaque jour y sont donnés tels quels) ; le responsable technique de
             l&apos;association, hébergeur du site, pour la base de données.
           </p>
           <p>

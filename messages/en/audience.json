@@ -52,7 +52,7 @@
   },
   "pages": {
     "title": "Most viewed pages",
-    "hint": "Pages are grouped by type, with no exact address and no name. A type seen by fewer than 5 visitors in a day joins \"Other pages\".",
+    "hint": "Pages are grouped by type, with no exact address and no name. A type seen by fewer than {min} visitors in a day joins \"Other pages\" (with, if needed, the next smallest type).",
     "page": "Page",
     "views": "Page views",
     "share": "Share",
@@ -83,7 +83,7 @@
   },
   "timing": {
     "heatmapTitle": "When people visit",
-    "heatmapHint": "Page views by day of the week and hour (Paris time), leaving out hours with fewer than 5 visitors that day. The darker the cell, the busier the site.",
+    "heatmapHint": "Page views by day of the week and hour (Paris time), leaving out hours with fewer than {min} visitors that day (and, if needed, the next smallest hour). The darker the cell, the busier the site.",
     "weekdaysTitle": "Days of the week",
     "hoursTitle": "Hours of the day",
     "hourLabel": "{hour}:00",
@@ -111,7 +111,7 @@
       "other": "Other websites"
     },
     "localeLabels": { "fr": "French", "en": "English" },
-    "small": "Small numbers (fewer than 5 visitors in a day)"
+    "small": "Small numbers, grouped"
   },
   "community": {
     "title": "The community",
@@ -140,7 +140,7 @@
       "A visitor is only recognised for one day: visitors of a week, a month or a year are the sum of each day's visitors.",
       "Time counted is the time the page is shown in the foreground, capped at 30 minutes per page.",
       "Known bots and people who object to the measurement are not counted. Today's figures appear the next day.",
-      "No breakdown (page, device, source, language, hour) shows a group of fewer than 5 visitors from the same day: these small numbers are grouped together."
+      "No row of a breakdown (page, device, source, language, hour) describes fewer than {min} visitors from the same day: small numbers are grouped, and a group still too small takes in the next row. Each day's totals are given as they are."
     ],
     "privacy": "Privacy of the measurement",
     "sourceCode": "Source code",

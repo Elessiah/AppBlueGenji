@@ -18,6 +18,7 @@ import {
   ANONYMOUS_IDENTITY,
   refundRateLimit,
   rateLimitWindowOf,
+  chargeRateLimit,
   checkRateLimit,
   consumeRateLimit,
   rateLimitIdentity,
@@ -497,6 +498,14 @@ export const VISIT_REQUEST_RULE: RateLimitRule = {
 };
 
 /**
+ * Clés suivies au plus par seau de la mesure d'audience. Ses seaux refusent
+ * une clé nouvelle quand ils sont pleins (jamais vidés : ce serait rendre ses
+ * plafonds à qui les sature) ; large, pour qu'il faille des dizaines de
+ * milliers de réseaux actifs dans la minute pour les remplir. Quelques Mo.
+ */
+export const AUDIENCE_MAX_KEYS = 50_000;
+
+/**
  * Signalements de pages vues (`/api/audience`, registre T19), par réseau
  * (`clientNetworkKey` : une adresse IPv4, un préfixe IPv6 `/64` — sans quoi un
  * hôte IPv6 tirerait une adresse, donc un plafond neuf, à chaque envoi).
@@ -514,6 +523,7 @@ export const AUDIENCE_REQUEST_RULE: RateLimitRule = {
   name: "audience-request",
   limit: 120,
   windowMs: 60_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
 };
 
@@ -526,6 +536,7 @@ export const AUDIENCE_WIDE_REQUEST_RULE: RateLimitRule = {
   name: "audience-request-wide",
   limit: 600,
   windowMs: 60_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
 };
 
@@ -539,6 +550,7 @@ export const AUDIENCE_VIEW_RULE: RateLimitRule = {
   name: "audience-view",
   limit: 120,
   windowMs: 60_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
 };
 
@@ -547,6 +559,7 @@ export const AUDIENCE_WIDE_VIEW_RULE: RateLimitRule = {
   name: "audience-view-wide",
   limit: 600,
   windowMs: 60_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
 };
 
@@ -563,16 +576,18 @@ export const AUDIENCE_GLOBAL_VIEW_RULE: RateLimitRule = {
 };
 
 /**
- * Navigateurs distincts (adresse + user-agent) par réseau et par minute.
- * L'empreinte d'un visiteur est celle du couple IP + navigateur : sans ce
- * plafond, un client qui change de user-agent, ou d'adresse dans son `/64`, à
- * chaque envoi se ferait passer pour autant de visiteurs. Une salle de LAN
- * n'a que quelques versions de navigateur.
+ * Navigateurs nouveaux (user-agents) par réseau et par minute. L'empreinte
+ * d'un visiteur est celle du couple réseau (adresse IPv4, `/64` en IPv6) +
+ * navigateur : changer d'adresse dans son `/64` n'en fait pas un autre ; sans
+ * ce plafond, un client qui change de user-agent à chaque envoi se ferait
+ * passer pour autant de visiteurs. Une salle de LAN n'a que quelques versions
+ * de navigateur, et un navigateur déjà vu n'y compte plus.
  */
 export const AUDIENCE_IDENTITY_RULE: RateLimitRule = {
   name: "audience-identity",
   limit: 30,
   windowMs: 60_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
 };
 
@@ -581,6 +596,7 @@ export const AUDIENCE_WIDE_IDENTITY_RULE: RateLimitRule = {
   name: "audience-identity-wide",
   limit: 150,
   windowMs: 60_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
 };
 
@@ -592,18 +608,33 @@ export const AUDIENCE_GLOBAL_IDENTITY_RULE: RateLimitRule = {
 };
 
 /**
- * Navigateurs déjà vus dans la minute (clé : adresse complète + condensé court
- * du user-agent, en mémoire seulement, effacée avec la fenêtre). Plein, il
- * refuse les clés nouvelles plutôt que de se vider : un seau vidé ferait
- * reparaître tous les navigateurs comme nouveaux.
+ * Navigateurs déjà vus (clé : réseau — l'adresse IPv4, le `/64` en IPv6 —
+ * + condensé court du user-agent, celle de l'empreinte du visiteur ; en
+ * mémoire seulement). Fenêtre glissante : un navigateur actif ne redevient
+ * pas nouveau chaque minute, sa clé s'efface une minute après sa dernière
+ * requête. Plein, il refuse les clés nouvelles plutôt que de se vider : un
+ * seau vidé ferait reparaître tous les navigateurs comme nouveaux.
  */
 const AUDIENCE_IDENTITY_SEEN_RULE: RateLimitRule = {
   name: "audience-identity-seen",
   limit: Number.MAX_SAFE_INTEGER,
   windowMs: 60_000,
-  maxKeys: 50_000,
+  maxKeys: AUDIENCE_MAX_KEYS,
   overflow: "refuse",
+  slide: true,
 };
+
+/**
+ * Part de chaque réseau (et de son `/48`) que les plafonds du site entier
+ * ignorent, par minute : les premiers navigateurs nouveaux et les premières
+ * pages vues d'un réseau passent toujours. Un foyer, un téléphone derrière le
+ * NAT d'un opérateur restent comptés même quand des réseaux fabriquant des
+ * signalements épuisent les plafonds du site ; ceux-là ne bornent que ce qui
+ * dépasse cette part.
+ */
+export const AUDIENCE_FAIR_IDENTITIES = 5;
+/** Voir {@link AUDIENCE_FAIR_IDENTITIES}. */
+export const AUDIENCE_FAIR_VIEWS = 20;
 
 /** Réseau d'un envoi dont l'adresse est illisible : tous partagent un même plafond. */
 export const AUDIENCE_UNKNOWN_NETWORK = "unknown-network";
@@ -672,13 +703,28 @@ export function throttleAudienceRequest(ip: string | null): NextResponse | null 
   return tooManyRequests(state.retryAfterMs);
 }
 
+/** Ce geste est-il parmi les `share` premiers de chaque étage dans la fenêtre ? */
+function withinFairShare(limits: readonly (readonly [RateLimitRule, string])[], share: number): boolean {
+  return limits.every(([rule, key]) => rule.limit - checkRateLimit(rule, key).remaining < share);
+}
+
+/** Étages d'un geste, plus le plafond du site s'il dépasse la part de son réseau ({@link AUDIENCE_FAIR_IDENTITIES}). */
+function withSiteCap(
+  limits: [RateLimitRule, string][],
+  site: RateLimitRule,
+  share: number,
+): [RateLimitRule, string][] {
+  return withinFairShare(limits, share) ? limits : [...limits, [site, AUDIENCE_SITE_KEY]];
+}
+
 /**
  * Pages vues qu'un envoi peut encore ajouter aux chiffres (`/api/audience`) :
- * aucune si ce navigateur (adresse complète + user-agent) est nouveau et que
- * son réseau, son `/48` ou le site a déjà vu trop de navigateurs dans la
- * minute ({@link AUDIENCE_IDENTITY_RULE}), sinon les suites et les pages vues
- * sous {@link AUDIENCE_VIEW_RULE} (réseau, `/48`, site). Les entrées refusées
- * sont écartées sans bruit.
+ * aucune si ce navigateur (réseau + user-agent, comme l'empreinte) est nouveau
+ * et que son réseau, son `/48` ou — au-delà de la part de chaque réseau — le
+ * site a déjà vu trop de navigateurs nouveaux dans la minute
+ * ({@link AUDIENCE_IDENTITY_RULE}), sinon les suites et les pages vues sous
+ * {@link AUDIENCE_VIEW_RULE} (réseau, `/48`, site). Les entrées refusées sont
+ * écartées sans bruit.
  */
 export function admitAudienceViews<T extends { isView: boolean }>(
   ip: string | null,
@@ -686,28 +732,31 @@ export function admitAudienceViews<T extends { isView: boolean }>(
   views: readonly T[],
 ): T[] {
   const network = audienceNetworkKey(ip);
-  const address = ip?.trim().toLowerCase() || network;
-  const seenKey = `${address}\u0000${createHash("sha256").update(userAgent).digest("base64url").slice(0, 16)}`;
-  const firstSeen = checkRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey).remaining === AUDIENCE_IDENTITY_SEEN_RULE.limit;
-  if (firstSeen) {
+  const seenKey = `${network}\u0000${createHash("sha256").update(userAgent).digest("base64url").slice(0, 16)}`;
+  const seen = checkRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
+  // Registre plein de navigateurs actifs : un nouveau n'y a pas de place, il n'est pas compté.
+  if (!seen.allowed) {
+    warnUnknownNetworkThrottled(network);
+    return [];
+  }
+  if (seen.remaining === AUDIENCE_IDENTITY_SEEN_RULE.limit) {
     const identity = consumeAll([
-      ...tiers(ip, AUDIENCE_IDENTITY_RULE, AUDIENCE_WIDE_IDENTITY_RULE),
-      [AUDIENCE_GLOBAL_IDENTITY_RULE, AUDIENCE_SITE_KEY],
+      ...withSiteCap(tiers(ip, AUDIENCE_IDENTITY_RULE, AUDIENCE_WIDE_IDENTITY_RULE), AUDIENCE_GLOBAL_IDENTITY_RULE, AUDIENCE_FAIR_IDENTITIES),
+      [AUDIENCE_IDENTITY_SEEN_RULE, seenKey],
     ]);
     if (!identity.allowed) {
       warnUnknownNetworkThrottled(network);
       return [];
     }
-    consumeRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
+  } else {
+    // Déjà vu : sa fenêtre glisse.
+    chargeRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
   }
-  const viewLimits: [RateLimitRule, string][] = [
-    ...tiers(ip, AUDIENCE_VIEW_RULE, AUDIENCE_WIDE_VIEW_RULE),
-    [AUDIENCE_GLOBAL_VIEW_RULE, AUDIENCE_SITE_KEY],
-  ];
   let dropped = false;
   const admitted = views.filter((view) => {
     if (!view.isView) return true;
-    const allowed = consumeAll(viewLimits).allowed;
+    const limits = withSiteCap(tiers(ip, AUDIENCE_VIEW_RULE, AUDIENCE_WIDE_VIEW_RULE), AUDIENCE_GLOBAL_VIEW_RULE, AUDIENCE_FAIR_VIEWS);
+    const allowed = consumeAll(limits).allowed;
     dropped ||= !allowed;
     return allowed;
   });

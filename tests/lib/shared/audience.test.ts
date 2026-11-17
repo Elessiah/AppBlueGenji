@@ -500,7 +500,7 @@ describe("sécurité, cycle 1", () => {
     expect(isAudienceScriptRequest(headers({ "sec-fetch-site": "same-origin", "sec-fetch-dest": "empty" }))).toBe(true);
   });
 
-  it("isAudienceScriptRequest_noFetchMetadata_true", () => {
+  it("isAudienceScriptRequest_noFetchMetadataUnknownBrowser_true", () => {
     expect(isAudienceScriptRequest(headers({}))).toBe(true);
   });
 

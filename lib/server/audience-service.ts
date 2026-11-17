@@ -28,6 +28,7 @@
  */
 import { createHmac, randomBytes } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { clientNetworkKey } from "@/lib/server/api-guard";
 import { failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { readSiteCounts } from "./site-counts";
@@ -37,8 +38,9 @@ import {
   AUDIENCE_RANGES,
   AUDIENCE_RAW_RETENTION_MONTHS,
   aggregateAudienceDay,
-  AUDIENCE_MIN_VISITORS,
-  AUDIENCE_SMALL_KEY,
+  anonymizeAudienceDay,
+  type AudienceDistinctCounter,
+
   emptyHeatmap,
   mergeAudienceAggregates,
   parisClock,
@@ -188,10 +190,17 @@ function startSaltSweep(): void {
   saltSweep.unref?.();
 }
 
-/** Empreinte d'un visiteur pour la journée : HMAC-SHA-256 de l'IP et du navigateur sous le sel du jour. */
+/**
+ * Empreinte d'un visiteur pour la journée : HMAC-SHA-256 du réseau et du
+ * navigateur sous le sel du jour. Le réseau est l'adresse IPv4, ou le `/64`
+ * d'une adresse IPv6 (`clientNetworkKey`, port et écritures variantes ôtés) :
+ * tirer une adresse neuve dans son `/64` ne fait pas un visiteur de plus, et
+ * les appareils d'un même navigateur derrière un `/64` comptent pour un, comme
+ * derrière une adresse IPv4 partagée.
+ */
 export async function audienceVisitorKey(day: string, ip: string | null, userAgent: string | null): Promise<string> {
   const salt = await dailySalt(day);
-  return createHmac("sha256", salt).update(visitorIdentitySource({ ip, userAgent })).digest("hex");
+  return createHmac("sha256", salt).update(visitorIdentitySource({ ip: clientNetworkKey(ip) ?? ip, userAgent })).digest("hex");
 }
 
 /** Efface les sels des jours repliés (`day <= until`), en base puis en mémoire. */
@@ -462,7 +471,34 @@ interface CountRow extends RowDataPacket {
   total: number | string;
 }
 
+/** Colonne du détail de chaque répartition (constantes du code, jamais une saisie). */
+const DISTINCT_COLUMNS: Readonly<Record<Parameters<AudienceDistinctCounter>[0], string>> = {
+  page: "page_key",
+  hour: "hour",
+  device: "device",
+  source: "source",
+  locale: "locale",
+};
+
+/** Visiteurs distincts d'un jour ayant vu une page sous l'une des `values` d'une répartition. */
+async function countDistinctVisitors(
+  connection: PoolConnection,
+  day: string,
+  dim: Parameters<AudienceDistinctCounter>[0],
+  values: readonly string[],
+): Promise<number> {
+  if (values.length === 0) return 0;
+  const [rows] = await connection.execute<CountRow[]>(
+    `SELECT COUNT(DISTINCT visitor_key) AS total
+       FROM bg_audience_views
+      WHERE day = ? AND is_view = 1 AND ${DISTINCT_COLUMNS[dim]} IN (${values.map(() => "?").join(", ")})`,
+    [day, ...values],
+  );
+  return num(rows[0]?.total);
+}
+
 async function rollUpDay(connection: PoolConnection, day: string): Promise<void> {
+
   const [counted] = await connection.execute<CountRow[]>(`SELECT COUNT(*) AS total FROM bg_audience_views WHERE day = ?`, [day]);
   // Un visiteur reste dans une seule tranche (CRC32 de son empreinte) : les
   // compteurs de chaque tranche s'additionnent (`mergeAudienceAggregates`) et
@@ -493,7 +529,13 @@ async function rollUpDay(connection: PoolConnection, day: string): Promise<void>
       ),
     );
   }
-  const aggregate = parts.length === 1 ? parts[0] : mergeAudienceAggregates(parts);
+  // Seules les lignes d'au moins `AUDIENCE_MIN_VISITORS` visiteurs distincts
+  // du jour sont écrites (regroupées sinon) : la page publique ne lit qu'elles.
+  const aggregate = await anonymizeAudienceDay(
+    parts.length === 1 ? parts[0] : mergeAudienceAggregates(parts),
+    (dim, values) => countDistinctVisitors(connection, day, dim, values),
+  );
+
   for (const table of ["bg_audience_day_pages", "bg_audience_day_hours", "bg_audience_day_dims", "bg_audience_days"]) {
     await connection.execute(`DELETE FROM ${table} WHERE day = ?`, [day]);
   }
@@ -591,37 +633,33 @@ async function readRange(from: string | null): Promise<AudienceRangeStats> {
   const db = await getDatabase();
   const where = from ? "WHERE day >= ?" : "";
   const params = from ? [from] : [];
-  // Seuil de k-anonymat jour par jour (`AUDIENCE_MIN_VISITORS`, constante du
-  // code) : une ligne d'un jour sous le seuil rejoint « Autres pages » ou
-  // « petits nombres », une heure sous le seuil sort de la grille. Les
-  // sous-requêtes nomment autrement la clé fondue : un GROUP BY sur un alias
-  // homonyme d'une colonne lirait la colonne.
+  // Les compteurs du jour sont déjà k-anonymes (`anonymizeAudienceDay`, au
+  // repli) : la lecture ne fait qu'additionner les jours de la période. Un
+  // seuil appliqué ici, période par période, laisserait le groupe écarté se
+  // déduire des totaux.
   const [[pages], [hours], [dims]] = await Promise.all([
     db.execute<PageRow[]>(
-      `SELECT page_group AS page_key, SUM(views) AS views, SUM(visitors) AS visitors, SUM(engaged_ms) AS engaged_ms
-         FROM (SELECT CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN page_key ELSE 'other' END AS page_group,
-                      views, visitors, engaged_ms
-                 FROM bg_audience_day_pages ${where}) AS folded
-        GROUP BY page_group
+      `SELECT page_key, SUM(views) AS views, SUM(visitors) AS visitors, SUM(engaged_ms) AS engaged_ms
+         FROM bg_audience_day_pages ${where}
+        GROUP BY page_key
         ORDER BY views DESC`,
       params,
     ),
     // Grille 7 × 24 faite par la base (`WEEKDAY` : lundi = 0) : 168 lignes au plus.
     db.execute<HourRow[]>(
-      `SELECT WEEKDAY(day) AS weekday, hour, SUM(CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN views ELSE 0 END) AS views
+      `SELECT WEEKDAY(day) AS weekday, hour, SUM(views) AS views
          FROM bg_audience_day_hours ${where}
         GROUP BY WEEKDAY(day), hour`,
       params,
     ),
     db.execute<DimRow[]>(
-      `SELECT dim, value_group AS dim_value, SUM(views) AS views, SUM(visitors) AS visitors
-         FROM (SELECT dim, CASE WHEN visitors >= ${AUDIENCE_MIN_VISITORS} THEN dim_value ELSE '${AUDIENCE_SMALL_KEY}' END AS value_group,
-                      views, visitors
-                 FROM bg_audience_day_dims ${where}) AS folded
-        GROUP BY dim, value_group`,
+      `SELECT dim, dim_value, SUM(views) AS views, SUM(visitors) AS visitors
+         FROM bg_audience_day_dims ${where}
+        GROUP BY dim, dim_value`,
       params,
     ),
   ]);
+
   const heatmap = emptyHeatmap();
   for (const row of hours) {
     const weekday = Number(row.weekday);

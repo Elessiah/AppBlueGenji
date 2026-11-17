@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   if (audienceOptOutFromHeaders(req.headers)) return ok({ recorded: 0 });
 
   const userAgent = req.headers.get("user-agent");
-  if (isBotUserAgent(userAgent) || !isAudienceScriptRequest(req.headers)) return ok({ recorded: 0 });
+  if (isBotUserAgent(userAgent) || !isAudienceScriptRequest(req.headers, userAgent)) return ok({ recorded: 0 });
 
   const ip = requestClientIp(req);
   const throttled = throttleAudienceRequest(ip);

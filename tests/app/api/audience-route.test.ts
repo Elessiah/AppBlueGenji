@@ -106,15 +106,29 @@ describe("POST /api/audience", () => {
     expect(recordAudienceViews).not.toHaveBeenCalled();
   });
 
-  it("POST_noFetchMetadataHeaders_recordsViews", async () => {
+  it("POST_noFetchMetadataHeadersFromOldSafari_recordsViews", async () => {
     // Safari avant iOS 16.4 : ni Sec-Fetch-Site ni Sec-Fetch-Dest.
-    const req = audienceReq(BATCH);
+    const req = audienceReq(BATCH, {
+      "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Mobile/15E148 Safari/604.1",
+    });
     req.headers.delete("sec-fetch-site");
     req.headers.delete("sec-fetch-dest");
 
     const res = await POST(req);
 
     expect(await res.json()).toEqual({ recorded: 1 });
+  });
+
+  it("POST_noFetchMetadataHeadersFromModernBrowser_recordsNothing", async () => {
+    // Un script qui se dit Firefox 130 sans les en-têtes que Firefox pose toujours.
+    const req = audienceReq(BATCH);
+    req.headers.delete("sec-fetch-site");
+    req.headers.delete("sec-fetch-dest");
+
+    const res = await POST(req);
+
+    expect(await res.json()).toEqual({ recorded: 0 });
+    expect(recordAudienceViews).not.toHaveBeenCalled();
   });
 
   it("POST_emptyFetchMetadata_recordsNothing", async () => {

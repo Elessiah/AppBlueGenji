@@ -38,6 +38,13 @@ export type RateLimitRule = {
    * plafonds (clés fabriquées en masse : réseaux, navigateurs).
    */
   overflow?: "reset" | "refuse";
+  /**
+   * Fenêtre glissante : chaque décompte d'une clé vivante repousse sa fin à
+   * `windowMs` après lui. Pour un registre « déjà vu » (limite immense), où
+   * une clé active ne doit pas redevenir nouvelle à chaque fenêtre. La clé
+   * vit au plus `windowMs` après sa dernière requête.
+   */
+  slide?: boolean;
 };
 
 const DEFAULT_MAX_KEYS = 10_000;
@@ -144,8 +151,14 @@ export function checkRateLimit(
   now: number = Date.now(),
 ): { allowed: boolean; remaining: number; retryAfterMs: number } {
   sweepWhenDue(now);
-  const counter = bucketOf(rule).get(key);
+  const bucket = bucketOf(rule);
+  const counter = bucket.get(key);
   if (!counter || now >= counter.resetAt) {
+    // Un seau qui refuse, plein de fenêtres actives, refusera cette clé
+    // nouvelle : le dire dès le contrôle, pour qu'un geste à plusieurs
+    // plafonds ne décompte pas les premiers avant d'être refusé au dernier.
+    const full = rule.overflow === "refuse" ? fullBucketRetry(rule, bucket, now) : null;
+    if (full !== null) return { allowed: false, remaining: 0, retryAfterMs: full };
     return { allowed: true, remaining: rule.limit, retryAfterMs: 0 };
   }
 
@@ -169,6 +182,12 @@ export function chargeRateLimit(
 
   if (counter && now < counter.resetAt) {
     counter.count += 1;
+    if (rule.slide) {
+      // Repoussée et replacée en fin : l'ordre de la `Map` reste celui des fins de fenêtre.
+      counter.resetAt = now + rule.windowMs;
+      bucket.delete(key);
+      bucket.set(key, counter);
+    }
     const remaining = Math.max(0, rule.limit - counter.count);
     return {
       allowed: counter.count <= rule.limit,
@@ -177,24 +196,42 @@ export function chargeRateLimit(
     };
   }
 
-  // Purge opportuniste : on ne balaie le seau qu'au moment où il déborde, pour
-  // ne pas payer un parcours à chaque appel.
   const maxKeys = rule.maxKeys ?? DEFAULT_MAX_KEYS;
   if (bucket.size >= maxKeys) {
-    for (const [trackedKey, tracked] of bucket) {
-      if (now >= tracked.resetAt) bucket.delete(trackedKey);
-    }
-    if (bucket.size >= maxKeys) {
+    const full = fullBucketRetry(rule, bucket, now);
+    if (full !== null) {
       // Toujours plein de fenêtres actives : un seau qui refuse garde les
       // plafonds en cours (la clé nouvelle attend une place) ; les autres
       // repartent de zéro plutôt que de laisser la mémoire filer.
-      if (rule.overflow === "refuse") return { allowed: false, remaining: 0, retryAfterMs: rule.windowMs };
+      if (rule.overflow === "refuse") return { allowed: false, remaining: 0, retryAfterMs: full };
       bucket.clear();
     }
   }
 
+  // Une fenêtre neuve se place en fin : la `Map` reste triée par fin de
+  // fenêtre (même `windowMs` pour tout le seau), ce qui borne la purge.
+  bucket.delete(key);
   bucket.set(key, { count: 1, resetAt: now + rule.windowMs });
   return { allowed: rule.limit >= 1, remaining: Math.max(0, rule.limit - 1), retryAfterMs: 0 };
+}
+
+/**
+ * Seau plein ? Retire d'abord, par la tête, les fenêtres closes — la `Map` est
+ * triée par fin de fenêtre ({@link chargeRateLimit}), la purge s'arrête à la
+ * première encore ouverte : un seau tenu plein ne coûte pas un parcours de
+ * toutes ses clés à chaque clé nouvelle. Rend `null` s'il reste une place,
+ * sinon le délai jusqu'à la fin de la plus ancienne fenêtre.
+ */
+function fullBucketRetry(rule: RateLimitRule, bucket: Map<string, Counter>, now: number): number | null {
+  const maxKeys = rule.maxKeys ?? DEFAULT_MAX_KEYS;
+  if (bucket.size < maxKeys) return null;
+  for (const [trackedKey, tracked] of bucket) {
+    if (now < tracked.resetAt) break;
+    bucket.delete(trackedKey);
+  }
+  if (bucket.size < maxKeys) return null;
+  const oldest = bucket.values().next().value;
+  return Math.max(1, (oldest?.resetAt ?? now + rule.windowMs) - now);
 }
 
 /**

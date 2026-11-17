@@ -762,7 +762,7 @@ Intérêt légitime (RGPD, art. 6.1.f : faire connaître l'audience de l'associa
 Personnes concernées
 Visiteurs du site, connectés ou non (le compte n'est jamais lu)
 Données
-Empreinte du jour (HMAC-SHA256) de l'adresse IP et du navigateur, calculée avec un sel aléatoire tiré pour la journée (heure de Paris), gardé en base le temps de la journée et effacé le lendemain dès la journée comptée : passé ce moment, plus personne — l'association comprise — ne peut recalculer l'empreinte d'un visiteur, hors une copie de sauvegarde chiffrée faite entre-temps, qui peut contenir le sel et les pages vues de la journée (T09, 30 jours au plus) ; un même visiteur n'est donc reconnu que le temps d'une journée
+Empreinte du jour (HMAC-SHA256) de l'adresse IP (réduite à son réseau /64 en IPv6) et du navigateur, calculée avec un sel aléatoire tiré pour la journée (heure de Paris), gardé en base le temps de la journée et effacé le lendemain dès la journée comptée : passé ce moment, plus personne — l'association comprise — ne peut recalculer l'empreinte d'un visiteur, hors une copie de sauvegarde chiffrée faite entre-temps, qui peut contenir le sel et les pages vues de la journée (T09, 30 jours au plus) ; un même visiteur n'est donc reconnu que le temps d'une journée
 Type de page consultée (accueil, fiche d'un tournoi, fiche d'une équipe…), jamais son adresse précise, un numéro ni un nom — les pages d'administration et de signalements ne sont pas mesurées ; langue de la page ; date et heure (heure de Paris)
 Classe d'appareil (mobile, tablette, ordinateur), déduite de la largeur de la fenêtre
 Famille de provenance de la première page d'une visite (accès direct, moteur de recherche, Discord, réseau social, plateforme vidéo, autre site), déduite du site d'origine, qui n'est pas gardé
@@ -776,7 +776,7 @@ Chiffres agrégés par jour (totaux, par type de page, par heure, par appareil, 
 Sel du jour : en base le temps de la journée (un redémarrage du site le reprend), effacé le lendemain dès la journée comptée (à partir de 1 h 15, heure de Paris, au premier entretien entraîné par l'activité du site) ; jamais dans un journal ; une copie de sauvegarde chiffrée faite entre-temps peut le contenir (T09, 30 jours au plus)
 Adresse IP (et réseaux) et condensé du navigateur des plafonds d'envois : deux minutes au plus après sa dernière requête, en mémoire ; pages vues reçues : quelques secondes en mémoire avant leur écriture groupée
 Destinataires
-Toute personne qui a le lien de la page /frequentation, pour les seuls chiffres agrégés, sans répartition de moins de 5 visiteurs d'une même journée (partenaires, annonceurs)
+Toute personne qui a le lien de la page /frequentation, pour les seuls chiffres agrégés, sans répartition de moins de 5 visiteurs d'une même journée, les totaux de chaque jour exceptés (partenaires, annonceurs)
 Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)
 Transferts hors UE
 Aucun

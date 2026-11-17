@@ -10,7 +10,11 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
 
 - **Aucun cookie, aucun stockage** dans le navigateur ; la session n'est jamais
   lue (`/api/audience` ne touche pas à `bg_user_sessions`).
-- **Empreinte du jour** : `HMAC-SHA256(sel_du_jour, visitorIdentitySource({ ip, userAgent }))`.
+- **Empreinte du jour** : `HMAC-SHA256(sel_du_jour, visitorIdentitySource({ ip: clientNetworkKey(ip), userAgent }))`
+  — le réseau (IPv4, ou `/64` en IPv6, port et écritures variantes ôtés) :
+  une adresse neuve tirée dans son `/64` n'est pas un visiteur de plus ; les
+  appareils d'un même navigateur derrière un `/64` comptent pour un, comme
+  derrière une adresse IPv4 partagée.
   Le sel est tiré au hasard (`randomBytes(32)`) au premier signalement d'une
   journée de Paris et gardé dans `bg_audience_salts` (`INSERT IGNORE` puis
   relecture : un redémarrage ou un envoi concurrent reprend le même sel, un
@@ -35,32 +39,44 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   avant tout calcul, plafond compris). Les robots connus (user-agent) sont
   écartés de même.
 - **IP en mémoire ≤ 2 min** : seuls les plafonds la tiennent, fenêtres de
-  60 s, balayage du module `rate-limit`. Trois étages : le **réseau**
+  60 s (glissante pour le registre des navigateurs vus : une minute après la
+  dernière requête), balayage du module `rate-limit`. Trois étages : le **réseau**
   (`audienceNetworkKey` : IPv4, ou préfixe IPv6 `/64` ; adresse illisible =
   un réseau commun, signalé une fois par 10 min dans les journaux quand il
   est plafonné), le **`/48`** en IPv6 (`audienceWideNetworkKey` : un abonné
   reçoit souvent un `/56`, un hébergeur un `/48`) et le **site entier**.
   `throttleAudienceRequest` : `AUDIENCE_REQUEST_RULE` (120 envois/min par
   réseau), `AUDIENCE_WIDE_REQUEST_RULE` (600 par `/48`). `admitAudienceViews` :
-  navigateurs nouveaux (clé : adresse complète + condensé court du
-  user-agent, `AUDIENCE_IDENTITY_SEEN_RULE`) plafonnés à 30/min par réseau
-  (`AUDIENCE_IDENTITY_RULE`), 150 par `/48`, 1 500 pour le site ; pages vues
-  à 120/min par réseau (`AUDIENCE_VIEW_RULE`), 600 par `/48`, 6 000 pour le
-  site (les suites n'y comptent pas). Larges à dessein : une adresse
+  navigateurs nouveaux (clé : réseau + condensé court du user-agent, celle
+  de l'empreinte ; `AUDIENCE_IDENTITY_SEEN_RULE`, fenêtre glissante : un
+  navigateur actif ne redevient pas nouveau chaque minute) plafonnés à
+  30/min par réseau (`AUDIENCE_IDENTITY_RULE`), 150 par `/48`, 1 500 pour
+  le site ; pages vues à 120/min par réseau (`AUDIENCE_VIEW_RULE`), 600 par
+  `/48`, 6 000 pour le site (les suites n'y comptent pas). Les plafonds du
+  site ne visent que ce qui dépasse la part de chaque réseau et de son `/48`
+  (`AUDIENCE_FAIR_IDENTITIES` = 5 navigateurs nouveaux, `AUDIENCE_FAIR_VIEWS`
+  = 20 pages vues par minute) : des réseaux qui les épuisent n'effacent pas
+  un foyer des chiffres. Larges à dessein : une adresse
   partagée (NAT d'opérateur mobile, réseau local d'un événement) ne doit pas
   faire disparaître ses visiteurs des chiffres. Ces seaux sont en
-  `overflow: "refuse"` : pleins de fenêtres actives, ils refusent les clés
-  nouvelles au lieu de se vider (un seau vidé rendrait leurs plafonds à
-  tous, l'attaquant compris).
+  `overflow: "refuse"` (`AUDIENCE_MAX_KEYS` = 50 000 clés chacun) : pleins de
+  fenêtres actives, ils refusent les clés nouvelles au lieu de se vider (un
+  seau vidé rendrait leurs plafonds à tous, l'attaquant compris) ; le refus
+  est vu dès le contrôle (`checkRateLimit`), si bien qu'un geste à plusieurs
+  étages ne décompte rien avant d'être refusé, et son `Retry-After` est la
+  fin de la plus ancienne fenêtre. La `Map` d'un seau reste triée par fin de
+  fenêtre : la purge d'un seau plein s'arrête à la première fenêtre ouverte
+  (pas de parcours de toutes les clés à chaque clé nouvelle).
 - **Contre les signalements fabriqués** (chiffres gonflés devant les
   partenaires) : un envoi qui **déclare** une autre provenance est écarté
   (`isAudienceScriptRequest` : `Sec-Fetch-Site` autre que `same-origin` ou
-  `Sec-Fetch-Dest` autre que `empty`) ; un navigateur qui ne pose pas ces
-  en-têtes (Safari avant iOS 16.4, vieilles vues web, proxy qui les retire)
-  reste compté. Ce filtre ne prouve rien : la vraie borne est celle des
+  `Sec-Fetch-Dest` autre que `empty`), comme un envoi sans ces en-têtes au
+  nom d'un navigateur qui les pose toujours (`sendsFetchMetadata` : Chrome
+  76+, Firefox 90+, WebKit de Safari / iOS 16.4+) ; seul un navigateur plus
+  ancien ou inconnu (Safari avant iOS 16.4, vieilles vues web) est compté
+  sans eux. Ce filtre ne prouve rien : la vraie borne est celle des
   plafonds ci-dessus, qui tiennent même quand un client change de
-  user-agent ou d'adresse dans son `/64` (chaque adresse est un navigateur
-  nouveau du réseau). Le temps d'une page vue est ignoré (il arrive par ses
+  user-agent ou d'adresse dans son `/64` (même empreinte). Le temps d'une page vue est ignoré (il arrive par ses
   suites) et, au repli, une suite ne compte que la part de sa lecture
   postérieure au début de la visite et au dernier temps déjà compté du
   visiteur : des suites forgées qui se chevauchent ne s'additionnent pas.
@@ -70,17 +86,23 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   défaut, jamais par excès. Passé la moitié de `MAX_PENDING`, un envoi
   n'ajoute plus qu'une ligne à la file. Le référent égal à l'hôte d'`APP_URL`
   compte en accès direct.
-- **k-anonymat jour par jour** (`AUDIENCE_MIN_VISITORS` = 5) : à la lecture
-  (`readRange`), une ligne d'un jour sous 5 visiteurs rejoint « Autres
-  pages » (types de page) ou `small` (« Petits nombres », appareils,
-  provenance, langue), une heure d'un jour sous 5 visiteurs sort de la
-  carte de chaleur. Jour par jour et non sur la période : un visiteur n'est
-  reconnu que le temps d'une journée, la somme d'une période compterait
-  cinq fois une personne venue cinq jours. « Autres pages » est toujours
-  montrée : la cacher ne protégerait rien, les totaux quotidiens la
-  redonnent par soustraction. Les totaux du site par jour (visiteurs, pages
-  vues, visites, temps) restent publiés tels quels : ils ne disent ni qui,
-  ni quelle page, ni d'où.
+- **k-anonymat jour par jour** (`AUDIENCE_MIN_VISITORS` = 5), appliqué **au
+  repli** (`anonymizeAudienceDay`, dans `rollUpDay`) : seules des lignes sûres
+  sont écrites dans `bg_audience_day_pages` / `_hours` / `_dims`, et la
+  lecture (`readRange`) ne fait qu'additionner. Une ligne d'un jour sous 5
+  visiteurs (ou un type de page inconnu, ou `other`) rejoint « Autres
+  pages » ou `small` (« Petits nombres regroupés » : appareils, provenance,
+  langue) ; une heure sous 5 visiteurs n'est pas écrite. Le groupe compte ses
+  visiteurs **distincts** (`COUNT(DISTINCT visitor_key)` dans le détail) ;
+  sous 5, il absorbe la plus petite ligne suivante (suppression
+  complémentaire), et s'il n'y parvient qu'avec tout le jour, il n'est pas
+  écrit. Ainsi ni une ligne, ni l'écart entre le total publié d'un jour et
+  ses lignes (relevés successifs de « tout », deux périodes) ne décrit moins
+  de 5 visiteurs d'un jour. Jour par jour et non sur la période : un visiteur
+  n'est reconnu que le temps d'une journée. Les totaux du site par jour
+  (visiteurs, pages vues, visites, temps) restent publiés tels quels : ils
+  ne disent ni quelle page, ni d'où, ni à quelle heure. Les jours repliés
+  avant ce mécanisme (bases de développement) ne sont pas réécrits.
 - **Pages jamais mesurées** : `/admin/*` et `/signalements/*`, avec ou sans
   préfixe `/en` (personnel et auteurs de signalements, trop peu nombreux
   pour des chiffres anonymes). Le navigateur ne les signale même pas

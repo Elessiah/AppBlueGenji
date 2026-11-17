@@ -191,8 +191,9 @@ describe("rollUpAudienceDays — mémoire bornée", () => {
     const day = connection.execute.mock.calls.find(([sql]) => sql.includes("INSERT INTO bg_audience_days"));
     // 3 visiteurs, 3 pages vues, 3 visites, 3 rebonds, aucune suite (0 s) : somme des tranches.
     expect(day?.[1]).toEqual(["2026-11-14", 3, 3, 3, 3, 0]);
+    // Trois visiteurs en tout : sous le seuil, aucune heure n'est écrite (k-anonymat).
     const hours = connection.execute.mock.calls.find(([sql]) => sql.includes("INSERT INTO bg_audience_day_hours"));
-    expect(hours?.[1]).toEqual(["2026-11-14", 10, 1, 1, "2026-11-14", 11, 1, 1, "2026-11-14", 12, 1, 1]);
+    expect(hours).toBeUndefined();
   });
 });
 

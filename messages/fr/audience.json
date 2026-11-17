@@ -52,7 +52,7 @@
   },
   "pages": {
     "title": "Pages les plus consultées",
-    "hint": "Les pages sont regroupées par type, sans adresse précise ni nom. Un type vu par moins de 5 visiteurs dans la journée rejoint « Autres pages ».",
+    "hint": "Les pages sont regroupées par type, sans adresse précise ni nom. Un type vu par moins de {min} visiteurs dans la journée rejoint « Autres pages » (avec, si besoin, le plus petit type suivant).",
     "page": "Page",
     "views": "Pages vues",
     "share": "Part",
@@ -83,7 +83,7 @@
   },
   "timing": {
     "heatmapTitle": "Moments de visite",
-    "heatmapHint": "Pages vues par jour de la semaine et par heure (heure de Paris), sans les heures de moins de 5 visiteurs dans la journée. Plus la case est foncée, plus le site est consulté.",
+    "heatmapHint": "Pages vues par jour de la semaine et par heure (heure de Paris), sans les heures de moins de {min} visiteurs dans la journée (ni, si besoin, la plus petite heure suivante). Plus la case est foncée, plus le site est consulté.",
     "weekdaysTitle": "Jours de la semaine",
     "hoursTitle": "Heures de la journée",
     "hourLabel": "{hour} h",
@@ -111,7 +111,7 @@
       "other": "Autres sites"
     },
     "localeLabels": { "fr": "Français", "en": "Anglais" },
-    "small": "Petits nombres (moins de 5 visiteurs dans la journée)"
+    "small": "Petits nombres regroupés"
   },
   "community": {
     "title": "La communauté",
@@ -140,7 +140,7 @@
       "Un visiteur est reconnu le temps d'une journée seulement : les visiteurs d'une semaine, d'un mois ou d'une année sont la somme des visiteurs de chaque jour.",
       "Le temps compté est celui où la page est affichée au premier plan, plafonné à 30 minutes par page.",
       "Les robots connus et les personnes qui s'opposent à la mesure ne sont pas comptés. Les chiffres du jour en cours s'affichent le lendemain.",
-      "Aucune répartition (page, appareil, provenance, langue, heure) ne montre un groupe de moins de 5 visiteurs d'une même journée : ces petits nombres sont regroupés."
+      "Aucune ligne d'une répartition (page, appareil, provenance, langue, heure) ne décrit moins de {min} visiteurs d'une même journée : les petits nombres sont regroupés, et un groupe encore trop petit l'est avec la ligne suivante. Les totaux de chaque jour sont donnés tels quels."
     ],
     "privacy": "Confidentialité de la mesure",
     "sourceCode": "Code source",

@@ -311,13 +311,11 @@ describe("rollUpAudienceDays", () => {
       "DELETE FROM bg_audience_day_hours",
       "DELETE FROM bg_audience_day_dims",
       "DELETE FROM bg_audience_days",
-      "INSERT INTO bg_audience_day_pages",
-      "INSERT INTO bg_audience_day_hours",
-      "INSERT INTO bg_audience_day_dims",
+      // Un seul visiteur : aucune ligne de répartition n'atteint le seuil (k-anonymat).
       "INSERT INTO bg_audience_days",
     ]);
     // Le temps d'une page vue n'est pas compté (il n'arrive que par ses suites).
-    expect(connection.execute.mock.calls[9][1]).toEqual(["2026-11-14", 1, 1, 1, 1, 0]);
+    expect(connection.execute.mock.calls[6][1]).toEqual(["2026-11-14", 1, 1, 1, 1, 0]);
   });
 
   it("ne replie rien quand aucun jour clos n'attend", async () => {

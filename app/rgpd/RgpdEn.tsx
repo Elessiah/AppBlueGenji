@@ -725,7 +725,7 @@ export function RgpdEn({
           </p>
           <p>
             <strong>What is recorded.</strong> The server computes a daily hash (HMAC-SHA256) of your
-            IP address and your browser, with a random salt drawn for the day (Paris time), kept in the
+            IP address (reduced to its /64 network in IPv6) and your browser, with a random salt drawn for the day (Paris time), kept in the
             database for the day and erased the next day, as soon as the day is counted (from 1:15
             a.m.): after that, no one, the association included, can recompute your hash (apart from an
             encrypted backup copy made in the meantime, which may contain the salt and your page views
@@ -760,7 +760,8 @@ export function RgpdEn({
           <p>
             <strong>Recipients.</strong> Anyone who has the link to the {AUDIENCE_PAGE_PATH} page, for
             the aggregate figures only (no breakdown there shows a group of fewer than{" "}
-            {AUDIENCE_MIN_VISITORS} visitors from the same day); the association&apos;s technical manager, who hosts the site,
+            {AUDIENCE_MIN_VISITORS} visitors from the same day; only each day&apos;s totals are given as
+            they are); the association&apos;s technical manager, who hosts the site,
             for the database.
           </p>
           <p>
