@@ -45,7 +45,7 @@ describe("signalements du staff — boutons pendant une requête", () => {
 
   it("page_gestureRefusedByGuard_showsInfoToast", () => {
     const code = source(PAGE);
-    expect(code).toContain("const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE), [showInfo]);");
+    expect(code).toContain("const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE, { once: true }), [showInfo]);");
     expect(code.match(/if \(done === undefined\) refuse\(\);/g)).toHaveLength(2);
     // « Actualiser » passe par la même garde : pas de relecture pendant un geste.
     expect(code).toContain("onClick={() => void refresh()}");
@@ -112,15 +112,17 @@ describe("signalements du staff — boutons pendant une requête", () => {
 
   it("PlayerRolesPanel_guardRefused_saysRefusal", () => {
     const code = source(ROLES);
-    expect(code).toMatch(/const done = await run\(sendRoles\);\s+if \(done === undefined\) \{\s+showInfo\(BUSY_REFUSED_MESSAGE, toastLang\);\s+return false;/);
-    expect(code).toMatch(/if \(isBusy\(\)\) \{\s+showInfo\(BUSY_REFUSED_MESSAGE, toastLang\);\s+return;/);
+    expect(code).toMatch(/const done = await run\(sendRoles\);\s+if \(done === undefined\) \{\s+showInfo\(BUSY_REFUSED_MESSAGE, \{ \.\.\.toastLang, once: true \}\);\s+return false;/);
+    expect(code).toMatch(/if \(isBusy\(\)\) \{\s+showInfo\(BUSY_REFUSED_MESSAGE, \{ \.\.\.toastLang, once: true \}\);\s+return;/);
   });
 
   it("PlayerRolesPanel_failedReload_saysProfileReloadFailed", () => {
     const code = source(ROLES);
     expect(code).toMatch(/Promise\.resolve\(onSaved\(\)\)\.then\(\s*\(result\) => result !== false,\s*\(\) => false,/);
-    expect(code).toContain('if (!reloaded) showError(rolesErrorMessage("PROFILE_RELOAD_FAILED"), toastLang);');
-    expect(code.match(/await reloadProfile\(\);/g)).toHaveLength(2);
+    expect(code).toContain("if (!reloaded) showError(rolesErrorMessage(failureCode), toastLang);");
+    // Enregistré mais fiche non relue : une seule phrase, qui dit les deux.
+    expect(code).toContain('await reloadProfile("ROLES_SAVED_RELOAD_FAILED");');
+    expect(code).toContain('await reloadProfile("PROFILE_RELOAD_FAILED");');
   });
 
   it("playerPage_moderationBar_revalidatedInBackground", () => {
@@ -132,7 +134,7 @@ describe("signalements du staff — boutons pendant une requête", () => {
   it("PlayerModerationBar_failedReload_saysSo", () => {
     const bar = source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
     expect(bar).toMatch(/Promise\.resolve\(onChanged\(\)\)/);
-    expect(bar).toContain(`if (!reloaded) showError("La fiche n'a pas pu être relue : recharge la page."`);
+    expect(bar).toContain("showError(PROFILE_RELOAD_FAILED_MESSAGE,");
   });
 
   it("useResourceLoader_failedRead_returnsFalse", () => {
@@ -241,5 +243,31 @@ describe("signalements du staff — rendu des gestes", () => {
 
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('data-gesture="purge:4"');
+  });
+
+  it("PlayerModerationBar_profileRead_focusBackOnBarWhenOpenerGone", () => {
+    const bar = source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
+    expect(bar).toContain("restoreFocus.current = true;");
+    expect(bar).toMatch(/useLayoutEffect\(\(\) => \{\s+if \(!restoreFocus\.current\) return;[\s\S]*?isFocusLost\(document\)\) barRef\.current\?\.querySelector<HTMLElement>\("button"\)\?\.focus\(\);\s+\}, \[profile\]\);/);
+    // Relecture échouée : plus rien à restaurer.
+    expect(bar).toMatch(/restoreFocus\.current = false;\s+showError\(/);
+  });
+
+  it("ReportDetail_focusRestore_usesIsFocusLost", () => {
+    const code = source(DETAIL);
+    expect(code).toContain("if (root && isFocusLost(document)) focusAfterGesture(root, last)?.focus();");
+  });
+
+  it("ArmedButton_otherGestureStarts_disarmedSoLongLabelGoes", () => {
+    const code = source(ARMED);
+    expect(code).toMatch(/const off = busy \|\| blocked;\s+useEffect\(\(\) => \{\s+if \(off\) setArmed\(false\);\s+\}, \[off\]\);/);
+    expect(code).toContain("{armed && !off ? confirmLabel : label}");
+  });
+
+  it("page_pending_releasedAfterTheGuard_neverBefore", () => {
+    const code = source(PAGE);
+    // Aucun rendu où la garde refuse (`busy`) sans qu'un bouton s'annonce occupé.
+    expect(code).not.toMatch(/finally \{[^}]*setPending\(null\)/);
+    expect(code.match(/else setPending\(null\);/g)).toHaveLength(2);
   });
 });

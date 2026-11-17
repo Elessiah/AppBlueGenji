@@ -44,6 +44,13 @@ export function ArmedButton({
 }: Readonly<ArmedButtonProps>) {
   const [armed, setArmed] = useState(false);
 
+  // Un autre geste part (ou celui-ci attend) : la question n'a plus de sens, et
+  // son libellé long ne doit pas rester à l'écran, bouton refusé.
+  const off = busy || blocked;
+  useEffect(() => {
+    if (off) setArmed(false);
+  }, [off]);
+
   useEffect(() => {
     if (!armed) return;
     const timer = setTimeout(() => setArmed(false), ARM_WINDOW_MS);
@@ -67,7 +74,7 @@ export function ArmedButton({
         onConfirm();
       }}
     >
-      {armed ? confirmLabel : label}
+      {armed && !off ? confirmLabel : label}
     </BusyButton>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { ModerationReasonField, isModerationReasonReady } from "@/components/moderation/ModerationReasonField";
@@ -14,8 +14,10 @@ import {
   type SuspensionGround,
 } from "@/lib/shared/account-suspension";
 import { moderationReasonErrorMessage } from "@/lib/shared/logo-quarantine";
+import { isFocusLost } from "@/lib/shared/focus-lost";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useStaffLang } from "@/components/i18n/staff-lang";
+import { PROFILE_RELOAD_FAILED_MESSAGE } from "../_lib/roles-errors";
 import styles from "../player.module.css";
 
 /**
@@ -44,15 +46,27 @@ export function PlayerModerationBar({
   const [dialog, setDialog] = useState<"avatar" | "suspend" | "lift" | null>(null);
   const { showError } = useToast();
   const staffLang = useStaffLang();
+  const barRef = useRef<HTMLFieldSetElement>(null);
+  const restoreFocus = useRef(false);
   const suspension = profile.moderationSuspension;
   const showAvatar = profile.moderationAvatarPresent;
   const showSuspension = suspension !== null || profile.moderationSuspendable;
+
+  // La fenêtre rend le focus au bouton qui l'a ouverte, avant la relecture de
+  // la fiche ; si celle-ci le retire (« Retirer l'avatar » une fois l'avatar
+  // parti), le focus tombait sur la page : il va au premier bouton de la barre.
+  useLayoutEffect(() => {
+    if (!restoreFocus.current) return;
+    restoreFocus.current = false;
+    if (isFocusLost(document)) barRef.current?.querySelector<HTMLElement>("button")?.focus();
+  }, [profile]);
 
   if (deleted || !profile.canModerate || (!showAvatar && !showSuspension)) return null;
 
   const close = () => setDialog(null);
   const done = () => {
     setDialog(null);
+    restoreFocus.current = true;
     // Relecture en arrière-plan : un échec laisserait la barre sur l'état
     // d'avant le geste (« Suspendre » sur un compte suspendu) sans le dire.
     void Promise.resolve(onChanged())
@@ -61,12 +75,14 @@ export function PlayerModerationBar({
         () => false,
       )
       .then((reloaded) => {
-        if (!reloaded) showError("La fiche n'a pas pu être relue : recharge la page.", staffLang ? { lang: staffLang } : undefined);
+        if (reloaded) return;
+        restoreFocus.current = false;
+        showError(PROFILE_RELOAD_FAILED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
       });
   };
 
   return (
-    <fieldset className={`native-group ${styles.moderationBar}`} aria-label="Modération" lang={staffLang}>
+    <fieldset ref={barRef} className={`native-group ${styles.moderationBar}`} aria-label="Modération" lang={staffLang}>
       <span className={styles.moderationLabel}>MODÉRATION</span>
       {suspension && (
         <span className={styles.moderationStatus}>

@@ -71,7 +71,7 @@ export function PlayerRolesPanel({
   const saveRoles = async (): Promise<boolean> => {
     const done = await run(sendRoles);
     if (done === undefined) {
-      showInfo(BUSY_REFUSED_MESSAGE, toastLang);
+      showInfo(BUSY_REFUSED_MESSAGE, { ...toastLang, once: true });
       return false;
     }
     return done;
@@ -79,12 +79,12 @@ export function PlayerRolesPanel({
 
   // Relecture de la fiche qui échoue : les rôles affichés (et `expectedRoles`
   // du prochain envoi) resteraient périmés sans que rien ne le dise.
-  const reloadProfile = async () => {
+  const reloadProfile = async (failureCode: string) => {
     const reloaded = await Promise.resolve(onSaved()).then(
       (result) => result !== false,
       () => false,
     );
-    if (!reloaded) showError(rolesErrorMessage("PROFILE_RELOAD_FAILED"), toastLang);
+    if (!reloaded) showError(rolesErrorMessage(failureCode), toastLang);
   };
 
   const sendRoles = async (): Promise<boolean> => {
@@ -99,7 +99,7 @@ export function PlayerRolesPanel({
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
       showSuccess("Rôles mis à jour.", toastLang);
-      await reloadProfile();
+      await reloadProfile("ROLES_SAVED_RELOAD_FAILED");
       return true;
     } catch (e) {
       const code = (e as Error).message;
@@ -107,7 +107,7 @@ export function PlayerRolesPanel({
       if (code === "ROLES_CHANGED") {
         // La fiche relit les rôles enregistrés (la sélection s'y resynchronise)
         // et la confirmation, qui annonçait un écart périmé, se ferme.
-        await reloadProfile();
+        await reloadProfile("PROFILE_RELOAD_FAILED");
         return true;
       }
       return false;
@@ -116,7 +116,7 @@ export function PlayerRolesPanel({
 
   const requestSave = () => {
     if (isBusy()) {
-      showInfo(BUSY_REFUSED_MESSAGE, toastLang);
+      showInfo(BUSY_REFUSED_MESSAGE, { ...toastLang, once: true });
       return;
     }
     // Sans les rôles enregistrés, rien ne permet de détecter un réglage concurrent.

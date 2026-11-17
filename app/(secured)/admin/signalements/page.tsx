@@ -137,7 +137,8 @@ function ReportsPanel() {
   // Un geste refusé parce qu'un autre attend le dit : par la garde synchrone
   // (second envoi parti avant le rendu de `pending`, double clic), ou par le
   // bouton déjà désarmé (`onBlockedClick` de `BusyButton`).
-  const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE), [showInfo]);
+  // `once` : un clic répété, ou Entrée tenue, n'empile pas le même message.
+  const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE, { once: true }), [showInfo]);
 
   // La garde synchrone écarte le second envoi parti avant le rendu de `busy`
   // (double clic).
@@ -153,11 +154,14 @@ function ReportsPanel() {
         showError(adminReportErrorMessage((error as Error).message));
       } finally {
         await load();
-        setPending(null);
       }
       return true;
     });
     if (done === undefined) refuse();
+    // Après la garde, jamais avant : entre les deux, aucun bouton ne serait
+    // refusé « occupé » sans montrer lequel attend. Un refus ne touche pas
+    // `pending`, qui nomme encore le geste en cours.
+    else setPending(null);
   };
 
   // « Actualiser » passe par la même garde : un geste lancé pendant la relecture
@@ -165,14 +169,11 @@ function ReportsPanel() {
   const refresh = async () => {
     const done = await runGuarded(async () => {
       setPending(REFRESH_GESTURE);
-      try {
-        await load();
-      } finally {
-        setPending(null);
-      }
+      await load();
       return true;
     });
     if (done === undefined) refuse();
+    else setPending(null);
   };
 
   const onAction = (action: ReportAction, note?: string) => {

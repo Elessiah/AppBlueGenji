@@ -591,8 +591,12 @@ describe("revue UI/UX", () => {
   });
 
   it("rolesErrorMessage_profileReloadFailed_asksToReloadPage", () => {
-    expect(rolesErrorMessage("PROFILE_RELOAD_FAILED")).toBe(
-      "La fiche n'a pas pu être relue : recharge la page avant de modifier d'autres rôles.",
+    expect(rolesErrorMessage("PROFILE_RELOAD_FAILED")).toBe("La fiche n'a pas pu être relue : recharge la page.");
+  });
+
+  it("rolesErrorMessage_savedButReloadFailed_saysBoth", () => {
+    expect(rolesErrorMessage("ROLES_SAVED_RELOAD_FAILED")).toBe(
+      "Rôles mis à jour, mais la fiche n'a pas pu être relue : recharge la page avant de modifier d'autres rôles.",
     );
   });
 

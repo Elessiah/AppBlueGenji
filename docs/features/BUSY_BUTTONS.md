@@ -219,8 +219,8 @@ annoncer de l'attente.
   la fiche du joueur se relit **en arrière-plan** (`revalidate`) : `refresh`
   la repassait en « Chargement… », démontait panneau et confirmation, et le
   focus tombait sur la page ; de même après un geste de la barre de modération
-  (la modale rend le focus au bouton voisin si le sien disparaît). Une relecture
+  (la modale rend le focus au bouton qui l'a ouverte ; si la relecture le retire, il va au premier bouton de la barre — `isFocusLost`, `lib/shared/focus-lost.ts`, qui compte aussi `<html>`). Une relecture
   qui échoue (`revalidate` rend `false`) le dit en notification, sans quoi les
   rôles affichés resteraient périmés en silence. Un enregistrement refusé par
-  la garde le dit aussi (`BUSY_REFUSED_MESSAGE`).
+  la garde le dit aussi (`BUSY_REFUSED_MESSAGE`). Ce refus s'affiche **une fois** (`once`) : un clic répété ou Entrée tenue n'empile pas le même message. `pending` n'est rendu qu'**après** la garde (jamais de rendu où tout est refusé sans bouton occupé), `ArmedButton` se désarme dès qu'un geste part (son libellé long ne reste pas) et « Rôles mis à jour, mais la fiche n'a pas pu être relue » tient en un seul message.
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

@@ -13,6 +13,7 @@ import {
   type ReportView,
 } from "@/lib/shared/content-reports";
 import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
+import { isFocusLost } from "@/lib/shared/focus-lost";
 import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
@@ -124,9 +125,8 @@ export function ReportDetail({
     const last = pressed.current;
     if (!last) return;
     const root = articleRef.current;
-    const active = document.activeElement;
     // Un focus parti ailleurs entre-temps (la liste, un lien) n'est pas repris.
-    if (root && (active === null || active === document.body)) focusAfterGesture(root, last)?.focus();
+    if (root && isFocusLost(document)) focusAfterGesture(root, last)?.focus();
     if (pending === null) pressed.current = null;
   }, [report, pending]);
 
