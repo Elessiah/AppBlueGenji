@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { DiscordTag } from "@/components/discord-tag";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { contactsPanelView } from "../_lib/contacts-panel-view";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
@@ -49,7 +50,6 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
   const mapError = useMapError();
   const { showError } = useToast();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [entrants, setEntrants] = useState<EntrantContactGroup[] | null>(null);
   // **Un échec doit rester lisible dans le panneau**, et pas seulement passer en
   // toast : le toast s'efface au bout de quelques secondes, le panneau reste
@@ -57,32 +57,44 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
   // (`loading` retombé, `entrants` encore `null`) et l'arbitre se retrouvait
   // devant un bloc vide, sans savoir qu'il devait replier pour relancer.
   const [failure, setFailure] = useState<string | null>(null);
+  // Numéro de l'échec : une relance qui échoue sur le **même** message ne
+  // changerait pas le texte de l'alerte, qui ne serait pas relue — le
+  // paragraphe est remplacé à chaque échec (`key`), le bouton reste.
+  const [failures, setFailures] = useState(0);
 
-  // Garde synchrone : un double clic sur « Réessayer » lancerait deux lectures.
-  const loadingRef = useRef(false);
-  // `retry` : l'échec reste affiché pendant la relance (`contactsPanelView`),
-  // et avec lui « Réessayer », qui garde le focus (`aria-busy`) au lieu de
-  // disparaître sous le doigt.
+  // Une lecture à la fois (`useBusyGuard`) : un double clic sur « Réessayer »
+  // lancerait deux lectures. `retry` : l'échec reste affiché pendant la relance
+  // (`contactsPanelView`), et avec lui « Réessayer », qui garde le focus
+  // (`aria-busy`) au lieu de disparaître sous le doigt.
+  const { busy: loading, isBusy, run } = useBusyGuard();
+  // Une réouverture pendant une lecture ne la double pas, mais n'est pas
+  // perdue : la relecture promise à chaque ouverture part juste après.
+  const rereadRef = useRef(false);
   const load = async (retry = false) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    setLoading(true);
-    if (!retry) setFailure(null);
-    try {
-      const res = await fetch(`/api/admin/tournaments/${tournamentId}/contacts`, {
-        cache: "no-store",
-      });
-      const payload = (await res.json()) as { entrants?: EntrantContactGroup[]; error?: string };
-      if (!res.ok) throw new Error(payload.error || "CONTACTS_LOAD_FAILED");
-      setEntrants(payload.entrants ?? []);
-      setFailure(null);
-    } catch (e) {
-      const message = mapError((e as Error).message);
-      setFailure(message);
-      showError(message);
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
+    if (isBusy()) {
+      if (!retry) rereadRef.current = true;
+      return;
+    }
+    await run(async () => {
+      if (!retry) setFailure(null);
+      try {
+        const res = await fetch(`/api/admin/tournaments/${tournamentId}/contacts`, {
+          cache: "no-store",
+        });
+        const payload = (await res.json()) as { entrants?: EntrantContactGroup[]; error?: string };
+        if (!res.ok) throw new Error(payload.error || "CONTACTS_LOAD_FAILED");
+        setEntrants(payload.entrants ?? []);
+        setFailure(null);
+      } catch (e) {
+        const message = mapError((e as Error).message);
+        setFailure(message);
+        setFailures((count) => count + 1);
+        showError(message);
+      }
+    });
+    if (rereadRef.current) {
+      rereadRef.current = false;
+      void load();
     }
   };
 
@@ -117,12 +129,14 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
            doit pas demander de replier le panneau d'abord. `role="alert"`
            parce que le message remplace un contenu attendu. */
         <div className={styles.hint} role="alert">
-          <p style={{ margin: "0 0 8px" }}>{failure}</p>
+          <p key={failures} style={{ margin: "0 0 8px" }}>
+            {failure}
+          </p>
           <button
             type="button"
             className="btn"
             onClick={() => {
-              if (!loading) void load(true);
+              if (!isBusy()) void load(true);
             }}
             aria-disabled={loading || undefined}
             aria-busy={loading || undefined}

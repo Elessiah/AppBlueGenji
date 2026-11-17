@@ -140,8 +140,8 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toMatch(/onKeyDown=\{\(event\) => \{\s*if \(event\.repeat && event\.key === "Enter"\) event\.preventDefault\(\);\s*\}\}/);
     // « Vider la date » et « Annuler », repoussés sous le second clic par
     // l'avertissement qui apparaît, ne le prennent pas non plus.
-    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1 && !busyRef\.current\) clearAll\(\);\s*\}\}/);
-    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1 && !busyRef\.current\) onClose\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1 && !isBusy\(\)\) clearAll\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1 && !isBusy\(\)\) onClose\(\);\s*\}\}/);
     expect(SOURCE).not.toContain("onClick={onClose}");
     expect(SOURCE).not.toContain("heldBackAt");
     expect(SOURCE).not.toContain("LATE_WARNING_CONFIRM_DELAY_MS");

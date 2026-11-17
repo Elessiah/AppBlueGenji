@@ -430,7 +430,7 @@ describe("MatchCardActions — branchements du cast", () => {
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
     expect(settings).toContain('requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED")');
     // Geste sans retour : confirmé par ConfirmActionDialog (jamais un clic direct).
-    expect(settings).toMatch(/onClick=\{\(\) => \{\s+if \(!busyRef\.current\) setConfirmRelease\(true\);/);
+    expect(settings).toMatch(/onClick=\{\(\) => \{\s+if \(!isBusy\(\)\) setConfirmRelease\(true\);/);
     expect(settings).toContain("<ConfirmActionDialog");
     expect(settings).toContain('t("cardActions.releaseConfirm.selfConfirm")');
   });

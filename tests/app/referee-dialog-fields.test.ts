@@ -99,7 +99,7 @@ describe("RefereeDialog — gestes et textes (EF-30)", () => {
     const assign = source.slice(source.indexOf("const assign ="), source.indexOf("const saveMap ="));
     expect(assign).toContain('if (done) setPick("")');
     // Un choix qui n'est plus proposé (le compte désigné a quitté la liste) n'envoie rien.
-    expect(assign).toContain("if (busyRef.current || !pickOffered) return;");
+    expect(assign).toContain("if (isBusy() || !pickOffered) return;");
     expect(source).toContain("aria-disabled={busy || !pickOffered || undefined}");
   });
 

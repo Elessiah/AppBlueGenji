@@ -6,14 +6,16 @@ import { join } from "node:path";
  * Pendant une requête, les boutons des dialogues de match et d'arbitrage
  * restaient `disabled` : le focus clavier tombait sur le `<body>` et un lecteur
  * d'écran perdait sa place. Ils restent focalisables (`aria-disabled`,
- * `aria-busy`), le gestionnaire ignore un second geste, et une garde
- * synchrone (`useRef`) écarte le double envoi qui part avant le rendu.
+ * `aria-busy`), le gestionnaire ignore un second geste, et la garde partagée
+ * `useBusyGuard` (`runExclusive`, testée en comportement dans
+ * `tests/lib/shared/busy-guard.test.ts`) écarte le double envoi qui part
+ * avant le rendu et se lève sur tout chemin d'erreur.
  *
  * Un **champ** peut garder `disabled` : les listes déroulantes de l'arbitrage
  * et de la date (le focus est sur le bouton qui envoie, une liste n'envoie
  * pas le formulaire), la liste des maps d'un score (`MapScoreList`, Entrée n'y
- * envoie pas) et les points par map (`RoundMapsDialog`) — les valeurs en
- * cours d'envoi ne doivent pas changer sous la requête.
+ * envoie pas). Les points par map (`RoundMapsDialog`), où Entrée envoie,
+ * passent en lecture seule pendant l'envoi.
  */
 const DIR = "app/(secured)/tournois/[id]/_components/";
 const SCREENS = [
@@ -47,39 +49,77 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
     expect(source(DIR + file)).toMatch(new RegExp(String.raw`aria-busy=\{(?:${BUSY}|waiting) \|\| undefined\}|"aria-busy": busy \|\| undefined`));
   });
 
-  it.each([
-    ["RefereeDialog.tsx", "busyRef"],
-    ["MatchScheduleDialog.tsx", "busyRef"],
-    ["CastSettingsDialog.tsx", "busyRef"],
-    ["MatchReplayDialog.tsx", "busyRef"],
-    ["MatchLiveDialog.tsx", "busyRef"],
-    ["IssueReportDialog.tsx", "busyRef"],
-    ["PlayerScoreDialog.tsx", "submittingRef"],
-    ["RoundMapsDialog.tsx", "busyRef"],
-    ["MatchPlanningPanel.tsx", "busyRef"],
-    ["MatchCardActions.tsx", "busyRef"],
-    ["EntrantContactsPanel.tsx", "loadingRef"],
-  ])("%s_sendWhileSending_ignoredBySynchronousGuard", (file, ref) => {
-    expect(source(DIR + file)).toMatch(new RegExp(String.raw`if \((?:!match \|\| )?${ref}\.current[^)]*\) return`));
-  });
+  it.each(SCREENS.filter((file) => file !== "AdminScoreDialog.tsx").map((file) => [file]))(
+    "%s_sends_throughSharedBusyGuard",
+    (file) => {
+      const code = source(DIR + file);
+      expect(code).toMatch(/= useBusyGuard\(\);/);
+      // Plus de garde écrite à la main (drapeau oublié dans un `finally` = bouton bloqué).
+      expect(code).not.toMatch(/\b(?:busyRef|submittingRef|loadingRef|inFlight)\b/);
+    },
+  );
 
-  it("useScoreForm_submitWhileSubmitting_ignoredBySynchronousGuard", () => {
+  it("useScoreForm_submit_throughSharedBusyGuard", () => {
+    // AdminScoreDialog envoie par `useScoreForm`.
     const code = source("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(code).toMatch(/if \(!match \|\| submittingRef\.current\) return false;/);
-    expect(code).toMatch(/submittingRef\.current = true;\s+setSubmitting\(true\);/);
-    expect(code).toMatch(/finally \{\s+submittingRef\.current = false;/);
+    expect(code).toMatch(/const \{ busy: submitting, isBusy, run \} = useBusyGuard\(\);/);
+    expect(code).toMatch(/if \(!match \|\| isBusy\(\)\) return false;/);
+    expect(code).not.toMatch(/submittingRef/);
   });
 
-  it("useOnAirToggle_toggleWhileInFlight_ignored", () => {
+  it("useOnAirToggle_sharesWindowGuard", () => {
+    // L'antenne et l'enregistrement d'une fenêtre partagent un seul drapeau :
+    // l'un lancé pendant l'autre est ignoré.
     const code = source("app/(secured)/tournois/[id]/_lib/use-on-air-toggle.ts");
-    expect(code).toMatch(/if \(inFlight\.current\) return;\s+inFlight\.current = true;/);
-    expect(code).toMatch(/finally \{\s+inFlight\.current = false;/);
+    expect(code).toMatch(/\{ run, onDone \}: \{ run: BusyRun; onDone: \(\) => void \}/);
+    expect(code).toMatch(/await run\(async \(\) => \{/);
+    for (const file of ["CastSettingsDialog.tsx", "MatchLiveDialog.tsx"]) {
+      expect(source(DIR + file)).toMatch(/useOnAirToggle\(match\.id, onAir, \{ run, onDone: onSaved \}\)/);
+    }
+  });
+
+  it("CastAirAndReplay_clicks_guardedSynchronously", () => {
+    const code = source(DIR + "CastSettingsDialog.tsx");
+    expect(code).toMatch(/if \(!isBusy\(\)\) void toggleAir\(\);/);
+    expect(code).toMatch(/if \(!isBusy\(\)\) onReplay\(\);/);
+  });
+
+  it("RoundPointsForm_mapPoints_readOnlyNotDisabledWhileBusy", () => {
+    const code = source(DIR + "RoundMapsDialog.tsx");
+    expect(code).toMatch(/<fieldset className=\{styles\.pointMaps\} disabled=\{locked\}>/);
+    expect(code).toMatch(/readOnly=\{busy\}\s+onEdit=\{editMap\}/);
+    expect(code).toMatch(/readOnly=\{readOnly \|\| undefined\}/);
+  });
+
+  it("MatchPlanningPanel_busyToggle_keepsItsLabel", () => {
+    const code = source(DIR + "MatchPlanningPanel.tsx");
+    expect(code).not.toMatch(/busy \? "…" : toggleLabel/);
+    expect(code).toMatch(/\{toggleLabel\}\s+\{busy && "…"\}/);
+  });
+
+  it("EntrantContactsPanel_reopenDuringLoad_rereadsAfter", () => {
+    const code = source(DIR + "EntrantContactsPanel.tsx");
+    expect(code).toMatch(/if \(!retry\) rereadRef\.current = true;/);
+    expect(code).toMatch(/if \(rereadRef\.current\) \{\s+rereadRef\.current = false;\s+void load\(\);/);
+  });
+
+  it("EntrantContactsPanel_sameFailureAgain_alertReplaced", () => {
+    const code = source(DIR + "EntrantContactsPanel.tsx");
+    expect(code).toMatch(/setFailures\(\(count\) => count \+ 1\)/);
+    expect(code).toMatch(/<p key=\{failures\}/);
+  });
+
+  it.each(SCREENS.map((file) => [file]))("%s_focusableBusyButton_alsoAnnouncesBusy", (file) => {
+    for (const button of buttonsOf(source(DIR + file))) {
+      if (!new RegExp(String.raw`aria-disabled=\{[^}]*\b(?:${BUSY}|waiting)\b`).test(button)) continue;
+      expect(button).toMatch(/aria-busy=|busyProps/);
+    }
   });
 
   it("RefereeDialog_confirmAndClose_ignoredWhileBusy", () => {
     const code = source(DIR + "RefereeDialog.tsx");
-    expect(code).toMatch(/const ask = \(pending: PendingConfirm\) => \{\s+if \(!busyRef\.current\) setConfirm\(pending\);/);
-    expect(code).toMatch(/const close = \(\) => \{\s+if \(!busyRef\.current\) onClose\(\);/);
+    expect(code).toMatch(/const ask = \(pending: PendingConfirm\) => \{\s+if \(!isBusy\(\)\) setConfirm\(pending\);/);
+    expect(code).toMatch(/const close = \(\) => \{\s+if \(!isBusy\(\)\) onClose\(\);/);
     expect(code).not.toMatch(/onClick=\{\(\) => setConfirm\(/);
   });
 
@@ -98,7 +138,7 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
     // Le bouton n'est plus `disabled` natif : Entrée dans un champ enverrait
     // sinon un formulaire que `saveReason` refusait.
     expect(source(DIR + "MatchLiveDialog.tsx")).toMatch(
-      /if \(busyRef\.current \|\| urlInvalid \|\| triggerNeedsDate \|\| invalidCasterLink \|\| saveReason !== null\) return;/,
+      /if \(isBusy\(\) \|\| urlInvalid \|\| triggerNeedsDate \|\| invalidCasterLink \|\| saveReason !== null\) return;/,
     );
   });
 
@@ -117,6 +157,11 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
     const code = source(DIR + "EntrantContactsPanel.tsx");
     expect(code).toMatch(/if \(!retry\) setFailure\(null\);/);
     expect(code).toMatch(/void load\(true\)/);
+  });
+
+  it("ScoreDialogCss_noNativeDisabledLeft_noDeadSelectors", () => {
+    // Plus aucun bouton de ces dialogues n'est `disabled` natif.
+    expect(source(DIR + "ScoreDialog.module.css")).not.toMatch(/:disabled/);
   });
 
   it("ScoreDialogCss_disabledForfeitAndLink_useColoursNotOpacity", () => {

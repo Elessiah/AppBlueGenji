@@ -12,6 +12,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
@@ -593,6 +594,7 @@ const MapPointRow = memo(function MapPointRow({
   draft,
   fallback,
   message,
+  readOnly,
   onEdit,
   onClearError,
 }: Readonly<{
@@ -605,6 +607,8 @@ const MapPointRow = memo(function MapPointRow({
   /** N du tour, montré quand la carte le suit. */
   fallback: number;
   message: string | null;
+  /** Envoi en cours : lecture seule (pas `disabled`, qui ferait perdre le focus après Entrée). */
+  readOnly: boolean;
   onEdit: (index: number, next: number) => void;
   onClearError: (index: number) => void;
 }>) {
@@ -619,6 +623,7 @@ const MapPointRow = memo(function MapPointRow({
         value={draft ?? fallback}
         onValueChange={(next) => onEdit(index, next)}
         onEdit={() => onClearError(index)}
+        readOnly={readOnly || undefined}
         {...fieldAria(inputId, message !== null, draft === null && followsId)}
       />
       <FieldErrorText fieldId={inputId} message={message} />
@@ -786,8 +791,11 @@ function RoundPointsForm({
             </p>
           )}
         </div>
+        {/* `locked` est un état durable (champs désactivés) ; pendant un envoi les
+            champs passent en lecture seule : Entrée y envoie le formulaire et
+            un champ désactivé sous le focus le renverrait sur la page. */}
         {rows > 0 && (
-          <fieldset className={styles.pointMaps} disabled={locked || busy}>
+          <fieldset className={styles.pointMaps} disabled={locked}>
             <legend className={styles.pointMapsLegend}>
               <span className={styles.labelRow}>
                 <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
@@ -807,6 +815,7 @@ function RoundPointsForm({
                   draft={draft}
                   fallback={value}
                   message={fieldErrors.message(`map-${index}`)}
+                  readOnly={busy}
                   onEdit={editMap}
                   onClearError={clearMapError}
                 />
@@ -1001,10 +1010,9 @@ export function RoundMapsDialog({
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
   const [copyTarget, setCopyTarget] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
-  const [busy, setBusy] = useState(false);
   // Garde synchrone : Entrée répétée ou double clic relancerait un envoi avant
   // que `busy` soit rendu (les boutons restent focalisables, `aria-disabled`).
-  const busyRef = useRef(false);
+  const { busy, isBusy, run: guarded } = useBusyGuard();
   // Saisie non enregistrée du champ de la map de départage (remontée par son formulaire).
   const [tiebreakDirty, setTiebreakDirty] = useState(false);
   // Saisie non enregistrée des points du tour (format Duel / Arcade).
@@ -1083,23 +1091,20 @@ export function RoundMapsDialog({
   const clearedText = t(tiebreakKept ? "dialog.roundClearedTiebreakKept" : "dialog.roundCleared");
 
   const run: RunTask = async (task, onRefused) => {
-    if (busyRef.current) return false;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      await task();
-      window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-      return true;
-    } catch (error) {
-      const code = (error as Error).message;
-      const text = launchErrorText(actionText, errorsText, code);
-      showError(text);
-      onRefused?.(code, text);
-      return false;
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    if (isBusy()) return false;
+    return (await guarded(async () => {
+      try {
+        await task();
+        window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+        return true;
+      } catch (error) {
+        const code = (error as Error).message;
+        const text = launchErrorText(actionText, errorsText, code);
+        showError(text);
+        onRefused?.(code, text);
+        return false;
+      }
+    })) ?? false;
   };
 
   const tiebreakTournament = {

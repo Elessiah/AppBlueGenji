@@ -1,7 +1,8 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
-import { FormEvent, useRef, useState } from "react";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -29,7 +30,11 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   const mapError = useMapError();
   const { t } = useDialogsText();
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (Entrée dans le champ, double clic) : un second envoi
+  // partirait avant que `busy` soit rendu. Les boutons restent focalisables
+  // pendant l'envoi (`aria-disabled` + `aria-busy`), le champ passe en lecture
+  // seule (`readOnly`) : désactivé, il perdrait le focus qu'Entrée y laisse.
+  const { busy, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 
@@ -39,32 +44,24 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   // Rien à enregistrer : un champ vide sur un match sans lien.
   const noop = !touched && match.replayUrl === null;
 
-  // Garde synchrone (Entrée dans le champ, double clic) : un second envoi
-  // partirait avant que `busy` soit rendu. Les boutons restent focalisables
-  // pendant l'envoi (`aria-disabled` + `aria-busy`), le champ passe en lecture
-  // seule (`readOnly`) : désactivé, il perdrait le focus qu'Entrée y laisse.
-  const busyRef = useRef(false);
   const save = async (value: string | null) => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/replay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ replayUrl: value }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_REPLAY_UPDATE_FAILED");
-      showSuccess(value === null ? t("replay.removed") : t("replay.saved"));
-      onSaved();
-      onClose();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    if (isBusy()) return;
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/matches/${match.id}/replay`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ replayUrl: value }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(payload.error || "MATCH_REPLAY_UPDATE_FAILED");
+        showSuccess(value === null ? t("replay.removed") : t("replay.saved"));
+        onSaved();
+        onClose();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 
   const submit = (event: FormEvent) => {
@@ -181,7 +178,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
               type="button"
               className="btn ghost"
               onClick={() => {
-                if (!busyRef.current) onClose();
+                if (!isBusy()) onClose();
               }}
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}

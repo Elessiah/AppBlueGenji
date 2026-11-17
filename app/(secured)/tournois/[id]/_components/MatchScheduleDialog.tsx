@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { FormEvent, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -270,12 +271,11 @@ export function MatchScheduleDialog({
   // Les boutons de décalage restent repliés tant qu'on ne les demande pas :
   // l'aperçu juste — le cas courant — n'a pas à les montrer.
   const [yearFixOpen, setYearFixOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   // Garde synchrone : un second envoi (double clic, Entrée) part avant que
   // `busy` soit rendu. Les boutons restent focalisables pendant l'envoi
   // (`aria-disabled` + `aria-busy`) ; les listes gardent `disabled` (le focus
   // est sur le bouton qui envoie, une liste n'envoie pas le formulaire).
-  const busyRef = useRef(false);
+  const { busy, isBusy, run } = useBusyGuard();
   // Le dernier envoi a été retenu (date devenue passée) : le clic suivant, s'il
   // prolonge un double-clic, ne le confirme pas (`isUnreadConfirmationClick`).
   const justHeld = useRef(false);
@@ -350,7 +350,7 @@ export function MatchScheduleDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busyRef.current) return;
+    if (isBusy()) return;
     if (entry.kind === "incomplete" || entry.kind === "invalid") {
       const message = entryRefusal(text, entry) ?? t("schedule.refusal.unknown");
       fieldErrors.flag(entry.field, message);
@@ -377,32 +377,29 @@ export function MatchScheduleDialog({
     }
 
     justHeld.current = false;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
-        }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
-        throw new CodedError(code, mapError(code));
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
+          }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
+          throw new CodedError(code, mapError(code));
+        }
+        showSuccess(savedMessage(text, entry.kind === "ready", planning, match.startAt !== null));
+        onSaved();
+        onClose();
+      } catch (error) {
+        const message = error instanceof CodedError ? error.message : mapError((error as Error).message);
+        fieldErrors.report(errorCode(error), message);
+        showError(message);
       }
-      showSuccess(savedMessage(text, entry.kind === "ready", planning, match.startAt !== null));
-      onSaved();
-      onClose();
-    } catch (error) {
-      const message = error instanceof CodedError ? error.message : mapError((error as Error).message);
-      fieldErrors.report(errorCode(error), message);
-      showError(message);
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    });
   };
   const busyProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
 
@@ -560,7 +557,7 @@ export function MatchScheduleDialog({
               className="btn ghost"
               {...busyProps}
               onClick={() => {
-                if (!busyRef.current) setYearFixOpen((open) => !open);
+                if (!isBusy()) setYearFixOpen((open) => !open);
               }}
               aria-expanded={yearFixOpen}
               aria-controls={YEAR_FIX_ID}
@@ -582,7 +579,7 @@ export function MatchScheduleDialog({
                   className="btn ghost"
                   {...busyProps}
                   onClick={() => {
-                    if (!busyRef.current) setYearShift(previousYear.shift);
+                    if (!isBusy()) setYearShift(previousYear.shift);
                   }}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
@@ -596,7 +593,7 @@ export function MatchScheduleDialog({
                   className="btn ghost"
                   {...busyProps}
                   onClick={() => {
-                    if (!busyRef.current) setYearShift(nextYear.shift);
+                    if (!isBusy()) setYearShift(nextYear.shift);
                   }}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
@@ -649,7 +646,7 @@ export function MatchScheduleDialog({
                 type="button"
                 className="btn ghost"
                 onClick={(event) => {
-                  if (event.detail <= 1 && !busyRef.current) clearAll();
+                  if (event.detail <= 1 && !isBusy()) clearAll();
                 }}
                 {...busyProps}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
@@ -661,7 +658,7 @@ export function MatchScheduleDialog({
               type="button"
               className="btn ghost"
               onClick={(event) => {
-                if (event.detail <= 1 && !busyRef.current) onClose();
+                if (event.detail <= 1 && !isBusy()) onClose();
               }}
               {...busyProps}
               style={{ padding: "8px 18px", fontSize: 13 }}

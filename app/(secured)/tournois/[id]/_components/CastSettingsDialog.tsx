@@ -8,6 +8,7 @@ import { offersCastRelease } from "@/lib/shared/cast-settings";
 import { canToggleOnAir, isMatchCastable, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { liveTriggerViewer, viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { canEditReplay } from "@/lib/shared/match-replay";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -112,15 +113,11 @@ export function CastSettingsDialog({
   const { current: liveTrigger, refresh: refreshTrigger } = useCurrentTrigger(match.liveTrigger);
   const trigger: MatchLiveTrigger = pickedTrigger ?? liveTrigger ?? "AUTO";
   const { seenTrigger, pickTrigger } = useSeenTrigger(liveTrigger, pickedTrigger, setTrigger);
-  const [busy, setBusyState] = useState(false);
-  // Garde synchrone : Entrée dans un champ ou un double clic relancerait un
-  // envoi avant que `busy` soit rendu. Pendant l'envoi les boutons restent
-  // focalisables (`aria-disabled` + `aria-busy`), jamais `disabled` natif.
-  const busyRef = useRef(false);
-  const setBusy = (next: boolean) => {
-    busyRef.current = next;
-    setBusyState(next);
-  };
+  // Un envoi à la fois (enregistrement, antenne, retrait) : Entrée dans un
+  // champ ou un double clic relancerait un envoi avant que `busy` soit rendu.
+  // Pendant l'envoi les boutons restent focalisables (`aria-disabled` +
+  // `aria-busy`), jamais `disabled` natif (`useBusyGuard`).
+  const { busy, isBusy, run } = useBusyGuard();
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId, trigger: triggerId });
   const fail = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
 
@@ -191,66 +188,62 @@ export function CastSettingsDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busyRef.current || blocked || cast === null) return;
-    setBusy(true);
-    try {
-      // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
-      // diffusion), et n'est envoyée que si elle a changé.
-      const settings: Record<string, unknown> = {};
-      // Le mode vu part avec le mode choisi : changé entre-temps, le serveur
-      // refuse (`LIVE_TRIGGER_CHANGED`) plutôt que d'écraser ce qu'il ignore.
-      if (triggerChanged) {
-        settings.trigger = pickedTrigger;
-        settings.expectedTrigger = seenTrigger.current;
+    if (isBusy() || blocked || cast === null) return;
+    await run(async () => {
+      try {
+        // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
+        // diffusion), et n'est envoyée que si elle a changé.
+        const settings: Record<string, unknown> = {};
+        // Le mode vu part avec le mode choisi : changé entre-temps, le serveur
+        // refuse (`LIVE_TRIGGER_CHANGED`) plutôt que d'écraser ce qu'il ignore.
+        if (triggerChanged) {
+          settings.trigger = pickedTrigger;
+          settings.expectedTrigger = seenTrigger.current;
+        }
+        if (streamEditable && urlChanged) {
+          settings.liveUrl = url.trim() === "" ? null : url.trim();
+        }
+        if (battletagChanged) settings.battletag = battletag.trim() === "" ? null : battletag.trim();
+        await requestJson(`/api/matches/${match.id}/caster`, { method: "PUT", body: settings }, "MATCH_CAST_SETTINGS_FAILED");
+        showSuccess(t("cardActions.castSettings.saved"));
+        onSaved();
+        onClose();
+      } catch (error) {
+        const code = (error as Error).message;
+        const message = fail(code);
+        fieldErrors.report(code, message);
+        showError(message);
+        // Mode changé entre-temps : la fenêtre relit le mode du match (le flux
+        // a pu ne pas le livrer encore) et le montre ; le prochain choix part
+        // avec lui comme mode vu (`useSeenTrigger`).
+        if (code === "LIVE_TRIGGER_CHANGED") {
+          setTrigger(null);
+          void refreshTrigger(match.id);
+        }
       }
-      if (streamEditable && urlChanged) {
-        settings.liveUrl = url.trim() === "" ? null : url.trim();
-      }
-      if (battletagChanged) settings.battletag = battletag.trim() === "" ? null : battletag.trim();
-      await requestJson(`/api/matches/${match.id}/caster`, { method: "PUT", body: settings }, "MATCH_CAST_SETTINGS_FAILED");
-      showSuccess(t("cardActions.castSettings.saved"));
-      onSaved();
-      onClose();
-    } catch (error) {
-      const code = (error as Error).message;
-      const message = fail(code);
-      fieldErrors.report(code, message);
-      showError(message);
-      // Mode changé entre-temps : la fenêtre relit le mode du match (le flux
-      // a pu ne pas le livrer encore) et le montre ; le prochain choix part
-      // avec lui comme mode vu (`useSeenTrigger`).
-      if (code === "LIVE_TRIGGER_CHANGED") {
-        setTrigger(null);
-        void refreshTrigger(match.id);
-      }
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
-  const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });
+  const toggleAir = useOnAirToggle(match.id, onAir, { run, onDone: onSaved });
 
   // Se retirer rend la place (le serveur retire aussi le stream et son lien) :
   // geste sans retour, il passe par une confirmation (`ConfirmActionDialog`).
   // Rend `true` s'il a abouti : la confirmation et la fenêtre se ferment.
-  const release = async (): Promise<boolean> => {
-    if (busyRef.current) return false;
-    setBusy(true);
-    onReleasing?.(true);
-    try {
-      await requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED");
-      showSuccess(t("cardActions.notCasting"));
-      onSaved();
-      onClose();
-      return true;
-    } catch (error) {
-      onReleasing?.(false);
-      showError(fail((error as Error).message));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
+  const release = async (): Promise<boolean> =>
+    (await run(async () => {
+      onReleasing?.(true);
+      try {
+        await requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED");
+        showSuccess(t("cardActions.notCasting"));
+        onSaved();
+        onClose();
+        return true;
+      } catch (error) {
+        onReleasing?.(false);
+        showError(fail((error as Error).message));
+        return false;
+      }
+    })) ?? false;
 
   return (
     <TournamentDialogFrame titleId={titleId} maxWidth={470} zIndex={80} busy={busy} onClose={onClose}>
@@ -336,6 +329,7 @@ export function CastSettingsDialog({
             showAir={canToggleOnAir(match) && !triggerLocked}
             onAir={onAir}
             busy={busy}
+            isBusy={isBusy}
             toggleAir={toggleAir}
             replayable={replayable}
             onReplay={() => {
@@ -355,7 +349,7 @@ export function CastSettingsDialog({
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
               onClick={() => {
-                if (!busyRef.current) setConfirmRelease(true);
+                if (!isBusy()) setConfirmRelease(true);
               }}
             >
               {t("cardActions.stopCasting")}
@@ -366,7 +360,7 @@ export function CastSettingsDialog({
               type="button"
               className={`btn ghost ${styles.button}`}
               onClick={() => {
-                if (!busyRef.current) onClose();
+                if (!isBusy()) onClose();
               }}
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
@@ -468,6 +462,7 @@ function CastAirAndReplay({
   showAir,
   onAir,
   busy,
+  isBusy,
   toggleAir,
   replayable,
   onReplay,
@@ -477,6 +472,8 @@ function CastAirAndReplay({
   showAir: boolean;
   onAir: boolean;
   busy: boolean;
+  /** Garde synchrone de la fenêtre : un envoi parti avant le rendu de `busy`. */
+  isBusy: () => boolean;
   toggleAir: () => Promise<unknown>;
   replayable: boolean;
   onReplay: () => void;
@@ -500,7 +497,7 @@ function CastAirAndReplay({
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}
             onClick={() => {
-              if (!busy) void toggleAir();
+              if (!isBusy()) void toggleAir();
             }}
           >
             {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
@@ -522,7 +519,7 @@ function CastAirAndReplay({
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}
             onClick={() => {
-              if (!busy) onReplay();
+              if (!isBusy()) onReplay();
             }}
           >
             {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}

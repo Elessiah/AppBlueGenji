@@ -337,7 +337,7 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
   it("CastSettingsDialog_and_MatchLiveDialog_shareOnAirToggle", () => {
     const live = readSource(`${DIR}/_components/MatchLiveDialog.tsx`);
     for (const source of [settings, live]) {
-      expect(source).toContain("useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved })");
+      expect(source).toContain("useOnAirToggle(match.id, onAir, { run, onDone: onSaved })");
     }
     expect(live).not.toContain('style={{ margin: "0 0 14px" }}');
     expect(live).toContain("styles.sectionButton");

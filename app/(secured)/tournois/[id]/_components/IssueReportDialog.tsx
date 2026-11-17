@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
@@ -37,40 +38,35 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
   const team1 = useShownEntrantName(match?.team1Id ?? null, match?.team1Name ?? null);
   const team2 = useShownEntrantName(match?.team2Id ?? null, match?.team2Name ?? null);
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
   // Garde synchrone (double clic, Entrée) : un second signalement partirait
   // avant que `busy` soit rendu. Boutons focalisables pendant l'envoi.
-  const busyRef = useRef(false);
+  const { busy, isBusy, run } = useBusyGuard();
 
   const valid = normalizeIssueReportMessage(message) !== null;
   const touched = message.trim().length > 0;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busyRef.current || !valid) return;
-
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/report-issue`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: message.trim(), matchId: match?.id ?? null }),
-      });
-      const payload = (await response.json()) as { error?: string; notifiedReferees?: number };
-      if (!response.ok) throw new Error(payload.error || "ISSUE_REPORT_FAILED");
-      showSuccess(
-        payload.notifiedReferees && payload.notifiedReferees > 0
-          ? t("issue.sentReferees", { count: payload.notifiedReferees })
-          : t("issue.sentStaff"),
-      );
-      onClose();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    if (isBusy() || !valid) return;
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/tournaments/${tournamentId}/report-issue`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ message: message.trim(), matchId: match?.id ?? null }),
+        });
+        const payload = (await response.json()) as { error?: string; notifiedReferees?: number };
+        if (!response.ok) throw new Error(payload.error || "ISSUE_REPORT_FAILED");
+        showSuccess(
+          payload.notifiedReferees && payload.notifiedReferees > 0
+            ? t("issue.sentReferees", { count: payload.notifiedReferees })
+            : t("issue.sentStaff"),
+        );
+        onClose();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 
   return (
@@ -123,7 +119,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             type="button"
             className="btn ghost"
             onClick={() => {
-              if (!busyRef.current) onClose();
+              if (!isBusy()) onClose();
             }}
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}

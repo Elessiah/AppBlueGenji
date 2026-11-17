@@ -785,13 +785,14 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
     expect(source).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
     expect(source).toContain("if (submitting || nothingEntered || unchangedMine) return;");
-    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(3);
+    // Le lien du forfait et « Fermer » aussi : focalisables pendant l'envoi.
+    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(5);
     // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
     for (const selector of ['.forfeit[aria-disabled="true"]', '.link[aria-disabled="true"]', '.actions :global(.btn[aria-disabled="true"])']) {
       expect(css).toContain(selector);
     }
-    expect(css).toContain(':hover:not(:disabled, [aria-disabled="true"])');
+    expect(css).toContain(':hover:not([aria-disabled="true"])');
   });
 
   it("score : l'envoi s'annonce dans une région d'état montée d'avance, vide au repos (FR et EN)", () => {

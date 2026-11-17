@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
@@ -87,8 +88,7 @@ export function RefereeDialog({
       if (initial) onClose();
     };
   });
-  const [busy, setBusy] = useState(false);
-  const busyRef = useRef(false);
+  const { busy, isBusy, run: guarded } = useBusyGuard();
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [objectionPick, setObjectionPick] = useState("");
@@ -104,7 +104,7 @@ export function RefereeDialog({
   // comme le texte de la confirmation basculeraient avant qu'elle se ferme.
   const [confirmBusy, setConfirmBusy] = useState(false);
   // Pendant l'envoi, les boutons restent focalisables (`aria-disabled` +
-  // `aria-busy`, jamais `disabled` natif) et `busyRef` écarte un second geste
+  // `aria-busy`, jamais `disabled` natif) et `useBusyGuard` écarte un second geste
   // avant même le rendu (double clic, Entrée répétée). Mais un geste retire
   // souvent son propre bouton (« Arbitrer ce match » devient « Ne plus
   // arbitrer ») : le focus tomberait sur la page, la fenêtre encore ouverte. Il revient au contrôle du geste
@@ -159,41 +159,39 @@ export function RefereeDialog({
     success: string | ((payload: unknown) => string | { unchanged: string }),
     resetMap = false,
   ): Promise<boolean> => {
-    if (busyRef.current) return false;
-    busyRef.current = true;
+    if (isBusy()) return false;
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setBusy(true);
-    try {
-      const payload = await request();
-      const outcome = typeof success === "string" ? success : success(payload);
-      if (typeof outcome !== "string") {
-        showInfo(outcome.unchanged);
+    const done = await guarded(async () => {
+      try {
+        const payload = await request();
+        const outcome = typeof success === "string" ? success : success(payload);
+        if (typeof outcome !== "string") {
+          showInfo(outcome.unchanged);
+          return true;
+        }
+        showSuccess(outcome);
+        window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+        await load(false, resetMap);
         return true;
+      } catch (error) {
+        const code = (error as Error).message;
+        const message = errorText(code);
+        fieldErrors.report(code, message);
+        showError(message);
+        // Un autre membre du staff a changé l'arbitre : la fenêtre se relit
+        // pour montrer celui qui est désigné maintenant.
+        if (code === "REFEREE_CHANGED") await load(false);
+        return false;
       }
-      showSuccess(outcome);
-      window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-      await load(false, resetMap);
-      return true;
-    } catch (error) {
-      const code = (error as Error).message;
-      const message = errorText(code);
-      fieldErrors.report(code, message);
-      showError(message);
-      // Un autre membre du staff a changé l'arbitre : la fenêtre se relit
-      // pour montrer celui qui est désigné maintenant.
-      if (code === "REFEREE_CHANGED") await load(false);
-      return false;
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    });
+    return done ?? false;
   };
   // Ouvrir une confirmation pendant un envoi : ignoré, comme le bouton qui l'ouvre.
   const ask = (pending: PendingConfirm) => {
-    if (!busyRef.current) setConfirm(pending);
+    if (!isBusy()) setConfirm(pending);
   };
   const close = () => {
-    if (!busyRef.current) onClose();
+    if (!isBusy()) onClose();
   };
   // Boutons pendant l'envoi : focalisables, annoncés en attente.
   const busyProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
@@ -205,7 +203,7 @@ export function RefereeDialog({
   const pickOffered = actions?.candidates.some((candidate) => String(candidate.userId) === pick) ?? false;
   const assign = (event: FormEvent) => {
     event.preventDefault();
-    if (busyRef.current || !pickOffered) return;
+    if (isBusy() || !pickOffered) return;
     void run(() => send(`${base}/referee`, "PUT", { userId: Number(pick), expectedUserId: panel?.referee?.userId ?? null }), t("cardActions.refereeDialog.assigned")).then(
       (done) => {
         if (done) setPick("");
@@ -221,7 +219,7 @@ export function RefereeDialog({
   const objectionUrl = (userId: number | string) => `/api/admin/referees/${userId}/objection`;
   const upholdObjection = (event: FormEvent) => {
     event.preventDefault();
-    if (busyRef.current || !objectionOffered || !panel) return;
+    if (isBusy() || !objectionOffered || !panel) return;
     setConfirmPseudo(objectionOffered.pseudo);
     setConfirmBusy(refereeConfirmTone("objection", panel, objectionOffered.userId) === "danger");
     setConfirm("objection");
@@ -485,7 +483,7 @@ export function RefereeDialog({
                         {...busyProps}
                         aria-label={t("cardActions.refereeDialog.objection.liftAria", { pseudo: referee.pseudo })}
                         onClick={() => {
-                          if (busyRef.current) return;
+                          if (isBusy()) return;
                           setLiftTarget(referee);
                           setConfirmPseudo(referee.pseudo);
                           setConfirm("liftObjection");

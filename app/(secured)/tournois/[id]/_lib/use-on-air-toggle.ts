@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef } from "react";
 import { useToast } from "@/components/ui/toast";
 import { useActionsText } from "./actions-text";
 import { useMapError } from "./error-map";
 import { requestJson } from "./request-json";
+import type { BusyRun } from "@/lib/shared/hooks/useBusyGuard";
 
 /**
  * Ouvre ou coupe l'antenne d'un match en mode manuel
@@ -13,35 +13,31 @@ import { requestJson } from "./request-json";
  * toasts et la même lecture des refus (`useMapError` :
  * `LIVE_TRIGGER_NOT_MANUAL`, `MATCH_NOT_LIVE_READY`, `LIVE_TRIGGER_NOT_OWNED`…).
  *
- * `setBusy` verrouille la fenêtre pendant l'envoi ; `onDone` relit le match.
- * Un second appel pendant l'envoi (double clic avant le rendu) est ignoré.
+ * `run` est la garde d'envoi de la fenêtre (`useBusyGuard`) : l'antenne et
+ * l'enregistrement partagent le même drapeau, un geste lancé pendant l'autre
+ * (ou un double clic avant le rendu) est ignoré ; `onDone` relit le match.
  */
 export function useOnAirToggle(
   matchId: number,
   onAir: boolean,
-  { setBusy, onDone }: { setBusy: (busy: boolean) => void; onDone: () => void },
+  { run, onDone }: { run: BusyRun; onDone: () => void },
 ): () => Promise<void> {
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useActionsText();
-  const inFlight = useRef(false);
   return async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    try {
-      await requestJson(
-        `/api/admin/matches/${matchId}/live`,
-        { method: "POST", body: { onAir: !onAir } },
-        "MATCH_LIVE_UPDATE_FAILED",
-      );
-      showSuccess(onAir ? t("cardActions.airClosed") : t("cardActions.airOpened"));
-      onDone();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        await requestJson(
+          `/api/admin/matches/${matchId}/live`,
+          { method: "POST", body: { onAir: !onAir } },
+          "MATCH_LIVE_UPDATE_FAILED",
+        );
+        showSuccess(onAir ? t("cardActions.airClosed") : t("cardActions.airOpened"));
+        onDone();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 }

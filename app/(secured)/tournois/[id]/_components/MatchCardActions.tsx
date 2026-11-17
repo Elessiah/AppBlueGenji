@@ -28,6 +28,7 @@ import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation
 import { useSpectatorView } from "@/components/spectator-view";
 import { matchPagePath } from "@/lib/shared/match-page";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useShareLink } from "@/components/share/ShareLinkButton";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -461,9 +462,8 @@ export function MatchCardActions({
   // Le refus d'identité dit ce qui manque pour le jeu du tournoi (Battle.net en Overwatch seulement).
   const castIdentityNotice = castBlock && castBlock !== "NOT_CASTER" ? launchError(castBlock) : undefined;
   const actionName = (label: string) => matchCardActionName(label, matchLabel, actionText);
-  const [busy, setBusy] = useState(false);
   // Garde synchrone : un double clic relancerait un geste avant que `busy` soit rendu.
-  const busyRef = useRef(false);
+  const { busy, isBusy, run: guarded } = useBusyGuard();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -632,21 +632,18 @@ export function MatchCardActions({
   };
 
   const run = async (action: () => Promise<unknown>, success: string, refresh = true): Promise<boolean> => {
-    if (busyRef.current) return false;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      await action();
-      showSuccess(success);
-      if (refresh) window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-      return true;
-    } catch (error) {
-      showError(refresh ? launchError((error as Error).message) : mapError((error as Error).message));
-      return false;
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    if (isBusy()) return false;
+    return (await guarded(async () => {
+      try {
+        await action();
+        showSuccess(success);
+        if (refresh) window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+        return true;
+      } catch (error) {
+        showError(refresh ? launchError((error as Error).message) : mapError((error as Error).message));
+        return false;
+      }
+    })) ?? false;
   };
 
   // « Partager » : le lien **public** du match (`/suivre/…`), qui s'ouvre sans

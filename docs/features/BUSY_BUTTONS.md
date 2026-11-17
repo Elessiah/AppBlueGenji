@@ -13,14 +13,23 @@ annoncer de l'attente.
 - Le **gestionnaire** fait la garde (`if (busy) return`) : `aria-disabled`
   n'empêche ni le clic ni la soumission. Un bouton `submit` garde donc **toutes**
   ses raisons de refus dans le `onSubmit` (Entrée dans un champ le déclenche).
-- Une **garde synchrone** (`useRef`) écarte le second envoi qui part avant que
-  `busy` soit rendu (double clic, Entrée répétée) : `if (busyRef.current) return;
-  busyRef.current = true;` … `finally { busyRef.current = false; }`.
+- Une **garde synchrone** écarte le second envoi qui part avant que `busy` soit
+  rendu (double clic, Entrée répétée) : `useBusyGuard()`
+  (`lib/shared/hooks/useBusyGuard.ts`) rend `busy` (affichage), `isBusy()`
+  (garde des gestionnaires, juste avant le rendu) et `run(task)`, qui lève le
+  drapeau **avant** la première attente et le baisse dans `finally` sur tout
+  chemin (refus, exception) — logique pure `runExclusive`
+  (`lib/shared/busy-guard.ts`). Jamais de drapeau écrit à la main. Deux gestes
+  d'une même fenêtre (enregistrer, ouvrir l'antenne) partagent **un** `run`
+  (`useOnAirToggle` le reçoit).
 - Un **champ** peut garder `disabled` quand c'est la bonne sémantique : liste
   déroulante (le focus est sur le bouton qui envoie, une liste n'envoie pas le
   formulaire), liste des maps d'un score (`MapScoreList`, Entrée n'y envoie
-  pas), valeur figée durablement. Un champ texte où **Entrée** lance l'envoi
-  passe en `readOnly`, pas en `disabled` (il perdrait le focus).
+  pas), valeur figée durablement (`locked`). Un champ où **Entrée** lance
+  l'envoi passe en `readOnly`, pas en `disabled` (il perdrait le focus) : saisie
+  de la première map, lien de rediff, points par map (`RoundMapsDialog`).
+- Le **libellé reste** pendant l'attente (suivi de « … ») : un bouton focalisé
+  dont le nom se réduit à « … » ne dit plus rien.
 - Apparence : `.btn:where([aria-disabled="true"][aria-busy="true"])` donne le
   curseur d'attente (`globals.css`) ; un état désarmé se dit en **couleurs**,
   jamais en `opacity` (`CHECKBOX_STYLES.md`), et l'attente garde son libellé lisible.

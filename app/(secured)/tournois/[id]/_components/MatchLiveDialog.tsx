@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { fieldAria } from "@/lib/shared/field-errors";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   canConfigureLive,
@@ -450,15 +451,11 @@ export function MatchLiveDialog({
   const casterStreams = offersCasterLinks(match, referee) ? casterStreamsOf(match, casterList) : [];
   // Seules les saisies de l'arbitre ; un champ intouché montre le lien actuel.
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
-  const [busy, setBusyState] = useState(false);
-  // Garde synchrone : Entrée dans un champ ou un double clic relancerait un
-  // envoi avant que `busy` soit rendu. Pendant l'envoi les boutons restent
-  // focalisables (`aria-disabled` + `aria-busy`), jamais `disabled` natif.
-  const busyRef = useRef(false);
-  const setBusy = (next: boolean) => {
-    busyRef.current = next;
-    setBusyState(next);
-  };
+  // Un envoi à la fois (enregistrement, antenne) : Entrée dans un champ ou un
+  // double clic relancerait un envoi avant que `busy` soit rendu. Pendant
+  // l'envoi les boutons restent focalisables (`aria-disabled` + `aria-busy`),
+  // jamais `disabled` natif (`useBusyGuard`).
+  const { busy, isBusy, run } = useBusyGuard();
   // Un refus du serveur rattaché à son champ (`ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`).
   const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID, streamed: STREAMED_INPUT_ID };
   for (const stream of casterStreams) fieldIds[`caster-${stream.id}`] = casterLinkInputId(stream.id);
@@ -510,38 +507,37 @@ export function MatchLiveDialog({
   const airToggle = canToggleOnAir(match) && viewerMayChangeLiveTrigger(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
-  const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });
+  const toggleAir = useOnAirToggle(match.id, onAir, { run, onDone: onSaved });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     // Le bouton n'est jamais `disabled` natif : toutes ses raisons se gardent ici.
-    if (busyRef.current || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null) return;
+    if (isBusy() || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null) return;
 
     // Mode verrouillé : renvoyé tel quel, le serveur n'y voit aucun changement.
     const chosenTrigger = streamed ? trigger : null;
     const sentTrigger = triggerLocked ? match.liveTrigger : chosenTrigger;
     const streamLinks = casterLinkEdits(casterStreams, casterLinks);
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/live`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          matchLiveBody({ castable, trigger: sentTrigger, liveUrl, organisationLink: canSpeakForOrganisation ? organisationLink : undefined, streamLinks }),
-        ),
-      });
-      const payload = (await response.json().catch(() => ({}))) as { error?: string; streamId?: unknown };
-      if (!response.ok) throw new LiveRefusal(payload.error || "MATCH_LIVE_UPDATE_FAILED", refusedCasterField(payload));
-      // « Retiré » seulement d'un mode qui était posé : corriger les liens des
-      // casters d'un match sans mode n'en retire aucun.
-      showSuccess(sentTrigger === null && match.liveTrigger !== null ? t("live.removed") : t("live.saved"));
-      onSaved();
-      onClose();
-    } catch (error) {
-      reportRefusal(error);
-    } finally {
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/matches/${match.id}/live`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            matchLiveBody({ castable, trigger: sentTrigger, liveUrl, organisationLink: canSpeakForOrganisation ? organisationLink : undefined, streamLinks }),
+          ),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { error?: string; streamId?: unknown };
+        if (!response.ok) throw new LiveRefusal(payload.error || "MATCH_LIVE_UPDATE_FAILED", refusedCasterField(payload));
+        // « Retiré » seulement d'un mode qui était posé : corriger les liens des
+        // casters d'un match sans mode n'en retire aucun.
+        showSuccess(sentTrigger === null && match.liveTrigger !== null ? t("live.removed") : t("live.saved"));
+        onSaved();
+        onClose();
+      } catch (error) {
+        reportRefusal(error);
+      }
+    });
   };
 
   /** Un refus : notifié, et rattaché au champ qu'il désigne (lien d'un caster, sinon par son code). */
@@ -703,7 +699,7 @@ export function MatchLiveDialog({
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
               onClick={() => {
-                if (!busyRef.current) void toggleAir();
+                if (!isBusy()) void toggleAir();
               }}
             >
               {onAir ? actions.t("cardActions.stopLive") : actions.t("cardActions.startLive")}
@@ -718,7 +714,7 @@ export function MatchLiveDialog({
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
               onClick={() => {
-                if (busyRef.current) return;
+                if (isBusy()) return;
                 // Une autre modale : celle-ci se ferme d'abord, les deux ne se
                 // disputent pas le piège de focus.
                 onClose();
@@ -738,7 +734,7 @@ export function MatchLiveDialog({
             type="button"
             className={`btn ghost ${styles.sectionButton}`}
             onClick={() => {
-              if (!busyRef.current) onClose();
+              if (!isBusy()) onClose();
             }}
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { matchesToPlan } from "@/lib/shared/match-planning";
 import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
@@ -40,9 +41,8 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const actionText = useActionsText();
   const a = actionText.t;
   const { showError, showSuccess } = useToast();
-  const [busy, setBusy] = useState(false);
   // Garde synchrone : un double clic basculerait deux fois avant le rendu.
-  const busyRef = useRef(false);
+  const { busy, isBusy, run } = useBusyGuard();
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
   const canManage = detail.isAdmin && !frozen;
@@ -68,31 +68,28 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const moving = toPlan.filter((match) => match.team1Score === null && match.team2Score === null);
 
   const toggle = async (next: boolean): Promise<boolean> => {
-    if (busyRef.current) return false;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/tournaments/${detail.card.id}/referee-scheduling`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: next }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        movedToPlanning?: number;
-      };
-      if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      const moved = payload.movedToPlanning ?? 0;
-      if (!next) showSuccess(a("planning.disabled"));
-      else showSuccess(moved > 0 ? a("planning.enabledMoved", { count: moved }) : a("planning.enabled"));
-      return true;
-    } catch (error) {
-      showError(refereeSchedulingErrorText(actionText, (error as Error).message));
-      return false;
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    if (isBusy()) return false;
+    return (await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/tournaments/${detail.card.id}/referee-scheduling`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ enabled: next }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          movedToPlanning?: number;
+        };
+        if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+        const moved = payload.movedToPlanning ?? 0;
+        if (!next) showSuccess(a("planning.disabled"));
+        else showSuccess(moved > 0 ? a("planning.enabledMoved", { count: moved }) : a("planning.enabled"));
+        return true;
+      } catch (error) {
+        showError(refereeSchedulingErrorText(actionText, (error as Error).message));
+        return false;
+      }
+    })) ?? false;
   };
 
   const onToggle = () => {
@@ -159,12 +156,15 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
               type="button"
               className={`btn ghost tap-target ${styles.toggle}`}
               onClick={() => {
-                if (!busyRef.current) onToggle();
+                if (!isBusy()) onToggle();
               }}
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
             >
-              {busy ? "…" : toggleLabel}
+              {/* Le libellé reste pendant l'envoi : le bouton garde le focus, et un
+                  nom réduit à « … » ne dirait plus rien du geste en cours. */}
+              {toggleLabel}
+              {busy && "…"}
             </button>
           )}
         </div>

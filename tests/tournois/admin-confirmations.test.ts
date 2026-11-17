@@ -123,7 +123,8 @@ describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
     expect(actions.match(/aria-disabled=\{form\.submitting \|\| undefined\}/g)).toHaveLength(1);
     expect(actions).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
     expect(actions).toContain("aria-disabled={form.submitting || resolveBlocked || undefined}");
-    expect(actions.match(/aria-busy=\{form\.submitting \|\| undefined\}/g)).toHaveLength(2);
+    // « Fermer » aussi : focalisable pendant l'envoi, il s'annonce occupé.
+    expect(actions.match(/aria-busy=\{form\.submitting \|\| undefined\}/g)).toHaveLength(3);
   });
 
   it("ignore Fermer et Enregistrer pressés pendant l'envoi", () => {

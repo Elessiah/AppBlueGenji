@@ -752,6 +752,7 @@ export function AdminScoreDialog({
                 if (!form.submitting) onClose();
               }}
               aria-disabled={form.submitting || undefined}
+              aria-busy={form.submitting || undefined}
             >
               {t("score.close")}
             </button>

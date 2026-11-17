@@ -120,12 +120,6 @@
   border-radius: 3px;
 }
 
-.conflictAction:disabled {
-  cursor: not-allowed;
-  color: var(--ink-soft, #c3ccd8);
-  text-decoration: none;
-}
-
 /* « Reprendre la proposition » pendant un envoi : `aria-disabled` (le focus
    reste), inactif à l'œil par la couleur et le curseur. */
 .conflictAction[aria-disabled="true"] {
@@ -236,7 +230,7 @@
   border-style: solid;
 }
 
-.forfeit:hover:not(:disabled, [aria-disabled="true"]) {
+.forfeit:hover:not([aria-disabled="true"]) {
   background: rgba(var(--amber-rgb), 0.12);
 }
 
@@ -253,7 +247,6 @@
 
 /* Désarmé : couleurs ternies, jamais `opacity` (elle se multiplie avec celle
    d'un parent). En attente (`aria-busy`), le libellé reste lisible. */
-.forfeit:disabled,
 .forfeit[aria-disabled="true"] {
   border-color: rgba(var(--amber-rgb), 0.15);
   color: rgba(var(--amber-rgb), 0.5);
@@ -279,7 +272,7 @@
   transition: color 0.15s ease;
 }
 
-.link:hover:not(:disabled, [aria-disabled="true"]) {
+.link:hover:not([aria-disabled="true"]) {
   color: var(--ink, var(--ink));
 }
 
@@ -289,7 +282,6 @@
   border-radius: 3px;
 }
 
-.link:disabled,
 .link[aria-disabled="true"] {
   cursor: not-allowed;
   color: var(--ink-dim, #859dbb);
@@ -342,14 +334,13 @@
   background: rgba(90, 200, 255, 0.3);
 }
 
-.actions :global(.btn:not(.ghost):hover:not(:disabled, [aria-disabled="true"])) {
+.actions :global(.btn:not(.ghost):hover:not([aria-disabled="true"])) {
   background: rgba(90, 200, 255, 0.42);
 }
 
 /* `.btn` global n'a pas d'état désactivé : sans ça, « Valider le résultat »
    gardait l'apparence d'un bouton cliquable alors qu'il refusait le clic, et
    rien à l'écran ne disait pourquoi. */
-.actions :global(.btn:disabled),
 .actions :global(.btn[aria-disabled="true"]) {
   border-color: rgba(180, 210, 230, 0.2);
   background: rgba(255, 255, 255, 0.03);
