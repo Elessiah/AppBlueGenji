@@ -346,10 +346,16 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     if (isBusy()) return false;
     const next = moveInOrder(order, teamId, direction);
     if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
+    // Sans modale de confirmation ouverte, la ligne bouge à l'aperçu optimiste :
+    // le focus lui est rendu tout de suite, pas après l'aller-retour réseau
+    // (un clavier, un lecteur d'écran n'attendent pas sur le `<body>`).
+    const optimistic = confirmingMove === null;
+    if (optimistic) refocusArrow(teamId, direction);
     const done = await applyOrder(next, teamId);
     // Sur un refus, la modale de confirmation reste ouverte : le focus ne doit
-    // pas repartir vers une flèche derrière elle.
-    if (done) refocusArrow(teamId, direction);
+    // pas repartir vers une flèche derrière elle. Sans modale, le retour à
+    // l'ordre du serveur déplace la ligne à nouveau : le focus la suit.
+    if (done || optimistic) refocusArrow(teamId, direction);
     return done;
   };
 

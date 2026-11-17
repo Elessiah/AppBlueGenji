@@ -63,7 +63,7 @@ describe("Ordre de départ — flèches seules", () => {
     // passe à celle qui ramène la ligne.
     // Même règle que la vitrine : `useArrowRefocus` lit `data-edge` (`pickArrowTarget`).
     expect(panel).toContain('const refocusArrow = useArrowRefocus("seeding");');
-    expect(panel).toContain("if (done) refocusArrow(teamId, direction);");
+    expect(panel).toContain("if (done || optimistic) refocusArrow(teamId, direction);");
   });
 
   it("ne réagit qu'au clic, jamais au défilement", () => {

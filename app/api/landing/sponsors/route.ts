@@ -4,7 +4,7 @@ import { serviceErrorCode, failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createSponsor, listSponsors } from "@/lib/server/sponsors-service";
 import { readJsonBody } from "@/lib/server/request-body";
-import { readRequestKey, runOnce } from "@/lib/server/idempotency";
+import { runOnceForBody } from "@/lib/server/idempotency";
 
 export async function GET() {
   try {
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   try {
     // Un renvoi du même ajout (réponse perdue) rend le partenaire déjà créé au
     // lieu d'en créer un second (`lib/server/idempotency.ts`).
-    const sponsor = await runOnce(`sponsor-create:${user.id}`, readRequestKey(body.requestKey), () =>
+    const sponsor = await runOnceForBody(`sponsor-create:${user.id}`, body, () =>
       createSponsor({
         name: typeof body.name === "string" ? body.name : "",
         tier: typeof body.tier === "string" ? body.tier : undefined,

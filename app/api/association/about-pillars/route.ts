@@ -4,7 +4,7 @@ import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutPillar, listAboutPillars } from "@/lib/server/about-pillars-service";
 import { readJsonBody } from "@/lib/server/request-body";
-import { readRequestKey, runOnce } from "@/lib/server/idempotency";
+import { runOnceForBody } from "@/lib/server/idempotency";
 
 export async function GET() {
   const pillars = await listAboutPillars();
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   try {
     // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au
     // lieu d'en créer une seconde (`lib/server/idempotency.ts`).
-    const pillar = await runOnce(`about-pillar-create:${user.id}`, readRequestKey(body.requestKey), () =>
+    const pillar = await runOnceForBody(`about-pillar-create:${user.id}`, body, () =>
       createAboutPillar({
         title: typeof body.title === "string" ? body.title : "",
         text: typeof body.text === "string" ? body.text : "",

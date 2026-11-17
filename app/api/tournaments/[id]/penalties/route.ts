@@ -4,7 +4,7 @@ import { applyEndurancePenalty } from "@/lib/server/tournaments-service";
 import { checkEndurancePenalty } from "@/lib/shared/endurance-penalty";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
-import { readRequestKey, runOnce } from "@/lib/server/idempotency";
+import { runOnceForBody } from "@/lib/server/idempotency";
 
 /**
  * Inflige une pénalité de points d'endurance à un engagé (mode « BlueGenji
@@ -49,7 +49,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   try {
     // Une réponse perdue après l'écriture laissait l'arbitre renvoyer la même
     // sanction : comptée deux fois, elle pouvait éliminer l'engagé.
-    await runOnce(`endurance-penalty:${user.id}:${tournamentId}:${teamId}`, readRequestKey(body.requestKey), () =>
+    await runOnceForBody(`endurance-penalty:${user.id}:${tournamentId}:${teamId}`, body, () =>
       applyEndurancePenalty(tournamentId, teamId, points, reason, user.id),
     );
     return ok({ success: true });

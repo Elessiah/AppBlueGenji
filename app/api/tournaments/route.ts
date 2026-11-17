@@ -13,7 +13,7 @@ import {
 } from "@/lib/server/tournaments/validation";
 import { readJsonBody } from "@/lib/server/request-body";
 import { isContentionMessage } from "@/lib/server/mysql-errors";
-import { readRequestKey, runOnce } from "@/lib/server/idempotency";
+import { runOnceForBody } from "@/lib/server/idempotency";
 import type { TournamentBuckets } from "@/lib/shared/types";
 
 /**
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
 
     // Un renvoi du même geste (réponse perdue, écran rendu après `hold()`)
     // rend le tournoi déjà créé au lieu d'en créer un second.
-    const id = await runOnce(`tournament-create:${user.id}`, readRequestKey(body.requestKey), () =>
+    const id = await runOnceForBody(`tournament-create:${user.id}`, body, () =>
       createTournament(user.id, {
         ...input,
         startVisibilityAt: body.startVisibilityAt ?? "",

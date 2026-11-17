@@ -4,7 +4,7 @@ import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
 import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
-import { readRequestKey, runOnce } from "@/lib/server/idempotency";
+import { runOnceForBody } from "@/lib/server/idempotency";
 
 export async function GET() {
   const stats = await listAboutStats();
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   try {
     // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au
     // lieu d'en créer une seconde (`lib/server/idempotency.ts`).
-    const stat = await runOnce(`about-stat-create:${user.id}`, readRequestKey(body.requestKey), () =>
+    const stat = await runOnceForBody(`about-stat-create:${user.id}`, body, () =>
       createAboutStat({
         value: typeof body.value === "string" ? body.value : "",
         // Un type qui n'est pas un texte est refusé par la validation (`VALUE_EN_INVALID`).

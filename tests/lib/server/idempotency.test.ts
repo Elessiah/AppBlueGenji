@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
+  IDEMPOTENCY_MAX_ENTRIES,
+  IDEMPOTENCY_MAX_PER_SCOPE,
   IDEMPOTENCY_TTL_MS,
+  bodyFingerprint,
   readRequestKey,
   resetIdempotencyForTests,
   runOnce,
+  runOnceForBody,
 } from "@/lib/server/idempotency";
 import { newRequestKey } from "@/lib/shared/request-key";
 import { isAdvanceTarget } from "@/lib/shared/tournament-launch";
@@ -70,6 +74,98 @@ describe("runOnce", () => {
     const task = jest.fn(async () => 1);
     await runOnce("scope", KEY, task, NOW);
     await runOnce("scope", KEY, task, NOW + IDEMPOTENCY_TTL_MS);
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("runOnce bounds and body fingerprint", () => {
+  beforeEach(() => {
+    resetIdempotencyForTests();
+  });
+  const keyOf = (n: number) => `key-${String(n).padStart(16, "0")}`;
+
+  it("runOnce_scopeFull_evictsOwnOldestSettledOnly", async () => {
+    const task = jest.fn(async () => 1);
+    await runOnce("other", KEY, task, NOW);
+    for (let n = 0; n < IDEMPOTENCY_MAX_PER_SCOPE + 1; n += 1) await runOnce("flood", keyOf(n), task, NOW);
+    task.mockClear();
+    await runOnce("other", KEY, task, NOW);
+    expect(task).not.toHaveBeenCalled();
+    await runOnce("flood", keyOf(0), task, NOW);
+    expect(task).toHaveBeenCalledTimes(1);
+    await runOnce("flood", keyOf(IDEMPOTENCY_MAX_PER_SCOPE), task, NOW);
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
+  it("runOnce_scopeFullOfPendingTasks_neverEvictsPendingAndRunsUnretained", async () => {
+    const resolvers: Array<(value: number) => void> = [];
+    const pending = () =>
+      new Promise<number>((resolve) => {
+        resolvers.push(resolve);
+      });
+    const first = runOnce("flood", keyOf(0), pending, NOW);
+    for (let n = 1; n < IDEMPOTENCY_MAX_PER_SCOPE; n += 1) void runOnce("flood", keyOf(n), pending, NOW);
+    const extra = jest.fn(async () => 9);
+    expect(await runOnce("flood", keyOf(999), extra, NOW)).toBe(9);
+    expect(await runOnce("flood", keyOf(999), extra, NOW)).toBe(9);
+    expect(extra).toHaveBeenCalledTimes(2);
+    const repeat = jest.fn(async () => 0);
+    const second = runOnce("flood", keyOf(0), repeat, NOW);
+    resolvers[0](5);
+    expect(await first).toBe(5);
+    expect(await second).toBe(5);
+    expect(repeat).not.toHaveBeenCalled();
+    resolvers.slice(1).forEach((resolve) => resolve(1));
+  });
+
+  it("runOnce_globalCapReached_evictsOldestSettledAcrossScopes", async () => {
+    const task = jest.fn(async () => 1);
+    const scopes = Math.ceil((IDEMPOTENCY_MAX_ENTRIES + 1) / IDEMPOTENCY_MAX_PER_SCOPE);
+    for (let n = 0; n <= IDEMPOTENCY_MAX_ENTRIES; n += 1) {
+      await runOnce(`scope-${n % scopes}`, keyOf(n), task, NOW);
+    }
+    task.mockClear();
+    await runOnce("scope-0", keyOf(0), task, NOW);
+    expect(task).toHaveBeenCalledTimes(1);
+    await runOnce(`scope-${IDEMPOTENCY_MAX_ENTRIES % scopes}`, keyOf(IDEMPOTENCY_MAX_ENTRIES), task, NOW);
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
+  it("runOnce_sameKeyOtherFingerprint_runsAsNewGestureWithoutReplacingFirst", async () => {
+    const first = jest.fn(async () => "first");
+    const edited = jest.fn(async () => "edited");
+    await runOnce("scope", KEY, first, NOW, "a");
+    expect(await runOnce("scope", KEY, edited, NOW, "b")).toBe("edited");
+    expect(await runOnce("scope", KEY, edited, NOW, "a")).toBe("first");
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(edited).toHaveBeenCalledTimes(1);
+  });
+
+  it("runOnce_sameKeySameFingerprint_replays", async () => {
+    const task = jest.fn(async () => 1);
+    await runOnce("scope", KEY, task, NOW, "a");
+    await runOnce("scope", KEY, task, NOW, "a");
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
+  it("bodyFingerprint_requestKeyDiffers_sameFingerprint", () => {
+    expect(bodyFingerprint({ name: "x", requestKey: "k1" })).toBe(bodyFingerprint({ name: "x", requestKey: "k2" }));
+    expect(bodyFingerprint({ name: "x" })).not.toBe(bodyFingerprint({ name: "y" }));
+  });
+
+  it("runOnceForBody_editedRetryUnderOldKey_runsEditedBody", async () => {
+    const task = jest.fn(async () => 1);
+    await runOnceForBody("scope", { name: "a", requestKey: KEY }, task);
+    await runOnceForBody("scope", { name: "a", requestKey: KEY }, task);
+    expect(task).toHaveBeenCalledTimes(1);
+    await runOnceForBody("scope", { name: "b", requestKey: KEY }, task);
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
+  it("runOnceForBody_noKey_runsEveryTime", async () => {
+    const task = jest.fn(async () => 1);
+    await runOnceForBody("scope", { name: "a" }, task);
+    await runOnceForBody("scope", { name: "a" }, task);
     expect(task).toHaveBeenCalledTimes(2);
   });
 });

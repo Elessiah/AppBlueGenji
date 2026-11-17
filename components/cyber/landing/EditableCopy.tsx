@@ -20,6 +20,7 @@ import {
   type SiteCopyEditorEntry,
   type SiteCopyKey,
 } from "@/lib/shared/site-copy";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./EditableCopy.module.css";
 
 /**
@@ -99,10 +100,21 @@ export async function submitSiteCopy(
  * L'administration reste en français (D4) : sous `/en`, l'éditeur porte
  * `lang="fr"`.
  */
-export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<EditableCopyProps>) {
+export function EditableCopy({ canEdit, children, ...rest }: Readonly<EditableCopyProps>) {
+  // Le visiteur ne paie rien de l'édition : aucun crochet (garde d'envoi,
+  // routeur, notifications, formulaire) n'est monté pour lui.
+  if (!canEdit) return <>{children}</>;
+  return (
+    <EditableCopyEditor canEdit {...rest}>
+      {children}
+    </EditableCopyEditor>
+  );
+}
+
+function EditableCopyEditor({ copyKey, value, children }: Readonly<EditableCopyProps>) {
   const router = useRouter();
   const locale = useAppLocale();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const entries = useContext(SiteCopyEditorContext);
   const entry: SiteCopyEditorEntry = entries?.[copyKey] ?? { fr: value, en: "", enMissing: false };
   const [editing, setEditing] = useState(false);
@@ -130,16 +142,17 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   const label = field?.label ?? copyKey;
   const staffLang = locale === "fr" ? undefined : "fr";
 
-  if (!canEdit) return <>{children}</>;
-
   const refuse = (code: string, fallback: string) => {
     const message = siteCopyErrorMessage(code, fallback);
     fieldErrors.report(code, message);
     showError(message, staffLang ? { lang: staffLang } : undefined);
   };
 
-  const save = () =>
-    run(async () => {
+  // Geste refusé parce qu'un autre envoi tient la section : dit, pas ignoré.
+  const refusedBusy = () => showInfo(BUSY_REFUSED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
+
+  const save = async () => {
+    const done = await run(async () => {
       const outcome = await submitSiteCopy(fetch, copyKey, draft, draftEn);
       if (!outcome.ok) {
         refuse(outcome.code, outcome.fallback);
@@ -149,9 +162,11 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
       closeEditor();
       router.refresh();
     });
+    if (done === undefined) refusedBusy();
+  };
 
-  const reset = async (): Promise<boolean> =>
-    (await run(async () => {
+  const reset = async (): Promise<boolean> => {
+    const done = await run(async () => {
       try {
         const res = await fetch(`/api/site-copy?key=${encodeURIComponent(copyKey)}`, {
           method: "DELETE",
@@ -169,7 +184,10 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
         refuse("", "Erreur réseau, réessaye.");
         return false;
       }
-    })) ?? false;
+    });
+    if (done === undefined) refusedBusy();
+    return done ?? false;
+  };
 
   if (editing) {
     const rows = (text: string) => Math.min(8, Math.max(3, text.split("\n").length + 1));

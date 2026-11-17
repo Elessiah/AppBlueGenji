@@ -71,6 +71,26 @@ describe("pages vitrine — boutons pendant une requête", () => {
   });
 });
 
+describe("EditableCopy — coût pour le visiteur et refus dit", () => {
+  const code = () => source(DIR + "EditableCopy.tsx");
+
+  it("EditableCopy_visitor_mountsNoHook", () => {
+    const wrapper = /export function EditableCopy\([\s\S]*?\n\}\n/.exec(code())?.[0] ?? "";
+    expect(wrapper).toContain("if (!canEdit) return <>{children}</>;");
+    expect(wrapper).not.toMatch(/\buse[A-Z]\w*\(/);
+  });
+
+  it("EditableCopy_editorHooks_liveInEditorComponent", () => {
+    expect(code()).toMatch(/function EditableCopyEditor\([\s\S]*?useBusyGuard\(\)/);
+  });
+
+  it("EditableCopy_saveAndReset_refusedByGuardShowInfoToast", () => {
+    const body = code();
+    expect(body.match(/if \(done === undefined\) refusedBusy\(\);/g)).toHaveLength(2);
+    expect(body).toContain("showInfo(BUSY_REFUSED_MESSAGE");
+  });
+});
+
 describe("pages vitrine — champs figés pendant l'envoi", () => {
   it("FooterContact_fields_readOnlyWhileSending", () => {
     expect(source(DIR + "FooterContact.tsx").match(/readOnly=\{busy\}/g)).toHaveLength(3);

@@ -103,7 +103,7 @@ annoncer de l'attente.
   entrées, portée = route + utilisateur + cible) exécute la tâche une fois par
   clé et rend aux répétitions le même résultat — création d'un tournoi
   (`POST /api/tournaments`, clé de la page) et pénalité d'endurance (clé du
-  dialogue). Un échec n'est pas retenu. « Avancer le tournoi » envoie l'étape
+  dialogue). Un échec n'est pas retenu. Une entrée en cours n'est jamais évincée, chaque portée en garde au plus 100 (un compte qui inonde de clés n'use que sa part), et une clé reprise avec un **autre corps** (`bodyFingerprint`, `runOnceForBody`) est un autre geste : exécuté, sans rendre le résultat du premier. « Avancer le tournoi » envoie l'étape
   annoncée (`expectedTarget`) : si le tournoi a déjà avancé, 409
   `TOURNAMENT_STAGE_CHANGED` au lieu d'une étape de plus. L'équipe fantôme
   créée par un essai dont l'inscription échoue est réutilisée au nouvel essai
