@@ -37,21 +37,32 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   const teamId = team.team.id;
   // Un geste à la fois (garde synchrone) ; seul le bouton pressé s'annonce
   // occupé (`pendingGesture`), les autres sont refusés sans attente annoncée.
-  const { busy, isBusy, run } = useBusyGuard();
+  const { busy, run, whenIdle } = useBusyGuard();
   const [pendingGesture, setPendingGesture] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Le bouton pressé disparaît souvent au retour (« Rejoindre » devient
   // « Retirer ma demande », une demande traitée quitte la liste) : le focus,
   // tombé sur la page, revient au premier geste **actif** du bloc
-  // (`data-focus-rescue="membership"`) — une demande traitée, à sa voisine.
+  // (`data-focus-rescue="membership"`) — une demande traitée, au **même**
+  // bouton de sa voisine (« Refuser » après un refus, jamais « Accepter »).
+  // Suivi de `team` et `requests` : rien ne se rend avant leur relecture — la
+  // fenêtre de départ, fermée avant, rend d'abord le focus à « Quitter ».
   const rootRef = useRef<HTMLDivElement>(null);
-  const rescueFocus = useFocusRescue(rootRef);
+  const rescueFocus = useFocusRescue(rootRef, [team, requests]);
   /** État d'un bouton : occupé s'il est le geste en cours, refusé si un autre l'est (`gestureState`). */
   const gesture = (name: string) => gestureState(pendingGesture, name);
   /** Geste qui répond à l'invitation du lecteur : refusé aussi sans invitation connue. */
   const gestureWithInvitation = (name: string) => {
     const state = gesture(name);
     return { ...state, blocked: state.blocked || team.viewerInvitationId === null };
+  };
+  /**
+   * Geste sur l'invitation du lecteur (`gestureWithInvitation` le refuse déjà
+   * au clic sans invitation) : la seule garde du code, l'URL n'est jamais bâtie sur `null`.
+   */
+  const actOnInvitation = (name: string, request: (invitationId: number) => Promise<string>) => {
+    const invitationId = team.viewerInvitationId;
+    return invitationId === null ? Promise.resolve(false) : act(name, () => request(invitationId), membershipErrorMessage);
   };
 
   /**
@@ -103,16 +114,10 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     );
 
   const declineInvitation = () =>
-    team.viewerInvitationId === null
-      ? Promise.resolve(false)
-      : act(
-          "decline",
-          async () => {
-            await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: false }), "INVITATION_RESPOND_FAILED");
-            return t("membership.declined");
-          },
-          membershipErrorMessage,
-        );
+    actOnInvitation("decline", async (invitationId) => {
+      await teamApi(`/api/invitations/${invitationId}`, jsonRequest("POST", { accept: false }), "INVITATION_RESPOND_FAILED");
+      return t("membership.declined");
+    });
 
   // Reprise d'une fantôme : acceptée **par l'identifiant de l'invitation**, et
   // non par « Rejoindre » (`/join`). Sur une page restée ouverte pendant qu'un
@@ -120,28 +125,16 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   // invitation et y déposerait une demande d'adhésion ; l'invitation, elle, a
   // été annulée par cette reprise et répond `INVITATION_NOT_PENDING`.
   const acceptGhostClaim = () =>
-    team.viewerInvitationId === null
-      ? Promise.resolve(false)
-      : act(
-          "takeOver",
-          async () => {
-            await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
-            return t("membership.claimAccepted");
-          },
-          membershipErrorMessage,
-        );
+    actOnInvitation("takeOver", async (invitationId) => {
+      await teamApi(`/api/invitations/${invitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
+      return t("membership.claimAccepted");
+    });
 
   const withdrawRequest = () =>
-    team.viewerInvitationId === null
-      ? Promise.resolve(false)
-      : act(
-          "withdrawRequest",
-          async () => {
-            await teamApi(`/api/invitations/${team.viewerInvitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
-            return t("membership.withdrawn");
-          },
-          membershipErrorMessage,
-        );
+    actOnInvitation("withdrawRequest", async (invitationId) => {
+      await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
+      return t("membership.withdrawn");
+    });
 
   const leave = () =>
     act(
@@ -166,7 +159,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       },
       // Accepter la demande d'un autre : `USER_ALREADY_IN_TEAM` parle de lui.
       teamErrorMessage,
-      [...neighbourRescueSelectors("request", keys, request.id), ...MEMBERSHIP_RESCUE],
+      [...neighbourRescueSelectors(accept ? "request-accept" : "request-refuse", keys, request.id), ...MEMBERSHIP_RESCUE],
     );
   };
 
@@ -278,9 +271,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
             data-focus-rescue="membership"
             busy={false}
             blocked={busy}
-            onClick={() => {
-              if (!isBusy()) setConfirmLeave(true);
-            }}
+            onClick={whenIdle(() => setConfirmLeave(true))}
           >
             {t("membership.leave")}
           </BusyButton>
@@ -304,7 +295,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                 <span className={styles.rowActions}>
                   <BusyButton
                     className={`btn ${styles.smallButton}`}
-                    data-focus-rescue="request"
+                    data-focus-rescue="request-accept"
                     data-focus-rescue-key={r.id}
                     onClick={() => void respondRequest(r, true)}
                     {...gesture(`accept-${r.id}`)}
@@ -314,6 +305,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                   </BusyButton>
                   <BusyButton
                     className={`btn ghost ${styles.smallButton}`}
+                    data-focus-rescue="request-refuse"
+                    data-focus-rescue-key={r.id}
                     onClick={() => void respondRequest(r, false)}
                     {...gesture(`refuse-${r.id}`)}
                     aria-label={t("membership.refuseLabel", { pseudo: r.pseudo })}

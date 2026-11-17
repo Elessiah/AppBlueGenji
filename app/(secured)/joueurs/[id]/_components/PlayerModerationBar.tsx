@@ -48,7 +48,8 @@ export function PlayerModerationBar({
   const { showError } = useToast();
   const staffLang = useStaffLang();
   const barRef = useRef<HTMLFieldSetElement>(null);
-  const rescueFocus = useFocusRescue(barRef);
+  // Suivi de `profile` : le secours attend la relecture, pas la fermeture de la fenêtre.
+  const rescueFocus = useFocusRescue(barRef, [profile]);
   const suspension = profile.moderationSuspension;
   const showAvatar = profile.moderationAvatarPresent;
   const showSuspension = suspension !== null || profile.moderationSuspendable;
@@ -68,6 +69,8 @@ export function PlayerModerationBar({
     // d'avant le geste (« Suspendre » sur un compte suspendu) sans le dire.
     void reloadSucceeded(onChanged).then((reloaded) => {
       if (reloaded) return;
+      // Issue inconnue : la barre n'a plus à reprendre le focus pour ce geste.
+      rescueFocus(null);
       showError(PROFILE_RELOAD_FAILED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
     });
   };

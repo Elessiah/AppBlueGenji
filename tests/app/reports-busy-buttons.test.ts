@@ -250,7 +250,7 @@ describe("signalements du staff — rendu des gestes", () => {
   it("PlayerModerationBar_profileRead_focusBackOnBarWhenOpenerGone", () => {
     const bar = source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
     // Secours commun (`useFocusRescue`) : focus perdu seulement, dans les 4 s, sauf reprise en main.
-    expect(bar).toContain("const rescueFocus = useFocusRescue(barRef);");
+    expect(bar).toContain("const rescueFocus = useFocusRescue(barRef, [profile]);");
     expect(bar).toMatch(/setDialog\(null\);\s+rescueFocus\(\["button"\]\);/);
   });
 

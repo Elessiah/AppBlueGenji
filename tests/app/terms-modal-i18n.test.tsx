@@ -191,8 +191,8 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toContain("const { leaving, logout } = useLogout();");
     // Lien-bouton `BusyButton` : refusé pendant l'envoi et la suppression (`blocked`), en attente pendant la déconnexion.
     expect(modal).toMatch(/<BusyButton\s+className=\{styles\.textButton\}\s+busy=\{leaving\}\s+blocked=\{busy \|\| deletionOpen\}/);
-    expect(modal).toMatch(/if \(!isBusy\(\)\) void logout\(\);/);
-    expect(modal).toMatch(/if \(isBusy\(\) \|\| leaving \|\| deletionOpen\) return;\s*setDeletionOpen\(true\);/);
+    expect(modal).toMatch(/if \(!isBusy\(\) && !deletionStarted\.current\) void logout\(\);/);
+    expect(modal).toMatch(/if \(isBusy\(\) \|\| leaving \|\| deletionStarted\.current\) return;\s*setDeletionOpen\(true\);/);
     expect(modal).toMatch(/\{deletionOpen && DeletionFlow \? \(\s*<DeletionFlow\s+preview=\{deletionPreview\.current\}\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
     // Préparation (code, textes, aperçu) : le bouton dit qu'il travaille, jusqu'à l'ouverture de la confirmation.
     expect(modal).toContain("const preparing = deletionOpen && !deletionReady;");
@@ -203,7 +203,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toMatch(/<output className="sr-only" aria-live="polite">\s*\{preparing \? t\("termsModal\.deleting"\) : ""\}\s*<\/output>/);
     expect(modal).toContain('<BusyLabel busy={preparing} idle={t("termsModal.deleteAccount")} pending={t("termsModal.deleting")} />');
     // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
-    expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*deletionAttempt\.current \+= 1;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open\]\);/);
+    expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*deletionAttempt\.current \+= 1;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open, setDeletionOpen\]\);/);
     // Préparation bornée (morceau disparu, réseau figé) : la fenêtre retrouve ses issues, un toast le dit, le focus revient au bouton.
     expect(modal).toContain("export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;");
     expect(modal).toMatch(/if \(!deletionOpen \|\| deletionReady\) return;\s*const timer = window\.setTimeout\(\(\) => abandonDeletion\(\), TERMS_DELETION_PREPARE_TIMEOUT_MS\);/);
@@ -281,7 +281,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).not.toMatch(/aria-(?:disabled|busy)=\{(?:busy|preparing|leaving)/);
     // Les trois gestes s'excluent : ni envoi pendant une déconnexion ou une suppression, ni l'inverse.
     expect(modal).toMatch(/<BusyButton\s+busy=\{busy\}\s+blocked=\{!checked \|\| leaving \|\| deletionOpen\}\s+onClick=\{accept\}/);
-    expect(modal).toContain("if (leaving || deletionOpen || !checked) return;");
+    expect(modal).toContain("if (leaving || deletionStarted.current || !checked) return;");
     // Garde synchrone : un double clic n'enregistre qu'une acceptation.
     expect(modal).toContain("const { busy, isBusy, run } = useBusyGuard();");
     expect(modal).toMatch(/void run\(async \(\) => \{\s*try \{\s*const response = await fetch\("\/api\/profile\/terms"/);

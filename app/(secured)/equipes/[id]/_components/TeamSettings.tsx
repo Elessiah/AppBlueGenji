@@ -363,7 +363,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   const { t } = text;
   const teamErrorMessage = useTeamErrorMessage();
   // Une garde pour le logo : l'envoi et le retrait partagent un `run`.
-  const { busy: logoBusy, isBusy, run } = useBusyGuard();
+  const { busy: logoBusy, isBusy, run, whenIdle } = useBusyGuard();
   // L'envoi réussi efface la rangée du logo choisi, bouton pressé compris :
   // le focus revient au bouton du choix d'un fichier.
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -489,9 +489,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
             data-focus-rescue="logo"
             busy={false}
             blocked={logoBusy}
-            onClick={() => {
-              if (!isBusy()) logoFileRef.current?.click();
-            }}
+            onClick={whenIdle(() => logoFileRef.current?.click())}
           >
             {pendingLogo ? t("settings.chooseAnother") : savedLogoLabel}
           </BusyButton>
@@ -500,9 +498,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
               className="btn ghost"
               busy={false}
               blocked={logoBusy}
-              onClick={() => {
-                if (!isBusy()) setRemoveLogoOpen(true);
-              }}
+              onClick={whenIdle(() => setRemoveLogoOpen(true))}
             >
               {t("settings.removeLogo")}
             </BusyButton>
@@ -527,9 +523,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
               // Figée pendant l'envoi sans `disabled` natif (le focus resterait
               // sur la page) : `aria-readonly` la peint éteinte, le geste est ignoré.
               aria-readonly={logoBusy || undefined}
-              onChange={(e) => {
-                if (!isBusy()) setLogoRights(e.target.checked);
-              }}
+              onChange={whenIdle((e: ChangeEvent<HTMLInputElement>) => setLogoRights(e.target.checked))}
             />
             <span>
               {t("settings.logoRights")}{" "}
@@ -546,9 +540,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
               className="btn ghost"
               busy={false}
               blocked={logoBusy}
-              onClick={() => {
-                if (!isBusy()) void onLogoRecrop();
-              }}
+              onClick={whenIdle(() => void onLogoRecrop())}
             >
               {t("settings.recrop")}
             </BusyButton>
@@ -556,9 +548,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
               className="btn ghost"
               busy={false}
               blocked={logoBusy}
-              onClick={() => {
-                if (!isBusy()) cancelPendingLogo();
-              }}
+              onClick={whenIdle(cancelPendingLogo)}
             >
               {t("settings.cancel")}
             </BusyButton>

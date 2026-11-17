@@ -105,7 +105,7 @@ describe("TeamSettings — équipe avec un logo", () => {
 
   it("TeamSettings_removeLogoButton_opensConfirmationInsteadOfDeleting", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/equipes/[id]/_components/TeamSettings.tsx"), "utf8");
-    expect(source).toMatch(/onClick=\{\(\) => \{\s*if \(!isBusy\(\)\) setRemoveLogoOpen\(true\);\s*\}\}/);
+    expect(source).toMatch(/onClick=\{whenIdle\(\(\) => setRemoveLogoOpen\(true\)\)\}/);
     expect(source).toMatch(/<ConfirmActionDialog\s+title=\{t\("settings\.removeLogoTitle"\)\}[\s\S]*?onConfirm=\{onLogoDelete\}/);
   });
 });

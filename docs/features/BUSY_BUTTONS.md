@@ -38,7 +38,9 @@ annoncer de l'attente.
   requête) ; un sous-composant qui ne reçoit que `busy` reçoit aussi `isBusy`,
   ou son appelant garde le rappel. Pas de `if (isBusy()) return` juste avant
   `run(…)`, qui fait déjà ce contrôle — seulement quand du code (validation,
-  focus) passe avant.
+  focus) passe avant. Un contrôle **secondaire** (choisir un fichier, cocher,
+  ouvrir une fenêtre) passe son gestionnaire par `whenIdle(fn)`, qui lit
+  `isBusy()` au geste.
 - Un **champ** peut garder `disabled` quand c'est la bonne sémantique : liste
   déroulante (le focus est sur le bouton qui envoie, une liste n'envoie pas le
   formulaire), liste des maps d'un score (`MapScoreList`, Entrée n'y envoie
@@ -233,10 +235,15 @@ annoncer de l'attente.
   légal ni `TERMS_VERSION` touchés. Écrans d'équipe : `MembershipActions`
   (un geste nommé, seul occupé, les autres refusés), `TeamSettings` (identité,
   logo, demandes de reprise), `MembersSection`, `MyRolesBlock`, `RoleTable`
-  (prop `readOnly` : cases `aria-readonly` + `aria-busy`), `RolesDialog`,
+  (prop `readOnly` : cases `aria-readonly`, que `Coche` peint « en attente » ;
+  seul le bouton pressé porte `aria-busy`), `RolesDialog`,
   `InviteRolesDialog`, `TransferOwnershipDialog` (radios `aria-disabled`),
   `ClaimGhostTeamDialog` (`PlayerPseudoCombobox`, prop `readOnly`),
-  `GhostTeamDialog`, `CreateTeamForm` (`hold()` jusqu'à la page de l'équipe) ;
+  `GhostTeamDialog`, `CreateTeamForm` (`hold()` jusqu'à la page de l'équipe ;
+  un échec du logo, même réseau, dit « créée sans logo », jamais « non créée » ;
+  un nouvel envoi après la création n'envoie rien et ouvre la fiche de
+  **cette** équipe, avec `router.refresh()` et un message disant que les
+  changements faits depuis n'ont pas été enregistrés) ;
   l'aspect désarmé de la fiche d'équipe passe de l'`opacity` aux couleurs de
   `.dim-disabled` (`globals.css`, posée avec `.page` sur la fiche et ses
   fenêtres : une seule palette). Un « Enregistrer » ou « J'accepte » désarmé
@@ -254,8 +261,15 @@ annoncer de l'attente.
   tard ne ramène pas le focus à ce geste). Une ligne retirée d'une liste
   (invitation, reprise, demande d'adhésion) rend le focus à sa **voisine**
   (`neighbourRescueSelectors`, `data-focus-rescue-key` : la suivante, sinon la
-  précédente), un autre geste au premier bouton **actif** du bloc
-  (`armedRescueSelector`). La barre de modération d'un profil passe par le
+  précédente) — au **même** bouton (« Refuser » après un refus, jamais
+  « Accepter ») —, un autre geste au premier bouton **actif** du bloc
+  (`armedRescueSelector`). Un écran dont le geste ferme d'abord une fenêtre
+  (départ de l'équipe, barre de modération) passe les données relues
+  (`useFocusRescue(ref, [team, requests])`, `[profile]`) : le secours attend
+  qu'elles changent (`rescueAwaitsData`) au lieu de s'user à la fermeture ;
+  une relecture échouée le retire (`arm(null)`). `TermsAcceptanceModal` lit
+  au geste (`deletionStarted`) qu'une suppression est lancée : ni
+  déconnexion ni acceptation ne partent par-dessus. La barre de modération d'un profil passe par le
   même crochet ; le dossier d'un signalement garde son déclencheur (le geste
   en attente) mais choisit sa cible par le même `pickRescueTarget` —
   `tests/app/leftover-busy-buttons.test.tsx`, `tests/app/leftover-busy-behaviour.test.tsx`,

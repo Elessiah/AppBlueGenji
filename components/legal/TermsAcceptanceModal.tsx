@@ -116,7 +116,14 @@ export function TermsAcceptanceModal({
   // deux fois avant que `busy` soit rendu — deux preuves pour un geste.
   const { busy, isBusy, run } = useBusyGuard();
   /** La suppression du compte est lancée (aperçu, puis confirmation par-dessus). */
-  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deletionOpen, setDeletionOpenState] = useState(false);
+  // Même état, lu **au geste** : un clic sur « Se déconnecter » ou « J'accepte »
+  // parti juste après « Supprimer mon compte », avant le rendu, est écarté.
+  const deletionStarted = useRef(false);
+  const setDeletionOpen = useCallback((next: boolean) => {
+    deletionStarted.current = next;
+    setDeletionOpenState(next);
+  }, []);
   /** Sa confirmation est ouverte : la préparation (code, textes, aperçu) est finie. */
   const [deletionReady, setDeletionReady] = useState(false);
   /** Le code de la suppression, une fois chargé (`termsDeletionLoader`). */
@@ -152,7 +159,7 @@ export function TermsAcceptanceModal({
     deletionAttempt.current += 1;
     setDeletionOpen(false);
     setDeletionReady(false);
-  }, [open]);
+  }, [open, setDeletionOpen]);
 
   const unavailableRef = useRef("");
   unavailableRef.current = t("termsModal.deletionUnavailable");
@@ -166,7 +173,7 @@ export function TermsAcceptanceModal({
     requestAnimationFrame(() => {
       if (document.activeElement === document.body) deleteButtonRef.current?.focus();
     });
-  }, [showError]);
+  }, [showError, setDeletionOpen]);
   useEffect(() => {
     if (!deletionOpen || deletionReady) return;
     const timer = window.setTimeout(() => abandonDeletion(), TERMS_DELETION_PREPARE_TIMEOUT_MS);
@@ -174,7 +181,7 @@ export function TermsAcceptanceModal({
   }, [deletionOpen, deletionReady, abandonDeletion]);
   const { leaving, logout } = useLogout();
   const startDeletion = () => {
-    if (isBusy() || leaving || deletionOpen) return;
+    if (isBusy() || leaving || deletionStarted.current) return;
     setDeletionOpen(true);
     deletionAttempt.current += 1;
     const attempt = deletionAttempt.current;
@@ -200,7 +207,7 @@ export function TermsAcceptanceModal({
   // Une acceptation n'est enregistrée qu'**une fois** par geste : la garde
   // écarte le second clic (ou Entrée répétée) parti avant le rendu de `busy`.
   const accept = () => {
-    if (leaving || deletionOpen || !checked) return;
+    if (leaving || deletionStarted.current || !checked) return;
     void run(async () => {
       try {
         const response = await fetch("/api/profile/terms", {
@@ -255,7 +262,7 @@ export function TermsAcceptanceModal({
                     busy={leaving}
                     blocked={busy || deletionOpen}
                     onClick={() => {
-                      if (!isBusy()) void logout();
+                      if (!isBusy() && !deletionStarted.current) void logout();
                     }}
                   >
                     {richNodes(children)}

@@ -27,6 +27,12 @@ export type BusyGuard = {
    * l'utilisateur au lieu de rester gelé.
    */
   hold: () => void;
+  /**
+   * Le gestionnaire d'un contrôle **secondaire** (choisir un fichier, cocher,
+   * ouvrir une fenêtre), ignoré tant qu'un envoi est en cours ou l'écran tenu :
+   * `isBusy()` lu au geste, juste avant le rendu qui pose `blocked`.
+   */
+  whenIdle: <A extends unknown[]>(handler: (...args: A) => void) => (...args: A) => void;
 };
 
 /**
@@ -80,6 +86,16 @@ export function useBusyGuard(): BusyGuard {
       if (mounted.current) setHeld(false);
     }, HOLD_RELEASE_MS);
   }, []);
+  const whenIdle = useCallback(
+    <A extends unknown[]>(handler: (...args: A) => void) =>
+      (...args: A) => {
+        if (!isBusy()) handler(...args);
+      },
+    [isBusy],
+  );
   const shown = busy || held;
-  return useMemo(() => ({ busy: shown, isBusy, run, isMounted, hold }), [shown, isBusy, run, isMounted, hold]);
+  return useMemo(
+    () => ({ busy: shown, isBusy, run, isMounted, hold, whenIdle }),
+    [shown, isBusy, run, isMounted, hold, whenIdle],
+  );
 }

@@ -123,13 +123,13 @@ describe("écrans d'équipe", () => {
     expect(code).toContain(
       `const MEMBERSHIP_RESCUE = [armedRescueSelector("membership"), '[data-focus-rescue="membership"]'] as const;`,
     );
-    expect(code).toContain('[...neighbourRescueSelectors("request", keys, request.id), ...MEMBERSHIP_RESCUE]');
+    expect(code).toContain('[...neighbourRescueSelectors(accept ? "request-accept" : "request-refuse", keys, request.id), ...MEMBERSHIP_RESCUE]');
     expect(code).toContain("data-focus-rescue-key={r.id}");
   });
 
   it("CreateTeamForm_success_holdsUntilTheTeamPage", () => {
     const code = readSource("app/(secured)/equipes/creer/CreateTeamForm.tsx");
-    expect(code).toMatch(/hold\(\);\s*router\.push\(`\/equipes\/\$\{payload\.teamId\}`\);/);
+    expect(code).toMatch(/hold\(\);\s*router\.push\(`\/equipes\/\$\{teamId\}`\);\s*router\.refresh\(\);/);
   });
 
   it("TeamSettings_claimWithdraw_rescuesToNeighbourClaim", () => {
@@ -149,7 +149,7 @@ describe("écrans d'équipe", () => {
 
   it("PlayerModerationBar_reusesUseFocusRescue", () => {
     const code = readSource("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
-    expect(code).toContain("const rescueFocus = useFocusRescue(barRef);");
+    expect(code).toContain("const rescueFocus = useFocusRescue(barRef, [profile]);");
     expect(code).toContain('rescueFocus(["button"]);');
     expect(code).not.toContain("isFocusLost");
   });
@@ -201,10 +201,36 @@ describe("écrans d'équipe", () => {
     for (const sentence of sentences) expect(sentence).toMatch(/ first\.$/);
   });
 
-  it("CreateTeamForm_createdTeam_secondSubmitAfterHoldGoesToTheTeamPage", () => {
+  it("CreateTeamForm_createdTeam_secondSubmitOpensItBeforeAnyCheck", () => {
     const code = readSource("app/(secured)/equipes/creer/CreateTeamForm.tsx");
-    expect(code).toContain("createdTeamId.current = payload.teamId;");
-    expect(code).toMatch(/if \(createdTeamId\.current !== null\) \{\s+hold\(\);\s+router\.push\(`\/equipes\/\$\{createdTeamId\.current\}`\);\s+return;/);
+    expect(code).toContain("created.current = { id: teamId, name };");
+    // Avant la validation : un nom effacé ou modifié depuis ne bloque ni ne recrée rien.
+    expect(code.indexOf("if (created.current !== null)")).toBeLessThan(code.indexOf("const nameCheck = checkTeamName(name);"));
+    expect(code).toMatch(/showInfo\(t\("create\.alreadyCreated", \{ name: created\.current\.name \}\), \{ once: true \}\);\s+openCreatedTeam\(created\.current\.id\);/);
+  });
+
+  it("MembershipActions_requestButtons_rescueToTheSameActionOfTheNeighbour", () => {
+    const code = readSource(`${TEAM}/MembershipActions.tsx`);
+    expect(code).toContain('data-focus-rescue="request-accept"');
+    expect(code).toContain('data-focus-rescue="request-refuse"');
+    expect(code).toContain("useFocusRescue(rootRef, [team, requests])");
+  });
+
+  it("PlayerModerationBar_rescue_waitsForProfileAndDropsOnReloadFailure", () => {
+    const code = readSource("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
+    expect(code).toContain("useFocusRescue(barRef, [profile])");
+    expect(code).toMatch(/if \(reloaded\) return;[\s\S]*?rescueFocus\(null\);/);
+  });
+
+  it("TermsAcceptanceModal_logout_ignoredOnceDeletionStarted", () => {
+    const code = readSource("components/legal/TermsAcceptanceModal.tsx");
+    expect(code).toContain("if (!isBusy() && !deletionStarted.current) void logout();");
+    expect(code).toContain("if (leaving || deletionStarted.current || !checked) return;");
+  });
+
+  it("Coche_ariaReadonly_takesTheWaitingLook", () => {
+    const code = readSource("components/Coche.tsx");
+    expect(code).toMatch(/props\["aria-readonly"\] === true \|\|\s+props\["aria-readonly"\] === "true";/);
   });
 
   it("teamPage_disarmedColours_comeFromGlobalDimDisabled", () => {
@@ -216,14 +242,15 @@ describe("écrans d'équipe", () => {
 });
 
 describe("champs figés pendant un envoi", () => {
-  it("RoleTable_readOnly_cochesCarryAriaReadonlyAndAriaBusy", () => {
+  it("RoleTable_readOnly_cochesCarryAriaReadonlyNotAriaBusy", () => {
     const html = fr(<RoleTable selected={["DPS"]} onChange={() => {}} checkable={MANAGER_ASSIGNABLE_ROLES} readOnly />);
     const boxes = html.match(/<input[^>]*type="checkbox"[^>]*>/g) ?? [];
 
     expect(boxes.length).toBeGreaterThan(0);
     for (const box of boxes) {
       expect(box).toContain('aria-readonly="true"');
-      expect(box).toContain('aria-busy="true"');
+      // Seul le bouton pressé s'annonce occupé : la case est figée, pas « en attente ».
+      expect(box).not.toContain("aria-busy");
       expect(box).not.toMatch(/\sdisabled=""/);
     }
   });

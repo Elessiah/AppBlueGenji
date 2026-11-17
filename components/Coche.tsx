@@ -84,7 +84,14 @@ export function Coche({
   // attend un instant, la case garde ses couleurs et prend le curseur
   // d'attente. Peindre l'état inerte le temps d'un envoi faisait clignoter
   // toutes les cases vers le style permanent d'une case verrouillée.
-  const busy = props["aria-busy"] === true || props["aria-busy"] === "true";
+  // Figée le temps d'un envoi (`aria-readonly`) : même rendu d'attente, sans
+  // que la case s'annonce elle-même occupée — seul le bouton pressé le dit
+  // (`docs/features/BUSY_BUTTONS.md`).
+  const busy =
+    props["aria-busy"] === true ||
+    props["aria-busy"] === "true" ||
+    props["aria-readonly"] === true ||
+    props["aria-readonly"] === "true";
   const inert = disabled && !busy;
   const { pillBorder, markBorder, labelColor } = pillColors(rgbColor, checked, inert);
 

@@ -51,7 +51,8 @@ const showError = jest.fn<(message: string, options?: { once?: boolean }) => voi
 const showSuccess = jest.fn<(message: string) => void>();
 const push = jest.fn<(href: string) => void>();
 const refresh = jest.fn<() => void>();
-jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess, showInfo: jest.fn() }) }));
+const showInfo = jest.fn<(message: string, options?: { once?: boolean }) => void>();
+jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess, showInfo }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({
   LocaleLink: () => null,
   useLocalePathname: () => ({ path: "/tournois" }),
@@ -273,6 +274,27 @@ describe("CreateTeamForm — « Créer l'équipe »", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith("/equipes/7");
+  });
+
+  it("onSubmit_logoNetworkError_reportsCreatedWithoutLogoAndOpensTeam", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate"] });
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => ({ teamId: 7 }) } as Response)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    filledForm();
+    // Un logo choisi et ses droits certifiés : l'état du formulaire est posé à la main.
+    const logoCell = cells.findIndex((cell) => cell === null);
+    cells[logoCell] = { file: { name: "logo.png" }, blob: {}, crop: null };
+    let tree = renderOnce(CreateTeamForm, {});
+    input(tree, (p) => p.type === "checkbox" && p.id !== "team-terms").onChange({ target: { checked: true } });
+    tree = renderOnce(CreateTeamForm, {});
+
+    await submitOf(tree)(event);
+
+    expect(showError).toHaveBeenCalledTimes(1);
+    expect(showError.mock.calls[0]?.[0]).toContain("create.createdWithoutLogo");
+    expect(push).toHaveBeenCalledWith("/equipes/7");
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("onSubmit_creationRefused_releasesBusyAndShowsError", async () => {

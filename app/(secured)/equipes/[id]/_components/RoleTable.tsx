@@ -83,7 +83,6 @@ const RoleTableRow = memo(function RoleTableRow({
               onChange={() => onToggle(role)}
               aria-describedby={hintId}
               aria-readonly={readOnly || undefined}
-              aria-busy={readOnly || undefined}
             />
           ) : (
             roleLabel(role, label, tickMode)

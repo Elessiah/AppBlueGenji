@@ -106,7 +106,6 @@ export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readon
                 checked={selected.includes(role)}
                 theme="equipe"
                 aria-readonly={pending || undefined}
-                aria-busy={pending || undefined}
                 onChange={() => toggle(role)}
               />
             ))}

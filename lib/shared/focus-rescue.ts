@@ -31,6 +31,19 @@ export function rescueDue(rescue: FocusRescue | null, now: number, focusLost: bo
   return rescue !== null && now <= rescue.until && focusLost;
 }
 
+/**
+ * Le secours attend-il encore la relecture ? Avec des données suivies
+ * (`armedWith`, copiées à la pose), seul un rendu où l'une d'elles a changé
+ * (`Object.is`) peut rendre le focus : la fermeture d'une fenêtre, rendue
+ * avant la relecture, fait tomber le focus un instant (la fenêtre le rend
+ * ensuite à son bouton d'origine) — le secours ne doit pas s'y user.
+ */
+export function rescueAwaitsData(armedWith: readonly unknown[] | null, current: readonly unknown[] | null): boolean {
+  if (armedWith === null || current === null) return false;
+  if (armedWith.length !== current.length) return false;
+  return armedWith.every((value, index) => Object.is(value, current[index]));
+}
+
 /** Le secours a-t-il expiré (à oublier, même sans focus perdu) ? */
 export function rescueExpired(rescue: FocusRescue | null, now: number): boolean {
   return rescue !== null && now > rescue.until;

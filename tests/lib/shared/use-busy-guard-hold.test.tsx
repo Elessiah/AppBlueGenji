@@ -22,6 +22,13 @@ function captureGuard(): BusyGuard {
 }
 
 describe("useBusyGuard — hold", () => {
+  // `hold()` arme une minuterie de 20 s : réelle, elle survivait au fichier
+  // (« A worker process has failed to exit gracefully »).
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
   it("useBusyGuard_initial_isNotBusy", () => {
     const guard = captureGuard();
 
@@ -30,6 +37,7 @@ describe("useBusyGuard — hold", () => {
   });
 
   it("hold_called_isBusyTrue", () => {
+    jest.useFakeTimers();
     const guard = captureGuard();
 
     guard.hold();
@@ -38,6 +46,7 @@ describe("useBusyGuard — hold", () => {
   });
 
   it("run_afterHold_skipsTaskAndResolvesUndefined", async () => {
+    jest.useFakeTimers();
     const guard = captureGuard();
     const task = jest.fn<() => Promise<number>>().mockResolvedValue(7);
     guard.hold();

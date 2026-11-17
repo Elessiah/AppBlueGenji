@@ -4,6 +4,7 @@ import {
   armedRescueSelector,
   neighbourRescueSelectors,
   pickRescueTarget,
+  rescueAwaitsData,
   rescueDue,
   rescueExpired,
   type FocusRescueRoot,
@@ -117,5 +118,25 @@ describe("neighbourRescueSelectors", () => {
     const picked = pickRescueTarget(rootWith({ [row(1)]: previous }), neighbourRescueSelectors("invitation", [1, 2, 3], 2));
 
     expect(picked).toBe(previous);
+  });
+});
+
+describe("rescueAwaitsData", () => {
+  const profile = { id: 1 };
+
+  it("rescueAwaitsData_noTrackedData_returnsFalse", () => {
+    expect(rescueAwaitsData(null, [profile])).toBe(false);
+  });
+
+  it("rescueAwaitsData_sameValues_returnsTrue", () => {
+    expect(rescueAwaitsData([profile, 2], [profile, 2])).toBe(true);
+  });
+
+  it("rescueAwaitsData_oneValueReloaded_returnsFalse", () => {
+    expect(rescueAwaitsData([profile, 2], [{ id: 1 }, 2])).toBe(false);
+  });
+
+  it("rescueAwaitsData_lengthDiffers_returnsFalse", () => {
+    expect(rescueAwaitsData([profile], [profile, 2])).toBe(false);
   });
 });

@@ -255,4 +255,33 @@ describe("useFocusRescue", () => {
       jest.useRealTimers();
     }
   });
+
+  it("useFocusRescue_trackedDataUnchanged_waitsForReload", () => {
+    const next = makeTarget();
+    targets.button = next;
+    const data: unknown[] = [{ id: 1 }];
+    const arm = useFocusRescue(rootRef, data);
+    arm(["button"]);
+
+    // La fenêtre se ferme avant la relecture : focus tombé, données identiques.
+    render();
+    expect(next.focus).not.toHaveBeenCalled();
+
+    data[0] = { id: 1 };
+    render();
+    expect(next.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("useFocusRescue_armNull_dropsRequestAndListeners", () => {
+    const next = makeTarget();
+    targets.button = next;
+    const arm = useFocusRescue(rootRef);
+    arm(["button"]);
+
+    arm(null);
+    render();
+
+    expect(next.focus).not.toHaveBeenCalled();
+    expect(listening()).toBe(0);
+  });
 });
