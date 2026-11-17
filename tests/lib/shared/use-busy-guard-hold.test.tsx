@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HOLD_RELEASE_MS, useBusyGuard, type BusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 
@@ -54,6 +56,16 @@ describe("useBusyGuard — hold", () => {
 
     expect(task).toHaveBeenCalledTimes(1);
     expect(result).toBe(7);
+  });
+
+  // Pas de DOM dans cet environnement : le démontage ne se rejoue pas, son
+  // ordre se lit dans la source (aucune minuterie armée après le nettoyage).
+  it("hold_afterUnmount_returnsBeforeArmingTimer", () => {
+    const code = readFileSync(join(process.cwd(), "lib/shared/hooks/useBusyGuard.ts"), "utf8");
+    const body = code.slice(code.indexOf("const hold = useCallback("));
+
+    expect(body).toMatch(/const hold = useCallback\(\(\) => \{[\s\S]*?if \(!mounted\.current\) return;\s+heldRef\.current = true;[\s\S]*?setTimeout\(/);
+    expect(body).toContain("clearTimeout(releaseTimer.current)");
   });
 
   describe("auto-release", () => {

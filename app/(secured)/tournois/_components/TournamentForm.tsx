@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, type ReactNode, type SetStateAction } from "react";
+import { FormEvent, useCallback, useState, type ReactNode, type SetStateAction } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
@@ -156,21 +156,30 @@ export function TournamentForm({
   const [values, setValuesState] = useState<TournamentFormValues>(initialValues);
   // Pendant l'envoi, ce qui est affiché est ce qui part : toute saisie (champ,
   // case, liste, réglages des sous-formulaires) est ignorée.
-  const setValues = (next: SetStateAction<TournamentFormValues>) => {
-    if (!isBusy()) setValuesState(next);
-  };
+  // Les rappels sont stables (`useCallback`) : un sous-formulaire mémoïsé ne se
+  // redessine pas à chaque frappe du parent.
+  const setValues = useCallback(
+    (next: SetStateAction<TournamentFormValues>) => {
+      if (!isBusy()) setValuesState(next);
+    },
+    [isBusy],
+  );
   // Format Duel / Arcade décoché : le champ des points n'est pas rendu, un refus
   // des points (décocher sous un score, `MAP_POINTS_LOCKED`) se rattache à la case.
   const fieldErrors = useFieldErrors(
     TOURNAMENT_FIELD_ERRORS,
     values.duelArcade ? FIELD_IDS : { ...FIELD_IDS, mapPointTarget: DUEL_ARCADE_FIELD_ID },
   );
-  const set = <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
-    // Une saisie ignorée pendant l'envoi ne lève pas non plus l'erreur du champ.
-    if (isBusy()) return;
-    setValues((prev) => ({ ...prev, [key]: value }));
-    if (key in FIELD_IDS) fieldErrors.clear(key as TournamentFormField);
-  };
+  const clearFieldError = fieldErrors.clear;
+  const set = useCallback(
+    <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
+      // Une saisie ignorée pendant l'envoi ne lève pas non plus l'erreur du champ.
+      if (isBusy()) return;
+      setValues((prev) => ({ ...prev, [key]: value }));
+      if (key in FIELD_IDS) clearFieldError(key as TournamentFormField);
+    },
+    [isBusy, setValues, clearFieldError],
+  );
 
   const locked = (field: TournamentField) => !editableFields.has(field);
   const lockedAttr = (field: TournamentField) => (locked(field) && explanationId ? { "aria-describedby": explanationId } : {});
@@ -194,18 +203,27 @@ export function TournamentForm({
   // Les états voisins du formulaire suivent la même règle que `setValues` :
   // une saisie ignorée pendant l'envoi ne laisse aucune trace (suivi de la
   // recommandation des rondes, valeur retenue pour une bascule de format).
-  const setSwissRoundsTouched = (next: boolean) => {
-    if (!isBusy()) setSwissRoundsTouchedState(next);
-  };
-  const setLastMatchFormatValue = (next: number) => {
-    if (!isBusy()) setLastMatchFormatValueState(next);
-  };
+  const setSwissRoundsTouched = useCallback(
+    (next: boolean) => {
+      if (!isBusy()) setSwissRoundsTouchedState(next);
+    },
+    [isBusy],
+  );
+  const setLastMatchFormatValue = useCallback(
+    (next: number) => {
+      if (!isBusy()) setLastMatchFormatValueState(next);
+    },
+    [isBusy],
+  );
   // Incrémenté à chaque refus d'un plan de phases invalide (`PhaseBuilder`).
   const [phaseFocusRequest, setPhaseFocusRequest] = useState(0);
   const [image, setImageState] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
-  const setImage = (next: ImagePickerValue) => {
-    if (!isBusy()) setImageState(next);
-  };
+  const setImage = useCallback(
+    (next: ImagePickerValue) => {
+      if (!isBusy()) setImageState(next);
+    },
+    [isBusy],
+  );
 
   const { format, maxTeams, phases } = values;
   const entrantType = toParticipantType(values.participantType);

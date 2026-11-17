@@ -51,22 +51,22 @@ describe("Ordre de départ — flèches seules", () => {
     // De vrais `<button>` (`BusyButton`) : focusables, actionnés à Entrée et à
     // l'espace, et qui gardent le focus pendant l'envoi.
     expect(
-      panel.match(/<BusyButton\s+busy=\{busy\}\s+blocked=\{[^}]+\}\s+ref=\{[\s\S]*?\}\s+className=\{styles\.arrow\}/g),
+      panel.match(/<BusyButton\s+busy=\{busy\}\s+blocked=\{[^}]+\}\s+data-arrow=\{.\$\{reg\.teamId\}:(?:up|down).\}\s+className=\{styles\.arrow\}/g),
     ).toHaveLength(2);
   });
 
   it("désarme la flèche qui sortirait de la liste, sans lui retirer le focus", () => {
     expect(panel).toMatch(/blocked=\{index === 0\}/);
-    expect(panel).toMatch(/blocked=\{index === rows\.length - 1\}/);
+    expect(panel).toMatch(/blocked=\{isLast\}/);
     expect(panel).not.toMatch(/disabled=\{busy/);
     // Arrivée en bout de liste, la flèche actionnée est désarmée : le focus
     // passe à celle qui ramène la ligne.
-    expect(panel).toMatch(/preferred\.getAttribute\("aria-disabled"\) !== "true" \? preferred : buttons\.current\.get\(key\(opposite\)\)/);
+    expect(panel).toMatch(/preferred\.getAttribute\("aria-disabled"\) !== "true" \? preferred : arrow\(opposite\)/);
   });
 
   it("ne réagit qu'au clic, jamais au défilement", () => {
-    expect(panel).toMatch(/onClick=\{\(\) => void move\(reg\.teamId, "up"\)\}/);
-    expect(panel).toMatch(/onClick=\{\(\) => void move\(reg\.teamId, "down"\)\}/);
+    expect(panel).toMatch(/onClick=\{\(\) => onMove\(reg\.teamId, "up"\)\}/);
+    expect(panel).toMatch(/onClick=\{\(\) => onMove\(reg\.teamId, "down"\)\}/);
     expect(ruleBody(css, ".arrow")).toMatch(/touch-action:\s*manipulation/);
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { Pill } from "@/components/cyber";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -37,7 +37,131 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
 import { BusyButton } from "@/components/ui/busy-button";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
-import { pageDateTime, participantText } from "@/lib/shared/tournament-page-text";
+import { pageDateTime, participantText, type TournamentPageText } from "@/lib/shared/tournament-page-text";
+import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
+
+type RegistrationEntry = TournamentDetail["registrations"][number];
+
+/** Date d'inscription ; vide : date d'une entrée solo, que la page sans compte ne sert pas. */
+function RegisteredAt({ text, iso }: Readonly<{ text: TournamentPageText; iso: string }>) {
+  const { t } = text;
+  if (iso === "") {
+    // Le tiret seul ne dit rien à un lecteur d'écran : il annonce la raison.
+    return (
+      <>
+        <span aria-hidden="true">-</span>
+        <span className="sr-only">{t("registrations.registeredAtHidden")}</span>
+      </>
+    );
+  }
+  return text.locale === "fr"
+    ? formatLocalDateTime(iso)
+    : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+interface RegistrationRowProps {
+  reg: RegistrationEntry;
+  index: number;
+  isLast: boolean;
+  gridClass: string;
+  followsFrozenDraw: boolean;
+  showActions: boolean;
+  reorderable: boolean;
+  removable: boolean;
+  busy: boolean;
+  a: TournamentActionsText["t"];
+  text: TournamentPageText;
+  onMove: (teamId: number, direction: "up" | "down") => void;
+  onRemove: (teamId: number, teamName: string) => void;
+}
+
+/**
+ * Une ligne de la liste. Mémoïsée : les rappels (`onMove`, `onRemove`) et les
+ * textes sont stables, si bien qu'un instantané du flux qui ne touche pas la
+ * ligne, ou le va-et-vient de `busy` d'un déplacement, ne redessine que ce qui
+ * a changé — avec 256 engagés, la liste ne se reconstruit pas à chaque geste.
+ * Les flèches se retrouvent par `data-arrow` (focus rendu après un
+ * déplacement) : aucune `ref` recréée à chaque rendu.
+ */
+const RegistrationRow = memo(function RegistrationRow({
+  reg,
+  index,
+  isLast,
+  gridClass,
+  followsFrozenDraw,
+  showActions,
+  reorderable,
+  removable,
+  busy,
+  a,
+  text,
+  onMove,
+  onRemove,
+}: Readonly<RegistrationRowProps>) {
+  const { t } = text;
+  return (
+    <div className={`${styles.row} ${gridClass}`}>
+      <span className={styles.seed}>
+        {followsFrozenDraw ? frozenSeedLabel(reg.seed) : `#${index + 1}`}
+      </span>
+      <EntrantName
+        teamId={reg.teamId}
+        name={reg.teamName}
+        textClassName={styles.name}
+      />
+      <span className={styles.muted} data-label={t("registrations.registeredAt")}>
+        <RegisteredAt text={text} iso={reg.registeredAt} />
+      </span>
+      <span className={styles.muted} data-label={t("registrations.finalRank")}>
+        {reg.finalRank ?? "-"}
+      </span>
+      {showActions && (
+        <span className={styles.actions} data-tap-zone>
+          {reorderable && (
+            <>
+              <BusyButton
+                busy={busy}
+                blocked={index === 0}
+                data-arrow={`${reg.teamId}:up`}
+                className={styles.arrow}
+                aria-label={a("registrations.moveUpAria", { name: reg.teamName })}
+                title={a("registrations.moveUpTitle")}
+                onClick={() => onMove(reg.teamId, "up")}
+              >
+                ↑
+              </BusyButton>
+              <BusyButton
+                busy={busy}
+                blocked={isLast}
+                data-arrow={`${reg.teamId}:down`}
+                className={styles.arrow}
+                aria-label={a("registrations.moveDownAria", { name: reg.teamName })}
+                title={a("registrations.moveDownTitle")}
+                onClick={() => onMove(reg.teamId, "down")}
+              >
+                ↓
+              </BusyButton>
+            </>
+          )}
+          {removable && (
+            /* Le nom est dans le libellé accessible, pas seulement dans
+               la ligne : trente boutons « Retirer » identiques ne se
+               distinguent pas à la voix ni au lecteur d'écran. */
+            <BusyButton
+              busy={busy}
+              className={styles.remove}
+              aria-label={a("registrations.removeAria", { name: reg.teamName })}
+              title={a("registrations.removeTitle")}
+              onClick={() => onRemove(reg.teamId, reg.teamName)}
+            >
+              {a("registrations.remove")}
+            </BusyButton>
+          )}
+        </span>
+      )}
+    </div>
+  );
+});
 
 interface RegistrationsPanelProps {
   detail: TournamentDetail;
@@ -95,21 +219,6 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const { t } = text;
   // Ordre de départ et retraits (outils du staff posés sur la fiche) : lot 8b.
   const a = useActionsText().t;
-  // Vide : date d'une entrée solo, que la page sans compte ne sert pas.
-  const registeredAt = (iso: string) => {
-    if (iso === "") {
-      // Le tiret seul ne dit rien à un lecteur d'écran : il annonce la raison.
-      return (
-        <>
-          <span aria-hidden="true">-</span>
-          <span className="sr-only">{t("registrations.registeredAtHidden")}</span>
-        </>
-      );
-    }
-    return text.locale === "fr"
-      ? formatLocalDateTime(iso)
-      : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  };
   // Garde synchrone : un double clic sur une flèche partait deux fois, chaque
   // envoi calculé sur l'ordre d'avant l'autre. Les flèches et « Retirer »
   // restent focalisables pendant l'envoi (`BusyButton`) : désactivées, elles
@@ -125,7 +234,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // Le clavier ne doit pas perdre sa place : la ligne bouge, et le bouton qu'on
   // vient d'actionner devient sans effet dès qu'elle atteint une extrémité — on
   // rend alors la main au bouton qui la ramène.
-  const buttons = useRef(new Map<string, HTMLButtonElement | null>());
+  const tableRef = useRef<HTMLDivElement>(null);
   const [refocus, setRefocus] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
   // Le lecteur d'écran a besoin qu'on lui dise ce qui a bougé : le seul retour
   // visuel est le déplacement de la ligne.
@@ -216,12 +325,14 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   useEffect(() => {
     if (!refocus) return;
     const key = (direction: "up" | "down") => `${refocus.teamId}:${direction}`;
-    const preferred = buttons.current.get(key(refocus.direction));
+    const arrow = (direction: "up" | "down") =>
+      tableRef.current?.querySelector<HTMLButtonElement>(`[data-arrow="${key(direction)}"]`) ?? null;
+    const preferred = arrow(refocus.direction);
     // Arrivé en tête ou en queue, le bouton actionné n'existe plus comme cible :
     // on rend la main à celui qui ramène la ligne d'où elle vient.
     const opposite = refocus.direction === "up" ? "down" : "up";
     const target =
-      preferred && preferred.getAttribute("aria-disabled") !== "true" ? preferred : buttons.current.get(key(opposite));
+      preferred && preferred.getAttribute("aria-disabled") !== "true" ? preferred : arrow(opposite);
     target?.focus();
     setRefocus(null);
   }, [refocus]);
@@ -265,6 +376,19 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     }
     await performMove(teamId, direction);
   };
+  // Rappels stables pour les lignes mémoïsées : `move` se relit à chaque rendu
+  // (il dépend de l'ordre, de la source…), la ligne ne voit que ce passage.
+  const moveRef = useRef(move);
+  useEffect(() => {
+    moveRef.current = move;
+  });
+  const onMove = useCallback((teamId: number, direction: "up" | "down") => void moveRef.current(teamId, direction), []);
+  const onRemove = useCallback(
+    (teamId: number, teamName: string) => {
+      if (!isBusy()) setRemoving({ teamId, teamName });
+    },
+    [isBusy],
+  );
   // Une fois lancé, le serveur range la liste par les têtes de série figées au
   // coup d'envoi (`orderByFrozenSeeds`) : le rang montré est ce `seed`, que des
   // retraits peuvent laisser troué, et « — » pour une engagée sans rang figé.
@@ -326,7 +450,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         <p className={styles.empty}>{t("registrations.empty")}</p>
       ) : (
         <PodiumTiersOffWhen off={showActions}>
-        <div className={styles.table}>
+        <div ref={tableRef} className={styles.table}>
           <div className={`${styles.row} ${styles.header} ${gridClass}`}>
             <span>{t("registrations.rank")}</span>
             <span>{participantText(text, detail.card.participantType, "oneCapitalized")}</span>
@@ -335,72 +459,22 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             {showActions && <span className={styles.actionsHead}>{actionsLabel}</span>}
           </div>
           {visibleRows.map((reg, index) => (
-            <div key={reg.teamId} className={`${styles.row} ${gridClass}`}>
-              <span className={styles.seed}>
-                {followsFrozenDraw ? frozenSeedLabel(reg.seed) : `#${index + 1}`}
-              </span>
-              <EntrantName
-                teamId={reg.teamId}
-                name={reg.teamName}
-                textClassName={styles.name}
-              />
-              <span className={styles.muted} data-label={t("registrations.registeredAt")}>
-                {registeredAt(reg.registeredAt)}
-              </span>
-              <span className={styles.muted} data-label={t("registrations.finalRank")}>
-                {reg.finalRank ?? "-"}
-              </span>
-              {showActions && (
-                <span className={styles.actions} data-tap-zone>
-                  {reorderable && (
-                    <>
-                      <BusyButton
-                        busy={busy}
-                        blocked={index === 0}
-                        ref={(node) => {
-                          buttons.current.set(`${reg.teamId}:up`, node);
-                        }}
-                        className={styles.arrow}
-                        aria-label={a("registrations.moveUpAria", { name: reg.teamName })}
-                        title={a("registrations.moveUpTitle")}
-                        onClick={() => void move(reg.teamId, "up")}
-                      >
-                        ↑
-                      </BusyButton>
-                      <BusyButton
-                        busy={busy}
-                        blocked={index === rows.length - 1}
-                        ref={(node) => {
-                          buttons.current.set(`${reg.teamId}:down`, node);
-                        }}
-                        className={styles.arrow}
-                        aria-label={a("registrations.moveDownAria", { name: reg.teamName })}
-                        title={a("registrations.moveDownTitle")}
-                        onClick={() => void move(reg.teamId, "down")}
-                      >
-                        ↓
-                      </BusyButton>
-                    </>
-                  )}
-                  {removable && (
-                    /* Le nom est dans le libellé accessible, pas seulement dans
-                       la ligne : trente boutons « Retirer » identiques ne se
-                       distinguent pas à la voix ni au lecteur d'écran. */
-                    <BusyButton
-                      busy={busy}
-                      className={styles.remove}
-                      aria-label={a("registrations.removeAria", { name: reg.teamName })}
-                      title={a("registrations.removeTitle")}
-                      onClick={() => {
-                        if (!isBusy()) setRemoving({ teamId: reg.teamId, teamName: reg.teamName });
-                      }}
-                    >
-                      {a("registrations.remove")}
-                    </BusyButton>
-                  )}
-                </span>
-              )}
-            </div>
+            <RegistrationRow
+              key={reg.teamId}
+              reg={reg}
+              index={index}
+              isLast={index === rows.length - 1}
+              gridClass={gridClass}
+              followsFrozenDraw={followsFrozenDraw}
+              showActions={showActions}
+              reorderable={reorderable}
+              removable={removable}
+              busy={busy}
+              a={a}
+              text={text}
+              onMove={onMove}
+              onRemove={onRemove}
+            />
           ))}
         </div>
         </PodiumTiersOffWhen>

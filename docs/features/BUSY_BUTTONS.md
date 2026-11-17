@@ -91,7 +91,13 @@ annoncer de l'attente.
   `useBusyGuard().hold()`, appelé au succès, garde `busy` et `isBusy()` vrais
   jusqu'au démontage — sinon `busy` retombait et un second clic recréait le
   tournoi ou relançait la suppression. Inutile quand le parent ferme le
-  dialogue dans le même rendu (manche effacée).
+  dialogue dans le même rendu (manche effacée). Sur un écran déjà démonté,
+  `hold()` ne fait rien (aucune minuterie que le démontage n'effacerait plus).
+- **Coût au rendu** : les setters de `TournamentForm` sont des `useCallback`
+  (stables) ; les lignes de `RegistrationsPanel` sont mémoïsées
+  (`RegistrationRow`, rappels `onMove` / `onRemove` stables) et leurs flèches se
+  retrouvent par `data-arrow`, sans `ref` recréée à chaque rendu. `form[data-frozen]`
+  épargne les boutons « i » (`aria-expanded`).
 - Formulaire de tournoi : toute saisie est ignorée pendant l'envoi (setters
   gardés par `isBusy()`, états voisins compris : suivi des rondes suisses,
   valeur retenue du format), les champs texte et dates passent en `readOnly`,

@@ -195,12 +195,12 @@ describe("formulaire de tournoi et image", () => {
   });
 
   it("TournamentForm_edits_ignoredWhileSending", () => {
-    expect(form).toMatch(/const setValues = \(next: SetStateAction<TournamentFormValues>\) => \{\s+if \(!isBusy\(\)\) setValuesState\(next\);/);
-    expect(form).toMatch(/const setImage = \(next: ImagePickerValue\) => \{\s+if \(!isBusy\(\)\) setImageState\(next\);/);
+    expect(form).toMatch(/const setValues = useCallback\(\s+\(next: SetStateAction<TournamentFormValues>\) => \{\s+if \(!isBusy\(\)\) setValuesState\(next\);/);
+    expect(form).toMatch(/const setImage = useCallback\(\s+\(next: ImagePickerValue\) => \{\s+if \(!isBusy\(\)\) setImageState\(next\);/);
     // États voisins : une saisie ignorée ne coupe pas le suivi des rondes ni ne
     // déplace la valeur retenue du format.
-    expect(form).toMatch(/const setSwissRoundsTouched = \(next: boolean\) => \{\s+if \(!isBusy\(\)\) setSwissRoundsTouchedState\(next\);/);
-    expect(form).toMatch(/const setLastMatchFormatValue = \(next: number\) => \{\s+if \(!isBusy\(\)\) setLastMatchFormatValueState\(next\);/);
+    expect(form).toMatch(/const setSwissRoundsTouched = useCallback\(\s+\(next: boolean\) => \{\s+if \(!isBusy\(\)\) setSwissRoundsTouchedState\(next\);/);
+    expect(form).toMatch(/const setLastMatchFormatValue = useCallback\(\s+\(next: number\) => \{\s+if \(!isBusy\(\)\) setLastMatchFormatValueState\(next\);/);
   });
 
   it("TournamentForm_numberInputs_allReadOnlyThroughContext", () => {
@@ -278,7 +278,7 @@ describe("cases et radios figées pendant l'envoi", () => {
 
   it("globals_ariaFrozenCheckboxes_noHoverHighlight", () => {
     expect(globals).toContain(
-      'input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(form[data-frozen] *):not(:checked):not(:focus-visible)',
+      'input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible):not(form[data-frozen] *)',
     );
   });
 
@@ -292,9 +292,30 @@ describe("cases et radios figées pendant l'envoi", () => {
   it("TournamentForm_busy_formFrozenAndSetterGuarded", () => {
     const form = source(FORM_DIR + "TournamentForm.tsx");
     expect(form).toContain("data-frozen={loading || undefined}");
-    expect(form).toMatch(/const set = <K[^\n]*\n\s*\/\/[^\n]*\n\s+if \(isBusy\(\)\) return;/);
+    expect(form).toMatch(/const set = useCallback\(\s+<K[^\n]*\n\s*\/\/[^\n]*\n\s+if \(isBusy\(\)\) return;/);
     expect(form).toContain('onEdit={() => !isBusy() && fieldErrors.clear("maxTeams")}');
     expect(form).toMatch(/onCheckedChange=\{\(checked\) => \{\s+if \(isBusy\(\)\) return;/);
+  });
+
+  it("globals_frozenForm_infoHintTriggersKeepTheirLook", () => {
+    // Les boutons « i » (aria-expanded) s'ouvrent encore pendant l'envoi.
+    expect(globals).toContain('form[data-frozen] button:not([type="submit"]):not([aria-busy="true"]):not([aria-expanded]) {');
+  });
+
+  it("globals_hoverExclusion_ancestorWalkComesLast", () => {
+    // Le test d'ancêtre (le plus coûteux) ne s'évalue qu'après les conditions bon marché.
+    const hover = globals.match(/input\[type="checkbox"\]:hover[^{]*\{/)?.[0] ?? "";
+    expect(hover.indexOf(":not(form[data-frozen] *)")).toBeGreaterThan(hover.indexOf(":not(:focus-visible)"));
+  });
+
+  it("RegistrationsPanel_rows_memoisedWithStableCallbacksAndNoRefCallbacks", () => {
+    const panel = source(DIR + "RegistrationsPanel.tsx");
+    expect(panel).toContain("const RegistrationRow = memo(function RegistrationRow(");
+    expect(panel).toMatch(/const onMove = useCallback\(\(teamId: number, direction: "up" \| "down"\) => void moveRef\.current\(teamId, direction\), \[\]\);/);
+    expect(panel).toMatch(/const onRemove = useCallback\(\s+\(teamId: number, teamName: string\) => \{[\s\S]*?\[isBusy\],/);
+    // Les flèches se retrouvent par data-arrow : aucune ref recréée à chaque rendu.
+    expect(panel).not.toMatch(/ref=\{\(node\)/);
+    expect(panel).toContain("[data-arrow=");
   });
 
   it("globals_frozenForm_checkboxesSelectsAndButtonsDimmedByColour", () => {

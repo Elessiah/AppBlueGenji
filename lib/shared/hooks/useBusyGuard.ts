@@ -68,8 +68,11 @@ export function useBusyGuard(): BusyGuard {
     [setBusy],
   );
   const hold = useCallback(() => {
+    // Écran déjà démonté (la navigation a été plus vite) : rien à tenir, et
+    // aucune minuterie que le démontage ne viendrait plus effacer.
+    if (!mounted.current) return;
     heldRef.current = true;
-    if (mounted.current) setHeld(true);
+    setHeld(true);
     if (releaseTimer.current !== null) clearTimeout(releaseTimer.current);
     releaseTimer.current = setTimeout(() => {
       releaseTimer.current = null;
