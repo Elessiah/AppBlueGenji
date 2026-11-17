@@ -125,7 +125,7 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toMatch(
       /if \(shouldHoldSubmit\(pastWarning !== null, pastWarningAt\(now\) !== null\)\) \{\s*justHeld\.current = true;\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
     );
-    expect(SOURCE).toMatch(/<button\s+id=\{SUBMIT_ID\}\s+type="submit"/);
+    expect(SOURCE).toMatch(/<BusyButton\s+busy=\{busy\}\s+id=\{SUBMIT_ID\}\s+type="submit"/);
     expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
     expect(SOURCE).toContain("<output id={PAST_WARNING_ID} style=");
     expect(SOURCE).not.toContain("warnPastLate");

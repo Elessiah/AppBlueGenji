@@ -760,23 +760,24 @@ textarea,
   border-style: dashed;
 }
 
-/* `BusyLabel` : libellé au repos et libellé d'attente dans la même case, le
-   bouton garde sa largeur. `visibility` (non `display`) : la case reste réservée. */
+/* `BusyLabel` : le libellé actif (seul dans le DOM) et, dans la même case, l'autre
+   en pseudo-élément invisible — le bouton garde la largeur du plus long.
+   `visibility` (non `display`) : la case reste réservée, et le texte caché
+   n'entre ni dans le nom accessible ni à l'écran ; `/ ""` le redit aux
+   navigateurs qui lisent le texte alternatif d'un `content`. */
 .busy-label {
   display: inline-grid;
 }
 
-.busy-label > * {
+.busy-label > *,
+.busy-label::after {
   grid-area: 1 / 1;
 }
 
-.busy-label > :last-child,
-.busy-label[data-busy="true"] > :first-child {
+.busy-label::after {
+  content: attr(data-alt);
+  content: attr(data-alt) / "";
   visibility: hidden;
-}
-
-.busy-label[data-busy="true"] > :last-child {
-  visibility: visible;
 }
 
 /* Zone où `aria-disabled` remplace `disabled` (le bouton garde le focus) : le

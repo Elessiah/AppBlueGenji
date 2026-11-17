@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
@@ -46,7 +47,6 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   const noop = !touched && match.replayUrl === null;
 
   const save = async (value: string | null) => {
-    if (isBusy()) return;
     await run(async () => {
       try {
         const response = await fetch(`/api/admin/matches/${match.id}/replay`, {
@@ -164,39 +164,37 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
             }}
           >
             {match.replayUrl !== null && (
-              <button
+              <BusyButton
+                busy={busy}
                 type="button"
                 className="btn ghost"
                 onClick={() => void save(null)}
-                aria-disabled={busy || undefined}
-                aria-busy={busy || undefined}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
                 {t("replay.remove")}
-              </button>
+              </BusyButton>
             )}
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className="btn ghost"
               onClick={() => {
                 if (!isBusy()) onClose();
               }}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
-            </button>
+            </BusyButton>
             {replayable && (
-              <button
+              <BusyButton
+                busy={busy}
+                blocked={invalid || noop}
                 type="submit"
                 className="btn"
-                aria-disabled={busy || invalid || noop || undefined}
-                aria-busy={busy || undefined}
                 style={{ padding: "8px 20px", fontSize: 13 }}
               >
                 <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
-              </button>
+              </BusyButton>
             )}
           </div>
         </form>

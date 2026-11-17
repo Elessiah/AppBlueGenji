@@ -717,7 +717,8 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expectNoFrench(admin("en"));
     // Le bouton garde le focus pendant un envoi (aria-disabled), et reprend les maps de la proposition.
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx"), "utf8");
-    expect(source).toMatch(/aria-disabled=\{submitting \|\| undefined\}[\s\S]{0,160}if \(!submitting\) onAdopt\(\);/);
+    expect(source).toMatch(/<BusyButton\s+busy=\{submitting\}[\s\S]{0,120}onClick=\{onAdopt\}/);
+    expect(source).toMatch(/onAdopt=\{\(\) => \{\s+if \(form\.isBusy\(\)\) return;/);
     const hook = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
     expect(hook).toMatch(/const adoptReport = \(report: MatchScoreReport\) => \{[\s\S]{0,400}forfeitTeamId: undefined, doubleForfeit: undefined, \.\.\.scoresFromMaps\(rows\)/);
     // Les champs portent déjà la proposition (enregistrée telle quelle) : rien à reprendre.
@@ -783,10 +784,11 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.
     // Le bouton d'envoi n'est jamais désactivé nativement : `aria-disabled`, gardes dans `onSubmitForm`.
     expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
-    expect(source).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
-    expect(source).toContain("if (submitting || nothingEntered || unchangedMine) return;");
-    // Le lien du forfait et « Fermer » aussi : focalisables pendant l'envoi.
-    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(5);
+    expect(source).toContain("blocked={nothingEntered || unchangedMine}");
+    expect(source).toContain("if (isBusy() || nothingEntered || unchangedMine) return;");
+    // Le lien du forfait et « Fermer » aussi : focalisables pendant l'envoi (`BusyButton`).
+    expect(source.match(/<BusyButton\s+busy=\{submitting\}/g)).toHaveLength(5);
+    expect(source).not.toMatch(/<button\b/);
     // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
     for (const selector of ['.forfeit[aria-disabled="true"]', '.link[aria-disabled="true"]', '.actions :global(.btn[aria-disabled="true"])']) {

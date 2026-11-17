@@ -485,7 +485,9 @@ describe("MatchCardActions — branchements du cast", () => {
   it("les choix restent figés pendant l'envoi, sans disabled natif (le focus ne se perd pas)", () => {
     expectContains(card, [
       "aria-disabled={busy || undefined}",
-      "if (!busy) onPick(caster.userId);",
+      "onChange={() => onPick(caster.userId)}",
+      // Garde synchrone chez l'appelant : un choix parti avec l'envoi ne change pas la cible.
+      "if (!isBusy()) setReleaseTarget(userId);",
     ]);
     expect(card).not.toMatch(/<fieldset[^>]*disabled/);
   });

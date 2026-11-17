@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useToast } from "@/components/ui/toast";
@@ -280,9 +281,11 @@ export function CastSettingsDialog({
                 id={urlId}
                 value={url}
                 onChange={(next) => {
+                  if (isBusy()) return;
                   setUrl(next);
                   fieldErrors.clear("url");
                 }}
+                sending={busy}
                 required={streamEditable}
                 missing={urlMissing}
                 invalid={urlRefused || fieldErrors.invalidField === "url"}
@@ -296,9 +299,11 @@ export function CastSettingsDialog({
                 id={battletagId}
                 value={battletag}
                 onChange={(next) => {
+                  if (isBusy()) return;
                   setBattletag(next);
                   fieldErrors.clear("battletag");
                 }}
+                sending={busy}
                 invalid={battletagRefused || fieldErrors.invalidField === "battletag"}
                 fieldError={fieldErrors.message("battletag")}
               />
@@ -310,9 +315,11 @@ export function CastSettingsDialog({
                 trigger={triggerLocked ? lockedTrigger(true, liveTrigger, trigger) : (pickedTrigger ?? liveTrigger)}
                 startAt={match.startAt}
                 onChange={(next) => {
+                  if (isBusy()) return;
                   pickTrigger(next);
                   fieldErrors.clear("trigger");
                 }}
+                sending={busy}
                 locked={triggerLocked}
                 id={triggerId}
                 fieldError={fieldErrors.message("trigger")}
@@ -344,40 +351,38 @@ export function CastSettingsDialog({
 
         <div className={styles.footer}>
           {cast !== null && offersCastRelease(match) && (
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className={`btn ghost ${styles.button}`}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
               onClick={() => {
                 if (!isBusy()) setConfirmRelease(true);
               }}
             >
               {t("cardActions.stopCasting")}
-            </button>
+            </BusyButton>
           )}
           <div className={styles.actions}>
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className={`btn ghost ${styles.button}`}
               onClick={() => {
                 if (!isBusy()) onClose();
               }}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
             >
               {played || !settable ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
-            </button>
+            </BusyButton>
             {/* Un match joué ne prend plus ni lien, ni mode, ni BattleTag : rien à enregistrer. */}
             {!played && settable && (
-              <button
+              <BusyButton
+                busy={busy}
+                blocked={blocked || cast === null}
                 type="submit"
                 className={`btn ${styles.button}`}
-                aria-disabled={busy || blocked || cast === null || undefined}
-                aria-busy={busy || undefined}
               >
                 <BusyLabel busy={busy} idle={t("cardActions.castSettings.save")} pending={t("cardActions.castSettings.saving")} />
-              </button>
+              </BusyButton>
             )}
           </div>
         </div>
@@ -492,17 +497,16 @@ function CastAirAndReplay({
               <p>{t("cardActions.castSettings.airHint")}</p>
             </InfoHint>
           </InfoHintRow>
-          <button
+          <BusyButton
+            busy={busy}
             type="button"
             className={onAir ? "btn ghost" : "btn"}
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
             onClick={() => {
               if (!isBusy()) void toggleAir();
             }}
           >
             {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
-          </button>
+          </BusyButton>
         </div>
       )}
 
@@ -514,17 +518,16 @@ function CastAirAndReplay({
               <p>{t("cardActions.castSettings.replayHint")}</p>
             </InfoHint>
           </InfoHintRow>
-          <button
+          <BusyButton
+            busy={busy}
             type="button"
             className="btn ghost"
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
             onClick={() => {
               if (!isBusy()) onReplay();
             }}
           >
             {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
-          </button>
+          </BusyButton>
         </div>
       )}
     </>

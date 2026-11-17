@@ -11,6 +11,7 @@ import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -310,6 +311,7 @@ function SlotEditor({
   open,
   removable,
   busy,
+  isBusy,
   overwatch,
   toggleId,
   errorAria,
@@ -324,6 +326,8 @@ function SlotEditor({
   open: boolean;
   removable: boolean;
   busy: boolean;
+  /** Garde synchrone des gestionnaires (`useBusyGuard`), juste avant le rendu de `busy`. */
+  isBusy: () => boolean;
   overwatch: boolean;
   /** `id` du bouton de la liste : c'est lui que désigne un refus sur ce créneau. */
   toggleId: string;
@@ -357,18 +361,17 @@ function SlotEditor({
         <span className={styles.slotTitle}>{t("dialog.slot", { number })}</span>
         <span className={`pill ${slot.length === 0 ? "pill-neutral" : "pill-info"}`}>{kind}</span>
         {removable && (
-          <button
+          <BusyButton
+            busy={busy}
             type="button"
             className="btn ghost"
             aria-label={t("dialog.removeSlot", { number })}
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
             onClick={() => {
-              if (!busy) onRemoveSlot();
+              if (!isBusy()) onRemoveSlot();
             }}
           >
             <span aria-hidden="true">✕</span>
-          </button>
+          </BusyButton>
         )}
       </div>
       {slot.length > 0 && (
@@ -448,6 +451,7 @@ function TiebreakForm({
   allowed,
   overwatch,
   busy,
+  isBusy,
   run,
   onWritten,
   onDirtyChange,
@@ -459,6 +463,8 @@ function TiebreakForm({
   allowed: boolean;
   overwatch: boolean;
   busy: boolean;
+  /** Garde synchrone des gestionnaires (`useBusyGuard`), juste avant le rendu de `busy`. */
+  isBusy: () => boolean;
   run: RunTask;
   /** Une écriture a réussi : le tour entre dans l'annonce que la fermeture peut devancer. */
   onWritten: () => void;
@@ -501,7 +507,7 @@ function TiebreakForm({
     event.preventDefault();
     // Rien de changé : rien à envoyer (renvoyer la valeur en place n'écrirait que du bruit au journal),
     // et Entrée dans un champ intact ne réclame pas un nom que le bouton grisé ne demande pas.
-    if (busy || !dirty) return;
+    if (isBusy() || !dirty) return;
     if (!allowed) {
       showError(t("dialog.tiebreakUnavailable"));
       return;
@@ -532,7 +538,7 @@ function TiebreakForm({
             value={value}
             maxLength={FIRST_MAP_MAX_LENGTH}
             list={overwatch ? listId : undefined}
-            readOnly={!allowed || undefined}
+            readOnly={!allowed || busy || undefined}
             {...fieldErrors.aria("tiebreak", !allowed && unavailableId)}
             onChange={(event) => {
               setValue(event.target.value);
@@ -549,22 +555,22 @@ function TiebreakForm({
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           {/* Toujours monté : après un retrait réussi il n'y a plus rien à retirer, mais un
               bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
-          <button
+          <BusyButton
+            busy={busy}
+            blocked={saved === null}
             type="button"
             className="btn ghost"
-            aria-disabled={busy || saved === null || undefined}
-            aria-busy={busy || undefined}
             onClick={() => {
-              if (busy || saved === null) return;
+              if (isBusy() || saved === null) return;
               // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
               void send(null, t("dialog.tiebreakRemoved"));
             }}
           >
             {t("dialog.tiebreakRemove")}
-          </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || !allowed || undefined} aria-busy={busy || undefined}>
+          </BusyButton>
+          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className="btn ghost">
             {t("dialog.tiebreakSave")}
-          </button>
+          </BusyButton>
         </div>
       </fieldset>
     </form>
@@ -654,6 +660,7 @@ function RoundPointsForm({
   maxMaps,
   locked,
   busy,
+  isBusy,
   run,
   onDirtyChange,
 }: Readonly<{
@@ -670,6 +677,8 @@ function RoundPointsForm({
   /** Cartes que le format du tour joue au plus (`roundMaxMaps`, `null` en score libre). */
   maxMaps: number | null;
   busy: boolean;
+  /** Garde synchrone des gestionnaires (`useBusyGuard`), juste avant le rendu de `busy`. */
+  isBusy: () => boolean;
   run: RunTask;
   onDirtyChange: (dirty: boolean) => void;
 }>) {
@@ -752,7 +761,7 @@ function RoundPointsForm({
 
   const save = (event: FormEvent) => {
     event.preventDefault();
-    if (busy || locked || !dirty) return;
+    if (isBusy() || locked || !dirty) return;
     // Le nombre du tournoi saisi sur le tour : le tour le suit, aucun réglage propre à garder.
     void send(value === tournamentTarget ? null : value, sendMaps, t("dialog.pointsSaved"));
   };
@@ -777,6 +786,7 @@ function RoundPointsForm({
             onValueChange={setValue}
             onEdit={() => fieldErrors.clear()}
             disabled={locked}
+            readOnly={busy || undefined}
             {...fieldErrors.aria("points", statusId, locked && lockedId)}
           />
           <FieldErrorText fieldId={inputId} message={fieldErrors.message("points")} />
@@ -825,21 +835,21 @@ function RoundPointsForm({
         )}
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
-          <button
+          <BusyButton
+            busy={busy}
+            blocked={locked || !hasOwn}
             type="button"
             className="btn ghost"
-            aria-disabled={busy || locked || !hasOwn || undefined}
-            aria-busy={busy || undefined}
             onClick={() => {
-              if (busy || locked || !hasOwn) return;
+              if (isBusy() || locked || !hasOwn) return;
               void send(null, [], t("dialog.pointsRemoved"));
             }}
           >
             {t("dialog.pointsRemove")}
-          </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || locked || !dirty || undefined} aria-busy={busy || undefined}>
+          </BusyButton>
+          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className="btn ghost">
             {t("dialog.pointsSave")}
-          </button>
+          </BusyButton>
         </div>
       </fieldset>
     </form>
@@ -871,6 +881,7 @@ function StaleTiebreaks({
   roundLabel,
   tournamentId,
   busy,
+  isBusy,
   run,
   onWritten,
   fallbackFocusId,
@@ -879,6 +890,8 @@ function StaleTiebreaks({
   roundLabel: (round: RoundKey) => string;
   tournamentId: number;
   busy: boolean;
+  /** Garde synchrone des gestionnaires (`useBusyGuard`), juste avant le rendu de `busy`. */
+  isBusy: () => boolean;
   run: RunTask;
   onWritten: (round: RoundKey) => void;
   /** Où va le focus quand le dernier retrait fait disparaître toute la rubrique. */
@@ -916,15 +929,14 @@ function StaleTiebreaks({
           return (
             <li key={roundKeyId(item)} className={styles.staleItem}>
               <span>{t("dialog.staleTiebreakItem", { round: label, map: visibleText(item.map) })}</span>
-              <button
+              <BusyButton
+                busy={busy}
                 type="button"
                 id={`${ids}-${index}`}
                 className="btn ghost"
                 aria-label={t("dialog.staleTiebreakRemoveLabel", { round: label })}
-                aria-disabled={busy || undefined}
-                aria-busy={busy || undefined}
                 onClick={() => {
-                  if (busy) return;
+                  if (isBusy()) return;
                   void run(async () => {
                     await putJson(`/api/admin/tournaments/${tournamentId}/round-tiebreak`, {
                       phaseId: item.phaseId,
@@ -939,7 +951,7 @@ function StaleTiebreaks({
                 }}
               >
                 {t("dialog.staleTiebreakRemove")}
-              </button>
+              </BusyButton>
             </li>
           );
         })}
@@ -1091,7 +1103,6 @@ export function RoundMapsDialog({
   const clearedText = t(tiebreakKept ? "dialog.roundClearedTiebreakKept" : "dialog.roundCleared");
 
   const run: RunTask = async (task, onRefused) => {
-    if (isBusy()) return false;
     return (await guarded(async () => {
       try {
         await task();
@@ -1153,7 +1164,7 @@ export function RoundMapsDialog({
   const saveRules = (event: FormEvent) => {
     event.preventDefault();
     // Rien de modifié : rien à envoyer, ni « Règles enregistrées » annoncé sur des règles qui n'ont pas bougé.
-    if (busy || !rulesDirty) return;
+    if (isBusy() || !rulesDirty) return;
     void run(async () => {
       // La règle « carte suivante » n'est plus proposée (`NextPickRule`) : la valeur en place est renvoyée telle quelle.
       await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, { firstBan, nextBan, nextPick: rules.nextPick });
@@ -1210,7 +1221,7 @@ export function RoundMapsDialog({
   const saveRound = (event: FormEvent) => {
     event.preventDefault();
     // Rien de modifié : ni envoi, ni « Tour réinitialisé » annoncé sur un tour qui n'a pas bougé.
-    if (!round || busy || !roundDirty || gapRefused() || overMaxRefused()) return;
+    if (!round || isBusy() || !roundDirty || gapRefused() || overMaxRefused()) return;
     void sendRounds([round], toSave, toSave.length === 0 ? clearedText : t("dialog.roundSaved"));
   };
 
@@ -1232,7 +1243,7 @@ export function RoundMapsDialog({
   };
 
   const applyAll = () => {
-    if (busy || toSave.length === 0 || gapRefused() || targetOverMaxRefused(rounds, "applyAll")) return;
+    if (isBusy() || toSave.length === 0 || gapRefused() || targetOverMaxRefused(rounds, "applyAll")) return;
     const others = rounds.filter((key) => roundKeyId(key) !== roundId);
     const overwritten = overwrittenRounds(rules.rounds, others, toSave).length;
     if (overwritten > 0) setPending({ kind: "applyAll", overwritten });
@@ -1241,7 +1252,7 @@ export function RoundMapsDialog({
 
   const copy = () => {
     const target = findRound(rounds, copyTarget);
-    if (busy || !target || toSave.length === 0 || gapRefused() || targetOverMaxRefused([target], "copy")) return;
+    if (isBusy() || !target || toSave.length === 0 || gapRefused() || targetOverMaxRefused([target], "copy")) return;
     if (overwrittenRounds(rules.rounds, [target], toSave).length > 0) setPending({ kind: "copy", target });
     else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }), "copy");
   };
@@ -1359,9 +1370,9 @@ export function RoundMapsDialog({
             </div>
             <div className={styles.actions}>
               <UnsavedNote dirty={rulesDirty} text={t("dialog.unsaved")} />
-              <button type="submit" className="btn ghost" aria-disabled={busy || !rulesDirty || undefined} aria-busy={busy || undefined}>
+              <BusyButton busy={busy} blocked={!rulesDirty} type="submit" className="btn ghost">
                 {t("dialog.saveRules")}
-              </button>
+              </BusyButton>
             </div>
           </fieldset>
         </form>
@@ -1409,6 +1420,7 @@ export function RoundMapsDialog({
                     open={activeSlot === index}
                     removable={slots.length > 1}
                     busy={busy}
+                    isBusy={isBusy}
                     overwatch={overwatch}
                     toggleId={slotToggleId(index + 1)}
                     errorAria={errorSlot === index + 1 ? fieldErrors.aria("slots") : {}}
@@ -1429,19 +1441,18 @@ export function RoundMapsDialog({
               <FieldErrorText fieldId={slotsListId} message={errorSlot === null ? fieldErrors.message("slots") : null} />
               {slots.length < slotCap ? (
                 <div>
-                  <button
+                  <BusyButton
+                    busy={busy}
                     type="button"
                     className="btn ghost"
-                    aria-disabled={busy || undefined}
-                    aria-busy={busy || undefined}
                     onClick={() => {
-                      if (busy) return;
+                      if (isBusy()) return;
                       setSlots((current) => [...current, []]);
                       setActiveSlot(slots.length);
                     }}
                   >
                     {t("dialog.addSlot")}
-                  </button>
+                  </BusyButton>
                 </div>
               ) : (
                 <p className={styles.muted}>{t("dialog.slotsLimit", { max: slotCap })}</p>
@@ -1450,20 +1461,20 @@ export function RoundMapsDialog({
                 <UnsavedNote dirty={roundDirty} text={t("dialog.unsaved")} />
                 {/* Toujours monté : après une réinitialisation il n'y a plus rien à réinitialiser, mais un
                     bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
-                <button
+                <BusyButton
+                  busy={busy}
+                  blocked={!saved}
                   type="button"
                   className="btn ghost"
-                  aria-disabled={busy || !saved || undefined}
-                  aria-busy={busy || undefined}
                   onClick={() => {
-                    if (!busy && saved) setPending({ kind: "reset" });
+                    if (!isBusy() && saved) setPending({ kind: "reset" });
                   }}
                 >
                   {t("dialog.clearRound")}
-                </button>
-                <button type="submit" className="btn" aria-disabled={busy || !roundDirty || undefined} aria-busy={busy || undefined}>
+                </BusyButton>
+                <BusyButton busy={busy} blocked={!roundDirty} type="submit" className="btn">
                   {t("dialog.saveRound")}
-                </button>
+                </BusyButton>
               </div>
               {rounds.length > 1 && (
                 <div className={styles.copyRow}>
@@ -1486,26 +1497,26 @@ export function RoundMapsDialog({
                     </select>
                     <FieldErrorText fieldId={`${ids}-copy`} message={fieldErrors.message("copy")} />
                   </div>
-                  <button
+                  <BusyButton
+                    busy={busy}
+                    blocked={copyTarget === "" || toSave.length === 0}
                     type="button"
                     className="btn ghost"
-                    aria-disabled={busy || copyTarget === "" || toSave.length === 0 || undefined}
-                    aria-busy={busy || undefined}
                     onClick={copy}
                   >
                     {t("dialog.copy")}
-                  </button>
-                  <button
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy}
+                    blocked={toSave.length === 0}
                     type="button"
                     className="btn ghost"
                     id={`${ids}-apply-all`}
                     {...fieldErrors.aria("applyAll")}
-                    aria-disabled={busy || toSave.length === 0 || undefined}
-                    aria-busy={busy || undefined}
                     onClick={applyAll}
                   >
                     {t("dialog.applyAll")}
-                  </button>
+                  </BusyButton>
                 </div>
               )}
               <FieldErrorText fieldId={`${ids}-apply-all`} message={fieldErrors.message("applyAll")} />
@@ -1522,6 +1533,7 @@ export function RoundMapsDialog({
             allowed={tiebreakAllowed}
             overwatch={overwatch}
             busy={busy}
+            isBusy={isBusy}
             run={run}
             onWritten={() => writtenRounds.current.add(roundKeyId(round))}
             onDirtyChange={setTiebreakDirty}
@@ -1539,6 +1551,7 @@ export function RoundMapsDialog({
             maxMaps={maxMaps}
             locked={pointsLocked}
             busy={busy}
+            isBusy={isBusy}
             run={run}
             onDirtyChange={setPointsDirty}
           />
@@ -1549,24 +1562,24 @@ export function RoundMapsDialog({
           roundLabel={roundLabel}
           tournamentId={tournamentId}
           busy={busy}
+          isBusy={isBusy}
           run={run}
           onWritten={(key) => writtenRounds.current.add(roundKeyId(key))}
           fallbackFocusId={`${ids}-close`}
         />
 
         <div className={styles.footer}>
-          <button
+          <BusyButton
+            busy={busy}
             id={`${ids}-close`}
             type="button"
             className="btn ghost"
             onClick={() => {
-              if (!busy) requestClose();
+              if (!isBusy()) requestClose();
             }}
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
           >
             {t("dialog.close")}
-          </button>
+          </BusyButton>
         </div>
       </TournamentDialogFrame>
       {confirmation && (

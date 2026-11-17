@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -195,6 +196,7 @@ function StreamedBox({
   disabled,
   invalid,
   error,
+  sending,
   onChange,
 }: Readonly<{
   checked: boolean;
@@ -202,6 +204,8 @@ function StreamedBox({
   disabled: boolean;
   invalid: boolean;
   error: string | null;
+  /** Envoi en cours : la case ne change plus et reste focalisable (`aria-readonly`). */
+  sending: boolean;
   onChange: (checked: boolean) => void;
 }>) {
   const { t } = useDialogsText();
@@ -215,6 +219,7 @@ function StreamedBox({
         // (`LIVE_TRIGGER_NOT_OWNED` au serveur) ; un match joué jamais casté ne
         // se marque plus (`MATCH_NOT_CASTABLE`) : case grisée, avec son « i ».
         disabled={disabled}
+        aria-readonly={sending || undefined}
         onChange={(e) => onChange(e.target.checked)}
         {...fieldAria(STREAMED_INPUT_ID, invalid, reason !== null && STREAMED_HINT_ID)}
       />
@@ -581,7 +586,9 @@ export function MatchLiveDialog({
             reason={streamedBoxReason(match, streamedDisabled, castable)}
             invalid={fieldErrors.invalidField === "streamed"}
             error={fieldErrors.message("streamed")}
+            sending={busy}
             onChange={(next) => {
+              if (isBusy()) return;
               setStreamed(next);
               fieldErrors.clear("streamed");
             }}
@@ -590,7 +597,16 @@ export function MatchLiveDialog({
 
         {showUrl && (
           <>
-            {!triggerLocked && <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />}
+            {!triggerLocked && (
+              <CastTriggerField
+                trigger={trigger}
+                startAt={match.startAt}
+                onChange={(next) => {
+                  if (!isBusy()) setTrigger(next);
+                }}
+                sending={busy}
+              />
+            )}
 
             <div className="field">
               <InfoHintRow>
@@ -630,7 +646,12 @@ export function MatchLiveDialog({
                     <input
                       type="checkbox"
                       checked={organisationLink}
-                      onChange={(e) => setOrganisationLink(e.target.checked)}
+                      // Envoi en cours : la case ne change plus (ce qui est affiché est ce qui
+                      // part), et reste focalisable (`aria-readonly`, pas `disabled`).
+                      aria-readonly={busy || undefined}
+                      onChange={(e) => {
+                        if (!isBusy()) setOrganisationLink(e.target.checked);
+                      }}
                     />
                     {/* NOSONAR S6772 — label en flex avec `gap` */}
                     {t("live.organisationLink")}
@@ -695,26 +716,24 @@ export function MatchLiveDialog({
         {/* Antenne (mode manuel) et rediff : la carte ne les porte plus. */}
         {airToggle && (
           <div className={styles.section}>
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className={`${onAir ? "btn ghost" : "btn"} ${styles.sectionButton}`}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
               onClick={() => {
                 if (!isBusy()) void toggleAir();
               }}
             >
               {onAir ? actions.t("cardActions.stopLive") : actions.t("cardActions.startLive")}
-            </button>
+            </BusyButton>
           </div>
         )}
         {canEditReplay(match, mayEditReplay(match, controls)) && (
           <div className={styles.section}>
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className={`btn ghost ${styles.sectionButton}`}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
               onClick={() => {
                 if (isBusy()) return;
                 // Une autre modale : celle-ci se ferme d'abord, les deux ne se
@@ -726,32 +745,31 @@ export function MatchLiveDialog({
               {match.replayUrl === null
                 ? actions.t("cardActions.addReplay")
                 : actions.t("cardActions.editReplay")}
-            </button>
+            </BusyButton>
           </div>
         )}
 
         <SaveBlockedHint reason={saveReason} />
         <div className={styles.footer}>
-          <button
+          <BusyButton
+            busy={busy}
             type="button"
             className={`btn ghost ${styles.sectionButton}`}
             onClick={() => {
               if (!isBusy()) onClose();
             }}
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null}
             type="submit"
             className={`btn ${styles.submitButton}`}
-            aria-disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null || undefined}
-            aria-busy={busy || undefined}
             aria-describedby={saveHintId(saveReason)}
           >
             <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
-          </button>
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

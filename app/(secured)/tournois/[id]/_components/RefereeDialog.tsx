@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -88,7 +89,7 @@ export function RefereeDialog({
       if (initial) onClose();
     };
   });
-  const { busy, isBusy, run: guarded, busyProps } = useBusyGuard();
+  const { busy, isBusy, run: guarded } = useBusyGuard();
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [objectionPick, setObjectionPick] = useState("");
@@ -332,33 +333,33 @@ export function RefereeDialog({
 
             <div className={styles.row}>
               {actions.take && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn"
-                  {...busyProps}
                   onClick={() =>
                     void run(() => send(`/api/matches/${match.id}/referee`, "POST"), t("cardActions.refereeDialog.taken"))
                   }
                 >
                   {t("cardActions.refereeDialog.take")}
-                </button>
+                </BusyButton>
               )}
               {actions.releaseSelf && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  {...busyProps}
                   onClick={() =>
                     void run(() => send(`/api/matches/${match.id}/referee`, "DELETE"), t("cardActions.refereeDialog.released"))
                   }
                 >
                   {t("cardActions.refereeDialog.releaseSelf")}
-                </button>
+                </BusyButton>
               )}
               {actions.removeOther && (
-                <button type="button" className="btn ghost" {...busyProps} onClick={() => ask("removeReferee")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("removeReferee")}>
                   {t("cardActions.refereeDialog.remove")}
-                </button>
+                </BusyButton>
               )}
             </div>
 
@@ -377,18 +378,18 @@ export function RefereeDialog({
                   ))}
                 </select>
               </div>
-              <button type="submit" className="btn ghost" aria-disabled={busy || !pickOffered || undefined} aria-busy={busy || undefined}>
+              <BusyButton busy={busy} blocked={!pickOffered} type="submit" className="btn ghost">
                 {t("cardActions.refereeDialog.assign")}
-              </button>
+              </BusyButton>
             </form>
             )}
 
             <div className={styles.row}>
               {panel.selfManaged ? (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  {...busyProps}
                   onClick={() =>
                     void run(
                       () => send(`${base}/self-management`, "PUT", { enabled: false }),
@@ -397,21 +398,21 @@ export function RefereeDialog({
                   }
                 >
                   {t("cardActions.refereeDialog.selfOffAction")}
-                </button>
+                </BusyButton>
               ) : (
-                <button type="button" className="btn ghost" {...busyProps} onClick={() => ask("selfOn")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("selfOn")}>
                   {t("cardActions.refereeDialog.selfOnAction")}
-                </button>
+                </BusyButton>
               )}
               {actions.roundOn && (
-                <button type="button" className="btn ghost" {...busyProps} onClick={() => ask("roundOn")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("roundOn")}>
                   {t("cardActions.refereeDialog.roundOnAction")}
-                </button>
+                </BusyButton>
               )}
               {actions.roundOff && (
-                <button type="button" className="btn ghost" {...busyProps} onClick={() => ask("roundOff")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("roundOff")}>
                   {t("cardActions.refereeDialog.roundOffAction")}
-                </button>
+                </BusyButton>
               )}
             </div>
 
@@ -454,9 +455,9 @@ export function RefereeDialog({
                     readOnly={busy}
                     {...fieldErrors.aria("map")}
                   />
-                  <button type="submit" className="btn ghost" {...busyProps}>
+                  <BusyButton busy={busy} type="submit" className="btn ghost">
                     {t("cardActions.refereeDialog.mapSave")}
-                  </button>
+                  </BusyButton>
                   </div>
                   <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
                 </div>
@@ -475,10 +476,10 @@ export function RefereeDialog({
                   {panel.objections.map((referee) => (
                     <li key={referee.userId} className={styles.objection}>
                       <span>{referee.pseudo}</span>
-                      <button
+                      <BusyButton
+                        busy={busy}
                         type="button"
                         className="btn ghost"
-                        {...busyProps}
                         aria-label={t("cardActions.refereeDialog.objection.liftAria", { pseudo: referee.pseudo })}
                         onClick={() => {
                           if (isBusy()) return;
@@ -488,7 +489,7 @@ export function RefereeDialog({
                         }}
                       >
                         {t("cardActions.refereeDialog.objection.lift")}
-                      </button>
+                      </BusyButton>
                     </li>
                   ))}
                 </ul>
@@ -510,18 +511,18 @@ export function RefereeDialog({
                     ))}
                   </select>
                 </div>
-                <button type="submit" className="btn ghost" aria-disabled={busy || !objectionOffered || undefined} aria-busy={busy || undefined}>
+                <BusyButton busy={busy} blocked={!objectionOffered} type="submit" className="btn ghost">
                   {t("cardActions.refereeDialog.objection.uphold")}
-                </button>
+                </BusyButton>
               </form>
             </div>
           </div>
         )}
 
         <div className={styles.footer}>
-          <button type="button" className="btn ghost" onClick={close} {...busyProps}>
+          <BusyButton busy={busy} type="button" className="btn ghost" onClick={close}>
             {t("cardActions.refereeDialog.close")}
-          </button>
+          </BusyButton>
         </div>
       </TournamentDialogFrame>
       {pending && (

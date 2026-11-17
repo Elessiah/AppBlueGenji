@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { shownMatchScore } from "@/lib/shared/map-points";
@@ -249,6 +250,7 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
   /** Les champs portent déjà cette proposition : « Reprendre » ne changerait rien. */
   adopted: boolean;
   submitting: boolean;
+  /** Gardé par l'appelant sur l'état synchrone (`form.isBusy()`), seul juste avant le rendu. */
   onAdopt: () => void;
 }>) {
   return (
@@ -261,17 +263,14 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
       )}
       {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
       {pending.report.maps.length > 0 && !adopted && (
-        <button
+        <BusyButton
+          busy={submitting}
           type="button"
           className={styles.conflictAction}
-          aria-disabled={submitting || undefined}
-          aria-busy={submitting || undefined}
-          onClick={() => {
-            if (!submitting) onAdopt();
-          }}
+          onClick={onAdopt}
         >
           {text.t("score.admin.adoptProposal", { name: pending.by })}
-        </button>
+        </BusyButton>
       )}
       {!paused && (
         <p className={styles.formatHint}>
@@ -300,17 +299,16 @@ function ScoreConflictNotice({
       {form.conflict && <p className={styles.conflictText}>{text.t("score.admin.conflict")}</p>}
       {form.rulesConflict && <p className={styles.conflictText}>{text.t("score.admin.rulesChanged")}</p>}
       {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
-      <button
+      <BusyButton
+        busy={form.submitting}
         type="button"
         className={styles.conflictAction}
         onClick={() => {
           if (!form.isBusy()) form.adoptStoredResult();
         }}
-        aria-disabled={form.submitting || undefined}
-        aria-busy={form.submitting || undefined}
       >
         {text.t("score.admin.adoptStored")}
-      </button>
+      </BusyButton>
     </div>
   );
 }
@@ -484,7 +482,7 @@ export function AdminScoreDialog({
   const resolveBlocked = (!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail;
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
-    if (!resolveBlocked && !form.submitting) void run("resolve");
+    if (!resolveBlocked && !form.isBusy()) void run("resolve");
   };
 
   const toggleForfeit = (teamId: number | null) => {
@@ -651,7 +649,8 @@ export function AdminScoreDialog({
                 panneau est toujours ouvert : seul « Annuler le forfait » garde
                 un sens. */}
             {(!scoreEntryClosed || anyForfeit) && (
-            <button
+            <BusyButton
+              busy={form.submitting}
               type="button"
               className={styles.link}
               onClick={() => {
@@ -661,14 +660,12 @@ export function AdminScoreDialog({
               }}
               aria-expanded={showForfeit}
               aria-controls="admin-score-forfeit"
-              aria-disabled={form.submitting || undefined}
-              aria-busy={form.submitting || undefined}
             >
               {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
                   désignée : panneau ouvert et vide, il n'y a que le panneau à
                   refermer. */}
               {anyForfeit ? t("score.admin.forfeit.cancel") : forfeitToggleLabel}
-            </button>
+            </BusyButton>
             )}
 
             {showForfeit && (
@@ -695,29 +692,31 @@ export function AdminScoreDialog({
                   })}
                 </p>
                 <div className={styles.forfeitRow}>
-                  <button
+                  <BusyButton
+                    busy={form.submitting}
+                    blocked={match.team1Id === null}
                     type="button"
                     className={styles.forfeit}
                     aria-pressed={forfeitTeamId === match.team1Id}
                     aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team1Id)}
-                    aria-disabled={form.submitting || match.team1Id === null || undefined}
-                    aria-busy={form.submitting || undefined}
                   >
                     {team1}
-                  </button>
-                  <button
+                  </BusyButton>
+                  <BusyButton
+                    busy={form.submitting}
+                    blocked={match.team2Id === null}
                     type="button"
                     className={styles.forfeit}
                     aria-pressed={forfeitTeamId === match.team2Id}
                     aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team2Id)}
-                    aria-disabled={form.submitting || match.team2Id === null || undefined}
-                    aria-busy={form.submitting || undefined}
                   >
                     {team2}
-                  </button>
-                  <button
+                  </BusyButton>
+                  <BusyButton
+                    busy={form.submitting}
+                    blocked={match.team1Id === null || match.team2Id === null}
                     type="button"
                     className={`${styles.forfeit} ${styles.forfeitBoth}`}
                     aria-pressed={doubleForfeit}
@@ -725,11 +724,9 @@ export function AdminScoreDialog({
                     onClick={() => {
                       if (!form.isBusy() && match.team1Id !== null && match.team2Id !== null) form.setDoubleForfeit(!doubleForfeit);
                     }}
-                    aria-disabled={form.submitting || match.team1Id === null || match.team2Id === null || undefined}
-                    aria-busy={form.submitting || undefined}
                   >
                     {t("score.admin.forfeit.both")}
-                  </button>
+                  </BusyButton>
                 </div>
               </div>
             )}
@@ -747,38 +744,37 @@ export function AdminScoreDialog({
                 pressé garde le focus, qui tomberait sinon sur <body>, derrière
                 la modale, le temps d'un refus. Son libellé reste, suivi de
                 « … » : un nom réduit à « … » ne dirait plus rien. */}
-            <button
+            <BusyButton
+              busy={form.submitting}
               type="button"
               className={`${styles.link} ${styles.close}`}
               onClick={() => {
                 if (!form.isBusy()) onClose();
               }}
-              aria-disabled={form.submitting || undefined}
-              aria-busy={form.submitting || undefined}
             >
               {t("score.close")}
-            </button>
-            <button
+            </BusyButton>
+            <BusyButton
+              busy={form.submitting}
+              blocked={saveBlocked}
               type="button"
               className="btn ghost"
               onClick={() => {
-                if (!form.submitting && !saveBlocked) void run("save");
+                if (!form.isBusy() && !saveBlocked) void run("save");
               }}
-              aria-disabled={form.submitting || saveBlocked || undefined}
-              aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
             >
               <BusyLabel busy={form.submitting} idle={t("score.admin.save")} pending={`${t("score.admin.save")}…`} />
-            </button>
-            <button
+            </BusyButton>
+            <BusyButton
+              busy={form.submitting}
+              blocked={resolveBlocked}
               type="submit"
               className="btn"
-              aria-disabled={form.submitting || resolveBlocked || undefined}
-              aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
             >
               <BusyLabel busy={form.submitting} idle={t("score.admin.resolve")} pending={`${t("score.admin.resolve")}…`} />
-            </button>
+            </BusyButton>
             {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé :
                 l'envoi se dit ici, comme dans `ConfirmActionDialog`. */}
             <output className="sr-only" aria-live="polite">

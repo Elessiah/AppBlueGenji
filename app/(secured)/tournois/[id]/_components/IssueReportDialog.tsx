@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
@@ -117,27 +118,26 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
+          <BusyButton
+            busy={busy}
             type="button"
             className="btn ghost"
             onClick={() => {
               if (!isBusy()) onClose();
             }}
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={!valid}
             type="submit"
             className="btn"
-            aria-disabled={busy || !valid || undefined}
-            aria-busy={busy || undefined}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
             <BusyLabel busy={busy} idle={t("issue.send")} pending={t("issue.pending")} />
-          </button>
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

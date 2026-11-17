@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -69,7 +70,6 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const moving = toPlan.filter((match) => match.team1Score === null && match.team2Score === null);
 
   const toggle = async (next: boolean): Promise<boolean> => {
-    if (isBusy()) return false;
     return (await run(async () => {
       try {
         const response = await fetch(`/api/admin/tournaments/${detail.card.id}/referee-scheduling`, {
@@ -153,19 +153,18 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
             </button>
           )}
           {toggleable && (
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className={`btn ghost tap-target ${styles.toggle}`}
               onClick={() => {
                 if (!isBusy()) onToggle();
               }}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
             >
               {/* Le libellé reste pendant l'envoi : le bouton garde le focus, et un
                   nom réduit à « … » ne dirait plus rien du geste en cours. */}
               <BusyLabel busy={busy} idle={toggleLabel} pending={`${toggleLabel}…`} />
-            </button>
+            </BusyButton>
           )}
         </div>
       )}

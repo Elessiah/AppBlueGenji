@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
@@ -401,7 +402,6 @@ export function MatchScheduleDialog({
       }
     });
   };
-  const busyProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
 
   const fieldStyle = { flex: "1 1 96px", margin: 0, minWidth: 0 } as const;
 
@@ -552,10 +552,10 @@ export function MatchScheduleDialog({
           </output>
           {entry.kind === "ready" && (previousYear !== null || nextYear !== null) && (
             // Le bouton reste en place une fois déplié : il garde le focus.
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className="btn ghost"
-              {...busyProps}
               onClick={() => {
                 if (!isBusy()) setYearFixOpen((open) => !open);
               }}
@@ -564,7 +564,7 @@ export function MatchScheduleDialog({
               style={{ padding: "4px 10px", fontSize: 12, marginTop: 6 }}
             >
               {t("schedule.wrongYear")}
-            </button>
+            </BusyButton>
           )}
           {entry.kind === "ready" && yearFixOpen && (previousYear !== null || nextYear !== null) && (
             <fieldset
@@ -574,10 +574,10 @@ export function MatchScheduleDialog({
               <legend className="sr-only">{t("schedule.fixYear")}</legend>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {previousYear !== null && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  {...busyProps}
                   onClick={() => {
                     if (!isBusy()) setYearShift(previousYear.shift);
                   }}
@@ -585,13 +585,13 @@ export function MatchScheduleDialog({
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
                   {t("schedule.previousYear")}
-                </button>
+                </BusyButton>
               )}
               {nextYear !== null && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  {...busyProps}
                   onClick={() => {
                     if (!isBusy()) setYearShift(nextYear.shift);
                   }}
@@ -599,7 +599,7 @@ export function MatchScheduleDialog({
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
                   {t("schedule.nextYear")}
-                </button>
+                </BusyButton>
               )}
               </div>
             </fieldset>
@@ -642,29 +642,29 @@ export function MatchScheduleDialog({
 
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
             {!cleared && (
-              <button
+              <BusyButton
+                busy={busy}
                 type="button"
                 className="btn ghost"
                 onClick={(event) => {
                   if (event.detail <= 1 && !isBusy()) clearAll();
                 }}
-                {...busyProps}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
                 {t("schedule.clear")}
-              </button>
+              </BusyButton>
             )}
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className="btn ghost"
               onClick={(event) => {
                 if (event.detail <= 1 && !isBusy()) onClose();
               }}
-              {...busyProps}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
-            </button>
+            </BusyButton>
             {/* Le clic qui prolonge un double-clic (`detail`, au réglage du
                 système) juste après un envoi retenu (date devenue passée), et
                 la répétition d'« Entrée » tenue, n'envoient pas : ils
@@ -672,7 +672,8 @@ export function MatchScheduleDialog({
                 suivant part (`isUnreadConfirmationClick`). Même garde sur « Vider la date »
                 et « Annuler » : l'avertissement qui apparaît repousse la
                 rangée, et le second clic tombait sur eux (date perdue). */}
-            <button
+            <BusyButton
+              busy={busy}
               id={SUBMIT_ID}
               type="submit"
               onClick={(event) => {
@@ -683,11 +684,10 @@ export function MatchScheduleDialog({
                 if (event.repeat && event.key === "Enter") event.preventDefault();
               }}
               className="btn"
-              {...busyProps}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
               <SubmitLabel text={text} busy={busy} planning={planning} />
-            </button>
+            </BusyButton>
           </div>
         </form>
       </div>

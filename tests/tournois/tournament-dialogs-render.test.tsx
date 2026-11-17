@@ -224,7 +224,7 @@ describe("MatchReplayDialog — boutons et champ désarmés", () => {
   it("MatchReplayDialog_noopReplay_rendersAriaDisabledSubmit", () => {
     const html = render(<MatchReplayDialog match={bracketMatch(played)} onClose={noop} onSaved={noop} />);
 
-    expect(html).toMatch(/<button type="submit" class="btn" aria-disabled="true"/);
+    expect(html).toMatch(/<button class="btn" style="[^"]*" type="submit" aria-disabled="true"/);
     expect(html).not.toMatch(/<button[^>]*\sdisabled=""/);
     // Le rendu serveur écrit l'attribut en minuscules : au repos, le champ est éditable.
     expect(html).toMatch(/<input id="match-replay-url"/);

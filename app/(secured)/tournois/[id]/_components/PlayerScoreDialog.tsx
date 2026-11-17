@@ -1,6 +1,7 @@
 "use client";
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useToast } from "@/components/ui/toast";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
@@ -679,12 +680,11 @@ export function PlayerScoreDialog({
    */
   const confirmTheirs = () => {
     const send = confirmTheirsSend(theirs);
-    if (submitting || send === null) return;
+    if (isBusy() || send === null) return;
     void submitScore(send);
   };
 
   const submitForfeit = async () => {
-    if (isBusy()) return;
     await run(async () => {
       onOwnSettle?.(true);
       // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
@@ -717,7 +717,7 @@ export function PlayerScoreDialog({
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
     // Le bouton n'est jamais `disabled` natif (`aria-disabled`) : la garde est ici.
-    if (submitting || nothingEntered || unchangedMine) return;
+    if (isBusy() || nothingEntered || unchangedMine) return;
     // Version différente de la déclaration adverse : l'envoi ouvre un litige,
     // confirmé à part.
     // Les deux envois suivent la même règle du « vu » (`seenOpponentReportAt`).
@@ -874,37 +874,35 @@ export function PlayerScoreDialog({
 
           {canDeclareForfeit && (
             <div className={styles.forfeitZone}>
-              <button
+              <BusyButton
+                busy={submitting}
                 type="button"
                 className={styles.link}
                 onClick={() => {
-                  if (!submitting) setForfeitOpen(!forfeitOpen);
+                  if (!isBusy()) setForfeitOpen(!forfeitOpen);
                 }}
                 aria-expanded={forfeitOpen}
                 aria-controls="player-score-forfeit"
-                aria-disabled={submitting || undefined}
-                aria-busy={submitting || undefined}
               >
                 {forfeitOpen ? t("score.player.forfeit.close") : t("score.player.forfeit.open")}
-              </button>
+              </BusyButton>
               {forfeitOpen && (
                 <div id="player-score-forfeit" className={styles.forfeitPanel}>
                   <p id="player-score-forfeit-hint" className={styles.forfeitHint}>
                     {t("score.player.forfeit.hint", { mine: myName, opponent: opponentName, maps: forfeitMaps })}
                   </p>
                   <div className={styles.forfeitRow}>
-                    <button
+                    <BusyButton
+                      busy={submitting}
                       type="button"
                       className={styles.forfeit}
                       aria-describedby="player-score-forfeit-hint"
                       onClick={() => void submitForfeit()}
-                      aria-disabled={submitting || undefined}
-                      aria-busy={submitting || undefined}
                     >
                       {/* En vol, un libellé d'attente plutôt qu'un « … » accolé au
                           nom, qui se lisait comme un nom tronqué. */}
                       {submitting ? t("score.sending") : t("score.player.forfeit.confirm", { name: myName })}
-                    </button>
+                    </BusyButton>
                   </div>
                 </div>
               )}
@@ -940,16 +938,15 @@ export function PlayerScoreDialog({
                 </InfoHint>
               </InfoHintRow>
               <MapDifferenceList differences={differences} opponentName={opponentName} mapNames={mapNames} />
-              <button
+              <BusyButton
+                busy={submitting}
                 type="button"
                 className={`btn ghost ${styles.confirmTheirs}`}
                 onClick={confirmTheirs}
-                aria-disabled={submitting || undefined}
-                aria-busy={submitting || undefined}
                 aria-describedby="player-score-diff-title"
               >
                 {submitting ? t("score.sending") : t("score.player.confirmTheirs")}
-              </button>
+              </BusyButton>
             </fieldset>
           )}
 
@@ -960,33 +957,32 @@ export function PlayerScoreDialog({
           )}
 
           <div className={styles.actions}>
-            <button
+            <BusyButton
+              busy={submitting}
               type="button"
               className={`${styles.link} ${styles.close}`}
               onClick={() => {
-                if (!submitting) onClose();
+                if (!isBusy()) onClose();
               }}
-              aria-disabled={submitting || undefined}
-              aria-busy={submitting || undefined}
             >
               {t("score.close")}
-            </button>
+            </BusyButton>
             {canEnterScore && (
-              <button
-                type="submit"
-                className="btn"
+              <BusyButton
+                busy={submitting}
                 // Jamais `disabled` natif : un refus suivi d'un rafraîchissement
                 // (proposition périmée) ou le report reçu par le flux pourrait
                 // désactiver le bouton focalisé et faire tomber le focus sur
-                // <body>. Les gardes sont dans `onSubmitForm`.
-                aria-disabled={submitting || nothingEntered || unchangedMine || undefined}
+                // <body>. Les gardes sont aussi dans `onSubmitForm`.
+                blocked={nothingEntered || unchangedMine}
+                type="submit"
+                className="btn"
                 // Un avertissement monté déjà rempli n'est pas toujours annoncé :
                 // rattaché au bouton, il se lit au moment d'envoyer.
                 aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}
-                aria-busy={submitting || undefined}
               >
                 <BusyLabel busy={submitting} idle={submitLabel} pending={`${submitLabel}…`} />
-              </button>
+              </BusyButton>
             )}
             <SendingStatus active={submitting} />
             <ArrivalStatus message={arrivalMessage} />

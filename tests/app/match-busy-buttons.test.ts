@@ -35,7 +35,7 @@ const SCREENS = [
 
 const BUSY = String.raw`busy|submitting|form\.submitting|loading`;
 const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
-const buttonsOf = (code: string) => code.match(/<button[\s\S]*?<\/button>/g) ?? [];
+const buttonsOf = (code: string) => code.match(/<(?:button|BusyButton)\b[\s\S]*?<\/(?:button|BusyButton)>/g) ?? [];
 
 describe("dialogues de match et d'arbitrage — boutons pendant une requête", () => {
   it.each(SCREENS.map((file) => [file]))("%s ne désactive aucun bouton par l'état de la requête", (file) => {
@@ -45,8 +45,18 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
     }
   });
 
-  it.each(SCREENS.map((file) => [file]))("%s annonce l'attente par aria-busy", (file) => {
-    expect(source(DIR + file)).toMatch(new RegExp(String.raw`aria-busy=\{(?:${BUSY}|waiting) \|\| undefined\}|"aria-busy": busy \|\| undefined`));
+  it.each(SCREENS.map((file) => [file]))("%s annonce l'attente par BusyButton (aria-busy)", (file) => {
+    const code = source(DIR + file);
+    expect(code).toMatch(new RegExp(String.raw`<BusyButton\s+busy=\{(?:${BUSY}|waiting)\}`));
+    expect(code).toContain('import { BusyButton } from "@/components/ui/busy-button";');
+  });
+
+  it.each(SCREENS.map((file) => [file]))("%s_noHandWrittenBusyAttributes_onButtons", (file) => {
+    // Une seule écriture des attributs et de la garde : `BusyButton`.
+    for (const button of buttonsOf(source(DIR + file))) {
+      expect(button).not.toMatch(/^<button\b[^>]*aria-(?:disabled|busy)=/);
+    }
+    expect(source(DIR + file)).not.toMatch(/busyProps/);
   });
 
   it.each(SCREENS.filter((file) => file !== "AdminScoreDialog.tsx").map((file) => [file]))(
@@ -100,7 +110,7 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
   it("EntrantContactsPanel_reopenDuringLoad_rereadsAfter", () => {
     const code = source(DIR + "EntrantContactsPanel.tsx");
     expect(code).toMatch(/if \(!retry\) rereadRef\.current = true;/);
-    expect(code).toMatch(/if \(rereadRef\.current\) \{\s+rereadRef\.current = false;\s+if \(mountedRef\.current\) void load\(\);/);
+    expect(code).toMatch(/if \(rereadRef\.current\) \{\s+rereadRef\.current = false;\s+if \(isMounted\(\)\) void load\(\);/);
   });
 
   it("EntrantContactsPanel_sameFailureAgain_alertReplaced", () => {
@@ -109,12 +119,6 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
     expect(code).toMatch(/<p key=\{failures\}/);
   });
 
-  it.each(SCREENS.map((file) => [file]))("%s_focusableBusyButton_alsoAnnouncesBusy", (file) => {
-    for (const button of buttonsOf(source(DIR + file))) {
-      if (!new RegExp(String.raw`aria-disabled=\{[^}]*\b(?:${BUSY}|waiting)\b`).test(button)) continue;
-      expect(button).toMatch(/aria-busy=|busyProps/);
-    }
-  });
 
   it("RefereeDialog_confirmAndClose_ignoredWhileBusy", () => {
     const code = source(DIR + "RefereeDialog.tsx");
@@ -145,8 +149,11 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
   it("MatchCardActions_waitingAction_clickIgnored", () => {
     const code = source(DIR + "MatchCardActions.tsx");
     expect(code).toMatch(/const waiting = busy && writes\(id\);/);
-    expect(code).toMatch(/aria-disabled=\{waiting \|\| blocked \|\| undefined\}\s+aria-busy=\{waiting \|\| undefined\}/);
-    expect(code).toMatch(/onClick=\{\(\) => \{\s+if \(waiting\) return;/);
+    expect(code).toMatch(/busy=\{waiting\}\s+blocked=\{blocked\}/);
+    // Garde synchrone des gestes qui écrivent ; un « Prendre le cast » désarmé dit encore pourquoi.
+    expect(code).toMatch(/const activate = \(\) => \{\s+\/\/[^\n]*\n\s+if \(writes\(id\) && isBusy\(\)\) return;/);
+    expect(code).toContain("onBlockedClick={blocked ? activate : undefined}");
+    expect(code).toMatch(/if \(!isBusy\(\)\) setReleaseTarget\(userId\);/);
   });
 
   it("MatchCardActionsCss_busyItem_sharesWaitingLook", () => {
@@ -229,12 +236,72 @@ describe("EF-66 performance cycle 1", () => {
   });
 
   it("EntrantContactsPanel_unmounted_doesNotRereadNorFetchAgain", () => {
-    expect(source(DIR + "EntrantContactsPanel.tsx")).toMatch(/const mountedRef = useRef\(true\);[\s\S]*mountedRef\.current = false;/);
+    const code = source(DIR + "EntrantContactsPanel.tsx");
+    // Un seul suivi du montage : celui du hook.
+    expect(code).toMatch(/const \{ busy: loading, isBusy, run, isMounted \} = useBusyGuard\(\);/);
+    expect(code).not.toMatch(/mountedRef/);
   });
 
-  it("RefereeDialog_busyProps_comeFromTheSharedHook", () => {
-    const code = source(DIR + "RefereeDialog.tsx");
-    expect(code).toMatch(/run: guarded, busyProps \} = useBusyGuard\(\)/);
-    expect(code).not.toMatch(/const busyProps =/);
+  it("EntrantContactsPanel_collapsedDuringLoad_dropsQueuedReread", () => {
+    expect(source(DIR + "EntrantContactsPanel.tsx")).toMatch(/setOpen\(next\);\s+if \(!next\) rereadRef\.current = false;/);
+  });
+});
+
+describe("EF-66 security cycle 1", () => {
+  it.each([
+    ["PlayerScoreDialog.tsx", /if \(isBusy\(\) \|\| send === null\) return;/],
+    ["PlayerScoreDialog.tsx", /if \(!isBusy\(\)\) setForfeitOpen\(!forfeitOpen\);/],
+    ["PlayerScoreDialog.tsx", /if \(!isBusy\(\)\) onClose\(\);/],
+    ["RoundMapsDialog.tsx", /if \(!isBusy\(\)\) onRemoveSlot\(\);/],
+    ["RoundMapsDialog.tsx", /if \(isBusy\(\) \|\| saved === null\) return;/],
+    ["RoundMapsDialog.tsx", /if \(!isBusy\(\) && saved\) setPending\(\{ kind: "reset" \}\);/],
+    ["AdminScoreDialog.tsx", /if \(!form\.isBusy\(\) && !saveBlocked\) void run\("save"\);/],
+  ])("%s_handler_asksTheSynchronousGuard (%s)", (file, pattern) => {
+    expect(source(DIR + file)).toMatch(pattern);
+  });
+
+  it.each(SCREENS.map((file) => [file]))("%s_handlers_neverReadTheRenderedBusyState", (file) => {
+    // Seule exception : l'effet de RefereeDialog qui rend le focus après le rendu de `busy`.
+    const code = source(DIR + file).replace("if (busy || confirm !== null) return;", "");
+    expect(code).not.toMatch(/if \(!?\(?(?:busy|submitting|form\.submitting|waiting)\b[^)]*\) (?:return|on|set|void)/);
+  });
+
+  it.each([
+    ["MatchPlanningPanel.tsx", /const toggle = async \(next: boolean\): Promise<boolean> => \{\s+return \(await run\(/],
+    ["MatchCardActions.tsx", /refresh = true\): Promise<boolean> => \{\s+return \(await guarded\(/],
+    ["RoundMapsDialog.tsx", /const run: RunTask = async \(task, onRefused\) => \{\s+return \(await guarded\(/],
+    ["MatchReplayDialog.tsx", /const save = async \(value: string \| null\) => \{\s+await run\(/],
+    ["PlayerScoreDialog.tsx", /const submitForfeit = async \(\) => \{\s+await run\(/],
+  ])("%s_noRedundantGuardBeforeRun", (file, pattern) => {
+    expect(source(DIR + file)).toMatch(pattern);
+  });
+
+  it("RoundPointsForm_roundPoints_readOnlyWhileSending", () => {
+    const code = source(DIR + "RoundMapsDialog.tsx");
+    expect(code).toMatch(/disabled=\{locked\}\s+readOnly=\{busy \|\| undefined\}/);
+    expect(code).toContain("readOnly={!allowed || busy || undefined}");
+  });
+
+  it("CastSettingsDialog_fields_frozenWhileSending", () => {
+    const code = source(DIR + "CastSettingsDialog.tsx");
+    expect(code.match(/sending=\{busy\}/g)).toHaveLength(3);
+    expect(code.match(/if \(isBusy\(\)\) return;\s+(?:setUrl|setBattletag|pickTrigger)\(next\);/g)).toHaveLength(3);
+    const fields = source(DIR + "CastSettingsFields.tsx");
+    expect(fields).toContain("readOnly={locked || sending}");
+    expect(fields).toContain("readOnly={sending || undefined}");
+    expect(fields).toMatch(/aria-disabled=\{sending \|\| undefined\}\s+onChange=\{\(\) => \{\s+if \(!sending\) onChange\(option\);/);
+  });
+
+  it("MatchLiveDialog_checkboxesAndTrigger_frozenWhileSending", () => {
+    const code = source(DIR + "MatchLiveDialog.tsx");
+    expect(code).toMatch(/aria-readonly=\{busy \|\| undefined\}\s+onChange=\{\(e\) => \{\s+if \(!isBusy\(\)\) setOrganisationLink\(e\.target\.checked\);/);
+    expect(code).toContain("aria-readonly={sending || undefined}");
+    expect(code).toMatch(/if \(!isBusy\(\)\) setTrigger\(next\);\s+\}\}\s+sending=\{busy\}/);
+  });
+
+  it("AdminScoreDialog_adoptProposal_guardedOnceBySynchronousState", () => {
+    const code = source(DIR + "AdminScoreDialog.tsx");
+    expect(code).toContain("onClick={onAdopt}");
+    expect(code).not.toMatch(/if \(!submitting\) onAdopt\(\)/);
   });
 });
