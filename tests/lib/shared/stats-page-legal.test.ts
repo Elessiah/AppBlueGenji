@@ -26,14 +26,14 @@ describe("registre T19", () => {
   });
 
   it("register_updatedAt_isTheStatsPageDate", () => {
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-19");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-18");
   });
 });
 
 describe("historique des changements", () => {
   it("privacyChanges_statsEntry_isLastAndDated", () => {
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
-    expect(PRIVACY_CHANGES.at(-1)?.publishedAt).toBe("2026-11-19");
+    expect(PRIVACY_CHANGES.at(-1)?.publishedAt).toBe("2026-11-18");
     expect(PRIVACY_CHANGES.at(-1)?.links?.map((link) => link.href)).toEqual(["/rgpd#audience-detaillee", "/rgpd#audience"]);
   });
 
