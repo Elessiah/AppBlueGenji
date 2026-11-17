@@ -47,7 +47,7 @@ jest.mock("react-dom", () => {
   return { ...actual, createPortal: (node: unknown) => node };
 });
 
-const showError = jest.fn<(message: string) => void>();
+const showError = jest.fn<(message: string, options?: { once?: boolean }) => void>();
 const showSuccess = jest.fn<(message: string) => void>();
 const push = jest.fn<(href: string) => void>();
 const refresh = jest.fn<() => void>();
@@ -204,7 +204,7 @@ describe("TermsAcceptanceModal — « J'accepte »", () => {
     accept.onBlockedClick?.();
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(showError).toHaveBeenCalledWith("termsModal.checkFirst");
+    expect(showError).toHaveBeenCalledWith("termsModal.checkFirst", { once: true });
   });
 
   it("accept_failure_showsErrorAndRetrySendsAgain", async () => {

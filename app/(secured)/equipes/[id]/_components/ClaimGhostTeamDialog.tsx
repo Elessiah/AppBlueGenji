@@ -75,7 +75,7 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
           <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={busy}
             blocked={!trimmed}
             // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
-            onBlockedClick={() => showError(t("claim.pseudoFirst"))}
+            onBlockedClick={() => showError(t("claim.pseudoFirst"), { once: true })}
           >
             <BusyLabel busy={busy} idle={t("claim.submit")} pending={t("claim.pending")} />
           </BusyButton>

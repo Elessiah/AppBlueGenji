@@ -325,7 +325,7 @@ export function TermsAcceptanceModal({
               blocked={!checked || leaving || deletionOpen}
               onClick={accept}
               // Case décochée : activé, le bouton dit pourquoi rien ne part — jamais une acceptation.
-              onBlockedClick={checked || leaving || deletionOpen ? undefined : () => showError(t("termsModal.checkFirst"))}
+              onBlockedClick={checked || leaving || deletionOpen ? undefined : () => showError(t("termsModal.checkFirst"), { once: true })}
             >
               <BusyLabel busy={busy} idle={t("termsModal.accept")} pending={t("termsModal.saving")} />
             </BusyButton>

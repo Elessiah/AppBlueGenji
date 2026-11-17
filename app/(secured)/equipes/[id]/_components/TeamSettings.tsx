@@ -624,7 +624,7 @@ function TeamDangerZone({
                 data-focus-rescue-key={claim.id}
                 busy={withdrawingClaimId === claim.id}
                 blocked={withdrawingClaimId !== null}
-                onBlockedClick={() => showInfo(t("members.otherWithdrawing"))}
+                onBlockedClick={() => showInfo(t("members.otherWithdrawing"), { once: true })}
                 onClick={() => void onWithdraw(claim.id, claim.pseudo)}
               >
                 {t("settings.withdraw")}

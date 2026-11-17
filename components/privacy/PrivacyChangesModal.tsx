@@ -428,7 +428,7 @@ export function PrivacyChangesModal({
             <BusyButton
               busy={busy}
               blocked={detailsPending}
-              onBlockedClick={() => showInfo(t("privacyModal.detailsLoading"))}
+              onBlockedClick={() => showInfo(t("privacyModal.detailsLoading"), { once: true })}
               onClick={acknowledge}
             >
               <BusyLabel busy={busy} idle={t("privacyModal.acknowledge")} pending={t("privacyModal.saving")} />

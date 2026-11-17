@@ -29,12 +29,19 @@ const USER_INPUT_EVENTS = ["pointerdown", "keydown"] as const;
 export function useFocusRescue(rootRef: RefObject<HTMLElement | null>): (selectors: readonly string[]) => void {
   const pending = useRef<FocusRescue | null>(null);
   const detach = useRef<(() => void) | null>(null);
+  const mounted = useRef(true);
   const clear = useCallback(() => {
     pending.current = null;
     detach.current?.();
     detach.current = null;
   }, []);
-  useEffect(() => clear, [clear]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clear();
+    };
+  }, [clear]);
   useIsomorphicLayoutEffect(() => {
     const rescue = pending.current;
     if (rescue === null) return;
@@ -52,10 +59,15 @@ export function useFocusRescue(rootRef: RefObject<HTMLElement | null>): (selecto
   return useCallback(
     (selectors: readonly string[]) => {
       clear();
+      // Un geste qui se termine après le démontage ne pose rien : plus aucun rendu ne le retirerait.
+      if (!mounted.current) return;
       pending.current = { until: Date.now() + FOCUS_RESCUE_WINDOW_MS, selectors };
       const drop = () => clear();
       for (const type of USER_INPUT_EVENTS) document.addEventListener(type, drop, true);
+      // Sans rendu après le geste, rien ne constaterait l'expiration : le délai la porte aussi.
+      const timer = setTimeout(drop, FOCUS_RESCUE_WINDOW_MS + 1);
       detach.current = () => {
+        clearTimeout(timer);
         for (const type of USER_INPUT_EVENTS) document.removeEventListener(type, drop, true);
       };
     },

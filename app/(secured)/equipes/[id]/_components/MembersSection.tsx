@@ -317,7 +317,7 @@ export function MembersSection({
                     data-focus-rescue-key={invitation.id}
                     busy={cancellingId === invitation.id}
                     blocked={cancellingId !== null}
-                    onBlockedClick={() => showInfo(t("members.otherWithdrawing"))}
+                    onBlockedClick={() => showInfo(t("members.otherWithdrawing"), { once: true })}
                     aria-label={t("members.withdrawLabel", { pseudo: playerName(invitation.pseudo, invitation.userId) })}
                     onClick={() => void withdraw(invitation)}
                   >

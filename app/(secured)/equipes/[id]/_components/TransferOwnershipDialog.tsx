@@ -82,7 +82,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
             className={`btn ${confirmStep ? "danger" : styles.primaryButton}`}
             busy={pending}
             blocked={!target}
-            onBlockedClick={() => showError(t("transfer.chooseFirst"))}
+            onBlockedClick={() => showError(t("transfer.chooseFirst"), { once: true })}
           >
             <BusyLabel busy={pending} idle={submitLabel} pending={t("transfer.pending")} />
           </BusyButton>

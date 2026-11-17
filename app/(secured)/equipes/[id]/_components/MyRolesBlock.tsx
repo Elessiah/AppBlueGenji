@@ -121,7 +121,7 @@ export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readon
           <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending}
             blocked={unchanged}
             // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
-            onBlockedClick={() => showError(t("roles.unchanged"))}
+            onBlockedClick={() => showError(t("roles.unchanged"), { once: true })}
           >
             <BusyLabel busy={pending} idle={t("myRoles.save")} pending={t("myRoles.saving")} />
           </BusyButton>

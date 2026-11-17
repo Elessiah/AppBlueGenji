@@ -79,7 +79,7 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
           <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending}
             blocked={unchanged}
             // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
-            onBlockedClick={() => showError(t("roles.unchanged"))}
+            onBlockedClick={() => showError(t("roles.unchanged"), { once: true })}
           >
             <BusyLabel busy={pending} idle={t("roles.save")} pending={t("roles.saving")} />
           </BusyButton>

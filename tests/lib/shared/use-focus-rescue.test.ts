@@ -73,6 +73,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Démonte : le minuteur d'expiration réel ne doit pas survivre au faux `document`.
+  const unmount = hooks.mount?.();
+  if (typeof unmount === "function") unmount();
   delete globalWithDocument.document;
   jest.restoreAllMocks();
 });
@@ -212,5 +215,44 @@ describe("useFocusRescue", () => {
     if (typeof unmount === "function") unmount();
 
     expect(listening()).toBe(0);
+  });
+
+  it("useFocusRescue_armedAfterUnmount_attachesNothing", () => {
+    const arm = useFocusRescue(rootRef);
+    const unmount = hooks.mount?.();
+    if (typeof unmount === "function") unmount();
+
+    arm(["button"]);
+
+    expect(listening()).toBe(0);
+  });
+
+  it("useFocusRescue_noRenderAfterWindow_detachesListenersByTimer", () => {
+    jest.useFakeTimers();
+    try {
+      const arm = useFocusRescue(rootRef);
+      arm(["button"]);
+      expect(listening()).toBe(2);
+
+      jest.advanceTimersByTime(4_001);
+
+      expect(listening()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("useFocusRescue_consumed_cancelsTimer", () => {
+    jest.useFakeTimers();
+    try {
+      targets.button = makeTarget();
+      const arm = useFocusRescue(rootRef);
+      arm(["button"]);
+      render();
+
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

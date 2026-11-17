@@ -10,6 +10,9 @@ import { test, expect } from "./helpers/test";
  * qui traduit une route y ajoute son contrôle `lang="en"` et `hreflang`.
  */
 test.describe("Langues — adresses /en", () => {
+  // Première compilation à froid de chaque route sous `next dev` : plus longue que les 30 s par défaut.
+  test.setTimeout(90_000);
+
   test("une route pas encore traduite renvoie vers la française, en français", async ({ page }) => {
     const response = await page.goto("/en/route-jamais-traduite");
     expect(new URL(page.url()).pathname).toBe("/route-jamais-traduite");

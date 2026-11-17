@@ -86,7 +86,7 @@ describe("modales légales", () => {
     const code = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(code).toContain("const { busy, isBusy, run } = useBusyGuard();");
     expect(code).toMatch(/if \(detailsPending\) return;\s*void run\(async \(\) => \{/);
-    expect(code).toMatch(/<BusyButton\s+busy=\{busy\}\s+blocked=\{detailsPending\}\s+onBlockedClick=\{[^}]*\}\s+onClick=\{acknowledge\}\s+>/);
+    expect(code).toMatch(/<BusyButton\s+busy=\{busy\}\s+blocked=\{detailsPending\}\s+onBlockedClick={.*}\s+onClick=\{acknowledge\}\s+>/);
     expect(disabledByRequest(code)).toEqual([]);
   });
 
@@ -100,7 +100,7 @@ describe("modales légales", () => {
   it("TermsAcceptanceModal_blockedUnchecked_explainsWithoutAccepting", () => {
     const code = readSource("components/legal/TermsAcceptanceModal.tsx");
     expect(code).toContain(
-      'onBlockedClick={checked || leaving || deletionOpen ? undefined : () => showError(t("termsModal.checkFirst"))}',
+      'onBlockedClick={checked || leaving || deletionOpen ? undefined : () => showError(t("termsModal.checkFirst"), { once: true })}',
     );
     expect(frShell.termsModal.checkFirst).toBe("Coche d'abord la case pour accepter les conditions d'utilisation.");
     expect(enShell.termsModal.checkFirst).toBe("Tick the box to accept the terms of use first.");
@@ -155,13 +155,13 @@ describe("écrans d'équipe", () => {
   });
 
   it("teamDialogs_blockedSubmit_explainTheRefusal", () => {
-    expect(readSource(`${TEAM}/RolesDialog.tsx`)).toContain('onBlockedClick={() => showError(t("roles.unchanged"))}');
-    expect(readSource(`${TEAM}/MyRolesBlock.tsx`)).toContain('onBlockedClick={() => showError(t("roles.unchanged"))}');
+    expect(readSource(`${TEAM}/RolesDialog.tsx`)).toContain('onBlockedClick={() => showError(t("roles.unchanged"), { once: true })}');
+    expect(readSource(`${TEAM}/MyRolesBlock.tsx`)).toContain('onBlockedClick={() => showError(t("roles.unchanged"), { once: true })}');
     expect(readSource(`${TEAM}/TransferOwnershipDialog.tsx`)).toContain(
-      'onBlockedClick={() => showError(t("transfer.chooseFirst"))}',
+      'onBlockedClick={() => showError(t("transfer.chooseFirst"), { once: true })}',
     );
     expect(readSource(`${TEAM}/ClaimGhostTeamDialog.tsx`)).toContain(
-      'onBlockedClick={() => showError(t("claim.pseudoFirst"))}',
+      'onBlockedClick={() => showError(t("claim.pseudoFirst"), { once: true })}',
     );
     expect(readSource(`${TEAM}/TeamSettings.tsx`)).toContain("onBlockedClick={explainRefusedSave}");
   });
@@ -178,7 +178,7 @@ describe("écrans d'équipe", () => {
 
   it("withdrawButtons_refusedWhileAnotherPending_explainWithAnInfoToast", () => {
     for (const file of ["MembersSection.tsx", "TeamSettings.tsx"]) {
-      expect(readSource(`${TEAM}/${file}`)).toContain('onBlockedClick={() => showInfo(t("members.otherWithdrawing"))}');
+      expect(readSource(`${TEAM}/${file}`)).toContain('onBlockedClick={() => showInfo(t("members.otherWithdrawing"), { once: true })}');
     }
     expect(frTeam.members.otherWithdrawing).toBe("Un autre retrait est en cours, réessaie.");
     expect(enTeam.members.otherWithdrawing).toBe("Another withdrawal is in progress, try again.");
@@ -186,7 +186,7 @@ describe("écrans d'équipe", () => {
 
   it("PrivacyChangesModal_acknowledgeWhileDetailsLoad_explainsTheWait", () => {
     expect(readSource("components/privacy/PrivacyChangesModal.tsx")).toContain(
-      'onBlockedClick={() => showInfo(t("privacyModal.detailsLoading"))}',
+      'onBlockedClick={() => showInfo(t("privacyModal.detailsLoading"), { once: true })}',
     );
   });
 
