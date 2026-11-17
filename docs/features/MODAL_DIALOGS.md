@@ -62,6 +62,24 @@ qui se ferme ne rend pas le focus à son déclencheur (seule celle du dessus le
 fait) ; elle passe cette cible aux modales du dessus qui comptaient rendre le
 focus en son sein (`restoreTargets`).
 
+Un déclencheur **retiré** pendant que la modale était ouverte — la ligne d'une
+liste supprimée par `ConfirmActionDialog` (bureau, bénévoles, annonces,
+partenaires…) — ne peut plus reprendre le focus, qui tomberait sur `<body>`
+(WCAG 2.4.3). Son voisinage est relevé à l'ouverture (`focusTrail`) et la
+fermeture rend le focus au premier focalisable de la ligne **suivante**, sinon
+de la précédente, sinon de la liste, en remontant jusqu'au bouton « Ajouter »
+d'une liste vidée (`restoreFocusTarget`, `lib/shared/dialog-focus.ts`). Une
+ligne retirée **après** la fermeture (liste rechargée) est guettée trois
+secondes : un `MutationObserver` écoute les **seuls parents** du déclencheur, jusqu'à
+`<main>` (`childList`, sans sous-arbre : les mises à jour en continu du reste de la page ne
+déclenchent rien), et s'arrête au premier retrait, à la page quittée (adresse
+changée), à l'ouverture d'une autre modale, au premier clic dans la page ou dès que le focus va ailleurs (un seul
+guet à la fois). Si le focus est tombé sur `<body>`, il suit la même règle. Le relevé
+s'arrête à `<main>` (seize ancêtres au plus) et la recherche d'un focalisable
+est paresseuse : elle ne balaie jamais le document. Le rang du chaînon est relevé aussi : une liste
+rafraîchie pendant l'ouverture a remplacé les voisins relevés, la ligne **d'aujourd'hui** au même rang les remplace. Un contrôle `aria-disabled`
+(flèche « monter » d'une première ligne) n'est choisi qu'à défaut d'un contrôle actif.
+
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà
 ouverte — prend le focus par `ref={focusOnMount}` (`lib/shared/focus-on-mount.ts`) :

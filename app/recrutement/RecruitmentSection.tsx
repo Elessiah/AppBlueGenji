@@ -8,9 +8,15 @@ import { useAppLocale } from "@/components/i18n/locale-context";
 import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { FR_RECRUITMENT_TEXT } from "@/lib/shared/recruitment-text";
 import { EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
+import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { arrowKey } from "@/lib/shared/arrow-refocus";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
+import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
 import {
   type RecruiterContactDefaults,
   type HiddenRecruitmentAd,
@@ -133,6 +139,7 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const fieldErrors = useFieldErrors<RecruitmentField>(RECRUITMENT_FIELD_ERRORS, RECRUITMENT_FIELD_IDS);
   // Toujours rangée par statut : les flèches de réordonnancement ne se lisent
   // que sur cet ordre-là (voir `canMoveRecruitmentAd`).
@@ -140,7 +147,16 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
   const [editing, setEditing] = useState<RecruitmentAd | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Un envoi à la fois pour la section (publier, déplacer, supprimer) : garde
+  // synchrone, boutons focalisables pendant l'attente (`BUSY_BUTTONS.md`). Un
+  // double clic sur une flèche partait deux fois, chaque envoi calculé sur
+  // l'ordre d'avant l'autre.
+  const { busy, isBusy, run } = useBusyGuard();
+  const refocusArrow = useArrowRefocus("recruitment");
+  // Clé de la publication, oubliée à chaque ouverture : un renvoi du même
+  // formulaire (réponse perdue) rend l'annonce déjà publiée au lieu d'en
+  // publier une seconde ; un formulaire corrigé tire une clé neuve (`keyForBody`).
+  const createKey = useRef<KeyedBody | null>(null);
   // Annonce ouverte en lecture (modale « grand format »). Mémorisée par id pour
   // rester juste après une modification : la modale relit toujours la version
   // courante de la liste.
@@ -217,6 +233,8 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
   }
 
   function openCreate() {
+    if (isBusy()) return;
+    createKey.current = null;
     fieldErrors.clear();
     setEditing(null);
     const discord = contactDefaults?.discord ?? "";
@@ -227,6 +245,7 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
   }
 
   function openEdit(shown: RecruitmentAd) {
+    if (isBusy()) return;
     // La carte montre l'annonce traduite : la gestion reprend l'enregistrement d'origine.
     const ad = ads.find((a) => a.id === shown.id) ?? shown;
     fieldErrors.clear();
@@ -237,15 +256,20 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
     setOpen(true);
   }
 
-  function close() {
-    if (busy) return;
+  function closeDialog() {
     setOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
   }
 
+  function close() {
+    if (!isBusy()) closeDialog();
+  }
+
+  // Champ modifié pendant un envoi (liste, case comprises) : ignoré, même avant
+  // que « readOnly » soit rendu (ce qui est affiché est ce qui part).
   function set<K extends keyof FormState>(field: K, value: FormState[K]) {
-    setForm((f) => ({ ...f, [field]: value }));
+    if (!isBusy()) setForm((f) => ({ ...f, [field]: value }));
   }
 
   // Un refus désigne son champ quand il le peut (titre, anglais…) : rattaché
@@ -257,6 +281,7 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
   }
 
   async function submit() {
+    if (isBusy()) return;
     // L'id de lien profond ne repart que si le pseudo est resté celui pour
     // lequel il a été dérivé (profil du recruteur ou valeur enregistrée).
     const payload = recruitmentRequestBody(form, discordSnapshot.current);
@@ -268,56 +293,55 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
       return;
     }
 
-    setBusy(true);
+    await run(async () => {
+      try {
+        const url = editing ? `/api/recruitment/${editing.id}` : "/api/recruitment";
+        const res = await fetch(url, {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
+        });
+        const data = (await res.json()) as { ad?: RecruitmentAd; error?: string };
+        if (!res.ok || !data.ad) {
+          refuse(data.error, "Échec de l'enregistrement.");
+          return;
+        }
 
-    try {
-      const url = editing ? `/api/recruitment/${editing.id}` : "/api/recruitment";
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { ad?: RecruitmentAd; error?: string };
-      if (!res.ok || !data.ad) {
-        refuse(data.error, "Échec de l'enregistrement.");
-        return;
+        // Rangée comme le serveur la range : à sa place si son statut n'a pas
+        // changé, en fin de son groupe sinon.
+        const saved = data.ad;
+        setAds((prev) => placeRecruitmentAd(prev, saved));
+        showSuccess(editing ? "Annonce mise à jour." : "Annonce publiée.");
+        closeDialog();
+      } catch {
+        showError("Erreur réseau, réessaye.");
       }
-
-      // Rangée comme le serveur la range : à sa place si son statut n'a pas
-      // changé, en fin de son groupe sinon.
-      const saved = data.ad;
-      setAds((prev) => placeRecruitmentAd(prev, saved));
-      showSuccess(editing ? "Annonce mise à jour." : "Annonce publiée.");
-      close();
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const [pendingRemoval, setPendingRemoval] = useState<RecruitmentAd | null>(null);
 
   async function remove(ad: RecruitmentAd): Promise<boolean> {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/recruitment/${ad.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+    const done = await run(async () => {
+      try {
+        const res = await fetch(`/api/recruitment/${ad.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+          return false;
+        }
+        setAds((prev) => prev.filter((a) => a.id !== ad.id));
+        // Une annonce supprimée ne doit pas rester ouverte en lecture derrière.
+        if (detailId === ad.id) closeDetail();
+        showSuccess("Annonce supprimée.");
+        return true;
+      } catch {
+        showError("Erreur réseau, réessaye.");
         return false;
       }
-      setAds((prev) => prev.filter((a) => a.id !== ad.id));
-      // Une annonce supprimée ne doit pas rester ouverte en lecture derrière.
-      if (detailId === ad.id) closeDetail();
-      showSuccess("Annonce supprimée.");
-      return true;
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
-    return false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
 
   // Déplace une annonce d'un cran (admin), **dans son statut** seulement.
@@ -326,31 +350,34 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
     if (!canMoveRecruitmentAd(ads, index, direction)) return;
     const target = index + direction;
 
-    const previous = ads;
-    const reordered = [...ads];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setAds(reordered);
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/recruitment/reorder", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((a) => a.id) }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(reorderErrorMessage(data.error));
+    await run(async () => {
+      const previous = ads;
+      const reordered = [...ads];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      const id = ads[index].id;
+      const arrow = direction < 0 ? "up" : "down";
+      setAds(reordered);
+      refocusArrow(id, arrow);
+      try {
+        const res = await fetch("/api/recruitment/reorder", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: reordered.map((a) => a.id) }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(reorderErrorMessage(data.error));
+          setAds(previous);
+          refocusArrow(id, arrow);
+          return;
+        }
+        showSuccess("Ordre mis à jour.");
+      } catch {
+        showError("Erreur réseau, réessaye.");
         setAds(previous);
-        return;
+        refocusArrow(id, arrow);
       }
-      showSuccess("Ordre mis à jour.");
-    } catch {
-      showError("Erreur réseau, réessaye.");
-      setAds(previous);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // Un seul parcours de la liste pour les pôles représentés et leurs effectifs,
@@ -433,26 +460,30 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
           {/* Ordre réglé en français seulement : sous /en, une annonce sans anglais est masquée. */}
           {isAdmin && locale === "fr" && (
             <div className={styles.moveActions} data-tap-zone lang={staffLang}>
-              <button
-                type="button"
+              <BusyButton
+                busy={busy}
+                blocked={filterActive || !canUp}
                 className={styles.move}
-                onClick={() => move(index, -1)}
-                disabled={busy || filterActive || !canUp}
+                onClick={() => void move(index, -1)}
+                data-arrow={arrowKey("recruitment", saved.id, "up")}
+                data-edge={!canUp || undefined}
                 aria-label={`Monter l'annonce ${saved.title}`}
                 title={moveTitle(canUp, "Monter")}
               >
                 ↑
-              </button>
-              <button
-                type="button"
+              </BusyButton>
+              <BusyButton
+                busy={busy}
+                blocked={filterActive || !canDown}
                 className={styles.move}
-                onClick={() => move(index, 1)}
-                disabled={busy || filterActive || !canDown}
+                onClick={() => void move(index, 1)}
+                data-arrow={arrowKey("recruitment", saved.id, "down")}
+                data-edge={!canDown || undefined}
                 aria-label={`Descendre l'annonce ${saved.title}`}
                 title={moveTitle(canDown, "Descendre")}
               >
                 ↓
-              </button>
+              </BusyButton>
             </div>
           )}
         </div>
@@ -498,25 +529,25 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
           )}
           {isAdmin && (
             <div className={styles.cardActions} lang={staffLang}>
-              <button
-                type="button"
+              <BusyButton
+                busy={busy}
                 className={styles.action}
                 onClick={() => openEdit(saved)}
-                disabled={busy}
                 aria-label={withEnglishMissing(`Modifier ${saved.title}`, enMissing)}
               >
                 Modifier
                 {enMissing && <EnglishMissingMark />}
-              </button>
-              <button
-                type="button"
+              </BusyButton>
+              <BusyButton
+                busy={busy}
                 className={`${styles.action} ${styles.actionDanger}`}
-                onClick={() => setPendingRemoval(saved)}
-                disabled={busy}
+                onClick={() => {
+                  if (!isBusy()) setPendingRemoval(saved);
+                }}
                 aria-label={`Supprimer ${saved.title}`}
               >
                 Supprimer
-              </button>
+              </BusyButton>
             </div>
           )}
         </div>
@@ -546,8 +577,12 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
               </span>
             )}
             {isAdmin && (
-              <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
-                + Nouvelle annonce
+              <CyberButton variant="primary" asChild>
+                {/* Bloqué pendant un déplacement ou une suppression : il le dit
+                    (`aria-busy`) et garde son focus. */}
+                <BusyButton busy={busy} onClick={openCreate} lang={staffLang}>
+                  + Nouvelle annonce
+                </BusyButton>
               </CyberButton>
             )}
           </div>
@@ -582,8 +617,10 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
           <div className={styles.empty}>
             <p>{t(emptyKeys.empty)}</p>
             {isAdmin && !translationPending && (
-              <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
-                Publier la première annonce
+              <CyberButton variant="primary" asChild>
+                <BusyButton busy={busy} onClick={openCreate} lang={staffLang}>
+                  Publier la première annonce
+                </BusyButton>
               </CyberButton>
             )}
           </div>
@@ -620,7 +657,7 @@ export function RecruitmentSection({ initialAds, hiddenAds: serverHidden, isAdmi
           busy={busy}
           prefilledDiscord={Boolean(contactDefaults?.discord)}
           onClose={close}
-          onSubmit={submit}
+          onSubmit={() => void submit()}
           errors={fieldErrors}
           enMissing={editing !== null && !recruitmentAdHasEnglish(editing)}
           staffLang={staffLang}

@@ -81,13 +81,14 @@ function benevoleJoinedAtError(joinedAt: string): string | null {
 function benevoleExtrasError(pseudo: string, photoUrl: string): string | null {
   if (pseudo && pseudo.length > BENEVOLE_PSEUDO_MAX) return "PSEUDO_TOO_LONG";
   if (photoUrl && photoUrl.length > BENEVOLE_PHOTO_URL_MAX) return "PHOTO_URL_TOO_LONG";
+  // Seule une photo téléversée est servie (`localUploadUrl` tait toute autre
+  // adresse à la sortie) : une adresse étrangère (`https:`, `javascript:`…)
+  // s'enregistrait puis disparaissait au rechargement, sans un mot.
+  if (photoUrl && toDiskUploadPath(photoUrl) === null) return "PHOTO_URL_NOT_UPLOADED";
   // Une photo téléversée vit dans `benevoles/` : une autre adresse d'upload
   // (avatar d'un joueur, logo d'une équipe) serait effacée au remplacement de
-  // la photo. Une adresse étrangère reste acceptée ; `localUploadUrl` la
-  // tait à la sortie.
-  if (photoUrl && toDiskUploadPath(photoUrl) !== null && !isStoredUploadIn(photoUrl, "benevoles")) {
-    return "INVALID_PHOTO_URL";
-  }
+  // la photo.
+  if (photoUrl && !isStoredUploadIn(photoUrl, "benevoles")) return "INVALID_PHOTO_URL";
   return null;
 }
 

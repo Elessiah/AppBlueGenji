@@ -170,6 +170,20 @@ export async function getRecruiterContactDefaults(userId: number): Promise<Recru
   }
 }
 
+/**
+ * Une annonce relue en base, brouillon compris (`null` si elle a disparu) : un
+ * ajout rejoué (`runOnceForBody`, option `fresh`) rend sa version actuelle,
+ * jamais une annonce supprimée entre-temps.
+ */
+export async function findRecruitmentAd(id: number): Promise<RecruitmentAd | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<RecruitmentRow[]>(
+    `SELECT ${SELECT_COLUMNS} FROM bg_recruitment_ads WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  return rows.length > 0 ? fromRow(rows[0]) : null;
+}
+
 /** Crée une annonce et la renvoie. Placée en fin de liste. */
 export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<RecruitmentAd> {
   const validation = validateRecruitmentAdInput(input);

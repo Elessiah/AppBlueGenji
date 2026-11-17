@@ -13,6 +13,17 @@
   background: rgba(90, 200, 255, 0.03);
 }
 
+/* Un chiffre long (valeur libre saisie par le staff) se replie dans sa carte :
+   sans cela il dépasse la demi-largeur d'un téléphone et la page défile à
+   l'horizontale. */
+.stat {
+  min-width: 0;
+}
+
+.stat :global(.num) {
+  overflow-wrap: anywhere;
+}
+
 .stat :global(.mono) {
   margin-top: 4px;
   display: inline-block;

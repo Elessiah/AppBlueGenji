@@ -3,7 +3,7 @@ import { can } from "@/lib/shared/permissions";
 import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutStat, findAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
-import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
+import { readJsonObject } from "@/lib/server/request-body";
 import { runOnceForBody } from "@/lib/server/idempotency";
 
 export async function GET() {
@@ -16,16 +16,10 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let json: unknown;
-  try {
-    json = await readJsonBody(req);
-  } catch (error) {
-    return fail(bodyReadRefusal(error) ?? "INVALID_BODY", 400);
-  }
-  // `null`, un tableau ou un nombre sont du JSON valide, mais pas une carte :
-  // refusés comme le PUT (`readBody`), sans quoi `body.value` lèverait.
-  if (typeof json !== "object" || json === null || Array.isArray(json)) return fail("INVALID_BODY", 400);
-  const body = json as { value?: unknown; valueEn?: unknown; label?: unknown; labelEn?: unknown; requestKey?: unknown };
+  // Corps illisible, trop lourd (413), non JSON (415), ou JSON qui n'est pas un objet.
+  const read = await readJsonObject(req, "INVALID_BODY");
+  if ("refusal" in read) return fail(read.refusal, 400);
+  const body = read.body as { value?: unknown; valueEn?: unknown; label?: unknown; labelEn?: unknown; requestKey?: unknown };
 
   try {
     // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au

@@ -1,0 +1,24 @@
+/*
+ * Apparence d'un bouton désarmé par `aria-disabled` (`BusyButton` : le bouton
+ * garde le focus), mise en commun des écrans association, bénévoles et
+ * recrutement (`composes: busyLook from "../busy-look.module.css"`) : dite en
+ * couleurs, jamais en `opacity`, sans réaction au survol. En attente
+ * (`aria-busy`), le libellé reste lisible : curseur d'attente, liseré en tirets.
+ * Une seule source pour les jetons (contraste, tirets) ; la spécificité
+ * (classe + attribut + survol) l'emporte sur le survol propre à chaque bouton.
+ */
+.busyLook[aria-disabled="true"],
+.busyLook[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border-color: var(--line-soft);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.busyLook[aria-disabled="true"][aria-busy="true"],
+.busyLook[aria-disabled="true"][aria-busy="true"]:hover {
+  color: var(--ink-mute);
+  border-style: dashed;
+  border-color: var(--blue-500);
+  cursor: progress;
+}

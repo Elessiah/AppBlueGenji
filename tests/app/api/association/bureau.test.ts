@@ -7,6 +7,7 @@ import { GET, POST } from "@/app/api/association/bureau/route";
 import { PUT, DELETE } from "@/app/api/association/bureau/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/bureau-service";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
@@ -150,5 +151,156 @@ describe("DELETE /api/association/bureau/[id]", () => {
 
     const res = await DELETE(jsonReq("DELETE", {}), params("99"));
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/association/bureau — renvoi du même ajout", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const OTHER = authUser({ id: 3, isAdmin: true });
+  const created = { id: 7, name: "Léo", role: "Président", roleEn: "President", initials: "L", color: "#5ac8ff" };
+  const input = { name: "Léo", role: "Président", roleEn: "President" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+    jest.mocked(service.findBureauMember).mockImplementation(async () => created);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("POST_sameRequestKeyTwice_createsOnceAndReturnsSameResource", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+
+    const first = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const second = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(service.createBureauMember).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe(201);
+    expect(await second.json()).toEqual(await first.json());
+  });
+
+  it("POST_sameRequestKeyOtherUser_createsAgain", async () => {
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(OTHER);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(service.createBureauMember).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_noRequestKey_createsEachTime", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", input));
+    await POST(jsonReq("POST", input));
+
+    expect(service.createBureauMember).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_firstAttemptFails_retryWithSameKeyCreates", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBureauMember).mockRejectedValueOnce(new Error("BUREAU_ROLE_REQUIRED")).mockResolvedValueOnce(created);
+
+    const failed = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const retried = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(failed.status).toBe(400);
+    expect(retried.status).toBe(201);
+    expect(service.createBureauMember).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+    jest.mocked(service.findBureauMember).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createBureauMember).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+    const current = { ...created, name: "Léa" };
+    jest.mocked(service.findBureauMember).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ member: current });
+    expect(service.createBureauMember).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createBureauMember).not.toHaveBeenCalled();
+  });
+
+  it("POST_arrayBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", [input]));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createBureauMember).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/association/bureau — revue de sécurité EF-69", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const SAME_USER_WITHOUT_RIGHT = authUser({ id: 1, isAdmin: false });
+  const created = { id: 7, name: "Léo", role: "Président", roleEn: "President", initials: "L", color: "#5ac8ff" };
+  const input = { name: "Léo", role: "Président", roleEn: "President" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+  });
+
+  it("POST_permissionRevokedBeforeReplay_returns403AndNoReplay", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(SAME_USER_WITHOUT_RIGHT);
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(403);
+    expect(await replay.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.createBureauMember).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_bodyTooLarge_returns413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", { ...input, pad: "x".repeat(300 * 1024) }));
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(service.createBureauMember).not.toHaveBeenCalled();
+  });
+
+  it("POST_nonJsonContentType_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(
+      new Request("http://localhost/api/association/bureau", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "name=x" }),
+    );
+
+    expect(res.status).toBe(415);
+    expect(await res.json()).toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+    expect(service.createBureauMember).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ import {
   readImageUploadForm,
   readJsonBody,
   readJsonBodyOrFallback,
+  readJsonObject,
   readOptionalJsonBody,
   readOptionalJsonObject,
 } from "@/lib/server/request-body";
@@ -324,6 +325,14 @@ describe("readJsonBodyOrFallback", () => {
     await expect(readJsonBodyOrFallback(jsonRequest('{"a":1}'), {})).resolves.toEqual({ body: { a: 1 } });
   });
 
+  it("readJsonBodyOrFallback_arrayBody_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("[1,2]"), { a: 0 })).resolves.toEqual({ body: { a: 0 } });
+  });
+
+  it("readJsonBodyOrFallback_nullBody_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("null"), { a: 0 })).resolves.toEqual({ body: { a: 0 } });
+  });
+
   it("readJsonBodyOrFallback_invalidJson_returnsFallback", async () => {
     await expect(readJsonBodyOrFallback(jsonRequest("{nope"), null)).resolves.toEqual({ body: null });
   });
@@ -370,5 +379,39 @@ describe("readJsonBodyOrFallback — JSON qui n'est pas un objet", () => {
 
   it("readJsonBodyOrFallback_jsonArray_returnsFallback", async () => {
     await expect(readJsonBodyOrFallback(jsonRequest("[1]"), null)).resolves.toEqual({ body: null });
+  });
+});
+
+describe("readJsonObject — corps requis en objet", () => {
+  const json = (body: string, type = "application/json") =>
+    new Request("http://localhost/api/test", { method: "POST", headers: { "content-type": type }, body });
+
+  it("readJsonObject_object_returnsBody", async () => {
+    await expect(readJsonObject(json('{"a":1}'), "REFUS")).resolves.toEqual({ body: { a: 1 } });
+  });
+
+  it.each<[string, string]>([
+    ["null", "null"],
+    ["tableau", "[1]"],
+    ["nombre", "3"],
+    ["chaîne", '"x"'],
+  ])("readJsonObject_%s_returnsRefusal", async (_label, body) => {
+    await expect(readJsonObject(json(body), "REFUS")).resolves.toEqual({ refusal: "REFUS" });
+  });
+
+  it("readJsonObject_brokenJson_returnsRefusal", async () => {
+    await expect(readJsonObject(json("{pas"), "REFUS")).resolves.toEqual({ refusal: "REFUS" });
+  });
+
+  it("readJsonObject_tooLarge_returnsPayloadTooLarge", async () => {
+    await expect(readJsonObject(json(`{"a":"${"x".repeat(64)}"}`), "REFUS", 16)).resolves.toEqual({
+      refusal: PAYLOAD_TOO_LARGE,
+    });
+  });
+
+  it("readJsonObject_notJsonContentType_returnsUnsupportedContentType", async () => {
+    await expect(readJsonObject(json('{"a":1}', "text/plain"), "REFUS")).resolves.toEqual({
+      refusal: UNSUPPORTED_CONTENT_TYPE,
+    });
   });
 });

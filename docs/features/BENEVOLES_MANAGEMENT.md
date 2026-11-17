@@ -45,7 +45,12 @@ Deux façons de renseigner la photo d'un bénévole :
    **WebP 256×256** (recadrage « cover »), stocké sous `public/uploads/benevoles/`
    et servi via `/api/uploads/benevoles/…`. Formats acceptés : PNG / JPEG / WebP,
    5 Mo max.
-2. **URL externe** — collée directement dans le champ (≤ 500 caractères).
+2. **Adresse d'une photo déjà importée** — collée dans le champ (≤ 500
+   caractères). Une adresse étrangère (`https:`, `javascript:`…) est refusée
+   (`PHOTO_URL_NOT_UPLOADED`) : `localUploadUrl` ne sert que les fichiers du
+   site, elle s'enregistrait puis disparaissait au rechargement. L'aperçu de la
+   modale ne rend l'image que pour une adresse du site (une saisie en cours
+   faisait lever `next/image` en dev).
 
 Une adresse d'upload collée doit désigner le dossier des bénévoles
 (`INVALID_PHOTO_URL` sinon) : l'avatar d'un joueur ou le logo d'une équipe collé
@@ -54,7 +59,12 @@ ici était effacé du disque au remplacement de la photo.
 À la mise à jour ou la suppression d'un bénévole, l'ancien fichier est supprimé
 en best-effort par `deleteUnreferencedUpload` (`lib/server/stored-upload-cleanup.ts`) —
 **seulement** s'il vit sous `uploads/benevoles/` et que plus aucune ligne ne le
-désigne ; les URLs externes sont ignorées.
+désigne.
+
+À l'ajout, une photo du dossier dont le fichier n'existe plus est laissée
+(bénévole créé sans photo) : un ajout **rejoué** après la suppression du
+bénévole (même clé de requête, `BUSY_BUTTONS.md`) le recréait sur l'image que
+cette suppression avait effacée.
 
 ## Réordonnancement des catégories
 
@@ -91,3 +101,7 @@ Toutes les routes d'écriture exigent `getCurrentUser()` **et** `isAdmin`
 ## Langues (lot 5b de l'i18n)
 
 La catégorie a son anglais (`category_en`, `categoryEn`), obligatoire à la saisie (`CATEGORY_EN_*`) et **recopié sur toute la catégorie** à l'enregistrement : traduire un bénévole traduit sa catégorie. Le formulaire reprend l'anglais déjà connu d'une catégorie choisie. Sous `/en`, une catégorie sans anglais n'est pas rendue ; l'ordre des catégories se règle sur la page française. Date d'arrivée en anglais : « Since Mar 15, 2024 ». Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.
+
+## Envois
+
+Boutons occupés, focus des flèches de catégorie, photo et enregistrement sous une même garde, ajout sans doublon par clé de requête : `BUSY_BUTTONS.md` (EF-69).

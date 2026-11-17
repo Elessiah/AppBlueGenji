@@ -180,9 +180,34 @@ export async function readOptionalJsonObject(
 ): Promise<{ body: Record<string, unknown> } | { refusal: string }> {
   const read = await readOptionalJsonBody(req, refusal, maxBytes);
   if ("refusal" in read) return read;
-  const body = read.body;
-  if (typeof body !== "object" || body === null || Array.isArray(body)) return { refusal };
-  return { body: body as Record<string, unknown> };
+  return asJsonObject(read.body, refusal);
+}
+
+/** Une valeur JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) est refusée sous `refusal`. */
+function asJsonObject(value: unknown, refusal: string): { body: Record<string, unknown> } | { refusal: string } {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return { refusal };
+  return { body: value as Record<string, unknown> };
+}
+
+/**
+ * Corps JSON **requis, en objet** : `readJsonBody`, puis un JSON qui n'est pas
+ * un objet (`null`, nombre, chaîne, tableau) est refusé sous `refusal`, comme
+ * un JSON invalide — les routes lisent des champs du corps, et `null.name`
+ * lèverait. Un refus qui a son propre statut (`bodyReadRefusal` : 413, 415)
+ * garde son code au lieu de se fondre dans `refusal`.
+ */
+export async function readJsonObject(
+  req: Request,
+  refusal: string,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: Record<string, unknown> } | { refusal: string }> {
+  let json: unknown;
+  try {
+    json = await readJsonBody(req, maxBytes);
+  } catch (error) {
+    return { refusal: bodyReadRefusal(error) ?? refusal };
+  }
+  return asJsonObject(json, refusal);
 }
 
 /**
@@ -217,8 +242,8 @@ export async function readJsonBodyOrFallback<T>(
     // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) vaut
     // `fallback`, comme un JSON invalide : les routes lisent des champs du
     // corps, et `null.slot` rendrait un 500 brut hors de leur `try`.
-    if (typeof body !== "object" || body === null || Array.isArray(body)) return { body: fallback };
-    return { body };
+    const object = asJsonObject(body, "");
+    return "refusal" in object ? { body: fallback } : object;
   } catch (error) {
     const code = bodyReadRefusal(error);
     if (code === null || (code === UNSUPPORTED_CONTENT_TYPE && !declaresForeignBody(req))) return { body: fallback };

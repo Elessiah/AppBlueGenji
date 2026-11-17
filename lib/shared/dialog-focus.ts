@@ -227,3 +227,85 @@ export function handOffRestoreTargets<T>(
     if (element !== null && inside(element)) targets.set(token, target);
   }
 }
+
+/** Ce que la restitution du focus lit d'un élément de la page. */
+export interface TrailNode<T> {
+  readonly parentElement: T | null;
+  readonly nextElementSibling: T | null;
+  readonly previousElementSibling: T | null;
+  /** Enfants d'alors : une liste rafraîchie les a peut-être remplacés. */
+  readonly children: ArrayLike<T>;
+}
+
+/** Un cran de la remontée du déclencheur : son parent et ses voisins d'alors. */
+export interface FocusTrailStep<T> {
+  parent: T;
+  next: T | null;
+  previous: T | null;
+  /** Rang du chaînon parmi les enfants de `parent` à l'ouverture. */
+  index: number;
+}
+
+/** Nombre maximal d'ancêtres relevés quand aucune borne n'est rencontrée. */
+const FOCUS_TRAIL_MAX_STEPS = 16;
+
+/**
+ * Relevé, **à l'ouverture**, du voisinage du déclencheur : chacun de ses
+ * ancêtres avec les voisins du chaînon qu'il contient et le rang de celui-ci. Une fois la ligne
+ * retirée (suppression confirmée), l'élément détaché ne sait plus où il était.
+ *
+ * Le relevé coûte un parcours des enfants par ancêtre, à chaque ouverture de
+ * modale : il s'arrête donc à `isBoundary` (la région principale, dernier
+ * parent relevé) ou, à défaut, après `FOCUS_TRAIL_MAX_STEPS` ancêtres.
+ */
+export function focusTrail<T extends TrailNode<T>>(
+  target: T | null,
+  isBoundary: (node: T) => boolean = () => false,
+): FocusTrailStep<T>[] {
+  const steps: FocusTrailStep<T>[] = [];
+  let node = target;
+  while (node?.parentElement && steps.length < FOCUS_TRAIL_MAX_STEPS) {
+    const parent: T = node.parentElement;
+    steps.push({
+      parent,
+      next: node.nextElementSibling,
+      previous: node.previousElementSibling,
+      index: Array.prototype.indexOf.call(parent.children, node),
+    });
+    if (isBoundary(parent)) break;
+    node = parent;
+  }
+  return steps;
+}
+
+/**
+ * Où rendre le focus à la fermeture d'une modale. Le déclencheur, s'il est
+ * encore dans la page ; sinon — sa ligne a disparu avec la suppression
+ * confirmée, le focus tomberait sur `<body>` (WCAG 2.4.3) — le premier
+ * focalisable de la ligne **suivante**, sinon de la **précédente**, sinon de la
+ * liste, et ainsi de suite en remontant (le bouton « Ajouter » d'une liste
+ * vidée). `null` si rien ne convient.
+ */
+export function restoreFocusTarget<T extends TrailNode<T>>(
+  target: T | null,
+  trail: readonly FocusTrailStep<T>[],
+  isConnected: (node: T) => boolean,
+  firstFocusable: (root: T) => T | null,
+): T | null {
+  if (target === null || isConnected(target)) return target;
+  for (const step of trail) {
+    if (!isConnected(step.parent)) continue;
+    // Voisins relevés à l'ouverture, puis ceux **d'aujourd'hui** au même rang :
+    // une liste rafraîchie pendant que la modale était ouverte a remplacé les
+    // nœuds relevés, le rang, lui, tient encore.
+    const now = (at: number): T | null => (at >= 0 && at < step.parent.children.length ? step.parent.children[at] : null);
+    for (const sibling of [step.next, step.previous, now(step.index), now(step.index - 1)]) {
+      if (sibling === null || !isConnected(sibling)) continue;
+      const found = firstFocusable(sibling);
+      if (found !== null) return found;
+    }
+    const found = firstFocusable(step.parent);
+    if (found !== null) return found;
+  }
+  return null;
+}

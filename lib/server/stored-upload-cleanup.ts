@@ -1,4 +1,5 @@
 import path from "node:path";
+import { access } from "node:fs/promises";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -108,6 +109,24 @@ export async function deleteUnreferencedUpload(
     return true;
   } catch (error) {
     console.error(`[uploads] fichier ${folder}/ non effacé`, failureReason(error));
+    return false;
+  }
+}
+
+/**
+ * Vrai si le fichier téléversé que désigne `url` (dossier `folder`) existe
+ * encore sur disque. Un ajout **rejoué** après une suppression
+ * (`lib/server/idempotency.ts`, option `fresh`) recrée la ligne depuis le corps
+ * d'origine, alors que la suppression a pu effacer ce fichier : la ligne
+ * recréée désignerait une image absente, que plus rien n'effacerait.
+ */
+export async function storedUploadExists(url: string, folder: UploadFolder): Promise<boolean> {
+  const absolute = storedUploadAbsolutePath(url, folder);
+  if (absolute === null) return false;
+  try {
+    await access(absolute);
+    return true;
+  } catch {
     return false;
   }
 }

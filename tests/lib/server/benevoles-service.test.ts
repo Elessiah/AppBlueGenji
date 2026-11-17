@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import {
   createBenevole,
   deleteBenevole,
+  findBenevole,
   listBenevoles,
   updateBenevole,
 } from "@/lib/server/benevoles-service";
@@ -136,5 +137,70 @@ describe("benevoles-service — mutualisation de la lecture", () => {
       String(sql).trim().startsWith("SELECT id, first_name"),
     );
     expect(reread).toBe(true);
+  });
+});
+
+describe("findBenevole", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("findBenevole_existingId_returnsMappedBenevole", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ROW, id: 3, category_en: "Refereeing" }]]);
+    await mockDb(execute);
+
+    const found = await findBenevole(3);
+
+    expect(found).toEqual({
+      id: 3,
+      firstName: "Léa",
+      pseudo: "lea",
+      lastName: "Martin",
+      category: "Arbitrage",
+      categoryEn: "Refereeing",
+      photoUrl: null,
+      joinedAt: "2025-01-05",
+    });
+    expect(execute.mock.calls[0][1]).toEqual([3]);
+  });
+
+  it("findBenevole_unknownId_returnsNull", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+
+    expect(await findBenevole(999)).toBeNull();
+  });
+});
+
+/** Revue de sécurité EF-69 : la réponse d'un ajout dit la même photo que la liste. */
+describe("createBenevole / updateBenevole — photo rendue", () => {
+  const PHOTO = "/api/uploads/benevoles/1-a.webp";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+
+  it("createBenevole_uploadedPhoto_returnsPhoto", async () => {
+    await mockDb(db());
+
+    const created = await createBenevole({ ...INPUT, photoUrl: PHOTO });
+
+    expect(created.photoUrl).toBe(PHOTO);
+  });
+
+  it("createBenevole_foreignPhoto_throwsPhotoUrlNotUploaded", async () => {
+    await mockDb(db());
+
+    await expect(createBenevole({ ...INPUT, photoUrl: "https://tracker.example/x.png" })).rejects.toThrow(
+      "PHOTO_URL_NOT_UPLOADED",
+    );
+  });
+
+  it("updateBenevole_uploadedPhoto_returnsPhoto", async () => {
+    await mockDb(db());
+
+    const updated = await updateBenevole(1, { ...INPUT, photoUrl: PHOTO });
+
+    expect(updated.photoUrl).toBe(PHOTO);
   });
 });

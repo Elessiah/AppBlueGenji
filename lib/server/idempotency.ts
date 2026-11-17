@@ -97,13 +97,28 @@ function prune(now: number, scope: string): boolean {
   return true;
 }
 
-/** Copie aux clés triées : deux corps égaux à l'ordre près des champs ont la même empreinte. */
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
+/** Profondeur d'imbrication au-delà de laquelle un corps n'a pas d'empreinte (pas de rejeu). */
+export const FINGERPRINT_MAX_DEPTH = 32;
+
+/** Levée par `canonical` sur un corps trop profond : la récursion ne doit pas épuiser la pile. */
+class TooDeep extends Error {}
+
+/**
+ * Copie aux clés triées : deux corps égaux à l'ordre près des champs ont la même
+ * empreinte. Objet sans prototype et champs **définis** (pas affectés) : une clé
+ * `__proto__` reçue reste un champ comme un autre, au lieu de remplacer le
+ * prototype et de sortir de l'empreinte.
+ */
+function canonical(value: unknown, depth = 0): unknown {
   if (value === null || typeof value !== "object") return value;
-  const sorted: Record<string, unknown> = {};
+  if (depth >= FINGERPRINT_MAX_DEPTH) throw new TooDeep();
+  if (Array.isArray(value)) return value.map((item) => canonical(item, depth + 1));
+  const sorted: Record<string, unknown> = Object.create(null);
   for (const name of Object.keys(value).sort((a, b) => a.localeCompare(b, "en"))) {
-    sorted[name] = canonical((value as Record<string, unknown>)[name]);
+    Object.defineProperty(sorted, name, {
+      value: canonical((value as Record<string, unknown>)[name], depth + 1),
+      enumerable: true,
+    });
   }
   return sorted;
 }
@@ -111,12 +126,22 @@ function canonical(value: unknown): unknown {
 /**
  * Empreinte d'un corps de requête sans sa clé (`requestKey` de premier niveau) :
  * deux envois du même geste la partagent. Un condensé SHA-256 de taille fixe
- * — l'entrée ne garde jamais le corps lui-même.
+ * — l'entrée ne garde jamais le corps lui-même. `null` pour un corps imbriqué
+ * au-delà de `FINGERPRINT_MAX_DEPTH` : il s'exécute sans rejeu.
  */
-export function bodyFingerprint(body: object): string {
-  const rest: Record<string, unknown> = { ...(body as Record<string, unknown>) };
-  delete rest.requestKey;
-  return createHash("sha256").update(JSON.stringify(canonical(rest))).digest("hex");
+export function bodyFingerprint(body: object): string | null {
+  const rest: Record<string, unknown> = Object.create(null);
+  for (const name of Object.keys(body)) {
+    if (name !== "requestKey") {
+      Object.defineProperty(rest, name, { value: (body as Record<string, unknown>)[name], enumerable: true });
+    }
+  }
+  try {
+    return createHash("sha256").update(JSON.stringify(canonical(rest))).digest("hex");
+  } catch (error) {
+    if (error instanceof TooDeep) return null;
+    throw error;
+  }
 }
 
 export type RunOnceOptions<T> = {
@@ -159,7 +184,8 @@ export function runOnce<T>(
       const current = await fresh(value);
       if (current !== null) return current;
       if (bucket.get(id) === existing) remove(scope, bucket, id);
-      return runOnce(scope, key, task, now, fingerprint, options);
+      // Recréé maintenant : son échéance part de ce nouvel envoi, pas du premier.
+      return runOnce(scope, key, task, Date.now(), fingerprint, options);
     });
   }
   if (!prune(now, scope)) return task();
@@ -194,7 +220,11 @@ export function runOnceForBody<T>(
   options: RunOnceOptions<T> = {},
 ): Promise<T> {
   const key = readRequestKey(body.requestKey);
-  return runOnce(scope, key, task, Date.now(), key === null ? null : bodyFingerprint(body), options);
+  if (key === null) return task();
+  const fingerprint = bodyFingerprint(body);
+  // Corps trop profond pour une empreinte : exécuté sans rejeu.
+  if (fingerprint === null) return task();
+  return runOnce(scope, key, task, Date.now(), fingerprint, options);
 }
 
 /** Tests seulement : nombre d'entrées gardées. */

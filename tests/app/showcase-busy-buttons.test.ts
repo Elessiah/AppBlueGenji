@@ -26,7 +26,8 @@ const SCREENS = [
 const SENDERS = SCREENS.filter((file) => !file.endsWith("LandingDialog.tsx"));
 
 const BUSY = String.raw`busy|loading|pending|saving|uploading`;
-const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+// Fins de ligne ramenées à LF : un dépôt extrait sous Windows (CRLF) lit le même code.
+const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8").replace(/\r\n/g, "\n");
 const buttonsOf = (code: string) =>
   code.match(/<(?:button|BusyButton|CyberButton)\b[\s\S]*?<\/(?:button|BusyButton|CyberButton)>/g) ?? [];
 const css = (file: string) => source(DIR + file).replace(/\/\*[\s\S]*?\*\//g, "");

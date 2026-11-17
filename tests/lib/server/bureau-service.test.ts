@@ -3,6 +3,7 @@ import {
   FALLBACK_BUREAU,
   createBureauMember,
   deleteBureauMember,
+  findBureauMember,
   listBureauMembers,
   updateBureauMember,
 } from "@/lib/server/bureau-service";
@@ -182,5 +183,28 @@ describe("bureau-service — mutualisation de la lecture", () => {
     await listBureauMembers();
 
     expect(execute.mock.calls.some(([sql]) => String(sql).trim().startsWith("SELECT"))).toBe(true);
+  });
+});
+
+describe("findBureauMember", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("findBureauMember_existingId_returnsMappedMember", async () => {
+    const row = { id: 3, name: "Léo", role: "Président", role_en: "President", initials: "LP", color: "rgb(1,2,3)" };
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
+    await mockDb(execute);
+
+    const found = await findBureauMember(3);
+
+    expect(found).toEqual({ id: 3, name: "Léo", role: "Président", roleEn: "President", initials: "LP", color: "rgb(1,2,3)" });
+    expect(execute.mock.calls[0][1]).toEqual([3]);
+  });
+
+  it("findBureauMember_unknownId_returnsNull", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+
+    expect(await findBureauMember(999)).toBeNull();
   });
 });

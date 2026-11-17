@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { runExclusive, type BusyFlag } from "@/lib/shared/busy-guard";
+import { cropThenUpload, runExclusive, type BusyFlag } from "@/lib/shared/busy-guard";
 
 /** Une promesse réglée à la main : la tâche reste « en vol » tant qu'on veut. */
 function deferred<T>() {
@@ -86,5 +86,91 @@ describe("runExclusive", () => {
     const actual = await runExclusive(flag, setBusy, async () => "retried");
 
     expect(actual).toBe("retried");
+  });
+});
+
+describe("cropThenUpload — recadrage puis envoi sous la garde", () => {
+  function guard() {
+    const flag: BusyFlag = { current: false };
+    const run = <T,>(task: () => Promise<T>) => runExclusive(flag, () => undefined, task);
+    return { flag, run };
+  }
+
+  it("cropThenUpload_cropped_uploadsImageAndReturnsTrue", async () => {
+    const { run } = guard();
+    const upload = jest.fn<(image: string) => Promise<void>>().mockResolvedValue(undefined);
+
+    const started = await cropThenUpload({ run, crop: async () => "image", upload, setUploading: () => undefined });
+
+    expect(started).toBe(true);
+    expect(upload).toHaveBeenCalledWith("image");
+  });
+
+  it("cropThenUpload_cropCancelled_skipsUploadAndReleasesGuard", async () => {
+    const { flag, run } = guard();
+    const upload = jest.fn<(image: string) => Promise<void>>();
+
+    const started = await cropThenUpload<string>({ run, crop: async () => null, upload, setUploading: () => undefined });
+
+    expect(started).toBe(true);
+    expect(upload).not.toHaveBeenCalled();
+    expect(flag.current).toBe(false);
+  });
+
+  it("cropThenUpload_duringCrop_guardHeldSoSaveRefused", async () => {
+    // « Ajouter » pressé pendant le recadrage partait sans la photo.
+    const { run } = guard();
+    const crop = deferred<string | null>();
+    const save = jest.fn<() => Promise<string>>().mockResolvedValue("saved");
+    const flow = cropThenUpload({ run, crop: () => crop.promise, upload: async () => undefined, setUploading: () => undefined });
+
+    const saved = await run(save);
+
+    expect(saved).toBeUndefined();
+    expect(save).not.toHaveBeenCalled();
+    crop.resolve(null);
+    await flow;
+  });
+
+  it("cropThenUpload_otherSendInFlight_returnsFalseWithoutOpeningCrop", async () => {
+    const { flag, run } = guard();
+    flag.current = true;
+    const crop = jest.fn<() => Promise<string | null>>();
+
+    const started = await cropThenUpload({ run, crop, upload: async () => undefined, setUploading: () => undefined });
+
+    expect(started).toBe(false);
+    expect(crop).not.toHaveBeenCalled();
+  });
+
+  it("cropThenUpload_uploadThrows_releasesGuardAndUploadingFlag", async () => {
+    const { flag, run } = guard();
+    const setUploading = jest.fn<(uploading: boolean) => void>();
+
+    await expect(
+      cropThenUpload({ run, crop: async () => "image", upload: () => Promise.reject(new Error("réseau")), setUploading }),
+    ).rejects.toThrow("réseau");
+
+    expect(flag.current).toBe(false);
+    expect(setUploading).toHaveBeenLastCalledWith(false);
+  });
+
+  it("cropThenUpload_uploading_setBeforeCropAndClearedAfterUpload", async () => {
+    const { run } = guard();
+    const calls: string[] = [];
+
+    await cropThenUpload({
+      run,
+      crop: async () => {
+        calls.push("crop");
+        return "image";
+      },
+      upload: async () => {
+        calls.push("upload");
+      },
+      setUploading: (uploading) => calls.push(`uploading:${uploading}`),
+    });
+
+    expect(calls).toEqual(["uploading:true", "crop", "upload", "uploading:false"]);
   });
 });

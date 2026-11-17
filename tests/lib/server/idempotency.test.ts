@@ -3,6 +3,7 @@ import {
   IDEMPOTENCY_MAX_ENTRIES,
   IDEMPOTENCY_MAX_PER_SCOPE,
   IDEMPOTENCY_TTL_MS,
+  FINGERPRINT_MAX_DEPTH,
   bodyFingerprint,
   readRequestKey,
   idempotencyEntryCountForTests,
@@ -333,5 +334,61 @@ describe("isAdvanceTarget", () => {
     expect(isAdvanceTarget("HIDDEN")).toBe(false);
     expect(isAdvanceTarget(null)).toBe(false);
     expect(isAdvanceTarget(3)).toBe(false);
+  });
+});
+
+/** Revue de sécurité EF-69 : empreinte sans prototype, profondeur bornée, échéance d'un geste recréé. */
+describe("idempotency — revue de sécurité EF-69", () => {
+  beforeEach(() => {
+    resetIdempotencyForTests();
+    jest.restoreAllMocks();
+  });
+
+  const nested = (depth: number): unknown => {
+    let value: unknown = 1;
+    for (let i = 0; i < depth; i += 1) value = [value];
+    return value;
+  };
+
+  it("bodyFingerprint_protoKeyDiffers_differentFingerprint", () => {
+    const a = JSON.parse('{"name":"x","__proto__":{"a":1}}') as object;
+    const b = JSON.parse('{"name":"x","__proto__":{"a":2}}') as object;
+    expect(bodyFingerprint(a)).not.toBe(bodyFingerprint(b));
+  });
+
+  it("bodyFingerprint_depthBelowCap_returnsDigest", () => {
+    expect(bodyFingerprint({ deep: nested(FINGERPRINT_MAX_DEPTH - 2) })).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("bodyFingerprint_depthOverCap_returnsNull", () => {
+    expect(bodyFingerprint({ deep: nested(FINGERPRINT_MAX_DEPTH) })).toBeNull();
+  });
+
+  it("bodyFingerprint_veryDeepBody_returnsNullWithoutStackOverflow", () => {
+    expect(bodyFingerprint({ deep: nested(200_000) })).toBeNull();
+  });
+
+  it("runOnceForBody_tooDeepBodyWithKey_runsEveryTimeWithoutReplay", async () => {
+    const task = jest.fn(async () => 1);
+    const body = { deep: nested(FINGERPRINT_MAX_DEPTH), requestKey: KEY };
+    await runOnceForBody("scope", body, task);
+    await runOnceForBody("scope", body, task);
+    expect(task).toHaveBeenCalledTimes(2);
+    expect(idempotencyEntryCountForTests()).toBe(0);
+  });
+
+  it("runOnce_rerunAfterFreshNull_expiryCountedFromRerun", async () => {
+    const task = jest.fn<() => Promise<{ id: number }>>().mockResolvedValueOnce({ id: 7 }).mockResolvedValueOnce({ id: 8 });
+    const fresh = jest.fn<(cached: { id: number }) => Promise<{ id: number } | null>>().mockResolvedValueOnce(null);
+    const rerunAt = NOW + IDEMPOTENCY_TTL_MS - 1;
+    await runOnce("scope", KEY, task, NOW, "a", { fresh });
+    jest.spyOn(Date, "now").mockReturnValue(rerunAt);
+    await runOnce("scope", KEY, task, rerunAt, "a", { fresh });
+    fresh.mockImplementation(async (cached) => cached);
+
+    const third = await runOnce("scope", KEY, task, NOW + IDEMPOTENCY_TTL_MS + 1, "a", { fresh });
+
+    expect(third).toEqual({ id: 8 });
+    expect(task).toHaveBeenCalledTimes(2);
   });
 });

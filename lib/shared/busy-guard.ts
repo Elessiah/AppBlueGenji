@@ -28,3 +28,40 @@ export async function runExclusive<T>(
     setBusy(false);
   }
 }
+
+/** `run` d'une garde d'envoi (`useBusyGuard`) : la tâche, ou `undefined` si un envoi était en cours. */
+export type GuardedRun = <T>(task: () => Promise<T>) => Promise<T | undefined>;
+
+/**
+ * Recadrage **puis** envoi d'une image, tous deux sous la garde d'envoi de
+ * l'écran : pendant le recadrage déjà, aucun enregistrement ne part (il
+ * partirait sans l'image), et aucun recadrage ne s'ouvre pendant un autre
+ * envoi pour finir refusé. `setUploading` est posé pendant tout le geste et
+ * levé quoi qu'il arrive (recadrage abandonné, envoi refusé, exception).
+ *
+ * Rend `false` si un autre envoi tenait déjà l'écran (rien n'a été ouvert),
+ * `true` sinon — recadrage abandonné compris.
+ */
+export async function cropThenUpload<I>({
+  run,
+  crop,
+  upload,
+  setUploading,
+}: Readonly<{
+  run: GuardedRun;
+  crop: () => Promise<I | null>;
+  upload: (image: I) => Promise<void>;
+  setUploading: (uploading: boolean) => void;
+}>): Promise<boolean> {
+  const started = await run(async () => {
+    setUploading(true);
+    try {
+      const image = await crop();
+      if (image !== null) await upload(image);
+    } finally {
+      setUploading(false);
+    }
+    return true as const;
+  });
+  return started === true;
+}
