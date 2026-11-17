@@ -1,0 +1,156 @@
+{
+  "meta": {
+    "title": "Audience statistics",
+    "description": "Traffic on the BlueGenji Esport website: visitors, pages read, time spent and when people visit."
+  },
+  "header": {
+    "eyebrow": "Partner pack",
+    "title": "BlueGenji Esport in figures",
+    "lead": "Traffic on the association's website, measured without cookies or cross-site tracking, and shown as it is.",
+    "updated": "Data up to {date}",
+    "since": "Measured since {date}",
+    "home": "Back to the site"
+  },
+  "ranges": {
+    "label": "Period",
+    "7d": "7 days",
+    "30d": "30 days",
+    "12m": "12 months",
+    "all": "All time"
+  },
+  "kpis": {
+    "label": "Key figures",
+    "visitors": "Daily visitors, summed",
+    "visitorsHint": "Sum of each day's unique visitors: someone who came on three days counts three times.",
+    "views": "Page views",
+    "visits": "Visits",
+    "avgVisitorsPerDay": "Visitors per day",
+    "avgTimePerVisit": "Time per visit",
+    "avgTimePerPage": "Time per page",
+    "pagesPerVisit": "Pages per visit",
+    "bounceRate": "Single-page visits",
+    "vsPrevious": "{change} on the previous period",
+    "noPrevious": "No previous period to compare"
+  },
+  "evolution": {
+    "title": "Traffic over time",
+    "hint": "Visitors and page views day by day over the chosen period.",
+    "visitors": "Visitors",
+    "visitorsSummed": "Daily visitors, summed",
+    "hintWeekly": "Daily visitors summed and page views, week by week: someone who came on three days of a week counts three times.",
+    "hintMonthly": "Daily visitors summed and page views, month by month: someone who came on three days of a month counts three times.",
+    "views": "Page views"
+  },
+  "buckets": {
+    "title": "Daily visitors summed per week, month and year",
+    "hint": "Sum of each day's unique visitors, not of distinct people: someone who came on three days counts three times.",
+    "label": "Grouping",
+    "week": "Week",
+    "month": "Month",
+    "year": "Year",
+    "weekOf": "Week of {date}"
+  },
+  "pages": {
+    "title": "Most viewed pages",
+    "hint": "Pages are grouped by type, with no exact address and no name. A type seen by fewer than {min} visitors in a day joins \"Other pages\" (with, if needed, the next smallest type).",
+    "page": "Page",
+    "views": "Page views",
+    "share": "Share",
+    "avgTime": "Average time",
+    "labels": {
+      "home": "Home",
+      "rules": "Rulebooks",
+      "rulesMode": "A mode's rulebook",
+      "ranking": "Ranking",
+      "tournaments": "Tournament list",
+      "tournament": "A tournament's page",
+      "match": "A match page",
+      "tournamentOther": "Other tournament pages",
+      "follow": "Following a tournament without an account",
+      "teams": "Team directory",
+      "team": "A team's page",
+      "players": "Player directory",
+      "player": "A player's page",
+      "profile": "Profile",
+      "login": "Sign-in",
+      "bot": "Discord bot",
+      "association": "The association",
+      "volunteers": "Volunteers",
+      "recruitment": "Recruitment",
+      "legal": "Legal pages",
+      "other": "Other pages"
+    }
+  },
+  "timing": {
+    "heatmapTitle": "When people visit",
+    "heatmapHint": "Page views by day of the week and hour (Paris time), leaving out hours with fewer than {min} visitors that day (and, if needed, the next smallest hour). The darker the cell, the busier the site.",
+    "weekdaysTitle": "Days of the week",
+    "hoursTitle": "Hours of the day",
+    "hourLabel": "{hour}:00",
+    "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "weekdaysShort": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "less": "Less",
+    "more": "More",
+    "peak": "Busiest time: {day}, {hour}:00",
+    "peakNone": "Hover a cell to read its page views.",
+    "cell": "{day}, {hour}:00: {views} page views"
+  },
+  "audience": {
+    "title": "Who reads us",
+    "devices": "Devices",
+    "sources": "Where visitors come from",
+    "sourcesHint": "Where visitors come from on their first page: the referring site is only kept as a family.",
+    "locales": "Reading language",
+    "deviceLabels": { "mobile": "Mobile", "tablet": "Tablet", "desktop": "Computer" },
+    "sourceLabels": {
+      "direct": "Direct access",
+      "search": "Search engines",
+      "discord": "Discord",
+      "social": "Social networks",
+      "video": "Video platforms",
+      "other": "Other websites"
+    },
+    "localeLabels": { "fr": "French", "en": "English" },
+    "small": "Small numbers, grouped"
+  },
+  "community": {
+    "title": "The community",
+    "hint": "Platform figures to date, across all tournaments.",
+    "tournaments": "Tournaments played",
+    "matches": "Matches played",
+    "teams": "Teams on the platform",
+    "players": "Registered accounts"
+  },
+  "table": {
+    "show": "Show the data",
+    "hide": "Hide the data",
+    "period": "Period",
+    "value": "Value"
+  },
+  "empty": {
+    "title": "The first figures are on their way",
+    "body": "Figures appear the day after the first measured visits.",
+    "errorTitle": "Statistics temporarily unavailable",
+    "errorBody": "The figures could not be read. Please try again in a few minutes."
+  },
+  "method": {
+    "title": "Method",
+    "items": [
+      "Measured by the site itself: no cookie, no third-party tool, no link to an account.",
+      "A visitor is only recognised for one day: visitors of a week, a month or a year are the sum of each day's visitors.",
+      "Time counted is the time the page is shown in the foreground, sent in slices, each capped at {minutes} minutes.",
+      "Known bots and people who object to the measurement are not counted. Today's figures appear the next day.",
+      "No row of a breakdown (page, device, source, language, hour) describes fewer than {min} visitors from the same day: small numbers are grouped, and a group still too small takes in the next row. Each day's totals are given as they are."
+    ],
+    "privacy": "Privacy of the measurement",
+    "sourceCode": "Source code",
+    "association": "BlueGenji Esport, French non-profit association (loi 1901)"
+  },
+  "chart": {
+    "failed": "Chart unavailable. The figures remain readable in the data table.",
+    "summary": "{series}: total {total}, minimum {min}, maximum {max}, over {count} points.",
+    "seeTable": "Details in the data table.",
+    "tooltip": "{label}: {value}",
+    "loading": "Loading the chart…"
+  }
+}

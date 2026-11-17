@@ -1,7 +1,7 @@
 {
   "name": "blue-genji",
   "type": "module",
-  "version": "1.95.2",
+  "version": "1.96.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
+    "chart.js": "^4.5.1",
     "dotenv": "^17.2.3",
     "lucide-react": "^0.522.0",
     "mysql2": "^3.14.1",

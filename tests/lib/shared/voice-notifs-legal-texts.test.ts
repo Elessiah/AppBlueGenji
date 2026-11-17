@@ -20,8 +20,8 @@ const voiceSummary = (source: string) =>
 describe("entrée PRIVACY_CHANGES de la reprise d'équipe (#595)", () => {
   it("privacyChange_takeoverEntry_isLastDated20261113ForAllAccounts", () => {
     // Suivie, le même jour, des entrées des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
-    // Puis l'avis d'exclusion du bot, le rectificatif EF-63 et les trois entrées d'EF-65.
-    expect(PRIVACY_CHANGES.at(-9)?.id).toBe(ENTRY_ID);
+    // Puis l'avis d'exclusion du bot, le rectificatif EF-63 et les trois entrées d'EF-65, puis la mesure détaillée (STATS-PAGE).
+    expect(PRIVACY_CHANGES.at(-10)?.id).toBe(ENTRY_ID);
     expect(entryFr?.publishedAt).toBe("2026-11-13");
     expect(entryFr?.audience).toBeUndefined();
     expect(entryFr?.asksTermsAcceptance).toBeUndefined();

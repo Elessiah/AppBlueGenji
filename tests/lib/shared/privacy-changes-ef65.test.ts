@@ -38,7 +38,7 @@ describe("D87 — décision close effacée avec son signalement", () => {
   it("privacyChanges_newEntry_datedWithEnglish", () => {
     expect(entry("2026-11-decisions-sur-image-et-signalement")?.publishedAt).toBe("2026-11-18");
     expect(PRIVACY_CHANGES_EN["2026-11-decisions-sur-image-et-signalement"]).toBeDefined();
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-18");
+    expect(REGISTER_UPDATED_AT >= "2026-11-18").toBe(true);
   });
 
   it("register_t11Retention_decisionErasedWithItsReport", () => {

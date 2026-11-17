@@ -105,4 +105,7 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // notifications, communs au site, suivent la langue de la page.
   "/profil",
   "/signalements/[id]",
+  // STATS-PAGE — statistiques de fréquentation pour les partenaires
+  // (`docs/features/STATS_PAGE.md`) : `noindex`, hors menus et hors sitemap.
+  "/frequentation",
 ];

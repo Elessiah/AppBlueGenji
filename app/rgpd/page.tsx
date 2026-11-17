@@ -93,6 +93,7 @@ import {
 } from "@/lib/shared/site-visits";
 import { headers } from "next/headers";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
+import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
@@ -427,7 +428,8 @@ function RgpdFr({
           Le site garde aussi, en mémoire seulement, jamais en base ni dans un journal, l&apos;adresse IP
           de qui appelle ses routes ouvertes sans compte ou avant la connexion (données de la page
           d&apos;accueil, page du bot et son direct, rapports de sécurité du navigateur, signalement sans
-          compte, code de connexion Discord), pour en plafonner les requêtes : deux minutes au plus
+          compte, code de connexion Discord, envoi des statistiques de fréquentation détaillées — pour cet envoi, aussi ses réseaux
+          IPv6 /64 et /48 et un condensé court du navigateur), pour en plafonner les requêtes : deux minutes au plus
           après sa dernière requête, trente et une minutes pour un signalement sans compte, seize pour
           un code Discord, et en outre tant que le direct de la page du bot reste ouvert (même
           registre, T17).
@@ -720,10 +722,18 @@ function RgpdFr({
               décrit sous <Link href="#audience">Mesure d&apos;audience</Link>.
             </li>
             <li>
+              <strong>Statistiques de fréquentation détaillées</strong> — rien n&apos;est déposé
+              dans votre navigateur : le script de cette mesure y lit seulement, à chaque page, la
+              largeur de la fenêtre (classe d&apos;appareil), à la première page d&apos;une visite
+              l&apos;adresse du site d&apos;où vous venez (référent), les signaux Global Privacy
+              Control et Do Not Track et le cookie d&apos;opposition ci-dessous ; ce qui part au serveur est décrit sous{" "}
+              <Link href="#audience-detaillee">Statistiques de fréquentation détaillées</Link>.
+            </li>
+            <li>
               <strong>bg_audience_optout</strong> — déposé uniquement <strong>si vous vous
               opposez à la mesure d&apos;audience</strong> (bouton de la section{" "}
               <Link href="#audience">Mesure d&apos;audience</Link>), pour ne plus signaler ni
-              enregistrer vos visites. Il ne contient que la valeur « 1 », jamais
+              enregistrer vos visites, ni vos pages vues des statistiques détaillées. Il ne contient que la valeur « 1 », jamais
               d&apos;identifiant de personne, dure {AUDIENCE_OPT_OUT_MAX_AGE_DAYS} jours (treize
               mois) et disparaît si vous réactivez la mesure.
             </li>
@@ -781,8 +791,9 @@ function RgpdFr({
             </li>
           </ul>
           <p>
-            <strong>bg:last-visit-ping</strong> relève de la mesure d&apos;audience, dont les
-            conditions sont décrites ci-dessous : il entre dans la dispense prévue par la
+            <strong>bg:last-visit-ping</strong> et la lecture faite par les statistiques de
+            fréquentation détaillées relèvent de la mesure d&apos;audience, dont les
+            conditions sont décrites ci-dessous : elles entrent dans la dispense prévue par la
             CNIL pour les traceurs de mesure d&apos;audience (lignes directrices du 17 septembre
             2020), qui suppose un moyen de s&apos;y opposer et des durées de conservation
             limitées — les deux sont décrits ci-dessous. Les autres éléments ne demandent pas votre
@@ -807,7 +818,7 @@ function RgpdFr({
             <span className="eyebrow">SECTION 06 · MESURE D&apos;AUDIENCE</span>
             <h2 className={styles.sectionTitle}>Mesure d&apos;audience</h2>
           </div>
-          <span className={styles.meta}>REGISTRE T06</span>
+          <span className={styles.meta}>REGISTRE T06 · T19</span>
         </header>
         <div className={styles.prose}>
           <p>
@@ -875,6 +886,81 @@ function RgpdFr({
             <a href="#exercer-vos-droits">« Exercer vos droits »</a>.
           </p>
           <AudienceOptOutControl initialReason={audienceOptOut} />
+          <h3 id="audience-detaillee">Statistiques de fréquentation détaillées (registre T19)</h3>
+          <p>
+            <strong>Finalité.</strong> Mesurer la fréquentation du site page par page — pages vues,
+            visites, visiteurs de chaque jour, temps passé, jours et heures de visite — pour la
+            présenter, en chiffres agrégés seulement, aux partenaires et annonceurs de
+            l&apos;association, sur une page publique non référencée ({AUDIENCE_PAGE_PATH}, absente
+            des moteurs de recherche et des menus du site). Cette page montre aussi le nombre de
+            tournois joués, de matchs disputés, d&apos;équipes et de comptes du site : des totaux,
+            aucune personne. Aucun outil tiers n&apos;est employé.
+          </p>
+          <p>
+            <strong>Ce qui est transmis.</strong> À chaque page affichée, votre navigateur note le
+            type de la page (accueil, fiche d&apos;un tournoi…), jamais son adresse précise, un numéro
+            ni un nom, le temps passé onglet visible (envoyé par tranches, chacune plafonnée à{" "}
+            {AUDIENCE_MAX_ENGAGED_MINUTES} minutes), la classe de votre
+            appareil (mobile, tablette, ordinateur, d&apos;après la largeur de la fenêtre) et, pour la
+            première page d&apos;une visite, le nom du site d&apos;où vous venez. Ces notes partent
+            par lots vers le serveur. Aucun cookie n&apos;est déposé, rien n&apos;est gardé dans le
+            navigateur, et votre session n&apos;est pas lue : la mesure ignore si vous êtes connecté.
+          </p>
+          <p>
+            <strong>Ce qui est enregistré.</strong> Le serveur calcule une empreinte du jour
+            (HMAC-SHA256) de votre adresse IP (réduite à son réseau /64 en IPv6) et de votre navigateur, avec un sel aléatoire tiré pour la
+            journée (heure de Paris), gardé en base le temps de la journée et effacé le lendemain, dès
+            la journée comptée (à partir de 1 h 15) : passé ce moment, plus personne, l&apos;association
+            comprise, ne peut recalculer votre empreinte (hors une copie de sauvegarde chiffrée faite
+            entre-temps, qui peut contenir le sel et vos pages vues de la journée,{" "}
+            {BACKUP_RETENTION_DAYS} jours au plus), et vous n&apos;êtes reconnu que le temps
+            d&apos;une journée. Il enregistre cette empreinte avec
+            le type de page, sa langue, la date et l&apos;heure, la classe d&apos;appareil, le temps
+            passé et une famille de provenance (accès direct, moteur de recherche, Discord, réseau
+            social, plateforme vidéo, autre site) ; jamais l&apos;adresse précise de la page, ni le
+            site d&apos;origine, ni votre adresse IP ou votre navigateur tels quels. Les robots connus
+            ne sont pas comptés, et les pages d&apos;administration (dont la création et la
+            modification d&apos;un tournoi) et de signalements ne sont pas mesurées.
+          </p>
+          <p>
+            <strong>Base légale et dispense de consentement.</strong> L&apos;intérêt légitime de
+            l&apos;association à faire connaître son audience à ses partenaires (art. 6.1.f du RGPD).
+            Cette mesure est dispensée de consentement (art. 82 de la loi Informatique et Libertés) :
+            elle se limite à la mesure d&apos;audience du site, ne produit que des chiffres agrégés,
+            ne vous suit pas d&apos;un site à l&apos;autre et n&apos;est rapprochée ni de votre compte ni
+            d&apos;aucun autre traitement, conditions posées par la CNIL ; ses données détaillées ne
+            sont gardées que {AUDIENCE_RAW_RETENTION_MONTHS} mois, durée choisie par
+            l&apos;association, en deçà des 25 mois que la CNIL admet.
+          </p>
+          <p>
+            <strong>Durée de conservation.</strong> Les pages vues détaillées sont effacées au bout de{" "}
+            <strong>{AUDIENCE_RAW_RETENTION_MONTHS} mois</strong> (hors les copies de sauvegarde
+            chiffrées, {BACKUP_RETENTION_DAYS} jours au plus). Les chiffres agrégés par jour, sans
+            empreinte, sont gardés sans limite : ils ne concernent plus personne. Le sel du jour est
+            effacé de la base le lendemain, dès la journée comptée (à partir de 1 h 15, heure de
+            Paris) ; il n&apos;est écrit dans aucun journal, mais une copie de sauvegarde chiffrée faite
+            entre-temps peut le contenir ({BACKUP_RETENTION_DAYS} jours au plus). Votre
+            adresse IP (et, en IPv6, ses réseaux /64 et /48) et un condensé court de votre navigateur ne
+            sont gardés qu&apos;en mémoire, pour plafonner les envois de chaque réseau : deux minutes au
+            plus après votre dernière requête.
+          </p>
+          <p>
+            <strong>Destinataires.</strong> Toute personne qui a le lien de la page{" "}
+            {AUDIENCE_PAGE_PATH}, pour les seuls chiffres agrégés (aucune répartition n&apos;y montre un
+            groupe de moins de {AUDIENCE_MIN_VISITORS} visiteurs d&apos;une même journée ; seuls les
+            totaux de chaque jour y sont donnés tels quels) ; le responsable technique de
+            l&apos;association, hébergeur du site, pour la base de données.
+          </p>
+          <p>
+            <strong>Votre droit d&apos;opposition.</strong> Le même que pour la mesure ci-dessus : les
+            signaux Global Privacy Control et Do Not Track de votre navigateur, ou le bouton
+            ci-dessus, arrêtent aussi cette mesure-ci — un navigateur qui expose ces signaux, ou qui
+            porte le cookie d&apos;opposition, n&apos;envoie rien, et le serveur, qui relit les signaux
+            reçus et ce cookie, n&apos;enregistre rien. Pour les pages vues déjà
+            enregistrées, l&apos;empreinte du jour ne permet plus de vous retrouver une fois la
+            journée passée ; le droit s&apos;exerce comme vos autres droits (section{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
+          </p>
         </div>
       </section>
 
