@@ -27,7 +27,7 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://si
 
 import { copyFile, rename, unlink } from "node:fs/promises";
 import { getDatabase } from "@/lib/server/database";
-import { blockImageHashOn, blockImageHashesSafely, pinClosedQuarantineHashesOn, readImageSha256, unblockImageHashOn } from "@/lib/server/blocked-images";
+import { blockImageHashOn, blockImageHashesSafely, pinClosedQuarantineHashesOn, readImageFingerprint, unblockImageHashOn } from "@/lib/server/blocked-images";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
@@ -104,13 +104,23 @@ beforeEach(() => {
       .storedUploadAbsolutePath,
   );
   jest.mocked(isUploadReferenced).mockResolvedValue(false);
-  // Chaque fichier a son empreinte, dérivée de son nom.
-  jest.mocked(readImageSha256).mockImplementation(async (file) => sha(file));
+  // Chaque fichier a ses empreintes, dérivées de son nom.
+  jest.mocked(readImageFingerprint).mockImplementation(async (file) => fingerprint(file));
 });
 
-/** L'empreinte simulée d'un fichier. */
+/** L'empreinte SHA-256 simulée d'un fichier. */
 function sha(file: string): string {
   return `sha:${path.basename(file)}`;
+}
+
+/** L'empreinte perceptuelle simulée d'un fichier (entier en décimal). */
+function phash(file: string): string {
+  return String(path.basename(file).length);
+}
+
+/** Les deux empreintes simulées d'un fichier. */
+function fingerprint(file: string): { sha256: string; phash: string } {
+  return { sha256: sha(file), phash: phash(file) };
 }
 
 describe("logoFileLocations", () => {
@@ -273,8 +283,12 @@ describe("deleteUserAvatarForReport", () => {
     // D6 : supprimé par la modération, l'avatar est bloqué avant que le fichier ne parte
     // — et le fichier ne part que si plus rien ne le désigne.
     // Bloqué dans la transaction de la décision, empreinte gardée sur la ligne (D18).
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(LIVE_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(LIVE_AVATAR));
     expect((insert?.[1] as unknown[])[7]).toBe(sha(LIVE_AVATAR));
+    // D17 : l'empreinte perceptuelle est gardée sur la décision, à côté du SHA-256.
+    expect(insert?.[0]).toContain("image_phash, hash_blocked");
+    expect(insert?.[0]).toContain("CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)");
+    expect((insert?.[1] as unknown[])[8]).toBe(phash(LIVE_AVATAR));
     expect(jest.mocked(blockImageHashOn).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(connection.commit).mock.invocationCallOrder[0],
     );
@@ -322,7 +336,7 @@ describe("deleteUserAvatarForReport", () => {
     expect(connection.execute.mock.calls.some(([sql]) => /UPDATE bg_users SET avatar_url/.test(sql))).toBe(false);
     expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/UPDATE bg_account_deletion_holds SET avatar_url = \?/), [null, 9]);
     expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(LIVE_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(LIVE_AVATAR));
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith(AVATAR, "avatars");
   });
 
@@ -977,7 +991,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     expect(unlink).toHaveBeenCalledWith(HIDDEN_AVATAR);
     // D6 : l'avatar supprimé est bloqué, dans la transaction qui le supprime,
     // avant que le fichier en quarantaine ne parte ; son empreinte est gardée (D18).
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(HIDDEN_AVATAR));
     expect(jest.mocked(blockImageHashOn).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(connection.commit).mock.invocationCallOrder[0],
     );
@@ -985,7 +999,8 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
       jest.mocked(unlink).mock.invocationCallOrder[0],
     );
     const purge = connection.execute.mock.calls.find(([sql]) => /SET status = 'PURGED'/.test(sql));
-    expect(purge?.[1]).toEqual([sha(HIDDEN_AVATAR), 1, 30]);
+    expect(purge?.[0]).toContain("image_phash = IF(? IS NULL, image_phash, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED))");
+    expect(purge?.[1]).toEqual([sha(HIDDEN_AVATAR), sha(HIDDEN_AVATAR), phash(HIDDEN_AVATAR), 1, 30]);
     const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-removed");
     expect(message).toContain("Ton avatar");
@@ -1018,7 +1033,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     );
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(2);
     const purged = connection.execute.mock.calls.filter(([sql]) => /SET status = 'PURGED'/.test(sql)).map(([, p]) => p);
-    expect(purged).toEqual([[null, 0, 30], [null, 0, 32]]);
+    expect(purged).toEqual([[null, null, null, 0, 30], [null, null, null, 0, 32]]);
     expect(publishStaffAction).not.toHaveBeenCalled();
     // À l'échéance, le message du masquage a déjà annoncé la date.
     await flush();
@@ -1047,7 +1062,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     // L'empreinte reste gardée : une issue « maintenue » écrite après coup la
     // bloquera (D22) ; la ligne ne justifie aucun blocage (`hash_blocked = 0`).
     const purge = connection.execute.mock.calls.find(([sql]) => /SET status = 'PURGED'/.test(sql));
-    expect(purge?.[1]).toEqual([sha(HIDDEN_AVATAR), 0, 30]);
+    expect(purge?.[1]).toEqual([sha(HIDDEN_AVATAR), sha(HIDDEN_AVATAR), phash(HIDDEN_AVATAR), 0, 30]);
   });
 
   it("purgeDueQuarantines_uncontestedAvatar_blocksHash", async () => {
@@ -1065,7 +1080,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
 
     await purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"));
 
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(HIDDEN_AVATAR));
   });
 
   // Revue sécurité #571, cycle 2 : une contestation déposée après la relève est
@@ -1107,7 +1122,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(1);
 
     expect(connection.execute.mock.calls.some(([sql]) => /bg_reports/.test(sql))).toBe(false);
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(HIDDEN_AVATAR));
   });
 
   it("purgeDueQuarantines_contestReread_parameterisedOnReportId", async () => {
@@ -1139,7 +1154,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
 
     await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
 
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(HIDDEN_AVATAR));
   });
 
   it("ne compte pas la contestation de l'auteur du signalement : elle ne défend pas l'image", async () => {
@@ -1164,7 +1179,7 @@ describe("removeModeratedAvatarFile", () => {
 
     await removeModeratedAvatarFile("/api/uploads/avatars/old.name.png");
 
-    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(legacy)]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([fingerprint(legacy)]);
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith("/api/uploads/avatars/old.name.png", "avatars");
     expect(jest.mocked(blockImageHashesSafely).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deleteUnreferencedUpload).mock.invocationCallOrder[0],
@@ -1176,7 +1191,7 @@ describe("removeModeratedAvatarFile", () => {
   it("removeModeratedAvatarFile_sharedFile_neverUnlinksDirectly", async () => {
     await removeModeratedAvatarFile(AVATAR);
 
-    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(LIVE_AVATAR)]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([fingerprint(LIVE_AVATAR)]);
     expect(unlink).not.toHaveBeenCalled();
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith(AVATAR, "avatars");
   });
@@ -1202,7 +1217,7 @@ describe("removeModeratedAvatarFile — fichier partagé", () => {
 
     await removeModeratedAvatarFile(AVATAR);
 
-    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(LIVE_AVATAR)]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([fingerprint(LIVE_AVATAR)]);
     expect(deleteUnreferencedUpload).not.toHaveBeenCalled();
     expect(logged).toHaveBeenCalledWith(expect.stringContaining("fichier gardé et servi"));
     logged.mockRestore();
@@ -1214,7 +1229,7 @@ describe("removeModeratedAvatarFile — fichier partagé", () => {
 
     await removeModeratedAvatarFile(AVATAR);
 
-    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(LIVE_AVATAR)]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([fingerprint(LIVE_AVATAR)]);
     expect(deleteUnreferencedUpload).not.toHaveBeenCalled();
     logged.mockRestore();
   });
@@ -1251,7 +1266,7 @@ describe("purgeQuarantinedLogo — issue écrite (D22, D23)", () => {
 
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(1);
 
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(HIDDEN_AVATAR));
   });
 });
 
@@ -1307,9 +1322,27 @@ describe("recordContestOutcome", () => {
 
     await expect(recordContestOutcome(30, "UPHELD", actor)).resolves.toEqual({ blocked: true, hashUnknown: false });
 
-    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), "abc");
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), { sha256: "abc", phash: null });
     expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/SET hash_blocked = \?/), [1, 30]);
     expect(unblockImageHashOn).not.toHaveBeenCalled();
+  });
+
+  // D17 : le blocage posé après coup reprend l'empreinte perceptuelle gardée sur la ligne.
+  it("recordContestOutcome_purgedAvatarUpheldWithPhash_blocksWithRowPhash", async () => {
+    install([], [lockRow(purgedAvatar({ image_phash: "123" })), writeOutcome, writeHashBlocked]);
+
+    await recordContestOutcome(30, "UPHELD", actor);
+
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), { sha256: "abc", phash: "123" });
+  });
+
+  it("recordContestOutcome_quarantineRead_readsPhashAsText", async () => {
+    install([], [lockRow(purgedAvatar()), writeOutcome, writeHashBlocked]);
+
+    await recordContestOutcome(30, "UPHELD", actor);
+
+    const read = connection.execute.mock.calls.find(([sql]) => /FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/.test(sql));
+    expect(read?.[0]).toContain("CAST(q.image_phash AS CHAR) AS image_phash");
   });
 
   it("recordContestOutcome_purgedWithoutSha_hashUnknown", async () => {

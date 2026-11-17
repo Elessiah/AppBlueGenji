@@ -1126,6 +1126,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing new is linked to your account, and what its deletion removes stays the same (these measurements, which are not linked to it, do not depend on it).",
     ],
   },
+  "2026-11-empreinte-perceptuelle-avatar": {
+    linkLabels: ["Read the “Reports” section"],
+    title: "Avatar deleted by moderation: a perceptual hash is added",
+    summary:
+      "When moderation deletes an avatar, the site now keeps, next to its SHA-256 hash, a perceptual hash of the image: it also refuses the same image being uploaded again cropped, re-encoded or in another format.",
+    details: [
+      "What it is: a 64-bit summary of what the image looks like (its large light and dark areas), computed on the site, with no third-party service. It cannot be used to rebuild the image and designates no account. An image uploaded as an avatar or as a team logo is refused if its hash is very close to that of a blocked image.",
+      "Where and for how long: exactly where the SHA-256 hash is kept, and for as long — in the list of blocked images, without time limit and with no link to any account, and on the deletion decision as long as that decision is kept. An accepted challenge that lifts the block removes both hashes together from the list of blocked images.",
+      "Avatars deleted before this change stay blocked by their SHA-256 hash only: their file is gone, nothing is recomputed. A nearly plain image has no perceptual hash.",
+      "What does not change: an avatar that is only hidden, or that moderation never deleted, leaves no hash; what deleting an account removes stays the same.",
+    ],
+  },
 };
 
 /**

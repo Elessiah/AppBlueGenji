@@ -5,6 +5,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { failureReason } from "@/lib/server/failure-reason";
+import { imagePerceptualHash, PHASH_MATCH_DISTANCE } from "@/lib/server/image-phash";
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
@@ -18,8 +19,16 @@ import { failureReason } from "@/lib/server/failure-reason";
  * se conteste encore : il n'est pas bloqué, même si son compte est effacé
  * entre-temps. L'empreinte est celle du fichier tel qu'il était servi (le WebP
  * que `storeImageBuffer` écrit) ; au téléversement, l'image traitée **et** le
- * fichier brut sont comparés. Un autre recadrage ou une retouche y échappent —
- * c'est un garde-fou, pas une modération.
+ * fichier brut sont comparés.
+ *
+ * À côté du SHA-256, une **empreinte perceptuelle** (`phash`, décision D17,
+ * `image-phash.ts`, `docs/features/BLOCKED_IMAGE_PHASH.md`) : l'image traitée
+ * d'un téléversement est aussi refusée si son allure est à
+ * `PHASH_MATCH_DISTANCE` bits au plus de celle d'une image bloquée — un cadre
+ * un peu décalé, un autre format source, un réencodage ne passent plus. Une
+ * empreinte posée avant D17 n'a que son SHA-256 (le fichier est parti, rien
+ * ne se recalcule). Une retouche franche y échappe encore — c'est un
+ * garde-fou, pas une modération.
  *
  * L'empreinte d'une image n'identifie personne ; aucune colonne ne désigne de
  * compte.
@@ -34,18 +43,49 @@ export function imageSha256(content: Buffer): string {
 }
 
 /**
- * L'une de ces images (l'image traitée, et le fichier tel que téléversé) est-elle
- * bloquée ? Le fichier brut compte : la copie exacte d'un avatar servi, reposée
- * telle quelle, est réencodée en d'autres octets. Table absente (migration en
- * échec) = non.
+ * Les deux empreintes d'une image bloquée : `sha256` (octets exacts, clé de la
+ * liste) et `phash` (allure, entier de 64 bits écrit en décimal ; `null` pour
+ * une image presque unie ou indécodable — elle n'est alors bloquée que par
+ * ses octets).
  */
-export async function isBlockedImage(...contents: Buffer[]): Promise<boolean> {
-  if (contents.length === 0) return false;
+export type ImageFingerprint = { sha256: string; phash: string | null };
+
+/** Les deux empreintes d'un contenu. */
+export async function imageFingerprint(content: Buffer): Promise<ImageFingerprint> {
+  return { sha256: imageSha256(content), phash: await imagePerceptualHash(content) };
+}
+
+/**
+ * L'image traitée (et, s'il est donné, le fichier tel que téléversé) est-elle
+ * bloquée ? Par ses octets : le fichier brut compte, la copie exacte d'un
+ * avatar servi, reposée telle quelle, étant réencodée en d'autres octets ; par
+ * son allure : l'empreinte perceptuelle de l'image **traitée** — celle qui
+ * serait servie, comparable à celle des avatars bloqués — à
+ * `PHASH_MATCH_DISTANCE` bits au plus d'une empreinte bloquée.
+ *
+ * L'empreinte voyage en texte décimal et passe par `DECIMAL(20,0)` avant
+ * `UNSIGNED` : en requête préparée, MySQL 8 lit le seul cast `UNSIGNED` d'une
+ * chaîne comme un entier **signé** et plafonne tout au-delà de 2^63 − 1 —
+ * la moitié des empreintes y seraient faussées (mesuré sur la base de
+ * développement).
+ *
+ * Une requête, comparaison faite en SQL (`BIT_COUNT` du OU exclusif) : la
+ * liste ne grandit qu'avec les suppressions de la modération (quelques
+ * dizaines de lignes), son parcours complet coûte moins qu'un aller-retour,
+ * et aucune empreinte ne quitte la base. Table absente (migration en échec) =
+ * non.
+ */
+export async function isBlockedImage(processed: Buffer, original?: Buffer): Promise<boolean> {
+  const hashes = [imageSha256(processed)];
+  if (original) hashes.push(imageSha256(original));
+  const phash = await imagePerceptualHash(processed);
+  const perceptual =
+    phash === null ? "" : " OR (phash IS NOT NULL AND BIT_COUNT(phash ^ CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)) <= ?)";
   const db = await getDatabase();
   try {
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (${contents.map(() => "?").join(", ")}) LIMIT 1`,
-      contents.map((content) => imageSha256(content)),
+      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (${hashes.map(() => "?").join(", ")})${perceptual} LIMIT 1`,
+      phash === null ? hashes : [...hashes, phash, PHASH_MATCH_DISTANCE],
     );
     return rows.length > 0;
   } catch (error) {
@@ -77,23 +117,46 @@ function blockDay(options: BlockOptions): { sql: string; params: string[] } {
  * Datée du jour seulement : l'instant d'un effacement de compte, rapproché du
  * journal des suppressions, relierait l'empreinte au compte (D31).
  */
-async function blockImageHashes(hashes: readonly string[], options: BlockOptions = {}): Promise<void> {
-  const unique = [...new Set(hashes)];
+async function blockImageHashes(fingerprints: readonly ImageFingerprint[], options: BlockOptions = {}): Promise<void> {
+  const unique = uniqueFingerprints(fingerprints);
   if (unique.length === 0) return;
   const db = await getDatabase();
   const day = blockDay(options);
-  const liftableRow = "(?, 1, " + day.sql + ")";
-  const pinnedRow = "(?, " + day.sql + ")";
-  // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre d'images.
+  const liftableRow = "(?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), 1, " + day.sql + ")";
+  const pinnedRow = "(?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), " + day.sql + ")";
+  // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre
+  // d'images. Une ligne déjà posée sans empreinte perceptuelle la reçoit.
   await ignoreMissingTable(
     db.execute(
       options.liftable
-        ? `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES ${unique.map(() => liftableRow).join(", ")}`
-        : `INSERT INTO bg_blocked_image_hashes (sha256, created_at) VALUES ${unique.map(() => pinnedRow).join(", ")}
-         ON DUPLICATE KEY UPDATE liftable = 0`,
-      unique.flatMap((sha) => [sha, ...day.params]),
+        ? `INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at) VALUES ${unique.map(() => liftableRow).join(", ")}
+         ON DUPLICATE KEY UPDATE ${KEEP_OR_ADD_PHASH}`
+        : `INSERT INTO bg_blocked_image_hashes (sha256, phash, created_at) VALUES ${unique.map(() => pinnedRow).join(", ")}
+         ON DUPLICATE KEY UPDATE liftable = 0, ${KEEP_OR_ADD_PHASH}`,
+      unique.flatMap((entry) => [entry.sha256, entry.phash, ...day.params]),
     ),
   );
+}
+
+/**
+ * Une ligne déjà posée garde son empreinte perceptuelle, ou reçoit celle
+ * qu'on lui apporte si elle n'en avait pas (ligne d'avant D17).
+ */
+const KEEP_OR_ADD_PHASH = "phash = COALESCE(phash, VALUES(phash))";
+
+/** Une entrée par SHA-256 — une empreinte perceptuelle connue l'emporte sur son absence. */
+function uniqueFingerprints(fingerprints: readonly ImageFingerprint[]): ImageFingerprint[] {
+  const bySha = new Map<string, ImageFingerprint>();
+  for (const entry of fingerprints) {
+    const known = bySha.get(entry.sha256);
+    if (!known || (known.phash === null && entry.phash !== null)) bySha.set(entry.sha256, entry);
+  }
+  return [...bySha.values()];
+}
+
+/** Une empreinte telle qu'écrite au journal pour une pose à la main. */
+function fingerprintLabel(entry: ImageFingerprint): string {
+  return entry.phash === null ? entry.sha256 : `${entry.sha256} (phash ${entry.phash})`;
 }
 
 /**
@@ -114,15 +177,10 @@ export async function blockRemovedImageFiles(
   if (absolutePaths.length === 0) return;
   // Chaque lecture est rattrapée : un fichier illisible est seulement omis.
   const read = await Promise.all(
-    absolutePaths.map((file) =>
-      readFile(file).then(
-        (content) => ({ file, sha: imageSha256(content) as string | null }),
-        () => ({ file, sha: null }),
-      ),
-    ),
+    absolutePaths.map(async (file) => ({ file, fingerprint: await readImageFingerprint(file) })),
   );
-  const hashes = read.flatMap((entry) => (entry.sha === null ? [] : [entry.sha]));
-  const missing = read.filter((entry) => entry.sha === null).map((entry) => anonymousFileName(entry.file));
+  const hashes = read.flatMap((entry) => (entry.fingerprint === null ? [] : [entry.fingerprint]));
+  const missing = read.filter((entry) => entry.fingerprint === null).map((entry) => anonymousFileName(entry.file));
   if (missing.length > 0) {
     // Un fichier que la modération supprime manquait déjà (course avec une
     // rotation, effacement à la main) : son image n'est pas bloquée et
@@ -140,7 +198,10 @@ export async function blockRemovedImageFiles(
  * `blockRemovedImageFiles` : **ne lève jamais**, une reprise, puis les
  * empreintes consignées (pm2) pour une pose à la main.
  */
-export async function blockImageHashesSafely(hashes: readonly string[], options: BlockOptions = {}): Promise<void> {
+export async function blockImageHashesSafely(
+  hashes: readonly ImageFingerprint[],
+  options: BlockOptions = {},
+): Promise<void> {
   if (hashes.length === 0) return;
   for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {
     try {
@@ -149,7 +210,7 @@ export async function blockImageHashesSafely(hashes: readonly string[], options:
     } catch (error) {
       if (attempt === BLOCK_ATTEMPTS) {
         console.error(
-          `[moderation] empreintes à bloquer à la main (bg_blocked_image_hashes) : ${hashes.join(", ")}`,
+          `[moderation] empreintes à bloquer à la main (bg_blocked_image_hashes) : ${hashes.map(fingerprintLabel).join(", ")}`,
           failureReason(error),
         );
       }
@@ -158,15 +219,13 @@ export async function blockImageHashesSafely(hashes: readonly string[], options:
 }
 
 /**
- * L'empreinte d'un fichier, ou `null` s'il ne se lit pas (déjà parti) — lue
- * avant l'effacement, pour être gardée sur la ligne de la décision
- * (`bg_logo_quarantines.image_sha256`, décisions D18 et D22).
+ * Les empreintes d'un fichier, ou `null` s'il ne se lit pas (déjà parti) —
+ * lues avant l'effacement, pour être gardées sur la ligne de la décision
+ * (`bg_logo_quarantines.image_sha256` et `image_phash`, décisions D18, D22, D17).
  */
-export async function readImageSha256(absolutePath: string): Promise<string | null> {
-  return readFile(absolutePath).then(
-    (content) => imageSha256(content),
-    () => null,
-  );
+export async function readImageFingerprint(absolutePath: string): Promise<ImageFingerprint | null> {
+  const content = await readFile(absolutePath).catch(() => null);
+  return content === null ? null : imageFingerprint(content);
 }
 
 /** Ce qu'il faut pour écrire dans la transaction de l'appelant. */
@@ -178,11 +237,12 @@ type Executor = Pick<PoolConnection, "execute">;
  * empreinte neuve est levable (D18) ; une empreinte déjà posée garde son état
  * — non levable, elle le reste.
  */
-export async function blockImageHashOn(connection: Executor, sha256: string): Promise<void> {
+export async function blockImageHashOn(connection: Executor, fingerprint: ImageFingerprint): Promise<void> {
   await ignoreMissingTable(
     connection.execute(
-      `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, CURRENT_DATE)`,
-      [sha256],
+      `INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at) VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), 1, CURRENT_DATE)
+       ON DUPLICATE KEY UPDATE ${KEEP_OR_ADD_PHASH}`,
+      [fingerprint.sha256, fingerprint.phash],
     ),
   );
 }
@@ -202,12 +262,12 @@ export async function blockImageHashOn(connection: Executor, sha256: string): Pr
 export async function pinAccountBlockedHashesOn(connection: Executor, userId: number): Promise<void> {
   await ignoreMissingTable(
     connection.execute(
-      `INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)
-       SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines
+      `INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at)
+       SELECT image_sha256, MAX(image_phash), 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines
         WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL
           AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
         GROUP BY image_sha256
-       ON DUPLICATE KEY UPDATE liftable = 0`,
+       ON DUPLICATE KEY UPDATE liftable = 0, ${KEEP_OR_ADD_PHASH}`,
       [userId],
     ),
   );
@@ -225,12 +285,12 @@ export async function pinClosedQuarantineHashesOn(connection: Executor, quaranti
   if (quarantineIds.length === 0) return;
   await ignoreMissingTable(
     connection.execute(
-      `INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)
-       SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines
+      `INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at)
+       SELECT image_sha256, MAX(image_phash), 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines
         WHERE id IN (${quarantineIds.map(() => "?").join(", ")})
           AND status = 'PURGED' AND hash_blocked = 1 AND image_sha256 IS NOT NULL
         GROUP BY image_sha256
-       ON DUPLICATE KEY UPDATE liftable = 0`,
+       ON DUPLICATE KEY UPDATE liftable = 0, ${KEEP_OR_ADD_PHASH}`,
       [...quarantineIds],
     ),
   );

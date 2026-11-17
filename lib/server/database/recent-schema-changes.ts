@@ -635,6 +635,13 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
         ),
       ],
     },
+    // EF-72 / D17 — empreinte perceptuelle des avatars bloqués
+    // (`docs/features/BLOCKED_IMAGE_PHASH.md`), à côté du SHA-256 : nulle
+    // partout au départ, **aucun remplissage possible** — le fichier d'un
+    // avatar déjà bloqué est parti, ces lignes restent bloquées par leurs
+    // seuls octets.
+    `ALTER TABLE bg_blocked_image_hashes ADD COLUMN phash BIGINT UNSIGNED NULL AFTER sha256`,
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN image_phash BIGINT UNSIGNED NULL AFTER image_sha256`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

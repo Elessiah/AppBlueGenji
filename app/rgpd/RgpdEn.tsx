@@ -902,7 +902,9 @@ export function RgpdEn({
               player&apos;s page, by
               the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
               a hiding without a challenge —, whether the
-              account is active or pending deletion, the hash (SHA-256) of the image is kept without time limit in
+              account is active or pending deletion, the hash (SHA-256) of the image — and, since November 19, 2026, its perceptual
+              hash, a 64-bit summary of what it looks like that cannot be used to rebuild it but also recognises the image cropped,
+              re-encoded or in another format — is kept without time limit in
               the list of blocked images, which designates no account and only dates a block to the day, to refuse
               it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
               erased if nothing else on the site points to it. As long as the deletion decision taken on a report or after a hiding is kept, the hash is also kept on it, with the

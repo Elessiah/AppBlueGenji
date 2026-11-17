@@ -175,8 +175,8 @@ describe("revue juridique cycle 4", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
 
-    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par son empreinte (SHA-256) gardée dès cette suppression");
-    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hash (SHA-256) kept from that deletion");
+    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par ses empreintes (SHA-256, et empreinte perceptuelle, qui reconnaît aussi l'image recadrée, réencodée ou dans un autre format) gardées dès cette suppression");
+    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hashes (SHA-256, and a perceptual hash, which also recognises the image cropped, re-encoded or in another format) kept from that deletion");
   });
 
   it("processingRegisterT01_avatarHash_dataCategoryNamesAvatarsFrAndEn", () => {
@@ -184,8 +184,8 @@ describe("revue juridique cycle 4", () => {
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
 
     // D31 : sans lien dans la liste des images bloquées, lié au compte sur la décision tant qu'elle est gardée (D87).
-    expect(fr).toContain("Empreintes (SHA-256) des avatars supprimés par la modération : dans la liste des images bloquées, sans lien avec aucun compte, datée au jour près ; sur la décision de modération (registre T11), liée au compte tant que cette décision est gardée, avec l'issue de sa contestation (maintenue ou acceptée)");
-    expect(en).toContain("Hashes (SHA-256) of avatars deleted by moderation: in the list of blocked images, with no link to any account, dated to the day; on the moderation decision (record T11), linked to the account as long as that decision is kept, with the outcome of its challenge (upheld or accepted)");
+    expect(fr).toContain("Empreintes (SHA-256 et, depuis le 19 novembre 2026, empreinte perceptuelle — un résumé de 64 bits de l'allure de l'image, qui ne permet pas de la reconstituer) des avatars supprimés par la modération : dans la liste des images bloquées, sans lien avec aucun compte, datée au jour près ; sur la décision de modération (registre T11), liée au compte tant que cette décision est gardée, avec l'issue de sa contestation (maintenue ou acceptée)");
+    expect(en).toContain("Hashes (SHA-256 and, since November 19, 2026, a perceptual hash — a 64-bit summary of what the image looks like, which cannot be used to rebuild it) of avatars deleted by moderation: in the list of blocked images, with no link to any account, dated to the day; on the moderation decision (record T11), linked to the account as long as that decision is kept, with the outcome of its challenge (upheld or accepted)");
   });
 
   it("processingRegisterT01_avatarHash_legitimateInterestBasisFrAndEn", () => {
@@ -263,8 +263,8 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     const fr = PROCESSING_ACTIVITIES.flatMap((a) => a.dataCategories).join(" ");
     const en = PROCESSING_ACTIVITIES_EN.flatMap((a) => a.dataCategories).join(" ");
 
-    expect(fr).toContain("sur la décision de suppression d'un avatar, son empreinte (SHA-256) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant que la décision est gardée ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
-    expect(en).toContain("on the decision deleting an avatar, its hash (SHA-256) and the outcome of the challenge (upheld or accepted), linked to the account as long as the decision is kept; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
+    expect(fr).toContain("sur la décision de suppression d'un avatar, ses empreintes (SHA-256 et, depuis le 19 novembre 2026, perceptuelle) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant que la décision est gardée ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
+    expect(en).toContain("on the decision deleting an avatar, its hashes (SHA-256 and, since November 19, 2026, perceptual) and the outcome of the challenge (upheld or accepted), linked to the account as long as the decision is kept; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
   });
 
   it("deletionNotice_heldAvatar_reactivationMayNotReturnModeratedAvatarFrAndEn", () => {

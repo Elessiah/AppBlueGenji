@@ -2131,6 +2131,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est rattaché à ton compte, et ce que sa suppression emporte reste le même (ces mesures, qui ne s'y rattachent pas, n'en dépendent pas).",
     ],
   },
+  {
+    // EF-72 / D17 — empreinte perceptuelle des avatars supprimés par la
+    // modération, gardée à côté du SHA-256 (docs/features/BLOCKED_IMAGE_PHASH.md).
+    // /rgpd § « Signalements » (FR et EN), registre T01 et T11. Pour tous les
+    // comptes. Datée du lendemain de la mise en ligne prévue (2026-11-18),
+    // comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-empreinte-perceptuelle-avatar",
+    publishedAt: "2026-11-19",
+    title: "Avatar supprimé par la modération : une empreinte perceptuelle s'ajoute",
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+    summary:
+      "Quand la modération supprime un avatar, le site garde désormais, à côté de son empreinte SHA-256, une empreinte perceptuelle de l'image : elle refuse aussi la remise en ligne de la même image recadrée, réencodée ou dans un autre format.",
+    details: [
+      "Ce que c'est : un résumé de 64 bits de l'allure de l'image (ses grandes zones claires et sombres), calculé sur le site, sans service tiers. Il ne permet pas de reconstituer l'image et ne désigne aucun compte. Une image téléversée comme avatar ou comme logo d'équipe est refusée si son empreinte est très proche de celle d'une image bloquée.",
+      "Où et combien de temps : exactement là où l'empreinte SHA-256 est gardée, et aussi longtemps qu'elle — dans la liste des images bloquées, sans limite de durée et sans lien avec aucun compte, et sur la décision de suppression tant que celle-ci est gardée. Une contestation acceptée qui lève le blocage retire les deux empreintes ensemble de la liste des images bloquées.",
+      "Les avatars supprimés avant ce changement restent bloqués par leur seule empreinte SHA-256 : leur fichier est parti, rien n'est recalculé. Une image presque unie n'a pas d'empreinte perceptuelle.",
+      "Ce qui ne change pas : un avatar seulement masqué, ou que la modération n'a jamais supprimé, ne laisse aucune empreinte ; ce que la suppression d'un compte emporte reste le même.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

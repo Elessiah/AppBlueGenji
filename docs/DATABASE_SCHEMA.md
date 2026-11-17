@@ -401,6 +401,10 @@ lever son blocage, index `idx_bg_logo_quarantines_sha`), `hash_blocked` (la
 décision a bloqué l'empreinte) et `bg_blocked_image_hashes.liftable` (blocage
 qu'une contestation acceptée peut lever ; 0 par défaut) : aux deux endroits
 aussi, sans remplissage (`ACCOUNT_DELETION.md` § Issue écrite).
+`bg_blocked_image_hashes.phash` et `bg_logo_quarantines.image_phash`
+(`BIGINT UNSIGNED NULL`, empreinte perceptuelle d'un avatar bloqué, D17) : aux
+deux endroits, sans remplissage possible — le fichier d'un avatar déjà bloqué
+est parti (`docs/features/BLOCKED_IMAGE_PHASH.md`).
 
 `bg_account_suspensions` (suspension d'un compte par la modération,
 `lib/shared/account-suspension.ts`) : `ends_at` à `NULL` = durée

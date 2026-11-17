@@ -1091,7 +1091,9 @@ function RgpdFr({
               Quand la modération <strong>supprime</strong> un avatar — sans délai, sur signalement ou
               depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l&apos;échéance), ou
               d&apos;office au terme d&apos;un masquage sans contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
-              (SHA-256) de l&apos;image est gardée sans limite de durée dans la liste des images bloquées, qui ne
+              (SHA-256) de l&apos;image — et, depuis le 19 novembre 2026, son empreinte perceptuelle, un résumé de 64 bits de son
+              allure qui ne permet pas de la reconstituer mais reconnaît aussi l&apos;image recadrée, réencodée ou dans un autre
+              format — est gardée sans limite de durée dans la liste des images bloquées, qui ne
               désigne aucun compte et ne date un blocage qu&apos;au jour près, pour en refuser la remise en ligne,
               comme avatar ou comme logo d&apos;équipe ; supprimé sans délai, son fichier n&apos;est effacé que si
               rien d&apos;autre sur le site ne le désigne. Tant que la décision de suppression prise sur un signalement ou après un masquage est gardée, l&apos;empreinte l&apos;est aussi sur elle, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
