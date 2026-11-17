@@ -332,8 +332,50 @@ export function tournamentEmbedAlt(card: TournamentCard, messages: ShareEmbedMes
 }
 
 /**
- * Titre de l'encart d'un match : « A contre B · Quart de finale 2 », suivi de
- * l'horaire d'un match à venir (« · mar. 18 nov. 21:00 »).
+ * Budget du titre d'un encart de match, en caractères : Discord coupe le titre
+ * d'un aperçu de lien d'une ellipse sur une ligne (vers 70 caractères à la
+ * largeur d'un message) ; au-delà, le nom du tour, le score ou l'horaire
+ * disparaissaient (« … · Manche 1000 · Match 2 — BlueGen… »).
+ */
+export const EMBED_MATCH_TITLE_BUDGET = 70;
+/** Ce qu'un nom d'équipe garde au moins dans le titre (ellipse comprise). */
+export const EMBED_TITLE_TEAM_MIN_LENGTH = 4;
+
+/** `name` borné à `max` caractères (points de code), ellipse comprise. */
+function cutName(name: string, max: number): string {
+  const chars = Array.from(name);
+  if (chars.length <= max) return name;
+  return `${chars.slice(0, Math.max(1, max - 1)).join("").trimEnd()}…`;
+}
+
+/**
+ * Les deux noms tenus dans `room` caractères : le plus court garde tout ce
+ * qu'il peut, l'autre prend le reste ; chacun garde au moins
+ * {@link EMBED_TITLE_TEAM_MIN_LENGTH} caractères (le titre déborde alors, sans
+ * jamais rogner le tour, le score ni l'horaire).
+ */
+function fitNames(names: readonly [string, string], room: number): [string, string] {
+  const [a, b] = names.map((name) => Array.from(name).length);
+  if (a + b <= room) return [names[0], names[1]];
+  const half = Math.floor(room / 2);
+  let maxA: number;
+  if (a <= half) maxA = a;
+  else if (b <= room - half) maxA = room - b;
+  else maxA = half;
+  const maxB = room - maxA;
+  return [
+    cutName(names[0], Math.max(EMBED_TITLE_TEAM_MIN_LENGTH, maxA)),
+    cutName(names[1], Math.max(EMBED_TITLE_TEAM_MIN_LENGTH, maxB)),
+  ];
+}
+
+/**
+ * Titre de l'encart d'un match, court pour n'être jamais coupé
+ * ({@link EMBED_MATCH_TITLE_BUDGET}) : « A 0–3 B · Quart de finale 2 » une fois
+ * le score connu, « A contre B · Quart de finale 2 · mar. 18 nov. 21:00 » pour
+ * un match à venir, « A contre B · Finale » sinon. Seuls les noms d'équipe
+ * cèdent (ellipse) ; ni le nom du site ni celui du tournoi n'y figurent
+ * (`og:site_name`, l'image et la description les portent).
  */
 export function matchEmbedTitle(
   match: MatchShareSummary,
@@ -343,13 +385,18 @@ export function matchEmbedTitle(
   now: number = Date.now(),
 ): string {
   const text = messages.share.embed;
-  const versus = fill(text.versus, {
-    team1: embedSideName(match.team1, 1, text),
-    team2: embedSideName(match.team2, 2, text),
-  });
+  const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
+  const center = scoreCenter(match, names, text);
   const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
-  return when === null ? `${versus} · ${position}` : `${versus} · ${position} · ${when}`;
+  const tail = when === null ? ` · ${position}` : ` · ${position} · ${when}`;
+  const head = (team1: string, team2: string) =>
+    center.kind === "score"
+      ? `${team1} ${center.team1}–${center.team2} ${team2}`
+      : fill(text.versus, { team1, team2 });
+  const room = EMBED_MATCH_TITLE_BUDGET - Array.from(head("", "") + tail).length;
+  const [team1, team2] = fitNames(names, room);
+  return `${head(team1, team2)}${tail}`;
 }
 
 /**

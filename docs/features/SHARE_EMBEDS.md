@@ -68,17 +68,32 @@ de replay publics).
 - Encart : `tournamentPageMetadata` / `matchPageMetadata` posent
   `openGraph.images` et `twitter.images` (adresse versionnée, 1200×630, texte
   alternatif) ; un tournoi illisible garde l'image du site (`/og/<langue>/home.png`),
-  posée par l'encart de repli — un `openGraph` de page remplace celui de la racine ; une page de match sans compte prend titre « A contre B ·
-  Quart de finale 2 — tournoi » et une description score + maps + codes (voir « Nom de la manche » et « Match à venir »).
+  posée par l'encart de repli — un `openGraph` de page remplace celui de la racine ; une page de match prend un titre d'encart court (voir « Titre d'un match ») et une
+  description score + maps + codes (voir « Nom de la manche » et « Match à venir »).
 - Textes : espace `share.embed` (FR et EN), rédaction pure
   `lib/shared/share-embed-cards.ts`, noms passés par `visibleText`.
+
+## Titre d'un match
+
+Discord coupe d'une ellipse le titre d'un aperçu de lien qui dépasse une ligne (vers
+70 caractères) : « Choco Pops contre Sl solearis · Manche 1000 · Match 2 — BlueGen… ».
+`og:title` / `twitter:title` d'une page de match (`matchEmbedTitle`) sont donc compacts :
+- joué : « Choco Pops 0–3 Sl solearis · Quart de finale 2 » (score à la place de « contre ») ;
+- à venir : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » / « A vs B · … » ;
+- sinon (forfait, en saisie, sans horaire) : « A contre B · Finale » ;
+- ni nom de site ni nom de tournoi (`og:site_name`, l'image et la description les portent) ;
+- budget `EMBED_MATCH_TITLE_BUDGET` = 70 caractères : seuls les **noms d'équipe** cèdent
+  (ellipse, le plus court gardé entier, 4 caractères au moins chacun) — jamais le tour,
+  le score ni l'horaire.
+L'onglet (`<title>`) garde « … — tournoi ». Repli sans résumé public : « Manche 2 · Match 3
+— tournoi », le nom du tournoi borné au même budget.
 
 ## Nom de la manche
 
 Le match se place par **le nom de sa manche tel que la fiche le donne**, non
 plus « Manche n · Match m » (`lib/shared/share-round.ts`) : « Quart de finale 2 »,
 « Demi-finale 1 », « Finale », « Finale perdants », « Tableau perdants · Demi-finale 1 »,
-« Grande Finale », « Petite Finale » (mêmes clés `bracket.stage` / `bracket.matchLabel`
+« Grande Finale », « Petite finale » (mêmes clés `bracket.stage` / `bracket.matchLabel`
 de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-stage.ts`).
 - `buildShareRounds` (dans le résumé, donc dans l'empreinte `?v=` de l'image) nomme
   chaque tableau (par phase et par `bracket`) depuis son dernier tour ; l'arbre final
@@ -95,15 +110,19 @@ de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-st
   qualification de BlueGenji Survie) — « Round » en anglais. Le numéro du match n'est
   écrit que si le nom seul est ambigu (jamais pour une finale).
 - L'en-tête de la page du match (ligne de situation) porte le même nom
-  (`buildShareRounds` sur `detail.matches`).
-- Match absent du résumé (encart de repli) : « Manche n · Match m ». Ce repli ne sert
+  (`buildShareRounds` sur les seuls matchs de sa phase).
+- Les mots d'un stade (« Quarts de finale », « Demi-finale 2 », « Manche 2 ») sont rédigés
+  une seule fois, pour l'arbre (`BracketTree`) et pour ce nom : `lib/shared/bracket-stage-text.ts`.
+  « Petite finale » en minuscule partout (`bracket.stage.thirdPlace`, comme le plateau d'Endurance).
+- Match absent du résumé (encart de repli) : « Manche n · Match m » (`fallbackRoundLabel`),
+  « Phase finale · Match m » dans l'arbre final de BlueGenji Survie (jamais « Manche 1001 »). Ce repli ne sert
   que quand la réponse publique n'est pas lue (tournoi non publié, lecture en échec ou
   refusée par le plafond) : nommer le tour demande tous les matchs du tournoi, soit
   précisément la lecture qui manque — la refaire à part contournerait le plafond.
 - Non changé : la carte du direct de l'accueil (`landing.json` → `round`,
   `phase.round`) n'est pas un aperçu partagé.
-- Image : le sous-titre (nom du tour, « +N maps ») a 640 px ; c'est le nom du tournoi
-  qui cède, pas le numéro du match.
+- Image : le sous-titre (nom du tour, « +N maps ») a 640 px (`MATCH_SUBTITLE_MAX_WIDTH`) ; c'est le nom
+  du tournoi qui cède, pas le numéro du match, en gardant au moins 360 px (`MATCH_TITLE_MIN_WIDTH`, testé).
 
 ## Match à venir : horaire en avant
 

@@ -10,6 +10,7 @@ import {
   matchEmbedAlt,
   matchEmbedCard,
   matchEmbedDescription,
+  EMBED_MATCH_TITLE_BUDGET,
   matchEmbedTitle,
   tournamentEmbedAlt,
   tournamentEmbedCard,
@@ -239,12 +240,23 @@ describe("matchEmbedCard", () => {
 });
 
 describe("matchEmbedTitle / matchEmbedDescription", () => {
-  it("matchEmbedTitle_teams_versusThenPosition", () => {
-    expect(matchEmbedTitle(summary(), "Round 2 · Match 3", EN, "en")).toBe("Alpha vs Bravo · Round 2 · Match 3");
+  it("matchEmbedTitle_played_scoreBetweenTeamsThenPosition", () => {
+    expect(matchEmbedTitle(summary(), "Round 2 · Match 3", EN, "en")).toBe("Alpha 2–1 Bravo · Round 2 · Match 3");
+    expect(matchEmbedTitle(summary(), "Quart de finale 2", FR, "fr")).toBe("Alpha 2–1 Bravo · Quart de finale 2");
+  });
+
+  it("matchEmbedTitle_notPlayed_versusThenPosition", () => {
+    const pending = summary({ score: null, winnerSide: null, status: "READY", maps: [] });
+    expect(matchEmbedTitle(pending, "Final", EN, "en")).toBe("Alpha vs Bravo · Final");
+    expect(matchEmbedTitle(pending, "Finale", FR, "fr")).toBe("Alpha contre Bravo · Finale");
+  });
+
+  it("matchEmbedTitle_forfeit_versusNotScore", () => {
+    expect(matchEmbedTitle(summary({ forfeitSide: 2 }), "Final", EN, "en")).toBe("Alpha vs Bravo · Final");
   });
 
   it("matchEmbedTitle_solo_noPseudo", () => {
-    expect(matchEmbedTitle(summary({ team1: SOLO_1, team2: SOLO_2 }), "Match 1", EN, "en")).toBe("Player 1 vs Player 2 · Match 1");
+    expect(matchEmbedTitle(summary({ team1: SOLO_1, team2: SOLO_2 }), "Match 1", EN, "en")).toBe("Player 1 2–1 Player 2 · Match 1");
   });
 
   it("matchEmbedDescription_noScoreNoMaps_returnsNull", () => {
@@ -395,7 +407,7 @@ describe("match a venir : horaire programme", () => {
   });
 
   it("matchEmbedTitle_played_hasNoDate", () => {
-    expect(matchEmbedTitle(summary({ startAt: START }), "Final", EN, "en", NOW)).toBe("Alpha vs Bravo · Final");
+    expect(matchEmbedTitle(summary({ startAt: START }), "Final", EN, "en", NOW)).toBe("Alpha 2–1 Bravo · Final");
   });
 
   it("matchEmbedDescription_scheduled_opensOnDateAndZone", () => {
@@ -413,5 +425,56 @@ describe("match a venir : horaire programme", () => {
 
     expect(card.team1.name.length).toBeLessThanOrEqual(EMBED_TEAM_NAME_MAX_LENGTH);
     expect(card.schedule?.when).toBe("Tuesday, November 17 · 21:00");
+  });
+});
+
+describe("matchEmbedTitle — budget de l'encart", () => {
+  const LONG_1: ShareEntrantSide = { teamId: 1, name: "Les Chevaliers Extraordinaires du Nord", logoUrl: null, solo: false };
+  const LONG_2: ShareEntrantSide = { teamId: 2, name: "Sl solearis Academy Esport Division", logoUrl: null, solo: false };
+  const SHORT: ShareEntrantSide = { teamId: 3, name: "Choco Pops", logoUrl: null, solo: false };
+  const length = (value: string) => Array.from(value).length;
+
+  it("matchEmbedTitle_shortNames_untouchedWithinBudget", () => {
+    const title = matchEmbedTitle(summary({ team1: SHORT }), "Quart de finale 2", FR, "fr");
+    expect(title).toBe("Choco Pops 2–1 Bravo · Quart de finale 2");
+    expect(length(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_longNamesPlayed_cutNamesKeepScoreAndRound", () => {
+    const title = matchEmbedTitle(summary({ team1: LONG_1, team2: LONG_2 }), "Tableau perdants · Demi-finale 1", FR, "fr");
+    expect(length(title)).toBe(EMBED_MATCH_TITLE_BUDGET);
+    expect(title).toMatch(/^Les Chevaliers.*… 2–1 Sl solearis.*… · Tableau perdants · Demi-finale 1$/u);
+  });
+
+  it("matchEmbedTitle_longNamesScheduled_keepRoundAndDate", () => {
+    const match = summary({
+      team1: LONG_1,
+      team2: LONG_2,
+      score: null,
+      winnerSide: null,
+      status: "READY",
+      maps: [],
+      startAt: "2026-11-17T20:00:00.000Z",
+    });
+    const fr = matchEmbedTitle(match, "Quart de finale 2", FR, "fr", Date.parse("2026-11-17T10:00:00.000Z"));
+    const en = matchEmbedTitle(match, "Quarterfinal 2", EN, "en", Date.parse("2026-11-17T10:00:00.000Z"));
+    expect(fr.endsWith(" · Quart de finale 2 · mar. 17 nov. 21:00")).toBe(true);
+    expect(fr).toContain("… contre ");
+    expect(en.endsWith(" · Quarterfinal 2 · Tue, Nov 17 21:00")).toBe(true);
+    expect(en).toContain("… vs ");
+    expect(length(fr)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+    expect(length(en)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_oneLongName_shortNameKeptWhole", () => {
+    const title = matchEmbedTitle(summary({ team1: SHORT, team2: LONG_1 }), "Tableau perdants · Quart de finale 2", FR, "fr");
+    expect(title).toMatch(/^Choco Pops 2–1 Les Chevaliers… · Tableau perdants · Quart de finale 2$/u);
+    expect(length(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_hugeRound_namesKeepMinimum", () => {
+    const round = "x".repeat(EMBED_MATCH_TITLE_BUDGET);
+    const title = matchEmbedTitle(summary({ team1: LONG_1, team2: LONG_2 }), round, EN, "en");
+    expect(title).toBe(`Les… 2–1 Sl… · ${round}`);
   });
 });

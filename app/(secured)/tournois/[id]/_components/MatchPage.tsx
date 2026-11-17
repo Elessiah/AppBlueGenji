@@ -268,8 +268,13 @@ function MatchHeader({
   const score = matchPageHeaderScore(match, sides, doubleForfeit);
   const phaseName = detail.phases?.find((item) => item.id === match.phaseId)?.name ?? null;
   // Le nom du tour que l'arbre lui donne (« Quart de finale 2 »), comme son aperçu partagé.
-  const rounds = useMemo(() => buildShareRounds(detail), [detail]);
-  const roundName = shareRoundText(text, rounds.get(match.id) ?? null, match);
+  // Seuls les matchs de sa phase le nomment (un tableau = une phase et un
+  // `bracket`) : chaque poussée du flux ne relit pas tout le tournoi.
+  const roundName = useMemo(() => {
+    const phaseMatches = detail.matches.filter((item) => item.phaseId === match.phaseId);
+    const rounds = buildShareRounds({ card: detail.card, phases: detail.phases, matches: phaseMatches });
+    return shareRoundText(text, rounds.get(match.id) ?? null, match);
+  }, [detail.card, detail.phases, detail.matches, match, text]);
   const startAt = formatMatchStartAtFull(match.startAt, locale);
   const winner = sides.find((side) => side.teamId !== null && side.teamId === match.winnerTeamId) ?? null;
   // Même alerte que le bandeau d'horaire de la carte : un match casté à son

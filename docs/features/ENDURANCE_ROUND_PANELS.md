@@ -30,7 +30,7 @@ Dans l'ordre, du haut vers le bas :
    la suite des volets — aperçu, manche en cours, manches closes. Il s'arrête
    avec la phase qualificative : aucun aperçu des play-offs.
 3. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`), la
-   `Petite Finale` en carte sous la `Grande Finale`.
+   `Petite finale` en carte sous la `Grande Finale`.
 4. **Les manches qualificatives**, un volet par manche : la **manche en cours
    d'abord**, puis les manches closes **de la plus récente à la plus
    ancienne** (`orderEnduranceRoundSections`, module pur).
@@ -176,7 +176,7 @@ Le moteur pose la petite finale dans **la même manche** que la finale
 dernière colonne de l'arbre comme un créneau de plus, elle serait nommée
 « Finale 2 » et recevrait un trait. Elle n'est donc **pas** un créneau de
 l'arbre : c'est une carte de match posée **sous la finale**, dans sa colonne,
-sous-titrée « Petite Finale » (`bracket.stage.thirdPlace`, « Third-place match »
+sous-titrée « Petite finale » (`bracket.stage.thirdPlace`, « Third-place match »
 sous `/en`). La finale de cet arbre est sous-titrée « Grande Finale »
 (`bracket.stage.grandFinal`, prop `grandFinalLabel`) au lieu de « Finale 1 » —
 **toujours**, que la petite finale se joue ou non : la finale ne change pas de

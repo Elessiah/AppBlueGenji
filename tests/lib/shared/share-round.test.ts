@@ -71,7 +71,7 @@ describe("buildShareRounds / shareRoundText — simple élimination", () => {
   it("buildShareRounds_thirdPlace_named", () => {
     const third = match("THIRD_PLACE", 3, 1);
     const of = roundsOf({ format: "SINGLE" }, [...all, third]);
-    expect(textOf(third, of(third))).toBe("Petite Finale");
+    expect(textOf(third, of(third))).toBe("Petite finale");
     expect(textOf(r3, of(r3))).toBe("Finale");
   });
 });
@@ -160,7 +160,7 @@ describe("buildShareRounds / shareRoundText — modes à classement", () => {
     const third = match("THIRD_PLACE", PLAYOFF_ROUND_OFFSET + 2, 1);
     const of = roundsOf({ format: "BG_SURVIE" }, [...quarters, third]);
     expect(textOf(quarters[1], of(quarters[1]))).toBe("Quart de finale 2");
-    expect(textOf(third, of(third))).toBe("Petite Finale");
+    expect(textOf(third, of(third))).toBe("Petite finale");
   });
 
   it("buildShareRounds_bgSurviePlayoffFinal_isGrandFinalLikeThePage", () => {

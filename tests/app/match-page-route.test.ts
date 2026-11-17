@@ -36,6 +36,8 @@ import { authUser } from "../helpers/auth-user";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentSnapshot } from "../helpers/tournament-detail";
 import { isMigratedRoute } from "@/lib/shared/locales";
+import { EMBED_MATCH_TITLE_BUDGET } from "@/lib/shared/share-embed-cards";
+import type { MatchShareSummary } from "@/lib/shared/share-embeds";
 
 const connection = connectionMock();
 const card = jest.mocked(getVisibleTournamentCard);
@@ -241,6 +243,51 @@ describe("encart du lien partagé", () => {
 
     expect(loadCard).toHaveBeenCalledTimes(1);
     expect(String((meta.title as { absolute: string }).absolute)).toContain("Coupe des membres");
+  });
+
+  it("matchPageMetadata_sharedMatch_compactShareTitleTabKeepsTournament", async () => {
+    const summary: MatchShareSummary = {
+      matchId: 34,
+      bracket: "UPPER",
+      roundNumber: 2,
+      matchNumber: 3,
+      round: { kind: "stage", stage: "quarters", lower: false, round: 2 },
+      startAt: null,
+      status: "COMPLETED",
+      team1: { teamId: 1, name: "Choco Pops", logoUrl: null, solo: false },
+      team2: { teamId: 2, name: "Sl solearis", logoUrl: null, solo: false },
+      score: { team1: 0, team2: 3 },
+      winnerSide: 2,
+      forfeitSide: null,
+      doubleForfeit: false,
+      maps: [],
+    };
+    const loadShare = jest.fn(async () => ({
+      card: tournamentCard({ id: 12, name: "BlueGenji Survie d'hiver" }),
+      share: { leader: null, matches: new Map([[34, summary]]) },
+      stale: false,
+    }));
+
+    const meta = await matchPageMetadata("12", "34", true, async () => ({ canManage: false }), undefined, loadShare);
+
+    const shareTitle = "Choco Pops 0–3 Sl solearis · Quart de finale 3";
+    expect((meta.openGraph as { title?: string }).title).toBe(shareTitle);
+    expect((meta.twitter as { title?: string }).title).toBe(shareTitle);
+    expect((meta.openGraph as { siteName?: string }).siteName).toBe("BlueGenji Esport");
+    expect(meta.title).toEqual({ absolute: expect.stringMatching(/^Choco Pops 0–3 Sl solearis · Quart de finale 3 — BlueGenji Survie/u) });
+  });
+
+  it("matchPageMetadata_fallbackLongTournament_shareTitleWithinBudget", async () => {
+    const long = "Coupe d'hiver des équipes amateurs francophones édition spéciale de fin d'année";
+    card.mockResolvedValue(tournamentCard({ id: 12, name: long }));
+
+    const meta = await matchPageMetadata("12", "34", false, async () => ({ canManage: false }), undefined, async () => null);
+
+    const shareTitle = String((meta.openGraph as { title?: string }).title);
+    expect(shareTitle.startsWith("Manche 2 · Match 3 — Coupe d'hiver")).toBe(true);
+    expect(shareTitle.endsWith("…")).toBe(true);
+    expect(Array.from(shareTitle).length).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+    expect(meta.title).toEqual({ absolute: expect.stringContaining("édition spéciale de fin d'année") });
   });
 
   it("tournoi invisible, droits refusés ou identifiant de match invalide : l'encart du site", async () => {

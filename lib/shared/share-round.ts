@@ -13,9 +13,10 @@
 import { endurancePlayoffGhostSlots, endurancePlayoffRoundCount } from "./bg-survie/playoff-rounds";
 import { isEndurancePlayoffRound } from "./bg-survie/rounds";
 import { stageKey, type StageKey } from "./bracket-stage";
+import { stageMatchLabel, stageRoundLabel } from "./bracket-stage-text";
 import type { Locale } from "./locales";
 import type { Messages } from "./i18n-messages";
-import { tournamentPageMessages, tournamentPageText, type TournamentPageText } from "./tournament-page-text";
+import { fallbackRoundLabel, tournamentPageMessages, tournamentPageText, type TournamentPageText } from "./tournament-page-text";
 import type { BracketMatch, TournamentPhase, TournamentSnapshot } from "./types";
 
 /** Mot de manche d'un mode à classement : « Ronde » (suisse), « Manche » (Survie, qualification). */
@@ -148,10 +149,8 @@ export function shareRoundPageText(
   return tournamentPageText(locale, tournamentPageMessages(messages));
 }
 
-type NumberedStage = "semis" | "quarters" | "roundOf16";
-
 /** Stades dont le libellé de la fiche porte le numéro du match (`bracket.matchLabel`). */
-function isNumberedStage(stage: StageKey): stage is NumberedStage {
+function isNumberedStage(stage: StageKey): stage is "semis" | "quarters" | "roundOf16" {
   return stage === "semis" || stage === "quarters" || stage === "roundOf16";
 }
 
@@ -174,22 +173,20 @@ function numberedRoundLabel(text: TournamentPageText, noun: ShareRoundNoun, valu
  * une finale, une grande finale ou une petite finale (un seul match).
  *
  * @param round Le descripteur ({@link buildShareRounds}) ; `null` (match
- *   inconnu du résumé) retombe sur « Manche n · Match m ».
+ *   inconnu du résumé) retombe sur « Manche n · Match m » ({@link fallbackRoundLabel}).
  */
 export function shareRoundText(
   text: TournamentPageText,
   round: ShareRound | null,
   position: Readonly<{ roundNumber: number; matchNumber: number }>,
 ): string {
-  const number = String(position.matchNumber);
-  const matchN = text.t("bracket.matchN", { number });
-  const roundN = (value: number) => text.t("bracket.roundN", { number: String(value) });
-  if (round === null) return `${roundN(position.roundNumber)} · ${matchN}`;
+  const matchN = text.t("bracket.matchN", { number: String(position.matchNumber) });
+  if (round === null) return `${fallbackRoundLabel(text, position.roundNumber)} · ${matchN}`;
   if (round.kind === "numbered") return `${numberedRoundLabel(text, round.noun, round.number)} · ${matchN}`;
   const lowerPrefix = round.lower && round.stage !== "lowerFinal" ? text.t("page.bracketLabels.LOWER") : null;
   let label: string;
-  if (round.stage === "early") label = `${roundN(round.round)} · ${matchN}`;
-  else if (isNumberedStage(round.stage)) label = text.t(`bracket.matchLabel.${round.stage}`, { number });
-  else label = text.t(`bracket.stage.${round.stage}`);
+  if (round.stage === "early") label = `${stageRoundLabel(text, "early", round.round - 1)} · ${matchN}`;
+  else if (isNumberedStage(round.stage)) label = stageMatchLabel(text, round.stage, position.matchNumber);
+  else label = stageRoundLabel(text, round.stage, round.round - 1);
   return lowerPrefix ? `${lowerPrefix} · ${label}` : label;
 }

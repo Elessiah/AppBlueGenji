@@ -209,6 +209,16 @@ function Schedule({ schedule }: Readonly<{ schedule: EmbedSchedule }>): ReactEle
   );
 }
 
+/** Largeur maximale du sous-titre (nom du tour, « +N maps »), qui ne rétrécit pas. */
+export const MATCH_SUBTITLE_MAX_WIDTH = 640;
+/** Écart entre le titre et le sous-titre. */
+export const MATCH_SUBTITLE_GAP = 18;
+/**
+ * Place que le titre (nom du tournoi) garde au pire, à côté du sous-titre le
+ * plus large : 1200 − 2 × 72 (marges) − 640 − 18 = 398 px.
+ */
+export const MATCH_TITLE_MIN_WIDTH = 360;
+
 /** La carte d'un match, prête à être passée à `ImageResponse`. */
 export function MatchShareCard({
   eyebrow,
@@ -261,8 +271,9 @@ export function MatchShareCard({
               flexShrink: 0,
               // Assez large pour « Tableau perdants · Quart de finale 12 · +3 maps » :
               // c'est le titre (nom du tournoi) qui cède, pas le numéro du match.
-              maxWidth: 640,
-              marginLeft: 18,
+              // Borné : le titre garde au moins `MATCH_TITLE_MIN_WIDTH` (testé).
+              maxWidth: MATCH_SUBTITLE_MAX_WIDTH,
+              marginLeft: MATCH_SUBTITLE_GAP,
               fontSize: 26,
               color: SHARE_CARD_COLORS.inkMute,
             }}
