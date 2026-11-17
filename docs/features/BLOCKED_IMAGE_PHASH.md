@@ -89,14 +89,20 @@ ES2017).
   nombre JavaScript perdrait ses derniers chiffres.
 - **Aucun remplissage** : les lignes bloquées avant EF-72 n'ont que leur
   SHA-256 — le fichier est parti, rien ne se recalcule d'office. Seule
-  exception : la même image supprimée **de nouveau** alors que son fichier est
-  encore sur le site (URL partagée par un autre compte, effacement d'un compte)
-  — `COALESCE(phash, VALUES(phash))` pose alors l'empreinte perceptuelle sur la
-  ligne ancienne. Les textes légaux le disent (/rgpd, registre T01, entrée
+  exception : la même image bloquée **de nouveau** alors que le site en garde
+  encore le fichier (nouvelle suppression, URL partagée par un autre compte,
+  effacement d'un compte, purge d'un avatar masqué) —
+  `COALESCE(phash, VALUES(phash))` pose alors l'empreinte perceptuelle sur la
+  ligne ancienne, qui garde la date de son premier blocage (D31 : jamais
+  redatée). Les textes légaux le disent (/rgpd, registre T01, entrée
   `2026-11-empreinte-perceptuelle-avatar`) et ne datent l'empreinte qu'au mois
   (« novembre 2026 ») : la mise en ligne tombe la nuit du 18.
-- Textes légaux et borne : « 2 000 empreintes perceptuelles bloquées les plus
-  récentes » = `MAX_COMPARED_PHASHES` (test `account-deletion-d2-texts`).
+- Textes légaux et borne : « les empreintes perceptuelles des 2 000 images
+  bloquées le plus récemment (date du blocage) ; les plus anciennes restent
+  gardées mais ne sont plus comparées » = `MAX_COMPARED_PHASHES`, tri par
+  `created_at` (test `account-deletion-d2-texts`). « Décoder », pas « lire » :
+  un fichier introuvable ne bloque rien, seule une image indécodable n'a que
+  son SHA-256.
 - La levée d'un blocage (contestation acceptée, `unblockImageHashOn`) retire la
   ligne entière, `phash` compris. Une **autre** image bloquée d'allure voisine
   continue de refuser l'image rétablie : elle a elle-même été supprimée par la

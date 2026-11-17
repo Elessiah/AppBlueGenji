@@ -102,6 +102,8 @@ export async function isBlockedImage(processed: Buffer, original?: Buffer): Prom
     // en nombre JavaScript perdrait ses derniers chiffres.
     // `created_at` n'est qu'un jour : `sha256` départage, la coupe ne varie pas
     // d'un téléversement à l'autre.
+    // Tri par jour de blocage, comme le disent les textes légaux : une ligne
+    // ancienne qui reçoit une empreinte perceptuelle garde sa date (D31).
     const [rows] = await db.execute<(RowDataPacket & { phash: string })[]>(
       `SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
         WHERE phash IS NOT NULL ORDER BY created_at DESC, sha256 LIMIT ${MAX_COMPARED_PHASHES}`,
