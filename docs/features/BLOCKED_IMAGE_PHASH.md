@@ -11,24 +11,35 @@ empreinte perceptuelle (`phash`).
 
 pHash DCT, 64 bits, calculé avec sharp (déjà dans le dépôt, aucune
 dépendance) : image aplatie sur un gris moyen, ramenée à 32 × 32 en niveaux de
-gris ; DCT, bloc 8 × 8 des basses fréquences ; chaque bit dit si son
-coefficient dépasse la médiane des 63 coefficients hors composante continue.
-Écrite en décimal (forme d'un `BIGINT UNSIGNED`), sans littéral `BigInt`
-(cible ES2017).
+gris ; DCT, bloc 9 × 9 des basses fréquences dont on garde les **64
+coefficients de plus basse fréquence hors composante continue** (la
+luminosité moyenne dépasserait toujours la médiane : gardée, elle poserait le
+même bit sur toutes les empreintes) ; chaque bit dit si son coefficient
+dépasse leur médiane. Écrite en décimal (forme d'un `BIGINT UNSIGNED`), sans
+littéral `BigInt` (cible ES2017).
 
-- **Image presque unie** (énergie moyenne des coefficients sous
-  `MIN_AC_ENERGY`) : pas d'empreinte (`null`). Toutes les images unies se
-  ressembleraient — un aplat bloqué refuserait tous les autres. Même chose pour
-  une image dont le contraste n'est **que de couleur** (teintes de même
-  luminance) : elle n'est bloquée que par ses octets.
+- **Image trop simple** : pas d'empreinte (`null`) quand moins de
+  `MIN_SIGNIFICANT_COEFFICIENTS` (40) coefficients sur 64 s'écartent de la
+  médiane de plus de `MIN_COEFFICIENT_DEVIATION` (0,5 niveau de gris). Les
+  autres bits ne disent que le bruit d'arrondi, **le même d'une image à
+  l'autre** : un aplat, un dégradé, une image dont le contraste n'est que de
+  couleur, et surtout **tout motif centré et symétrique** (disque, losange,
+  anneau, initiale dans un cercle, emblème au milieu d'un logo d'équipe sur
+  fond transparent, silhouette de face) — la symétrie annule la moitié des
+  coefficients ou plus. Avant la revue EF-72, deux emblèmes différents
+  tombaient à 6 bits l'un de l'autre : un emblème bloqué en aurait refusé
+  d'innocents. Une telle image n'est bloquée que par ses octets. Mesuré : un
+  motif symétrique a 14 à 39 coefficients marqués, une silhouette de face 33,
+  une scène ordinaire 25 à 53 (49 scènes sur 60 en ont une empreinte).
 - **Seuil** `PHASH_MATCH_DISTANCE = 10` bits sur 64. Mesuré sur des images de
-  synthèse passées par le gabarit avatar (`tests/lib/server/image-phash.test.ts`) :
-  autre format source, réencodage, redimensionnement ≤ 2 ; cadre décalé de
-  2,5 % de la source ≤ 8 ; décalé de 5 % : 2 à 20 (le plus souvent sous 10) ;
-  images différentes ≥ 18 (moitié des paires au-delà de 30), silhouettes de
-  même disposition ≥ 22. Un faux refus coûte plus à un joueur de bonne foi
-  qu'un contournement par un cadre très décalé, que la modération rattrape sur
-  signalement.
+  synthèse passées par le gabarit avatar (`tests/lib/server/image-phash.test.ts`,
+  60 scènes à la revue) : autre format source, réencodage, redimensionnement
+  ≤ 2 ; cadre décalé de 2,5 % de la source ≤ 12 (presque toujours sous 10) ;
+  décalé de 5 % : 2 à 18 (trois fois sur quatre sous 10) ; images différentes
+  qui ont une empreinte ≥ 20 (moitié des paires au-delà de 32). Une image à la
+  limite peut perdre son empreinte une fois retouchée : elle passe alors.
+  Un faux refus coûte plus à un joueur de bonne foi qu'un contournement par
+  un cadre très décalé, que la modération rattrape sur signalement.
 
 ## Stockage
 
@@ -54,23 +65,39 @@ coefficient dépasse la médiane des 63 coefficients hors composante continue.
 
 `isBlockedImage(processed, original?)` : SHA-256 de l'image traitée et du
 fichier brut, et empreinte perceptuelle de l'image **traitée** (celle qui serait
-servie, comparable à celle des avatars bloqués). Une seule requête :
+servie, comparable à celle des avatars bloqués). Une seule requête rend la
+correspondance exacte et les empreintes perceptuelles posées :
 
 ```sql
-SELECT 1 FROM bg_blocked_image_hashes
- WHERE sha256 IN (?, ?) OR (phash IS NOT NULL AND BIT_COUNT(phash ^ CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)) <= ?) LIMIT 1
+SELECT sha256 IN (?, ?) AS exact, CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
+ WHERE sha256 IN (?, ?) OR phash IS NOT NULL
 ```
 
-Comparaison en SQL plutôt qu'en mémoire : la liste ne grandit qu'avec les
-suppressions de la modération (quelques dizaines de lignes), son parcours
-complet coûte moins qu'un aller-retour, aucune empreinte ne quitte la base.
-`BIT_COUNT` et `^` sur `BIGINT UNSIGNED` existent sous MySQL 8 et MariaDB 11.8.
-Toute empreinte liée en paramètre passe par
+Une ligne `exact` refuse. Sinon, et seulement si une empreinte perceptuelle est
+posée, l'image traitée est décodée une fois de plus pour la sienne, comparée en
+mémoire (`phashDistance`) : chaque téléversement ne paie pas ce décodage tant
+que la liste n'a que des lignes d'avant D17. La liste ne grandit qu'avec les
+suppressions de la modération (quelques dizaines de lignes). Une ligne sans
+`phash` ne compte que par son SHA-256. Le refus reste le code `IMAGE_BLOCKED`,
+comme avant ; il vaut pour un avatar comme pour un logo d'équipe (un emblème
+centré sur fond transparent n'a pas d'empreinte, voir plus haut).
+
+Toute empreinte **écrite** en paramètre passe par
 `CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)` : en requête préparée, MySQL 8 lit
 `CAST(? AS UNSIGNED)` d'une chaîne comme un entier signé et plafonne tout
 au-delà de 2^63 − 1 (mesuré : `18446744073709551615` devenait
-`9223372036854775807`).
-Le refus reste le code `IMAGE_BLOCKED`, comme avant.
+`9223372036854775807`). MariaDB 11.8 accepte la même chaîne de casts.
+
+## Relevé hors verrou
+
+Le décodage d'une image (dizaines de millisecondes, davantage sur le Raspberry
+de production) ne tient pas les verrous d'une décision : `deleteUserAvatarForReport`
+et `purgeQuarantinedLogo` relèvent les empreintes du fichier **avant** leur
+transaction (`prepareAvatarFingerprint`, `prepareQuarantinedAvatarFingerprint`,
+lecture non verrouillée) ; sous le verrou, `readImageFingerprint(chemin, préparée)`
+ne refait que la lecture et le SHA-256, et reprend l'empreinte perceptuelle
+préparée si les octets n'ont pas changé. Toute préparation en échec rend
+`null` : l'empreinte se calcule alors sous le verrou, comme avant.
 
 ## RGPD
 

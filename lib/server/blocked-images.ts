@@ -5,7 +5,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { failureReason } from "@/lib/server/failure-reason";
-import { imagePerceptualHash, PHASH_MATCH_DISTANCE } from "@/lib/server/image-phash";
+import { imagePerceptualHash, PHASH_MATCH_DISTANCE, phashDistance } from "@/lib/server/image-phash";
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
@@ -27,8 +27,9 @@ import { imagePerceptualHash, PHASH_MATCH_DISTANCE } from "@/lib/server/image-ph
  * `PHASH_MATCH_DISTANCE` bits au plus de celle d'une image bloquée — un cadre
  * un peu décalé, un autre format source, un réencodage ne passent plus. Une
  * empreinte posée avant D17 n'a que son SHA-256 (le fichier est parti, rien
- * ne se recalcule). Une retouche franche y échappe encore — c'est un
- * garde-fou, pas une modération.
+ * ne se recalcule), comme une image trop simple pour en avoir une (motif
+ * centré et symétrique : `image-phash.ts`). Une retouche franche y échappe
+ * encore — c'est un garde-fou, pas une modération.
  *
  * L'empreinte d'une image n'identifie personne ; aucune colonne ne désigne de
  * compte.
@@ -45,15 +46,10 @@ export function imageSha256(content: Buffer): string {
 /**
  * Les deux empreintes d'une image bloquée : `sha256` (octets exacts, clé de la
  * liste) et `phash` (allure, entier de 64 bits écrit en décimal ; `null` pour
- * une image presque unie ou indécodable — elle n'est alors bloquée que par
- * ses octets).
+ * une image trop simple — presque unie, motif centré et symétrique — ou
+ * indécodable : elle n'est alors bloquée que par ses octets).
  */
 export type ImageFingerprint = { sha256: string; phash: string | null };
-
-/** Les deux empreintes d'un contenu. */
-export async function imageFingerprint(content: Buffer): Promise<ImageFingerprint> {
-  return { sha256: imageSha256(content), phash: await imagePerceptualHash(content) };
-}
 
 /**
  * L'image traitée (et, s'il est donné, le fichier tel que téléversé) est-elle
@@ -63,35 +59,36 @@ export async function imageFingerprint(content: Buffer): Promise<ImageFingerprin
  * serait servie, comparable à celle des avatars bloqués — à
  * `PHASH_MATCH_DISTANCE` bits au plus d'une empreinte bloquée.
  *
- * L'empreinte voyage en texte décimal et passe par `DECIMAL(20,0)` avant
- * `UNSIGNED` : en requête préparée, MySQL 8 lit le seul cast `UNSIGNED` d'une
- * chaîne comme un entier **signé** et plafonne tout au-delà de 2^63 − 1 —
- * la moitié des empreintes y seraient faussées (mesuré sur la base de
- * développement).
- *
- * Une requête, comparaison faite en SQL (`BIT_COUNT` du OU exclusif) : la
- * liste ne grandit qu'avec les suppressions de la modération (quelques
- * dizaines de lignes), son parcours complet coûte moins qu'un aller-retour,
- * et aucune empreinte ne quitte la base. Table absente (migration en échec) =
- * non.
+ * Une requête rend à la fois la correspondance exacte et les empreintes
+ * perceptuelles posées (relues en texte : un `BIGINT` rendu en nombre
+ * JavaScript perdrait ses derniers chiffres) ; la liste ne grandit qu'avec les
+ * suppressions de la modération (quelques dizaines de lignes). L'empreinte de
+ * l'image n'est calculée — un décodage de plus — que si une correspondance
+ * exacte manque **et** qu'une empreinte perceptuelle est posée : sans quoi
+ * chaque téléversement paierait ce décodage pour rien. Table absente
+ * (migration en échec) = non.
  */
 export async function isBlockedImage(processed: Buffer, original?: Buffer): Promise<boolean> {
   const hashes = [imageSha256(processed)];
   if (original) hashes.push(imageSha256(original));
-  const phash = await imagePerceptualHash(processed);
-  const perceptual =
-    phash === null ? "" : " OR (phash IS NOT NULL AND BIT_COUNT(phash ^ CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)) <= ?)";
+  const placeholders = hashes.map(() => "?").join(", ");
   const db = await getDatabase();
+  let rows: (RowDataPacket & { exact: number | string; phash: string | null })[];
   try {
-    const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (${hashes.map(() => "?").join(", ")})${perceptual} LIMIT 1`,
-      phash === null ? hashes : [...hashes, phash, PHASH_MATCH_DISTANCE],
+    [rows] = await db.execute<(RowDataPacket & { exact: number | string; phash: string | null })[]>(
+      `SELECT sha256 IN (${placeholders}) AS exact, CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
+        WHERE sha256 IN (${placeholders}) OR phash IS NOT NULL`,
+      [...hashes, ...hashes],
     );
-    return rows.length > 0;
   } catch (error) {
     if (isMissingTableError(error)) return false;
     throw error;
   }
+  if (rows.some((row) => Number(row.exact) === 1)) return true;
+  const blocked = rows.flatMap((row) => (row.phash === null ? [] : [row.phash]));
+  if (blocked.length === 0) return false;
+  const phash = await imagePerceptualHash(processed);
+  return phash !== null && blocked.some((other) => phashDistance(phash, other) <= PHASH_MATCH_DISTANCE);
 }
 
 /**
@@ -222,10 +219,21 @@ export async function blockImageHashesSafely(
  * Les empreintes d'un fichier, ou `null` s'il ne se lit pas (déjà parti) —
  * lues avant l'effacement, pour être gardées sur la ligne de la décision
  * (`bg_logo_quarantines.image_sha256` et `image_phash`, décisions D18, D22, D17).
+ *
+ * `prepared` : les empreintes du même fichier, relevées **avant** la
+ * transaction de l'appelant. Sous verrou, seuls la lecture et le SHA-256 sont
+ * refaits ; si les octets n'ont pas changé, l'empreinte perceptuelle préparée
+ * est reprise — son décodage ne tient pas les verrous de la décision.
  */
-export async function readImageFingerprint(absolutePath: string): Promise<ImageFingerprint | null> {
+export async function readImageFingerprint(
+  absolutePath: string,
+  prepared?: ImageFingerprint | null,
+): Promise<ImageFingerprint | null> {
   const content = await readFile(absolutePath).catch(() => null);
-  return content === null ? null : imageFingerprint(content);
+  if (content === null) return null;
+  const sha256 = imageSha256(content);
+  if (prepared && prepared.sha256 === sha256) return { sha256, phash: prepared.phash };
+  return { sha256, phash: await imagePerceptualHash(content) };
 }
 
 /** Ce qu'il faut pour écrire dans la transaction de l'appelant. */

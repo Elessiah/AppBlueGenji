@@ -319,6 +319,35 @@ describe("deleteUserAvatarForReport", () => {
 
   // Revue sécurité #571, cycle 3 (D6) : demander la suppression ne met pas
   // l'avatar hors d'atteinte — il est retiré du masque, bloqué, effacé.
+  // Revue EF-72 cycle 1 : le décodage de l'image (empreinte perceptuelle) se
+  // fait avant la transaction ; sous le verrou, l'empreinte préparée est reprise.
+  it("deleteUserAvatarForReport_preparesFingerprintBeforeTransaction", async () => {
+    install(
+      [reportTargets, userTarget, [/SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = \? LIMIT 1/, () => [[{ pseudo: "Nova", avatar_url: AVATAR, is_deleted: 0 }]]]],
+      [locked(AVATAR), [/UPDATE bg_users SET avatar_url = NULL/, () => [{}]], [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 40 }]]],
+    );
+
+    await deleteUserAvatarForReport(12, 9, actor);
+
+    const calls = jest.mocked(readImageFingerprint).mock;
+    expect(calls.calls[0]).toEqual([LIVE_AVATAR]);
+    expect(calls.invocationCallOrder[0]).toBeLessThan(jest.mocked(connection.beginTransaction).mock.invocationCallOrder[0]);
+    expect(calls.calls[1]).toEqual([LIVE_AVATAR, fingerprint(LIVE_AVATAR)]);
+  });
+
+  it("deleteUserAvatarForReport_prepareReadFails_readsUnderLockWithoutPrepared", async () => {
+    install(
+      [reportTargets, userTarget, [/SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = \? LIMIT 1/, () => { throw new Error("DB_DOWN"); }]],
+      [locked(AVATAR), [/UPDATE bg_users SET avatar_url = NULL/, () => [{}]], [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 40 }]]],
+    );
+
+    await deleteUserAvatarForReport(12, 9, actor);
+
+    expect(readImageFingerprint).toHaveBeenCalledTimes(1);
+    expect(readImageFingerprint).toHaveBeenCalledWith(LIVE_AVATAR, null);
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), fingerprint(LIVE_AVATAR));
+  });
+
   it("deleteUserAvatarForReport_pendingAccount_takesHeldAvatarSkipsUserUpdateAndSoloSync", async () => {
     install(
       [reportTargets, userTarget],
@@ -1394,6 +1423,11 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
     quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR, status, image_sha256: "abc" });
   const owner: Route = [/SELECT user_id FROM bg_logo_quarantines WHERE id = \? LIMIT 1/, () => [[{ user_id: 9 }]]];
   const lockUser: Route = [/SELECT id FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ id: 9 }]]];
+  // L'avatar en quarantaine, lu hors transaction pour préparer son empreinte.
+  const prepareRow: Route = [
+    /SELECT user_id, logo_url FROM bg_logo_quarantines WHERE id = \? AND team_id IS NULL AND user_id IS NOT NULL LIMIT 1/,
+    () => [[{ user_id: 9, logo_url: AVATAR }]],
+  ];
 
   /** Rang du verrou du compte et de celui de la quarantaine parmi les requêtes de la connexion. */
   function lockRanks(): { user: number; quarantine: number } {
@@ -1426,6 +1460,7 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
   it("purgeQuarantinedLogo_avatar_locksUserBeforeQuarantine", async () => {
     install([], [
       owner,
+      prepareRow,
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
       [/SET status = 'PURGED'/, () => [{}]],
@@ -1433,7 +1468,55 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
 
     await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
 
-    expect(lockRanks()).toEqual({ user: 1, quarantine: 2 });
+    // Rang 1 : la préparation de l'empreinte, hors transaction.
+    expect(lockRanks()).toEqual({ user: 2, quarantine: 3 });
+  });
+
+  // Revue EF-72 cycle 1 : le décodage de l'image (empreinte perceptuelle) se
+  // fait avant la transaction, pas sous les verrous du compte et de la ligne.
+  it("purgeQuarantinedLogo_avatar_preparesFingerprintBeforeTransaction", async () => {
+    install([], [
+      owner,
+      prepareRow,
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
+
+    const calls = jest.mocked(readImageFingerprint).mock;
+    expect(calls.calls[0]).toEqual([HIDDEN_AVATAR]);
+    expect(calls.invocationCallOrder[0]).toBeLessThan(jest.mocked(connection.beginTransaction).mock.invocationCallOrder[0]);
+    expect(calls.calls[1]).toEqual([HIDDEN_AVATAR, fingerprint(HIDDEN_AVATAR)]);
+  });
+
+  it("purgeQuarantinedLogo_prepareQueryFails_readsUnderLockWithoutPrepared", async () => {
+    install([], [
+      owner,
+      [/AND team_id IS NULL AND user_id IS NOT NULL LIMIT 1/, () => { throw new Error("ER_LOCK_WAIT_TIMEOUT"); }],
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
+
+    expect(readImageFingerprint).toHaveBeenCalledTimes(1);
+    expect(readImageFingerprint).toHaveBeenCalledWith(HIDDEN_AVATAR, null);
+  });
+
+  it("purgeQuarantinedLogo_teamLogo_noPrepareQuery", async () => {
+    install([], [
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[quarantineRow({ status: "HIDDEN" })]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
+
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    expect(sqls.some((sql) => /AND team_id IS NULL AND user_id IS NOT NULL/.test(sql))).toBe(false);
+    expect(readImageFingerprint).not.toHaveBeenCalled();
   });
 
   it("restoreReportedImage_avatar_locksUserBeforeQuarantine", async () => {

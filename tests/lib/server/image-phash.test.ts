@@ -43,11 +43,33 @@ function scene(seed: number): Buffer {
   return svg(parts.join(""));
 }
 
-/** Silhouette (tête et buste) : même disposition, couleurs et tailles au choix. */
-function silhouette(skin: string, radius: number, background: string): Buffer {
+/**
+ * Silhouette (tête et buste) décentrée, comme un portrait cadré de côté : même
+ * disposition, couleurs et tailles au choix.
+ */
+function silhouette(skin: string, radius: number, background: string, centre = 220): Buffer {
   return svg(
-    `<rect width="600" height="600" fill="${background}"/><circle cx="300" cy="230" r="${radius}" fill="${skin}"/><ellipse cx="300" cy="560" rx="${radius * 2}" ry="200" fill="${skin}"/>`,
+    `<rect width="600" height="600" fill="${background}"/><circle cx="${centre}" cy="230" r="${radius}" fill="${skin}"/><ellipse cx="${centre}" cy="560" rx="${radius * 2}" ry="200" fill="${skin}"/><rect x="420" y="60" width="120" height="40" fill="${skin}"/>`,
   );
+}
+
+/** Un motif centré et symétrique sur un fond uni (disque, losange, anneau, initiale dans un cercle). */
+function centredEmblem(kind: "disc" | "diamond" | "ring" | "initial", foreground: string, background: string): Buffer {
+  const shapes = {
+    disc: `<circle cx="300" cy="300" r="190" fill="${foreground}"/>`,
+    diamond: `<rect x="150" y="150" width="300" height="300" fill="${foreground}" transform="rotate(45 300 300)"/>`,
+    ring: `<circle cx="300" cy="300" r="210" fill="none" stroke="${foreground}" stroke-width="40"/>`,
+    initial: `<circle cx="300" cy="300" r="250" fill="${foreground}"/><text x="300" y="400" font-size="300" text-anchor="middle" font-family="Arial" fill="${background}">A</text>`,
+  };
+  return svg(`<rect width="600" height="600" fill="${background}"/>${shapes[kind]}`);
+}
+
+/** Le gabarit logo d'équipe de `storeImageBuffer` : 512 × 512 `contain` sur fond transparent, WebP 82. */
+async function storedTeamLogo(source: Buffer): Promise<Buffer> {
+  return sharp(source)
+    .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .webp({ quality: 82 })
+    .toBuffer();
 }
 
 function svg(body: string): Buffer {
@@ -74,11 +96,13 @@ async function sourcePng(seed: number): Promise<Buffer> {
   return sharp(scene(seed)).png().toBuffer();
 }
 
-const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+// Scènes assez détaillées pour avoir une empreinte (les graines 1, 2, 3 et 6 ; les 5 et 17, à la limite, perdent la leur une fois agrandie ou décalée — sans empreinte, rien ne correspond : un contournement possible, jamais un faux refus
+// en ont moins de `MIN_SIGNIFICANT_COEFFICIENTS` coefficients marqués).
+const SEEDS = [4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
 
 describe("imagePerceptualHash — même image, autre version", () => {
   it("imagePerceptualHash_jpegSource_withinTwoBits", async () => {
-    const png = await sourcePng(1);
+    const png = await sourcePng(8);
     const stored = await hashOf(await storedAvatar(png));
 
     const fromJpeg = await hashOf(await storedAvatar(await sharp(png).jpeg({ quality: 70 }).toBuffer()));
@@ -87,7 +111,7 @@ describe("imagePerceptualHash — même image, autre version", () => {
   });
 
   it("imagePerceptualHash_storedFileReencodedAsPng_withinTwoBits", async () => {
-    const stored = await storedAvatar(await sourcePng(2));
+    const stored = await storedAvatar(await sourcePng(9));
 
     const reencoded = await sharp(stored).png().toBuffer();
 
@@ -95,7 +119,7 @@ describe("imagePerceptualHash — même image, autre version", () => {
   });
 
   it("imagePerceptualHash_storedFileReencodedAsLowQualityJpeg_withinTwoBits", async () => {
-    const stored = await storedAvatar(await sourcePng(3));
+    const stored = await storedAvatar(await sourcePng(10));
 
     const reencoded = await sharp(stored).jpeg({ quality: 50 }).toBuffer();
 
@@ -111,7 +135,7 @@ describe("imagePerceptualHash — même image, autre version", () => {
   });
 
   it("imagePerceptualHash_storedFileResizedLarge_withinTwoBits", async () => {
-    const stored = await storedAvatar(await sourcePng(5));
+    const stored = await storedAvatar(await sourcePng(12));
 
     const large = await sharp(stored).resize(1024, 1024).jpeg().toBuffer();
 
@@ -119,7 +143,7 @@ describe("imagePerceptualHash — même image, autre version", () => {
   });
 
   it("imagePerceptualHash_storedFileUploadedAgainThroughPipeline_withinTwoBits", async () => {
-    const stored = await storedAvatar(await sourcePng(6));
+    const stored = await storedAvatar(await sourcePng(11));
 
     const again = await storedAvatar(stored);
 
@@ -136,7 +160,7 @@ describe("imagePerceptualHash — même image, autre version", () => {
   });
 
   it("imagePerceptualHash_cropShiftedFivePercent_matches", async () => {
-    const png = await sourcePng(1);
+    const png = await sourcePng(8);
     const stored = await hashOf(await storedAvatar(png));
 
     const shifted = await hashOf(await storedAvatar(png, { left: 30, top: 30, width: 570, height: 570 }));
@@ -174,6 +198,44 @@ describe("imagePerceptualHash — images différentes", () => {
 });
 
 describe("imagePerceptualHash — sans empreinte", () => {
+  // Revue EF-72 cycle 1 : la symétrie annule la moitié des coefficients ou plus ;
+  // leurs bits n'étaient que du bruit d'arrondi, et deux emblèmes différents
+  // tombaient à 6 bits l'un de l'autre.
+  it.each(["disc", "diamond", "ring", "initial"] satisfies ("disc" | "diamond" | "ring" | "initial")[])(
+    "imagePerceptualHash_centredSymmetricEmblem_returnsNull (%s)",
+    async (kind) => {
+      const avatar = await storedAvatar(await sharp(centredEmblem(kind, "#f4f4f4", "#2244cc")).png().toBuffer());
+
+      expect(await imagePerceptualHash(avatar)).toBeNull();
+    },
+  );
+
+  it("imagePerceptualHash_centredEmblemTeamLogo_returnsNull", async () => {
+    const emblem = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><circle cx="300" cy="200" r="120" fill="#ffd000"/></svg>`,
+    );
+
+    const logo = await storedTeamLogo(await sharp(emblem).png().toBuffer());
+
+    expect(await imagePerceptualHash(logo)).toBeNull();
+  });
+
+  it("imagePerceptualHash_mirrorSymmetricSilhouette_returnsNull", async () => {
+    const centred = svg(
+      `<rect width="600" height="600" fill="#204060"/><circle cx="300" cy="230" r="110" fill="#e0b090"/><ellipse cx="300" cy="560" rx="220" ry="200" fill="#e0b090"/>`,
+    );
+
+    expect(await imagePerceptualHash(await storedAvatar(centred))).toBeNull();
+  });
+
+  it("imagePerceptualHash_horizontalGradient_returnsNull", async () => {
+    const gradient = svg(
+      `<defs><linearGradient id="g"><stop offset="0" stop-color="#cc2020"/><stop offset="1" stop-color="#2020cc"/></linearGradient></defs><rect width="600" height="600" fill="url(#g)"/>`,
+    );
+
+    expect(await imagePerceptualHash(await storedAvatar(gradient))).toBeNull();
+  });
+
   it("imagePerceptualHash_solidColour_returnsNull", async () => {
     const flat = await sharp({ create: { width: 256, height: 256, channels: 3, background: "#3366aa" } })
       .jpeg({ quality: 60 })
@@ -216,6 +278,18 @@ describe("imagePerceptualHash — forme", () => {
     const rgb = new Uint8Array(32 * 32 * 3).map((_, i) => grey[Math.floor(i / 3)]);
 
     expect(perceptualHashFromGrey(rgb, 3)).toBe(perceptualHashFromGrey(grey));
+  });
+});
+
+describe("imagePerceptualHash — composante continue", () => {
+  // La luminosité moyenne dépasse toujours la médiane : gardée, elle aurait
+  // posé le même bit sur toutes les empreintes.
+  it("imagePerceptualHash_detailedScenes_lowestBitNotConstant", async () => {
+    const hashes = await Promise.all(SEEDS.map(async (seed) => hashOf(await storedAvatar(await sourcePng(seed)))));
+
+    const lowestBits = new Set(hashes.map((hash) => BigInt(hash) % BigInt(2)));
+
+    expect(lowestBits.size).toBe(2);
   });
 });
 

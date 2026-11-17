@@ -46,13 +46,29 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+/** Cette empreinte, ses `count` bits les plus bas inversés. */
+function flipLowBits(hash: string, count: number): string {
+  return BigInt.asUintN(64, BigInt(hash) ^ (BigInt(2) ** BigInt(count) - BigInt(1))).toString();
+}
+
+/** L'empreinte perceptuelle d'une image qui doit en avoir une. */
+async function phashOf(image: Buffer): Promise<string> {
+  const hash = await imagePerceptualHash(image);
+  if (hash === null) throw new Error("image sans empreinte");
+  return hash;
+}
+
+/** Une ligne lue par `isBlockedImage`. */
+function blockedRow(exact: 0 | 1, phash: string | null): { exact: number; phash: string | null } {
+  return { exact, phash };
+}
+
 describe("isBlockedImage", () => {
-  it("isBlockedImage_hashPresent_true", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ 1: 1 }], []]);
+  it("isBlockedImage_exactShaMatch_true", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(1, null)], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     expect(await isBlockedImage(IMAGE)).toBe(true);
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
   });
 
   it("isBlockedImage_twoContents_queriesBothHashesInOneStatement", async () => {
@@ -63,48 +79,50 @@ describe("isBlockedImage", () => {
     await isBlockedImage(IMAGE, raw);
 
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0][0]).toContain("sha256 IN (?, ?)");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(raw)]);
+    expect(execute.mock.calls[0][0]).toContain("SELECT sha256 IN (?, ?) AS exact, CAST(phash AS CHAR) AS phash");
+    expect(execute.mock.calls[0][0]).toContain("WHERE sha256 IN (?, ?) OR phash IS NOT NULL");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(raw), imageSha256(IMAGE), imageSha256(raw)]);
   });
 
-  it("isBlockedImage_notAnImage_queriesSha256Only", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-
-    await isBlockedImage(IMAGE);
-
-    expect(execute.mock.calls[0][0]).not.toContain("BIT_COUNT");
-  });
-
-  // EF-72 / D17 : l'allure de l'image traitée est comparée en SQL, au seuil commun.
-  it("isBlockedImage_drawnImage_addsPerceptualComparisonWithThreshold", async () => {
-    const image = await drawnImage();
-    const raw = Buffer.from("fichier tel que téléversé");
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-
-    await isBlockedImage(image, raw);
-
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0][0]).toContain(
-      "WHERE sha256 IN (?, ?) OR (phash IS NOT NULL AND BIT_COUNT(phash ^ CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)) <= ?) LIMIT 1",
-    );
-    expect(execute.mock.calls[0][1]).toEqual([
-      imageSha256(image),
-      imageSha256(raw),
-      await imagePerceptualHash(image),
-      PHASH_MATCH_DISTANCE,
-    ]);
-  });
-
-  it("isBlockedImage_perceptualMatchFound_true", async () => {
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[{ 1: 1 }], []]) }));
-
-    expect(await isBlockedImage(await drawnImage())).toBe(true);
-  });
-
-  it("isBlockedImage_hashAbsent_false", async () => {
+  it("isBlockedImage_noRows_false", async () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[], []]) }));
+
+    expect(await isBlockedImage(await drawnImage())).toBe(false);
+  });
+
+  it("isBlockedImage_rowsWithoutPhash_false", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, null)], []]) }),
+    );
+
+    expect(await isBlockedImage(await drawnImage())).toBe(false);
+  });
+
+  // EF-72 / D17 : l'allure de l'image traitée, au seuil commun (borne comprise).
+  it("isBlockedImage_phashAtThreshold_true", async () => {
+    const image = await drawnImage();
+    const near = flipLowBits(await phashOf(image), PHASH_MATCH_DISTANCE);
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, near)], []]) }),
+    );
+
+    expect(await isBlockedImage(image)).toBe(true);
+  });
+
+  it("isBlockedImage_phashBeyondThreshold_false", async () => {
+    const image = await drawnImage();
+    const far = flipLowBits(await phashOf(image), PHASH_MATCH_DISTANCE + 1);
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, far)], []]) }),
+    );
+
+    expect(await isBlockedImage(image)).toBe(false);
+  });
+
+  it("isBlockedImage_imageWithoutPhashAgainstPhashRows_false", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, "0"), blockedRow(0, "18446744073709551615")], []]) }),
+    );
 
     expect(await isBlockedImage(IMAGE)).toBe(false);
   });
@@ -433,6 +451,32 @@ describe("readImageFingerprint", () => {
 
   it("readImageFingerprint_missingFile_returnsNull", async () => {
     expect(await readImageFingerprint(join(tmpdir(), "absent-bg-sha.webp"))).toBeNull();
+  });
+
+  // Revue EF-72 cycle 1 : l'empreinte perceptuelle se relève hors verrou ; sous
+  // le verrou, seuls la lecture et le SHA-256 sont refaits.
+  it("readImageFingerprint_preparedSameBytes_reusesPreparedPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
+
+    const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(image), phash: "42" });
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: "42" });
+  });
+
+  it("readImageFingerprint_preparedOtherBytes_recomputesPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
+
+    const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(IMAGE), phash: "42" });
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: await phashOf(image) });
+  });
+
+  it("readImageFingerprint_preparedButFileGone_returnsNull", async () => {
+    expect(await readImageFingerprint(join(tmpdir(), "absent-bg-sha.webp"), { sha256: "abc", phash: "42" })).toBeNull();
   });
 });
 

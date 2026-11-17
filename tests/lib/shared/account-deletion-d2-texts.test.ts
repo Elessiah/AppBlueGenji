@@ -175,8 +175,26 @@ describe("revue juridique cycle 4", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
 
-    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par ses empreintes (SHA-256, et empreinte perceptuelle, qui reconnaît aussi l'image recadrée, réencodée ou dans un autre format) gardées dès cette suppression");
-    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hashes (SHA-256, and a perceptual hash, which also recognises the image cropped, re-encoded or in another format) kept from that deletion");
+    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par ses empreintes (SHA-256, et empreinte perceptuelle, qui reconnaît aussi, sauf pour une image trop simple, l'image légèrement recadrée, réencodée ou dans un autre format) gardées dès cette suppression");
+    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hashes (SHA-256, and a perceptual hash, which also recognises, except for an image that is too simple, the image slightly cropped, re-encoded or in another format) kept from that deletion");
+  });
+
+  // Revue EF-72 cycle 1 : une image trop simple (motif centré et symétrique)
+  // n'a pas d'empreinte perceptuelle — les textes ne promettent pas plus.
+  it("privacyChangePerceptualHash_tooSimpleImage_saysSha256OnlyFrAndEn", () => {
+    const id = "2026-11-empreinte-perceptuelle-avatar";
+    const fr = PRIVACY_CHANGES.find((change) => change.id === id);
+    const en = PRIVACY_CHANGES_EN[id];
+
+    expect(fr?.summary).toContain("la même image légèrement recadrée, réencodée ou dans un autre format");
+    expect(fr?.details.join(" ")).toContain("Une image trop simple — presque unie, ou un motif centré et symétrique comme une initiale dans un cercle — n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.");
+    expect(en?.summary).toContain("the same image being uploaded again slightly cropped, re-encoded or in another format");
+    expect(en?.details.join(" ")).toContain("An image that is too simple — nearly plain, or a centred symmetric pattern such as an initial in a circle — has no perceptual hash: it is blocked by its SHA-256 hash only.");
+  });
+
+  it("rgpdReports_perceptualHash_exceptTooSimpleImageFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("reconnaît aussi, sauf pour une image trop simple, l&apos;image légèrement recadrée, réencodée");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("also recognises, except for an image that is too simple, the image slightly cropped,");
   });
 
   it("processingRegisterT01_avatarHash_dataCategoryNamesAvatarsFrAndEn", () => {
