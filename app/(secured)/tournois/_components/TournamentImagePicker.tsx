@@ -210,7 +210,7 @@ export function TournamentImagePicker({ existing, value, onChange, busy = false 
             {TOURNAMENT_IMAGE_FITS.map((fit) => (
               <label // NOSONAR S6853 — label englobant : le bouton radio et son texte sont à l'intérieur
                 key={fit}
-                className={`${s.mode} ${settings.fit === fit ? s.modeActive : ""}`}>
+                className={`${s.mode} ${settings.fit === fit ? s.modeActive : ""} ${busy ? s.modeFrozen : ""}`}>
                 <input
                   type="radio"
                   name={`${baseId}-fit`}

@@ -97,8 +97,14 @@
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
-.mode:has(input:enabled):hover {
+.mode:has(input:enabled):not(.modeFrozen):hover {
   border-color: rgba(var(--blue-500-rgb), 0.45);
+}
+
+/* Choix figé le temps d'un envoi (radio en `aria-disabled`) : ni survol ni
+   main, curseur d'attente. */
+.modeFrozen {
+  cursor: progress;
 }
 
 .modeActive {

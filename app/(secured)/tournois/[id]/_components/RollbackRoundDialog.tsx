@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState, type ReactNode } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
@@ -100,19 +100,15 @@ export function RollbackRoundDialog({
   const strongInk = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
   const [acknowledged, setAcknowledged] = useState(false);
   // Boutons focalisables pendant l'envoi (`BusyButton`), garde synchrone
-  // (`useBusyGuard`). La manche effacée, le dialogue reste en attente jusqu'à
-  // sa fermeture : un second envoi viserait une manche déjà annulée.
-  const guard = useBusyGuard();
-  const doneRef = useRef(false);
-  const [done, setDone] = useState(false);
-  const busy = guard.busy || done;
-  const isBusy = () => guard.isBusy() || doneRef.current;
+  // (`useBusyGuard`). La manche effacée, `onRolledBack` ferme le dialogue dans
+  // le même rendu : aucun second envoi ne peut suivre.
+  const { busy, isBusy, run } = useBusyGuard();
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!acknowledged || doneRef.current) return;
+    if (!acknowledged || isBusy()) return;
 
-    await guard.run(async () => {
+    await run(async () => {
       try {
         const res = await fetch(`/api/admin/tournaments/${tournamentId}/rollback`, {
           method: "POST",
@@ -124,8 +120,6 @@ export function RollbackRoundDialog({
           rolledBack?: { label: string };
         };
         if (!res.ok) throw new Error(payload.error || "ROLLBACK_FAILED");
-        doneRef.current = true;
-        setDone(true);
         // Le stade annoncé est celui que le serveur dit avoir effacé : le nôtre
         // pouvait être périmé, et un message qui nomme la mauvaise manche serait
         // pire qu'aucun message. Le serveur le rédige en français : sous `/en`,

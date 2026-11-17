@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState, type ReactNode, type SetStateAction } from "react";
+import { FormEvent, useState, type ReactNode, type SetStateAction } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
@@ -67,7 +67,7 @@ import {
 } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import { NumberInput } from "@/components/ui/number-input";
+import { NumberInput, NumberInputReadOnlyContext } from "@/components/ui/number-input";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 
 /** Fonctionnement du format choisi, derrière le « i » du libellé « Format ». */
@@ -149,14 +149,10 @@ export function TournamentForm({
   const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
   // Envoi (`docs/features/BUSY_BUTTONS.md`) : le bouton reste focalisable
   // (`BusyButton`), une garde synchrone écarte le second envoi, et le
-  // formulaire réussi reste en attente jusqu'à la navigation (`submittedRef`) —
-  // la page restait montée le temps du `router.push`, et un second clic créait
-  // un tournoi en double.
-  const guard = useBusyGuard();
-  const submittedRef = useRef(false);
-  const [submitted, setSubmitted] = useState(false);
-  const loading = guard.busy || submitted;
-  const isBusy = () => guard.isBusy() || submittedRef.current;
+  // formulaire réussi reste en attente jusqu'à la navigation (`hold()`) — la
+  // page restait montée le temps du `router.push`, et un second clic créait un
+  // tournoi en double.
+  const { busy: loading, isBusy, run, hold } = useBusyGuard();
   const [values, setValuesState] = useState<TournamentFormValues>(initialValues);
   // Pendant l'envoi, ce qui est affiché est ce qui part : toute saisie (champ,
   // case, liste, réglages des sous-formulaires) est ignorée.
@@ -187,12 +183,21 @@ export function TournamentForm({
   // Ronde suisse : le nombre de rondes suit la recommandation ⌈log₂(N)⌉ + 1 tant
   // que l'organisateur n'a pas saisi la sienne — sinon un changement d'effectif
   // écraserait son choix. À l'édition, la valeur enregistrée fait foi d'emblée.
-  const [swissRoundsTouched, setSwissRoundsTouched] = useState(mode === "edit");
+  const [swissRoundsTouched, setSwissRoundsTouchedState] = useState(mode === "edit");
   // « Libre » ne retient pas de nombre de manches : on garde le dernier saisi
   // pour le restituer si l'organisateur revient à un BO ou un FT.
-  const [lastMatchFormatValue, setLastMatchFormatValue] = useState(
+  const [lastMatchFormatValue, setLastMatchFormatValueState] = useState(
     initialValues.matchFormat?.value ?? DEFAULT_MATCH_FORMAT.value,
   );
+  // Les états voisins du formulaire suivent la même règle que `setValues` :
+  // une saisie ignorée pendant l'envoi ne laisse aucune trace (suivi de la
+  // recommandation des rondes, valeur retenue pour une bascule de format).
+  const setSwissRoundsTouched = (next: boolean) => {
+    if (!isBusy()) setSwissRoundsTouchedState(next);
+  };
+  const setLastMatchFormatValue = (next: number) => {
+    if (!isBusy()) setLastMatchFormatValueState(next);
+  };
   // Incrémenté à chaque refus d'un plan de phases invalide (`PhaseBuilder`).
   const [phaseFocusRequest, setPhaseFocusRequest] = useState(0);
   const [image, setImageState] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
@@ -298,11 +303,10 @@ export function TournamentForm({
       return;
     }
 
-    await guard.run(async () => {
+    await run(async () => {
       try {
         await onSubmit(values, image);
-        submittedRef.current = true;
-        setSubmitted(true);
+        hold();
       } catch (e) {
         const message = (e as Error).message;
         const code = errorCode(e);
@@ -321,6 +325,8 @@ export function TournamentForm({
   return (
     <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
       <form onSubmit={handleSubmit} style={SECTION_STACK}>
+        {/* Tous les champs numériques, sous-formulaires compris, en lecture seule pendant l'envoi. */}
+        <NumberInputReadOnlyContext.Provider value={loading}>
         <section>
           <p className="eyebrow" style={sectionEyebrow("identity")}>
             {t("form.sections.identity")}
@@ -809,6 +815,7 @@ export function TournamentForm({
             </BusyButton>
           </CyberButton>
         </div>
+        </NumberInputReadOnlyContext.Provider>
       </form>
     </CyberCard>
   );

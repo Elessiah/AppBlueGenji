@@ -2321,8 +2321,8 @@ input[type="radio"] {
    `:focus-visible` : la souris posée sur une case cochée la faisait paraître
    moins cochée, et sur une case parcourue au clavier, elle affaiblissait le
    seul repère du parcours. */
-input[type="checkbox"]:hover:not(:disabled):not(:checked):not(:focus-visible),
-input[type="radio"]:hover:not(:disabled):not(:checked):not(:focus-visible) {
+input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible),
+input[type="radio"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible) {
   border-color: rgba(var(--blue-500-rgb), 0.55);
 }
 
@@ -2357,8 +2357,16 @@ input[type="radio"]:focus-visible {
    multiplie avec celle d'un parent — une carte verrouillée en porte déjà une —
    et la bordure, qui porte seule le contrôle décoché, finissait effacée par le
    produit des deux. Une couleur, elle, ne se compose pas. */
+/* Figée le temps d'un envoi (`aria-disabled` / `aria-readonly`, voir
+   `docs/features/BUSY_BUTTONS.md`) : la case garde le focus mais s'affiche
+   éteinte, comme désactivée — sinon elle semblerait accepter un geste que le
+   formulaire ignore. */
 input[type="checkbox"]:disabled,
-input[type="radio"]:disabled {
+input[type="radio"]:disabled,
+input[type="checkbox"][aria-disabled="true"],
+input[type="radio"][aria-disabled="true"],
+input[type="checkbox"][aria-readonly="true"],
+input[type="radio"][aria-readonly="true"] {
   /* Désactivée et décochée, la case n'est **que** sa bordure : `appearance: none`
      a retiré le carré gris que le système dessinait dessous, et plus rien ne
      remplit la boîte. À 0,2 de blanc elle rendait ≈ 1,7:1 sur le fond du site —
@@ -2377,7 +2385,11 @@ input[type="radio"]:disabled {
    dans la feuille, à spécificité égale) effacerait le bleu et la marque
    flotterait sur un fond vide. */
 input[type="checkbox"]:disabled:checked,
-input[type="radio"]:disabled:checked {
+input[type="radio"]:disabled:checked,
+input[type="checkbox"][aria-disabled="true"]:checked,
+input[type="radio"][aria-disabled="true"]:checked,
+input[type="checkbox"][aria-readonly="true"]:checked,
+input[type="radio"][aria-readonly="true"]:checked {
   border-color: rgba(var(--blue-500-rgb), 0.45);
   background-color: rgba(var(--blue-500-rgb), 0.55);
 }

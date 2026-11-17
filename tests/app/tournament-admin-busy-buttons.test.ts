@@ -136,16 +136,17 @@ describe("dialogues sans retour", () => {
   it("DeleteTournament_success_staysWaitingUntilNavigation", () => {
     // La fiche part par `router.replace` : un second clic ne relance pas la suppression.
     const code = source(DIR + "DeleteTournamentDialog.tsx");
-    expect(code).toMatch(/deletedRef\.current = true;\s+setDeleted\(true\);\s+onDeleted\(tournamentName\);/);
-    expect(code).toContain("if (!armed || deletedRef.current) return;");
-    expect(code).toContain("const busy = guard.busy || deleted;");
+    expect(code).toMatch(/hold\(\);\s+onDeleted\(tournamentName\);/);
+    expect(code).toContain("if (!armed || isBusy()) return;");
+    expect(code).toContain("const { busy, isBusy, run, hold } = useBusyGuard();");
     expect(code).toMatch(/autoComplete="off"\s+\/\/[^\n]*\n\s+\/\/[^\n]*\n\s+readOnly=\{busy\}/);
   });
 
-  it("RollbackRound_success_staysWaitingUntilClosed", () => {
+  it("RollbackRound_submit_guardedSynchronously", () => {
+    // Le parent ferme le dialogue au succès, dans le même rendu : pas de `hold()`.
     const code = source(DIR + "RollbackRoundDialog.tsx");
-    expect(code).toMatch(/doneRef\.current = true;\s+setDone\(true\);/);
-    expect(code).toContain("if (!acknowledged || doneRef.current) return;");
+    expect(code).toContain("if (!acknowledged || isBusy()) return;");
+    expect(code).not.toMatch(/doneRef|hold\(\)/);
     expect(code).toContain("if (!isBusy()) setAcknowledged(e.target.checked);");
   });
 
@@ -188,14 +189,30 @@ describe("formulaire de tournoi et image", () => {
 
   it("TournamentForm_success_staysWaitingUntilNavigation", () => {
     // La page restait montée le temps du `router.push` : un second clic créait un doublon.
-    expect(form).toMatch(/await onSubmit\(values, image\);\s+submittedRef\.current = true;\s+setSubmitted\(true\);/);
-    expect(form).toContain("const loading = guard.busy || submitted;");
+    expect(form).toMatch(/await onSubmit\(values, image\);\s+hold\(\);/);
+    expect(form).toContain("const { busy: loading, isBusy, run, hold } = useBusyGuard();");
     expect(form).toMatch(/event\.preventDefault\(\);\s+if \(isBusy\(\)\) return;/);
   });
 
   it("TournamentForm_edits_ignoredWhileSending", () => {
     expect(form).toMatch(/const setValues = \(next: SetStateAction<TournamentFormValues>\) => \{\s+if \(!isBusy\(\)\) setValuesState\(next\);/);
     expect(form).toMatch(/const setImage = \(next: ImagePickerValue\) => \{\s+if \(!isBusy\(\)\) setImageState\(next\);/);
+    // États voisins : une saisie ignorée ne coupe pas le suivi des rondes ni ne
+    // déplace la valeur retenue du format.
+    expect(form).toMatch(/const setSwissRoundsTouched = \(next: boolean\) => \{\s+if \(!isBusy\(\)\) setSwissRoundsTouchedState\(next\);/);
+    expect(form).toMatch(/const setLastMatchFormatValue = \(next: number\) => \{\s+if \(!isBusy\(\)\) setLastMatchFormatValueState\(next\);/);
+  });
+
+  it("TournamentForm_numberInputs_allReadOnlyThroughContext", () => {
+    // Sous-formulaires compris (réglages de format, Duel / Arcade, phases).
+    expect(form).toMatch(/<form onSubmit=\{handleSubmit\}[^>]*>\s+\{\/\*[^*]*\*\/\}\s+<NumberInputReadOnlyContext\.Provider value=\{loading\}>/);
+    expect(form).toMatch(/<\/NumberInputReadOnlyContext\.Provider>\s+<\/form>/);
+  });
+
+  it("TournamentImageDialog_draftEdits_guardedSynchronously", () => {
+    const code = source(DIR + "TournamentImageDialog.tsx");
+    expect(code).toMatch(/const editDraft = \(next: ImagePickerValue\) => \{\s+if \(!isBusy\(\)\) setValue\(next\);/);
+    expect(code).toContain("onChange={editDraft}");
   });
 
   it("TournamentForm_textFields_readOnlyWhileSending", () => {
@@ -244,5 +261,31 @@ describe("lien du direct, pénalité, centre de lancement", () => {
     const code = source(LAUNCH);
     expect(code).toMatch(/if \(isBusy\(\)\) return;\s+pendingFocusRef\.current = "confirm";\s+setConfirming\(true\);/);
     expect(code).toMatch(/if \(isBusy\(\)\) return;\s+pendingFocusRef\.current = "ready";\s+setConfirming\(false\);/);
+  });
+});
+
+describe("cases et radios figées pendant l'envoi", () => {
+  const globals = source("app/globals.css");
+
+  it("globals_ariaFrozenCheckboxes_lookOffLikeDisabled", () => {
+    // `aria-disabled` (radios du cadrage) et `aria-readonly` (cases fantômes, manche) :
+    // mêmes couleurs que `:disabled`, cochées comprises.
+    expect(globals).toMatch(
+      /input\[type="radio"\]:disabled,\s+input\[type="checkbox"\]\[aria-disabled="true"\],\s+input\[type="radio"\]\[aria-disabled="true"\],\s+input\[type="checkbox"\]\[aria-readonly="true"\],\s+input\[type="radio"\]\[aria-readonly="true"\] \{/,
+    );
+    expect(globals).toMatch(/input\[type="radio"\]\[aria-readonly="true"\]:checked \{/);
+  });
+
+  it("globals_ariaFrozenCheckboxes_noHoverHighlight", () => {
+    expect(globals).toContain(
+      'input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible)',
+    );
+  });
+
+  it("ImagePickerCss_frozenFitMode_noHoverAndWaitCursor", () => {
+    const css = source(FORM_DIR + "TournamentImagePicker.module.css");
+    expect(css).toContain(".mode:has(input:enabled):not(.modeFrozen):hover {");
+    expect(css).toMatch(/\.modeFrozen \{\s+cursor: progress;/);
+    expect(source(FORM_DIR + "TournamentImagePicker.tsx")).toContain('${busy ? s.modeFrozen : ""}');
   });
 });

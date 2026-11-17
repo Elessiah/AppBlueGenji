@@ -5,15 +5,15 @@ const source = readFileSync("lib/shared/hooks/useBusyGuard.ts", "utf8");
 
 describe("useBusyGuard (contrat de rendu)", () => {
   it("useBusyGuard_result_memoizedWithIsMounted", () => {
-    expect(source).toMatch(/useMemo\(\(\) => \(\{ busy, isBusy, run, isMounted \}\), \[busy, isBusy, run, isMounted\]\)/);
+    expect(source).toMatch(/useMemo\(\(\) => \(\{ busy: shown, isBusy, run, isMounted, hold \}\), \[shown, isBusy, run, isMounted, hold\]\)/);
     // Les attributs des boutons viennent de `BusyButton`, plus du hook.
     expect(source).not.toMatch(/busyProps|BUSY_PROPS|IDLE_PROPS/);
   });
 
   it("useBusyGuard_callbacks_areStableAndFlagIsARef", () => {
     expect(source).toMatch(/const flag = useRef\(false\)/);
-    expect(source).toMatch(/const isBusy = useCallback\(\(\) => flag\.current, \[\]\)/);
-    expect(source).toMatch(/useCallback<BusyRun>\(\(task\) => runExclusive\(flag, setBusy, task\), \[setBusy\]\)/);
+    expect(source).toMatch(/const isBusy = useCallback\(\(\) => flag\.current \|\| heldRef\.current, \[\]\)/);
+    expect(source).toMatch(/\(heldRef\.current \? Promise\.resolve\(undefined\) : runExclusive\(flag, setBusy, task\)\)/);
   });
 
   it("useBusyGuard_isMounted_readsMountedRef", () => {

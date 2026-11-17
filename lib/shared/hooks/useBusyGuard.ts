@@ -14,6 +14,13 @@ export type BusyGuard = {
   run: BusyRun;
   /** L'écran est-il encore monté ? Pour ne pas relancer un geste après sa fermeture. */
   isMounted: () => boolean;
+  /**
+   * Garde l'écran en attente **après** la fin de l'envoi, jusqu'à son démontage :
+   * pour un geste réussi suivi d'une navigation (création, suppression), qui
+   * laisse l'écran monté le temps du `router.push` — un second clic y
+   * renverrait la requête. Sans retour : `busy` et `isBusy()` restent vrais.
+   */
+  hold: () => void;
 };
 
 /**
@@ -31,7 +38,9 @@ export type BusyGuard = {
  */
 export function useBusyGuard(): BusyGuard {
   const [busy, setBusyState] = useState(false);
+  const [held, setHeld] = useState(false);
   const flag = useRef(false);
+  const heldRef = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -42,8 +51,18 @@ export function useBusyGuard(): BusyGuard {
   const setBusy = useCallback((next: boolean) => {
     if (mounted.current) setBusyState(next);
   }, []);
-  const isBusy = useCallback(() => flag.current, []);
+  const isBusy = useCallback(() => flag.current || heldRef.current, []);
   const isMounted = useCallback(() => mounted.current, []);
-  const run = useCallback<BusyRun>((task) => runExclusive(flag, setBusy, task), [setBusy]);
-  return useMemo(() => ({ busy, isBusy, run, isMounted }), [busy, isBusy, run, isMounted]);
+  // Écran tenu (`hold`) : plus aucun envoi ne part, même d'un appelant qui
+  // n'aurait pas consulté `isBusy()`.
+  const run = useCallback<BusyRun>(
+    (task) => (heldRef.current ? Promise.resolve(undefined) : runExclusive(flag, setBusy, task)),
+    [setBusy],
+  );
+  const hold = useCallback(() => {
+    heldRef.current = true;
+    if (mounted.current) setHeld(true);
+  }, []);
+  const shown = busy || held;
+  return useMemo(() => ({ busy: shown, isBusy, run, isMounted, hold }), [shown, isBusy, run, isMounted, hold]);
 }

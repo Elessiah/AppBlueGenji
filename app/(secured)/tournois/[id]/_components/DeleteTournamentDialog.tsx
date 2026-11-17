@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState, type ReactNode } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ui/toast";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
@@ -49,27 +49,22 @@ export function DeleteTournamentDialog({
   const { t } = text;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
   const [confirmation, setConfirmation] = useState("");
-  const guard = useBusyGuard();
-  // Suppression faite, navigation en cours : la garde synchrone (`deletedRef`)
-  // et l'attente affichée (`deleted`) restent levées jusqu'au démontage.
-  const deletedRef = useRef(false);
-  const [deleted, setDeleted] = useState(false);
-  const busy = guard.busy || deleted;
-  const isBusy = () => guard.isBusy() || deletedRef.current;
+  // Suppression faite, navigation en cours : `hold()` garde la garde synchrone
+  // et l'attente affichée levées jusqu'au démontage.
+  const { busy, isBusy, run, hold } = useBusyGuard();
 
   const armed = isDeletionConfirmed(tournamentName, confirmation);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!armed || deletedRef.current) return;
+    if (!armed || isBusy()) return;
 
-    await guard.run(async () => {
+    await run(async () => {
       try {
         const res = await fetch(`/api/admin/tournaments/${tournamentId}`, { method: "DELETE" });
         const payload = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(payload.error || "TOURNAMENT_DELETE_FAILED");
-        deletedRef.current = true;
-        setDeleted(true);
+        hold();
         onDeleted(tournamentName);
       } catch (e) {
         showError(mapError((e as Error).message));

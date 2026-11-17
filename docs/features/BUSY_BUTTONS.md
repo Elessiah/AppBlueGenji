@@ -87,12 +87,22 @@ annoncer de l'attente.
   `tests/app/tournament-admin-busy-buttons.test.ts`. `BusyButton` transmet sa
   `ref` (`forwardRef`, React 18).
 - **Geste qui quitte l'écran** sans le démonter sur-le-champ (suppression d'un
-  tournoi puis `router.replace`, création ou édition puis `router.push`, manche
-  effacée) : un verrou de succès (`useRef` pour la garde, état pour
-  l'affichage) garde l'écran en attente jusqu'au démontage — sinon `busy`
-  retombait et un second clic recréait le tournoi ou relançait la suppression.
-- Formulaire de tournoi : toute saisie est ignorée pendant l'envoi (setter
-  gardé par `isBusy()`), les champs texte, nombres et dates passent en
-  `readOnly` ; les listes déroulantes gardent seulement leur `disabled` de
-  verrou durable (`locked(…)`).
+  tournoi puis `router.replace`, création ou édition puis `router.push`) :
+  `useBusyGuard().hold()`, appelé au succès, garde `busy` et `isBusy()` vrais
+  jusqu'au démontage — sinon `busy` retombait et un second clic recréait le
+  tournoi ou relançait la suppression. Inutile quand le parent ferme le
+  dialogue dans le même rendu (manche effacée).
+- Formulaire de tournoi : toute saisie est ignorée pendant l'envoi (setters
+  gardés par `isBusy()`, états voisins compris : suivi des rondes suisses,
+  valeur retenue du format), les champs texte et dates passent en `readOnly`,
+  et **tous** les `NumberInput`, sous-formulaires compris, par
+  `NumberInputReadOnlyContext` — un champ numérique garde son brouillon, qui
+  sinon resterait affiché sans partir ; les listes déroulantes gardent
+  seulement leur `disabled` de verrou durable (`locked(…)`).
+- Image d'un tournoi : le choix (Remplacer, Retirer, cadrage) passe par la
+  garde synchrone du dialogue (`editDraft`), pas seulement par le `busy` rendu.
+- Cases et radios figées par `aria-disabled` / `aria-readonly` : rendues
+  éteintes par `globals.css` (mêmes couleurs que `:disabled`, sans survol).
+- Centre de lancement : en échec, le focus revient au bouton pressé
+  (« Confirmer prêt », `confirmReadyRef`), resté focalisable.
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

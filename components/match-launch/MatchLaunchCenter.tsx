@@ -161,8 +161,9 @@ export function MatchLaunchCenter({
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
   // confirmation retirent chacun le bouton qui l'avait, et le focus sortait
   // alors de la modale (sur `<body>`). Consommé par l'effet plus bas.
-  const pendingFocusRef = useRef<"confirm" | "ready" | null>(null);
+  const pendingFocusRef = useRef<"confirm" | "confirmReady" | "ready" | null>(null);
   const confirmRef = useRef<HTMLFieldSetElement>(null);
+  const confirmReadyRef = useRef<HTMLButtonElement>(null);
   const readyRef = useRef<HTMLButtonElement>(null);
   // Boutons focalisables pendant l'envoi (`BusyButton`,
   // `docs/features/BUSY_BUTTONS.md`) et garde synchrone : un double clic sur
@@ -266,8 +267,9 @@ export function MatchLaunchCenter({
         await refresh();
       } catch (error) {
         // Le geste a pu changer la vue (match lancé entre-temps) : le focus
-        // revient où l'envoi est parti.
-        pendingFocusRef.current = confirming ? "confirm" : "ready";
+        // revient au bouton d'où l'envoi est parti — resté focalisable
+        // (`BusyButton`), il garde la main pour réessayer.
+        pendingFocusRef.current = confirming ? "confirmReady" : "ready";
         showError(launchErrorText(text, (error as Error).message));
       }
     });
@@ -288,7 +290,7 @@ export function MatchLaunchCenter({
     const target = pendingFocusRef.current;
     if (target === null || busy) return;
     pendingFocusRef.current = null;
-    const element = target === "confirm" ? confirmRef.current : readyRef.current;
+    const element = { confirm: confirmRef, confirmReady: confirmReadyRef, ready: readyRef }[target].current;
     (element ?? dialogRef.current)?.focus();
   });
 
@@ -406,7 +408,12 @@ export function MatchLaunchCenter({
               >
                 {t("back")}
               </BusyButton>
-              <BusyButton busy={busy} className={`btn ${styles.readyButton}`} onClick={() => void setReady(true)}>
+              <BusyButton
+                ref={confirmReadyRef}
+                busy={busy}
+                className={`btn ${styles.readyButton}`}
+                onClick={() => void setReady(true)}
+              >
                 <BusyLabel busy={busy} idle={t("confirmReady")} pending={`${t("confirmReady")}…`} />
               </BusyButton>
             </div>

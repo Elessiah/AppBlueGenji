@@ -71,6 +71,12 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   }
 
   const change = imagePickerChange(image, value);
+  // Le choix de l'organisateur passe par la garde **synchrone** : un
+  // « Retirer » parti dans la même image que « Enregistrer », avant le rendu
+  // qui arme `busy`, effaçait sinon le brouillon d'un envoi déjà en route.
+  const editDraft = (next: ImagePickerValue) => {
+    if (!isBusy()) setValue(next);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -155,7 +161,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} busy={busy} />
+            <TournamentImagePicker existing={image} value={value} onChange={editDraft} busy={busy} />
 
             <div
               style={{
