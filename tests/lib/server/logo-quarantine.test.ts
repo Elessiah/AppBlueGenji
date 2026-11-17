@@ -79,7 +79,7 @@ const AVATAR = "/api/uploads/avatars/9-abc.webp";
 const LIVE_AVATAR = path.join(process.cwd(), "public", "uploads", "avatars", "9-abc.webp");
 const HIDDEN_AVATAR = path.join(avatarQuarantineDirectory(), "user-9-9-abc.webp");
 
-let pool: { execute: jest.Mock<SqlQuery>; getConnection: () => Promise<unknown> };
+let pool: { execute: jest.Mock<SqlQuery>; getConnection: jest.Mock<() => Promise<unknown>> };
 let connection: ReturnType<typeof connectionMock>;
 
 const reportCategory: Route = [/SELECT category FROM bg_reports WHERE id = \? LIMIT 1/, () => [[{ category: "COPYRIGHT" }]]];
@@ -90,7 +90,11 @@ function install(poolRoutes: Route[], connectionRoutes: Route[] = []) {
   connection = connectionMock();
   connection.execute = routed([...connectionRoutes, quarantineOwner]);
   // Le fondement d'une décision se relit sur la catégorie du signalement.
-  pool = { execute: routed([...poolRoutes, reportCategory]), getConnection: async () => fakeConnection(connection) };
+  // Le compte visé d'une purge se lit sur le pool, avant d'emprunter la connexion.
+  pool = {
+    execute: routed([...poolRoutes, quarantineOwner, reportCategory]),
+    getConnection: jest.fn(async () => fakeConnection(connection)),
+  };
   jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
 }
 
@@ -1431,7 +1435,7 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
 
   /** La requête de préparation de la purge, et ses paramètres. */
   function prepareCall(): [string, unknown] | undefined {
-    const call = connection.execute.mock.calls.find(([sql]) => /SELECT user_id, logo_url FROM bg_logo_quarantines/.test(String(sql)));
+    const call = pool.execute.mock.calls.find(([sql]) => /SELECT user_id, logo_url FROM bg_logo_quarantines/.test(String(sql)));
     return call ? [String(call[0]), call[1]] : undefined;
   }
 
@@ -1464,9 +1468,7 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
   });
 
   it("purgeQuarantinedLogo_avatar_locksUserBeforeQuarantine", async () => {
-    install([], [
-      owner,
-      prepareRow,
+    install([owner, prepareRow], [
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
       [/SET status = 'PURGED'/, () => [{}]],
@@ -1474,16 +1476,14 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
 
     await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
 
-    // Rang 1 : la préparation de l'empreinte, hors transaction.
-    expect(lockRanks()).toEqual({ user: 2, quarantine: 3 });
+    // La préparation de l'empreinte passe par le pool : rien d'autre avant les verrous.
+    expect(lockRanks()).toEqual({ user: 0, quarantine: 1 });
   });
 
   // Revue EF-72 cycle 1 : le décodage de l'image (empreinte perceptuelle) se
   // fait avant la transaction, pas sous les verrous du compte et de la ligne.
   it("purgeQuarantinedLogo_avatar_preparesFingerprintBeforeTransaction", async () => {
-    install([], [
-      owner,
-      prepareRow,
+    install([owner, prepareRow], [
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
       [/SET status = 'PURGED'/, () => [{}]],
@@ -1494,15 +1494,15 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
     const calls = jest.mocked(readImageFingerprint).mock;
     expect(calls.calls[0]).toEqual([HIDDEN_AVATAR]);
     expect(calls.invocationCallOrder[0]).toBeLessThan(jest.mocked(connection.beginTransaction).mock.invocationCallOrder[0]);
+    // Revue EF-72 perf. 1 : la connexion n'est empruntée qu'après le décodage, jamais gardée inactive pendant lui.
+    expect(calls.invocationCallOrder[0]).toBeLessThan(pool.getConnection.mock.invocationCallOrder[0]);
     expect(calls.calls[1]).toEqual([HIDDEN_AVATAR, fingerprint(HIDDEN_AVATAR)]);
   });
 
   // Revue EF-72 cycle 2 : rien n'est décodé pour une purge qui n'aura pas
   // lieu — ligne close, ou échéance d'office pas encore passée.
   it("purgeQuarantinedLogo_byStaff_prepareSkipsClosedRowsOnly", async () => {
-    install([], [
-      owner,
-      prepareRow,
+    install([owner, prepareRow], [
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
       [/SET status = 'PURGED'/, () => [{}]],
@@ -1517,9 +1517,7 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
 
   it("purgeQuarantinedLogo_auto_prepareSkipsRowsNotYetDue", async () => {
     const now = new Date("2026-11-20T10:00:00Z");
-    install([], [
-      owner,
-      prepareRow,
+    install([owner, prepareRow], [
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
     ]);
@@ -1531,9 +1529,7 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
   });
 
   it("purgeQuarantinedLogo_prepareQueryFails_readsUnderLockWithoutPrepared", async () => {
-    install([], [
-      owner,
-      [/AND team_id IS NULL AND user_id IS NOT NULL AND status = 'HIDDEN'/, () => { throw new Error("ER_LOCK_WAIT_TIMEOUT"); }],
+    install([owner, [/AND team_id IS NULL AND user_id IS NOT NULL AND status = 'HIDDEN'/, () => { throw new Error("ER_LOCK_WAIT_TIMEOUT"); }]], [
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
       [/SET status = 'PURGED'/, () => [{}]],
@@ -1553,7 +1549,7 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
 
     await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
 
-    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const sqls = [...pool.execute.mock.calls, ...connection.execute.mock.calls].map(([sql]) => sql);
     expect(sqls.some((sql) => /AND team_id IS NULL AND user_id IS NOT NULL/.test(sql))).toBe(false);
     expect(readImageFingerprint).not.toHaveBeenCalled();
   });

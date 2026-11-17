@@ -43,6 +43,9 @@ import sharp from "sharp";
 
 /** Côté de l'image réduite sur laquelle la DCT est calculée. */
 const SAMPLE_SIZE = 32;
+
+/** Pixels d'entrée au plus (sharp refuse au-delà, l'empreinte reste nulle) : 2 048 × 2 048, très au-delà des WebP de 256 à 512 px servis. */
+const MAX_INPUT_PIXELS = 2048 * 2048;
 /** Côté du bloc de basses fréquences calculé (9 × 9, dont 64 gardés). */
 const BLOCK_SIZE = 9;
 /** Nombre de bits de l'empreinte. */
@@ -135,9 +138,13 @@ export async function imagePerceptualHash(content: Buffer): Promise<string | nul
  */
 export async function imagePerceptualHashResult(content: Buffer): Promise<{ phash: string | null; decoded: boolean }> {
   try {
-    const { data, info } = await sharp(content, { failOn: "none", autoOrient: true })
-      .flatten({ background: { r: 128, g: 128, b: 128 } })
+    // Réduit d'abord (une seule lecture, 32 × 32), aplati ensuite : le fond
+    // transparent ne se compose que sur 1 024 pixels, jamais sur l'image
+    // pleine taille. `limitInputPixels` borne un appelant futur qui passerait
+    // une grande image (aujourd'hui : le WebP de 256 à 512 px que l'on sert).
+    const { data, info } = await sharp(content, { failOn: "none", autoOrient: true, limitInputPixels: MAX_INPUT_PIXELS })
       .resize(SAMPLE_SIZE, SAMPLE_SIZE, { fit: "fill" })
+      .flatten({ background: { r: 128, g: 128, b: 128 } })
       .toColourspace("b-w")
       .raw({ depth: "uchar" })
       .toBuffer({ resolveWithObject: true });
@@ -296,10 +303,30 @@ function bitsAbove(coefficients: readonly number[], median: number): string {
   return (BigInt(high) * BigInt(0x100000000) + BigInt(low)).toString();
 }
 
+const MASK_32 = BigInt(0xffffffff);
+const SHIFT_32 = BigInt(32);
+
+/** Bits à 1 d'un entier de 32 bits (Hamming weight, sans boucle ni chaîne). */
+function popcount32(value: number): number {
+  let v = value - ((value >>> 1) & 0x55555555);
+  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
+  return (((v + (v >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+}
+
+/**
+ * Une empreinte (décimale) prête à être comparée à beaucoup d'autres : lue une
+ * seule fois. Rend la fonction « distance de Hamming vers `other` », sans
+ * allocation de chaîne par comparaison.
+ */
+export function phashComparator(reference: string): (other: string) => number {
+  const base = BigInt.asUintN(64, BigInt(reference));
+  return (other) => {
+    const diff = BigInt.asUintN(64, base ^ BigInt(other));
+    return popcount32(Number(diff & MASK_32)) + popcount32(Number(diff >> SHIFT_32));
+  };
+}
+
 /** Nombre de bits différents entre deux empreintes (écrites en décimal). */
 export function phashDistance(a: string, b: string): number {
-  const diff = BigInt.asUintN(64, BigInt(a) ^ BigInt(b)).toString(2);
-  let count = 0;
-  for (const bit of diff) if (bit === "1") count += 1;
-  return count;
+  return phashComparator(a)(b);
 }

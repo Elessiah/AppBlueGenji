@@ -98,19 +98,29 @@ ES2017).
 
 `isBlockedImage(processed, original?)` : SHA-256 de l'image traitée et du
 fichier brut, et empreinte perceptuelle de l'image **traitée** (celle qui serait
-servie, comparable à celle des avatars bloqués). Une seule requête rend la
-correspondance exacte et les empreintes perceptuelles posées :
+servie, comparable à celle des avatars bloqués). Deux requêtes au plus :
 
 ```sql
-SELECT sha256 IN (?, ?) AS exact, CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
- WHERE sha256 IN (?, ?) OR phash IS NOT NULL
+-- 1. exact, par la clé primaire (jamais de balayage)
+SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (?, ?) LIMIT 1
+-- 2. seulement à défaut : les empreintes perceptuelles posées, bornées
+SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
+ WHERE phash IS NOT NULL ORDER BY created_at DESC LIMIT 20000
 ```
 
-Une ligne `exact` refuse. Sinon, et seulement si une empreinte perceptuelle est
-posée, l'image traitée est décodée une fois de plus pour la sienne, comparée en
-mémoire (`phashDistance`) : chaque téléversement ne paie pas ce décodage tant
-que la liste n'a que des lignes d'avant D17. La liste ne grandit qu'avec les
-suppressions de la modération (quelques dizaines de lignes). Une ligne sans
+Une ligne à la première requête refuse, sans balayage ni décodage. Sinon, et
+seulement si une empreinte perceptuelle est posée, l'image traitée est décodée
+une fois de plus pour la sienne, comparée en mémoire (`phashComparator` : la
+référence lue une fois, comptage de bits sans chaîne) : chaque téléversement ne
+paie pas ce décodage tant que la liste n'a que des lignes d'avant D17. Aucun
+index ne sert une distance de Hamming : la lecture est un balayage, bornée par
+`MAX_COMPARED_PHASHES` (20 000 lignes, les plus récentes d'abord ; la liste ne
+grandit qu'avec les suppressions de la modération, quelques dizaines de
+lignes). Le décodage est celui du WebP déjà encodé (256 à 512 px) : décoder
+les pixels d'avant l'encodage donnerait une empreinte un peu autre que celle
+des fichiers servis, qui est ce qu'on compare. `imagePerceptualHashResult`
+réduit à 32 × 32 **avant** d'aplatir la transparence et refuse (`limitInputPixels`,
+2 048 × 2 048) une grande image. Une ligne sans
 `phash` ne compte que par son SHA-256. Le refus reste le code `IMAGE_BLOCKED`,
 comme avant ; il vaut pour un avatar comme pour un logo d'équipe (un emblème
 sur fond transparent n'a pas d'empreinte, voir plus haut).
@@ -136,7 +146,11 @@ peut venir d'un échec passager, et le fichier effacé ensuite ne permettrait
 plus de la calculer : elle est recalculée sous le verrou. Toute
 préparation en échec rend `null` : l'empreinte se calcule alors sous le
 verrou, comme avant. La purge ne prépare rien pour une ligne déjà close, ni,
-d'office, avant l'échéance.
+d'office, avant l'échéance ; elle prépare sur le pool, **avant** d'emprunter
+sa connexion (le décodage ne la garde pas inactive). `purgeDueQuarantines`
+tourne en tâche de fond (`void`, hors réponse) : son arriéré se purge une
+ligne après l'autre, sans borne par passage (une borne ferait mourir de faim
+les lignes contestées, qui restent en tête).
 
 ## RGPD
 

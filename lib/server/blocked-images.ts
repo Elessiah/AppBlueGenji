@@ -5,7 +5,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { failureReason } from "@/lib/server/failure-reason";
-import { imagePerceptualHash, imagePerceptualHashResult, PHASH_MATCH_DISTANCE, phashDistance } from "@/lib/server/image-phash";
+import { imagePerceptualHash, imagePerceptualHashResult, PHASH_MATCH_DISTANCE, phashComparator } from "@/lib/server/image-phash";
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
@@ -36,6 +36,15 @@ import { imagePerceptualHash, imagePerceptualHashResult, PHASH_MATCH_DISTANCE, p
  * compte.
  */
 
+/**
+ * Empreintes perceptuelles comparées au plus, par téléversement : la liste ne
+ * grandit qu'avec les suppressions de la modération (quelques dizaines), cette
+ * borne garde le balayage (lecture + distance en JavaScript) à quelques
+ * millisecondes même sur le Raspberry Pi si elle grossissait un jour. Les
+ * plus récentes d'abord.
+ */
+export const MAX_COMPARED_PHASHES = 20_000;
+
 /** Refus d'un téléversement dont l'image est bloquée. */
 export const IMAGE_BLOCKED = "IMAGE_BLOCKED";
 
@@ -60,13 +69,14 @@ export type ImageFingerprint = { sha256: string; phash: string | null };
  * serait servie, comparable à celle des avatars bloqués — à
  * `PHASH_MATCH_DISTANCE` bits au plus d'une empreinte bloquée.
  *
- * Une requête rend à la fois la correspondance exacte et les empreintes
- * perceptuelles posées (relues en texte : un `BIGINT` rendu en nombre
- * JavaScript perdrait ses derniers chiffres) ; la liste ne grandit qu'avec les
- * suppressions de la modération (quelques dizaines de lignes). L'empreinte de
- * l'image n'est calculée — un décodage de plus — que si une correspondance
- * exacte manque **et** qu'une empreinte perceptuelle est posée : sans quoi
- * chaque téléversement paierait ce décodage pour rien. Table absente
+ * La correspondance exacte se lit par la clé primaire d'abord ; les empreintes
+ * perceptuelles posées ne se relisent (`MAX_COMPARED_PHASHES` au plus) qu'à
+ * défaut. L'empreinte de l'image n'est calculée — un décodage de plus, de
+ * l'image traitée de 256 à 512 px, que le gabarit vient d'encoder : décoder ses
+ * pixels d'avant l'encodage donnerait une empreinte légèrement autre que celle
+ * des fichiers servis — que si une correspondance exacte manque **et** qu'une
+ * empreinte perceptuelle est posée : sans quoi chaque téléversement paierait
+ * ce décodage pour rien. Table absente
  * (migration en échec) = non.
  */
 export async function isBlockedImage(processed: Buffer, original?: Buffer): Promise<boolean> {
@@ -74,22 +84,31 @@ export async function isBlockedImage(processed: Buffer, original?: Buffer): Prom
   if (original) hashes.push(imageSha256(original));
   const placeholders = hashes.map(() => "?").join(", ");
   const db = await getDatabase();
-  let rows: (RowDataPacket & { exact: number | string; phash: string | null })[];
+  let blocked: string[];
   try {
-    [rows] = await db.execute<(RowDataPacket & { exact: number | string; phash: string | null })[]>(
-      `SELECT sha256 IN (${placeholders}) AS exact, CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
-        WHERE sha256 IN (${placeholders}) OR phash IS NOT NULL`,
-      [...hashes, ...hashes],
+    // 1. Correspondance exacte, par la clé primaire (jamais de balayage).
+    const [exact] = await db.execute<RowDataPacket[]>(
+      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (${placeholders}) LIMIT 1`,
+      hashes,
     );
+    if (exact.length > 0) return true;
+    // 2. Les empreintes perceptuelles posées (un balayage : aucun index ne sert
+    // une distance de Hamming), bornées. Relues en texte : un `BIGINT` rendu
+    // en nombre JavaScript perdrait ses derniers chiffres.
+    const [rows] = await db.execute<(RowDataPacket & { phash: string })[]>(
+      `SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
+        WHERE phash IS NOT NULL ORDER BY created_at DESC LIMIT ${MAX_COMPARED_PHASHES}`,
+    );
+    blocked = rows.map((row) => row.phash);
   } catch (error) {
     if (isMissingTableError(error)) return false;
     throw error;
   }
-  if (rows.some((row) => Number(row.exact) === 1)) return true;
-  const blocked = rows.flatMap((row) => (row.phash === null ? [] : [row.phash]));
   if (blocked.length === 0) return false;
   const phash = await imagePerceptualHash(processed);
-  return phash !== null && blocked.some((other) => phashDistance(phash, other) <= PHASH_MATCH_DISTANCE);
+  if (phash === null) return false;
+  const distanceTo = phashComparator(phash);
+  return blocked.some((other) => distanceTo(other) <= PHASH_MATCH_DISTANCE);
 }
 
 /**

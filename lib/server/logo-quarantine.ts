@@ -832,7 +832,7 @@ export async function listQuarantinesForReports(reportIds: readonly number[]): P
  * validation automatique, sans figer d'instantané —, pour
  * `lockQuarantineUserFirst`.
  */
-async function quarantineUserId(connection: PoolConnection, quarantineId: number): Promise<number | null> {
+async function quarantineUserId(connection: Pick<PoolConnection, "execute">, quarantineId: number): Promise<number | null> {
   const [rows] = await connection.execute<(RowDataPacket & { user_id: number | null })[]>(
     `SELECT user_id FROM bg_logo_quarantines WHERE id = ? LIMIT 1`,
     [quarantineId],
@@ -1226,17 +1226,18 @@ export async function purgeQuarantinedLogo(
   options: { now?: Date } = {},
 ): Promise<boolean> {
   const db = await getDatabase();
+  const userId = await quarantineUserId(db, quarantineId);
+  // Empreintes relevées hors verrou (décodage de l'image), reprises sous le
+  // verrou si le fichier n'a pas changé (`readImageFingerprint`) — sur le pool,
+  // avant d'emprunter une connexion : le décodage ne la garde pas inactive.
+  // D'office, rien n'est préparé avant l'échéance (la purge n'aurait pas lieu).
+  const dueBy = actor === null ? (options.now ?? new Date()) : null;
+  const prepared = userId === null ? null : await prepareQuarantinedAvatarFingerprint(db, quarantineId, dueBy);
   const connection = await db.getConnection();
   let row: QuarantineRow;
   let fingerprint: ImageFingerprint | null = null;
   let blockHash = false;
   try {
-    const userId = await quarantineUserId(connection, quarantineId);
-    // Empreintes relevées hors verrou (décodage de l'image), reprises sous le
-    // verrou si le fichier n'a pas changé (`readImageFingerprint`).
-    // D'office, rien n'est préparé avant l'échéance (la purge n'aurait pas lieu).
-    const dueBy = actor === null ? (options.now ?? new Date()) : null;
-    const prepared = userId === null ? null : await prepareQuarantinedAvatarFingerprint(connection, quarantineId, dueBy);
     await connection.beginTransaction();
     await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
@@ -1336,7 +1337,7 @@ async function prepareAvatarFingerprint(
  * perdu.
  */
 async function prepareQuarantinedAvatarFingerprint(
-  connection: PoolConnection,
+  connection: Pick<PoolConnection, "execute">,
   quarantineId: number,
   dueBy: Date | null,
 ): Promise<ImageFingerprint | null> {

@@ -6,6 +6,7 @@ import {
   MIN_TONAL_RANGE,
   PHASH_MATCH_DISTANCE,
   perceptualHashFromGrey,
+  phashComparator,
   phashDistance,
 } from "@/lib/server/image-phash";
 
@@ -49,7 +50,25 @@ function scene(seed: number): Buffer {
  * Une image « photo » : somme de vagues de fréquences mêlées, d'amplitude en
  * 1/f comme une photo, teintes tirées de la graine (128 × 128, PNG).
  */
-async function photoLike(seed: number): Promise<Buffer> {
+/** Les sources de synthèse sont rastérisées une fois par graine (les tests les rejouent : rendu SVG et pixel à pixel coûteux). Les tampons ne sont jamais modifiés. */
+const PHOTO_CACHE = new Map<number, Promise<Buffer>>();
+const SCENE_CACHE = new Map<number, Promise<Buffer>>();
+const STORED_CACHE = new WeakMap<Buffer, Promise<Buffer>>();
+
+function memoised<K>(cache: Map<K, Promise<Buffer>>, key: K, make: () => Promise<Buffer>): Promise<Buffer> {
+  let found = cache.get(key);
+  if (!found) {
+    found = make();
+    cache.set(key, found);
+  }
+  return found;
+}
+
+function photoLike(seed: number): Promise<Buffer> {
+  return memoised(PHOTO_CACHE, seed, () => renderPhotoLike(seed));
+}
+
+async function renderPhotoLike(seed: number): Promise<Buffer> {
   const random = seeded(seed * 31 + 7);
   const size = 128;
   const waves = Array.from({ length: 30 }, () => {
@@ -123,7 +142,21 @@ function svg(body: string): Buffer {
 }
 
 /** Le gabarit avatar de `storeImageBuffer` : cadre éventuel, 256 × 256 `cover`, WebP 80. */
-async function storedAvatar(
+function storedAvatar(
+  source: Buffer,
+  crop?: { left: number; top: number; width: number; height: number },
+): Promise<Buffer> {
+  if (crop) return renderStoredAvatar(source, crop);
+  // Sans cadre, le résultat ne dépend que de la source : une fois par tampon.
+  let found = STORED_CACHE.get(source);
+  if (!found) {
+    found = renderStoredAvatar(source);
+    STORED_CACHE.set(source, found);
+  }
+  return found;
+}
+
+async function renderStoredAvatar(
   source: Buffer,
   crop?: { left: number; top: number; width: number; height: number },
 ): Promise<Buffer> {
@@ -138,8 +171,8 @@ async function hashOf(content: Buffer): Promise<string> {
   return hash;
 }
 
-async function sourcePng(seed: number): Promise<Buffer> {
-  return sharp(scene(seed)).png().toBuffer();
+function sourcePng(seed: number): Promise<Buffer> {
+  return memoised(SCENE_CACHE, seed, () => sharp(scene(seed)).png().toBuffer());
 }
 
 // Graines des scènes mesurées : toutes ont une empreinte, avant comme après un
@@ -448,6 +481,48 @@ describe("phashDistance", () => {
 
   it("phashDistance_oneBitDiffers_one", () => {
     expect(phashDistance("1", "3")).toBe(1);
+  });
+
+  // Revue EF-72 perf. 1 : comptage de bits sans chaîne, vérifié contre le comptage naïf.
+  it("phashDistance_randomPairs_matchesNaiveBitCount", () => {
+    const random = seeded(99);
+    const word = () => BigInt(Math.floor(random() * 4294967296));
+    for (let i = 0; i < 300; i += 1) {
+      const a = word() * BigInt(4294967296) + word();
+      const b = word() * BigInt(4294967296) + word();
+      const naive = [...BigInt.asUintN(64, a ^ b).toString(2)].filter((bit) => bit === "1").length;
+      expect(phashDistance(a.toString(), b.toString())).toBe(naive);
+    }
+  });
+
+  it("phashDistance_bitsInEachHalf_countedOnce", () => {
+    expect(phashDistance("0", "4294967296")).toBe(1);
+    expect(phashDistance("0", "4294967295")).toBe(32);
+    expect(phashDistance("0", "18446744069414584320")).toBe(32);
+    expect(phashDistance("9223372036854775808", "0")).toBe(1);
+  });
+
+  it("phashComparator_oneReferenceManyOthers_sameAsDistance", () => {
+    const distanceTo = phashComparator("12345678901234567890");
+
+    for (const other of ["0", "1", "18446744073709551615", "12345678901234567891"]) {
+      expect(distanceTo(other)).toBe(phashDistance("12345678901234567890", other));
+    }
+  });
+});
+
+describe("imagePerceptualHashResult — borne d'entrée", () => {
+  // Revue EF-72 perf. 1 : une grande image n'est pas décodée (limitInputPixels).
+  it("imagePerceptualHashResult_overPixelLimit_notDecoded", async () => {
+    const huge = await sharp({ create: { width: 2049, height: 2049, channels: 3, background: "#336699" } }).png().toBuffer();
+
+    expect(await imagePerceptualHashResult(huge)).toEqual({ phash: null, decoded: false });
+  });
+
+  it("imagePerceptualHashResult_transparentBackground_flattenedAfterResize", async () => {
+    const logo = await storedTeamLogo(await sharp(scene(8)).png().toBuffer());
+
+    expect((await imagePerceptualHashResult(logo)).decoded).toBe(true);
   });
 });
 

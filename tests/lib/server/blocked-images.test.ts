@@ -15,6 +15,7 @@ import {
   blockRemovedImageFiles,
   imageSha256,
   isBlockedImage,
+  MAX_COMPARED_PHASHES,
   pinAccountBlockedHashesOn,
   pinClosedQuarantineHashesOn,
   readImageFingerprint,
@@ -62,53 +63,68 @@ async function phashOf(image: Buffer): Promise<string> {
   return hash;
 }
 
-/** Une ligne lue par `isBlockedImage`. */
-function blockedRow(exact: 0 | 1, phash: string | null): { exact: number; phash: string | null } {
-  return { exact, phash };
+/**
+ * Le double SQL d'`isBlockedImage` : `exact` = la clé primaire connaît l'une des
+ * empreintes SHA-256 ; `phashes` = la liste des empreintes perceptuelles posées.
+ */
+function blockedList(exact: boolean, phashes: (string | null)[] = []) {
+  return jest.fn<SqlQuery>(async (sql) =>
+    /^SELECT 1 FROM bg_blocked_image_hashes/.test(sql.trim())
+      ? [exact ? [{ 1: 1 }] : [], []]
+      : [phashes.filter((phash) => phash !== null).map((phash) => ({ phash })), []],
+  );
 }
 
 describe("isBlockedImage", () => {
-  it("isBlockedImage_exactShaMatch_true", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(1, null)], []]);
+  it("isBlockedImage_exactShaMatch_trueWithOneQueryAndNoPhashScan", async () => {
+    const execute = blockedList(true, ["1"]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHash");
 
     expect(await isBlockedImage(IMAGE)).toBe(true);
+
+    // Revue EF-72 perf. 1 : la clé primaire d'abord, ni balayage ni décodage sur une copie exacte.
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(decode).not.toHaveBeenCalled();
   });
 
-  it("isBlockedImage_twoContents_queriesBothHashesInOneStatement", async () => {
+  it("isBlockedImage_twoContents_exactLookupByPrimaryKeyOnBothHashes", async () => {
     const raw = Buffer.from("fichier tel que téléversé");
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    const execute = blockedList(false);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     await isBlockedImage(IMAGE, raw);
 
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0][0]).toContain("SELECT sha256 IN (?, ?) AS exact, CAST(phash AS CHAR) AS phash");
-    expect(execute.mock.calls[0][0]).toContain("WHERE sha256 IN (?, ?) OR phash IS NOT NULL");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(raw), imageSha256(IMAGE), imageSha256(raw)]);
+    expect(execute.mock.calls[0][0]).toContain("SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (?, ?) LIMIT 1");
+    expect(execute.mock.calls[0][0]).not.toContain(" OR ");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(raw)]);
   });
 
-  it("isBlockedImage_noRows_false", async () => {
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[], []]) }));
+  it("isBlockedImage_exactMiss_readsBoundedPhashListNewestFirst", async () => {
+    const execute = blockedList(false);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    expect(await isBlockedImage(await drawnImage())).toBe(false);
+    await isBlockedImage(IMAGE);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1][0]).toContain("SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes");
+    expect(execute.mock.calls[1][0]).toContain("WHERE phash IS NOT NULL ORDER BY created_at DESC LIMIT 20000");
+    expect(MAX_COMPARED_PHASHES).toBe(20_000);
   });
 
-  it("isBlockedImage_rowsWithoutPhash_false", async () => {
-    jest.mocked(getDatabase).mockResolvedValue(
-      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, null)], []]) }),
-    );
+  it("isBlockedImage_noRows_falseWithoutDecoding", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false) }));
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHash");
 
     expect(await isBlockedImage(await drawnImage())).toBe(false);
+    expect(decode).not.toHaveBeenCalled();
   });
 
   // EF-72 / D17 : l'allure de l'image traitée, au seuil commun (borne comprise).
   it("isBlockedImage_phashAtThreshold_true", async () => {
     const image = await drawnImage();
     const near = flipLowBits(await phashOf(image), PHASH_MATCH_DISTANCE);
-    jest.mocked(getDatabase).mockResolvedValue(
-      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, near)], []]) }),
-    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, [near]) }));
 
     expect(await isBlockedImage(image)).toBe(true);
   });
@@ -116,17 +132,22 @@ describe("isBlockedImage", () => {
   it("isBlockedImage_phashBeyondThreshold_false", async () => {
     const image = await drawnImage();
     const far = flipLowBits(await phashOf(image), PHASH_MATCH_DISTANCE + 1);
-    jest.mocked(getDatabase).mockResolvedValue(
-      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, far)], []]) }),
-    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, [far]) }));
 
     expect(await isBlockedImage(image)).toBe(false);
   });
 
+  it("isBlockedImage_matchAmongManyRows_true", async () => {
+    const image = await drawnImage();
+    const near = flipLowBits(await phashOf(image), 3);
+    const others = Array.from({ length: 2000 }, (_, i) => String(BigInt(i) * BigInt("9007199254740993") + BigInt(12345)));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, [...others, near]) }));
+
+    expect(await isBlockedImage(image)).toBe(true);
+  });
+
   it("isBlockedImage_imageWithoutPhashAgainstPhashRows_false", async () => {
-    jest.mocked(getDatabase).mockResolvedValue(
-      fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[blockedRow(0, "0"), blockedRow(0, "18446744073709551615")], []]) }),
-    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, ["0", "18446744073709551615"]) }));
 
     expect(await isBlockedImage(IMAGE)).toBe(false);
   });
