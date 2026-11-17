@@ -6,10 +6,9 @@ import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { toParticipantType } from "@/lib/shared/participants";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
-import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -111,6 +110,21 @@ export function GhostRegistrationDialog({
   const { busy, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
+  // Le champ du mode affiché prend le focus quand le mode change, pas à
+  // l'ouverture : un focus posé au montage (ref) passait avant l'effet de
+  // `useDialogBehavior`, qui retenait alors ce champ comme élément à refocaliser
+  // — à la fermeture, le focus tombait en tête de page au lieu de revenir au
+  // bouton « + Équipe fantôme ». L'ouverture passe par `data-autofocus`.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    openedRef.current = true;
+    return () => {
+      openedRef.current = false;
+    };
+  }, []);
+  const focusOnModeSwitch = useCallback((element: HTMLInputElement | null) => {
+    if (element && openedRef.current) element.focus();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,7 +344,7 @@ export function GhostRegistrationDialog({
               }}
               placeholder={t("ghost.searchPlaceholder")}
               aria-label={t("ghost.searchAria")}
-              ref={focusOnMount}
+              ref={focusOnModeSwitch}
               data-autofocus
             />
 
@@ -397,7 +411,7 @@ export function GhostRegistrationDialog({
               minLength={3}
               maxLength={60}
               required
-              ref={focusOnMount}
+              ref={focusOnModeSwitch}
               data-autofocus
             />
           </div>

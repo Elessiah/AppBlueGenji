@@ -106,6 +106,18 @@ describe("équipes fantômes", () => {
     expect(code).toMatch(/readOnly=\{busy\}\s+minLength=\{3\}/);
   });
 
+  it("GhostRegistration_openingFocus_leftToDialogSoCloseRestoresTrigger", () => {
+    // Un focus posé au montage passait avant `useDialogBehavior`, qui retenait
+    // le champ comme cible de retour : à la fermeture, le focus tombait sur body.
+    expect(code).not.toContain("focusOnMount");
+    expect(code.match(/ref=\{focusOnModeSwitch\}\s+data-autofocus/g)).toHaveLength(2);
+    expect(code).toMatch(/if \(element && openedRef\.current\) element\.focus\(\);/);
+  });
+
+  it("GhostRegistration_modeSwitchFocus_resetOnUnmount", () => {
+    expect(code).toMatch(/openedRef\.current = true;\s+return \(\) => \{\s+openedRef\.current = false;/);
+  });
+
   it("GhostRegistration_submit_guardsEveryBlockingReason", () => {
     expect(code).toMatch(/event\.preventDefault\(\);\s+\/\/[^\n]*\n\s+if \(submitBlocked\) return;/);
     expect(code).toMatch(/busy=\{busy\}\s+blocked=\{submitBlocked\}\s+type="submit"/);
