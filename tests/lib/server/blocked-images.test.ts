@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { getDatabase } from "@/lib/server/database";
+import * as imagePhash from "@/lib/server/image-phash";
 import { imagePerceptualHash, PHASH_MATCH_DISTANCE } from "@/lib/server/image-phash";
 import {
   blockImageHashOn,
@@ -489,6 +490,24 @@ describe("readImageFingerprint", () => {
     const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(image), phash: null });
 
     expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: await phashOf(image) });
+  });
+
+  // Revue EF-72 cycle 3 : une image trop simple, bien décodée hors verrou,
+  // n'est pas décodée une seconde fois sous le verrou.
+  it("readImageFingerprint_preparedTooSimpleImage_reusesWithoutDecoding", async () => {
+    const plain = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 40, g: 90, b: 200 } } })
+      .webp()
+      .toBuffer();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, plain);
+    const prepared = await readImageFingerprint(file);
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHashResult");
+
+    const fingerprint = await readImageFingerprint(file, prepared);
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(plain), phash: null });
+    expect(decode).not.toHaveBeenCalled();
+    decode.mockRestore();
   });
 
   it("readImageFingerprint_preparedButFileGone_returnsNull", async () => {

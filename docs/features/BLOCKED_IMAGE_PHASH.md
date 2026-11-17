@@ -25,17 +25,21 @@ ES2017).
   avatar bloqué en refuserait d'innocents. Une telle image n'est bloquée que
   par ses octets. Quatre critères, tous relatifs à l'image (aucun ne dépend de
   son contraste) :
-  - **presque unie** : moins de `MIN_TONAL_RANGE` (8) niveaux de gris entre
-    ses 2e et 98e centiles ;
+  - **presque unie** : moins de `MIN_TONAL_RANGE` (16) niveaux de gris entre
+    ses 2e et 98e centiles (cycle 3 : à 8, un léger vignetage ou un bruit de
+    compression d'un avatar presque noir, étirés jusqu'à 255, faisaient
+    l'empreinte) ;
   - **surtout faite d'un fond uni** : au moins `MAX_BACKGROUND_SHARE` (50 %)
     des pixels dans un même ton (± 6 niveaux après étirement) — pseudo ou
     initiale sur un aplat (deux pseudos courts au même endroit tombaient à
     0 bit), emblème au milieu d'un logo sur fond transparent, silhouette sur
     fond uni ;
-  - **symétrique en miroir** (gauche-droite ou haut-bas) : écart à son reflet
-    sous `MIN_MIRROR_ASYMMETRY` (0,1) de l'écart à la moyenne — identicon,
-    motif centré (la symétrie annule la moitié des coefficients, dont les bits
-    ne disent plus que le bruit d'arrondi, le même d'une image à l'autre) ;
+  - **symétrique** — reflet gauche-droite, haut-bas ou sur l'une des deux
+    diagonales, ou demi-tour (cycle 3 : moulinet, yin-yang, logo en S) : écart
+    à son image par cette symétrie sous `MIN_MIRROR_ASYMMETRY` (0,1) de l'écart
+    à la moyenne — identicon, motif centré (la symétrie annule ou apparie la
+    moitié des coefficients, dont les bits ne disent plus que le bruit
+    d'arrondi, le même d'une image à l'autre) ;
   - **dégradé** : au moins `MAX_LOW_FREQUENCY_SHARE` (90 %) de la variance
     dans les cinq plus basses fréquences.
   Revue EF-72 : le cycle 1 avait d'abord compté les coefficients écartés de la
@@ -50,6 +54,15 @@ ES2017).
   illustrations ; les icônes, logos et captures à fond uni n'en ont pas — ;
   aucun avatar texte, dégradé, identicon, emblème ni silhouette sur fond uni
   n'en a.
+- **Limite connue** (revue EF-72 cycle 3, choix assumé du cycle 2) : un avatar
+  bloqué fait surtout d'un fond uni (symbole ou mot sur un aplat) n'est bloqué
+  que par ses octets — réencodé ou recadré d'un pixel, il passe ; de même une
+  image détaillée bloquée, collée sur un grand aplat (plus de la moitié des
+  pixels) ou rendue symétrique. Ces images ne se distinguent pas d'avatars
+  innocents de même genre à 32 × 32 ; la retouche est délibérée, comme un cadre
+  très décalé, et la modération la rattrape sur signalement.
+- **Profondeur** : une image 16 bits (PNG) est lue en 8 bits (`raw({ depth:
+  "uchar" })`) — même empreinte, à quelques bits près, que sa copie 8 bits.
 - **Seuil** `PHASH_MATCH_DISTANCE = 10` bits sur 64. Mesuré sur ce jeu (images
   passées par le gabarit avatar) : autre format source, réencodage,
   redimensionnement ≤ 6 ; copie assombrie ou délavée ≤ 8 (une copie très
@@ -116,9 +129,11 @@ et `purgeQuarantinedLogo` relèvent les empreintes du fichier **avant** leur
 transaction (`prepareAvatarFingerprint`, `prepareQuarantinedAvatarFingerprint`,
 lecture non verrouillée) ; sous le verrou, `readImageFingerprint(chemin, préparée)`
 ne refait que la lecture et le SHA-256, et reprend l'empreinte perceptuelle
-préparée si les octets n'ont pas changé **et** qu'elle existe — absente, elle
-peut venir d'un décodage en échec passager, et le fichier effacé ensuite ne
-permettrait plus de la calculer : elle est recalculée sous le verrou. Toute
+préparée si les octets n'ont pas changé **et** qu'elle existe ou que l'image
+s'est bien décodée (image trop simple : `imagePerceptualHashResult` dit
+`decoded`, retenu par `readImageFingerprint`) — absente faute de décodage, elle
+peut venir d'un échec passager, et le fichier effacé ensuite ne permettrait
+plus de la calculer : elle est recalculée sous le verrou. Toute
 préparation en échec rend `null` : l'empreinte se calcule alors sous le
 verrou, comme avant. La purge ne prépare rien pour une ligne déjà close, ni,
 d'office, avant l'échéance.

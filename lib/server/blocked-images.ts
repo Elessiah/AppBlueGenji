@@ -5,7 +5,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { failureReason } from "@/lib/server/failure-reason";
-import { imagePerceptualHash, PHASH_MATCH_DISTANCE, phashDistance } from "@/lib/server/image-phash";
+import { imagePerceptualHash, imagePerceptualHashResult, PHASH_MATCH_DISTANCE, phashDistance } from "@/lib/server/image-phash";
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
@@ -225,9 +225,10 @@ export async function blockImageHashesSafely(
  * transaction de l'appelant. Sous verrou, seuls la lecture et le SHA-256 sont
  * refaits ; si les octets n'ont pas changé, l'empreinte perceptuelle préparée
  * est reprise — son décodage ne tient pas les verrous de la décision. Une
- * empreinte perceptuelle préparée absente est recalculée : elle peut venir
- * d'un décodage en échec passager (mémoire), et le fichier, effacé ensuite,
- * ne permettrait plus de la calculer.
+ * empreinte perceptuelle préparée absente n'est reprise que si l'image a bien
+ * été décodée (image trop simple, `decodedFingerprints`) ; sinon elle est
+ * recalculée : elle peut venir d'un décodage en échec passager (mémoire), et le
+ * fichier, effacé ensuite, ne permettrait plus de la calculer.
  */
 export async function readImageFingerprint(
   absolutePath: string,
@@ -236,8 +237,24 @@ export async function readImageFingerprint(
   const content = await readFile(absolutePath).catch(() => null);
   if (content === null) return null;
   const sha256 = imageSha256(content);
-  if (prepared && prepared.sha256 === sha256 && prepared.phash !== null) return { sha256, phash: prepared.phash };
-  return { sha256, phash: await imagePerceptualHash(content) };
+  if (prepared && prepared.sha256 === sha256 && (prepared.phash !== null || decodedFingerprints.has(prepared))) {
+    return remember({ sha256, phash: prepared.phash }, true);
+  }
+  const { phash, decoded } = await imagePerceptualHashResult(content);
+  return remember({ sha256, phash }, decoded);
+}
+
+/**
+ * Les empreintes rendues par `readImageFingerprint` dont l'image a été
+ * décodée : leur `phash` nul dit « image trop simple », pas « décodage en
+ * échec » — reprise sous le verrou sans nouveau décodage (revue EF-72 cycle 3 :
+ * avec les critères du cycle 2, c'est le cas de la plupart des avatars texte).
+ */
+const decodedFingerprints = new WeakSet<ImageFingerprint>();
+
+function remember(fingerprint: ImageFingerprint, decoded: boolean): ImageFingerprint {
+  if (decoded) decodedFingerprints.add(fingerprint);
+  return fingerprint;
 }
 
 /** Ce qu'il faut pour écrire dans la transaction de l'appelant. */

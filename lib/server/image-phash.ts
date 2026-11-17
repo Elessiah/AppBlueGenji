@@ -30,10 +30,11 @@ import sharp from "sharp";
  *   pixels dans un même ton — un pseudo ou une initiale sur un aplat, un
  *   emblème au milieu d'un logo, une silhouette sur un fond uni (deux pseudos
  *   courts au même endroit tombaient à 0 bit l'un de l'autre) ;
- * - **symétrique** en miroir, de gauche à droite ou de haut en bas (identicon,
- *   motif centré : la symétrie annule la moitié des coefficients, dont les
- *   bits ne disent plus que le bruit d'arrondi, le même d'une image à
- *   l'autre) ;
+ * - **symétrique** : son propre reflet de gauche à droite, de haut en bas ou
+ *   sur une diagonale, ou sa propre image après un demi-tour (identicon, motif
+ *   centré, moulinet : la symétrie annule ou apparie la moitié des
+ *   coefficients, dont les bits ne disent plus que le bruit d'arrondi, le même
+ *   d'une image à l'autre) ;
  * - un **dégradé** : `MAX_LOW_FREQUENCY_SHARE` de ses variations, ou plus,
  *   dans ses cinq plus basses fréquences.
  * Une photo, une illustration, une scène détaillée — même sombre ou délavée —
@@ -48,8 +49,13 @@ const BLOCK_SIZE = 9;
 const HASH_BITS = 64;
 /** Centiles (en part des pixels) ramenés à 0 et à 255 par l'étirement du contraste. */
 const STRETCH_PERCENTILE = 0.02;
-/** Écart (niveaux de gris) entre ces centiles sous lequel l'image est presque unie. */
-export const MIN_TONAL_RANGE = 8;
+/**
+ * Écart (niveaux de gris) entre ces centiles sous lequel l'image est presque
+ * unie : en deçà de 16 niveaux (6 %), un léger vignetage ou un bruit de
+ * compression, étirés jusqu'à 255, feraient l'empreinte (revue EF-72 cycle 3).
+ * Une photo assombrie à 30 % en garde encore une soixantaine.
+ */
+export const MIN_TONAL_RANGE = 16;
 /** Demi-largeur (niveaux de gris, après étirement) de ce qui compte pour un même ton. */
 const BACKGROUND_TONE_TOLERANCE = 6;
 /**
@@ -61,8 +67,9 @@ const BACKGROUND_TONE_TOLERANCE = 6;
  */
 export const MAX_BACKGROUND_SHARE = 0.5;
 /**
- * Écart à son reflet (somme des écarts pixel à pixel, rapportée à la somme des
- * écarts à la moyenne) sous lequel l'image est symétrique. Mesuré : un motif
+ * Écart à son reflet ou à son demi-tour (somme des écarts pixel à pixel,
+ * rapportée à la somme des écarts à la moyenne) sous lequel l'image est
+ * symétrique. Mesuré : un motif
  * symétrique, de 0 à 0,05 (arrondi) ; une illustration à peu près symétrique,
  * 0,25 et plus ; une photo, une scène, au-delà de 0,4.
  */
@@ -118,16 +125,25 @@ const KEPT_COEFFICIENTS: readonly number[] = (() => {
  * est trop simple ou ne se décode pas.
  */
 export async function imagePerceptualHash(content: Buffer): Promise<string | null> {
+  return (await imagePerceptualHashResult(content)).phash;
+}
+
+/**
+ * Comme `imagePerceptualHash`, en disant si l'image s'est décodée : un `phash`
+ * nul d'une image décodée est définitif (image trop simple), celui d'un
+ * décodage en échec peut se retenter.
+ */
+export async function imagePerceptualHashResult(content: Buffer): Promise<{ phash: string | null; decoded: boolean }> {
   try {
     const { data, info } = await sharp(content, { failOn: "none", autoOrient: true })
       .flatten({ background: { r: 128, g: 128, b: 128 } })
       .resize(SAMPLE_SIZE, SAMPLE_SIZE, { fit: "fill" })
       .toColourspace("b-w")
-      .raw()
+      .raw({ depth: "uchar" })
       .toBuffer({ resolveWithObject: true });
-    return perceptualHashFromGrey(data, info.channels);
+    return { phash: perceptualHashFromGrey(data, info.channels), decoded: true };
   } catch {
-    return null;
+    return { phash: null, decoded: false };
   }
 }
 
@@ -180,21 +196,30 @@ function isMostlyOneTone(grey: Float64Array): boolean {
   return largest >= grey.length * MAX_BACKGROUND_SHARE;
 }
 
-/** L'image est-elle (presque) son propre reflet, de gauche à droite ou de haut en bas ? */
+/**
+ * L'image est-elle (presque) sa propre image par une symétrie du carré qui
+ * annule ou apparie ses coefficients : reflet gauche-droite ou haut-bas,
+ * demi-tour (moulinet, yin-yang, logo en S), reflet sur une diagonale ? (Revue
+ * EF-72 cycle 3 : le demi-tour annule, comme un reflet, la moitié des
+ * coefficients.)
+ */
 function isMirrorSymmetric(grey: Float64Array): boolean {
   const mean = meanOf(grey);
+  const last = SAMPLE_SIZE - 1;
   let spread = 0;
-  let horizontal = 0;
-  let vertical = 0;
+  const gaps = [0, 0, 0, 0, 0];
   for (let y = 0; y < SAMPLE_SIZE; y += 1) {
     for (let x = 0; x < SAMPLE_SIZE; x += 1) {
       const value = grey[y * SAMPLE_SIZE + x];
       spread += Math.abs(value - mean);
-      horizontal += Math.abs(value - grey[y * SAMPLE_SIZE + (SAMPLE_SIZE - 1 - x)]);
-      vertical += Math.abs(value - grey[(SAMPLE_SIZE - 1 - y) * SAMPLE_SIZE + x]);
+      gaps[0] += Math.abs(value - grey[y * SAMPLE_SIZE + (last - x)]);
+      gaps[1] += Math.abs(value - grey[(last - y) * SAMPLE_SIZE + x]);
+      gaps[2] += Math.abs(value - grey[(last - y) * SAMPLE_SIZE + (last - x)]);
+      gaps[3] += Math.abs(value - grey[x * SAMPLE_SIZE + y]);
+      gaps[4] += Math.abs(value - grey[(last - x) * SAMPLE_SIZE + (last - y)]);
     }
   }
-  return Math.min(horizontal, vertical) < spread * MIN_MIRROR_ASYMMETRY;
+  return Math.min(...gaps) < spread * MIN_MIRROR_ASYMMETRY;
 }
 
 /**

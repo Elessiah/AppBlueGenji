@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import sharp from "sharp";
 import {
   imagePerceptualHash,
+  imagePerceptualHashResult,
   MIN_TONAL_RANGE,
   PHASH_MATCH_DISTANCE,
   perceptualHashFromGrey,
@@ -73,12 +74,18 @@ async function photoLike(seed: number): Promise<Buffer> {
 /** Les images « photo » se calculent pixel à pixel : un passage de toute la suite, chargé, y dépasse les 5 s par défaut. */
 const PHOTO_TEST_TIMEOUT_MS = 30_000;
 
+/**
+ * Police des avatars texte : Arial sous Windows, sa métrique jumelle (Liberation
+ * Sans) ou DejaVu Sans sous Linux — l'intégration continue n'a pas Arial.
+ */
+const TEXT_FONT = "Arial, Liberation Sans, DejaVu Sans, sans-serif";
+
 /** Un avatar texte : un pseudo en gras sur un aplat. */
 function textAvatar(name: string, background: string, small = false): Buffer {
   const foreground = background === "#ffffff" ? "#111111" : "#eeeeee";
   const text = small
-    ? `<text x="160" y="380" font-size="120" font-family="Arial" font-weight="bold" fill="${foreground}">${name}</text>`
-    : `<text x="300" y="370" font-size="200" text-anchor="middle" font-family="Arial" font-weight="bold" fill="${foreground}">${name}</text>`;
+    ? `<text x="160" y="380" font-size="120" font-family="${TEXT_FONT}" font-weight="bold" fill="${foreground}">${name}</text>`
+    : `<text x="300" y="370" font-size="200" text-anchor="middle" font-family="${TEXT_FONT}" font-weight="bold" fill="${foreground}">${name}</text>`;
   return svg(`<rect width="600" height="600" fill="${background}"/>${text}`);
 }
 
@@ -98,7 +105,7 @@ function centredEmblem(kind: "disc" | "diamond" | "ring" | "initial", foreground
     disc: `<circle cx="300" cy="300" r="190" fill="${foreground}"/>`,
     diamond: `<rect x="150" y="150" width="300" height="300" fill="${foreground}" transform="rotate(45 300 300)"/>`,
     ring: `<circle cx="300" cy="300" r="210" fill="none" stroke="${foreground}" stroke-width="40"/>`,
-    initial: `<circle cx="300" cy="300" r="250" fill="${foreground}"/><text x="300" y="400" font-size="300" text-anchor="middle" font-family="Arial" fill="${background}">A</text>`,
+    initial: `<circle cx="300" cy="300" r="250" fill="${foreground}"/><text x="300" y="400" font-size="300" text-anchor="middle" font-family="${TEXT_FONT}" fill="${background}">A</text>`,
   };
   return svg(`<rect width="600" height="600" fill="${background}"/>${shapes[kind]}`);
 }
@@ -279,7 +286,10 @@ describe("imagePerceptualHash — sans empreinte", () => {
     ["Zed", "#ffffff", true],
   ] satisfies [string, string, boolean][])("imagePerceptualHash_textOnFlatBackground_returnsNull (%s sur %s, petit : %s)", async (name, background, small) => {
     const avatar = await storedAvatar(await sharp(textAvatar(name, background, small)).png().toBuffer());
+    // Le texte est bien dessiné (sans police, l'aplat seul rendrait le test vide).
+    const { channels } = await sharp(avatar).stats();
 
+    expect(channels[0].stdev).toBeGreaterThan(10);
     expect(await imagePerceptualHash(avatar)).toBeNull();
   });
 
@@ -438,5 +448,78 @@ describe("phashDistance", () => {
 
   it("phashDistance_oneBitDiffers_one", () => {
     expect(phashDistance("1", "3")).toBe(1);
+  });
+});
+
+// Revue EF-72 cycle 3.
+/** Un moulinet (`arms` bras tordus, sans axe de reflet) : sa propre image après un demi-tour. */
+function pinwheelGrey(arms: number, twist: number): Uint8Array {
+  return Uint8Array.from({ length: 32 * 32 }, (_, i) => {
+    const dx = (i % 32) - 15.5;
+    const dy = Math.floor(i / 32) - 15.5;
+    const radius = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) + twist * radius;
+    return Math.round(128 + 92 * Math.sin(arms * angle) * Math.min(1, radius / 10));
+  });
+}
+
+/** Une image presque noire : léger vignetage d'un coin à l'autre et bruit de compression, sur 14 niveaux. */
+async function nearBlackAvatar(): Promise<Buffer> {
+  const random = seeded(11);
+  const size = 256;
+  const pixels = Buffer.alloc(size * size * 3);
+  for (let i = 0; i < size * size; i += 1) {
+    const value = 8 + Math.round((((i % size) + Math.floor(i / size)) / (2 * size)) * 8 + random() * 6);
+    pixels.fill(value, i * 3, i * 3 + 3);
+  }
+  return sharp(pixels, { raw: { width: size, height: size, channels: 3 } }).webp({ quality: 80 }).toBuffer();
+}
+
+describe("imagePerceptualHash — symétries et cas limites (cycle 3)", () => {
+  // Le demi-tour annule, comme un reflet, la moitié des coefficients.
+  it("perceptualHashFromGrey_halfTurnSymmetricPinwheel_returnsNull", () => {
+    expect(perceptualHashFromGrey(pinwheelGrey(2, 0.15))).toBeNull();
+  });
+
+  it("perceptualHashFromGrey_diagonalMirrorPattern_returnsNull", () => {
+    const grey = detailedGrey(200);
+    const mirrored = Uint8Array.from(grey, (value, i) => Math.round((value + grey[(i % 32) * 32 + Math.floor(i / 32)]) / 2));
+
+    expect(perceptualHashFromGrey(mirrored)).toBeNull();
+  });
+
+  it("perceptualHashFromGrey_detailedImageWithoutSymmetry_stillHashed", () => {
+    expect(perceptualHashFromGrey(detailedGrey(200))).not.toBeNull();
+  });
+
+  it("imagePerceptualHash_nearBlackWithVignetteAndNoise_returnsNull", async () => {
+    expect(await imagePerceptualHash(await nearBlackAvatar())).toBeNull();
+  });
+
+  it("imagePerceptualHash_sixteenBitPng_matchesEightBitCopy", async () => {
+    const png = await photoLike(3);
+    const png16 = await sharp(png).toColourspace("rgb16").png().toBuffer();
+
+    expect(phashDistance(await hashOf(png16), await hashOf(png))).toBeLessThanOrEqual(PHASH_MATCH_DISTANCE);
+  }, PHOTO_TEST_TIMEOUT_MS);
+
+  it("imagePerceptualHash_fullyTransparentImage_returnsNull", async () => {
+    const transparent = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .png()
+      .toBuffer();
+
+    expect(await imagePerceptualHash(transparent)).toBeNull();
+  });
+
+  it("imagePerceptualHashResult_tooSimpleImage_decodedWithoutHash", async () => {
+    const plain = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 40, g: 90, b: 200 } } })
+      .webp()
+      .toBuffer();
+
+    expect(await imagePerceptualHashResult(plain)).toEqual({ phash: null, decoded: true });
+  });
+
+  it("imagePerceptualHashResult_notAnImage_notDecoded", async () => {
+    expect(await imagePerceptualHashResult(Buffer.from("pas une image"))).toEqual({ phash: null, decoded: false });
   });
 });
