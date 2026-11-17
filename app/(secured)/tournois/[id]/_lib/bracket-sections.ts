@@ -1,6 +1,9 @@
 import type { BracketMatch, BracketType } from "@/lib/shared/types";
+import { stageKey, type StageKey } from "@/lib/shared/bracket-stage";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { FR_TOURNAMENT_PAGE_TEXT, type TournamentPageText } from "@/lib/shared/tournament-page-text";
+
+export { stageKey, type StageKey };
 
 /** Couleur d'accent par tableau — distingue d'un coup d'œil principal / perdants / finale. */
 export const ACCENT: Record<BracketType, string> = {
@@ -47,29 +50,6 @@ export interface BracketSection {
   roundIdxBase: number;
   /** Libellé « Qualifié en X » menant au stade suivant (null = dernière section). */
   qualifyLabel: string | null;
-}
-
-/** Nom de stade d'un round, à partir de la fin du tableau (0 = round le plus précoce). */
-export type StageKey =
-  | "grandFinal"
-  | "thirdPlace"
-  | "lowerFinal"
-  | "final"
-  | "semis"
-  | "quarters"
-  | "roundOf16"
-  | "early";
-
-/** Stade d'un tour, par sa distance à la finale (lot 8a-2 : une clé, traduite à l'écran). */
-export function stageKey(globalIdx: number, totalRounds: number, bracketType: BracketType): StageKey {
-  if (bracketType === "GRAND") return "grandFinal";
-  if (bracketType === "THIRD_PLACE") return "thirdPlace";
-  const fromEnd = totalRounds - 1 - globalIdx;
-  if (fromEnd === 0) return bracketType === "LOWER" ? "lowerFinal" : "final";
-  if (fromEnd === 1) return "semis";
-  if (fromEnd === 2) return "quarters";
-  if (fromEnd === 3) return "roundOf16";
-  return "early";
 }
 
 export function stageName(

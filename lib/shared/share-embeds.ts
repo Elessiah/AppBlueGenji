@@ -23,6 +23,7 @@
 import { matchMapNames } from "./round-maps";
 import { isMatchPlayed } from "./match-outcome";
 import { isSoloTournament } from "./participants";
+import { buildShareRounds, type ShareRound } from "./share-round";
 import { localUploadUrl } from "./uploads";
 import type { BracketMatch, BracketType, MatchStatus, TournamentCard, TournamentSnapshot } from "./types";
 
@@ -53,6 +54,10 @@ export type MatchShareSummary = {
   bracket: BracketType;
   roundNumber: number;
   matchNumber: number;
+  /** Nom de la manche, tel que la fiche le donne (`share-round.ts`). */
+  round: ShareRound | null;
+  /** Horaire programmé (ISO), `null` sans horaire annoncé. */
+  startAt: string | null;
   status: MatchStatus;
   team1: ShareEntrantSide;
   team2: ShareEntrantSide;
@@ -76,7 +81,7 @@ export type TournamentShareSummary = {
 /** Ce que le résumé lit de la réponse publique. */
 export type ShareSummarySource = Pick<
   TournamentSnapshot,
-  "card" | "soloUserIds" | "registrations" | "matches" | "swiss" | "survival" | "endurance" | "mapRules"
+  "card" | "soloUserIds" | "registrations" | "matches" | "swiss" | "survival" | "endurance" | "mapRules" | "phases"
 >;
 
 function sideOf(
@@ -116,6 +121,7 @@ type ShareMatchSource = Pick<
   | "bracket"
   | "roundNumber"
   | "matchNumber"
+  | "startAt"
   | "status"
   | "team1Id"
   | "team2Id"
@@ -139,6 +145,7 @@ function shareMatchSource(match: BracketMatch): ShareMatchSource {
     bracket: match.bracket,
     roundNumber: match.roundNumber,
     matchNumber: match.matchNumber,
+    startAt: match.startAt,
     status: match.status,
     team1Id: match.team1Id,
     team2Id: match.team2Id,
@@ -160,6 +167,7 @@ function matchSummary(
   snapshot: { card: TournamentCard; soloUserIds: TournamentSnapshot["soloUserIds"]; mapRules: Pick<TournamentSnapshot["mapRules"], "rounds"> },
   logos: ReadonlyMap<number, string | null>,
   match: ShareMatchSource,
+  round: ShareRound | null,
 ): MatchShareSummary {
   const names = match.maps.length > 0 ? matchMapNames(snapshot.mapRules.rounds, match) : [];
   return {
@@ -167,6 +175,8 @@ function matchSummary(
     bracket: match.bracket,
     roundNumber: match.roundNumber,
     matchNumber: match.matchNumber,
+    round,
+    startAt: match.startAt,
     status: match.status,
     team1: sideOf(snapshot, logos, match.team1Id, match.team1Name),
     team2: sideOf(snapshot, logos, match.team2Id, match.team2Name),
@@ -232,6 +242,7 @@ export function buildTournamentShareSummary(snapshot: ShareSummarySource): Tourn
     soloUserIds: snapshot.soloUserIds,
     mapRules: { rounds: snapshot.mapRules.rounds },
     matches: snapshot.matches.map(shareMatchSource),
+    phases: snapshot.phases,
   };
   let matches: ReadonlyMap<number, MatchShareSummary> | null = null;
   return {
@@ -239,7 +250,8 @@ export function buildTournamentShareSummary(snapshot: ShareSummarySource): Tourn
     get matches() {
       if (matches === null) {
         const built = new Map<number, MatchShareSummary>();
-        for (const match of source.matches) built.set(match.id, matchSummary(source, logos, match));
+        const rounds = buildShareRounds(source);
+        for (const match of source.matches) built.set(match.id, matchSummary(source, logos, match, rounds.get(match.id) ?? null));
         matches = built;
       }
       return matches;

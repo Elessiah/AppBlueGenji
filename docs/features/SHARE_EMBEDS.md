@@ -69,9 +69,40 @@ de replay publics).
   `openGraph.images` et `twitter.images` (adresse versionnée, 1200×630, texte
   alternatif) ; un tournoi illisible garde l'image du site (`/og/<langue>/home.png`),
   posée par l'encart de repli — un `openGraph` de page remplace celui de la racine ; une page de match sans compte prend titre « A contre B ·
-  Manche 2 · Match 3 — tournoi » et une description score + maps + codes.
+  Quart de finale 2 — tournoi » et une description score + maps + codes (voir « Nom de la manche » et « Match à venir »).
 - Textes : espace `share.embed` (FR et EN), rédaction pure
   `lib/shared/share-embed-cards.ts`, noms passés par `visibleText`.
+
+## Nom de la manche
+
+Le match se place par **le nom de sa manche tel que la fiche le donne**, non
+plus « Manche n · Match m » (`lib/shared/share-round.ts`) : « Quart de finale 2 »,
+« Demi-finale 1 », « Finale », « Finale perdants », « Tableau perdants · Demi-finale 1 »,
+« Grande Finale », « Petite Finale » (mêmes clés `bracket.stage` / `bracket.matchLabel`
+de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-stage.ts`).
+- `buildShareRounds` (dans le résumé, donc dans l'empreinte `?v=` de l'image) nomme
+  chaque tableau (par phase et par `bracket`) depuis son dernier tour ; l'arbre final
+  de BlueGenji Survie sur `endurancePlayoffRoundCount` (déplacé dans
+  `lib/shared/bg-survie/playoff-rounds.ts`).
+- Premiers tours d'un grand tableau : « Manche 1 · Match 7 » ; modes à classement :
+  « Ronde 3 · Match 2 » (suisse, mot `swiss.roundNoun`), « Manche 4 · Match 1 » (Survie,
+  qualification de BlueGenji Survie) — « Round » en anglais. Le numéro du match n'est
+  écrit que si le nom seul est ambigu (jamais pour une finale).
+- Match absent du résumé (encart de repli, sans réponse publique) : « Manche n · Match m ».
+- Non changé : l'en-tête de la page du match garde « Manche n · Match m »
+  (`matchPositionText`), et la carte du direct de l'accueil (`landing.json` → `round`,
+  `phase.round`) n'est pas un aperçu partagé.
+
+## Match à venir : horaire en avant
+
+Un match **programmé** (`startAt`) sans score, map ni forfait (`matchScheduledAt`) met
+son horaire en tête, à l'heure de Paris, dans les deux langues :
+- image : ligne principale en 52 px sous les équipes, « Mardi 17 novembre · 21:00 » /
+  « Tuesday, November 17 · 21:00 », fuseau en dessous (« heure de Paris » / « Paris time »,
+  `share.embed.timeZone`) ;
+- titre : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » ;
+- description : « Mardi 17 novembre · 21:00 (heure de Paris) ».
+Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant.
 
 ## Confidentialité
 

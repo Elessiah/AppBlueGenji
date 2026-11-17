@@ -70,6 +70,8 @@ const MATCH: MatchShareSummary = {
   bracket: "UPPER",
   roundNumber: 1,
   matchNumber: 1,
+  round: null,
+  startAt: null,
   status: "COMPLETED",
   team1: { teamId: 10, name: "Alpha", logoUrl: "/uploads/teams/10.png", solo: false },
   team2: { teamId: 20, name: "Bravo", logoUrl: null, solo: false },

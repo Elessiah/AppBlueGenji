@@ -69,6 +69,61 @@ export function embedShortDate(iso: string, locale: Locale): string | null {
   return `${day} · ${hour}`;
 }
 
+/** Première lettre en capitale (« mardi » → « Mardi »), dans la langue. */
+function capitalized(text: string, locale: Locale): string {
+  return text.charAt(0).toLocaleUpperCase(INTL_LOCALE[locale]) + text.slice(1);
+}
+
+/** L'heure de Paris sur 24 h : « 21:00 » (les deux langues, comme la fiche). */
+function embedHour(date: Date, locale: Locale): string {
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    timeZone: SHARE_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
+/** Date longue d'un match programmé, à l'heure de Paris : « Mardi 18 novembre · 21:00 » / « Tuesday, November 18 · 21:00 ». */
+export function embedLongWhen(iso: string, locale: Locale): string | null {
+  const time = Date.parse(iso);
+  if (!Number.isFinite(time)) return null;
+  const date = new Date(time);
+  const day = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    timeZone: SHARE_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+  return `${capitalized(day, locale)} · ${embedHour(date, locale)}`;
+}
+
+/** Date courte pour un titre : « mar. 18 nov. 21:00 » / « Tue, Nov 18 21:00 ». */
+export function embedShortWhen(iso: string, locale: Locale): string | null {
+  const time = Date.parse(iso);
+  if (!Number.isFinite(time)) return null;
+  const date = new Date(time);
+  const day = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    timeZone: SHARE_TIME_ZONE,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+  return `${day} ${embedHour(date, locale)}`;
+}
+
+/**
+ * L'horaire d'un match **à venir** : programmé (`startAt`) et ni score, ni map,
+ * ni forfait — un match joué, ou en cours de saisie, ne s'annonce plus.
+ * `null` sinon, ou si l'horaire est illisible.
+ */
+export function matchScheduledAt(match: MatchShareSummary): string | null {
+  if (match.startAt === null || match.doubleForfeit || match.forfeitSide !== null) return null;
+  if (match.status !== "PENDING" && match.status !== "READY") return null;
+  if (match.score !== null || match.maps.length > 0) return null;
+  return Number.isFinite(Date.parse(match.startAt)) ? match.startAt : null;
+}
+
 type ScheduleKey = keyof EmbedText["schedule"];
 
 /** L'échéance qui compte à cet instant (même règle que l'encart d'une fiche). */
@@ -185,6 +240,9 @@ export type EmbedScoreCenter =
   /** Ni score ni forfait : le tableau d'affichage écrit « VS » (`scoreboardVersus`). */
   | { kind: "none"; text: string };
 
+/** L'horaire mis en avant sous les équipes d'un match à venir. */
+export type EmbedSchedule = { when: string; zone: string };
+
 /** Une case de map : « Map 1 · Ilios », son score et son code de replay. */
 export type EmbedMapCell = { label: string; score: string; code: string | null; winnerSide: 1 | 2 | null };
 
@@ -194,8 +252,10 @@ export type MatchEmbedCard = {
   state: { label: string; tone: ShareStateTone };
   /** Nom du tournoi. */
   title: string;
-  /** Place du match (« Manche 2 · Match 3 »). */
+  /** Place du match (« Quart de finale 2 », « Ronde 3 · Match 2 »). */
   subtitle: string;
+  /** Horaire d'un match à venir (grand, sous les équipes), `null` sinon. */
+  schedule: EmbedSchedule | null;
   team1: EmbedTeamMark;
   team2: EmbedTeamMark;
   center: EmbedScoreCenter;
@@ -245,17 +305,21 @@ export function matchEmbedCard(
   match: MatchShareSummary,
   position: string,
   messages: ShareEmbedMessages,
+  locale: Locale,
 ): MatchEmbedCard {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
   const state = matchStateOf(match);
   const shownMaps = match.maps.slice(0, EMBED_MAX_MAPS);
   const extra = match.maps.length - shownMaps.length;
+  const scheduledAt = matchScheduledAt(match);
+  const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
   return {
     eyebrow: localizedTournamentLabel(messages.labels, "game", card.game),
     state: { label: text.matchStates[state.key], tone: state.tone },
     title: shownText(card.name, EMBED_TITLE_MAX_LENGTH) || text.tournamentFallback,
     subtitle: position,
+    schedule: when === null ? null : { when, zone: text.timeZone },
     team1: { name: names[0], initial: initialOf(names[0]), logoUrl: match.team1.logoUrl, winner: match.winnerSide === 1 },
     team2: { name: names[1], initial: initialOf(names[1]), logoUrl: match.team2.logoUrl, winner: match.winnerSide === 2 },
     center: scoreCenter(match, names, text),
@@ -282,27 +346,45 @@ export function tournamentEmbedAlt(card: TournamentCard, messages: ShareEmbedMes
   return fill(text.tournamentAlt, { name: shownText(card.name, EMBED_TITLE_MAX_LENGTH) || text.tournamentFallback });
 }
 
-/** Titre de l'encart d'un match : « A contre B · Manche 2 · Match 3 ». */
-export function matchEmbedTitle(match: MatchShareSummary, position: string, messages: ShareEmbedMessages): string {
+/**
+ * Titre de l'encart d'un match : « A contre B · Quart de finale 2 », suivi de
+ * l'horaire d'un match à venir (« · mar. 18 nov. 21:00 »).
+ */
+export function matchEmbedTitle(
+  match: MatchShareSummary,
+  position: string,
+  messages: ShareEmbedMessages,
+  locale: Locale,
+): string {
   const text = messages.share.embed;
   const versus = fill(text.versus, {
     team1: embedSideName(match.team1, 1, text),
     team2: embedSideName(match.team2, 2, text),
   });
-  return `${versus} · ${position}`;
+  const scheduledAt = matchScheduledAt(match);
+  const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
+  return when === null ? `${versus} · ${position}` : `${versus} · ${position} · ${when}`;
 }
 
 /**
  * Description de l'encart d'un match : le score, puis chaque map jouée (nom,
  * score, code de replay), bornée à {@link EMBED_DESCRIPTION_MAX_LENGTH}.
  * `null` tant que le match n'a ni score ni map : l'encart garde alors celle du
- * tournoi.
+ * tournoi. Un match **à venir** s'ouvre sur son horaire (« Mardi 18 novembre ·
+ * 21:00 (heure de Paris) »).
  */
-export function matchEmbedDescription(match: MatchShareSummary, messages: ShareEmbedMessages): string | null {
+export function matchEmbedDescription(
+  match: MatchShareSummary,
+  messages: ShareEmbedMessages,
+  locale: Locale,
+): string | null {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
   const center = scoreCenter(match, names, text);
   const parts: string[] = [];
+  const scheduledAt = matchScheduledAt(match);
+  const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
+  if (when !== null) parts.push(`${when} (${text.timeZone})`);
   if (center.kind === "score") parts.push(`${names[0]} ${center.team1} – ${center.team2} ${names[1]}`);
   else if (center.kind === "label") parts.push(center.text);
   for (const map of match.maps) {

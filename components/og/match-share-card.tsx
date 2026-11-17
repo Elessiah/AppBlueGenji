@@ -10,7 +10,7 @@
  * un engagé solo s'y appelle « Joueur 1 » / « Joueur 2 ».
  */
 import type { ReactElement } from "react";
-import type { EmbedMapCell, EmbedScoreCenter, EmbedTeamMark } from "@/lib/shared/share-embed-cards";
+import type { EmbedMapCell, EmbedSchedule, EmbedScoreCenter, EmbedTeamMark } from "@/lib/shared/share-embed-cards";
 import { SHARE_CARD_COLORS, ShareCardBadges, ShareCardFrame, type ShareCardTone } from "./share-card";
 import { rgba, ShareTeamMark } from "./share-team-mark";
 
@@ -28,6 +28,8 @@ export type MatchShareCardProps = {
   state: { label: string; tone: ShareCardTone };
   title: string;
   subtitle: string;
+  /** Horaire d'un match à venir, en grand sous les équipes. */
+  schedule?: EmbedSchedule | null;
   team1: EmbedTeamMark & { logoSrc: string | null };
   team2: EmbedTeamMark & { logoSrc: string | null };
   center: EmbedScoreCenter;
@@ -178,12 +180,42 @@ function MapCell({ cell, noCode }: Readonly<{ cell: EmbedMapCell; noCode: string
   );
 }
 
+/**
+ * L'horaire d'un match à venir : la ligne principale de la carte, sous les
+ * équipes, avec son fuseau. Une ligne au plus (rognée à la largeur de la
+ * carte) : un horaire n'a jamais besoin de plus.
+ */
+function Schedule({ schedule }: Readonly<{ schedule: EmbedSchedule }>): ReactElement {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 26 }}>
+      <div
+        style={{
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 1,
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          maxWidth: 1056,
+          fontSize: 52,
+          lineHeight: 1.15,
+          fontWeight: 700,
+          color: SHARE_CARD_COLORS.cyan,
+        }}
+      >
+        {schedule.when}
+      </div>
+      <div style={{ display: "flex", marginTop: 6, fontSize: 24, color: SHARE_CARD_COLORS.inkMute }}>{schedule.zone}</div>
+    </div>
+  );
+}
+
 /** La carte d'un match, prête à être passée à `ImageResponse`. */
 export function MatchShareCard({
   eyebrow,
   state,
   title,
   subtitle,
+  schedule = null,
   team1,
   team2,
   center,
@@ -243,6 +275,8 @@ export function MatchShareCard({
           <Center center={center} />
           <Side team={team2} color={MATCH_SIDE_COLORS[1]} align="right" dimLoser={dimLoser} />
         </div>
+
+        {schedule ? <Schedule schedule={schedule} /> : null}
 
         {rows.map((row, rowIndex) => (
           <div key={rowIndex} style={{ display: "flex" }}>

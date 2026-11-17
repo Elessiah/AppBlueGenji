@@ -67,7 +67,7 @@ import {
   tournamentShareVersion,
   type EmbedShareTarget,
 } from "@/lib/shared/share-embeds";
-import { matchPositionText, tournamentPageMessages, tournamentPageText } from "@/lib/shared/tournament-page-text";
+import { shareRoundPageText, shareRoundText } from "@/lib/shared/share-round";
 
 /**
  * Durée de cache annoncée : cinq minutes, comme le podium. L'adresse publiée
@@ -224,8 +224,8 @@ export async function buildEmbedShareImage(
 
   const match = view.share.matches.get(target.matchId);
   if (!match) return null;
-  const position = matchPositionText(tournamentPageText(locale, tournamentPageMessages(messages)), match);
-  const card = matchEmbedCard(view.card, match, position, messages);
+  const position = shareRoundText(shareRoundPageText(locale, messages), match.round, match);
+  const card = matchEmbedCard(view.card, match, position, messages, locale);
   const [logo1, logo2] = await Promise.all([
     teamLogoDataUrl(card.team1.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
     teamLogoDataUrl(card.team2.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
@@ -236,6 +236,7 @@ export async function buildEmbedShareImage(
       state={card.state}
       title={card.title}
       subtitle={card.subtitle}
+      schedule={card.schedule}
       team1={{ ...card.team1, logoSrc: logo1 }}
       team2={{ ...card.team2, logoSrc: logo2 }}
       center={card.center}

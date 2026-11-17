@@ -20,6 +20,7 @@ import { matchPagePath } from "@/lib/shared/match-page";
 import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import type { BracketType } from "@/lib/shared/types";
 import { matchPositionText, tournamentPageMessages, tournamentPageText } from "@/lib/shared/tournament-page-text";
+import { shareRoundPageText, shareRoundText } from "@/lib/shared/share-round";
 
 /**
  * Lectures serveur de la page d'un match (`docs/features/MATCH_PAGE.md`) :
@@ -151,8 +152,9 @@ export async function matchPageMetadata(
     };
   }
   const messages = messagesFor(locale);
-  const title = prefixedTitle(metadata.title, matchEmbedTitle(match, prefix, messages));
-  const description = matchEmbedDescription(match, messages) ?? metadata.description ?? undefined;
+  const roundName = shareRoundText(shareRoundPageText(locale, messages), match.round, match);
+  const title = prefixedTitle(metadata.title, matchEmbedTitle(match, roundName, messages, locale));
+  const description = matchEmbedDescription(match, messages, locale) ?? metadata.description ?? undefined;
   const image = embedImageMetadata(
     matchShareCardKey(tournamentId as number, matchId as number),
     locale,

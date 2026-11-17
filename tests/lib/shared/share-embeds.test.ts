@@ -46,6 +46,7 @@ function source(overrides: Partial<ShareSummarySource> = {}): ShareSummarySource
     survival: null,
     endurance: null,
     mapRules: EMPTY_MAP_RULES,
+    phases: null,
     ...overrides,
   };
 }
@@ -107,6 +108,8 @@ describe("buildTournamentShareSummary — matchs", () => {
       bracket: "UPPER",
       roundNumber: 1,
       matchNumber: 1,
+      round: { kind: "stage", stage: "final", lower: false },
+      startAt: null,
       status: "COMPLETED",
       team1: { teamId: 10, name: "Alpha", logoUrl: "/uploads/teams/10.png", solo: false },
       team2: { teamId: 20, name: "Bravo", logoUrl: "/uploads/teams/20.png", solo: false },
@@ -119,6 +122,21 @@ describe("buildTournamentShareSummary — matchs", () => {
         { mapNumber: 2, mapName: null, team1Score: 0, team2Score: 2, replayCode: "" },
       ],
     });
+  });
+
+  it("buildTournamentShareSummary_scheduledMatch_carriesStartAt", () => {
+    const planned = bracketMatch({ id: 8, startAt: "2026-11-17T20:00:00.000Z" });
+    const summary = buildTournamentShareSummary(source({ matches: [PLAYED, planned] }));
+
+    expect(summary.matches.get(8)?.startAt).toBe("2026-11-17T20:00:00.000Z");
+  });
+
+  it("buildTournamentShareSummary_scheduledMatch_changesImageVersion", () => {
+    const at = (startAt: string | null) =>
+      buildTournamentShareSummary(source({ matches: [bracketMatch({ id: 8, startAt })] })).matches.get(8);
+
+    const card = tournamentCard({ id: 4 });
+    expect(matchShareVersion(card, at("2026-11-17T20:00:00.000Z")!)).not.toBe(matchShareVersion(card, at(null)!));
   });
 
   it("buildTournamentShareSummary_soloTournament_neverCarriesNameOrAvatar", () => {
