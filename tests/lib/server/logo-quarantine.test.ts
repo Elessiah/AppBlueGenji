@@ -1425,9 +1425,15 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
   const lockUser: Route = [/SELECT id FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ id: 9 }]]];
   // L'avatar en quarantaine, lu hors transaction pour préparer son empreinte.
   const prepareRow: Route = [
-    /SELECT user_id, logo_url FROM bg_logo_quarantines WHERE id = \? AND team_id IS NULL AND user_id IS NOT NULL LIMIT 1/,
+    /SELECT user_id, logo_url FROM bg_logo_quarantines\s+WHERE id = \? AND team_id IS NULL AND user_id IS NOT NULL AND status = 'HIDDEN'/,
     () => [[{ user_id: 9, logo_url: AVATAR }]],
   ];
+
+  /** La requête de préparation de la purge, et ses paramètres. */
+  function prepareCall(): [string, unknown] | undefined {
+    const call = connection.execute.mock.calls.find(([sql]) => /SELECT user_id, logo_url FROM bg_logo_quarantines/.test(String(sql)));
+    return call ? [String(call[0]), call[1]] : undefined;
+  }
 
   /** Rang du verrou du compte et de celui de la quarantaine parmi les requêtes de la connexion. */
   function lockRanks(): { user: number; quarantine: number } {
@@ -1491,10 +1497,43 @@ describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", 
     expect(calls.calls[1]).toEqual([HIDDEN_AVATAR, fingerprint(HIDDEN_AVATAR)]);
   });
 
+  // Revue EF-72 cycle 2 : rien n'est décodé pour une purge qui n'aura pas
+  // lieu — ligne close, ou échéance d'office pas encore passée.
+  it("purgeQuarantinedLogo_byStaff_prepareSkipsClosedRowsOnly", async () => {
+    install([], [
+      owner,
+      prepareRow,
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await purgeQuarantinedLogo(30, actor);
+
+    expect(prepareCall()?.[0]).toContain("AND status = 'HIDDEN'");
+    expect(prepareCall()?.[0]).not.toContain("purge_after");
+    expect(prepareCall()?.[1]).toEqual([30]);
+  });
+
+  it("purgeQuarantinedLogo_auto_prepareSkipsRowsNotYetDue", async () => {
+    const now = new Date("2026-11-20T10:00:00Z");
+    install([], [
+      owner,
+      prepareRow,
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
+    ]);
+
+    await purgeQuarantinedLogo(30, null, { now }).catch(() => false);
+
+    expect(prepareCall()?.[0]).toContain("AND status = 'HIDDEN' AND purge_after <= ?");
+    expect(prepareCall()?.[1]).toEqual([30, now]);
+  });
+
   it("purgeQuarantinedLogo_prepareQueryFails_readsUnderLockWithoutPrepared", async () => {
     install([], [
       owner,
-      [/AND team_id IS NULL AND user_id IS NOT NULL LIMIT 1/, () => { throw new Error("ER_LOCK_WAIT_TIMEOUT"); }],
+      [/AND team_id IS NULL AND user_id IS NOT NULL AND status = 'HIDDEN'/, () => { throw new Error("ER_LOCK_WAIT_TIMEOUT"); }],
       lockUser,
       [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
       [/SET status = 'PURGED'/, () => [{}]],

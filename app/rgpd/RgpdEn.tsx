@@ -903,7 +903,7 @@ export function RgpdEn({
               the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
               a hiding without a challenge —, whether the
               account is active or pending deletion, the hash (SHA-256) of the image — and, since November 19, 2026, its perceptual
-              hash, a 64-bit summary of what it looks like that cannot be used to rebuild it but also recognises, except for an image that is too simple, the image slightly cropped,
+              hash, a 64-bit summary of what it looks like that cannot be used to rebuild it but also recognises, except for an image that is too simple (nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour), the image slightly cropped,
               re-encoded or in another format — is kept without time limit in
               the list of blocked images, which designates no account and only dates a block to the day, to refuse
               it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only

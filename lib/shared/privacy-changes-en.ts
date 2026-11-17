@@ -1134,7 +1134,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     details: [
       "What it is: a 64-bit summary of what the image looks like (its large light and dark areas), computed on the site, with no third-party service. It cannot be used to rebuild the image and designates no account. An image uploaded as an avatar or as a team logo is refused if its hash is very close to that of a blocked image.",
       "Where and for how long: exactly where the SHA-256 hash is kept, and for as long — in the list of blocked images, without time limit and with no link to any account, and on the deletion decision as long as that decision is kept. An accepted challenge that lifts the block removes both hashes together from the list of blocked images.",
-      "Avatars deleted before this change stay blocked by their SHA-256 hash only: their file is gone, nothing is recomputed. An image that is too simple — nearly plain, or a centred symmetric pattern such as an initial in a circle — has no perceptual hash: it is blocked by its SHA-256 hash only.",
+      "Avatars deleted before this change stay blocked by their SHA-256 hash only: their file is gone, nothing is recomputed. An image that is too simple — nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour — has no perceptual hash: it is blocked by its SHA-256 hash only.",
       "What does not change: an avatar that is only hidden, or that moderation never deleted, leaves no hash; what deleting an account removes stays the same.",
     ],
   },

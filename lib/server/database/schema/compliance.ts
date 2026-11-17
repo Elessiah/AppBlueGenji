@@ -343,8 +343,8 @@ const COMPLIANCE_TABLES: readonly string[] = [
       -- Empreinte perceptuelle (pHash 64 bits, décision D17,
       -- docs/features/BLOCKED_IMAGE_PHASH.md) : refuse aussi une image
       -- d'allure voisine (cadre décalé, autre format, réencodage). Nulle pour
-      -- une image presque unie et pour les lignes d'avant D17 (fichier parti,
-      -- rien à recalculer).
+      -- une image trop simple (image-phash.ts) et pour les lignes d'avant D17
+      -- (fichier parti, rien à recalculer).
       phash BIGINT UNSIGNED NULL,
       -- 1 : posée par une décision gardée sur sa ligne de quarantaine, qu'une
       -- contestation acceptée peut lever (D18). 0 : posée par un geste sans

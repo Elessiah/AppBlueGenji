@@ -30,11 +30,14 @@ import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-doubl
 // Octets qui ne sont pas une image : pas d'empreinte perceptuelle, SHA-256 seul.
 const IMAGE = Buffer.from("image webp traitée");
 
-/** Une vraie image, avec du dessin : elle a une empreinte perceptuelle. */
+/**
+ * Une vraie image, avec du dessin sur un fond en dégradé (un fond uni la
+ * rendrait trop simple) : elle a une empreinte perceptuelle.
+ */
 async function drawnImage(): Promise<Buffer> {
   return sharp(
     Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#123456"/><circle cx="90" cy="100" r="60" fill="#f0c040"/><rect x="140" y="150" width="90" height="80" fill="#e04080"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#123456"/><stop offset="1" stop-color="#80c0a0"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/><circle cx="90" cy="100" r="60" fill="#f0c040"/><rect x="140" y="150" width="90" height="80" fill="#e04080"/><circle cx="200" cy="60" r="35" fill="#202020"/></svg>`,
     ),
   )
     .webp({ quality: 80 })
@@ -471,6 +474,19 @@ describe("readImageFingerprint", () => {
     writeFileSync(file, image);
 
     const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(IMAGE), phash: "42" });
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: await phashOf(image) });
+  });
+
+  // Revue EF-72 cycle 2 : une préparation sans empreinte perceptuelle peut
+  // venir d'un décodage en échec passager — le fichier, effacé ensuite, ne
+  // permettrait plus de la calculer.
+  it("readImageFingerprint_preparedSameBytesWithoutPhash_recomputesPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
+
+    const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(image), phash: null });
 
     expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: await phashOf(image) });
   });

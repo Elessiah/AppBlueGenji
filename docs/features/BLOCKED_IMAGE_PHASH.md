@@ -11,35 +11,55 @@ empreinte perceptuelle (`phash`).
 
 pHash DCT, 64 bits, calculé avec sharp (déjà dans le dépôt, aucune
 dépendance) : image aplatie sur un gris moyen, ramenée à 32 × 32 en niveaux de
-gris ; DCT, bloc 9 × 9 des basses fréquences dont on garde les **64
-coefficients de plus basse fréquence hors composante continue** (la
-luminosité moyenne dépasserait toujours la médiane : gardée, elle poserait le
-même bit sur toutes les empreintes) ; chaque bit dit si son coefficient
-dépasse leur médiane. Écrite en décimal (forme d'un `BIGINT UNSIGNED`), sans
-littéral `BigInt` (cible ES2017).
+gris, **contraste étiré** (2e et 98e centiles ramenés à 0 et 255 : une copie
+assombrie, éclaircie ou délavée garde l'allure de l'originale) ; DCT, bloc
+9 × 9 des basses fréquences dont on garde les **64 coefficients de plus basse
+fréquence hors composante continue** (la luminosité moyenne dépasserait
+toujours la médiane : gardée, elle poserait le même bit sur toutes les
+empreintes) ; chaque bit dit si son coefficient dépasse leur médiane. Écrite
+en décimal (forme d'un `BIGINT UNSIGNED`), sans littéral `BigInt` (cible
+ES2017).
 
-- **Image trop simple** : pas d'empreinte (`null`) quand moins de
-  `MIN_SIGNIFICANT_COEFFICIENTS` (40) coefficients sur 64 s'écartent de la
-  médiane de plus de `MIN_COEFFICIENT_DEVIATION` (0,5 niveau de gris). Les
-  autres bits ne disent que le bruit d'arrondi, **le même d'une image à
-  l'autre** : un aplat, un dégradé, une image dont le contraste n'est que de
-  couleur, et surtout **tout motif centré et symétrique** (disque, losange,
-  anneau, initiale dans un cercle, emblème au milieu d'un logo d'équipe sur
-  fond transparent, silhouette de face) — la symétrie annule la moitié des
-  coefficients ou plus. Avant la revue EF-72, deux emblèmes différents
-  tombaient à 6 bits l'un de l'autre : un emblème bloqué en aurait refusé
-  d'innocents. Une telle image n'est bloquée que par ses octets. Mesuré : un
-  motif symétrique a 14 à 39 coefficients marqués, une silhouette de face 33,
-  une scène ordinaire 25 à 53 (49 scènes sur 60 en ont une empreinte).
-- **Seuil** `PHASH_MATCH_DISTANCE = 10` bits sur 64. Mesuré sur des images de
-  synthèse passées par le gabarit avatar (`tests/lib/server/image-phash.test.ts`,
-  60 scènes à la revue) : autre format source, réencodage, redimensionnement
-  ≤ 2 ; cadre décalé de 2,5 % de la source ≤ 12 (presque toujours sous 10) ;
-  décalé de 5 % : 2 à 18 (trois fois sur quatre sous 10) ; images différentes
-  qui ont une empreinte ≥ 20 (moitié des paires au-delà de 32). Une image à la
-  limite peut perdre son empreinte une fois retouchée : elle passe alors.
-  Un faux refus coûte plus à un joueur de bonne foi qu'un contournement par
-  un cadre très décalé, que la modération rattrape sur signalement.
+- **Image trop simple** : pas d'empreinte (`null`) — à 32 × 32, deux images
+  différentes de ce genre tombent à quelques bits l'une de l'autre, et un
+  avatar bloqué en refuserait d'innocents. Une telle image n'est bloquée que
+  par ses octets. Quatre critères, tous relatifs à l'image (aucun ne dépend de
+  son contraste) :
+  - **presque unie** : moins de `MIN_TONAL_RANGE` (8) niveaux de gris entre
+    ses 2e et 98e centiles ;
+  - **surtout faite d'un fond uni** : au moins `MAX_BACKGROUND_SHARE` (50 %)
+    des pixels dans un même ton (± 6 niveaux après étirement) — pseudo ou
+    initiale sur un aplat (deux pseudos courts au même endroit tombaient à
+    0 bit), emblème au milieu d'un logo sur fond transparent, silhouette sur
+    fond uni ;
+  - **symétrique en miroir** (gauche-droite ou haut-bas) : écart à son reflet
+    sous `MIN_MIRROR_ASYMMETRY` (0,1) de l'écart à la moyenne — identicon,
+    motif centré (la symétrie annule la moitié des coefficients, dont les bits
+    ne disent plus que le bruit d'arrondi, le même d'une image à l'autre) ;
+  - **dégradé** : au moins `MAX_LOW_FREQUENCY_SHARE` (90 %) de la variance
+    dans les cinq plus basses fréquences.
+  Revue EF-72 : le cycle 1 avait d'abord compté les coefficients écartés de la
+  médiane d'au moins 0,5 niveau (seuil absolu) ; le cycle 2 a mesuré que
+  des pseudos différents gardaient une empreinte et se confondaient, tandis
+  que la plupart des photos réelles et toute copie assombrie la perdaient —
+  d'où ces critères. Jeu de mesure (279 images : 30 scènes, 20 images
+  « photo » à spectre en 1/f, 120 avatars texte, 21 dégradés, 16 pixel art,
+  16 identicons, 16 emblèmes, 10 silhouettes, 30 images réelles du dépôt) :
+  scènes, « photos » et pixel art ont une empreinte (une scène sur trente
+  exceptée), comme 13 des 30 images réelles — toutes les photos et
+  illustrations ; les icônes, logos et captures à fond uni n'en ont pas — ;
+  aucun avatar texte, dégradé, identicon, emblème ni silhouette sur fond uni
+  n'en a.
+- **Seuil** `PHASH_MATCH_DISTANCE = 10` bits sur 64. Mesuré sur ce jeu (images
+  passées par le gabarit avatar) : autre format source, réencodage,
+  redimensionnement ≤ 6 ; copie assombrie ou délavée ≤ 8 (une copie très
+  éclaircie, deux fois sur quatre-vingts, au-delà) ; cadre décalé de 2,5 % de
+  la source ≤ 12 (presque toujours sous 10) ; décalé de 5 % : jusqu'à 18 (un
+  peu plus d'une fois sur deux sous 10) ; images différentes qui ont une
+  empreinte ≥ 14 (une paire sur cent sous 22). Une image à la limite d'un
+  critère peut perdre son empreinte une fois retouchée : elle passe alors. Un
+  faux refus coûte plus à un joueur de bonne foi qu'un contournement par un
+  cadre très décalé, que la modération rattrape sur signalement.
 
 ## Stockage
 
@@ -80,7 +100,7 @@ que la liste n'a que des lignes d'avant D17. La liste ne grandit qu'avec les
 suppressions de la modération (quelques dizaines de lignes). Une ligne sans
 `phash` ne compte que par son SHA-256. Le refus reste le code `IMAGE_BLOCKED`,
 comme avant ; il vaut pour un avatar comme pour un logo d'équipe (un emblème
-centré sur fond transparent n'a pas d'empreinte, voir plus haut).
+sur fond transparent n'a pas d'empreinte, voir plus haut).
 
 Toute empreinte **écrite** en paramètre passe par
 `CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)` : en requête préparée, MySQL 8 lit
@@ -96,8 +116,12 @@ et `purgeQuarantinedLogo` relèvent les empreintes du fichier **avant** leur
 transaction (`prepareAvatarFingerprint`, `prepareQuarantinedAvatarFingerprint`,
 lecture non verrouillée) ; sous le verrou, `readImageFingerprint(chemin, préparée)`
 ne refait que la lecture et le SHA-256, et reprend l'empreinte perceptuelle
-préparée si les octets n'ont pas changé. Toute préparation en échec rend
-`null` : l'empreinte se calcule alors sous le verrou, comme avant.
+préparée si les octets n'ont pas changé **et** qu'elle existe — absente, elle
+peut venir d'un décodage en échec passager, et le fichier effacé ensuite ne
+permettrait plus de la calculer : elle est recalculée sous le verrou. Toute
+préparation en échec rend `null` : l'empreinte se calcule alors sous le
+verrou, comme avant. La purge ne prépare rien pour une ligne déjà close, ni,
+d'office, avant l'échéance.
 
 ## RGPD
 

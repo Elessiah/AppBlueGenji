@@ -27,8 +27,9 @@ import { imagePerceptualHash, PHASH_MATCH_DISTANCE, phashDistance } from "@/lib/
  * `PHASH_MATCH_DISTANCE` bits au plus de celle d'une image bloquée — un cadre
  * un peu décalé, un autre format source, un réencodage ne passent plus. Une
  * empreinte posée avant D17 n'a que son SHA-256 (le fichier est parti, rien
- * ne se recalcule), comme une image trop simple pour en avoir une (motif
- * centré et symétrique : `image-phash.ts`). Une retouche franche y échappe
+ * ne se recalcule), comme une image trop simple pour en avoir une (presque
+ * unie, surtout faite d'un fond uni, symétrique, dégradé : `image-phash.ts`).
+ * Une retouche franche y échappe
  * encore — c'est un garde-fou, pas une modération.
  *
  * L'empreinte d'une image n'identifie personne ; aucune colonne ne désigne de
@@ -46,8 +47,8 @@ export function imageSha256(content: Buffer): string {
 /**
  * Les deux empreintes d'une image bloquée : `sha256` (octets exacts, clé de la
  * liste) et `phash` (allure, entier de 64 bits écrit en décimal ; `null` pour
- * une image trop simple — presque unie, motif centré et symétrique — ou
- * indécodable : elle n'est alors bloquée que par ses octets).
+ * une image trop simple — `image-phash.ts` — ou indécodable : elle n'est alors
+ * bloquée que par ses octets).
  */
 export type ImageFingerprint = { sha256: string; phash: string | null };
 
@@ -223,7 +224,10 @@ export async function blockImageHashesSafely(
  * `prepared` : les empreintes du même fichier, relevées **avant** la
  * transaction de l'appelant. Sous verrou, seuls la lecture et le SHA-256 sont
  * refaits ; si les octets n'ont pas changé, l'empreinte perceptuelle préparée
- * est reprise — son décodage ne tient pas les verrous de la décision.
+ * est reprise — son décodage ne tient pas les verrous de la décision. Une
+ * empreinte perceptuelle préparée absente est recalculée : elle peut venir
+ * d'un décodage en échec passager (mémoire), et le fichier, effacé ensuite,
+ * ne permettrait plus de la calculer.
  */
 export async function readImageFingerprint(
   absolutePath: string,
@@ -232,7 +236,7 @@ export async function readImageFingerprint(
   const content = await readFile(absolutePath).catch(() => null);
   if (content === null) return null;
   const sha256 = imageSha256(content);
-  if (prepared && prepared.sha256 === sha256) return { sha256, phash: prepared.phash };
+  if (prepared && prepared.sha256 === sha256 && prepared.phash !== null) return { sha256, phash: prepared.phash };
   return { sha256, phash: await imagePerceptualHash(content) };
 }
 

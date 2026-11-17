@@ -1234,7 +1234,9 @@ export async function purgeQuarantinedLogo(
     const userId = await quarantineUserId(connection, quarantineId);
     // Empreintes relevées hors verrou (décodage de l'image), reprises sous le
     // verrou si le fichier n'a pas changé (`readImageFingerprint`).
-    const prepared = userId === null ? null : await prepareQuarantinedAvatarFingerprint(connection, quarantineId);
+    // D'office, rien n'est préparé avant l'échéance (la purge n'aurait pas lieu).
+    const dueBy = actor === null ? (options.now ?? new Date()) : null;
+    const prepared = userId === null ? null : await prepareQuarantinedAvatarFingerprint(connection, quarantineId, dueBy);
     await connection.beginTransaction();
     await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
@@ -1329,15 +1331,21 @@ async function prepareAvatarFingerprint(
  * transaction de sa purge (`purgeQuarantinedLogo`) : le décodage de l'image ne
  * tient pas les verrous. Simple préparation — tout échec (ou un logo d'équipe)
  * rend `null`, et l'empreinte se calcule alors sous le verrou, comme avant.
+ * Rien n'est lu pour une ligne déjà close, ni, d'office (`dueBy`), pour une
+ * échéance pas encore passée : la purge n'aurait pas lieu, le décodage serait
+ * perdu.
  */
 async function prepareQuarantinedAvatarFingerprint(
   connection: PoolConnection,
   quarantineId: number,
+  dueBy: Date | null,
 ): Promise<ImageFingerprint | null> {
   try {
     const [rows] = await connection.execute<(RowDataPacket & { user_id: number; logo_url: string })[]>(
-      `SELECT user_id, logo_url FROM bg_logo_quarantines WHERE id = ? AND team_id IS NULL AND user_id IS NOT NULL LIMIT 1`,
-      [quarantineId],
+      `SELECT user_id, logo_url FROM bg_logo_quarantines
+        WHERE id = ? AND team_id IS NULL AND user_id IS NOT NULL AND status = 'HIDDEN'${dueBy === null ? "" : " AND purge_after <= ?"}
+        LIMIT 1`,
+      dueBy === null ? [quarantineId] : [quarantineId, dueBy],
     );
     const row = rows[0];
     const files = row ? avatarFileLocations(row.logo_url, Number(row.user_id)) : null;

@@ -179,7 +179,8 @@ describe("revue juridique cycle 4", () => {
     expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hashes (SHA-256, and a perceptual hash, which also recognises, except for an image that is too simple, the image slightly cropped, re-encoded or in another format) kept from that deletion");
   });
 
-  // Revue EF-72 cycle 1 : une image trop simple (motif centré et symétrique)
+  // Revue EF-72 cycles 1 et 2 : une image trop simple (presque unie, dégradé,
+  // motif symétrique, surtout faite d'un fond uni)
   // n'a pas d'empreinte perceptuelle — les textes ne promettent pas plus.
   it("privacyChangePerceptualHash_tooSimpleImage_saysSha256OnlyFrAndEn", () => {
     const id = "2026-11-empreinte-perceptuelle-avatar";
@@ -187,14 +188,14 @@ describe("revue juridique cycle 4", () => {
     const en = PRIVACY_CHANGES_EN[id];
 
     expect(fr?.summary).toContain("la même image légèrement recadrée, réencodée ou dans un autre format");
-    expect(fr?.details.join(" ")).toContain("Une image trop simple — presque unie, ou un motif centré et symétrique comme une initiale dans un cercle — n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.");
+    expect(fr?.details.join(" ")).toContain("Une image trop simple — presque unie, dégradé, motif symétrique, ou faite surtout d'un fond uni, comme un pseudo ou un emblème sur un aplat — n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.");
     expect(en?.summary).toContain("the same image being uploaded again slightly cropped, re-encoded or in another format");
-    expect(en?.details.join(" ")).toContain("An image that is too simple — nearly plain, or a centred symmetric pattern such as an initial in a circle — has no perceptual hash: it is blocked by its SHA-256 hash only.");
+    expect(en?.details.join(" ")).toContain("An image that is too simple — nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour — has no perceptual hash: it is blocked by its SHA-256 hash only.");
   });
 
   it("rgpdReports_perceptualHash_exceptTooSimpleImageFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("reconnaît aussi, sauf pour une image trop simple, l&apos;image légèrement recadrée, réencodée");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("also recognises, except for an image that is too simple, the image slightly cropped,");
+    expect(readSource("app/rgpd/page.tsx")).toContain("reconnaît aussi, sauf pour une image trop simple (presque unie, dégradé, motif symétrique, ou faite surtout d&apos;un fond uni, comme un pseudo ou un emblème sur un aplat), l&apos;image légèrement recadrée, réencodée");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("also recognises, except for an image that is too simple (nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour), the image slightly cropped,");
   });
 
   it("processingRegisterT01_avatarHash_dataCategoryNamesAvatarsFrAndEn", () => {
