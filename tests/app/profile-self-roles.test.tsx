@@ -244,7 +244,9 @@ describe("Rôles — cas limites de l'écran (cycle UI)", () => {
 
   it("saveRoles_rolesChangedAndRefreshThrows_stillReturnsTrue", () => {
     const panel = read("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
-    expect(panel).toMatch(/if \(code === "ROLES_CHANGED"\) \{[\s\S]*?try \{\s*await onSaved\(\);\s*\} catch \{[\s\S]*?\}\s*return true;/);
+    // `reloadProfile` attrape l'échec de la relecture (et le dit) : la confirmation se ferme.
+    expect(panel).toMatch(/if \(code === "ROLES_CHANGED"\) \{[\s\S]*?await reloadProfile\(\);\s*return true;/);
+    expect(panel).toMatch(/Promise\.resolve\(onSaved\(\)\)\.then\(\s*\(result\) => result !== false,\s*\(\) => false,/);
   });
 
   it("selfRolesField_nothingToSave_usesNeutralToast", () => {

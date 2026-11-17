@@ -38,9 +38,11 @@ export function PlayerModerationBar({
 }: Readonly<{
   profile: FullProfileResponse;
   deleted: boolean;
-  onChanged: () => void;
+  /** Relit la fiche ; `false` : relecture échouée, la barre montre peut-être un état périmé. */
+  onChanged: () => Promise<boolean | void> | void;
 }>) {
   const [dialog, setDialog] = useState<"avatar" | "suspend" | "lift" | null>(null);
+  const { showError } = useToast();
   const staffLang = useStaffLang();
   const suspension = profile.moderationSuspension;
   const showAvatar = profile.moderationAvatarPresent;
@@ -51,7 +53,16 @@ export function PlayerModerationBar({
   const close = () => setDialog(null);
   const done = () => {
     setDialog(null);
-    onChanged();
+    // Relecture en arrière-plan : un échec laisserait la barre sur l'état
+    // d'avant le geste (« Suspendre » sur un compte suspendu) sans le dire.
+    void Promise.resolve(onChanged())
+      .then(
+        (result) => result !== false,
+        () => false,
+      )
+      .then((reloaded) => {
+        if (!reloaded) showError("La fiche n'a pas pu être relue : recharge la page.", staffLang ? { lang: staffLang } : undefined);
+      });
   };
 
   return (

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
-import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";

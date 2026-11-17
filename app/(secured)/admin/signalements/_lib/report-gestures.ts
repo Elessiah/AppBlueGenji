@@ -41,6 +41,16 @@ export function pressedGestureOf(target: EventTarget | null): PressedGesture | n
   return { gesture, scope: button.closest("[data-focus-scope]")?.getAttribute("data-focus-scope") ?? null };
 }
 
+/**
+ * Le bouton cliqué devient le bouton **pressé** (celui dont le focus se rend
+ * après la relecture) seulement si son geste part : `pending` le nomme. Le
+ * premier clic qui arme « Supprimer… », un clic refusé pendant un autre geste
+ * ou « Actualiser » (hors du dossier) n'en font pas un. `null` : rien ne part.
+ */
+export function gestureStarted(clicked: PressedGesture | null, pending: string | null): PressedGesture | null {
+  return pending !== null && clicked?.gesture === pending ? clicked : null;
+}
+
 /** Zone des gestes de traitement, en tête du dossier : le repli du focus. */
 export const ACTIONS_SCOPE = "actions";
 

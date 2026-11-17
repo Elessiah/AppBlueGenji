@@ -590,6 +590,12 @@ describe("revue UI/UX", () => {
     expect(rolesErrorMessage("constructor")).toBe("La mise à jour des rôles a échoué.");
   });
 
+  it("rolesErrorMessage_profileReloadFailed_asksToReloadPage", () => {
+    expect(rolesErrorMessage("PROFILE_RELOAD_FAILED")).toBe(
+      "La fiche n'a pas pu être relue : recharge la page avant de modifier d'autres rôles.",
+    );
+  });
+
   it("en-tête d'équipe : le taux au format anglais, comme le bloc de statistiques", () => {
     const team = teamDetailResponse({ team: { id: 4, name: "Glaciers" } });
     const html = inEnglish(<TeamHeader team={{ ...team, stats: { ...team.stats, winRate: 0.62 } }} />);

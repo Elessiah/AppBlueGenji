@@ -82,7 +82,7 @@ export default function PlayerDetailPage() {
   const text = usePlayersText();
   const { t, locale } = text;
   const statsI18n = useStatsPanelI18n();
-  const { status, data, error, refresh, revalidate } = useResourceLoader<FullProfileResponse>(
+  const { status, data, error, revalidate } = useResourceLoader<FullProfileResponse>(
     `/api/players/${params.id}`,
     {
       onNotFoundRedirect: () => {
@@ -241,7 +241,9 @@ export default function PlayerDetailPage() {
         </div>
       </div>
 
-      <PlayerModerationBar profile={data} deleted={deleted} onChanged={refresh} />
+      {/* Relecture en arrière-plan, comme les rôles plus bas : la fiche reste en
+          place et la modale rend le focus au bouton voisin si le sien disparaît. */}
+      <PlayerModerationBar profile={data} deleted={deleted} onChanged={revalidate} />
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
         <div className="ds-section-title blue">

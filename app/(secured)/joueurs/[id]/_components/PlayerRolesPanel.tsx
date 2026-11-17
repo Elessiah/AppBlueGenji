@@ -16,6 +16,7 @@ import {
 } from "@/lib/shared/permissions";
 import { useStaffLang } from "@/components/i18n/staff-lang";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import { rolesErrorMessage } from "../_lib/roles-errors";
 
 /**
@@ -40,7 +41,8 @@ export function PlayerRolesPanel({
   userId: string;
   pseudo: string;
   roles: PlatformRole[] | undefined;
-  onSaved: () => Promise<void> | void;
+  /** Relit la fiche ; `false` : relecture échouée, les rôles affichés sont peut-être périmés. */
+  onSaved: () => Promise<boolean | void> | void;
 }>) {
   const { showError, showInfo, showSuccess } = useToast();
   const staffLang = useStaffLang();
@@ -64,7 +66,26 @@ export function PlayerRolesPanel({
     );
   };
 
-  const saveRoles = async (): Promise<boolean> => (await run(sendRoles)) ?? false;
+  // Refusé par la garde (un enregistrement attend encore) : la confirmation
+  // reste ouverte, et la notification dit pourquoi.
+  const saveRoles = async (): Promise<boolean> => {
+    const done = await run(sendRoles);
+    if (done === undefined) {
+      showInfo(BUSY_REFUSED_MESSAGE, toastLang);
+      return false;
+    }
+    return done;
+  };
+
+  // Relecture de la fiche qui échoue : les rôles affichés (et `expectedRoles`
+  // du prochain envoi) resteraient périmés sans que rien ne le dise.
+  const reloadProfile = async () => {
+    const reloaded = await Promise.resolve(onSaved()).then(
+      (result) => result !== false,
+      () => false,
+    );
+    if (!reloaded) showError(rolesErrorMessage("PROFILE_RELOAD_FAILED"), toastLang);
+  };
 
   const sendRoles = async (): Promise<boolean> => {
     try {
@@ -78,7 +99,7 @@ export function PlayerRolesPanel({
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
       showSuccess("Rôles mis à jour.", toastLang);
-      await onSaved();
+      await reloadProfile();
       return true;
     } catch (e) {
       const code = (e as Error).message;
@@ -86,11 +107,7 @@ export function PlayerRolesPanel({
       if (code === "ROLES_CHANGED") {
         // La fiche relit les rôles enregistrés (la sélection s'y resynchronise)
         // et la confirmation, qui annonçait un écart périmé, se ferme.
-        try {
-          await onSaved();
-        } catch {
-          // Relecture impossible : la notification a dit de relire la fiche.
-        }
+        await reloadProfile();
         return true;
       }
       return false;
@@ -98,7 +115,10 @@ export function PlayerRolesPanel({
   };
 
   const requestSave = () => {
-    if (isBusy()) return;
+    if (isBusy()) {
+      showInfo(BUSY_REFUSED_MESSAGE, toastLang);
+      return;
+    }
     // Sans les rôles enregistrés, rien ne permet de détecter un réglage concurrent.
     if (!roles) return;
     const change = diffPlatformRoles(roles ?? [], selectedRoles);

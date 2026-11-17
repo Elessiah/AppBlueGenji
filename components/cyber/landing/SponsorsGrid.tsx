@@ -39,7 +39,7 @@ import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { EditableCopy } from "./EditableCopy";
 import { useLandingText } from "@/components/i18n/landing-text";
 import { LandingDialog } from "./LandingDialog";
-import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import styles from "./SponsorsGrid.module.css";
 
 type SponsorsGridProps = {

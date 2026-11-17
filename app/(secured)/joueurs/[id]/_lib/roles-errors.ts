@@ -10,6 +10,7 @@ const ROLES_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   CANNOT_MODIFY_SELF: "Tu ne peux pas modifier tes propres rôles.",
   INVALID_PAYLOAD: "La sélection de rôles est invalide.",
   ROLES_CHANGED: "Les rôles de ce compte ont changé entre-temps : relis-les avant d'enregistrer.",
+  PROFILE_RELOAD_FAILED: "La fiche n'a pas pu être relue : recharge la page avant de modifier d'autres rôles.",
   CONCURRENT_UPDATE_RETRY: "Une autre modification de ce compte est passée au même moment : rien n'a été enregistré. Réessaie.",
 };
 

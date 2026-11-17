@@ -43,8 +43,14 @@ export function useResourceLoader<T>(
    */
   const latestRef = useRef(0);
 
+  /**
+   * Rend `false` si la lecture a échoué (réponse en erreur, réseau) — une
+   * relecture en arrière-plan qui échoue laisse l'écran sur l'ancien état sans
+   * rien dire : l'appelant le signale. `true` sinon (lue, ou dépassée par une
+   * lecture plus récente).
+   */
   const load = useCallback(
-    async (silent: boolean) => {
+    async (silent: boolean): Promise<boolean> => {
       const seq = ++latestRef.current;
       const isLatest = () => seq === latestRef.current;
       if (!silent) setState({ status: "loading", data: null, error: null });
@@ -52,23 +58,24 @@ export function useResourceLoader<T>(
         const res = await fetch(url, { cache: "no-store" });
         if (res.status === 404) {
           const body = (await res.json().catch(() => ({}))) as NotFoundPayload;
-          if (!isLatest()) return;
+          if (!isLatest()) return true;
           setState({ status: "not-found", data: null, error: null });
           optionsRef.current?.onNotFoundRedirect?.(body);
-          return;
+          return true;
         }
         if (!res.ok) {
-          if (silent || !isLatest()) return;
+          if (silent || !isLatest()) return false;
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
-          return;
+          return false;
         }
         const data = (await res.json()) as T;
-        if (!isLatest()) return;
+        if (!isLatest()) return true;
         setState({ status: "ready", data, error: null });
+        return true;
       } catch (e) {
-        if (silent || !isLatest()) return;
-        setState({ status: "error", data: null, error: (e as Error).message });
+        if (!silent && isLatest()) setState({ status: "error", data: null, error: (e as Error).message });
+        return false;
       }
     },
     [url],

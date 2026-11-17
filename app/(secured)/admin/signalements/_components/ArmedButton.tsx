@@ -18,6 +18,8 @@ interface ArmedButtonProps {
   className?: string;
   /** Nom du geste, pour rendre le focus après la relecture du dossier (`report-gestures.ts`). */
   "data-gesture"?: string;
+  /** Clic pendant qu'un autre geste attend (`blocked`) : le dire, sans armer. */
+  onBlockedClick?: () => void;
 }
 
 /**
@@ -38,6 +40,7 @@ export function ArmedButton({
   blocked = false,
   className,
   "data-gesture": gesture,
+  onBlockedClick,
 }: Readonly<ArmedButtonProps>) {
   const [armed, setArmed] = useState(false);
 
@@ -52,6 +55,7 @@ export function ArmedButton({
       busy={busy}
       blocked={blocked}
       data-gesture={gesture}
+      onBlockedClick={onBlockedClick}
       className={`${styles.actionButton} ${className ?? ""}`}
       aria-live="polite"
       onClick={() => {

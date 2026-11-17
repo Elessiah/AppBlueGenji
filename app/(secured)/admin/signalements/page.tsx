@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { BusyButton } from "@/components/ui/busy-button";
-import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   reportStatTone,
@@ -134,8 +134,13 @@ function ReportsPanel() {
     }
   };
 
+  // Un geste refusé parce qu'un autre attend le dit : par la garde synchrone
+  // (second envoi parti avant le rendu de `pending`, double clic), ou par le
+  // bouton déjà désarmé (`onBlockedClick` de `BusyButton`).
+  const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE), [showInfo]);
+
   // La garde synchrone écarte le second envoi parti avant le rendu de `busy`
-  // (double clic) ; un geste refusé parce qu'un autre attend le dit.
+  // (double clic).
   const run = async <T,>(gesture: string, task: () => Promise<T>, success: string | ((result: T) => string)) => {
     const done = await runGuarded(async () => {
       setPending(gesture);
@@ -152,7 +157,7 @@ function ReportsPanel() {
       }
       return true;
     });
-    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    if (done === undefined) refuse();
   };
 
   // « Actualiser » passe par la même garde : un geste lancé pendant la relecture
@@ -167,7 +172,7 @@ function ReportsPanel() {
       }
       return true;
     });
-    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    if (done === undefined) refuse();
   };
 
   const onAction = (action: ReportAction, note?: string) => {
@@ -360,6 +365,7 @@ function ReportsPanel() {
             busy={pending === REFRESH_GESTURE}
             blocked={busy}
             className={`${styles.segment} ${styles.refresh}`}
+            onBlockedClick={refuse}
             onClick={() => void refresh()}
           >
             Actualiser
@@ -383,6 +389,7 @@ function ReportsPanel() {
             <ReportDetail
               report={selected}
               pending={pending}
+              onRefused={refuse}
               onAction={onAction}
               onHideLogo={onHideLogo}
               onDeleteLogo={onDeleteLogo}

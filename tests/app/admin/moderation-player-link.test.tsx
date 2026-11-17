@@ -58,6 +58,7 @@ describe("ReportTargetCard — cible joueur", () => {
       category="OTHER"
       quarantines={[]}
       pending={null}
+      onRefused={noop}
       onHideLogo={noop}
       onDeleteLogo={noop}
       onRestore={noop}

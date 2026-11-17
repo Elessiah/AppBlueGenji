@@ -201,17 +201,26 @@ annoncer de l'attente.
   `tests/app/reports-busy-buttons.test.ts`. Une garde pour le panneau : chaque
   geste porte un nom (`_lib/report-gestures.ts`, `data-gesture`) ; seul le geste
   en attente s'annonce occupé (`gestureState`), les autres sont refusés, et un
-  geste refusé parce qu'un autre attend le dit (`BUSY_REFUSED_MESSAGE`).
+  geste refusé parce qu'un autre attend le dit (`BUSY_REFUSED_MESSAGE`,
+  `lib/shared/busy-refused-message.ts`) — par la garde synchrone **et** par
+  `onBlockedClick` sur chaque bouton déjà désarmé, dont le clic n'appelle
+  jamais `onClick`.
   « Actualiser » passe par la même garde (un geste lancé pendant la relecture
   agirait sur un dossier remplacé). Le bouton pressé disparaît souvent au retour
   (« Prendre en charge » devient « Remettre en attente », « Masquer le logo »
   laisse « Rétablir ») : `focusAfterGesture` rend le focus au même geste, sinon
   au premier bouton de sa cible (`data-focus-scope`), sinon au premier geste de
-  traitement — avant la peinture, et jamais s'il est parti ailleurs. Ouvrir la
+  traitement — avant la peinture, et jamais s'il est parti ailleurs. Seul un
+  clic dont le geste part vraiment compte (`gestureStarted`) : ni le premier
+  clic qui arme « Supprimer… », ni un clic refusé. Ouvrir la
   note d'archivage met le focus dans le champ, « Annuler » le rend à
   « Résoudre et archiver… ». Note en `readOnly` pendant l'envoi. Aucun texte
   nouveau ; le panneau reste en français sous `/en` (D4). Les rôles enregistrés,
   la fiche du joueur se relit **en arrière-plan** (`revalidate`) : `refresh`
   la repassait en « Chargement… », démontait panneau et confirmation, et le
-  focus tombait sur la page.
+  focus tombait sur la page ; de même après un geste de la barre de modération
+  (la modale rend le focus au bouton voisin si le sien disparaît). Une relecture
+  qui échoue (`revalidate` rend `false`) le dit en notification, sans quoi les
+  rôles affichés resteraient périmés en silence. Un enregistrement refusé par
+  la garde le dit aussi (`BUSY_REFUSED_MESSAGE`).
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

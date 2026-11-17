@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   ACTIONS_SCOPE,
   focusAfterGesture,
+  gestureStarted,
   gestureState,
   pressedGestureOf,
   reportGesture,
@@ -118,5 +119,27 @@ describe("focusAfterGesture", () => {
 
   it("focusAfterGesture_nothingLeft_returnsNull", () => {
     expect(focusAfterGesture(fakeRoot({}), pressed)).toBeNull();
+  });
+});
+
+describe("gestureStarted", () => {
+  const clicked = { gesture: "remove:TEAM-3", scope: "target:TEAM-3" };
+
+  it("gestureStarted_clickedMatchesPending_returnsClicked", () => {
+    expect(gestureStarted(clicked, "remove:TEAM-3")).toBe(clicked);
+  });
+
+  it("gestureStarted_noPending_returnsNull", () => {
+    // Premier clic de « Supprimer… » : il arme le bouton, rien ne part.
+    expect(gestureStarted(clicked, null)).toBeNull();
+  });
+
+  it("gestureStarted_pendingOtherGesture_returnsNull", () => {
+    // Clic refusé pendant un autre geste, ou « Actualiser » hors du dossier.
+    expect(gestureStarted(clicked, "refresh")).toBeNull();
+  });
+
+  it("gestureStarted_noClicked_returnsNull", () => {
+    expect(gestureStarted(null, "action:TAKE")).toBeNull();
   });
 });

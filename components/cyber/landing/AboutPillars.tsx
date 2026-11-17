@@ -24,7 +24,7 @@ import { arrowKey } from "@/lib/shared/arrow-refocus";
 import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { LandingDialog } from "./LandingDialog";
-import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import styles from "./AboutPillars.module.css";
 
 interface AboutPillarsProps {

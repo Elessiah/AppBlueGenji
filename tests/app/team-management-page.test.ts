@@ -321,7 +321,7 @@ describe("correctifs de la première revue", () => {
     const loader = stripComments(readFileSync(join(ROOT, "lib", "shared", "hooks", "useResourceLoader.ts"), "utf8"));
     expect(loader).toContain("const seq = ++latestRef.current");
     const ready = loader.slice(0, loader.indexOf('setState({ status: "ready"'));
-    expect(ready.slice(ready.lastIndexOf("res.json()"))).toContain("if (!isLatest()) return;");
+    expect(ready.slice(ready.lastIndexOf("res.json()"))).toContain("if (!isLatest()) return true;");
   });
 });
 

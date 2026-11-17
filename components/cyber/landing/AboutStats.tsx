@@ -18,7 +18,7 @@ import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { orReload } from "@/lib/shared/lazy-component";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
-import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import styles from "./AboutStats.module.css";
 
 // Chargée au premier clic sur « Ajouter » / « Modifier » : seul le staff

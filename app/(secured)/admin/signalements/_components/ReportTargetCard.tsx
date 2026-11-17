@@ -27,6 +27,8 @@ interface ReportTargetCardProps {
   quarantines: LogoQuarantineView[];
   /** Geste en attente (`report-gestures.ts`), `null` hors envoi. */
   pending: string | null;
+  /** Un bouton pressé pendant qu'un autre geste attend : le dire (notification neutre). */
+  onRefused: () => void;
   onHideLogo: (target: ReportTargetRef) => void;
   onDeleteLogo: (target: ReportTargetRef) => void;
   onRestore: (quarantineId: number) => void;
@@ -64,6 +66,7 @@ export function ReportTargetCard({
   category,
   quarantines,
   pending,
+  onRefused,
   onHideLogo,
   onDeleteLogo,
   onRestore,
@@ -78,8 +81,15 @@ export function ReportTargetCard({
   const { nounCap, withArticle } = image ?? DEFAULT_IMAGE_NOUN;
   const canActOnLogo = image !== undefined && target.exists && category !== "BUG";
   const targetRef = { type: target.type, id: target.id };
-  /** Props d'un bouton de geste : état (`busy`/`blocked`) et nom (`data-gesture`). */
-  const gesture = (name: string) => ({ ...gestureState(pending, name), "data-gesture": name });
+  /**
+   * Props d'un bouton de geste : état (`busy`/`blocked`), nom (`data-gesture`)
+   * et refus dit quand un autre geste attend (`onBlockedClick`).
+   */
+  const gesture = (name: string) => ({
+    ...gestureState(pending, name),
+    "data-gesture": name,
+    onBlockedClick: onRefused,
+  });
 
   return (
     // Zone du focus : un geste qui retire son bouton (masquer, rétablir) rend

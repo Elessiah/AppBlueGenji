@@ -19,6 +19,7 @@ import { relativeAge } from "../_lib/report-filters";
 import {
   ACTIONS_SCOPE,
   focusAfterGesture,
+  gestureStarted,
   gestureState,
   pressedGestureOf,
   reportGesture,
@@ -34,6 +35,8 @@ interface ReportDetailProps {
   report: ReportView;
   /** Geste en attente (`report-gestures.ts`), `null` hors envoi. */
   pending: string | null;
+  /** Un bouton pressé pendant qu'un autre geste attend : le dire (notification neutre). */
+  onRefused: () => void;
   onAction: (action: ReportAction, note?: string) => void;
   onHideLogo: (target: ReportTargetRef) => void;
   onDeleteLogo: (target: ReportTargetRef) => void;
@@ -55,6 +58,7 @@ function formatDateTime(iso: string): string {
 export function ReportDetail({
   report,
   pending,
+  onRefused,
   onAction,
   onHideLogo,
   onDeleteLogo,
@@ -78,6 +82,10 @@ export function ReportDetail({
   const resolveRef = useRef<HTMLButtonElement>(null);
   // Le bouton pressé disparaît souvent au retour du geste (« Prendre en
   // charge » devient « Remettre en attente ») : le focus tomberait sur la page.
+  // `clicked` est le dernier bouton de geste cliqué ; il ne devient `pressed`
+  // que si son geste part vraiment (`pending` le nomme) — ni le premier clic
+  // qui arme « Supprimer… », ni un clic refusé pendant un autre geste.
+  const clicked = useRef<PressedGesture | null>(null);
   const pressed = useRef<PressedGesture | null>(null);
   // Ouvrir ou refermer la note d'archivage retire le bouton pressé : le focus
   // va au champ, puis revient à « Résoudre et archiver… ».
@@ -108,6 +116,11 @@ export function ReportDetail({
   }, [resolving]);
 
   useLayoutEffect(() => {
+    const started = gestureStarted(clicked.current, pending);
+    if (started) {
+      pressed.current = started;
+      clicked.current = null;
+    }
     const last = pressed.current;
     if (!last) return;
     const root = articleRef.current;
@@ -132,8 +145,7 @@ export function ReportDetail({
       className={styles.detail}
       aria-labelledby={titleId}
       onClickCapture={(event) => {
-        const gesture = pressedGestureOf(event.target);
-        if (gesture) pressed.current = gesture;
+        clicked.current = pressedGestureOf(event.target);
       }}
     >
       <header className={styles.detailHead}>
@@ -158,6 +170,7 @@ export function ReportDetail({
             {...gestureState(pending, reportGesture.action("TAKE"))}
             data-gesture={reportGesture.action("TAKE")}
             className={`${styles.actionButton} ${styles.actionPrimary}`}
+            onBlockedClick={onRefused}
             onClick={() => onAction("TAKE")}
           >
             Prendre en charge
@@ -168,13 +181,21 @@ export function ReportDetail({
             {...gestureState(pending, reportGesture.action("RELEASE"))}
             data-gesture={reportGesture.action("RELEASE")}
             className={styles.actionButton}
+            onBlockedClick={onRefused}
             onClick={() => onAction("RELEASE")}
           >
             Remettre en attente
           </BusyButton>
         )}
         {report.status !== "RESOLVED" && !resolving && (
-          <BusyButton ref={resolveRef} busy={false} blocked={busy} className={styles.actionButton} onClick={openResolve}>
+          <BusyButton
+            ref={resolveRef}
+            busy={false}
+            blocked={busy}
+            className={styles.actionButton}
+            onBlockedClick={onRefused}
+            onClick={openResolve}
+          >
             Résoudre et archiver…
           </BusyButton>
         )}
@@ -183,6 +204,7 @@ export function ReportDetail({
             {...gestureState(pending, reportGesture.action("REOPEN"))}
             data-gesture={reportGesture.action("REOPEN")}
             className={styles.actionButton}
+            onBlockedClick={onRefused}
             onClick={() => onAction("REOPEN")}
           >
             Rouvrir
@@ -209,11 +231,18 @@ export function ReportDetail({
                 {...gestureState(pending, reportGesture.action("RESOLVE"))}
                 data-gesture={reportGesture.action("RESOLVE")}
                 className={`${styles.actionButton} ${styles.actionPrimary}`}
+                onBlockedClick={onRefused}
                 onClick={() => onAction("RESOLVE", note)}
               >
                 Archiver
               </BusyButton>
-              <BusyButton busy={false} blocked={busy} className={styles.actionButton} onClick={cancelResolve}>
+              <BusyButton
+                busy={false}
+                blocked={busy}
+                className={styles.actionButton}
+                onBlockedClick={onRefused}
+                onClick={cancelResolve}
+              >
                 Annuler
               </BusyButton>
             </div>
@@ -292,6 +321,7 @@ export function ReportDetail({
                   (quarantine) => quarantine.targetType === target.type && quarantine.targetId === target.id,
                 )}
                 pending={pending}
+                onRefused={onRefused}
                 onHideLogo={onHideLogo}
                 onDeleteLogo={onDeleteLogo}
                 onRestore={onRestore}

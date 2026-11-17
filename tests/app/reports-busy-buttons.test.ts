@@ -45,10 +45,47 @@ describe("signalements du staff — boutons pendant une requête", () => {
 
   it("page_gestureRefusedByGuard_showsInfoToast", () => {
     const code = source(PAGE);
-    expect(code.match(/if \(done === undefined\) showInfo\(BUSY_REFUSED_MESSAGE\);/g)).toHaveLength(2);
+    expect(code).toContain("const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE), [showInfo]);");
+    expect(code.match(/if \(done === undefined\) refuse\(\);/g)).toHaveLength(2);
     // « Actualiser » passe par la même garde : pas de relecture pendant un geste.
     expect(code).toContain("onClick={() => void refresh()}");
     expect(code).not.toContain("onClick={() => void load()}");
+  });
+
+  it("page_blockedRefresh_saysRefusal", () => {
+    // Un bouton déjà désarmé annule le clic sans appeler `onClick` : le refus
+    // passe par `onBlockedClick`, sans quoi la notification ne partait jamais.
+    const code = source(PAGE);
+    expect(code).toMatch(/onBlockedClick=\{refuse\}\s+onClick=\{\(\) => void refresh\(\)\}/);
+    expect(code).toContain("onRefused={refuse}");
+  });
+
+  it("ReportDetail_blockedGestures_sayRefusal", () => {
+    const code = source(DETAIL);
+    expect(code.match(/onBlockedClick=\{onRefused\}/g)).toHaveLength(6);
+    expect(code).toContain("onRefused={onRefused}");
+  });
+
+  it("ReportTargetCard_gestureProps_sayRefusal", () => {
+    expect(source(CARD)).toMatch(/"data-gesture": name,\s+onBlockedClick: onRefused,/);
+  });
+
+  it("ArmedButton_blockedClick_forwardedToBusyButton", () => {
+    expect(source(ARMED)).toContain("onBlockedClick={onBlockedClick}");
+  });
+
+  it("ReportDetail_pressedGesture_onlyWhenGestureStarts", () => {
+    // Le clic qui arme « Supprimer… » ou un clic refusé ne vole pas le focus plus tard.
+    const code = source(DETAIL);
+    expect(code).toContain("clicked.current = pressedGestureOf(event.target);");
+    expect(code).toContain("const started = gestureStarted(clicked.current, pending);");
+    expect(code).not.toContain("if (gesture) pressed.current = gesture;");
+  });
+
+  it("refusalMessage_sharedOutsideLanding", () => {
+    const shared = 'import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";';
+    expect(source(PAGE)).toContain(shared);
+    expect(source(ROLES)).toContain(shared);
   });
 
   it("ReportDetail_noteField_readOnlyWhileSending", () => {
@@ -71,7 +108,37 @@ describe("signalements du staff — boutons pendant une requête", () => {
     const code = source(ROLES);
     expect(code).toContain("aria-readonly={rolesBusy || undefined}");
     expect(code).toMatch(/const toggleRole = \(role: PlatformRole\) => \{\s+\/\/[^\n]*\n\s+if \(isBusy\(\)\) return;/);
-    expect(code).toContain("const saveRoles = async (): Promise<boolean> => (await run(sendRoles)) ?? false;");
+  });
+
+  it("PlayerRolesPanel_guardRefused_saysRefusal", () => {
+    const code = source(ROLES);
+    expect(code).toMatch(/const done = await run\(sendRoles\);\s+if \(done === undefined\) \{\s+showInfo\(BUSY_REFUSED_MESSAGE, toastLang\);\s+return false;/);
+    expect(code).toMatch(/if \(isBusy\(\)\) \{\s+showInfo\(BUSY_REFUSED_MESSAGE, toastLang\);\s+return;/);
+  });
+
+  it("PlayerRolesPanel_failedReload_saysProfileReloadFailed", () => {
+    const code = source(ROLES);
+    expect(code).toMatch(/Promise\.resolve\(onSaved\(\)\)\.then\(\s*\(result\) => result !== false,\s*\(\) => false,/);
+    expect(code).toContain('if (!reloaded) showError(rolesErrorMessage("PROFILE_RELOAD_FAILED"), toastLang);');
+    expect(code.match(/await reloadProfile\(\);/g)).toHaveLength(2);
+  });
+
+  it("playerPage_moderationBar_revalidatedInBackground", () => {
+    const page = source("app/(secured)/joueurs/[id]/page.tsx");
+    expect(page).toContain("<PlayerModerationBar profile={data} deleted={deleted} onChanged={revalidate} />");
+    expect(page).not.toContain("onChanged={refresh}");
+  });
+
+  it("PlayerModerationBar_failedReload_saysSo", () => {
+    const bar = source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
+    expect(bar).toMatch(/Promise\.resolve\(onChanged\(\)\)/);
+    expect(bar).toContain(`if (!reloaded) showError("La fiche n'a pas pu être relue : recharge la page."`);
+  });
+
+  it("useResourceLoader_failedRead_returnsFalse", () => {
+    const hook = source("lib/shared/hooks/useResourceLoader.ts");
+    expect(hook).toContain("async (silent: boolean): Promise<boolean> => {");
+    expect(hook.match(/return false;/g)).toHaveLength(3);
   });
 
   it("playerPage_rolesSaved_revalidatedInBackgroundNotRemounted", () => {
@@ -116,6 +183,7 @@ const detail = (pending: string | null) =>
     createElement(ReportDetail, {
       report,
       pending,
+      onRefused: noop,
       onAction: noop,
       onHideLogo: noop,
       onDeleteLogo: noop,
