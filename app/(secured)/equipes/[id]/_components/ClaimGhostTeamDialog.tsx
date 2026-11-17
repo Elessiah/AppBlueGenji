@@ -72,7 +72,11 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
             {t("claim.cancel")}
           </BusyButton>
           {/* Pseudo vide : refusé mais focalisable (`blocked`), comme pendant l'envoi. */}
-          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={busy} blocked={!trimmed}>
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={busy}
+            blocked={!trimmed}
+            // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
+            onBlockedClick={() => showError(t("claim.pseudoFirst"))}
+          >
             <BusyLabel busy={busy} idle={t("claim.submit")} pending={t("claim.pending")} />
           </BusyButton>
         </>

@@ -14,6 +14,7 @@ import {
 } from "@/lib/shared/content-reports";
 import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import { isFocusLost } from "@/lib/shared/focus-lost";
+import { gestureState } from "@/lib/shared/gesture-state";
 import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
@@ -21,7 +22,6 @@ import {
   ACTIONS_SCOPE,
   focusAfterGesture,
   gestureStarted,
-  gestureState,
   pressedGestureOf,
   reportGesture,
   type PressedGesture,

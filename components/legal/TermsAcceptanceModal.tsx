@@ -320,7 +320,13 @@ export function TermsAcceptanceModal({
             </BusyButton>
           </CyberButton>
           <CyberButton variant="primary" asChild>
-            <BusyButton busy={busy} blocked={!checked || leaving || deletionOpen} onClick={accept}>
+            <BusyButton
+              busy={busy}
+              blocked={!checked || leaving || deletionOpen}
+              onClick={accept}
+              // Case décochée : activé, le bouton dit pourquoi rien ne part — jamais une acceptation.
+              onBlockedClick={checked || leaving || deletionOpen ? undefined : () => showError(t("termsModal.checkFirst"))}
+            >
               <BusyLabel busy={busy} idle={t("termsModal.accept")} pending={t("termsModal.saving")} />
             </BusyButton>
           </CyberButton>

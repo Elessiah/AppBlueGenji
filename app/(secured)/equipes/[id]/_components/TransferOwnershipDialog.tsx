@@ -76,12 +76,13 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
           <BusyButton className="btn ghost" busy={false} blocked={pending} onClick={onClose}>
             {t("transfer.cancel")}
           </BusyButton>
-          {/* Aucun membre choisi : refusé mais focalisable (`blocked`). */}
+          {/* Aucun membre choisi : refusé mais focalisable (`blocked`), activé il dit pourquoi. */}
           <BusyButton
             type="submit"
             className={`btn ${confirmStep ? "danger" : styles.primaryButton}`}
             busy={pending}
             blocked={!target}
+            onBlockedClick={() => showError(t("transfer.chooseFirst"))}
           >
             <BusyLabel busy={pending} idle={submitLabel} pending={t("transfer.pending")} />
           </BusyButton>

@@ -29,6 +29,7 @@ import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
+import { neighbourRescueSelectors } from "@/lib/shared/focus-rescue";
 import styles from "../team.module.css";
 import { TEAM_IDENTITY_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -69,13 +70,15 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   // « Retirer » suivant, sinon à « Proposer la reprise ».
   const sectionRef = useRef<HTMLElement>(null);
   const rescueFocus = useFocusRescue(sectionRef);
-  const withdrawClaim = (invitationId: number, pseudo: string) =>
-    claimGuard.run(async () => {
+  const withdrawClaim = (invitationId: number, pseudo: string) => {
+    // Ordre affiché avant le retrait : il désigne le voisin de la ligne retirée.
+    const claimKeys = ghostClaims.invitations.map((claim) => claim.id);
+    return claimGuard.run(async () => {
       setWithdrawingClaimId(invitationId);
       try {
         await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
         showSuccess(t("settings.claimWithdrawn", { pseudo }));
-        rescueFocus(['[data-focus-rescue="claim"]']);
+        rescueFocus(neighbourRescueSelectors("claim", claimKeys, invitationId));
       } catch (e) {
         showError(teamErrorMessage((e as Error).message));
       } finally {
@@ -83,6 +86,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
         void ghostClaims.reload();
       }
     });
+  };
 
   const { cropImage, cropDialog } = useImageCropper();
   const [transferOpen, setTransferOpen] = useState(false);
@@ -209,6 +213,12 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const dirty =
     name.trim() !== saved.name || tag.trim() !== saved.tag || description.trim() !== saved.description.trim();
   const canSave = dirty && nameCheck.ok && tagCheck.ok;
+  /** « Enregistrer » désarmé mais focalisable : activé, il dit pourquoi rien ne part. */
+  const explainRefusedSave = () => {
+    if (!nameCheck.ok) showError(teamErrorMessage(nameCheck.reason));
+    else if (!tagCheck.ok) showError(teamErrorMessage(tagCheck.reason));
+    else if (!dirty) showError(t("settings.unchanged"));
+  };
 
   const saveMeta = (event: FormEvent) => {
     event.preventDefault();
@@ -326,7 +336,10 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
         {/* Jamais `disabled` : pendant l'envoi comme après (formulaire redevenu
             propre), le bouton garde le focus clavier (`BusyButton`) ; le
             gestionnaire ignore tout envoi hors `canSave`. */}
-        <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={saving} blocked={!canSave}>
+        <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={saving}
+          blocked={!canSave}
+          onBlockedClick={explainRefusedSave}
+        >
           <BusyLabel busy={saving} idle={t("settings.save")} pending={t("settings.saving")} />
         </BusyButton>
       </div>
@@ -607,6 +620,7 @@ function TeamDangerZone({
               <BusyButton
                 className="btn ghost"
                 data-focus-rescue="claim"
+                data-focus-rescue-key={claim.id}
                 busy={withdrawingClaimId === claim.id}
                 blocked={withdrawingClaimId !== null}
                 onClick={() => void onWithdraw(claim.id, claim.pseudo)}

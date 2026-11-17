@@ -129,7 +129,8 @@
     "save": "Save",
     "saving": "Saving…",
     "ownerNotice": "The owner role can't be ticked here: transfer it from the team settings.",
-    "dropsManagement": "Without the manager role, you'll no longer be able to manage the team's roster."
+    "dropsManagement": "Without the manager role, you'll no longer be able to manage the team's roster.",
+    "unchanged": "Nothing to save: tick or untick a role first."
   },
   "inviteDialog": {
     "title": "Invite {pseudo}",
@@ -221,7 +222,8 @@
     "newOwner": "New owner",
     "rolesOf": "{pseudo}'s roles",
     "lastCheck": "Last check: {pseudo} will become the owner, and will be the only person able to give this role back to you.",
-    "done": "{pseudo} now owns the team."
+    "done": "{pseudo} now owns the team.",
+    "chooseFirst": "First choose the member to hand the team to."
   },
   "claim": {
     "title": "Offer the team to a player",
@@ -232,7 +234,8 @@
     "pseudo": "Player's username",
     "pseudoPlaceholder": "Start typing a username…",
     "help": "Only players without a team are suggested: they must not belong to any other.",
-    "done": "{pseudo} is invited to take over {team}."
+    "done": "{pseudo} is invited to take over {team}.",
+    "pseudoFirst": "First enter the username of the player to offer the team to."
   },
   "settings": {
     "title": "Team settings",
@@ -288,6 +291,7 @@
     "transfer": "Transfer ownership",
     "deleteGhost": "Delete the ghost team",
     "dissolve": "Disband the team",
-    "tagPlaceholder": "BG"
+    "tagPlaceholder": "BG",
+    "unchanged": "Nothing to save: first change the name, tag or description."
   }
 }

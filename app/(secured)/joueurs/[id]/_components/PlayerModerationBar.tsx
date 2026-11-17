@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { ModerationReasonField, isModerationReasonReady } from "@/components/moderation/ModerationReasonField";
@@ -14,7 +14,7 @@ import {
   type SuspensionGround,
 } from "@/lib/shared/account-suspension";
 import { moderationReasonErrorMessage } from "@/lib/shared/logo-quarantine";
-import { isFocusLost } from "@/lib/shared/focus-lost";
+import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
 import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useStaffLang } from "@/components/i18n/staff-lang";
@@ -48,31 +48,26 @@ export function PlayerModerationBar({
   const { showError } = useToast();
   const staffLang = useStaffLang();
   const barRef = useRef<HTMLFieldSetElement>(null);
-  const restoreFocus = useRef(false);
+  const rescueFocus = useFocusRescue(barRef);
   const suspension = profile.moderationSuspension;
   const showAvatar = profile.moderationAvatarPresent;
   const showSuspension = suspension !== null || profile.moderationSuspendable;
 
   // La fenêtre rend le focus au bouton qui l'a ouverte, avant la relecture de
   // la fiche ; si celle-ci le retire (« Retirer l'avatar » une fois l'avatar
-  // parti), le focus tombait sur la page : il va au premier bouton de la barre.
-  useLayoutEffect(() => {
-    if (!restoreFocus.current) return;
-    restoreFocus.current = false;
-    if (isFocusLost(document)) barRef.current?.querySelector<HTMLElement>("button")?.focus();
-  }, [profile]);
+  // parti), le focus tombait sur la page : il va au premier bouton de la barre
+  // (`useFocusRescue`, commun à la fiche d'équipe).
 
   if (deleted || !profile.canModerate || (!showAvatar && !showSuspension)) return null;
 
   const close = () => setDialog(null);
   const done = () => {
     setDialog(null);
-    restoreFocus.current = true;
+    rescueFocus(["button"]);
     // Relecture en arrière-plan : un échec laisserait la barre sur l'état
     // d'avant le geste (« Suspendre » sur un compte suspendu) sans le dire.
     void reloadSucceeded(onChanged).then((reloaded) => {
       if (reloaded) return;
-      restoreFocus.current = false;
       showError(PROFILE_RELOAD_FAILED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
     });
   };

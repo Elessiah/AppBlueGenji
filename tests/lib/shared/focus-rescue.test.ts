@@ -1,6 +1,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   FOCUS_RESCUE_WINDOW_MS,
+  armedRescueSelector,
+  neighbourRescueSelectors,
   pickRescueTarget,
   rescueDue,
   rescueExpired,
@@ -71,5 +73,49 @@ describe("pickRescueTarget", () => {
 
   it("pickRescueTarget_noMatch_returnsNull", () => {
     expect(pickRescueTarget(rootWith({}), ["button", "a[href]"])).toBeNull();
+  });
+});
+
+describe("armedRescueSelector", () => {
+  it("armedRescueSelector_kind_excludesAriaDisabledButtons", () => {
+    expect(armedRescueSelector("membership")).toBe('[data-focus-rescue="membership"]:not([aria-disabled="true"])');
+  });
+});
+
+describe("neighbourRescueSelectors", () => {
+  const ARMED = '[data-focus-rescue="invitation"]:not([aria-disabled="true"])';
+  const ANY = '[data-focus-rescue="invitation"]';
+  const row = (key: number) => `[data-focus-rescue="invitation"][data-focus-rescue-key="${key}"]`;
+
+  it("neighbourRescueSelectors_middleRow_nextThenPreviousThenArmedThenAny", () => {
+    expect(neighbourRescueSelectors("invitation", [1, 2, 3], 2)).toEqual([row(3), row(1), ARMED, ANY]);
+  });
+
+  it("neighbourRescueSelectors_lastRow_previousThenFallbacks", () => {
+    expect(neighbourRescueSelectors("invitation", [1, 2, 3], 3)).toEqual([row(2), ARMED, ANY]);
+  });
+
+  it("neighbourRescueSelectors_firstRow_nextThenFallbacks", () => {
+    expect(neighbourRescueSelectors("invitation", [1, 2, 3], 1)).toEqual([row(2), ARMED, ANY]);
+  });
+
+  it("neighbourRescueSelectors_onlyRow_fallbacksOnly", () => {
+    expect(neighbourRescueSelectors("invitation", [5], 5)).toEqual([ARMED, ANY]);
+  });
+
+  it("neighbourRescueSelectors_unknownKey_fallbacksOnly", () => {
+    expect(neighbourRescueSelectors("invitation", [1, 2], 9)).toEqual([ARMED, ANY]);
+  });
+
+  it("neighbourRescueSelectors_stringAndNumberKeys_matchByValue", () => {
+    expect(neighbourRescueSelectors("invitation", ["1", 2], 1)).toEqual([row(2), ARMED, ANY]);
+  });
+
+  it("pickRescueTarget_neighbourChainWithNextGone_returnsPrevious", () => {
+    const previous = target();
+
+    const picked = pickRescueTarget(rootWith({ [row(1)]: previous }), neighbourRescueSelectors("invitation", [1, 2, 3], 2));
+
+    expect(picked).toBe(previous);
   });
 });

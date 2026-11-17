@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { MANAGER_ASSIGNABLE_ROLES } from "@/lib/shared/team-role-display";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { useToast } from "@/components/ui/toast";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
@@ -34,6 +35,7 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
   // Garde synchrone : un double clic (ou Entrée répétée) enregistrait deux fois.
   const { busy: pending, isBusy, run, hold } = useBusyGuard();
   const { t } = useTeamPageText();
+  const { showError } = useToast();
 
   const toSave = memberRolesToSave(target.selected, selected);
   const unchanged = toSave === null;
@@ -74,7 +76,11 @@ export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogPro
             {t("roles.cancel")}
           </BusyButton>
           {/* Rien à enregistrer : refusé mais focalisable (`blocked`). */}
-          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending} blocked={unchanged}>
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending}
+            blocked={unchanged}
+            // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
+            onBlockedClick={() => showError(t("roles.unchanged"))}
+          >
             <BusyLabel busy={pending} idle={t("roles.save")} pending={t("roles.saving")} />
           </BusyButton>
         </>

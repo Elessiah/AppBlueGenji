@@ -44,7 +44,7 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
   // l'envoi ni après (formulaire redevenu propre) — le focus reste sur le bouton.
   it("TeamSettings_saveWhileSaving_staysFocusable", () => {
     const code = source("app/(secured)/equipes/[id]/_components/TeamSettings.tsx");
-    expect(code).toMatch(/<BusyButton type="submit" className=\{`btn \$\{styles\.primaryButton\}`\} busy=\{saving\} blocked=\{!canSave\}>/);
+    expect(code).toMatch(/<BusyButton\s+type="submit"\s+className=\{`btn \$\{styles\.primaryButton\}`\}\s+busy=\{saving\}\s+blocked=\{!canSave\}\s+onBlockedClick=\{explainRefusedSave\}\s+>/);
     expect(code).toContain('<BusyLabel busy={saving} idle={t("settings.save")} pending={t("settings.saving")} />');
   });
 
@@ -67,7 +67,8 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
 
   it("teamModuleCss_ariaDisabledButton_isDimmedByColoursNotOpacity", () => {
     const css = source("app/(secured)/equipes/[id]/team.module.css");
-    expect(css).toMatch(/\.page :global\(\.btn\):where\(:disabled, \[aria-disabled="true"\]\) \{[^}]*cursor: not-allowed;[^}]*color: var\(--ink-dim\);/);
+    // Les couleurs viennent de `.dim-disabled` (globals.css), posée avec `.page`.
+    expect(css).toMatch(/\.page :global\(\.btn\):where\(:disabled, \[aria-disabled="true"\]\) \{[^}]*cursor: not-allowed;/);
     expect(css).not.toMatch(/opacity:/);
   });
 
@@ -98,7 +99,7 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
   it("MembershipActions_act_usesSynchronousGuardAndRescuesFocus", () => {
     const code = source("app/(secured)/equipes/[id]/_components/MembershipActions.tsx");
     expect(code).toContain("const outcome = await run(async () => {");
-    expect(code).toContain('rescueFocus(["button", "a[href]"]);');
+    expect(code).toContain("rescueFocus(rescue);");
     expect(code).not.toContain("busyRef");
   });
 });

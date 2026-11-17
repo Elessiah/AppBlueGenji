@@ -22,6 +22,7 @@ import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
+import { neighbourRescueSelectors } from "@/lib/shared/focus-rescue";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
 import { invitationOutcome } from "../_lib/member-roles";
 import styles from "../team.module.css";
@@ -226,8 +227,12 @@ export function MembersSection({
       setCancellingId(invitation.id);
       try {
         const ok = await cancelInvitation(invitation.id, playerName(invitation.pseudo, invitation.userId));
-        // La liste relue retire la ligne pressée : le focus a un point de chute.
-        if (ok) rescueFocus(['[data-focus-rescue="invitation"]', `#${INVITE_FIELD_IDS.pseudo}`]);
+        // La liste relue retire la ligne pressée : le focus va au « Retirer »
+        // voisin (suivant, sinon précédent), sinon au champ du pseudo.
+        if (ok) {
+          const keys = invitations.map((pending) => pending.id);
+          rescueFocus([...neighbourRescueSelectors("invitation", keys, invitation.id), `#${INVITE_FIELD_IDS.pseudo}`]);
+        }
       } finally {
         setCancellingId(null);
       }
@@ -307,6 +312,7 @@ export function MembersSection({
                   <BusyButton
                     className={`btn ghost ${styles.smallButton}`}
                     data-focus-rescue="invitation"
+                    data-focus-rescue-key={invitation.id}
                     busy={cancellingId === invitation.id}
                     blocked={cancellingId !== null}
                     aria-label={t("members.withdrawLabel", { pseudo: playerName(invitation.pseudo, invitation.userId) })}

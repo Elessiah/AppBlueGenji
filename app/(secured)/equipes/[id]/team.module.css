@@ -6,15 +6,11 @@
 .page :global(.btn):where(:disabled, [aria-disabled="true"]) {
   /* Le `.btn` global n'a pas d'état désactivé : un bouton en attente gardait
      son survol et son curseur de clic. `aria-disabled` : le bouton garde le
-     focus clavier pendant son geste (`BusyButton`). Désarmé, il se dit en
-     **couleurs**, jamais en `opacity` (`docs/features/BUSY_BUTTONS.md`) : elle
-     se multipliait avec celle d'un parent et éteignait aussi le liseré du focus. */
+     focus clavier pendant son geste (`BusyButton`). Ses couleurs de bouton
+     désarmé sont celles de `.dim-disabled` (`globals.css`), posée avec
+     `.page` : jamais d'`opacity` (`docs/features/BUSY_BUTTONS.md`), qui se
+     multipliait avec celle d'un parent et éteignait aussi le liseré du focus. */
   cursor: not-allowed;
-  border-color: rgba(180, 210, 230, 0.2);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--ink-dim);
-  transform: none;
-  box-shadow: none;
 }
 
 /* En attente (`aria-busy`) : le libellé d'attente doit se lire (couleur

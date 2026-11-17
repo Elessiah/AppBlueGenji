@@ -1,5 +1,6 @@
 import type { ReportAction, ReportTargetRef } from "@/lib/shared/content-reports";
 import type { ContestOutcome } from "@/lib/shared/logo-quarantine";
+import { pickRescueTarget } from "@/lib/shared/focus-rescue";
 
 /**
  * Nom d'un geste du panneau des signalements (`BUSY_BUTTONS.md`) : pendant un
@@ -21,10 +22,6 @@ export const reportGesture = {
   outcome: (quarantineId: number, outcome: ContestOutcome) => `outcome:${quarantineId}:${outcome}`,
 };
 
-/** État d'un bouton de geste : occupé s'il attend, refusé si un autre geste attend. */
-export function gestureState(pending: string | null, gesture: string): { busy: boolean; blocked: boolean } {
-  return { busy: pending === gesture, blocked: pending !== null };
-}
 
 /** Le dernier bouton de geste pressé dans le dossier : son geste et sa zone. */
 export type PressedGesture = { gesture: string; scope: string | null };
@@ -54,8 +51,7 @@ export function gestureStarted(clicked: PressedGesture | null, pending: string |
 /** Zone des gestes de traitement, en tête du dossier : le repli du focus. */
 export const ACTIONS_SCOPE = "actions";
 
-const firstButtonIn = (root: ParentNode, scope: string) =>
-  root.querySelector<HTMLElement>(`[data-focus-scope="${scope}"] button`);
+const firstButtonIn = (scope: string) => `[data-focus-scope="${scope}"] button`;
 
 /**
  * Où rendre le focus quand la relecture du dossier a retiré le bouton pressé
@@ -65,9 +61,12 @@ const firstButtonIn = (root: ParentNode, scope: string) =>
  * traitement du dossier. `null` : rien à viser.
  */
 export function focusAfterGesture(root: ParentNode, pressed: PressedGesture): HTMLElement | null {
-  return (
-    root.querySelector<HTMLElement>(`[data-gesture="${pressed.gesture}"]`) ??
-    (pressed.scope ? firstButtonIn(root, pressed.scope) : null) ??
-    firstButtonIn(root, ACTIONS_SCOPE)
-  );
+  // Même choix de cible que `useFocusRescue` (`pickRescueTarget`) ; le
+  // déclencheur, lui, suit le geste en attente du dossier (`ReportDetail`).
+  const selectors = [
+    `[data-gesture="${pressed.gesture}"]`,
+    ...(pressed.scope ? [firstButtonIn(pressed.scope)] : []),
+    firstButtonIn(ACTIONS_SCOPE),
+  ];
+  return pickRescueTarget({ querySelector: (selector) => root.querySelector<HTMLElement>(selector) }, selectors);
 }

@@ -11,6 +11,7 @@ import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { teamRoleLabel } from "@/lib/shared/team-role-display";
 import { SELF_ASSIGNABLE_ROLES, isLeadingRole } from "@/lib/shared/team-roles";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { useToast } from "@/components/ui/toast";
 import { RolePills } from "./RolePills";
 import { isCheckboxEnter, ownGameRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
@@ -33,6 +34,7 @@ interface MyRolesBlockProps {
  */
 export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
   const { t, locale } = useTeamPageText();
+  const { showError } = useToast();
   const saved = SELF_ASSIGNABLE_ROLES.filter((role) => roles.includes(role));
   const leading = roles.filter(isLeadingRole);
   const [selected, setSelected] = useState<TeamRole[]>(saved);
@@ -116,7 +118,11 @@ export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readon
           </button>
           {/* Jamais `disabled` : le bouton garde le focus clavier pendant l'envoi ;
               le gestionnaire ignore tout envoi sans changement. */}
-          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending} blocked={unchanged}>
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending}
+            blocked={unchanged}
+            // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
+            onBlockedClick={() => showError(t("roles.unchanged"))}
+          >
             <BusyLabel busy={pending} idle={t("myRoles.save")} pending={t("myRoles.saving")} />
           </BusyButton>
         </div>

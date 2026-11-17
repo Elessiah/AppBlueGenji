@@ -1,17 +1,28 @@
 /**
  * Focus rendu après un geste (`lib/shared/hooks/useFocusRescue.ts`) : les
  * crochets de React sont simulés (aucun DOM dans Jest), `document` remplacé
- * par un faux dont on règle l'élément actif.
+ * par un faux dont on règle l'élément actif et dont on suit les écouteurs.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-type Effect = () => void;
-const hooks: { effect: Effect | null } = { effect: null };
+type Effect = () => void | (() => void);
+// Effets dans l'ordre d'appel : le montage (son retour est le démontage),
+// puis celui de chaque rendu. Sans `window` (Jest), le crochet passe le second
+// par `useEffect` lui aussi.
+const effects: Effect[] = [];
+const hooks = {
+  get mount(): Effect | undefined {
+    return effects[0];
+  },
+  get render(): Effect | undefined {
+    return effects[1];
+  },
+};
 
 jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   const register = (effect: Effect) => {
-    hooks.effect = effect;
+    effects.push(effect);
   };
   return {
     ...actual,
@@ -24,24 +35,39 @@ jest.mock("react", () => {
 
 import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
 
+type Listener = () => void;
 type FakeTarget = { focus: jest.Mock<() => void> };
 const makeTarget = (): FakeTarget => ({ focus: jest.fn<() => void>() });
 
 const body = { tag: "body" };
-const fakeDocument: { body: unknown; documentElement: unknown; activeElement: unknown } = {
+const listeners = new Map<string, Set<Listener>>();
+const fakeDocument = {
   body,
   documentElement: { tag: "html" },
-  activeElement: body,
+  activeElement: body as unknown,
+  addEventListener: (type: string, listener: Listener) => {
+    if (!listeners.has(type)) listeners.set(type, new Set());
+    listeners.get(type)?.add(listener);
+  },
+  removeEventListener: (type: string, listener: Listener) => {
+    listeners.get(type)?.delete(listener);
+  },
 };
 const globalWithDocument = globalThis as { document?: unknown };
+const fire = (type: string) => {
+  for (const listener of [...(listeners.get(type) ?? [])]) listener();
+};
+const listening = () => (listeners.get("pointerdown")?.size ?? 0) + (listeners.get("keydown")?.size ?? 0);
+const render = () => hooks.render?.();
 
 let targets: Record<string, FakeTarget>;
 const root = { querySelector: (selector: string) => targets[selector] ?? null };
 const rootRef = { current: root as unknown as HTMLElement };
 
 beforeEach(() => {
-  hooks.effect = null;
+  effects.length = 0;
   targets = {};
+  listeners.clear();
   fakeDocument.activeElement = body;
   globalWithDocument.document = fakeDocument;
 });
@@ -57,7 +83,7 @@ describe("useFocusRescue", () => {
     targets.button = next;
 
     useFocusRescue(rootRef);
-    hooks.effect?.();
+    render();
 
     expect(next.focus).not.toHaveBeenCalled();
   });
@@ -68,35 +94,59 @@ describe("useFocusRescue", () => {
     const arm = useFocusRescue(rootRef);
 
     arm(["button"]);
-    hooks.effect?.();
-    hooks.effect?.();
+    render();
+    render();
 
     expect(next.focus).toHaveBeenCalledTimes(1);
   });
 
-  it("useFocusRescue_focusElsewhere_keepsItThenRescuesALaterLoss", () => {
+  it("useFocusRescue_focusStillOnPressedButton_waitsForLaterLoss", () => {
     const next = makeTarget();
     targets.button = next;
     const arm = useFocusRescue(rootRef);
     arm(["button"]);
 
-    fakeDocument.activeElement = { tag: "input" };
-    hooks.effect?.();
+    fakeDocument.activeElement = { tag: "button" };
+    render();
     expect(next.focus).not.toHaveBeenCalled();
 
     fakeDocument.activeElement = body;
-    hooks.effect?.();
+    render();
     expect(next.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("useFocusRescue_userKeydownAfterArm_dropsRequest", () => {
+    const next = makeTarget();
+    targets.button = next;
+    const arm = useFocusRescue(rootRef);
+    arm(["button"]);
+
+    fire("keydown");
+    render();
+
+    expect(next.focus).not.toHaveBeenCalled();
+  });
+
+  it("useFocusRescue_userPointerdownAfterArm_dropsRequest", () => {
+    const next = makeTarget();
+    targets.button = next;
+    const arm = useFocusRescue(rootRef);
+    arm(["button"]);
+
+    fire("pointerdown");
+    render();
+
+    expect(next.focus).not.toHaveBeenCalled();
   });
 
   it("useFocusRescue_targetNotYetRendered_waitsForLaterRender", () => {
     const arm = useFocusRescue(rootRef);
     arm(['[data-focus-rescue="claim"]']);
-    hooks.effect?.();
+    render();
 
     const propose = makeTarget();
     targets['[data-focus-rescue="claim"]'] = propose;
-    hooks.effect?.();
+    render();
 
     expect(propose.focus).toHaveBeenCalledTimes(1);
   });
@@ -108,11 +158,59 @@ describe("useFocusRescue", () => {
     arm(["button"]);
 
     now.mockReturnValue(14_001);
-    hooks.effect?.();
+    render();
     targets.button = next;
     now.mockReturnValue(10_001);
-    hooks.effect?.();
+    render();
 
     expect(next.focus).not.toHaveBeenCalled();
+  });
+
+  it("useFocusRescue_armed_listensToKeydownAndPointerdown", () => {
+    const arm = useFocusRescue(rootRef);
+
+    arm(["button"]);
+
+    expect(listening()).toBe(2);
+  });
+
+  it("useFocusRescue_consumed_detachesListeners", () => {
+    targets.button = makeTarget();
+    const arm = useFocusRescue(rootRef);
+    arm(["button"]);
+
+    render();
+
+    expect(listening()).toBe(0);
+  });
+
+  it("useFocusRescue_expired_detachesListeners", () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(10_000);
+    const arm = useFocusRescue(rootRef);
+    arm(["button"]);
+
+    now.mockReturnValue(14_001);
+    render();
+
+    expect(listening()).toBe(0);
+  });
+
+  it("useFocusRescue_rearmed_keepsOnlyTheNewListeners", () => {
+    const arm = useFocusRescue(rootRef);
+
+    arm(["button"]);
+    arm(["a[href]"]);
+
+    expect(listening()).toBe(2);
+  });
+
+  it("useFocusRescue_unmounted_detachesListeners", () => {
+    const arm = useFocusRescue(rootRef);
+    const unmount = hooks.mount?.();
+    arm(["button"]);
+
+    if (typeof unmount === "function") unmount();
+
+    expect(listening()).toBe(0);
   });
 });

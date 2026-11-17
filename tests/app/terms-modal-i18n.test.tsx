@@ -280,7 +280,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).not.toMatch(/[^-]disabled=\{/);
     expect(modal).not.toMatch(/aria-(?:disabled|busy)=\{(?:busy|preparing|leaving)/);
     // Les trois gestes s'excluent : ni envoi pendant une déconnexion ou une suppression, ni l'inverse.
-    expect(modal).toMatch(/<BusyButton busy=\{busy\} blocked=\{!checked \|\| leaving \|\| deletionOpen\} onClick=\{accept\}>/);
+    expect(modal).toMatch(/<BusyButton\s+busy=\{busy\}\s+blocked=\{!checked \|\| leaving \|\| deletionOpen\}\s+onClick=\{accept\}/);
     expect(modal).toContain("if (leaving || deletionOpen || !checked) return;");
     // Garde synchrone : un double clic n'enregistre qu'une acceptation.
     expect(modal).toContain("const { busy, isBusy, run } = useBusyGuard();");
