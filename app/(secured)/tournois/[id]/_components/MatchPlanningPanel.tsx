@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { matchesToPlan } from "@/lib/shared/match-planning";
 import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { refereeSchedulingErrorText, useActionsText } from "../_lib/actions-text";
@@ -40,7 +43,8 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const actionText = useActionsText();
   const a = actionText.t;
   const { showError, showSuccess } = useToast();
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic basculerait deux fois avant le rendu.
+  const { busy, isBusy, run } = useBusyGuard();
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
   const canManage = detail.isAdmin && !frozen;
@@ -66,28 +70,27 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const moving = toPlan.filter((match) => match.team1Score === null && match.team2Score === null);
 
   const toggle = async (next: boolean): Promise<boolean> => {
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/tournaments/${detail.card.id}/referee-scheduling`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: next }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        movedToPlanning?: number;
-      };
-      if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      const moved = payload.movedToPlanning ?? 0;
-      if (!next) showSuccess(a("planning.disabled"));
-      else showSuccess(moved > 0 ? a("planning.enabledMoved", { count: moved }) : a("planning.enabled"));
-      return true;
-    } catch (error) {
-      showError(refereeSchedulingErrorText(actionText, (error as Error).message));
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    return (await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/tournaments/${detail.card.id}/referee-scheduling`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ enabled: next }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          movedToPlanning?: number;
+        };
+        if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+        const moved = payload.movedToPlanning ?? 0;
+        if (!next) showSuccess(a("planning.disabled"));
+        else showSuccess(moved > 0 ? a("planning.enabledMoved", { count: moved }) : a("planning.enabled"));
+        return true;
+      } catch (error) {
+        showError(refereeSchedulingErrorText(actionText, (error as Error).message));
+        return false;
+      }
+    })) ?? false;
   };
 
   const onToggle = () => {
@@ -150,14 +153,18 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
             </button>
           )}
           {toggleable && (
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className={`btn ghost tap-target ${styles.toggle}`}
-              onClick={onToggle}
-              disabled={busy}
+              onClick={() => {
+                if (!isBusy()) onToggle();
+              }}
             >
-              {busy ? "…" : toggleLabel}
-            </button>
+              {/* Le libellé reste pendant l'envoi : le bouton garde le focus, et un
+                  nom réduit à « … » ne dirait plus rien du geste en cours. */}
+              <BusyLabel busy={busy} idle={toggleLabel} pending={`${toggleLabel}…`} />
+            </BusyButton>
           )}
         </div>
       )}

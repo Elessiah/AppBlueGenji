@@ -81,7 +81,7 @@ describe("scoreCorrectionNeedsConfirmation", () => {
 
 describe("Correction d'un résultat — câblage", () => {
   it("aucune écriture n'échappe à la règle : toute saisie passe par run (Enregistrer, désactivé sur un match tranché, compris)", () => {
-    expect(SCORE).toMatch(/onClick=\{\(\) => \{\s*if \(!form\.submitting && !saveBlocked\) void run\("save"\);\s*\}\}/);
+    expect(SCORE).toMatch(/onClick=\{\(\) => \{\s*if \(!form\.isBusy\(\) && !saveBlocked\) void run\("save"\);\s*\}\}/);
     expect(SCORE).toMatch(/void run\("resolve"\)/);
     expect(SCORE.match(/form\.submit\(/g)).toHaveLength(1);
     const run = /const run = async[\s\S]*?\n {2}\};/.exec(SCORE)?.[0] ?? "";
@@ -120,23 +120,24 @@ describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
     // Aucun `disabled` natif sur un bouton d'action : un refus suivi d'un
     // rafraîchissement (`PROPOSAL_STALE`) ne doit pas faire tomber le focus.
     expect(actions).not.toMatch(/(?<!aria-)disabled=\{/);
-    expect(actions.match(/aria-disabled=\{form\.submitting \|\| undefined\}/g)).toHaveLength(1);
-    expect(actions).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
-    expect(actions).toContain("aria-disabled={form.submitting || resolveBlocked || undefined}");
-    expect(actions.match(/aria-busy=\{form\.submitting \|\| undefined\}/g)).toHaveLength(2);
+    expect(actions).not.toMatch(/<button\b/);
+    expect(actions).toMatch(/busy=\{form\.submitting\}\s+blocked=\{saveBlocked\}/);
+    expect(actions).toMatch(/busy=\{form\.submitting\}\s+blocked=\{resolveBlocked\}/);
+    // « Fermer » aussi : focalisable pendant l'envoi, il s'annonce occupé (`BusyButton`).
+    expect(actions.match(/<BusyButton\s+busy=\{form\.submitting\}/g)).toHaveLength(3);
   });
 
   it("ignore Fermer et Enregistrer pressés pendant l'envoi", () => {
-    expect(actions).toContain("if (!form.submitting) onClose();");
-    expect(actions).toContain('if (!form.submitting && !saveBlocked) void run("save");');
+    expect(actions).toContain("if (!form.isBusy()) onClose();");
+    expect(actions).toContain('if (!form.isBusy() && !saveBlocked) void run("save");');
     // « Valider le résultat » passe par le formulaire, qui garde déjà l'envoi.
-    expect(SCORE).toMatch(/!resolveBlocked && !form\.submitting\) void run\("resolve"\)/);
+    expect(SCORE).toMatch(/!resolveBlocked && !form\.isBusy\(\)\) void run\("resolve"\)/);
   });
 
   it("garde le libellé des boutons pendant l'envoi : un nom réduit à « … » ne dit rien", () => {
     expect(actions).not.toMatch(/submitting \? "…"/);
-    expect(actions).toMatch(/\{t\("score\.admin\.save"\)\}\s*\{form\.submitting && "…"\}/);
-    expect(actions).toMatch(/\{t\("score\.admin\.resolve"\)\}\s*\{form\.submitting && "…"\}/);
+    expect(actions).toContain('<BusyLabel busy={form.submitting} idle={t("score.admin.save")} pending={`${t("score.admin.save")}…`} />');
+    expect(actions).toContain('<BusyLabel busy={form.submitting} idle={t("score.admin.resolve")} pending={`${t("score.admin.resolve")}…`} />');
     const player = read("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).not.toMatch(/submitting \? "…"/);
   });

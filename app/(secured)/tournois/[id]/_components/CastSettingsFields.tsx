@@ -75,6 +75,7 @@ export function CastUrlField({
   readOnlyNote,
   required = false,
   missing = false,
+  sending = false,
 }: Readonly<{
   id: string;
   value: string;
@@ -88,6 +89,8 @@ export function CastUrlField({
   required?: boolean;
   /** Le lien a été vidé alors qu'il est exigé : la note dit pourquoi « Enregistrer » est désarmé. */
   missing?: boolean;
+  /** Envoi en cours : lecture seule — ce qui est affiché est ce qui part (`BUSY_BUTTONS.md`). */
+  sending?: boolean;
 }>) {
   const { t } = useActionsText();
   const hintId = useId();
@@ -118,7 +121,7 @@ export function CastUrlField({
         maxLength={MAX_STREAM_URL_LENGTH}
         inputMode="url"
         placeholder="https://twitch.tv/…"
-        readOnly={locked}
+        readOnly={locked || sending}
         aria-required={required || undefined}
         // Le refus est lu avant l'aide (`fieldAria`), et l'aide reste lisible.
         {...fieldAria(id, invalid, note === null ? null : hintId, infoId)}
@@ -151,6 +154,7 @@ export function CastTriggerField({
   locked = false,
   id,
   fieldError,
+  sending = false,
 }: Readonly<{
   /** `null` : aucun mode coché (match démarqué) — chaque choix se clique. */
   trigger: MatchLiveTrigger | null;
@@ -161,6 +165,12 @@ export function CastTriggerField({
   id?: string;
   /** Refus du serveur rattaché au groupe (`LIVE_TRIGGER_CHANGED`). */
   fieldError?: string | null;
+  /**
+   * Envoi en cours : le choix ne change plus (ce qui est affiché est ce qui
+   * part). Les boutons radio restent focalisables (`aria-disabled`, pas
+   * `disabled`, qui ferait tomber le focus sur la page).
+   */
+  sending?: boolean;
 }>) {
   const { t, locale } = useActionsText();
   const name = useId();
@@ -210,7 +220,10 @@ export function CastTriggerField({
               value={option}
               checked={trigger === option}
               disabled={off}
-              onChange={() => onChange(option)}
+              aria-disabled={sending || undefined}
+              onChange={() => {
+                if (!sending) onChange(option);
+              }}
             />
             {/* NOSONAR S6772 — label en flex avec `gap` */}
             {t(`cardActions.castSettings.triggers.${option}`)}
@@ -235,6 +248,7 @@ export function CastBattletagField({
   onChange,
   invalid,
   fieldError,
+  sending = false,
 }: Readonly<{
   id: string;
   value: string;
@@ -242,6 +256,8 @@ export function CastBattletagField({
   invalid: boolean;
   /** Refus du serveur rattaché au champ (`INVALID_CAST_BATTLETAG`, `useFieldErrors`). */
   fieldError?: string | null;
+  /** Envoi en cours : lecture seule, comme le lien. */
+  sending?: boolean;
 }>) {
   const { t } = useActionsText();
   const hintId = useId();
@@ -259,6 +275,7 @@ export function CastBattletagField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={MAX_CAST_BATTLETAG_LENGTH}
+        readOnly={sending || undefined}
         placeholder={t("cardActions.castSettings.battletagPlaceholder")}
         // Le refus est lu avant l'aide (`fieldAria`), comme pour le lien.
         {...fieldAria(id, invalid, invalid && !fieldError ? hintId : null, infoId)}

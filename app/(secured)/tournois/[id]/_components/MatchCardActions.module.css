@@ -76,7 +76,9 @@
 }
 
 .primary:disabled,
-.item:disabled {
+.item:disabled,
+.primary[aria-busy="true"],
+.item[aria-busy="true"] {
   cursor: progress;
   color: var(--ink-mute);
   background: transparent;

@@ -125,7 +125,7 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toMatch(
       /if \(shouldHoldSubmit\(pastWarning !== null, pastWarningAt\(now\) !== null\)\) \{\s*justHeld\.current = true;\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
     );
-    expect(SOURCE).toMatch(/<button\s+id=\{SUBMIT_ID\}\s+type="submit"/);
+    expect(SOURCE).toMatch(/<BusyButton\s+busy=\{busy\}\s+id=\{SUBMIT_ID\}\s+type="submit"/);
     expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
     expect(SOURCE).toContain("<output id={PAST_WARNING_ID} style=");
     expect(SOURCE).not.toContain("warnPastLate");
@@ -140,8 +140,8 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toMatch(/onKeyDown=\{\(event\) => \{\s*if \(event\.repeat && event\.key === "Enter"\) event\.preventDefault\(\);\s*\}\}/);
     // « Vider la date » et « Annuler », repoussés sous le second clic par
     // l'avertissement qui apparaît, ne le prennent pas non plus.
-    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1\) clearAll\(\);\s*\}\}/);
-    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1\) onClose\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1 && !isBusy\(\)\) clearAll\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1 && !isBusy\(\)\) onClose\(\);\s*\}\}/);
     expect(SOURCE).not.toContain("onClick={onClose}");
     expect(SOURCE).not.toContain("heldBackAt");
     expect(SOURCE).not.toContain("LATE_WARNING_CONFIRM_DELAY_MS");

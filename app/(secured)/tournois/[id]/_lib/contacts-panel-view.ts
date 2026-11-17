@@ -11,11 +11,13 @@
  *
  * L'ordre des cas est la règle :
  *
- * 1. **premier chargement** — rien à montrer encore. Un rechargement, lui, garde
+ * 1. **échec** — avant tout le reste, même pendant une relance (« Réessayer »
+ *    reste affiché, en attente, et garde le focus clavier), et même quand une
+ *    liste plus ancienne existe : un refus comme « tournoi terminé » ferme
+ *    l'accès, y laisser les tags déjà reçus serait afficher ce que la route
+ *    vient de refuser ;
+ * 2. **premier chargement** — rien à montrer encore. Un rechargement, lui, garde
  *    la liste affichée : elle est périmée d'une seconde, pas fausse ;
- * 2. **échec** — avant la liste, et même quand une liste plus ancienne existe :
- *    un refus comme « tournoi terminé » ferme l'accès, y laisser les tags déjà
- *    reçus serait afficher ce que la route vient de refuser ;
  * 3. **liste vide** — un plateau sans engagé, qui se dit ;
  * 4. **liste**.
  */
@@ -30,8 +32,8 @@ export type ContactsPanelState = {
 export type ContactsPanelView = "LOADING" | "ERROR" | "EMPTY" | "LIST";
 
 export function contactsPanelView(state: ContactsPanelState): ContactsPanelView {
-  if (state.loading && state.entrants === null) return "LOADING";
   if (state.failure !== null) return "ERROR";
+  if (state.loading && state.entrants === null) return "LOADING";
   // Ni liste, ni échec, ni chargement : l'état ne devrait pas exister, et c'est
   // la raison de le trancher ici plutôt que de le laisser tomber dans le vide.
   // « En attente » est la seule lecture honnête — il n'y a rien à montrer, mais

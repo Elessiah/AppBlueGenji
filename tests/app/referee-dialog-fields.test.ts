@@ -99,8 +99,8 @@ describe("RefereeDialog — gestes et textes (EF-30)", () => {
     const assign = source.slice(source.indexOf("const assign ="), source.indexOf("const saveMap ="));
     expect(assign).toContain('if (done) setPick("")');
     // Un choix qui n'est plus proposé (le compte désigné a quitté la liste) n'envoie rien.
-    expect(assign).toContain("if (!pickOffered) return;");
-    expect(source).toContain("disabled={busy || !pickOffered}");
+    expect(assign).toContain("if (isBusy() || !pickOffered) return;");
+    expect(source).toContain('<BusyButton busy={busy} blocked={!pickOffered} type="submit"');
   });
 
   it("RefereeDialog_noCandidate_saysWhyInsteadOfEmptyList", () => {
@@ -110,8 +110,8 @@ describe("RefereeDialog — gestes et textes (EF-30)", () => {
   });
 
   it("RefereeDialog_roundGestures_offeredOnlyWhenUseful", () => {
-    expect(source).toMatch(/\{actions\.roundOn && \(\s*<button[^\n]*setConfirm\("roundOn"\)/);
-    expect(source).toMatch(/\{actions\.roundOff && \(\s*<button[^\n]*setConfirm\("roundOff"\)/);
+    expect(source).toMatch(/\{actions\.roundOn && \(\s*<BusyButton[^\n]*ask\("roundOn"\)/);
+    expect(source).toMatch(/\{actions\.roundOff && \(\s*<BusyButton[^\n]*ask\("roundOff"\)/);
     expect(source).toContain('roundDone(t("cardActions.refereeDialog.roundOn"))');
     expect(source).toContain('roundDone(t("cardActions.refereeDialog.roundOff"))');
     expect(fr.cardActions.refereeDialog.roundUnchanged).toBe("Rien à changer : la manche était déjà dans cet état.");
@@ -153,7 +153,7 @@ describe("RefereeDialog — gestes et textes (EF-30)", () => {
   });
 
   it("RefereeDialog_objection_onlyForRefereeStillOffered", () => {
-    expect(source).toContain("disabled={busy || !objectionOffered}");
+    expect(source).toContain('<BusyButton busy={busy} blocked={!objectionOffered} type="submit"');
     expect(source).toContain("send(objectionUrl(objectionOffered.userId), \"PUT\", { upheld: true })");
   });
 

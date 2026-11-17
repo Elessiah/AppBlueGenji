@@ -136,7 +136,7 @@ describe("détail map par map — arbitrage et relecture", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toContain("const resolveBlocked = (!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail;");
     // Jamais `disabled` natif : `aria-disabled` + garde du gestionnaire.
-    expect(dialog).toContain("aria-disabled={form.submitting || resolveBlocked || undefined}");
+    expect(dialog).toMatch(/busy=\{form\.submitting\}\s+blocked=\{resolveBlocked\}/);
   });
 
   it("la relecture du détail adverse se retente tant qu'il manque, au plus trois fois", () => {
@@ -251,9 +251,9 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toMatch(/const awaitingDetail =\s*detailPending &&\s*!form\.maps\.some\(isMapTouched\)/);
     expect(dialog).toContain("const saveBlocked = (!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail;");
-    expect(dialog).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
-    expect(dialog).toContain("if (!form.submitting && !saveBlocked) void run(\"save\");");
-    expect(dialog).toContain("if (!resolveBlocked && !form.submitting) void run(\"resolve\");");
+    expect(dialog).toMatch(/busy=\{form\.submitting\}\s+blocked=\{saveBlocked\}/);
+    expect(dialog).toContain("if (!form.isBusy() && !saveBlocked) void run(\"save\");");
+    expect(dialog).toContain("if (!resolveBlocked && !form.isBusy()) void run(\"resolve\");");
     expect(dialog).toContain('if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");');
   });
 
@@ -488,10 +488,10 @@ describe("détail map par map — formulaire vierge", () => {
   it("la ligne vierge d'ouverture n'est pas une proposition : bouton fermé, rien d'« envoyé »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("const nothingEntered = !maps.some(isMapTouched);");
-    expect(dialog).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
-    expect(dialog).toContain("if (submitting || nothingEntered || unchangedMine) return;");
-    // Pendant l'envoi : `aria-disabled` + `aria-busy`, le focus reste sur le bouton.
-    expect(dialog).toContain("aria-busy={submitting || undefined}");
+    expect(dialog).toContain("blocked={nothingEntered || unchangedMine}");
+    expect(dialog).toContain("if (isBusy() || nothingEntered || unchangedMine) return;");
+    // Pendant l'envoi : `aria-disabled` + `aria-busy` (`BusyButton`), le focus reste sur le bouton.
+    expect(dialog).toMatch(/<BusyButton\s+busy=\{submitting\}/);
     expect(dialog).not.toContain("disabled={maps.length === 0 ||");
   });
 });
@@ -569,7 +569,7 @@ describe("format Duel / Arcade — revue UI cycle 1", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx");
     expect(dialog).toContain("locked={pointsLocked}");
     expect(dialog).toContain("disabled={locked}");
-    expect(dialog).toContain("aria-disabled={busy || locked || !dirty || undefined}");
+    expect(dialog).toContain("<BusyButton busy={busy} blocked={locked || !dirty} type=\"submit\"");
     expect(dialog).toContain('t("dialog.pointsLocked")');
   });
 

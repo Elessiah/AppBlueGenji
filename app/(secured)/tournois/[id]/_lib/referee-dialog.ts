@@ -103,8 +103,12 @@ type FocusCandidate = { isConnected: boolean };
 /**
  * Où rendre le focus quand un geste de la fenêtre s'achève : rien si le focus
  * est encore sur un élément vivant ; sinon le contrôle qui a lancé le geste
- * s'il existe toujours (désactivé le temps de l'envoi, le navigateur l'a
- * lâché), et la phrase d'état quand le geste a retiré son propre bouton.
+ * s'il existe toujours (le focus a pu le quitter : une confirmation fermée le
+ * rend à son déclencheur, parfois disparu entre-temps), et la phrase d'état
+ * quand le geste a retiré son propre bouton (« Arbitrer ce match » devenu
+ * « Ne plus arbitrer »). Les boutons ne sont plus désactivés pendant l'envoi
+ * (`aria-disabled`, `docs/features/BUSY_BUTTONS.md`) : c'est la disparition
+ * du contrôle, non son état, qui fait perdre le focus.
  */
 export function refereeFocusTarget<E extends FocusCandidate>(input: {
   active: E | null;

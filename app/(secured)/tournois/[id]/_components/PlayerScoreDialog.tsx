@@ -1,7 +1,10 @@
 "use client";
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { SCORE_LOCKED_DISPUTE, autoValidateTimeText } from "@/lib/shared/score-dispute";
@@ -412,7 +415,9 @@ export function PlayerScoreDialog({
   // saisissable (à planifier, en attente de départ, en lancement).
   const { refereeScheduling, launchPhase: launchPhaseEnabled } = useLiveControls();
   const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase: launchPhaseEnabled });
-  const [submitting, setSubmitting] = useState(false);
+  // Garde synchrone : un double clic ou Entrée répétée relancerait un envoi
+  // avant que `submitting` soit rendu (`useBusyGuard`).
+  const { busy: submitting, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: submitting });
   const backdrop = useBackdropDismiss(onClose, submitting);
   const [forfeitOpen, setForfeitOpen] = useState(false);
@@ -603,7 +608,7 @@ export function PlayerScoreDialog({
     confirmTheirs: boolean;
     seenAt: string | null;
   }): Promise<boolean> => {
-    if (submitting) return false;
+    if (isBusy()) return false;
     const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true, ...pointRules });
     if (sendCheck.error) {
       if (!send.confirmTheirs) flagRefusal(sendCheck.error);
@@ -613,60 +618,59 @@ export function PlayerScoreDialog({
     const entered1 = sendCheck.score.team1;
     const entered2 = sendCheck.score.team2;
     const body = toReporterScores(myTeamIsTeam1, entered1, entered2);
-    setSubmitting(true);
-    onOwnSettle?.(true);
-    // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
-    // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
-    // passer, la page ne dira pas « tranché par un autre ».
-    let refusedCode: string | null = null;
-    try {
-      const response = await fetch(
-        `/api/tournaments/${tournamentId}/matches/${match.id}/report`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          // « Confirmer » renvoie le dépôt adverse lu ici : le serveur refuse
-          // (`PROPOSAL_STALE`) s'il a changé ou expiré depuis. Un simple envoi
-          // dit quelle déclaration adverse la modale montrait : une autre,
-          // contraire, est refusée (`PROPOSAL_ARRIVED`) plutôt que d'ouvrir un
-          // litige à l'aveugle.
-          body: reportBody(send),
-        },
-      );
-      const payload = (await response.json().catch(() => ({}))) as { error?: string; completed?: boolean };
-      if (!response.ok) {
-        refusedCode = payload.error ?? null;
-        throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
+    return (await run(async () => {
+      onOwnSettle?.(true);
+      // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
+      // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
+      // passer, la page ne dira pas « tranché par un autre ».
+      let refusedCode: string | null = null;
+      try {
+        const response = await fetch(
+          `/api/tournaments/${tournamentId}/matches/${match.id}/report`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            // « Confirmer » renvoie le dépôt adverse lu ici : le serveur refuse
+            // (`PROPOSAL_STALE`) s'il a changé ou expiré depuis. Un simple envoi
+            // dit quelle déclaration adverse la modale montrait : une autre,
+            // contraire, est refusée (`PROPOSAL_ARRIVED`) plutôt que d'ouvrir un
+            // litige à l'aveugle.
+            body: reportBody(send),
+          },
+        );
+        const payload = (await response.json().catch(() => ({}))) as { error?: string; completed?: boolean };
+        if (!response.ok) {
+          refusedCode = payload.error ?? null;
+          throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
+        }
+        // `completed` : la version envoyée concordait avec la déclaration adverse
+        // (modale périmée, ou arrivée identique) — le match est clos, pas « en
+        // attente de l'adversaire ».
+        showSuccess(
+          reportClosedMatch(send.confirmTheirs, payload)
+            ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
+            : t("score.player.submitted", {
+                team1,
+                team2,
+                score1: myTeamIsTeam1 ? body.myScore : body.opponentScore,
+                score2: myTeamIsTeam1 ? body.opponentScore : body.myScore,
+              }),
+        );
+        onSubmitted();
+        onClose();
+        return true;
+      } catch (error) {
+        const code = (error as Error).message;
+        // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
+        onOwnSettle?.(ownSettleAfterFailure(refusedCode));
+        if (!send.confirmTheirs) flagRefusal(code);
+        showError(mapError(code));
+        // Proposition changée ou expirée, ou litige ouvert entre-temps : plutôt que
+        // de laisser réessayer en vain, la modale se remet à jour (`refreshAfterRefusal`).
+        if (REFRESH_ON_REFUSAL.has(code)) refreshAfterRefusal();
+        return false;
       }
-      // `completed` : la version envoyée concordait avec la déclaration adverse
-      // (modale périmée, ou arrivée identique) — le match est clos, pas « en
-      // attente de l'adversaire ».
-      showSuccess(
-        reportClosedMatch(send.confirmTheirs, payload)
-          ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
-          : t("score.player.submitted", {
-              team1,
-              team2,
-              score1: myTeamIsTeam1 ? body.myScore : body.opponentScore,
-              score2: myTeamIsTeam1 ? body.opponentScore : body.myScore,
-            }),
-      );
-      onSubmitted();
-      onClose();
-      return true;
-    } catch (error) {
-      const code = (error as Error).message;
-      // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
-      onOwnSettle?.(ownSettleAfterFailure(refusedCode));
-      if (!send.confirmTheirs) flagRefusal(code);
-      showError(mapError(code));
-      // Proposition changée ou expirée, ou litige ouvert entre-temps : plutôt que
-      // de laisser réessayer en vain, la modale se remet à jour (`refreshAfterRefusal`).
-      if (REFRESH_ON_REFUSAL.has(code)) refreshAfterRefusal();
-      return false;
-    } finally {
-      setSubmitting(false);
-    }
+    })) ?? false;
   };
 
   /**
@@ -676,46 +680,44 @@ export function PlayerScoreDialog({
    */
   const confirmTheirs = () => {
     const send = confirmTheirsSend(theirs);
-    if (submitting || send === null) return;
+    if (isBusy() || send === null) return;
     void submitScore(send);
   };
 
   const submitForfeit = async () => {
-    if (submitting) return;
-    setSubmitting(true);
-    onOwnSettle?.(true);
-    // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
-    // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
-    // passer, la page ne dira pas « tranché par un autre ».
-    let refusedCode: string | null = null;
-    try {
-      const response = await fetch(
-        `/api/tournaments/${tournamentId}/matches/${match.id}/forfeit`,
-        { method: "POST" },
-      );
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) {
-        refusedCode = payload.error ?? null;
-        throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
+    await run(async () => {
+      onOwnSettle?.(true);
+      // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
+      // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
+      // passer, la page ne dira pas « tranché par un autre ».
+      let refusedCode: string | null = null;
+      try {
+        const response = await fetch(
+          `/api/tournaments/${tournamentId}/matches/${match.id}/forfeit`,
+          { method: "POST" },
+        );
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) {
+          refusedCode = payload.error ?? null;
+          throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
+        }
+        showSuccess(t("score.player.forfeitRecorded", { opponent: opponentName }));
+        onSubmitted();
+        onClose();
+      } catch (error) {
+        const code = (error as Error).message;
+        // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
+        onOwnSettle?.(ownSettleAfterFailure(refusedCode));
+        showError(mapError(code));
+        if (REFRESH_ON_REFUSAL.has(code)) refreshAfterRefusal();
       }
-      showSuccess(t("score.player.forfeitRecorded", { opponent: opponentName }));
-      onSubmitted();
-      onClose();
-    } catch (error) {
-      const code = (error as Error).message;
-      // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
-      onOwnSettle?.(ownSettleAfterFailure(refusedCode));
-      showError(mapError(code));
-      if (REFRESH_ON_REFUSAL.has(code)) refreshAfterRefusal();
-    } finally {
-      setSubmitting(false);
-    }
+    });
   };
 
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
     // Le bouton n'est jamais `disabled` natif (`aria-disabled`) : la garde est ici.
-    if (submitting || nothingEntered || unchangedMine) return;
+    if (isBusy() || nothingEntered || unchangedMine) return;
     // Version différente de la déclaration adverse : l'envoi ouvre un litige,
     // confirmé à part.
     // Les deux envois suivent la même règle du « vu » (`seenOpponentReportAt`).
@@ -872,36 +874,35 @@ export function PlayerScoreDialog({
 
           {canDeclareForfeit && (
             <div className={styles.forfeitZone}>
-              <button
+              <BusyButton
+                busy={submitting}
                 type="button"
                 className={styles.link}
                 onClick={() => {
-                  if (!submitting) setForfeitOpen(!forfeitOpen);
+                  if (!isBusy()) setForfeitOpen(!forfeitOpen);
                 }}
                 aria-expanded={forfeitOpen}
                 aria-controls="player-score-forfeit"
-                aria-disabled={submitting || undefined}
               >
                 {forfeitOpen ? t("score.player.forfeit.close") : t("score.player.forfeit.open")}
-              </button>
+              </BusyButton>
               {forfeitOpen && (
                 <div id="player-score-forfeit" className={styles.forfeitPanel}>
                   <p id="player-score-forfeit-hint" className={styles.forfeitHint}>
                     {t("score.player.forfeit.hint", { mine: myName, opponent: opponentName, maps: forfeitMaps })}
                   </p>
                   <div className={styles.forfeitRow}>
-                    <button
+                    <BusyButton
+                      busy={submitting}
                       type="button"
                       className={styles.forfeit}
                       aria-describedby="player-score-forfeit-hint"
                       onClick={() => void submitForfeit()}
-                      aria-disabled={submitting || undefined}
-                      aria-busy={submitting || undefined}
                     >
                       {/* En vol, un libellé d'attente plutôt qu'un « … » accolé au
                           nom, qui se lisait comme un nom tronqué. */}
                       {submitting ? t("score.sending") : t("score.player.forfeit.confirm", { name: myName })}
-                    </button>
+                    </BusyButton>
                   </div>
                 </div>
               )}
@@ -937,16 +938,15 @@ export function PlayerScoreDialog({
                 </InfoHint>
               </InfoHintRow>
               <MapDifferenceList differences={differences} opponentName={opponentName} mapNames={mapNames} />
-              <button
+              <BusyButton
+                busy={submitting}
                 type="button"
                 className={`btn ghost ${styles.confirmTheirs}`}
                 onClick={confirmTheirs}
-                aria-disabled={submitting || undefined}
-                aria-busy={submitting || undefined}
                 aria-describedby="player-score-diff-title"
               >
                 {submitting ? t("score.sending") : t("score.player.confirmTheirs")}
-              </button>
+              </BusyButton>
             </fieldset>
           )}
 
@@ -957,33 +957,32 @@ export function PlayerScoreDialog({
           )}
 
           <div className={styles.actions}>
-            <button
+            <BusyButton
+              busy={submitting}
               type="button"
               className={`${styles.link} ${styles.close}`}
               onClick={() => {
-                if (!submitting) onClose();
+                if (!isBusy()) onClose();
               }}
-              aria-disabled={submitting || undefined}
             >
               {t("score.close")}
-            </button>
+            </BusyButton>
             {canEnterScore && (
-              <button
-                type="submit"
-                className="btn"
+              <BusyButton
+                busy={submitting}
                 // Jamais `disabled` natif : un refus suivi d'un rafraîchissement
                 // (proposition périmée) ou le report reçu par le flux pourrait
                 // désactiver le bouton focalisé et faire tomber le focus sur
-                // <body>. Les gardes sont dans `onSubmitForm`.
-                aria-disabled={submitting || nothingEntered || unchangedMine || undefined}
+                // <body>. Les gardes sont aussi dans `onSubmitForm`.
+                blocked={nothingEntered || unchangedMine}
+                type="submit"
+                className="btn"
                 // Un avertissement monté déjà rempli n'est pas toujours annoncé :
                 // rattaché au bouton, il se lit au moment d'envoyer.
                 aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}
-                aria-busy={submitting || undefined}
               >
-                {submitLabel}
-                {submitting && "…"}
-              </button>
+                <BusyLabel busy={submitting} idle={submitLabel} pending={`${submitLabel}…`} />
+              </BusyButton>
             )}
             <SendingStatus active={submitting} />
             <ArrivalStatus message={arrivalMessage} />

@@ -1,6 +1,9 @@
 "use client";
 
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -29,7 +32,11 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   const mapError = useMapError();
   const { t } = useDialogsText();
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (Entrée dans le champ, double clic) : un second envoi
+  // partirait avant que `busy` soit rendu. Les boutons restent focalisables
+  // pendant l'envoi (`aria-disabled` + `aria-busy`), le champ passe en lecture
+  // seule (`readOnly`) : désactivé, il perdrait le focus qu'Entrée y laisse.
+  const { busy, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 
@@ -40,23 +47,22 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   const noop = !touched && match.replayUrl === null;
 
   const save = async (value: string | null) => {
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/replay`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ replayUrl: value }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_REPLAY_UPDATE_FAILED");
-      showSuccess(value === null ? t("replay.removed") : t("replay.saved"));
-      onSaved();
-      onClose();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/matches/${match.id}/replay`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ replayUrl: value }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(payload.error || "MATCH_REPLAY_UPDATE_FAILED");
+        showSuccess(value === null ? t("replay.removed") : t("replay.saved"));
+        onSaved();
+        onClose();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 
   const submit = (event: FormEvent) => {
@@ -131,7 +137,8 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
               placeholder="https://www.youtube.com/watch?v=…"
               value={replayUrl}
               onChange={(e) => setReplayUrl(e.target.value)}
-              disabled={busy || !replayable}
+              disabled={!replayable}
+              readOnly={busy}
               aria-invalid={invalid}
               aria-describedby="match-replay-url-hint"
             />
@@ -157,34 +164,37 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
             }}
           >
             {match.replayUrl !== null && (
-              <button
+              <BusyButton
+                busy={busy}
                 type="button"
                 className="btn ghost"
                 onClick={() => void save(null)}
-                disabled={busy}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
                 {t("replay.remove")}
-              </button>
+              </BusyButton>
             )}
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
+              onClick={() => {
+                if (!isBusy()) onClose();
+              }}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
-            </button>
+            </BusyButton>
             {replayable && (
-              <button
+              <BusyButton
+                busy={busy}
+                blocked={invalid || noop}
                 type="submit"
                 className="btn"
-                disabled={busy || invalid || noop}
                 style={{ padding: "8px 20px", fontSize: 13 }}
               >
-                {busy ? t("schedule.saving") : t("schedule.save")}
-              </button>
+                <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
+              </BusyButton>
             )}
           </div>
         </form>
