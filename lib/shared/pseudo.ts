@@ -10,6 +10,7 @@
  *
  * Module **pur**.
  */
+import { graphemesOf } from "./graphemes";
 
 /** Longueur maximale d'un pseudo, en caractères — celle de la colonne. */
 export const PSEUDO_MAX_LENGTH = 40;
@@ -48,10 +49,4 @@ export function reactivationPseudoCandidate(pseudo: string, attempt: number): st
     length += size;
   }
   return `${base.trimEnd()}${suffix}`;
-}
-
-/** Les graphèmes d'un texte ; à défaut de `Intl.Segmenter`, ses caractères. */
-function graphemesOf(text: string): string[] {
-  if (typeof Intl.Segmenter !== "function") return Array.from(text);
-  return Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (part) => part.segment);
 }

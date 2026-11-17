@@ -60,7 +60,7 @@ describe("stageName", () => {
 
   it("force un nom unique pour GRAND et THIRD_PLACE", () => {
     expect(stageName(0, 1, "GRAND")).toBe("Grande Finale");
-    expect(stageName(0, 1, "THIRD_PLACE")).toBe("Petite Finale");
+    expect(stageName(0, 1, "THIRD_PLACE")).toBe("Petite finale");
   });
 });
 

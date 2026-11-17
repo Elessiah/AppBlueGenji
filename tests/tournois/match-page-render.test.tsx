@@ -126,10 +126,11 @@ function render(
   game: TournamentGame = "OW",
   asCard = false,
   leadTeamIds: number[] = [],
+  others: BracketMatch[] = [],
 ): string {
   const detail = tournamentDetail({
     card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING", game }),
-    matches: [page],
+    matches: [page, ...others],
     mapRules,
     canCreateReportsForTeamIds: leadTeamIds,
   });
@@ -202,7 +203,8 @@ describe("page d'un match — ce que tout le monde lit", () => {
     // Titre et tableau d'affichage dans l'ordre des côtés : l'hôte (Bravo) à gauche.
     expect(visible(html)).toContain("Bravo contre Alpha");
     expect(html).toContain('href="/suivre/tournois/12#match-34"');
-    expect(visible(html)).toContain("Manche 2 · Match 3");
+    // Seul match de son tableau : c'est la finale, comme l'arbre la nomme.
+    expect(visible(html)).toContain("Coupe d'hiver · Finale");
     const facts = visible(html.slice(html.indexOf('data-fact="host"')));
     expect(facts).toContain("Hôte B Bravo Crée la partie");
     expect(facts).toContain("Premier ban A Alpha");
@@ -355,7 +357,7 @@ describe("page d'un match — ce que tout le monde lit", () => {
   });
 
   it("le nom du tournoi, qui n'est plus le bouton de retour, ouvre la ligne de situation", () => {
-    expect(visible(render(match(), "public"))).toContain("Coupe d'hiver · Manche 2 · Match 3");
+    expect(visible(render(match(), "public"))).toContain("Coupe d'hiver · Finale");
   });
 
   it("première map pas encore choisie, adversaires à venir", () => {
@@ -366,7 +368,7 @@ describe("page d'un match — ce que tout le monde lit", () => {
   });
 
   it("nomme le tableau hors du tableau principal, et porte le témoin du flux", () => {
-    expect(visible(render(match({ bracket: "LOWER" }), "public"))).toContain("Tableau perdants · Manche 2 · Match 3");
+    expect(visible(render(match({ bracket: "LOWER" }), "public"))).toContain("Finale perdants");
     expect(visible(render(match(), "public"))).not.toContain("Tableau principal");
     expect(render(match(), "public")).toContain('data-probe="live-status"');
     expect(visible(render(match(), "public", true))).toContain("Hors ligne");
@@ -983,10 +985,36 @@ describe("page d'un match — mêmes gestes que la carte du plateau", () => {
   });
 });
 
+describe("page d'un match — nom du tour", () => {
+  // Tableau de quatre tours ; la page est au deuxième (match 3) : un quart de finale.
+  const rounds = (bracket: BracketMatch["bracket"]) => [
+    bracketMatch({ id: 401, tournamentId: 12, bracket, roundNumber: 1, matchNumber: 1 }),
+    bracketMatch({ id: 403, tournamentId: 12, bracket, roundNumber: 3, matchNumber: 1 }),
+    bracketMatch({ id: 404, tournamentId: 12, bracket, roundNumber: 4, matchNumber: 1 }),
+  ];
+
+  it("render_upperQuarterFinal_headerNamesTheRoundLikeTheBracket", () => {
+    const html = visible(render(match(), "public", false, "fr", EMPTY_MAP_RULES, "OW", false, [], rounds("UPPER")));
+    expect(html).toContain("Coupe d'hiver · Quart de finale 3");
+    expect(html).not.toContain("Manche 2 · Match 3");
+  });
+
+  it("render_lowerQuarterFinal_headerPrefixedByLowerBracket", () => {
+    const page = match({ bracket: "LOWER" });
+    const html = visible(render(page, "public", false, "fr", EMPTY_MAP_RULES, "OW", false, [], rounds("LOWER")));
+    expect(html).toContain("Tableau perdants · Quart de finale 3");
+  });
+
+  it("render_upperQuarterFinalEnglish_headerTranslated", () => {
+    const html = visible(render(match(), "public", false, "en", EMPTY_MAP_RULES, "OW", false, [], rounds("UPPER")));
+    expect(html).toContain("Coupe d'hiver · Quarterfinal 3");
+  });
+});
+
 describe("page d'un match — sous /en", () => {
   it("rédige ses blocs en anglais, liens sans préfixe réécrits sous /en", () => {
     const html = visible(render(match({ selfManaged: true, casters: [matchCaster()], streams: [{ id: 1, liveUrl: null, staff: false }], firstMap: "Tokyo" }), "public", false, "en"));
-    for (const english of ["Bravo vs Alpha", "Host", "Creates the game", "First ban", "First map", "Sides Left: Bravo Right: Alpha", "Casters", "Self-managed", "Round 2", "Stream 1", "Link not published yet"]) {
+    for (const english of ["Bravo vs Alpha", "Host", "Creates the game", "First ban", "First map", "Sides Left: Bravo Right: Alpha", "Casters", "Self-managed", "Final", "Stream 1", "Link not published yet"]) {
       expect(html).toContain(english);
     }
     for (const french of ["Hôte : crée la partie", "Première map", "Aucun caster", "Lien pas encore publié", "Étapes"]) {

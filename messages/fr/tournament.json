@@ -49,7 +49,7 @@
       "UPPER": "Tableau principal",
       "LOWER": "Tableau perdants",
       "GRAND": "Grande Finale",
-      "THIRD_PLACE": "Petite Finale"
+      "THIRD_PLACE": "Petite finale"
     },
     "phaseContext": "Phase {position}",
     "phaseContextNamed": "Phase {position} — {name}"
@@ -188,7 +188,7 @@
   "bracket": {
     "stage": {
       "grandFinal": "Grande Finale",
-      "thirdPlace": "Petite Finale",
+      "thirdPlace": "Petite finale",
       "lowerFinal": "Finale perdants",
       "final": "Finale",
       "semis": "Demi-finales",
@@ -209,11 +209,12 @@
     "matchLabel": {
       "final": "Finale {number}",
       "lowerFinal": "Finale perdants {number}",
-      "semis": "Demi finale {number}",
+      "semis": "Demi-finale {number}",
       "quarters": "Quart de finale {number}",
       "roundOf16": "8ème de finale {number}"
     },
     "roundN": "Manche {number}",
+    "swissRoundN": "Ronde {number}",
     "matchN": "Match {number}",
     "roundsRange": "Tours {from} à {to}",
     "finalPhase": "Phase finale",

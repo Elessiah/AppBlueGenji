@@ -36,6 +36,30 @@ describe("cachedShareImage", () => {
     expect(first!.cacheControl).toBe("public, max-age=60");
   });
 
+  it("cachedShareImage_renderWithShorterTtl_expiresAtThatTtl", async () => {
+    jest.useFakeTimers({ now: 0 });
+    const build = jest.fn(async () => ({ body: new ArrayBuffer(1), cacheControl: "x", ttlMs: 100 }));
+    await cachedShareImage("fr:short", 1000, build);
+    jest.setSystemTime(101);
+    await cachedShareImage("fr:short", 1000, build);
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("cachedShareImage_longerRenderTtl_keepsPoolTtl", async () => {
+    jest.useFakeTimers({ now: 0 });
+    const build = jest.fn(async () => ({ body: new ArrayBuffer(1), cacheControl: "x", ttlMs: 60_000 }));
+    await cachedShareImage("fr:long", 1000, build);
+    jest.setSystemTime(1001);
+    await cachedShareImage("fr:long", 1000, build);
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("cachedShareImage_renderObject_servedAsIsWithoutTtlField", async () => {
+    const body = new ArrayBuffer(2);
+    const image = await cachedShareImage("fr:obj", 1000, async () => ({ body, cacheControl: "c", ttlMs: 50 }));
+    expect(image).toEqual({ body, cacheControl: "c" });
+  });
+
   it("rend à nouveau une fois la fenêtre passée", async () => {
     jest.useFakeTimers({ now: 0 });
     const build = jest.fn(png("a"));

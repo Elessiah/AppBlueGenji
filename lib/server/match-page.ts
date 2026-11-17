@@ -13,13 +13,21 @@ import {
   type TournamentMetadataRights,
   type TournamentShareLoader,
 } from "@/lib/server/tournament-metadata";
-import { matchEmbedAlt, matchEmbedDescription, matchEmbedTitle } from "@/lib/shared/share-embed-cards";
+import {
+  EMBED_MATCH_TITLE_BUDGET,
+  matchEmbedAlt,
+  matchEmbedDescription,
+  matchEmbedTitle,
+  matchPageTitle,
+} from "@/lib/shared/share-embed-cards";
 import { matchShareCardKey, matchShareVersion } from "@/lib/shared/share-embeds";
+import { cutToWidth, displayWidth } from "@/lib/shared/graphemes";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
 import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import type { BracketType } from "@/lib/shared/types";
 import { matchPositionText, tournamentPageMessages, tournamentPageText } from "@/lib/shared/tournament-page-text";
+import { shareRoundPageText, shareRoundText } from "@/lib/shared/share-round";
 
 /**
  * Lectures serveur de la page d'un match (`docs/features/MATCH_PAGE.md`) :
@@ -75,12 +83,24 @@ export async function matchPageExists(
   }
 }
 
-/** Préfixe le titre de l'encart du tournoi (« Manche 2 · Match 3 — … »). */
-function prefixedTitle(title: Metadata["title"], prefix: string): string {
+/** Place minimale du nom du tournoi dans le titre de repli d'un encart. */
+const MIN_TOURNAMENT_ROOM = 8;
+
+/**
+ * Préfixe le titre de l'encart du tournoi (« Quart de finale 2 — … »). Sans
+ * résumé public, le repli garde « Manche 2 · Match 3 » : nommer le tour lirait
+ * tous les matchs, la lecture même qui a manqué (`SHARE_EMBEDS.md`).
+ */
+function prefixedTitle(title: Metadata["title"], prefix: string, budget?: number): string {
   let base = "";
   if (typeof title === "string") base = title;
   else if (title && typeof title === "object" && "absolute" in title) base = title.absolute;
-  return base ? `${prefix} — ${base}` : prefix;
+  if (!base) return prefix;
+  if (budget === undefined) return `${prefix} — ${base}`;
+  // Seul le nom du tournoi cède au budget (en colonnes, comme le titre d'un
+  // match : un idéogramme en vaut deux), jamais le tour ; plus de place : tour seul.
+  const room = budget - displayWidth(`${prefix} — `);
+  return room >= MIN_TOURNAMENT_ROOM ? `${prefix} — ${cutToWidth(base, room)}` : prefix;
 }
 
 /**
@@ -91,8 +111,8 @@ function prefixedTitle(title: Metadata["title"], prefix: string): string {
  * celle de la vue lue (`/suivre/…` sans compte), jamais une page en 404.
  *
  * Quand le résumé public du tournoi porte le match (`loadShare`,
- * `SHARE_EMBEDS.md`), l'encart devient celui du match : « A contre B · Manche 2
- * · Match 3 — tournoi », le score et chaque map jouée (code de replay compris,
+ * `SHARE_EMBEDS.md`), l'encart devient celui du match : « A contre B · Quart de
+ * finale 2 — tournoi » (nom du tour de la fiche, `shareRoundText`), le score et chaque map jouée (code de replay compris,
  * D74) en description, et l'image du match. Un engagé solo y est « Joueur 1 »
  * ou « Joueur 2 », jamais son pseudo.
  */
@@ -143,27 +163,40 @@ export async function matchPageMetadata(
   const match = view?.share.matches.get(matchId as number);
   if (!view || !match) {
     const title = prefixedTitle(metadata.title, prefix);
+    // L'encart garde le tournoi (sans lui, « Manche 2 · Match 3 » ne dit rien),
+    // borné pour que Discord ne coupe pas le tour : c'est le nom qui cède.
+    // Une largeur ne dépasse jamais deux colonnes par unité de texte : un titre
+    // assez court tient sans découpe en graphèmes.
+    const shareTitle =
+      title.length * 2 <= EMBED_MATCH_TITLE_BUDGET ? title : prefixedTitle(metadata.title, prefix, EMBED_MATCH_TITLE_BUDGET);
     return {
       ...metadata,
       title: { absolute: title },
-      openGraph: { ...metadata.openGraph, title },
-      twitter: { ...metadata.twitter, title },
+      openGraph: { ...metadata.openGraph, title: shareTitle },
+      twitter: { ...metadata.twitter, title: shareTitle },
     };
   }
   const messages = messagesFor(locale);
-  const title = prefixedTitle(metadata.title, matchEmbedTitle(match, prefix, messages));
-  const description = matchEmbedDescription(match, messages) ?? metadata.description ?? undefined;
+  const roundName = shareRoundText(shareRoundPageText(locale, messages), match.round, match);
+  // Un seul instant pour le titre, la description et l'empreinte de l'image :
+  // l'horaire d'un match n'y figure qu'à venir (`matchScheduledAt`).
+  const now = Date.now();
+  // L'encart : court, sans nom de site ni de tournoi (`og:site_name`, l'image et
+  // la description les portent) — Discord le coupait. L'onglet garde le tournoi.
+  const shareTitle = matchEmbedTitle(match, roundName, messages, locale, now);
+  const title = prefixedTitle(metadata.title, matchPageTitle(match, roundName, messages, locale, now));
+  const description = matchEmbedDescription(match, messages, locale, now) ?? metadata.description ?? undefined;
   const image = embedImageMetadata(
     matchShareCardKey(tournamentId as number, matchId as number),
     locale,
-    matchShareVersion(view.card, match),
+    matchShareVersion(view.card, match, now),
     matchEmbedAlt(match, messages),
   );
   return {
     ...metadata,
     title: { absolute: title },
     description,
-    openGraph: { ...metadata.openGraph, title, description, images: [image] },
-    twitter: { ...metadata.twitter, title, description, images: [image] },
+    openGraph: { ...metadata.openGraph, title: shareTitle, description, images: [image] },
+    twitter: { ...metadata.twitter, title: shareTitle, description, images: [image] },
   };
 }

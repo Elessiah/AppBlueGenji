@@ -38,6 +38,17 @@ export const MAX_CONCURRENT_RENDERS = 2;
 export type CachedShareImage = { body: ArrayBuffer; cacheControl: string };
 
 /**
+ * Un PNG déjà lu, que `build` rend à la place d'une `Response` (pas de seconde
+ * copie du tampon). `ttlMs` raccourcit la garde de cette image-là — une carte
+ * de repli (`DEGRADED_SHARE_IMAGE_TTL_MS`) ne survit pas des heures à un échec
+ * peut-être passager.
+ */
+export type ShareImageRender = CachedShareImage & { ttlMs?: number };
+
+/** Garde d'une carte de repli (dessinée sans ses lettres de droite à gauche). */
+export const DEGRADED_SHARE_IMAGE_TTL_MS = 10 * 60_000;
+
+/**
  * Garde d'un **nouveau** rendu (ni en mémoire, ni en vol) : la réserve `embed`
  * a des clés en nombre ouvert (un tournoi, un match, une langue), qu'un client
  * peut parcourir plus vite que la réserve ne les garde.
@@ -163,7 +174,7 @@ function admitsNewRender(pool: ShareImagePool, admission: ShareRenderAdmission):
 export async function cachedShareImage(
   key: string,
   ttlMs: number,
-  build: () => Promise<Response | null>,
+  build: () => Promise<Response | ShareImageRender | null>,
   pool: ShareImagePool = "fixed",
   followsRanking = false,
   admission?: ShareRenderAdmission,
@@ -194,6 +205,7 @@ export async function cachedShareImage(
           guarded?.refund();
           return null;
         }
+        if (!(response instanceof Response)) return response;
         return { body: await response.arrayBuffer(), cacheControl: response.headers.get("cache-control") ?? "" };
       },
       pool,
@@ -201,16 +213,18 @@ export async function cachedShareImage(
     ),
   );
   if (!image) return null;
+  const { ttlMs: imageTtlMs, ...kept } = image as ShareImageRender;
   // Invalidée pendant le rendu : servie à qui l'attendait, jamais gardée.
-  if (followsRanking && rankingGeneration !== generationAtStart) return image;
+  if (followsRanking && rankingGeneration !== generationAtStart) return kept;
   store.delete(key);
   while (store.size >= SHARE_IMAGE_POOL_LIMITS[pool]) {
     const oldest = store.keys().next();
     if (oldest.done) break;
     store.delete(oldest.value);
   }
-  store.set(key, { ...image, expiresAt: Date.now() + ttlMs, followsRanking });
-  return image;
+  const keptMs = imageTtlMs === undefined ? ttlMs : Math.min(ttlMs, imageTtlMs);
+  store.set(key, { ...kept, expiresAt: Date.now() + keptMs, followsRanking });
+  return kept;
 }
 
 /**

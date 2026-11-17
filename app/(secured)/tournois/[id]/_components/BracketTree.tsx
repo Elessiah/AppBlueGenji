@@ -11,6 +11,7 @@ import { GhostMatchCard } from "./GhostMatchCard";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { stageKey, type BracketSlotRef } from "../_lib/bracket-sections";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { stageMatchLabel, stageRoundLabel } from "@/lib/shared/bracket-stage-text";
 
 
 const CARD_W = 260;
@@ -138,7 +139,8 @@ export function BracketTree({
   // action offerte au lecteur, et une hauteur figée la laissait déborder sur le
   // libellé du match voisin. Voir `_lib/bracket-layout.ts`.
   const { slotHeight, measureSlot } = useSlotHeight();
-  const { t } = useTournamentPageText();
+  const text = useTournamentPageText();
+  const { t } = text;
   const matchRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const didScrollRef = useRef(false);
   const setMatchRef = (id: number) => (el: HTMLDivElement | null) => {
@@ -227,8 +229,7 @@ export function BracketTree({
   // Stade nommé à partir de la fin du tableau complet (index global).
   // Même règle que les volets (`stageKey`), libellés dans la langue de la page.
   const roundLabel = (globalIdx: number) => {
-    const key = stageKey(globalIdx, totalRoundsGlobal, bracketType);
-    return key === "early" ? t("bracket.roundN", { number: String(globalIdx + 1) }) : t(`bracket.stage.${key}`);
+    return stageRoundLabel(text, stageKey(globalIdx, totalRoundsGlobal, bracketType), globalIdx);
   };
 
   const matchLabel = (matchNum: number, globalIdx: number) => {
@@ -237,7 +238,7 @@ export function BracketTree({
     if (key === "grandFinal" || key === "thirdPlace") return null;
     if (key === "final" && grandFinalLabel) return t("bracket.stage.grandFinal");
     if (key === "early") return t("bracket.matchN", { number });
-    return t(`bracket.matchLabel.${key}`, { number });
+    return stageMatchLabel(text, key, matchNum);
   };
 
   /** Carte d'un créneau : la rencontre posée, ou sa case à pourvoir. */
@@ -280,7 +281,7 @@ export function BracketTree({
     return (
       <div
         // Le sous-titre nomme la carte pour un lecteur d'écran : sans groupe, la
-        // « Petite Finale » n'est qu'une ligne de texte devant deux rangées.
+        // « Petite finale » n'est qu'une ligne de texte devant deux rangées.
         role={label ? "group" : undefined}
         aria-label={label ?? undefined}
         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}

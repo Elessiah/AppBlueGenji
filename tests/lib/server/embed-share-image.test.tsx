@@ -10,6 +10,7 @@ import {
   buildEmbedShareImage,
   clearNeutralShareImages,
   renderEmbedShareImage,
+  withoutRightToLeftText,
 } from "@/lib/server/embed-share-image";
 import { renderPageShareImage } from "@/lib/server/page-share-image";
 import { shareCardLogo } from "@/lib/server/share-card-logo";
@@ -35,6 +36,9 @@ import {
 } from "@/lib/shared/share-embeds";
 import { tournamentCard } from "../../helpers/tournament-card";
 
+/** « النسور » : le moteur d'images échoue sur sa police. */
+const ARABIC = String.fromCharCode(0x627, 0x644, 0x646, 0x633, 0x648, 0x631);
+
 /**
  * Images d'aperçu d'un tournoi et d'un match partagés
  * (`docs/features/SHARE_EMBEDS.md`). `ImageResponse` est remplacée par un
@@ -44,6 +48,9 @@ import { tournamentCard } from "../../helpers/tournament-card";
 
 type FakeImageResponse = Response & { element: ReactElement };
 
+/** Vrai pour un dessin que le moteur d'images (double) échoue à rendre ; `null` : jamais. */
+const mockRenderFails: { when: ((element: unknown) => boolean) | null } = { when: null };
+
 jest.mock("next/og", () => ({
   ImageResponse: class extends Response {
     constructor(
@@ -51,6 +58,12 @@ jest.mock("next/og", () => ({
       readonly options: unknown,
     ) {
       super("png", { headers: { "content-type": "image/png" } });
+    }
+
+    // Satori échoue à la lecture du flux, pas à la construction.
+    override async arrayBuffer(): Promise<ArrayBuffer> {
+      if (mockRenderFails.when?.(this.element)) throw new Error("lookupType: 5 - substFormat: 3 is not yet supported");
+      return super.arrayBuffer();
     }
   },
 }));
@@ -70,6 +83,8 @@ const MATCH: MatchShareSummary = {
   bracket: "UPPER",
   roundNumber: 1,
   matchNumber: 1,
+  round: null,
+  startAt: null,
   status: "COMPLETED",
   team1: { teamId: 10, name: "Alpha", logoUrl: "/uploads/teams/10.png", solo: false },
   team2: { teamId: 20, name: "Bravo", logoUrl: null, solo: false },
@@ -118,6 +133,7 @@ beforeEach(() => {
   jest.mocked(renderPageShareImage).mockReset().mockImplementation(async () => neutral());
   jest.mocked(teamLogoDataUrl).mockReset().mockResolvedValue(null);
   jest.mocked(shareCardLogo).mockReset().mockResolvedValue(null);
+  mockRenderFails.when = null;
 });
 
 describe("GET /og/<langue>/<clé>.png — tournois et matchs", () => {
@@ -336,5 +352,134 @@ describe("buildEmbedShareImage — contenu", () => {
 
   it("buildEmbedShareImage_missingMatch_returnsNull", async () => {
     expect(await html({ kind: "match", tournamentId: 4, matchId: 99 }, view(), "fr")).toBeNull();
+  });
+});
+
+describe("carte d'un match — écriture de droite à gauche", () => {
+  const drawsArabic = (element: unknown) => renderToStaticMarkup(element as ReactElement).includes(ARABIC);
+
+  it("GET_arabicTeamName_retriesWithoutArabicLetters", async () => {
+    mockRenderFails.when = drawsArabic;
+    const rendered: string[] = [];
+    const failing = mockRenderFails.when;
+    mockRenderFails.when = (element) => {
+      rendered.push(renderToStaticMarkup(element as ReactElement));
+      return failing(element);
+    };
+    jest
+      .mocked(publicTournamentShareForRequest)
+      .mockResolvedValue(view({ team1: { teamId: 10, name: `Les ${ARABIC}`, logoUrl: null, solo: false } }));
+
+    const response = await get("fr", "tournament-4-match-7.png");
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("png");
+    expect(rendered).toHaveLength(2);
+    expect(rendered[0]).toContain(ARABIC);
+    expect(rendered[1]).not.toContain(ARABIC);
+    expect(rendered[1]).toContain("Les");
+  });
+
+  it("GET_renderFailsWithoutArabic_throwsAfterASingleRender", async () => {
+    let renders = 0;
+    mockRenderFails.when = () => {
+      renders += 1;
+      return true;
+    };
+
+    await expect(get("fr", "tournament-4-match-7.png")).rejects.toThrow("lookupType");
+    // Rien à retirer : un nouvel essai ferait deux fois le même rendu perdu.
+    expect(renders).toBe(1);
+  });
+
+  it("GET_arabicTeamName_readsEachLogoOnceAcrossBothAttempts", async () => {
+    mockRenderFails.when = drawsArabic;
+    jest.mocked(teamLogoDataUrl).mockClear();
+    jest
+      .mocked(publicTournamentShareForRequest)
+      .mockResolvedValue(view({ team1: { teamId: 10, name: `Les ${ARABIC}`, logoUrl: "/uploads/teams/10.png", solo: false } }));
+
+    await get("fr", "tournament-4-match-7.png");
+
+    expect(teamLogoDataUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it("withoutRightToLeftText_withMatchId_keepsOnlyThatMatch", () => {
+    const shown = view();
+    shown.share.matches = new Map([
+      [7, MATCH],
+      [8, { ...MATCH, matchId: 8 }],
+    ]);
+
+    expect([...withoutRightToLeftText(shown, 7).share.matches.keys()]).toEqual([7]);
+  });
+
+  it("withoutRightToLeftText_tournamentCard_copiesNoMatch", () => {
+    // La carte du tournoi ne dessine aucun match : la copie n'en porte pas.
+    expect(withoutRightToLeftText(view()).share.matches.size).toBe(0);
+  });
+
+  it("withoutRightToLeftText_description_marked", () => {
+    const shown = view();
+    shown.card = { ...shown.card, description: `${ARABIC} Ladder` };
+
+    expect(withoutRightToLeftText(shown).card.description).toBe("\u2026 Ladder");
+  });
+
+  it("GET_tournamentCardArabicDescription_retriesAndServesPng", async () => {
+    mockRenderFails.when = drawsArabic;
+    const shown = view();
+    shown.card = { ...shown.card, description: `${ARABIC} Ladder` };
+    jest.mocked(publicTournamentImageViewForRequest).mockResolvedValue(shown);
+
+    const response = await get("fr", "tournament-4.png");
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("png");
+  });
+
+  it("GET_tournamentCardFailsWithArabicOnlyInMatches_throwsAfterSingleRender", async () => {
+    let renders = 0;
+    mockRenderFails.when = () => {
+      renders += 1;
+      return true;
+    };
+    jest
+      .mocked(publicTournamentImageViewForRequest)
+      .mockResolvedValue(view({ team1: { teamId: 10, name: ARABIC, logoUrl: null, solo: false } }));
+
+    await expect(get("fr", "tournament-4.png")).rejects.toThrow("lookupType");
+    // Les matchs ne sont pas dessinés : rien à retirer, aucun second rendu.
+    expect(renders).toBe(1);
+  });
+
+  it("withoutRightToLeftText_namesAndMaps_loseArabicLetters", () => {
+    const shown = view({
+      team1: { teamId: 10, name: `${ARABIC} Alpha`, logoUrl: null, solo: false },
+      team2: { teamId: 20, name: ARABIC, logoUrl: null, solo: false },
+      maps: [{ mapNumber: 1, mapName: `Ilios ${ARABIC}`, team1Score: 2, team2Score: 0, replayCode: "ABC123" }],
+    });
+    shown.card = { ...shown.card, name: `${ARABIC} Cup` };
+    shown.share = {
+      ...shown.share,
+      leader: { kind: "LEADER", side: { teamId: 10, name: `${ARABIC} Alpha`, logoUrl: null, solo: false } },
+    };
+
+    const plain = withoutRightToLeftText(shown, 7);
+    const match = plain.share.matches.get(7);
+
+    expect(match?.team1.name).toBe("\u2026 Alpha");
+    expect(match?.team2.name).toBe("");
+    expect(match?.maps[0]?.mapName).toBe("Ilios \u2026");
+    expect(plain.card.name).toBe("\u2026 Cup");
+    expect(plain.share.leader?.side.name).toBe("\u2026 Alpha");
+    // L'original n'est pas modifié.
+    expect(shown.share.matches.get(7)?.team1.name).toBe(`${ARABIC} Alpha`);
+  });
+
+  it("withoutRightToLeftText_soloSideWithoutName_staysNull", () => {
+    const shown = view({ team1: { teamId: null, name: null, logoUrl: null, solo: true } });
+
+    expect(withoutRightToLeftText(shown, 7).share.matches.get(7)?.team1.name).toBeNull();
   });
 });

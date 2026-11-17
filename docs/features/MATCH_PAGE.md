@@ -21,11 +21,13 @@ d'équipe et du pool de maps : des sections, sans emplacement vide.
   Requête et langue suivent. Les chemins se lisent par
   `matchPageIdsFromMemberPath` / `matchPageIdsFromSpectatorPath`
   (`lib/shared/match-page.ts`, chiffres seuls).
-- **Encart d'un lien partagé** : celui du tournoi, titre précédé de la place du
-  match (`matchPositionText` : « Manche R · Match N », précédé du tableau hors
-  du tableau principal — « Tableau perdants · … »), adresse canonique sur la page
-  du match ; la page sans compte reste `noindex`. Même place sous le titre de la
-  page. Une session illisible (base injoignable) n'est pas un 404. Un match
+- **Encart d'un lien partagé** : celui du tournoi, titre précédé du nom du tour
+  du match tel que l'arbre le donne (`shareRoundText` : « Quart de finale 3 »,
+  « Tableau perdants · Demi-finale 1 », « Ronde 2 · Match 1 » — `SHARE_EMBEDS.md`),
+  adresse canonique sur la page du match ; la page sans compte reste `noindex`.
+  Même nom sous le titre de la page (ligne de situation, calculée sur
+  `detail.matches`). Seul l'encart de repli, sans résumé public, garde
+  `matchPositionText` (« Manche R · Match N »). Une session illisible (base injoignable) n'est pas un 404. Un match
   introuvable garde l'encart **et la canonique** du tournoi (`/suivre/…` sans
   compte), jamais celle d'une page en 404 ; une lecture en échec (base
   injoignable) garde la canonique du match. Carte du tournoi et place du match

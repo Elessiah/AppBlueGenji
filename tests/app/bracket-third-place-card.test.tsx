@@ -109,12 +109,12 @@ function playoffTree(decisive: BracketMatch[], thirdPlace: BracketMatch[] = [], 
 }
 
 describe("petite finale sous la finale", () => {
-  it("annonce une case vide « Petite Finale » sous la « Grande Finale » dès les quarts", () => {
+  it("annonce une case vide « Petite finale » sous la « Grande Finale » dès les quarts", () => {
     const html = playoffTree(round(QUARTERS, 4));
 
     expect(html).toContain("Grande Finale");
-    expect(html).toContain("Petite Finale");
-    expect(html.indexOf("Grande Finale")).toBeLessThan(html.indexOf("Petite Finale"));
+    expect(html).toContain("Petite finale");
+    expect(html.indexOf("Grande Finale")).toBeLessThan(html.indexOf("Petite finale"));
     expect(html).not.toContain("Finale 1");
     // Quatre quarts, deux demies, la finale et la petite finale.
     expect(html).toContain("8 matchs");
@@ -133,7 +133,7 @@ describe("petite finale sous la finale", () => {
     const closed: BracketMatch = { ...semi1, status: "COMPLETED", winnerTeamId: semi1.team1Id, loserTeamId: semi1.team2Id, team1Score: 3, team2Score: 1 };
     const html = playoffTree([closed, semi2]);
 
-    const thirdPlace = html.slice(html.indexOf("Petite Finale"));
+    const thirdPlace = html.slice(html.indexOf("Petite finale"));
     expect(thirdPlace).toContain("M1 bas");
     expect(thirdPlace).toContain(`href="/equipes/${semi1.team2Id}`);
     expect(thirdPlace).not.toContain("M1 haut");
@@ -155,7 +155,7 @@ describe("petite finale sous la finale", () => {
     });
     const html = playoffTree([...round(SEMIS, 2), ...round(FINAL, 1)], [posted]);
 
-    const thirdPlace = html.slice(html.indexOf("Petite Finale"));
+    const thirdPlace = html.slice(html.indexOf("Petite finale"));
     expect(thirdPlace).toContain(`id="${matchAnchorId(990)}"`);
     expect(thirdPlace).toContain("Battue A");
     expect(thirdPlace).toContain("Battue B");
@@ -168,7 +168,7 @@ describe("petite finale sous la finale", () => {
 
     expect(html).toContain("Grande Finale");
     expect(html).not.toContain("Finale 1");
-    expect(html).not.toContain("Petite Finale");
+    expect(html).not.toContain("Petite finale");
     // Trois quarts, deux demies, la finale.
     expect(html).toContain("6 matchs");
   });
@@ -198,6 +198,6 @@ describe("petite finale sous la finale", () => {
     const html = playoffTree(round(QUARTERS, 4));
 
     expect(html).toContain('role="group" aria-label="Grande Finale"');
-    expect(html).toContain('role="group" aria-label="Petite Finale"');
+    expect(html).toContain('role="group" aria-label="Petite finale"');
   });
 });

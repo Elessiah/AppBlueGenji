@@ -2114,7 +2114,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // (sous-partie « Statistiques de fréquentation détaillées », FR et EN),
     // registre T19 et T17. Pour tous les comptes.
     id: "2026-11-statistiques-frequentation-detaillees",
-    publishedAt: "2026-11-19",
+    publishedAt: "2026-11-18",
     title: "Statistiques de fréquentation détaillées, sans cookie",
     links: [
       { href: "/rgpd#audience-detaillee", label: "Lire ce que mesurent les statistiques détaillées" },

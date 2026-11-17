@@ -214,6 +214,7 @@
       "roundOf16": "Round of 16 {number}"
     },
     "roundN": "Round {number}",
+    "swissRoundN": "Round {number}",
     "matchN": "Match {number}",
     "roundsRange": "Rounds {from} to {to}",
     "finalPhase": "Final phase",

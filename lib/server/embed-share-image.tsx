@@ -49,7 +49,7 @@ import { messagesFor } from "./i18n-messages";
 import { renderPageShareImage } from "./page-share-image";
 import { shareCardLogo } from "./share-card-logo";
 import { shareImageOptions } from "./share-card-fonts";
-import { cachedShareImage } from "./share-image-cache";
+import { cachedShareImage, DEGRADED_SHARE_IMAGE_TTL_MS, type ShareImageRender } from "./share-image-cache";
 import { teamLogoDataUrl } from "./share-podium";
 import {
   publicTournamentImageViewForRequest,
@@ -58,6 +58,7 @@ import {
   shareRequestClient,
 } from "./spectator-request";
 import { TEAM_SHARE_LOGO_SIZE } from "./share-team";
+import { hasRightToLeftLetters, withoutRightToLeftLetters } from "@/lib/shared/graphemes";
 import type { Locale } from "@/lib/shared/locales";
 import { matchEmbedCard, tournamentEmbedCard } from "@/lib/shared/share-embed-cards";
 import {
@@ -66,8 +67,10 @@ import {
   parseEmbedShareCardKey,
   tournamentShareVersion,
   type EmbedShareTarget,
+  type MatchShareSummary,
+  type ShareEntrantSide,
 } from "@/lib/shared/share-embeds";
-import { matchPositionText, tournamentPageMessages, tournamentPageText } from "@/lib/shared/tournament-page-text";
+import { shareRoundPageText, shareRoundText } from "@/lib/shared/share-round";
 
 /**
  * Durée de cache annoncée : cinq minutes, comme le podium. L'adresse publiée
@@ -141,14 +144,16 @@ export async function renderEmbedShareImage(
   const match = target.kind === "match" ? view.share.matches.get(target.matchId) : undefined;
   if (target.kind === "match" && !match) return neutralImage(locale);
 
+  // Un seul instant pour l'empreinte et l'image : l'horaire n'y est dessiné qu'à venir.
+  const now = Date.now();
   const version =
     target.kind === "match" && match
-      ? matchShareVersion(view.card, match)
+      ? matchShareVersion(view.card, match, now)
       : tournamentShareVersion(view.card, view.share.leader);
   const image = await cachedShareImage(
     `${locale}:${key}:${version}`,
     EMBED_CARD_TTL_MS,
-    () => buildEmbedShareImage(target, view, locale),
+    () => drawnEmbedShareImage(target, view, locale, now),
     "embed",
     false,
     shareEmbedRenderAdmission(client),
@@ -180,11 +185,128 @@ async function readShareView(target: EmbedShareTarget, client: string | null): P
   return read(target.tournamentId, client).catch(() => null);
 }
 
+/** Un camp sans les lettres de droite à gauche de son nom. */
+function sideWithoutRightToLeft(side: ShareEntrantSide): ShareEntrantSide {
+  return { ...side, name: side.name === null ? null : withoutRightToLeftLetters(side.name) };
+}
+
+/**
+ * Les textes saisis que la carte de `matchId` dessine — ou, sans `matchId`,
+ * la carte du tournoi : son nom, sa description (sous-titre sans équipe en
+ * tête) et l'équipe en tête, jamais les matchs (elle n'en dessine aucun, et
+ * les lire bâtirait leurs résumés pour rien).
+ */
+function drawnTexts(view: ShareView, matchId?: number): (string | null)[] {
+  const { leader } = view.share;
+  const texts: (string | null)[] = [view.card.name, leader ? leader.side.name : null];
+  if (matchId === undefined) {
+    texts.push(view.card.description);
+    return texts;
+  }
+  const match = view.share.matches.get(matchId);
+  if (match) texts.push(match.team1.name, match.team2.name, ...match.maps.map((map) => map.mapName));
+  return texts;
+}
+
+/** Une lettre de droite à gauche figure-t-elle dans ce que la carte dessine ? */
+function hasRightToLeftText(view: ShareView, matchId?: number): boolean {
+  return drawnTexts(view, matchId).some((text) => text !== null && hasRightToLeftLetters(text));
+}
+
+/**
+ * La réponse publique dont tout texte saisi a perdu ses lettres de droite à
+ * gauche (noms de tournoi, d'équipe et de map, description) : le moteur
+ * d'images (Satori) échoue sur la police arabe qu'il va chercher, et une équipe
+ * « النسور » faisait répondre 500 à la carte de son match. Avec `matchId`,
+ * seul ce match est repris (la carte n'en dessine pas d'autre : un tableau de
+ * centaines de matchs n'est pas recopié pour un seul rendu) ; sans, la carte du
+ * tournoi ne dessine aucun match : la copie n'en porte pas.
+ */
+export function withoutRightToLeftText(view: ShareView, matchId?: number): ShareView {
+  const { leader } = view.share;
+  const match = matchId === undefined ? undefined : view.share.matches.get(matchId);
+  const kept: [number, MatchShareSummary][] = match && matchId !== undefined ? [[matchId, match]] : [];
+  const { description } = view.card;
+  return {
+    ...view,
+    card: {
+      ...view.card,
+      name: withoutRightToLeftLetters(view.card.name),
+      description: description === null ? null : withoutRightToLeftLetters(description),
+    },
+    share: {
+      leader: leader && { ...leader, side: sideWithoutRightToLeft(leader.side) },
+      matches: new Map(
+        kept.map(([id, match]): [number, MatchShareSummary] => [
+          id,
+          {
+            ...match,
+            team1: sideWithoutRightToLeft(match.team1),
+            team2: sideWithoutRightToLeft(match.team2),
+            maps: match.maps.map((map) => ({
+              ...map,
+              mapName: map.mapName === null ? null : withoutRightToLeftLetters(map.mapName),
+            })),
+          },
+        ]),
+      ),
+    },
+  };
+}
+
+/**
+ * Dessine la carte jusqu'au PNG. Un échec de rendu sur un texte écrit de droite
+ * à gauche (police embarquée) retente **une fois** sans ces lettres
+ * ({@link withoutRightToLeftText}) ; un second échec remonte. Sans telle lettre
+ * dans la carte, le nouvel essai ne changerait rien : l'échec remonte aussitôt.
+ * Les logos ne sont lus qu'une fois pour les deux essais ; le PNG est lu une
+ * seule fois (aucune seconde copie). La carte de repli n'est gardée que
+ * `DEGRADED_SHARE_IMAGE_TTL_MS` : l'échec pouvait être passager.
+ */
+async function drawnEmbedShareImage(
+  target: EmbedShareTarget,
+  view: ShareView,
+  locale: Locale,
+  now: number,
+): Promise<ShareImageRender | null> {
+  const logos: LogoMemo = new Map();
+  const draw = async (shown: ShareView): Promise<ShareImageRender | null> => {
+    const image = await buildEmbedShareImage(target, shown, locale, now, logos);
+    if (!image) return null;
+    return { body: await image.arrayBuffer(), cacheControl: image.headers.get("cache-control") ?? "" };
+  };
+  const matchId = target.kind === "match" ? target.matchId : undefined;
+  try {
+    return await draw(view);
+  } catch (error) {
+    if (!hasRightToLeftText(view, matchId)) throw error;
+    console.warn("[share-embed] rendu en échec, nouvel essai sans écriture de droite à gauche", error);
+    const degraded = await draw(withoutRightToLeftText(view, matchId));
+    return degraded && { ...degraded, ttlMs: DEGRADED_SHARE_IMAGE_TTL_MS };
+  }
+}
+
+/** Logos déjà convertis d'un rendu (`url|côté`), partagés par ses essais. */
+type LogoMemo = Map<string, Promise<string | null>>;
+
+function memoLogo(memo: LogoMemo | undefined, url: string | null, size: number): Promise<string | null> {
+  if (!memo) return teamLogoDataUrl(url, size);
+  const key = `${url ?? ""}|${size}`;
+  let logo = memo.get(key);
+  if (!logo) {
+    logo = teamLogoDataUrl(url, size);
+    memo.set(key, logo);
+  }
+  return logo;
+}
+
 /** Rend l'image de `target` depuis la réponse publique, sans cache. */
 export async function buildEmbedShareImage(
   target: EmbedShareTarget,
   view: ShareView,
   locale: Locale,
+  now: number = Date.now(),
+  logos?: LogoMemo,
 ): Promise<ImageResponse | null> {
   const messages = messagesFor(locale);
   const logoSrc = await shareCardLogo();
@@ -198,7 +320,7 @@ export async function buildEmbedShareImage(
     const accent = SHARE_ACCENT_COLORS.cyan;
     const motif = card.leader ? (
       <ShareTeamMark
-        logoSrc={await teamLogoDataUrl(card.leader.logoUrl, TEAM_SHARE_LOGO_SIZE)}
+        logoSrc={await memoLogo(logos, card.leader.logoUrl, TEAM_SHARE_LOGO_SIZE)}
         initial={card.leader.initial}
         color={card.leader.winner ? SHARE_ACCENT_COLORS.teal : accent}
         size={TEAM_SHARE_LOGO_SIZE}
@@ -224,11 +346,11 @@ export async function buildEmbedShareImage(
 
   const match = view.share.matches.get(target.matchId);
   if (!match) return null;
-  const position = matchPositionText(tournamentPageText(locale, tournamentPageMessages(messages)), match);
-  const card = matchEmbedCard(view.card, match, position, messages);
+  const position = shareRoundText(shareRoundPageText(locale, messages), match.round, match);
+  const card = matchEmbedCard(view.card, match, position, messages, locale, now);
   const [logo1, logo2] = await Promise.all([
-    teamLogoDataUrl(card.team1.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
-    teamLogoDataUrl(card.team2.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
+    memoLogo(logos, card.team1.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
+    memoLogo(logos, card.team2.logoUrl, MATCH_SHARE_LOGO_SIZE * 2),
   ]);
   return new ImageResponse(
     <MatchShareCard
@@ -236,6 +358,7 @@ export async function buildEmbedShareImage(
       state={card.state}
       title={card.title}
       subtitle={card.subtitle}
+      schedule={card.schedule}
       team1={{ ...card.team1, logoSrc: logo1 }}
       team2={{ ...card.team2, logoSrc: logo2 }}
       center={card.center}

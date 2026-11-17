@@ -68,10 +68,102 @@ de replay publics).
 - Encart : `tournamentPageMetadata` / `matchPageMetadata` posent
   `openGraph.images` et `twitter.images` (adresse versionnée, 1200×630, texte
   alternatif) ; un tournoi illisible garde l'image du site (`/og/<langue>/home.png`),
-  posée par l'encart de repli — un `openGraph` de page remplace celui de la racine ; une page de match sans compte prend titre « A contre B ·
-  Manche 2 · Match 3 — tournoi » et une description score + maps + codes.
+  posée par l'encart de repli — un `openGraph` de page remplace celui de la racine ; une page de match prend un titre d'encart court (voir « Titre d'un match ») et une
+  description score + maps + codes (voir « Nom de la manche » et « Match à venir »).
 - Textes : espace `share.embed` (FR et EN), rédaction pure
   `lib/shared/share-embed-cards.ts`, noms passés par `visibleText`.
+
+## Titre d'un match
+
+Discord coupe d'une ellipse le titre d'un aperçu de lien qui dépasse une ligne (vers
+70 caractères) : « Choco Pops contre Sl solearis · Manche 1000 · Match 2 — BlueGen… ».
+`og:title` / `twitter:title` d'une page de match (`matchEmbedTitle`) sont donc compacts :
+- résultat validé (`COMPLETED`) : « Choco Pops 0–3 Sl solearis · Quart de finale 2 » (score à la place de « contre ») ;
+- à venir : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » / « A vs B · … » ;
+- sinon (forfait, score en saisie ou en attente de confirmation, sans horaire) : « A contre B · Finale » —
+  un score partiel ne s'y lit jamais comme un résultat ;
+- ni nom de site ni nom de tournoi (`og:site_name`, l'image et la description les portent) ;
+- budget `EMBED_MATCH_TITLE_BUDGET` = 70 **colonnes** (`displayWidth`, `lib/shared/graphemes.ts` : un
+  idéogramme, un kana, un hangul ou un emoji en valent deux), **jamais dépassé** par les noms : seuls les
+  **noms d'équipe** cèdent (ellipse coupée entre deux graphèmes — ni drapeau ni emoji à teinte brisé ;
+  le plus court gardé entier, 4 colonnes au moins chacun quand la place le permet) ; quand le tour et
+  l'horaire ne laissent pas 3 colonnes par nom, **l'horaire d'abord** quitte le titre (la description et l'image le
+  portent : « Tableau perdants · Quart de finale 12 » + date garderait « Te… vs Te… » sinon), puis, si la place
+  manque encore, les noms — jamais le tour ni le score. La largeur d'un pictogramme étroit (©, ™, ✔) est
+  d'une colonne (emoji seulement avec leur sélecteur U+FE0F ou en présentation emoji) et les marques
+  d'isolation (FSI/PDI, invisibles) n'en valent aucune ;
+- un nom contenant une lettre de droite à gauche (arabe, hébreu…) est isolé (FSI … PDI, `isolateDirection`) :
+  il ne retourne pas l'ordre du score voisin (de même dans la description).
+L'onglet (`<title>`, `matchPageTitle`) garde la forme longue « A contre B · Quart de finale 2 — tournoi »
+(noms entiers à la borne de la carte, jamais de score). Repli sans résumé public : « Manche 2 · Match 3
+— tournoi », le nom du tournoi borné au même budget en colonnes. `truncateForShare` compte en points de
+code et coupe entre deux graphèmes.
+
+## Nom de la manche
+
+Le match se place par **le nom de sa manche tel que la fiche le donne**, non
+plus « Manche n · Match m » (`lib/shared/share-round.ts`) : « Quart de finale 2 »,
+« Demi-finale 1 », « Finale », « Finale perdants », « Tableau perdants · Demi-finale 1 »,
+« Grande Finale », « Petite finale » (mêmes clés `bracket.stage` / `bracket.matchLabel`
+de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-stage.ts`).
+- `buildShareRounds` (dans le résumé, donc dans l'empreinte `?v=` de l'image) nomme
+  chaque tableau (par phase et par `bracket`) depuis son dernier tour ; l'arbre final
+  de BlueGenji Survie sur le même compte que la fiche (`endurancePlayoffRoundCount`
+  avec les cases à pourvoir `endurancePlayoffGhostSlots` tant que le tournoi vit —
+  une paire vidée par double forfait raccourcit l'arbre —, tous deux dans
+  `lib/shared/bg-survie/playoff-rounds.ts`), et sa finale y est « Grande Finale »
+  comme sur la fiche (`grandFinalLabel`).
+- Premiers tours d'un grand tableau : « Manche 1 · Match 7 », le numéro étant le **rang
+  du tour dans son tableau** (celui de la colonne de la fiche), jamais le numéro brut
+  du moteur (1000 et plus dans l'arbre final de BlueGenji Survie) ; modes à classement :
+  « Ronde 3 · Match 2 » (suisse, `bracket.swissRoundN`, tenu égal à `swiss.roundNoun`
+  par un test : la page d'un match n'a pas les textes des vues), « Manche 4 · Match 1 » (Survie,
+  qualification de BlueGenji Survie) — « Round » en anglais. Le numéro du match n'est
+  écrit que si le nom seul est ambigu (jamais pour une finale).
+- L'en-tête de la page du match (ligne de situation) porte le même nom
+  (`buildShareRounds` sur les seuls matchs de sa phase, recalculé seulement quand leur forme change : `phaseRoundShapeKey`).
+- Les mots d'un stade (« Quarts de finale », « Demi-finale 2 », « Manche 2 ») sont rédigés
+  une seule fois, pour l'arbre (`BracketTree`) et pour ce nom : `lib/shared/bracket-stage-text.ts`.
+  Les stades où un match porte son numéro (« Quart de finale 2 ») y sont listés une fois (`AMBIGUOUS_MATCH_STAGES`).
+  « Petite finale » en minuscule partout (`bracket.stage.thirdPlace`, comme le plateau d'Endurance).
+- Match absent du résumé (encart de repli) : « Manche n · Match m » (`fallbackRoundLabel`),
+  « Phase finale · Manche k · Match m » dans l'arbre final de BlueGenji Survie (k : rang du tour, jamais « Manche 1001 » ; deux tours restent distincts). Ce repli ne sert
+  que quand la réponse publique n'est pas lue (tournoi non publié, lecture en échec ou
+  refusée par le plafond) : nommer le tour demande tous les matchs du tournoi, soit
+  précisément la lecture qui manque — la refaire à part contournerait le plafond.
+- Non changé : la carte du direct de l'accueil (`landing.json` → `round`,
+  `phase.round`) n'est pas un aperçu partagé.
+- Image : le sous-titre (nom du tour, « +N maps ») a 640 px (`MATCH_SUBTITLE_MAX_WIDTH`) ; c'est le nom
+  du tournoi qui cède, pas le numéro du match, en gardant au moins 360 px (`MATCH_TITLE_MIN_WIDTH`, testé).
+
+## Match à venir : horaire en avant
+
+Un match **programmé** (`startAt`) sans score, map ni forfait (`matchScheduledAt`) met
+son horaire en tête, à l'heure de Paris, dans les deux langues :
+- image : ligne principale en 52 px sous les équipes, « Mardi 17 novembre · 21:00 » /
+  « Tuesday, November 17 · 21:00 », fuseau en dessous, en capitale (« Heure de Paris » / « Paris time »,
+  `share.embed.timeZone` ; la description le reprend tel quel, en minuscules, entre parenthèses) ;
+- titre : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » ;
+- description : « Mardi 17 novembre · 21:00 (heure de Paris) ».
+Écriture de droite à gauche : Satori échoue sur la police arabe qu'il va chercher (« lookupType: 5 -
+substFormat: 3 is not yet supported ») ; une équipe « النسور » faisait répondre 500 à l'image de son match.
+`drawnEmbedShareImage` lit le PNG et, sur échec, **retente une fois** sans les lettres de droite à gauche
+(`withoutRightToLeftText` : noms de tournoi, d'équipe et de map, description du tournoi ;
+`withoutRightToLeftLetters`). Chaque suite retirée laisse « … » à sa place : « النسور TeamLiquid » se dessine
+« … TeamLiquid », jamais le nom exact d'une autre équipe ; un nom vide retombe sur « Équipe n ». Le nouvel
+essai n'a lieu que si la carte dessine une telle lettre (sinon l'échec remonte aussitôt ; la carte d'un tournoi
+ne dessine aucun match, leurs noms ne comptent pas et ne sont pas recopiés), ne recopie que le match dessiné, et
+ne relit pas les logos (mémo du rendu). Au plus deux rendus par carte et par version, dans la même place de la
+file ; le PNG n'est lu qu'une fois. La carte de repli n'est gardée que 10 min (`DEGRADED_SHARE_IMAGE_TTL_MS`,
+l'échec pouvait être passager), une carte normale 6 h. Le titre et la description gardent le nom entier.
+
+Score non validé : le titre ne porte un score qu'une fois le match `COMPLETED` ; la description, elle, le
+dit avec son état tant qu'il ne l'est pas (« Résultat en attente : A 3 – 0 B », « Match en cours : A 1 – 0 B »,
+clé `share.embed.provisionalScore`, FR et EN).
+Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant. Un créneau
+**passé** non plus (match en retard) : `matchScheduledAt(match, now)` ne rend l'horaire
+qu'à venir, et ce basculement entre dans l'empreinte (`matchShareVersion`), calculée au
+même instant que l'image, le titre et la description.
 
 ## Confidentialité
 

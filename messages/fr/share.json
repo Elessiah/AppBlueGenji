@@ -154,6 +154,7 @@
     },
     "map": "Map {number}",
     "noCode": "Sans code",
+    "timeZone": "heure de Paris",
     "forfeit": "Forfait : {name}",
     "doubleForfeit": "Double forfait",
     "versus": "{team1} contre {team2}",
@@ -161,6 +162,7 @@
     "moreMaps": "+{count} maps",
     "mapLine": "Map {number}{name} : {score}",
     "mapCode": "code {code}",
+    "provisionalScore": "{state} : {score}",
     "tournamentAlt": "Aperçu du tournoi {name}",
     "matchAlt": "Aperçu du match {team1} contre {team2}"
   }

@@ -10,6 +10,7 @@
  * d'être borné : un caractère invisible ou de contrôle n'arrive ni au PNG ni à
  * l'encart (`UNTRUSTED_NAMES.md`). Un engagé solo n'est jamais nommé.
  */
+import { capitalizeFirst } from "./capitalize-first";
 import type { Locale } from "./locales";
 import { INTL_LOCALE } from "./locales";
 import type { Messages } from "./i18n-messages";
@@ -21,10 +22,11 @@ import {
   truncateForShare,
   type ShareStateTone,
 } from "./share-metadata";
-import type { MatchShareSummary, ShareEntrantSide, ShareLeader } from "./share-embeds";
+import { matchScheduledAt, type MatchShareSummary, type ShareEntrantSide, type ShareLeader } from "./share-embeds";
 import { localizedTournamentLabel } from "./tournament-labels";
 import type { MatchStatus, TournamentCard } from "./types";
 import { visibleText } from "./visible-text";
+import { cutToWidth, displayWidth, isolateDirection } from "./graphemes";
 
 /** Les textes que lisent les cartes. */
 export type ShareEmbedMessages = Pick<Messages, "share" | "labels">;
@@ -60,14 +62,53 @@ export function embedShortDate(iso: string, locale: Locale): string | null {
     month: "short",
     year: "numeric",
   }).format(date);
-  const hour = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+  return `${day} · ${embedHour(date, locale)}`;
+}
+
+/** Première lettre en capitale (« mardi » → « Mardi »), dans la langue. */
+function capitalized(text: string, locale: Locale): string {
+  return capitalizeFirst(text, INTL_LOCALE[locale]);
+}
+
+/** L'heure de Paris sur 24 h : « 21:00 » (les deux langues, comme la fiche). */
+function embedHour(date: Date, locale: Locale): string {
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
     timeZone: SHARE_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
   }).format(date);
-  return `${day} · ${hour}`;
 }
+
+/** Date longue d'un match programmé, à l'heure de Paris : « Mardi 18 novembre · 21:00 » / « Tuesday, November 18 · 21:00 ». */
+export function embedLongWhen(iso: string, locale: Locale): string | null {
+  const time = Date.parse(iso);
+  if (!Number.isFinite(time)) return null;
+  const date = new Date(time);
+  const day = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    timeZone: SHARE_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+  return `${capitalized(day, locale)} · ${embedHour(date, locale)}`;
+}
+
+/** Date courte pour un titre : « mar. 18 nov. 21:00 » / « Tue, Nov 18 21:00 ». */
+export function embedShortWhen(iso: string, locale: Locale): string | null {
+  const time = Date.parse(iso);
+  if (!Number.isFinite(time)) return null;
+  const date = new Date(time);
+  const day = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    timeZone: SHARE_TIME_ZONE,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+  return `${day} ${embedHour(date, locale)}`;
+}
+
+export { matchScheduledAt };
 
 type ScheduleKey = keyof EmbedText["schedule"];
 
@@ -185,6 +226,9 @@ export type EmbedScoreCenter =
   /** Ni score ni forfait : le tableau d'affichage écrit « VS » (`scoreboardVersus`). */
   | { kind: "none"; text: string };
 
+/** L'horaire mis en avant sous les équipes d'un match à venir. */
+export type EmbedSchedule = { when: string; zone: string };
+
 /** Une case de map : « Map 1 · Ilios », son score et son code de replay. */
 export type EmbedMapCell = { label: string; score: string; code: string | null; winnerSide: 1 | 2 | null };
 
@@ -194,8 +238,10 @@ export type MatchEmbedCard = {
   state: { label: string; tone: ShareStateTone };
   /** Nom du tournoi. */
   title: string;
-  /** Place du match (« Manche 2 · Match 3 »). */
+  /** Place du match (« Quart de finale 2 », « Ronde 3 · Match 2 »). */
   subtitle: string;
+  /** Horaire d'un match à venir (grand, sous les équipes), `null` sinon. */
+  schedule: EmbedSchedule | null;
   team1: EmbedTeamMark;
   team2: EmbedTeamMark;
   center: EmbedScoreCenter;
@@ -245,17 +291,22 @@ export function matchEmbedCard(
   match: MatchShareSummary,
   position: string,
   messages: ShareEmbedMessages,
+  locale: Locale,
+  now: number = Date.now(),
 ): MatchEmbedCard {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
   const state = matchStateOf(match);
   const shownMaps = match.maps.slice(0, EMBED_MAX_MAPS);
   const extra = match.maps.length - shownMaps.length;
+  const scheduledAt = matchScheduledAt(match, now);
+  const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
   return {
     eyebrow: localizedTournamentLabel(messages.labels, "game", card.game),
     state: { label: text.matchStates[state.key], tone: state.tone },
     title: shownText(card.name, EMBED_TITLE_MAX_LENGTH) || text.tournamentFallback,
     subtitle: position,
+    schedule: when === null ? null : { when, zone: capitalized(text.timeZone, locale) },
     team1: { name: names[0], initial: initialOf(names[0]), logoUrl: match.team1.logoUrl, winner: match.winnerSide === 1 },
     team2: { name: names[1], initial: initialOf(names[1]), logoUrl: match.team2.logoUrl, winner: match.winnerSide === 2 },
     center: scoreCenter(match, names, text),
@@ -282,28 +333,138 @@ export function tournamentEmbedAlt(card: TournamentCard, messages: ShareEmbedMes
   return fill(text.tournamentAlt, { name: shownText(card.name, EMBED_TITLE_MAX_LENGTH) || text.tournamentFallback });
 }
 
-/** Titre de l'encart d'un match : « A contre B · Manche 2 · Match 3 ». */
-export function matchEmbedTitle(match: MatchShareSummary, position: string, messages: ShareEmbedMessages): string {
+/**
+ * Budget du titre d'un encart de match, en colonnes ({@link displayWidth} : un
+ * idéogramme ou un emoji en vaut deux) : Discord coupe le titre d'un aperçu de
+ * lien d'une ellipse sur une ligne (vers 70 caractères latins à la largeur d'un
+ * message) ; au-delà, le nom du tour, le score ou l'horaire disparaissaient
+ * (« … · Manche 1000 · Match 2 — BlueGen… »).
+ */
+export const EMBED_MATCH_TITLE_BUDGET = 70;
+/** Ce qu'un nom d'équipe garde au moins dans le titre (ellipse comprise), place permettant. */
+export const EMBED_TITLE_TEAM_MIN_LENGTH = 4;
+/**
+ * En deçà de cette place par nom (« Ab… »), les noms quittent le titre : le
+ * tour, le score et l'horaire restent seuls, l'image et la description
+ * nomment les équipes.
+ */
+export const EMBED_TITLE_TEAM_FLOOR = 3;
+
+/**
+ * Les deux noms tenus dans `room` colonnes : le plus court garde tout ce qu'il
+ * peut, l'autre prend le reste ; chacun garde au moins
+ * {@link EMBED_TITLE_TEAM_MIN_LENGTH} colonnes quand la place le permet, la
+ * moitié de la place sinon. La somme ne dépasse **jamais** `room` ; `null` quand
+ * un nom n'y garderait pas {@link EMBED_TITLE_TEAM_FLOOR} colonnes.
+ */
+function fitNames(names: readonly [string, string], room: number): [string, string] | null {
+  const [a, b] = names.map(displayWidth);
+  if (a + b <= room) return [names[0], names[1]];
+  const half = Math.floor(room / 2);
+  const floor = Math.min(EMBED_TITLE_TEAM_MIN_LENGTH, half);
+  if (floor < EMBED_TITLE_TEAM_FLOOR) return null;
+  let maxA: number;
+  if (a <= half) maxA = a;
+  else if (b <= room - half) maxA = room - b;
+  else maxA = half;
+  const maxB = room - maxA;
+  return [cutToWidth(names[0], Math.max(floor, maxA)), cutToWidth(names[1], Math.max(floor, maxB))];
+}
+
+/** Score en tête du titre : seulement un résultat **validé** (un score en saisie n'est pas un résultat). */
+function finalScore(match: MatchShareSummary, center: EmbedScoreCenter): Extract<EmbedScoreCenter, { kind: "score" }> | null {
+  return match.status === "COMPLETED" && center.kind === "score" ? center : null;
+}
+
+/**
+ * Titre de l'encart d'un match, court pour n'être jamais coupé
+ * ({@link EMBED_MATCH_TITLE_BUDGET}) : « A 0–3 B · Quart de finale 2 » une fois
+ * le résultat validé, « A contre B · Quart de finale 2 · mar. 18 nov. 21:00 »
+ * pour un match à venir, « A contre B · Finale » sinon (forfait, score en
+ * saisie ou en attente de confirmation). Seuls les noms d'équipe cèdent
+ * (ellipse entre deux graphèmes), jusqu'à quitter le titre quand le tour et
+ * l'horaire prennent toute la place ; ni le nom du site ni celui du tournoi
+ * n'y figurent (`og:site_name`, l'image et la description les portent). Un nom
+ * écrit de droite à gauche est isolé ({@link isolateDirection}) : il ne
+ * retourne pas le score voisin.
+ */
+export function matchEmbedTitle(
+  match: MatchShareSummary,
+  position: string,
+  messages: ShareEmbedMessages,
+  locale: Locale,
+  now: number = Date.now(),
+): string {
+  const text = messages.share.embed;
+  const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
+  const score = finalScore(match, scoreCenter(match, names, text));
+  const scheduledAt = matchScheduledAt(match, now);
+  const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
+  const head = (team1: string, team2: string) =>
+    score === null ? fill(text.versus, { team1, team2 }) : `${team1} ${score.team1}–${score.team2} ${team2}`;
+  // L'horaire d'abord ; si les équipes n'ont plus de place avec lui, il cède
+  // (la description et l'image le portent) plutôt que les deux noms.
+  const tails = when === null ? [position] : [`${position} · ${when}`, position];
+  for (const tail of tails) {
+    const room = EMBED_MATCH_TITLE_BUDGET - displayWidth(`${head("", "")} · ${tail}`);
+    const fitted = fitNames(names, room);
+    if (fitted !== null) return `${head(isolateDirection(fitted[0]), isolateDirection(fitted[1]))} · ${tail}`;
+  }
+  return tails[0];
+}
+
+/**
+ * Titre de l'onglet d'une page de match (avant « — tournoi ») : « A contre B ·
+ * Quart de finale 2 », suivi de l'horaire d'un match à venir. Noms entiers et
+ * jamais de score : seul l'encart partagé ({@link matchEmbedTitle}) se plie au
+ * budget de Discord.
+ */
+export function matchPageTitle(
+  match: MatchShareSummary,
+  position: string,
+  messages: ShareEmbedMessages,
+  locale: Locale,
+  now: number = Date.now(),
+): string {
   const text = messages.share.embed;
   const versus = fill(text.versus, {
     team1: embedSideName(match.team1, 1, text),
     team2: embedSideName(match.team2, 2, text),
   });
-  return `${versus} · ${position}`;
+  const scheduledAt = matchScheduledAt(match, now);
+  const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
+  return when === null ? `${versus} · ${position}` : `${versus} · ${position} · ${when}`;
 }
 
 /**
  * Description de l'encart d'un match : le score, puis chaque map jouée (nom,
  * score, code de replay), bornée à {@link EMBED_DESCRIPTION_MAX_LENGTH}.
  * `null` tant que le match n'a ni score ni map : l'encart garde alors celle du
- * tournoi.
+ * tournoi. Un match **à venir** s'ouvre sur son horaire (« Mardi 18 novembre ·
+ * 21:00 (heure de Paris) »).
  */
-export function matchEmbedDescription(match: MatchShareSummary, messages: ShareEmbedMessages): string | null {
+export function matchEmbedDescription(
+  match: MatchShareSummary,
+  messages: ShareEmbedMessages,
+  locale: Locale,
+  now: number = Date.now(),
+): string | null {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
   const center = scoreCenter(match, names, text);
   const parts: string[] = [];
-  if (center.kind === "score") parts.push(`${names[0]} ${center.team1} – ${center.team2} ${names[1]}`);
+  const scheduledAt = matchScheduledAt(match, now);
+  const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
+  if (when !== null) parts.push(`${when} (${text.timeZone})`);
+  if (center.kind === "score") {
+    const score = `${isolateDirection(names[0])} ${center.team1} – ${center.team2} ${isolateDirection(names[1])}`;
+    // Seul un résultat validé se lit seul : un score en saisie ou soumis dit son état.
+    parts.push(
+      match.status === "COMPLETED"
+        ? score
+        : fill(text.provisionalScore, { state: text.matchStates[matchStateOf(match).key], score }),
+    );
+  }
   else if (center.kind === "label") parts.push(center.text);
   for (const map of match.maps) {
     const name = map.mapName === null ? "" : shownText(map.mapName, EMBED_MAP_NAME_MAX_LENGTH);

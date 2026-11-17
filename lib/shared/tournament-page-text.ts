@@ -30,6 +30,7 @@ import { toParticipantType, type ParticipantType } from "@/lib/shared/participan
 import type { Messages } from "@/lib/shared/i18n-messages";
 import { parseBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 import type { BracketType } from "@/lib/shared/types";
+import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 type FrTournament = typeof frTournament;
 
@@ -108,6 +109,19 @@ export function participantText(
 }
 
 /**
+ * Tour d'un match qu'on ne sait pas nommer d'après son tableau : « Manche n »,
+ * ou « Phase finale · Manche k » dans l'arbre final de BlueGenji Survie
+ * (k : rang du tour dans l'arbre, 1 = le premier), dont le numéro brut du
+ * moteur (1000 et plus) ne doit jamais s'afficher — le rang garde distincts
+ * deux matchs de tours différents.
+ */
+export function fallbackRoundLabel(text: TournamentPageText, roundNumber: number): string {
+  if (!isEndurancePlayoffRound(roundNumber)) return text.t("bracket.roundN", { number: String(roundNumber) });
+  const rank = roundNumber - PLAYOFF_ROUND_OFFSET + 1;
+  return `${text.t("bracket.finalPhase")} · ${text.t("bracket.roundN", { number: String(rank) })}`;
+}
+
+/**
  * Place d'un match (« Tableau perdants · Manche 2 · Match 1 ») : le tableau
  * n'est nommé que hors du tableau principal — sans lui, en double
  * élimination, deux matchs de même manche et de même numéro se confondaient.
@@ -118,7 +132,7 @@ export function matchPositionText(
 ): string {
   return [
     position.bracket === "UPPER" ? null : text.t(`page.bracketLabels.${position.bracket}`),
-    text.t("bracket.roundN", { number: position.roundNumber }),
+    fallbackRoundLabel(text, position.roundNumber),
     text.t("bracket.matchN", { number: position.matchNumber }),
   ]
     .filter(Boolean)

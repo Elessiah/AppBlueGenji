@@ -23,6 +23,7 @@ const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
 /** Modèle de la carte, partagé avec la page du match : c'est lui qui décide des gestes. */
 const CARD_MODEL = read(join(TOURNAMENT_DIR, "_lib", "match-card-model.ts"));
 const BRACKET_TREE = read(join(TOURNAMENT_DIR, "_components", "BracketTree.tsx"));
+const STAGE_TEXT = read(join("lib", "shared", "bracket-stage-text.ts"));
 const PAGE = read(join(TOURNAMENT_DIR, "_components/TournamentSheet.tsx"));
 const PLAYER_DIALOG = read(join(TOURNAMENT_DIR, "_components", "PlayerScoreDialog.tsx"));
 const ADMIN_DIALOG = read(join(TOURNAMENT_DIR, "_components", "AdminScoreDialog.tsx"));
@@ -115,7 +116,8 @@ describe("notification d'envoi — nomme les équipes, pas l'identifiant du matc
 
 describe("libellé d'un tour profond du tableau — français, comme l'accueil", () => {
   it("BracketTree replie sur « Manche N », pas « Round N »", () => {
-    expect(BRACKET_TREE).toContain('t("bracket.roundN", { number: String(globalIdx + 1) })');
+    expect(BRACKET_TREE).toContain("stageRoundLabel(text, stageKey(globalIdx, totalRoundsGlobal, bracketType), globalIdx)");
+    expect(STAGE_TEXT).toContain('text.t("bracket.roundN", { number: String(roundIndex + 1) })');
     expect(frTournament.bracket.roundN).toBe("Manche {number}");
     expect(BRACKET_TREE).not.toMatch(/`Round \$\{/);
   });
