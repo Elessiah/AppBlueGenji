@@ -116,6 +116,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `RANKING_PAGE.md` — Page `/classement` (titre éditable, podium et effets de nom par marche, tableau, filtres par jeu, en-tête selon la session), règle d'ordre du classement et masquage des équipes sans match (filtre unique `isRankedTeam`).
 - `PODIUM_TIERS.md` — Marches du podium (top 3 « Général ») sur chaque nom d'équipe et, adoucies, de ses membres, partout sur le site.
 - `TOURNAMENT_PLACEMENT_POINTS.md` — Points de parcours selon le rang final.
+- `STATS_PAGE.md` — Page `/frequentation` des partenaires : non référencée, blanche, graphiques Chart.js chargés à la demande.
 
 ## RGPD, légal et modération
 
@@ -126,6 +127,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `CONNECTION_LOGS.md` — Journal des données de connexion (LCEN).
 - `BACKUP_DATA_PROTECTION.md` — Sauvegardes chiffrées et journal des suppressions.
 - `SITE_VISIT_STATS.md` — Fréquentation du site, empreintes salées.
+- `AUDIENCE_MEASUREMENT.md` — Statistiques de fréquentation détaillées (T19) : mesure sans cookie, empreinte du jour, agrégats, 13 mois.
 - `CONTENT_REPORTS.md` — Signalements, contestations, panneau de modération.
 - `LOGO_QUARANTINE.md` — Quarantaine des images signalées.
 - `TERMS_OF_USE.md` — Conditions d'utilisation et leur acceptation.

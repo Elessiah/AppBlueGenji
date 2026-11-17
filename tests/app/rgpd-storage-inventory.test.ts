@@ -87,7 +87,11 @@ describe("/rgpd — inventaire des cookies et du stockage", () => {
     expect(cookies).not.toMatch(/exemption cookies fonctionnels|ePrivacy/);
     expect(cookies).toContain("article 82");
     // Le traceur de mesure d'audience n'est pas rangé sous la dispense.
-    expect(cookies).toMatch(/<strong>bg:last-visit-ping<\/strong> relève de la mesure d&apos;audience/);
+    expect(cookies).toMatch(
+      /<strong>bg:last-visit-ping<\/strong> et la lecture faite par les statistiques de\s+fréquentation détaillées relèvent de la mesure d&apos;audience/,
+    );
+    // La lecture du script des statistiques détaillées figure dans l'inventaire.
+    expect(cookies).toMatch(/<strong>Statistiques de fréquentation détaillées<\/strong> — rien n&apos;est déposé/);
     expect(cookies).toContain("Les autres éléments ne demandent pas votre");
   });
 });

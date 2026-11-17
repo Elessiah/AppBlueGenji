@@ -900,7 +900,7 @@ describe("getDatabase — configuration", () => {
 
 describe("getDatabase — rattrapage des comptes supprimés", () => {
   type ReconcileResult = { erased: number; renamed: number; failed: number };
-  const state = globalThis as typeof globalThis & { __bgDeletedAccountsReconciliation?: Promise<void> };
+  const state = globalThis as typeof globalThis & { __bgDeletedAccountsReconciliation?: Promise<void>; __bgDatabase?: unknown };
 
   async function runOnServer(
     reconcile: () => Promise<ReconcileResult>,
@@ -944,6 +944,8 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
 
   afterEach(() => {
     delete state.__bgDeletedAccountsReconciliation;
+    // Le serveur (`NEXT_RUNTIME`) garde son pool sur `globalThis` : chaque test repart du sien.
+    delete state.__bgDatabase;
     namedLocks.length = 0;
   });
 

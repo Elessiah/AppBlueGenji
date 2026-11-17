@@ -53,6 +53,7 @@ import { localUploadUrl } from "@/lib/shared/uploads";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { toIso } from "@/lib/server/serialization";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
+import { readSiteCounts } from "@/lib/server/site-counts";
 import { landingServerText } from "@/lib/server/i18n-landing";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { parseMatchFormat } from "@/lib/shared/match-format";
@@ -70,12 +71,6 @@ function defaultTicker(locale: Locale): LandingTickerPayload {
   const { t } = landingServerText(locale);
   return { items: [t("ticker.defaultResult"), t("ticker.defaultRegistration"), t("ticker.defaultCommunity")] };
 }
-
-type StatsRow = RowDataPacket & {
-  players: number;
-  teams: number;
-  tournaments: number;
-};
 
 /** Compteurs de la vitrine. Mutualisés et invalidés par `landing-cache.ts`. */
 export async function getLandingStats(): Promise<LandingStats> {
@@ -99,26 +94,11 @@ async function loadLandingStats(): Promise<LandingStats> {
 
 type SiteCounts = Omit<LandingStats, "discord">;
 
-/**
- * « Équipes actives » : les équipes que l'annuaire montre — ni entrée solo
- * (`solo_user_id`), ni équipe dissoute (`deleted_at`) ; une équipe fantôme y
- * figure, comme à l'annuaire (`GHOST_TEAMS.md`).
- */
+/** Compteurs de la plateforme (`site-counts.ts`, comptes et équipes identiques à `/frequentation`) ; zéros si la base ne répond pas. */
 async function loadSiteCounts(): Promise<SiteCounts> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.execute<StatsRow[]>(`
-      SELECT
-        (SELECT COUNT(*) FROM bg_users) AS players,
-        (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL AND deleted_at IS NULL) AS teams,
-        (SELECT COUNT(*) FROM bg_tournaments WHERE start_visibility_at <= NOW()) AS tournaments
-    `);
-    const row = rows[0];
-    return {
-      players: Number(row?.players ?? 0),
-      teams: Number(row?.teams ?? 0),
-      tournaments: Number(row?.tournaments ?? 0),
-    };
+    const { players, teams, tournaments } = await readSiteCounts();
+    return { players, teams, tournaments };
   } catch {
     return DEFAULT_SITE_COUNTS;
   }

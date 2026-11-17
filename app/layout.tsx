@@ -6,6 +6,8 @@ import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { RecruitmentTextProvider } from "@/components/i18n/recruitment-text";
 import { recruitmentClientMessages } from "@/lib/shared/recruitment-text";
+import { AudienceBeacon } from "@/components/audience-beacon";
+import { AUDIENCE_PAGE_PATH } from "@/lib/shared/audience";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { SiteNavigationTracker } from "@/components/site-navigation-tracker";
@@ -215,6 +217,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const spotlight = await getRecruitmentSpotlight(pageLocale);
   const requestedPath = requestHeaders.get(PATHNAME_HEADER);
   const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
+  // Page des statistiques de fréquentation (`docs/features/STATS_PAGE.md`) :
+  // vitrine formelle pour les partenaires, sans mise en avant du recrutement.
+  const onAudiencePage = requestedPath === AUDIENCE_PAGE_PATH;
   const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
   const bannerCookie = cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value;
   const modalOffCookie = cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value;
@@ -328,6 +333,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               traverser la bannière de recrutement ni la navigation. */}
           <SkipLink />
           <VisitTracker />
+          <AudienceBeacon />
           <ServiceWorkerRegistration />
           <SiteNavigationTracker />
           <StickyHeaderOffset />
@@ -338,6 +344,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               la connexion (sa modale de consentement passe d'abord), la mise
               en avant du recrutement se tait (la banderole, elle, reste).
               Voir `lib/shared/global-modals.ts`. */}
+          {!onAudiencePage && (
           <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
             modalAds={modalAds}
@@ -358,6 +365,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             onAdPage={onRecruitmentPage}
           />
           </RecruitmentTextProvider>
+          )}
           {/* Entrées déjà dans la langue de la page (lot 7b-2) : la modale ne charge aucune traduction.
               Sans leur détail (#587) : la modale le lit à l'ouverture, pas chaque page. */}
           <PrivacyChangesModal changes={privacyChangeHeads(localizedPrivacyChanges(privacyChanges, locale))} detailsDeferred />

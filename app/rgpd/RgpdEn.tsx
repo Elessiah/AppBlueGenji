@@ -5,6 +5,7 @@ import { TranslationNotice } from "@/components/legal/TranslationNotice";
 import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
+import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
@@ -318,7 +319,8 @@ export function RgpdEn({
           The site also keeps, in memory only, never in the database or in a log, the IP address of
           whoever calls its routes open without an account or before logging in (home page data, the bot
           page and its live feed, the browser&apos;s security reports, report without an account, Discord
-          login code), to cap their requests: two minutes at most after its last request, thirty-one
+          login code, submission of the detailed audience statistics — for that submission, also its IPv6 /64 and
+          /48 networks and a short digest of the browser), to cap their requests: two minutes at most after its last request, thirty-one
           minutes for a report without an account, sixteen for a Discord code, and also as long as the
           bot page&apos;s live feed stays open (same register, T17).
         </p>
@@ -570,9 +572,16 @@ export function RgpdEn({
               <a href="#audience">Audience measurement</a>.
             </li>
             <li>
+              <strong>Detailed audience statistics</strong> — nothing is stored in your browser: this
+              measurement&apos;s script only reads there, on each page, the window&apos;s width (device class),
+              on the first page of a visit the address of the site you came from (referrer), the Global
+              Privacy Control and Do Not Track signals and the objection cookie below; what is sent to the server is described under{" "}
+              <a href="#audience-detaillee">Detailed audience statistics</a>.
+            </li>
+            <li>
               <strong>bg_audience_optout</strong> — set only <strong>if you object to audience
               measurement</strong> (button of the <a href="#audience">Audience measurement</a> section), so as to
-              stop reporting and recording your visits. It only contains the value “1”, never a personal
+              stop reporting and recording your visits, and your page views for the detailed statistics. It only contains the value “1”, never a personal
               identifier, lasts {AUDIENCE_OPT_OUT_MAX_AGE_DAYS} days (thirteen months) and disappears if you turn
               measurement back on.
             </li>
@@ -622,8 +631,8 @@ export function RgpdEn({
             </li>
           </ul>
           <p>
-            <strong>bg:last-visit-ping</strong> is part of audience measurement, whose conditions are described
-            below: it falls within the exemption provided by the CNIL (the French data protection authority) for
+            <strong>bg:last-visit-ping</strong> and the reading done by the detailed audience statistics are part
+            of audience measurement, whose conditions are described below: they fall within the exemption provided by the CNIL (the French data protection authority) for
             audience measurement trackers (guidelines of September 17, 2020), which requires a means of objecting
             and limited retention periods — both are described below. The other items do not require your
             consent: article 82 of the French Data Protection Act (<span lang="fr">loi Informatique et
@@ -646,7 +655,7 @@ export function RgpdEn({
             <span className="eyebrow">SECTION 06 · AUDIENCE MEASUREMENT</span>
             <h2 className={styles.sectionTitle}>Audience measurement</h2>
           </div>
-          <span className={styles.meta}>REGISTER T06</span>
+          <span className={styles.meta}>REGISTER T06 · T19</span>
         </header>
         <div className={styles.prose}>
           <p>
@@ -704,6 +713,77 @@ export function RgpdEn({
             <a href="#exercer-vos-droits">“Exercising your rights”</a> section.
           </p>
           <AudienceOptOutControl initialReason={audienceOptOut} text={audience} />
+          <h3 id="audience-detaillee">Detailed audience statistics (register T19)</h3>
+          <p>
+            <strong>Purpose.</strong> Measuring the site&apos;s traffic page by page — page views,
+            visits, each day&apos;s visitors, time spent, days and hours of visit — to present it, as
+            aggregate figures only, to the association&apos;s partners and advertisers, on an unlisted
+            public page ({AUDIENCE_PAGE_PATH}, absent from search engines and from the site&apos;s
+            menus). That page also shows the number of tournaments played, matches played, teams and
+            accounts on the site: totals, no person. No third-party tool is used.
+          </p>
+          <p>
+            <strong>What is sent.</strong> For each page shown, your browser notes the type of page
+            (home, a tournament&apos;s page…), never its exact address, a number or a name, the time
+            spent with the tab visible (sent in slices, each capped at{" "}
+            {AUDIENCE_MAX_ENGAGED_MINUTES} minutes), your device class (mobile, tablet,
+            computer, from the window&apos;s width) and, for the first page of a visit, the name of
+            the site you came from. These notes are sent to the server in batches. No cookie is set,
+            nothing is kept in the browser, and your session is not read: the measurement does not
+            know whether you are logged in.
+          </p>
+          <p>
+            <strong>What is recorded.</strong> The server computes a daily hash (HMAC-SHA256) of your
+            IP address (reduced to its /64 network in IPv6) and your browser, with a random salt drawn for the day (Paris time), kept in the
+            database for the day and erased the next day, as soon as the day is counted (from 1:15
+            a.m.): after that, no one, the association included, can recompute your hash (apart from an
+            encrypted backup copy made in the meantime, which may contain the salt and your page views
+            of the day, {BACKUP_RETENTION_DAYS} days at most), and you are only recognised for one day.
+            It records
+            this hash with the type of page, its language, the date and hour, the device class, the
+            time spent and a referral family (direct access, search engine, Discord, social network,
+            video platform, other website); never the page&apos;s exact address, nor the referring
+            site, nor your IP address or browser as such. Known bots are not counted, and the
+            administration pages (including creating and editing a tournament) and the report pages
+            are not measured.
+          </p>
+          <p>
+            <strong>Legal basis and consent exemption.</strong> The association&apos;s legitimate
+            interest in making its audience known to its partners (art. 6.1.f GDPR). This measurement
+            is exempt from consent (art. 82 of the French Data Protection Act): it is limited to
+            measuring the site&apos;s audience, only produces aggregate figures, does not follow you
+            from one site to another and is linked neither to your account nor to any other processing,
+            conditions set by the CNIL; its detailed data are only kept{" "}
+            {monthsEn(AUDIENCE_RAW_RETENTION_MONTHS)}, a period chosen by the association, below the 25
+            months the CNIL allows.
+          </p>
+          <p>
+            <strong>Retention period.</strong> Detailed page views are erased after{" "}
+            <strong>{monthsEn(AUDIENCE_RAW_RETENTION_MONTHS)}</strong> (apart from the encrypted
+            backup copies, {BACKUP_RETENTION_DAYS} days at most). Aggregate figures per day, without
+            any hash, are kept with no limit: they no longer concern anyone. The daily salt is erased
+            from the database the next day, as soon as the day is counted (from 1:15 a.m., Paris
+            time); it is written in no log, but an encrypted backup copy made in the meantime may
+            contain it ({BACKUP_RETENTION_DAYS} days at most). Your IP address (and, in IPv6, its /64
+            and /48 networks) and a short digest of your browser are only kept in memory, to cap each
+            network&apos;s submissions: two minutes at most after your last request.
+          </p>
+          <p>
+            <strong>Recipients.</strong> Anyone who has the link to the {AUDIENCE_PAGE_PATH} page, for
+            the aggregate figures only (no breakdown there shows a group of fewer than{" "}
+            {AUDIENCE_MIN_VISITORS} visitors from the same day; only each day&apos;s totals are given as
+            they are); the association&apos;s technical manager, who hosts the site,
+            for the database.
+          </p>
+          <p>
+            <strong>Your right to object.</strong> The same as for the measurement above: your
+            browser&apos;s Global Privacy Control and Do Not Track signals, or the button above, also
+            stop this measurement — a browser that exposes these signals, or carries the objection
+            cookie, sends nothing, and the server, which reads the signals it receives and that cookie
+            again, records nothing. For page views already recorded, the daily hash can no
+            longer lead back to you once the day is over; the right is exercised like your other
+            rights (section <a href="#exercer-vos-droits">“Exercising your rights”</a>).
+          </p>
         </div>
       </section>
 

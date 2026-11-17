@@ -50,8 +50,9 @@ import type frPush from "@/messages/fr/push.json";
 import type frPushMessages from "@/messages/fr/pushMessages.json";
 import type frRoundMaps from "@/messages/fr/roundMaps.json";
 import type frMatchPage from "@/messages/fr/matchPage.json";
+import type frAudience from "@/messages/fr/audience.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage", "audience"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -172,6 +173,8 @@ export type Messages = {
   roundMaps: typeof frRoundMaps;
   /** Page d'un match (en-tête, faits clés, sections), deux langues dans son module — `_lib/match-page-text.ts`. */
   matchPage: typeof frMatchPage;
+  /** Page de fréquentation non référencée `/frequentation` (`docs/features/STATS_PAGE.md`). */
+  audience: typeof frAudience;
 };
 
 /**
