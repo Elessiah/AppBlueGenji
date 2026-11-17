@@ -9,6 +9,7 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useCroppedPreviewUrl, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
 import {
   TOURNAMENT_IMAGE_ACCEPT,
   TOURNAMENT_IMAGE_FITS,
@@ -32,7 +33,11 @@ interface TournamentImagePickerProps {
   existing: TournamentImage | null;
   value: ImagePickerValue;
   onChange: (value: ImagePickerValue) => void;
-  disabled?: boolean;
+  /**
+   * La page enregistre le brouillon : boutons indisponibles mais focalisables
+   * (`BusyButton`, `docs/features/BUSY_BUTTONS.md`), modes et point focal figés.
+   */
+  busy?: boolean;
 }
 
 /** Dimensions d'un fichier image ; `null` si le navigateur ne sait pas les lire. */
@@ -66,7 +71,7 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Le composant est contrôlé : il ne fait qu'un brouillon, que la page enregistre.
  */
-export function TournamentImagePicker({ existing, value, onChange, disabled }: Readonly<TournamentImagePickerProps>) {
+export function TournamentImagePicker({ existing, value, onChange, busy = false }: Readonly<TournamentImagePickerProps>) {
   const { showError } = useToast();
   const text = useImageText();
   const { t } = text;
@@ -165,15 +170,14 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
       />
 
       {!hasImage ? (
-        <button
-          type="button"
+        <BusyButton
+          busy={busy}
           className={`${s.empty} ${dropping ? s.emptyDropping : ""}`}
-          disabled={disabled}
           onClick={() => fileInputRef.current?.click()}
           // Glisser un fichier sur la zone vaut le choisir : c'est le geste
           // qu'on tente d'abord devant une grande cible en pointillés.
           onDragOver={(event) => {
-            if (disabled) return;
+            if (busy) return;
             event.preventDefault();
             setDropping(true);
           }}
@@ -185,7 +189,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
           onDrop={(event) => {
             event.preventDefault();
             setDropping(false);
-            if (!disabled) void onFileChosen(event.dataTransfer.files?.[0]);
+            if (!busy) void onFileChosen(event.dataTransfer.files?.[0]);
           }}
           aria-describedby={hintId}
         >
@@ -198,7 +202,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
           <span id={hintId} className={s.emptyHint}>
             {t("picker.hint")}
           </span>
-        </button>
+        </BusyButton>
       ) : (
         <>
           <fieldset className={s.modes}>
@@ -212,8 +216,11 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
                   name={`${baseId}-fit`}
                   value={fit}
                   checked={settings.fit === fit}
-                  disabled={disabled}
-                  onChange={() => setSettings({ fit })}
+                  // Le bouton radio garde le focus pendant l'envoi : il ignore le geste.
+                  aria-disabled={busy || undefined}
+                  onChange={() => {
+                    if (!busy) setSettings({ fit });
+                  }}
                 />
                 <span className={s.modeText}>
                   <span className={s.modeLabel}>{t(`picker.fits.${fit}.label`)}</span>
@@ -233,11 +240,11 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
                   aria-roledescription={t("picker.focusRole")}
                   aria-label={t("picker.focusAria", { x: settings.focusX, y: settings.focusY })}
                   aria-describedby={focusHintId}
-                  aria-disabled={disabled || undefined}
-                  tabIndex={disabled ? -1 : 0}
-                  onKeyDown={disabled ? undefined : onFocusKey}
+                  aria-disabled={busy || undefined}
+                  tabIndex={0}
+                  onKeyDown={busy ? undefined : onFocusKey}
                   onPointerDown={
-                    disabled
+                    busy
                       ? undefined
                       : (event) => {
                           draggingRef.current = true;
@@ -248,7 +255,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
                   onPointerMove={(event) => {
                     // Un glisser commencé avant l'envoi s'arrête avec lui : le
                     // brouillon ne doit plus bouger une fois parti.
-                    if (draggingRef.current && !disabled) moveFocus(event);
+                    if (draggingRef.current && !busy) moveFocus(event);
                   }}
                   onPointerUp={() => {
                     draggingRef.current = false;
@@ -311,30 +318,27 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
           )}
 
           <div className={s.actions}>
-            <button
-              type="button"
+            <BusyButton
+              busy={busy}
               className="btn ghost"
-              disabled={disabled}
               onClick={() => fileInputRef.current?.click()}
               style={{ padding: "8px 16px", fontSize: 13 }}
             >
               {t("picker.replace")}
-            </button>
+            </BusyButton>
             {value.file !== null && (
-              <button
-                type="button"
+              <BusyButton
+                busy={busy}
                 className="btn ghost"
-                disabled={disabled}
                 onClick={() => void onRecrop()}
                 style={{ padding: "8px 16px", fontSize: 13 }}
               >
                 {t("picker.recrop")}
-              </button>
+              </BusyButton>
             )}
-            <button
-              type="button"
+            <BusyButton
+              busy={busy}
               className="btn ghost"
-              disabled={disabled}
               onClick={() => {
                 // Un fichier dont les dimensions se lisent encore ne revient pas
                 // après un retrait.
@@ -344,7 +348,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
               style={{ padding: "8px 16px", fontSize: 13 }}
             >
               {t("picker.remove")}
-            </button>
+            </BusyButton>
           </div>
         </>
       )}

@@ -2,6 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   MAX_ENDURANCE_PENALTY_POINTS,
   MAX_ENDURANCE_PENALTY_REASON,
@@ -49,7 +52,10 @@ export function EndurancePenaltyDialog({
   const { t } = useDialogsText();
   const [points, setPoints] = useState("1");
   const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
+  // Boutons focalisables pendant l'envoi (`BusyButton`), champs en lecture
+  // seule (ce qui est affiché est ce qui part), garde synchrone : une Entrée
+  // répétée dans les points infligeait la sanction deux fois.
+  const { busy, isBusy, run } = useBusyGuard();
 
   const parsedPoints = Number(points);
   const violation = checkEndurancePenalty(parsedPoints, reason);
@@ -79,23 +85,22 @@ export function EndurancePenaltyDialog({
       return;
     }
 
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/penalties`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ teamId, points: Math.floor(parsedPoints), reason }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "PENALTY_FAILED");
-      showSuccess(t("penalty.applied", { points: Math.floor(parsedPoints), name: teamName }));
-      onApplied();
-      onClose();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/tournaments/${tournamentId}/penalties`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ teamId, points: Math.floor(parsedPoints), reason }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(payload.error || "PENALTY_FAILED");
+        showSuccess(t("penalty.applied", { points: Math.floor(parsedPoints), name: teamName }));
+        onApplied();
+        onClose();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 
   return (
@@ -126,6 +131,7 @@ export function EndurancePenaltyDialog({
             step={1}
             value={points}
             onChange={(e) => setPoints(e.target.value)}
+            readOnly={busy}
             aria-invalid={violation === "POINTS_NOT_POSITIVE" || violation === "POINTS_TOO_HIGH"}
             aria-describedby="endurance-penalty-hint"
             style={{ width: 120, fontSize: 13 }}
@@ -138,6 +144,7 @@ export function EndurancePenaltyDialog({
             id="endurance-penalty-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            readOnly={busy}
             rows={3}
             maxLength={MAX_ENDURANCE_PENALTY_REASON}
             aria-invalid={violation === "REASON_TOO_LONG"}
@@ -164,24 +171,26 @@ export function EndurancePenaltyDialog({
           </p>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
+        <div className="dim-disabled" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <BusyButton
+            busy={busy}
             className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!isBusy()) onClose();
+            }}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={violation !== null}
             type="submit"
             className="btn"
-            disabled={busy || violation !== null}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
-            {busy ? t("schedule.saving") : t("penalty.apply")}
-          </button>
+            <BusyLabel busy={busy} idle={t("penalty.apply")} pending={t("schedule.saving")} />
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

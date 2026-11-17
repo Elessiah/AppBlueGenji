@@ -77,4 +77,22 @@ annoncer de l'attente.
   `EntrantContactsPanel` (pendant une relance, l'échec et « Réessayer » restent
   affichés : `contactsPanelView` place l'échec avant le chargement) —
   `tests/app/match-busy-buttons.test.ts`.
+- Gestion du tournoi (EF-67) : `GhostRegistrationDialog`, `RegistrationsPanel`
+  (flèches et « Retirer » ; arrivée en bout de liste, le focus passe à la
+  flèche opposée), `RollbackRoundDialog`, `DeleteTournamentDialog`,
+  `TournamentImageDialog` (+ `TournamentImagePicker`, prop `busy`),
+  `TournamentDialogShell` (+ `AdvanceTournamentDialog`, `RemoveEntrantDialog`,
+  qui lui passent `isBusy` et `pendingLabel`), `TournamentLiveLink`,
+  `EndurancePenaltyDialog`, `TournamentForm`, `MatchLaunchCenter` —
+  `tests/app/tournament-admin-busy-buttons.test.ts`. `BusyButton` transmet sa
+  `ref` (`forwardRef`, React 18).
+- **Geste qui quitte l'écran** sans le démonter sur-le-champ (suppression d'un
+  tournoi puis `router.replace`, création ou édition puis `router.push`, manche
+  effacée) : un verrou de succès (`useRef` pour la garde, état pour
+  l'affichage) garde l'écran en attente jusqu'au démontage — sinon `busy`
+  retombait et un second clic recréait le tournoi ou relançait la suppression.
+- Formulaire de tournoi : toute saisie est ignorée pendant l'envoi (setter
+  gardé par `isBusy()`), les champs texte, nombres et dates passent en
+  `readOnly` ; les listes déroulantes gardent seulement leur `disabled` de
+  verrou durable (`locked(…)`).
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

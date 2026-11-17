@@ -1,6 +1,9 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { imageErrorText, imageSuccessText, useImageText } from "../../_lib/image-text";
 import { FormEvent, useState } from "react";
@@ -51,7 +54,9 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   // pour qu'aucun rendu ne montre un brouillon périmé face à la nouvelle image.
   const [base, setBase] = useState<TournamentImage | null>(image);
   const [conflict, setConflict] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Boutons focalisables pendant l'envoi (`BusyButton`), garde synchrone :
+  // un double clic envoyait l'image deux fois.
+  const { busy, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 
@@ -69,22 +74,22 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isBusy()) return;
     if (change.kind === "NONE") {
       onClose();
       return;
     }
-    setBusy(true);
-    try {
-      await applyImageChange(tournamentId, change, value.file, value.crop, (code) => imageErrorText(imageText, code));
-      const message = imageSuccessText(imageText, change);
-      if (message) showSuccess(message);
-      onSaved();
-      onClose();
-    } catch (error) {
-      showError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        await applyImageChange(tournamentId, change, value.file, value.crop, (code) => imageErrorText(imageText, code));
+        const message = imageSuccessText(imageText, change);
+        if (message) showSuccess(message);
+        onSaved();
+        onClose();
+      } catch (error) {
+        showError((error as Error).message);
+      }
+    });
   };
 
   return createPortal(
@@ -150,7 +155,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} />
+            <TournamentImagePicker existing={image} value={value} onChange={setValue} busy={busy} />
 
             <div
               style={{
@@ -163,11 +168,20 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
                 borderTop: "1px solid var(--line-soft)",
               }}
             >
-              <CyberButton type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                {t("score.cancel")}
+              <CyberButton variant="ghost" asChild>
+                <BusyButton
+                  busy={busy}
+                  onClick={() => {
+                    if (!isBusy()) onClose();
+                  }}
+                >
+                  {t("score.cancel")}
+                </BusyButton>
               </CyberButton>
-              <CyberButton type="submit" variant="primary" disabled={busy || change.kind === "NONE"}>
-                {busy ? t("schedule.saving") : t("schedule.save")}
+              <CyberButton variant="primary" asChild>
+                <BusyButton busy={busy} blocked={change.kind === "NONE"} type="submit">
+                  <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
+                </BusyButton>
               </CyberButton>
             </div>
           </form>

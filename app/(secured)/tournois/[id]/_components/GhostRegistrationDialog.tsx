@@ -1,6 +1,9 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { toParticipantType } from "@/lib/shared/participants";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -102,7 +105,10 @@ export function GhostRegistrationDialog({
   const [selected, setSelected] = useState<number[]>([]);
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState("");
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (double clic, Entrée répétée) : un second lot partirait
+  // avant que `busy` soit rendu — l'équipe fantôme serait créée deux fois.
+  // Les boutons restent focalisables pendant l'envoi (`BusyButton`).
+  const { busy, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 
@@ -164,6 +170,8 @@ export function GhostRegistrationDialog({
   const emptyMessage = ghostListEmptyMessage(text, load, teams.length, t(`ghost.${type}.noneAvailable`));
 
   const toggle = (teamId: number) => {
+    // La case garde le focus pendant l'envoi : le lot affiché est celui qui part.
+    if (isBusy()) return;
     setSelected((current) =>
       current.includes(teamId)
         ? current.filter((id) => id !== teamId)
@@ -179,6 +187,7 @@ export function GhostRegistrationDialog({
   // remplissage devant quatorze places désactivait « Inscrire » sans autre issue
   // que de décocher cent vingt-six cases à la main.
   const selectVisible = () => {
+    if (isBusy()) return;
     setSelected((current) => {
       const next = [...current];
       for (const team of visible) {
@@ -205,39 +214,40 @@ export function GhostRegistrationDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setBusy(true);
+    // Défense en profondeur : le bouton désarmé annule déjà l'envoi implicite.
+    if (submitBlocked) return;
     // Retenu avant le premier `await` : c'est la taille du lot *envoyé* qui dit
     // si le refus doit préciser que rien n'a été enregistré.
     const batchSize = mode === "new" ? 1 : selected.length;
-    try {
-      let teamIds = selected;
+    await run(async () => {
+      try {
+        let teamIds = selected;
 
-      if (mode === "new") {
-        const res = await fetch("/api/teams", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: newName.trim(), ghost: true }),
-        });
-        const payload = (await res.json()) as { teamId?: number; error?: string };
-        if (!res.ok || !payload.teamId) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
-        teamIds = [payload.teamId];
+        if (mode === "new") {
+          const res = await fetch("/api/teams", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: newName.trim(), ghost: true }),
+          });
+          const payload = (await res.json()) as { teamId?: number; error?: string };
+          if (!res.ok || !payload.teamId) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
+          teamIds = [payload.teamId];
+        }
+
+        if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
+
+        await registerBatch(teamIds);
+        showSuccess(t(`ghost.${type}.success`, { count: teamIds.length }));
+        onRegistered();
+        onClose();
+      } catch (e) {
+        // Le refus qui désigne un engagé le nomme : sur un lot de trente, « déjà
+        // inscrite » sans nom n'apprend rien.
+        const teamId = registrationErrorTeamId(e);
+        const name = teamId === undefined ? null : nameById.get(teamId) ?? null;
+        showError(mapBatchError((e as Error).message, name, batchSize, errorsText));
       }
-
-      if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");
-
-      await registerBatch(teamIds);
-      showSuccess(t(`ghost.${type}.success`, { count: teamIds.length }));
-      onRegistered();
-      onClose();
-    } catch (e) {
-      // Le refus qui désigne un engagé le nomme : sur un lot de trente, « déjà
-      // inscrite » sans nom n'apprend rien.
-      const teamId = registrationErrorTeamId(e);
-      const name = teamId === undefined ? null : nameById.get(teamId) ?? null;
-      showError(mapBatchError((e as Error).message, name, batchSize, errorsText));
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   // Le plafond vaut aussi pour la création : sans lui, `POST /api/teams` créait
@@ -245,8 +255,7 @@ export function GhostRegistrationDialog({
   // dans `bg_teams`, reproposée à tous les autres tournois, et une de plus à
   // chaque nouvelle tentative.
   const noSlot = capacity < 1;
-  const submitDisabled = busy
-    || noSlot
+  const submitBlocked = noSlot
     || (mode === "existing"
       ? selected.length === 0 || overCapacity
       : newName.trim().length < 3);
@@ -262,7 +271,7 @@ export function GhostRegistrationDialog({
         aria-labelledby="ghost-registration-title"
         tabIndex={-1}
         onSubmit={submit}
-        className={styles.panel}
+        className={`${styles.panel} dim-disabled`}
       >
         <h3 id="ghost-registration-title" className={styles.title}>
           {t(`ghost.${type}.title`)}
@@ -273,7 +282,9 @@ export function GhostRegistrationDialog({
           <button
             type="button"
             className={`${mode === "existing" ? "btn" : "btn ghost"} ${styles.modeButton}`}
-            onClick={() => setMode("existing")}
+            onClick={() => {
+              if (!isBusy()) setMode("existing");
+            }}
             aria-pressed={mode === "existing"}
           >
             {t("ghost.existing")}
@@ -281,7 +292,9 @@ export function GhostRegistrationDialog({
           <button
             type="button"
             className={`${mode === "new" ? "btn" : "btn ghost"} ${styles.modeButton}`}
-            onClick={() => setMode("new")}
+            onClick={() => {
+              if (!isBusy()) setMode("new");
+            }}
             aria-pressed={mode === "new"}
           >
             {t("ghost.new")}
@@ -340,7 +353,7 @@ export function GhostRegistrationDialog({
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggle(team.id)}
-                        disabled={busy}
+                        aria-readonly={busy || undefined}
                       />
                       <EntrantLogo teamId={team.id} name={team.name} size={20} logoUrl={team.logoUrl} />
                       <span className={styles.optionName}>{team.name}</span>
@@ -351,22 +364,24 @@ export function GhostRegistrationDialog({
             </ScrollArea>
 
             <div className={styles.bulk}>
-              <button
-                type="button"
+              <BusyButton
+                busy={busy}
+                blocked={visible.length === 0 || selected.length >= capacity}
                 className={styles.linkButton}
                 onClick={selectVisible}
-                disabled={busy || visible.length === 0 || selected.length >= capacity}
               >
                 {t("ghost.selectAll")}
-              </button>
-              <button
-                type="button"
+              </BusyButton>
+              <BusyButton
+                busy={busy}
+                blocked={selected.length === 0}
                 className={styles.linkButton}
-                onClick={() => setSelected([])}
-                disabled={busy || selected.length === 0}
+                onClick={() => {
+                  if (!isBusy()) setSelected([]);
+                }}
               >
                 {t("ghost.selectNone")}
-              </button>
+              </BusyButton>
             </div>
           </div>
         ) : (
@@ -376,6 +391,9 @@ export function GhostRegistrationDialog({
               id="ghost-team-new-name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
+              // Entrée y lance l'envoi : en lecture seule (pas `disabled`), le
+              // champ garde le focus et le nom affiché est celui qui part.
+              readOnly={busy}
               minLength={3}
               maxLength={60}
               required
@@ -386,24 +404,26 @@ export function GhostRegistrationDialog({
         )}
 
         <div className={styles.actions}>
-          <button
-            type="button"
+          <BusyButton
+            busy={busy}
             className={`btn ghost ${styles.actionButton}`}
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!isBusy()) onClose();
+            }}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={submitBlocked}
             type="submit"
             className={`btn ${styles.actionButton}`}
-            disabled={submitDisabled}
             // Le bouton grisé doit dire pourquoi : le compteur passe à l'ambre,
             // encore faut-il faire le lien.
             title={capacityBlockTitle(text, noSlot, overCapacity, remainingSlots)}
           >
-            {busy ? t("ghost.pending") : submitLabel}
-          </button>
+            <BusyLabel busy={busy} idle={submitLabel} pending={t("ghost.pending")} />
+          </BusyButton>
         </div>
       </form>
     </div>,

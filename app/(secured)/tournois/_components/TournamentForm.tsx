@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, type ReactNode } from "react";
+import { FormEvent, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
@@ -26,6 +26,9 @@ import {
 } from "@/lib/shared/registration-filters";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { conditionsText, formatExplainText, formatHintText, invalidFormatText, phaseIssueText, useFormText } from "../_lib/form-text";
 import { useErrorsText } from "../[id]/_lib/error-map";
@@ -144,7 +147,22 @@ export function TournamentForm({
   const errorsText = useErrorsText();
   const em = (children: ReadonlyArray<ReactNode>) => <em>{richNodes(children)}</em>;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
-  const [values, setValues] = useState<TournamentFormValues>(initialValues);
+  // Envoi (`docs/features/BUSY_BUTTONS.md`) : le bouton reste focalisable
+  // (`BusyButton`), une garde synchrone écarte le second envoi, et le
+  // formulaire réussi reste en attente jusqu'à la navigation (`submittedRef`) —
+  // la page restait montée le temps du `router.push`, et un second clic créait
+  // un tournoi en double.
+  const guard = useBusyGuard();
+  const submittedRef = useRef(false);
+  const [submitted, setSubmitted] = useState(false);
+  const loading = guard.busy || submitted;
+  const isBusy = () => guard.isBusy() || submittedRef.current;
+  const [values, setValuesState] = useState<TournamentFormValues>(initialValues);
+  // Pendant l'envoi, ce qui est affiché est ce qui part : toute saisie (champ,
+  // case, liste, réglages des sous-formulaires) est ignorée.
+  const setValues = (next: SetStateAction<TournamentFormValues>) => {
+    if (!isBusy()) setValuesState(next);
+  };
   // Format Duel / Arcade décoché : le champ des points n'est pas rendu, un refus
   // des points (décocher sous un score, `MAP_POINTS_LOCKED`) se rattache à la case.
   const fieldErrors = useFieldErrors(
@@ -175,10 +193,12 @@ export function TournamentForm({
   const [lastMatchFormatValue, setLastMatchFormatValue] = useState(
     initialValues.matchFormat?.value ?? DEFAULT_MATCH_FORMAT.value,
   );
-  const [loading, setLoading] = useState(false);
   // Incrémenté à chaque refus d'un plan de phases invalide (`PhaseBuilder`).
   const [phaseFocusRequest, setPhaseFocusRequest] = useState(0);
-  const [image, setImage] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
+  const [image, setImageState] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
+  const setImage = (next: ImagePickerValue) => {
+    if (!isBusy()) setImageState(next);
+  };
 
   const { format, maxTeams, phases } = values;
   const entrantType = toParticipantType(values.participantType);
@@ -257,43 +277,43 @@ export function TournamentForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isBusy()) return;
     fieldErrors.clear();
-    setLoading(true);
-    try {
-      if (!matchFormatValid) {
-        const message = invalidFormatText(text, matchFormatType);
-        fieldErrors.flag("matchFormatValue", message);
-        showError(message);
-        setLoading(false);
-        return;
-      }
-
-      // Validate phases for MULTI format
-      const phaseIssue = format === "MULTI" ? findPhaseIssue(phases) : null;
-      if (phaseIssue) {
-        showError(phaseIssueText(text, errorsText, phaseIssue));
-        // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
-        // la phase et y porte le focus — sauf plan figé par la fenêtre
-        // d'édition, dont les champs désactivés ne prennent pas le focus :
-        // la notification reste alors seule à parler.
-        if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
-        setLoading(false);
-        return;
-      }
-
-      await onSubmit(values, image);
-    } catch (e) {
-      const message = (e as Error).message;
-      const code = errorCode(e);
-      // Les deux refus de date ne disent pas **laquelle** : le premier jalon
-      // mal placé se relit sur les valeurs qui viennent de partir.
-      const dateField = misplacedDateField(code, values);
-      if (dateField) fieldErrors.flag(dateField, message);
-      else fieldErrors.report(code, message);
+    if (!matchFormatValid) {
+      const message = invalidFormatText(text, matchFormatType);
+      fieldErrors.flag("matchFormatValue", message);
       showError(message);
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    // Validate phases for MULTI format
+    const phaseIssue = format === "MULTI" ? findPhaseIssue(phases) : null;
+    if (phaseIssue) {
+      showError(phaseIssueText(text, errorsText, phaseIssue));
+      // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
+      // la phase et y porte le focus — sauf plan figé par la fenêtre
+      // d'édition, dont les champs désactivés ne prennent pas le focus :
+      // la notification reste alors seule à parler.
+      if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
+      return;
+    }
+
+    await guard.run(async () => {
+      try {
+        await onSubmit(values, image);
+        submittedRef.current = true;
+        setSubmitted(true);
+      } catch (e) {
+        const message = (e as Error).message;
+        const code = errorCode(e);
+        // Les deux refus de date ne disent pas **laquelle** : le premier jalon
+        // mal placé se relit sur les valeurs qui viennent de partir.
+        const dateField = misplacedDateField(code, values);
+        if (dateField) fieldErrors.flag(dateField, message);
+        else fieldErrors.report(code, message);
+        showError(message);
+      }
+    });
   };
 
   const loadingLabel = mode === "create" ? t("form.creating") : t("form.saving");
@@ -312,6 +332,7 @@ export function TournamentForm({
                 id="tournament-name"
                 required
                 disabled={locked("name")}
+                readOnly={loading}
                 value={values.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder={t("form.namePlaceholder")}
@@ -337,6 +358,7 @@ export function TournamentForm({
               <textarea
                 id="tournament-description"
                 disabled={locked("description")}
+                readOnly={loading}
                 value={values.description}
                 onChange={(e) => set("description", e.target.value)}
                 placeholder={t("form.descriptionPlaceholder")}
@@ -351,7 +373,7 @@ export function TournamentForm({
             <p className="eyebrow" style={sectionEyebrow("image")}>
               {t("form.sections.image")}
             </p>
-            <TournamentImagePicker existing={null} value={image} onChange={setImage} disabled={loading} />
+            <TournamentImagePicker existing={null} value={image} onChange={setImage} busy={loading} />
           </section>
         )}
 
@@ -417,6 +439,7 @@ export function TournamentForm({
                 min={2}
                 max={256}
                 disabled={locked("maxTeams")}
+                readOnly={loading}
                 value={maxTeams}
                 onValueChange={setMaxTeams}
                 onEdit={() => fieldErrors.clear("maxTeams")}
@@ -469,6 +492,7 @@ export function TournamentForm({
                   max={MATCH_FORMAT_BOUNDS[matchFormatType].max}
                   step={matchFormatType === "BO" ? 2 : 1}
                   disabled={locked("matchFormat")}
+                  readOnly={loading}
                   value={matchFormatValue}
                   onValueChange={(value) => {
                     setLastMatchFormatValue(value);
@@ -511,6 +535,7 @@ export function TournamentForm({
                   min={matchWinsRequired(matchFormat!)}
                   max={naturalMaxMaps(matchFormat!)}
                   disabled={locked("matchFormat")}
+                  readOnly={loading}
                   value={matchMaxMaps(matchFormat!)}
                   onValueChange={(value) => {
                     // Le plafond naturel n'est pas un réglage : le stocker
@@ -658,6 +683,7 @@ export function TournamentForm({
                   min={MIN_PLAYERS_BOUNDS.min}
                   max={MIN_PLAYERS_BOUNDS.max}
                   disabled={locked("registrationMinPlayers")}
+                  readOnly={loading}
                   value={values.registrationMinPlayers}
                   onValueChange={(next) => set("registrationMinPlayers", next)}
                   aria-describedby="registration-min-players-hint"
@@ -682,6 +708,7 @@ export function TournamentForm({
                 id="visibility-at"
                 type="datetime-local"
                 disabled={locked("startVisibilityAt")}
+                readOnly={loading}
                 value={values.startVisibilityAt}
                 onChange={(e) => set("startVisibilityAt", e.target.value)}
                 {...fieldAttrs("startVisibilityAt")}
@@ -694,6 +721,7 @@ export function TournamentForm({
                 id="registration-open-at"
                 type="datetime-local"
                 disabled={locked("registrationOpenAt")}
+                readOnly={loading}
                 value={values.registrationOpenAt}
                 onChange={(e) => set("registrationOpenAt", e.target.value)}
                 {...fieldAttrs("registrationOpenAt")}
@@ -706,6 +734,7 @@ export function TournamentForm({
                 id="registration-close-at"
                 type="datetime-local"
                 disabled={locked("registrationCloseAt")}
+                readOnly={loading}
                 value={values.registrationCloseAt}
                 onChange={(e) => set("registrationCloseAt", e.target.value)}
                 {...fieldAttrs("registrationCloseAt")}
@@ -718,6 +747,7 @@ export function TournamentForm({
                 id="start-at"
                 type="datetime-local"
                 disabled={locked("startAt")}
+                readOnly={loading}
                 value={values.startAt}
                 onChange={(e) => set("startAt", e.target.value)}
                 {...fieldAttrs("startAt")}
@@ -773,13 +803,10 @@ export function TournamentForm({
           <CyberButton variant="ghost" asChild>
             <LocaleLink href="/tournois">{t("form.cancel")}</LocaleLink>
           </CyberButton>
-          <CyberButton
-            variant="primary"
-            type="submit"
-            disabled={loading}
-            style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
-          >
-            {loading ? loadingLabel : submitLabel}
+          <CyberButton variant="primary" asChild>
+            <BusyButton busy={loading} type="submit">
+              <BusyLabel busy={loading} idle={submitLabel} pending={loadingLabel} />
+            </BusyButton>
           </CyberButton>
         </div>
       </form>

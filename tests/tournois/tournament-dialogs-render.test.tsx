@@ -32,6 +32,16 @@ jest.mock("react", () => {
   };
 });
 jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: () => ({ current: null }) }));
+// La garde d'envoi pose son propre effet (suivi du montage) : au repos, sans
+// lui, l'effet unique rejoué ici reste celui qui monte le dialogue.
+jest.mock("@/lib/shared/hooks/useBusyGuard", () => ({
+  useBusyGuard: () => ({
+    busy: false,
+    isBusy: () => false,
+    run: <T,>(task: () => Promise<T>) => task(),
+    isMounted: () => true,
+  }),
+}));
 jest.mock("@/components/ui/toast", () => ({
   useToast: () => ({ showError: () => undefined, showSuccess: () => undefined }),
 }));

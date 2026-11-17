@@ -3,6 +3,9 @@
 import { FormEvent, useState } from "react";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import {
   isValidStreamUrl,
@@ -43,7 +46,9 @@ export function TournamentLiveLink({
   const mapError = useMapError();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(liveUrl ?? "");
-  const [busy, setBusy] = useState(false);
+  // Boutons focalisables pendant l'envoi (`BusyButton`), garde synchrone
+  // (Entrée répétée dans le champ) : `docs/features/BUSY_BUTTONS.md`.
+  const { busy, isBusy, run } = useBusyGuard();
 
   /**
    * Ouvre l'éditeur sur la valeur **courante**.
@@ -69,23 +74,22 @@ export function TournamentLiveLink({
     event.preventDefault();
     if (draftInvalid) return;
 
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/tournaments/${tournamentId}/live`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ liveUrl: draft.trim() || null }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "TOURNAMENT_LIVE_UPDATE_FAILED");
-      showSuccess(draft.trim() ? a("liveLink.saved") : a("liveLink.removed"));
-      setEditing(false);
-      onSaved();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/tournaments/${tournamentId}/live`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ liveUrl: draft.trim() || null }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) throw new Error(payload.error || "TOURNAMENT_LIVE_UPDATE_FAILED");
+        showSuccess(draft.trim() ? a("liveLink.saved") : a("liveLink.removed"));
+        setEditing(false);
+        onSaved();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 
   if (editing) {
@@ -106,6 +110,9 @@ export function TournamentLiveLink({
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            // Entrée y lance l'envoi : en lecture seule (pas `disabled`), le
+            // champ garde le focus et le lien affiché est celui qui part.
+            readOnly={busy}
             maxLength={MAX_STREAM_URL_LENGTH}
             placeholder="https://twitch.tv/…"
             aria-label={a("liveLink.inputAria")}
@@ -127,26 +134,27 @@ export function TournamentLiveLink({
               : a("liveLink.hint", { platforms: LIVE_PLATFORMS.join(", ") })}
           </p>
         </div>
-        <button
+        <BusyButton
+          busy={busy}
+          blocked={draftInvalid}
           type="submit"
           className="btn"
-          disabled={busy || draftInvalid}
           style={{ padding: "6px 14px", fontSize: 13 }}
         >
-          {busy ? "…" : a("common.save")}
-        </button>
-        <button
-          type="button"
+          <BusyLabel busy={busy} idle={a("common.save")} pending={`${a("common.save")}…`} />
+        </BusyButton>
+        <BusyButton
+          busy={busy}
           className="btn ghost"
-          disabled={busy}
           onClick={() => {
+            if (isBusy()) return;
             setDraft(liveUrl ?? "");
             setEditing(false);
           }}
           style={{ padding: "6px 14px", fontSize: 13 }}
         >
           {a("common.cancel")}
-        </button>
+        </BusyButton>
       </form>
     );
   }

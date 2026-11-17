@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, ReactNode } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import { useActionsText } from "../_lib/actions-text";
 
@@ -15,12 +17,19 @@ interface TournamentDialogShellProps {
   summaryId: string;
   maxWidth: number;
   title: ReactNode;
-  /** Geste en vol : boutons désactivés, Échap et voile sans effet. */
+  /**
+   * Geste en vol : boutons indisponibles mais focalisables (`BusyButton`,
+   * `docs/features/BUSY_BUTTONS.md`), Échap et voile sans effet.
+   */
   busy: boolean;
+  /** Garde synchrone du dialogue (`useBusyGuard().isBusy`) : « Annuler » parti avant le rendu. */
+  isBusy: () => boolean;
   onClose: () => void;
   onSubmit: (event: FormEvent) => void;
-  /** Libellé du bouton de confirmation (attente comprise). */
-  submitLabel: ReactNode;
+  /** Libellé du bouton de confirmation… */
+  submitLabel: string;
+  /** … et pendant l'envoi (`BusyLabel` : le bouton garde sa largeur). */
+  pendingLabel: string;
   /** Ce que le geste entraîne, entre le titre et les boutons. */
   children: ReactNode;
 }
@@ -44,9 +53,11 @@ export function TournamentDialogShell({
   maxWidth,
   title,
   busy,
+  isBusy,
   onClose,
   onSubmit,
   submitLabel,
+  pendingLabel,
   children,
 }: Readonly<TournamentDialogShellProps>) {
   const { t } = useActionsText();
@@ -69,23 +80,19 @@ export function TournamentDialogShell({
 
       <form onSubmit={onSubmit}>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
+          <BusyButton
+            busy={busy}
             className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!isBusy()) onClose();
+            }}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("common.cancel")}
-          </button>
-          <button
-            type="submit"
-            className="btn"
-            disabled={busy}
-            style={{ padding: "8px 20px", fontSize: 13 }}
-          >
-            {submitLabel}
-          </button>
+          </BusyButton>
+          <BusyButton busy={busy} type="submit" className="btn" style={{ padding: "8px 20px", fontSize: 13 }}>
+            <BusyLabel busy={busy} idle={submitLabel} pending={pendingLabel} />
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

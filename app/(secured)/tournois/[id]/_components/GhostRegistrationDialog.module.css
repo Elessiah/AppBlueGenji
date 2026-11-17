@@ -180,10 +180,15 @@
   text-decoration: underline;
 }
 
-.linkButton:disabled {
+/* Désarmé par `aria-disabled` (`BusyButton`) : le bouton garde le focus. */
+.linkButton[aria-disabled="true"] {
   color: var(--ink-dim, #6f7887);
   cursor: default;
   text-decoration: none;
+}
+
+.linkButton[aria-disabled="true"][aria-busy="true"] {
+  cursor: progress;
 }
 
 .actions {
@@ -198,16 +203,8 @@
   font-size: 13px;
 }
 
-/* `:global` obligatoire : `.btn` appartient au style global, et CSS Modules
-   hacherait un `.btn` local — la règle ne s'appliquerait alors à rien. Le `.btn`
-   global n'a pas d'état désactivé : sans ces lignes, « Inscrire » gardait
-   l'apparence d'un bouton cliquable alors qu'il refusait le clic. */
-.panel :global(.btn:disabled) {
-  opacity: 0.4;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
+/* L'état désarmé des `.btn` (« Inscrire » refusé) vient de `.dim-disabled`
+   (`globals.css`), posé sur le panneau : en couleurs, jamais en `opacity`. */
 
 .panel :global(.btn:focus-visible) {
   outline: 2px solid var(--blue-400, #5ac8ff);

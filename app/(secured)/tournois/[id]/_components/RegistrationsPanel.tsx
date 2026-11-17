@@ -35,6 +35,8 @@ import { PodiumTiersOffWhen } from "@/components/podium-tiers";
 import styles from "./RegistrationsPanel.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { pageDateTime, participantText } from "@/lib/shared/tournament-page-text";
 
 interface RegistrationsPanelProps {
@@ -108,7 +110,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
       ? formatLocalDateTime(iso)
       : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic sur une flèche partait deux fois, chaque
+  // envoi calculé sur l'ordre d'avant l'autre. Les flèches et « Retirer »
+  // restent focalisables pendant l'envoi (`BusyButton`) : désactivées, elles
+  // rendaient le focus au `<body>` au milieu d'une série de déplacements.
+  const { busy, isBusy, run } = useBusyGuard();
 
   // Ordre affiché en attendant que le flux rapporte l'écriture : sans lui, la
   // ligne resterait en place le temps d'un aller-retour et le geste semblerait
@@ -117,8 +123,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const baseline = useRef<string>("");
 
   // Le clavier ne doit pas perdre sa place : la ligne bouge, et le bouton qu'on
-  // vient d'actionner se désactive dès qu'elle atteint une extrémité — le
-  // navigateur retire alors le focus, qui retombe sur le corps de la page.
+  // vient d'actionner devient sans effet dès qu'elle atteint une extrémité — on
+  // rend alors la main au bouton qui la ramène.
   const buttons = useRef(new Map<string, HTMLButtonElement | null>());
   const [refocus, setRefocus] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
   // Le lecteur d'écran a besoin qu'on lui dise ce qui a bougé : le seul retour
@@ -171,11 +177,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
   /** Écrit un ordre complet, avec aperçu optimiste et annonce vocale. */
   const applyOrder = useCallback(
-    async (next: number[], teamId: number): Promise<boolean> => {
+    async (next: number[], teamId: number): Promise<boolean> =>
+      (await run(async () => {
       const name = detail.registrations.find((reg) => reg.teamId === teamId)?.teamName ?? "";
       baseline.current = serverKey;
       setPending(next);
-      setBusy(true);
       try {
         const res = await fetch(`/api/admin/tournaments/${detail.card.id}/seeding`, {
           method: "PATCH",
@@ -197,11 +203,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         setPending(null);
         showError(mapError((e as Error).message));
         return false;
-      } finally {
-        setBusy(false);
       }
-    },
-    [a, detail.card.id, detail.registrations, mapError, onChanged, serverKey, showError, showSuccess],
+      })) ?? false,
+    [a, detail.card.id, detail.registrations, mapError, onChanged, run, serverKey, showError, showSuccess],
   );
 
   const rows = order.flatMap((teamId) => {
@@ -216,7 +220,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     // Arrivé en tête ou en queue, le bouton actionné n'existe plus comme cible :
     // on rend la main à celui qui ramène la ligne d'où elle vient.
     const opposite = refocus.direction === "up" ? "down" : "up";
-    const target = preferred && !preferred.disabled ? preferred : buttons.current.get(key(opposite));
+    const target =
+      preferred && preferred.getAttribute("aria-disabled") !== "true" ? preferred : buttons.current.get(key(opposite));
     target?.focus();
     setRefocus(null);
   }, [refocus]);
@@ -237,6 +242,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   }, [serverKey]);
 
   const performMove = async (teamId: number, direction: "up" | "down"): Promise<boolean> => {
+    // Un déplacement à la fois : l'ordre suivant se calcule sur l'ordre rendu.
+    if (isBusy()) return false;
     const next = moveInOrder(order, teamId, direction);
     if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
     const done = await applyOrder(next, teamId);
@@ -249,6 +256,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const source = detail.seedingSource;
 
   const move = async (teamId: number, direction: "up" | "down") => {
+    if (isBusy()) return;
     // `manualConfirmed` couvre l'aller-retour : la source ne passe à `MANUAL`
     // qu'au rafraîchissement du détail, et un second clic ne doit pas redemander.
     if (!manualConfirmed && seedingReorderNeedsConfirmation(source)) {
@@ -346,48 +354,49 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                 <span className={styles.actions} data-tap-zone>
                   {reorderable && (
                     <>
-                      <button
-                        type="button"
+                      <BusyButton
+                        busy={busy}
+                        blocked={index === 0}
                         ref={(node) => {
                           buttons.current.set(`${reg.teamId}:up`, node);
                         }}
                         className={styles.arrow}
                         aria-label={a("registrations.moveUpAria", { name: reg.teamName })}
                         title={a("registrations.moveUpTitle")}
-                        disabled={busy || index === 0}
-                        onClick={() => move(reg.teamId, "up")}
+                        onClick={() => void move(reg.teamId, "up")}
                       >
                         ↑
-                      </button>
-                      <button
-                        type="button"
+                      </BusyButton>
+                      <BusyButton
+                        busy={busy}
+                        blocked={index === rows.length - 1}
                         ref={(node) => {
                           buttons.current.set(`${reg.teamId}:down`, node);
                         }}
                         className={styles.arrow}
                         aria-label={a("registrations.moveDownAria", { name: reg.teamName })}
                         title={a("registrations.moveDownTitle")}
-                        disabled={busy || index === rows.length - 1}
-                        onClick={() => move(reg.teamId, "down")}
+                        onClick={() => void move(reg.teamId, "down")}
                       >
                         ↓
-                      </button>
+                      </BusyButton>
                     </>
                   )}
                   {removable && (
                     /* Le nom est dans le libellé accessible, pas seulement dans
                        la ligne : trente boutons « Retirer » identiques ne se
                        distinguent pas à la voix ni au lecteur d'écran. */
-                    <button
-                      type="button"
+                    <BusyButton
+                      busy={busy}
                       className={styles.remove}
                       aria-label={a("registrations.removeAria", { name: reg.teamName })}
                       title={a("registrations.removeTitle")}
-                      disabled={busy}
-                      onClick={() => setRemoving({ teamId: reg.teamId, teamName: reg.teamName })}
+                      onClick={() => {
+                        if (!isBusy()) setRemoving({ teamId: reg.teamId, teamName: reg.teamName });
+                      }}
                     >
                       {a("registrations.remove")}
-                    </button>
+                    </BusyButton>
                   )}
                 </span>
               )}
