@@ -8,6 +8,7 @@ import {
   perceptualHashFromGrey,
   phashComparator,
   phashDistance,
+  storablePhash,
 } from "@/lib/server/image-phash";
 
 /*
@@ -596,5 +597,69 @@ describe("imagePerceptualHash — symétries et cas limites (cycle 3)", () => {
 
   it("imagePerceptualHashResult_notAnImage_notDecoded", async () => {
     expect(await imagePerceptualHashResult(Buffer.from("pas une image"))).toEqual({ phash: null, decoded: false });
+  });
+});
+
+// Revue EF-72 sécurité 1 : seuls les formats matriciels du téléversement se
+// décodent ; un fichier tronqué ou corrompu n'est pas empreint.
+describe("imagePerceptualHashResult — formats et fichiers abîmés (sécurité 1)", () => {
+  it("imagePerceptualHashResult_svgImage_notDecoded", async () => {
+    expect(await imagePerceptualHashResult(scene(8))).toEqual({ phash: null, decoded: false });
+  });
+
+  it("imagePerceptualHashResult_truncatedPng_notDecoded", async () => {
+    const png = await sharp(scene(8)).png().toBuffer();
+
+    expect(await imagePerceptualHashResult(png.subarray(0, Math.floor(png.length / 2)))).toEqual({ phash: null, decoded: false });
+  });
+
+  it("imagePerceptualHashResult_detailedPng_hashed", async () => {
+    const png = await sharp(scene(8)).png().toBuffer();
+
+    expect((await imagePerceptualHashResult(png)).phash).not.toBeNull();
+  });
+
+  it("imagePerceptualHashResult_detailedJpeg_hashed", async () => {
+    const jpeg = await sharp(scene(8)).jpeg().toBuffer();
+
+    expect((await imagePerceptualHashResult(jpeg)).phash).not.toBeNull();
+  });
+});
+
+describe("storablePhash (sécurité 1)", () => {
+  it("storablePhash_zero_kept", () => {
+    expect(storablePhash("0")).toBe("0");
+  });
+
+  it("storablePhash_largestUnsigned64_kept", () => {
+    expect(storablePhash("18446744073709551615")).toBe("18446744073709551615");
+  });
+
+  it("storablePhash_justAboveUnsigned64_null", () => {
+    expect(storablePhash("18446744073709551616")).toBeNull();
+  });
+
+  it("storablePhash_twentyOneDigits_null", () => {
+    expect(storablePhash("100000000000000000000")).toBeNull();
+  });
+
+  it("storablePhash_negative_null", () => {
+    expect(storablePhash("-1")).toBeNull();
+  });
+
+  it("storablePhash_notDigits_null", () => {
+    expect(storablePhash("12a")).toBeNull();
+  });
+
+  it("storablePhash_empty_null", () => {
+    expect(storablePhash("")).toBeNull();
+  });
+
+  it("storablePhash_null_null", () => {
+    expect(storablePhash(null)).toBeNull();
+  });
+
+  it("storablePhash_undefined_null", () => {
+    expect(storablePhash(undefined)).toBeNull();
   });
 });

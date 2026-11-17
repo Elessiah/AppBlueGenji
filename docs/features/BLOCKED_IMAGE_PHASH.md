@@ -105,7 +105,7 @@ servie, comparable à celle des avatars bloqués). Deux requêtes au plus :
 SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (?, ?) LIMIT 1
 -- 2. seulement à défaut : les empreintes perceptuelles posées, bornées
 SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
- WHERE phash IS NOT NULL ORDER BY created_at DESC LIMIT 20000
+ WHERE phash IS NOT NULL ORDER BY created_at DESC, sha256 LIMIT 2000
 ```
 
 Une ligne à la première requête refuse, sans balayage ni décodage. Sinon, et
@@ -114,9 +114,9 @@ une fois de plus pour la sienne, comparée en mémoire (`phashComparator` : la
 référence lue une fois, comptage de bits sans chaîne) : chaque téléversement ne
 paie pas ce décodage tant que la liste n'a que des lignes d'avant D17. Aucun
 index ne sert une distance de Hamming : la lecture est un balayage, bornée par
-`MAX_COMPARED_PHASHES` (20 000 lignes, les plus récentes d'abord ; la liste ne
-grandit qu'avec les suppressions de la modération, quelques dizaines de
-lignes). Le décodage est celui du WebP déjà encodé (256 à 512 px) : décoder
+`MAX_COMPARED_PHASHES` (2 000 lignes, les plus récentes d'abord, `sha256`
+départageant un même jour ; la liste ne grandit qu'avec les suppressions de la
+modération, quelques dizaines de lignes). Le décodage est celui du WebP déjà encodé (256 à 512 px) : décoder
 les pixels d'avant l'encodage donnerait une empreinte un peu autre que celle
 des fichiers servis, qui est ce qu'on compare. `imagePerceptualHashResult`
 réduit à 32 × 32 **avant** d'aplatir la transparence et refuse (`limitInputPixels`,
@@ -130,6 +130,45 @@ Toute empreinte **écrite** en paramètre passe par
 `CAST(? AS UNSIGNED)` d'une chaîne comme un entier signé et plafonne tout
 au-delà de 2^63 − 1 (mesuré : `18446744073709551615` devenait
 `9223372036854775807`). MariaDB 11.8 accepte la même chaîne de casts.
+
+## Sécurité (revue EF-72 sécurité 1)
+
+- **Formats décodés** : `imagePerceptualHashResult` lit l'en-tête
+  (`metadata()`) et ne décode qu'un WebP, un PNG ou un JPEG (ce qu'accepte le
+  téléversement) — jamais un SVG ni un PDF, même déposé à la main sous un
+  chemin d'avatar. `failOn: "error"` : un fichier tronqué ou corrompu n'est pas
+  empreint (pixels de remplissage), `limitInputPixels` borne la taille (bombe
+  de décompression). Une image animée : sa première image seulement.
+- **Échec de décodage = ouvert** (empreinte nulle, SHA-256 seul). Au
+  téléversement, l'image décodée est le WebP de 256 à 512 px que le gabarit
+  vient d'écrire : un téléverseur ne peut pas la rendre indécodable ni trop
+  grande, seul un incident passager (mémoire) l'empêche — refuser alors un
+  innocent coûterait plus cher. Consigné (pm2, sans empreinte ni chemin :
+  `[images] empreinte perceptuelle non calculée au téléversement`).
+- **Blocages par les seuls octets consignés** : à la pose d'un blocage, une
+  image trop simple ou non décodée est notée (pm2, `[moderation] … bloquée(s)
+  par leurs octets seulement`, compte seul, sans empreinte ni chemin) : la
+  modération sait qu'une copie retouchée repasserait (texte ou symbole sur un
+  aplat : limite connue, voir plus haut).
+- **Borne de 2 000 et faux refus** : chaque empreinte comparée ajoute une
+  chance qu'une image innocente tombe à 10 bits d'elle ; aucune paire d'images
+  différentes du jeu de mesure n'est descendue sous 14 bits, 2 000
+  comparaisons gardent ce risque négligeable (20 000 ne le garantiraient
+  plus). Atteinte, la borne est consignée (`[images] 2000 empreintes
+  perceptuelles comparées`) : les plus anciennes ne comptent plus que par leur
+  SHA-256 — contournement accepté, visible, et la borne se revoit.
+- **Écriture** : toute empreinte écrite passe par `storablePhash` (entier non
+  signé de 64 bits en décimal, sinon `null`) — une valeur relue abîmée ne fait
+  pas échouer la décision qui pose le blocage. `VALUES()` (et non l'alias
+  `AS new`) : seule forme connue de MariaDB.
+- **Décodages en série** : `blockRemovedImageFiles` lit ses fichiers un à un
+  (un effacement de compte en emporte plusieurs ; des décodages simultanés
+  pèseraient sur la mémoire du Raspberry).
+- **Journal de pose à la main** : en cas d'échec d'insertion, l'empreinte
+  perceptuelle est consignée avec le SHA-256 — le fichier part juste après,
+  elle ne se recalculerait plus ; elle ne désigne pas plus un compte que lui.
+- **Canal auxiliaire** : le refus dit déjà « bloquée » (`IMAGE_BLOCKED`, code
+  seul) ; la durée de la réponse n'en apprend pas davantage.
 
 ## Relevé hors verrou
 

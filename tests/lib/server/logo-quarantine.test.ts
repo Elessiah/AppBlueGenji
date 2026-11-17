@@ -1369,6 +1369,15 @@ describe("recordContestOutcome", () => {
     expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), { sha256: "abc", phash: "123" });
   });
 
+  // Revue EF-72 sécurité 1 : une empreinte relue abîmée ne fait pas échouer la décision.
+  it("recordContestOutcome_purgedAvatarUpheldWithCorruptPhash_blocksWithNullPhash", async () => {
+    install([], [lockRow(purgedAvatar({ image_phash: "x" })), writeOutcome, writeHashBlocked]);
+
+    await recordContestOutcome(30, "UPHELD", actor);
+
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), { sha256: "abc", phash: null });
+  });
+
   it("recordContestOutcome_quarantineRead_readsPhashAsText", async () => {
     install([], [lockRow(purgedAvatar()), writeOutcome, writeHashBlocked]);
 

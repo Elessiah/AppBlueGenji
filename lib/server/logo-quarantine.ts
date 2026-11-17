@@ -41,6 +41,7 @@ import {
   readImageFingerprint,
   unblockImageHashOn,
 } from "@/lib/server/blocked-images";
+import { storablePhash } from "@/lib/server/image-phash";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 // Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`, le
@@ -513,7 +514,7 @@ export async function deleteUserAvatarForReport(
         contestUntil,
         removedAt,
         fingerprint?.sha256 ?? null,
-        fingerprint?.phash ?? null,
+        storablePhash(fingerprint?.phash),
         fingerprint === null ? 0 : 1,
       ],
     );
@@ -1050,7 +1051,7 @@ async function applyOutcomeToHash(
   if (row.status !== "PURGED" || row.target_type !== "USER") return { blocked: null, hashUnknown: false };
   const sha256 = row.image_sha256;
   if (!sha256) return { blocked: null, hashUnknown: true };
-  const fingerprint: ImageFingerprint = { sha256, phash: row.image_phash ?? null };
+  const fingerprint: ImageFingerprint = { sha256, phash: storablePhash(row.image_phash) };
   await connection.execute(`UPDATE bg_logo_quarantines SET hash_blocked = ? WHERE id = ?`, [
     outcome === "UPHELD" ? 1 : 0,
     Number(row.id),
@@ -1267,7 +1268,7 @@ export async function purgeQuarantinedLogo(
       [
         fingerprint?.sha256 ?? null,
         fingerprint?.sha256 ?? null,
-        fingerprint?.phash ?? null,
+        storablePhash(fingerprint?.phash),
         fingerprint !== null && blockHash ? 1 : 0,
         quarantineId,
       ],

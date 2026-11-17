@@ -5,7 +5,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 import { failureReason } from "@/lib/server/failure-reason";
-import { imagePerceptualHash, imagePerceptualHashResult, PHASH_MATCH_DISTANCE, phashComparator } from "@/lib/server/image-phash";
+import { imagePerceptualHashResult, PHASH_MATCH_DISTANCE, phashComparator, storablePhash } from "@/lib/server/image-phash";
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
@@ -37,13 +37,18 @@ import { imagePerceptualHash, imagePerceptualHashResult, PHASH_MATCH_DISTANCE, p
  */
 
 /**
- * Empreintes perceptuelles comparées au plus, par téléversement : la liste ne
- * grandit qu'avec les suppressions de la modération (quelques dizaines), cette
- * borne garde le balayage (lecture + distance en JavaScript) à quelques
- * millisecondes même sur le Raspberry Pi si elle grossissait un jour. Les
- * plus récentes d'abord.
+ * Empreintes perceptuelles comparées au plus, par téléversement — les plus
+ * récentes d'abord. La liste ne grandit qu'avec les suppressions de la
+ * modération (quelques dizaines). La borne tient le balayage à quelques
+ * millisecondes, et surtout le risque de **faux refus** : chaque empreinte
+ * comparée est une chance de plus qu'une image innocente tombe à
+ * `PHASH_MATCH_DISTANCE` bits d'elle. Aucune paire d'images différentes du
+ * jeu de mesure n'est descendue sous 14 bits ; 2 000 comparaisons gardent ce
+ * risque négligeable, 20 000 ne le garantiraient plus (revue EF-72 sécurité
+ * 1). Atteinte, la borne est consignée (pm2) : les plus anciennes empreintes
+ * ne sont plus comparées que par leurs octets, et la borne se revoit.
  */
-export const MAX_COMPARED_PHASHES = 20_000;
+export const MAX_COMPARED_PHASHES = 2_000;
 
 /** Refus d'un téléversement dont l'image est bloquée. */
 export const IMAGE_BLOCKED = "IMAGE_BLOCKED";
@@ -95,17 +100,28 @@ export async function isBlockedImage(processed: Buffer, original?: Buffer): Prom
     // 2. Les empreintes perceptuelles posées (un balayage : aucun index ne sert
     // une distance de Hamming), bornées. Relues en texte : un `BIGINT` rendu
     // en nombre JavaScript perdrait ses derniers chiffres.
+    // `created_at` n'est qu'un jour : `sha256` départage, la coupe ne varie pas
+    // d'un téléversement à l'autre.
     const [rows] = await db.execute<(RowDataPacket & { phash: string })[]>(
       `SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes
-        WHERE phash IS NOT NULL ORDER BY created_at DESC LIMIT ${MAX_COMPARED_PHASHES}`,
+        WHERE phash IS NOT NULL ORDER BY created_at DESC, sha256 LIMIT ${MAX_COMPARED_PHASHES}`,
     );
     blocked = rows.map((row) => row.phash);
+    if (blocked.length >= MAX_COMPARED_PHASHES) {
+      console.warn(`[images] ${MAX_COMPARED_PHASHES} empreintes perceptuelles comparées : les plus anciennes ne le sont plus`);
+    }
   } catch (error) {
     if (isMissingTableError(error)) return false;
     throw error;
   }
   if (blocked.length === 0) return false;
-  const phash = await imagePerceptualHash(processed);
+  // Décodage en échec (mémoire) : ouvert — l'image n'est comparée que par ses
+  // octets. Refuser un innocent sur un incident passager coûterait plus cher ;
+  // l'image traitée est le WebP de 256 à 512 px que le gabarit vient d'écrire,
+  // qu'un téléverseur ne peut pas rendre indécodable. Consigné, sans empreinte
+  // ni chemin.
+  const { phash, decoded } = await imagePerceptualHashResult(processed);
+  if (!decoded) console.warn("[images] empreinte perceptuelle non calculée au téléversement : comparée par ses octets seulement");
   if (phash === null) return false;
   const distanceTo = phashComparator(phash);
   return blocked.some((other) => distanceTo(other) <= PHASH_MATCH_DISTANCE);
@@ -150,14 +166,16 @@ async function blockImageHashes(fingerprints: readonly ImageFingerprint[], optio
          ON DUPLICATE KEY UPDATE ${KEEP_OR_ADD_PHASH}`
         : `INSERT INTO bg_blocked_image_hashes (sha256, phash, created_at) VALUES ${unique.map(() => pinnedRow).join(", ")}
          ON DUPLICATE KEY UPDATE liftable = 0, ${KEEP_OR_ADD_PHASH}`,
-      unique.flatMap((entry) => [entry.sha256, entry.phash, ...day.params]),
+      unique.flatMap((entry) => [entry.sha256, storablePhash(entry.phash), ...day.params]),
     ),
   );
 }
 
 /**
  * Une ligne déjà posée garde son empreinte perceptuelle, ou reçoit celle
- * qu'on lui apporte si elle n'en avait pas (ligne d'avant D17).
+ * qu'on lui apporte si elle n'en avait pas (ligne d'avant D17). `VALUES()` et
+ * non l'alias `AS new` de MySQL 8.0.19 : MariaDB, en production, ne connaît
+ * que `VALUES()`.
  */
 const KEEP_OR_ADD_PHASH = "phash = COALESCE(phash, VALUES(phash))";
 
@@ -171,7 +189,12 @@ function uniqueFingerprints(fingerprints: readonly ImageFingerprint[]): ImageFin
   return [...bySha.values()];
 }
 
-/** Une empreinte telle qu'écrite au journal pour une pose à la main. */
+/**
+ * Une empreinte telle qu'écrite au journal pour une pose à la main.
+ * L'empreinte perceptuelle y figure : le fichier part juste après, elle ne se
+ * recalculerait plus, et sans elle la pose à la main ne bloquerait que les
+ * octets exacts. Comme le SHA-256, elle ne désigne aucun compte.
+ */
 function fingerprintLabel(entry: ImageFingerprint): string {
   return entry.phash === null ? entry.sha256 : `${entry.sha256} (phash ${entry.phash})`;
 }
@@ -193,9 +216,11 @@ export async function blockRemovedImageFiles(
 ): Promise<void> {
   if (absolutePaths.length === 0) return;
   // Chaque lecture est rattrapée : un fichier illisible est seulement omis.
-  const read = await Promise.all(
-    absolutePaths.map(async (file) => ({ file, fingerprint: await readImageFingerprint(file) })),
-  );
+  // Une à une : chaque lecture décode l'image, et un effacement de compte en
+  // emporte plusieurs — des décodages simultanés pèseraient sur la mémoire du
+  // Raspberry Pi, et un décodage en échec perdrait l'empreinte perceptuelle.
+  const read: { file: string; fingerprint: ImageFingerprint | null }[] = [];
+  for (const file of absolutePaths) read.push({ file, fingerprint: await readImageFingerprint(file) });
   const hashes = read.flatMap((entry) => (entry.fingerprint === null ? [] : [entry.fingerprint]));
   const missing = read.filter((entry) => entry.fingerprint === null).map((entry) => anonymousFileName(entry.file));
   if (missing.length > 0) {
@@ -220,6 +245,7 @@ export async function blockImageHashesSafely(
   options: BlockOptions = {},
 ): Promise<void> {
   if (hashes.length === 0) return;
+  logMissingPhashes(hashes);
   for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {
     try {
       await blockImageHashes(hashes, options);
@@ -271,9 +297,34 @@ export async function readImageFingerprint(
  */
 const decodedFingerprints = new WeakSet<ImageFingerprint>();
 
+/** Les empreintes rendues par `readImageFingerprint` dont l'image ne s'est pas décodée. */
+const undecodedFingerprints = new WeakSet<ImageFingerprint>();
+
 function remember(fingerprint: ImageFingerprint, decoded: boolean): ImageFingerprint {
-  if (decoded) decodedFingerprints.add(fingerprint);
+  (decoded ? decodedFingerprints : undecodedFingerprints).add(fingerprint);
   return fingerprint;
+}
+
+/**
+ * Consigne (pm2) les images bloquées par leurs seuls octets — sans empreinte
+ * ni chemin : la modération sait qu'une copie à peine retouchée repasserait.
+ * Image trop simple (`image-phash.ts`) ou décodage en échec ; une empreinte
+ * relue d'une ligne de quarantaine (ni l'un ni l'autre connu) ne l'est pas.
+ */
+export function logMissingPhashes(fingerprints: readonly ImageFingerprint[]): void {
+  let simple = 0;
+  let undecoded = 0;
+  for (const entry of fingerprints) {
+    if (entry.phash !== null) continue;
+    if (decodedFingerprints.has(entry)) simple += 1;
+    else if (undecodedFingerprints.has(entry)) undecoded += 1;
+  }
+  if (simple > 0) console.warn(`[moderation] ${simple} image(s) trop simple(s) : bloquée(s) par leurs octets seulement`);
+  if (undecoded > 0) {
+    console.warn(
+      `[moderation] ${undecoded} image(s) non décodée(s) : empreinte perceptuelle non calculée, bloquée(s) par leurs octets seulement`,
+    );
+  }
 }
 
 /** Ce qu'il faut pour écrire dans la transaction de l'appelant. */
@@ -286,11 +337,12 @@ type Executor = Pick<PoolConnection, "execute">;
  * — non levable, elle le reste.
  */
 export async function blockImageHashOn(connection: Executor, fingerprint: ImageFingerprint): Promise<void> {
+  logMissingPhashes([fingerprint]);
   await ignoreMissingTable(
     connection.execute(
       `INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at) VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), 1, CURRENT_DATE)
        ON DUPLICATE KEY UPDATE ${KEEP_OR_ADD_PHASH}`,
-      [fingerprint.sha256, fingerprint.phash],
+      [fingerprint.sha256, storablePhash(fingerprint.phash)],
     ),
   );
 }

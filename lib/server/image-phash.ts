@@ -46,6 +46,8 @@ const SAMPLE_SIZE = 32;
 
 /** Pixels d'entrée au plus (sharp refuse au-delà, l'empreinte reste nulle) : 2 048 × 2 048, très au-delà des WebP de 256 à 512 px servis. */
 const MAX_INPUT_PIXELS = 2048 * 2048;
+/** Formats décodés (ceux qu'accepte le téléversement, `image-upload.ts`) ; tout autre rend une empreinte nulle. */
+const HASHABLE_FORMATS: ReadonlySet<string> = new Set(["webp", "png", "jpeg"]);
 /** Côté du bloc de basses fréquences calculé (9 × 9, dont 64 gardés). */
 const BLOCK_SIZE = 9;
 /** Nombre de bits de l'empreinte. */
@@ -138,11 +140,19 @@ export async function imagePerceptualHash(content: Buffer): Promise<string | nul
  */
 export async function imagePerceptualHashResult(content: Buffer): Promise<{ phash: string | null; decoded: boolean }> {
   try {
+    // `limitInputPixels` borne un appelant futur qui passerait une grande image
+    // (aujourd'hui : le WebP de 256 à 512 px que l'on sert) ; `failOn: "error"`
+    // refuse un fichier tronqué ou corrompu plutôt que d'empreindre des pixels
+    // de remplissage. Seuls les formats matriciels qu'accepte le téléversement
+    // se décodent : jamais un SVG ni un PDF (rastérisés par librsvg ou poppler),
+    // même déposé à la main sous un chemin d'avatar (revue EF-72 sécurité 1).
+    const image = sharp(content, { failOn: "error", autoOrient: true, limitInputPixels: MAX_INPUT_PIXELS });
+    const { format } = await image.metadata();
+    if (!format || !HASHABLE_FORMATS.has(format)) return { phash: null, decoded: false };
     // Réduit d'abord (une seule lecture, 32 × 32), aplati ensuite : le fond
     // transparent ne se compose que sur 1 024 pixels, jamais sur l'image
-    // pleine taille. `limitInputPixels` borne un appelant futur qui passerait
-    // une grande image (aujourd'hui : le WebP de 256 à 512 px que l'on sert).
-    const { data, info } = await sharp(content, { failOn: "none", autoOrient: true, limitInputPixels: MAX_INPUT_PIXELS })
+    // pleine taille. Une image animée : sa première image seulement (sharp).
+    const { data, info } = await image
       .resize(SAMPLE_SIZE, SAMPLE_SIZE, { fit: "fill" })
       .flatten({ background: { r: 128, g: 128, b: 128 } })
       .toColourspace("b-w")
@@ -329,4 +339,18 @@ export function phashComparator(reference: string): (other: string) => number {
 /** Nombre de bits différents entre deux empreintes (écrites en décimal). */
 export function phashDistance(a: string, b: string): number {
   return phashComparator(a)(b);
+}
+
+/** Plus grand entier non signé de 64 bits. */
+const MAX_PHASH = BigInt("18446744073709551615");
+
+/**
+ * L'empreinte perceptuelle telle qu'écrite en SQL : un entier non signé de 64
+ * bits en décimal, sinon `null` — une valeur inattendue (relue d'une ligne
+ * abîmée) ne fait pas échouer la décision qui pose le blocage, elle n'en perd
+ * que l'empreinte perceptuelle.
+ */
+export function storablePhash(phash: string | null | undefined): string | null {
+  if (typeof phash !== "string" || !/^\d{1,20}$/.test(phash)) return null;
+  return BigInt(phash) <= MAX_PHASH ? phash : null;
 }
