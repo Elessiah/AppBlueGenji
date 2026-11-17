@@ -29,9 +29,15 @@ annoncer de l'attente.
   l'envoi passe en `readOnly`, pas en `disabled` (il perdrait le focus) : saisie
   de la première map, lien de rediff, points par map (`RoundMapsDialog`).
 - Le **libellé reste** pendant l'attente (suivi de « … ») : un bouton focalisé
-  dont le nom se réduit à « … » ne dit plus rien.
+  dont le nom se réduit à « … » ne dit plus rien. Un libellé qui **change**
+  (« Enregistrer » → « Enregistrement… ») passe par `<BusyLabel>`
+  (`components/ui/busy-label.tsx`) : les deux textes partagent une case de grille,
+  le bouton ne change pas de largeur et ne pousse pas ses voisins à 375 px.
+- Un **champ de texte** où l'on peut encore écrire (message de signalement, liens
+  du direct) passe en `readOnly` pendant l'envoi : ce qui est affiché est ce qui part.
 - Apparence : `.btn:where([aria-disabled="true"][aria-busy="true"])` donne le
-  curseur d'attente (`globals.css`) ; un état désarmé se dit en **couleurs**,
+  curseur d'attente et un liseré **en tirets** (`globals.css`, lisible sans
+  curseur, au toucher) ; un état désarmé se dit en **couleurs**,
   jamais en `opacity` (`CHECKBOX_STYLES.md`), et l'attente garde son libellé lisible.
 
 ## Écrans convertis

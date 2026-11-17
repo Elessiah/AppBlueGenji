@@ -164,7 +164,8 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
               {/* Le libellé reste pendant l'envoi : le bouton garde le focus, et un
                   nom réduit à « … » ne dirait plus rien du geste en cours. */}
               {toggleLabel}
-              {busy && "…"}
+              {/* Place réservée : le bouton ne change pas de largeur à l'envoi. */}
+              <span style={{ visibility: busy ? "visible" : "hidden" }}>…</span>
             </button>
           )}
         </div>

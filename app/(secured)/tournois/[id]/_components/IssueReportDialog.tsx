@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   ISSUE_REPORT_MAX_LENGTH,
@@ -94,6 +95,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={5}
+            readOnly={busy}
             maxLength={ISSUE_REPORT_MAX_LENGTH}
             aria-invalid={touched && !valid}
             aria-describedby="issue-report-hint"
@@ -134,7 +136,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             aria-busy={busy || undefined}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
-            {busy ? t("issue.pending") : t("issue.send")}
+            <BusyLabel busy={busy} idle={t("issue.send")} pending={t("issue.pending")} />
           </button>
         </div>
       </form>

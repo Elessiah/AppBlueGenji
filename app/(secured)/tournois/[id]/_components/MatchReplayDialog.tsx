@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
@@ -194,7 +195,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 aria-busy={busy || undefined}
                 style={{ padding: "8px 20px", fontSize: 13 }}
               >
-                {busy ? t("schedule.saving") : t("schedule.save")}
+                <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
               </button>
             )}
           </div>

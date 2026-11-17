@@ -94,7 +94,7 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
   it("MatchPlanningPanel_busyToggle_keepsItsLabel", () => {
     const code = source(DIR + "MatchPlanningPanel.tsx");
     expect(code).not.toMatch(/busy \? "…" : toggleLabel/);
-    expect(code).toMatch(/\{toggleLabel\}\s+\{busy && "…"\}/);
+    expect(code).toMatch(/\{toggleLabel\}[\s\S]*?visibility: busy/);
   });
 
   it("EntrantContactsPanel_reopenDuringLoad_rereadsAfter", () => {
@@ -176,5 +176,45 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
 
   it("globalsCss_busyButton_showsProgressCursor", () => {
     expect(source("app/globals.css")).toMatch(/\.btn:where\(\[aria-disabled="true"\]\[aria-busy="true"\]\) \{\s+cursor: progress;/);
+  });
+
+  it("globalsCss_busyButton_saysWaitWithoutCursor", () => {
+    expect(source("app/globals.css")).toMatch(/\.btn:where\(\[aria-disabled="true"\]\[aria-busy="true"\]\) \{[^}]*border-style: dashed;/);
+  });
+
+  it("globalsCss_dimDisabled_usesColoursNotOpacity", () => {
+    const rules = source("app/globals.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const rule of rules.match(/\.dim-disabled[^{]*\{[^}]*\}/g) ?? []) {
+      expect(rule).not.toMatch(/opacity/);
+    }
+  });
+
+  it("ScoreDialogCss_disabledForfeit_keepsReadableContrast", () => {
+    const css = source(DIR + "ScoreDialog.module.css");
+    const alpha = css.match(/\.forfeit\[aria-disabled="true"\] \{[^}]*color: rgba\(var\(--amber-rgb\), ([\d.]+)\)/);
+    expect(Number(alpha?.[1])).toBeGreaterThanOrEqual(0.65);
+  });
+
+  it("textFields_whileSending_areReadOnly", () => {
+    expect(source(DIR + "IssueReportDialog.tsx")).toMatch(/readOnly=\{busy\}/);
+    const live = source(DIR + "MatchLiveDialog.tsx");
+    expect(live).toMatch(/readOnly=\{linkLocked \|\| busy\}/);
+    expect(live).toMatch(/value=\{value\}\s+readOnly=\{busy\}/);
+  });
+
+  it("MatchPlanningPanel_busyLabel_reservesEllipsisWidth", () => {
+    expect(source(DIR + "MatchPlanningPanel.tsx")).toMatch(/visibility: busy \? "visible" : "hidden" \}\}>…<\/span>/);
+  });
+
+  it.each([
+    ["CastSettingsDialog.tsx"],
+    ["MatchLiveDialog.tsx"],
+    ["MatchReplayDialog.tsx"],
+    ["IssueReportDialog.tsx"],
+    ["MatchScheduleDialog.tsx"],
+  ])("%s_swappedSubmitLabel_goesThroughBusyLabel", (file) => {
+    const code = source(DIR + file);
+    expect(code).toMatch(/<BusyLabel busy=\{busy\}/);
+    expect(code).not.toMatch(/\{busy \? t\("(?:schedule\.saving|issue\.pending|cardActions\.castSettings\.saving)"\)/);
   });
 });

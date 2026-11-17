@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { FormEvent, ReactNode, useRef, useState } from "react";
@@ -143,10 +144,9 @@ function savedMessage(text: TournamentDialogsText, touched: boolean, planning: b
   return text.t(planning ? "schedule.planned" : "schedule.saved");
 }
 
-/** Libellé du bouton d'envoi. */
-function submitLabel(text: TournamentDialogsText, busy: boolean, planning: boolean): string {
-  if (busy) return text.t("schedule.saving");
-  return text.t(planning ? "schedule.plan" : "schedule.save");
+/** Libellé du bouton d'envoi : « Enregistrer »/« Planifier », puis « Enregistrement… » sans bouger. */
+function SubmitLabel({ text, busy, planning }: Readonly<{ text: TournamentDialogsText; busy: boolean; planning: boolean }>) {
+  return <BusyLabel busy={busy} idle={text.t(planning ? "schedule.plan" : "schedule.save")} pending={text.t("schedule.saving")} />;
 }
 
 const WARNING_STYLE = {
@@ -686,7 +686,7 @@ export function MatchScheduleDialog({
               {...busyProps}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
-              {submitLabel(text, busy, planning)}
+              <SubmitLabel text={text} busy={busy} planning={planning} />
             </button>
           </div>
         </form>

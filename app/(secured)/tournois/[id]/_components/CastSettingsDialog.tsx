@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { offersCastRelease } from "@/lib/shared/cast-settings";
@@ -375,7 +376,7 @@ export function CastSettingsDialog({
                 aria-disabled={busy || blocked || cast === null || undefined}
                 aria-busy={busy || undefined}
               >
-                {busy ? t("cardActions.castSettings.saving") : t("cardActions.castSettings.save")}
+                <BusyLabel busy={busy} idle={t("cardActions.castSettings.save")} pending={t("cardActions.castSettings.saving")} />
               </button>
             )}
           </div>

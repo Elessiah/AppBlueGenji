@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { fieldAria } from "@/lib/shared/field-errors";
@@ -602,7 +603,7 @@ export function MatchLiveDialog({
               <input
                 id={URL_INPUT_ID}
                 value={liveUrl}
-                readOnly={linkLocked}
+                readOnly={linkLocked || busy}
                 onChange={(e) => {
                   setLiveUrl(e.target.value);
                   fieldErrors.clear("url");
@@ -670,6 +671,7 @@ export function MatchLiveDialog({
                   <input
                     id={inputId}
                     value={value}
+                    readOnly={busy}
                     onChange={(e) => {
                       setCasterLinks((links) => ({ ...links, [stream.id]: e.target.value }));
                       fieldErrors.clear(field);
@@ -748,7 +750,7 @@ export function MatchLiveDialog({
             aria-busy={busy || undefined}
             aria-describedby={saveHintId(saveReason)}
           >
-            {busy ? t("schedule.saving") : t("schedule.save")}
+            <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
           </button>
         </div>
       </form>
