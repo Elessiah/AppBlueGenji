@@ -239,10 +239,11 @@ describe("renderPageShareImage — nom en écriture de droite à gauche", () => 
     const response = await renderPageShareImage("team-7", "fr");
     expect(response!.status).toBe(200);
     expect(response!.headers.get("content-type")).toBe("image/png");
-    expect(loadShareTeam).toHaveBeenCalledTimes(2);
+    // La base n'est lue qu'une fois pour les deux essais.
+    expect(loadShareTeam).toHaveBeenCalledTimes(1);
     // Gardée : un robot suivant ne relance ni échec ni nouvel essai.
     await renderPageShareImage("team-7", "fr");
-    expect(loadShareTeam).toHaveBeenCalledTimes(2);
+    expect(loadShareTeam).toHaveBeenCalledTimes(1);
   });
 
   it("renderPageShareImage_arabicOnlyTeamName_usesFallbackTitle", async () => {
@@ -256,14 +257,25 @@ describe("renderPageShareImage — nom en écriture de droite à gauche", () => 
     jest.mocked(loadSharePodium).mockResolvedValue([{ ...PODIUM[0]!, teamName: `Alpha ${ARABIC}` }, PODIUM[1]!, PODIUM[2]!]);
     const response = await renderPageShareImage("ranking", "fr");
     expect(response!.status).toBe(200);
-    expect(loadSharePodium).toHaveBeenCalledTimes(2);
+    expect(loadSharePodium).toHaveBeenCalledTimes(1);
   });
 
   it("renderPageShareImage_secondRenderAlsoFails_rejectsAfterTwoAttemptsAndKeepsNothing", async () => {
     jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, logoSrc: null });
     jest.mocked(shareCardLogo).mockResolvedValue(`data:image/png;base64,${ARABIC}`);
     await expect(renderPageShareImage("team-7", "fr")).rejects.toThrow("substFormat");
-    expect(loadShareTeam).toHaveBeenCalledTimes(2);
+    expect(loadShareTeam).toHaveBeenCalledTimes(1);
+  });
+
+  it("renderPageShareImage_latinNameRenderFails_throwsWithoutRetry", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, teamName: "Dragon", logoSrc: null });
+    jest.mocked(shareCardLogo).mockResolvedValue(`data:image/png;base64,${ARABIC}`);
+    const warn = jest.mocked(console.warn);
+    warn.mockClear();
+
+    await expect(renderPageShareImage("team-7", "fr")).rejects.toThrow("substFormat");
+    // Aucun nom à retirer : pas de second rendu.
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("renderPageShareImage_latinTeamName_rendersOnce", async () => {

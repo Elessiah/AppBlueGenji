@@ -49,7 +49,7 @@ import { messagesFor } from "./i18n-messages";
 import { renderPageShareImage } from "./page-share-image";
 import { shareCardLogo } from "./share-card-logo";
 import { shareImageOptions } from "./share-card-fonts";
-import { cachedShareImage } from "./share-image-cache";
+import { cachedShareImage, DEGRADED_SHARE_IMAGE_TTL_MS, type ShareImageRender } from "./share-image-cache";
 import { teamLogoDataUrl } from "./share-podium";
 import {
   publicTournamentImageViewForRequest,
@@ -190,14 +190,21 @@ function sideWithoutRightToLeft(side: ShareEntrantSide): ShareEntrantSide {
   return { ...side, name: side.name === null ? null : withoutRightToLeftLetters(side.name) };
 }
 
-/** Les textes saisis que la carte de `matchId` (ou du tournoi) dessine. */
+/**
+ * Les textes saisis que la carte de `matchId` dessine — ou, sans `matchId`,
+ * la carte du tournoi : son nom, sa description (sous-titre sans équipe en
+ * tête) et l'équipe en tête, jamais les matchs (elle n'en dessine aucun, et
+ * les lire bâtirait leurs résumés pour rien).
+ */
 function drawnTexts(view: ShareView, matchId?: number): (string | null)[] {
-  const { leader, matches } = view.share;
+  const { leader } = view.share;
   const texts: (string | null)[] = [view.card.name, leader ? leader.side.name : null];
-  const drawn = matchId === undefined ? [...matches.values()] : [matches.get(matchId)];
-  for (const match of drawn) {
-    if (match) texts.push(match.team1.name, match.team2.name, ...match.maps.map((map) => map.mapName));
+  if (matchId === undefined) {
+    texts.push(view.card.description);
+    return texts;
   }
+  const match = view.share.matches.get(matchId);
+  if (match) texts.push(match.team1.name, match.team2.name, ...match.maps.map((map) => map.mapName));
   return texts;
 }
 
@@ -208,18 +215,25 @@ function hasRightToLeftText(view: ShareView, matchId?: number): boolean {
 
 /**
  * La réponse publique dont tout texte saisi a perdu ses lettres de droite à
- * gauche (noms de tournoi, d'équipe et de map) : le moteur d'images (Satori)
- * échoue sur la police arabe qu'il va chercher, et une équipe « النسور » faisait
- * répondre 500 à la carte de son match. Avec `matchId`, seul ce match est
- * repris (la carte n'en dessine pas d'autre : un tableau de centaines de
- * matchs n'est pas recopié pour un seul rendu).
+ * gauche (noms de tournoi, d'équipe et de map, description) : le moteur
+ * d'images (Satori) échoue sur la police arabe qu'il va chercher, et une équipe
+ * « النسور » faisait répondre 500 à la carte de son match. Avec `matchId`,
+ * seul ce match est repris (la carte n'en dessine pas d'autre : un tableau de
+ * centaines de matchs n'est pas recopié pour un seul rendu) ; sans, la carte du
+ * tournoi ne dessine aucun match : la copie n'en porte pas.
  */
 export function withoutRightToLeftText(view: ShareView, matchId?: number): ShareView {
-  const { leader, matches } = view.share;
-  const kept = matchId === undefined ? [...matches] : [...matches].filter(([id]) => id === matchId);
+  const { leader } = view.share;
+  const match = matchId === undefined ? undefined : view.share.matches.get(matchId);
+  const kept: [number, MatchShareSummary][] = match && matchId !== undefined ? [[matchId, match]] : [];
+  const { description } = view.card;
   return {
     ...view,
-    card: { ...view.card, name: withoutRightToLeftLetters(view.card.name) },
+    card: {
+      ...view.card,
+      name: withoutRightToLeftLetters(view.card.name),
+      description: description === null ? null : withoutRightToLeftLetters(description),
+    },
     share: {
       leader: leader && { ...leader, side: sideWithoutRightToLeft(leader.side) },
       matches: new Map(
@@ -245,19 +259,21 @@ export function withoutRightToLeftText(view: ShareView, matchId?: number): Share
  * à gauche (police embarquée) retente **une fois** sans ces lettres
  * ({@link withoutRightToLeftText}) ; un second échec remonte. Sans telle lettre
  * dans la carte, le nouvel essai ne changerait rien : l'échec remonte aussitôt.
- * Les logos ne sont lus qu'une fois pour les deux essais.
+ * Les logos ne sont lus qu'une fois pour les deux essais ; le PNG est lu une
+ * seule fois (aucune seconde copie). La carte de repli n'est gardée que
+ * `DEGRADED_SHARE_IMAGE_TTL_MS` : l'échec pouvait être passager.
  */
 async function drawnEmbedShareImage(
   target: EmbedShareTarget,
   view: ShareView,
   locale: Locale,
   now: number,
-): Promise<Response | null> {
+): Promise<ShareImageRender | null> {
   const logos: LogoMemo = new Map();
-  const draw = async (shown: ShareView): Promise<Response | null> => {
+  const draw = async (shown: ShareView): Promise<ShareImageRender | null> => {
     const image = await buildEmbedShareImage(target, shown, locale, now, logos);
     if (!image) return null;
-    return new Response(await image.arrayBuffer(), { headers: image.headers });
+    return { body: await image.arrayBuffer(), cacheControl: image.headers.get("cache-control") ?? "" };
   };
   const matchId = target.kind === "match" ? target.matchId : undefined;
   try {
@@ -265,7 +281,8 @@ async function drawnEmbedShareImage(
   } catch (error) {
     if (!hasRightToLeftText(view, matchId)) throw error;
     console.warn("[share-embed] rendu en échec, nouvel essai sans écriture de droite à gauche", error);
-    return draw(withoutRightToLeftText(view, matchId));
+    const degraded = await draw(withoutRightToLeftText(view, matchId));
+    return degraded && { ...degraded, ttlMs: DEGRADED_SHARE_IMAGE_TTL_MS };
   }
 }
 

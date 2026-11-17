@@ -64,8 +64,6 @@ export function cutToWidth(text: string, max: number): string {
 /** Lettres des écritures de droite à gauche (hébreu, arabe, syriaque, thâna, n'ko…). */
 const RTL_LETTER = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EEFF}]/u;
 
-const RTL_LETTERS = new RegExp(RTL_LETTER.source, "gu");
-
 /**
  * Un nom saisi isolé de son voisinage (FSI … PDI, U+2068 / U+2069) **s'il
  * contient une lettre de droite à gauche** : sans cela, un nom arabe ou hébreu
@@ -77,14 +75,24 @@ export function isolateDirection(name: string): string {
   return RTL_LETTER.test(name) ? `\u2068${name}\u2069` : name;
 }
 
+/** Une suite de lettres de droite à gauche, espaces intérieurs compris. */
+const RTL_RUNS = new RegExp(`${RTL_LETTER.source}+(?:\\s+${RTL_LETTER.source}+)*`, "gu");
+
+/** Ce qui tient la place d'une suite retirée : jamais un nom réduit à celui d'une autre équipe. */
+export const RIGHT_TO_LEFT_PLACEHOLDER = "…";
+
 /**
- * `text` sans ses lettres de droite à gauche ({@link RTL_LETTER}), espaces
- * resserrés. Pour dessiner un nom dans une police qui ne les compose pas (le
- * moteur d'images échoue sur l'arabe) : mieux vaut la partie latine d'un nom
- * qu'une carte absente.
+ * `text` dont chaque suite de lettres de droite à gauche ({@link RTL_LETTER})
+ * cède la place à {@link RIGHT_TO_LEFT_PLACEHOLDER}, espaces resserrés ; une
+ * chaîne vide quand il ne reste que des marques. Pour dessiner un nom dans une
+ * police qui ne les compose pas (le moteur d'images échoue sur l'arabe) : mieux
+ * vaut la partie latine d'un nom qu'une carte absente — mais marquée, sans quoi
+ * « النسور TeamLiquid » s'afficherait « TeamLiquid », le nom exact d'une autre
+ * équipe.
  */
 export function withoutRightToLeftLetters(text: string): string {
-  return text.replace(RTL_LETTERS, "").replace(/\s+/gu, " ").trim();
+  const kept = text.replace(RTL_RUNS, RIGHT_TO_LEFT_PLACEHOLDER).replace(/\s+/gu, " ").trim();
+  return kept.replaceAll(RIGHT_TO_LEFT_PLACEHOLDER, "").trim() === "" ? "" : kept;
 }
 
 /** `text` contient-il une lettre de droite à gauche ({@link RTL_LETTER}) ? */

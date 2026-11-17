@@ -412,7 +412,45 @@ describe("carte d'un match — écriture de droite à gauche", () => {
     ]);
 
     expect([...withoutRightToLeftText(shown, 7).share.matches.keys()]).toEqual([7]);
-    expect([...withoutRightToLeftText(shown).share.matches.keys()]).toEqual([7, 8]);
+  });
+
+  it("withoutRightToLeftText_tournamentCard_copiesNoMatch", () => {
+    // La carte du tournoi ne dessine aucun match : la copie n'en porte pas.
+    expect(withoutRightToLeftText(view()).share.matches.size).toBe(0);
+  });
+
+  it("withoutRightToLeftText_description_marked", () => {
+    const shown = view();
+    shown.card = { ...shown.card, description: `${ARABIC} Ladder` };
+
+    expect(withoutRightToLeftText(shown).card.description).toBe("\u2026 Ladder");
+  });
+
+  it("GET_tournamentCardArabicDescription_retriesAndServesPng", async () => {
+    mockRenderFails.when = drawsArabic;
+    const shown = view();
+    shown.card = { ...shown.card, description: `${ARABIC} Ladder` };
+    jest.mocked(publicTournamentImageViewForRequest).mockResolvedValue(shown);
+
+    const response = await get("fr", "tournament-4.png");
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("png");
+  });
+
+  it("GET_tournamentCardFailsWithArabicOnlyInMatches_throwsAfterSingleRender", async () => {
+    let renders = 0;
+    mockRenderFails.when = () => {
+      renders += 1;
+      return true;
+    };
+    jest
+      .mocked(publicTournamentImageViewForRequest)
+      .mockResolvedValue(view({ team1: { teamId: 10, name: ARABIC, logoUrl: null, solo: false } }));
+
+    await expect(get("fr", "tournament-4.png")).rejects.toThrow("lookupType");
+    // Les matchs ne sont pas dessinés : rien à retirer, aucun second rendu.
+    expect(renders).toBe(1);
   });
 
   it("withoutRightToLeftText_namesAndMaps_loseArabicLetters", () => {
@@ -427,14 +465,14 @@ describe("carte d'un match — écriture de droite à gauche", () => {
       leader: { kind: "LEADER", side: { teamId: 10, name: `${ARABIC} Alpha`, logoUrl: null, solo: false } },
     };
 
-    const plain = withoutRightToLeftText(shown);
+    const plain = withoutRightToLeftText(shown, 7);
     const match = plain.share.matches.get(7);
 
-    expect(match?.team1.name).toBe("Alpha");
+    expect(match?.team1.name).toBe("\u2026 Alpha");
     expect(match?.team2.name).toBe("");
-    expect(match?.maps[0]?.mapName).toBe("Ilios");
-    expect(plain.card.name).toBe("Cup");
-    expect(plain.share.leader?.side.name).toBe("Alpha");
+    expect(match?.maps[0]?.mapName).toBe("Ilios \u2026");
+    expect(plain.card.name).toBe("\u2026 Cup");
+    expect(plain.share.leader?.side.name).toBe("\u2026 Alpha");
     // L'original n'est pas modifié.
     expect(shown.share.matches.get(7)?.team1.name).toBe(`${ARABIC} Alpha`);
   });
@@ -442,6 +480,6 @@ describe("carte d'un match — écriture de droite à gauche", () => {
   it("withoutRightToLeftText_soloSideWithoutName_staysNull", () => {
     const shown = view({ team1: { teamId: null, name: null, logoUrl: null, solo: true } });
 
-    expect(withoutRightToLeftText(shown).share.matches.get(7)?.team1.name).toBeNull();
+    expect(withoutRightToLeftText(shown, 7).share.matches.get(7)?.team1.name).toBeNull();
   });
 });

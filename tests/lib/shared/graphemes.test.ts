@@ -84,8 +84,21 @@ describe("truncateForShare — graphèmes", () => {
 });
 
 describe("withoutRightToLeftLetters", () => {
-  it("withoutRightToLeftLetters_mixed_keepsLatinPart", () => {
-    expect(withoutRightToLeftLetters(`Team ${"\u0627\u0644\u0646\u0633\u0648\u0631"} 2`)).toBe("Team 2");
+  it("withoutRightToLeftLetters_mixed_marksRemovedRunWithEllipsis", () => {
+    expect(withoutRightToLeftLetters(`Team ${"\u0627\u0644\u0646\u0633\u0648\u0631"} 2`)).toBe("Team \u2026 2");
+  });
+
+  it("withoutRightToLeftLetters_twoWordRun_singleMarker", () => {
+    expect(withoutRightToLeftLetters("Team \u0627\u0644 \u0646\u0633 X")).toBe("Team \u2026 X");
+  });
+
+  it("withoutRightToLeftLetters_rtlPrefixOnOtherTeamName_neverEqualsThatName", () => {
+    // « النسور TeamLiquid » ne se dessine jamais « TeamLiquid », le nom d'une autre équipe.
+    expect(withoutRightToLeftLetters("\u0627\u0644\u0646\u0633\u0648\u0631 TeamLiquid")).toBe("\u2026 TeamLiquid");
+  });
+
+  it("withoutRightToLeftLetters_onlyRtlWords_returnsEmpty", () => {
+    expect(withoutRightToLeftLetters("\u0627\u0644 \u05E9\u05DC")).toBe("");
   });
 
   it("withoutRightToLeftLetters_hebrewOnly_returnsEmpty", () => {
@@ -110,6 +123,6 @@ describe("hasRightToLeftLetters", () => {
   });
 
   it("withoutRightToLeftLetters_calledTwice_givesTheSameResult", () => {
-    expect([1, 2].map(() => withoutRightToLeftLetters(`A ${ARABIC} B`))).toEqual(["A B", "A B"]);
+    expect([1, 2].map(() => withoutRightToLeftLetters(`A ${ARABIC} B`))).toEqual(["A \u2026 B", "A \u2026 B"]);
   });
 });

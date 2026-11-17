@@ -404,10 +404,12 @@ montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
 
 Satori échoue sur la police arabe qu'il va chercher (« lookupType: 5 - substFormat: 3 ») : une équipe
 « النسور » faisait répondre 500 à sa fiche (`team-<id>`) et pouvait le faire au podium. `drawnPageShareImage`
-lit le PNG et, sur échec d'une de ces deux cartes seulement (le texte des autres est le nôtre), **retente une
-fois** sans les lettres de droite à gauche du nom (`withoutRightToLeftLetters` ; un nom vide retombe sur
-« Équipe n »). Un seul rendu de plus, dans la même place de la file, jamais en boucle ; le résultat est gardé
-comme tout rendu. Même repli que `drawnEmbedShareImage` (`SHARE_EMBEDS.md`).
+lit l'équipe ou le podium **une fois** pour les deux essais et, sur échec d'une de ces deux cartes quand un nom
+dessiné porte une lettre de droite à gauche (sinon — base injoignable, autre écriture — l'échec remonte
+aussitôt), **retente une fois** sans ces lettres (`withoutRightToLeftLetters` : « … » à la place de chaque
+suite retirée, jamais le nom exact d'une autre équipe ; un nom vide retombe sur « Équipe n »). Un seul rendu
+de plus, dans la même place de la file, jamais en boucle ; la carte de repli n'est gardée que 10 min
+(`DEGRADED_SHARE_IMAGE_TTL_MS`). Même repli que `drawnEmbedShareImage` (`SHARE_EMBEDS.md`).
 
 ### Coût d'un rendu (`lib/server/share-image-cache.ts`)
 

@@ -148,10 +148,18 @@ son horaire en tête, à l'heure de Paris, dans les deux langues :
 Écriture de droite à gauche : Satori échoue sur la police arabe qu'il va chercher (« lookupType: 5 -
 substFormat: 3 is not yet supported ») ; une équipe « النسور » faisait répondre 500 à l'image de son match.
 `drawnEmbedShareImage` lit le PNG et, sur échec, **retente une fois** sans les lettres de droite à gauche
-(`withoutRightToLeftText` : noms de tournoi, d'équipe et de map, `withoutRightToLeftLetters` ; un nom vide
-retombe sur « Équipe n »). Le nouvel essai n'a lieu que si la carte dessine une telle lettre (sinon l'échec
-remonte aussitôt), ne recopie que le match dessiné, et ne relit pas les logos (mémo du rendu). Au plus deux
-rendus par carte et par version, dans la même place de la file, résultat gardé (6 h). Le titre et la description gardent le nom entier.
+(`withoutRightToLeftText` : noms de tournoi, d'équipe et de map, description du tournoi ;
+`withoutRightToLeftLetters`). Chaque suite retirée laisse « … » à sa place : « النسور TeamLiquid » se dessine
+« … TeamLiquid », jamais le nom exact d'une autre équipe ; un nom vide retombe sur « Équipe n ». Le nouvel
+essai n'a lieu que si la carte dessine une telle lettre (sinon l'échec remonte aussitôt ; la carte d'un tournoi
+ne dessine aucun match, leurs noms ne comptent pas et ne sont pas recopiés), ne recopie que le match dessiné, et
+ne relit pas les logos (mémo du rendu). Au plus deux rendus par carte et par version, dans la même place de la
+file ; le PNG n'est lu qu'une fois. La carte de repli n'est gardée que 10 min (`DEGRADED_SHARE_IMAGE_TTL_MS`,
+l'échec pouvait être passager), une carte normale 6 h. Le titre et la description gardent le nom entier.
+
+Score non validé : le titre ne porte un score qu'une fois le match `COMPLETED` ; la description, elle, le
+dit avec son état tant qu'il ne l'est pas (« Résultat en attente : A 3 – 0 B », « Match en cours : A 1 – 0 B »,
+clé `share.embed.provisionalScore`, FR et EN).
 Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant. Un créneau
 **passé** non plus (match en retard) : `matchScheduledAt(match, now)` ne rend l'horaire
 qu'à venir, et ce basculement entre dans l'empreinte (`matchShareVersion`), calculée au

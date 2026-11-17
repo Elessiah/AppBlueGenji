@@ -10,6 +10,7 @@
  * d'être borné : un caractère invisible ou de contrôle n'arrive ni au PNG ni à
  * l'encart (`UNTRUSTED_NAMES.md`). Un engagé solo n'est jamais nommé.
  */
+import { capitalizeFirst } from "./capitalize-first";
 import type { Locale } from "./locales";
 import { INTL_LOCALE } from "./locales";
 import type { Messages } from "./i18n-messages";
@@ -66,7 +67,7 @@ export function embedShortDate(iso: string, locale: Locale): string | null {
 
 /** Première lettre en capitale (« mardi » → « Mardi »), dans la langue. */
 function capitalized(text: string, locale: Locale): string {
-  return text.charAt(0).toLocaleUpperCase(INTL_LOCALE[locale]) + text.slice(1);
+  return capitalizeFirst(text, INTL_LOCALE[locale]);
 }
 
 /** L'heure de Paris sur 24 h : « 21:00 » (les deux langues, comme la fiche). */
@@ -456,7 +457,13 @@ export function matchEmbedDescription(
   const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
   if (when !== null) parts.push(`${when} (${text.timeZone})`);
   if (center.kind === "score") {
-    parts.push(`${isolateDirection(names[0])} ${center.team1} – ${center.team2} ${isolateDirection(names[1])}`);
+    const score = `${isolateDirection(names[0])} ${center.team1} – ${center.team2} ${isolateDirection(names[1])}`;
+    // Seul un résultat validé se lit seul : un score en saisie ou soumis dit son état.
+    parts.push(
+      match.status === "COMPLETED"
+        ? score
+        : fill(text.provisionalScore, { state: text.matchStates[matchStateOf(match).key], score }),
+    );
   }
   else if (center.kind === "label") parts.push(center.text);
   for (const map of match.maps) {

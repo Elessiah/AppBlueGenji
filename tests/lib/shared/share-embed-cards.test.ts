@@ -279,6 +279,22 @@ describe("matchEmbedTitle / matchEmbedDescription", () => {
     expect(description).toBe("Forfeit: Bravo");
   });
 
+  it("matchEmbedDescription_awaitingConfirmation_prefixesResultPending", () => {
+    const submitted = summary({ status: "AWAITING_CONFIRMATION", score: { team1: 3, team2: 0 }, maps: [] });
+
+    expect(matchEmbedDescription(submitted, EN, "en")).toBe("Result pending: Alpha 3 – 0 Bravo");
+  });
+
+  it("matchEmbedDescription_readyWithScore_prefixesInProgress", () => {
+    const live = summary({ status: "READY", score: { team1: 1, team2: 0 }, winnerSide: null, maps: [] });
+
+    expect(matchEmbedDescription(live, FR, "fr")).toBe("Match en cours : Alpha 1 – 0 Bravo");
+  });
+
+  it("matchEmbedDescription_completed_scoreAlone", () => {
+    expect(matchEmbedDescription(summary({ maps: [] }), EN, "en")).toBe("Alpha 2 – 1 Bravo");
+  });
+
   it("matchEmbedDescription_doubleForfeit_saysSo", () => {
     expect(matchEmbedDescription(summary({ score: null, doubleForfeit: true }), EN, "en")).toBe("Double forfeit");
   });

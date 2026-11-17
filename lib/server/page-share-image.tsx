@@ -18,7 +18,12 @@ import { messagesFor } from "./i18n-messages";
 import { shareCardLogo } from "./share-card-logo";
 import { shareImageOptions } from "./share-card-fonts";
 import { loadSharePodium } from "./share-podium";
-import { cachedShareImage, type ShareImagePool } from "./share-image-cache";
+import {
+  cachedShareImage,
+  DEGRADED_SHARE_IMAGE_TTL_MS,
+  type ShareImagePool,
+  type ShareImageRender,
+} from "./share-image-cache";
 import { findShareTeam, loadShareTeam, TEAM_SHARE_LOGO_SIZE } from "./share-team";
 import { RANKING_TTL_MS } from "./ranking-cache";
 import type { Locale } from "@/lib/shared/locales";
@@ -28,7 +33,7 @@ import {
   resolvePageShareCard,
   teamShareCard,
 } from "@/lib/shared/page-share-cards";
-import { withoutRightToLeftLetters } from "@/lib/shared/graphemes";
+import { hasRightToLeftLetters, withoutRightToLeftLetters } from "@/lib/shared/graphemes";
 import { localizedRuleModes } from "@/lib/shared/tournament-rules";
 
 /**
@@ -94,38 +99,63 @@ export async function renderPageShareImage(key: string, locale: Locale): Promise
   });
 }
 
+/** Ce que la carte `key` lit de la base : l'équipe (`team-<id>`) ou le podium. */
+export type PageShareData = {
+  team?: Awaited<ReturnType<typeof loadShareTeam>>;
+  podium?: Awaited<ReturnType<typeof loadSharePodium>>;
+};
+
+/** Lit une fois ce que la carte `key` dessine de la base (rien pour une carte au texte fixe). */
+async function loadPageShareData(key: string): Promise<PageShareData> {
+  const teamId = parseTeamShareCardKey(key);
+  if (teamId !== null) return { team: await loadShareTeam(teamId) };
+  if (key === PODIUM_CARD_KEY) return { podium: await loadSharePodium() };
+  return {};
+}
+
+/** Un nom saisi que la carte dessine porte-t-il une lettre de droite à gauche ? */
+function drawsRightToLeftName(data: PageShareData): boolean {
+  const names = [...(data.team ? [data.team.teamName] : []), ...(data.podium ?? []).map((row) => row.teamName)];
+  return names.some(hasRightToLeftLetters);
+}
+
 /**
- * Dessine la carte jusqu'au PNG. Un échec de rendu (nom d'équipe en arabe ou
- * dans une écriture que la police embarquée ne compose pas : Satori répondait
- * 500) retente **une fois** sans les lettres de droite à gauche des noms ; un
- * second échec remonte. Seules les cartes qui nomment une équipe (fiche,
- * podium) peuvent échouer ainsi : le texte des autres est le nôtre.
+ * Dessine la carte jusqu'au PNG, la base lue **une fois** pour les deux essais.
+ * Un échec de rendu sur un nom d'équipe écrit de droite à gauche (Satori
+ * répondait 500 sur l'arabe) retente **une fois** sans ces lettres ; un second
+ * échec remonte. Sans telle lettre dans un nom dessiné (carte au texte fixe,
+ * base injoignable, autre écriture), le nouvel essai ne changerait rien :
+ * l'échec remonte aussitôt. La carte de repli n'est gardée que
+ * `DEGRADED_SHARE_IMAGE_TTL_MS`.
  */
-async function drawnPageShareImage(key: string, locale: Locale): Promise<Response | null> {
-  const draw = async (plainNames: boolean): Promise<Response | null> => {
-    const image = await buildPageShareImage(key, locale, plainNames);
+async function drawnPageShareImage(key: string, locale: Locale): Promise<ShareImageRender | null> {
+  const data = await loadPageShareData(key);
+  const draw = async (plainNames: boolean): Promise<ShareImageRender | null> => {
+    const image = await buildPageShareImage(key, locale, plainNames, data);
     if (!image) return null;
-    return new Response(await image.arrayBuffer(), { headers: image.headers });
+    return { body: await image.arrayBuffer(), cacheControl: image.headers.get("cache-control") ?? "" };
   };
   try {
     return await draw(false);
   } catch (error) {
-    // Une carte au texte fixe n'a aucun nom saisi à retirer : l'échec remonte.
-    if (key !== PODIUM_CARD_KEY && parseTeamShareCardKey(key) === null) throw error;
+    if (!drawsRightToLeftName(data)) throw error;
     console.warn("[share-page] rendu en échec, nouvel essai sans écriture de droite à gauche", error);
-    return draw(true);
+    const degraded = await draw(true);
+    return degraded && { ...degraded, ttlMs: DEGRADED_SHARE_IMAGE_TTL_MS };
   }
 }
 
 /**
  * Rend la carte `key` dans `locale`, sans cache ; `null` pour une clé inconnue.
  * `plainNames` retire des noms d'équipe leurs lettres de droite à gauche
- * (repli de {@link drawnPageShareImage}).
+ * (repli de {@link drawnPageShareImage}) ; `data`, ce que la base en a déjà
+ * rendu (lu ici sinon).
  */
 export async function buildPageShareImage(
   key: string,
   locale: Locale,
   plainNames = false,
+  data?: PageShareData,
 ): Promise<ImageResponse | null> {
   const messages = messagesFor(locale);
   const modeTexts = new Map(localizedRuleModes(messages.rules).map((mode) => [mode.slug, mode]));
@@ -133,10 +163,11 @@ export async function buildPageShareImage(
   if (!card) return null;
 
   const logoSrc = await shareCardLogo();
+  const loaded = data ?? (await loadPageShareData(key));
 
   const teamId = parseTeamShareCardKey(key);
   if (teamId !== null) {
-    const team = await loadShareTeam(teamId);
+    const team = loaded.team ?? null;
     if (team) {
       const teamCard = teamShareCard(
         plainNames ? { ...team, teamName: withoutRightToLeftLetters(team.teamName) } : team,
@@ -167,7 +198,7 @@ export async function buildPageShareImage(
   }
 
   if (key === PODIUM_CARD_KEY) {
-    const podium = await loadSharePodium();
+    const podium = loaded.podium ?? [];
     const entries = podiumShareEntries(
       plainNames ? podium.map((row) => ({ ...row, teamName: withoutRightToLeftLetters(row.teamName) })) : podium,
       messages.share,

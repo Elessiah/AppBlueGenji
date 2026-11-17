@@ -162,6 +162,7 @@
     "moreMaps": "+{count} maps",
     "mapLine": "Map {number}{name}: {score}",
     "mapCode": "code {code}",
+    "provisionalScore": "{state}: {score}",
     "tournamentAlt": "Preview of the tournament {name}",
     "matchAlt": "Preview of the match {team1} vs {team2}"
   }
