@@ -65,6 +65,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TOURNAMENT_PROGRESS.md` — Frise de progression, de masqué à terminé.
 - `TOURNAMENT_LIST_CARDS.md` — Cartes de la liste `/tournois`.
 - `TOURNAMENT_LIST_TOOLBAR.md` — Recherche, filtres et sections de `/tournois`.
+- `TOURNOIS_LIST_EMPTY_LOOK.md` — `/tournois` vide ou presque : états vides (aucun tournoi, filtre, rien à venir) et voiles `.fabric` qui s'éteignent sur leurs bords (aussi `/equipes`, `/joueurs`).
 - `MY_TOURNAMENTS_SECTION.md` — « Mes tournois » en tête de `/tournois`, sommaire.
 - `TOURNAMENT_IMAGE.md` — Illustration ou logo d'un tournoi, cadrage au rendu.
 - `TOURNAMENT_ENTRANT_LOGOS.md` — Logos des engagés, rendus par `EntrantName`.

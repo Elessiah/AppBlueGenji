@@ -5,8 +5,20 @@
 .page {
   position: relative;
   padding: 40px 0 32px;
-  border-bottom: 1px solid var(--line-soft);
   overflow: hidden;
+}
+
+/* Filet de pied de page : il s'éteint à ses deux bouts au lieu de tirer un
+   trait net d'un bord à l'autre de la colonne (TOURNOIS_LIST_EMPTY_LOOK.md). */
+.page::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-soft) 20%, var(--line-soft) 80%, transparent);
+  pointer-events: none;
 }
 
 .pageInner {
@@ -21,6 +33,21 @@
     radial-gradient(1200px 600px at 70% -10%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%),
     radial-gradient(800px 500px at 10% 110%, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
   pointer-events: none;
+  /* Le voile s'éteint sur chaque bord : coupé net par la boîte de la page
+     (`overflow: hidden`), il dessinait un panneau aux arêtes dures sur le noir,
+     d'autant plus visible que la liste est courte. Les deux masques se
+     croisent (`intersect`) : seul le centre reste plein. */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 var(--fade-x), #000 calc(100% - var(--fade-x)), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, #000 var(--fade-x), #000 calc(100% - var(--fade-x)), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
+  mask-composite: intersect;
+  --fade-x: min(18%, 220px);
+  --fade-top: 64px;
+  --fade-bottom: min(30%, 260px);
 }
 
 .pageHead {
@@ -443,27 +470,93 @@ a.sectionNavLink[data-tone="finished"]:hover {
   grid-template-columns: 1fr;
 }
 
-/* Rien du tout à montrer (aucun tournoi publié, ou filtre trop strict) : un
-   seul cadre pour toute la page, au lieu d'un par section. */
-.emptyAll {
-  padding: 36px 24px;
-  border: 1px dashed var(--line-strong-cy);
-  border-radius: var(--r-cy-md);
+/* ---------- ÉTAT VIDE (`ListEmptyState`) ----------
+   Rien à montrer (aucun tournoi, filtre trop strict) ou rien à rejoindre
+   (ni inscriptions ni annonce) : un panneau qui le dit et propose une suite,
+   au lieu d'un grand vide noir. Son halo s'éteint bien avant ses bords (aucune
+   arête de dégradé), le cadre seul dessine la limite — teinté glacier, jamais
+   gris (`DESIGN_SYSTEM.md`). */
+.emptyState {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 24px 36px;
+  margin-bottom: 24px;
   text-align: center;
+  border: 1px solid rgba(90, 200, 255, 0.18);
+  border-radius: var(--r-cy-lg);
+  background:
+    radial-gradient(ellipse 60% 90% at 50% 0%, rgba(90, 200, 255, calc(0.12 * var(--glow, 1))), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 50% 100%, rgba(var(--violet-400-rgb), calc(0.06 * var(--glow, 1))), transparent 70%);
+  overflow: hidden;
+}
+
+.emptyState[data-kind="nothingUpcoming"] {
+  padding: 28px 24px;
+}
+
+.emptyIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--blue-300);
+  border: 1px solid rgba(90, 200, 255, 0.35);
+  background: rgba(90, 200, 255, 0.08);
+  box-shadow: 0 0 24px -4px rgba(90, 200, 255, calc(0.45 * var(--glow, 1)));
+}
+
+/* Anneau qui respire : animé en `transform`/`opacity`, arrêté avec les autres
+   décors (`--deco-anim-state`, `CLIENT_POWER_MODES.md`). */
+.emptyIcon::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(90, 200, 255, 0.3);
+  animation: emptyRing 3.2s ease-out infinite;
+  animation-play-state: var(--deco-anim-state);
+  pointer-events: none;
+}
+
+@keyframes emptyRing {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
 }
 
 .emptyTitle {
+  margin: 6px 0 0;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   letter-spacing: 0.2em;
-  color: var(--ink-mute);
+  color: var(--ink);
   text-transform: uppercase;
 }
 
 .emptyMsg {
-  margin-top: 8px;
-  color: var(--ink-dim);
-  font-size: 13px;
+  margin: 0;
+  max-width: 52ch;
+  color: var(--ink-mute);
+  font-size: 14px;
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 /* Ligne du bouton « Voir plus » / « Voir moins » d'une section : un grid item

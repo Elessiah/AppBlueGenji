@@ -2,8 +2,19 @@
 .page {
   position: relative;
   padding: 56px 0 40px;
-  border-bottom: 1px solid var(--line-soft);
   overflow: hidden;
+}
+/* Filet sous l'en-tête : éteint à ses deux bouts, comme celui de `/tournois`
+   (`docs/features/TOURNOIS_LIST_EMPTY_LOOK.md`). */
+.page::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-soft) 20%, var(--line-soft) 80%, transparent);
+  pointer-events: none;
 }
 .pageInner {
   position: relative;

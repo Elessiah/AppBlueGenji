@@ -32,10 +32,11 @@ import {
   flattenBuckets,
   countByGame,
   needsFinishedArchive,
-  sectionEmptyMessage,
   type GameFilter,
 } from "./_lib/buckets";
 import { isListGateOpen } from "./_lib/list-gate";
+import { listEmptyKind } from "./_lib/empty-state";
+import { ListEmptyState } from "./ListEmptyState";
 import { buildTickerItems } from "./_lib/ticker";
 import {
   DEFAULT_OPEN_SECTIONS,
@@ -512,6 +513,21 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   const ix = (key: PageSectionKey) =>
     String(shownSections.findIndex((entry) => entry.key === key) + 1).padStart(2, "0");
   const isOpen = (key: PageSectionKey) => openSections.has(key);
+  // Rien à montrer, ou rien à rejoindre : un panneau qui le dit et propose une
+  // suite, au lieu d'un grand vide noir (`TOURNOIS_LIST_EMPTY_LOOK.md`). Les
+  // inscriptions et annonces comptent « Mes tournois » compris (avant découpage).
+  const emptyKind = listEmptyKind({
+    loaded: listLoaded,
+    shownSections: shownSections.length,
+    upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length,
+    query: deferredQuery,
+    gameFilter,
+  });
+  const clearFilters = () => {
+    setQuery("");
+    setGameFilter("all");
+    searchInputRef.current?.focus();
+  };
 
   // Une ancre du sommaire reste dans l'URL : au rechargement (ou sur un lien
   // partagé), la section visée n'existe pas encore — elle naît avec la liste —
@@ -702,13 +718,8 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           <div className={s.sections} data-loading={listLoaded ? undefined : "true"}>
             {!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}
 
-            {listLoaded && shownSections.length === 0 && (
-              <div className={s.emptyAll}>
-                <div className={s.emptyTitle}>{t("list.emptyTitle")}</div>
-                <div className={s.emptyMsg}>
-                  {sectionEmptyMessage(t("list.emptyUnfiltered"), deferredQuery, gameFilter, t("list.emptyFiltered"))}
-                </div>
-              </div>
+            {(emptyKind === "empty" || emptyKind === "filtered") && (
+              <ListEmptyState kind={emptyKind} canManage={isAdmin} onClearFilters={clearFilters} />
             )}
 
             {showHidden && totalHidden > 0 && (
@@ -818,6 +829,17 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                   onToggle={() => toggleSection("upcoming")}
                 />
               </Section>
+            )}
+
+            {/* À la place des sections « Inscriptions » et « Prochainement »
+                absentes : la page ne s'arrête plus sur une carte unique. */}
+            {emptyKind === "nothingUpcoming" && (
+              <ListEmptyState
+                kind="nothingUpcoming"
+                canManage={isAdmin}
+                finishedCount={totalFinished}
+                onShowFinished={() => setSectionOpen("finished", true)}
+              />
             )}
 
             {totalFinished > 0 && (
