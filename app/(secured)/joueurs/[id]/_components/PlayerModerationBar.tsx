@@ -15,6 +15,7 @@ import {
 } from "@/lib/shared/account-suspension";
 import { moderationReasonErrorMessage } from "@/lib/shared/logo-quarantine";
 import { isFocusLost } from "@/lib/shared/focus-lost";
+import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import { useStaffLang } from "@/components/i18n/staff-lang";
 import { PROFILE_RELOAD_FAILED_MESSAGE } from "../_lib/roles-errors";
@@ -69,16 +70,11 @@ export function PlayerModerationBar({
     restoreFocus.current = true;
     // Relecture en arrière-plan : un échec laisserait la barre sur l'état
     // d'avant le geste (« Suspendre » sur un compte suspendu) sans le dire.
-    void Promise.resolve(onChanged())
-      .then(
-        (result) => result !== false,
-        () => false,
-      )
-      .then((reloaded) => {
-        if (reloaded) return;
-        restoreFocus.current = false;
-        showError(PROFILE_RELOAD_FAILED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
-      });
+    void reloadSucceeded(onChanged).then((reloaded) => {
+      if (reloaded) return;
+      restoreFocus.current = false;
+      showError(PROFILE_RELOAD_FAILED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
+    });
   };
 
   return (

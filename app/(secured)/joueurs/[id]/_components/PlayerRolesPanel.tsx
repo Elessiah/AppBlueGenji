@@ -17,6 +17,7 @@ import {
 import { useStaffLang } from "@/components/i18n/staff-lang";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
+import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import { rolesErrorMessage } from "../_lib/roles-errors";
 
 /**
@@ -80,10 +81,7 @@ export function PlayerRolesPanel({
   // Relecture de la fiche qui échoue : les rôles affichés (et `expectedRoles`
   // du prochain envoi) resteraient périmés sans que rien ne le dise.
   const reloadProfile = async (failureCode: string) => {
-    const reloaded = await Promise.resolve(onSaved()).then(
-      (result) => result !== false,
-      () => false,
-    );
+    const reloaded = await reloadSucceeded(onSaved);
     if (!reloaded) showError(rolesErrorMessage(failureCode), toastLang);
   };
 

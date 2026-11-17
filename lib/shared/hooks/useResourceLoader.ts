@@ -27,15 +27,6 @@ export function useResourceLoader<T>(
   optionsRef.current = options;
 
   /**
-   * Lecture de la ressource. `silent` : relecture **en arrière-plan** — la page
-   * garde ses données pendant l'appel, et un échec passager ne les retire pas.
-   *
-   * Sans elle, chaque geste d'une page de gestion (exclure un membre, changer
-   * un rôle) repassait l'écran entier en « Chargement… » : tout se démontait —
-   * saisie en cours, position de défilement, modale ouverte — pour se remonter
-   * une demi-seconde plus tard.
-   */
-  /**
    * Numéro de la dernière lecture lancée. Deux gestes rapprochés lancent deux
    * relectures, et rien ne garantit qu'elles reviennent dans l'ordre : sans ce
    * compteur, la réponse la plus ancienne pouvait arriver la dernière et
@@ -44,10 +35,19 @@ export function useResourceLoader<T>(
   const latestRef = useRef(0);
 
   /**
+   * Lecture de la ressource. `silent` : relecture **en arrière-plan** — la page
+   * garde ses données pendant l'appel, et un échec passager ne les retire pas.
+   *
+   * Sans elle, chaque geste d'une page de gestion (exclure un membre, changer
+   * un rôle) repassait l'écran entier en « Chargement… » : tout se démontait —
+   * saisie en cours, position de défilement, modale ouverte — pour se remonter
+   * une demi-seconde plus tard.
+   *
    * Rend `false` si la lecture a échoué (réponse en erreur, réseau) — une
    * relecture en arrière-plan qui échoue laisse l'écran sur l'ancien état sans
    * rien dire : l'appelant le signale. `true` sinon (lue, ou dépassée par une
-   * lecture plus récente).
+   * lecture plus récente : l'écran suit alors celle-là, un échec de la
+   * première n'a rien à dire).
    */
   const load = useCallback(
     async (silent: boolean): Promise<boolean> => {
@@ -64,7 +64,8 @@ export function useResourceLoader<T>(
           return true;
         }
         if (!res.ok) {
-          if (silent || !isLatest()) return false;
+          if (!isLatest()) return true;
+          if (silent) return false;
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
           return false;
@@ -74,7 +75,8 @@ export function useResourceLoader<T>(
         setState({ status: "ready", data, error: null });
         return true;
       } catch (e) {
-        if (!silent && isLatest()) setState({ status: "error", data: null, error: (e as Error).message });
+        if (!isLatest()) return true;
+        if (!silent) setState({ status: "error", data: null, error: (e as Error).message });
         return false;
       }
     },

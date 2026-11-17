@@ -157,6 +157,12 @@ describe("withToast — option once", () => {
     expect(withToast(shown, { id: 3, message: "Autre", type: "error" }, true)).toHaveLength(2);
   });
 
+  it("withToast_onceSameTextOtherLang_adds", () => {
+    const fr = [{ id: 1, message: "Occupé", type: "info" as const, lang: "fr" }];
+    expect(withToast(fr, { id: 2, message: "Occupé", type: "info" as const, lang: "fr" }, true)).toBe(fr);
+    expect(withToast(fr, { id: 3, message: "Occupé", type: "info" as const, lang: "en" }, true)).toHaveLength(2);
+  });
+
   it("withToast_withoutOnce_stacksDuplicates", () => {
     expect(withToast(shown, { id: 2, message: "Maximum 8", type: "error" }, false)).toHaveLength(2);
   });

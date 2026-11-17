@@ -124,15 +124,18 @@ function ReportsPanel() {
   const summary = useMemo(() => statusSummary(reports ?? []), [reports]);
   const selected = reports?.find((report) => report.id === selectedId) ?? null;
 
-  const select = (id: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("id", String(id));
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    // Sur mobile, le dossier est sous la liste : on l'amène à l'écran.
-    if (window.matchMedia("(max-width: 900px)").matches) {
-      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    }
-  };
+  const select = useCallback(
+    (id: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("id", String(id));
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      // Sur mobile, le dossier est sous la liste : on l'amène à l'écran.
+      if (window.matchMedia("(max-width: 900px)").matches) {
+        requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+    },
+    [searchParams, router, pathname],
+  );
 
   // Un geste refusé parce qu'un autre attend le dit : par la garde synchrone
   // (second envoi parti avant le rendu de `pending`, double clic), ou par le
@@ -260,44 +263,49 @@ function ReportsPanel() {
     );
   };
 
-  const reportList =
-    visible.length === 0 ? (
-      <p className={styles.empty}>
-        {filters.status === "ACTIVE" ? "Rien à traiter ici. 🎉" : "Aucun signalement archivé."}
-      </p>
-    ) : (
-      <ul className={styles.list} aria-label="Signalements">
-        {visible.map((report) => {
-          const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
-          const summaryLine = targetSummary(report);
-          return (
-            <li key={report.id}>
-              <button
-                type="button"
-                className={styles.item}
-                aria-current={report.id === selectedId ? "true" : undefined}
-                onClick={() => select(report.id)}
-              >
-                <span className={styles.itemIcon} aria-hidden="true">
-                  {definition.icon}
-                </span>
-                <span className={styles.itemTop}>
-                  <span>
-                    n° {report.id} · {definition.label}
+  // Mémoïsée : un geste en attente change `pending`/`busy` (deux ou trois rendus par
+  // geste) sans toucher la liste, que ces rendus ne reconstruisent donc pas.
+  const reportList = useMemo(
+    () =>
+      visible.length === 0 ? (
+        <p className={styles.empty}>
+          {filters.status === "ACTIVE" ? "Rien à traiter ici. 🎉" : "Aucun signalement archivé."}
+        </p>
+      ) : (
+        <ul className={styles.list} aria-label="Signalements">
+          {visible.map((report) => {
+            const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
+            const summaryLine = targetSummary(report);
+            return (
+              <li key={report.id}>
+                <button
+                  type="button"
+                  className={styles.item}
+                  aria-current={report.id === selectedId ? "true" : undefined}
+                  onClick={() => select(report.id)}
+                >
+                  <span className={styles.itemIcon} aria-hidden="true">
+                    {definition.icon}
                   </span>
-                  <StatusPill status={report.status} contested={report.contests.length > 0} />
-                </span>
-                <span className={styles.itemMeta}>
-                  {relativeAge(report.createdAt)}
-                  {report.assignee ? ` · ${report.assignee.pseudo}` : ""}
-                </span>
-                <span className={styles.itemTargets}>{summaryLine || report.pagePath || "—"}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    );
+                  <span className={styles.itemTop}>
+                    <span>
+                      n° {report.id} · {definition.label}
+                    </span>
+                    <StatusPill status={report.status} contested={report.contests.length > 0} />
+                  </span>
+                  <span className={styles.itemMeta}>
+                    {relativeAge(report.createdAt)}
+                    {report.assignee ? ` · ${report.assignee.pseudo}` : ""}
+                  </span>
+                  <span className={styles.itemTargets}>{summaryLine || report.pagePath || "—"}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ),
+    [visible, selectedId, filters.status, select],
+  );
 
   return (
     <section className={`container ${styles.page}`}>

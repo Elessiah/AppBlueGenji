@@ -50,6 +50,15 @@ describe("useResourceLoader", () => {
       expect(source).toContain("catch(() => ({}))");
     });
 
+    it("une lecture dépassée par une plus récente ne compte jamais comme un échec", () => {
+      const load = source.slice(source.indexOf("async (silent: boolean)"));
+      // Avant tout `return false` : `isLatest()` écarte la lecture dépassée.
+      const firstFalse = load.indexOf("return false");
+      expect(load.slice(0, firstFalse)).toContain("if (!isLatest()) return true;");
+      const catchBranch = load.slice(load.indexOf("catch (e)"));
+      expect(catchBranch.indexOf("if (!isLatest()) return true;")).toBeLessThan(catchBranch.indexOf("return false"));
+    });
+
     it("passe le corps au rappel, dans sa signature", () => {
       expect(source).toContain("onNotFoundRedirect?: (payload: NotFoundPayload) => void");
     });

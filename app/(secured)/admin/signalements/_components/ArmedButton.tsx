@@ -46,10 +46,10 @@ export function ArmedButton({
 
   // Un autre geste part (ou celui-ci attend) : la question n'a plus de sens, et
   // son libellé long ne doit pas rester à l'écran, bouton refusé.
+  // Remis à zéro pendant le rendu, pas dans un effet : aucune image ne montre
+  // la question sur un bouton déjà refusé.
   const off = busy || blocked;
-  useEffect(() => {
-    if (off) setArmed(false);
-  }, [off]);
+  if (off && armed) setArmed(false);
 
   useEffect(() => {
     if (!armed) return;

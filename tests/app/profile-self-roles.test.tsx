@@ -246,7 +246,7 @@ describe("Rôles — cas limites de l'écran (cycle UI)", () => {
     const panel = read("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
     // `reloadProfile` attrape l'échec de la relecture (et le dit) : la confirmation se ferme.
     expect(panel).toMatch(/if \(code === "ROLES_CHANGED"\) \{[\s\S]*?await reloadProfile\("PROFILE_RELOAD_FAILED"\);\s*return true;/);
-    expect(panel).toMatch(/Promise\.resolve\(onSaved\(\)\)\.then\(\s*\(result\) => result !== false,\s*\(\) => false,/);
+    expect(panel).toMatch(/await reloadSucceeded\(onSaved\)/);
   });
 
   it("selfRolesField_nothingToSave_usesNeutralToast", () => {

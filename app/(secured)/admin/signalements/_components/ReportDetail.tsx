@@ -118,10 +118,11 @@ export function ReportDetail({
 
   useLayoutEffect(() => {
     const started = gestureStarted(clicked.current, pending);
-    if (started) {
-      pressed.current = started;
-      clicked.current = null;
-    }
+    if (started) pressed.current = started;
+    // Un geste part (le sien ou un autre) : le dernier clic n'a plus rien à dire,
+    // un clic ancien (« Supprimer… » armé puis laissé expirer) ne doit pas en
+    // faire un bouton pressé plus tard.
+    if (pending !== null) clicked.current = null;
     const last = pressed.current;
     if (!last) return;
     const root = articleRef.current;

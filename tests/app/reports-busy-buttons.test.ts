@@ -79,6 +79,8 @@ describe("signalements du staff — boutons pendant une requête", () => {
     const code = source(DETAIL);
     expect(code).toContain("clicked.current = pressedGestureOf(event.target);");
     expect(code).toContain("const started = gestureStarted(clicked.current, pending);");
+    // Un geste part : le dernier clic est oublié, un clic ancien ne devient pas « pressé » plus tard.
+    expect(code).toContain("if (pending !== null) clicked.current = null;");
     expect(code).not.toContain("if (gesture) pressed.current = gesture;");
   });
 
@@ -118,7 +120,7 @@ describe("signalements du staff — boutons pendant une requête", () => {
 
   it("PlayerRolesPanel_failedReload_saysProfileReloadFailed", () => {
     const code = source(ROLES);
-    expect(code).toMatch(/Promise\.resolve\(onSaved\(\)\)\.then\(\s*\(result\) => result !== false,\s*\(\) => false,/);
+    expect(code).toMatch(/await reloadSucceeded\(onSaved\)/);
     expect(code).toContain("if (!reloaded) showError(rolesErrorMessage(failureCode), toastLang);");
     // Enregistré mais fiche non relue : une seule phrase, qui dit les deux.
     expect(code).toContain('await reloadProfile("ROLES_SAVED_RELOAD_FAILED");');
@@ -133,7 +135,7 @@ describe("signalements du staff — boutons pendant une requête", () => {
 
   it("PlayerModerationBar_failedReload_saysSo", () => {
     const bar = source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
-    expect(bar).toMatch(/Promise\.resolve\(onChanged\(\)\)/);
+    expect(bar).toMatch(/reloadSucceeded\(onChanged\)/);
     expect(bar).toContain("showError(PROFILE_RELOAD_FAILED_MESSAGE,");
   });
 
@@ -260,8 +262,22 @@ describe("signalements du staff — rendu des gestes", () => {
 
   it("ArmedButton_otherGestureStarts_disarmedSoLongLabelGoes", () => {
     const code = source(ARMED);
-    expect(code).toMatch(/const off = busy \|\| blocked;\s+useEffect\(\(\) => \{\s+if \(off\) setArmed\(false\);\s+\}, \[off\]\);/);
+    // Remis à zéro pendant le rendu : aucune image ne montre la question sur un bouton refusé.
+    expect(code).toMatch(/const off = busy \|\| blocked;\s+if \(off && armed\) setArmed\(false\);/);
     expect(code).toContain("{armed && !off ? confirmLabel : label}");
+  });
+
+  it("page_reportList_memoisedSoPendingRendersSkipIt", () => {
+    const code = source(PAGE);
+    expect(code).toContain("const reportList = useMemo(");
+    expect(code).toContain("[visible, selectedId, filters.status, select],");
+    expect(code).toMatch(/const select = useCallback\(/);
+  });
+
+  it("reloadOutcome_sharedByRolesPanelAndModerationBar", () => {
+    const shared = 'import { reloadSucceeded } from "@/lib/shared/reload-outcome";';
+    expect(source(ROLES)).toContain(shared);
+    expect(source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx")).toContain(shared);
   });
 
   it("page_pending_releasedAfterTheGuard_neverBefore", () => {
