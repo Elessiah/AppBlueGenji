@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import styles from "../reports.module.css";
 
 /** Délai pendant lequel le second clic confirme. */
@@ -10,8 +11,15 @@ interface ArmedButtonProps {
   label: string;
   confirmLabel: string;
   onConfirm: () => void;
-  disabled?: boolean;
+  /** Ce geste attend sa réponse : refusé **et** annoncé occupé (`BusyButton`). */
+  busy: boolean;
+  /** Un autre geste attend : refusé sans annonce d'attente. */
+  blocked?: boolean;
   className?: string;
+  /** Nom du geste, pour rendre le focus après la relecture du dossier (`report-gestures.ts`). */
+  "data-gesture"?: string;
+  /** Clic pendant qu'un autre geste attend (`blocked`) : le dire, sans armer. */
+  onBlockedClick?: () => void;
 }
 
 /**
@@ -21,10 +29,27 @@ interface ArmedButtonProps {
  * traitement ; un clic unique rendrait l'erreur irréparable.
  *
  * Le changement de libellé est annoncé (`aria-live`) : un lecteur d'écran doit
- * savoir que le bouton attend une confirmation.
+ * savoir que le bouton attend une confirmation. Pendant un envoi, il reste
+ * focalisable (`BusyButton`, `BUSY_BUTTONS.md`) et ne s'arme pas.
  */
-export function ArmedButton({ label, confirmLabel, onConfirm, disabled, className }: Readonly<ArmedButtonProps>) {
+export function ArmedButton({
+  label,
+  confirmLabel,
+  onConfirm,
+  busy,
+  blocked = false,
+  className,
+  "data-gesture": gesture,
+  onBlockedClick,
+}: Readonly<ArmedButtonProps>) {
   const [armed, setArmed] = useState(false);
+
+  // Un autre geste part (ou celui-ci attend) : la question n'a plus de sens, et
+  // son libellé long ne doit pas rester à l'écran, bouton refusé.
+  // Remis à zéro pendant le rendu, pas dans un effet : aucune image ne montre
+  // la question sur un bouton déjà refusé.
+  const off = busy || blocked;
+  if (off && armed) setArmed(false);
 
   useEffect(() => {
     if (!armed) return;
@@ -33,10 +58,12 @@ export function ArmedButton({ label, confirmLabel, onConfirm, disabled, classNam
   }, [armed]);
 
   return (
-    <button
-      type="button"
+    <BusyButton
+      busy={busy}
+      blocked={blocked}
+      data-gesture={gesture}
+      onBlockedClick={onBlockedClick}
       className={`${styles.actionButton} ${className ?? ""}`}
-      disabled={disabled}
       aria-live="polite"
       onClick={() => {
         if (!armed) {
@@ -47,7 +74,7 @@ export function ArmedButton({ label, confirmLabel, onConfirm, disabled, classNam
         onConfirm();
       }}
     >
-      {armed ? confirmLabel : label}
-    </button>
+      {armed && !off ? confirmLabel : label}
+    </BusyButton>
   );
 }

@@ -20,7 +20,7 @@ import {
   type SiteCopyEditorEntry,
   type SiteCopyKey,
 } from "@/lib/shared/site-copy";
-import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import styles from "./EditableCopy.module.css";
 
 /**

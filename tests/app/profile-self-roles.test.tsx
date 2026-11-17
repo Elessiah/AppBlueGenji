@@ -237,14 +237,16 @@ describe("Rôles — cas limites de l'écran (cycle UI)", () => {
   it("requestSave_rolesUndefined_returnsWithoutSaving", () => {
     const panel = read("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
     expect(panel).toContain("if (!roles) return;");
-    expect(panel).toContain("disabled={rolesBusy || !roles}");
+    expect(panel).toMatch(/busy=\{rolesBusy\}\s+blocked=\{!roles\}/);
     expect(panel).toContain("expectedRoles: roles");
     expect(panel).not.toContain("void saveRoles()");
   });
 
   it("saveRoles_rolesChangedAndRefreshThrows_stillReturnsTrue", () => {
     const panel = read("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
-    expect(panel).toMatch(/if \(code === "ROLES_CHANGED"\) \{[\s\S]*?try \{\s*await onSaved\(\);\s*\} catch \{[\s\S]*?\}\s*return true;/);
+    // `reloadProfile` attrape l'échec de la relecture (et le dit) : la confirmation se ferme.
+    expect(panel).toMatch(/if \(code === "ROLES_CHANGED"\) \{[\s\S]*?await reloadProfile\("PROFILE_RELOAD_FAILED"\);\s*return true;/);
+    expect(panel).toMatch(/await reloadSucceeded\(onSaved\)/);
   });
 
   it("selfRolesField_nothingToSave_usesNeutralToast", () => {

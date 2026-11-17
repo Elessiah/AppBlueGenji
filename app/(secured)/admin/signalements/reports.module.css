@@ -110,6 +110,11 @@
   border-color: var(--line-strong-cy);
 }
 
+/* « Actualiser » : désarmé pendant un geste par `aria-disabled` (`BusyButton`). */
+.refresh {
+  composes: busyLook from "../../../busy-look.module.css";
+}
+
 .tab[aria-pressed="true"],
 .segment[aria-pressed="true"],
 .chipToggle[aria-pressed="true"] {
@@ -456,6 +461,8 @@
 }
 
 .actionButton {
+  /* Désarmé par `aria-disabled` (`BusyButton`, le bouton garde le focus) : en couleurs, tirets en attente. */
+  composes: busyLook from "../../../busy-look.module.css";
   min-height: 32px;
   padding: 4px 12px;
   border: 1px solid var(--line-strong-cy);
@@ -466,14 +473,9 @@
   cursor: pointer;
 }
 
-.actionButton:hover:not(:disabled) {
+.actionButton:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: rgba(90, 200, 255, 0.6);
   background: rgba(90, 200, 255, 0.08);
-}
-
-.actionButton:disabled {
-  color: var(--ink-dim);
-  cursor: not-allowed;
 }
 
 .actionPrimary {
@@ -482,7 +484,7 @@
   color: var(--blue-100, var(--ink));
 }
 
-.actionPrimary:hover:not(:disabled) {
+.actionPrimary:hover:not(:disabled):not([aria-disabled="true"]) {
   box-shadow: var(--glow-blue);
 }
 
@@ -497,7 +499,7 @@
   color: #ff8a96;
 }
 
-.actionDanger:hover:not(:disabled) {
+.actionDanger:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(255, 110, 124, 0.1);
   border-color: rgba(255, 110, 124, 0.8);
 }

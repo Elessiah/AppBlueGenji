@@ -3,6 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   reportStatTone,
   type ReportAction,
@@ -25,6 +28,7 @@ import {
 import { adminFetch, adminReportErrorMessage, jsonBody } from "./_lib/admin-errors";
 import { contestOutcomeMessage, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { ReportDetail } from "./_components/ReportDetail";
+import { REFRESH_GESTURE, reportGesture } from "./_lib/report-gestures";
 import { StatusPill } from "./_components/StatusPill";
 import styles from "./reports.module.css";
 
@@ -64,10 +68,13 @@ function ReportsPanel() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const [reports, setReports] = useState<ReportView[] | null>(null);
   const [filters, setFilters] = useState<ReportFilters>(DEFAULT_FILTERS);
-  const [busy, setBusy] = useState(false);
+  // Un geste à la fois (`BUSY_BUTTONS.md`) : `pending` nomme celui qui attend
+  // (seul son bouton s'annonce occupé), les autres sont refusés sans attente.
+  const { busy, run: runGuarded } = useBusyGuard();
+  const [pending, setPending] = useState<string | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const selectedId = Number(searchParams.get("id")) || null;
 
@@ -117,35 +124,65 @@ function ReportsPanel() {
   const summary = useMemo(() => statusSummary(reports ?? []), [reports]);
   const selected = reports?.find((report) => report.id === selectedId) ?? null;
 
-  const select = (id: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("id", String(id));
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    // Sur mobile, le dossier est sous la liste : on l'amène à l'écran.
-    if (window.matchMedia("(max-width: 900px)").matches) {
-      requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    }
+  const select = useCallback(
+    (id: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("id", String(id));
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      // Sur mobile, le dossier est sous la liste : on l'amène à l'écran.
+      if (window.matchMedia("(max-width: 900px)").matches) {
+        requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+    },
+    [searchParams, router, pathname],
+  );
+
+  // Un geste refusé parce qu'un autre attend le dit : par la garde synchrone
+  // (second envoi parti avant le rendu de `pending`, double clic), ou par le
+  // bouton déjà désarmé (`onBlockedClick` de `BusyButton`).
+  // `once` : un clic répété, ou Entrée tenue, n'empile pas le même message.
+  const refuse = useCallback(() => showInfo(BUSY_REFUSED_MESSAGE, { once: true }), [showInfo]);
+
+  // La garde synchrone écarte le second envoi parti avant le rendu de `busy`
+  // (double clic).
+  const run = async <T,>(gesture: string, task: () => Promise<T>, success: string | ((result: T) => string)) => {
+    const done = await runGuarded(async () => {
+      setPending(gesture);
+      try {
+        const result = await task();
+        showSuccess(typeof success === "function" ? success(result) : success);
+        // Le badge « Signalements » de la barre compte les dossiers ouverts.
+        router.refresh();
+      } catch (error) {
+        showError(adminReportErrorMessage((error as Error).message));
+      } finally {
+        await load();
+      }
+      return true;
+    });
+    if (done === undefined) refuse();
+    // Après la garde, jamais avant : entre les deux, aucun bouton ne serait
+    // refusé « occupé » sans montrer lequel attend. Un refus ne touche pas
+    // `pending`, qui nomme encore le geste en cours.
+    else setPending(null);
   };
 
-  const run = async <T,>(task: () => Promise<T>, success: string | ((result: T) => string)) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const result = await task();
-      showSuccess(typeof success === "function" ? success(result) : success);
-      // Le badge « Signalements » de la barre compte les dossiers ouverts.
-      router.refresh();
-    } catch (error) {
-      showError(adminReportErrorMessage((error as Error).message));
-    } finally {
+  // « Actualiser » passe par la même garde : un geste lancé pendant la relecture
+  // agirait sur un dossier que la relecture va remplacer.
+  const refresh = async () => {
+    const done = await runGuarded(async () => {
+      setPending(REFRESH_GESTURE);
       await load();
-      setBusy(false);
-    }
+      return true;
+    });
+    if (done === undefined) refuse();
+    else setPending(null);
   };
 
   const onAction = (action: ReportAction, note?: string) => {
     if (!selected) return;
     void run(
+      reportGesture.action(action),
       () => adminFetch(`/api/admin/reports/${selected.id}`, jsonBody("PATCH", { action, note }), "REPORT_ACTION_FAILED"),
       ACTION_SUCCESS[action],
     );
@@ -159,6 +196,7 @@ function ReportsPanel() {
   const onHideLogo = (target: ReportTargetRef) => {
     if (!selected) return;
     void run(
+      reportGesture.hide(target),
       () =>
         adminFetch(
           `/api/admin/reports/${selected.id}/logo-quarantine`,
@@ -174,6 +212,7 @@ function ReportsPanel() {
   const onDeleteLogo = (target: ReportTargetRef) => {
     if (!selected) return;
     void run(
+      reportGesture.remove(target),
       () =>
         adminFetch(
           `/api/admin/reports/${selected.id}/logo-removal`,
@@ -193,6 +232,7 @@ function ReportsPanel() {
   const onRestore = (quarantineId: number) => {
     const type = quarantineTargetType(quarantineId);
     void run(
+      reportGesture.restore(quarantineId),
       () =>
         adminFetch(`/api/admin/logo-quarantines/${quarantineId}/restore`, { method: "POST" }, "LOGO_RESTORE_FAILED"),
       `${imageNoun(type)} rétabli. ${concernedNoun(type)}.`,
@@ -202,6 +242,7 @@ function ReportsPanel() {
   const onPurge = (quarantineId: number) => {
     const type = quarantineTargetType(quarantineId);
     void run(
+      reportGesture.purge(quarantineId),
       () => adminFetch(`/api/admin/logo-quarantines/${quarantineId}`, { method: "DELETE" }, "LOGO_PURGE_FAILED"),
       `${imageNoun(type)} supprimé définitivement. ${concernedNoun(type)}.`,
     );
@@ -211,6 +252,7 @@ function ReportsPanel() {
   // ce que devient le blocage de son image (D18).
   const onContestOutcome = (quarantineId: number, outcome: ContestOutcome) => {
     void run(
+      reportGesture.outcome(quarantineId, outcome),
       () =>
         adminFetch<{ blocked?: boolean | null; hashUnknown?: boolean }>(
           `/api/admin/logo-quarantines/${quarantineId}/contest-outcome`,
@@ -221,44 +263,49 @@ function ReportsPanel() {
     );
   };
 
-  const reportList =
-    visible.length === 0 ? (
-      <p className={styles.empty}>
-        {filters.status === "ACTIVE" ? "Rien à traiter ici. 🎉" : "Aucun signalement archivé."}
-      </p>
-    ) : (
-      <ul className={styles.list} aria-label="Signalements">
-        {visible.map((report) => {
-          const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
-          const summaryLine = targetSummary(report);
-          return (
-            <li key={report.id}>
-              <button
-                type="button"
-                className={styles.item}
-                aria-current={report.id === selectedId ? "true" : undefined}
-                onClick={() => select(report.id)}
-              >
-                <span className={styles.itemIcon} aria-hidden="true">
-                  {definition.icon}
-                </span>
-                <span className={styles.itemTop}>
-                  <span>
-                    n° {report.id} · {definition.label}
+  // Mémoïsée : un geste en attente change `pending`/`busy` (deux ou trois rendus par
+  // geste) sans toucher la liste, que ces rendus ne reconstruisent donc pas.
+  const reportList = useMemo(
+    () =>
+      visible.length === 0 ? (
+        <p className={styles.empty}>
+          {filters.status === "ACTIVE" ? "Rien à traiter ici. 🎉" : "Aucun signalement archivé."}
+        </p>
+      ) : (
+        <ul className={styles.list} aria-label="Signalements">
+          {visible.map((report) => {
+            const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
+            const summaryLine = targetSummary(report);
+            return (
+              <li key={report.id}>
+                <button
+                  type="button"
+                  className={styles.item}
+                  aria-current={report.id === selectedId ? "true" : undefined}
+                  onClick={() => select(report.id)}
+                >
+                  <span className={styles.itemIcon} aria-hidden="true">
+                    {definition.icon}
                   </span>
-                  <StatusPill status={report.status} contested={report.contests.length > 0} />
-                </span>
-                <span className={styles.itemMeta}>
-                  {relativeAge(report.createdAt)}
-                  {report.assignee ? ` · ${report.assignee.pseudo}` : ""}
-                </span>
-                <span className={styles.itemTargets}>{summaryLine || report.pagePath || "—"}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    );
+                  <span className={styles.itemTop}>
+                    <span>
+                      n° {report.id} · {definition.label}
+                    </span>
+                    <StatusPill status={report.status} contested={report.contests.length > 0} />
+                  </span>
+                  <span className={styles.itemMeta}>
+                    {relativeAge(report.createdAt)}
+                    {report.assignee ? ` · ${report.assignee.pseudo}` : ""}
+                  </span>
+                  <span className={styles.itemTargets}>{summaryLine || report.pagePath || "—"}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ),
+    [visible, selectedId, filters.status, select],
+  );
 
   return (
     <section className={`container ${styles.page}`}>
@@ -323,9 +370,15 @@ function ReportsPanel() {
           >
             <span aria-hidden="true">⚖</span> Contestés seulement
           </button>
-          <button type="button" className={styles.segment} onClick={() => void load()} disabled={busy}>
+          <BusyButton
+            busy={pending === REFRESH_GESTURE}
+            blocked={busy}
+            className={`${styles.segment} ${styles.refresh}`}
+            onBlockedClick={refuse}
+            onClick={() => void refresh()}
+          >
             Actualiser
-          </button>
+          </BusyButton>
         </fieldset>
       </div>
 
@@ -344,7 +397,8 @@ function ReportsPanel() {
           {selected ? (
             <ReportDetail
               report={selected}
-              busy={busy}
+              pending={pending}
+              onRefused={refuse}
               onAction={onAction}
               onHideLogo={onHideLogo}
               onDeleteLogo={onDeleteLogo}

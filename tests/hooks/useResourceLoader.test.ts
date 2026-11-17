@@ -50,6 +50,22 @@ describe("useResourceLoader", () => {
       expect(source).toContain("catch(() => ({}))");
     });
 
+    it("une lecture dépassée par une plus récente ne compte jamais comme un échec", () => {
+      const load = source.slice(source.indexOf("async (silent: boolean)"));
+      // Avant tout `return false` : `isLatest()` écarte la lecture dépassée.
+      const firstFalse = load.indexOf("return false");
+      expect(load.slice(0, firstFalse)).toContain("if (!isLatest()) return true;");
+      const catchBranch = load.slice(load.indexOf("catch (e)"));
+      expect(catchBranch.indexOf("if (!isLatest()) return true;")).toBeLessThan(catchBranch.indexOf("return false"));
+    });
+
+    it("une relecture en arrière-plan refusée (401, 403) retire les données", () => {
+      const notOk = source.slice(source.indexOf("if (!res.ok)"), source.indexOf("const data = (await res.json())"));
+      expect(notOk).toContain("if (keepsDataOnFailure(silent, res.status)) return false;");
+      expect(source).toContain("return silent && status !== 401 && status !== 403;");
+      expect(notOk.indexOf("return false;")).toBeLessThan(notOk.indexOf('setState({ status: "error"'));
+    });
+
     it("passe le corps au rappel, dans sa signature", () => {
       expect(source).toContain("onNotFoundRedirect?: (payload: NotFoundPayload) => void");
     });

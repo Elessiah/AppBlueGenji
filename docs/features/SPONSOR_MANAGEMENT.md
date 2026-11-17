@@ -98,3 +98,14 @@ La description a son anglais (`description_en`, `descriptionEn`), obligatoire d�
 ## Envois
 
 Boutons occupés et import d'image sous une même garde, ajout sans doublon par clé de requête : `BUSY_BUTTONS.md` (EF-68).
+
+À l'ajout, un logo ou un bandeau du dossier `sponsors/` dont le fichier n'existe
+plus est laissé (partenaire créé sans cette image, `keptStoredUpload` de
+`lib/server/kept-stored-upload.ts`, partagé avec `POST /api/benevoles`) : un
+ajout **rejoué** après la suppression du partenaire (même clé de requête) le
+recréait sur l'image que cette suppression avait effacée, et plus rien ne
+l'aurait effacée (EF-70).
+Seule l'absence avérée du fichier (`ENOENT`) retire l'image : une autre erreur du
+disque la garde (la validation de l'adresse décide), une requête ou une ancre
+(`?v=2`) est ignorée pour le contrôle, une adresse qui sort du dossier (`..`)
+n'est jamais lue sur disque.

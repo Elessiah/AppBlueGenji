@@ -28,7 +28,7 @@ import { scopedText } from "@/lib/shared/scoped-text";
 import { hasEnglish } from "@/lib/shared/staff-translation";
 import type frAssociation from "@/messages/fr/association.json";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
-import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import styles from "./page.module.css";
 
 interface BureauSectionProps {

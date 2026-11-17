@@ -272,6 +272,6 @@ describe("pages vitrine — attente lisible (UI/UX cycle 1)", () => {
   );
 
   it("showcaseMessages_busyRefused_isNeutralFrench", () => {
-    expect(source(DIR + "showcase-messages.ts")).toContain('"Un autre envoi est en cours, réessaye."');
+    expect(source("lib/shared/busy-refused-message.ts")).toContain('"Un autre envoi est en cours, réessaye."');
   });
 });

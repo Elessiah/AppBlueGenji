@@ -16,7 +16,7 @@ import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { arrowKey } from "@/lib/shared/arrow-refocus";
 import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
-import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
+import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import {
   type RecruiterContactDefaults,
   type HiddenRecruitmentAd,

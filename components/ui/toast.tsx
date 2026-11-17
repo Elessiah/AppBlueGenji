@@ -51,10 +51,17 @@ interface ToastContextValue {
 
 /**
  * Pile après l'ajout d'une notification ; avec `once`, la pile reste telle
- * quelle si le même texte du même type y est déjà.
+ * quelle si le même texte, du même type et dans la même langue, y est déjà.
  */
-export function withToast<T extends { message: string; type: ToastType }>(prev: T[], toast: T, once: boolean): T[] {
-  if (once && prev.some((shown) => shown.message === toast.message && shown.type === toast.type)) return prev;
+export function withToast<T extends { message: string; type: ToastType; lang?: string }>(
+  prev: T[],
+  toast: T,
+  once: boolean,
+): T[] {
+  // La langue en fait partie : le même texte dans une autre langue n'est pas le même message.
+  if (once && prev.some((shown) => shown.message === toast.message && shown.type === toast.type && shown.lang === toast.lang)) {
+    return prev;
+  }
   return [...prev, toast];
 }
 

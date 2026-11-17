@@ -194,4 +194,33 @@ annoncer de l'attente.
   « Envoi… ».
   Apparence désarmée/en attente de ces boutons : une seule règle, `app/busy-look.module.css` (`composes: busyLook`).
   Le champ « URL de la photo » est nommé par son libellé visible (`<label htmlFor>`).
+- Signalements du staff (EF-70) : panneau `/admin/signalements` (`page.tsx`,
+  « Actualiser » compris), `ReportDetail`, `ReportTargetCard`, `ArmedButton`
+  (props `busy` / `blocked`, ne s'arme pas pendant un envoi) et
+  `PlayerRolesPanel` (cases en `aria-readonly`, choix ignoré par `isBusy()`) —
+  `tests/app/reports-busy-buttons.test.ts`. Une garde pour le panneau : chaque
+  geste porte un nom (`_lib/report-gestures.ts`, `data-gesture`) ; seul le geste
+  en attente s'annonce occupé (`gestureState`), les autres sont refusés, et un
+  geste refusé parce qu'un autre attend le dit (`BUSY_REFUSED_MESSAGE`,
+  `lib/shared/busy-refused-message.ts`) — par la garde synchrone **et** par
+  `onBlockedClick` sur chaque bouton déjà désarmé, dont le clic n'appelle
+  jamais `onClick`.
+  « Actualiser » passe par la même garde (un geste lancé pendant la relecture
+  agirait sur un dossier remplacé). Le bouton pressé disparaît souvent au retour
+  (« Prendre en charge » devient « Remettre en attente », « Masquer le logo »
+  laisse « Rétablir ») : `focusAfterGesture` rend le focus au même geste, sinon
+  au premier bouton de sa cible (`data-focus-scope`), sinon au premier geste de
+  traitement — avant la peinture, et jamais s'il est parti ailleurs. Seul un
+  clic dont le geste part vraiment compte (`gestureStarted`) : ni le premier
+  clic qui arme « Supprimer… », ni un clic refusé. Ouvrir la
+  note d'archivage met le focus dans le champ, « Annuler » le rend à
+  « Résoudre et archiver… ». Note en `readOnly` pendant l'envoi. Aucun texte
+  nouveau ; le panneau reste en français sous `/en` (D4). Les rôles enregistrés,
+  la fiche du joueur se relit **en arrière-plan** (`revalidate`) : `refresh`
+  la repassait en « Chargement… », démontait panneau et confirmation, et le
+  focus tombait sur la page ; de même après un geste de la barre de modération
+  (la modale rend le focus au bouton qui l'a ouverte ; si la relecture le retire, il va au premier bouton de la barre — `isFocusLost`, `lib/shared/focus-lost.ts`, qui compte aussi `<html>`). Une relecture
+  qui échoue (`revalidate` rend `false`) le dit en notification, sans quoi les
+  rôles affichés resteraient périmés en silence. Un enregistrement refusé par
+  la garde le dit aussi (`BUSY_REFUSED_MESSAGE`). Ce refus s'affiche **une fois** (`once`) : un clic répété ou Entrée tenue n'empile pas le même message. `pending` n'est rendu qu'**après** la garde (jamais de rendu où tout est refusé sans bouton occupé), `ArmedButton` se désarme dès qu'un geste part (son libellé long ne reste pas) et « Rôles mis à jour, mais la fiche n'a pas pu être relue » tient en un seul message.
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

@@ -14,6 +14,16 @@ export type ResourceState<T> =
  */
 export type NotFoundPayload = { error?: string } & Record<string, unknown>;
 
+/**
+ * Une relecture en arrière-plan qui échoue garde l'écran — sauf session expirée
+ * ou droit retiré (401, 403) : ce que le lecteur ne peut plus lire (outils du
+ * staff, données réservées) ne reste pas à l'écran, elle passe en erreur comme
+ * une lecture.
+ */
+function keepsDataOnFailure(silent: boolean, status: number): boolean {
+  return silent && status !== 401 && status !== 403;
+}
+
 export function useResourceLoader<T>(
   url: string,
   options?: { onNotFoundRedirect?: (payload: NotFoundPayload) => void },
@@ -27,15 +37,6 @@ export function useResourceLoader<T>(
   optionsRef.current = options;
 
   /**
-   * Lecture de la ressource. `silent` : relecture **en arrière-plan** — la page
-   * garde ses données pendant l'appel, et un échec passager ne les retire pas.
-   *
-   * Sans elle, chaque geste d'une page de gestion (exclure un membre, changer
-   * un rôle) repassait l'écran entier en « Chargement… » : tout se démontait —
-   * saisie en cours, position de défilement, modale ouverte — pour se remonter
-   * une demi-seconde plus tard.
-   */
-  /**
    * Numéro de la dernière lecture lancée. Deux gestes rapprochés lancent deux
    * relectures, et rien ne garantit qu'elles reviennent dans l'ordre : sans ce
    * compteur, la réponse la plus ancienne pouvait arriver la dernière et
@@ -43,8 +44,24 @@ export function useResourceLoader<T>(
    */
   const latestRef = useRef(0);
 
+  /**
+   * Lecture de la ressource. `silent` : relecture **en arrière-plan** — la page
+   * garde ses données pendant l'appel, et un échec passager ne les retire pas.
+   *
+   * Sans elle, chaque geste d'une page de gestion (exclure un membre, changer
+   * un rôle) repassait l'écran entier en « Chargement… » : tout se démontait —
+   * saisie en cours, position de défilement, modale ouverte — pour se remonter
+   * une demi-seconde plus tard.
+   *
+   * Rend `false` si la lecture a échoué (réponse en erreur, réseau) — une
+   * relecture en arrière-plan qui échoue laisse l'écran sur l'ancien état sans
+   * rien dire : l'appelant le signale. `true` sinon (lue, ou dépassée par une
+   * lecture plus récente : l'écran suit alors celle-là, un échec de la
+   * première n'a rien à dire). Un refus d'accès (401, 403) retire les
+   * données même en arrière-plan.
+   */
   const load = useCallback(
-    async (silent: boolean) => {
+    async (silent: boolean): Promise<boolean> => {
       const seq = ++latestRef.current;
       const isLatest = () => seq === latestRef.current;
       if (!silent) setState({ status: "loading", data: null, error: null });
@@ -52,23 +69,26 @@ export function useResourceLoader<T>(
         const res = await fetch(url, { cache: "no-store" });
         if (res.status === 404) {
           const body = (await res.json().catch(() => ({}))) as NotFoundPayload;
-          if (!isLatest()) return;
+          if (!isLatest()) return true;
           setState({ status: "not-found", data: null, error: null });
           optionsRef.current?.onNotFoundRedirect?.(body);
-          return;
+          return true;
         }
         if (!res.ok) {
-          if (silent || !isLatest()) return;
+          if (!isLatest()) return true;
+          if (keepsDataOnFailure(silent, res.status)) return false;
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
-          return;
+          return false;
         }
         const data = (await res.json()) as T;
-        if (!isLatest()) return;
+        if (!isLatest()) return true;
         setState({ status: "ready", data, error: null });
+        return true;
       } catch (e) {
-        if (silent || !isLatest()) return;
-        setState({ status: "error", data: null, error: (e as Error).message });
+        if (!isLatest()) return true;
+        if (!silent) setState({ status: "error", data: null, error: (e as Error).message });
+        return false;
       }
     },
     [url],
