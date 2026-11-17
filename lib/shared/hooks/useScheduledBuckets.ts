@@ -6,6 +6,13 @@ import { nextBucketsChangeAt, rescheduleBuckets } from "@/lib/shared/tournament-
 
 const NO_BUCKETS: TournamentBuckets = { upcoming: [], registration: [], running: [], finished: [] };
 
+/** Rien à reclasser : ni passe de reclassement, ni frontière à chercher. */
+const isEmptyBuckets = (buckets: TournamentBuckets) =>
+  buckets.upcoming.length === 0 &&
+  buckets.registration.length === 0 &&
+  buckets.running.length === 0 &&
+  buckets.finished.length === 0;
+
 /**
  * Paniers de tournois reclassés à l'heure du client, et **remis à jour à la
  * seconde dite** sans la moindre requête.
@@ -46,7 +53,7 @@ export function useScheduledBucketsPair(
 
   useEffect(() => {
     const a = nextBucketsChangeAt(first, now);
-    const b = nextBucketsChangeAt(second, now);
+    const b = isEmptyBuckets(second) ? null : nextBucketsChangeAt(second, now);
     let at: number | null;
     if (a === null) at = b;
     else if (b === null) at = a;
@@ -71,6 +78,8 @@ export function useScheduledBucketsPair(
   }, [first, second, now]);
 
   const firstView = useMemo(() => rescheduleBuckets(first, now), [first, now]);
-  const secondView = useMemo(() => rescheduleBuckets(second, now), [second, now]);
+  // Un second jeu vide (`useScheduledBuckets`, ou aucun invisible) est rendu
+  // tel quel : aucune allocation ni passe de reclassement pour rien.
+  const secondView = useMemo(() => (isEmptyBuckets(second) ? second : rescheduleBuckets(second, now)), [second, now]);
   return useMemo(() => [firstView, secondView] as const, [firstView, secondView]);
 }

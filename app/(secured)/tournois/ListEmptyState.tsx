@@ -54,24 +54,24 @@ export function ListEmptyState(props: ListEmptyStateProps) {
   const Icon = ICONS[kind];
   const gameScoped = props.kind === "nothingUpcoming" && props.onClearGame !== undefined;
   const keys = TEXT_KEYS[gameScoped ? "nothingUpcomingGame" : kind];
-  const message = <p className={s.emptyMsg}>{t(keys.message)}</p>;
+  const title = t(keys.title);
 
   return (
     <div className={s.emptyState} data-kind={kind}>
       <span className={s.emptyIcon} aria-hidden="true">
         <Icon size={22} strokeWidth={1.6} />
       </span>
-      <h2 className={s.emptyTitle}>{t(keys.title)}</h2>
-      {kind === "nothingUpcoming" ? (
-        <InfoHintRow inline>
-          {message}
-          <InfoHint id="tournaments-nothing-upcoming-help" subject={t(keys.title)}>
-            <p>{t("list.emptyState.nothingUpcomingHint")}</p>
+      {/* L'explication passe derrière le « i » du titre, jamais en paragraphe
+          permanent (`INFO_HINTS.md`). */}
+      <div className={s.emptyHeading}>
+        <InfoHintRow>
+          <h2 className={s.emptyTitle}>{title}</h2>
+          <InfoHint id={`tournaments-empty-${kind}-help`} subject={title}>
+            <p>{t(keys.message)}</p>
+            {kind === "nothingUpcoming" && <p>{t("list.emptyState.nothingUpcomingHint")}</p>}
           </InfoHint>
         </InfoHintRow>
-      ) : (
-        message
-      )}
+      </div>
       <div className={s.emptyActions}>
         {props.kind === "filtered" ? (
           <CyberButton variant="ghost" type="button" onClick={props.onClearFilters}>

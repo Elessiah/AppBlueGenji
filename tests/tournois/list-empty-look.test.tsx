@@ -168,6 +168,9 @@ describe("ListEmptyState", () => {
   it("render_emptyKindManager_showsTitleRulesAndCreate", () => {
     const fr = inFrench(<ListEmptyState kind="empty" canManage />);
     expect(fr).toContain("Aucun tournoi pour le moment");
+    // L'explication est derrière le « i » du titre (panneau replié, `hidden`).
+    expect(fr).toContain('aria-controls="tournaments-empty-empty-help"');
+    expect(fr).toMatch(/<div[^>]*id="tournaments-empty-empty-help"[^>]*hidden/);
     expect(fr).toContain("Les prochains tournois s&#x27;annonceront ici, avec leurs dates d&#x27;inscription.");
     expect(fr).toContain('href="/tournois/creer"');
     expect(fr).toContain('href="/regles"');
@@ -190,6 +193,7 @@ describe("ListEmptyState", () => {
     const fr = inFrench(<ListEmptyState kind="filtered" canManage onClearFilters={() => undefined} />);
     expect(fr).toContain("Aucun résultat");
     expect(fr).toContain("Effacer la recherche et les filtres");
+    expect(fr).toContain('aria-controls="tournaments-empty-filtered-help"');
     expect(fr).toContain('type="button"');
     expect(fr).not.toContain("/tournois/creer");
     expect(fr).not.toContain("/regles");
@@ -204,7 +208,8 @@ describe("ListEmptyState", () => {
     expect(fr).toContain('href="#tournois-finished"');
     expect(fr).toContain("Voir les tournois terminés");
     // L'explication passe derrière le bouton « i », jamais en paragraphe permanent.
-    expect(fr).toContain('aria-controls="tournaments-nothing-upcoming-help"');
+    expect(fr).toContain('aria-controls="tournaments-empty-nothingUpcoming-help"');
+    expect(fr).toContain("Aucune inscription n&#x27;est ouverte pour l&#x27;instant.");
 
     const en = inEnglish(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={3} onShowFinished={() => undefined} />);
     expect(en).toContain("No upcoming tournament announced");
@@ -265,7 +270,11 @@ describe("TournamentsList — câblage de l'état vide", () => {
     expect(page).toContain("const [scheduledBuckets, scheduledHidden] = useScheduledBucketsPair(viewBuckets, hiddenAsBuckets);");
     expect(page).not.toContain("useScheduledBuckets(");
     expect(page).toMatch(/const hiddenUpcoming = useMemo\(\s*\(\) =>\s*showHidden\s*\?\s*filteredHidden\.filter\(/);
-    expect(page).toContain("const state = scheduledHiddenState.get(card.id) ?? card.state;");
+    // La section des invisibles rend les cartes reclassées (ordre servi) : elle
+    // et l'état vide disent le même état.
+    expect(page).toContain("return viewHidden.map((card) => byId.get(card.id) ?? card);");
+    expect(page).toContain("filterTournamentsByQuery(scheduledViewHidden, deferredQuery, formatName)");
+    expect(page).toContain('filteredHidden.filter((card) => card.state === "UPCOMING" || card.state === "REGISTRATION")');
   });
 
   it("page_clearFilters_focusesSearchOnlyWithQuery", () => {
@@ -280,9 +289,12 @@ describe("TournamentsList — câblage de l'état vide", () => {
   });
 
   it("page_archiveFailure_toastsOncePerStreakEvenOnSilentRefresh", () => {
-    expect(page).toContain("const archiveFailedToastedRef = useRef(false);");
-    expect(page).toContain("announceArchive && silent");
-    expect(page).toContain("archiveFailedToastedRef.current = false;");
+    expect(page).toContain("const archiveLastToastRef = useRef<number | null>(null);");
+    expect(page).toContain("const ARCHIVE_TOAST_QUIET_MS = 60_000;");
+    // Lecture d'archive, silencieuse ou non : l'annonce suit la série.
+    expect(page).toMatch(/if \(wantFinishedArchive\) \{\s*const announceArchive = noteArchiveFailure\(/);
+    expect(page).toContain("if (announceArchive) showError(t(\"list.loadFailed\"));");
+    expect(page).toContain("archiveLastToastRef.current = null;");
   });
 
   it("emptyState_titleCompensatesLetterSpacing_pendingRowIsGlacier", () => {
@@ -310,22 +322,32 @@ describe("TournamentsList — câblage de l'état vide", () => {
     expect(page).toContain("archiveHeldRef.current = true;");
     expect(page).toContain("if (!archiveStillWanted || archiveHeld) return false;");
     // Le besoin retombé : série d'échecs et archive en main oubliées.
+    // Le besoin retombé : l'archive en main est oubliée, pas la série d'échecs.
     const reset = page.slice(page.indexOf("if (wantFinishedArchive) return;"));
-    expect(reset.slice(0, 160)).toContain("archiveFailedToastedRef.current = false;");
-    expect(reset.slice(0, 160)).toContain("archiveHeldRef.current = false;");
+    expect(reset.slice(0, 120)).toContain("archiveHeldRef.current = false;");
+    expect(reset.slice(0, 120)).not.toContain("archiveLastToastRef");
+  });
+
+  it("page_load_returnsOutcomeStoppingRetryOnSessionLoss", () => {
+    expect(page).toContain("async (silent = false, signal?: AbortSignal): Promise<ArchiveAttemptOutcome> => {");
+    expect(page).toMatch(/router\.refresh\(\);\s*return "stop";/);
+    expect(page).toContain('if (signal?.aborted) return "stop";');
   });
 
   it("page_archiveFailure_retriesQuietlyWhileStillWanted", () => {
-    expect(page).toContain("const ARCHIVE_RETRY_MS = 15_000;");
-    expect(page).toContain("if (!archiveFailed || !wantFinishedArchive) return;");
-    expect(page).toContain("window.setInterval(() => void load(true, controller.signal), ARCHIVE_RETRY_MS)");
-    expect(page).toContain("window.clearInterval(timer);");
+    // Bornée, une à la fois, suspendue onglet caché (`archive-retry.test.ts`),
+    // et seulement quand une recherche attend l'archive.
+    expect(page).toContain("if (!archiveFailed || !wantFinishedArchive || !archiveSearch) return;");
+    expect(page).toContain("return startArchiveRetry((signal) => load(true, signal));");
+    expect(page).not.toContain("setInterval");
   });
 
   it("page_archiveRequest_debouncedOnKeystrokesNotOnClicks", () => {
     expect(page).toContain("const ARCHIVE_DEBOUNCE_MS = 400;");
-    expect(page).toContain("window.setTimeout(() => setArchiveQuery(deferredQuery), ARCHIVE_DEBOUNCE_MS)");
-    expect(page).toContain("needsFinishedArchive(archiveQuery, gameFilter, finishedExpanded)");
+    expect(page).toContain("window.setTimeout(() => setSearchSettled(true), ARCHIVE_DEBOUNCE_MS)");
+    expect(page).toContain('needsFinishedArchive(archiveSearch ? deferredQuery : "", gameFilter, finishedExpanded)');
+    // Le texte de recherche ne part jamais au serveur : l'URL d'archive est fixe.
+    expect(page).toContain('wantFinishedArchive ? "/api/tournaments?finished=all" : "/api/tournaments"');
     // L'attente se dit dès la frappe, avant le repos (pas de « Aucun résultat » qui clignote).
     expect(page).toContain("const archiveIntent = listFetched && needsFinishedArchive(deferredQuery, gameFilter, finishedExpanded);");
     expect(page).toContain("archiveWanted: archiveIntent,");

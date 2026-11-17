@@ -549,11 +549,19 @@ a.sectionNavLink[data-tone="finished"]:hover {
   text-transform: uppercase;
 }
 
-.emptyMsg {
-  margin: 0;
+/* Titre et son « i » centrés ; l'explication dépliée prend la largeur de
+   lecture (52 caractères), pas celle du seul titre. */
+.emptyHeading {
+  align-self: stretch;
+  width: 100%;
   max-width: 52ch;
+  margin-inline: auto;
   color: var(--ink-mute);
   font-size: 14px;
+}
+
+.emptyHeading > div {
+  justify-content: center;
 }
 
 .emptyActions {

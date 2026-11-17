@@ -153,8 +153,8 @@ describe("liste des tournois — sans flux SSE", () => {
     // Un incident réseau passager ne doit pas couvrir l'écran de notifications,
     // pas plus qu'une requête abandonnée par le rafraîchissement suivant.
     // (Seule une session partie passe avant : elle fait relire la page.)
-    expect(listPage).toContain("if (signal?.aborted) return;");
-    expect(listPage).toMatch(/if \(silent\) return;\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*showError\(t\("list\.loadFailed"\)\);/);
+    expect(listPage).toContain('if (signal?.aborted) return "stop";');
+    expect(listPage).toMatch(/\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!silent\) showError\(t\("list\.loadFailed"\)\);/);
   });
 
   it("fait basculer les états sans requête, bandeau compris", () => {

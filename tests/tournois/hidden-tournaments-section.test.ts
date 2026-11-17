@@ -41,7 +41,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     expect(publicLoad).not.toContain("scope=hidden");
     // Une relecture de fond partie avant la demande d'archive ne doit pas
     // remettre la liste tronquée par-dessus l'archive arrivée entre-temps.
-    expect(publicLoad).toContain("if (wantFinishedArchive !== wantFinishedArchiveRef.current) return;");
+    expect(publicLoad).toContain('if (wantFinishedArchive !== wantFinishedArchiveRef.current) return "stop";');
   });
 
   it("réserve la section au staff et la masque quand il n'y a rien", () => {
@@ -61,7 +61,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
   it("applique la recherche et le filtre de jeu aux invisibles", () => {
     // La recherche (coûteuse) n'est faite qu'une fois, dans `queryFilteredHidden` ;
     // le filtre de jeu (une comparaison de chaîne) s'applique ensuite par-dessus.
-    expect(page).toContain("filterTournamentsByQuery(viewHidden, deferredQuery, formatName)");
+    expect(page).toContain("filterTournamentsByQuery(scheduledViewHidden, deferredQuery, formatName)");
     expect(page).toContain("filterTournamentsByGame(queryFilteredHidden, gameFilter)");
   });
 
@@ -137,7 +137,7 @@ describe("page tournois — échecs de lecture de la liste", () => {
 
   it("une session partie sur la liste publique fait relire la page, sans toast « réessaie »", () => {
     expect(page).toMatch(
-      /if \(signal\?\.aborted\) return;[\s\S]{0,200}?if \(\(e as Error\)\.message === "UNAUTHORIZED"\) \{\s*router\.refresh\(\);\s*return;\s*\}[\s\S]{0,700}?if \(silent\) return;/,
+      /if \(signal\?\.aborted\) return "stop";[\s\S]{0,300}?if \(\(e as Error\)\.message === "UNAUTHORIZED"\) \{\s*router\.refresh\(\);\s*return "stop";\s*\}[\s\S]{0,1400}?if \(!silent\) showError\(t\("list\.loadFailed"\)\);/,
     );
   });
 
@@ -155,7 +155,7 @@ describe("page tournois — échecs de lecture de la liste", () => {
   });
 
   it("signale l'échec de la liste par une phrase traduite, jamais par le message brut", () => {
-    expect(page).toMatch(/if \(silent\) return;[\s\S]{0,300}?showError\(t\("list\.loadFailed"\)\);/);
+    expect(page).toMatch(/if \(!silent\) showError\(t\("list\.loadFailed"\)\);/);
     expect(page).not.toContain("showError((e as Error).message)");
   });
 });

@@ -34,12 +34,25 @@ none`) : le halo reste, sans surface masquée à repeindre.
 - L'archive des terminés n'est réclamée qu'après **400 ms de repos** de la frappe
   (`ARCHIVE_DEBOUNCE_MS`) : une lettre tapée puis effacée ne coûte aucune requête.
   L'attente se dit pourtant dès la frappe (`archiveIntent`), sans repos.
-- Archive en échec et encore attendue : relecture discrète toutes les 15 s
-  (`ARCHIVE_RETRY_MS`), sans notification, jusqu'à la réussite ou la fin du besoin.
-- Un échec de relecture de fond ne notifie pas quand l'archive est déjà en main ;
-  série d'échecs et archive en main sont oubliées quand le besoin retombe.
+- La recherche ne part **jamais** au serveur : l'archive se demande entière
+  (`?finished=all`, URL fixe) et se filtre côté client ; seul compte qu'une
+  recherche soit tapée et au repos (`searchSettled`).
+- Archive en échec alors qu'une **recherche** l'attend : quelques relectures
+  discrètes (`_lib/archive-retry.ts`, `startArchiveRetry`) — 15 s, 30 s, 60 s,
+  120 s puis arrêt (la relecture de fond prend le relais), **une à la fois** (la
+  suivante n'est programmée qu'une fois la précédente réglée), suspendues onglet
+  caché, arrêtées par une réussite, la fin du besoin, le démontage ou une session
+  partie (`load` rend `"ok" | "failed" | "stop"`). Un jeu choisi ou la section
+  dépliée seuls ne relancent rien.
+- Un échec de l'archive se notifie **une fois par série** (`noteArchiveFailure`) :
+  la série court jusqu'à une archive reçue ou 60 s sans annonce
+  (`ARCHIVE_TOAST_QUIET_MS`), lecture de fond ou non — basculer un filtre pendant
+  une panne n'empile pas les notifications. Archive déjà en main : rien à dire.
 - Les invisibles du staff partagent l'horloge et le minuteur des paniers publics
-  (`useScheduledBucketsPair`) : une frontière commune = un seul rendu.
+  (`useScheduledBucketsPair`) : une frontière commune = un seul rendu. Leur
+  section rend les cartes **reclassées** (ordre servi conservé) : elle et l'état
+  vide disent le même état. Un jeu vide (`useScheduledBuckets`, joueur sans
+  invisibles) n'est ni reclassé ni scruté.
 - Le panneau d'état vide est mémoïsé, ses rappels stables ; le décompte des
   invisibles à venir est sous `useMemo`. Le panneau n'est pas chargé en différé :
   un chargement paresseux ferait naître l'état vide un instant après la page.
@@ -57,7 +70,7 @@ un `border-bottom` tiré d'un bord à l'autre : la classe globale
 | --- | --- | --- |
 | `empty` | aucune section, aucun filtre | « Aucun tournoi pour le moment », « Créer un tournoi » (droit `tournaments`), « Lire les règles » |
 | `filtered` | aucune section, recherche ou jeu actif, et aucune recherche n'attend l'archive des terminés | « Aucun résultat », bouton « Effacer la recherche et les filtres » (vide la recherche, remet « Tous » ; focus au champ s'il portait un texte, à la pastille « Tous » sinon — pas de clavier virtuel ouvert pour rien) |
-| `nothingUpcoming` | des sections, mais ni inscriptions ouvertes ni annonce (« Mes tournois » compris, avant découpage, et, pour le staff, les invisibles à venir) et aucune recherche tapée | « Aucun tournoi à venir annoncé », `InfoHint` (Prochainement → Inscriptions ouvertes), « Créer » (staff), « Voir les tournois terminés » (s'il y en a : déplie la section), « Lire les règles » |
+| `nothingUpcoming` | des sections, mais ni inscriptions ouvertes ni annonce (« Mes tournois » compris, avant découpage, et, pour le staff, les invisibles à venir) et aucune recherche tapée | « Aucun tournoi à venir annoncé », `InfoHint` (aucune inscription ouverte ; Prochainement → Inscriptions ouvertes), « Créer » (staff), « Voir les tournois terminés » (s'il y en a : déplie la section), « Lire les règles » |
 | `pending` | aucune section, une recherche tapée attend encore l'archive des terminés | la ligne « Chargement des tournois terminés… » |
 | `null` | liste pas encore lue, ou de quoi s'inscrire | rien |
 
@@ -88,7 +101,10 @@ avant « Terminés ».
 
 Le panneau : cadre glacier (jamais gris), halo radial qui s'éteint bien avant ses
 bords, pictogramme Lucide dans un anneau qui respire (`transform`/`opacity`,
-`animation-play-state: var(--deco-anim-state)`), titre en `<h2>`. Aucune teinte
+`animation-play-state: var(--deco-anim-state)`), titre en `<h2>` suivi de son
+`InfoHint` (`tournaments-empty-<état>-help`) : la phrase d'explication de chaque
+état (et, pour `nothingUpcoming`, le passage Prochainement → Inscriptions) est
+derrière le « i », jamais en paragraphe permanent (`INFO_HINTS.md`). Aucune teinte
 chaude. Textes sous `tournaments.list.emptyState` (FR et EN) ; les anciennes clés
 `emptyTitle`/`emptyUnfiltered`/`emptyFiltered` et `sectionEmptyMessage` ont disparu.
 

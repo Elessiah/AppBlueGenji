@@ -196,6 +196,24 @@ describe("useScheduledBucketsPair", () => {
     expect(renderPair(empty, second)[1].registration.map((card) => card.id)).toEqual([2]);
   });
 
+  it("pair_emptySecondSet_returnedAsIsWithoutRescheduling", () => {
+    const empty: TournamentBuckets = { upcoming: [], registration: [], running: [], finished: [] };
+
+    const [, b] = renderPair(upcomingBuckets(1), empty);
+
+    expect(b).toBe(empty);
+  });
+
+  it("useScheduledBuckets_singleSet_secondViewIsTheSharedEmptySet", () => {
+    render(upcomingBuckets(1));
+
+    // Deux mémos de vues + le couple : la vue du second jeu est son entrée même.
+    const secondView = bench.memos[1]?.value as TournamentBuckets;
+    expect(secondView.upcoming).toHaveLength(0);
+    expect(bench.memos[2]?.value).toEqual([bench.memos[0]?.value, secondView]);
+    expect((bench.memos[2]?.value as readonly TournamentBuckets[])[1]).toBe(secondView);
+  });
+
   it("pair_nothingToSchedule_armsNoTimer", () => {
     const empty: TournamentBuckets = { upcoming: [], registration: [], running: [], finished: [] };
     renderPair(empty, empty);
