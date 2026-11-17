@@ -106,6 +106,21 @@ describe("newRequestKey", () => {
   it("newRequestKey_calledTwice_returnsDistinctKeys", () => {
     expect(newRequestKey()).not.toBe(newRequestKey());
   });
+  it("newRequestKey_withoutCrypto_timestampedKeysAcceptedAndDistinct", () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+    Object.defineProperty(globalThis, "crypto", { configurable: true, value: undefined });
+    let first = "";
+    let second = "";
+    try {
+      first = newRequestKey();
+      second = newRequestKey();
+    } finally {
+      if (original) Object.defineProperty(globalThis, "crypto", original);
+    }
+    expect(readRequestKey(first)).toBe(first);
+    expect(first).not.toBe(second);
+  });
+
   it("newRequestKey_withoutRandomUUID_fallbackAcceptedByServer", () => {
     const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
     Object.defineProperty(globalThis, "crypto", {

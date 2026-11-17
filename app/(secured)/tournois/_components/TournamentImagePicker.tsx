@@ -241,7 +241,7 @@ export function TournamentImagePicker({ existing, value, onChange, busy = false 
                   aria-label={t("picker.focusAria", { x: settings.focusX, y: settings.focusY })}
                   aria-describedby={focusHintId}
                   aria-disabled={busy || undefined}
-                  tabIndex={0}
+                  tabIndex={0} /* NOSONAR S6845 — widget clavier `role="application"` (flèches) : reste focalisable pendant l'envoi (`aria-disabled`) */
                   onKeyDown={busy ? undefined : onFocusKey}
                   onPointerDown={
                     busy
