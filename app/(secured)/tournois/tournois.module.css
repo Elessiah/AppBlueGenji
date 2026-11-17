@@ -479,10 +479,10 @@ a.sectionNavLink[data-tone="finished"]:hover {
   padding: 40px 24px 36px;
   margin-bottom: 24px;
   text-align: center;
-  border: 1px solid rgba(90, 200, 255, 0.18);
+  border: 1px solid rgba(var(--blue-500-rgb), 0.18);
   border-radius: var(--r-cy-lg);
   background:
-    radial-gradient(ellipse 60% 90% at 50% 0%, rgba(90, 200, 255, calc(0.12 * var(--glow, 1))), transparent 70%),
+    radial-gradient(ellipse 60% 90% at 50% 0%, rgba(var(--blue-500-rgb), calc(0.12 * var(--glow, 1))), transparent 70%),
     radial-gradient(ellipse 40% 60% at 50% 100%, rgba(var(--violet-400-rgb), calc(0.06 * var(--glow, 1))), transparent 70%);
   overflow: hidden;
 }
@@ -534,6 +534,9 @@ a.sectionNavLink[data-tone="finished"]:hover {
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.2em;
+  /* L'interlettrage laisse un blanc après la dernière lettre de chaque ligne :
+     le même blanc devant recentre le titre sur l'icône et les boutons. */
+  padding-left: 0.2em;
   color: var(--ink);
   text-transform: uppercase;
 }
@@ -551,6 +554,19 @@ a.sectionNavLink[data-tone="finished"]:hover {
   justify-content: center;
   gap: 10px;
   margin-top: 10px;
+}
+
+/* Attente de l'archive pour une recherche sans résultat : même teinte glacier
+   que le panneau, jamais un simple texte nu. */
+.emptyPending {
+  margin: 0 0 24px;
+  padding: 18px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--blue-300);
+  border: 1px solid rgba(var(--blue-500-rgb), 0.18);
+  border-radius: var(--r-cy-lg);
+  background: radial-gradient(ellipse 60% 140% at 50% 0%, rgba(var(--blue-500-rgb), calc(0.08 * var(--glow, 1))), transparent 70%);
 }
 
 /* Ligne du bouton « Voir plus » / « Voir moins » d'une section : un grid item

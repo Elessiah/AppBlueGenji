@@ -275,7 +275,19 @@ describe("TournamentsList — câblage de l'état vide", () => {
 
   it("page_pendingArchive_showsLoadingRowOnPendingOutcome", () => {
     expect(page).toContain("archivePending: searchPending,");
-    expect(page).toMatch(/\{emptyKind === "pending" && \(\s*<div className=\{s\.showMoreRow\}>\{t\("list\.finishedLoading"\)\}<\/div>/);
+    expect(page).toMatch(/\{emptyKind === "pending" && \(\s*<div className=\{s\.emptyPending\}>\{t\("list\.finishedLoading"\)\}<\/div>/);
+  });
+
+  it("page_archiveFailure_toastsOncePerStreakEvenOnSilentRefresh", () => {
+    expect(page).toContain("const archiveFailedToastedRef = useRef(false);");
+    expect(page).toContain("announceArchive && silent");
+    expect(page).toContain("archiveFailedToastedRef.current = false;");
+  });
+
+  it("emptyState_titleCompensatesLetterSpacing_pendingRowIsGlacier", () => {
+    expect(block(tournoisCss, ".emptyTitle")).toContain("padding-left: 0.2em;");
+    expect(block(tournoisCss, ".emptyPending")).toContain("var(--blue-500-rgb)");
+    expect(block(tournoisCss, ".emptyState")).toContain("border: 1px solid rgba(var(--blue-500-rgb)");
   });
 
   it("page_liveRegion_announcesLoadingWhileSearchPending", () => {
@@ -287,7 +299,8 @@ describe("TournamentsList — câblage de l'état vide", () => {
 
   it("page_archiveFailure_stopsWaitingAndResetsWhenNoLongerWanted", () => {
     expect(page).toContain("if (archiveFailed && !wantFinishedArchive) setArchiveFailed(false);");
-    expect(page).toContain("if (wantFinishedArchive && wantFinishedArchiveRef.current) setArchiveFailed(true);");
+    expect(page).toContain("noteArchiveFailure(");
+    expect(page).toContain("setArchiveFailed,");
     expect(page).toContain("const finishedArchivePending = wantFinishedArchive && listTruncated && !archiveFailed;");
   });
 

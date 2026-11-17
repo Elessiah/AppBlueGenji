@@ -137,7 +137,7 @@ describe("page tournois — échecs de lecture de la liste", () => {
 
   it("une session partie sur la liste publique fait relire la page, sans toast « réessaie »", () => {
     expect(page).toMatch(
-      /if \(signal\?\.aborted\) return;[\s\S]{0,200}?if \(\(e as Error\)\.message === "UNAUTHORIZED"\) \{\s*router\.refresh\(\);\s*return;\s*\}[\s\S]{0,200}?if \(silent\) return;/,
+      /if \(signal\?\.aborted\) return;[\s\S]{0,200}?if \(\(e as Error\)\.message === "UNAUTHORIZED"\) \{\s*router\.refresh\(\);\s*return;\s*\}[\s\S]{0,700}?if \(silent\) return;/,
     );
   });
 

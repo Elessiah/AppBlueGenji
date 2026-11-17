@@ -159,6 +159,22 @@ async function fetchBuckets(
 /** Le titre de la page : « BlueGenji » en accent (`<em>` du message). */
 const titleEm = (children: ReadonlyArray<ReactNode>) => <em className={s.titleEm}>{richNodes(children)}</em>;
 
+/**
+ * Note l'échec de l'archive des terminés quand elle est encore attendue ; vrai
+ * la première fois d'une série d'échecs (à annoncer une seule fois).
+ */
+function noteArchiveFailure(
+  toasted: { current: boolean },
+  archiveStillWanted: boolean,
+  setFailed: (failed: boolean) => void,
+): boolean {
+  if (!archiveStillWanted) return false;
+  setFailed(true);
+  const first = !toasted.current;
+  toasted.current = true;
+  return first;
+}
+
 export default function TournamentsList({ canManage }: Readonly<{ canManage: boolean }>) {
   const text = useTournamentsText();
   const { t } = text;
@@ -229,6 +245,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // (« Chargement… » resterait sinon affiché jusqu'à la relecture suivante).
   // Le besoin retombé, l'échec est oublié — état ajusté pendant le rendu.
   const [archiveFailed, setArchiveFailed] = useState(false);
+  const archiveFailedToastedRef = useRef(false);
   if (archiveFailed && !wantFinishedArchive) setArchiveFailed(false);
 
   // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
@@ -247,7 +264,10 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
         setListFetched(true);
-        if (wantFinishedArchive) setArchiveFailed(false);
+        if (wantFinishedArchive) {
+          setArchiveFailed(false);
+          archiveFailedToastedRef.current = false;
+        }
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
@@ -259,7 +279,14 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           return;
         }
         // Silencieuse ou non, une archive manquée n'est plus attendue.
-        if (wantFinishedArchive && wantFinishedArchiveRef.current) setArchiveFailed(true);
+        // Une archive manquée change le sens d'un « Aucun résultat » : on le dit
+        // une fois par série d'échecs, même sur une relecture de fond.
+        const announceArchive = noteArchiveFailure(
+          archiveFailedToastedRef,
+          wantFinishedArchive && wantFinishedArchiveRef.current,
+          setArchiveFailed,
+        );
+        if (announceArchive && silent) showError(t("list.loadFailed"));
         if (silent) return;
         // Une phrase traduite, jamais le code ni le message brut du navigateur
         // (« Failed to fetch » sur une page en français) : le lecteur n'en
@@ -780,7 +807,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                 terminés peut encore en apporter — on attend avant de dire
                 « Aucun résultat ». */}
             {emptyKind === "pending" && (
-              <div className={s.showMoreRow}>{t("list.finishedLoading")}</div>
+              <div className={s.emptyPending}>{t("list.finishedLoading")}</div>
             )}
 
             {showHidden && totalHidden > 0 && (
