@@ -73,7 +73,7 @@ ligne retirée **après** la fermeture (liste rechargée) est guettée trois
 secondes : un `MutationObserver` écoute les **seuls parents** du déclencheur, jusqu'à
 `<main>` (`childList`, sans sous-arbre : les mises à jour en continu du reste de la page ne
 déclenchent rien), et s'arrête au premier retrait, à la page quittée (adresse
-changée), à l'ouverture d'une autre modale ou dès que le focus va ailleurs (un seul
+changée), à l'ouverture d'une autre modale, au premier clic dans la page ou dès que le focus va ailleurs (un seul
 guet à la fois). Si le focus est tombé sur `<body>`, il suit la même règle. Le relevé
 s'arrête à `<main>` (seize ancêtres au plus) et la recherche d'un focalisable
 est paresseuse : elle ne balaie jamais le document. Le rang du chaînon est relevé aussi : une liste

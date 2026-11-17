@@ -144,7 +144,7 @@ export async function createBenevole(input: BenevoleInput): Promise<Benevole> {
     lastName,
     category,
     categoryEn,
-    photoUrl: photoUrl || null,
+    photoUrl: localUploadUrl(photoUrl || null),
     joinedAt,
   };
 }
@@ -177,7 +177,7 @@ export async function updateBenevole(id: number, input: BenevoleInput): Promise<
     lastName,
     category,
     categoryEn,
-    photoUrl: photoUrl || null,
+    photoUrl: localUploadUrl(photoUrl || null),
     joinedAt,
   };
 }

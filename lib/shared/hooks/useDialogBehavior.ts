@@ -116,8 +116,8 @@ const isMainRegion = (el: Element) => el.matches("main, [role='main']");
  * Le déclencheur a repris le focus mais sa ligne peut encore disparaître
  * (rechargement après fermeture) : à son retrait, si le focus est tombé sur
  * `<body>`, il passe à la ligne voisine. Guet borné (3 s), levé au premier
- * retrait, à la page quittée (adresse changée), à une nouvelle modale ou dès que
- * le focus va ailleurs. Il n'écoute que les **parents** du déclencheur
+ * retrait, à la page quittée (adresse changée), à une nouvelle modale, au
+ * premier clic dans la page ou dès que le focus va ailleurs. Il n'écoute que les **parents** du déclencheur
  * jusqu'à la région principale (`childList`, sans sous-arbre) : le retrait de
  * la ligne est celui d'un maillon de cette chaîne, et les mises à jour en
  * continu du reste de la page ne déclenchent rien.
@@ -139,11 +139,15 @@ function watchLateRemoval(entry: RestoreEntry) {
   const onFocusIn = (event: FocusEvent) => {
     if (event.target !== entry.element) stop();
   };
+  // Un clic dans la page (même sur un fond non focalisable, qui pose le focus
+  // sur `<body>` sans `focusin`) est un choix : le guet ne le reprend pas.
+  const onPointerDown = () => stop();
   const timer = setTimeout(() => stop(), LATE_REMOVAL_WATCH_MS);
   function stop() {
     observer.disconnect();
     clearTimeout(timer);
     document.removeEventListener("focusin", onFocusIn, true);
+    document.removeEventListener("pointerdown", onPointerDown, true);
     if (stopLateRemovalWatch === stop) stopLateRemovalWatch = null;
   }
   stopLateRemovalWatch = stop;
@@ -152,6 +156,7 @@ function watchLateRemoval(entry: RestoreEntry) {
     if (step.parent === region) break;
   }
   document.addEventListener("focusin", onFocusIn, true);
+  document.addEventListener("pointerdown", onPointerDown, true);
 }
 
 /**

@@ -219,6 +219,11 @@ describe("guet de retrait tardif du déclencheur — coût et sorties", () => {
     expect(watch).toMatch(/location\.pathname[\s\S]*!== startedAt/);
   });
 
+  it("watchLateRemoval_stopsOnPointerDown", () => {
+    expect(watch).toMatch(/addEventListener\("pointerdown", onPointerDown, true\)/);
+    expect(watch).toMatch(/removeEventListener\("pointerdown", onPointerDown, true\)/);
+  });
+
   it("useDialogBehavior_open_stopsPendingWatch", () => {
     expect(hook).toMatch(/stopLateRemovalWatch\?\.\(\);\s+const token = Symbol\("dialog"\)/);
   });

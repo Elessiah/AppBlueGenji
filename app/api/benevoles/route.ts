@@ -5,6 +5,8 @@ import { fail, ok } from "@/lib/server/http";
 import { createBenevole, findBenevole, listBenevoles } from "@/lib/server/benevoles-service";
 import { readJsonObject } from "@/lib/server/request-body";
 import { runOnceForBody } from "@/lib/server/idempotency";
+import { storedUploadExists } from "@/lib/server/stored-upload-cleanup";
+import { isStoredUploadIn } from "@/lib/shared/uploads";
 
 export async function GET() {
   const benevoles = await listBenevoles();
@@ -34,17 +36,23 @@ export async function POST(req: Request) {
     // Un renvoi du même ajout (réponse perdue) rend le bénévole déjà créé au
     // lieu d'en créer un second (`lib/server/idempotency.ts`) — relu d'abord :
     // supprimé entre-temps, il est recréé plutôt que rendu.
-    const benevole = await runOnceForBody(`benevole-create:${user.id}`, body, () =>
-      createBenevole({
+    const photoUrl = typeof body.photoUrl === "string" ? body.photoUrl.trim() : "";
+    const benevole = await runOnceForBody(`benevole-create:${user.id}`, body, async () => {
+      // Une photo du dossier dont le fichier n'existe plus est laissée : un
+      // ajout rejoué après la suppression du bénévole (qui a effacé sa photo)
+      // le recréerait sur une image absente (`BENEVOLES_MANAGEMENT.md`).
+      const gone = isStoredUploadIn(photoUrl, "benevoles") && !(await storedUploadExists(photoUrl, "benevoles"));
+      const keptPhoto = gone ? null : body.photoUrl;
+      return createBenevole({
         firstName: typeof body.firstName === "string" ? body.firstName : "",
         pseudo: typeof body.pseudo === "string" ? body.pseudo : null,
         lastName: typeof body.lastName === "string" ? body.lastName : "",
         category: typeof body.category === "string" ? body.category : "",
         categoryEn: typeof body.categoryEn === "string" ? body.categoryEn : null,
-        photoUrl: typeof body.photoUrl === "string" ? body.photoUrl : null,
+        photoUrl: typeof keptPhoto === "string" ? keptPhoto : null,
         joinedAt: typeof body.joinedAt === "string" ? body.joinedAt : "",
-      }),
-      { fresh: (created) => findBenevole(created.id) },
+      });
+    }, { fresh: (created) => findBenevole(created.id) },
     );
     return ok({ benevole }, 201);
   } catch (e) {

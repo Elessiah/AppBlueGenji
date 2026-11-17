@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
@@ -7,7 +7,13 @@ jest.mock("@/lib/server/image-upload");
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import path from "node:path";
-import { deleteUnreferencedUpload, isUploadReferenced, storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  deleteUnreferencedUpload,
+  isUploadReferenced,
+  storedUploadAbsolutePath,
+  storedUploadExists,
+} from "@/lib/server/stored-upload-cleanup";
 
 /**
  * Remplacer ou supprimer une image effaçait l'ancienne adresse sans regarder ni
@@ -157,5 +163,29 @@ describe("isUploadReferenced", () => {
 
     const hold = execute.mock.calls.find(([sql]) => sql.includes("bg_account_deletion_holds"));
     expect(hold?.[1]).toEqual(["/api/uploads/avatars/42-a.webp", "/uploads/avatars/42-a.webp"]);
+  });
+});
+
+describe("storedUploadExists", () => {
+  const dir = path.join(process.cwd(), "public", "uploads", "benevoles");
+  const name = `test-ef69-${process.pid}.webp`;
+  const file = path.join(dir, name);
+
+  afterEach(() => {
+    rmSync(file, { force: true });
+  });
+
+  it("storedUploadExists_otherFolder_false", async () => {
+    await expect(storedUploadExists("/api/uploads/avatars/1-a.webp", "benevoles")).resolves.toBe(false);
+  });
+
+  it("storedUploadExists_missingFile_false", async () => {
+    await expect(storedUploadExists(`/api/uploads/benevoles/${name}`, "benevoles")).resolves.toBe(false);
+  });
+
+  it("storedUploadExists_existingFile_true", async () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, "x");
+    await expect(storedUploadExists(`/api/uploads/benevoles/${name}`, "benevoles")).resolves.toBe(true);
   });
 });

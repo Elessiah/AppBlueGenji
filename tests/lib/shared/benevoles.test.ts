@@ -70,12 +70,12 @@ describe("validateBenevoleInput", () => {
     const result = validateBenevoleInput({
       ...valid,
       pseudo: "MarieD",
-      photoUrl: "https://example.com/avatar.jpg",
+      photoUrl: "/api/uploads/benevoles/1-a.webp",
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.pseudo).toBe("MarieD");
-      expect(result.value.photoUrl).toBe("https://example.com/avatar.jpg");
+      expect(result.value.photoUrl).toBe("/api/uploads/benevoles/1-a.webp");
     }
   });
 
@@ -306,9 +306,19 @@ describe("validateBenevoleInput — photo", () => {
     }
   });
 
-  // Rien à effacer chez nous : l'adresse est tue à la sortie par `localUploadUrl`.
-  it("laisse passer une adresse étrangère", () => {
-    expect(validateBenevoleInput({ ...valid, photoUrl: "https://cdn.exemple.fr/p.png" }).ok).toBe(true);
+  // `localUploadUrl` la tairait à la sortie : enregistrée, elle disparaissait au rechargement.
+  it.each(["https://cdn.exemple.fr/p.png", "javascript:alert(1)", "//evil.example/p.png", "data:image/png;base64,AA"])(
+    "refuse l'adresse étrangère %s",
+    (photoUrl) => {
+      expect(validateBenevoleInput({ ...valid, photoUrl })).toEqual({ ok: false, error: "PHOTO_URL_NOT_UPLOADED" });
+    },
+  );
+
+  it("refuse un chemin d'upload qui remonte d'un dossier", () => {
+    expect(validateBenevoleInput({ ...valid, photoUrl: "/api/uploads/benevoles/../avatars/1-a.webp" })).toEqual({
+      ok: false,
+      error: "INVALID_PHOTO_URL",
+    });
   });
 
   it.each([

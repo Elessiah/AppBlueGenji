@@ -325,6 +325,14 @@ describe("readJsonBodyOrFallback", () => {
     await expect(readJsonBodyOrFallback(jsonRequest('{"a":1}'), {})).resolves.toEqual({ body: { a: 1 } });
   });
 
+  it("readJsonBodyOrFallback_arrayBody_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("[1,2]"), { a: 0 })).resolves.toEqual({ body: { a: 0 } });
+  });
+
+  it("readJsonBodyOrFallback_nullBody_returnsFallback", async () => {
+    await expect(readJsonBodyOrFallback(jsonRequest("null"), { a: 0 })).resolves.toEqual({ body: { a: 0 } });
+  });
+
   it("readJsonBodyOrFallback_invalidJson_returnsFallback", async () => {
     await expect(readJsonBodyOrFallback(jsonRequest("{nope"), null)).resolves.toEqual({ body: null });
   });

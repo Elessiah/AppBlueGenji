@@ -258,3 +258,49 @@ describe("POST /api/association/bureau — renvoi du même ajout", () => {
     expect(service.createBureauMember).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/association/bureau — revue de sécurité EF-69", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const SAME_USER_WITHOUT_RIGHT = authUser({ id: 1, isAdmin: false });
+  const created = { id: 7, name: "Léo", role: "Président", roleEn: "President", initials: "L", color: "#5ac8ff" };
+  const input = { name: "Léo", role: "Président", roleEn: "President" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+  });
+
+  it("POST_permissionRevokedBeforeReplay_returns403AndNoReplay", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(SAME_USER_WITHOUT_RIGHT);
+    jest.mocked(service.createBureauMember).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(403);
+    expect(await replay.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.createBureauMember).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_bodyTooLarge_returns413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", { ...input, pad: "x".repeat(300 * 1024) }));
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(service.createBureauMember).not.toHaveBeenCalled();
+  });
+
+  it("POST_nonJsonContentType_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(
+      new Request("http://localhost/api/association/bureau", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "name=x" }),
+    );
+
+    expect(res.status).toBe(415);
+    expect(await res.json()).toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+    expect(service.createBureauMember).not.toHaveBeenCalled();
+  });
+});

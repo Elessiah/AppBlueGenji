@@ -170,3 +170,37 @@ describe("findBenevole", () => {
     expect(await findBenevole(999)).toBeNull();
   });
 });
+
+/** Revue de sécurité EF-69 : la réponse d'un ajout dit la même photo que la liste. */
+describe("createBenevole / updateBenevole — photo rendue", () => {
+  const PHOTO = "/api/uploads/benevoles/1-a.webp";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+
+  it("createBenevole_uploadedPhoto_returnsPhoto", async () => {
+    await mockDb(db());
+
+    const created = await createBenevole({ ...INPUT, photoUrl: PHOTO });
+
+    expect(created.photoUrl).toBe(PHOTO);
+  });
+
+  it("createBenevole_foreignPhoto_throwsPhotoUrlNotUploaded", async () => {
+    await mockDb(db());
+
+    await expect(createBenevole({ ...INPUT, photoUrl: "https://tracker.example/x.png" })).rejects.toThrow(
+      "PHOTO_URL_NOT_UPLOADED",
+    );
+  });
+
+  it("updateBenevole_uploadedPhoto_returnsPhoto", async () => {
+    await mockDb(db());
+
+    const updated = await updateBenevole(1, { ...INPUT, photoUrl: PHOTO });
+
+    expect(updated.photoUrl).toBe(PHOTO);
+  });
+});

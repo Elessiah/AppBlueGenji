@@ -412,3 +412,49 @@ describe("POST /api/recruitment — renvoi du même ajout", () => {
     expect(service.createRecruitmentAd).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/recruitment — revue de sécurité EF-69", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const SAME_USER_WITHOUT_RIGHT = authUser({ id: 1, isAdmin: false });
+  const created = { ...sampleAd, id: 7 };
+  const input = { title: "Recherche arbitre", titleEn: "Looking for referees", domain: "AUTRE" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+  });
+
+  it("POST_permissionRevokedBeforeReplay_returns403AndNoReplay", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(SAME_USER_WITHOUT_RIGHT);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(403);
+    expect(await replay.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_bodyTooLarge_returns413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", { ...input, pad: "x".repeat(300 * 1024) }));
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(service.createRecruitmentAd).not.toHaveBeenCalled();
+  });
+
+  it("POST_nonJsonContentType_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(
+      new Request("http://localhost/api/recruitment", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "name=x" }),
+    );
+
+    expect(res.status).toBe(415);
+    expect(await res.json()).toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+    expect(service.createRecruitmentAd).not.toHaveBeenCalled();
+  });
+});

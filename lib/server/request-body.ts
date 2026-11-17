@@ -242,8 +242,8 @@ export async function readJsonBodyOrFallback<T>(
     // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) vaut
     // `fallback`, comme un JSON invalide : les routes lisent des champs du
     // corps, et `null.slot` rendrait un 500 brut hors de leur `try`.
-    if (typeof body !== "object" || body === null || Array.isArray(body)) return { body: fallback };
-    return { body };
+    const object = asJsonObject(body, "");
+    return "refusal" in object ? { body: fallback } : object;
   } catch (error) {
     const code = bodyReadRefusal(error);
     if (code === null || (code === UNSUPPORTED_CONTENT_TYPE && !declaresForeignBody(req))) return { body: fallback };

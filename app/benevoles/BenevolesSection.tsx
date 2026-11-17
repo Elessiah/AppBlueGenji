@@ -34,7 +34,7 @@ import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { scopedText } from "@/lib/shared/scoped-text";
 import { englishErrorMessage, hasEnglish } from "@/lib/shared/staff-translation";
-import { toServedUploadUrl } from "@/lib/shared/uploads";
+import { localUploadUrl, toServedUploadUrl } from "@/lib/shared/uploads";
 import type frVolunteers from "@/messages/fr/volunteers.json";
 import styles from "./page.module.css";
 
@@ -93,6 +93,7 @@ const VALIDATION_ERROR_MESSAGES: Record<string, string> = {
   JOINED_AT_INVALID: "La date d'arrivée est invalide.",
   PHOTO_URL_TOO_LONG: "L'URL de la photo est trop longue.",
   INVALID_PHOTO_URL: "Cette photo est une image d'une autre partie du site : importe-la.",
+  PHOTO_URL_NOT_UPLOADED: "Seule une photo importée sur le site s'affiche : importe-la.",
 };
 
 /** Phrase d'un refus de validation (staff, en français — D4). */
@@ -537,7 +538,9 @@ export function BenevolesSection({
 
           {/* Prévisualisation avatar */}
           <div className={styles.modalPreview}>
-            {form.photoUrl ? (
+            {/* Aperçu d'une photo du site seulement : une adresse en cours de
+                saisie (« h », « https://… ») ferait lever `next/image`. */}
+            {localUploadUrl(form.photoUrl) ? (
               <Image
                 src={toServedUploadUrl(form.photoUrl)}
                 alt="Aperçu"
@@ -679,7 +682,7 @@ export function BenevolesSection({
               className={styles.modalInput}
               value={form.photoUrl}
               maxLength={500}
-              placeholder="… ou colle une URL https://example.com/avatar.jpg"
+              placeholder="… ou colle l'adresse d'une photo importée (/api/uploads/benevoles/…)"
               id="benevole-photo-url"
               readOnly={busy}
               onChange={(e) => set("photoUrl", e.target.value)}

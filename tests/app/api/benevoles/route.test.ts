@@ -9,7 +9,7 @@ import { PUT, DELETE } from "@/app/api/benevoles/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/benevoles-service";
 import { resetIdempotencyForTests } from "@/lib/server/idempotency";
-import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
+import { deleteUnreferencedUpload, storedUploadExists } from "@/lib/server/stored-upload-cleanup";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
@@ -333,5 +333,71 @@ describe("POST /api/benevoles — renvoi du même ajout", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_BODY" });
     expect(service.createBenevole).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/benevoles — revue de sécurité EF-69", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const SAME_USER_WITHOUT_RIGHT = authUser({ id: 1, isAdmin: false });
+  const created = { ...sampleBenevole, id: 7 };
+  const input = { firstName: "Marie", lastName: "Dupont", category: "Développeur", categoryEn: "Developer", joinedAt: "2024-03-15" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+  });
+
+  it("POST_permissionRevokedBeforeReplay_returns403AndNoReplay", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(SAME_USER_WITHOUT_RIGHT);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(403);
+    expect(await replay.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.createBenevole).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_bodyTooLarge_returns413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", { ...input, pad: "x".repeat(300 * 1024) }));
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(service.createBenevole).not.toHaveBeenCalled();
+  });
+
+  it("POST_nonJsonContentType_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(
+      new Request("http://localhost/api/benevoles", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "name=x" }),
+    );
+
+    expect(res.status).toBe(415);
+    expect(await res.json()).toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+    expect(service.createBenevole).not.toHaveBeenCalled();
+  });
+
+  it("POST_photoFileMissing_createsWithoutPhoto", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+    jest.mocked(storedUploadExists).mockResolvedValue(false);
+
+    await POST(jsonReq("POST", { ...input, photoUrl: "/api/uploads/benevoles/7-abc.webp" }));
+
+    expect(jest.mocked(service.createBenevole).mock.calls[0][0].photoUrl).toBeNull();
+  });
+
+  it("POST_photoFilePresent_keepsPhoto", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+    jest.mocked(storedUploadExists).mockResolvedValue(true);
+
+    await POST(jsonReq("POST", { ...input, photoUrl: "/api/uploads/benevoles/7-abc.webp" }));
+
+    expect(jest.mocked(service.createBenevole).mock.calls[0][0].photoUrl).toBe("/api/uploads/benevoles/7-abc.webp");
   });
 });
