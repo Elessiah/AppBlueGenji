@@ -128,7 +128,7 @@ describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
   });
 
   it("ignore Fermer et Enregistrer pressés pendant l'envoi", () => {
-    expect(actions).toContain("if (!form.submitting) onClose();");
+    expect(actions).toContain("if (!form.isBusy()) onClose();");
     expect(actions).toContain('if (!form.submitting && !saveBlocked) void run("save");');
     // « Valider le résultat » passe par le formulaire, qui garde déjà l'envoi.
     expect(SCORE).toMatch(/!resolveBlocked && !form\.submitting\) void run\("resolve"\)/);
@@ -136,8 +136,8 @@ describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
 
   it("garde le libellé des boutons pendant l'envoi : un nom réduit à « … » ne dit rien", () => {
     expect(actions).not.toMatch(/submitting \? "…"/);
-    expect(actions).toMatch(/\{t\("score\.admin\.save"\)\}\s*\{form\.submitting && "…"\}/);
-    expect(actions).toMatch(/\{t\("score\.admin\.resolve"\)\}\s*\{form\.submitting && "…"\}/);
+    expect(actions).toContain('<BusyLabel busy={form.submitting} idle={t("score.admin.save")} pending={`${t("score.admin.save")}…`} />');
+    expect(actions).toContain('<BusyLabel busy={form.submitting} idle={t("score.admin.resolve")} pending={`${t("score.admin.resolve")}…`} />');
     const player = read("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(player).not.toMatch(/submitting \? "…"/);
   });

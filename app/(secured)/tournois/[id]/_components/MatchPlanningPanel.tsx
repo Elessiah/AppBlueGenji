@@ -7,6 +7,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { matchesToPlan } from "@/lib/shared/match-planning";
 import { canToggleLiveTournamentOption } from "@/lib/shared/tournament-state";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { refereeSchedulingErrorText, useActionsText } from "../_lib/actions-text";
@@ -163,9 +164,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
             >
               {/* Le libellé reste pendant l'envoi : le bouton garde le focus, et un
                   nom réduit à « … » ne dirait plus rien du geste en cours. */}
-              {toggleLabel}
-              {/* Place réservée : le bouton ne change pas de largeur à l'envoi. */}
-              <span style={{ visibility: busy ? "visible" : "hidden" }}>…</span>
+              <BusyLabel busy={busy} idle={toggleLabel} pending={`${toggleLabel}…`} />
             </button>
           )}
         </div>

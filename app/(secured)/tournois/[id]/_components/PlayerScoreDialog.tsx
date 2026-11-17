@@ -1,6 +1,7 @@
 "use client";
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useToast } from "@/components/ui/toast";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
@@ -984,8 +985,7 @@ export function PlayerScoreDialog({
                 aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}
                 aria-busy={submitting || undefined}
               >
-                {submitLabel}
-                {submitting && "…"}
+                <BusyLabel busy={submitting} idle={submitLabel} pending={`${submitLabel}…`} />
               </button>
             )}
             <SendingStatus active={submitting} />

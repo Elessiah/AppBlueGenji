@@ -314,6 +314,8 @@ export function useScoreForm(
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
     submitting,
+    /** État synchrone de l'envoi : les gestionnaires l'interrogent, `submitting` n'est rendu qu'après. */
+    isBusy,
     decision,
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,

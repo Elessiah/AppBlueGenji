@@ -760,6 +760,25 @@ textarea,
   border-style: dashed;
 }
 
+/* `BusyLabel` : libellé au repos et libellé d'attente dans la même case, le
+   bouton garde sa largeur. `visibility` (non `display`) : la case reste réservée. */
+.busy-label {
+  display: inline-grid;
+}
+
+.busy-label > * {
+  grid-area: 1 / 1;
+}
+
+.busy-label > :last-child,
+.busy-label[data-busy="true"] > :first-child {
+  visibility: hidden;
+}
+
+.busy-label[data-busy="true"] > :last-child {
+  visibility: visible;
+}
+
 /* Zone où `aria-disabled` remplace `disabled` (le bouton garde le focus) : le
    `.btn` n'a pas d'état désarmé, on l'atténue ici. En attente (`aria-busy`) le
    libellé doit rester lisible : pas d'atténuation, curseur d'attente. Jamais

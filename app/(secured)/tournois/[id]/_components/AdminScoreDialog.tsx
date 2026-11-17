@@ -1,5 +1,6 @@
 "use client";
 
+import { BusyLabel } from "@/components/ui/busy-label";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { shownMatchScore } from "@/lib/shared/map-points";
 import { useShownEntrantName } from "./EntrantName";
@@ -290,7 +291,7 @@ function ScoreConflictNotice({
   form,
 }: Readonly<{
   text: TournamentDialogsText;
-  form: Pick<ReturnType<typeof useScoreForm>, "conflict" | "rulesConflict" | "adoptStoredResult" | "submitting">;
+  form: Pick<ReturnType<typeof useScoreForm>, "conflict" | "rulesConflict" | "adoptStoredResult" | "submitting" | "isBusy">;
 }>) {
   if (!form.conflict && !form.rulesConflict) return null;
   return (
@@ -303,7 +304,7 @@ function ScoreConflictNotice({
         type="button"
         className={styles.conflictAction}
         onClick={() => {
-          if (!form.submitting) form.adoptStoredResult();
+          if (!form.isBusy()) form.adoptStoredResult();
         }}
         aria-disabled={form.submitting || undefined}
         aria-busy={form.submitting || undefined}
@@ -487,7 +488,7 @@ export function AdminScoreDialog({
   };
 
   const toggleForfeit = (teamId: number | null) => {
-    if (teamId === null || form.submitting) return;
+    if (teamId === null || form.isBusy()) return;
     form.setForfeitTeamId(forfeitTeamId === teamId ? undefined : teamId);
   };
 
@@ -584,6 +585,7 @@ export function AdminScoreDialog({
               adopted={form.forfeitTeamId === undefined && !form.doubleForfeit && formHoldsReport(form.maps, pendingReport.report)}
               submitting={form.submitting}
               onAdopt={() => {
+                if (form.isBusy()) return;
                 setForfeitOpen(false);
                 form.adoptReport(pendingReport.report);
               }}
@@ -653,7 +655,7 @@ export function AdminScoreDialog({
               type="button"
               className={styles.link}
               onClick={() => {
-                if (form.submitting) return;
+                if (form.isBusy()) return;
                 if (showForfeit) closeForfeit();
                 setForfeitOpen(!showForfeit);
               }}
@@ -721,7 +723,7 @@ export function AdminScoreDialog({
                     aria-pressed={doubleForfeit}
                     aria-describedby="admin-score-forfeit-hint"
                     onClick={() => {
-                      if (!form.submitting && match.team1Id !== null && match.team2Id !== null) form.setDoubleForfeit(!doubleForfeit);
+                      if (!form.isBusy() && match.team1Id !== null && match.team2Id !== null) form.setDoubleForfeit(!doubleForfeit);
                     }}
                     aria-disabled={form.submitting || match.team1Id === null || match.team2Id === null || undefined}
                     aria-busy={form.submitting || undefined}
@@ -749,7 +751,7 @@ export function AdminScoreDialog({
               type="button"
               className={`${styles.link} ${styles.close}`}
               onClick={() => {
-                if (!form.submitting) onClose();
+                if (!form.isBusy()) onClose();
               }}
               aria-disabled={form.submitting || undefined}
               aria-busy={form.submitting || undefined}
@@ -766,8 +768,7 @@ export function AdminScoreDialog({
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
             >
-              {t("score.admin.save")}
-              {form.submitting && "…"}
+              <BusyLabel busy={form.submitting} idle={t("score.admin.save")} pending={`${t("score.admin.save")}…`} />
             </button>
             <button
               type="submit"
@@ -776,8 +777,7 @@ export function AdminScoreDialog({
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
             >
-              {t("score.admin.resolve")}
-              {form.submitting && "…"}
+              <BusyLabel busy={form.submitting} idle={t("score.admin.resolve")} pending={`${t("score.admin.resolve")}…`} />
             </button>
             {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé :
                 l'envoi se dit ici, comme dans `ConfirmActionDialog`. */}

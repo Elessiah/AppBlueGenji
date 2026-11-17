@@ -88,7 +88,7 @@ export function RefereeDialog({
       if (initial) onClose();
     };
   });
-  const { busy, isBusy, run: guarded } = useBusyGuard();
+  const { busy, isBusy, run: guarded, busyProps } = useBusyGuard();
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [objectionPick, setObjectionPick] = useState("");
@@ -193,8 +193,6 @@ export function RefereeDialog({
   const close = () => {
     if (!isBusy()) onClose();
   };
-  // Boutons pendant l'envoi : focalisables, annoncés en attente.
-  const busyProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
 
   const base = `/api/admin/matches/${match.id}`;
   const actions = panel ? refereeDialogActions(panel, viewerUserId) : null;

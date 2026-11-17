@@ -94,13 +94,13 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
   it("MatchPlanningPanel_busyToggle_keepsItsLabel", () => {
     const code = source(DIR + "MatchPlanningPanel.tsx");
     expect(code).not.toMatch(/busy \? "…" : toggleLabel/);
-    expect(code).toMatch(/\{toggleLabel\}[\s\S]*?visibility: busy/);
+    expect(code).toContain("<BusyLabel busy={busy} idle={toggleLabel} pending={`${toggleLabel}…`} />");
   });
 
   it("EntrantContactsPanel_reopenDuringLoad_rereadsAfter", () => {
     const code = source(DIR + "EntrantContactsPanel.tsx");
     expect(code).toMatch(/if \(!retry\) rereadRef\.current = true;/);
-    expect(code).toMatch(/if \(rereadRef\.current\) \{\s+rereadRef\.current = false;\s+void load\(\);/);
+    expect(code).toMatch(/if \(rereadRef\.current\) \{\s+rereadRef\.current = false;\s+if \(mountedRef\.current\) void load\(\);/);
   });
 
   it("EntrantContactsPanel_sameFailureAgain_alertReplaced", () => {
@@ -203,7 +203,7 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
   });
 
   it("MatchPlanningPanel_busyLabel_reservesEllipsisWidth", () => {
-    expect(source(DIR + "MatchPlanningPanel.tsx")).toMatch(/visibility: busy \? "visible" : "hidden" \}\}>…<\/span>/);
+    expect(source(DIR + "MatchPlanningPanel.tsx")).not.toMatch(/style=\{\{ visibility/);
   });
 
   it.each([
@@ -216,5 +216,25 @@ describe("dialogues de match et d'arbitrage — boutons pendant une requête", (
     const code = source(DIR + file);
     expect(code).toMatch(/<BusyLabel busy=\{busy\}/);
     expect(code).not.toMatch(/\{busy \? t\("(?:schedule\.saving|issue\.pending|cardActions\.castSettings\.saving)"\)/);
+  });
+});
+
+describe("EF-66 performance cycle 1", () => {
+  it("AdminScoreDialog_handlers_askTheSynchronousGuard", () => {
+    const dialog = source(DIR + "AdminScoreDialog.tsx");
+    expect(dialog).not.toMatch(/if \(!form\.submitting\) (form\.adoptStoredResult|onClose)\(\)/);
+    expect(dialog).toContain("if (teamId === null || form.isBusy()) return;");
+    expect(dialog).toContain("if (!form.isBusy()) form.adoptStoredResult();");
+    expect(source("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts")).toMatch(/submitting,\s+\/\*\*[^*]*\*\/\s+isBusy,/);
+  });
+
+  it("EntrantContactsPanel_unmounted_doesNotRereadNorFetchAgain", () => {
+    expect(source(DIR + "EntrantContactsPanel.tsx")).toMatch(/const mountedRef = useRef\(true\);[\s\S]*mountedRef\.current = false;/);
+  });
+
+  it("RefereeDialog_busyProps_comeFromTheSharedHook", () => {
+    const code = source(DIR + "RefereeDialog.tsx");
+    expect(code).toMatch(/run: guarded, busyProps \} = useBusyGuard\(\)/);
+    expect(code).not.toMatch(/const busyProps =/);
   });
 });

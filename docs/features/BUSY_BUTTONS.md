@@ -22,6 +22,12 @@ annoncer de l'attente.
   (`lib/shared/busy-guard.ts`). Jamais de drapeau écrit à la main. Deux gestes
   d'une même fenêtre (enregistrer, ouvrir l'antenne) partagent **un** `run`
   (`useOnAirToggle` le reçoit).
+  Coût de rendu : le résultat du hook est **mémoïsé** (il ne change qu'à
+  l'entrée et à la sortie d'un envoi, pas à la frappe), `isBusy`/`run` sont
+  stables, `busyProps` (`aria-disabled` + `aria-busy`) à étaler sur un bouton
+  vient du hook ; démonté pendant un envoi (la tâche ferme souvent sa propre
+  fenêtre), l'écran ne reçoit plus de mise à jour d'état — la requête, elle,
+  va à son terme. Un gestionnaire interroge `isBusy()`, jamais `busy`.
 - Un **champ** peut garder `disabled` quand c'est la bonne sémantique : liste
   déroulante (le focus est sur le bouton qui envoie, une liste n'envoie pas le
   formulaire), liste des maps d'un score (`MapScoreList`, Entrée n'y envoie
@@ -32,7 +38,9 @@ annoncer de l'attente.
   dont le nom se réduit à « … » ne dit plus rien. Un libellé qui **change**
   (« Enregistrer » → « Enregistrement… ») passe par `<BusyLabel>`
   (`components/ui/busy-label.tsx`) : les deux textes partagent une case de grille,
-  le bouton ne change pas de largeur et ne pousse pas ses voisins à 375 px.
+  le bouton ne change pas de largeur et ne pousse pas ses voisins à 375 px
+  (classe `.busy-label` + `data-busy` dans `globals.css`, aucun `style` en ligne :
+  le composant se rend à chaque frappe). Aucun « … » ajouté à la main.
 - Un **champ de texte** où l'on peut encore écrire (message de signalement, liens
   du direct) passe en `readOnly` pendant l'envoi : ce qui est affiché est ce qui part.
 - Apparence : `.btn:where([aria-disabled="true"][aria-busy="true"])` donne le

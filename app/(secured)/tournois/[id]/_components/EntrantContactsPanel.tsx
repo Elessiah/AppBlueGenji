@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DiscordTag } from "@/components/discord-tag";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { useToast } from "@/components/ui/toast";
@@ -70,6 +70,15 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
   // Une réouverture pendant une lecture ne la double pas, mais n'est pas
   // perdue : la relecture promise à chaque ouverture part juste après.
   const rereadRef = useRef(false);
+  // Démonté pendant une lecture : la relecture promise ne repart pas (une
+  // requête et un toast d'erreur pour un panneau qui n'existe plus).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const load = async (retry = false) => {
     if (isBusy()) {
       if (!retry) rereadRef.current = true;
@@ -94,7 +103,7 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
     });
     if (rereadRef.current) {
       rereadRef.current = false;
-      void load();
+      if (mountedRef.current) void load();
     }
   };
 
