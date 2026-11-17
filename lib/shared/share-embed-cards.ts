@@ -305,7 +305,7 @@ export function matchEmbedCard(
     state: { label: text.matchStates[state.key], tone: state.tone },
     title: shownText(card.name, EMBED_TITLE_MAX_LENGTH) || text.tournamentFallback,
     subtitle: position,
-    schedule: when === null ? null : { when, zone: text.timeZone },
+    schedule: when === null ? null : { when, zone: capitalized(text.timeZone, locale) },
     team1: { name: names[0], initial: initialOf(names[0]), logoUrl: match.team1.logoUrl, winner: match.winnerSide === 1 },
     team2: { name: names[1], initial: initialOf(names[1]), logoUrl: match.team2.logoUrl, winner: match.winnerSide === 2 },
     center: scoreCenter(match, names, text),
@@ -399,13 +399,17 @@ export function matchEmbedTitle(
   const score = finalScore(match, scoreCenter(match, names, text));
   const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
-  const tail = when === null ? position : `${position} · ${when}`;
   const head = (team1: string, team2: string) =>
     score === null ? fill(text.versus, { team1, team2 }) : `${team1} ${score.team1}–${score.team2} ${team2}`;
-  const room = EMBED_MATCH_TITLE_BUDGET - displayWidth(`${head("", "")} · ${tail}`);
-  const fitted = fitNames(names, room);
-  if (fitted === null) return tail;
-  return `${head(isolateDirection(fitted[0]), isolateDirection(fitted[1]))} · ${tail}`;
+  // L'horaire d'abord ; si les équipes n'ont plus de place avec lui, il cède
+  // (la description et l'image le portent) plutôt que les deux noms.
+  const tails = when === null ? [position] : [`${position} · ${when}`, position];
+  for (const tail of tails) {
+    const room = EMBED_MATCH_TITLE_BUDGET - displayWidth(`${head("", "")} · ${tail}`);
+    const fitted = fitNames(names, room);
+    if (fitted !== null) return `${head(isolateDirection(fitted[0]), isolateDirection(fitted[1]))} · ${tail}`;
+  }
+  return tails[0];
 }
 
 /**

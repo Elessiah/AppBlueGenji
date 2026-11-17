@@ -386,7 +386,7 @@ describe("match a venir : horaire programme", () => {
   it("matchEmbedCard_scheduled_carriesLargeScheduleWithZone", () => {
     expect(matchEmbedCard(CARD, scheduled(), "Quart de finale 2", FR, "fr", NOW).schedule).toEqual({
       when: "Mardi 17 novembre · 21:00",
-      zone: "heure de Paris",
+      zone: "Heure de Paris",
     });
     expect(matchEmbedCard(CARD, scheduled(), "Quarterfinal 2", EN, "en", NOW).schedule).toEqual({
       when: "Tuesday, November 17 · 21:00",
@@ -492,6 +492,42 @@ describe("matchEmbedTitle — budget de l'encart", () => {
     const title = matchEmbedTitle(match, "Tableau perdants · Demi-finale 2", FR, "fr", Date.parse("2026-11-17T10:00:00.000Z"));
     expect(title.endsWith(" · Tableau perdants · Demi-finale 2 · mar. 17 nov. 21:00")).toBe(true);
     expect(displayWidth(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_lowerRoundScheduledLongNames_dateYieldsBeforeTeams", () => {
+    // Le tour (« Tableau perdants · Quart de finale 12 ») + l'horaire ne laissent
+    // aucune place aux noms : l'horaire cède (description et image le portent).
+    const match = summary({
+      team1: LONG_1,
+      team2: LONG_2,
+      score: null,
+      winnerSide: null,
+      status: "READY",
+      maps: [],
+      startAt: "2026-11-18T20:00:00.000Z",
+    });
+    const title = matchEmbedTitle(match, "Tableau perdants · Quart de finale 12", FR, "fr", Date.parse("2026-11-18T10:00:00.000Z"));
+    expect(title).toMatch(/^Les Che.*… contre Sl sol.*… · Tableau perdants · Quart de finale 12$/u);
+    expect(displayWidth(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_rtlNames_isolationMarksNotCounted", () => {
+    const rtl = (seed: number): ShareEntrantSide => ({
+      teamId: seed,
+      name: String.fromCharCode(0x627, 0x644, 0x646, 0x633, 0x648, 0x631).repeat(8),
+      logoUrl: null,
+      solo: false,
+    });
+    const title = matchEmbedTitle(summary({ team1: rtl(1), team2: rtl(2) }), "Quart de finale 2", FR, "fr");
+    expect(displayWidth(title)).toBe(EMBED_MATCH_TITLE_BUDGET);
+    expect(title).toContain(String.fromCharCode(0x2068));
+  });
+
+  it("matchEmbedTitle_narrowSymbols_countedOneColumn", () => {
+    // 30 symboles étroits (©) = 30 colonnes : tiennent tous (2 colonnes chacun ils seraient coupés).
+    const tm: ShareEntrantSide = { teamId: 1, name: "\u00A9".repeat(30), logoUrl: null, solo: false };
+    const title = matchEmbedTitle(summary({ team1: tm }), "Final", EN, "en");
+    expect(title).toBe(`${"\u00A9".repeat(30)} 2–1 Bravo · Final`);
   });
 
   it("matchEmbedTitle_inProgressScore_usesVersus", () => {

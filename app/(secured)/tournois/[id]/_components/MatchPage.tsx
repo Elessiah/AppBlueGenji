@@ -277,7 +277,7 @@ function MatchHeader({
   // `bracket`), réduits à une clé de ce qui les nomme : chaque poussée du flux
   // apporte de nouveaux objets, mais le nom ne se recalcule que si la forme des
   // tours a changé (`phaseRoundShapeKey`).
-  const shapeKey = phaseRoundShapeKey(detail.matches, match.phaseId);
+  const shapeKey = useMemo(() => phaseRoundShapeKey(detail.matches, match.phaseId), [detail.matches, match.phaseId]);
   const { format, state } = detail.card;
   const phaseFormat = detail.phases?.find((item) => item.id === match.phaseId)?.format ?? null;
   const { id: matchId, phaseId, roundNumber, matchNumber } = match;

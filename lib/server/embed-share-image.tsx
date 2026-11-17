@@ -58,6 +58,7 @@ import {
   shareRequestClient,
 } from "./spectator-request";
 import { TEAM_SHARE_LOGO_SIZE } from "./share-team";
+import { withoutRightToLeftLetters } from "@/lib/shared/graphemes";
 import type { Locale } from "@/lib/shared/locales";
 import { matchEmbedCard, tournamentEmbedCard } from "@/lib/shared/share-embed-cards";
 import {
@@ -66,6 +67,8 @@ import {
   parseEmbedShareCardKey,
   tournamentShareVersion,
   type EmbedShareTarget,
+  type MatchShareSummary,
+  type ShareEntrantSide,
 } from "@/lib/shared/share-embeds";
 import { shareRoundPageText, shareRoundText } from "@/lib/shared/share-round";
 
@@ -150,7 +153,7 @@ export async function renderEmbedShareImage(
   const image = await cachedShareImage(
     `${locale}:${key}:${version}`,
     EMBED_CARD_TTL_MS,
-    () => buildEmbedShareImage(target, view, locale, now),
+    () => drawnEmbedShareImage(target, view, locale, now),
     "embed",
     false,
     shareEmbedRenderAdmission(client),
@@ -180,6 +183,66 @@ async function readShareView(target: EmbedShareTarget, client: string | null): P
   const read =
     target.kind === "tournament" ? publicTournamentImageViewForRequest : publicTournamentShareForRequest;
   return read(target.tournamentId, client).catch(() => null);
+}
+
+/** Un camp sans les lettres de droite à gauche de son nom. */
+function sideWithoutRightToLeft(side: ShareEntrantSide): ShareEntrantSide {
+  return { ...side, name: side.name === null ? null : withoutRightToLeftLetters(side.name) };
+}
+
+/**
+ * La réponse publique dont tout texte saisi a perdu ses lettres de droite à
+ * gauche (noms de tournoi, d'équipe et de map) : le moteur d'images (Satori)
+ * échoue sur la police arabe qu'il va chercher, et une équipe « النسور » faisait
+ * répondre 500 à la carte de son match.
+ */
+export function withoutRightToLeftText(view: ShareView): ShareView {
+  const { leader, matches } = view.share;
+  return {
+    ...view,
+    card: { ...view.card, name: withoutRightToLeftLetters(view.card.name) },
+    share: {
+      leader: leader && { ...leader, side: sideWithoutRightToLeft(leader.side) },
+      matches: new Map(
+        [...matches].map(([id, match]): [number, MatchShareSummary] => [
+          id,
+          {
+            ...match,
+            team1: sideWithoutRightToLeft(match.team1),
+            team2: sideWithoutRightToLeft(match.team2),
+            maps: match.maps.map((map) => ({
+              ...map,
+              mapName: map.mapName === null ? null : withoutRightToLeftLetters(map.mapName),
+            })),
+          },
+        ]),
+      ),
+    },
+  };
+}
+
+/**
+ * Dessine la carte jusqu'au PNG. Un échec de rendu (écriture que la police
+ * embarquée ne compose pas) retente **une fois** sans les lettres de droite à
+ * gauche ({@link withoutRightToLeftText}) ; un second échec remonte.
+ */
+async function drawnEmbedShareImage(
+  target: EmbedShareTarget,
+  view: ShareView,
+  locale: Locale,
+  now: number,
+): Promise<Response | null> {
+  const draw = async (shown: ShareView): Promise<Response | null> => {
+    const image = await buildEmbedShareImage(target, shown, locale, now);
+    if (!image) return null;
+    return new Response(await image.arrayBuffer(), { headers: image.headers });
+  };
+  try {
+    return await draw(view);
+  } catch (error) {
+    console.warn("[share-embed] rendu en échec, nouvel essai sans écriture de droite à gauche", error);
+    return draw(withoutRightToLeftText(view));
+  }
 }
 
 /** Rend l'image de `target` depuis la réponse publique, sans cache. */

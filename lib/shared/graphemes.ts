@@ -20,14 +20,19 @@ export function graphemesOf(text: string): string[] {
 
 /**
  * Graphèmes qui occupent deux colonnes dans une police proportionnelle
- * courante : idéogrammes, kana, hangul, formes pleine chasse, emoji et
- * drapeaux.
+ * courante : idéogrammes, kana, hangul, formes pleine chasse, drapeaux et
+ * emoji **en présentation emoji** (un pictogramme étroit comme ©, ™ ou ✔ n'en
+ * est pas un, sauf suivi du sélecteur U+FE0F).
  */
 const WIDE_GRAPHEME =
-  /[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303F\uFF01-\uFF60\uFFE0-\uFFE6]/u;
+  /[\p{Emoji_Presentation}\p{Regional_Indicator}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303F\uFF01-\uFF60\uFFE0-\uFFE6]|\p{Extended_Pictographic}\uFE0F/u;
 
-/** Largeur d'un graphème : 2 s'il est large ({@link WIDE_GRAPHEME}), 1 sinon. */
+/** Contrôles de direction invisibles (U+200E/F, U+202A–E, U+2066–U+2069) : aucune colonne. */
+const INVISIBLE_CONTROL = /^[\u200E\u200F\u202A-\u202E\u2066-\u2069]$/;
+
+/** Largeur d'un graphème : 0 s'il est invisible, 2 s'il est large ({@link WIDE_GRAPHEME}), 1 sinon. */
 export function graphemeWidth(grapheme: string): number {
+  if (INVISIBLE_CONTROL.test(grapheme)) return 0;
   return WIDE_GRAPHEME.test(grapheme) ? 2 : 1;
 }
 
@@ -67,4 +72,14 @@ const RTL_LETTER = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\
  */
 export function isolateDirection(name: string): string {
   return RTL_LETTER.test(name) ? `\u2068${name}\u2069` : name;
+}
+
+/**
+ * `text` sans ses lettres de droite à gauche ({@link RTL_LETTER}), espaces
+ * resserrés. Pour dessiner un nom dans une police qui ne les compose pas (le
+ * moteur d'images échoue sur l'arabe) : mieux vaut la partie latine d'un nom
+ * qu'une carte absente.
+ */
+export function withoutRightToLeftLetters(text: string): string {
+  return text.replace(new RegExp(RTL_LETTER.source, "gu"), "").replace(/\s+/gu, " ").trim();
 }

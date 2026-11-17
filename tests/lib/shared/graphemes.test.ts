@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { cutToWidth, displayWidth, graphemesOf, isolateDirection } from "@/lib/shared/graphemes";
+import { cutToWidth, displayWidth, graphemesOf, isolateDirection, withoutRightToLeftLetters } from "@/lib/shared/graphemes";
 import { truncateForShare } from "@/lib/shared/share-metadata";
 
 /** Drapeau français : deux indicateurs régionaux, un seul graphème. */
@@ -22,6 +22,22 @@ describe("displayWidth", () => {
     expect(displayWidth("東京")).toBe(4);
     expect(displayWidth(FLAG_FR)).toBe(2);
     expect(displayWidth(THUMB_TONE)).toBe(2);
+  });
+});
+
+describe("displayWidth — symboles étroits et contrôles invisibles", () => {
+  it("displayWidth_narrowPictographs_countsOne", () => {
+    expect(displayWidth("\u00A9\u00AE\u2122\u203C\u2194\u2714")).toBe(6);
+  });
+
+  it("displayWidth_emojiPresentationSelector_countsTwo", () => {
+    expect(displayWidth("\u2714\uFE0F")).toBe(2);
+    expect(displayWidth("\u{1F3C6}")).toBe(2);
+  });
+
+  it("displayWidth_directionIsolates_countZero", () => {
+    expect(displayWidth(isolateDirection("\u0627\u0644\u0646\u0633\u0648\u0631"))).toBe(6);
+    expect(displayWidth("\u200Fab\u202E")).toBe(2);
   });
 });
 
@@ -64,5 +80,19 @@ describe("truncateForShare — graphèmes", () => {
   it("truncateForShare_flags_cutBetweenGraphemes", () => {
     // Trois drapeaux = 6 points de code ; limite 4 → un drapeau entier + ellipse.
     expect(truncateForShare(`${FLAG_FR}${FLAG_FR}${FLAG_FR}`, 4)).toBe(`${FLAG_FR}…`);
+  });
+});
+
+describe("withoutRightToLeftLetters", () => {
+  it("withoutRightToLeftLetters_mixed_keepsLatinPart", () => {
+    expect(withoutRightToLeftLetters(`Team ${"\u0627\u0644\u0646\u0633\u0648\u0631"} 2`)).toBe("Team 2");
+  });
+
+  it("withoutRightToLeftLetters_hebrewOnly_returnsEmpty", () => {
+    expect(withoutRightToLeftLetters("\u05E9\u05DC\u05D5\u05DD")).toBe("");
+  });
+
+  it("withoutRightToLeftLetters_latin_unchanged", () => {
+    expect(withoutRightToLeftLetters("Choco Pops")).toBe("Choco Pops");
   });
 });

@@ -87,7 +87,11 @@ Discord coupe d'une ellipse le titre d'un aperçu de lien qui dépasse une ligne
   idéogramme, un kana, un hangul ou un emoji en valent deux), **jamais dépassé** par les noms : seuls les
   **noms d'équipe** cèdent (ellipse coupée entre deux graphèmes — ni drapeau ni emoji à teinte brisé ;
   le plus court gardé entier, 4 colonnes au moins chacun quand la place le permet) ; quand le tour et
-  l'horaire ne laissent pas 3 colonnes par nom, les noms quittent le titre — jamais le tour, le score ni l'horaire ;
+  l'horaire ne laissent pas 3 colonnes par nom, **l'horaire d'abord** quitte le titre (la description et l'image le
+  portent : « Tableau perdants · Quart de finale 12 » + date garderait « Te… vs Te… » sinon), puis, si la place
+  manque encore, les noms — jamais le tour ni le score. La largeur d'un pictogramme étroit (©, ™, ✔) est
+  d'une colonne (emoji seulement avec leur sélecteur U+FE0F ou en présentation emoji) et les marques
+  d'isolation (FSI/PDI, invisibles) n'en valent aucune ;
 - un nom contenant une lettre de droite à gauche (arabe, hébreu…) est isolé (FSI … PDI, `isolateDirection`) :
   il ne retourne pas l'ordre du score voisin (de même dans la description).
 L'onglet (`<title>`, `matchPageTitle`) garde la forme longue « A contre B · Quart de finale 2 — tournoi »
@@ -137,10 +141,15 @@ de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-st
 Un match **programmé** (`startAt`) sans score, map ni forfait (`matchScheduledAt`) met
 son horaire en tête, à l'heure de Paris, dans les deux langues :
 - image : ligne principale en 52 px sous les équipes, « Mardi 17 novembre · 21:00 » /
-  « Tuesday, November 17 · 21:00 », fuseau en dessous (« heure de Paris » / « Paris time »,
-  `share.embed.timeZone`) ;
+  « Tuesday, November 17 · 21:00 », fuseau en dessous, en capitale (« Heure de Paris » / « Paris time »,
+  `share.embed.timeZone` ; la description le reprend tel quel, en minuscules, entre parenthèses) ;
 - titre : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » ;
 - description : « Mardi 17 novembre · 21:00 (heure de Paris) ».
+Écriture de droite à gauche : Satori échoue sur la police arabe qu'il va chercher (« lookupType: 5 -
+substFormat: 3 is not yet supported ») ; une équipe « النسور » faisait répondre 500 à l'image de son match.
+`drawnEmbedShareImage` lit le PNG et, sur échec, **retente une fois** sans les lettres de droite à gauche
+(`withoutRightToLeftText` : noms de tournoi, d'équipe et de map, `withoutRightToLeftLetters` ; un nom vide
+retombe sur « Équipe n »). Le titre et la description gardent le nom entier.
 Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant. Un créneau
 **passé** non plus (match en retard) : `matchScheduledAt(match, now)` ne rend l'horaire
 qu'à venir, et ce basculement entre dans l'empreinte (`matchShareVersion`), calculée au
