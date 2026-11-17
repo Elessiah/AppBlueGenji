@@ -3,6 +3,9 @@
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -38,14 +41,16 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic créait deux fois (le second refusé par le
+  // nom déjà pris, mais avec une erreur au milieu d'un succès).
+  const { busy, isBusy, run, hold } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
   const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (isBusy()) return;
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
       const message = teamErrorMessage(nameCheck.reason);
@@ -54,33 +59,33 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
       return;
     }
     fieldErrors.clear();
-    setBusy(true);
-    try {
-      const response = await fetch("/api/teams", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description: description.trim() || null,
-          tag: tag.trim() || null,
-          ghost: true,
-        }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        const code = payload.error || "GHOST_TEAM_CREATE_FAILED";
-        throw new CodedError(code, code);
+    await run(async () => {
+      try {
+        const response = await fetch("/api/teams", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name,
+            description: description.trim() || null,
+            tag: tag.trim() || null,
+            ghost: true,
+          }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          const code = payload.error || "GHOST_TEAM_CREATE_FAILED";
+          throw new CodedError(code, code);
+        }
+        showSuccess(t("ghostDialog.created"));
+        hold();
+        onCreated();
+        onClose();
+      } catch (e) {
+        const message = teamErrorMessage((e as Error).message);
+        fieldErrors.report(errorCode(e), message);
+        showError(message);
       }
-      showSuccess(t("ghostDialog.created"));
-      onCreated();
-      onClose();
-    } catch (e) {
-      const message = teamErrorMessage((e as Error).message);
-      fieldErrors.report(errorCode(e), message);
-      showError(message);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   // Portée dans <body> : rendue dans la page, elle restait dans le contexte
@@ -107,6 +112,8 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
             <input
               id="ghost-team-name"
               value={name}
+              // Figés pendant l'envoi (`readOnly`, le focus reste) : ce qui est affiché est ce qui part.
+              readOnly={busy}
               onChange={(e) => {
                 setName(e.target.value);
                 fieldErrors.clear("name");
@@ -125,6 +132,7 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
             <input
               id="ghost-team-tag"
               value={tag}
+              readOnly={busy}
               onChange={(e) => {
                 setTag(normalizeTeamTag(e.target.value));
                 fieldErrors.clear("tag");
@@ -146,18 +154,19 @@ export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialog
             <textarea
               id="ghost-team-description"
               value={description}
+              readOnly={busy}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
           </div>
 
           <div className={s.actions}>
-            <button type="button" className="btn ghost" onClick={busy ? undefined : onClose} aria-disabled={busy || undefined}>
+            <BusyButton className="btn ghost" busy={false} blocked={busy} onClick={onClose}>
               {t("ghostDialog.cancel")}
-            </button>
-            <button type="submit" className="btn" aria-disabled={busy || undefined} aria-busy={busy || undefined}>
-              {busy ? t("ghostDialog.pending") : t("ghostDialog.submit")}
-            </button>
+            </BusyButton>
+            <BusyButton type="submit" className="btn" busy={busy}>
+              <BusyLabel busy={busy} idle={t("ghostDialog.submit")} pending={t("ghostDialog.pending")} />
+            </BusyButton>
           </div>
         </form>
       </div>

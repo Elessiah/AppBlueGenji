@@ -110,6 +110,7 @@
     "sentOn": "envoyée le {date}",
     "withdraw": "Retirer",
     "withdrawing": "Retrait…",
+    "otherWithdrawing": "Un autre retrait est en cours, réessaie.",
     "withdrawLabel": "Retirer l'invitation de {pseudo}",
     "kickTitle": "Exclure {pseudo} ?",
     "kickPending": "Exclusion…",
@@ -129,7 +130,8 @@
     "save": "Enregistrer",
     "saving": "Enregistrement…",
     "ownerNotice": "Le rôle de propriétaire ne se coche pas : il se transfère, depuis les paramètres de l'équipe.",
-    "dropsManagement": "Sans le rôle de manager, tu ne pourras plus gérer le roster de l'équipe."
+    "dropsManagement": "Sans le rôle de manager, tu ne pourras plus gérer le roster de l'équipe.",
+    "unchanged": "Coche ou décoche d'abord un rôle."
   },
   "inviteDialog": {
     "title": "Inviter {pseudo}",
@@ -221,7 +223,8 @@
     "newOwner": "Nouveau propriétaire",
     "rolesOf": "Rôles de {pseudo}",
     "lastCheck": "Dernière vérification : {pseudo} deviendra propriétaire, et sera la seule personne à pouvoir te rendre ce rôle.",
-    "done": "{pseudo} est désormais propriétaire de l'équipe."
+    "done": "{pseudo} est désormais propriétaire de l'équipe.",
+    "chooseFirst": "Choisis d'abord le membre à qui confier l'équipe."
   },
   "claim": {
     "title": "Proposer l'équipe à un joueur",
@@ -232,7 +235,8 @@
     "pseudo": "Pseudo du joueur",
     "pseudoPlaceholder": "Commence à taper un pseudo…",
     "help": "Seuls les joueurs sans équipe sont proposés : il ne doit appartenir à aucune autre.",
-    "done": "{pseudo} est invité à reprendre {team}."
+    "done": "{pseudo} est invité à reprendre {team}.",
+    "pseudoFirst": "Saisis d'abord le pseudo du joueur à qui proposer l'équipe."
   },
   "settings": {
     "title": "Paramètres de l'équipe",
@@ -288,6 +292,7 @@
     "transfer": "Transférer la propriété",
     "deleteGhost": "Supprimer l'équipe fantôme",
     "dissolve": "Dissoudre l'équipe",
-    "tagPlaceholder": "BG"
+    "tagPlaceholder": "BG",
+    "unchanged": "Modifie d'abord le nom, le sigle ou la description."
   }
 }

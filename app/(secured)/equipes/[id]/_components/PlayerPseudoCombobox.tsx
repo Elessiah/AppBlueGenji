@@ -48,6 +48,11 @@ interface PlayerPseudoComboboxProps {
   aria?: FieldAria;
   /** Joueurs à ne pas proposer (déjà invités, par exemple). */
   excludeUserIds?: readonly number[];
+  /**
+   * Figé pendant un envoi (`readOnly`, le focus reste) : ni frappe ni choix
+   * d'une suggestion — ce qui est affiché est ce qui part.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -71,6 +76,7 @@ export function PlayerPseudoCombobox({
   placeholder,
   aria,
   excludeUserIds = [],
+  readOnly = false,
 }: Readonly<PlayerPseudoComboboxProps>) {
   const listId = useId();
   const { t } = useTeamPageText();
@@ -111,10 +117,11 @@ export function PlayerPseudoCombobox({
       .slice(0, MAX_SUGGESTIONS);
   }, [players, value, excludeKey]);
 
-  const expanded = open && suggestions.length > 0;
+  const expanded = open && !readOnly && suggestions.length > 0;
   const optionId = (index: number) => `${listId}-option-${index}`;
 
   const choose = (player: DirectoryPlayer) => {
+    if (readOnly) return;
     onChange(player.pseudo);
     setOpen(false);
     setActive(-1);
@@ -153,6 +160,7 @@ export function PlayerPseudoCombobox({
         aria-activedescendant={expanded && active >= 0 ? optionId(active) : undefined}
         {...aria}
         value={value}
+        readOnly={readOnly}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);

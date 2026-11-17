@@ -106,7 +106,9 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(markup).toContain(entry.title.replace(/'/g, "&#x27;"));
     expect(markup).not.toContain(entry.details[0].slice(0, 40).replace(/'/g, "&#x27;"));
     expect(markup).toContain("Chargement du détail des changements…");
-    expect(markup).toMatch(/<button[^>]*disabled=""/);
+    // Refusé mais focalisable (`BusyButton blocked`) tant que le détail manque.
+    expect(markup).toMatch(/<button class="root primary" type="button" aria-disabled="true">/);
+    expect(markup).not.toMatch(/<button[^>]*\sdisabled=""/);
   });
 
   it("privacyDetailsPending_followsTheDueRequest", () => {

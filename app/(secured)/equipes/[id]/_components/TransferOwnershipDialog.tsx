@@ -7,6 +7,9 @@ import { sortTeamMembers } from "@/lib/shared/team-role-display";
 import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { jsonRequest, teamApi } from "../_lib/team-api";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { TeamDialog } from "./TeamDialog";
 import { RolePills } from "./RolePills";
 import styles from "../team.module.css";
@@ -21,7 +24,8 @@ interface TransferOwnershipDialogProps {
 export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }: Readonly<TransferOwnershipDialogProps>) {
   const [targetId, setTargetId] = useState<number | null>(null);
   const [confirmStep, setConfirmStep] = useState(false);
-  const [pending, setPending] = useState(false);
+  // Garde synchrone : un double clic au second temps transférait deux fois.
+  const { busy: pending, isBusy, run, hold } = useBusyGuard();
   const { showError, showSuccess } = useToast();
   const { t } = useTeamPageText();
   const teamErrorMessage = useTeamErrorMessage();
@@ -35,26 +39,27 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
   // avait aucun (`transferTeamOwnership`). Sans MANAGER, il perd la gestion.
   const ownerKeepsManagement = owner?.roles.includes("MANAGER") ?? false;
 
-  const submit = async () => {
-    if (!target || pending) return;
+  const submit = () => {
+    if (!target || isBusy()) return;
     if (!confirmStep) {
       setConfirmStep(true);
       return;
     }
-    setPending(true);
-    try {
-      await teamApi(
-        `/api/teams/${teamId}/transfer-ownership`,
-        jsonRequest("POST", { newOwnerUserId: target.userId }),
-        "TEAM_OWNERSHIP_TRANSFER_FAILED",
-      );
-      showSuccess(t("transfer.done", { pseudo: target.pseudo }));
-      onClose();
-      onChanged();
-    } catch (e) {
-      showError(teamErrorMessage((e as Error).message));
-      setPending(false);
-    }
+    void run(async () => {
+      try {
+        await teamApi(
+          `/api/teams/${teamId}/transfer-ownership`,
+          jsonRequest("POST", { newOwnerUserId: target.userId }),
+          "TEAM_OWNERSHIP_TRANSFER_FAILED",
+        );
+        showSuccess(t("transfer.done", { pseudo: target.pseudo }));
+        hold();
+        onClose();
+        onChanged();
+      } catch (e) {
+        showError(teamErrorMessage((e as Error).message));
+      }
+    });
   };
 
   const submitLabel = confirmStep ? t("transfer.confirm") : t("transfer.submit");
@@ -68,23 +73,19 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
       tone={confirmStep ? "danger" : "default"}
       footer={
         <>
-          <button
-            type="button"
-            className="btn ghost"
-            aria-disabled={pending || undefined}
-            onClick={pending ? undefined : onClose}
-          >
+          <BusyButton className="btn ghost" busy={false} blocked={pending} onClick={onClose}>
             {t("transfer.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          {/* Aucun membre choisi : refusé mais focalisable (`blocked`), activé il dit pourquoi. */}
+          <BusyButton
             type="submit"
             className={`btn ${confirmStep ? "danger" : styles.primaryButton}`}
-            disabled={!target && !pending}
-            aria-disabled={pending || undefined}
-            aria-busy={pending || undefined}
+            busy={pending}
+            blocked={!target}
+            onBlockedClick={() => showError(t("transfer.chooseFirst"), { once: true })}
           >
-            {pending ? t("transfer.pending") : submitLabel}
-          </button>
+            <BusyLabel busy={pending} idle={submitLabel} pending={t("transfer.pending")} />
+          </BusyButton>
         </>
       }
     >
@@ -103,7 +104,11 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
                 type="radio"
                 name="transfer-target"
                 checked={targetId === m.userId}
+                // Figé pendant l'envoi (le focus reste, `aria-disabled`) : un
+                // autre choix ne change pas le membre qui part.
+                aria-disabled={pending || undefined}
                 onChange={() => {
+                  if (isBusy()) return;
                   setTargetId(m.userId);
                   setConfirmStep(false);
                 }}

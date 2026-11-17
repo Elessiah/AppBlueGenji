@@ -124,6 +124,7 @@
     "cancel": "Cancel",
     "submit": "Create the team",
     "pending": "Creating…",
-    "createdWithoutLogo": "Team created, but without a logo: {reason}"
+    "createdWithoutLogo": "Team created, but without a logo: {reason}",
+    "alreadyCreated": "Team “{name}” is already created: opening its page. Changes made since were not saved here."
   }
 }

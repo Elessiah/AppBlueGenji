@@ -18,6 +18,11 @@ interface RoleTableProps {
   onChange?: (roles: TeamRole[]) => void;
   /** Rôles qui portent une case ; les autres se lisent seulement (`OWNER` ne se coche jamais). */
   checkable?: readonly TeamRole[];
+  /**
+   * Envoi en cours : les cases gardent le focus mais se disent figées
+   * (`aria-readonly`) et ignorent le geste (`docs/features/BUSY_BUTTONS.md`).
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -45,6 +50,8 @@ interface RoleTableRowProps {
   checked: boolean;
   /** Tableau à cocher (et non de lecture) : un rôle sans case se lit en libellé. */
   tickMode: boolean;
+  /** Envoi en cours : case figée (`aria-readonly`, curseur d'attente). */
+  readOnly: boolean;
   onToggle: (role: TeamRole) => void;
 }
 
@@ -52,7 +59,15 @@ interface RoleTableRowProps {
  * Une ligne du tableau, mémorisée : textes statiques (une vingtaine de
  * recherches de clé et un « i ») que cocher une autre ligne ne change pas.
  */
-const RoleTableRow = memo(function RoleTableRow({ role, hintId, tickable, checked, tickMode, onToggle }: Readonly<RoleTableRowProps>) {
+const RoleTableRow = memo(function RoleTableRow({
+  role,
+  hintId,
+  tickable,
+  checked,
+  tickMode,
+  readOnly,
+  onToggle,
+}: Readonly<RoleTableRowProps>) {
   const { t, locale } = useTeamPageText();
   const label = teamRoleLabel(role, locale);
   const columns = roleTableColumns(t);
@@ -61,7 +76,14 @@ const RoleTableRow = memo(function RoleTableRow({ role, hintId, tickable, checke
       <span role="rowheader" className={styles.roleTableRole}>
         <InfoHintRow>
           {tickable ? (
-            <Coche label={label} checked={checked} theme="equipe" onChange={() => onToggle(role)} aria-describedby={hintId} />
+            <Coche
+              label={label}
+              checked={checked}
+              theme="equipe"
+              onChange={() => onToggle(role)}
+              aria-describedby={hintId}
+              aria-readonly={readOnly || undefined}
+            />
           ) : (
             roleLabel(role, label, tickMode)
           )}
@@ -100,16 +122,16 @@ const RoleTableRow = memo(function RoleTableRow({ role, hintId, tickable, checke
  * (`roleTable`), en-têtes gardés pour les lecteurs d'écran, `data-label` en
  * libellé visuel seulement.
  */
-export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleTableProps>) {
+export function RoleTable({ selected, onChange, checkable = [], readOnly = false }: Readonly<RoleTableProps>) {
   const baseId = useId();
   const { t } = useTeamPageText();
   // Le dernier état, lu à la bascule : `toggle` garde une identité fixe, si bien
   // que cocher un rôle ne refait que **sa** ligne (`RoleTableRow` est mémorisée).
-  const latest = useRef({ selected, onChange });
-  latest.current = { selected, onChange };
+  const latest = useRef({ selected, onChange, readOnly });
+  latest.current = { selected, onChange, readOnly };
   const toggle = useCallback((role: TeamRole) => {
-    const { selected: current, onChange: change } = latest.current;
-    if (!current || !change) return;
+    const { selected: current, onChange: change, readOnly: frozen } = latest.current;
+    if (!current || !change || frozen) return;
     change(current.includes(role) ? current.filter((r) => r !== role) : [...current, role]);
   }, []);
   const columns = roleTableColumns(t);
@@ -134,6 +156,7 @@ export function RoleTable({ selected, onChange, checkable = [] }: Readonly<RoleT
               tickable={Boolean(selected && onChange) && checkable.includes(role)}
               checked={selected?.includes(role) ?? false}
               tickMode={Boolean(selected)}
+              readOnly={readOnly}
               onToggle={toggle}
             />
           ))}

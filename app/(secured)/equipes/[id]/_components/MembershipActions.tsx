@@ -10,6 +10,11 @@ import { useMembershipErrorMessage, useTeamErrorMessage } from "@/components/i18
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { BusyButton } from "@/components/ui/busy-button";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
+import { armedRescueSelector, neighbourRescueSelectors } from "@/lib/shared/focus-rescue";
+import { gestureState } from "@/lib/shared/gesture-state";
 import styles from "../team.module.css";
 
 interface MembershipActionsProps {
@@ -20,6 +25,9 @@ interface MembershipActionsProps {
   onRequestsChanged: () => void;
 }
 
+/** Repli du focus après un geste : le premier geste encore actif du bloc. */
+const MEMBERSHIP_RESCUE = [armedRescueSelector("membership"), '[data-focus-rescue="membership"]'] as const;
+
 export function MembershipActions({ team, requests, onChanged, onRequestsChanged }: Readonly<MembershipActionsProps>) {
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
@@ -27,43 +35,73 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   const teamErrorMessage = useTeamErrorMessage();
   const membershipErrorMessage = useMembershipErrorMessage();
   const teamId = team.team.id;
-  const [busy, setBusy] = useState(false);
-  // Verrou synchrone : l'état `busy` ne se relit qu'au rendu suivant.
-  const busyRef = useRef(false);
+  // Un geste à la fois (garde synchrone) ; seul le bouton pressé s'annonce
+  // occupé (`pendingGesture`), les autres sont refusés sans attente annoncée.
+  const { busy, run, whenIdle } = useBusyGuard();
+  const [pendingGesture, setPendingGesture] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Le bouton pressé disparaît souvent au retour (« Rejoindre » devient
+  // « Retirer ma demande », une demande traitée quitte la liste) : le focus,
+  // tombé sur la page, revient au premier geste **actif** du bloc
+  // (`data-focus-rescue="membership"`) — une demande traitée, au **même**
+  // bouton de sa voisine (« Refuser » après un refus, jamais « Accepter »).
+  // Suivi de `team` et `requests` : rien ne se rend avant leur relecture — la
+  // fenêtre de départ, fermée avant, rend d'abord le focus à « Quitter ».
+  const rootRef = useRef<HTMLDivElement>(null);
+  const rescueFocus = useFocusRescue(rootRef, [team, requests]);
+  /** État d'un bouton : occupé s'il est le geste en cours, refusé si un autre l'est (`gestureState`). */
+  const gesture = (name: string) => gestureState(pendingGesture, name);
+  /** Geste qui répond à l'invitation du lecteur : refusé aussi sans invitation connue. */
+  const gestureWithInvitation = (name: string) => {
+    const state = gesture(name);
+    return { ...state, blocked: state.blocked || team.viewerInvitationId === null };
+  };
+  /**
+   * Geste sur l'invitation du lecteur (`gestureWithInvitation` le refuse déjà
+   * au clic sans invitation) : la seule garde du code, l'URL n'est jamais bâtie sur `null`.
+   */
+  const actOnInvitation = (name: string, request: (invitationId: number) => Promise<string>) => {
+    const invitationId = team.viewerInvitationId;
+    return invitationId === null ? Promise.resolve(false) : act(name, () => request(invitationId), membershipErrorMessage);
+  };
 
   /**
    * Un geste, qui rend son message de succès, et sa traduction d'erreur. Rend
    * l'issue pour que la modale de départ ne se ferme que sur un succès.
    */
   const act = async (
+    name: string,
     request: () => Promise<string>,
     translate: (code: string) => string,
+    rescue: readonly string[] = MEMBERSHIP_RESCUE,
   ): Promise<boolean> => {
-    // Les boutons restent focalisables pendant un geste (`aria-disabled`) : la garde est ici.
-    if (busyRef.current) return false;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      showSuccess(await request());
-      onChanged();
-      // La barre de navigation vient de la mise en page serveur de l'espace
-      // connecté, que l'App Router ne rejoue pas d'une page à l'autre : sans
-      // ce rafraîchissement, elle garderait l'état d'avant jusqu'au F5.
-      router.refresh();
-      onRequestsChanged();
-      return true;
-    } catch (e) {
-      showError(translate((e as Error).message));
-      return false;
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    // Les boutons restent focalisables pendant un geste (`aria-disabled`) : la
+    // garde synchrone (`run`) écarte le second clic parti avant le rendu.
+    const outcome = await run(async () => {
+      setPendingGesture(name);
+      try {
+        showSuccess(await request());
+        rescueFocus(rescue);
+        onChanged();
+        // La barre de navigation vient de la mise en page serveur de l'espace
+        // connecté, que l'App Router ne rejoue pas d'une page à l'autre : sans
+        // ce rafraîchissement, elle garderait l'état d'avant jusqu'au F5.
+        router.refresh();
+        onRequestsChanged();
+        return true;
+      } catch (e) {
+        showError(translate((e as Error).message));
+        return false;
+      } finally {
+        setPendingGesture(null);
+      }
+    });
+    return outcome ?? false;
   };
 
   const join = () =>
     act(
+      "join",
       async () => {
         const payload = await teamApi<{ result?: "REQUESTED" | "JOINED" }>(
           `/api/teams/${teamId}/join`,
@@ -76,15 +114,10 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     );
 
   const declineInvitation = () =>
-    team.viewerInvitationId === null
-      ? Promise.resolve(false)
-      : act(
-          async () => {
-            await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: false }), "INVITATION_RESPOND_FAILED");
-            return t("membership.declined");
-          },
-          membershipErrorMessage,
-        );
+    actOnInvitation("decline", async (invitationId) => {
+      await teamApi(`/api/invitations/${invitationId}`, jsonRequest("POST", { accept: false }), "INVITATION_RESPOND_FAILED");
+      return t("membership.declined");
+    });
 
   // Reprise d'une fantôme : acceptée **par l'identifiant de l'invitation**, et
   // non par « Rejoindre » (`/join`). Sur une page restée ouverte pendant qu'un
@@ -92,29 +125,20 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   // invitation et y déposerait une demande d'adhésion ; l'invitation, elle, a
   // été annulée par cette reprise et répond `INVITATION_NOT_PENDING`.
   const acceptGhostClaim = () =>
-    team.viewerInvitationId === null
-      ? Promise.resolve(false)
-      : act(
-          async () => {
-            await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
-            return t("membership.claimAccepted");
-          },
-          membershipErrorMessage,
-        );
+    actOnInvitation("takeOver", async (invitationId) => {
+      await teamApi(`/api/invitations/${invitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
+      return t("membership.claimAccepted");
+    });
 
   const withdrawRequest = () =>
-    team.viewerInvitationId === null
-      ? Promise.resolve(false)
-      : act(
-          async () => {
-            await teamApi(`/api/invitations/${team.viewerInvitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
-            return t("membership.withdrawn");
-          },
-          membershipErrorMessage,
-        );
+    actOnInvitation("withdrawRequest", async (invitationId) => {
+      await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
+      return t("membership.withdrawn");
+    });
 
   const leave = () =>
     act(
+      "leave",
       async () => {
         await teamApi(`/api/teams/${teamId}/leave`, { method: "POST" }, "TEAM_LEAVE_FAILED");
         return t("membership.left");
@@ -122,8 +146,11 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       membershipErrorMessage,
     );
 
-  const respondRequest = (request: TeamJoinRequest, accept: boolean) =>
-    act(
+  const respondRequest = (request: TeamJoinRequest, accept: boolean) => {
+    // Ordre affiché avant la réponse : la demande voisine reçoit le focus.
+    const keys = requests.map((pending) => pending.id);
+    return act(
+      `${accept ? "accept" : "refuse"}-${request.id}`,
       async () => {
         await teamApi(`/api/invitations/${request.id}`, jsonRequest("POST", { accept }), "INVITATION_RESPOND_FAILED");
         return accept
@@ -132,7 +159,9 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       },
       // Accepter la demande d'un autre : `USER_ALREADY_IN_TEAM` parle de lui.
       teamErrorMessage,
+      [...neighbourRescueSelectors(accept ? "request-accept" : "request-refuse", keys, request.id), ...MEMBERSHIP_RESCUE],
     );
+  };
 
   if (team.team.deletedAt) {
     return (
@@ -149,34 +178,32 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   // l'arbitrage d'un tournoi qu'il n'a pas choisi.
   if (team.team.isGhost) {
     return (
-      <div className={`ds-block ${styles.block}`}>
-        {team.viewerInvitation === "INVITED" ? (
-          <div className={styles.actionsRow}>
-            <p className={styles.notice}>{t("membership.ghostClaimOffer")}</p>
-            <button
-              type="button"
-              className={`btn ${styles.primaryButton}`}
-              onClick={() => void acceptGhostClaim()}
-              disabled={team.viewerInvitationId === null}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
-            >
-              {t("membership.takeOver")}
-            </button>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => void declineInvitation()}
-              disabled={team.viewerInvitationId === null}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
-            >
-              {t("membership.decline")}
-            </button>
-          </div>
-        ) : (
-          <p className={styles.notice}>{t("membership.ghostNotice")}</p>
-        )}
+      <div ref={rootRef} className={styles.contents}>
+        <div className={`ds-block ${styles.block}`}>
+          {team.viewerInvitation === "INVITED" ? (
+            <div className={styles.actionsRow}>
+              <p className={styles.notice}>{t("membership.ghostClaimOffer")}</p>
+              <BusyButton
+                className={`btn ${styles.primaryButton}`}
+                data-focus-rescue="membership"
+                onClick={() => void acceptGhostClaim()}
+                {...gestureWithInvitation("takeOver")}
+              >
+                {t("membership.takeOver")}
+              </BusyButton>
+              <BusyButton
+                className="btn ghost"
+                data-focus-rescue="membership"
+                onClick={() => void declineInvitation()}
+                {...gestureWithInvitation("decline")}
+              >
+                {t("membership.decline")}
+              </BusyButton>
+            </div>
+          ) : (
+            <p className={styles.notice}>{t("membership.ghostNotice")}</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -186,43 +213,50 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     team.viewerInvitation === "INVITED" ? (
       <div className={styles.actionsRow}>
         <p className={styles.notice}>{t("membership.invited")}</p>
-        <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
+        <BusyButton
+          className={`btn ${styles.primaryButton}`}
+          data-focus-rescue="membership"
+          onClick={() => void join()}
+          {...gesture("join")}
+        >
           {t("membership.join")}
-        </button>
-        <button
-          type="button"
+        </BusyButton>
+        <BusyButton
           className="btn ghost"
+          data-focus-rescue="membership"
           onClick={() => void declineInvitation()}
-          disabled={team.viewerInvitationId === null}
-          aria-disabled={busy || undefined}
-          aria-busy={busy || undefined}
+          {...gestureWithInvitation("decline")}
         >
           {t("membership.decline")}
-        </button>
+        </BusyButton>
       </div>
     ) : (
-      <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
+      <BusyButton
+          className={`btn ${styles.primaryButton}`}
+          data-focus-rescue="membership"
+          onClick={() => void join()}
+          {...gesture("join")}
+        >
         {t("membership.requestToJoin")}
-      </button>
+      </BusyButton>
     );
 
+  // `display: contents` : le conteneur du secours de focus ne change rien à la mise en page.
   return (
-    <>
+    <div ref={rootRef} className={styles.contents}>
       {team.viewerMembership === "NONE" && (
         <div className={`ds-block ${styles.block}`}>
           {team.viewerInvitation === "REQUESTED" ? (
             <div className={styles.actionsRow}>
               <p className={styles.notice}>{t("membership.requestPending")}</p>
-              <button
-                type="button"
+              <BusyButton
                 className={`btn ghost ${styles.smallButton}`}
+                data-focus-rescue="membership"
                 onClick={() => void withdrawRequest()}
-                disabled={team.viewerInvitationId === null}
-                aria-disabled={busy || undefined}
-                aria-busy={busy || undefined}
+                {...gestureWithInvitation("withdrawRequest")}
               >
                 {t("membership.withdrawRequest")}
-              </button>
+              </BusyButton>
             </div>
           ) : (
             joinPrompt
@@ -232,16 +266,15 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
 
       {team.viewerMembership === "MEMBER" && (
         <div className={`ds-block ${styles.block} ${styles.leaveBlock}`}>
-          <button
-            type="button"
+          <BusyButton
             className="btn ghost"
-            onClick={() => {
-              if (!busy) setConfirmLeave(true);
-            }}
-            aria-disabled={busy || undefined}
+            data-focus-rescue="membership"
+            busy={false}
+            blocked={busy}
+            onClick={whenIdle(() => setConfirmLeave(true))}
           >
             {t("membership.leave")}
-          </button>
+          </BusyButton>
         </div>
       )}
 
@@ -260,26 +293,26 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                   </span>
                 </span>
                 <span className={styles.rowActions}>
-                  <button
-                    type="button"
+                  <BusyButton
                     className={`btn ${styles.smallButton}`}
+                    data-focus-rescue="request-accept"
+                    data-focus-rescue-key={r.id}
                     onClick={() => void respondRequest(r, true)}
-                    aria-disabled={busy || undefined}
-                    aria-busy={busy || undefined}
+                    {...gesture(`accept-${r.id}`)}
                     aria-label={t("membership.acceptLabel", { pseudo: r.pseudo })}
                   >
                     {t("membership.accept")}
-                  </button>
-                  <button
-                    type="button"
+                  </BusyButton>
+                  <BusyButton
                     className={`btn ghost ${styles.smallButton}`}
+                    data-focus-rescue="request-refuse"
+                    data-focus-rescue-key={r.id}
                     onClick={() => void respondRequest(r, false)}
-                    aria-disabled={busy || undefined}
-                    aria-busy={busy || undefined}
+                    {...gesture(`refuse-${r.id}`)}
                     aria-label={t("membership.refuseLabel", { pseudo: r.pseudo })}
                   >
                     {t("membership.refuse")}
-                  </button>
+                  </BusyButton>
                 </span>
               </li>
             ))}
@@ -303,6 +336,6 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
           <p>{t("membership.leaveBody", { team: team.team.name })}</p>
         </ConfirmActionDialog>
       ) : null}
-    </>
+    </div>
   );
 }

@@ -16,12 +16,15 @@ import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_TERMS_ANCHOR, TERMS_PATH, TERMS_VERSION 
 import { CodedError, TEAM_CREATION_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 
 const FIELD_IDS = { name: "team-name", tag: "team-tag", terms: "team-terms" } as const;
 
 export default function CreateTeamForm() {
   const router = useLocaleRouter();
-  const { showError } = useToast();
+  const { showError, showInfo } = useToast();
   const text = useTeamsText();
   const { t } = text;
   const teamErrorMessage = useTeamErrorMessage();
@@ -35,8 +38,14 @@ export default function CreateTeamForm() {
   // logo, c'est garantir en détenir les droits. Deux cases, deux engagements.
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [logoRights, setLogoRights] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // Garde synchrone (`useBusyGuard`) : un double clic envoyait deux fois. Tenue
+  // (`hold`) après la création jusqu'à la page de l'équipe.
+  const { busy: loading, isBusy, run, hold, whenIdle } = useBusyGuard();
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  // L'équipe créée : si la navigation tarde au-delà de la tenue (`hold`), un
+  // nouvel envoi reprend le chemin de sa fiche au lieu de recréer (`USER_ALREADY_IN_TEAM`).
+  // Seule la réponse à **ce** formulaire la pose : jamais une autre équipe.
+  const created = useRef<{ id: number; name: string } | null>(null);
   const fieldErrors = useFieldErrors(TEAM_CREATION_FIELD_ERRORS, FIELD_IDS);
 
   const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +74,15 @@ export default function CreateTeamForm() {
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     // Le bouton reste focalisable pendant l'envoi (`aria-disabled`) : la garde est ici.
-    if (loading) return;
+    if (isBusy()) return;
+    // Équipe déjà créée (navigation restée sans suite) : rien ne repart, ni
+    // création ni logo — la fiche s'ouvre, et le message dit que les champs
+    // modifiés depuis n'ont pas été enregistrés ici.
+    if (created.current !== null) {
+      showInfo(t("create.alreadyCreated", { name: created.current.name }), { once: true });
+      openCreatedTeam(created.current.id);
+      return;
+    }
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
       const message = teamErrorMessage(nameCheck.reason);
@@ -85,53 +102,70 @@ export default function CreateTeamForm() {
       showError(message);
       return;
     }
-    setLoading(true);
-    try {
-      const response = await fetch("/api/teams", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description: description.trim() || null,
-          tag: tag.trim() || null,
-          acceptTerms,
-          // La version montrée : une page restée ouverte sur une version
-          // antérieure est refusée (`TERMS_VERSION_MISMATCH`), pas enregistrée.
-          termsVersion: TERMS_VERSION,
-        }),
-      });
-      const payload = (await response.json()) as { error?: string; teamId?: number };
-      if (!response.ok || !payload.teamId) {
-        const code = payload.error || "TEAM_CREATE_FAILED";
-        throw new CodedError(code, code);
-      }
-
-      if (logo) {
-        const formData = new FormData();
-        appendCroppedImage(formData, logo);
-        formData.append(LOGO_RIGHTS_FIELD, logoRights ? "1" : "0");
-        const logoResponse = await fetch(`/api/teams/${payload.teamId}/logo`, {
+    await run(async () => {
+      let teamId: number;
+      try {
+        const response = await fetch("/api/teams", {
           method: "POST",
-          body: formData,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name,
+            description: description.trim() || null,
+            tag: tag.trim() || null,
+            acceptTerms,
+            // La version montrée : une page restée ouverte sur une version
+            // antérieure est refusée (`TERMS_VERSION_MISMATCH`), pas enregistrée.
+            termsVersion: TERMS_VERSION,
+          }),
         });
-        if (!logoResponse.ok) {
-          const logoPayload = (await logoResponse.json().catch(() => ({}))) as { error?: string };
-          // L'équipe existe : c'est le logo seul qui manque, et la fiche
-          // permet de le reposer.
-          showError(t("create.createdWithoutLogo", { reason: teamErrorMessage(logoPayload.error || "LOGO_UPLOAD_FAILED") }));
+        const payload = (await response.json()) as { error?: string; teamId?: number };
+        if (!response.ok || !payload.teamId) {
+          const code = payload.error || "TEAM_CREATE_FAILED";
+          throw new CodedError(code, code);
         }
+        teamId = payload.teamId;
+      } catch (e) {
+        // Le créateur devient propriétaire : `USER_ALREADY_IN_TEAM` parle de lui.
+        const message = membershipErrorMessage((e as Error).message);
+        fieldErrors.report(errorCode(e), message);
+        showError(message);
+        return;
       }
 
-      router.push(`/equipes/${payload.teamId}`);
-      router.refresh();
-    } catch (e) {
-      // Le créateur devient propriétaire : `USER_ALREADY_IN_TEAM` parle de lui.
-      const message = membershipErrorMessage((e as Error).message);
-      fieldErrors.report(errorCode(e), message);
-      showError(message);
-    } finally {
-      setLoading(false);
+      created.current = { id: teamId, name };
+      // L'équipe existe : un échec du logo, même réseau, ne dit jamais « non créée ».
+      if (logo) {
+        const refusal = await uploadLogo(teamId, logo);
+        if (refusal !== null) showError(t("create.createdWithoutLogo", { reason: teamErrorMessage(refusal) }));
+      }
+      openCreatedTeam(teamId);
+    });
+  };
+
+  /** Envoie le logo de l'équipe créée ; rend le code du refus, ou `null`. */
+  const uploadLogo = async (teamId: number, image: CroppedImage): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      appendCroppedImage(formData, image);
+      formData.append(LOGO_RIGHTS_FIELD, logoRights ? "1" : "0");
+      const logoResponse = await fetch(`/api/teams/${teamId}/logo`, { method: "POST", body: formData });
+      if (logoResponse.ok) return null;
+      const logoPayload = (await logoResponse.json().catch(() => ({}))) as { error?: string };
+      return logoPayload.error || "LOGO_UPLOAD_FAILED";
+    } catch {
+      return "LOGO_UPLOAD_FAILED";
     }
+  };
+
+  /**
+   * Ouvre la fiche de l'équipe créée. Plus rien ne part d'ici (`hold`, second
+   * clic pendant la navigation) ; la barre de navigation (« Mon équipe ») est
+   * relue (`router.refresh()`).
+   */
+  const openCreatedTeam = (teamId: number) => {
+    hold();
+    router.push(`/equipes/${teamId}`);
+    router.refresh();
   };
 
   return (
@@ -160,6 +194,8 @@ export default function CreateTeamForm() {
                 // UTF-16, la base des caractères.
                 {...fieldErrors.aria("name", "team-name-help")}
                 value={name}
+                // Figés pendant l'envoi (`readOnly`, le focus reste) : ce qui est affiché est ce qui part.
+                readOnly={loading}
                 onChange={(e) => {
                   setName(e.target.value);
                   fieldErrors.clear("name");
@@ -179,6 +215,7 @@ export default function CreateTeamForm() {
               <input
                 id="team-tag"
                 value={tag}
+                readOnly={loading}
                 onChange={(e) => {
                   setTag(normalizeTeamTag(e.target.value));
                   fieldErrors.clear("tag");
@@ -200,6 +237,7 @@ export default function CreateTeamForm() {
               <textarea
                 id="team-description"
                 value={description}
+                readOnly={loading}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t("create.descriptionPlaceholder")}
                 rows={3}
@@ -216,44 +254,39 @@ export default function CreateTeamForm() {
                 style={{ display: "none" }}
               />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <button
-                  type="button"
+                <BusyButton
                   className="btn"
-                  aria-disabled={loading || undefined}
-                  onClick={() => {
-                    if (!loading) logoInputRef.current?.click();
-                  }}
+                  busy={false}
+                  blocked={loading}
+                  onClick={whenIdle(() => logoInputRef.current?.click())}
                   style={{ padding: "9px 18px", fontSize: 13 }}
                 >
                   {t("create.chooseLogo")}
-                </button>
+                </BusyButton>
                 {logo ? (
                   <>
                     <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{logo.file.name}</span>
-                    <button
-                      type="button"
+                    <BusyButton
                       className="btn ghost"
-                      aria-disabled={loading || undefined}
-                      onClick={() => {
-                        if (!loading) void onLogoRecrop();
-                      }}
+                      busy={false}
+                      blocked={loading}
+                      onClick={whenIdle(() => void onLogoRecrop())}
                       style={{ padding: "6px 12px", fontSize: 12 }}
                     >
                       {t("create.recrop")}
-                    </button>
-                    <button
-                      type="button"
+                    </BusyButton>
+                    <BusyButton
                       className="btn ghost"
-                      aria-disabled={loading || undefined}
-                      onClick={() => {
-                        if (loading) return;
+                      busy={false}
+                      blocked={loading}
+                      onClick={whenIdle(() => {
                         setLogo(null);
                         setLogoRights(false);
-                      }}
+                      })}
                       style={{ padding: "6px 12px", fontSize: 12 }}
                     >
                       {t("create.remove")}
-                    </button>
+                    </BusyButton>
                   </>
                 ) : null}
               </div>
@@ -265,8 +298,10 @@ export default function CreateTeamForm() {
                   <input
                     type="checkbox"
                     checked={logoRights}
-                    disabled={loading}
-                    onChange={(e) => setLogoRights(e.target.checked)}
+                    // Figée pendant l'envoi sans `disabled` natif : `aria-readonly`
+                    // la peint éteinte (`globals.css`), le geste est ignoré.
+                    aria-readonly={loading || undefined}
+                    onChange={whenIdle((e: ChangeEvent<HTMLInputElement>) => setLogoRights(e.target.checked))}
                   />
                   <span>
                     {t("create.logoRights")}{" "}
@@ -284,10 +319,12 @@ export default function CreateTeamForm() {
               id={FIELD_IDS.terms}
               type="checkbox"
               checked={acceptTerms}
-              onChange={(e) => {
+              // Même règle : décocher pendant l'envoi ne change pas ce qui part.
+              aria-readonly={loading || undefined}
+              onChange={whenIdle((e: ChangeEvent<HTMLInputElement>) => {
                 setAcceptTerms(e.target.checked);
                 fieldErrors.clear("terms");
-              }}
+              })}
               {...fieldErrors.aria("terms")}
             />
             <span>
@@ -308,13 +345,10 @@ export default function CreateTeamForm() {
             <CyberButton variant="ghost" asChild>
               <LocaleLink href="/equipes">{t("create.cancel")}</LocaleLink>
             </CyberButton>
-            <CyberButton
-              variant="primary"
-              type="submit"
-              aria-disabled={loading || undefined}
-              aria-busy={loading || undefined}
-            >
-              {loading ? t("create.pending") : t("create.submit")}
+            <CyberButton variant="primary" asChild>
+              <BusyButton type="submit" busy={loading}>
+                <BusyLabel busy={loading} idle={t("create.submit")} pending={t("create.pending")} />
+              </BusyButton>
             </CyberButton>
           </div>
         </form>

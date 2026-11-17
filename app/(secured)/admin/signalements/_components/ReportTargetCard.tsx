@@ -16,7 +16,8 @@ import {
   type LogoQuarantineView,
 } from "@/lib/shared/logo-quarantine";
 import { BusyButton } from "@/components/ui/busy-button";
-import { gestureState, reportGesture } from "../_lib/report-gestures";
+import { gestureState } from "@/lib/shared/gesture-state";
+import { reportGesture } from "../_lib/report-gestures";
 import { ArmedButton } from "./ArmedButton";
 import styles from "../reports.module.css";
 

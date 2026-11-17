@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -32,28 +35,29 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
   const { t } = useTeamPageText();
   const teamErrorMessage = useTeamErrorMessage();
   const [pseudo, setPseudo] = useState("");
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic proposait deux fois la reprise.
+  const { busy, run } = useBusyGuard();
   const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, CLAIM_FIELD_IDS);
   const trimmed = pseudo.trim();
 
-  const submit = async () => {
-    if (busy || !trimmed) return;
-    setBusy(true);
-    fieldErrors.clear();
-    try {
-      await teamApi(`/api/teams/${teamId}/claim`, jsonRequest("POST", { pseudo: trimmed }), "TEAM_CLAIM_FAILED");
-      showSuccess(t("claim.done", { pseudo: trimmed, team: teamName }));
-      onClose();
-      onChanged();
-    } catch (e) {
-      const code = (e as Error).message;
-      const message = teamErrorMessage(code);
-      showError(message);
-      // Pseudo introuvable, joueur déjà dans une équipe : le champ est signalé
-      // et reprend le focus, sans rouvrir ses suggestions.
-      fieldErrors.report(code, message);
-      setBusy(false);
-    }
+  const submit = () => {
+    if (!trimmed) return;
+    void run(async () => {
+      fieldErrors.clear();
+      try {
+        await teamApi(`/api/teams/${teamId}/claim`, jsonRequest("POST", { pseudo: trimmed }), "TEAM_CLAIM_FAILED");
+        showSuccess(t("claim.done", { pseudo: trimmed, team: teamName }));
+        onClose();
+        onChanged();
+      } catch (e) {
+        const code = (e as Error).message;
+        const message = teamErrorMessage(code);
+        showError(message);
+        // Pseudo introuvable, joueur déjà dans une équipe : le champ est signalé
+        // et reprend le focus, sans rouvrir ses suggestions.
+        fieldErrors.report(code, message);
+      }
+    });
   };
 
   return (
@@ -64,23 +68,17 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
       onSubmit={submit}
       footer={
         <>
-          <button
-            type="button"
-            className="btn ghost"
-            aria-disabled={busy || undefined}
-            onClick={busy ? undefined : onClose}
-          >
+          <BusyButton className="btn ghost" busy={false} blocked={busy} onClick={onClose}>
             {t("claim.cancel")}
-          </button>
-          <button
-            type="submit"
-            className={`btn ${styles.primaryButton}`}
-            disabled={!trimmed && !busy}
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
+          </BusyButton>
+          {/* Pseudo vide : refusé mais focalisable (`blocked`), comme pendant l'envoi. */}
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={busy}
+            blocked={!trimmed}
+            // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
+            onBlockedClick={() => showError(t("claim.pseudoFirst"), { once: true })}
           >
-            {busy ? t("claim.pending") : t("claim.submit")}
-          </button>
+            <BusyLabel busy={busy} idle={t("claim.submit")} pending={t("claim.pending")} />
+          </BusyButton>
         </>
       }
     >
@@ -95,6 +93,7 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: R
             fieldErrors.clear("pseudo");
           }}
           placeholder={t("claim.pseudoPlaceholder")}
+          readOnly={busy}
           aria={fieldErrors.aria("pseudo", "claim-pseudo-help")}
         />
         <FieldErrorText fieldId={CLAIM_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />

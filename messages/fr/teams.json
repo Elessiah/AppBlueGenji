@@ -124,6 +124,7 @@
     "cancel": "Annuler",
     "submit": "Créer l'équipe",
     "pending": "Création…",
-    "createdWithoutLogo": "Équipe créée, mais sans logo : {reason}"
+    "createdWithoutLogo": "Équipe créée, mais sans logo : {reason}",
+    "alreadyCreated": "L'équipe « {name} » est déjà créée : ouverture de sa fiche. Les changements faits depuis n'ont pas été enregistrés ici."
   }
 }

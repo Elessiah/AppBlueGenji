@@ -25,6 +25,11 @@ import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
 import { useTeamPendingInvitations } from "../_hooks/useTeamPendingInvitations";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
+import { neighbourRescueSelectors } from "@/lib/shared/focus-rescue";
 import styles from "../team.module.css";
 import { TEAM_IDENTITY_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -59,18 +64,28 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   // indéfiniment.
   const ghostClaims = useTeamPendingInvitations(team.team.id, managedAsGhost && !team.team.deletedAt);
   const [withdrawingClaimId, setWithdrawingClaimId] = useState<number | null>(null);
-  const withdrawClaim = async (invitationId: number, pseudo: string) => {
-    if (withdrawingClaimId !== null) return;
-    setWithdrawingClaimId(invitationId);
-    try {
-      await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
-      showSuccess(t("settings.claimWithdrawn", { pseudo }));
-    } catch (e) {
-      showError(teamErrorMessage((e as Error).message));
-    } finally {
-      setWithdrawingClaimId(null);
-      void ghostClaims.reload();
-    }
+  // Garde synchrone : un double clic sur « Retirer » partait deux fois.
+  const claimGuard = useBusyGuard();
+  // La reprise retirée quitte la liste avec son bouton : le focus va au
+  // « Retirer » suivant, sinon à « Proposer la reprise ».
+  const sectionRef = useRef<HTMLElement>(null);
+  const rescueFocus = useFocusRescue(sectionRef);
+  const withdrawClaim = (invitationId: number, pseudo: string) => {
+    // Ordre affiché avant le retrait : il désigne le voisin de la ligne retirée.
+    const claimKeys = ghostClaims.invitations.map((claim) => claim.id);
+    return claimGuard.run(async () => {
+      setWithdrawingClaimId(invitationId);
+      try {
+        await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
+        showSuccess(t("settings.claimWithdrawn", { pseudo }));
+        rescueFocus(neighbourRescueSelectors("claim", claimKeys, invitationId));
+      } catch (e) {
+        showError(teamErrorMessage((e as Error).message));
+      } finally {
+        setWithdrawingClaimId(null);
+        void ghostClaims.reload();
+      }
+    });
   };
 
   const { cropImage, cropDialog } = useImageCropper();
@@ -93,7 +108,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   };
 
   return (
-    <section className={`ds-block ${styles.block}`} aria-labelledby="team-settings-title">
+    <section ref={sectionRef} className={`ds-block ${styles.block}`} aria-labelledby="team-settings-title">
       {cropDialog}
       <div className="ds-section-title purple">
         <h2 id="team-settings-title">{t("settings.title")}</h2>
@@ -179,7 +194,8 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const [name, setName] = useState(saved.name);
   const [tag, setTag] = useState(saved.tag);
   const [description, setDescription] = useState(saved.description);
-  const [saving, setSaving] = useState(false);
+  // Garde synchrone : un double clic (ou Entrée répétée) envoyait deux fois.
+  const { busy: saving, run } = useBusyGuard();
   const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
 
   // Réaligne le formulaire sur ce que le serveur a retenu (après un
@@ -196,40 +212,45 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const tagCheck = checkTeamTag(tag);
   const dirty =
     name.trim() !== saved.name || tag.trim() !== saved.tag || description.trim() !== saved.description.trim();
-  const canSave = dirty && nameCheck.ok && tagCheck.ok && !saving;
+  const canSave = dirty && nameCheck.ok && tagCheck.ok;
+  /** « Enregistrer » désarmé mais focalisable : activé, il dit pourquoi rien ne part. */
+  const explainRefusedSave = () => {
+    if (!nameCheck.ok) showError(teamErrorMessage(nameCheck.reason));
+    else if (!tagCheck.ok) showError(teamErrorMessage(tagCheck.reason));
+    else if (!dirty) showError(t("settings.unchanged"));
+  };
 
-  const saveMeta = async (event: FormEvent) => {
+  const saveMeta = (event: FormEvent) => {
     event.preventDefault();
     if (!canSave) return;
-    fieldErrors.clear();
-    setSaving(true);
-    try {
-      await teamApi(
-        `/api/teams/${team.team.id}`,
-        jsonRequest("PATCH", {
-          name: name.trim(),
-          description: description.trim() || null,
-          tag: tag.trim() || null,
-        }),
-        "TEAM_UPDATE_FAILED",
-      );
-      showSuccess(t("settings.updated"));
-      onChanged();
-      // Le menu du compte (« Mon équipe ») rappelle le nom : il doit suivre.
-      // Lui seul : un sigle ou une description changés ne s'y lisent pas, et
-      // tout l'arbre serveur (session, équipe active, signalements) serait
-      // recalculé pour rien.
-      if (name.trim() !== saved.name) router.refresh();
-    } catch (e) {
-      // `teamApi` lève le code du refus tel quel : c'est lui qui désigne le
-      // champ (nom ou sigle déjà pris, que le contrôle local ne peut pas voir).
-      const code = (e as Error).message;
-      const message = teamErrorMessage(code);
-      fieldErrors.report(code, message);
-      showError(message);
-    } finally {
-      setSaving(false);
-    }
+    void run(async () => {
+      fieldErrors.clear();
+      try {
+        await teamApi(
+          `/api/teams/${team.team.id}`,
+          jsonRequest("PATCH", {
+            name: name.trim(),
+            description: description.trim() || null,
+            tag: tag.trim() || null,
+          }),
+          "TEAM_UPDATE_FAILED",
+        );
+        showSuccess(t("settings.updated"));
+        onChanged();
+        // Le menu du compte (« Mon équipe ») rappelle le nom : il doit suivre.
+        // Lui seul : un sigle ou une description changés ne s'y lisent pas, et
+        // tout l'arbre serveur (session, équipe active, signalements) serait
+        // recalculé pour rien.
+        if (name.trim() !== saved.name) router.refresh();
+      } catch (e) {
+        // `teamApi` lève le code du refus tel quel : c'est lui qui désigne le
+        // champ (nom ou sigle déjà pris, que le contrôle local ne peut pas voir).
+        const code = (e as Error).message;
+        const message = teamErrorMessage(code);
+        fieldErrors.report(code, message);
+        showError(message);
+      }
+    });
   };
 
   return (
@@ -240,6 +261,9 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
           <input
             id="team-meta-name"
             value={name}
+            // Figé pendant l'envoi (`readOnly`, le focus reste) : ce qui est
+            // affiché est ce qui part.
+            readOnly={saving}
             onChange={(e) => {
               setName(e.target.value);
               fieldErrors.clear("name");
@@ -265,6 +289,7 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
             id="team-meta-tag"
             className={styles.tagInput}
             value={tag}
+            readOnly={saving}
             onChange={(e) => {
               setTag(normalizeTeamTag(e.target.value));
               fieldErrors.clear("tag");
@@ -286,6 +311,7 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
           <textarea
             id="team-meta-description"
             value={description}
+            readOnly={saving}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder={t("settings.descriptionPlaceholder")}
@@ -308,16 +334,14 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
           </button>
         ) : null}
         {/* Jamais `disabled` : pendant l'envoi comme après (formulaire redevenu
-            propre), le bouton garde le focus clavier (`aria-disabled`) ; le
+            propre), le bouton garde le focus clavier (`BusyButton`) ; le
             gestionnaire ignore tout envoi hors `canSave`. */}
-        <button
-          type="submit"
-          className={`btn ${styles.primaryButton}`}
-          aria-disabled={!canSave || undefined}
-          aria-busy={saving || undefined}
+        <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={saving}
+          blocked={!canSave}
+          onBlockedClick={explainRefusedSave}
         >
-          {saving ? t("settings.saving") : t("settings.save")}
-        </button>
+          <BusyLabel busy={saving} idle={t("settings.save")} pending={t("settings.saving")} />
+        </BusyButton>
       </div>
     </form>
   );
@@ -338,7 +362,12 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   const text = useTeamPageText();
   const { t } = text;
   const teamErrorMessage = useTeamErrorMessage();
-  const [logoBusy, setLogoBusy] = useState(false);
+  // Une garde pour le logo : l'envoi et le retrait partagent un `run`.
+  const { busy: logoBusy, isBusy, run, whenIdle } = useBusyGuard();
+  // L'envoi réussi efface la rangée du logo choisi, bouton pressé compris :
+  // le focus revient au bouton du choix d'un fichier.
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const rescueFocus = useFocusRescue(fieldRef);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
   // Le logo s'envoie en deux temps : choisir le fichier, puis certifier en
   // détenir les droits et envoyer. La case n'existe qu'entre les deux — cochée
@@ -380,45 +409,45 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   };
 
   const onLogoSend = async () => {
-    if (logoBusy || !pendingLogo) return;
+    if (isBusy() || !pendingLogo) return;
     if (!logoRights) {
       showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
       logoRightsRef.current?.focus();
       return;
     }
 
-    setLogoBusy(true);
-    try {
-      const formData = new FormData();
-      appendCroppedImage(formData, pendingLogo);
-      formData.append(LOGO_RIGHTS_FIELD, "1");
-      await teamApi(`/api/teams/${team.team.id}/logo`, { method: "POST", body: formData }, "LOGO_UPLOAD_FAILED");
-      showSuccess(t("settings.logoUpdated"));
-      cancelPendingLogo();
-      onChanged();
-    } catch (e) {
-      showError(teamErrorMessage((e as Error).message));
-    } finally {
-      setLogoBusy(false);
-    }
+    await run(async () => {
+      try {
+        const formData = new FormData();
+        appendCroppedImage(formData, pendingLogo);
+        formData.append(LOGO_RIGHTS_FIELD, "1");
+        await teamApi(`/api/teams/${team.team.id}/logo`, { method: "POST", body: formData }, "LOGO_UPLOAD_FAILED");
+        showSuccess(t("settings.logoUpdated"));
+        rescueFocus(['[data-focus-rescue="logo"]']);
+        cancelPendingLogo();
+        onChanged();
+      } catch (e) {
+        showError(teamErrorMessage((e as Error).message));
+      }
+    });
   };
 
   // Le serveur efface le fichier : le geste ne se défait pas, il passe par
   // une confirmation (`ConfirmActionDialog`).
   const [removeLogoOpen, setRemoveLogoOpen] = useState(false);
   const onLogoDelete = async (): Promise<boolean> => {
-    setLogoBusy(true);
-    try {
-      await teamApi(`/api/teams/${team.team.id}/logo`, { method: "DELETE" }, "LOGO_DELETE_FAILED");
-      showSuccess(t("settings.logoDeleted"));
-      onChanged();
-      return true;
-    } catch (e) {
-      showError(teamErrorMessage((e as Error).message));
-      return false;
-    } finally {
-      setLogoBusy(false);
-    }
+    const outcome = await run(async () => {
+      try {
+        await teamApi(`/api/teams/${team.team.id}/logo`, { method: "DELETE" }, "LOGO_DELETE_FAILED");
+        showSuccess(t("settings.logoDeleted"));
+        onChanged();
+        return true;
+      } catch (e) {
+        showError(teamErrorMessage((e as Error).message));
+        return false;
+      }
+    });
+    return outcome ?? false;
   };
 
   const savedLogo = team.team.logoUrl ? (
@@ -429,7 +458,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
   const savedLogoLabel = team.team.logoUrl ? t("settings.changeLogo") : t("settings.addLogo");
 
   return (
-    <div className={`field ${styles.fullWidth} ${ownsIdentity ? styles.divider : ""}`}>
+    <div ref={fieldRef} className={`field ${styles.fullWidth} ${ownsIdentity ? styles.divider : ""}`}>
       <span id="team-logo-label" className={styles.roleGroupLegend}>
         {t("settings.logo")}
       </span>
@@ -455,27 +484,24 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
           aria-hidden
         />
         <fieldset className={`native-group ${styles.actionsRow}`} aria-labelledby="team-logo-label">
-          <button
-            type="button"
+          <BusyButton
             className="btn"
-            aria-disabled={logoBusy || undefined}
-            onClick={() => {
-              if (!logoBusy) logoFileRef.current?.click();
-            }}
+            data-focus-rescue="logo"
+            busy={false}
+            blocked={logoBusy}
+            onClick={whenIdle(() => logoFileRef.current?.click())}
           >
             {pendingLogo ? t("settings.chooseAnother") : savedLogoLabel}
-          </button>
+          </BusyButton>
           {team.team.logoUrl && !pendingLogo ? (
-            <button
-              type="button"
+            <BusyButton
               className="btn ghost"
-              aria-disabled={logoBusy || undefined}
-              onClick={() => {
-                if (!logoBusy) setRemoveLogoOpen(true);
-              }}
+              busy={false}
+              blocked={logoBusy}
+              onClick={whenIdle(() => setRemoveLogoOpen(true))}
             >
               {t("settings.removeLogo")}
-            </button>
+            </BusyButton>
           ) : null}
         </fieldset>
       </div>
@@ -494,8 +520,10 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
               ref={logoRightsRef}
               type="checkbox"
               checked={logoRights}
-              disabled={logoBusy}
-              onChange={(e) => setLogoRights(e.target.checked)}
+              // Figée pendant l'envoi sans `disabled` natif (le focus resterait
+              // sur la page) : `aria-readonly` la peint éteinte, le geste est ignoré.
+              aria-readonly={logoBusy || undefined}
+              onChange={whenIdle((e: ChangeEvent<HTMLInputElement>) => setLogoRights(e.target.checked))}
             />
             <span>
               {t("settings.logoRights")}{" "}
@@ -505,35 +533,25 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
             </span>
           </label>
           <div className={styles.actionsRow}>
-            <button
-              type="button"
-              className="btn"
-              aria-disabled={logoBusy || undefined}
-              aria-busy={logoBusy || undefined}
-              onClick={() => void onLogoSend()}
-            >
-              {logoBusy ? t("settings.sending") : t("settings.sendLogo")}
-            </button>
-            <button
-              type="button"
+            <BusyButton className="btn" busy={logoBusy} onClick={() => void onLogoSend()}>
+              <BusyLabel busy={logoBusy} idle={t("settings.sendLogo")} pending={t("settings.sending")} />
+            </BusyButton>
+            <BusyButton
               className="btn ghost"
-              aria-disabled={logoBusy || undefined}
-              onClick={() => {
-                if (!logoBusy) void onLogoRecrop();
-              }}
+              busy={false}
+              blocked={logoBusy}
+              onClick={whenIdle(() => void onLogoRecrop())}
             >
               {t("settings.recrop")}
-            </button>
-            <button
-              type="button"
+            </BusyButton>
+            <BusyButton
               className="btn ghost"
-              aria-disabled={logoBusy || undefined}
-              onClick={() => {
-                if (!logoBusy) cancelPendingLogo();
-              }}
+              busy={false}
+              blocked={logoBusy}
+              onClick={whenIdle(cancelPendingLogo)}
             >
               {t("settings.cancel")}
-            </button>
+            </BusyButton>
           </div>
         </>
       ) : null}
@@ -556,7 +574,7 @@ interface TeamDangerZoneProps {
   managedAsGhost: boolean;
   claims: TeamSentInvitation[];
   withdrawingClaimId: number | null;
-  onWithdraw: (invitationId: number, pseudo: string) => Promise<void>;
+  onWithdraw: (invitationId: number, pseudo: string) => Promise<void | undefined>;
   onPropose: () => void;
   onTransfer: () => void;
   onDelete: () => void;
@@ -574,6 +592,7 @@ function TeamDangerZone({
 }: Readonly<TeamDangerZoneProps>) {
   const text = useTeamPageText();
   const { t } = text;
+  const { showInfo } = useToast();
   return (
     <div className={`${styles.dangerZone} ${styles.fullWidth}`}>
       <h3 className={styles.dangerTitle}>{t("settings.dangerTitle")}</h3>
@@ -589,22 +608,24 @@ function TeamDangerZone({
                   }),
                 )}
               </span>
-              <button
-                type="button"
+              <BusyButton
                 className="btn ghost"
-                aria-disabled={withdrawingClaimId !== null || undefined}
-                aria-busy={withdrawingClaimId === claim.id || undefined}
+                data-focus-rescue="claim"
+                data-focus-rescue-key={claim.id}
+                busy={withdrawingClaimId === claim.id}
+                blocked={withdrawingClaimId !== null}
+                onBlockedClick={() => showInfo(t("members.otherWithdrawing"), { once: true })}
                 onClick={() => void onWithdraw(claim.id, claim.pseudo)}
               >
                 {t("settings.withdraw")}
-              </button>
+              </BusyButton>
             </li>
           ))}
         </ul>
       ) : null}
       <div className={`${styles.actionsRow} ${styles.dangerActions}`}>
         {managedAsGhost ? (
-          <button type="button" className="btn ghost" onClick={() => onPropose()}>
+          <button type="button" className="btn ghost" data-focus-rescue="claim" onClick={() => onPropose()}>
             {t("settings.propose")}
           </button>
         ) : (

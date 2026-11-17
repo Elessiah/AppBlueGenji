@@ -1,4 +1,8 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
+
+// « Mes rôles » explique un « Enregistrer » refusé par une notification : hors
+// fournisseur de notifications ici, simulée.
+jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError: jest.fn(), showSuccess: jest.fn(), showInfo: jest.fn() }) }));
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { ReactElement } from "react";
@@ -110,7 +114,7 @@ describe("MyRolesBlock", () => {
   it("MyRolesBlock_unchanged_submitIsAriaDisabledButFocusable", () => {
     const html = render(<MyRolesBlock roles={["DPS"]} onSave={save} />);
 
-    expect(html).toMatch(/<button type="submit"[^>]*aria-disabled="true"/);
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
     expect(html).not.toMatch(/<button[^>]*\sdisabled=""/);
   });
 

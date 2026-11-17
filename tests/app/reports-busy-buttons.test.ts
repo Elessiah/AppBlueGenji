@@ -249,10 +249,9 @@ describe("signalements du staff — rendu des gestes", () => {
 
   it("PlayerModerationBar_profileRead_focusBackOnBarWhenOpenerGone", () => {
     const bar = source("app/(secured)/joueurs/[id]/_components/PlayerModerationBar.tsx");
-    expect(bar).toContain("restoreFocus.current = true;");
-    expect(bar).toMatch(/useLayoutEffect\(\(\) => \{\s+if \(!restoreFocus\.current\) return;[\s\S]*?isFocusLost\(document\)\) barRef\.current\?\.querySelector<HTMLElement>\("button"\)\?\.focus\(\);\s+\}, \[profile\]\);/);
-    // Relecture échouée : plus rien à restaurer.
-    expect(bar).toMatch(/restoreFocus\.current = false;\s+showError\(/);
+    // Secours commun (`useFocusRescue`) : focus perdu seulement, dans les 4 s, sauf reprise en main.
+    expect(bar).toContain("const rescueFocus = useFocusRescue(barRef, [profile]);");
+    expect(bar).toMatch(/setDialog\(null\);\s+rescueFocus\(\["button"\]\);/);
   });
 
   it("ReportDetail_focusRestore_usesIsFocusLost", () => {

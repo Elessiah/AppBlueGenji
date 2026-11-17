@@ -5,6 +5,9 @@ import type { TeamRole } from "@/lib/shared/types";
 import { MANAGER_ASSIGNABLE_ROLES } from "@/lib/shared/team-role-display";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { TeamDialog } from "./TeamDialog";
 import { RoleTable } from "./RoleTable";
 import styles from "../team.module.css";
@@ -30,16 +33,21 @@ interface InviteRolesDialogProps {
  */
 export function InviteRolesDialog({ pseudo, initialRoles = [], onClose, onConfirm }: Readonly<InviteRolesDialogProps>) {
   const [selected, setSelected] = useState<TeamRole[]>([...initialRoles]);
-  const [pending, setPending] = useState(false);
+  // Garde synchrone : un double clic (ou Entrée répétée) invitait deux fois.
+  const { busy: pending, isBusy, run, hold } = useBusyGuard();
   const { t } = useTeamPageText();
 
-  const send = async () => {
-    if (pending) return;
-    setPending(true);
-    const ok = await onConfirm(selected);
-    // Refus : la modale reste ouverte avec la sélection (si l'appelant ne l'a
-    // pas fermée pour montrer le refus sur le champ du pseudo).
-    if (!ok) setPending(false);
+  const send = () =>
+    run(async () => {
+      const ok = await onConfirm(selected);
+      // Succès : la modale reste en attente jusqu'à sa fermeture par l'appelant.
+      // Refus : elle se rend avec la sélection (si l'appelant ne l'a pas fermée
+      // pour montrer le refus sur le champ du pseudo).
+      if (ok) hold();
+    });
+  // Cocher pendant l'envoi changerait l'écran sous la requête : ignoré.
+  const change = (roles: TeamRole[]) => {
+    if (!isBusy()) setSelected(roles);
   };
 
   return (
@@ -51,22 +59,12 @@ export function InviteRolesDialog({ pseudo, initialRoles = [], onClose, onConfir
       wide
       footer={
         <>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={pending ? undefined : onClose}
-            aria-disabled={pending || undefined}
-          >
+          <BusyButton className="btn ghost" busy={false} blocked={pending} onClick={onClose}>
             {t("inviteDialog.cancel")}
-          </button>
-          <button
-            type="submit"
-            className={`btn ${styles.primaryButton}`}
-            aria-disabled={pending || undefined}
-            aria-busy={pending || undefined}
-          >
-            {pending ? t("inviteDialog.sending") : t("inviteDialog.confirm")}
-          </button>
+          </BusyButton>
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending}>
+            <BusyLabel busy={pending} idle={t("inviteDialog.confirm")} pending={t("inviteDialog.sending")} />
+          </BusyButton>
         </>
       }
     >
@@ -76,7 +74,7 @@ export function InviteRolesDialog({ pseudo, initialRoles = [], onClose, onConfir
           <p>{t("inviteDialog.intro")}</p>
         </InfoHint>
       </InfoHintRow>
-      <RoleTable selected={selected} onChange={setSelected} checkable={MANAGER_ASSIGNABLE_ROLES} />
+      <RoleTable selected={selected} onChange={change} checkable={MANAGER_ASSIGNABLE_ROLES} readOnly={pending} />
     </TeamDialog>
   );
 }

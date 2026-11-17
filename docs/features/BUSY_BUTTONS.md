@@ -38,7 +38,9 @@ annoncer de l'attente.
   requête) ; un sous-composant qui ne reçoit que `busy` reçoit aussi `isBusy`,
   ou son appelant garde le rappel. Pas de `if (isBusy()) return` juste avant
   `run(…)`, qui fait déjà ce contrôle — seulement quand du code (validation,
-  focus) passe avant.
+  focus) passe avant. Un contrôle **secondaire** (choisir un fichier, cocher,
+  ouvrir une fenêtre) passe son gestionnaire par `whenIdle(fn)`, qui lit
+  `isBusy()` au geste.
 - Un **champ** peut garder `disabled` quand c'est la bonne sémantique : liste
   déroulante (le focus est sur le bouton qui envoie, une liste n'envoie pas le
   formulaire), liste des maps d'un score (`MapScoreList`, Entrée n'y envoie
@@ -219,8 +221,64 @@ annoncer de l'attente.
   la fiche du joueur se relit **en arrière-plan** (`revalidate`) : `refresh`
   la repassait en « Chargement… », démontait panneau et confirmation, et le
   focus tombait sur la page ; de même après un geste de la barre de modération
-  (la modale rend le focus au bouton qui l'a ouverte ; si la relecture le retire, il va au premier bouton de la barre — `isFocusLost`, `lib/shared/focus-lost.ts`, qui compte aussi `<html>`). Une relecture
+  (la modale rend le focus au bouton qui l'a ouverte ; si la relecture le retire, il va au premier bouton de la barre — `useFocusRescue`, qui lit `isFocusLost`, `lib/shared/focus-lost.ts`, comptant aussi `<html>`). Une relecture
   qui échoue (`revalidate` rend `false`) le dit en notification, sans quoi les
   rôles affichés resteraient périmés en silence. Un enregistrement refusé par
   la garde le dit aussi (`BUSY_REFUSED_MESSAGE`). Ce refus s'affiche **une fois** (`once`) : un clic répété ou Entrée tenue n'empile pas le même message. `pending` n'est rendu qu'**après** la garde (jamais de rendu où tout est refusé sans bouton occupé), `ArmedButton` se désarme dès qu'un geste part (son libellé long ne reste pas) et « Rôles mis à jour, mais la fiche n'a pas pu être relue » tient en un seul message.
-- Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.
+- Reliquats (EF-71) — dernier lot, l'entrée « boutons grisés restants »
+  d'`ERREUR.txt` est close. Modales légales : `TermsAcceptanceModal`
+  (« J'accepte », « Supprimer mon compte », « te déconnecter » : trois gestes
+  qui s'excluent par `blocked`, la case en `aria-readonly`) et
+  `PrivacyChangesModal` (« J'ai pris connaissance » refusé tant que le détail
+  charge) — **comportement des boutons seul** : une acceptation n'est
+  enregistrée qu'au clic, une fois (`useBusyGuard`), jamais d'office ; ni texte
+  légal ni `TERMS_VERSION` touchés. Écrans d'équipe : `MembershipActions`
+  (un geste nommé, seul occupé, les autres refusés), `TeamSettings` (identité,
+  logo, demandes de reprise), `MembersSection`, `MyRolesBlock`, `RoleTable`
+  (prop `readOnly` : cases `aria-readonly`, que `Coche` peint « en attente » ;
+  seul le bouton pressé porte `aria-busy`), `RolesDialog`,
+  `InviteRolesDialog`, `TransferOwnershipDialog` (radios `aria-disabled`),
+  `ClaimGhostTeamDialog` (`PlayerPseudoCombobox`, prop `readOnly`),
+  `GhostTeamDialog`, `CreateTeamForm` (`hold()` jusqu'à la page de l'équipe ;
+  un échec du logo, même réseau, dit « créée sans logo », jamais « non créée » ;
+  un nouvel envoi après la création n'envoie rien et ouvre la fiche de
+  **cette** équipe, avec `router.refresh()` et un message disant que les
+  changements faits depuis n'ont pas été enregistrés) ;
+  l'aspect désarmé de la fiche d'équipe passe de l'`opacity` aux couleurs de
+  `.dim-disabled` (`globals.css`, posée avec `.page` sur la fiche et ses
+  fenêtres : une seule palette). Un « Enregistrer » ou « J'accepte » désarmé
+  par la saisie (rien de changé, aucun membre ou pseudo choisi, case décochée)
+  reste focalisable et, activé, dit pourquoi (`onBlockedClick`, toast FR et EN)
+  — jamais une acceptation. Les gestes nommés de `MembershipActions` partagent
+  `gestureState` (`lib/shared/gesture-state.ts`) avec les signalements.
+  Un bouton pressé qui **disparaît** au retour (« Rejoindre » devenu « Retirer
+  ma demande », invitation ou demande retirée, logo envoyé) : `useFocusRescue`
+  (`lib/shared/hooks/useFocusRescue.ts`, logique pure
+  `lib/shared/focus-rescue.ts`) rend le focus, avant la peinture, au premier
+  sélecteur trouvé dans l'écran — seulement si le focus est perdu
+  (`isFocusLost`), dans les 4 s, et tant que le lecteur n'a pas repris la main
+  (une touche ou un pointeur retire la demande : un clic dans le vide plus
+  tard ne ramène pas le focus à ce geste). Une ligne retirée d'une liste
+  (invitation, reprise, demande d'adhésion) rend le focus à sa **voisine**
+  (`neighbourRescueSelectors`, `data-focus-rescue-key` : la suivante, sinon la
+  précédente) — au **même** bouton (« Refuser » après un refus, jamais
+  « Accepter ») —, un autre geste au premier bouton **actif** du bloc
+  (`armedRescueSelector`). Un écran dont le geste ferme d'abord une fenêtre
+  (départ de l'équipe, barre de modération) passe les données relues
+  (`useFocusRescue(ref, [team, requests])`, `[profile]`) : le secours attend
+  qu'elles changent (`rescueAwaitsData`) au lieu de s'user à la fermeture ;
+  une relecture échouée le retire (`arm(null)`). `TermsAcceptanceModal` lit
+  au geste (`deletionStarted`) qu'une suppression est lancée : ni
+  déconnexion ni acceptation ne partent par-dessus. La barre de modération d'un profil passe par le
+  même crochet ; le dossier d'un signalement garde son déclencheur (le geste
+  en attente) mais choisit sa cible par le même `pickRescueTarget` —
+  `tests/app/leftover-busy-buttons.test.tsx`, `tests/app/leftover-busy-behaviour.test.tsx`,
+  `tests/lib/shared/focus-rescue.test.ts`, `tests/lib/shared/use-focus-rescue.test.ts`.
+- `disabled` natif encore lié à une requête — **à dessein**, des champs et non
+  des boutons, le focus étant sur le bouton qui envoie : listes de la date
+  (`MatchScheduleDialog` ×3) et de l'arbitre (`RefereeDialog` ×2, une liste
+  n'envoie pas le formulaire) ; `MapScoreList` des deux dialogues de score
+  (`AdminScoreDialog`, `PlayerScoreDialog` : Entrée n'y envoie pas). Le relevé
+  de l'ancienne entrée (`disabled={…}` natif dont l'expression, sur une ou
+  plusieurs lignes, nomme busy|pending|saving|loading|submitting) ne trouve
+  plus que ces 7 champs ; un nouveau doit s'y justifier.

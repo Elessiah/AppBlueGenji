@@ -3,7 +3,6 @@ import {
   ACTIONS_SCOPE,
   focusAfterGesture,
   gestureStarted,
-  gestureState,
   pressedGestureOf,
   reportGesture,
 } from "@/app/(secured)/admin/signalements/_lib/report-gestures";
@@ -34,20 +33,6 @@ function fakeRoot(found: Record<string, HTMLElement>): ParentNode {
 }
 const button = (name: string) => ({ name }) as unknown as HTMLElement;
 const ACTIONS_BUTTON = '[data-focus-scope="' + ACTIONS_SCOPE + '"] button';
-
-describe("gestureState", () => {
-  it("gestureState_noPending_armed", () => {
-    expect(gestureState(null, "action:TAKE")).toEqual({ busy: false, blocked: false });
-  });
-
-  it("gestureState_samePending_busyAndBlocked", () => {
-    expect(gestureState("action:TAKE", "action:TAKE")).toEqual({ busy: true, blocked: true });
-  });
-
-  it("gestureState_otherPending_blockedNotBusy", () => {
-    expect(gestureState("purge:4", "action:TAKE")).toEqual({ busy: false, blocked: true });
-  });
-});
 
 describe("reportGesture", () => {
   it("reportGesture_names_distinctPerTargetTypeAndOutcome", () => {

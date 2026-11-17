@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { PlayerLink } from "@/components/entity-link";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
@@ -18,6 +18,12 @@ import type { RolesDialogTarget } from "./RolesDialog";
 import { RolePills } from "./RolePills";
 import { MyRolesBlock } from "./MyRolesBlock";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { BusyButton } from "@/components/ui/busy-button";
+import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
+import { neighbourRescueSelectors } from "@/lib/shared/focus-rescue";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
 import { invitationOutcome } from "../_lib/member-roles";
 import styles from "../team.module.css";
@@ -61,7 +67,14 @@ export function MembersSection({
   const [rolesTarget, setRolesTarget] = useState<RolesDialogTarget | null>(null);
   const [kickTarget, setKickTarget] = useState<TeamMember | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  // Un retrait à la fois (garde synchrone : un double clic retirait deux fois).
+  const withdrawGuard = useBusyGuard();
+  // L'invitation retirée quitte la liste avec son bouton : le focus va au
+  // « Retirer » suivant, sinon au champ du pseudo.
+  const sectionRef = useRef<HTMLElement>(null);
+  const rescueFocus = useFocusRescue(sectionRef);
   const { t, locale } = useTeamPageText();
+  const { showInfo } = useToast();
   // Un pseudo ancien fait de caractères invisibles se lit « Joueur #id » partout, noms accessibles compris.
   const playerName = useCallback(
     (pseudo: string, userId: number) => shownEntityName(pseudo, "player", userId, locale),
@@ -211,16 +224,26 @@ export function MembersSection({
     return ok;
   };
 
-  const withdraw = async (invitation: TeamSentInvitation) => {
-    if (cancellingId === invitation.id) return;
-    setCancellingId(invitation.id);
-    await cancelInvitation(invitation.id, playerName(invitation.pseudo, invitation.userId));
-    setCancellingId(null);
-  };
+  const withdraw = (invitation: TeamSentInvitation) =>
+    withdrawGuard.run(async () => {
+      setCancellingId(invitation.id);
+      try {
+        const ok = await cancelInvitation(invitation.id, playerName(invitation.pseudo, invitation.userId));
+        // La liste relue retire la ligne pressée : le focus va au « Retirer »
+        // voisin (suivant, sinon précédent), sinon au champ du pseudo.
+        if (ok) {
+          const keys = invitations.map((pending) => pending.id);
+          rescueFocus([...neighbourRescueSelectors("invitation", keys, invitation.id), `#${INVITE_FIELD_IDS.pseudo}`]);
+        }
+      } finally {
+        setCancellingId(null);
+      }
+    });
 
   return (
     <>
       <section
+        ref={sectionRef}
         className={`ds-block ${styles.block} ${canManage ? styles.overflowBlock : ""}`}
         aria-labelledby="team-members-title"
       >
@@ -268,13 +291,9 @@ export function MembersSection({
               {/* Jamais `disabled` : champ vide comme modale ouverte, le
                   bouton garde le focus clavier (`aria-disabled`) ; le
                   gestionnaire ignore tout envoi hors `canInvite`. */}
-              <button
-                type="submit"
-                className={`btn ${styles.primaryButton}`}
-                aria-disabled={!canInvite || undefined}
-              >
+              <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={false} blocked={!canInvite}>
                 {t("members.invite")}
-              </button>
+              </BusyButton>
             </div>
           </form>
         ) : null}
@@ -292,16 +311,22 @@ export function MembersSection({
                       {t("members.sentOn", { date: formatLocalDate(invitation.createdAt, locale) })}
                     </span>
                   </span>
-                  <button
-                    type="button"
+                  <BusyButton
                     className={`btn ghost ${styles.smallButton}`}
-                    aria-disabled={cancellingId === invitation.id || undefined}
-                    aria-busy={cancellingId === invitation.id || undefined}
+                    data-focus-rescue="invitation"
+                    data-focus-rescue-key={invitation.id}
+                    busy={cancellingId === invitation.id}
+                    blocked={cancellingId !== null}
+                    onBlockedClick={() => showInfo(t("members.otherWithdrawing"), { once: true })}
                     aria-label={t("members.withdrawLabel", { pseudo: playerName(invitation.pseudo, invitation.userId) })}
                     onClick={() => void withdraw(invitation)}
                   >
-                    {cancellingId === invitation.id ? t("members.withdrawing") : t("members.withdraw")}
-                  </button>
+                    <BusyLabel
+                      busy={cancellingId === invitation.id}
+                      idle={t("members.withdraw")}
+                      pending={t("members.withdrawing")}
+                    />
+                  </BusyButton>
                 </li>
               ))}
             </ul>

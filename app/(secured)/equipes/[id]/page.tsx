@@ -43,7 +43,7 @@ export default function TeamDetailPage() {
 
   if (error) {
     return (
-      <section className={`ds-block ${styles.page}`}>
+      <section className={`ds-block ${styles.page} dim-disabled`}>
         <p className={styles.notice}>
           {failure ?? t("page.notFound")}{" "}
           <LocaleLink href="/equipes" className="entity-link">
@@ -56,14 +56,14 @@ export default function TeamDetailPage() {
 
   if (loading || !team) {
     return (
-      <section className={`ds-block ${styles.page}`} aria-busy="true">
+      <section className={`ds-block ${styles.page} dim-disabled`} aria-busy="true">
         <p className={styles.notice}>{t("page.loading")}</p>
       </section>
     );
   }
 
   return (
-    <section className={`fade-in ${styles.page}`}>
+    <section className={`fade-in ${styles.page} dim-disabled`}>
       <TeamHeader team={team} />
       <ModerationLogoBar team={team} onChanged={refresh} />
       <MembershipActions

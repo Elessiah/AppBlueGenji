@@ -5,9 +5,13 @@ import { memo, useState } from "react";
 import type { TeamRole } from "@/lib/shared/types";
 import { Coche } from "@/components/Coche";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { teamRoleLabel } from "@/lib/shared/team-role-display";
 import { SELF_ASSIGNABLE_ROLES, isLeadingRole } from "@/lib/shared/team-roles";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
+import { useToast } from "@/components/ui/toast";
 import { RolePills } from "./RolePills";
 import { isCheckboxEnter, ownGameRolesToSave } from "../_lib/member-roles";
 import styles from "../team.module.css";
@@ -30,6 +34,7 @@ interface MyRolesBlockProps {
  */
 export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readonly<MyRolesBlockProps>) {
   const { t, locale } = useTeamPageText();
+  const { showError } = useToast();
   const saved = SELF_ASSIGNABLE_ROLES.filter((role) => roles.includes(role));
   const leading = roles.filter(isLeadingRole);
   const [selected, setSelected] = useState<TeamRole[]>(saved);
@@ -45,19 +50,21 @@ export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readon
     setSyncedKey(savedKey);
     if (ownGameRolesToSave(previous, selected) === null) setSelected(saved);
   }
-  const [pending, setPending] = useState(false);
+  // Garde synchrone : un double clic (ou Entrée répétée) enregistrait deux fois.
+  const { busy: pending, isBusy, run } = useBusyGuard();
   const [guideOpen, setGuideOpen] = useState(false);
   const toSave = ownGameRolesToSave(saved, selected);
   const unchanged = toSave === null;
 
-  const toggle = (role: TeamRole) =>
+  // Cocher pendant l'envoi changerait l'écran sous la requête : ignoré.
+  const toggle = (role: TeamRole) => {
+    if (isBusy()) return;
     setSelected((current) => (current.includes(role) ? current.filter((r) => r !== role) : [...current, role]));
+  };
 
-  const save = async () => {
-    if (toSave === null || pending) return;
-    setPending(true);
-    await onSave(toSave);
-    setPending(false);
+  const save = () => {
+    if (toSave === null) return;
+    void run(() => onSave(toSave));
   };
 
   return (
@@ -98,6 +105,7 @@ export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readon
                 label={teamRoleLabel(role, locale)}
                 checked={selected.includes(role)}
                 theme="equipe"
+                aria-readonly={pending || undefined}
                 onChange={() => toggle(role)}
               />
             ))}
@@ -109,14 +117,13 @@ export const MyRolesBlock = memo(function MyRolesBlock({ roles, onSave }: Readon
           </button>
           {/* Jamais `disabled` : le bouton garde le focus clavier pendant l'envoi ;
               le gestionnaire ignore tout envoi sans changement. */}
-          <button
-            type="submit"
-            className={`btn ${styles.primaryButton}`}
-            aria-disabled={unchanged || pending || undefined}
-            aria-busy={pending || undefined}
+          <BusyButton type="submit" className={`btn ${styles.primaryButton}`} busy={pending}
+            blocked={unchanged}
+            // Désarmé mais focalisable : activé, il dit pourquoi rien ne part.
+            onBlockedClick={() => showError(t("roles.unchanged"), { once: true })}
           >
-            {pending ? t("myRoles.saving") : t("myRoles.save")}
-          </button>
+            <BusyLabel busy={pending} idle={t("myRoles.save")} pending={t("myRoles.saving")} />
+          </BusyButton>
         </div>
       </form>
       {guideOpen ? <RoleGuideDialog onClose={() => setGuideOpen(false)} /> : null}

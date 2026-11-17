@@ -186,7 +186,8 @@
     "accept": "J'accepte",
     "saving": "Enregistrement…",
     "accepted": "Merci, tu peux continuer.",
-    "failed": "Ton acceptation n'a pas pu être enregistrée. Recharge la page, puis réessaie."
+    "failed": "Ton acceptation n'a pas pu être enregistrée. Recharge la page, puis réessaie.",
+    "checkFirst": "Coche d'abord la case pour accepter les conditions d'utilisation."
   },
   "privacyModal": {
     "eyebrow": "PROTECTION DES DONNÉES · RGPD",

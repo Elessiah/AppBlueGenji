@@ -107,7 +107,7 @@ describe("câblage des modales globales", () => {
     expect(terms).not.toContain('t("termsModal.logout")');
     // La déconnexion reste, en lien de la phrase des issues.
     expect(terms).toContain("useLogout()");
-    expect(terms).toMatch(/logout: \(children\) => \(\s*<button\s+type="button"/);
+    expect(terms).toMatch(/logout: \(children\) => \(\s*<BusyButton\s+className=\{styles\.textButton\}/);
   });
 
   it("un ancien cookie de report tombe à l'ouverture et à la fermeture d'une session", () => {
