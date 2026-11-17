@@ -370,18 +370,13 @@
   box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
 }
 
-/* Envoi en cours : le champ ne reçoit plus de saisie (`readOnly`, ou
-   `aria-readonly` pour une liste ou une case) ; il le dit en couleurs et en
-   tirets, texte toujours lisible (≥ 4,5:1), jamais en `opacity`. */
-.modalInput[readonly],
-.modalInput[aria-readonly="true"] {
+/* Envoi en cours : le champ ne reçoit plus de saisie (`readOnly`) ; il le dit
+   en couleurs et en tirets, texte toujours lisible (≥ 4,5:1), jamais en
+   `opacity`. */
+.modalInput[readonly] {
   border-style: dashed;
   color: var(--ink-mute);
   cursor: progress;
-}
-
-select.modalInput[aria-readonly="true"] {
-  pointer-events: none;
 }
 
 .modalInput[type="date"] {

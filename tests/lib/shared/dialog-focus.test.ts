@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   anotherModalOpen,
   escapeBelongsElsewhere,
+  focusTrail,
   focusTrapTarget,
   handOffRestoreTargets,
+  restoreFocusTarget,
   watchModals,
   watchModalsClosed,
   watchUrgentModalOpened,
@@ -244,5 +246,153 @@ describe("handOffRestoreTargets", () => {
     const targets = new Map<symbol, string | null>([[token, null]]);
     handOffRestoreTargets(targets, () => true, "x");
     expect(targets.get(token)).toBeNull();
+  });
+});
+
+/** Élément factice : liens de parenté et présence dans la page posés à la main. */
+interface FakeNode {
+  name: string;
+  parentElement: FakeNode | null;
+  nextElementSibling: FakeNode | null;
+  previousElementSibling: FakeNode | null;
+  connected: boolean;
+  /** Premier focalisable de ce nœud, lui compris. */
+  focusable: FakeNode | null;
+}
+
+function fakeNode(name: string, parent: FakeNode | null = null): FakeNode {
+  return { name, parentElement: parent, nextElementSibling: null, previousElementSibling: null, connected: true, focusable: null };
+}
+
+/** `root > section > [header > add] + ul > [li1 > b1, li2 > b2, li3 > b3]`. */
+function listPage() {
+  const root = fakeNode("root");
+  const section = fakeNode("section", root);
+  const header = fakeNode("header", section);
+  const add = fakeNode("add", header);
+  const ul = fakeNode("ul", section);
+  header.nextElementSibling = ul;
+  ul.previousElementSibling = header;
+  const rows = [1, 2, 3].map((n) => {
+    const li = fakeNode(`li${n}`, ul);
+    const button = fakeNode(`b${n}`, li);
+    li.focusable = button;
+    return { li, button };
+  });
+  rows[0].li.nextElementSibling = rows[1].li;
+  rows[1].li.previousElementSibling = rows[0].li;
+  rows[1].li.nextElementSibling = rows[2].li;
+  rows[2].li.previousElementSibling = rows[1].li;
+  header.focusable = add;
+  section.focusable = add;
+  return { root, section, header, add, ul, rows };
+}
+
+/** Retire une ligne de la page, avec son bouton. */
+function removeRow(row: { li: FakeNode; button: FakeNode }) {
+  row.li.connected = false;
+  row.button.connected = false;
+}
+
+const isConnected = (n: FakeNode) => n.connected;
+const firstFocusable = (n: FakeNode) => n.focusable;
+
+describe("focusTrail", () => {
+  it("focusTrail_nullTarget_returnsEmpty", () => {
+    expect(focusTrail<FakeNode>(null)).toEqual([]);
+  });
+
+  it("focusTrail_nestedTarget_recordsEachAncestorWithSiblings", () => {
+    const { root, section, header, ul, rows } = listPage();
+
+    const trail = focusTrail(rows[1].button);
+
+    expect(trail).toEqual([
+      { parent: rows[1].li, next: null, previous: null },
+      { parent: ul, next: rows[2].li, previous: rows[0].li },
+      { parent: section, next: null, previous: header },
+      { parent: root, next: null, previous: null },
+    ]);
+  });
+});
+
+describe("restoreFocusTarget — déclencheur retiré (suppression confirmée)", () => {
+  it("restoreFocusTarget_nullTarget_returnsNull", () => {
+    expect(restoreFocusTarget<FakeNode>(null, [], isConnected, firstFocusable)).toBeNull();
+  });
+
+  it("restoreFocusTarget_connectedTarget_returnsTarget", () => {
+    const { rows } = listPage();
+    const trail = focusTrail(rows[1].button);
+
+    expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(rows[1].button);
+  });
+
+  it("restoreFocusTarget_removedRow_returnsNextRowFocusable", () => {
+    const { rows } = listPage();
+    const trail = focusTrail(rows[1].button);
+    removeRow(rows[1]);
+
+    expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(rows[2].button);
+  });
+
+  it("restoreFocusTarget_removedLastRow_returnsPreviousRowFocusable", () => {
+    const { rows } = listPage();
+    const trail = focusTrail(rows[2].button);
+    removeRow(rows[2]);
+
+    expect(restoreFocusTarget(rows[2].button, trail, isConnected, firstFocusable)).toBe(rows[1].button);
+  });
+
+  it("restoreFocusTarget_nextWithoutFocusable_fallsBackToPrevious", () => {
+    const { rows } = listPage();
+    const trail = focusTrail(rows[1].button);
+    removeRow(rows[1]);
+    rows[2].li.focusable = null;
+
+    expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(rows[0].button);
+  });
+
+  it("restoreFocusTarget_siblingsRemoved_fallsBackToListFocusable", () => {
+    const { ul, rows } = listPage();
+    const trail = focusTrail(rows[1].button);
+    removeRow(rows[0]);
+    removeRow(rows[1]);
+    removeRow(rows[2]);
+    const replacement = fakeNode("fallback-row", ul);
+    ul.focusable = replacement;
+
+    expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(replacement);
+  });
+
+  it("restoreFocusTarget_emptiedList_climbsToAddButton", () => {
+    const { add, rows } = listPage();
+    const trail = focusTrail(rows[0].button);
+    removeRow(rows[0]);
+    removeRow(rows[1]);
+    removeRow(rows[2]);
+
+    expect(restoreFocusTarget(rows[0].button, trail, isConnected, firstFocusable)).toBe(add);
+  });
+
+  it("restoreFocusTarget_disconnectedParent_skipsStep", () => {
+    const { add, ul, rows } = listPage();
+    const trail = focusTrail(rows[1].button);
+    removeRow(rows[1]);
+    ul.connected = false;
+
+    expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(add);
+  });
+
+  it("restoreFocusTarget_nothingFocusable_returnsNull", () => {
+    const { section, header, rows } = listPage();
+    const trail = focusTrail(rows[0].button);
+    removeRow(rows[0]);
+    removeRow(rows[1]);
+    removeRow(rows[2]);
+    header.focusable = null;
+    section.focusable = null;
+
+    expect(restoreFocusTarget(rows[0].button, trail, isConnected, firstFocusable)).toBeNull();
   });
 });

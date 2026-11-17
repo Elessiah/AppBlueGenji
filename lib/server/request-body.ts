@@ -186,6 +186,28 @@ export async function readOptionalJsonObject(
 }
 
 /**
+ * Corps JSON **requis, en objet** : `readJsonBody`, puis un JSON qui n'est pas
+ * un objet (`null`, nombre, chaîne, tableau) est refusé sous `refusal`, comme
+ * un JSON invalide — les routes lisent des champs du corps, et `null.name`
+ * lèverait. Un refus qui a son propre statut (`bodyReadRefusal` : 413, 415)
+ * garde son code au lieu de se fondre dans `refusal`.
+ */
+export async function readJsonObject(
+  req: Request,
+  refusal: string,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: Record<string, unknown> } | { refusal: string }> {
+  let json: unknown;
+  try {
+    json = await readJsonBody(req, maxBytes);
+  } catch (error) {
+    return { refusal: bodyReadRefusal(error) ?? refusal };
+  }
+  if (typeof json !== "object" || json === null || Array.isArray(json)) return { refusal };
+  return { body: json as Record<string, unknown> };
+}
+
+/**
  * Code d'un refus de lecture qui a **son propre statut** — `PAYLOAD_TOO_LARGE`
  * (413), `UNSUPPORTED_CONTENT_TYPE` (415), posés par `fail()` —, ou `null` pour
  * un corps simplement illisible (JSON invalide), que la route rend sous son

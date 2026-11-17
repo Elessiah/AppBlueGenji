@@ -3,7 +3,7 @@ import { can } from "@/lib/shared/permissions";
 import { serviceErrorCode, failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createSponsor, findSponsor, listSponsors } from "@/lib/server/sponsors-service";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readJsonObject } from "@/lib/server/request-body";
 import { runOnceForBody } from "@/lib/server/idempotency";
 
 export async function GET() {
@@ -21,15 +21,10 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let json: unknown;
-  try {
-    json = await readJsonBody(req);
-  } catch {
-    return fail("INVALID_BODY", 400);
-  }
-  // `null`, un tableau ou un nombre sont du JSON valide, mais pas un partenaire.
-  if (typeof json !== "object" || json === null || Array.isArray(json)) return fail("INVALID_BODY", 400);
-  const body = json as Record<string, unknown>;
+  // Corps illisible, trop lourd (413), non JSON (415), ou JSON qui n'est pas un objet.
+  const read = await readJsonObject(req, "INVALID_BODY");
+  if ("refusal" in read) return fail(read.refusal, 400);
+  const body = read.body;
 
   try {
     // Un renvoi du même ajout (réponse perdue) rend le partenaire déjà créé au

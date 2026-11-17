@@ -177,7 +177,8 @@ annoncer de l'attente.
   `busy` et dont la section garde `onChange`) — `tests/app/association-busy-buttons.test.ts`.
   Une garde par section : enregistrer, déplacer, supprimer **et importer la
   photo** d'un bénévole partagent un `run` (« Ajouter » pressé pendant l'envoi
-  de la photo partait sans elle). Le succès ferme la fenêtre par `closeDialog()`
+  de la photo partait sans elle) ; la garde est prise **dès le recadrage**
+  (`cropThenUpload`, `lib/shared/busy-guard.ts`), pas seulement pour l'envoi. Le succès ferme la fenêtre par `closeDialog()`
   — `close()` interroge la garde, encore tenue. Champs en `readOnly`, listes et
   case « Annonce active » en `aria-readonly` (choix ignoré), « Couleur
   aléatoire » du bureau refusée pendant l'envoi. Flèches d'ordre par
@@ -186,7 +187,9 @@ annoncer de l'attente.
   n'entre pas dans un sélecteur). Ajouts sans doublon : `POST /api/benevoles`,
   `/api/association/bureau` et `/api/recruitment` passent par `runOnceForBody`
   (option `fresh` : `findBenevole`, `findBureauMember`, `findRecruitmentAd`), et
-  refusent un corps qui n'est pas un objet (`INVALID_BODY`). Libellés d'attente,
+  refusent un corps qui n'est pas un objet (`INVALID_BODY`) par `readJsonObject`
+  (`lib/server/request-body.ts`, aussi lu par les piliers, les chiffres et les
+  partenaires) : un corps trop lourd reste 413, un corps non JSON 415. Libellés d'attente,
   restés en français (D4) : « Enregistrement… », « Ajout… », « Publication… »,
   « Envoi… ».
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

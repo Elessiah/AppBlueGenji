@@ -2,7 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { createDialogStack, type ScrollLockTarget } from "@/lib/shared/dialog-stack";
-import { escapeBelongsElsewhere, focusTrapTarget, handOffRestoreTargets } from "@/lib/shared/dialog-focus";
+import {
+  escapeBelongsElsewhere,
+  focusTrail,
+  focusTrapTarget,
+  handOffRestoreTargets,
+  restoreFocusTarget,
+  type FocusTrailStep,
+} from "@/lib/shared/dialog-focus";
 
 interface DialogBehaviorOptions {
   /** La boîte de dialogue est-elle montée / visible ? */
@@ -46,10 +53,63 @@ const dialogStack = createDialogStack(bodyScrollLock);
  * place au lancement d'un match) passe sa cible à celles du dessus qui
  * comptaient rendre le focus en son sein — un élément bientôt retiré.
  */
-const restoreTargets = new Map<symbol, HTMLElement | null>();
+const restoreTargets = new Map<symbol, RestoreEntry | null>();
+
+/**
+ * Cible de restitution : l'élément, et son voisinage relevé à l'ouverture
+ * (`focusTrail`) — pour retomber sur la ligne voisine si la sienne a été
+ * supprimée entre-temps.
+ */
+interface RestoreEntry {
+  element: HTMLElement;
+  trail: FocusTrailStep<Element>[];
+}
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Durée pendant laquelle un déclencheur rendu reste guetté : une liste
+ * rechargée **après** la fermeture (`router.refresh()`) retire sa ligne un peu
+ * plus tard, et le focus tomberait alors sur `<body>`.
+ */
+const LATE_REMOVAL_WATCH_MS = 3_000;
+
+const isShown = (el: Element) =>
+  (el as HTMLElement).offsetParent !== null && getComputedStyle(el).visibility !== "hidden";
+
+/** Premier élément focalisable et visible de `root`, `root` compris. */
+function firstFocusableIn(root: Element): Element | null {
+  if (root.matches(FOCUSABLE_SELECTOR) && isShown(root)) return root;
+  return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR)).find(isShown) ?? null;
+}
+
+function focusRestoreTarget(entry: RestoreEntry): Element | null {
+  const next = restoreFocusTarget<Element>(entry.element, entry.trail, (node) => node.isConnected, firstFocusableIn);
+  (next as HTMLElement | null)?.focus?.();
+  return next;
+}
+
+/**
+ * Le déclencheur a repris le focus mais sa ligne peut encore disparaître
+ * (rechargement après fermeture) : à son retrait, si le focus est tombé sur
+ * `<body>`, il passe à la ligne voisine. Guet borné, levé au premier retrait.
+ */
+function watchLateRemoval(entry: RestoreEntry) {
+  if (entry.element === document.body || entry.element === document.documentElement) return;
+  const observer = new MutationObserver(() => {
+    if (entry.element.isConnected) return;
+    stop();
+    const active = document.activeElement;
+    if (active === null || active === document.body) focusRestoreTarget(entry);
+  });
+  const timer = setTimeout(() => stop(), LATE_REMOVAL_WATCH_MS);
+  function stop() {
+    observer.disconnect();
+    clearTimeout(timer);
+  }
+  observer.observe(document.body, { childList: true, subtree: true });
+}
 
 /**
  * Comportement commun des boîtes de dialogue modales : fermeture par `Échap`,
@@ -81,7 +141,8 @@ export function useDialogBehavior({ open, onClose, locked = false, initialFocus 
 
     const token = Symbol("dialog");
     const container = containerRef.current;
-    restoreTargets.set(token, document.activeElement as HTMLElement | null);
+    const opener = document.activeElement as HTMLElement | null;
+    restoreTargets.set(token, opener ? { element: opener, trail: focusTrail<Element>(opener) } : null);
     dialogStack.push(token);
 
     // Focus initial : l'élément marqué `data-autofocus` s'il y en a un (le champ
@@ -156,6 +217,7 @@ export function useDialogBehavior({ open, onClose, locked = false, initialFocus 
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
       // Retour au déclencheur : sans ça, le focus repart en tête de document.
+      // Déclencheur retiré (sa ligne supprimée) : sa ligne voisine, sa liste…
       // Seulement pour la modale du dessus : une modale recouverte qui se ferme
       // ne doit pas arracher le focus à celle qui la couvre ; elle lui passe sa
       // cible si celle du dessus visait un élément en son sein.
@@ -164,10 +226,10 @@ export function useDialogBehavior({ open, onClose, locked = false, initialFocus 
       const target = restoreTargets.get(token) ?? null;
       restoreTargets.delete(token);
       if (wasTop) {
-        target?.focus?.();
+        if (target !== null && focusRestoreTarget(target) === target.element) watchLateRemoval(target);
         return;
       }
-      handOffRestoreTargets(restoreTargets, (element) => container?.contains(element) ?? false, target);
+      handOffRestoreTargets(restoreTargets, (entry) => container?.contains(entry.element) ?? false, target);
     };
   }, [open]);
 

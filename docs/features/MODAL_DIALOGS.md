@@ -62,6 +62,17 @@ qui se ferme ne rend pas le focus à son déclencheur (seule celle du dessus le
 fait) ; elle passe cette cible aux modales du dessus qui comptaient rendre le
 focus en son sein (`restoreTargets`).
 
+Un déclencheur **retiré** pendant que la modale était ouverte — la ligne d'une
+liste supprimée par `ConfirmActionDialog` (bureau, bénévoles, annonces,
+partenaires…) — ne peut plus reprendre le focus, qui tomberait sur `<body>`
+(WCAG 2.4.3). Son voisinage est relevé à l'ouverture (`focusTrail`) et la
+fermeture rend le focus au premier focalisable de la ligne **suivante**, sinon
+de la précédente, sinon de la liste, en remontant jusqu'au bouton « Ajouter »
+d'une liste vidée (`restoreFocusTarget`, `lib/shared/dialog-focus.ts`). Une
+ligne retirée **après** la fermeture (liste rechargée) est guettée trois
+secondes (`MutationObserver`) : si le focus est tombé sur `<body>`, il suit la
+même règle.
+
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà
 ouverte — prend le focus par `ref={focusOnMount}` (`lib/shared/focus-on-mount.ts`) :

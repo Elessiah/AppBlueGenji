@@ -227,3 +227,60 @@ export function handOffRestoreTargets<T>(
     if (element !== null && inside(element)) targets.set(token, target);
   }
 }
+
+/** Ce que la restitution du focus lit d'un élément de la page. */
+export interface TrailNode<T> {
+  readonly parentElement: T | null;
+  readonly nextElementSibling: T | null;
+  readonly previousElementSibling: T | null;
+}
+
+/** Un cran de la remontée du déclencheur : son parent et ses voisins d'alors. */
+export interface FocusTrailStep<T> {
+  parent: T;
+  next: T | null;
+  previous: T | null;
+}
+
+/**
+ * Relevé, **à l'ouverture**, du voisinage du déclencheur : chacun de ses
+ * ancêtres avec les voisins du chaînon qu'il contient. Une fois la ligne
+ * retirée (suppression confirmée), l'élément détaché ne sait plus où il était.
+ */
+export function focusTrail<T extends TrailNode<T>>(target: T | null): FocusTrailStep<T>[] {
+  const steps: FocusTrailStep<T>[] = [];
+  let node = target;
+  while (node?.parentElement) {
+    steps.push({ parent: node.parentElement, next: node.nextElementSibling, previous: node.previousElementSibling });
+    node = node.parentElement;
+  }
+  return steps;
+}
+
+/**
+ * Où rendre le focus à la fermeture d'une modale. Le déclencheur, s'il est
+ * encore dans la page ; sinon — sa ligne a disparu avec la suppression
+ * confirmée, le focus tomberait sur `<body>` (WCAG 2.4.3) — le premier
+ * focalisable de la ligne **suivante**, sinon de la **précédente**, sinon de la
+ * liste, et ainsi de suite en remontant (le bouton « Ajouter » d'une liste
+ * vidée). `null` si rien ne convient.
+ */
+export function restoreFocusTarget<T>(
+  target: T | null,
+  trail: readonly FocusTrailStep<T>[],
+  isConnected: (node: T) => boolean,
+  firstFocusable: (root: T) => T | null,
+): T | null {
+  if (target === null || isConnected(target)) return target;
+  for (const step of trail) {
+    if (!isConnected(step.parent)) continue;
+    for (const sibling of [step.next, step.previous]) {
+      if (sibling === null || !isConnected(sibling)) continue;
+      const found = firstFocusable(sibling);
+      if (found !== null) return found;
+    }
+    const found = firstFocusable(step.parent);
+    if (found !== null) return found;
+  }
+  return null;
+}

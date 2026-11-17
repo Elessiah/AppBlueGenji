@@ -93,7 +93,9 @@ describe("association, bénévoles, recrutement — champs figés pendant l'envo
     // « Ajouter » pendant l'envoi de la photo partait sans elle.
     const code = source(BENEVOLES);
     expect(code).toContain("if (!file || isBusy()) return;");
-    expect(code).toMatch(/await run\(async \(\) => \{\s+setPhotoBusy\(true\);/);
+    // Garde prise dès le recadrage (`cropThenUpload`, comportement testé dans busy-guard.test.ts).
+    expect(code).toMatch(/await cropThenUpload\(\{\s+run,\s+setUploading: setPhotoBusy,\s+crop: \(\) => cropImage\(/);
+    expect(code).not.toMatch(/const image = await cropImage\(/);
     expect(code).toContain('if (!started) showInfo("Photo non importée');
     expect(code).not.toContain("ariaBusy=");
   });

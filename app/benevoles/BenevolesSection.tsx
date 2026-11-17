@@ -28,6 +28,7 @@ import {
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { cropThenUpload } from "@/lib/shared/busy-guard";
 import { arrowKey } from "@/lib/shared/arrow-refocus";
 import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
@@ -304,32 +305,32 @@ export function BenevolesSection({
       return;
     }
 
-    const image = await cropImage(file, "benevole-photo", "Recadrer la photo");
-    if (!image) return;
-
-    const started = await run(async () => {
-      setPhotoBusy(true);
-      try {
-        const data = new FormData();
-        appendCroppedImage(data, image);
-        const res = await fetch("/api/benevoles/photo", { method: "POST", body: data });
-        const payload = (await res.json()) as { photoUrl?: string; error?: string };
-        const photoUrl = payload.photoUrl;
-        if (!res.ok || !photoUrl) {
-          showError(payload.error ? `Échec : ${payload.error}` : "Échec de l'envoi de la photo.");
-          return true;
+    // Recadrage et envoi sous la même garde que l'enregistrement : « Ajouter »
+    // ne part ni pendant le recadrage ni pendant l'envoi (sans la photo).
+    const started = await cropThenUpload({
+      run,
+      setUploading: setPhotoBusy,
+      crop: () => cropImage(file, "benevole-photo", "Recadrer la photo"),
+      upload: async (image) => {
+        try {
+          const data = new FormData();
+          appendCroppedImage(data, image);
+          const res = await fetch("/api/benevoles/photo", { method: "POST", body: data });
+          const payload = (await res.json()) as { photoUrl?: string; error?: string };
+          const photoUrl = payload.photoUrl;
+          if (!res.ok || !photoUrl) {
+            showError(payload.error ? `Échec : ${payload.error}` : "Échec de l'envoi de la photo.");
+            return;
+          }
+          setForm((f) => ({ ...f, photoUrl }));
+          showSuccess("Photo importée.");
+        } catch {
+          showError("Erreur réseau, réessaye.");
         }
-        setForm((f) => ({ ...f, photoUrl }));
-        showSuccess("Photo importée.");
-      } catch {
-        showError("Erreur réseau, réessaye.");
-      } finally {
-        setPhotoBusy(false);
-      }
-      return true;
+      },
     });
-    // Un autre envoi a pris la section pendant le recadrage : la photo n'est pas
-    // partie, on le dit plutôt que de laisser croire qu'elle est importée.
+    // Un autre envoi tenait la section : la photo n'est pas partie, on le dit
+    // plutôt que de laisser croire qu'elle est importée.
     if (!started) showInfo("Photo non importée : un autre envoi était en cours, réessaye.");
   }
 
