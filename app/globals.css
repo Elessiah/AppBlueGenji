@@ -1800,6 +1800,46 @@ html {
     radial-gradient(420px 300px at 8% 108%, rgba(90, 200, 255, calc(0.1 * var(--glow, 1))), transparent 62%);
 }
 
+/* Voile qui s'éteint sur chaque bord au lieu d'être coupé net par la boîte
+   qui le porte (`overflow: hidden` des en-têtes) : plus d'arête dure sur le
+   noir, à aucune largeur. Modificateur à poser **en plus** de `.fabric` (ou
+   d'un voile de module) : les autres pages gardent leur voile d'origine. Les
+   deux masques se croisent (`intersect`) : seul le centre reste plein. Un
+   module règle `--fade-x` / `--fade-top` / `--fade-bottom`
+   (`docs/features/TOURNOIS_LIST_EMPTY_LOOK.md`). */
+.fabric-fade {
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 var(--fade-x, min(18%, 220px)), #000 calc(100% - var(--fade-x, min(18%, 220px))), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--fade-top, 48px), #000 calc(100% - var(--fade-bottom, min(30%, 160px))), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, #000 var(--fade-x, min(18%, 220px)), #000 calc(100% - var(--fade-x, min(18%, 220px))), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--fade-top, 48px), #000 calc(100% - var(--fade-bottom, min(30%, 160px))), transparent);
+  mask-composite: intersect;
+}
+
+/* Régime économe (`data-motion="off"` : page sans focus, machine à la peine,
+   match, mouvement réduit) : un voile décoratif statique ne vaut pas une
+   surface masquée à repeindre — le halo reste, ses bords ne sont plus fondus
+   par masque (`docs/features/CLIENT_POWER_MODES.md`). */
+html[data-motion="off"] .fabric-fade {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* Filet bas d'un en-tête : il s'éteint à ses deux bouts au lieu de tirer un
+   trait net d'un bord à l'autre (porteur en `position: relative`). */
+.hairline-fade::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-soft) 20%, var(--line-soft) 80%, transparent);
+  pointer-events: none;
+}
+
 .fabric::after {
   content: "";
   position: absolute;

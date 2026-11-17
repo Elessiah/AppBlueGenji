@@ -80,21 +80,6 @@ export function hasActiveFilter(query: string, gameFilter: GameFilter): boolean 
 }
 
 /**
- * Message d'une section vide : une section réellement sans tournoi ne dit pas
- * la même chose qu'une section que le filtre en cours a vidée — la seconde
- * doit pousser à changer de recherche, pas laisser croire qu'il n'y a
- * vraiment rien.
- */
-export function sectionEmptyMessage(
-  whenUnfiltered: string,
-  query: string,
-  gameFilter: GameFilter,
-  whenFiltered = "Aucun résultat pour cette recherche.",
-): string {
-  return hasActiveFilter(query, gameFilter) ? whenFiltered : whenUnfiltered;
-}
-
-/**
  * Tournois terminés que la liste courante ne porte pas, pour un filtre de jeu.
  *
  * La liste publique ne transporte que les terminés les plus récents

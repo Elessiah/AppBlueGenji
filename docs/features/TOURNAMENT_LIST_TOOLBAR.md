@@ -53,11 +53,10 @@ elles, suivaient la recherche.
 
 ## Message d'une section vide
 
-Une section vidée par un filtre actif (recherche ou pastille de jeu) ne dit
-plus la même chose qu'une section réellement sans tournoi :
-`sectionEmptyMessage(whenUnfiltered, query, gameFilter)` (pur) retombe sur
-« Aucun résultat pour cette recherche. » dès que `hasActiveFilter` est vrai,
-et sur le message d'origine sinon.
+Une page vidée par un filtre actif (recherche ou pastille de jeu) ne dit pas la
+même chose qu'une page réellement sans tournoi : `listEmptyKind` rend
+`filtered` ou `empty`, et le panneau propose d'effacer les filtres ou de lire
+les règles — détail dans `TOURNOIS_LIST_EMPTY_LOOK.md`.
 
 **Avant la première liste** (revue performance a posteriori #425) : la page
 partait de paniers vides et affichait, à chaque visite et jusqu'à la réponse
@@ -195,7 +194,7 @@ déjà la même apparence.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Barre d'outils de `/tournois`** (`app/(secured)/tournois/page.tsx` + `Section.tsx` + `_lib/buckets.ts` pur) : la recherche filtre nom, description **et format** (`FORMAT_LABELS` — les équipes engagées n'y figurent pas, `TournamentCard` ne porte que des comptes) et porte un `aria-label` propre, le placeholder seul n'en étant pas un ; son raccourci affiché suit la plateforme (`searchShortcutLabel`, `lib/shared/search-shortcut.ts` : « ⌘K » sur Apple, « Ctrl+K » ailleurs), libellé et touche passant par `useSearchShortcut`, partagé avec `/equipes` et `/joueurs` (`AnnuaireSearchField`, qui affichait « ⌘K » sans écouter aucune touche) ; pastille masquée sous `(hover: none)`, champs en 16 px (iOS zoome en dessous). Les pastilles de jeu portent `aria-pressed` et un `aria-label` qui compose proprement libellé et compte (le chiffre visible passe en `aria-hidden`, sinon le nom accessible les collait — « Tous83 ») ; leur compte suit désormais la recherche en cours, pas seulement le jeu. Une section vidée par un filtre actif dit « Aucun résultat pour cette recherche. » (`sectionEmptyMessage`), distinct d'une section réellement sans tournoi. L'en-tête d'une section pose enfin le bouton **dans** son `<h2>` et non l'inverse (un titre n'est pas du contenu phrasé, il ne pouvait pas vivre dans un `<button>`) — au prix d'un `aria-label` qui retranche le nom accessible du `<h2>` au seul titre et à son accent (« · STAFF »), sans quoi il collerait aussi l'index et le compte ; `aria-controls` ne le relie à son corps que **section dépliée**, jamais vers un id absent du DOM d'une section fermée par défaut. Les quatre sections à cartes sont bornées à 12 par défaut, avec un « Voir plus » **réversible** (`ShowMoreRow`) — la version d'origine, propre à « Terminés », ne savait que déplier, et l'état déplié est un **drapeau** (`expandedSections`), pas un total figé au clic qui resterait périmé après un rafraîchissement de fond. Voir `docs/features/TOURNAMENT_LIST_TOOLBAR.md`.
+- **Barre d'outils de `/tournois`** (`app/(secured)/tournois/page.tsx` + `Section.tsx` + `_lib/buckets.ts` pur) : la recherche filtre nom, description **et format** (`FORMAT_LABELS` — les équipes engagées n'y figurent pas, `TournamentCard` ne porte que des comptes) et porte un `aria-label` propre, le placeholder seul n'en étant pas un ; son raccourci affiché suit la plateforme (`searchShortcutLabel`, `lib/shared/search-shortcut.ts` : « ⌘K » sur Apple, « Ctrl+K » ailleurs), libellé et touche passant par `useSearchShortcut`, partagé avec `/equipes` et `/joueurs` (`AnnuaireSearchField`, qui affichait « ⌘K » sans écouter aucune touche) ; pastille masquée sous `(hover: none)`, champs en 16 px (iOS zoome en dessous). Les pastilles de jeu portent `aria-pressed` et un `aria-label` qui compose proprement libellé et compte (le chiffre visible passe en `aria-hidden`, sinon le nom accessible les collait — « Tous83 ») ; leur compte suit désormais la recherche en cours, pas seulement le jeu. Une page vidée par un filtre actif dit « Aucun résultat » (`listEmptyKind`, `TOURNOIS_LIST_EMPTY_LOOK.md`), distinct d'une page réellement sans tournoi. L'en-tête d'une section pose enfin le bouton **dans** son `<h2>` et non l'inverse (un titre n'est pas du contenu phrasé, il ne pouvait pas vivre dans un `<button>`) — au prix d'un `aria-label` qui retranche le nom accessible du `<h2>` au seul titre et à son accent (« · STAFF »), sans quoi il collerait aussi l'index et le compte ; `aria-controls` ne le relie à son corps que **section dépliée**, jamais vers un id absent du DOM d'une section fermée par défaut. Les quatre sections à cartes sont bornées à 12 par défaut, avec un « Voir plus » **réversible** (`ShowMoreRow`) — la version d'origine, propre à « Terminés », ne savait que déplier, et l'état déplié est un **drapeau** (`expandedSections`), pas un total figé au clic qui resterait périmé après un rafraîchissement de fond. Voir `docs/features/TOURNAMENT_LIST_TOOLBAR.md`.
 
 ## Annonce aux lecteurs d'écran
 

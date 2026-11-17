@@ -7,7 +7,6 @@ import {
   flattenBuckets,
   countByGame,
   hasActiveFilter,
-  sectionEmptyMessage,
   finishedBeyondList,
   needsFinishedArchive,
 } from "@/app/(secured)/tournois/_lib/buckets";
@@ -222,23 +221,6 @@ describe("hasActiveFilter", () => {
   it("est vrai dès qu'une recherche ou un jeu est choisi", () => {
     expect(hasActiveFilter("marvel", "all")).toBe(true);
     expect(hasActiveFilter("", "ow")).toBe(true);
-  });
-});
-
-describe("sectionEmptyMessage", () => {
-  it("garde le message d'origine sans filtre actif", () => {
-    expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "", "all")).toBe(
-      "Aucun tournoi en cours actuellement.",
-    );
-  });
-
-  it("dit qu'aucun résultat ne correspond dès qu'un filtre est actif", () => {
-    expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "marvel", "all")).toBe(
-      "Aucun résultat pour cette recherche.",
-    );
-    expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "", "mr")).toBe(
-      "Aucun résultat pour cette recherche.",
-    );
   });
 });
 

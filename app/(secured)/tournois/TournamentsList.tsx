@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { tournamentLabel } from "@/lib/shared/tournaments-text";
@@ -9,7 +9,7 @@ import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
 import { refreshCadenceFor } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
-import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
+import { useScheduledBucketsPair } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { SecuredLoadingView } from "../_shared/SecuredLoadingView";
@@ -32,10 +32,12 @@ import {
   flattenBuckets,
   countByGame,
   needsFinishedArchive,
-  sectionEmptyMessage,
   type GameFilter,
 } from "./_lib/buckets";
 import { isListGateOpen } from "./_lib/list-gate";
+import { listEmptyKind, searchAwaitsArchive } from "./_lib/empty-state";
+import { startArchiveRetry, type ArchiveAttemptOutcome } from "./_lib/archive-retry";
+import { ListEmptyState as ListEmptyStatePanel } from "./ListEmptyState";
 import { buildTickerItems } from "./_lib/ticker";
 import {
   DEFAULT_OPEN_SECTIONS,
@@ -158,11 +160,45 @@ async function fetchBuckets(
 /** Le titre de la page : « BlueGenji » en accent (`<em>` du message). */
 const titleEm = (children: ReadonlyArray<ReactNode>) => <em className={s.titleEm}>{richNodes(children)}</em>;
 
+/** Délai de repos de la frappe avant de demander l'archive entière des terminés. */
+const ARCHIVE_DEBOUNCE_MS = 400;
+/**
+ * Fenêtre pendant laquelle un nouvel échec de l'archive ne se renotifie pas :
+ * basculer un filtre pendant une panne ne doit pas empiler des notifications
+ * identiques. Remise à zéro par une archive reçue.
+ */
+const ARCHIVE_TOAST_QUIET_MS = 60_000;
+
+/** Le panneau ne se redessine que si ses propres propriétés changent. */
+const ListEmptyState = memo(ListEmptyStatePanel);
+
+/**
+ * Note l'échec de l'archive des terminés quand elle est encore attendue **et
+ * pas déjà en main** (une archive reçue ne change plus le sens d'un « Aucun
+ * résultat » : un incident de relecture de fond n'a rien à annoncer) ; vrai
+ * quand l'échec est à annoncer — une fois par série, la série courant jusqu'à
+ * une archive reçue ou `ARCHIVE_TOAST_QUIET_MS` sans annonce.
+ */
+function noteArchiveFailure(
+  lastToastAt: { current: number | null },
+  archiveStillWanted: boolean,
+  archiveHeld: boolean,
+  setFailed: (failed: boolean) => void,
+  now: number,
+): boolean {
+  if (!archiveStillWanted || archiveHeld) return false;
+  setFailed(true);
+  if (lastToastAt.current !== null && now - lastToastAt.current < ARCHIVE_TOAST_QUIET_MS) return false;
+  lastToastAt.current = now;
+  return true;
+}
+
 export default function TournamentsList({ canManage }: Readonly<{ canManage: boolean }>) {
   const text = useTournamentsText();
   const { t } = text;
   const { showError } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const allGamesChipRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
@@ -217,44 +253,101 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // de ce besoin, les relectures de fond reprennent la liste courte : elles ne
   // retéléchargent plus sans fin une archive qui grossit. Le filtre effacé
   // coûte une relecture de la liste courte, mutualisée côté serveur.
-  const wantFinishedArchive = listFetched && needsFinishedArchive(deferredQuery, gameFilter, finishedExpanded);
+  // La frappe est mise au repos avant de réclamer l'archive : une lettre tapée
+  // puis effacée ne coûtait sinon deux requêtes (aller, abandon, retour).
+  // Seul compte qu'une recherche soit tapée et au repos : son texte ne part
+  // jamais au serveur (l'archive se demande entière, la recherche reste locale).
+  const hasQuery = deferredQuery.trim() !== "";
+  const [searchSettled, setSearchSettled] = useState(false);
+  useEffect(() => {
+    if (!hasQuery) {
+      setSearchSettled(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setSearchSettled(true), ARCHIVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [hasQuery]);
+  const archiveSearch = hasQuery && searchSettled;
+  const wantFinishedArchive =
+    listFetched && needsFinishedArchive(archiveSearch ? deferredQuery : "", gameFilter, finishedExpanded);
+  // Le besoin exprimé, avant le repos : l'attente se dit dès la frappe, pas
+  // après le délai (sinon « Aucun résultat » clignoterait en attendant).
+  const archiveIntent = listFetched && needsFinishedArchive(deferredQuery, gameFilter, finishedExpanded);
   // Lu **après** la réponse : une relecture de fond partie avant la demande
   // d'archive rapporterait la liste tronquée, et l'appliquer effacerait
   // l'archive arrivée entre-temps.
   const wantFinishedArchiveRef = useRef(wantFinishedArchive);
   wantFinishedArchiveRef.current = wantFinishedArchive;
+  // Dernière lecture de l'archive en échec : la page cesse de l'attendre
+  // (« Chargement… » resterait sinon affiché jusqu'à la relecture suivante).
+  // Le besoin retombé, l'échec est oublié — état ajusté pendant le rendu.
+  const [archiveFailed, setArchiveFailed] = useState(false);
+  const archiveLastToastRef = useRef<number | null>(null);
+  // L'archive entière est en main : ses relectures de fond n'annoncent rien.
+  const archiveHeldRef = useRef(false);
+  if (archiveFailed && !wantFinishedArchive) setArchiveFailed(false);
+  // Le besoin retombé, l'archive en main est oubliée (la série d'échecs, elle,
+  // court jusqu'à une archive reçue : basculer un filtre pendant une panne ne
+  // renotifie pas).
+  useEffect(() => {
+    if (wantFinishedArchive) return;
+    archiveHeldRef.current = false;
+  }, [wantFinishedArchive]);
 
   // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
   // notifications pour un incident réseau passager. Seul le premier chargement,
-  // celui que l'utilisateur attend, signale son échec.
+  // celui que l'utilisateur attend, signale son échec. L'issue rendue pilote
+  // la relecture de l'archive (`startArchiveRetry`).
   const load = useCallback(
-    async (silent = false, signal?: AbortSignal) => {
+    async (silent = false, signal?: AbortSignal): Promise<ArchiveAttemptOutcome> => {
       try {
         const all = await fetchBuckets(
           wantFinishedArchive ? "/api/tournaments?finished=all" : "/api/tournaments",
           signal,
         );
-        if (wantFinishedArchive !== wantFinishedArchiveRef.current) return;
+        if (wantFinishedArchive !== wantFinishedArchiveRef.current) return "stop";
         // On garde la référence précédente quand rien n'a changé : sinon chaque
         // relecture de fond redessinerait toute la liste et réarmerait le
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
         setListFetched(true);
+        if (wantFinishedArchive) {
+          setArchiveFailed(false);
+          archiveLastToastRef.current = null;
+          archiveHeldRef.current = true;
+        }
+        return "ok";
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
-        if (signal?.aborted) return;
+        if (signal?.aborted) return "stop";
         // Session partie : « réessaie » ne mènerait nulle part, le serveur rend
-        // la carte de connexion.
+        // la carte de connexion (et la relecture de l'archive s'arrête là).
         if ((e as Error).message === "UNAUTHORIZED") {
           router.refresh();
-          return;
+          return "stop";
         }
-        if (silent) return;
+        // Silencieuse ou non, une archive manquée n'est plus attendue.
+        // Une archive manquée change le sens d'un « Aucun résultat » : on le dit
+        // une fois par série d'échecs, même sur une relecture de fond.
+        // Lecture de l'archive, silencieuse ou non : l'annonce suit la série
+        // (`noteArchiveFailure`), pas chaque tentative.
+        if (wantFinishedArchive) {
+          const announceArchive = noteArchiveFailure(
+            archiveLastToastRef,
+            wantFinishedArchiveRef.current,
+            archiveHeldRef.current,
+            setArchiveFailed,
+            Date.now(),
+          );
+          if (announceArchive) showError(t("list.loadFailed"));
+          return "failed";
+        }
         // Une phrase traduite, jamais le code ni le message brut du navigateur
         // (« Failed to fetch » sur une page en français) : le lecteur n'en
         // ferait rien.
-        showError(t("list.loadFailed"));
+        if (!silent) showError(t("list.loadFailed"));
+        return "failed";
       }
     },
     [router, showError, t, wantFinishedArchive],
@@ -265,6 +358,18 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     void load(false, controller.signal);
     return () => controller.abort();
   }, [load]);
+
+  // Archive en échec et toujours attendue : une nouvelle tentative discrète
+  // (sans notification) tant que la recherche attend — sinon la page restait
+  // sur son « Aucun résultat » partiel jusqu'à la relecture de fond suivante
+  // (cinq minutes pour un spectateur). Une réussite lève archiveFailed.
+  // Bornée, espacée, une tentative à la fois, suspendue onglet caché
+  // (`startArchiveRetry`). Un jeu choisi ou la section dépliée seuls
+  // n'attendent rien à l'écran : la relecture de fond suffit.
+  useEffect(() => {
+    if (!archiveFailed || !wantFinishedArchive || !archiveSearch) return;
+    return startArchiveRetry((signal) => load(true, signal));
+  }, [archiveFailed, wantFinishedArchive, archiveSearch, load]);
 
   // Les tournois du lecteur arrivent par une lecture à part : la liste publique
   // est la même pour tous (et mutualisée côté serveur), elle ne peut pas savoir
@@ -396,7 +501,21 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // puis tout sautait deux fois à l'arrivée de la seconde lecture.
   const viewBuckets = listLoaded ? buckets : emptyBuckets;
   const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;
-  const scheduledBuckets = useScheduledBuckets(viewBuckets);
+  // Les invisibles suivent la même horloge (et le même minuteur) pour l'état
+  // vide : un invisible dont les inscriptions ferment page ouverte ne compte
+  // plus comme « à venir ». Leur section garde l'ordre et les cartes servis
+  // (seul l'état est relu).
+  const hiddenAsBuckets = useMemo<TournamentBuckets>(
+    () => ({ upcoming: viewHidden, registration: NO_TOURNAMENTS, running: NO_TOURNAMENTS, finished: NO_TOURNAMENTS }),
+    [viewHidden],
+  );
+  const [scheduledBuckets, scheduledHidden] = useScheduledBucketsPair(viewBuckets, hiddenAsBuckets);
+  // Les invisibles gardent l'ordre servi, avec l'état reclassé : leur section
+  // et l'état vide disent la même chose.
+  const scheduledViewHidden = useMemo(() => {
+    const byId = new Map(flattenBuckets(scheduledHidden).map((card) => [card.id, card] as const));
+    return viewHidden.map((card) => byId.get(card.id) ?? card);
+  }, [scheduledHidden, viewHidden]);
 
   // La recherche (le passage coûteux : nom, description, format sur chaque
   // tournoi) n'est faite qu'une fois par valeur de recherche différée et par
@@ -412,8 +531,8 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     [scheduledBuckets, deferredQuery, formatName],
   );
   const queryFilteredHidden = useMemo(
-    () => filterTournamentsByQuery(viewHidden, deferredQuery, formatName),
-    [viewHidden, deferredQuery, formatName],
+    () => filterTournamentsByQuery(scheduledViewHidden, deferredQuery, formatName),
+    [scheduledViewHidden, deferredQuery, formatName],
   );
 
   const gameFilteredBuckets = useMemo<TournamentBuckets>(
@@ -461,10 +580,20 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
   const finishedBeyond = (key: GameFilter) => (deferredQuery.trim() ? 0 : finishedBeyondList(viewBuckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
-  // Section dépliée, archive demandée mais pas encore reçue : la liste en main
-  // est encore la liste tronquée.
-  const finishedArchiveLoading =
-    finishedExpanded && wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
+  // Archive demandée mais pas encore reçue (ni en échec) : la liste en main est
+  // encore la liste tronquée.
+  const listTruncated = viewBuckets.finishedTotals !== undefined;
+  const finishedArchivePending = wantFinishedArchive && listTruncated && !archiveFailed;
+  // Section dépliée : l'attente se dit sous ses cartes.
+  const finishedArchiveLoading = finishedExpanded && finishedArchivePending;
+  // Une recherche peut viser un terminé que la liste courte ne porte pas : son
+  // résultat (compte annoncé, « Aucun résultat ») attend l'archive.
+  const searchPending = searchAwaitsArchive({
+    archiveWanted: archiveIntent,
+    listTruncated,
+    archiveFailed,
+    query: deferredQuery,
+  });
 
   const showHidden = isAdmin && viewHidden.length > 0;
   const gestureMadeRef = useRef(false);
@@ -479,6 +608,9 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     } else {
       gestureMadeRef.current = true;
     }
+    // Compte encore partiel (l'archive peut en apporter) : seul le compte final
+    // s'annonce, ni un « 0 » ni un « 2 » qui deviendra « 7 ».
+    if (searchPending) return t("list.finishedLoading");
     const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
     return t("list.resultsCount", { count: String(shown) });
   })();
@@ -512,6 +644,44 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   const ix = (key: PageSectionKey) =>
     String(shownSections.findIndex((entry) => entry.key === key) + 1).padStart(2, "0");
   const isOpen = (key: PageSectionKey) => openSections.has(key);
+  // Rien à montrer, ou rien à rejoindre : un panneau qui le dit et propose une
+  // suite, au lieu d'un grand vide noir (`TOURNOIS_LIST_EMPTY_LOOK.md`). Les
+  // inscriptions et annonces comptent « Mes tournois » compris (avant découpage)
+  // et, pour le staff, les invisibles à venir de la section qui les montre.
+  const hiddenUpcoming = useMemo(
+    () =>
+      showHidden
+        ? filteredHidden.filter((card) => card.state === "UPCOMING" || card.state === "REGISTRATION").length
+        : 0,
+    [showHidden, filteredHidden],
+  );
+  const emptyKind = listEmptyKind({
+    loaded: listLoaded,
+    shownSections: shownSections.length,
+    upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length + hiddenUpcoming,
+    query: deferredQuery,
+    gameFilter,
+    archivePending: searchPending,
+  });
+  // Le panneau disparaît avec le filtre : le focus va au contrôle effacé — le
+  // champ de recherche s'il portait un texte (sinon, sur un téléphone, le
+  // clavier s'ouvrirait sans raison), la pastille « Tous » sinon.
+  const queryHasText = query.trim() !== "";
+  const clearFilters = useCallback(() => {
+    setQuery("");
+    setGameFilter("all");
+    (queryHasText ? searchInputRef.current : allGamesChipRef.current)?.focus();
+  }, [queryHasText]);
+  // « Afficher tous les jeux » ne touche qu'au jeu : un texte en cours de
+  // frappe reste, le focus va à la pastille « Tous ».
+  const showFinishedSection = useCallback(
+    () => setOpenSections((prev) => (prev.has("finished") ? prev : new Set(prev).add("finished"))),
+    [],
+  );
+  const clearGame = useCallback(() => {
+    setGameFilter("all");
+    allGamesChipRef.current?.focus();
+  }, []);
 
   // Une ancre du sommaire reste dans l'URL : au rechargement (ou sur un lien
   // partagé), la section visée n'existe pas encore — elle naît avec la liste —
@@ -560,10 +730,11 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     list.slice(0, expandedSections.has(key) ? list.length : SECTION_DISPLAY_LIMIT);
 
   return (
-    <div className={`${s.page} page-wide`}>
+    <div className={`${s.page} page-wide hairline-fade`}>
       <RulesHelpFab />
       <BgCanvas mode="network" />
-      <div className={s.fabric} />
+      <div className={`${s.fabric} fabric-fade`} />
+      <div className={`${s.fabricBottom} fabric-fade`} />
       <div className={s.pageInner}>
         <div className="container">
           <header className={s.pageHead}>
@@ -618,6 +789,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                   return (
                     <button
                       key={key}
+                      ref={key === "all" ? allGamesChipRef : undefined}
                       className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
                       aria-pressed={gameFilter === key}
                       aria-label={listLoaded ? t("list.countLabel", { label, count: String(count) }) : undefined}
@@ -702,13 +874,15 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           <div className={s.sections} data-loading={listLoaded ? undefined : "true"}>
             {!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}
 
-            {listLoaded && shownSections.length === 0 && (
-              <div className={s.emptyAll}>
-                <div className={s.emptyTitle}>{t("list.emptyTitle")}</div>
-                <div className={s.emptyMsg}>
-                  {sectionEmptyMessage(t("list.emptyUnfiltered"), deferredQuery, gameFilter, t("list.emptyFiltered"))}
-                </div>
-              </div>
+            {emptyKind === "empty" && <ListEmptyState kind="empty" canManage={isAdmin} />}
+            {emptyKind === "filtered" && (
+              <ListEmptyState kind="filtered" canManage={isAdmin} onClearFilters={clearFilters} />
+            )}
+            {/* Recherche sans résultat dans la liste courte : l'archive des
+                terminés peut encore en apporter — on attend avant de dire
+                « Aucun résultat ». */}
+            {emptyKind === "pending" && (
+              <div className={s.emptyPending}>{t("list.finishedLoading")}</div>
             )}
 
             {showHidden && totalHidden > 0 && (
@@ -818,6 +992,18 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                   onToggle={() => toggleSection("upcoming")}
                 />
               </Section>
+            )}
+
+            {/* À la place des sections « Inscriptions » et « Prochainement »
+                absentes : la page ne s'arrête plus sur une carte unique. */}
+            {emptyKind === "nothingUpcoming" && (
+              <ListEmptyState
+                kind="nothingUpcoming"
+                canManage={isAdmin}
+                finishedCount={totalFinished}
+                onShowFinished={showFinishedSection}
+                onClearGame={gameFilter === "all" ? undefined : clearGame}
+              />
             )}
 
             {totalFinished > 0 && (

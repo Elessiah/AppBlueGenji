@@ -2,7 +2,6 @@
 .page {
   position: relative;
   padding: 56px 0 40px;
-  border-bottom: 1px solid var(--line-soft);
   overflow: hidden;
 }
 .pageInner {

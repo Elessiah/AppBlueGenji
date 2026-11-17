@@ -182,7 +182,7 @@ describe("page — rendu anglais", () => {
     expect(text).toContain("PLATFORM · TOURNAMENTS");
     // Premier rendu, liste pas encore lue : le squelette, jamais l'état vide.
     expect(text).toContain("Loading tournaments…");
-    expect(text).not.toContain("No tournament published yet.");
+    expect(text).not.toContain("No tournaments right now");
     expect(text).not.toContain("No tournament news right now");
     expect(html).toContain('role="marquee"');
     expect(html).toContain('aria-label="Page sections"');
@@ -196,7 +196,7 @@ describe("page — rendu anglais", () => {
     expect(html).toContain("PLATEFORME · TOURNOIS");
     expect(html).toContain('placeholder="Rechercher un tournoi, un format…"');
     expect(html).toContain("Chargement des tournois…");
-    expect(html).not.toContain("Aucun tournoi publié pour le moment.");
+    expect(html).not.toContain("Aucun tournoi pour le moment");
     expect(html).toContain('aria-label="Règles des tournois"');
     expect(html).toMatch(/Tournois <em[^>]*>BlueGenji<\/em>/);
   });

@@ -46,8 +46,10 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
-    expect(page).toContain('sectionEmptyMessage(t("list.emptyUnfiltered"), deferredQuery, gameFilter, t("list.emptyFiltered"))');
-    expect(frTournaments.list.emptyUnfiltered).toBe("Aucun tournoi publié pour le moment.");
+    // `listEmptyKind` (tests/tournois/list-empty-look.test.tsx) tranche entre les deux.
+    expect(page).toContain('{emptyKind === "empty" && <ListEmptyState kind="empty" canManage={isAdmin} />}');
+    expect(page).toContain('<ListEmptyState kind="filtered" canManage={isAdmin} onClearFilters={clearFilters} />');
+    expect(frTournaments.list.emptyState.emptyMsg).not.toBe(frTournaments.list.emptyState.filteredMsg);
   });
 
   it("avant la première liste : un squelette, ni état vide, ni compteurs à zéro, ni bandeau « Aucune actualité », sans saut de mise en page", () => {
@@ -59,13 +61,14 @@ describe("page tournois — barre de recherche et filtres", () => {
     // squelette, même quand la liste arrive avant « Mes tournois ».
     expect(page).toContain("const viewBuckets = listLoaded ? buckets : emptyBuckets;");
     expect(page).toContain("const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;");
-    expect(page).toContain("useScheduledBuckets(viewBuckets)");
+    expect(page).toContain("useScheduledBucketsPair(viewBuckets, hiddenAsBuckets)");
     expect(page).toContain("finishedBeyondList(viewBuckets, key)");
     expect(page).toContain("isAdmin && viewHidden.length > 0");
     expect(page.match(/\bhiddenTournaments\b/g)).toHaveLength(2);
     expect(page).toMatch(/fetchMyTournamentIds[\s\S]*?\} catch \{[\s\S]*?\}\s*if \(!signal\?\.aborted\) setMineSettled\(true\);/);
     expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}');
-    expect(page).toContain("{listLoaded && shownSections.length === 0 && (");
+    // L’état vide attend la première liste (`listEmptyKind` rend `null` avant).
+    expect(page).toContain("loaded: listLoaded,");
     // Sommaire, pastilles et bandeau gardent leur place (pas de saut de mise
     // en page à l'arrivée de la liste) : entrées sans compte, bandeau vide.
     expect(page).toMatch(/<nav className=\{s\.sectionNav\}[^>]*>\s*\{sections\.map\(\(entry\) => \{[\s\S]*?if \(!listLoaded\) \{[\s\S]*?\{COUNT_PENDING\}/);

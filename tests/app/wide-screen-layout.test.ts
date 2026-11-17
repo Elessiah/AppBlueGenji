@@ -53,7 +53,7 @@ describe("annuaires sur grand écran", () => {
   });
 
   it("marque la liste des tournois et l'annuaire des équipes", () => {
-    expect(TOURNAMENTS).toContain("className={`${s.page} page-wide`}");
+    expect(TOURNAMENTS).toContain("className={`${s.page} page-wide hairline-fade`}");
     expect(TEAMS).toContain('className="page-wide"');
   });
 
