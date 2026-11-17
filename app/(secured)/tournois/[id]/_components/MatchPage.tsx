@@ -45,7 +45,12 @@ import {
   versusText,
   type TournamentPageText,
 } from "@/lib/shared/tournament-page-text";
-import { buildShareRounds, shareRoundText } from "@/lib/shared/share-round";
+import {
+  buildShareRounds,
+  matchesOfRoundShapeKey,
+  phaseRoundShapeKey,
+  shareRoundText,
+} from "@/lib/shared/share-round";
 import { visibleText } from "@/lib/shared/visible-text";
 import { shownTiebreakMap } from "@/lib/shared/match-maps";
 import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapName } from "@/lib/shared/round-maps";
@@ -269,12 +274,18 @@ function MatchHeader({
   const phaseName = detail.phases?.find((item) => item.id === match.phaseId)?.name ?? null;
   // Le nom du tour que l'arbre lui donne (« Quart de finale 2 »), comme son aperçu partagé.
   // Seuls les matchs de sa phase le nomment (un tableau = une phase et un
-  // `bracket`) : chaque poussée du flux ne relit pas tout le tournoi.
+  // `bracket`), réduits à une clé de ce qui les nomme : chaque poussée du flux
+  // apporte de nouveaux objets, mais le nom ne se recalcule que si la forme des
+  // tours a changé (`phaseRoundShapeKey`).
+  const shapeKey = phaseRoundShapeKey(detail.matches, match.phaseId);
+  const { format, state } = detail.card;
+  const phaseFormat = detail.phases?.find((item) => item.id === match.phaseId)?.format ?? null;
+  const { id: matchId, phaseId, roundNumber, matchNumber } = match;
   const roundName = useMemo(() => {
-    const phaseMatches = detail.matches.filter((item) => item.phaseId === match.phaseId);
-    const rounds = buildShareRounds({ card: detail.card, phases: detail.phases, matches: phaseMatches });
-    return shareRoundText(text, rounds.get(match.id) ?? null, match);
-  }, [detail.card, detail.phases, detail.matches, match, text]);
+    const phases = phaseFormat === null ? null : [{ id: phaseId, format: phaseFormat }];
+    const rounds = buildShareRounds({ card: { format, state }, phases, matches: matchesOfRoundShapeKey(shapeKey) });
+    return shareRoundText(text, rounds.get(matchId) ?? null, { roundNumber, matchNumber });
+  }, [shapeKey, format, state, phaseFormat, phaseId, matchId, roundNumber, matchNumber, text]);
   const startAt = formatMatchStartAtFull(match.startAt, locale);
   const winner = sides.find((side) => side.teamId !== null && side.teamId === match.winnerTeamId) ?? null;
   // Même alerte que le bandeau d'horaire de la carte : un match casté à son

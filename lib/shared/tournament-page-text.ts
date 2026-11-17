@@ -30,7 +30,7 @@ import { toParticipantType, type ParticipantType } from "@/lib/shared/participan
 import type { Messages } from "@/lib/shared/i18n-messages";
 import { parseBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 import type { BracketType } from "@/lib/shared/types";
-import { isEndurancePlayoffRound } from "@/lib/shared/bg-survie/rounds";
+import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 type FrTournament = typeof frTournament;
 
@@ -110,13 +110,15 @@ export function participantText(
 
 /**
  * Tour d'un match qu'on ne sait pas nommer d'après son tableau : « Manche n »,
- * ou « Phase finale » dans l'arbre final de BlueGenji Survie, dont le numéro
- * brut du moteur (1000 et plus) ne doit jamais s'afficher.
+ * ou « Phase finale · Manche k » dans l'arbre final de BlueGenji Survie
+ * (k : rang du tour dans l'arbre, 1 = le premier), dont le numéro brut du
+ * moteur (1000 et plus) ne doit jamais s'afficher — le rang garde distincts
+ * deux matchs de tours différents.
  */
 export function fallbackRoundLabel(text: TournamentPageText, roundNumber: number): string {
-  return isEndurancePlayoffRound(roundNumber)
-    ? text.t("bracket.finalPhase")
-    : text.t("bracket.roundN", { number: String(roundNumber) });
+  if (!isEndurancePlayoffRound(roundNumber)) return text.t("bracket.roundN", { number: String(roundNumber) });
+  const rank = roundNumber - PLAYOFF_ROUND_OFFSET + 1;
+  return `${text.t("bracket.finalPhase")} · ${text.t("bracket.roundN", { number: String(rank) })}`;
 }
 
 /**

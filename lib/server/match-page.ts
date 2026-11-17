@@ -18,9 +18,10 @@ import {
   matchEmbedAlt,
   matchEmbedDescription,
   matchEmbedTitle,
+  matchPageTitle,
 } from "@/lib/shared/share-embed-cards";
 import { matchShareCardKey, matchShareVersion } from "@/lib/shared/share-embeds";
-import { truncateForShare } from "@/lib/shared/share-metadata";
+import { cutToWidth, displayWidth } from "@/lib/shared/graphemes";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
 import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
@@ -96,9 +97,10 @@ function prefixedTitle(title: Metadata["title"], prefix: string, budget?: number
   else if (title && typeof title === "object" && "absolute" in title) base = title.absolute;
   if (!base) return prefix;
   if (budget === undefined) return `${prefix} — ${base}`;
-  // Seul le nom du tournoi cède au budget, jamais le tour ; plus de place : tour seul.
-  const room = budget - Array.from(`${prefix} — `).length;
-  return room >= MIN_TOURNAMENT_ROOM ? `${prefix} — ${truncateForShare(base, room)}` : prefix;
+  // Seul le nom du tournoi cède au budget (en colonnes, comme le titre d'un
+  // match : un idéogramme en vaut deux), jamais le tour ; plus de place : tour seul.
+  const room = budget - displayWidth(`${prefix} — `);
+  return room >= MIN_TOURNAMENT_ROOM ? `${prefix} — ${cutToWidth(base, room)}` : prefix;
 }
 
 /**
@@ -179,7 +181,7 @@ export async function matchPageMetadata(
   // L'encart : court, sans nom de site ni de tournoi (`og:site_name`, l'image et
   // la description les portent) — Discord le coupait. L'onglet garde le tournoi.
   const shareTitle = matchEmbedTitle(match, roundName, messages, locale, now);
-  const title = prefixedTitle(metadata.title, shareTitle);
+  const title = prefixedTitle(metadata.title, matchPageTitle(match, roundName, messages, locale, now));
   const description = matchEmbedDescription(match, messages, locale, now) ?? metadata.description ?? undefined;
   const image = embedImageMetadata(
     matchShareCardKey(tournamentId as number, matchId as number),

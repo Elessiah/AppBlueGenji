@@ -12,10 +12,12 @@ import {
   matchEmbedDescription,
   EMBED_MATCH_TITLE_BUDGET,
   matchEmbedTitle,
+  matchPageTitle,
   tournamentEmbedAlt,
   tournamentEmbedCard,
 } from "@/lib/shared/share-embed-cards";
 import type { MatchShareSummary, ShareEntrantSide, ShareMapRow } from "@/lib/shared/share-embeds";
+import { displayWidth } from "@/lib/shared/graphemes";
 import { tournamentCard } from "../../helpers/tournament-card";
 
 /**
@@ -472,9 +474,60 @@ describe("matchEmbedTitle — budget de l'encart", () => {
     expect(length(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
   });
 
-  it("matchEmbedTitle_hugeRound_namesKeepMinimum", () => {
+  it("matchEmbedTitle_hugeRound_dropsNames", () => {
     const round = "x".repeat(EMBED_MATCH_TITLE_BUDGET);
     const title = matchEmbedTitle(summary({ team1: LONG_1, team2: LONG_2 }), round, EN, "en");
-    expect(title).toBe(`Les… 2–1 Sl… · ${round}`);
+    expect(title).toBe(round);
+  });
+
+  it("matchEmbedTitle_longLowerRoundScheduled_neverExceedsBudget", () => {
+    const match = summary({
+      team1: LONG_1,
+      team2: LONG_2,
+      score: null,
+      winnerSide: null,
+      status: "READY",
+      startAt: "2026-11-17T20:00:00.000Z",
+    });
+    const title = matchEmbedTitle(match, "Tableau perdants · Demi-finale 2", FR, "fr", Date.parse("2026-11-17T10:00:00.000Z"));
+    expect(title.endsWith(" · Tableau perdants · Demi-finale 2 · mar. 17 nov. 21:00")).toBe(true);
+    expect(displayWidth(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_inProgressScore_usesVersus", () => {
+    const match = summary({ status: "READY", winnerSide: null, score: { team1: 1, team2: 0 } });
+    expect(matchEmbedTitle(match, "Finale", FR, "fr")).toBe("Alpha contre Bravo · Finale");
+  });
+
+  it("matchEmbedTitle_awaitingConfirmation_usesVersus", () => {
+    const match = summary({ status: "AWAITING_CONFIRMATION", winnerSide: null });
+    expect(matchEmbedTitle(match, "Final", EN, "en")).toBe("Alpha vs Bravo · Final");
+  });
+
+  it("matchEmbedTitle_cjkNames_widthWithinBudget", () => {
+    const cjk1: ShareEntrantSide = { teamId: 1, name: "東京".repeat(10), logoUrl: null, solo: false };
+    const cjk2: ShareEntrantSide = { teamId: 2, name: "大阪".repeat(10), logoUrl: null, solo: false };
+    const title = matchEmbedTitle(summary({ team1: cjk1, team2: cjk2 }), "Quart de finale 2", FR, "fr");
+    expect(title.endsWith(" · Quart de finale 2")).toBe(true);
+    expect(title).toContain(" 2–1 ");
+    expect(displayWidth(title)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
+  });
+
+  it("matchEmbedTitle_rtlName_isolatedAroundScore", () => {
+    const arabic: ShareEntrantSide = { teamId: 1, name: "النسور", logoUrl: null, solo: false };
+    const title = matchEmbedTitle(summary({ team1: arabic, score: { team1: 0, team2: 3 }, winnerSide: 2 }), "Final", EN, "en");
+    expect(title).toBe("\u2068النسور\u2069 0–3 Bravo · Final");
+  });
+
+  it("matchEmbedDescription_rtlName_isolated", () => {
+    const hebrew: ShareEntrantSide = { teamId: 2, name: "שלום", logoUrl: null, solo: false };
+    expect(matchEmbedDescription(summary({ team2: hebrew }), EN, "en")).toBe("Alpha 2 – 1 \u2068שלום\u2069");
+  });
+
+  it("matchPageTitle_longNames_notCutToShareBudgetNoScore", () => {
+    // Seule la borne de la carte (EMBED_TEAM_NAME_MAX_LENGTH) s'applique, pas le budget de Discord.
+    const title = matchPageTitle(summary({ team1: LONG_1, team2: LONG_2 }), "Quart de finale 2", FR, "fr");
+    expect(title).toBe("Les Chevaliers Extraordinaires… contre Sl solearis Academy Esport… · Quart de finale 2");
+    expect(Array.from(title).length).toBeGreaterThan(EMBED_MATCH_TITLE_BUDGET);
   });
 });

@@ -18,6 +18,7 @@
  * rédigé une fois, côté serveur, et le même texte est servi à tout le monde.
  * Faute de fuseau du lecteur, on prend celui du public visé — la France.
  */
+import { graphemesOf } from "./graphemes";
 import { FORMAT_LABELS, GAME_LABELS } from "./tournament-labels";
 import { participantWording } from "./participants";
 import type { TournamentCard, TournamentState } from "./types";
@@ -121,16 +122,22 @@ export function shareInitial(name: string): string {
  */
 export function truncateForShare(text: string, maxLength: number): string {
   const flattened = text.replace(/\s+/gu, " ").trim();
-  if (flattened.length <= maxLength) return flattened;
+  // Compté en **points de code** (la limite est celle d'un encart, pas des
+  // unités UTF-16 : un emoji en vaut deux), coupé **entre deux graphèmes** :
+  // `slice` tomberait au milieu d'un point de code, `Array.from` entre les deux
+  // moitiés d'un drapeau ou avant le signe combinant d'une lettre. Un texte qui
+  // tient n'est pas coupé.
+  if (Array.from(flattened).length <= maxLength) return flattened;
 
-  // −1 pour l'ellipse, qui compte dans la limite annoncée. La coupe se fait en
-  // **caractères** et non en unités UTF-16 : un nom de tournoi contient volontiers
-  // un emoji, et `slice` tomberait un jour au milieu de son point de code — la
-  // description finirait alors sur un demi-caractère (même précaution que
-  // `avatarInitial`).
-  const hardCut = Array.from(flattened)
-    .slice(0, Math.max(0, maxLength - 1))
-    .join("");
+  // −1 pour l'ellipse, qui compte dans la limite annoncée.
+  let hardCut = "";
+  let length = 0;
+  for (const grapheme of graphemesOf(flattened)) {
+    const size = Array.from(grapheme).length;
+    if (length + size > maxLength - 1) break;
+    hardCut += grapheme;
+    length += size;
+  }
   const lastSpace = hardCut.lastIndexOf(" ");
   // Un mot unique plus long que la limite n'a pas d'espace où se couper : on
   // tranche dedans plutôt que de rendre une ellipse seule.

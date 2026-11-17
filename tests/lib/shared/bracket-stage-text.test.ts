@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
-import { stageMatchLabel, stageRoundLabel } from "@/lib/shared/bracket-stage-text";
+import { AMBIGUOUS_MATCH_STAGES, isAmbiguousMatchStage, stageMatchLabel, stageRoundLabel } from "@/lib/shared/bracket-stage-text";
+import frTournament from "@/messages/fr/tournament.json";
 import { shareRoundPageText, shareRoundText } from "@/lib/shared/share-round";
 import { fallbackRoundLabel, matchPositionText } from "@/lib/shared/tournament-page-text";
 import {
@@ -49,14 +50,19 @@ describe("fallbackRoundLabel / matchPositionText", () => {
     expect(fallbackRoundLabel(FR, PLAYOFF_ROUND_OFFSET - 1)).toBe(`Manche ${PLAYOFF_ROUND_OFFSET - 1}`);
   });
 
-  it("fallbackRoundLabel_playoffOffset_returnsFinalPhase", () => {
-    expect(fallbackRoundLabel(FR, PLAYOFF_ROUND_OFFSET)).toBe("Phase finale");
-    expect(fallbackRoundLabel(EN, PLAYOFF_ROUND_OFFSET)).toBe("Final phase");
+  it("fallbackRoundLabel_playoffOffset_returnsFinalPhaseRoundOne", () => {
+    expect(fallbackRoundLabel(FR, PLAYOFF_ROUND_OFFSET)).toBe("Phase finale · Manche 1");
+    expect(fallbackRoundLabel(EN, PLAYOFF_ROUND_OFFSET)).toBe("Final phase · Round 1");
+  });
+
+  it("fallbackRoundLabel_twoPlayoffRounds_stayDistinct", () => {
+    expect(fallbackRoundLabel(FR, PLAYOFF_ROUND_OFFSET + 2)).toBe("Phase finale · Manche 3");
+    expect(fallbackRoundLabel(FR, PLAYOFF_ROUND_OFFSET)).not.toBe(fallbackRoundLabel(FR, PLAYOFF_ROUND_OFFSET + 2));
   });
 
   it("matchPositionText_playoffRound_neverShowsRawNumber", () => {
     const text = matchPositionText(FR, { bracket: "UPPER", roundNumber: PLAYOFF_ROUND_OFFSET + 1, matchNumber: 1 });
-    expect(text).toBe("Phase finale · Match 1");
+    expect(text).toBe("Phase finale · Manche 2 · Match 1");
   });
 
   it("matchPositionText_lowerBracket_keepsPrefix", () => {
@@ -68,7 +74,9 @@ describe("fallbackRoundLabel / matchPositionText", () => {
 
 describe("shareRoundText — repli", () => {
   it("shareRoundText_nullPlayoffRound_returnsFinalPhase", () => {
-    expect(shareRoundText(FR, null, { roundNumber: PLAYOFF_ROUND_OFFSET, matchNumber: 1 })).toBe("Phase finale · Match 1");
+    expect(shareRoundText(FR, null, { roundNumber: PLAYOFF_ROUND_OFFSET, matchNumber: 1 })).toBe(
+      "Phase finale · Manche 1 · Match 1",
+    );
   });
 });
 
@@ -76,5 +84,19 @@ describe("MatchShareCard — largeur du sous-titre", () => {
   it("matchShareCard_subtitleMaxWidth_leavesTitleMinimum", () => {
     const inner = SHARE_CARD_SIZE.width - SHARE_CARD_PADDING.left - SHARE_CARD_PADDING.right;
     expect(inner - MATCH_SUBTITLE_MAX_WIDTH - MATCH_SUBTITLE_GAP).toBeGreaterThanOrEqual(MATCH_TITLE_MIN_WIDTH);
+  });
+});
+
+describe("AMBIGUOUS_MATCH_STAGES", () => {
+  it("isAmbiguousMatchStage_matchLabelKeys_coveredByNumberedStages", () => {
+    // Toute clé `bracket.matchLabel` est un stade ambigu, ou une finale que seul l'arbre numérote.
+    const keys = Object.keys(frTournament.bracket.matchLabel).sort();
+    expect(keys).toEqual([...AMBIGUOUS_MATCH_STAGES, "final", "lowerFinal"].sort());
+  });
+
+  it("isAmbiguousMatchStage_finalOrEarly_false", () => {
+    expect(isAmbiguousMatchStage("final")).toBe(false);
+    expect(isAmbiguousMatchStage("early")).toBe(false);
+    expect(isAmbiguousMatchStage("quarters")).toBe(true);
   });
 });

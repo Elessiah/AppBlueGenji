@@ -1,7 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
-import { buildShareRounds, shareRoundPageText, shareRoundText, type ShareRound } from "@/lib/shared/share-round";
+import {
+  buildShareRounds,
+  matchesOfRoundShapeKey,
+  phaseRoundShapeKey,
+  shareRoundPageText,
+  shareRoundText,
+  type ShareRound,
+} from "@/lib/shared/share-round";
 import type { BracketMatch, BracketType, TournamentCard, TournamentPhase } from "@/lib/shared/types";
 import { bracketMatch } from "../../helpers/bracket-match";
 import { tournamentCard } from "../../helpers/tournament-card";
@@ -233,5 +240,32 @@ describe("shareRoundText — repli", () => {
 
   it("buildShareRounds_noMatches_isEmpty", () => {
     expect(buildShareRounds({ card: tournamentCard({ format: "SINGLE" }), phases: null, matches: [] }).size).toBe(0);
+  });
+});
+describe("phaseRoundShapeKey / matchesOfRoundShapeKey", () => {
+  const semi1 = bracketMatch({ id: 501, bracket: "UPPER", roundNumber: 1, matchNumber: 1, phaseId: 3 });
+  const semi2 = bracketMatch({ id: 502, bracket: "UPPER", roundNumber: 1, matchNumber: 2, phaseId: 3 });
+  const final = bracketMatch({ id: 503, bracket: "UPPER", roundNumber: 2, matchNumber: 1, phaseId: 3 });
+  const other = bracketMatch({ id: 504, bracket: "UPPER", roundNumber: 1, matchNumber: 1, phaseId: 4 });
+
+  it("phaseRoundShapeKey_sameShapeNewObjects_sameKey", () => {
+    const pushed = [semi1, semi2, final].map((item) => ({ ...item, updatedAt: "2026-11-17T12:00:00.000Z" }));
+    expect(phaseRoundShapeKey(pushed, 3)).toBe(phaseRoundShapeKey([semi1, semi2, final], 3));
+  });
+
+  it("phaseRoundShapeKey_statusChange_changesKey", () => {
+    const completed = { ...final, status: "COMPLETED" as const };
+    expect(phaseRoundShapeKey([semi1, semi2, completed], 3)).not.toBe(phaseRoundShapeKey([semi1, semi2, final], 3));
+  });
+
+  it("phaseRoundShapeKey_otherPhase_ignored", () => {
+    expect(phaseRoundShapeKey([semi1, semi2, final, other], 3)).toBe(phaseRoundShapeKey([semi1, semi2, final], 3));
+  });
+
+  it("matchesOfRoundShapeKey_roundTrip_sameRounds", () => {
+    const card = tournamentCard({ format: "SINGLE" });
+    const direct = buildShareRounds({ card, phases: null, matches: [semi1, semi2, final] });
+    const viaKey = buildShareRounds({ card, phases: null, matches: matchesOfRoundShapeKey(phaseRoundShapeKey([semi1, semi2, final], 3)) });
+    expect(viaKey).toEqual(direct);
   });
 });

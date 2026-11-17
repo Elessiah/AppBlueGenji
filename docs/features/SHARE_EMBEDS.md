@@ -78,15 +78,22 @@ de replay publics).
 Discord coupe d'une ellipse le titre d'un aperçu de lien qui dépasse une ligne (vers
 70 caractères) : « Choco Pops contre Sl solearis · Manche 1000 · Match 2 — BlueGen… ».
 `og:title` / `twitter:title` d'une page de match (`matchEmbedTitle`) sont donc compacts :
-- joué : « Choco Pops 0–3 Sl solearis · Quart de finale 2 » (score à la place de « contre ») ;
+- résultat validé (`COMPLETED`) : « Choco Pops 0–3 Sl solearis · Quart de finale 2 » (score à la place de « contre ») ;
 - à venir : « A contre B · Quart de finale 2 · mar. 17 nov. 21:00 » / « A vs B · … » ;
-- sinon (forfait, en saisie, sans horaire) : « A contre B · Finale » ;
+- sinon (forfait, score en saisie ou en attente de confirmation, sans horaire) : « A contre B · Finale » —
+  un score partiel ne s'y lit jamais comme un résultat ;
 - ni nom de site ni nom de tournoi (`og:site_name`, l'image et la description les portent) ;
-- budget `EMBED_MATCH_TITLE_BUDGET` = 70 caractères : seuls les **noms d'équipe** cèdent
-  (ellipse, le plus court gardé entier, 4 caractères au moins chacun) — jamais le tour,
-  le score ni l'horaire.
-L'onglet (`<title>`) garde « … — tournoi ». Repli sans résumé public : « Manche 2 · Match 3
-— tournoi », le nom du tournoi borné au même budget.
+- budget `EMBED_MATCH_TITLE_BUDGET` = 70 **colonnes** (`displayWidth`, `lib/shared/graphemes.ts` : un
+  idéogramme, un kana, un hangul ou un emoji en valent deux), **jamais dépassé** par les noms : seuls les
+  **noms d'équipe** cèdent (ellipse coupée entre deux graphèmes — ni drapeau ni emoji à teinte brisé ;
+  le plus court gardé entier, 4 colonnes au moins chacun quand la place le permet) ; quand le tour et
+  l'horaire ne laissent pas 3 colonnes par nom, les noms quittent le titre — jamais le tour, le score ni l'horaire ;
+- un nom contenant une lettre de droite à gauche (arabe, hébreu…) est isolé (FSI … PDI, `isolateDirection`) :
+  il ne retourne pas l'ordre du score voisin (de même dans la description).
+L'onglet (`<title>`, `matchPageTitle`) garde la forme longue « A contre B · Quart de finale 2 — tournoi »
+(noms entiers à la borne de la carte, jamais de score). Repli sans résumé public : « Manche 2 · Match 3
+— tournoi », le nom du tournoi borné au même budget en colonnes. `truncateForShare` compte en points de
+code et coupe entre deux graphèmes.
 
 ## Nom de la manche
 
@@ -110,12 +117,13 @@ de `tournament.json`, même `stageKey` — déplacé dans `lib/shared/bracket-st
   qualification de BlueGenji Survie) — « Round » en anglais. Le numéro du match n'est
   écrit que si le nom seul est ambigu (jamais pour une finale).
 - L'en-tête de la page du match (ligne de situation) porte le même nom
-  (`buildShareRounds` sur les seuls matchs de sa phase).
+  (`buildShareRounds` sur les seuls matchs de sa phase, recalculé seulement quand leur forme change : `phaseRoundShapeKey`).
 - Les mots d'un stade (« Quarts de finale », « Demi-finale 2 », « Manche 2 ») sont rédigés
   une seule fois, pour l'arbre (`BracketTree`) et pour ce nom : `lib/shared/bracket-stage-text.ts`.
+  Les stades où un match porte son numéro (« Quart de finale 2 ») y sont listés une fois (`AMBIGUOUS_MATCH_STAGES`).
   « Petite finale » en minuscule partout (`bracket.stage.thirdPlace`, comme le plateau d'Endurance).
 - Match absent du résumé (encart de repli) : « Manche n · Match m » (`fallbackRoundLabel`),
-  « Phase finale · Match m » dans l'arbre final de BlueGenji Survie (jamais « Manche 1001 »). Ce repli ne sert
+  « Phase finale · Manche k · Match m » dans l'arbre final de BlueGenji Survie (k : rang du tour, jamais « Manche 1001 » ; deux tours restent distincts). Ce repli ne sert
   que quand la réponse publique n'est pas lue (tournoi non publié, lecture en échec ou
   refusée par le plafond) : nommer le tour demande tous les matchs du tournoi, soit
   précisément la lecture qui manque — la refaire à part contournerait le plafond.

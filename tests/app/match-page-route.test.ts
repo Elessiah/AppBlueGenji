@@ -37,6 +37,7 @@ import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentSnapshot } from "../helpers/tournament-detail";
 import { isMigratedRoute } from "@/lib/shared/locales";
 import { EMBED_MATCH_TITLE_BUDGET } from "@/lib/shared/share-embed-cards";
+import { displayWidth } from "@/lib/shared/graphemes";
 import type { MatchShareSummary } from "@/lib/shared/share-embeds";
 
 const connection = connectionMock();
@@ -274,7 +275,10 @@ describe("encart du lien partagé", () => {
     expect((meta.openGraph as { title?: string }).title).toBe(shareTitle);
     expect((meta.twitter as { title?: string }).title).toBe(shareTitle);
     expect((meta.openGraph as { siteName?: string }).siteName).toBe("BlueGenji Esport");
-    expect(meta.title).toEqual({ absolute: expect.stringMatching(/^Choco Pops 0–3 Sl solearis · Quart de finale 3 — BlueGenji Survie/u) });
+    // L'onglet garde la forme d'avant : noms entiers, « contre », jamais de score.
+    expect(meta.title).toEqual({
+      absolute: expect.stringMatching(/^Choco Pops contre Sl solearis · Quart de finale 3 — BlueGenji Survie/u),
+    });
   });
 
   it("matchPageMetadata_fallbackLongTournament_shareTitleWithinBudget", async () => {
@@ -288,6 +292,17 @@ describe("encart du lien partagé", () => {
     expect(shareTitle.endsWith("…")).toBe(true);
     expect(Array.from(shareTitle).length).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
     expect(meta.title).toEqual({ absolute: expect.stringContaining("édition spéciale de fin d'année") });
+  });
+
+  it("matchPageMetadata_fallbackCjkTournament_shareTitleWidthWithinBudget", async () => {
+    const cjk = "東京".repeat(30);
+    card.mockResolvedValue(tournamentCard({ id: 12, name: cjk }));
+
+    const meta = await matchPageMetadata("12", "34", false, async () => ({ canManage: false }), undefined, async () => null);
+
+    const shareTitle = String((meta.openGraph as { title?: string }).title);
+    expect(shareTitle.startsWith("Manche 2 · Match 3 — 東")).toBe(true);
+    expect(displayWidth(shareTitle)).toBeLessThanOrEqual(EMBED_MATCH_TITLE_BUDGET);
   });
 
   it("tournoi invisible, droits refusés ou identifiant de match invalide : l'encart du site", async () => {

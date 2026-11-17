@@ -7,8 +7,27 @@
 import type { StageKey } from "./bracket-stage";
 import type { TournamentPageText } from "./tournament-page-text";
 
-/** Stades dont un match se nomme avec son numéro (`bracket.matchLabel`). */
-export type NumberedMatchStage = "final" | "lowerFinal" | "semis" | "quarters" | "roundOf16";
+/**
+ * Stades à plusieurs matchs, où le nom seul est ambigu : un match s'y nomme
+ * toujours avec son numéro (« Quart de finale 2 »), sur l'arbre comme dans un
+ * aperçu partagé.
+ */
+export const AMBIGUOUS_MATCH_STAGES = ["semis", "quarters", "roundOf16"] as const satisfies readonly StageKey[];
+
+/** Stade à plusieurs matchs ({@link AMBIGUOUS_MATCH_STAGES}). */
+export type AmbiguousMatchStage = (typeof AMBIGUOUS_MATCH_STAGES)[number];
+
+/** `stage` est-il un stade à plusieurs matchs ({@link AMBIGUOUS_MATCH_STAGES}) ? */
+export function isAmbiguousMatchStage(stage: StageKey): stage is AmbiguousMatchStage {
+  return (AMBIGUOUS_MATCH_STAGES as readonly StageKey[]).includes(stage);
+}
+
+/**
+ * Stades dont un match se nomme avec son numéro (`bracket.matchLabel`) : les
+ * stades ambigus, plus les finales que l'arbre numérote aussi (« Finale 1 ») —
+ * un aperçu partagé, lui, ne numérote pas une finale (un seul match).
+ */
+export type NumberedMatchStage = AmbiguousMatchStage | "final" | "lowerFinal";
 
 /**
  * En-tête d'une colonne : « Quarts de finale », « Grande Finale », ou

@@ -25,6 +25,7 @@ import { matchScheduledAt, type MatchShareSummary, type ShareEntrantSide, type S
 import { localizedTournamentLabel } from "./tournament-labels";
 import type { MatchStatus, TournamentCard } from "./types";
 import { visibleText } from "./visible-text";
+import { cutToWidth, displayWidth, isolateDirection } from "./graphemes";
 
 /** Les textes que lisent les cartes. */
 export type ShareEmbedMessages = Pick<Messages, "share" | "labels">;
@@ -332,50 +333,59 @@ export function tournamentEmbedAlt(card: TournamentCard, messages: ShareEmbedMes
 }
 
 /**
- * Budget du titre d'un encart de match, en caractères : Discord coupe le titre
- * d'un aperçu de lien d'une ellipse sur une ligne (vers 70 caractères à la
- * largeur d'un message) ; au-delà, le nom du tour, le score ou l'horaire
- * disparaissaient (« … · Manche 1000 · Match 2 — BlueGen… »).
+ * Budget du titre d'un encart de match, en colonnes ({@link displayWidth} : un
+ * idéogramme ou un emoji en vaut deux) : Discord coupe le titre d'un aperçu de
+ * lien d'une ellipse sur une ligne (vers 70 caractères latins à la largeur d'un
+ * message) ; au-delà, le nom du tour, le score ou l'horaire disparaissaient
+ * (« … · Manche 1000 · Match 2 — BlueGen… »).
  */
 export const EMBED_MATCH_TITLE_BUDGET = 70;
-/** Ce qu'un nom d'équipe garde au moins dans le titre (ellipse comprise). */
+/** Ce qu'un nom d'équipe garde au moins dans le titre (ellipse comprise), place permettant. */
 export const EMBED_TITLE_TEAM_MIN_LENGTH = 4;
-
-/** `name` borné à `max` caractères (points de code), ellipse comprise. */
-function cutName(name: string, max: number): string {
-  const chars = Array.from(name);
-  if (chars.length <= max) return name;
-  return `${chars.slice(0, Math.max(1, max - 1)).join("").trimEnd()}…`;
-}
+/**
+ * En deçà de cette place par nom (« Ab… »), les noms quittent le titre : le
+ * tour, le score et l'horaire restent seuls, l'image et la description
+ * nomment les équipes.
+ */
+export const EMBED_TITLE_TEAM_FLOOR = 3;
 
 /**
- * Les deux noms tenus dans `room` caractères : le plus court garde tout ce
- * qu'il peut, l'autre prend le reste ; chacun garde au moins
- * {@link EMBED_TITLE_TEAM_MIN_LENGTH} caractères (le titre déborde alors, sans
- * jamais rogner le tour, le score ni l'horaire).
+ * Les deux noms tenus dans `room` colonnes : le plus court garde tout ce qu'il
+ * peut, l'autre prend le reste ; chacun garde au moins
+ * {@link EMBED_TITLE_TEAM_MIN_LENGTH} colonnes quand la place le permet, la
+ * moitié de la place sinon. La somme ne dépasse **jamais** `room` ; `null` quand
+ * un nom n'y garderait pas {@link EMBED_TITLE_TEAM_FLOOR} colonnes.
  */
-function fitNames(names: readonly [string, string], room: number): [string, string] {
-  const [a, b] = names.map((name) => Array.from(name).length);
+function fitNames(names: readonly [string, string], room: number): [string, string] | null {
+  const [a, b] = names.map(displayWidth);
   if (a + b <= room) return [names[0], names[1]];
   const half = Math.floor(room / 2);
+  const floor = Math.min(EMBED_TITLE_TEAM_MIN_LENGTH, half);
+  if (floor < EMBED_TITLE_TEAM_FLOOR) return null;
   let maxA: number;
   if (a <= half) maxA = a;
   else if (b <= room - half) maxA = room - b;
   else maxA = half;
   const maxB = room - maxA;
-  return [
-    cutName(names[0], Math.max(EMBED_TITLE_TEAM_MIN_LENGTH, maxA)),
-    cutName(names[1], Math.max(EMBED_TITLE_TEAM_MIN_LENGTH, maxB)),
-  ];
+  return [cutToWidth(names[0], Math.max(floor, maxA)), cutToWidth(names[1], Math.max(floor, maxB))];
+}
+
+/** Score en tête du titre : seulement un résultat **validé** (un score en saisie n'est pas un résultat). */
+function finalScore(match: MatchShareSummary, center: EmbedScoreCenter): Extract<EmbedScoreCenter, { kind: "score" }> | null {
+  return match.status === "COMPLETED" && center.kind === "score" ? center : null;
 }
 
 /**
  * Titre de l'encart d'un match, court pour n'être jamais coupé
  * ({@link EMBED_MATCH_TITLE_BUDGET}) : « A 0–3 B · Quart de finale 2 » une fois
- * le score connu, « A contre B · Quart de finale 2 · mar. 18 nov. 21:00 » pour
- * un match à venir, « A contre B · Finale » sinon. Seuls les noms d'équipe
- * cèdent (ellipse) ; ni le nom du site ni celui du tournoi n'y figurent
- * (`og:site_name`, l'image et la description les portent).
+ * le résultat validé, « A contre B · Quart de finale 2 · mar. 18 nov. 21:00 »
+ * pour un match à venir, « A contre B · Finale » sinon (forfait, score en
+ * saisie ou en attente de confirmation). Seuls les noms d'équipe cèdent
+ * (ellipse entre deux graphèmes), jusqu'à quitter le titre quand le tour et
+ * l'horaire prennent toute la place ; ni le nom du site ni celui du tournoi
+ * n'y figurent (`og:site_name`, l'image et la description les portent). Un nom
+ * écrit de droite à gauche est isolé ({@link isolateDirection}) : il ne
+ * retourne pas le score voisin.
  */
 export function matchEmbedTitle(
   match: MatchShareSummary,
@@ -386,17 +396,39 @@ export function matchEmbedTitle(
 ): string {
   const text = messages.share.embed;
   const names = [embedSideName(match.team1, 1, text), embedSideName(match.team2, 2, text)] as const;
-  const center = scoreCenter(match, names, text);
+  const score = finalScore(match, scoreCenter(match, names, text));
   const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
-  const tail = when === null ? ` · ${position}` : ` · ${position} · ${when}`;
+  const tail = when === null ? position : `${position} · ${when}`;
   const head = (team1: string, team2: string) =>
-    center.kind === "score"
-      ? `${team1} ${center.team1}–${center.team2} ${team2}`
-      : fill(text.versus, { team1, team2 });
-  const room = EMBED_MATCH_TITLE_BUDGET - Array.from(head("", "") + tail).length;
-  const [team1, team2] = fitNames(names, room);
-  return `${head(team1, team2)}${tail}`;
+    score === null ? fill(text.versus, { team1, team2 }) : `${team1} ${score.team1}–${score.team2} ${team2}`;
+  const room = EMBED_MATCH_TITLE_BUDGET - displayWidth(`${head("", "")} · ${tail}`);
+  const fitted = fitNames(names, room);
+  if (fitted === null) return tail;
+  return `${head(isolateDirection(fitted[0]), isolateDirection(fitted[1]))} · ${tail}`;
+}
+
+/**
+ * Titre de l'onglet d'une page de match (avant « — tournoi ») : « A contre B ·
+ * Quart de finale 2 », suivi de l'horaire d'un match à venir. Noms entiers et
+ * jamais de score : seul l'encart partagé ({@link matchEmbedTitle}) se plie au
+ * budget de Discord.
+ */
+export function matchPageTitle(
+  match: MatchShareSummary,
+  position: string,
+  messages: ShareEmbedMessages,
+  locale: Locale,
+  now: number = Date.now(),
+): string {
+  const text = messages.share.embed;
+  const versus = fill(text.versus, {
+    team1: embedSideName(match.team1, 1, text),
+    team2: embedSideName(match.team2, 2, text),
+  });
+  const scheduledAt = matchScheduledAt(match, now);
+  const when = scheduledAt === null ? null : embedShortWhen(scheduledAt, locale);
+  return when === null ? `${versus} · ${position}` : `${versus} · ${position} · ${when}`;
 }
 
 /**
@@ -419,7 +451,9 @@ export function matchEmbedDescription(
   const scheduledAt = matchScheduledAt(match, now);
   const when = scheduledAt === null ? null : embedLongWhen(scheduledAt, locale);
   if (when !== null) parts.push(`${when} (${text.timeZone})`);
-  if (center.kind === "score") parts.push(`${names[0]} ${center.team1} – ${center.team2} ${names[1]}`);
+  if (center.kind === "score") {
+    parts.push(`${isolateDirection(names[0])} ${center.team1} – ${center.team2} ${isolateDirection(names[1])}`);
+  }
   else if (center.kind === "label") parts.push(center.text);
   for (const map of match.maps) {
     const name = map.mapName === null ? "" : shownText(map.mapName, EMBED_MAP_NAME_MAX_LENGTH);

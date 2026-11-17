@@ -13,7 +13,7 @@
 import { endurancePlayoffGhostSlots, endurancePlayoffRoundCount } from "./bg-survie/playoff-rounds";
 import { isEndurancePlayoffRound } from "./bg-survie/rounds";
 import { stageKey, type StageKey } from "./bracket-stage";
-import { stageMatchLabel, stageRoundLabel } from "./bracket-stage-text";
+import { isAmbiguousMatchStage, stageMatchLabel, stageRoundLabel } from "./bracket-stage-text";
 import type { Locale } from "./locales";
 import type { Messages } from "./i18n-messages";
 import { fallbackRoundLabel, tournamentPageMessages, tournamentPageText, type TournamentPageText } from "./tournament-page-text";
@@ -37,7 +37,7 @@ export type ShareRound =
 /** Ce que la lecture des manches relit du tournoi public. */
 export type ShareRoundSource = {
   card: Pick<TournamentSnapshot["card"], "format" | "state">;
-  phases: TournamentSnapshot["phases"];
+  phases: readonly Pick<TournamentPhase, "id" | "format">[] | null;
   matches: readonly Pick<
     BracketMatch,
     "id" | "phaseId" | "bracket" | "roundNumber" | "matchNumber" | "status" | "doubleForfeit"
@@ -141,17 +141,63 @@ export function buildShareRounds(source: ShareRoundSource): Map<number, ShareRou
   return result;
 }
 
+/** Une ligne de {@link phaseRoundShapeKey} : ce qui nomme le tour d'un match. */
+type RoundShapeRow = [
+  id: number,
+  phaseId: RoundMatch["phaseId"],
+  bracket: RoundMatch["bracket"],
+  roundNumber: number,
+  matchNumber: number,
+  status: RoundMatch["status"],
+  doubleForfeit: boolean,
+];
+
+/**
+ * Les matchs d'une phase réduits, dans une clé stable, à ce que lit
+ * {@link buildShareRounds} : la page d'un match ne renomme son tour que si
+ * cette clé change, pas à chaque poussée du flux (nouveaux objets, même forme).
+ * {@link matchesOfRoundShapeKey} en relit les matchs.
+ */
+export function phaseRoundShapeKey(
+  matches: readonly RoundMatch[],
+  phaseId: RoundMatch["phaseId"],
+): string {
+  const rows: RoundShapeRow[] = [];
+  for (const match of matches) {
+    if (match.phaseId !== phaseId) continue;
+    rows.push([
+      match.id,
+      match.phaseId,
+      match.bracket,
+      match.roundNumber,
+      match.matchNumber,
+      match.status,
+      match.doubleForfeit,
+    ]);
+  }
+  return JSON.stringify(rows);
+}
+
+/** Les matchs d'une clé de {@link phaseRoundShapeKey}. */
+export function matchesOfRoundShapeKey(key: string): RoundMatch[] {
+  const rows = JSON.parse(key) as RoundShapeRow[];
+  return rows.map(([id, phaseId, bracket, roundNumber, matchNumber, status, doubleForfeit]) => ({
+    id,
+    phaseId,
+    bracket,
+    roundNumber,
+    matchNumber,
+    status,
+    doubleForfeit,
+  }));
+}
+
 /** Le texte de la fiche dans `locale` (les mots de manche sont ceux de `bracket.*`). */
 export function shareRoundPageText(
   locale: Locale,
   messages: Pick<Messages, "tournament">,
 ): TournamentPageText {
   return tournamentPageText(locale, tournamentPageMessages(messages));
-}
-
-/** Stades dont le libellé de la fiche porte le numéro du match (`bracket.matchLabel`). */
-function isNumberedStage(stage: StageKey): stage is "semis" | "quarters" | "roundOf16" {
-  return stage === "semis" || stage === "quarters" || stage === "roundOf16";
 }
 
 /**
@@ -186,7 +232,7 @@ export function shareRoundText(
   const lowerPrefix = round.lower && round.stage !== "lowerFinal" ? text.t("page.bracketLabels.LOWER") : null;
   let label: string;
   if (round.stage === "early") label = `${stageRoundLabel(text, "early", round.round - 1)} · ${matchN}`;
-  else if (isNumberedStage(round.stage)) label = stageMatchLabel(text, round.stage, position.matchNumber);
+  else if (isAmbiguousMatchStage(round.stage)) label = stageMatchLabel(text, round.stage, position.matchNumber);
   else label = stageRoundLabel(text, round.stage, round.round - 1);
   return lowerPrefix ? `${lowerPrefix} · ${label}` : label;
 }
