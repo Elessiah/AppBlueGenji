@@ -5,7 +5,7 @@ jest.mock("@/lib/server/audience-service");
 import { POST } from "@/app/api/audience/route";
 import { AUDIENCE_IDENTITY_RULE, AUDIENCE_REQUEST_RULE } from "@/lib/server/api-guard";
 import { maintainAudience, recordAudienceViews } from "@/lib/server/audience-service";
-import { resetRateLimit } from "@/lib/server/rate-limit";
+import { checkRateLimit, resetRateLimit } from "@/lib/server/rate-limit";
 
 /** Réception des pages vues (`docs/features/AUDIENCE_MEASUREMENT.md`, registre T19). */
 
@@ -70,6 +70,13 @@ describe("POST /api/audience", () => {
 
     expect(await res.json()).toEqual({ recorded: 0 });
     expect(recordAudienceViews).not.toHaveBeenCalled();
+  });
+
+  it("POST_emptyBatch_doesNotTouchIdentityCaps", async () => {
+    const res = await POST(audienceReq({ v: [] }));
+
+    expect(await res.json()).toEqual({ recorded: 0 });
+    expect(checkRateLimit(AUDIENCE_IDENTITY_RULE, "203.0.113.7").remaining).toBe(AUDIENCE_IDENTITY_RULE.limit);
   });
 
   it("POST_overLimit_returns429AfterLimitSends", async () => {

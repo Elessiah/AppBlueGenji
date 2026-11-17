@@ -47,7 +47,11 @@ export async function POST(req: Request) {
     return ok({ recorded: 0 });
   }
 
-  const views = admitAudienceViews(ip, userAgent ?? "", parseAudienceBatch(body, siteHost()));
+  // Un envoi vide ou illisible ne touche aucun plafond de navigateurs : il ne
+  // garderait vivante, sans rien mesurer, une entrée du registre des déjà vus.
+  const batch = parseAudienceBatch(body, siteHost());
+  if (batch.length === 0) return ok({ recorded: 0 });
+  const views = admitAudienceViews(ip, userAgent ?? "", batch);
   if (views.length === 0) return ok({ recorded: 0 });
   try {
     return ok({ recorded: await recordAudienceViews({ ip, userAgent, views }) });

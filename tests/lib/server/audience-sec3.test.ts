@@ -14,7 +14,7 @@ import {
   admitAudienceViews,
   resetAudienceUnknownWarning,
 } from "@/lib/server/api-guard";
-import { audienceVisitorKey, resetAudienceState, rollUpAudienceDays } from "@/lib/server/audience-service";
+import { ROLLUP_SHARD_ROWS, audienceVisitorKey, resetAudienceState, rollUpAudienceDays } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
 import { chargeRateLimit, checkRateLimit, resetRateLimit, type RateLimitRule } from "@/lib/server/rate-limit";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
@@ -394,7 +394,7 @@ describe("audienceVisitorKey — réseau", () => {
 });
 
 describe("rollUpAudienceDays — visiteurs distincts", () => {
-  it("rollUpDay_severalSmallRows_countsDistinctVisitorsWithInClause", async () => {
+  it("rollUpDay_shardedDaySeveralSmallRows_countsDistinctVisitorsWithInClause", async () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[{ day: "2026-11-14" }]]) }));
     const raw = (visitor: string, page: string) => ({
       viewed_at: "2026-11-14 18:00:00",
@@ -412,7 +412,7 @@ describe("rollUpAudienceDays — visiteurs distincts", () => {
       sql.includes("COUNT(DISTINCT")
         ? [[{ total: 2 }]]
         : sql.includes("COUNT(*) AS total")
-        ? [[{ total: 2 }]]
+        ? [[{ total: ROLLUP_SHARD_ROWS + 1 }]]
         : sql.includes("SELECT viewed_at")
         ? [[raw("v1", "team"), raw("v2", "player")]]
         : [{ affectedRows: 1 }],

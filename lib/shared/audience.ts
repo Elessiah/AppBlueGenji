@@ -230,17 +230,20 @@ export function sendsFetchMetadata(userAgent: string | null | undefined): boolea
  * L'envoi peut-il venir du script d'une page du site ? Un `fetch()` lancé par
  * une page pose `Sec-Fetch-Site: same-origin` et `Sec-Fetch-Dest: empty` ; un
  * envoi qui déclare une autre provenance (page tierce, aperçu de lien,
- * navigation) est écarté, comme un envoi sans ces en-têtes au nom d'un
- * navigateur qui les pose toujours ({@link sendsFetchMetadata} : un script
- * qui se dit Chrome sans les poser). Seul un navigateur qui ne les connaît pas
- * (Safari avant iOS 16.4, vieilles vues web) est compté sans eux. Un filtre
- * bon marché, pas une preuve — un script les forge sans peine — : la vraie
- * borne est celle des plafonds par réseau (`admitAudienceViews`).
+ * navigation) est écarté, comme un envoi sans ces en-têtes ni `Origin` au nom
+ * d'un navigateur qui les pose toujours ({@link sendsFetchMetadata} : un
+ * script qui se dit Chrome sans les poser). Sans `Sec-Fetch-*`, un `Origin`
+ * suffit : un mandataire (proxy d'entreprise, antivirus) qui retire les
+ * premiers garde d'ordinaire le second, que le middleware a déjà comparé aux
+ * hôtes du site (`requestOriginRefusal`). Un navigateur qui ne connaît pas ces
+ * en-têtes (Safari avant iOS 16.4, vieilles vues web) est compté sans eux. Un
+ * filtre bon marché, pas une preuve — un script les forge sans peine — : la
+ * vraie borne est celle des plafonds par réseau (`admitAudienceViews`).
  */
 export function isAudienceScriptRequest(headers: Pick<Headers, "get">, userAgent?: string | null): boolean {
   const site = headers.get("sec-fetch-site");
   const dest = headers.get("sec-fetch-dest");
-  if (site === null && dest === null) return !sendsFetchMetadata(userAgent);
+  if (site === null && dest === null) return headers.get("origin") !== null || !sendsFetchMetadata(userAgent);
   return (site === null || site === "same-origin") && (dest === null || dest === "empty");
 }
 
@@ -633,6 +636,39 @@ export type AudienceDistinctCounter = (
   values: readonly string[],
 ) => Promise<number>;
 
+/**
+ * Compteur de visiteurs distincts lu dans le détail d'un jour déjà en mémoire
+ * (repli d'une journée d'une seule tranche) : l'union des visiteurs des
+ * pages vues sous les `values` d'une répartition, sans requête par étape.
+ */
+export function inMemoryDistinctCounter(rows: readonly AudienceRawRow[]): AudienceDistinctCounter {
+  const index = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.isView) continue;
+    const entries: [string, string][] = [
+      ["page", row.pageKey],
+      ["hour", String(row.hour)],
+      ["device", row.device],
+      ["source", row.source],
+      ["locale", row.locale],
+    ];
+    for (const [dim, value] of entries) {
+      const key = `${dim} ${value}`;
+      let visitors = index.get(key);
+      if (!visitors) {
+        visitors = new Set();
+        index.set(key, visitors);
+      }
+      visitors.add(row.visitorKey);
+    }
+  }
+  return (dim, values) => {
+    const union = new Set<string>();
+    for (const value of values) for (const visitor of index.get(`${dim} ${value}`) ?? []) union.add(visitor);
+    return Promise.resolve(union.size);
+  };
+}
+
 interface FoldableRow {
   key: string;
   views: number;
@@ -651,7 +687,13 @@ async function foldRows<T extends FoldableRow>(
   mustFold: (row: T) => boolean,
   distinct: (values: readonly string[]) => Promise<number>,
 ): Promise<{ kept: T[]; folded: T[]; visitors: number }> {
-  const sorted = [...rows].sort((a, b) => a.visitors - b.visitors || a.views - b.views || a.key.localeCompare(b.key));
+  // Une ligne sans visiteur (du temps de lecture seul, sa page vue n'ayant pas
+  // été comptée ce jour-là) ne lance pas de regroupement : elle suit le groupe
+  // s'il existe et atteint le seuil, sinon elle n'est pas gardée.
+  const riders = rows.filter((row) => row.visitors === 0);
+  const sorted = rows
+    .filter((row) => row.visitors > 0)
+    .sort((a, b) => a.visitors - b.visitors || a.views - b.views || a.key.localeCompare(b.key));
   const folded = sorted.filter(mustFold);
   const kept = sorted.filter((row) => !mustFold(row));
   if (folded.length === 0) return { kept, folded, visitors: 0 };
@@ -662,7 +704,7 @@ async function foldRows<T extends FoldableRow>(
     if (next) folded.push(next);
     visitors = await count();
   }
-  return { kept, folded, visitors };
+  return { kept, folded: [...folded, ...riders], visitors };
 }
 
 function sumOf<T>(rows: readonly T[], field: (row: T) => number): number {
@@ -683,10 +725,13 @@ function sumOf<T>(rows: readonly T[], field: (row: T) => number): number {
  * dans le détail : une personne vue sur trois pages rares compte une fois) ;
  * sous le seuil, il absorbe la plus petite ligne suivante, jusqu'à l'atteindre.
  * S'il ne l'atteint pas même en prenant tout le jour, il n'est pas gardé : il
- * ne dirait que le total du jour, publié à part. Aucune ligne gardée, ni aucun
- * écart entre le total du jour et ses lignes, ne décrit donc moins de
+ * ne dirait que le total du jour, publié à part. Une ligne sans visiteur (du
+ * temps de lecture seul) ne lance aucun regroupement : elle suit le groupe s'il
+ * est gardé, sinon elle tombe. Aucune ligne gardée, ni aucun écart entre le
+ * total du jour et ses lignes, ne décrit donc moins de
  * {@link AUDIENCE_MIN_VISITORS} visiteurs d'un jour. Les totaux du jour
- * (`totals`) restent tels quels.
+ * (`totals`) restent tels quels, même sous le seuil — ce que disent `/rgpd`
+ * et le registre (T19) : ils ne détaillent aucune page, heure ni répartition.
  */
 export async function anonymizeAudienceDay(
   aggregate: AudienceDayAggregate,
@@ -735,7 +780,6 @@ export async function anonymizeAudienceDay(
 /**
  * Ce que la page publique montre des types de page d'une période (lignes
  * déjà regroupées jour par jour au repli, {@link anonymizeAudienceDay}) : les types
-
  * connus, le reste (types qui ne se mesurent plus, clés inconnues) fondu
  * dans `other`. `other` est toujours montré : le cacher ne protégerait rien,
  * les totaux publiés le redonnent par soustraction.

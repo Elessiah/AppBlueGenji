@@ -122,14 +122,21 @@ describe("flushAudienceViews — rafales", () => {
   });
 
   it("flush_rowsOfCurrentDay_skipsLastRolledDayLookup", async () => {
-    const execute = baseDatabase();
-    mockDb(execute);
+    // Le vidage déclenché par la file lit l'heure réelle : figée sur NOW, sans
+    // quoi le jour de NOW devient « repliable » dès le lendemain 1 h 15.
+    jest.useFakeTimers({ now: NOW, doNotFake: ["setImmediate", "setTimeout", "setInterval", "clearTimeout", "clearInterval", "nextTick", "queueMicrotask"] });
+    try {
+      const execute = baseDatabase();
+      mockDb(execute);
 
-    await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: Array.from({ length: FLUSH_SIZE }, () => view()), now: NOW });
-    await settle();
+      await recordAudienceViews({ ip: "203.0.113.7", userAgent: "Firefox", views: Array.from({ length: FLUSH_SIZE }, () => view()), now: NOW });
+      await settle();
 
-    expect(execute.mock.calls.some(([sql]) => sql.includes("MAX(day)"))).toBe(false);
-    expect(inserts(execute)).toHaveLength(1);
+      expect(execute.mock.calls.some(([sql]) => sql.includes("MAX(day)"))).toBe(false);
+      expect(inserts(execute)).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

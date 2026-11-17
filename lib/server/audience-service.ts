@@ -40,8 +40,8 @@ import {
   aggregateAudienceDay,
   anonymizeAudienceDay,
   type AudienceDistinctCounter,
-
   emptyHeatmap,
+  inMemoryDistinctCounter,
   mergeAudienceAggregates,
   parisClock,
   publicPageStats,
@@ -497,14 +497,29 @@ async function countDistinctVisitors(
   return num(rows[0]?.total);
 }
 
-async function rollUpDay(connection: PoolConnection, day: string): Promise<void> {
+/** Ligne brute lue en base, en forme de calcul. */
+function toRawRow(row: RawRow): AudienceRawRow {
+  return {
+    viewedAt: new Date(`${String(row.viewed_at).replace(" ", "T")}Z`),
+    hour: Number(row.hour),
+    visitorKey: row.visitor_key,
+    pageKey: row.page_key,
+    locale: row.locale,
+    device: row.device,
+    source: row.source,
+    isView: Number(row.is_view) === 1,
+    engagedMs: Number(row.engaged_ms),
+  };
+}
 
+async function rollUpDay(connection: PoolConnection, day: string): Promise<void> {
   const [counted] = await connection.execute<CountRow[]>(`SELECT COUNT(*) AS total FROM bg_audience_views WHERE day = ?`, [day]);
   // Un visiteur reste dans une seule tranche (CRC32 de son empreinte) : les
   // compteurs de chaque tranche s'additionnent (`mergeAudienceAggregates`) et
   // la mémoire reste bornée sur une journée très fréquentée.
   const shards = Math.max(1, Math.ceil(num(counted[0]?.total) / ROLLUP_SHARD_ROWS));
   const parts: AudienceDayAggregate[] = [];
+  let onlyShard: AudienceRawRow[] = [];
   for (let shard = 0; shard < shards; shard += 1) {
     const [rows] = await connection.execute<RawRow[]>(
       `SELECT viewed_at, hour, visitor_key, page_key, locale, device, source, is_view, engaged_ms
@@ -513,29 +528,24 @@ async function rollUpDay(connection: PoolConnection, day: string): Promise<void>
         ORDER BY viewed_at, id`,
       shards > 1 ? [day, shards, shard] : [day],
     );
-    parts.push(
-      aggregateAudienceDay(
-        rows.map<AudienceRawRow>((row) => ({
-          viewedAt: new Date(`${String(row.viewed_at).replace(" ", "T")}Z`),
-          hour: Number(row.hour),
-          visitorKey: row.visitor_key,
-          pageKey: row.page_key,
-          locale: row.locale,
-          device: row.device,
-          source: row.source,
-          isView: Number(row.is_view) === 1,
-          engagedMs: Number(row.engaged_ms),
-        })),
-      ),
-    );
+    const raw = rows.map(toRawRow);
+    if (shards === 1) onlyShard = raw;
+    parts.push(aggregateAudienceDay(raw));
   }
   // Seules les lignes d'au moins `AUDIENCE_MIN_VISITORS` visiteurs distincts
   // du jour sont écrites (regroupées sinon) : la page publique ne lit qu'elles.
+  // Jour d'une seule tranche : les visiteurs distincts se comptent dans le
+  // détail déjà lu ; au-delà (tranches), une requête par étape.
   const aggregate = await anonymizeAudienceDay(
     parts.length === 1 ? parts[0] : mergeAudienceAggregates(parts),
-    (dim, values) => countDistinctVisitors(connection, day, dim, values),
+    shards === 1 ? inMemoryDistinctCounter(onlyShard) : (dim, values) => countDistinctVisitors(connection, day, dim, values),
   );
 
+  await writeDayAggregate(connection, day, aggregate);
+}
+
+/** Remplace les compteurs repliés d'un jour par `aggregate` (déjà k-anonyme). */
+async function writeDayAggregate(connection: PoolConnection, day: string, aggregate: AudienceDayAggregate): Promise<void> {
   for (const table of ["bg_audience_day_pages", "bg_audience_day_hours", "bg_audience_day_dims", "bg_audience_days"]) {
     await connection.execute(`DELETE FROM ${table} WHERE day = ?`, [day]);
   }

@@ -608,6 +608,26 @@ export const AUDIENCE_GLOBAL_IDENTITY_RULE: RateLimitRule = {
 };
 
 /**
+ * Réserve du site entier où puise la part de chaque réseau
+ * ({@link AUDIENCE_FAIR_VIEWS}) : sans elle, la part, exempte de
+ * {@link AUDIENCE_GLOBAL_VIEW_RULE}, se multipliait par le nombre de réseaux
+ * (mille adresses à vingt pages chacune passaient 20 000 pages par minute).
+ * Le site ne reçoit donc jamais plus que la somme des deux plafonds.
+ */
+export const AUDIENCE_GLOBAL_FAIR_VIEW_RULE: RateLimitRule = {
+  name: "audience-view-global-fair",
+  limit: 6_000,
+  windowMs: 60_000,
+};
+
+/** Réserve de la part des navigateurs nouveaux ({@link AUDIENCE_FAIR_IDENTITIES}), comme {@link AUDIENCE_GLOBAL_FAIR_VIEW_RULE}. */
+export const AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE: RateLimitRule = {
+  name: "audience-identity-global-fair",
+  limit: 1_500,
+  windowMs: 60_000,
+};
+
+/**
  * Navigateurs déjà vus (clé : réseau — l'adresse IPv4, le `/64` en IPv6 —
  * + condensé court du user-agent, celle de l'empreinte du visiteur ; en
  * mémoire seulement). Fenêtre glissante : un navigateur actif ne redevient
@@ -625,12 +645,12 @@ const AUDIENCE_IDENTITY_SEEN_RULE: RateLimitRule = {
 };
 
 /**
- * Part de chaque réseau (et de son `/48`) que les plafonds du site entier
- * ignorent, par minute : les premiers navigateurs nouveaux et les premières
- * pages vues d'un réseau passent toujours. Un foyer, un téléphone derrière le
- * NAT d'un opérateur restent comptés même quand des réseaux fabriquant des
- * signalements épuisent les plafonds du site ; ceux-là ne bornent que ce qui
- * dépasse cette part.
+ * Part de chaque réseau (et de son `/48`), par minute, qui puise dans une
+ * réserve du site à part ({@link AUDIENCE_GLOBAL_FAIR_VIEW_RULE},
+ * {@link AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE}) plutôt que dans les plafonds
+ * du site : un foyer, un téléphone derrière le NAT d'un opérateur restent
+ * comptés quand des réseaux fabriquant des signalements épuisent ces
+ * plafonds-là, et la réserve borne ce que la part ajoute, tous réseaux confondus.
  */
 export const AUDIENCE_FAIR_IDENTITIES = 5;
 /** Voir {@link AUDIENCE_FAIR_IDENTITIES}. */
@@ -645,16 +665,35 @@ const AUDIENCE_SITE_KEY = "site";
 /** Intervalle minimal entre deux avertissements « réseau illisible plafonné ». */
 export const AUDIENCE_UNKNOWN_WARN_INTERVAL_MS = 10 * 60_000;
 let lastUnknownWarnAt = Number.NEGATIVE_INFINITY;
+let lastSeenFullWarnAt = Number.NEGATIVE_INFINITY;
 
-/** Identité de débit d'un envoi de mesure d'audience : son réseau, ou un réseau commun s'il est illisible. */
+/** Adresse IPv4 bien formée (quatre octets de 0 à 255). */
+function isIpv4(value: string): boolean {
+  const parts = value.split(".");
+  return parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255);
+}
+
+/**
+ * Identité de débit d'un envoi de mesure d'audience : son réseau (adresse IPv4,
+ * `/64` IPv6), ou un réseau commun si l'adresse est illisible. Une valeur qui
+ * n'est pas une adresse (`X-Forwarded-For` forgé quand aucun mandataire de
+ * confiance ne le réécrit) rejoint le réseau commun : sinon chaque valeur
+ * inventée aurait ses plafonds neufs.
+ */
 export function audienceNetworkKey(ip: string | null): string {
-  return clientNetworkKey(ip) ?? AUDIENCE_UNKNOWN_NETWORK;
+  const network = clientNetworkKey(ip);
+  if (network === null || !(isIpv4(network) || network.endsWith("::/64"))) return AUDIENCE_UNKNOWN_NETWORK;
+  return network;
 }
 
 /** Préfixe IPv6 `/48` d'une adresse (second étage des plafonds), `null` pour IPv4 ou une adresse illisible. */
 export function audienceWideNetworkKey(ip: string | null): string | null {
-  const network = clientNetworkKey(ip);
-  if (!network?.endsWith("::/64")) return null;
+  return wideOf(audienceNetworkKey(ip));
+}
+
+/** Préfixe `/48` d'un réseau `/64`, `null` pour un autre réseau. */
+function wideOf(network: string): string | null {
+  if (!network.endsWith("::/64")) return null;
   return `${network.slice(0, -"::/64".length).split(":").slice(0, 3).join(":")}::/48`;
 }
 
@@ -670,9 +709,21 @@ function warnUnknownNetworkThrottled(network: string, now: number = Date.now()):
   console.warn("[audience] Adresse client illisible : plafond commun atteint, pages vues écartées (vérifier TRUSTED_PROXY_HOPS).");
 }
 
-/** Remet à zéro l'avertissement « réseau illisible » (tests). */
+/**
+ * Le registre des navigateurs déjà vus est plein : chaque envoi d'un navigateur
+ * qu'il ne contient pas est compté comme nouveau (plafonds de navigateurs).
+ * Signalé, au plus une fois par {@link AUDIENCE_UNKNOWN_WARN_INTERVAL_MS}.
+ */
+function warnSeenRegistryFull(now: number = Date.now()): void {
+  if (now - lastSeenFullWarnAt < AUDIENCE_UNKNOWN_WARN_INTERVAL_MS) return;
+  lastSeenFullWarnAt = now;
+  console.warn("[audience] Registre des navigateurs déjà vus plein : envois comptés comme navigateurs nouveaux.");
+}
+
+/** Remet à zéro les avertissements « réseau illisible » et « registre plein » (tests). */
 export function resetAudienceUnknownWarning(): void {
   lastUnknownWarnAt = Number.NEGATIVE_INFINITY;
+  lastSeenFullWarnAt = Number.NEGATIVE_INFINITY;
 }
 
 /** Plafonds (règle, clé) qu'un même geste doit tous respecter : contrôlés tous, puis décomptés tous. */
@@ -689,17 +740,17 @@ function consumeAll(limits: readonly (readonly [RateLimitRule, string])[]): { al
 }
 
 /** Plafonds d'un réseau, puis de son `/48` s'il est en IPv6. */
-function tiers(ip: string | null, perNetwork: RateLimitRule, perWide: RateLimitRule): [RateLimitRule, string][] {
-  const network = audienceNetworkKey(ip);
-  const wide = audienceWideNetworkKey(ip);
+function tiers(network: string, perNetwork: RateLimitRule, perWide: RateLimitRule): [RateLimitRule, string][] {
+  const wide = wideOf(network);
   return wide ? [[perNetwork, network], [perWide, wide]] : [[perNetwork, network]];
 }
 
 /** Plafond des envois de `/api/audience` (réseau, puis `/48` en IPv6) : `429` au-delà. */
 export function throttleAudienceRequest(ip: string | null): NextResponse | null {
-  const state = consumeAll(tiers(ip, AUDIENCE_REQUEST_RULE, AUDIENCE_WIDE_REQUEST_RULE));
+  const network = audienceNetworkKey(ip);
+  const state = consumeAll(tiers(network, AUDIENCE_REQUEST_RULE, AUDIENCE_WIDE_REQUEST_RULE));
   if (state.allowed) return null;
-  warnUnknownNetworkThrottled(audienceNetworkKey(ip));
+  warnUnknownNetworkThrottled(network);
   return tooManyRequests(state.retryAfterMs);
 }
 
@@ -708,13 +759,18 @@ function withinFairShare(limits: readonly (readonly [RateLimitRule, string])[], 
   return limits.every(([rule, key]) => rule.limit - checkRateLimit(rule, key).remaining < share);
 }
 
-/** Étages d'un geste, plus le plafond du site s'il dépasse la part de son réseau ({@link AUDIENCE_FAIR_IDENTITIES}). */
+/**
+ * Étages d'un geste, plus un plafond du site : la réserve de la part
+ * (`fair`) tant que le geste est dans la part de son réseau
+ * ({@link AUDIENCE_FAIR_IDENTITIES}), le plafond commun (`site`) au-delà.
+ */
 function withSiteCap(
-  limits: [RateLimitRule, string][],
+  limits: readonly [RateLimitRule, string][],
   site: RateLimitRule,
+  fair: RateLimitRule,
   share: number,
 ): [RateLimitRule, string][] {
-  return withinFairShare(limits, share) ? limits : [...limits, [site, AUDIENCE_SITE_KEY]];
+  return [...limits, [withinFairShare(limits, share) ? fair : site, AUDIENCE_SITE_KEY]];
 }
 
 /**
@@ -724,7 +780,8 @@ function withSiteCap(
  * site a déjà vu trop de navigateurs nouveaux dans la minute
  * ({@link AUDIENCE_IDENTITY_RULE}), sinon les suites et les pages vues sous
  * {@link AUDIENCE_VIEW_RULE} (réseau, `/48`, site). Les entrées refusées sont
- * écartées sans bruit.
+ * écartées sans bruit. Registre des navigateurs déjà vus plein : l'envoi est
+ * compté comme un navigateur nouveau, jamais écarté pour ce seul motif.
  */
 export function admitAudienceViews<T extends { isView: boolean }>(
   ip: string | null,
@@ -734,16 +791,14 @@ export function admitAudienceViews<T extends { isView: boolean }>(
   const network = audienceNetworkKey(ip);
   const seenKey = `${network}\u0000${createHash("sha256").update(userAgent).digest("base64url").slice(0, 16)}`;
   const seen = checkRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
-  // Registre plein de navigateurs actifs : un nouveau n'y a pas de place, il n'est pas compté.
-  if (!seen.allowed) {
-    warnUnknownNetworkThrottled(network);
-    return [];
-  }
-  if (seen.remaining === AUDIENCE_IDENTITY_SEEN_RULE.limit) {
-    const identity = consumeAll([
-      ...withSiteCap(tiers(ip, AUDIENCE_IDENTITY_RULE, AUDIENCE_WIDE_IDENTITY_RULE), AUDIENCE_GLOBAL_IDENTITY_RULE, AUDIENCE_FAIR_IDENTITIES),
-      [AUDIENCE_IDENTITY_SEEN_RULE, seenKey],
-    ]);
+  if (!seen.allowed || seen.remaining === AUDIENCE_IDENTITY_SEEN_RULE.limit) {
+    const identityTiers = tiers(network, AUDIENCE_IDENTITY_RULE, AUDIENCE_WIDE_IDENTITY_RULE);
+    const limits = withSiteCap(identityTiers, AUDIENCE_GLOBAL_IDENTITY_RULE, AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE, AUDIENCE_FAIR_IDENTITIES);
+    // Registre plein de navigateurs actifs (peut-être saturé exprès) : ce
+    // navigateur n'y entre pas, mais il n'est pas écarté pour autant — chaque
+    // envoi compte comme un navigateur nouveau, sous les mêmes plafonds.
+    if (!seen.allowed) warnSeenRegistryFull();
+    const identity = consumeAll(seen.allowed ? [...limits, [AUDIENCE_IDENTITY_SEEN_RULE, seenKey]] : limits);
     if (!identity.allowed) {
       warnUnknownNetworkThrottled(network);
       return [];
@@ -752,11 +807,11 @@ export function admitAudienceViews<T extends { isView: boolean }>(
     // Déjà vu : sa fenêtre glisse.
     chargeRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
   }
+  const viewTiers = tiers(network, AUDIENCE_VIEW_RULE, AUDIENCE_WIDE_VIEW_RULE);
   let dropped = false;
   const admitted = views.filter((view) => {
     if (!view.isView) return true;
-    const limits = withSiteCap(tiers(ip, AUDIENCE_VIEW_RULE, AUDIENCE_WIDE_VIEW_RULE), AUDIENCE_GLOBAL_VIEW_RULE, AUDIENCE_FAIR_VIEWS);
-    const allowed = consumeAll(limits).allowed;
+    const allowed = consumeAll(withSiteCap(viewTiers, AUDIENCE_GLOBAL_VIEW_RULE, AUDIENCE_GLOBAL_FAIR_VIEW_RULE, AUDIENCE_FAIR_VIEWS)).allowed;
     dropped ||= !allowed;
     return allowed;
   });

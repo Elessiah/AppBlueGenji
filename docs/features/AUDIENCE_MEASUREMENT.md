@@ -43,7 +43,9 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   dernière requête), balayage du module `rate-limit`. Trois étages : le **réseau**
   (`audienceNetworkKey` : IPv4, ou préfixe IPv6 `/64` ; adresse illisible =
   un réseau commun, signalé une fois par 10 min dans les journaux quand il
-  est plafonné), le **`/48`** en IPv6 (`audienceWideNetworkKey` : un abonné
+  est plafonné ; une valeur qui n'est pas une adresse IPv4/IPv6 — un
+  `X-Forwarded-For` forgé sans mandataire de confiance — y tombe aussi, au
+  lieu d'avoir ses plafonds neufs), le **`/48`** en IPv6 (`audienceWideNetworkKey` : un abonné
   reçoit souvent un `/56`, un hébergeur un `/48`) et le **site entier**.
   `throttleAudienceRequest` : `AUDIENCE_REQUEST_RULE` (120 envois/min par
   réseau), `AUDIENCE_WIDE_REQUEST_RULE` (600 par `/48`). `admitAudienceViews` :
@@ -52,11 +54,19 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   navigateur actif ne redevient pas nouveau chaque minute) plafonnés à
   30/min par réseau (`AUDIENCE_IDENTITY_RULE`), 150 par `/48`, 1 500 pour
   le site ; pages vues à 120/min par réseau (`AUDIENCE_VIEW_RULE`), 600 par
-  `/48`, 6 000 pour le site (les suites n'y comptent pas). Les plafonds du
-  site ne visent que ce qui dépasse la part de chaque réseau et de son `/48`
-  (`AUDIENCE_FAIR_IDENTITIES` = 5 navigateurs nouveaux, `AUDIENCE_FAIR_VIEWS`
-  = 20 pages vues par minute) : des réseaux qui les épuisent n'effacent pas
-  un foyer des chiffres. Larges à dessein : une adresse
+  `/48`, 6 000 pour le site (les suites n'y comptent pas). La part de chaque
+  réseau et de son `/48` (`AUDIENCE_FAIR_IDENTITIES` = 5 navigateurs
+  nouveaux, `AUDIENCE_FAIR_VIEWS` = 20 pages vues par minute) puise dans une
+  **réserve du site à part** (`AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE` 1 500,
+  `AUDIENCE_GLOBAL_FAIR_VIEW_RULE` 6 000 par minute), le reste dans les
+  plafonds du site : des réseaux qui épuisent ces derniers n'effacent pas un
+  foyer des chiffres, et la part, tous réseaux confondus, reste bornée (le
+  site ne reçoit jamais plus de 12 000 pages vues par minute). Registre des
+  navigateurs vus plein (`AUDIENCE_MAX_KEYS`, peut-être saturé exprès) : un
+  navigateur absent n'est pas écarté, chacun de ses envois compte comme un
+  navigateur nouveau sous les mêmes plafonds (journal, une fois par 10 min).
+  Un envoi vide ou illisible ne touche pas ces plafonds (il garderait vivante
+  une entrée du registre sans rien mesurer). Larges à dessein : une adresse
   partagée (NAT d'opérateur mobile, réseau local d'un événement) ne doit pas
   faire disparaître ses visiteurs des chiffres. Ces seaux sont en
   `overflow: "refuse"` (`AUDIENCE_MAX_KEYS` = 50 000 clés chacun) : pleins de
@@ -72,9 +82,10 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   (`isAudienceScriptRequest` : `Sec-Fetch-Site` autre que `same-origin` ou
   `Sec-Fetch-Dest` autre que `empty`), comme un envoi sans ces en-têtes au
   nom d'un navigateur qui les pose toujours (`sendsFetchMetadata` : Chrome
-  76+, Firefox 90+, WebKit de Safari / iOS 16.4+) ; seul un navigateur plus
-  ancien ou inconnu (Safari avant iOS 16.4, vieilles vues web) est compté
-  sans eux. Ce filtre ne prouve rien : la vraie borne est celle des
+  76+, Firefox 90+, WebKit de Safari / iOS 16.4+) **et** sans `Origin` : un
+  mandataire qui retire `Sec-Fetch-*` garde d'ordinaire `Origin`, que le
+  middleware a déjà comparé aux hôtes du site ; un navigateur plus ancien ou
+  inconnu (Safari avant iOS 16.4, vieilles vues web) est compté sans eux. Ce filtre ne prouve rien : la vraie borne est celle des
   plafonds ci-dessus, qui tiennent même quand un client change de
   user-agent ou d'adresse dans son `/64` (même empreinte). Le temps d'une page vue est ignoré (il arrive par ses
   suites) et, au repli, une suite ne compte que la part de sa lecture
@@ -93,7 +104,11 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   visiteurs (ou un type de page inconnu, ou `other`) rejoint « Autres
   pages » ou `small` (« Petits nombres regroupés » : appareils, provenance,
   langue) ; une heure sous 5 visiteurs n'est pas écrite. Le groupe compte ses
-  visiteurs **distincts** (`COUNT(DISTINCT visitor_key)` dans le détail) ;
+  visiteurs **distincts** (dans le détail : en mémoire pour un jour d'une
+  seule tranche, `inMemoryDistinctCounter` ; `COUNT(DISTINCT visitor_key)`
+  pour un jour en tranches) ; une ligne sans visiteur (du temps de lecture
+  seul, sa page vue écartée ce jour-là) ne lance aucun regroupement, elle
+  suit le groupe s'il est écrit ;
   sous 5, il absorbe la plus petite ligne suivante (suppression
   complémentaire), et s'il n'y parvient qu'avec tout le jour, il n'est pas
   écrit. Ainsi ni une ligne, ni l'écart entre le total publié d'un jour et
