@@ -3,6 +3,7 @@
 import { FormEvent, useState, type ReactNode } from "react";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { richNodes } from "@/components/i18n/shell-text";
 import { pageDateTime } from "@/lib/shared/tournament-page-text";
 import { toParticipantType } from "@/lib/shared/participants";
@@ -52,7 +53,9 @@ export function AdvanceTournamentDialog({
   const pageText = useTournamentPageText();
   const text = useDialogsText();
   const { t } = text;
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (`docs/features/BUSY_BUTTONS.md`) : un second clic parti
+  // avant le rendu ne relance pas le passage d'étape.
+  const { busy, isBusy, run } = useBusyGuard();
   const dateTime = (iso: string) =>
     text.locale === "fr"
       ? formatLocalDateTime(iso)
@@ -85,20 +88,25 @@ export function AdvanceTournamentDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
-
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/tournaments/${card.id}/advance`, { method: "POST" });
-      const payload = (await res.json()) as { error?: string; advanced?: AdvanceResult };
-      if (!res.ok || !payload.advanced) {
-        throw new Error(payload.error || "TOURNAMENT_ADVANCE_FAILED");
+    await run(async () => {
+      try {
+        // L'étape annoncée part avec la demande : si un autre membre du staff
+        // a déjà avancé le tournoi, le serveur refuse (409) au lieu de lui
+        // faire franchir une étape de plus que celle confirmée ici.
+        const res = await fetch(`/api/admin/tournaments/${card.id}/advance`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(plan.target ? { expectedTarget: plan.target } : {}),
+        });
+        const payload = (await res.json()) as { error?: string; advanced?: AdvanceResult };
+        if (!res.ok || !payload.advanced) {
+          throw new Error(payload.error || "TOURNAMENT_ADVANCE_FAILED");
+        }
+        onAdvanced(payload.advanced);
+      } catch (e) {
+        showError(mapError((e as Error).message));
       }
-      onAdvanced(payload.advanced);
-    } catch (e) {
-      showError(mapError((e as Error).message));
-      setBusy(false);
-    }
+    });
   };
 
   return (
@@ -108,9 +116,11 @@ export function AdvanceTournamentDialog({
       maxWidth={480}
       title={t(`advance.targets.${key}.title`)}
       busy={busy}
+      isBusy={isBusy}
       onClose={onClose}
       onSubmit={submit}
-      submitLabel={busy ? t(`advance.targets.${key}.busy`) : confirmLabel}
+      submitLabel={confirmLabel}
+      pendingLabel={t(`advance.targets.${key}.busy`)}
     >
       <p
         id="advance-tournament-summary"

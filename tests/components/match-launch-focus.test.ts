@@ -34,10 +34,14 @@ describe("MatchLaunchCenter — focus rendu après chaque étape", () => {
     expect(escape).toMatch(/if \(confirming\) \{\s*pendingFocusRef\.current = "ready";\s*setConfirming\(false\);/);
   });
 
-  it("après l'envoi, le focus va au bouton qui remplace « Prêt », ou reste à l'étape en échec", () => {
+  it("après l'envoi, le focus va au bouton qui remplace « Prêt », ou reste au bouton pressé en échec", () => {
     const send = source.slice(source.indexOf("const setReady"), source.indexOf("const copy"));
     expect(send).toMatch(/setConfirming\(false\);\s*pendingFocusRef\.current = "ready";/);
-    expect(send).toContain('pendingFocusRef.current = confirming ? "confirm" : "ready";');
+    // En échec, le bouton « Confirmer » (focalisable pendant l'envoi) garde la
+    // main — et non l'étape entière, qui forçait un Tab pour réessayer.
+    expect(send).toContain('pendingFocusRef.current = confirming ? "confirmReady" : "ready";');
+    expect(source).toMatch(/ref=\{confirmReadyRef\}\s*busy=\{busy\}\s*className=\{`btn \$\{styles\.readyButton\}`\}\s*onClick=\{\(\) => void setReady\(true\)\}/);
+    expect(source).toContain("confirmReady: confirmReadyRef");
   });
 
   it("les deux boutons « Prêt » portent la même référence", () => {

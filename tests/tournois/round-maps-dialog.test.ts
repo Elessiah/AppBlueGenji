@@ -272,8 +272,10 @@ describe("copie vers des tours que le tournoi ne porte plus (REFEREE-LOT-1)", ()
 describe("RoundMapsDialog per-map points fields wiring", () => {
   const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx"), "utf8");
 
-  it("pointMapsFieldset_saveInFlight_disabledLikeLocked", () => {
-    expect(source).toContain("disabled={locked || busy}");
+  it("pointMapsFieldset_saveInFlight_readOnlyNotDisabled", () => {
+    // Entrée dans un champ envoie : désactivé, il perdrait le focus (`BUSY_BUTTONS.md`).
+    expect(source).toContain("<fieldset className={styles.pointMaps} disabled={locked}>");
+    expect(source).toContain("readOnly={busy}");
   });
 
   it("perMapInput_edit_clearsOnlyItsOwnFieldError", () => {

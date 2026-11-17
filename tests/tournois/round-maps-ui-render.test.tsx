@@ -118,7 +118,7 @@ describe("câblage de la fenêtre des cartes", () => {
     const source = dialog();
 
     expect(source).toContain("onClose={requestClose}");
-    expect(source).toContain("if (!busy) requestClose();");
+    expect(source).toContain("if (!isBusy()) requestClose();");
     expect(source).toMatch(/if \(roundDirty \|\| rulesDirty \|\| tiebreakDirty \|\| pointsDirty\) setPending\(\{ kind: "close" \}\)/);
   });
 
@@ -242,13 +242,13 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "unchangedRules_areNotSent",
       file: "RoundMapsDialog.tsx",
-      present: ["if (busy || !rulesDirty) return;", "aria-disabled={busy || !rulesDirty || undefined}"],
+      present: ["if (isBusy() || !rulesDirty) return;", "<BusyButton busy={busy} blocked={!rulesDirty} type=\"submit\""],
       absent: [],
     },
     {
       name: "buttonsThatEmptyThemselves_stayMountedWithAriaDisabled",
       file: "RoundMapsDialog.tsx",
-      present: ["aria-disabled={busy || !saved || undefined}", "aria-disabled={busy || saved === null || undefined}", "{rounds.length > 1 && ("],
+      present: ["blocked={!saved}", "blocked={saved === null}", "{rounds.length > 1 && ("],
       absent: ["{saved && (", "{saved !== null && ("],
     },
     {
@@ -265,7 +265,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "untouchedFormsAndStaleRefusals_areHandledWithoutNoise",
       file: "RoundMapsDialog.tsx",
-      present: ["if (busy || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
+      present: ["if (isBusy() || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
       absent: [],
     },
     {
@@ -283,7 +283,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "tiebreakForm_keepsMountedAndResyncsAfterSave",
       file: "RoundMapsDialog.tsx",
-      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", "if (!allowed) {", 'fieldErrors.aria("tiebreak", !allowed && unavailableId)', "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
+      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "<BusyButton busy={busy} blocked={!dirty || !allowed} type=\"submit\"", "if (!allowed) {", 'fieldErrors.aria("tiebreak", !allowed && unavailableId)', "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
       absent: [],
     },
     {

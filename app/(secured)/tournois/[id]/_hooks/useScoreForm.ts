@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import type { BracketMatch, MatchScoreReport, TournamentGame } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
@@ -105,7 +106,9 @@ export function useScoreForm(
   const [state, setState] = useState<ScoreFormState>(openingState);
   const [maps, setMaps] = useState<MatchMapInput[]>(openingRows);
   const sentMaps = trimTrailingBlankMaps(maps);
-  const [submitting, setSubmitting] = useState(false);
+  // Garde synchrone : un double clic ou Entrée répétée relance `submit` avant
+  // que `submitting` soit rendu — le second envoi partirait.
+  const { busy: submitting, isBusy, run } = useBusyGuard();
 
   // Le dialogue reste monté entre deux ouvertures : sans resynchronisation, il
   // rouvrirait sur le score du match précédemment édité. On se réaligne sur
@@ -240,7 +243,7 @@ export function useScoreForm(
     state.doubleForfeit !== true;
 
   const submit = async (action: "save" | "resolve") => {
-    if (!match) return false;
+    if (!match || isBusy()) return false;
 
     // Les maps se jugent par la règle du report d'équipe : un résultat validé
     // doit décrire un match terminé, un enregistrement seulement rester dans
@@ -255,47 +258,45 @@ export function useScoreForm(
       showError(scoreBlockerText(dialogText, blocker, matchFormat));
       return false;
     }
+    return (await run(async () => {
+      try {
+        const endpoint =
+          action === "save"
+            ? `/api/admin/matches/${match.id}/scores`
+            : `/api/admin/matches/${match.id}/resolve`;
+        const method = action === "save" ? "PATCH" : "POST";
 
-    setSubmitting(true);
-    try {
-      const endpoint =
-        action === "save"
-          ? `/api/admin/matches/${match.id}/scores`
-          : `/api/admin/matches/${match.id}/resolve`;
-      const method = action === "save" ? "PATCH" : "POST";
+        const body = adminScoreBody(state, sendMaps ? sentMaps : null);
+        if (!body) {
+          showError(scoreBlockerText(dialogText, "INCOMPLETE", matchFormat));
+          return false;
+        }
 
-      const body = adminScoreBody(state, sendMaps ? sentMaps : null);
-      if (!body) {
-        showError(scoreBlockerText(dialogText, "INCOMPLETE", matchFormat));
+        const response = await fetch(endpoint, {
+          method,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        const payload = (await response.json()) as { error?: string; autoValidationPaused?: boolean };
+        if (!response.ok) throw new Error(payload.error || "API_ERROR");
+
+        // « Enregistrer » sur un report seul suspend sa validation d'office
+        // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit — et dit « forfait »
+        // quand c'est un forfait, non un score, qui a été noté (un double forfait
+        // ne s'enregistre pas : `DOUBLE_FORFEIT`). Un forfait se note aussi avant
+        // le lancement : sa notification ne dit pas « en cours ».
+        const forfeitSaved = state.forfeitTeamId !== undefined;
+        const savedKey = savedToastKey(forfeitSaved, payload.autoValidationPaused === true);
+        showSuccess(dialogText.t(action === "save" ? savedKey : "score.admin.resolved"));
+        return true;
+      } catch (e) {
+        const code = (e as Error).message;
+        if (sendMaps) flagMapRefusal(code, decisive);
+        showError(mapError(code));
         return false;
       }
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      const payload = (await response.json()) as { error?: string; autoValidationPaused?: boolean };
-      if (!response.ok) throw new Error(payload.error || "API_ERROR");
-
-      // « Enregistrer » sur un report seul suspend sa validation d'office
-      // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit — et dit « forfait »
-      // quand c'est un forfait, non un score, qui a été noté (un double forfait
-      // ne s'enregistre pas : `DOUBLE_FORFEIT`). Un forfait se note aussi avant
-      // le lancement : sa notification ne dit pas « en cours ».
-      const forfeitSaved = state.forfeitTeamId !== undefined;
-      const savedKey = savedToastKey(forfeitSaved, payload.autoValidationPaused === true);
-      showSuccess(dialogText.t(action === "save" ? savedKey : "score.admin.resolved"));
-      return true;
-    } catch (e) {
-      const code = (e as Error).message;
-      if (sendMaps) flagMapRefusal(code, decisive);
-      showError(mapError(code));
-      return false;
-    } finally {
-      setSubmitting(false);
-    }
+    })) ?? false;
   };
 
   return {
@@ -313,6 +314,8 @@ export function useScoreForm(
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
     submitting,
+    /** État synchrone de l'envoi : les gestionnaires l'interrogent, `submitting` n'est rendu qu'après. */
+    isBusy,
     decision,
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,

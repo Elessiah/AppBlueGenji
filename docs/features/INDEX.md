@@ -159,6 +159,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `ACCESSIBILITY_SCROLL_AREA_FOCUS.md` — `<ScrollArea>` focalisable seulement quand elle défile.
 - `ACCESSIBILITY_ARIA_AND_ENTITY_TITLES.md` — Rôles ARIA de la fiche tournoi, titres des fiches.
 - `ACCESSIBILITY_RECRUITMENT_BANNER_LINK.md` — Lien « Voir » de la banderole de recrutement.
+- `BUSY_BUTTONS.md` — Boutons pendant une requête : `aria-disabled` + `aria-busy`, garde synchrone.
 - `ERROR_PAGES_AND_ANCHORS.md` — Pages d'erreur, ancres sous l'en-tête collant.
 - `PUBLIC_NAVIGATION.md` — Menu burger et pied de page de la vitrine.
 - `CARD_REORDERING.md` — Réordonnancement des cartes (bureau, association, partenaires).

@@ -27,7 +27,9 @@ import {
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useSpectatorView } from "@/components/spectator-view";
 import { matchPagePath } from "@/lib/shared/match-page";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useShareLink } from "@/components/share/ShareLinkButton";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -358,9 +360,8 @@ function ReleaseCastDialog({
                 // resterait nulle part) : la requête vise le caster choisi au
                 // clic, la fenêtre ne montre pas un autre choix le temps de la réponse.
                 aria-disabled={busy || undefined}
-                onChange={() => {
-                  if (!busy) onPick(caster.userId);
-                }}
+                // Gardé par l'appelant sur l'état synchrone (`isBusy()`).
+                onChange={() => onPick(caster.userId)}
               />
               <span>{caster.pseudo}</span>
             </label>
@@ -461,7 +462,8 @@ export function MatchCardActions({
   // Le refus d'identité dit ce qui manque pour le jeu du tournoi (Battle.net en Overwatch seulement).
   const castIdentityNotice = castBlock && castBlock !== "NOT_CASTER" ? launchError(castBlock) : undefined;
   const actionName = (label: string) => matchCardActionName(label, matchLabel, actionText);
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic relancerait un geste avant que `busy` soit rendu.
+  const { busy, isBusy, run: guarded } = useBusyGuard();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -630,18 +632,17 @@ export function MatchCardActions({
   };
 
   const run = async (action: () => Promise<unknown>, success: string, refresh = true): Promise<boolean> => {
-    setBusy(true);
-    try {
-      await action();
-      showSuccess(success);
-      if (refresh) window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-      return true;
-    } catch (error) {
-      showError(refresh ? launchError((error as Error).message) : mapError((error as Error).message));
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    return (await guarded(async () => {
+      try {
+        await action();
+        showSuccess(success);
+        if (refresh) window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+        return true;
+      } catch (error) {
+        showError(refresh ? launchError((error as Error).message) : mapError((error as Error).message));
+        return false;
+      }
+    })) ?? false;
   };
 
   // « Partager » : le lien **public** du match (`/suivre/…`), qui s'ouvre sans
@@ -685,7 +686,9 @@ export function MatchCardActions({
     report: onReport,
   };
 
-  // Gestes qui écrivent eux-mêmes (sans modale) : désactivés pendant un envoi.
+  // Gestes qui écrivent eux-mêmes (sans modale) : en attente pendant un envoi —
+  // `aria-disabled` + `aria-busy`, jamais `disabled` natif (le focus resterait
+  // sinon sans bouton), le clic ignoré.
   const writes = (id: MatchCardActionId) =>
     id === "hostSwap" || id === "claimCast" || id === "releaseCast" || id === "force";
 
@@ -707,28 +710,34 @@ export function MatchCardActions({
       );
     }
     const blocked = id === "claimCast" && castBlock !== null;
+    const waiting = busy && writes(id);
+    const activate = () => {
+      // Garde synchrone : un geste qui écrit, parti avant le rendu de `busy`.
+      if (writes(id) && isBusy()) return;
+      if (inMenu) {
+        setOpen(false);
+        toggleRef.current?.focus();
+      }
+      handlers[id]();
+    };
     return (
-      <button
+      <BusyButton
+        busy={waiting}
+        blocked={blocked}
         key={id}
         type="button"
         className={className}
-        disabled={busy && writes(id)}
-        aria-disabled={id === "claimCast" ? blocked : undefined}
         title={blocked ? castIdentityNotice : undefined}
         aria-label={actionName(action.label)}
         data-action={id}
         onKeyDown={inMenu ? onPanelKeyDown : undefined}
-        onClick={() => {
-          if (inMenu) {
-            setOpen(false);
-            toggleRef.current?.focus();
-          }
-          handlers[id]();
-        }}
+        // Désarmé, « Prendre le cast » dit encore pourquoi (le toast de `claimCast`).
+        onBlockedClick={blocked ? activate : undefined}
+        onClick={activate}
       >
         <Icon size={16} aria-hidden />
         <span className={styles.label}>{action.label}</span>
-      </button>
+      </BusyButton>
     );
   };
 
@@ -820,7 +829,10 @@ export function MatchCardActions({
           releasedCaster={releasedCaster}
           viewerUserId={viewerUserId}
           busy={busy}
-          onPick={setReleaseTarget}
+          onPick={(userId) => {
+            // Garde synchrone : le choix part avec la requête déjà lancée.
+            if (!isBusy()) setReleaseTarget(userId);
+          }}
           onClose={() => setConfirmRelease(false)}
           onConfirm={async (self) => {
             markOwnRelease(true);

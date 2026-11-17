@@ -1,6 +1,6 @@
 "use client";
 
-import { type InputHTMLAttributes, useRef, useState } from "react";
+import { createContext, type InputHTMLAttributes, useContext, useRef, useState } from "react";
 import { displayedNumber, parseNumberDraft, valueAfterEdit } from "@/lib/shared/number-draft";
 
 type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & {
@@ -19,6 +19,15 @@ type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "va
 };
 
 /**
+ * Fige en lecture seule tous les `NumberInput` d'un sous-arbre — un formulaire
+ * en cours d'envoi (`docs/features/BUSY_BUTTONS.md`). Le champ garde son texte
+ * en cours d'édition : un formulaire qui ignore la saisie pendant l'envoi
+ * laisserait sinon à l'écran un nombre qui ne part pas. Les sous-formulaires
+ * (réglages de format, phases) en héritent sans relais de propriété.
+ */
+export const NumberInputReadOnlyContext = createContext(false);
+
+/**
  * Champ numérique qu'on peut vider pour réécrire.
  *
  * Remplace le motif `value={n} onChange={(e) => set(Number(e.target.value))}`,
@@ -29,13 +38,23 @@ type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "va
  * « 16 » au Retour arrière passe par « 1 », que personne n'a voulu garder
  * (voir `lib/shared/number-draft.ts`).
  */
-export function NumberInput({ value, onValueChange, onEdit, onFocus, onBlur, ...rest }: Readonly<NumberInputProps>) {
+export function NumberInput({
+  value,
+  onValueChange,
+  onEdit,
+  onFocus,
+  onBlur,
+  readOnly,
+  ...rest
+}: Readonly<NumberInputProps>) {
+  const frozen = useContext(NumberInputReadOnlyContext);
   const [draft, setDraft] = useState<string | null>(null);
   const valueBeforeEdit = useRef(value);
 
   return (
     <input
       {...rest}
+      readOnly={readOnly || frozen || undefined}
       type="number"
       value={displayedNumber(draft, value)}
       onFocus={(event) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, type ReactNode } from "react";
+import { FormEvent, useCallback, useState, type ReactNode, type SetStateAction } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
@@ -26,6 +26,9 @@ import {
 } from "@/lib/shared/registration-filters";
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { conditionsText, formatExplainText, formatHintText, invalidFormatText, phaseIssueText, useFormText } from "../_lib/form-text";
 import { useErrorsText } from "../[id]/_lib/error-map";
@@ -64,7 +67,7 @@ import {
 } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import { NumberInput } from "@/components/ui/number-input";
+import { NumberInput, NumberInputReadOnlyContext } from "@/components/ui/number-input";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 
 /** Fonctionnement du format choisi, derrière le « i » du libellé « Format ». */
@@ -144,17 +147,47 @@ export function TournamentForm({
   const errorsText = useErrorsText();
   const em = (children: ReadonlyArray<ReactNode>) => <em>{richNodes(children)}</em>;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
-  const [values, setValues] = useState<TournamentFormValues>(initialValues);
+  // Envoi (`docs/features/BUSY_BUTTONS.md`) : le bouton reste focalisable
+  // (`BusyButton`), une garde synchrone écarte le second envoi, et le
+  // formulaire réussi reste en attente jusqu'à la navigation (`hold()`) — la
+  // page restait montée le temps du `router.push`, et un second clic créait un
+  // tournoi en double.
+  const { busy: loading, isBusy, run, hold } = useBusyGuard();
+  const [values, setValuesState] = useState<TournamentFormValues>(initialValues);
+  // Pendant l'envoi, ce qui est affiché est ce qui part : toute saisie (champ,
+  // case, liste, réglages des sous-formulaires) est ignorée.
+  // Les rappels sont stables (`useCallback`) : un sous-formulaire mémoïsé ne se
+  // redessine pas à chaque frappe du parent.
+  const setValues = useCallback(
+    (next: SetStateAction<TournamentFormValues>) => {
+      if (!isBusy()) setValuesState(next);
+    },
+    [isBusy],
+  );
   // Format Duel / Arcade décoché : le champ des points n'est pas rendu, un refus
   // des points (décocher sous un score, `MAP_POINTS_LOCKED`) se rattache à la case.
   const fieldErrors = useFieldErrors(
     TOURNAMENT_FIELD_ERRORS,
     values.duelArcade ? FIELD_IDS : { ...FIELD_IDS, mapPointTarget: DUEL_ARCADE_FIELD_ID },
   );
-  const set = <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
-    if (key in FIELD_IDS) fieldErrors.clear(key as TournamentFormField);
-  };
+  const clearFieldError = fieldErrors.clear;
+  const set = useCallback(
+    <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
+      // Une saisie ignorée pendant l'envoi ne lève pas non plus l'erreur du champ :
+      // la garde est ici, une seule fois, pour la valeur **et** l'erreur.
+      if (isBusy()) return;
+      setValuesState((prev) => ({ ...prev, [key]: value }));
+      if (key in FIELD_IDS) clearFieldError(key as TournamentFormField);
+    },
+    [isBusy, clearFieldError],
+  );
+  /** Lève l'erreur d'un champ hors envoi : même règle que `set`, pour les rappels de saisie. */
+  const clearIdle = useCallback(
+    (field: TournamentFormField) => {
+      if (!isBusy()) clearFieldError(field);
+    },
+    [isBusy, clearFieldError],
+  );
 
   const locked = (field: TournamentField) => !editableFields.has(field);
   const lockedAttr = (field: TournamentField) => (locked(field) && explanationId ? { "aria-describedby": explanationId } : {});
@@ -169,16 +202,36 @@ export function TournamentForm({
   // Ronde suisse : le nombre de rondes suit la recommandation ⌈log₂(N)⌉ + 1 tant
   // que l'organisateur n'a pas saisi la sienne — sinon un changement d'effectif
   // écraserait son choix. À l'édition, la valeur enregistrée fait foi d'emblée.
-  const [swissRoundsTouched, setSwissRoundsTouched] = useState(mode === "edit");
+  const [swissRoundsTouched, setSwissRoundsTouchedState] = useState(mode === "edit");
   // « Libre » ne retient pas de nombre de manches : on garde le dernier saisi
   // pour le restituer si l'organisateur revient à un BO ou un FT.
-  const [lastMatchFormatValue, setLastMatchFormatValue] = useState(
+  const [lastMatchFormatValue, setLastMatchFormatValueState] = useState(
     initialValues.matchFormat?.value ?? DEFAULT_MATCH_FORMAT.value,
   );
-  const [loading, setLoading] = useState(false);
+  // Les états voisins du formulaire suivent la même règle que `setValues` :
+  // une saisie ignorée pendant l'envoi ne laisse aucune trace (suivi de la
+  // recommandation des rondes, valeur retenue pour une bascule de format).
+  const setSwissRoundsTouched = useCallback(
+    (next: boolean) => {
+      if (!isBusy()) setSwissRoundsTouchedState(next);
+    },
+    [isBusy],
+  );
+  const setLastMatchFormatValue = useCallback(
+    (next: number) => {
+      if (!isBusy()) setLastMatchFormatValueState(next);
+    },
+    [isBusy],
+  );
   // Incrémenté à chaque refus d'un plan de phases invalide (`PhaseBuilder`).
   const [phaseFocusRequest, setPhaseFocusRequest] = useState(0);
-  const [image, setImage] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
+  const [image, setImageState] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
+  const setImage = useCallback(
+    (next: ImagePickerValue) => {
+      if (!isBusy()) setImageState(next);
+    },
+    [isBusy],
+  );
 
   const { format, maxTeams, phases } = values;
   const entrantType = toParticipantType(values.participantType);
@@ -257,50 +310,51 @@ export function TournamentForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isBusy()) return;
     fieldErrors.clear();
-    setLoading(true);
-    try {
-      if (!matchFormatValid) {
-        const message = invalidFormatText(text, matchFormatType);
-        fieldErrors.flag("matchFormatValue", message);
-        showError(message);
-        setLoading(false);
-        return;
-      }
-
-      // Validate phases for MULTI format
-      const phaseIssue = format === "MULTI" ? findPhaseIssue(phases) : null;
-      if (phaseIssue) {
-        showError(phaseIssueText(text, errorsText, phaseIssue));
-        // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
-        // la phase et y porte le focus — sauf plan figé par la fenêtre
-        // d'édition, dont les champs désactivés ne prennent pas le focus :
-        // la notification reste alors seule à parler.
-        if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
-        setLoading(false);
-        return;
-      }
-
-      await onSubmit(values, image);
-    } catch (e) {
-      const message = (e as Error).message;
-      const code = errorCode(e);
-      // Les deux refus de date ne disent pas **laquelle** : le premier jalon
-      // mal placé se relit sur les valeurs qui viennent de partir.
-      const dateField = misplacedDateField(code, values);
-      if (dateField) fieldErrors.flag(dateField, message);
-      else fieldErrors.report(code, message);
+    if (!matchFormatValid) {
+      const message = invalidFormatText(text, matchFormatType);
+      fieldErrors.flag("matchFormatValue", message);
       showError(message);
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    // Validate phases for MULTI format
+    const phaseIssue = format === "MULTI" ? findPhaseIssue(phases) : null;
+    if (phaseIssue) {
+      showError(phaseIssueText(text, errorsText, phaseIssue));
+      // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
+      // la phase et y porte le focus — sauf plan figé par la fenêtre
+      // d'édition, dont les champs désactivés ne prennent pas le focus :
+      // la notification reste alors seule à parler.
+      if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
+      return;
+    }
+
+    await run(async () => {
+      try {
+        await onSubmit(values, image);
+        hold();
+      } catch (e) {
+        const message = (e as Error).message;
+        const code = errorCode(e);
+        // Les deux refus de date ne disent pas **laquelle** : le premier jalon
+        // mal placé se relit sur les valeurs qui viennent de partir.
+        const dateField = misplacedDateField(code, values);
+        if (dateField) fieldErrors.flag(dateField, message);
+        else fieldErrors.report(code, message);
+        showError(message);
+      }
+    });
   };
 
   const loadingLabel = mode === "create" ? t("form.creating") : t("form.saving");
 
   return (
     <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
-      <form onSubmit={handleSubmit} style={SECTION_STACK}>
+      <form onSubmit={handleSubmit} style={SECTION_STACK} data-frozen={loading || undefined}>
+        {/* Tous les champs numériques, sous-formulaires compris, en lecture seule pendant l'envoi. */}
+        <NumberInputReadOnlyContext.Provider value={loading}>
         <section>
           <p className="eyebrow" style={sectionEyebrow("identity")}>
             {t("form.sections.identity")}
@@ -312,6 +366,7 @@ export function TournamentForm({
                 id="tournament-name"
                 required
                 disabled={locked("name")}
+                readOnly={loading}
                 value={values.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder={t("form.namePlaceholder")}
@@ -322,6 +377,7 @@ export function TournamentForm({
             <div className="field">
               <label htmlFor="tournament-game">{t("form.game")}</label>
               <select
+                aria-readonly={loading || undefined}
                 id="tournament-game"
                 disabled={locked("game")}
                 value={values.game}
@@ -337,6 +393,7 @@ export function TournamentForm({
               <textarea
                 id="tournament-description"
                 disabled={locked("description")}
+                readOnly={loading}
                 value={values.description}
                 onChange={(e) => set("description", e.target.value)}
                 placeholder={t("form.descriptionPlaceholder")}
@@ -351,7 +408,7 @@ export function TournamentForm({
             <p className="eyebrow" style={sectionEyebrow("image")}>
               {t("form.sections.image")}
             </p>
-            <TournamentImagePicker existing={null} value={image} onChange={setImage} disabled={loading} />
+            <TournamentImagePicker existing={null} value={image} onChange={setImage} busy={loading} />
           </section>
         )}
 
@@ -372,6 +429,7 @@ export function TournamentForm({
                 )}
               </InfoHintRow>
               <select
+                aria-readonly={loading || undefined}
                 id="tournament-format"
                 aria-describedby={describedBy(
                   formatExplain !== null && FORMAT_EXPLAIN_ID,
@@ -397,6 +455,7 @@ export function TournamentForm({
             <div className="field">
               <label htmlFor="participant-type">{t("form.participantType")}</label>
               <select
+                aria-readonly={loading || undefined}
                 id="participant-type"
                 aria-describedby={describedBy("participant-type-hint", locked("participantType") && explanationId)}
                 disabled={locked("participantType")}
@@ -417,9 +476,10 @@ export function TournamentForm({
                 min={2}
                 max={256}
                 disabled={locked("maxTeams")}
+                readOnly={loading}
                 value={maxTeams}
                 onValueChange={setMaxTeams}
-                onEdit={() => fieldErrors.clear("maxTeams")}
+                onEdit={() => clearIdle("maxTeams")}
                 {...fieldAttrs("maxTeams")}
               />
               <FieldErrorText fieldId={FIELD_IDS.maxTeams} message={fieldErrors.message("maxTeams")} />
@@ -428,6 +488,7 @@ export function TournamentForm({
             <div className="field">
               <label htmlFor="match-format-type">{t("form.matchFormat")}</label>
               <select
+                aria-readonly={loading || undefined}
                 id="match-format-type"
                 disabled={locked("matchFormat")}
                 value={matchFormatType}
@@ -469,12 +530,13 @@ export function TournamentForm({
                   max={MATCH_FORMAT_BOUNDS[matchFormatType].max}
                   step={matchFormatType === "BO" ? 2 : 1}
                   disabled={locked("matchFormat")}
+                  readOnly={loading}
                   value={matchFormatValue}
                   onValueChange={(value) => {
                     setLastMatchFormatValue(value);
                     patchMatchFormat({ value });
                   }}
-                  onEdit={() => fieldErrors.clear("matchFormatValue")}
+                  onEdit={() => clearIdle("matchFormatValue")}
                   {...fieldErrors.aria(
                     "matchFormatValue",
                     locked("matchFormat") && explanationId,
@@ -511,6 +573,7 @@ export function TournamentForm({
                   min={matchWinsRequired(matchFormat!)}
                   max={naturalMaxMaps(matchFormat!)}
                   disabled={locked("matchFormat")}
+                  readOnly={loading}
                   value={matchMaxMaps(matchFormat!)}
                   onValueChange={(value) => {
                     // Le plafond naturel n'est pas un réglage : le stocker
@@ -537,10 +600,10 @@ export function TournamentForm({
               error={fieldErrors.message("mapPointTarget")}
               onCheckedChange={(checked) => {
                 set("duelArcade", checked);
-                fieldErrors.clear("mapPointTarget");
+                clearIdle("mapPointTarget");
               }}
               onTargetChange={(target) => set("mapPointTarget", target)}
-              onTargetEdit={() => fieldErrors.clear("mapPointTarget")}
+              onTargetEdit={() => clearIdle("mapPointTarget")}
             />
 
             <FormatSettings
@@ -590,6 +653,7 @@ export function TournamentForm({
                 </InfoHint>
               </InfoHintRow>
               <select
+                aria-readonly={loading || undefined}
                 id="registration-discord"
                 disabled={locked("registrationDiscordRequirement")}
                 value={values.registrationDiscordRequirement}
@@ -617,6 +681,7 @@ export function TournamentForm({
                 </InfoHint>
               </InfoHintRow>
               <select
+                aria-readonly={loading || undefined}
                 id="registration-blizzard"
                 disabled={locked("registrationBlizzardRequirement")}
                 value={values.registrationBlizzardRequirement}
@@ -658,6 +723,7 @@ export function TournamentForm({
                   min={MIN_PLAYERS_BOUNDS.min}
                   max={MIN_PLAYERS_BOUNDS.max}
                   disabled={locked("registrationMinPlayers")}
+                  readOnly={loading}
                   value={values.registrationMinPlayers}
                   onValueChange={(next) => set("registrationMinPlayers", next)}
                   aria-describedby="registration-min-players-hint"
@@ -682,6 +748,7 @@ export function TournamentForm({
                 id="visibility-at"
                 type="datetime-local"
                 disabled={locked("startVisibilityAt")}
+                readOnly={loading}
                 value={values.startVisibilityAt}
                 onChange={(e) => set("startVisibilityAt", e.target.value)}
                 {...fieldAttrs("startVisibilityAt")}
@@ -694,6 +761,7 @@ export function TournamentForm({
                 id="registration-open-at"
                 type="datetime-local"
                 disabled={locked("registrationOpenAt")}
+                readOnly={loading}
                 value={values.registrationOpenAt}
                 onChange={(e) => set("registrationOpenAt", e.target.value)}
                 {...fieldAttrs("registrationOpenAt")}
@@ -706,6 +774,7 @@ export function TournamentForm({
                 id="registration-close-at"
                 type="datetime-local"
                 disabled={locked("registrationCloseAt")}
+                readOnly={loading}
                 value={values.registrationCloseAt}
                 onChange={(e) => set("registrationCloseAt", e.target.value)}
                 {...fieldAttrs("registrationCloseAt")}
@@ -718,6 +787,7 @@ export function TournamentForm({
                 id="start-at"
                 type="datetime-local"
                 disabled={locked("startAt")}
+                readOnly={loading}
                 value={values.startAt}
                 onChange={(e) => set("startAt", e.target.value)}
                 {...fieldAttrs("startAt")}
@@ -773,15 +843,13 @@ export function TournamentForm({
           <CyberButton variant="ghost" asChild>
             <LocaleLink href="/tournois">{t("form.cancel")}</LocaleLink>
           </CyberButton>
-          <CyberButton
-            variant="primary"
-            type="submit"
-            disabled={loading}
-            style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
-          >
-            {loading ? loadingLabel : submitLabel}
+          <CyberButton variant="primary" asChild>
+            <BusyButton busy={loading} type="submit">
+              <BusyLabel busy={loading} idle={submitLabel} pending={loadingLabel} />
+            </BusyButton>
           </CyberButton>
         </div>
+        </NumberInputReadOnlyContext.Provider>
       </form>
     </CyberCard>
   );

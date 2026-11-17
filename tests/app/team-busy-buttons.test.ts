@@ -71,8 +71,8 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
 
   it("globalsCss_dimDisabledScope_definesDimmedAndBusyRules", () => {
     const css = source("app/globals.css");
-    expect(css).toMatch(/\.dim-disabled \.btn\[aria-disabled="true"\] \{[^}]*opacity: 0\.55;/);
-    expect(css).toMatch(/\.dim-disabled \.btn\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*opacity: 1;/);
+    expect(css).toMatch(/\.dim-disabled \.btn\[aria-disabled="true"\]:not\(\[aria-busy="true"\]\) \{[^}]*color: var\(--ink-dim\);/);
+    expect(css).toMatch(/\.dim-disabled \.btn\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*cursor: progress;/);
   });
 
   it.each([

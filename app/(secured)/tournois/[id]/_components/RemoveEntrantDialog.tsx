@@ -3,6 +3,7 @@
 import { FormEvent, useState, type ReactNode } from "react";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentCard } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -56,7 +57,9 @@ export function RemoveEntrantDialog({
   const mapError = useMapError();
   const text = useActionsText();
   const { t } = text;
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (`docs/features/BUSY_BUTTONS.md`) : un second clic parti
+  // avant le rendu ne relance pas le retrait.
+  const { busy, isBusy, run } = useBusyGuard();
 
   // Figé à l'ouverture, comme la liste des étapes de `LaunchTournamentDialog` :
   // le dialogue reste monté pendant que le flux SSE redessine la page, et voir
@@ -66,22 +69,20 @@ export function RemoveEntrantDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
-
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/tournaments/${card.id}/registrations/${teamId}`, {
-        method: "DELETE",
-      });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(payload.error || "ENTRANT_REMOVAL_FAILED");
-      // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
-      showSuccess(t("registrations.removed", { name: entrantName }));
-      onRemoved();
-    } catch (e) {
-      showError(mapError((e as Error).message));
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const res = await fetch(`/api/admin/tournaments/${card.id}/registrations/${teamId}`, {
+          method: "DELETE",
+        });
+        const payload = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(payload.error || "ENTRANT_REMOVAL_FAILED");
+        // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
+        showSuccess(t("registrations.removed", { name: entrantName }));
+        onRemoved();
+      } catch (e) {
+        showError(mapError((e as Error).message));
+      }
+    });
   };
 
   return (
@@ -91,9 +92,11 @@ export function RemoveEntrantDialog({
       maxWidth={440}
       title={t("removeEntrant.title", { name: entrantName })}
       busy={busy}
+      isBusy={isBusy}
       onClose={onClose}
       onSubmit={submit}
-      submitLabel={busy ? t("removeEntrant.pending") : t("registrations.remove")}
+      submitLabel={t("registrations.remove")}
+      pendingLabel={t("removeEntrant.pending")}
     >
       <p
         id="remove-entrant-summary"

@@ -92,7 +92,9 @@ describe("Bouton de retrait dans la liste des inscrites", () => {
 
   it("n'écrit rien sans confirmation : le clic ouvre un dialogue", () => {
     // Le bouton voisine les flèches à trente-deux pixels d'un geste anodin.
-    expect(panel).toMatch(/onClick=\{\(\) => setRemoving\(\{ teamId: reg\.teamId, teamName: reg\.teamName \}\)\}/);
+    // Garde synchrone : un clic parti pendant un réordonnancement n'ouvre rien.
+    expect(panel).toMatch(/if \(!isBusy\(\)\) setRemoving\(\{ teamId, teamName \}\);/);
+    expect(panel).toContain('onClick={() => onRemove(reg.teamId, reg.teamName)}');
     // Et le composant lui-même n'appelle la route nulle part : le seul `fetch`
     // qu'il contient est celui du réordonnancement.
     expect(panel.match(/fetch\(/g)).toHaveLength(1);
@@ -170,7 +172,7 @@ describe("Cellule d'actions partagée", () => {
     // qu'on répète : un mot plutôt qu'une flèche, du rouge au survol, une marge.
     const remove = ruleBody(css, ".remove");
     expect(remove).toMatch(/margin-left/);
-    expect(ruleBody(css, ".remove:hover:not(:disabled)")).toMatch(/--red-live/);
+    expect(ruleBody(css, '.remove:hover:not([aria-disabled="true"])')).toMatch(/--red-live/);
     // Mais pas de rouge au repos : une liste d'inscriptions n'est pas une liste
     // d'avertissements.
     expect(remove).not.toMatch(/--red-live/);

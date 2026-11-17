@@ -85,7 +85,7 @@
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.arrow:hover:not(:disabled) {
+.arrow:hover:not([aria-disabled="true"]) {
   border-color: var(--blue-400, var(--accent-blue));
   color: var(--blue-200, var(--accent-blue));
   background: color-mix(in srgb, var(--blue-500, #5ac8ff) 12%, transparent);
@@ -96,10 +96,11 @@
   outline-offset: 2px;
 }
 
-/* Désactivé par les couleurs, jamais par `opacity` (CHECKBOX_STYLES.md) : un
+/* Désarmé (`aria-disabled`, `BusyButton` : le bouton garde le focus) par les
+   couleurs, jamais par `opacity` (CHECKBOX_STYLES.md) : un
    bouton estompé par transparence laisse deviner le fond et perd son contraste
    de façon imprévisible selon le thème. */
-.arrow:disabled {
+.arrow[aria-disabled="true"] {
   border-color: var(--line, var(--line-soft));
   color: var(--ink-mute);
   cursor: not-allowed;
@@ -134,7 +135,7 @@
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.remove:hover:not(:disabled) {
+.remove:hover:not([aria-disabled="true"]) {
   border-color: color-mix(in srgb, var(--red-live, #ff4d4d) 60%, transparent);
   color: var(--red-live, #ff4d4d);
   background: color-mix(in srgb, var(--red-live, #ff4d4d) 12%, transparent);
@@ -145,10 +146,16 @@
   outline-offset: 2px;
 }
 
-.remove:disabled {
+.remove[aria-disabled="true"] {
   border-color: var(--line, var(--line-soft));
   color: var(--ink-mute);
   cursor: not-allowed;
+}
+
+/* En attente (`BusyButton`, le bouton garde le focus) : curseur d'attente. */
+.arrow[aria-busy="true"],
+.remove[aria-busy="true"] {
+  cursor: progress;
 }
 
 /* Ligne d'état du staff et son « i » : la marge passe sur la rangée, pour que

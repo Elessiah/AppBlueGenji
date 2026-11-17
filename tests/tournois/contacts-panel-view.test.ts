@@ -36,6 +36,11 @@ describe("contactsPanelView", () => {
     ).toBe("ERROR");
   });
 
+  it("garde l'échec et son « Réessayer » pendant la relance", () => {
+    // Le bouton reste en place (en attente) : il garde le focus clavier.
+    expect(contactsPanelView({ loading: true, entrants: null, failure: "Réseau." })).toBe("ERROR");
+  });
+
   it("garde la liste pendant un rechargement", () => {
     // Périmée d'une seconde, pas fausse : la faire clignoter en « Chargement… »
     // à chaque réouverture n'apprendrait rien.

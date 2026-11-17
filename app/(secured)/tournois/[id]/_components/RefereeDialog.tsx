@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
@@ -87,7 +89,7 @@ export function RefereeDialog({
       if (initial) onClose();
     };
   });
-  const [busy, setBusy] = useState(false);
+  const { busy, isBusy, run: guarded } = useBusyGuard();
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [objectionPick, setObjectionPick] = useState("");
@@ -102,10 +104,11 @@ export function RefereeDialog({
   // l'ouverture : le panneau relu après le geste dit l'arbitre libre, et le ton
   // comme le texte de la confirmation basculeraient avant qu'elle se ferme.
   const [confirmBusy, setConfirmBusy] = useState(false);
-  // Le contrôle d'un geste est désactivé le temps de l'envoi (le navigateur
-  // lâche alors le focus), et un geste retire souvent son propre bouton
-  // (« Arbitrer ce match » devient « Ne plus arbitrer ») : le focus tomberait
-  // sur la page, la fenêtre encore ouverte. Il revient au contrôle du geste
+  // Pendant l'envoi, les boutons restent focalisables (`aria-disabled` +
+  // `aria-busy`, jamais `disabled` natif) et `useBusyGuard` écarte un second geste
+  // avant même le rendu (double clic, Entrée répétée). Mais un geste retire
+  // souvent son propre bouton (« Arbitrer ce match » devient « Ne plus
+  // arbitrer ») : le focus tomberait sur la page, la fenêtre encore ouverte. Il revient au contrôle du geste
   // s'il existe encore, sinon à la phrase d'état, qui dit le nouvel état —
   // après la fermeture de la confirmation, dont le retour au déclencheur vise
   // alors un bouton disparu (`refereeFocusTarget`).
@@ -157,31 +160,39 @@ export function RefereeDialog({
     success: string | ((payload: unknown) => string | { unchanged: string }),
     resetMap = false,
   ): Promise<boolean> => {
+    if (isBusy()) return false;
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setBusy(true);
-    try {
-      const payload = await request();
-      const outcome = typeof success === "string" ? success : success(payload);
-      if (typeof outcome !== "string") {
-        showInfo(outcome.unchanged);
+    const done = await guarded(async () => {
+      try {
+        const payload = await request();
+        const outcome = typeof success === "string" ? success : success(payload);
+        if (typeof outcome !== "string") {
+          showInfo(outcome.unchanged);
+          return true;
+        }
+        showSuccess(outcome);
+        window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+        await load(false, resetMap);
         return true;
+      } catch (error) {
+        const code = (error as Error).message;
+        const message = errorText(code);
+        fieldErrors.report(code, message);
+        showError(message);
+        // Un autre membre du staff a changé l'arbitre : la fenêtre se relit
+        // pour montrer celui qui est désigné maintenant.
+        if (code === "REFEREE_CHANGED") await load(false);
+        return false;
       }
-      showSuccess(outcome);
-      window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-      await load(false, resetMap);
-      return true;
-    } catch (error) {
-      const code = (error as Error).message;
-      const message = errorText(code);
-      fieldErrors.report(code, message);
-      showError(message);
-      // Un autre membre du staff a changé l'arbitre : la fenêtre se relit
-      // pour montrer celui qui est désigné maintenant.
-      if (code === "REFEREE_CHANGED") await load(false);
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    });
+    return done ?? false;
+  };
+  // Ouvrir une confirmation pendant un envoi : ignoré, comme le bouton qui l'ouvre.
+  const ask = (pending: PendingConfirm) => {
+    if (!isBusy()) setConfirm(pending);
+  };
+  const close = () => {
+    if (!isBusy()) onClose();
   };
 
   const base = `/api/admin/matches/${match.id}`;
@@ -191,7 +202,7 @@ export function RefereeDialog({
   const pickOffered = actions?.candidates.some((candidate) => String(candidate.userId) === pick) ?? false;
   const assign = (event: FormEvent) => {
     event.preventDefault();
-    if (!pickOffered) return;
+    if (isBusy() || !pickOffered) return;
     void run(() => send(`${base}/referee`, "PUT", { userId: Number(pick), expectedUserId: panel?.referee?.userId ?? null }), t("cardActions.refereeDialog.assigned")).then(
       (done) => {
         if (done) setPick("");
@@ -207,7 +218,7 @@ export function RefereeDialog({
   const objectionUrl = (userId: number | string) => `/api/admin/referees/${userId}/objection`;
   const upholdObjection = (event: FormEvent) => {
     event.preventDefault();
-    if (!objectionOffered || !panel) return;
+    if (isBusy() || !objectionOffered || !panel) return;
     setConfirmPseudo(objectionOffered.pseudo);
     setConfirmBusy(refereeConfirmTone("objection", panel, objectionOffered.userId) === "danger");
     setConfirm("objection");
@@ -322,33 +333,33 @@ export function RefereeDialog({
 
             <div className={styles.row}>
               {actions.take && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn"
-                  disabled={busy}
                   onClick={() =>
                     void run(() => send(`/api/matches/${match.id}/referee`, "POST"), t("cardActions.refereeDialog.taken"))
                   }
                 >
                   {t("cardActions.refereeDialog.take")}
-                </button>
+                </BusyButton>
               )}
               {actions.releaseSelf && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  disabled={busy}
                   onClick={() =>
                     void run(() => send(`/api/matches/${match.id}/referee`, "DELETE"), t("cardActions.refereeDialog.released"))
                   }
                 >
                   {t("cardActions.refereeDialog.releaseSelf")}
-                </button>
+                </BusyButton>
               )}
               {actions.removeOther && (
-                <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("removeReferee")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("removeReferee")}>
                   {t("cardActions.refereeDialog.remove")}
-                </button>
+                </BusyButton>
               )}
             </div>
 
@@ -367,18 +378,18 @@ export function RefereeDialog({
                   ))}
                 </select>
               </div>
-              <button type="submit" className="btn ghost" disabled={busy || !pickOffered}>
+              <BusyButton busy={busy} blocked={!pickOffered} type="submit" className="btn ghost">
                 {t("cardActions.refereeDialog.assign")}
-              </button>
+              </BusyButton>
             </form>
             )}
 
             <div className={styles.row}>
               {panel.selfManaged ? (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  disabled={busy}
                   onClick={() =>
                     void run(
                       () => send(`${base}/self-management`, "PUT", { enabled: false }),
@@ -387,21 +398,21 @@ export function RefereeDialog({
                   }
                 >
                   {t("cardActions.refereeDialog.selfOffAction")}
-                </button>
+                </BusyButton>
               ) : (
-                <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("selfOn")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("selfOn")}>
                   {t("cardActions.refereeDialog.selfOnAction")}
-                </button>
+                </BusyButton>
               )}
               {actions.roundOn && (
-                <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("roundOn")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("roundOn")}>
                   {t("cardActions.refereeDialog.roundOnAction")}
-                </button>
+                </BusyButton>
               )}
               {actions.roundOff && (
-                <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("roundOff")}>
+                <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => ask("roundOff")}>
                   {t("cardActions.refereeDialog.roundOffAction")}
-                </button>
+                </BusyButton>
               )}
             </div>
 
@@ -441,12 +452,12 @@ export function RefereeDialog({
                       setMap(event.target.value);
                       fieldErrors.clear("map");
                     }}
-                    disabled={busy}
+                    readOnly={busy}
                     {...fieldErrors.aria("map")}
                   />
-                  <button type="submit" className="btn ghost" disabled={busy}>
+                  <BusyButton busy={busy} type="submit" className="btn ghost">
                     {t("cardActions.refereeDialog.mapSave")}
-                  </button>
+                  </BusyButton>
                   </div>
                   <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
                 </div>
@@ -465,19 +476,20 @@ export function RefereeDialog({
                   {panel.objections.map((referee) => (
                     <li key={referee.userId} className={styles.objection}>
                       <span>{referee.pseudo}</span>
-                      <button
+                      <BusyButton
+                        busy={busy}
                         type="button"
                         className="btn ghost"
-                        disabled={busy}
                         aria-label={t("cardActions.refereeDialog.objection.liftAria", { pseudo: referee.pseudo })}
                         onClick={() => {
+                          if (isBusy()) return;
                           setLiftTarget(referee);
                           setConfirmPseudo(referee.pseudo);
                           setConfirm("liftObjection");
                         }}
                       >
                         {t("cardActions.refereeDialog.objection.lift")}
-                      </button>
+                      </BusyButton>
                     </li>
                   ))}
                 </ul>
@@ -499,18 +511,18 @@ export function RefereeDialog({
                     ))}
                   </select>
                 </div>
-                <button type="submit" className="btn ghost" disabled={busy || !objectionOffered}>
+                <BusyButton busy={busy} blocked={!objectionOffered} type="submit" className="btn ghost">
                   {t("cardActions.refereeDialog.objection.uphold")}
-                </button>
+                </BusyButton>
               </form>
             </div>
           </div>
         )}
 
         <div className={styles.footer}>
-          <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+          <BusyButton busy={busy} type="button" className="btn ghost" onClick={close}>
             {t("cardActions.refereeDialog.close")}
-          </button>
+          </BusyButton>
         </div>
       </TournamentDialogFrame>
       {pending && (

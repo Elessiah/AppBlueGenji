@@ -1,6 +1,9 @@
 "use client";
 
 import { FormEvent, useState, type ReactNode } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { shownMatchScore } from "@/lib/shared/map-points";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
@@ -96,34 +99,37 @@ export function RollbackRoundDialog({
   const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
   const strongInk = (children: ReadonlyArray<ReactNode>) => <strong>{richNodes(children)}</strong>;
   const [acknowledged, setAcknowledged] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Boutons focalisables pendant l'envoi (`BusyButton`), garde synchrone
+  // (`useBusyGuard`). La manche effacée, `onRolledBack` ferme le dialogue dans
+  // le même rendu : aucun second envoi ne peut suivre.
+  const { busy, isBusy, run } = useBusyGuard();
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!acknowledged || busy) return;
+    if (!acknowledged || isBusy()) return;
 
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/tournaments/${tournamentId}/rollback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expectedStage: stageKey }),
-      });
-      const payload = (await res.json()) as {
-        error?: string;
-        rolledBack?: { label: string };
-      };
-      if (!res.ok) throw new Error(payload.error || "ROLLBACK_FAILED");
-      // Le stade annoncé est celui que le serveur dit avoir effacé : le nôtre
-      // pouvait être périmé, et un message qui nomme la mauvaise manche serait
-      // pire qu'aucun message. Le serveur le rédige en français : sous `/en`,
-      // c'est le nôtre qui est annoncé — le serveur ayant refusé tout stade
-      // autre que `expectedStage`, il désigne la même manche.
-      onRolledBack(text.locale === "fr" ? payload.rolledBack?.label ?? stageLabel : stageLabel);
-    } catch (e) {
-      showError(mapError((e as Error).message));
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const res = await fetch(`/api/admin/tournaments/${tournamentId}/rollback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedStage: stageKey }),
+        });
+        const payload = (await res.json()) as {
+          error?: string;
+          rolledBack?: { label: string };
+        };
+        if (!res.ok) throw new Error(payload.error || "ROLLBACK_FAILED");
+        // Le stade annoncé est celui que le serveur dit avoir effacé : le nôtre
+        // pouvait être périmé, et un message qui nomme la mauvaise manche serait
+        // pire qu'aucun message. Le serveur le rédige en français : sous `/en`,
+        // c'est le nôtre qui est annoncé — le serveur ayant refusé tout stade
+        // autre que `expectedStage`, il désigne la même manche.
+        onRolledBack(text.locale === "fr" ? payload.rolledBack?.label ?? stageLabel : stageLabel);
+      } catch (e) {
+        showError(mapError((e as Error).message));
+      }
+    });
   };
 
   return (
@@ -242,34 +248,39 @@ export function RollbackRoundDialog({
             fontSize: 13,
             lineHeight: 1.5,
             color: "var(--ink-quiet, #9aa4b2)",
-            cursor: busy ? "default" : "pointer",
+            cursor: busy ? "progress" : "pointer",
           }}
         >
           <input
             type="checkbox"
             checked={acknowledged}
-            onChange={(e) => setAcknowledged(e.target.checked)}
-            disabled={busy}
+            // La case garde le focus pendant l'envoi : elle ignore le geste.
+            aria-readonly={busy || undefined}
+            onChange={(e) => {
+              if (!isBusy()) setAcknowledged(e.target.checked);
+            }}
             style={{ marginTop: 2 }}
           />
           {/* NOSONAR S6772 — label en flex avec `gap` */}
           {t("rollback.acknowledge")}
         </label>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
+        <div className="dim-disabled" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <BusyButton
+            busy={busy}
             className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!isBusy()) onClose();
+            }}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={!acknowledged}
             type="submit"
             className="btn"
-            disabled={!acknowledged || busy}
             style={{
               padding: "8px 20px",
               fontSize: 13,
@@ -280,8 +291,8 @@ export function RollbackRoundDialog({
             {/* Neutre, et pas « cette manche » : le stade peut être un *tour*
                 d'arbre final, et le libellé se serait trompé de genre une fois
                 sur deux. Le titre du dialogue, lui, porte déjà le nom exact. */}
-            {busy ? t("rollback.pending") : t("rollback.confirm")}
-          </button>
+            <BusyLabel busy={busy} idle={t("rollback.confirm")} pending={t("rollback.pending")} />
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

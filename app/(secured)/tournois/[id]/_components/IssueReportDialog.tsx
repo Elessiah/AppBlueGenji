@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   ISSUE_REPORT_MAX_LENGTH,
   ISSUE_REPORT_MIN_LENGTH,
@@ -37,35 +40,35 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
   const team1 = useShownEntrantName(match?.team1Id ?? null, match?.team1Name ?? null);
   const team2 = useShownEntrantName(match?.team2Id ?? null, match?.team2Name ?? null);
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (double clic, Entrée) : un second signalement partirait
+  // avant que `busy` soit rendu. Boutons focalisables pendant l'envoi.
+  const { busy, isBusy, run } = useBusyGuard();
 
   const valid = normalizeIssueReportMessage(message) !== null;
   const touched = message.trim().length > 0;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!valid) return;
-
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/report-issue`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: message.trim(), matchId: match?.id ?? null }),
-      });
-      const payload = (await response.json()) as { error?: string; notifiedReferees?: number };
-      if (!response.ok) throw new Error(payload.error || "ISSUE_REPORT_FAILED");
-      showSuccess(
-        payload.notifiedReferees && payload.notifiedReferees > 0
-          ? t("issue.sentReferees", { count: payload.notifiedReferees })
-          : t("issue.sentStaff"),
-      );
-      onClose();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
-    }
+    if (isBusy() || !valid) return;
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/tournaments/${tournamentId}/report-issue`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ message: message.trim(), matchId: match?.id ?? null }),
+        });
+        const payload = (await response.json()) as { error?: string; notifiedReferees?: number };
+        if (!response.ok) throw new Error(payload.error || "ISSUE_REPORT_FAILED");
+        showSuccess(
+          payload.notifiedReferees && payload.notifiedReferees > 0
+            ? t("issue.sentReferees", { count: payload.notifiedReferees })
+            : t("issue.sentStaff"),
+        );
+        onClose();
+      } catch (error) {
+        showError(mapError((error as Error).message));
+      }
+    });
   };
 
   return (
@@ -93,6 +96,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={5}
+            readOnly={busy}
             maxLength={ISSUE_REPORT_MAX_LENGTH}
             aria-invalid={touched && !valid}
             aria-describedby="issue-report-hint"
@@ -114,23 +118,26 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
+          <BusyButton
+            busy={busy}
             type="button"
             className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!isBusy()) onClose();
+            }}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={!valid}
             type="submit"
             className="btn"
-            disabled={busy || !valid}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
-            {busy ? t("issue.pending") : t("issue.send")}
-          </button>
+            <BusyLabel busy={busy} idle={t("issue.send")} pending={t("issue.pending")} />
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

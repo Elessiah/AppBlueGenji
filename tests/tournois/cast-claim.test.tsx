@@ -430,7 +430,7 @@ describe("MatchCardActions — branchements du cast", () => {
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
     expect(settings).toContain('requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED")');
     // Geste sans retour : confirmé par ConfirmActionDialog (jamais un clic direct).
-    expect(settings).toContain("onClick={() => setConfirmRelease(true)}");
+    expect(settings).toMatch(/onClick=\{\(\) => \{\s+if \(!isBusy\(\)\) setConfirmRelease\(true\);/);
     expect(settings).toContain("<ConfirmActionDialog");
     expect(settings).toContain('t("cardActions.releaseConfirm.selfConfirm")');
   });
@@ -485,7 +485,9 @@ describe("MatchCardActions — branchements du cast", () => {
   it("les choix restent figés pendant l'envoi, sans disabled natif (le focus ne se perd pas)", () => {
     expectContains(card, [
       "aria-disabled={busy || undefined}",
-      "if (!busy) onPick(caster.userId);",
+      "onChange={() => onPick(caster.userId)}",
+      // Garde synchrone chez l'appelant : un choix parti avec l'envoi ne change pas la cible.
+      "if (!isBusy()) setReleaseTarget(userId);",
     ]);
     expect(card).not.toMatch(/<fieldset[^>]*disabled/);
   });
@@ -684,7 +686,7 @@ describe("Fenêtre de diffusion — lien du staff sur le mode d'un autre caster"
   it("MatchLiveDialog_linkOwnedByOtherCaster_readOnlyWithHintAndNoOrganisationBox", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
     expect(dialog).toContain("const linkLocked = staffLinkLocked(triggerLocked, match) || !staffSide;");
-    expect(dialog).toContain("readOnly={linkLocked}");
+    expect(dialog).toContain("readOnly={linkLocked || busy}");
     expect(dialog).toContain('return linkLocked ? <p>{t("live.urlLocked")}</p> : null;');
     expect(dialog).toContain("{canSpeakForOrganisation && urlTouched && !linkLocked && (");
   });

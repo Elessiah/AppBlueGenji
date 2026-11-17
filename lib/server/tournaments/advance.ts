@@ -103,11 +103,16 @@ async function countEntrants(
  *
  * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
  * @throws le code de `LaunchBlockReason` — la fenêtre de lancement est fermée.
+ * @throws `TOURNAMENT_STAGE_CHANGED` — `expectedTarget` donné, et l'étape
+ *   suivante n'est plus celle-là (le tournoi a déjà avancé).
  * @throws `INVALID_DATE_ORDER` — filet : les jalons abrégés se suivent par
  *   construction, mais rien n'écrit de dates incohérentes dans `bg_tournaments`
  *   sans passer par ce contrôle, et ce n'est pas ici que l'exception commencera.
  */
-export async function advanceTournamentNow(tournamentId: number): Promise<AdvancedTournament> {
+export async function advanceTournamentNow(
+  tournamentId: number,
+  expectedTarget?: AdvanceTarget,
+): Promise<AdvancedTournament> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -134,6 +139,10 @@ export async function advanceTournamentNow(tournamentId: number): Promise<Advanc
     // Filet : `advanceTarget` ne rend `null` que quand `launchBlockReason`
     // refuse, contrôlé juste au-dessus.
     if (!target) throw new Error("TOURNAMENT_ALREADY_STARTED");
+    // L'étape confirmée n'est plus la suivante : quelqu'un (ou l'heure) a déjà
+    // fait avancer le tournoi. Le second clic ne lui en fait pas franchir une
+    // de plus — sous verrou, le second lit les jalons abrégés par le premier.
+    if (expectedTarget && target !== expectedTarget) throw new Error("TOURNAMENT_STAGE_CHANGED");
 
     const entrantCount = await countEntrants(connection, tournamentId);
 

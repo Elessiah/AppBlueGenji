@@ -1,11 +1,14 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { imageErrorText, imageSuccessText, useImageText } from "../../_lib/image-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
-import { CyberButton, ScrollArea } from "@/components/cyber";
+import { ScrollArea } from "@/components/cyber";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
@@ -51,7 +54,9 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   // pour qu'aucun rendu ne montre un brouillon périmé face à la nouvelle image.
   const [base, setBase] = useState<TournamentImage | null>(image);
   const [conflict, setConflict] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Boutons focalisables pendant l'envoi (`BusyButton`), garde synchrone :
+  // un double clic envoyait l'image deux fois.
+  const { busy, isBusy, run } = useBusyGuard();
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 
@@ -66,25 +71,31 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   }
 
   const change = imagePickerChange(image, value);
+  // Le choix de l'organisateur passe par la garde **synchrone** : un
+  // « Retirer » parti dans la même image que « Enregistrer », avant le rendu
+  // qui arme `busy`, effaçait sinon le brouillon d'un envoi déjà en route.
+  const editDraft = (next: ImagePickerValue) => {
+    if (!isBusy()) setValue(next);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isBusy()) return;
     if (change.kind === "NONE") {
       onClose();
       return;
     }
-    setBusy(true);
-    try {
-      await applyImageChange(tournamentId, change, value.file, value.crop, (code) => imageErrorText(imageText, code));
-      const message = imageSuccessText(imageText, change);
-      if (message) showSuccess(message);
-      onSaved();
-      onClose();
-    } catch (error) {
-      showError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        await applyImageChange(tournamentId, change, value.file, value.crop, (code) => imageErrorText(imageText, code));
+        const message = imageSuccessText(imageText, change);
+        if (message) showSuccess(message);
+        onSaved();
+        onClose();
+      } catch (error) {
+        showError((error as Error).message);
+      }
+    });
   };
 
   return createPortal(
@@ -150,9 +161,10 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
               </p>
             )}
 
-            <TournamentImagePicker existing={image} value={value} onChange={setValue} disabled={busy} />
+            <TournamentImagePicker existing={image} value={value} onChange={editDraft} busy={busy} />
 
             <div
+              className="dim-disabled"
               style={{
                 display: "flex",
                 justifyContent: "flex-end",
@@ -163,12 +175,18 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
                 borderTop: "1px solid var(--line-soft)",
               }}
             >
-              <CyberButton type="button" variant="ghost" onClick={onClose} disabled={busy}>
+              <BusyButton
+                busy={busy}
+                className="btn ghost"
+                onClick={() => {
+                  if (!isBusy()) onClose();
+                }}
+              >
                 {t("score.cancel")}
-              </CyberButton>
-              <CyberButton type="submit" variant="primary" disabled={busy || change.kind === "NONE"}>
-                {busy ? t("schedule.saving") : t("schedule.save")}
-              </CyberButton>
+              </BusyButton>
+              <BusyButton busy={busy} blocked={change.kind === "NONE"} type="submit" className="btn">
+                <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
+              </BusyButton>
             </div>
           </form>
         </ScrollArea>

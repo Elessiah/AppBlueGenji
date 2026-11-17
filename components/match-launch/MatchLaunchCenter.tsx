@@ -12,6 +12,9 @@ import { useEnglishMessagesUntilRemount } from "@/components/i18n/use-english-me
 import { preloadMissing } from "@/lib/shared/lazy-component";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { anotherModalOpen, watchModalsClosed } from "@/lib/shared/dialog-focus";
@@ -107,11 +110,6 @@ export function launchErrorText(text: LaunchText, code: string | null | undefine
   return message === key ? text.t("errors.fallback") : message;
 }
 
-/** Libellé d'un bouton, remplacé par « … » le temps d'un envoi. */
-function busyLabel(busy: boolean, label: string): string {
-  return busy ? "…" : label;
-}
-
 /** Doit-on ouvrir la modale d'office pour ce match ? */
 function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
   if (info.phase === "LOBBY") return true;
@@ -163,10 +161,14 @@ export function MatchLaunchCenter({
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
   // confirmation retirent chacun le bouton qui l'avait, et le focus sortait
   // alors de la modale (sur `<body>`). Consommé par l'effet plus bas.
-  const pendingFocusRef = useRef<"confirm" | "ready" | null>(null);
+  const pendingFocusRef = useRef<"confirm" | "confirmReady" | "ready" | null>(null);
   const confirmRef = useRef<HTMLFieldSetElement>(null);
+  const confirmReadyRef = useRef<HTMLButtonElement>(null);
   const readyRef = useRef<HTMLButtonElement>(null);
-  const [busy, setBusy] = useState(false);
+  // Boutons focalisables pendant l'envoi (`BusyButton`,
+  // `docs/features/BUSY_BUTTONS.md`) et garde synchrone : un double clic sur
+  // « Prêt » partait deux fois.
+  const { busy, isBusy, run } = useBusyGuard();
   const dismissedRef = useRef<Set<string> | null>(null);
   // Relance de l'ouverture d'office, retenue par une autre modale ouverte.
   const [modalRecheck, setModalRecheck] = useState(0);
@@ -245,31 +247,32 @@ export function MatchLaunchCenter({
   });
 
   const setReady = async (ready: boolean) => {
-    if (!current || busy) return;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/matches/${current.matchId}/ready`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ready }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        launched?: boolean;
-      };
-      if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      const readyMessage = ready ? t("readyNoted") : t("readyCanceled");
-      showSuccess(payload.launched ? t("launched") : readyMessage);
-      setConfirming(false);
-      pendingFocusRef.current = "ready";
-      await refresh();
-    } catch (error) {
-      // Le bouton, désactivé le temps de l'envoi, a pu perdre le focus.
-      pendingFocusRef.current = confirming ? "confirm" : "ready";
-      showError(launchErrorText(text, (error as Error).message));
-    } finally {
-      setBusy(false);
-    }
+    if (!current) return;
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/matches/${current.matchId}/ready`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ready }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          launched?: boolean;
+        };
+        if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+        const readyMessage = ready ? t("readyNoted") : t("readyCanceled");
+        showSuccess(payload.launched ? t("launched") : readyMessage);
+        setConfirming(false);
+        pendingFocusRef.current = "ready";
+        await refresh();
+      } catch (error) {
+        // Le geste a pu changer la vue (match lancé entre-temps) : le focus
+        // revient au bouton d'où l'envoi est parti — resté focalisable
+        // (`BusyButton`), il garde la main pour réessayer.
+        pendingFocusRef.current = confirming ? "confirmReady" : "ready";
+        showError(launchErrorText(text, (error as Error).message));
+      }
+    });
   };
 
   const copy = async (value: string, label: string) => {
@@ -287,7 +290,7 @@ export function MatchLaunchCenter({
     const target = pendingFocusRef.current;
     if (target === null || busy) return;
     pendingFocusRef.current = null;
-    const element = target === "confirm" ? confirmRef.current : readyRef.current;
+    const element = { confirm: confirmRef, confirmReady: confirmReadyRef, ready: readyRef }[target].current;
     (element ?? dialogRef.current)?.focus();
   });
 
@@ -394,52 +397,51 @@ export function MatchLaunchCenter({
               {confirmQuestion} {t("startsWhenReady")}
             </p>
             <div className={styles.actions}>
-              <button
-                type="button"
+              <BusyButton
+                busy={busy}
                 className="btn ghost"
                 onClick={() => {
+                  if (isBusy()) return;
                   pendingFocusRef.current = "ready";
                   setConfirming(false);
                 }}
-                disabled={busy}
               >
                 {t("back")}
-              </button>
-              <button
-                type="button"
+              </BusyButton>
+              <BusyButton
+                ref={confirmReadyRef}
+                busy={busy}
                 className={`btn ${styles.readyButton}`}
                 onClick={() => void setReady(true)}
-                disabled={busy}
               >
-                {busyLabel(busy, t("confirmReady"))}
-              </button>
+                <BusyLabel busy={busy} idle={t("confirmReady")} pending={`${t("confirmReady")}…`} />
+              </BusyButton>
             </div>
           </fieldset>
         ) : (
           <footer className={styles.footer}>
             {current.phase === "LOBBY" && current.viewer.canDeclareReady && (
               current.viewer.ready ? (
-                <button
+                <BusyButton
+                  busy={busy}
                   ref={readyRef}
-                  type="button"
                   className={`btn ${styles.readyOn}`}
                   onClick={() => void setReady(false)}
-                  disabled={busy}
                   aria-pressed="true"
                   title={t("cancelReadyTitle")}
                 >
-                  {busyLabel(busy, t("cancelReady"))}
-                </button>
+                  <BusyLabel busy={busy} idle={t("cancelReady")} pending={`${t("cancelReady")}…`} />
+                </BusyButton>
               ) : (
-                <button
+                <BusyButton
+                  busy={busy}
                   ref={readyRef}
-                  type="button"
                   className={`btn ${styles.readyButton}`}
                   onClick={() => {
+                    if (isBusy()) return;
                     pendingFocusRef.current = "confirm";
                     setConfirming(true);
                   }}
-                  disabled={busy}
                   aria-pressed="false"
                   // Focus d'ouverture : ce bouton n'ouvre que la confirmation,
                   // un Entrée égaré ne déclare donc rien. Ni « annuler » (un
@@ -449,7 +451,7 @@ export function MatchLaunchCenter({
                   data-autofocus
                 >
                   {partyWord}
-                </button>
+                </BusyButton>
               )
             )}
             {current.phase === "LOBBY" && !current.viewer.canDeclareReady && (

@@ -120,17 +120,16 @@
   border-radius: 3px;
 }
 
-.conflictAction:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 /* « Reprendre la proposition » pendant un envoi : `aria-disabled` (le focus
    reste), inactif à l'œil par la couleur et le curseur. */
 .conflictAction[aria-disabled="true"] {
   cursor: not-allowed;
   color: var(--ink-soft, #c3ccd8);
   text-decoration: none;
+}
+
+.conflictAction[aria-disabled="true"][aria-busy="true"] {
+  cursor: progress;
 }
 
 /* Déclaration adverse arrivée pendant la saisie : ce qui diffère, map par
@@ -231,7 +230,7 @@
   border-style: solid;
 }
 
-.forfeit:hover:not(:disabled, [aria-disabled="true"]) {
+.forfeit:hover:not([aria-disabled="true"]) {
   background: rgba(var(--amber-rgb), 0.12);
 }
 
@@ -246,10 +245,17 @@
   outline-offset: 2px;
 }
 
-.forfeit:disabled,
+/* Désarmé : couleurs ternies, jamais `opacity` (elle se multiplie avec celle
+   d'un parent). En attente (`aria-busy`), le libellé reste lisible. */
 .forfeit[aria-disabled="true"] {
-  opacity: 0.5;
+  border-color: rgba(var(--amber-rgb), 0.35);
+  color: rgba(var(--amber-rgb), 0.7);
   cursor: not-allowed;
+}
+
+.forfeit[aria-disabled="true"][aria-busy="true"] {
+  color: rgba(var(--amber-rgb), 0.85);
+  cursor: progress;
 }
 
 /* Lien d'action : le poids le plus faible du dialogue, pour « Déclarer un
@@ -266,7 +272,7 @@
   transition: color 0.15s ease;
 }
 
-.link:hover:not(:disabled, [aria-disabled="true"]) {
+.link:hover:not([aria-disabled="true"]) {
   color: var(--ink, var(--ink));
 }
 
@@ -276,10 +282,15 @@
   border-radius: 3px;
 }
 
-.link:disabled,
 .link[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.5;
+  color: var(--ink-dim, #859dbb);
+  text-decoration: none;
+}
+
+.link[aria-disabled="true"][aria-busy="true"] {
+  color: var(--ink-quiet, #9aa4b2);
+  cursor: progress;
 }
 
 /* ---------- Raison d'un refus, puis actions ---------- */
@@ -323,19 +334,26 @@
   background: rgba(90, 200, 255, 0.3);
 }
 
-.actions :global(.btn:not(.ghost):hover:not(:disabled, [aria-disabled="true"])) {
+.actions :global(.btn:not(.ghost):hover:not([aria-disabled="true"])) {
   background: rgba(90, 200, 255, 0.42);
 }
 
 /* `.btn` global n'a pas d'état désactivé : sans ça, « Valider le résultat »
    gardait l'apparence d'un bouton cliquable alors qu'il refusait le clic, et
    rien à l'écran ne disait pourquoi. */
-.actions :global(.btn:disabled),
 .actions :global(.btn[aria-disabled="true"]) {
-  opacity: 0.4;
+  border-color: rgba(180, 210, 230, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-dim);
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
+}
+
+/* En attente (`aria-busy`), le libellé suivi de « … » reste lisible. */
+.actions :global(.btn[aria-disabled="true"][aria-busy="true"]) {
+  color: var(--ink-soft);
+  cursor: progress;
 }
 
 .actions :global(.btn:focus-visible) {

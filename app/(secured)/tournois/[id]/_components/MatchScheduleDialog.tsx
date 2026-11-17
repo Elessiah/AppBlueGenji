@@ -1,6 +1,9 @@
 "use client";
 
+import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { FormEvent, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -142,10 +145,9 @@ function savedMessage(text: TournamentDialogsText, touched: boolean, planning: b
   return text.t(planning ? "schedule.planned" : "schedule.saved");
 }
 
-/** Libellé du bouton d'envoi. */
-function submitLabel(text: TournamentDialogsText, busy: boolean, planning: boolean): string {
-  if (busy) return text.t("schedule.saving");
-  return text.t(planning ? "schedule.plan" : "schedule.save");
+/** Libellé du bouton d'envoi : « Enregistrer »/« Planifier », puis « Enregistrement… » sans bouger. */
+function SubmitLabel({ text, busy, planning }: Readonly<{ text: TournamentDialogsText; busy: boolean; planning: boolean }>) {
+  return <BusyLabel busy={busy} idle={text.t(planning ? "schedule.plan" : "schedule.save")} pending={text.t("schedule.saving")} />;
 }
 
 const WARNING_STYLE = {
@@ -270,7 +272,11 @@ export function MatchScheduleDialog({
   // Les boutons de décalage restent repliés tant qu'on ne les demande pas :
   // l'aperçu juste — le cas courant — n'a pas à les montrer.
   const [yearFixOpen, setYearFixOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone : un second envoi (double clic, Entrée) part avant que
+  // `busy` soit rendu. Les boutons restent focalisables pendant l'envoi
+  // (`aria-disabled` + `aria-busy`) ; les listes gardent `disabled` (le focus
+  // est sur le bouton qui envoie, une liste n'envoie pas le formulaire).
+  const { busy, isBusy, run } = useBusyGuard();
   // Le dernier envoi a été retenu (date devenue passée) : le clic suivant, s'il
   // prolonge un double-clic, ne le confirme pas (`isUnreadConfirmationClick`).
   const justHeld = useRef(false);
@@ -345,6 +351,7 @@ export function MatchScheduleDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isBusy()) return;
     if (entry.kind === "incomplete" || entry.kind === "invalid") {
       const message = entryRefusal(text, entry) ?? t("schedule.refusal.unknown");
       fieldErrors.flag(entry.field, message);
@@ -371,30 +378,29 @@ export function MatchScheduleDialog({
     }
 
     justHeld.current = false;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
-        }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
-        throw new CodedError(code, mapError(code));
+    await run(async () => {
+      try {
+        const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
+          }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
+          throw new CodedError(code, mapError(code));
+        }
+        showSuccess(savedMessage(text, entry.kind === "ready", planning, match.startAt !== null));
+        onSaved();
+        onClose();
+      } catch (error) {
+        const message = error instanceof CodedError ? error.message : mapError((error as Error).message);
+        fieldErrors.report(errorCode(error), message);
+        showError(message);
       }
-      showSuccess(savedMessage(text, entry.kind === "ready", planning, match.startAt !== null));
-      onSaved();
-      onClose();
-    } catch (error) {
-      const message = error instanceof CodedError ? error.message : mapError((error as Error).message);
-      fieldErrors.report(errorCode(error), message);
-      showError(message);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const fieldStyle = { flex: "1 1 96px", margin: 0, minWidth: 0 } as const;
@@ -546,17 +552,19 @@ export function MatchScheduleDialog({
           </output>
           {entry.kind === "ready" && (previousYear !== null || nextYear !== null) && (
             // Le bouton reste en place une fois déplié : il garde le focus.
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className="btn ghost"
-              disabled={busy}
-              onClick={() => setYearFixOpen((open) => !open)}
+              onClick={() => {
+                if (!isBusy()) setYearFixOpen((open) => !open);
+              }}
               aria-expanded={yearFixOpen}
               aria-controls={YEAR_FIX_ID}
               style={{ padding: "4px 10px", fontSize: 12, marginTop: 6 }}
             >
               {t("schedule.wrongYear")}
-            </button>
+            </BusyButton>
           )}
           {entry.kind === "ready" && yearFixOpen && (previousYear !== null || nextYear !== null) && (
             <fieldset
@@ -566,28 +574,32 @@ export function MatchScheduleDialog({
               <legend className="sr-only">{t("schedule.fixYear")}</legend>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {previousYear !== null && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  disabled={busy}
-                  onClick={() => setYearShift(previousYear.shift)}
+                  onClick={() => {
+                    if (!isBusy()) setYearShift(previousYear.shift);
+                  }}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
                   {t("schedule.previousYear")}
-                </button>
+                </BusyButton>
               )}
               {nextYear !== null && (
-                <button
+                <BusyButton
+                  busy={busy}
                   type="button"
                   className="btn ghost"
-                  disabled={busy}
-                  onClick={() => setYearShift(nextYear.shift)}
+                  onClick={() => {
+                    if (!isBusy()) setYearShift(nextYear.shift);
+                  }}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
                   {t("schedule.nextYear")}
-                </button>
+                </BusyButton>
               )}
               </div>
             </fieldset>
@@ -630,29 +642,29 @@ export function MatchScheduleDialog({
 
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
             {!cleared && (
-              <button
+              <BusyButton
+                busy={busy}
                 type="button"
                 className="btn ghost"
                 onClick={(event) => {
-                  if (event.detail <= 1) clearAll();
+                  if (event.detail <= 1 && !isBusy()) clearAll();
                 }}
-                disabled={busy}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
                 {t("schedule.clear")}
-              </button>
+              </BusyButton>
             )}
-            <button
+            <BusyButton
+              busy={busy}
               type="button"
               className="btn ghost"
               onClick={(event) => {
-                if (event.detail <= 1) onClose();
+                if (event.detail <= 1 && !isBusy()) onClose();
               }}
-              disabled={busy}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
-            </button>
+            </BusyButton>
             {/* Le clic qui prolonge un double-clic (`detail`, au réglage du
                 système) juste après un envoi retenu (date devenue passée), et
                 la répétition d'« Entrée » tenue, n'envoient pas : ils
@@ -660,7 +672,8 @@ export function MatchScheduleDialog({
                 suivant part (`isUnreadConfirmationClick`). Même garde sur « Vider la date »
                 et « Annuler » : l'avertissement qui apparaît repousse la
                 rangée, et le second clic tombait sur eux (date perdue). */}
-            <button
+            <BusyButton
+              busy={busy}
               id={SUBMIT_ID}
               type="submit"
               onClick={(event) => {
@@ -671,11 +684,10 @@ export function MatchScheduleDialog({
                 if (event.repeat && event.key === "Enter") event.preventDefault();
               }}
               className="btn"
-              disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
-              {submitLabel(text, busy, planning)}
-            </button>
+              <SubmitLabel text={text} busy={busy} planning={planning} />
+            </BusyButton>
           </div>
         </form>
       </div>

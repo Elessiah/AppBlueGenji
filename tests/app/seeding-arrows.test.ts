@@ -48,28 +48,34 @@ describe("Ordre de départ — flèches seules", () => {
     expect(frActions.registrations.moveUpAria).toBe("Monter {name} d'un rang");
     expect(frActions.registrations.moveDownAria).toBe("Descendre {name} d'un rang");
     expect(panel.match(/className=\{styles\.arrow\}/g)).toHaveLength(2);
-    // De vrais `<button>` : focusables, actionnés à Entrée et à l'espace.
+    // De vrais `<button>` (`BusyButton`) : focusables, actionnés à Entrée et à
+    // l'espace, et qui gardent le focus pendant l'envoi.
     expect(
-      panel.match(/<button\s+type="button"\s+ref=\{[\s\S]*?\}\s+className=\{styles\.arrow\}/g),
+      panel.match(/<BusyButton\s+busy=\{busy\}\s+blocked=\{[^}]+\}\s+data-arrow=\{.\$\{reg\.teamId\}:(?:up|down).\}\s+className=\{styles\.arrow\}/g),
     ).toHaveLength(2);
   });
 
-  it("désactive la flèche qui sortirait de la liste", () => {
-    expect(panel).toMatch(/disabled=\{busy \|\| index === 0\}/);
-    expect(panel).toMatch(/disabled=\{busy \|\| index === rows\.length - 1\}/);
+  it("désarme la flèche qui sortirait de la liste, sans lui retirer le focus", () => {
+    expect(panel).toMatch(/blocked=\{index === 0\}/);
+    expect(panel).toMatch(/blocked=\{isLast\}/);
+    expect(panel).not.toMatch(/disabled=\{busy/);
+    // Arrivée en bout de liste, la flèche actionnée est désarmée : le focus
+    // passe à celle qui ramène la ligne.
+    expect(panel).toMatch(/preferred\.getAttribute\("aria-disabled"\) !== "true" \? preferred : arrow\(opposite\)/);
   });
 
   it("ne réagit qu'au clic, jamais au défilement", () => {
-    expect(panel).toMatch(/onClick=\{\(\) => move\(reg\.teamId, "up"\)\}/);
-    expect(panel).toMatch(/onClick=\{\(\) => move\(reg\.teamId, "down"\)\}/);
+    expect(panel).toMatch(/onClick=\{\(\) => onMove\(reg\.teamId, "up"\)\}/);
+    expect(panel).toMatch(/onClick=\{\(\) => onMove\(reg\.teamId, "down"\)\}/);
     expect(ruleBody(css, ".arrow")).toMatch(/touch-action:\s*manipulation/);
   });
 
   it("marque l'état désactivé par les couleurs, jamais par l'opacité", () => {
-    const disabled = ruleBody(css, ".arrow:disabled");
+    const disabled = ruleBody(css, '.arrow[aria-disabled="true"]');
     expect(disabled).not.toMatch(/opacity/);
     expect(disabled).toMatch(/color:\s*var\(--ink-mute\)/);
-    expect(ruleBody(css, ".remove:disabled")).not.toMatch(/opacity/);
+    expect(ruleBody(css, '.remove[aria-disabled="true"]')).not.toMatch(/opacity/);
+    expect(stripComments(css)).not.toMatch(/:disabled/);
   });
 
   it("agrandit les flèches au doigt", () => {

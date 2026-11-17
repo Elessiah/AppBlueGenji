@@ -1,5 +1,5 @@
 {
-  "count": 227,
+  "count": 229,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -202,6 +202,8 @@
     "TOO_MANY_TEAMS": "Sélection trop large : inscris-les en plusieurs fois.",
     "TOURNAMENT_ADVANCE_FAILED": "Erreur lors de l'avancée du tournoi.",
     "TOURNAMENT_ALREADY_FINISHED": "Ce tournoi est terminé.",
+    "TOURNAMENT_STAGE_CHANGED": "Ce tournoi a déjà avancé entre-temps : rechargez la page pour voir son étape actuelle.",
+    "INVALID_ADVANCE_BODY": "Demande d'avancée invalide.",
     "TOURNAMENT_ALREADY_STARTED": "Ce tournoi a déjà démarré : il n'y a plus d'étape à avancer.",
     "TOURNAMENT_CREATE_FAILED": "Le tournoi n'a pas pu être créé.",
     "TOURNAMENT_DELETE_FAILED": "Erreur lors de la suppression du tournoi.",

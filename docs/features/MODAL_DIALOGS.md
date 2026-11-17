@@ -36,7 +36,9 @@ main est levé sous la modale par la fermeture d'une autre.
 Le focus initial va au premier élément focalisable, **sauf** s'il existe un
 élément marqué `data-autofocus` : le champ à remplir d'abord n'est pas toujours
 le premier (le bureau place un bouton « Couleur aléatoire » avant le champ
-Nom). `initialFocus: "container"` le pose sur le conteneur lui-même
+Nom). Jamais de focus posé au montage dans une modale (`focusOnMount`, `autoFocus`) :
+la ref passe avant l'effet de `useDialogBehavior`, qui retient alors ce champ
+comme cible de retour, et la fermeture laisse le focus sur `body` (`GhostRegistrationDialog` ne refocalise qu'au changement de mode). `initialFocus: "container"` le pose sur le conteneur lui-même
 (`tabIndex={-1}`, sans défilement) : une proposition dont aucun bouton ne doit
 partir sur Entrée, et dont le titre doit rester en vue à fort zoom
 (`DiscordCertifyPrompt`, `CertificationPromptDialog` — prop `initialFocus` de
