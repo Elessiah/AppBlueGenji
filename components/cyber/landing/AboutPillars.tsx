@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -16,6 +18,10 @@ import {
   validateAboutPillarInput,
 } from "@/lib/shared/about-pillars";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { arrowKey } from "@/lib/shared/arrow-refocus";
+import { newRequestKey } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutPillars.module.css";
@@ -59,12 +65,22 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   const [editing, setEditing] = useState<AboutPillar | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Un envoi à la fois pour la section (enregistrer, déplacer, supprimer) :
+  // garde synchrone, boutons focalisables pendant l'attente (`BUSY_BUTTONS.md`).
+  // Un double clic sur une flèche partait deux fois, chaque envoi calculé sur
+  // l'ordre d'avant l'autre.
+  const { busy, isBusy, run } = useBusyGuard();
+  const refocusArrow = useArrowRefocus("pillar");
+  // Clé de l'ajout, tirée à chaque ouverture : un renvoi (réponse perdue) rend
+  // la carte déjà créée au lieu d'en ajouter une seconde (`lib/server/idempotency.ts`).
+  const createKey = useRef("");
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (p: AboutPillar) => isAdmin && p.id > 0;
 
   function openCreate() {
+    if (isBusy()) return;
+    createKey.current = newRequestKey();
     fieldErrors.clear();
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -72,17 +88,21 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   }
 
   function openEdit(pillar: AboutPillar) {
+    if (isBusy()) return;
     fieldErrors.clear();
     setEditing(pillar);
     setForm({ title: pillar.title, text: pillar.text, titleEn: pillar.titleEn ?? "", textEn: pillar.textEn ?? "" });
     setOpen(true);
   }
 
-  function close() {
-    if (busy) return;
+  function closeDialog() {
     setOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
+  }
+
+  function close() {
+    if (!isBusy()) closeDialog();
   }
 
   // Un refus désigne son champ (titre, texte, et leur anglais) : rattaché à
@@ -94,6 +114,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   }
 
   async function submit() {
+    if (isBusy()) return;
     const payload = {
       title: form.title.trim(),
       text: form.text.trim(),
@@ -108,35 +129,33 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
       return;
     }
 
-    setBusy(true);
+    await run(async () => {
+      try {
+        const url = editing ? `/api/association/about-pillars/${editing.id}` : "/api/association/about-pillars";
+        const res = await fetch(url, {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing ? payload : { ...payload, requestKey: createKey.current }),
+        });
+        const data = (await res.json()) as { pillar?: AboutPillar; error?: string };
+        if (!res.ok || !data.pillar) {
+          refuse(data.error, "Échec de l'enregistrement.");
+          return;
+        }
 
-    try {
-      const url = editing ? `/api/association/about-pillars/${editing.id}` : "/api/association/about-pillars";
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { pillar?: AboutPillar; error?: string };
-      if (!res.ok || !data.pillar) {
-        refuse(data.error, "Échec de l'enregistrement.");
-        return;
+        if (editing) {
+          setPillars((prev) => prev.map((p) => (p.id === data.pillar!.id ? data.pillar! : p)));
+          showSuccess("Carte mise à jour.");
+        } else {
+          // Si on partait des cartes de secours, on bascule sur la liste réelle.
+          setPillars((prev) => [...prev.filter((p) => p.id > 0), data.pillar!]);
+          showSuccess("Carte ajoutée.");
+        }
+        closeDialog();
+      } catch {
+        showError("Erreur réseau, réessaye.");
       }
-
-      if (editing) {
-        setPillars((prev) => prev.map((p) => (p.id === data.pillar!.id ? data.pillar! : p)));
-        showSuccess("Carte mise à jour.");
-      } else {
-        // Si on partait des cartes de secours, on bascule sur la liste réelle.
-        setPillars((prev) => [...prev.filter((p) => p.id > 0), data.pillar!]);
-        showSuccess("Carte ajoutée.");
-      }
-      close();
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // Déplace une carte d'un cran (direction -1 = vers le haut, +1 = vers le bas)
@@ -145,61 +164,64 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
     const target = index + direction;
     if (target < 0 || target >= pillars.length) return;
 
-    const previous = pillars;
-    const reordered = [...pillars];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setPillars(reordered);
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/association/about-pillars/reorder", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((p) => p.id) }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+    await run(async () => {
+      const previous = pillars;
+      const reordered = [...pillars];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      const id = pillars[index].id;
+      const arrow = direction < 0 ? "up" : "down";
+      setPillars(reordered);
+      refocusArrow(id, arrow);
+      try {
+        const res = await fetch("/api/association/about-pillars/reorder", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: reordered.map((p) => p.id) }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+          setPillars(previous);
+          refocusArrow(id, arrow);
+          return;
+        }
+        showSuccess("Ordre des cartes mis à jour.");
+      } catch {
+        showError("Erreur réseau, réessaye.");
         setPillars(previous);
-        return;
+        refocusArrow(id, arrow);
       }
-      showSuccess("Ordre des cartes mis à jour.");
-    } catch {
-      showError("Erreur réseau, réessaye.");
-      setPillars(previous);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const [pendingRemoval, setPendingRemoval] = useState<AboutPillar | null>(null);
 
   async function remove(pillar: AboutPillar): Promise<boolean> {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/association/about-pillars/${pillar.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+    return (await run(async () => {
+      try {
+        const res = await fetch(`/api/association/about-pillars/${pillar.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+          return false;
+        }
+        // Si plus aucune carte réelle, réafficher les cartes de secours — c'est ce
+        // que renverrait un rechargement (table vide → FALLBACK_ABOUT_PILLARS).
+        setPillars((prev) => {
+          const next = prev.filter((p) => p.id !== pillar.id);
+          return next.length === 0 ? FALLBACK_ABOUT_PILLARS : next;
+        });
+        showSuccess("Carte supprimée.");
+        return true;
+      } catch {
+        showError("Erreur réseau, réessaye.");
         return false;
       }
-      // Si plus aucune carte réelle, réafficher les cartes de secours — c'est ce
-      // que renverrait un rechargement (table vide → FALLBACK_ABOUT_PILLARS).
-      setPillars((prev) => {
-        const next = prev.filter((p) => p.id !== pillar.id);
-        return next.length === 0 ? FALLBACK_ABOUT_PILLARS : next;
-      });
-      showSuccess("Carte supprimée.");
-      return true;
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
-    return false;
+    })) ?? false;
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  const pendingLabel = editing ? "Enregistrement…" : "Ajout…";
 
   return (
     <>
@@ -215,56 +237,60 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
               {/* Ordre réglé en français seulement : sous /en, des voisins sans anglais sont masqués. */}
               {locale === DEFAULT_LOCALE && (
                 <>
-                  <button
-                    type="button"
+                  <BusyButton
+                    busy={busy}
+                    blocked={index === 0}
                     className={`${styles.action} ${styles.moveAction}`}
-                    onClick={() => move(index, -1)}
-                    disabled={busy || index === 0}
+                    onClick={() => void move(index, -1)}
+                    data-arrow={arrowKey("pillar", p.id, "up")}
+                    data-edge={index === 0 || undefined}
                     aria-label={`Déplacer la carte ${p.title} vers le haut`}
                     title="Déplacer avant"
                   >
                     ↑
-                  </button>
-                  <button
-                    type="button"
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy}
+                    blocked={index === pillars.length - 1}
                     className={`${styles.action} ${styles.moveAction}`}
-                    onClick={() => move(index, 1)}
-                    disabled={busy || index === pillars.length - 1}
+                    onClick={() => void move(index, 1)}
+                    data-arrow={arrowKey("pillar", p.id, "down")}
+                    data-edge={index === pillars.length - 1 || undefined}
                     aria-label={`Déplacer la carte ${p.title} vers le bas`}
                     title="Déplacer après"
                   >
                     ↓
-                  </button>
+                  </BusyButton>
                 </>
               )}
-              <button
-                type="button"
+              <BusyButton
+                busy={busy}
                 className={styles.action}
                 onClick={() => openEdit(p)}
-                disabled={busy}
                 aria-label={withEnglishMissing(`Modifier la carte ${p.title}`, !aboutPillarHasEnglish(p))}
               >
                 Modifier
                 {!aboutPillarHasEnglish(p) && <EnglishMissingMark />}
-              </button>
-              <button
-                type="button"
+              </BusyButton>
+              <BusyButton
+                busy={busy}
                 className={`${styles.action} ${styles.actionDanger}`}
-                onClick={() => setPendingRemoval(p)}
-                disabled={busy}
+                onClick={() => {
+                  if (!isBusy()) setPendingRemoval(p);
+                }}
                 aria-label={`Supprimer la carte ${p.title}`}
               >
                 Supprimer
-              </button>
+              </BusyButton>
             </div>
           )}
         </article>
       ))}
 
       {isAdmin && (
-        <button type="button" className={styles.addBtn} onClick={openCreate} disabled={busy} lang={staffLang}>
+        <BusyButton busy={busy} className={styles.addBtn} onClick={openCreate} lang={staffLang}>
           + Ajouter une carte
-        </button>
+        </BusyButton>
       )}
 
       {open && (
@@ -290,6 +316,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
               maxLength={ABOUT_PILLAR_TITLE_MAX}
               placeholders={{ fr: "Accessible", en: "Accessible" }}
               enterKeyHint="next"
+              readOnly={busy}
               enMissing={editing !== null && !aboutPillarHasEnglish(editing)}
               inputClassName={styles.modalInput}
               labelClassName={styles.modalLabel}
@@ -307,6 +334,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
               maxLength={ABOUT_PILLAR_TEXT_MAX}
               multiline
               rows={3}
+              readOnly={busy}
               placeholders={{ fr: "Inscription gratuite, matchmaking par niveau…", en: "Free registration, skill-based matchmaking…" }}
               enMissing={editing !== null && !aboutPillarHasEnglish(editing)}
               inputClassName={styles.modalInput}
@@ -315,18 +343,12 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
           </div>
 
           <div className={styles.modalActions}>
-            <button type="button" className={styles.action} onClick={close} disabled={busy}>
+            <BusyButton busy={busy} className={styles.action} onClick={close}>
               Annuler
-            </button>
-            <button
-              type="button"
-              className={styles.actionPrimary}
-              onClick={submit}
-              disabled={busy}
-              aria-busy={busy}
-            >
-              {busy ? "…" : submitLabel}
-            </button>
+            </BusyButton>
+            <BusyButton busy={busy} className={styles.actionPrimary} onClick={() => void submit()}>
+              <BusyLabel busy={busy} idle={submitLabel} pending={pendingLabel} />
+            </BusyButton>
           </div>
         </LandingDialog>
       )}

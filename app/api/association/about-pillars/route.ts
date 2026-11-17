@@ -4,6 +4,7 @@ import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutPillar, listAboutPillars } from "@/lib/server/about-pillars-service";
 import { readJsonBody } from "@/lib/server/request-body";
+import { readRequestKey, runOnce } from "@/lib/server/idempotency";
 
 export async function GET() {
   const pillars = await listAboutPillars();
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let body: { title?: unknown; text?: unknown; titleEn?: unknown; textEn?: unknown };
+  let body: { title?: unknown; text?: unknown; titleEn?: unknown; textEn?: unknown; requestKey?: unknown };
   try {
     body = (await readJsonBody(req)) as typeof body;
   } catch {
@@ -23,12 +24,16 @@ export async function POST(req: Request) {
   }
 
   try {
-    const pillar = await createAboutPillar({
-      title: typeof body.title === "string" ? body.title : "",
-      text: typeof body.text === "string" ? body.text : "",
-      titleEn: typeof body.titleEn === "string" ? body.titleEn : null,
-      textEn: typeof body.textEn === "string" ? body.textEn : null,
-    });
+    // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au
+    // lieu d'en créer une seconde (`lib/server/idempotency.ts`).
+    const pillar = await runOnce(`about-pillar-create:${user.id}`, readRequestKey(body.requestKey), () =>
+      createAboutPillar({
+        title: typeof body.title === "string" ? body.title : "",
+        text: typeof body.text === "string" ? body.text : "",
+        titleEn: typeof body.titleEn === "string" ? body.titleEn : null,
+        textEn: typeof body.textEn === "string" ? body.textEn : null,
+      }),
+    );
     return ok({ pillar }, 201);
   } catch (e) {
     return fail(serviceErrorCode(e, "ABOUT_PILLAR_CREATE_FAILED"), 400);

@@ -106,3 +106,7 @@ trois règles communes à toutes les modales : `docs/features/MODAL_DIALOGS.md`.
 ## Langues (lot 5b de l'i18n)
 
 Titre et texte ont leur anglais (`title_en`, `text_en`), obligatoires à la saisie (`TITLE_EN_*`, `TEXT_EN_*`). Sous `/en`, une carte sans tout son anglais n'est pas rendue ; sans aucune carte traduite, la section « À propos » passe sur une colonne. Les cartes de secours ont leur anglais. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.
+
+## Envois
+
+Boutons occupés, focus des flèches d'ordre et ajout sans doublon par clé de requête : `BUSY_BUTTONS.md` (EF-68).

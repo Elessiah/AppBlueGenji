@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/about-stats-service";
 import { validateAboutStatInput, type AboutStatRequestInput } from "@/lib/shared/about-stats";
 import { authUser } from "../../../helpers/auth-user";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 
 const admin = authUser({ id: 1, isAdmin: true });
 const normalUser = authUser({ id: 2, isAdmin: false });
@@ -272,5 +273,63 @@ describe("DELETE /api/association/about-stats/[id]", () => {
 
     const res = await DELETE(jsonReq("DELETE", {}), params("99"));
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/association/about-stats — renvoi du même ajout", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const OTHER = authUser({ id: 3, isAdmin: true });
+  const created = { id: 7, value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("POST_sameRequestKeyTwice_createsOnceAndReturnsSameResource", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockResolvedValue(created);
+
+    const first = await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+    const second = await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+
+    expect(service.createAboutStat).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe(201);
+    expect(await second.json()).toEqual(await first.json());
+  });
+
+  it("POST_sameRequestKeyOtherUser_createsAgain", async () => {
+    jest.mocked(service.createAboutStat).mockResolvedValue(created);
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(OTHER);
+
+    await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+    await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+
+    expect(service.createAboutStat).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_noRequestKey_createsEachTime", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", { value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }));
+    await POST(jsonReq("POST", { value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }));
+
+    expect(service.createAboutStat).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_firstAttemptFails_retryWithSameKeyCreates", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockRejectedValueOnce(new Error("VALUE_REQUIRED")).mockResolvedValueOnce(created);
+
+    const failed = await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+    const retried = await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+
+    expect(failed.status).toBe(400);
+    expect(retried.status).toBe(201);
+    expect(service.createAboutStat).toHaveBeenCalledTimes(2);
   });
 });

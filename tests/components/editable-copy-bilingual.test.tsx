@@ -155,7 +155,7 @@ describe("EditableCopy — remise à l'origine", () => {
   const source = readFileSync(join(__dirname, "..", "..", "components", "cyber", "landing", "EditableCopy.tsx"), "utf8");
 
   it("ne supprime rien d'un clic : le bouton ouvre une confirmation", () => {
-    expect(source).toContain("onClick={() => setConfirmReset(true)}");
+    expect(source).toContain("if (!isBusy()) setConfirmReset(true);");
     expect(source).not.toContain("onClick={reset}");
   });
 

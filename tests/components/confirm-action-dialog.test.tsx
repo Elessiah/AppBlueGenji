@@ -262,7 +262,7 @@ describe("plus de window.confirm", () => {
   ])("%s confirme la suppression par la modale commune, qui joue le geste", (path) => {
     const src = readSource(path);
     expect(src).toContain("<ConfirmActionDialog");
-    expect(src).toContain("onClick={() => setPendingRemoval(");
+    expect(src).toMatch(/onClick=\{\(\) => (?:\{\s+if \(!isBusy\(\)\) )?setPendingRemoval\(/);
     expect(src).toContain("onConfirm={() => remove(pendingRemoval)}");
     expect(src).toMatch(/async function remove\([^)]*\): Promise<boolean>/);
   });

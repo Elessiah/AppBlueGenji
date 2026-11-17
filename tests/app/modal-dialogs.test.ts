@@ -183,11 +183,12 @@ describe("LandingDialog — fermeture d'en-tête et listes déroulantes", () => 
   );
 
   it("porte un bouton « Fermer » nommé, agrandi au toucher, bloqué pendant un envoi", () => {
-    const button = dialog.slice(dialog.indexOf("<button"), dialog.indexOf("</button>"));
+    const button = dialog.slice(dialog.indexOf("<BusyButton"), dialog.indexOf("</BusyButton>"));
     expect(button).toContain('aria-label="Fermer"');
     expect(button).toContain("tap-target");
     expect(button).toContain("onClick={onClose}");
-    expect(button).toContain("disabled={busy}");
+    // Bloqué pendant un envoi sans perdre le focus (`BUSY_BUTTONS.md`).
+    expect(button).toContain("busy={busy}");
     expect(button).toContain("data-dialog-close");
     expect(button).toMatch(/<span aria-hidden="true">×<\/span>/);
   });

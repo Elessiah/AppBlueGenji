@@ -94,3 +94,7 @@ l'image est devenue locale, pas parce qu'on renonce à l'optimiser.
 ## Langues (lot 5b de l'i18n)
 
 La description a son anglais (`description_en`, `descriptionEn`), obligatoire dès qu'une description est saisie (`DESCRIPTION_EN_*`). Sous `/en`, un partenaire sans description anglaise reste affiché, **sans** sa description (`sponsorDescription`), et son bouton « Modifier » porte la marque **EN**. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.
+
+## Envois
+
+Boutons occupés et import d'image sous une même garde, ajout sans doublon par clé de requête : `BUSY_BUTTONS.md` (EF-68).

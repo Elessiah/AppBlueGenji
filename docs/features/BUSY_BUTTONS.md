@@ -130,4 +130,26 @@ annoncer de l'attente.
   éteintes par `globals.css` (mêmes couleurs que `:disabled`, sans survol).
 - Centre de lancement : en échec, le focus revient au bouton pressé
   (« Confirmer prêt », `confirmReadyRef`), resté focalisable.
+- Pages vitrine éditables (EF-68) : `SponsorsGrid`, `AboutPillars`, `AboutStats`
+  (+ `AboutStatEditor`, qui écrivait `aria-disabled` à la main), `EditableCopy`,
+  `FooterContact` et le « × » de `LandingDialog` — `tests/app/showcase-busy-buttons.test.ts`.
+  Une garde par section : enregistrer, déplacer, supprimer **et importer une
+  image** (partenaires) partagent un `run` — « Enregistrer » pressé pendant
+  l'envoi d'un logo partait sans lui, et le logo arrivait dans un formulaire
+  déjà fermé. Champs en `readOnly`, palier en `aria-readonly` (choix ignoré),
+  `CyberButton` habille un `BusyButton` par `asChild`. Libellés d'attente de
+  ces outils de gestion, restés en français (D4) : « Enregistrement… »,
+  « Ajout… », « Envoi… ».
+- **Flèches d'ordre de la vitrine** : la carte déplacée change de place dans le
+  DOM et le bouton pressé perdait le focus. `useArrowRefocus(liste)`
+  (`lib/shared/hooks/useArrowRefocus.ts`, choix pur `pickArrowTarget` dans
+  `lib/shared/arrow-refocus.ts`) le rend à la flèche retrouvée par `data-arrow`
+  — après l'aperçu optimiste et après un retour à l'ordre d'avant —, ou à la
+  flèche opposée quand la carte arrive en bout (`data-edge`). Un focus parti
+  ailleurs entre-temps n'est pas repris.
+- Ajouts de la vitrine sans doublon : `POST /api/landing/sponsors`,
+  `/api/association/about-pillars` et `/api/association/about-stats` passent par
+  `runOnce` (portée route + utilisateur) ; la clé est tirée à chaque ouverture
+  de la fenêtre d'ajout (`newRequestKey`), jamais envoyée pour une modification
+  (le `PUT` réécrit la même ligne).
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

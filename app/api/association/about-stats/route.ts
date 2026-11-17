@@ -4,6 +4,7 @@ import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
 import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
+import { readRequestKey, runOnce } from "@/lib/server/idempotency";
 
 export async function GET() {
   const stats = await listAboutStats();
@@ -24,16 +25,20 @@ export async function POST(req: Request) {
   // `null`, un tableau ou un nombre sont du JSON valide, mais pas une carte :
   // refusés comme le PUT (`readBody`), sans quoi `body.value` lèverait.
   if (typeof json !== "object" || json === null || Array.isArray(json)) return fail("INVALID_BODY", 400);
-  const body = json as { value?: unknown; valueEn?: unknown; label?: unknown; labelEn?: unknown };
+  const body = json as { value?: unknown; valueEn?: unknown; label?: unknown; labelEn?: unknown; requestKey?: unknown };
 
   try {
-    const stat = await createAboutStat({
-      value: typeof body.value === "string" ? body.value : "",
-      // Un type qui n'est pas un texte est refusé par la validation (`VALUE_EN_INVALID`).
-      valueEn: body.valueEn ?? null,
-      label: typeof body.label === "string" ? body.label : "",
-      labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
-    });
+    // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au
+    // lieu d'en créer une seconde (`lib/server/idempotency.ts`).
+    const stat = await runOnce(`about-stat-create:${user.id}`, readRequestKey(body.requestKey), () =>
+      createAboutStat({
+        value: typeof body.value === "string" ? body.value : "",
+        // Un type qui n'est pas un texte est refusé par la validation (`VALUE_EN_INVALID`).
+        valueEn: body.valueEn ?? null,
+        label: typeof body.label === "string" ? body.label : "",
+        labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
+      }),
+    );
     return ok({ stat }, 201);
   } catch (e) {
     return fail(serviceErrorCode(e, "ABOUT_STAT_CREATE_FAILED"), 400);

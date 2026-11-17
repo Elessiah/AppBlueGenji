@@ -51,17 +51,23 @@
   background: rgba(90, 200, 255, 0.05);
 }
 
-.action:disabled,
-.action[aria-disabled="true"] {
-  opacity: 0.45;
+/* Désarmé par `aria-disabled` (`BusyButton` : le bouton garde le focus) : dit en
+   couleurs, jamais en `opacity`, et sans réaction au survol. En attente
+   (`aria-busy`), le libellé reste lisible : curseur d'attente, liseré en tirets. */
+.action[aria-disabled="true"],
+.action[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border-color: var(--line-soft);
+  background: transparent;
   cursor: not-allowed;
 }
 
-.action:disabled:hover,
-.action[aria-disabled="true"]:hover {
+.action[aria-disabled="true"][aria-busy="true"],
+.action[aria-disabled="true"][aria-busy="true"]:hover {
   color: var(--ink-mute);
-  border-color: var(--line-soft);
-  background: transparent;
+  border-style: dashed;
+  border-color: var(--line-strong-cy, var(--blue-500));
+  cursor: progress;
 }
 
 .actionDanger:hover {
@@ -100,16 +106,18 @@
   border-color: var(--blue-300, #84d6ff);
 }
 
-.actionPrimary:disabled,
-.actionPrimary[aria-disabled="true"] {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.actionPrimary:disabled:hover,
+.actionPrimary[aria-disabled="true"],
 .actionPrimary[aria-disabled="true"]:hover {
   background: var(--blue-400, #5ac8ff);
   border-color: var(--blue-400, #5ac8ff);
+  cursor: not-allowed;
+}
+
+/* En attente : le fond reste bleu (texte sombre ≥ 4,5:1), liseré clair en tirets. */
+.actionPrimary[aria-disabled="true"][aria-busy="true"] {
+  border-style: dashed;
+  border-color: var(--blue-100, #e6f6ff);
+  cursor: progress;
 }
 
 .addBtn {
@@ -134,9 +142,16 @@
   background: rgba(90, 200, 255, 0.04);
 }
 
-.addBtn:disabled {
-  opacity: 0.45;
+.addBtn[aria-disabled="true"],
+.addBtn[aria-disabled="true"]:hover {
+  color: var(--ink-mute);
+  border-color: var(--line-soft);
+  background: transparent;
   cursor: not-allowed;
+}
+
+.addBtn[aria-disabled="true"][aria-busy="true"] {
+  cursor: progress;
 }
 
 /* Retour pendant le chargement du morceau de l'éditeur. */

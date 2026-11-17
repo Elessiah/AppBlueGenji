@@ -4,6 +4,7 @@ import { serviceErrorCode, failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createSponsor, listSponsors } from "@/lib/server/sponsors-service";
 import { readJsonBody } from "@/lib/server/request-body";
+import { readRequestKey, runOnce } from "@/lib/server/idempotency";
 
 export async function GET() {
   try {
@@ -28,16 +29,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    const sponsor = await createSponsor({
-      name: typeof body.name === "string" ? body.name : "",
-      tier: typeof body.tier === "string" ? body.tier : undefined,
-      logoUrl: typeof body.logoUrl === "string" ? body.logoUrl : null,
-      bannerUrl: typeof body.bannerUrl === "string" ? body.bannerUrl : null,
-      websiteUrl: typeof body.websiteUrl === "string" ? body.websiteUrl : null,
-      description: typeof body.description === "string" ? body.description : null,
-      descriptionEn: typeof body.descriptionEn === "string" ? body.descriptionEn : null,
-      active: typeof body.active === "boolean" ? body.active : undefined,
-    });
+    // Un renvoi du même ajout (réponse perdue) rend le partenaire déjà créé au
+    // lieu d'en créer un second (`lib/server/idempotency.ts`).
+    const sponsor = await runOnce(`sponsor-create:${user.id}`, readRequestKey(body.requestKey), () =>
+      createSponsor({
+        name: typeof body.name === "string" ? body.name : "",
+        tier: typeof body.tier === "string" ? body.tier : undefined,
+        logoUrl: typeof body.logoUrl === "string" ? body.logoUrl : null,
+        bannerUrl: typeof body.bannerUrl === "string" ? body.bannerUrl : null,
+        websiteUrl: typeof body.websiteUrl === "string" ? body.websiteUrl : null,
+        description: typeof body.description === "string" ? body.description : null,
+        descriptionEn: typeof body.descriptionEn === "string" ? body.descriptionEn : null,
+        active: typeof body.active === "boolean" ? body.active : undefined,
+      }),
+    );
     return ok({ sponsor }, 201);
   } catch (e) {
     return fail(serviceErrorCode(e, "SPONSOR_CREATE_FAILED"), 400);
