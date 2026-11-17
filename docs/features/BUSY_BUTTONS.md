@@ -162,4 +162,14 @@ annoncer de l'attente.
   avant même que `readOnly` soit rendu ; « + Ajouter » des partenaires est un
   `BusyButton`, et une image recadrée pendant qu'un autre envoi tient la
   section le dit (notification neutre) au lieu de se perdre.
+- Attente lisible sur la vitrine : seul le contrôle **réellement en attente**
+  porte `aria-busy` (le bouton d'import pendant l'import d'une image,
+  « Enregistrer » pendant un enregistrement) ; « Annuler », « Retirer » et les
+  autres boutons de la fenêtre sont `blocked` (refusés, sans annonce d'attente).
+  Le liseré d'attente est un vrai accent (`--blue-500`, `--blue-100` sur fond
+  bleu), pas le filet `--line-strong-cy` (14 % d'opacité, invisible) ;
+  `CyberButton` pose lui aussi le tiret en attente. Un champ `readOnly` (ou liste
+  en `aria-readonly`, qui n'ouvre plus au toucher) se dit en couleurs et en
+  tirets. Une suppression refusée parce qu'un autre envoi tient la section le dit
+  par une notification neutre (`BUSY_REFUSED_MESSAGE`).
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

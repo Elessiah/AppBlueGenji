@@ -188,7 +188,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
 
           <div className={styles.actions}>
             <CyberButton variant="ghost" asChild>
-              <BusyButton busy={busy} onClick={close}>
+              <BusyButton busy={false} blocked={busy} onClick={close}>
                 Annuler
               </BusyButton>
             </CyberButton>

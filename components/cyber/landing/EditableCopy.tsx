@@ -235,9 +235,10 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             <FieldErrorText fieldId={ids.en} message={fieldErrors.message("en")} />
           </div>
         </div>
-        <div className={styles.actions}>
+        <div className={`${styles.actions} dim-disabled`}>
           <BusyButton
-            busy={busy}
+            busy={false}
+            blocked={busy}
             className="btn ghost"
             onClick={() => {
               if (!isBusy()) setConfirmReset(true);
@@ -247,7 +248,8 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
           </BusyButton>
           <span className={styles.spacer} />
           <BusyButton
-            busy={busy}
+            busy={false}
+            blocked={busy}
             className="btn ghost"
             onClick={() => {
               if (isBusy()) return;

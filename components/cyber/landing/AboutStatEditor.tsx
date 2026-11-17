@@ -246,7 +246,7 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
       <div className={styles.modalActions}>
         {/* `BusyButton` plutôt que `disabled` : le bouton cliqué garde le focus
             pendant l'envoi, et son libellé dit l'attente (« Ajout… »). */}
-        <BusyButton busy={busy} className={styles.action} onClick={close}>
+        <BusyButton busy={false} blocked={busy} className={styles.action} onClick={close}>
           Annuler
         </BusyButton>
         <BusyButton busy={busy} className={styles.actionPrimary} onClick={() => void submit()}>

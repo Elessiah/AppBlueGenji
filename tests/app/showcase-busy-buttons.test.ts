@@ -188,3 +188,69 @@ describe("pages vitrine — apparence désarmée", () => {
     expect(rules).not.toMatch(new RegExp(String.raw`\.${cls}(?::disabled|\[aria-disabled="true"\])[^{]*\{[^}]*opacity`));
   });
 });
+
+describe("pages vitrine — attente lisible (UI/UX cycle 1)", () => {
+  it.each([["AboutPillars.module.css"], ["AboutStats.module.css"], ["SponsorsGrid.module.css"]])(
+    "%s_busyOutline_usesVisibleAccentNotHairline",
+    (file) => {
+      const rules = css(file);
+      expect(rules).toContain("border-style: dashed");
+      expect(rules).not.toMatch(/\[aria-busy="true"\][^{]*\{[^}]*--line-strong-cy/);
+    },
+  );
+
+  it.each([
+    ["AboutPillars.module.css", ".modalInput[readonly]"],
+    ["AboutStats.module.css", ".modalInput[readonly]"],
+    ["SponsorsGrid.module.css", ".modalInput[readonly]"],
+    ["SponsorsGrid.module.css", 'select.modalInput[aria-readonly="true"]'],
+    ["FooterContact.module.css", ".input[readonly]"],
+    ["EditableCopy.module.css", ".input[readonly]"],
+  ])("%s_%s_readOnlyFieldLooksFrozen", (file, selector) => {
+    const rules = css(file);
+    expect(rules).toContain(selector);
+    expect(rules).not.toMatch(/\[readonly\][^{]*\{[^}]*opacity/);
+  });
+
+  it("EditableCopy_blockedButtons_dimmedByColours", () => {
+    expect(source(DIR + "EditableCopy.tsx")).toContain("`${styles.actions} dim-disabled`");
+  });
+
+  it("LandingDialog_closeBusy_dashedOutline", () => {
+    expect(css("LandingDialog.module.css")).toMatch(/\.close\[aria-disabled="true"\]\[aria-busy="true"\]\s*\{[^}]*border-style:\s*dashed/);
+  });
+
+  it("CyberButton_busy_dashedOutlineThroughSlot", () => {
+    const rules = css("../CyberButton.module.css");
+    expect(rules).toMatch(/\.root\[aria-disabled="true"\]\[aria-busy="true"\]\s*\{[^}]*border-style:\s*dashed/);
+    expect(rules).toContain('.ghost[aria-disabled="true"][aria-busy="true"]');
+  });
+
+  it("SponsorsGrid_onlyThePendingControl_isBusy", () => {
+    const code = source(DIR + "SponsorsGrid.tsx");
+    expect(code).toContain('busy={uploadKind === "banner"}');
+    expect(code).toContain('busy={uploadKind === "logo"}');
+    expect(code).toMatch(/<BusyButton busy=\{false\} blocked=\{busy\} onClick=\{close\}>/);
+    expect(code).toMatch(/busy=\{busy && uploadKind === null\} blocked=\{busy\}/);
+  });
+
+  it.each([["AboutPillars.tsx"], ["AboutStatEditor.tsx"], ["FooterContact.tsx"]])(
+    "%s_cancel_isBlockedNotBusy",
+    (file) => {
+      expect(source(DIR + file)).toMatch(/<BusyButton busy=\{false\} blocked=\{busy\}/);
+    },
+  );
+
+  it.each([["AboutPillars.tsx"], ["AboutStats.tsx"], ["SponsorsGrid.tsx"]])(
+    "%s_removeRefusedByGuard_saysSo",
+    (file) => {
+      const code = source(DIR + file);
+      expect(code).toContain("const done = await run(async () => {");
+      expect(code).toContain("if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);");
+    },
+  );
+
+  it("showcaseMessages_busyRefused_isNeutralFrench", () => {
+    expect(source(DIR + "showcase-messages.ts")).toContain('"Un autre envoi est en cours, réessaye."');
+  });
+});

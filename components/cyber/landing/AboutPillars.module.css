@@ -75,7 +75,7 @@
 .action[aria-disabled="true"][aria-busy="true"]:hover {
   color: var(--ink-mute);
   border-style: dashed;
-  border-color: var(--line-strong-cy, var(--blue-500));
+  border-color: var(--blue-500);
   cursor: progress;
 }
 
@@ -226,4 +226,18 @@ textarea.modalInput {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
+}
+
+/* Envoi en cours : le champ ne reçoit plus de saisie (`readOnly`, ou
+   `aria-readonly` pour une liste) ; il le dit en couleurs et en tirets, texte
+   toujours lisible (≥ 4,5:1), jamais en `opacity`. */
+.modalInput[readonly],
+.modalInput[aria-readonly="true"] {
+  border-style: dashed;
+  color: var(--ink-mute);
+  cursor: progress;
+}
+
+select.modalInput[aria-readonly="true"] {
+  pointer-events: none;
 }

@@ -18,6 +18,7 @@ import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { orReload } from "@/lib/shared/lazy-component";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./AboutStats.module.css";
 
 // Chargée au premier clic sur « Ajouter » / « Modifier » : seul le staff
@@ -51,6 +52,7 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const [stats, setStats] = useState<AboutStat[]>(initialStats);
   // Sous `/en`, un chiffre sans titre anglais n'est pas rendu.
   const shown = useMemo(() => localizedAboutStats(stats, locale), [stats, locale]);
@@ -116,7 +118,7 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   const [pendingRemoval, setPendingRemoval] = useState<AboutStat | null>(null);
 
   async function remove(stat: AboutStat): Promise<boolean> {
-    return (await run(async () => {
+    const done = await run(async () => {
       try {
         const res = await fetch(`/api/association/about-stats/${stat.id}`, { method: "DELETE" });
         if (!res.ok) {
@@ -136,7 +138,9 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
         showError("Erreur réseau, réessaye.");
         return false;
       }
-    })) ?? false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
 
   // Ouvrir la fenêtre ou la confirmation pendant un envoi changerait l'écran

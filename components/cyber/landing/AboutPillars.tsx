@@ -24,6 +24,7 @@ import { arrowKey } from "@/lib/shared/arrow-refocus";
 import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { LandingDialog } from "./LandingDialog";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./AboutPillars.module.css";
 
 interface AboutPillarsProps {
@@ -58,6 +59,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const fieldErrors = useFieldErrors(ABOUT_PILLAR_FIELD_ERRORS, PILLAR_FIELD_IDS);
   const [pillars, setPillars] = useState<AboutPillar[]>(initialPillars);
   // Sous `/en`, une carte sans anglais n'est pas rendue.
@@ -204,7 +206,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   const [pendingRemoval, setPendingRemoval] = useState<AboutPillar | null>(null);
 
   async function remove(pillar: AboutPillar): Promise<boolean> {
-    return (await run(async () => {
+    const done = await run(async () => {
       try {
         const res = await fetch(`/api/association/about-pillars/${pillar.id}`, { method: "DELETE" });
         if (!res.ok) {
@@ -224,7 +226,9 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
         showError("Erreur réseau, réessaye.");
         return false;
       }
-    })) ?? false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
@@ -350,7 +354,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
           </div>
 
           <div className={styles.modalActions}>
-            <BusyButton busy={busy} className={styles.action} onClick={close}>
+            <BusyButton busy={false} blocked={busy} className={styles.action} onClick={close}>
               Annuler
             </BusyButton>
             <BusyButton busy={busy} className={styles.actionPrimary} onClick={() => void submit()}>

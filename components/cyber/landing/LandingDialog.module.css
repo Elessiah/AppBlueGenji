@@ -71,6 +71,7 @@
 /* Fermeture refusée le temps d'un envoi (`BusyButton`) : curseur d'attente. */
 .close[aria-disabled="true"][aria-busy="true"] {
   cursor: progress;
+  border-style: dashed;
 }
 
 /* Listes déroulantes des formulaires de la vitrine : la flèche native, propre

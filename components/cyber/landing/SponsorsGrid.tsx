@@ -39,6 +39,7 @@ import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { EditableCopy } from "./EditableCopy";
 import { useLandingText } from "@/components/i18n/landing-text";
 import { LandingDialog } from "./LandingDialog";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./SponsorsGrid.module.css";
 
 type SponsorsGridProps = {
@@ -298,7 +299,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const [pendingRemoval, setPendingRemoval] = useState<Sponsor | null>(null);
 
   async function remove(sponsor: Sponsor): Promise<boolean> {
-    return (await run(async () => {
+    const done = await run(async () => {
       try {
         const res = await fetch(`/api/landing/sponsors/${sponsor.id}`, { method: "DELETE" });
         if (!res.ok) {
@@ -318,7 +319,9 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
         showError("Erreur réseau, réessaye.");
         return false;
       }
-    })) ?? false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
 
   // Logo et bandeau suivent le même chemin : contrôle local (le serveur refait
@@ -656,12 +659,18 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                   className={styles.logoFileInput}
                   onChange={(e) => uploadImage(e, "banner")}
                 />
-                <BusyButton busy={busy} className={styles.logoUploadBtn} onClick={() => bannerFileRef.current?.click()}>
+                <BusyButton
+                  busy={uploadKind === "banner"}
+                  blocked={busy}
+                  className={styles.logoUploadBtn}
+                  onClick={() => bannerFileRef.current?.click()}
+                >
                   <BusyLabel busy={uploadKind === "banner"} idle={bannerFileLabel} pending="Envoi…" />
                 </BusyButton>
                 {form.bannerUrl && (
                   <BusyButton
-                    busy={busy}
+                    busy={false}
+                    blocked={busy}
                     className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
                     onClick={() => edit((f) => ({ ...f, bannerUrl: "" }))}
                   >
@@ -695,12 +704,18 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                   className={styles.logoFileInput}
                   onChange={(e) => uploadImage(e, "logo")}
                 />
-                <BusyButton busy={busy} className={styles.logoUploadBtn} onClick={() => logoFileRef.current?.click()}>
+                <BusyButton
+                  busy={uploadKind === "logo"}
+                  blocked={busy}
+                  className={styles.logoUploadBtn}
+                  onClick={() => logoFileRef.current?.click()}
+                >
                   <BusyLabel busy={uploadKind === "logo"} idle={logoFileLabel} pending="Envoi…" />
                 </BusyButton>
                 {form.logoUrl && (
                   <BusyButton
-                    busy={busy}
+                    busy={false}
+                    blocked={busy}
                     className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
                     onClick={() => edit((f) => ({ ...f, logoUrl: "" }))}
                   >
@@ -726,14 +741,14 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
 
           <div className={styles.modalActions}>
             <CyberButton variant="ghost" asChild>
-              <BusyButton busy={busy} onClick={close}>
+              <BusyButton busy={false} blocked={busy} onClick={close}>
                 Annuler
               </BusyButton>
             </CyberButton>
             <CyberButton variant="primary" asChild>
               {/* Pendant l'import d'une image, l'attente est celle de l'image :
                   le libellé d'envoi n'est pas celui de l'enregistrement. */}
-              <BusyButton busy={busy} onClick={() => void submit()}>
+              <BusyButton busy={busy && uploadKind === null} blocked={busy} onClick={() => void submit()}>
                 <BusyLabel busy={busy && uploadKind === null} idle={submitLabel} pending={pendingLabel} />
               </BusyButton>
             </CyberButton>

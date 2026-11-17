@@ -109,7 +109,8 @@ describe("AboutStats — valeur anglaise", () => {
   it("pendant l'envoi, les boutons gardent le focus : aria-disabled + garde, jamais disabled", () => {
     const actions = /<div className=\{styles\.modalActions\}>([\s\S]*?)<\/div>/.exec(source)?.[1] ?? "";
     expect(actions).not.toMatch(/\sdisabled=\{busy\}/);
-    expect(actions.match(/<BusyButton busy=\{busy\}/g)).toHaveLength(2);
+    expect(actions.match(/<BusyButton busy=\{busy\}/g)).toHaveLength(1);
+    expect(actions).toContain("<BusyButton busy={false} blocked={busy}");
     expect(source).toMatch(/async function submit\(\) \{\r?\n\s+if \(isBusy\(\)\) return;/);
     expect(source).toMatch(/function close\(\) \{\r?\n\s+if \(isBusy\(\)\) return;/);
     const css = readSource("components/cyber/landing/AboutStats.module.css");
