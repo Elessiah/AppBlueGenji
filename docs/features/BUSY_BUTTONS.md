@@ -146,10 +146,20 @@ annoncer de l'attente.
   `lib/shared/arrow-refocus.ts`) le rend à la flèche retrouvée par `data-arrow`
   — après l'aperçu optimiste et après un retour à l'ordre d'avant —, ou à la
   flèche opposée quand la carte arrive en bout (`data-edge`). Un focus parti
-  ailleurs entre-temps n'est pas repris.
+  ailleurs entre-temps n'est pas repris. La cible vit dans une `ref` lue avant
+  la peinture (`useLayoutEffect`) : aucune image peinte focus perdu, aucun rendu
+  de plus. L'ordre des engagés d'un tournoi (`RegistrationsPanel`, liste
+  `seeding`) suit le même crochet.
 - Ajouts de la vitrine sans doublon : `POST /api/landing/sponsors`,
   `/api/association/about-pillars` et `/api/association/about-stats` passent par
-  `runOnce` (portée route + utilisateur) ; la clé est tirée à chaque ouverture
-  de la fenêtre d'ajout (`newRequestKey`), jamais envoyée pour une modification
-  (le `PUT` réécrit la même ligne).
+  `runOnce` (portée route + utilisateur) ; la clé est oubliée à chaque ouverture
+  de la fenêtre d'ajout et liée au corps envoyé (`withRequestKey` /
+  `keyForBody`, `lib/shared/request-key.ts`) : le même formulaire renvoyé garde
+  sa clé, un formulaire corrigé après un échec en tire une neuve — sous
+  l'ancienne, le serveur rendrait l'ajout précédent et la correction serait
+  perdue. Jamais envoyée pour une modification (le `PUT` réécrit la même
+  ligne). Les champs ignorent une saisie arrivée pendant l'envoi (`isBusy()`),
+  avant même que `readOnly` soit rendu ; « + Ajouter » des partenaires est un
+  `BusyButton`, et une image recadrée pendant qu'un autre envoi tient la
+  section le dit (notification neutre) au lieu de se perdre.
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

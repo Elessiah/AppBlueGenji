@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { BilingualField, EnglishMissingHint } from "@/components/ui/bilingual-field";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
@@ -18,7 +18,7 @@ import {
 } from "@/lib/shared/about-stats";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { newRequestKey } from "@/lib/shared/request-key";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { hasEnglish } from "@/lib/shared/staff-translation";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutStats.module.css";
@@ -84,9 +84,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
   // Garde synchrone (`BUSY_BUTTONS.md`) : Entrée dans le dernier champ et un
   // clic sur « Ajouter » partis dans la même image n'envoient qu'une fois.
   const { busy, isBusy, run } = useBusyGuard();
-  // Clé de l'ajout, tirée à l'ouverture (la fenêtre est montée à chaque fois) :
-  // un renvoi (réponse perdue) rend la carte déjà créée (`lib/server/idempotency.ts`).
-  const [requestKey] = useState(newRequestKey);
+  // Clé de l'ajout (la fenêtre est montée à chaque ouverture) : un renvoi du
+  // même formulaire (réponse perdue) rend la carte déjà créée ; un formulaire
+  // corrigé entre-temps tire une clé neuve (`keyForBody`, `lib/server/idempotency.ts`).
+  const createKey = useRef<KeyedBody | null>(null);
 
   function close() {
     if (isBusy()) return;
@@ -123,7 +124,7 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
         const res = await fetch(url, {
           method: editing ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editing ? payload : { ...payload, requestKey }),
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
         });
         const data = (await res.json()) as { stat?: AboutStat; error?: string };
         if (!res.ok || !data.stat) {
@@ -172,8 +173,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           readOnly={busy}
           {...fieldErrors.aria("value")}
           onChange={(e) => {
+            if (isBusy()) return;
             fieldErrors.clear("value");
-            setForm((f) => ({ ...f, value: e.target.value }));
+            const value = e.target.value;
+            setForm((f) => ({ ...f, value }));
           }}
           onKeyDown={focusNextOnEnter(STAT_FIELD_IDS.valueEn)}
         />
@@ -205,8 +208,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           readOnly={busy}
           {...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID, valueEnNote !== null && VALUE_EN_MISSING_ID)}
           onChange={(e) => {
+            if (isBusy()) return;
             fieldErrors.clear("valueEn");
-            setForm((f) => ({ ...f, valueEn: e.target.value }));
+            const valueEn = e.target.value;
+            setForm((f) => ({ ...f, valueEn }));
           }}
           onKeyDown={focusNextOnEnter(STAT_FIELD_IDS.label)}
         />
@@ -224,7 +229,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           fields={{ fr: "label", en: "labelEn" }}
           errors={fieldErrors}
           values={{ fr: form.label, en: form.labelEn }}
-          onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }))}
+          onChange={(lang, value) => {
+            // Saisie arrivée avant que « readOnly » soit rendu : ignorée.
+            if (!isBusy()) setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }));
+          }}
           maxLength={ABOUT_STAT_LABEL_MAX}
           placeholders={{ fr: "Bénévole", en: "Volunteer-run" }}
           onEnter={() => void submit()}

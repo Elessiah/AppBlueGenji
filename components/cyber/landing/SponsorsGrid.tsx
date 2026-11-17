@@ -26,7 +26,7 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { arrowKey } from "@/lib/shared/arrow-refocus";
-import { newRequestKey } from "@/lib/shared/request-key";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { englishErrorMessage } from "@/lib/shared/staff-translation";
 import {
   sponsorCardMedia,
@@ -120,6 +120,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const fieldErrors = useFieldErrors(SPONSOR_FIELD_ERRORS, DESCRIPTION_FIELD_IDS);
   // Modale portée dans body : sous `/en`, elle dit elle-même sa langue (D4).
   const { cropImage, cropDialog } = useImageCropper({ lang: staffLang });
@@ -136,9 +137,11 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   // Image en cours d'envoi : son bouton dit « Envoi… ».
   const [uploadKind, setUploadKind] = useState<"logo" | "banner" | null>(null);
   const refocusArrow = useArrowRefocus("sponsor");
-  // Clé de l'ajout, tirée à chaque ouverture : un renvoi (réponse perdue) rend
-  // le partenaire déjà créé au lieu d'en ajouter un second (`lib/server/idempotency.ts`).
-  const createKey = useRef("");
+  // Clé de l'ajout, oubliée à chaque ouverture : un renvoi du même formulaire
+  // (réponse perdue) rend le partenaire déjà créé au lieu d'en ajouter un
+  // second ; un formulaire corrigé entre-temps tire une clé neuve
+  // (`keyForBody`, `lib/server/idempotency.ts`).
+  const createKey = useRef<KeyedBody | null>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
 
@@ -149,7 +152,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
 
   function openCreate() {
     if (isBusy()) return;
-    createKey.current = newRequestKey();
+    createKey.current = null;
     fieldErrors.clear();
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -225,7 +228,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
         const res = await fetch(url, {
           method: editing ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editing ? payload : { ...payload, requestKey: createKey.current }),
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
         });
         const data = (await res.json()) as { sponsor?: Sponsor; error?: string };
         if (!res.ok || !data.sponsor) {
@@ -346,7 +349,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     if (!image) return;
 
     const label = kind === "logo" ? "du logo" : "du bandeau";
-    await run(async () => {
+    const started = await run(async () => {
       setUploadKind(kind);
       try {
         const data = new FormData();
@@ -356,7 +359,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
         const url = kind === "logo" ? payload.logoUrl : payload.bannerUrl;
         if (!res.ok || !url) {
           showError(payload.error ? `Échec : ${payload.error}` : `Échec de l'envoi ${label}.`);
-          return;
+          return true;
         }
         setForm((f) => (kind === "logo" ? { ...f, logoUrl: url } : { ...f, bannerUrl: url }));
         showSuccess(kind === "logo" ? "Logo importé." : "Bandeau importé.");
@@ -365,7 +368,11 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
       } finally {
         setUploadKind(null);
       }
+      return true;
     });
+    // Un autre envoi a pris la section pendant le recadrage : l'image n'est pas
+    // partie, on le dit plutôt que de laisser croire qu'elle est importée.
+    if (!started) showInfo("Image non importée : un autre envoi était en cours, réessaye.");
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
@@ -386,8 +393,12 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
         <div className={styles.headActions}>
           <span className={styles.meta}>{t("sponsors.count", { count: displaySponsors.length })}</span>
           {isAdmin && (
-            <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
-              + Ajouter
+            <CyberButton variant="primary" asChild>
+              {/* Bloqué pendant un déplacement ou une suppression : il le dit
+                  (`aria-disabled`, `aria-busy`) au lieu d'ignorer le clic. */}
+              <BusyButton busy={busy} onClick={openCreate} lang={staffLang}>
+                + Ajouter
+              </BusyButton>
             </CyberButton>
           )}
         </div>
@@ -617,9 +628,9 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
               readOnly={busy}
               {...fieldErrors.aria("websiteUrl")}
               onChange={(e) => {
-                if (isBusy()) return;
-                fieldErrors.clear("websiteUrl");
-                setForm((f) => ({ ...f, websiteUrl: e.target.value }));
+                const websiteUrl = e.target.value;
+                edit((f) => ({ ...f, websiteUrl }));
+                if (!isBusy()) fieldErrors.clear("websiteUrl");
               }}
             />
             <FieldErrorText fieldId={DESCRIPTION_FIELD_IDS.websiteUrl} message={fieldErrors.message("websiteUrl")} />

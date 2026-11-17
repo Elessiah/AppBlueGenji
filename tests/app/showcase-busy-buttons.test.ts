@@ -116,16 +116,58 @@ describe("pages vitrine — flèches d'ordre", () => {
 });
 
 describe("pages vitrine — ajout sans doublon", () => {
-  it.each([["SponsorsGrid.tsx"], ["AboutPillars.tsx"]])("%s_create_sendsKeyDrawnAtOpening", (file) => {
+  it.each([["SponsorsGrid.tsx"], ["AboutPillars.tsx"]])("%s_create_keyForgottenAtOpeningAndTiedToBody", (file) => {
     const code = source(DIR + file);
-    expect(code).toMatch(/if \(isBusy\(\)\) return;\s+createKey\.current = newRequestKey\(\);/);
-    expect(code).toContain("JSON.stringify(editing ? payload : { ...payload, requestKey: createKey.current })");
+    expect(code).toMatch(/if \(isBusy\(\)\) return;\s+createKey\.current = null;/);
+    // Formulaire corrigé après un échec : clé neuve (`keyForBody`), sinon le
+    // serveur rendrait l'ajout précédent et la correction serait perdue.
+    expect(code).toContain("JSON.stringify(editing ? payload : withRequestKey(createKey, payload))");
+    expect(code).not.toContain("newRequestKey");
   });
 
-  it("AboutStatEditor_create_sendsKeyDrawnAtMount", () => {
+  it("AboutStatEditor_create_keyTiedToBody", () => {
     const code = source(DIR + "AboutStatEditor.tsx");
-    expect(code).toContain("const [requestKey] = useState(newRequestKey);");
-    expect(code).toContain("JSON.stringify(editing ? payload : { ...payload, requestKey })");
+    expect(code).toContain("const createKey = useRef<KeyedBody | null>(null);");
+    expect(code).toContain("JSON.stringify(editing ? payload : withRequestKey(createKey, payload))");
+  });
+});
+
+describe("pages vitrine — saisie figée avant le rendu", () => {
+  it.each([
+    ["AboutPillars.tsx", /const edit = \(change: \(f: FormState\) => FormState\) => \{\s+if \(!isBusy\(\)\) setForm\(change\);/],
+    ["SponsorsGrid.tsx", /const edit = \(change: \(f: FormState\) => FormState\) => \{\s+if \(!isBusy\(\)\) setForm\(change\);/],
+    ["FooterContact.tsx", /const editField = \(field: keyof ContactInfo, value: string\) => \{\s+if \(!isBusy\(\)\) setForm/],
+    ["EditableCopy.tsx", /const onChange = \(next: string\) => \{[\s\S]{0,120}if \(isBusy\(\)\) return;/],
+  ])("%s_fields_ignoreInputWhileBusy", (file, guard) => {
+    expect(source(DIR + file)).toMatch(guard);
+  });
+
+  it("AboutPillars_fields_allGoThroughEdit", () => {
+    expect(source(DIR + "AboutPillars.tsx")).not.toMatch(/onChange=\{\(lang, value\) => setForm/);
+  });
+
+  it("SponsorsGrid_websiteField_goesThroughEdit", () => {
+    expect(source(DIR + "SponsorsGrid.tsx")).toContain("edit((f) => ({ ...f, websiteUrl }));");
+  });
+
+  it("AboutStatEditor_fields_ignoreInputWhileBusy", () => {
+    const code = source(DIR + "AboutStatEditor.tsx");
+    expect(code.match(/if \(isBusy\(\)\) return;\s+fieldErrors\.clear\("value(?:En)?"\);/g)).toHaveLength(2);
+    expect(code).toContain("if (!isBusy()) setForm((f) => (lang === \"fr\" ? { ...f, label: value } : { ...f, labelEn: value }));");
+  });
+});
+
+describe("partenaires — ajout et import", () => {
+  it("SponsorsGrid_addButton_isBusyButton", () => {
+    expect(source(DIR + "SponsorsGrid.tsx")).toMatch(
+      /<CyberButton variant="primary" asChild>[\s\S]{0,200}<BusyButton busy=\{busy\} onClick=\{openCreate\} lang=\{staffLang\}>\s+\+ Ajouter/,
+    );
+  });
+
+  it("SponsorsGrid_uploadRefusedByGuard_saysSo", () => {
+    const code = source(DIR + "SponsorsGrid.tsx");
+    expect(code).toContain("const started = await run(async () => {");
+    expect(code).toMatch(/if \(!started\) showInfo\(/);
   });
 });
 

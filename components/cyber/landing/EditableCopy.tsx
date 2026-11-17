@@ -176,6 +176,8 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
     const control = (lang: CopyLang) => {
       const text = lang === "fr" ? draft : draftEn;
       const onChange = (next: string) => {
+        // Saisie arrivée avant que « readOnly » soit rendu : ignorée.
+        if (isBusy()) return;
         fieldErrors.clear(lang);
         if (lang === "fr") setDraft(next);
         else setDraftEn(next);

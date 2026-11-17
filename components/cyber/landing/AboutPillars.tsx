@@ -21,7 +21,7 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { arrowKey } from "@/lib/shared/arrow-refocus";
-import { newRequestKey } from "@/lib/shared/request-key";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutPillars.module.css";
@@ -71,16 +71,17 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   // l'ordre d'avant l'autre.
   const { busy, isBusy, run } = useBusyGuard();
   const refocusArrow = useArrowRefocus("pillar");
-  // Clé de l'ajout, tirée à chaque ouverture : un renvoi (réponse perdue) rend
-  // la carte déjà créée au lieu d'en ajouter une seconde (`lib/server/idempotency.ts`).
-  const createKey = useRef("");
+  // Clé de l'ajout, oubliée à chaque ouverture : un renvoi du même formulaire
+  // (réponse perdue) rend la carte déjà créée au lieu d'en ajouter une seconde ;
+  // un formulaire corrigé entre-temps tire une clé neuve (`keyForBody`).
+  const createKey = useRef<KeyedBody | null>(null);
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (p: AboutPillar) => isAdmin && p.id > 0;
 
   function openCreate() {
     if (isBusy()) return;
-    createKey.current = newRequestKey();
+    createKey.current = null;
     fieldErrors.clear();
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -104,6 +105,12 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
   function close() {
     if (!isBusy()) closeDialog();
   }
+
+  // Champ modifié pendant un envoi : ignoré, même avant que « readOnly » soit
+  // rendu (ce qui est affiché est ce qui part).
+  const edit = (change: (f: FormState) => FormState) => {
+    if (!isBusy()) setForm(change);
+  };
 
   // Un refus désigne son champ (titre, texte, et leur anglais) : rattaché à
   // lui, focus ramené, et la même phrase en notification.
@@ -135,7 +142,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
         const res = await fetch(url, {
           method: editing ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editing ? payload : { ...payload, requestKey: createKey.current }),
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
         });
         const data = (await res.json()) as { pillar?: AboutPillar; error?: string };
         if (!res.ok || !data.pillar) {
@@ -312,7 +319,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
               fields={{ fr: "title", en: "titleEn" }}
               errors={fieldErrors}
               values={{ fr: form.title, en: form.titleEn }}
-              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, title: value } : { ...f, titleEn: value }))}
+              onChange={(lang, value) => edit((f) => (lang === "fr" ? { ...f, title: value } : { ...f, titleEn: value }))}
               maxLength={ABOUT_PILLAR_TITLE_MAX}
               placeholders={{ fr: "Accessible", en: "Accessible" }}
               enterKeyHint="next"
@@ -330,7 +337,7 @@ export function AboutPillars({ initialPillars, isAdmin, locale = DEFAULT_LOCALE 
               fields={{ fr: "text", en: "textEn" }}
               errors={fieldErrors}
               values={{ fr: form.text, en: form.textEn }}
-              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, text: value } : { ...f, textEn: value }))}
+              onChange={(lang, value) => edit((f) => (lang === "fr" ? { ...f, text: value } : { ...f, textEn: value }))}
               maxLength={ABOUT_PILLAR_TEXT_MAX}
               multiline
               rows={3}

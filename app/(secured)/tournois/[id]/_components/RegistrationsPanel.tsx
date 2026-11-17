@@ -23,6 +23,8 @@ import { useActionsText } from "../_lib/actions-text";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { arrowKey } from "@/lib/shared/arrow-refocus";
+import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
 import {
   hiddenRegistrationCount,
   mustExpandToShow,
@@ -122,7 +124,8 @@ const RegistrationRow = memo(function RegistrationRow({
               <BusyButton
                 busy={busy}
                 blocked={index === 0}
-                data-arrow={`${reg.teamId}:up`}
+                data-arrow={arrowKey("seeding", reg.teamId, "up")}
+                data-edge={index === 0 || undefined}
                 className={styles.arrow}
                 aria-label={a("registrations.moveUpAria", { name: reg.teamName })}
                 title={a("registrations.moveUpTitle")}
@@ -133,7 +136,8 @@ const RegistrationRow = memo(function RegistrationRow({
               <BusyButton
                 busy={busy}
                 blocked={isLast}
-                data-arrow={`${reg.teamId}:down`}
+                data-arrow={arrowKey("seeding", reg.teamId, "down")}
+                data-edge={isLast || undefined}
                 className={styles.arrow}
                 aria-label={a("registrations.moveDownAria", { name: reg.teamName })}
                 title={a("registrations.moveDownTitle")}
@@ -234,8 +238,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // Le clavier ne doit pas perdre sa place : la ligne bouge, et le bouton qu'on
   // vient d'actionner devient sans effet dès qu'elle atteint une extrémité — on
   // rend alors la main au bouton qui la ramène.
-  const tableRef = useRef<HTMLDivElement>(null);
-  const [refocus, setRefocus] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
+  // Même règle que les flèches de la vitrine (`useArrowRefocus`).
+  const refocusArrow = useArrowRefocus("seeding");
   // Le lecteur d'écran a besoin qu'on lui dise ce qui a bougé : le seul retour
   // visuel est le déplacement de la ligne.
   const [announcement, setAnnouncement] = useState("");
@@ -322,21 +326,6 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     return reg ? [reg] : [];
   });
 
-  useEffect(() => {
-    if (!refocus) return;
-    const key = (direction: "up" | "down") => `${refocus.teamId}:${direction}`;
-    const arrow = (direction: "up" | "down") =>
-      tableRef.current?.querySelector<HTMLButtonElement>(`[data-arrow="${key(direction)}"]`) ?? null;
-    const preferred = arrow(refocus.direction);
-    // Arrivé en tête ou en queue, le bouton actionné n'existe plus comme cible :
-    // on rend la main à celui qui ramène la ligne d'où elle vient.
-    const opposite = refocus.direction === "up" ? "down" : "up";
-    const target =
-      preferred && preferred.getAttribute("aria-disabled") !== "true" ? preferred : arrow(opposite);
-    target?.focus();
-    setRefocus(null);
-  }, [refocus]);
-
   // Premier réordonnancement d'un tournoi seedé par le classement : il passe
   // l'ordre en manuel, sans retour — on le fait confirmer, une seule fois
   // (`seedingReorderNeedsConfirmation`). Le geste attend ici, pas encore joué.
@@ -360,7 +349,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     const done = await applyOrder(next, teamId);
     // Sur un refus, la modale de confirmation reste ouverte : le focus ne doit
     // pas repartir vers une flèche derrière elle.
-    if (done) setRefocus({ teamId, direction });
+    if (done) refocusArrow(teamId, direction);
     return done;
   };
 
@@ -450,7 +439,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         <p className={styles.empty}>{t("registrations.empty")}</p>
       ) : (
         <PodiumTiersOffWhen off={showActions}>
-        <div ref={tableRef} className={styles.table}>
+        <div className={styles.table}>
           <div className={`${styles.row} ${styles.header} ${gridClass}`}>
             <span>{t("registrations.rank")}</span>
             <span>{participantText(text, detail.card.participantType, "oneCapitalized")}</span>

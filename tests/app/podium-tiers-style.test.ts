@@ -261,7 +261,7 @@ describe("marches du podium — fonds teintés où la lueur reste", () => {
 describe("marches du podium — outils du staff et comptes supprimés", () => {
   it("éteint les marches du tableau des inscriptions en mode staff seulement", () => {
     const panel = readSource("app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx");
-    expect(panel).toMatch(/<PodiumTiersOffWhen off=\{showActions\}>\s*<div ref=\{tableRef\} className=\{styles\.table\}>/);
+    expect(panel).toMatch(/<PodiumTiersOffWhen off=\{showActions\}>\s*<div className=\{styles\.table\}>/);
   });
 
   it("garde sans marche l'historique d'équipes d'un compte supprimé", () => {

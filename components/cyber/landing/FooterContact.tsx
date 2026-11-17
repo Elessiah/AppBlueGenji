@@ -57,6 +57,12 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
     setForm(editableContact(contact));
   }
 
+  // Champ modifié pendant l'envoi : ignoré, même avant que « readOnly » soit
+  // rendu (ce qui est affiché est ce qui part).
+  const editField = (field: keyof ContactInfo, value: string) => {
+    if (!isBusy()) setForm((f) => ({ ...f, [field]: value }));
+  };
+
   async function submit() {
     if (isBusy()) return;
     const validation = validateContactInfo(form);
@@ -152,7 +158,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               maxLength={254}
               placeholder="Adresse de l'association"
               readOnly={busy}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              onChange={(e) => editField("email", e.target.value)}
             />
           </label>
 
@@ -164,7 +170,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               maxLength={64}
               placeholder="bluegenji"
               readOnly={busy}
-              onChange={(e) => setForm((f) => ({ ...f, discordTag: e.target.value }))}
+              onChange={(e) => editField("discordTag", e.target.value)}
             />
           </label>
 
@@ -176,7 +182,7 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               maxLength={200}
               placeholder={DISCORD_INVITE_URL}
               readOnly={busy}
-              onChange={(e) => setForm((f) => ({ ...f, discordUrl: e.target.value }))}
+              onChange={(e) => editField("discordUrl", e.target.value)}
             />
           </label>
 
