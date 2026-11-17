@@ -328,6 +328,22 @@ describe("focusTrail", () => {
   });
 });
 
+describe("focusTrail — bornes du relevé", () => {
+  it("focusTrail_boundary_stopsAfterBoundaryParent", () => {
+    const { section, rows, ul } = listPage();
+
+    const trail = focusTrail(rows[1].button, (node) => node === section);
+
+    expect(trail.map((step) => step.parent)).toEqual([rows[1].li, ul, section]);
+  });
+
+  it("focusTrail_noBoundary_capsTheClimbOnDeepPages", () => {
+    let node = fakeNode("n0");
+    for (let depth = 1; depth <= 40; depth += 1) node = fakeNode(`n${depth}`, node);
+    expect(focusTrail(node)).toHaveLength(16);
+  });
+});
+
 describe("restoreFocusTarget — déclencheur retiré (suppression confirmée)", () => {
   it("restoreFocusTarget_nullTarget_returnsNull", () => {
     expect(restoreFocusTarget<FakeNode>(null, [], isConnected, firstFocusable)).toBeNull();

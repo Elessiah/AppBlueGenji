@@ -197,3 +197,42 @@ describe("association, bénévoles, recrutement — apparence désarmée", () =>
     },
   );
 });
+
+/**
+ * Coût du guet de focus après suppression (`useDialogBehavior`, perf cycle 1) :
+ * il n'écoute que les parents du déclencheur, sans sous-arbre, et se lève sur
+ * toutes les sorties.
+ */
+describe("guet de retrait tardif du déclencheur — coût et sorties", () => {
+  const hook = source("lib/shared/hooks/useDialogBehavior.ts");
+  const watch = hook.slice(hook.indexOf("function watchLateRemoval"), hook.indexOf("export function useDialogBehavior"));
+
+  it("watchLateRemoval_observesTrailParentsWithoutSubtree", () => {
+    expect(watch).toMatch(/observer\.observe\(step\.parent, \{ childList: true \}\)/);
+    expect(watch).not.toMatch(/subtree/);
+  });
+
+  it("watchLateRemoval_stopsOnTimerFocusMoveAndPageChange", () => {
+    expect(watch).toContain("LATE_REMOVAL_WATCH_MS");
+    expect(watch).toMatch(/addEventListener\("focusin"/);
+    expect(watch).toMatch(/removeEventListener\("focusin"/);
+    expect(watch).toMatch(/location\.pathname[\s\S]*!== startedAt/);
+  });
+
+  it("useDialogBehavior_open_stopsPendingWatch", () => {
+    expect(hook).toMatch(/stopLateRemovalWatch\?\.\(\);\s+const token = Symbol\("dialog"\)/);
+  });
+
+  it("firstFocusableIn_neverScansTheWholeDocument", () => {
+    expect(hook).toMatch(/root === document\.body \|\| root === document\.documentElement\) return null/);
+  });
+});
+
+describe("chiffres de « L'Association » à 375 px", () => {
+  const stats = css("components/cyber/landing/AboutStats.module.css");
+
+  it("aboutStats_longValue_wrapsInsideItsCard", () => {
+    expect(stats).toMatch(/\.stat \{\s*min-width: 0;\s*\}/);
+    expect(stats).toMatch(/\.stat :global\(\.num\) \{\s*overflow-wrap: anywhere;\s*\}/);
+  });
+});

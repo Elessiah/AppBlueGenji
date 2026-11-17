@@ -246,15 +246,25 @@ export interface FocusTrailStep<T> {
   index: number;
 }
 
+/** Nombre maximal d'ancêtres relevés quand aucune borne n'est rencontrée. */
+const FOCUS_TRAIL_MAX_STEPS = 16;
+
 /**
  * Relevé, **à l'ouverture**, du voisinage du déclencheur : chacun de ses
  * ancêtres avec les voisins du chaînon qu'il contient et le rang de celui-ci. Une fois la ligne
  * retirée (suppression confirmée), l'élément détaché ne sait plus où il était.
+ *
+ * Le relevé coûte un parcours des enfants par ancêtre, à chaque ouverture de
+ * modale : il s'arrête donc à `isBoundary` (la région principale, dernier
+ * parent relevé) ou, à défaut, après `FOCUS_TRAIL_MAX_STEPS` ancêtres.
  */
-export function focusTrail<T extends TrailNode<T>>(target: T | null): FocusTrailStep<T>[] {
+export function focusTrail<T extends TrailNode<T>>(
+  target: T | null,
+  isBoundary: (node: T) => boolean = () => false,
+): FocusTrailStep<T>[] {
   const steps: FocusTrailStep<T>[] = [];
   let node = target;
-  while (node?.parentElement) {
+  while (node?.parentElement && steps.length < FOCUS_TRAIL_MAX_STEPS) {
     const parent: T = node.parentElement;
     steps.push({
       parent,
@@ -262,7 +272,8 @@ export function focusTrail<T extends TrailNode<T>>(target: T | null): FocusTrail
       previous: node.previousElementSibling,
       index: Array.prototype.indexOf.call(parent.children, node),
     });
-    node = node.parentElement;
+    if (isBoundary(parent)) break;
+    node = parent;
   }
   return steps;
 }

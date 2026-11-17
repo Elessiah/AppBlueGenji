@@ -70,8 +70,13 @@ fermeture rend le focus au premier focalisable de la ligne **suivante**, sinon
 de la précédente, sinon de la liste, en remontant jusqu'au bouton « Ajouter »
 d'une liste vidée (`restoreFocusTarget`, `lib/shared/dialog-focus.ts`). Une
 ligne retirée **après** la fermeture (liste rechargée) est guettée trois
-secondes (`MutationObserver`, limité à la région `<main>`, un seul guet à la fois) : si le focus est tombé sur `<body>`, il suit la
-même règle — sauf si la page a changé (aucun ancêtre du déclencheur ne survit dans `<main>`). Le rang du chaînon est relevé aussi : une liste
+secondes : un `MutationObserver` écoute les **seuls parents** du déclencheur, jusqu'à
+`<main>` (`childList`, sans sous-arbre : les mises à jour en continu du reste de la page ne
+déclenchent rien), et s'arrête au premier retrait, à la page quittée (adresse
+changée), à l'ouverture d'une autre modale ou dès que le focus va ailleurs (un seul
+guet à la fois). Si le focus est tombé sur `<body>`, il suit la même règle. Le relevé
+s'arrête à `<main>` (seize ancêtres au plus) et la recherche d'un focalisable
+est paresseuse : elle ne balaie jamais le document. Le rang du chaînon est relevé aussi : une liste
 rafraîchie pendant l'ouverture a remplacé les voisins relevés, la ligne **d'aujourd'hui** au même rang les remplace. Un contrôle `aria-disabled`
 (flèche « monter » d'une première ligne) n'est choisi qu'à défaut d'un contrôle actif.
 

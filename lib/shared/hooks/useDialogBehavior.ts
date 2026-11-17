@@ -84,11 +84,20 @@ const isArmed = (el: Element) => el.getAttribute("aria-disabled") !== "true";
 /**
  * Premier élément focalisable et visible de `root`, `root` compris — un
  * contrôle actif de préférence (la flèche « monter » grisée d'une première
- * ligne ne mène nulle part), à défaut un désarmé plutôt que rien.
+ * ligne ne mène nulle part), à défaut un désarmé plutôt que rien. Parcours
+ * **paresseux** : il s'arrête au premier contrôle actif (la mise en page n'est
+ * lue que pour les candidats rencontrés) et ne balaie jamais le document entier.
  */
 function firstFocusableIn(root: Element): Element | null {
-  const shown = [root, ...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => el.matches(FOCUSABLE_SELECTOR) && isShown(el));
-  return shown.find(isArmed) ?? shown[0] ?? null;
+  if (root === document.body || root === document.documentElement) return null;
+  let fallback: Element | null = null;
+  const candidates = root.matches(FOCUSABLE_SELECTOR) ? [root, ...root.querySelectorAll(FOCUSABLE_SELECTOR)] : root.querySelectorAll(FOCUSABLE_SELECTOR);
+  for (const el of candidates) {
+    if (!isShown(el)) continue;
+    if (isArmed(el)) return el;
+    fallback ??= el;
+  }
+  return fallback;
 }
 
 function focusRestoreTarget(entry: RestoreEntry): Element | null {
@@ -97,36 +106,52 @@ function focusRestoreTarget(entry: RestoreEntry): Element | null {
   return next;
 }
 
-/** Arrêt du guet en cours : un seul à la fois, une nouvelle fermeture remplace le précédent. */
+/** Arrêt du guet en cours : un seul à la fois, une nouvelle fermeture ou ouverture le remplace. */
 let stopLateRemovalWatch: (() => void) | null = null;
+
+/** La région principale de la page : borne du relevé du voisinage et du guet. */
+const isMainRegion = (el: Element) => el.matches("main, [role='main']");
 
 /**
  * Le déclencheur a repris le focus mais sa ligne peut encore disparaître
  * (rechargement après fermeture) : à son retrait, si le focus est tombé sur
- * `<body>`, il passe à la ligne voisine. Guet borné, levé au premier retrait,
- * limité à la région principale ; il n'agit que si un ancêtre du déclencheur
- * **de cette région** est toujours là (une ligne retirée d'une liste, pas un
- * changement de page, où le focus sur `<body>` est l'usage).
+ * `<body>`, il passe à la ligne voisine. Guet borné (3 s), levé au premier
+ * retrait, à la page quittée (adresse changée), à une nouvelle modale ou dès que
+ * le focus va ailleurs. Il n'écoute que les **parents** du déclencheur
+ * jusqu'à la région principale (`childList`, sans sous-arbre) : le retrait de
+ * la ligne est celui d'un maillon de cette chaîne, et les mises à jour en
+ * continu du reste de la page ne déclenchent rien.
  */
 function watchLateRemoval(entry: RestoreEntry) {
   stopLateRemovalWatch?.();
   if (entry.element === document.body || entry.element === document.documentElement) return;
   const region: Element = entry.element.closest("main, [role='main']") ?? document.body;
+  const startedAt = `${location.pathname}${location.search}`;
   const observer = new MutationObserver(() => {
     if (entry.element.isConnected) return;
     stop();
-    if (!entry.trail.some((step) => step.parent !== region && step.parent.isConnected && region.contains(step.parent))) return;
+    // Page changée : le focus sur `<body>` est l'usage, rien à rendre.
+    if (`${location.pathname}${location.search}` !== startedAt) return;
+    if (!entry.trail.some((step) => step.parent.isConnected && region.contains(step.parent))) return;
     const active = document.activeElement;
     if (active === null || active === document.body) focusRestoreTarget(entry);
   });
+  const onFocusIn = (event: FocusEvent) => {
+    if (event.target !== entry.element) stop();
+  };
   const timer = setTimeout(() => stop(), LATE_REMOVAL_WATCH_MS);
   function stop() {
     observer.disconnect();
     clearTimeout(timer);
+    document.removeEventListener("focusin", onFocusIn, true);
     if (stopLateRemovalWatch === stop) stopLateRemovalWatch = null;
   }
   stopLateRemovalWatch = stop;
-  observer.observe(region, { childList: true, subtree: true });
+  for (const step of entry.trail) {
+    observer.observe(step.parent, { childList: true });
+    if (step.parent === region) break;
+  }
+  document.addEventListener("focusin", onFocusIn, true);
 }
 
 /**
@@ -157,10 +182,11 @@ export function useDialogBehavior({ open, onClose, locked = false, initialFocus 
   useEffect(() => {
     if (!open) return;
 
+    stopLateRemovalWatch?.();
     const token = Symbol("dialog");
     const container = containerRef.current;
     const opener = document.activeElement as HTMLElement | null;
-    restoreTargets.set(token, opener ? { element: opener, trail: focusTrail<Element>(opener) } : null);
+    restoreTargets.set(token, opener ? { element: opener, trail: focusTrail<Element>(opener, isMainRegion) } : null);
     dialogStack.push(token);
 
     // Focus initial : l'élément marqué `data-autofocus` s'il y en a un (le champ

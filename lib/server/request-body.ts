@@ -180,9 +180,13 @@ export async function readOptionalJsonObject(
 ): Promise<{ body: Record<string, unknown> } | { refusal: string }> {
   const read = await readOptionalJsonBody(req, refusal, maxBytes);
   if ("refusal" in read) return read;
-  const body = read.body;
-  if (typeof body !== "object" || body === null || Array.isArray(body)) return { refusal };
-  return { body: body as Record<string, unknown> };
+  return asJsonObject(read.body, refusal);
+}
+
+/** Une valeur JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) est refusée sous `refusal`. */
+function asJsonObject(value: unknown, refusal: string): { body: Record<string, unknown> } | { refusal: string } {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return { refusal };
+  return { body: value as Record<string, unknown> };
 }
 
 /**
@@ -203,8 +207,7 @@ export async function readJsonObject(
   } catch (error) {
     return { refusal: bodyReadRefusal(error) ?? refusal };
   }
-  if (typeof json !== "object" || json === null || Array.isArray(json)) return { refusal };
-  return { body: json as Record<string, unknown> };
+  return asJsonObject(json, refusal);
 }
 
 /**
