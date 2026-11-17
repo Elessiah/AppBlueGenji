@@ -149,7 +149,9 @@ son horaire en tête, à l'heure de Paris, dans les deux langues :
 substFormat: 3 is not yet supported ») ; une équipe « النسور » faisait répondre 500 à l'image de son match.
 `drawnEmbedShareImage` lit le PNG et, sur échec, **retente une fois** sans les lettres de droite à gauche
 (`withoutRightToLeftText` : noms de tournoi, d'équipe et de map, `withoutRightToLeftLetters` ; un nom vide
-retombe sur « Équipe n »). Le titre et la description gardent le nom entier.
+retombe sur « Équipe n »). Le nouvel essai n'a lieu que si la carte dessine une telle lettre (sinon l'échec
+remonte aussitôt), ne recopie que le match dessiné, et ne relit pas les logos (mémo du rendu). Au plus deux
+rendus par carte et par version, dans la même place de la file, résultat gardé (6 h). Le titre et la description gardent le nom entier.
 Un match joué, en saisie ou sans horaire n'affiche rien de plus qu'avant. Un créneau
 **passé** non plus (match en retard) : `matchScheduledAt(match, now)` ne rend l'horaire
 qu'à venir, et ce basculement entre dans l'empreinte (`matchShareVersion`), calculée au

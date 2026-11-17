@@ -380,10 +380,39 @@ describe("carte d'un match — écriture de droite à gauche", () => {
     expect(rendered[1]).toContain("Les");
   });
 
-  it("GET_renderFailsWithoutArabic_stillThrows", async () => {
-    mockRenderFails.when = () => true;
+  it("GET_renderFailsWithoutArabic_throwsAfterASingleRender", async () => {
+    let renders = 0;
+    mockRenderFails.when = () => {
+      renders += 1;
+      return true;
+    };
 
     await expect(get("fr", "tournament-4-match-7.png")).rejects.toThrow("lookupType");
+    // Rien à retirer : un nouvel essai ferait deux fois le même rendu perdu.
+    expect(renders).toBe(1);
+  });
+
+  it("GET_arabicTeamName_readsEachLogoOnceAcrossBothAttempts", async () => {
+    mockRenderFails.when = drawsArabic;
+    jest.mocked(teamLogoDataUrl).mockClear();
+    jest
+      .mocked(publicTournamentShareForRequest)
+      .mockResolvedValue(view({ team1: { teamId: 10, name: `Les ${ARABIC}`, logoUrl: "/uploads/teams/10.png", solo: false } }));
+
+    await get("fr", "tournament-4-match-7.png");
+
+    expect(teamLogoDataUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it("withoutRightToLeftText_withMatchId_keepsOnlyThatMatch", () => {
+    const shown = view();
+    shown.share.matches = new Map([
+      [7, MATCH],
+      [8, { ...MATCH, matchId: 8 }],
+    ]);
+
+    expect([...withoutRightToLeftText(shown, 7).share.matches.keys()]).toEqual([7]);
+    expect([...withoutRightToLeftText(shown).share.matches.keys()]).toEqual([7, 8]);
   });
 
   it("withoutRightToLeftText_namesAndMaps_loseArabicLetters", () => {

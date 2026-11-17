@@ -400,6 +400,15 @@ montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
 - **Aucun joueur** : ni pseudo, ni avatar, ni effectif. La fiche d'un joueur
   reste générique.
 
+### Nom d'équipe en écriture de droite à gauche
+
+Satori échoue sur la police arabe qu'il va chercher (« lookupType: 5 - substFormat: 3 ») : une équipe
+« النسور » faisait répondre 500 à sa fiche (`team-<id>`) et pouvait le faire au podium. `drawnPageShareImage`
+lit le PNG et, sur échec d'une de ces deux cartes seulement (le texte des autres est le nôtre), **retente une
+fois** sans les lettres de droite à gauche du nom (`withoutRightToLeftLetters` ; un nom vide retombe sur
+« Équipe n »). Un seul rendu de plus, dans la même place de la file, jamais en boucle ; le résultat est gardé
+comme tout rendu. Même repli que `drawnEmbedShareImage` (`SHARE_EMBEDS.md`).
+
 ### Coût d'un rendu (`lib/server/share-image-cache.ts`)
 
 La route `/og/…` est dynamique et un lien collé dans un gros salon fait venir

@@ -35,6 +35,14 @@ jest.mock("next/og", () => ({
         headers: { "content-type": "image/png", ...(options as { headers?: Record<string, string> }).headers },
       });
     }
+
+    // Satori échoue à la lecture du flux, sur une lettre arabe (pas à la construction).
+    override async arrayBuffer(): Promise<ArrayBuffer> {
+      if (/[؀-ۿ]/u.test(renderToStaticMarkup(this.element as ReactElement))) {
+        throw new Error("lookupType: 5 - substFormat: 3 is not yet supported");
+      }
+      return super.arrayBuffer();
+    }
   },
 }));
 jest.mock("@/lib/server/share-podium");
@@ -213,6 +221,55 @@ describe("renderPageShareImage", () => {
   it("rend null pour une clé inconnue", async () => {
     expect(await buildPageShareImage("nope", "fr")).toBeNull();
     expect(await renderPageShareImage("nope", "fr")).toBeNull();
+  });
+});
+
+describe("renderPageShareImage — nom en écriture de droite à gauche", () => {
+  /** « النسور » : le moteur d'images échoue sur sa police. */
+  const ARABIC = String.fromCharCode(0x627, 0x644, 0x646, 0x633, 0x648, 0x631);
+  const TEAM = { teamId: 7, teamName: `Dragon ${ARABIC}`, logoUrl: null, wins: 1, losses: 0, draws: 0, points: 1000 };
+
+  beforeEach(() => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(findShareTeam).mockResolvedValue(TEAM);
+  });
+
+  it("renderPageShareImage_arabicTeamName_retriesOnceWithLatinPartAndServesPng", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, logoSrc: null });
+    const response = await renderPageShareImage("team-7", "fr");
+    expect(response!.status).toBe(200);
+    expect(response!.headers.get("content-type")).toBe("image/png");
+    expect(loadShareTeam).toHaveBeenCalledTimes(2);
+    // Gardée : un robot suivant ne relance ni échec ni nouvel essai.
+    await renderPageShareImage("team-7", "fr");
+    expect(loadShareTeam).toHaveBeenCalledTimes(2);
+  });
+
+  it("renderPageShareImage_arabicOnlyTeamName_usesFallbackTitle", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, teamName: ARABIC, logoSrc: null });
+    const retried = await buildPageShareImage("team-7", "fr", true);
+    expect(renderToStaticMarkup((retried as unknown as FakeImageResponse).element)).toContain("7");
+    expect((await renderPageShareImage("team-7", "fr"))!.status).toBe(200);
+  });
+
+  it("renderPageShareImage_arabicPodiumName_retriesWithoutArabic", async () => {
+    jest.mocked(loadSharePodium).mockResolvedValue([{ ...PODIUM[0]!, teamName: `Alpha ${ARABIC}` }, PODIUM[1]!, PODIUM[2]!]);
+    const response = await renderPageShareImage("ranking", "fr");
+    expect(response!.status).toBe(200);
+    expect(loadSharePodium).toHaveBeenCalledTimes(2);
+  });
+
+  it("renderPageShareImage_secondRenderAlsoFails_rejectsAfterTwoAttemptsAndKeepsNothing", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, logoSrc: null });
+    jest.mocked(shareCardLogo).mockResolvedValue(`data:image/png;base64,${ARABIC}`);
+    await expect(renderPageShareImage("team-7", "fr")).rejects.toThrow("substFormat");
+    expect(loadShareTeam).toHaveBeenCalledTimes(2);
+  });
+
+  it("renderPageShareImage_latinTeamName_rendersOnce", async () => {
+    jest.mocked(loadShareTeam).mockResolvedValue({ ...TEAM, teamName: "Dragon", logoSrc: null });
+    await renderPageShareImage("team-7", "fr");
+    expect(loadShareTeam).toHaveBeenCalledTimes(1);
   });
 });
 

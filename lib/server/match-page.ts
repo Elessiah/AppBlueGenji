@@ -165,7 +165,10 @@ export async function matchPageMetadata(
     const title = prefixedTitle(metadata.title, prefix);
     // L'encart garde le tournoi (sans lui, « Manche 2 · Match 3 » ne dit rien),
     // borné pour que Discord ne coupe pas le tour : c'est le nom qui cède.
-    const shareTitle = prefixedTitle(metadata.title, prefix, EMBED_MATCH_TITLE_BUDGET);
+    // Une largeur ne dépasse jamais deux colonnes par unité de texte : un titre
+    // assez court tient sans découpe en graphèmes.
+    const shareTitle =
+      title.length * 2 <= EMBED_MATCH_TITLE_BUDGET ? title : prefixedTitle(metadata.title, prefix, EMBED_MATCH_TITLE_BUDGET);
     return {
       ...metadata,
       title: { absolute: title },

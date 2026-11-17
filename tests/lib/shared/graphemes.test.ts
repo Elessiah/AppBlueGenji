@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { cutToWidth, displayWidth, graphemesOf, isolateDirection, withoutRightToLeftLetters } from "@/lib/shared/graphemes";
+import { cutToWidth, displayWidth, graphemesOf, hasRightToLeftLetters, isolateDirection, withoutRightToLeftLetters } from "@/lib/shared/graphemes";
 import { truncateForShare } from "@/lib/shared/share-metadata";
 
 /** Drapeau français : deux indicateurs régionaux, un seul graphème. */
@@ -94,5 +94,22 @@ describe("withoutRightToLeftLetters", () => {
 
   it("withoutRightToLeftLetters_latin_unchanged", () => {
     expect(withoutRightToLeftLetters("Choco Pops")).toBe("Choco Pops");
+  });
+});
+
+describe("hasRightToLeftLetters", () => {
+  const ARABIC = String.fromCharCode(0x627, 0x644, 0x646, 0x633, 0x648, 0x631);
+
+  it("hasRightToLeftLetters_arabicName_isTrueEveryCall", () => {
+    // Un test répété : aucune dérive d'état (`lastIndex`) d'une expression globale.
+    expect([1, 2, 3].map(() => hasRightToLeftLetters(`Les ${ARABIC}`))).toEqual([true, true, true]);
+  });
+
+  it("hasRightToLeftLetters_latinAndCjkName_isFalse", () => {
+    expect(hasRightToLeftLetters("Alpha 東京")).toBe(false);
+  });
+
+  it("withoutRightToLeftLetters_calledTwice_givesTheSameResult", () => {
+    expect([1, 2].map(() => withoutRightToLeftLetters(`A ${ARABIC} B`))).toEqual(["A B", "A B"]);
   });
 });

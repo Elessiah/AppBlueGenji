@@ -48,11 +48,12 @@ export function displayWidth(text: string): number {
  * coupé entre deux graphèmes ; intact s'il tient.
  */
 export function cutToWidth(text: string, max: number): string {
-  if (displayWidth(text) <= max) return text;
+  // Une seule découpe : les largeurs servent au test d'abord, à la coupe ensuite.
+  const parts = graphemesOf(text).map((grapheme) => ({ grapheme, size: graphemeWidth(grapheme) }));
+  if (parts.reduce((total, part) => total + part.size, 0) <= max) return text;
   let kept = "";
   let width = 0;
-  for (const grapheme of graphemesOf(text)) {
-    const size = graphemeWidth(grapheme);
+  for (const { grapheme, size } of parts) {
     if (width + size > max - 1) break;
     kept += grapheme;
     width += size;
@@ -62,6 +63,8 @@ export function cutToWidth(text: string, max: number): string {
 
 /** Lettres des écritures de droite à gauche (hébreu, arabe, syriaque, thâna, n'ko…). */
 const RTL_LETTER = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EEFF}]/u;
+
+const RTL_LETTERS = new RegExp(RTL_LETTER.source, "gu");
 
 /**
  * Un nom saisi isolé de son voisinage (FSI … PDI, U+2068 / U+2069) **s'il
@@ -81,5 +84,10 @@ export function isolateDirection(name: string): string {
  * qu'une carte absente.
  */
 export function withoutRightToLeftLetters(text: string): string {
-  return text.replace(new RegExp(RTL_LETTER.source, "gu"), "").replace(/\s+/gu, " ").trim();
+  return text.replace(RTL_LETTERS, "").replace(/\s+/gu, " ").trim();
+}
+
+/** `text` contient-il une lettre de droite à gauche ({@link RTL_LETTER}) ? */
+export function hasRightToLeftLetters(text: string): boolean {
+  return RTL_LETTER.test(text);
 }
