@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, MouseEvent } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type MouseEvent } from "react";
 
 export type BusyButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -30,15 +30,15 @@ export type BusyButtonProps = Omit<
  * profondeur), la garde synchrone (`useBusyGuard().run`) écarte le second geste
  * parti avant le rendu, et le serveur autorise chaque geste : tout ceci n'est
  * que de l'ergonomie.
+ *
+ * Transmet sa `ref` au `<button>` (React 18 : `forwardRef`) — un écran qui rend
+ * le focus à un bouton précis après l'envoi (flèches de l'ordre des engagés,
+ * centre de lancement) en a besoin.
  */
-export function BusyButton({
-  busy,
-  blocked = false,
-  onClick,
-  onBlockedClick,
-  type = "button",
-  ...rest
-}: Readonly<BusyButtonProps>) {
+export const BusyButton = forwardRef<HTMLButtonElement, Readonly<BusyButtonProps>>(function BusyButton(
+  { busy, blocked = false, onClick, onBlockedClick, type = "button", ...rest },
+  ref,
+) {
   const off = busy || blocked;
   const activate = (event: MouseEvent<HTMLButtonElement>) => {
     if (!off) {
@@ -48,5 +48,7 @@ export function BusyButton({
     event.preventDefault();
     if (!busy) onBlockedClick?.(event);
   };
-  return <button {...rest} type={type} aria-disabled={off || undefined} aria-busy={busy || undefined} onClick={activate} />;
-}
+  return (
+    <button {...rest} ref={ref} type={type} aria-disabled={off || undefined} aria-busy={busy || undefined} onClick={activate} />
+  );
+});

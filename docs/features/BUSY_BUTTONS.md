@@ -77,4 +77,57 @@ annoncer de l'attente.
   `EntrantContactsPanel` (pendant une relance, l'échec et « Réessayer » restent
   affichés : `contactsPanelView` place l'échec avant le chargement) —
   `tests/app/match-busy-buttons.test.ts`.
+- Gestion du tournoi (EF-67) : `GhostRegistrationDialog`, `RegistrationsPanel`
+  (flèches et « Retirer » ; arrivée en bout de liste, le focus passe à la
+  flèche opposée), `RollbackRoundDialog`, `DeleteTournamentDialog`,
+  `TournamentImageDialog` (+ `TournamentImagePicker`, prop `busy`),
+  `TournamentDialogShell` (+ `AdvanceTournamentDialog`, `RemoveEntrantDialog`,
+  qui lui passent `isBusy` et `pendingLabel`), `TournamentLiveLink`,
+  `EndurancePenaltyDialog`, `TournamentForm`, `MatchLaunchCenter` —
+  `tests/app/tournament-admin-busy-buttons.test.ts`. `BusyButton` transmet sa
+  `ref` (`forwardRef`, React 18).
+- **Geste qui quitte l'écran** sans le démonter sur-le-champ (suppression d'un
+  tournoi puis `router.replace`, création ou édition puis `router.push`) :
+  `useBusyGuard().hold()`, appelé au succès, garde `busy` et `isBusy()` vrais
+  jusqu'au démontage — sinon `busy` retombait et un second clic recréait le
+  tournoi ou relançait la suppression. Inutile quand le parent ferme le
+  dialogue dans le même rendu (manche effacée). Sur un écran déjà démonté,
+  `hold()` ne fait rien (aucune minuterie que le démontage n'effacerait plus).
+  Passé `HOLD_RELEASE_MS` (20 s) sans navigation, l'écran se rend : la
+  suppression ne se réarme pas pour autant (`deleted`, rien à resupprimer).
+- **Côté serveur — la garde du client n'est qu'un confort.** Un envoi dont la
+  réponse se perd (réseau coupé après l'écriture, écran rendu par `hold()`)
+  pouvait être renvoyé. Les gestes qui **ajoutent** portent une clé de
+  requête tirée une fois par geste (`newRequestKey`, `lib/shared/request-key.ts`) :
+  `runOnce` (`lib/server/idempotency.ts`, mémoire du processus, 10 min, 2 000
+  entrées, portée = route + utilisateur + cible) exécute la tâche une fois par
+  clé et rend aux répétitions le même résultat — création d'un tournoi
+  (`POST /api/tournaments`, clé de la page) et pénalité d'endurance (clé du
+  dialogue). Un échec n'est pas retenu. « Avancer le tournoi » envoie l'étape
+  annoncée (`expectedTarget`) : si le tournoi a déjà avancé, 409
+  `TOURNAMENT_STAGE_CHANGED` au lieu d'une étape de plus. L'équipe fantôme
+  créée par un essai dont l'inscription échoue est réutilisée au nouvel essai
+  sous le même nom. Le reste est déjà sans double effet côté serveur
+  (suppression, retour de manche par `expectedStage`, inscriptions déjà
+  engagées refusées).
+- Listes (`<select>`) du formulaire de tournoi pendant l'envoi : `aria-readonly`
+  (le choix y est ignoré, et le lecteur d'écran l'annonce).
+- **Coût au rendu** : les setters de `TournamentForm` sont des `useCallback`
+  (stables) ; les lignes de `RegistrationsPanel` sont mémoïsées
+  (`RegistrationRow`, rappels `onMove` / `onRemove` stables) et leurs flèches se
+  retrouvent par `data-arrow`, sans `ref` recréée à chaque rendu. `form[data-frozen]`
+  épargne les boutons « i » (`aria-expanded`).
+- Formulaire de tournoi : toute saisie est ignorée pendant l'envoi (setters
+  gardés par `isBusy()`, états voisins compris : suivi des rondes suisses,
+  valeur retenue du format), les champs texte et dates passent en `readOnly`,
+  et **tous** les `NumberInput`, sous-formulaires compris, par
+  `NumberInputReadOnlyContext` — un champ numérique garde son brouillon, qui
+  sinon resterait affiché sans partir ; les listes déroulantes gardent
+  seulement leur `disabled` de verrou durable (`locked(…)`).
+- Image d'un tournoi : le choix (Remplacer, Retirer, cadrage) passe par la
+  garde synchrone du dialogue (`editDraft`), pas seulement par le `busy` rendu.
+- Cases et radios figées par `aria-disabled` / `aria-readonly` : rendues
+  éteintes par `globals.css` (mêmes couleurs que `:disabled`, sans survol).
+- Centre de lancement : en échec, le focus revient au bouton pressé
+  (« Confirmer prêt », `confirmReadyRef`), resté focalisable.
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

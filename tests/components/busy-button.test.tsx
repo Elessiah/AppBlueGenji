@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import type { MouseEvent } from "react";
+import { createRef, type MouseEvent, type ReactElement, type Ref } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BusyButton, type BusyButtonProps } from "@/components/ui/busy-button";
 
@@ -16,8 +16,15 @@ function fakeClick() {
   return { event: { preventDefault } as unknown as MouseEvent<HTMLButtonElement>, preventDefault };
 }
 
+// `forwardRef` : le rendu est la fonction `render(props, ref)` de l'objet exporté.
+type ForwardRendered = { render: (props: BusyButtonProps, ref: Ref<HTMLButtonElement> | null) => ReactElement };
+const renderBusy = (props: BusyButtonProps, ref: Ref<HTMLButtonElement> | null = null) =>
+  (BusyButton as unknown as ForwardRendered).render(props, ref) as ReactElement<{ onClick: ClickHandler }> & {
+    ref: unknown;
+  };
+
 function clickOf(props: BusyButtonProps): ClickHandler {
-  return (BusyButton(props).props as { onClick: ClickHandler }).onClick;
+  return renderBusy(props).props.onClick;
 }
 
 describe("BusyButton", () => {
@@ -90,5 +97,14 @@ describe("BusyButton", () => {
 
     expect(html).not.toMatch(/(?<!aria-)disabled=/);
     expect(html).toContain('class="btn"');
+  });
+
+  it("BusyButton_ref_forwardedToTheNativeButton", () => {
+    // Un écran rend le focus à un bouton précis après l'envoi (flèches de l'ordre
+    // des engagés, « Prêt » du centre de lancement) : la `ref` doit l'atteindre.
+    const ref = createRef<HTMLButtonElement>();
+
+    expect(renderBusy({ busy: false }, ref).ref).toBe(ref);
+    expect(renderBusy({ busy: true }).ref).toBeNull();
   });
 });

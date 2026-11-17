@@ -170,6 +170,8 @@
     "INVALID_TOURNAMENT_ID": "Identifiant de tournoi invalide.",
     "TOURNAMENT_ALREADY_STARTED": "Ce tournoi a déjà démarré : il n'y a plus d'étape à avancer.",
     "TOURNAMENT_ALREADY_FINISHED": "Ce tournoi est terminé.",
+    "TOURNAMENT_STAGE_CHANGED": "Ce tournoi a déjà avancé entre-temps : rechargez la page pour voir son étape actuelle.",
+    "INVALID_ADVANCE_BODY": "Demande d'avancée invalide.",
     "TOURNAMENT_ADVANCE_FAILED": "Erreur lors de l'avancée du tournoi.",
     "INVALID_ISSUE_MESSAGE": "Décris le problème en 10 à 1000 caractères pour que l'arbitre puisse agir.",
     "NOT_REGISTERED": "Seuls les engagés du tournoi peuvent signaler un problème.",

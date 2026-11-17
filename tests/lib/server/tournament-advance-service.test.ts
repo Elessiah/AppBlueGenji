@@ -291,4 +291,19 @@ describe("advanceTournamentNow", () => {
     expect(flushBotLogs).not.toHaveBeenCalled();
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
+
+  it("advanceTournamentNow_expectedTargetMatches_advances", async () => {
+    mockTournament(registrationRow(), 12);
+
+    await expect(advanceTournamentNow(7, "RUNNING")).resolves.toMatchObject({ target: "RUNNING" });
+  });
+
+  it("advanceTournamentNow_expectedTargetDiffers_throwsStageChangedAndRollsBack", async () => {
+    const { execute, connection } = mockTournament(registrationRow(), 12);
+
+    await expect(advanceTournamentNow(7, "LOCKED")).rejects.toThrow("TOURNAMENT_STAGE_CHANGED");
+
+    expect(execute.mock.calls.some((c) => /UPDATE bg_tournaments/.test(String((c as [string])[0])))).toBe(false);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+  });
 });

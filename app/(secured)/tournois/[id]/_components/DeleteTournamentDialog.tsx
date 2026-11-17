@@ -1,7 +1,10 @@
 "use client";
 
-import { FormEvent, useState, type ReactNode } from "react";
+import { FormEvent, useRef, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { richNodes } from "@/components/i18n/shell-text";
 import { isDeletionConfirmed } from "@/lib/shared/tournament-deletion";
 import { useMapError } from "../_lib/error-map";
@@ -27,6 +30,12 @@ interface DeleteTournamentDialogProps {
  * après le premier rendu (`deferMount`) pour que la saisie ait le curseur à
  * l'ouverture. `busy` verrouille Échap pendant l'envoi : une modale en train
  * d'écrire ne se referme pas — la suppression, elle, partirait quand même.
+ *
+ * Les boutons restent focalisables pendant l'envoi (`BusyButton`,
+ * `docs/features/BUSY_BUTTONS.md`), la saisie passe en lecture seule. Après
+ * le succès, la fiche part vers la liste sans démonter le dialogue sur-le-champ
+ * (`router.replace`) : il reste en attente (`deleted`) jusqu'à la navigation,
+ * un second clic ne relance pas une suppression déjà faite.
  */
 export function DeleteTournamentDialog({
   tournamentId,
@@ -40,24 +49,35 @@ export function DeleteTournamentDialog({
   const { t } = text;
   const strong = (children: ReadonlyArray<ReactNode>) => <strong style={{ color: "var(--ink)" }}>{richNodes(children)}</strong>;
   const [confirmation, setConfirmation] = useState("");
-  const [busy, setBusy] = useState(false);
+  // Suppression faite, navigation en cours : `hold()` garde la garde synchrone
+  // et l'attente affichée levées jusqu'au démontage.
+  const { busy, isBusy, run, hold } = useBusyGuard();
+  // Le tournoi n'existe plus : si la navigation tarde au-delà de la fin de
+  // `hold()` (`HOLD_RELEASE_MS`), le dialogue se rend pour être fermé, mais
+  // son bouton ne se réarme pas — il n'y a plus rien à supprimer, et un second
+  // envoi n'apporterait qu'un refus « introuvable » après le succès.
+  const [deleted, setDeleted] = useState(false);
+  const deletedRef = useRef(false);
 
   const armed = isDeletionConfirmed(tournamentName, confirmation);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!armed || busy) return;
+    if (!armed || isBusy() || deletedRef.current) return;
 
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/tournaments/${tournamentId}`, { method: "DELETE" });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(payload.error || "TOURNAMENT_DELETE_FAILED");
-      onDeleted(tournamentName);
-    } catch (e) {
-      showError(mapError((e as Error).message));
-      setBusy(false);
-    }
+    await run(async () => {
+      try {
+        const res = await fetch(`/api/admin/tournaments/${tournamentId}`, { method: "DELETE" });
+        const payload = (await res.json()) as { error?: string };
+        if (!res.ok) throw new Error(payload.error || "TOURNAMENT_DELETE_FAILED");
+        deletedRef.current = true;
+        setDeleted(true);
+        hold();
+        onDeleted(tournamentName);
+      } catch (e) {
+        showError(mapError((e as Error).message));
+      }
+    });
   };
 
   return (
@@ -95,7 +115,9 @@ export function DeleteTournamentDialog({
             onChange={(e) => setConfirmation(e.target.value)}
             placeholder={tournamentName}
             autoComplete="off"
-            disabled={busy}
+            // Entrée y lance l'envoi : en lecture seule (pas `disabled`), le
+            // champ garde le focus.
+            readOnly={busy}
             aria-describedby="delete-tournament-hint"
           />
           <p
@@ -107,29 +129,31 @@ export function DeleteTournamentDialog({
           </p>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
+        <div className="dim-disabled" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <BusyButton
+            busy={busy}
             className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!isBusy()) onClose();
+            }}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("score.cancel")}
-          </button>
-          <button
+          </BusyButton>
+          <BusyButton
+            busy={busy}
+            blocked={!armed || deleted}
             type="submit"
             className="btn"
-            disabled={!armed || busy}
             style={{
               padding: "8px 20px",
               fontSize: 13,
               borderColor: "var(--red-live, #ff4d4d)",
-              color: armed && !busy ? "var(--red-live, #ff4d4d)" : undefined,
+              color: armed && !busy && !deleted ? "var(--red-live, #ff4d4d)" : undefined,
             }}
           >
-            {busy ? t("delete.pending") : t("delete.confirm")}
-          </button>
+            <BusyLabel busy={busy} idle={t("delete.confirm")} pending={t("delete.pending")} />
+          </BusyButton>
         </div>
       </form>
     </TournamentDialogFrame>

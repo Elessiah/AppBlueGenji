@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/tournaments/validation";
 import { readJsonBody } from "@/lib/server/request-body";
 import { isContentionMessage } from "@/lib/server/mysql-errors";
+import { readRequestKey, runOnce } from "@/lib/server/idempotency";
 import type { TournamentBuckets } from "@/lib/shared/types";
 
 /**
@@ -114,6 +115,8 @@ export async function POST(req: Request) {
       registrationOpenAt?: string;
       registrationCloseAt?: string;
       startAt?: string;
+      /** Clé du geste (`lib/server/idempotency.ts`) : un renvoi rend le même tournoi. */
+      requestKey?: unknown;
     };
 
     const validation = validateTournamentInput(body);
@@ -122,14 +125,18 @@ export async function POST(req: Request) {
     // `null` (seulement absent hors MULTI), contrairement au reste des champs.
     const { phases, ...input } = validation.value;
 
-    const id = await createTournament(user.id, {
-      ...input,
-      startVisibilityAt: body.startVisibilityAt ?? "",
-      registrationOpenAt: body.registrationOpenAt ?? "",
-      registrationCloseAt: body.registrationCloseAt ?? "",
-      startAt: body.startAt ?? "",
-      ...(phases ? { phases } : {}),
-    });
+    // Un renvoi du même geste (réponse perdue, écran rendu après `hold()`)
+    // rend le tournoi déjà créé au lieu d'en créer un second.
+    const id = await runOnce(`tournament-create:${user.id}`, readRequestKey(body.requestKey), () =>
+      createTournament(user.id, {
+        ...input,
+        startVisibilityAt: body.startVisibilityAt ?? "",
+        registrationOpenAt: body.registrationOpenAt ?? "",
+        registrationCloseAt: body.registrationCloseAt ?? "",
+        startAt: body.startAt ?? "",
+        ...(phases ? { phases } : {}),
+      }),
+    );
 
     return ok({ id }, 201);
   } catch (error) {

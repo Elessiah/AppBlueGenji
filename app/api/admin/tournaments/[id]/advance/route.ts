@@ -4,6 +4,8 @@ import { advanceTournamentNow } from "@/lib/server/tournaments/advance";
 import { can } from "@/lib/shared/permissions";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import { unexpectedFailureCode } from "@/lib/server/failure-reason";
+import { readOptionalJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
+import { isAdvanceTarget } from "@/lib/shared/tournament-launch";
 
 /**
  * « Avancer le tournoi » : fait franchir au tournoi l'étape suivante de son
@@ -15,12 +17,19 @@ import { unexpectedFailureCode } from "@/lib/server/failure-reason";
  * suppression définitive reste le seul geste du domaine à exiger `isAdmin`,
  * parce qu'elle, rien ne la rejoue.
  *
- * `POST` sans corps : l'action n'a pas de paramètre — les dates sont déduites de
- * l'instant de l'avancée (`lib/shared/tournament-launch.ts`). Laisser le client
- * proposer une date rouvrirait par la fenêtre ce que l'édition refuse par la
- * porte : un tournoi antidaté d'une semaine.
+ * `POST` sans date : les dates sont déduites de l'instant de l'avancée
+ * (`lib/shared/tournament-launch.ts`). Laisser le client proposer une date
+ * rouvrirait par la fenêtre ce que l'édition refuse par la porte : un tournoi
+ * antidaté d'une semaine.
+ *
+ * Corps facultatif `{ expectedTarget }` : l'étape que le dialogue a annoncée.
+ * Si le tournoi n'y va plus (un autre membre du staff l'a déjà avancé, ou
+ * l'heure l'a fait), 409 `TOURNAMENT_STAGE_CHANGED` au lieu de lui faire
+ * franchir **une étape de plus** que ce qui a été confirmé — deux onglets ou
+ * deux arbitres confirmant ensemble « Ouvrir les inscriptions » ne les closent
+ * plus au passage.
  */
-export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
@@ -31,8 +40,18 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
+  const read = await readOptionalJsonObject(req, "INVALID_ADVANCE_BODY", SMALL_JSON_BODY_MAX_BYTES);
+  if ("refusal" in read) return fail(read.refusal, 400);
+  const rawExpected = read.body.expectedTarget;
+  if (rawExpected !== undefined && rawExpected !== null && !isAdvanceTarget(rawExpected)) {
+    return fail("INVALID_ADVANCE_BODY", 400);
+  }
+  const expectedTarget = isAdvanceTarget(rawExpected) ? rawExpected : null;
+
   try {
-    const advanced = await advanceTournamentNow(tournamentId);
+    const advanced = expectedTarget
+      ? await advanceTournamentNow(tournamentId, expectedTarget)
+      : await advanceTournamentNow(tournamentId);
     announceStaffTournamentAction(tournamentId, "ADVANCED", { target: advanced.target });
     return ok({ advanced });
   } catch (error) {
@@ -43,7 +62,11 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     // Il n'y a plus d'étape à avancer : le tournoi a déjà démarré, ou s'est
     // terminé. 409 — l'état du tournoi contredit la demande, la demande
     // elle-même est bien formée.
-    if (message === "TOURNAMENT_ALREADY_STARTED" || message === "TOURNAMENT_ALREADY_FINISHED") {
+    if (
+      message === "TOURNAMENT_ALREADY_STARTED" ||
+      message === "TOURNAMENT_ALREADY_FINISHED" ||
+      message === "TOURNAMENT_STAGE_CHANGED"
+    ) {
       return fail(message, 409);
     }
 

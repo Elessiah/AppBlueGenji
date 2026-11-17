@@ -2320,9 +2320,11 @@ input[type="radio"] {
    il pèse plus lourd (`:not()` compte son argument) que `:checked` et que
    `:focus-visible` : la souris posée sur une case cochée la faisait paraître
    moins cochée, et sur une case parcourue au clavier, elle affaiblissait le
-   seul repère du parcours. */
-input[type="checkbox"]:hover:not(:disabled):not(:checked):not(:focus-visible),
-input[type="radio"]:hover:not(:disabled):not(:checked):not(:focus-visible) {
+   seul repère du parcours. L'exclusion du formulaire figé (`:not(form[data-frozen] *)`,
+   qui remonte les ancêtres) vient en dernier : elle ne se teste qu'une fois
+   écartés, par les conditions bon marché, tous les survols sans objet. */
+input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible):not(form[data-frozen] *),
+input[type="radio"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible):not(form[data-frozen] *) {
   border-color: rgba(var(--blue-500-rgb), 0.55);
 }
 
@@ -2356,9 +2358,20 @@ input[type="radio"]:focus-visible {
 /* L'état désactivé se dit en **couleurs**, jamais en `opacity` : une opacité se
    multiplie avec celle d'un parent — une carte verrouillée en porte déjà une —
    et la bordure, qui porte seule le contrôle décoché, finissait effacée par le
-   produit des deux. Une couleur, elle, ne se compose pas. */
+   produit des deux. Une couleur, elle, ne se compose pas.
+
+   Figée le temps d'un envoi (`aria-disabled` / `aria-readonly`, ou dans un
+   `form[data-frozen]` : `docs/features/BUSY_BUTTONS.md`), la case garde le focus
+   mais s'affiche éteinte, comme désactivée — sinon elle semblerait accepter un
+   geste que le formulaire ignore. */
 input[type="checkbox"]:disabled,
-input[type="radio"]:disabled {
+input[type="radio"]:disabled,
+input[type="checkbox"][aria-disabled="true"],
+input[type="radio"][aria-disabled="true"],
+input[type="checkbox"][aria-readonly="true"],
+input[type="radio"][aria-readonly="true"],
+form[data-frozen] input[type="checkbox"],
+form[data-frozen] input[type="radio"] {
   /* Désactivée et décochée, la case n'est **que** sa bordure : `appearance: none`
      a retiré le carré gris que le système dessinait dessous, et plus rien ne
      remplit la boîte. À 0,2 de blanc elle rendait ≈ 1,7:1 sur le fond du site —
@@ -2377,9 +2390,27 @@ input[type="radio"]:disabled {
    dans la feuille, à spécificité égale) effacerait le bleu et la marque
    flotterait sur un fond vide. */
 input[type="checkbox"]:disabled:checked,
-input[type="radio"]:disabled:checked {
+input[type="radio"]:disabled:checked,
+input[type="checkbox"][aria-disabled="true"]:checked,
+input[type="radio"][aria-disabled="true"]:checked,
+input[type="checkbox"][aria-readonly="true"]:checked,
+input[type="radio"][aria-readonly="true"]:checked,
+form[data-frozen] input[type="checkbox"]:checked,
+form[data-frozen] input[type="radio"]:checked {
   border-color: rgba(var(--blue-500-rgb), 0.45);
   background-color: rgba(var(--blue-500-rgb), 0.55);
+}
+
+/* Formulaire en cours d'envoi (`form[data-frozen]`, `TournamentForm`) : ses
+   listes et ses boutons de réglage ignorent aussi les gestes. Curseur d'attente
+   et couleurs éteintes (jamais `opacity`) ; le texte garde ≥ 4,5:1 et le bouton
+   d'envoi, qui porte `aria-busy`, n'est pas touché — ni les boutons « i » des
+   explications (`aria-expanded`), qui s'ouvrent encore pendant l'envoi. */
+form[data-frozen] select,
+form[data-frozen] button:not([type="submit"]):not([aria-busy="true"]):not([aria-expanded]) {
+  cursor: progress;
+  border-color: rgba(180, 210, 230, 0.2);
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 /* Contrastes forcés : on rend la main au système, et c'est la seule réponse
