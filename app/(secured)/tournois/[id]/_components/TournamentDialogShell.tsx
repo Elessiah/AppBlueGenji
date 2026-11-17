@@ -79,7 +79,7 @@ export function TournamentDialogShell({
       {children}
 
       <form onSubmit={onSubmit}>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <div className="dim-disabled" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <BusyButton
             busy={busy}
             className="btn ghost"

@@ -271,14 +271,14 @@ describe("cases et radios figées pendant l'envoi", () => {
     // `aria-disabled` (radios du cadrage) et `aria-readonly` (cases fantômes, manche) :
     // mêmes couleurs que `:disabled`, cochées comprises.
     expect(globals).toMatch(
-      /input\[type="radio"\]:disabled,\s+input\[type="checkbox"\]\[aria-disabled="true"\],\s+input\[type="radio"\]\[aria-disabled="true"\],\s+input\[type="checkbox"\]\[aria-readonly="true"\],\s+input\[type="radio"\]\[aria-readonly="true"\] \{/,
+      /input\[type="radio"\]:disabled,\s+input\[type="checkbox"\]\[aria-disabled="true"\],\s+input\[type="radio"\]\[aria-disabled="true"\],\s+input\[type="checkbox"\]\[aria-readonly="true"\],\s+input\[type="radio"\]\[aria-readonly="true"\],\s+form\[data-frozen\] input\[type="checkbox"\],\s+form\[data-frozen\] input\[type="radio"\] \{/,
     );
-    expect(globals).toMatch(/input\[type="radio"\]\[aria-readonly="true"\]:checked \{/);
+    expect(globals).toMatch(/form\[data-frozen\] input\[type="radio"\]:checked \{/);
   });
 
   it("globals_ariaFrozenCheckboxes_noHoverHighlight", () => {
     expect(globals).toContain(
-      'input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(:checked):not(:focus-visible)',
+      'input[type="checkbox"]:hover:not(:disabled):not([aria-disabled="true"]):not([aria-readonly="true"]):not(form[data-frozen] *):not(:checked):not(:focus-visible)',
     );
   });
 
@@ -287,5 +287,33 @@ describe("cases et radios figées pendant l'envoi", () => {
     expect(css).toContain(".mode:has(input:enabled):not(.modeFrozen):hover {");
     expect(css).toMatch(/\.modeFrozen \{\s+cursor: progress;/);
     expect(source(FORM_DIR + "TournamentImagePicker.tsx")).toContain('${busy ? s.modeFrozen : ""}');
+  });
+
+  it("TournamentForm_busy_formFrozenAndSetterGuarded", () => {
+    const form = source(FORM_DIR + "TournamentForm.tsx");
+    expect(form).toContain("data-frozen={loading || undefined}");
+    expect(form).toMatch(/const set = <K[^\n]*\n\s*\/\/[^\n]*\n\s+if \(isBusy\(\)\) return;/);
+    expect(form).toContain('onEdit={() => !isBusy() && fieldErrors.clear("maxTeams")}');
+    expect(form).toMatch(/onCheckedChange=\{\(checked\) => \{\s+if \(isBusy\(\)\) return;/);
+  });
+
+  it("globals_frozenForm_checkboxesSelectsAndButtonsDimmedByColour", () => {
+    expect(globals).toContain('form[data-frozen] input[type="checkbox"]:checked');
+    expect(globals).toMatch(/form\[data-frozen\] select,\s+form\[data-frozen\] button:not\(\[type="submit"\]\)/);
+    const block = globals.slice(globals.indexOf("form[data-frozen] select,"));
+    expect(block.slice(0, block.indexOf("}"))).not.toContain("opacity");
+  });
+
+  it("dialogs_blockedButtons_useDimDisabledNotCyberButton", () => {
+    expect(source(DIR + "TournamentDialogShell.tsx")).toContain('className="dim-disabled"');
+    expect(source(DIR + "TournamentLiveLink.tsx")).toMatch(/<form\s+className="dim-disabled"/);
+    const image = source(DIR + "TournamentImageDialog.tsx");
+    expect(image).toContain('className="dim-disabled"');
+    expect(image).not.toContain("CyberButton");
+  });
+
+  it("GhostCss_busyLinkButton_keepsReadableColour", () => {
+    const css = source(DIR + "GhostRegistrationDialog.module.css");
+    expect(css).toMatch(/\[aria-busy="true"\] \{[^}]*color: var\(--blue-300/);
   });
 });

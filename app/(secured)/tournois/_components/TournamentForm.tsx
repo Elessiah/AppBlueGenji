@@ -166,6 +166,8 @@ export function TournamentForm({
     values.duelArcade ? FIELD_IDS : { ...FIELD_IDS, mapPointTarget: DUEL_ARCADE_FIELD_ID },
   );
   const set = <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
+    // Une saisie ignorée pendant l'envoi ne lève pas non plus l'erreur du champ.
+    if (isBusy()) return;
     setValues((prev) => ({ ...prev, [key]: value }));
     if (key in FIELD_IDS) fieldErrors.clear(key as TournamentFormField);
   };
@@ -324,7 +326,7 @@ export function TournamentForm({
 
   return (
     <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
-      <form onSubmit={handleSubmit} style={SECTION_STACK}>
+      <form onSubmit={handleSubmit} style={SECTION_STACK} data-frozen={loading || undefined}>
         {/* Tous les champs numériques, sous-formulaires compris, en lecture seule pendant l'envoi. */}
         <NumberInputReadOnlyContext.Provider value={loading}>
         <section>
@@ -448,7 +450,7 @@ export function TournamentForm({
                 readOnly={loading}
                 value={maxTeams}
                 onValueChange={setMaxTeams}
-                onEdit={() => fieldErrors.clear("maxTeams")}
+                onEdit={() => !isBusy() && fieldErrors.clear("maxTeams")}
                 {...fieldAttrs("maxTeams")}
               />
               <FieldErrorText fieldId={FIELD_IDS.maxTeams} message={fieldErrors.message("maxTeams")} />
@@ -504,7 +506,7 @@ export function TournamentForm({
                     setLastMatchFormatValue(value);
                     patchMatchFormat({ value });
                   }}
-                  onEdit={() => fieldErrors.clear("matchFormatValue")}
+                  onEdit={() => !isBusy() && fieldErrors.clear("matchFormatValue")}
                   {...fieldErrors.aria(
                     "matchFormatValue",
                     locked("matchFormat") && explanationId,
@@ -567,11 +569,12 @@ export function TournamentForm({
               aria={fieldAttrs("mapPointTarget", MAP_POINT_TARGET_HINT_ID)}
               error={fieldErrors.message("mapPointTarget")}
               onCheckedChange={(checked) => {
+                if (isBusy()) return;
                 set("duelArcade", checked);
                 fieldErrors.clear("mapPointTarget");
               }}
               onTargetChange={(target) => set("mapPointTarget", target)}
-              onTargetEdit={() => fieldErrors.clear("mapPointTarget")}
+              onTargetEdit={() => !isBusy() && fieldErrors.clear("mapPointTarget")}
             />
 
             <FormatSettings

@@ -188,6 +188,8 @@
 }
 
 .linkButton[aria-disabled="true"][aria-busy="true"] {
+  /* En attente, le lien garde sa couleur : lisible (≥ 4,5:1), pas éteint. */
+  color: var(--blue-300, var(--accent-blue));
   cursor: progress;
 }
 

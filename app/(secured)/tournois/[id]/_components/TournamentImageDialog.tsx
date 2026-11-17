@@ -8,7 +8,7 @@ import { useDialogsText } from "../_lib/dialogs-text";
 import { imageErrorText, imageSuccessText, useImageText } from "../../_lib/image-text";
 import { FormEvent, useState } from "react";
 import { createPortal } from "react-dom";
-import { CyberButton, ScrollArea } from "@/components/cyber";
+import { ScrollArea } from "@/components/cyber";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
@@ -164,6 +164,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
             <TournamentImagePicker existing={image} value={value} onChange={editDraft} busy={busy} />
 
             <div
+              className="dim-disabled"
               style={{
                 display: "flex",
                 justifyContent: "flex-end",
@@ -174,21 +175,18 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
                 borderTop: "1px solid var(--line-soft)",
               }}
             >
-              <CyberButton variant="ghost" asChild>
-                <BusyButton
-                  busy={busy}
-                  onClick={() => {
-                    if (!isBusy()) onClose();
-                  }}
-                >
-                  {t("score.cancel")}
-                </BusyButton>
-              </CyberButton>
-              <CyberButton variant="primary" asChild>
-                <BusyButton busy={busy} blocked={change.kind === "NONE"} type="submit">
-                  <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
-                </BusyButton>
-              </CyberButton>
+              <BusyButton
+                busy={busy}
+                className="btn ghost"
+                onClick={() => {
+                  if (!isBusy()) onClose();
+                }}
+              >
+                {t("score.cancel")}
+              </BusyButton>
+              <BusyButton busy={busy} blocked={change.kind === "NONE"} type="submit" className="btn">
+                <BusyLabel busy={busy} idle={t("schedule.save")} pending={t("schedule.saving")} />
+              </BusyButton>
             </div>
           </form>
         </ScrollArea>

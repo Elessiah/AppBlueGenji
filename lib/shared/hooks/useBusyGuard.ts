@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { runExclusive } from "@/lib/shared/busy-guard";
 
+/** Délai après lequel un écran tenu (`hold`) dont la navigation n'a pas abouti est rendu. */
+export const HOLD_RELEASE_MS = 20_000;
+
 /** Lance une tâche si aucun envoi n'est en cours (`runExclusive`). */
 export type BusyRun = <T>(task: () => Promise<T>) => Promise<T | undefined>;
 
@@ -18,7 +21,10 @@ export type BusyGuard = {
    * Garde l'écran en attente **après** la fin de l'envoi, jusqu'à son démontage :
    * pour un geste réussi suivi d'une navigation (création, suppression), qui
    * laisse l'écran monté le temps du `router.push` — un second clic y
-   * renverrait la requête. Sans retour : `busy` et `isBusy()` restent vrais.
+   * renverrait la requête. `busy` et `isBusy()` restent vrais jusqu'au
+   * démontage — ou, si la navigation n'aboutit pas (réseau coupé, redirection
+   * vers la même page), jusqu'à `HOLD_RELEASE_MS` : l'écran se rend alors à
+   * l'utilisateur au lieu de rester gelé.
    */
   hold: () => void;
 };
@@ -42,10 +48,12 @@ export function useBusyGuard(): BusyGuard {
   const flag = useRef(false);
   const heldRef = useRef(false);
   const mounted = useRef(true);
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      if (releaseTimer.current !== null) clearTimeout(releaseTimer.current);
     };
   }, []);
   const setBusy = useCallback((next: boolean) => {
@@ -62,6 +70,12 @@ export function useBusyGuard(): BusyGuard {
   const hold = useCallback(() => {
     heldRef.current = true;
     if (mounted.current) setHeld(true);
+    if (releaseTimer.current !== null) clearTimeout(releaseTimer.current);
+    releaseTimer.current = setTimeout(() => {
+      releaseTimer.current = null;
+      heldRef.current = false;
+      if (mounted.current) setHeld(false);
+    }, HOLD_RELEASE_MS);
   }, []);
   const shown = busy || held;
   return useMemo(() => ({ busy: shown, isBusy, run, isMounted, hold }), [shown, isBusy, run, isMounted, hold]);

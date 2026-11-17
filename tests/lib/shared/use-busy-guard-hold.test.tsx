@@ -1,6 +1,6 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { useBusyGuard, type BusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { HOLD_RELEASE_MS, useBusyGuard, type BusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 
 /**
  * `hold()` (`docs/features/BUSY_BUTTONS.md`) : un geste réussi suivi d'une
@@ -54,5 +54,34 @@ describe("useBusyGuard — hold", () => {
 
     expect(task).toHaveBeenCalledTimes(1);
     expect(result).toBe(7);
+  });
+
+  describe("auto-release", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("hold_beforeDelay_stillBusy", () => {
+      jest.useFakeTimers();
+      const guard = captureGuard();
+      guard.hold();
+
+      jest.advanceTimersByTime(HOLD_RELEASE_MS - 1);
+
+      expect(guard.isBusy()).toBe(true);
+    });
+
+    it("hold_afterDelay_releasedAndRunsAgain", async () => {
+      jest.useFakeTimers();
+      const guard = captureGuard();
+      const task = jest.fn<() => Promise<number>>().mockResolvedValue(3);
+      guard.hold();
+
+      jest.advanceTimersByTime(HOLD_RELEASE_MS);
+      const result = await guard.run(task);
+
+      expect(guard.isBusy()).toBe(false);
+      expect(result).toBe(3);
+    });
   });
 });

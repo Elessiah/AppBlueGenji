@@ -95,6 +95,7 @@ export function TournamentLiveLink({
   if (editing) {
     return (
       <form
+        className="dim-disabled"
         onSubmit={submit}
         style={{
           display: "flex",
