@@ -8,19 +8,6 @@
   overflow: hidden;
 }
 
-/* Filet de pied de page : il s'éteint à ses deux bouts au lieu de tirer un
-   trait net d'un bord à l'autre de la colonne (TOURNOIS_LIST_EMPTY_LOOK.md). */
-.page::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--line-soft) 20%, var(--line-soft) 80%, transparent);
-  pointer-events: none;
-}
-
 .pageInner {
   position: relative;
   z-index: 1;
@@ -33,18 +20,11 @@
     radial-gradient(1200px 600px at 70% -10%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%),
     radial-gradient(800px 500px at 10% 110%, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
   pointer-events: none;
-  /* Le voile s'éteint sur chaque bord : coupé net par la boîte de la page
-     (`overflow: hidden`), il dessinait un panneau aux arêtes dures sur le noir,
-     d'autant plus visible que la liste est courte. Les deux masques se
-     croisent (`intersect`) : seul le centre reste plein. */
-  -webkit-mask-image:
-    linear-gradient(to right, transparent, #000 var(--fade-x), #000 calc(100% - var(--fade-x)), transparent),
-    linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(to right, transparent, #000 var(--fade-x), #000 calc(100% - var(--fade-x)), transparent),
-    linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
-  mask-composite: intersect;
+  /* Bords éteints par `.fabric-fade` (globals.css), réglé ici. Hauteur
+     bornée : la page porte toute la liste, et un voile masqué de plusieurs
+     milliers de pixels se recomposerait à chaque carte ajoutée ou retirée
+     (« Voir plus », flux en direct, archive). */
+  max-height: 1400px;
   --fade-x: min(18%, 220px);
   --fade-top: 64px;
   --fade-bottom: min(30%, 260px);

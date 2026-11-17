@@ -28,6 +28,9 @@
       "nothingUpcomingTitle": "No upcoming tournament announced",
       "nothingUpcomingMsg": "No registration is open right now.",
       "nothingUpcomingHint": "An announced tournament first shows under “Upcoming”, then under “Registration open” on the day registration opens.",
+      "nothingUpcomingGameTitle": "No upcoming tournament for this game",
+      "nothingUpcomingGameMsg": "Other games may have open registration: show all games to see them.",
+      "clearGame": "Show all games",
       "rules": "Read the rules",
       "finished": "See finished tournaments"
     },

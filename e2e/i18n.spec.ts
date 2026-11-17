@@ -132,6 +132,7 @@ test.describe("Langues — adresses /en", () => {
   });
 
   test("/en/connexion : lang=en, noindex, et les départs OAuth emportent la langue", async ({ page }) => {
+    test.skip(Boolean(process.env.E2E_AUTH_USER), "Parcours sans session : la session de test (E2E_AUTH_USER) remplace la carte de connexion.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     const response = await page.goto("/en/connexion?redirect=%2Fen%2Fregles");
     expect(response?.status()).toBe(200);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -149,6 +150,7 @@ test.describe("Langues — adresses /en", () => {
   // Lot 8a-1 : la liste des tournois. Sans session, la carte « Connexion
   // requise » (200) dans la langue de l'adresse, métadonnées de la page comprises.
   test("/en/tournois : lang=en, carte de connexion anglaise, hreflang réciproques, noindex", async ({ page }) => {
+    test.skip(Boolean(process.env.E2E_AUTH_USER), "Parcours sans session : la session de test (E2E_AUTH_USER) remplace la carte de connexion.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     const response = await page.goto("/en/tournois");
     expect(response?.status()).toBe(200);
     expect(new URL(page.url()).pathname).toBe("/en/tournois");
@@ -162,6 +164,7 @@ test.describe("Langues — adresses /en", () => {
 
   // Lot 8b-2 : création et édition ouvertes sous `/en` (carte de connexion sans session).
   test("/en/tournois/creer et /en/tournois/<id>/modifier : lang=en, hreflang, noindex", async ({ page }) => {
+    test.skip(Boolean(process.env.E2E_AUTH_USER), "Parcours sans session : la session de test (E2E_AUTH_USER) remplace la carte de connexion.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     for (const path of ["/en/tournois/creer", "/en/tournois/1/modifier"]) {
       const response = await page.goto(path);
       expect(response?.status()).toBe(200);

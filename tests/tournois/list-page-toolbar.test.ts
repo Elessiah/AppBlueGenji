@@ -47,7 +47,8 @@ describe("page tournois — barre de recherche et filtres", () => {
 
   it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
     // `listEmptyKind` (tests/tournois/list-empty-look.test.tsx) tranche entre les deux.
-    expect(page).toContain('(emptyKind === "empty" || emptyKind === "filtered")');
+    expect(page).toContain('{emptyKind === "empty" && <ListEmptyState kind="empty" canManage={isAdmin} />}');
+    expect(page).toContain('<ListEmptyState kind="filtered" canManage={isAdmin} onClearFilters={clearFilters} />');
     expect(frTournaments.list.emptyState.emptyMsg).not.toBe(frTournaments.list.emptyState.filteredMsg);
   });
 

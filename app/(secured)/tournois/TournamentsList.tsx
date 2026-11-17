@@ -164,6 +164,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   const { t } = text;
   const { showError } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const allGamesChipRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
@@ -462,10 +463,11 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
   const finishedBeyond = (key: GameFilter) => (deferredQuery.trim() ? 0 : finishedBeyondList(viewBuckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
-  // Section dépliée, archive demandée mais pas encore reçue : la liste en main
-  // est encore la liste tronquée.
-  const finishedArchiveLoading =
-    finishedExpanded && wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
+  // Archive demandée mais pas encore reçue : la liste en main est encore la
+  // liste tronquée (une recherche peut viser un terminé qu'elle ne porte pas).
+  const finishedArchivePending = wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
+  // Section dépliée : l'attente se dit sous ses cartes.
+  const finishedArchiveLoading = finishedExpanded && finishedArchivePending;
 
   const showHidden = isAdmin && viewHidden.length > 0;
   const gestureMadeRef = useRef(false);
@@ -481,6 +483,8 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
       gestureMadeRef.current = true;
     }
     const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
+    // Rien encore, mais l'archive peut en apporter : pas de « 0 » annoncé à tort.
+    if (shown === 0 && finishedArchivePending) return t("list.finishedLoading");
     return t("list.resultsCount", { count: String(shown) });
   })();
 
@@ -515,18 +519,27 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   const isOpen = (key: PageSectionKey) => openSections.has(key);
   // Rien à montrer, ou rien à rejoindre : un panneau qui le dit et propose une
   // suite, au lieu d'un grand vide noir (`TOURNOIS_LIST_EMPTY_LOOK.md`). Les
-  // inscriptions et annonces comptent « Mes tournois » compris (avant découpage).
+  // inscriptions et annonces comptent « Mes tournois » compris (avant découpage)
+  // et, pour le staff, les invisibles à venir de la section qui les montre.
+  const hiddenUpcoming = showHidden
+    ? filteredHidden.filter((card) => card.state === "UPCOMING" || card.state === "REGISTRATION").length
+    : 0;
   const emptyKind = listEmptyKind({
     loaded: listLoaded,
     shownSections: shownSections.length,
-    upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length,
+    upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length + hiddenUpcoming,
     query: deferredQuery,
     gameFilter,
+    archivePending: finishedArchivePending,
   });
+  // Le panneau disparaît avec le filtre : le focus va au contrôle effacé — le
+  // champ de recherche s'il portait un texte (sinon, sur un téléphone, le
+  // clavier s'ouvrirait sans raison), la pastille « Tous » sinon.
   const clearFilters = () => {
+    const hadQuery = query.trim() !== "";
     setQuery("");
     setGameFilter("all");
-    searchInputRef.current?.focus();
+    (hadQuery ? searchInputRef.current : allGamesChipRef.current)?.focus();
   };
 
   // Une ancre du sommaire reste dans l'URL : au rechargement (ou sur un lien
@@ -576,10 +589,10 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     list.slice(0, expandedSections.has(key) ? list.length : SECTION_DISPLAY_LIMIT);
 
   return (
-    <div className={`${s.page} page-wide`}>
+    <div className={`${s.page} page-wide hairline-fade`}>
       <RulesHelpFab />
       <BgCanvas mode="network" />
-      <div className={s.fabric} />
+      <div className={`${s.fabric} fabric-fade`} />
       <div className={s.pageInner}>
         <div className="container">
           <header className={s.pageHead}>
@@ -634,6 +647,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                   return (
                     <button
                       key={key}
+                      ref={key === "all" ? allGamesChipRef : undefined}
                       className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
                       aria-pressed={gameFilter === key}
                       aria-label={listLoaded ? t("list.countLabel", { label, count: String(count) }) : undefined}
@@ -718,8 +732,15 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           <div className={s.sections} data-loading={listLoaded ? undefined : "true"}>
             {!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}
 
-            {(emptyKind === "empty" || emptyKind === "filtered") && (
-              <ListEmptyState kind={emptyKind} canManage={isAdmin} onClearFilters={clearFilters} />
+            {emptyKind === "empty" && <ListEmptyState kind="empty" canManage={isAdmin} />}
+            {emptyKind === "filtered" && (
+              <ListEmptyState kind="filtered" canManage={isAdmin} onClearFilters={clearFilters} />
+            )}
+            {/* Recherche sans résultat dans la liste courte : l'archive des
+                terminés peut encore en apporter — on attend avant de dire
+                « Aucun résultat ». */}
+            {listLoaded && shownSections.length === 0 && emptyKind === null && (
+              <div className={s.showMoreRow}>{t("list.finishedLoading")}</div>
             )}
 
             {showHidden && totalHidden > 0 && (
@@ -839,6 +860,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                 canManage={isAdmin}
                 finishedCount={totalFinished}
                 onShowFinished={() => setSectionOpen("finished", true)}
+                onClearGame={gameFilter === "all" ? undefined : clearFilters}
               />
             )}
 

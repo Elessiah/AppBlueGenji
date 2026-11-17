@@ -30,6 +30,8 @@ const tournoisCss = read("app/(secured)/tournois/tournois.module.css");
 const annuaireCss = read("app/(secured)/_shared/annuaire.module.css");
 const globalsCss = read("app/globals.css");
 const page = read("app/(secured)/tournois/TournamentsList.tsx");
+const teamsList = read("app/(secured)/equipes/TeamsList.tsx");
+const playersList = read("app/(secured)/joueurs/PlayersList.tsx");
 
 function inFrench(ui: ReactElement): string {
   mockPathname = "/tournois";
@@ -97,6 +99,24 @@ describe("listEmptyKind", () => {
     expect(listEmptyKind({ loaded: true, shownSections: 2, upcomingCount: 1, query: "", gameFilter: "all" })).toBeNull();
   });
 
+  it("listEmptyKind_noSectionsFilteredArchivePending_returnsNull", () => {
+    expect(
+      listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "strike", gameFilter: "all", archivePending: true }),
+    ).toBeNull();
+  });
+
+  it("listEmptyKind_noSectionsUnfilteredArchivePending_returnsEmpty", () => {
+    expect(
+      listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "", gameFilter: "all", archivePending: true }),
+    ).toBe("empty");
+  });
+
+  it("listEmptyKind_sectionsShownArchivePending_returnsNothingUpcoming", () => {
+    expect(
+      listEmptyKind({ loaded: true, shownSections: 1, upcomingCount: 0, query: "", gameFilter: "ow", archivePending: true }),
+    ).toBe("nothingUpcoming");
+  });
+
   it("listEmptyKind_whitespaceQuery_treatedAsNoFilter", () => {
     expect(listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "   ", gameFilter: "all" })).toBe("empty");
   });
@@ -125,34 +145,56 @@ describe("ListEmptyState", () => {
   });
 
   it("render_filteredKind_showsClearButtonNoCreate", () => {
-    const fr = inFrench(<ListEmptyState kind="filtered" canManage />);
+    const fr = inFrench(<ListEmptyState kind="filtered" canManage onClearFilters={() => undefined} />);
     expect(fr).toContain("Aucun résultat");
     expect(fr).toContain("Effacer la recherche et les filtres");
     expect(fr).toContain('type="button"');
     expect(fr).not.toContain("/tournois/creer");
     expect(fr).not.toContain("/regles");
 
-    const en = inEnglish(<ListEmptyState kind="filtered" canManage />);
+    const en = inEnglish(<ListEmptyState kind="filtered" canManage onClearFilters={() => undefined} />);
     expect(en).toContain("Clear the search and filters");
   });
 
   it("render_nothingUpcomingWithFinished_showsFinishedLink", () => {
-    const fr = inFrench(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={3} />);
+    const fr = inFrench(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={3} onShowFinished={() => undefined} />);
     expect(fr).toContain("Aucun tournoi à venir annoncé");
     expect(fr).toContain('href="#tournois-finished"');
     expect(fr).toContain("Voir les tournois terminés");
     // L'explication passe derrière le bouton « i », jamais en paragraphe permanent.
     expect(fr).toContain('aria-controls="tournaments-nothing-upcoming-help"');
 
-    const en = inEnglish(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={3} />);
+    const en = inEnglish(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={3} onShowFinished={() => undefined} />);
     expect(en).toContain("No upcoming tournament announced");
     expect(en).toContain("See finished tournaments");
   });
 
   it("render_nothingUpcomingNoFinished_noFinishedLink", () => {
-    const html = inFrench(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={0} />);
+    const html = inFrench(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={0} onShowFinished={() => undefined} />);
 
     expect(html).not.toContain("#tournois-finished");
+  });
+
+  it("render_nothingUpcomingWithClearGame_showsGameScopedTextAndButton", () => {
+    const fr = inFrench(
+      <ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={0} onShowFinished={() => undefined} onClearGame={() => undefined} />,
+    );
+    expect(fr).toContain("Aucun tournoi à venir pour ce jeu");
+    expect(fr).toContain("Afficher tous les jeux");
+    expect(fr).not.toContain("Aucun tournoi à venir annoncé");
+
+    const en = inEnglish(
+      <ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={0} onShowFinished={() => undefined} onClearGame={() => undefined} />,
+    );
+    expect(en).toContain("No upcoming tournament for this game");
+    expect(en).toContain("Show all games");
+  });
+
+  it("render_nothingUpcomingWithoutClearGame_keepsGlobalText", () => {
+    const html = inFrench(<ListEmptyState kind="nothingUpcoming" canManage={false} finishedCount={0} onShowFinished={() => undefined} />);
+
+    expect(html).toContain("Aucun tournoi à venir annoncé");
+    expect(html).not.toContain("Afficher tous les jeux");
   });
 
   it("messages_allNewKeys_presentInFrAndEn", () => {
@@ -169,40 +211,81 @@ describe("ListEmptyState", () => {
   it("page_wiresEmptyStates_beforeFinishedSection", () => {
     expect(page).toContain("const emptyKind = listEmptyKind({");
     expect(page).toContain(
-      "upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length",
+      "upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length + hiddenUpcoming",
     );
     expect(page.indexOf('kind="nothingUpcoming"')).toBeLessThan(page.indexOf('id={pageSectionAnchor("finished")}'));
     expect(page).toContain("canManage={isAdmin}");
   });
 });
 
+describe("TournamentsList — câblage de l'état vide", () => {
+  it("page_upcomingCount_includesHiddenUpcomingForStaff", () => {
+    expect(page).toMatch(
+      /const hiddenUpcoming = showHidden\s*\?\s*filteredHidden\.filter\(\(card\) => card\.state === "UPCOMING" \|\| card\.state === "REGISTRATION"\)\.length\s*:\s*0;/,
+    );
+  });
+
+  it("page_clearFilters_focusesSearchOnlyWithQuery", () => {
+    expect(page).toContain('const hadQuery = query.trim() !== "";');
+    expect(page).toContain("(hadQuery ? searchInputRef.current : allGamesChipRef.current)?.focus();");
+    expect(page).toContain('ref={key === "all" ? allGamesChipRef : undefined}');
+  });
+
+  it("page_pendingArchive_showsLoadingRowAndAnnouncesIt", () => {
+    expect(page).toContain("archivePending: finishedArchivePending,");
+    expect(page).toContain('if (shown === 0 && finishedArchivePending) return t("list.finishedLoading");');
+    expect(page).toMatch(
+      /\{listLoaded && shownSections\.length === 0 && emptyKind === null && \(\s*<div className=\{s\.showMoreRow\}>\{t\("list\.finishedLoading"\)\}<\/div>/,
+    );
+  });
+
+  it("page_nothingUpcoming_passesClearGameOnlyUnderGameFilter", () => {
+    expect(page).toContain('onClearGame={gameFilter === "all" ? undefined : clearFilters}');
+  });
+});
+
 describe("voiles sans arête dure", () => {
-  it("fabric_tournois_hasEdgeFadeMask", () => {
+  it("fabricFade_global_hasCrossedEdgeMasks", () => {
+    const fade = block(globalsCss, ".fabric-fade");
+
+    expect(fade).toMatch(/-webkit-mask-image:\s*linear-gradient\(to right, transparent,/);
+    expect(fade).toMatch(/\smask-image:\s*linear-gradient\(to right, transparent,/);
+    expect(fade).toContain("linear-gradient(to bottom, transparent,");
+    expect(fade).toContain("mask-composite: intersect;");
+    expect(fade).toContain("-webkit-mask-composite: source-in;");
+  });
+
+  it("fabric_global_staysUnmaskedForOtherPages", () => {
+    expect(block(globalsCss, ".fabric")).not.toContain("mask");
+  });
+
+  it("fabricFade_optIn_onTournoisAndDirectoriesOnly", () => {
+    expect(page).toContain("<div className={`${s.fabric} fabric-fade`} />");
+    expect(teamsList).toContain('<div className="fabric fabric-fade" />');
+    expect(playersList).toContain('<div className="fabric fabric-fade" />');
+    expect(read("app/connexion/_components/LoginForm.tsx")).not.toContain("fabric-fade");
+    expect(read("app/rgpd/page.tsx")).not.toContain("fabric-fade");
+  });
+
+  it("fabric_tournois_setsFadeVarsAndBoundedHeight", () => {
     const fabric = block(tournoisCss, ".fabric");
 
-    expect(fabric).toMatch(/-webkit-mask-image:\s*linear-gradient\(to right, transparent,/);
-    expect(fabric).toMatch(/\smask-image:\s*linear-gradient\(to right, transparent,/);
-    expect(fabric).toContain("linear-gradient(to bottom, transparent,");
-    expect(fabric).toContain("mask-composite: intersect;");
-    expect(fabric).toContain("-webkit-mask-composite: source-in;");
+    expect(fabric).toContain("max-height: 1400px;");
+    expect(fabric).toContain("--fade-x: min(18%, 220px);");
+    expect(fabric).not.toContain("mask-image");
   });
 
-  it("fabric_global_hasEdgeFadeMask", () => {
-    const fabric = block(globalsCss, ".fabric");
-
-    expect(fabric).toMatch(/-webkit-mask-image:\s*linear-gradient\(to right, transparent,/);
-    expect(fabric).toContain("linear-gradient(to bottom, transparent,");
-    expect(fabric).toContain("mask-composite: intersect;");
-    expect(fabric).toContain("-webkit-mask-composite: source-in;");
-  });
-
-  it("page_bottomHairline_fadesAtEnds", () => {
-    for (const css of [tournoisCss, annuaireCss]) {
-      expect(block(css, ".page")).not.toContain("border-bottom");
-      expect(block(css, ".page::after")).toContain(
-        "background: linear-gradient(90deg, transparent, var(--line-soft) 20%, var(--line-soft) 80%, transparent);",
-      );
-    }
+  it("hairlineFade_global_usedByThreeHeaders", () => {
+    expect(block(globalsCss, ".hairline-fade::after")).toContain(
+      "background: linear-gradient(90deg, transparent, var(--line-soft) 20%, var(--line-soft) 80%, transparent);",
+    );
+    expect(block(tournoisCss, ".page")).not.toContain("border-bottom");
+    expect(block(annuaireCss, ".page")).not.toContain("border-bottom");
+    expect(tournoisCss).not.toContain(".page::after");
+    expect(annuaireCss).not.toContain(".page::after");
+    expect(page).toContain("<div className={`${s.page} page-wide hairline-fade`}>");
+    expect(teamsList).toContain("<header className={`${s.page} hairline-fade`}>");
+    expect(playersList).toContain("<header className={`${s.page} hairline-fade`}>");
   });
 
   it("emptyState_animation_readsDecoAnimState", () => {

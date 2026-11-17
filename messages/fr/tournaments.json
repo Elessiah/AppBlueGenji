@@ -28,6 +28,9 @@
       "nothingUpcomingTitle": "Aucun tournoi à venir annoncé",
       "nothingUpcomingMsg": "Aucune inscription n'est ouverte pour l'instant.",
       "nothingUpcomingHint": "Un tournoi annoncé apparaît d'abord sous « Prochainement », puis sous « Inscriptions ouvertes » le jour où elles ouvrent.",
+      "nothingUpcomingGameTitle": "Aucun tournoi à venir pour ce jeu",
+      "nothingUpcomingGameMsg": "D'autres jeux peuvent avoir des inscriptions ouvertes : affichez tous les jeux pour les voir.",
+      "clearGame": "Afficher tous les jeux",
       "rules": "Lire les règles",
       "finished": "Voir les tournois terminés"
     },

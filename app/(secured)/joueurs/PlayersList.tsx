@@ -170,8 +170,8 @@ export default function PlayersList() {
     <div className="page-wide" style={accentStyle}>
       <BgCanvas rgb={ACCENT_RGB} />
 
-      <header className={s.page}>
-        <div className="fabric" />
+      <header className={`${s.page} hairline-fade`}>
+        <div className="fabric fabric-fade" />
         <div className={`container ${s.pageInner}`}>
           <div className={s.pageHead}>
             <div>
