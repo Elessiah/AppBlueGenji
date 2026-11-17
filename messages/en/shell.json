@@ -187,7 +187,7 @@
     "saving": "Saving…",
     "accepted": "Thanks, you can carry on.",
     "failed": "Your acceptance couldn't be saved. Reload the page, then try again.",
-    "checkFirst": "Tick the box first to accept the terms of use."
+    "checkFirst": "Tick the box to accept the terms of use first."
   },
   "privacyModal": {
     "eyebrow": "DATA PROTECTION · GDPR",

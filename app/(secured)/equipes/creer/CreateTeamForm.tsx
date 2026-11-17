@@ -42,6 +42,9 @@ export default function CreateTeamForm() {
   // (`hold`) après la création jusqu'à la page de l'équipe.
   const { busy: loading, isBusy, run, hold } = useBusyGuard();
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  // L'équipe créée : si la navigation tarde au-delà de la tenue (`hold`), un
+  // nouvel envoi reprend le chemin de sa fiche au lieu de recréer (`USER_ALREADY_IN_TEAM`).
+  const createdTeamId = useRef<number | null>(null);
   const fieldErrors = useFieldErrors(TEAM_CREATION_FIELD_ERRORS, FIELD_IDS);
 
   const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +93,11 @@ export default function CreateTeamForm() {
       showError(message);
       return;
     }
+    if (createdTeamId.current !== null) {
+      hold();
+      router.push(`/equipes/${createdTeamId.current}`);
+      return;
+    }
     await run(async () => {
       try {
         const response = await fetch("/api/teams", {
@@ -110,6 +118,8 @@ export default function CreateTeamForm() {
           const code = payload.error || "TEAM_CREATE_FAILED";
           throw new CodedError(code, code);
         }
+
+        createdTeamId.current = payload.teamId;
 
         if (logo) {
           const formData = new FormData();

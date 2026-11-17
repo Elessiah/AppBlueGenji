@@ -602,6 +602,7 @@ function TeamDangerZone({
 }: Readonly<TeamDangerZoneProps>) {
   const text = useTeamPageText();
   const { t } = text;
+  const { showInfo } = useToast();
   return (
     <div className={`${styles.dangerZone} ${styles.fullWidth}`}>
       <h3 className={styles.dangerTitle}>{t("settings.dangerTitle")}</h3>
@@ -623,6 +624,7 @@ function TeamDangerZone({
                 data-focus-rescue-key={claim.id}
                 busy={withdrawingClaimId === claim.id}
                 blocked={withdrawingClaimId !== null}
+                onBlockedClick={() => showInfo(t("members.otherWithdrawing"))}
                 onClick={() => void onWithdraw(claim.id, claim.pseudo)}
               >
                 {t("settings.withdraw")}

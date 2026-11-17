@@ -19,6 +19,7 @@ import { RolePills } from "./RolePills";
 import { MyRolesBlock } from "./MyRolesBlock";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { BusyButton } from "@/components/ui/busy-button";
+import { useToast } from "@/components/ui/toast";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFocusRescue } from "@/lib/shared/hooks/useFocusRescue";
@@ -73,6 +74,7 @@ export function MembersSection({
   const sectionRef = useRef<HTMLElement>(null);
   const rescueFocus = useFocusRescue(sectionRef);
   const { t, locale } = useTeamPageText();
+  const { showInfo } = useToast();
   // Un pseudo ancien fait de caractères invisibles se lit « Joueur #id » partout, noms accessibles compris.
   const playerName = useCallback(
     (pseudo: string, userId: number) => shownEntityName(pseudo, "player", userId, locale),
@@ -315,6 +317,7 @@ export function MembersSection({
                     data-focus-rescue-key={invitation.id}
                     busy={cancellingId === invitation.id}
                     blocked={cancellingId !== null}
+                    onBlockedClick={() => showInfo(t("members.otherWithdrawing"))}
                     aria-label={t("members.withdrawLabel", { pseudo: playerName(invitation.pseudo, invitation.userId) })}
                     onClick={() => void withdraw(invitation)}
                   >

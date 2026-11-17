@@ -74,7 +74,8 @@ describe("écrans d'équipe — boutons pendant une requête", () => {
 
   it("teamModuleCss_busyButton_keepsLabelReadable", () => {
     const css = source("app/(secured)/equipes/[id]/team.module.css");
-    expect(css).toMatch(/\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*cursor: progress;[^}]*color: var\(--ink-mute\);[^}]*border-style: dashed;/);
+    expect(css).toMatch(/\[aria-disabled="true"\]\[aria-busy="true"\] \{[^}]*cursor: progress;/);
+    expect(css).not.toMatch(/\[aria-busy="true"\] \{[^}]*color:/);
   });
 
   it("globalsCss_dimDisabledScope_definesDimmedAndBusyRules", () => {

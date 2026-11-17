@@ -227,7 +227,7 @@ export function PrivacyChangesModal({
   detailsDeferred = false,
 }: Readonly<{ changes: PrivacyChange[]; detailsDeferred?: boolean }>) {
   const { t, rich, locale } = useShellText();
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   // Garde synchrone (`useBusyGuard`) : un double clic sur « J'ai pris
   // connaissance » partait deux fois avant que `busy` soit rendu.
@@ -425,7 +425,12 @@ export function PrivacyChangesModal({
               clavier) et pendant la lecture du détail ; le même état pose
               `aria-disabled` et annule le clic. */}
           <CyberButton variant="primary" asChild>
-            <BusyButton busy={busy} blocked={detailsPending} onClick={acknowledge}>
+            <BusyButton
+              busy={busy}
+              blocked={detailsPending}
+              onBlockedClick={() => showInfo(t("privacyModal.detailsLoading"))}
+              onClick={acknowledge}
+            >
               <BusyLabel busy={busy} idle={t("privacyModal.acknowledge")} pending={t("privacyModal.saving")} />
             </BusyButton>
           </CyberButton>

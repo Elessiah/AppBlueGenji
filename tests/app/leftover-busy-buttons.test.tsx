@@ -86,7 +86,7 @@ describe("modales légales", () => {
     const code = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(code).toContain("const { busy, isBusy, run } = useBusyGuard();");
     expect(code).toMatch(/if \(detailsPending\) return;\s*void run\(async \(\) => \{/);
-    expect(code).toMatch(/<BusyButton busy=\{busy\} blocked=\{detailsPending\} onClick=\{acknowledge\}>/);
+    expect(code).toMatch(/<BusyButton\s+busy=\{busy\}\s+blocked=\{detailsPending\}\s+onBlockedClick=\{[^}]*\}\s+onClick=\{acknowledge\}\s+>/);
     expect(disabledByRequest(code)).toEqual([]);
   });
 
@@ -103,7 +103,7 @@ describe("modales légales", () => {
       'onBlockedClick={checked || leaving || deletionOpen ? undefined : () => showError(t("termsModal.checkFirst"))}',
     );
     expect(frShell.termsModal.checkFirst).toBe("Coche d'abord la case pour accepter les conditions d'utilisation.");
-    expect(enShell.termsModal.checkFirst).toBe("Tick the box first to accept the terms of use.");
+    expect(enShell.termsModal.checkFirst).toBe("Tick the box to accept the terms of use first.");
   });
 });
 
@@ -173,7 +173,38 @@ describe("écrans d'équipe", () => {
       expect(messages.claim.pseudoFirst).toBeTruthy();
       expect(messages.settings.unchanged).toBeTruthy();
     }
-    expect(enTeam.roles.unchanged).toBe("Nothing to save: tick or untick a role first.");
+    expect(enTeam.roles.unchanged).toBe("Tick or untick a role first.");
+  });
+
+  it("withdrawButtons_refusedWhileAnotherPending_explainWithAnInfoToast", () => {
+    for (const file of ["MembersSection.tsx", "TeamSettings.tsx"]) {
+      expect(readSource(`${TEAM}/${file}`)).toContain('onBlockedClick={() => showInfo(t("members.otherWithdrawing"))}');
+    }
+    expect(frTeam.members.otherWithdrawing).toBe("Un autre retrait est en cours, réessaie.");
+    expect(enTeam.members.otherWithdrawing).toBe("Another withdrawal is in progress, try again.");
+  });
+
+  it("PrivacyChangesModal_acknowledgeWhileDetailsLoad_explainsTheWait", () => {
+    expect(readSource("components/privacy/PrivacyChangesModal.tsx")).toContain(
+      'onBlockedClick={() => showInfo(t("privacyModal.detailsLoading"))}',
+    );
+  });
+
+  it("refusalToasts_enEnglish_allEndWithFirst", () => {
+    const sentences = [
+      enTeam.roles.unchanged,
+      enTeam.settings.unchanged,
+      enTeam.transfer.chooseFirst,
+      enTeam.claim.pseudoFirst,
+      enShell.termsModal.checkFirst,
+    ];
+    for (const sentence of sentences) expect(sentence).toMatch(/ first\.$/);
+  });
+
+  it("CreateTeamForm_createdTeam_secondSubmitAfterHoldGoesToTheTeamPage", () => {
+    const code = readSource("app/(secured)/equipes/creer/CreateTeamForm.tsx");
+    expect(code).toContain("createdTeamId.current = payload.teamId;");
+    expect(code).toMatch(/if \(createdTeamId\.current !== null\) \{\s+hold\(\);\s+router\.push\(`\/equipes\/\$\{createdTeamId\.current\}`\);\s+return;/);
   });
 
   it("teamPage_disarmedColours_comeFromGlobalDimDisabled", () => {
