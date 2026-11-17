@@ -100,10 +100,10 @@ annoncer de l'attente.
   pouvait être renvoyé. Les gestes qui **ajoutent** portent une clé de
   requête tirée une fois par geste (`newRequestKey`, `lib/shared/request-key.ts`) :
   `runOnce` (`lib/server/idempotency.ts`, mémoire du processus, 10 min, 2 000
-  entrées, portée = route + utilisateur + cible) exécute la tâche une fois par
+  entrées, portée = route + utilisateur, la cible s'ajoutant à l'identifiant) exécute la tâche une fois par
   clé et rend aux répétitions le même résultat — création d'un tournoi
   (`POST /api/tournaments`, clé de la page) et pénalité d'endurance (clé du
-  dialogue). Un échec n'est pas retenu. Une entrée en cours n'est jamais évincée, chaque portée en garde au plus 100 (un compte qui inonde de clés n'use que sa part), et une clé reprise avec un **autre corps** (`bodyFingerprint`, `runOnceForBody`) est un autre geste : exécuté, sans rendre le résultat du premier. « Avancer le tournoi » envoie l'étape
+  dialogue). Un échec n'est pas retenu. Le droit est vérifié par la route avant `runOnce` : un droit retiré ne reçoit jamais un succès rejoué. Une entrée en cours n'est jamais évincée par les plafonds, seulement par l'échéance (10 min) ; chaque portée en garde au plus 100, toutes cibles confondues (un compte qui inonde de clés n'use que sa part), et le plafond global évince d'abord dans la portée la plus fournie. L'empreinte du corps (`bodyFingerprint` : SHA-256 du corps aux clés triées, sans `requestKey`, jamais le corps lui-même) fait partie de l'identifiant : une clé reprise avec un **autre corps** est un autre geste, exécuté et retenu à son tour. Les ajouts de la vitrine (partenaire, pilier, chiffre) relisent l'objet avant de le rejouer (option `fresh`) : modifié entre-temps, sa version actuelle est rendue ; supprimé, l'ajout s'exécute de nouveau au lieu de rendre un objet disparu. « Avancer le tournoi » envoie l'étape
   annoncée (`expectedTarget`) : si le tournoi a déjà avancé, 409
   `TOURNAMENT_STAGE_CHANGED` au lieu d'une étape de plus. L'équipe fantôme
   créée par un essai dont l'inscription échoue est réutilisée au nouvel essai

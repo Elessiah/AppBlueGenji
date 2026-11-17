@@ -162,6 +162,7 @@ describe("POST /api/association/about-pillars — renvoi du même ajout", () => 
   beforeEach(() => {
     jest.clearAllMocks();
     resetIdempotencyForTests();
+    jest.mocked(service.findAboutPillar).mockImplementation(async () => created);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -209,5 +210,40 @@ describe("POST /api/association/about-pillars — renvoi du même ajout", () => 
     expect(failed.status).toBe(400);
     expect(retried.status).toBe(201);
     expect(service.createAboutPillar).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutPillar).mockResolvedValue(created);
+    jest.mocked(service.findAboutPillar).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...{ title: "Accessible", text: "Gratuit.", titleEn: "Accessible", textEn: "Free." }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ title: "Accessible", text: "Gratuit.", titleEn: "Accessible", textEn: "Free." }, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createAboutPillar).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutPillar).mockResolvedValue(created);
+    const current = { ...created, title: "Ouvert" };
+    jest.mocked(service.findAboutPillar).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...{ title: "Accessible", text: "Gratuit.", titleEn: "Accessible", textEn: "Free." }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ title: "Accessible", text: "Gratuit.", titleEn: "Accessible", textEn: "Free." }, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ pillar: current });
+    expect(service.createAboutPillar).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createAboutPillar).not.toHaveBeenCalled();
   });
 });

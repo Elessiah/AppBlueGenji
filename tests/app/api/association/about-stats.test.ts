@@ -284,6 +284,7 @@ describe("POST /api/association/about-stats — renvoi du même ajout", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetIdempotencyForTests();
+    jest.mocked(service.findAboutStat).mockImplementation(async () => created);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -331,5 +332,40 @@ describe("POST /api/association/about-stats — renvoi du même ajout", () => {
     expect(failed.status).toBe(400);
     expect(retried.status).toBe(201);
     expect(service.createAboutStat).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockResolvedValue(created);
+    jest.mocked(service.findAboutStat).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createAboutStat).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockResolvedValue(created);
+    const current = { ...created, value: "99%" };
+    jest.mocked(service.findAboutStat).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ value: "100%", valueEn: "100%", label: "Bénévole", labelEn: "Volunteer-run" }, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ stat: current });
+    expect(service.createAboutStat).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createAboutStat).not.toHaveBeenCalled();
   });
 });

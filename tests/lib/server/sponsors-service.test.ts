@@ -3,6 +3,7 @@ import {
   FALLBACK_SPONSORS,
   createSponsor,
   deleteSponsor,
+  findSponsor,
   getSponsorImageUrls,
   getSponsorLogoUrl,
   listSponsors,
@@ -225,6 +226,22 @@ describe("sponsors-service", () => {
     it("throws NOT_FOUND when nothing is deleted", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(deleteSponsor(999)).rejects.toThrow("SPONSOR_NOT_FOUND");
+    });
+  });
+
+  describe("findSponsor", () => {
+    it("findSponsor_existingId_returnsSponsorWhateverItsState", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 4, name: "A", slug: "a", tier: "GOLD", logoUrl: null, bannerUrl: null, websiteUrl: null, description: null, descriptionEn: null }]]);
+      await mockDb(execute);
+      expect(await findSponsor(4)).toEqual({ id: 4, name: "A", slug: "a", tier: "GOLD", logoUrl: null, bannerUrl: null, websiteUrl: null, description: null, descriptionEn: null });
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).not.toMatch(/active = 1/);
+      expect(params).toEqual([4]);
+    });
+
+    it("findSponsor_unknownId_returnsNull", async () => {
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+      expect(await findSponsor(999)).toBeNull();
     });
   });
 });

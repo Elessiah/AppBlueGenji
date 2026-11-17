@@ -332,6 +332,7 @@ describe("POST /api/landing/sponsors — renvoi du même ajout", () => {
     jest.clearAllMocks();
     resetIdempotencyForTests();
     jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: null, bannerUrl: null });
+    jest.mocked(service.findSponsor).mockImplementation(async () => created);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -379,5 +380,40 @@ describe("POST /api/landing/sponsors — renvoi du même ajout", () => {
     expect(failed.status).toBe(400);
     expect(retried.status).toBe(201);
     expect(service.createSponsor).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+    jest.mocked(service.findSponsor).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createSponsor).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+    const current = { ...created, name: "Boutique renommée" };
+    jest.mocked(service.findSponsor).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ sponsor: current });
+    expect(service.createSponsor).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createSponsor).not.toHaveBeenCalled();
   });
 });

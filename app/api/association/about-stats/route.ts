@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
-import { createAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
+import { createAboutStat, findAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
 import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
 import { runOnceForBody } from "@/lib/server/idempotency";
 
@@ -29,7 +29,8 @@ export async function POST(req: Request) {
 
   try {
     // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au
-    // lieu d'en créer une seconde (`lib/server/idempotency.ts`).
+    // lieu d'en créer une seconde (`lib/server/idempotency.ts`) — relue d'abord :
+    // supprimée entre-temps, elle est recréée plutôt que rendue.
     const stat = await runOnceForBody(`about-stat-create:${user.id}`, body, () =>
       createAboutStat({
         value: typeof body.value === "string" ? body.value : "",
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
         label: typeof body.label === "string" ? body.label : "",
         labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
       }),
+      { fresh: (created) => findAboutStat(created.id) },
     );
     return ok({ stat }, 201);
   } catch (e) {

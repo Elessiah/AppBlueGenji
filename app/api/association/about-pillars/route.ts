@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
-import { createAboutPillar, listAboutPillars } from "@/lib/server/about-pillars-service";
+import { createAboutPillar, findAboutPillar, listAboutPillars } from "@/lib/server/about-pillars-service";
 import { readJsonBody } from "@/lib/server/request-body";
 import { runOnceForBody } from "@/lib/server/idempotency";
 
@@ -16,16 +16,20 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let body: { title?: unknown; text?: unknown; titleEn?: unknown; textEn?: unknown; requestKey?: unknown };
+  let json: unknown;
   try {
-    body = (await readJsonBody(req)) as typeof body;
+    json = await readJsonBody(req);
   } catch {
     return fail("INVALID_BODY", 400);
   }
+  // `null`, un tableau ou un nombre sont du JSON valide, mais pas une carte.
+  if (typeof json !== "object" || json === null || Array.isArray(json)) return fail("INVALID_BODY", 400);
+  const body = json as { title?: unknown; text?: unknown; titleEn?: unknown; textEn?: unknown; requestKey?: unknown };
 
   try {
     // Un renvoi du même ajout (réponse perdue) rend la carte déjà créée au
-    // lieu d'en créer une seconde (`lib/server/idempotency.ts`).
+    // lieu d'en créer une seconde (`lib/server/idempotency.ts`) — relue d'abord :
+    // supprimée entre-temps, elle est recréée plutôt que rendue.
     const pillar = await runOnceForBody(`about-pillar-create:${user.id}`, body, () =>
       createAboutPillar({
         title: typeof body.title === "string" ? body.title : "",
@@ -33,6 +37,7 @@ export async function POST(req: Request) {
         titleEn: typeof body.titleEn === "string" ? body.titleEn : null,
         textEn: typeof body.textEn === "string" ? body.textEn : null,
       }),
+      { fresh: (created) => findAboutPillar(created.id) },
     );
     return ok({ pillar }, 201);
   } catch (e) {

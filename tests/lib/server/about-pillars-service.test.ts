@@ -3,6 +3,7 @@ import {
   FALLBACK_ABOUT_PILLARS,
   createAboutPillar,
   deleteAboutPillar,
+  findAboutPillar,
   listAboutPillars,
   updateAboutPillar,
 } from "@/lib/server/about-pillars-service";
@@ -103,6 +104,20 @@ describe("about-pillars-service", () => {
     it("throws NOT_FOUND when nothing is deleted", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(deleteAboutPillar(999)).rejects.toThrow("ABOUT_PILLAR_NOT_FOUND");
+    });
+  });
+
+  describe("findAboutPillar", () => {
+    it("findAboutPillar_existingId_returnsPillar", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 3, title: "T", text: "X", title_en: null, text_en: "Y" }]]);
+      await mockDb(execute);
+      expect(await findAboutPillar(3)).toEqual({ id: 3, title: "T", text: "X", titleEn: null, textEn: "Y" });
+      expect(execute.mock.calls[0][1]).toEqual([3]);
+    });
+
+    it("findAboutPillar_unknownId_returnsNull", async () => {
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+      expect(await findAboutPillar(999)).toBeNull();
     });
   });
 });

@@ -49,8 +49,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   try {
     // Une réponse perdue après l'écriture laissait l'arbitre renvoyer la même
     // sanction : comptée deux fois, elle pouvait éliminer l'engagé.
-    await runOnceForBody(`endurance-penalty:${user.id}:${tournamentId}:${teamId}`, body, () =>
-      applyEndurancePenalty(tournamentId, teamId, points, reason, user.id),
+    // Portée = route + arbitre (plafond de 100 entrées tous engagés confondus),
+    // la cible distingue les entrées.
+    await runOnceForBody(
+      `endurance-penalty:${user.id}`,
+      body,
+      () => applyEndurancePenalty(tournamentId, teamId, points, reason, user.id),
+      { target: `${tournamentId}:${teamId}` },
     );
     return ok({ success: true });
   } catch (error) {
