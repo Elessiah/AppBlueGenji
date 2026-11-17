@@ -760,17 +760,25 @@ function withinFairShare(limits: readonly (readonly [RateLimitRule, string])[], 
 }
 
 /**
- * Étages d'un geste, plus un plafond du site : la réserve de la part
- * (`fair`) tant que le geste est dans la part de son réseau
- * ({@link AUDIENCE_FAIR_IDENTITIES}), le plafond commun (`site`) au-delà.
+ * Contrôle et décompte d'un geste sous ses étages (`limits`, puis `extra`)
+ * et un plafond du site : la réserve de la part (`fair`) d'abord tant que le
+ * geste est dans la part de son réseau ({@link AUDIENCE_FAIR_IDENTITIES}),
+ * le plafond commun (`site`) sinon — ou quand la réserve est épuisée (des
+ * réseaux forgés l'ont remplie) : un foyer n'est pas écarté tant que le site
+ * a de la place. Le total du site reste borné par la somme des deux.
  */
-function withSiteCap(
+function consumeWithSiteCap(
   limits: readonly [RateLimitRule, string][],
   site: RateLimitRule,
   fair: RateLimitRule,
   share: number,
-): [RateLimitRule, string][] {
-  return [...limits, [withinFairShare(limits, share) ? fair : site, AUDIENCE_SITE_KEY]];
+  extra: readonly [RateLimitRule, string][] = [],
+): { allowed: boolean; retryAfterMs: number } {
+  if (withinFairShare(limits, share)) {
+    const reserved = consumeAll([...limits, [fair, AUDIENCE_SITE_KEY], ...extra]);
+    if (reserved.allowed) return reserved;
+  }
+  return consumeAll([...limits, [site, AUDIENCE_SITE_KEY], ...extra]);
 }
 
 /**
@@ -793,12 +801,17 @@ export function admitAudienceViews<T extends { isView: boolean }>(
   const seen = checkRateLimit(AUDIENCE_IDENTITY_SEEN_RULE, seenKey);
   if (!seen.allowed || seen.remaining === AUDIENCE_IDENTITY_SEEN_RULE.limit) {
     const identityTiers = tiers(network, AUDIENCE_IDENTITY_RULE, AUDIENCE_WIDE_IDENTITY_RULE);
-    const limits = withSiteCap(identityTiers, AUDIENCE_GLOBAL_IDENTITY_RULE, AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE, AUDIENCE_FAIR_IDENTITIES);
     // Registre plein de navigateurs actifs (peut-être saturé exprès) : ce
     // navigateur n'y entre pas, mais il n'est pas écarté pour autant — chaque
     // envoi compte comme un navigateur nouveau, sous les mêmes plafonds.
     if (!seen.allowed) warnSeenRegistryFull();
-    const identity = consumeAll(seen.allowed ? [...limits, [AUDIENCE_IDENTITY_SEEN_RULE, seenKey]] : limits);
+    const identity = consumeWithSiteCap(
+      identityTiers,
+      AUDIENCE_GLOBAL_IDENTITY_RULE,
+      AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE,
+      AUDIENCE_FAIR_IDENTITIES,
+      seen.allowed ? [[AUDIENCE_IDENTITY_SEEN_RULE, seenKey]] : [],
+    );
     if (!identity.allowed) {
       warnUnknownNetworkThrottled(network);
       return [];
@@ -811,7 +824,7 @@ export function admitAudienceViews<T extends { isView: boolean }>(
   let dropped = false;
   const admitted = views.filter((view) => {
     if (!view.isView) return true;
-    const allowed = consumeAll(withSiteCap(viewTiers, AUDIENCE_GLOBAL_VIEW_RULE, AUDIENCE_GLOBAL_FAIR_VIEW_RULE, AUDIENCE_FAIR_VIEWS)).allowed;
+    const allowed = consumeWithSiteCap(viewTiers, AUDIENCE_GLOBAL_VIEW_RULE, AUDIENCE_GLOBAL_FAIR_VIEW_RULE, AUDIENCE_FAIR_VIEWS).allowed;
     dropped ||= !allowed;
     return allowed;
   });

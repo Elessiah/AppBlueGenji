@@ -16,21 +16,35 @@ jest.mock("mysql2/promise", () => ({
   __esModule: true,
   default: { createPool: (options: PoolOptions) => createPool(options) },
 }));
+/** Porte de migrations employée à chaque `getDatabase()`, dans l'ordre (chaque porte créée est un objet distinct). */
+const mockGateRuns: OnceGate[] = [];
 jest.mock("@/lib/server/migration-lock", () => ({
-  createOnceGate: (): OnceGate => ({ run: async () => undefined }),
+  createOnceGate: (): OnceGate => {
+    const gate: OnceGate = {
+      run: async () => {
+        mockGateRuns.push(gate);
+      },
+    };
+    return gate;
+  },
   withMigrationLock: jest.fn(),
 }));
 
 type DatabaseModule = typeof import("@/lib/server/database");
 
 const ENV = { DB_HOST: "db.test", DB_USER: "app", DB_PASSWORD: randomUUID(), DB_DATABASE: "bluegenji" };
-const KEYS = [...Object.keys(ENV), "NEXT_RUNTIME"];
+const KEYS = [...Object.keys(ENV), "NEXT_RUNTIME", "NODE_ENV"];
 const saved: Record<string, string | undefined> = {};
 const state = globalThis as typeof globalThis & {
   __bgDatabase?: unknown;
   __bgDeletedAccountsReconciliation?: Promise<void>;
   __bgDueDeletionsAt?: number;
 };
+
+/** `NODE_ENV` est en lecture seule dans les types de Node : posé par indexation. */
+function setNodeEnv(value: string) {
+  (process.env as Record<string, string | undefined>).NODE_ENV = value;
+}
 
 /** Une copie neuve du module, comme celle des routes ou d'`instrumentation.ts`. */
 function moduleCopy(): DatabaseModule {
@@ -59,6 +73,7 @@ afterEach(() => {
   delete state.__bgDeletedAccountsReconciliation;
   delete state.__bgDueDeletionsAt;
   createPool.mockReset();
+  mockGateRuns.length = 0;
 });
 
 describe("getDatabase — copies du module", () => {
@@ -84,5 +99,38 @@ describe("getDatabase — copies du module", () => {
 
     expect(createPool).toHaveBeenCalledTimes(2);
     expect(state.__bgDatabase).toBeUndefined();
+  });
+
+  it("getDatabase_serverRuntimeTwoModuleCopies_oneConnectionListener", async () => {
+    process.env.NEXT_RUNTIME = "nodejs";
+    const on = jest.fn();
+    createPool.mockImplementation(() => fakePool({ on }));
+
+    await moduleCopy().getDatabase();
+    await moduleCopy().getDatabase();
+
+    expect(on).toHaveBeenCalledTimes(1);
+  });
+
+  it("getDatabase_productionTwoModuleCopies_shareMigrationGate", async () => {
+    process.env.NEXT_RUNTIME = "nodejs";
+    setNodeEnv("production");
+
+    await moduleCopy().getDatabase();
+    await moduleCopy().getDatabase();
+
+    expect(mockGateRuns).toHaveLength(2);
+    expect(mockGateRuns[1]).toBe(mockGateRuns[0]);
+  });
+
+  it("getDatabase_developmentTwoModuleCopies_eachCopyItsOwnMigrationGate", async () => {
+    process.env.NEXT_RUNTIME = "nodejs";
+    setNodeEnv("development");
+
+    await moduleCopy().getDatabase();
+    await moduleCopy().getDatabase();
+
+    expect(mockGateRuns).toHaveLength(2);
+    expect(mockGateRuns[1]).not.toBe(mockGateRuns[0]);
   });
 });

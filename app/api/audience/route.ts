@@ -1,5 +1,5 @@
 import { admitAudienceViews, requestClientIp, throttleAudienceRequest } from "@/lib/server/api-guard";
-import { maintainAudience, recordAudienceViews } from "@/lib/server/audience-service";
+import { maintainAudience, openAudienceViews, recordAudienceViews } from "@/lib/server/audience-service";
 import { failureReason } from "@/lib/server/failure-reason";
 import { ok } from "@/lib/server/http";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
@@ -49,7 +49,9 @@ export async function POST(req: Request) {
 
   // Un envoi vide ou illisible ne touche aucun plafond de navigateurs : il ne
   // garderait vivante, sans rien mesurer, une entrée du registre des déjà vus.
-  const batch = parseAudienceBatch(body, siteHost());
+  // Les entrées d'un jour déjà clos sont écartées avant les plafonds : elles
+  // n'useraient pas la part du réseau pour rien.
+  const batch = openAudienceViews(parseAudienceBatch(body, siteHost()));
   if (batch.length === 0) return ok({ recorded: 0 });
   const views = admitAudienceViews(ip, userAgent ?? "", batch);
   if (views.length === 0) return ok({ recorded: 0 });

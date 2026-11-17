@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/audience-service");
 
 import { POST } from "@/app/api/audience/route";
-import { AUDIENCE_IDENTITY_RULE, AUDIENCE_REQUEST_RULE } from "@/lib/server/api-guard";
-import { maintainAudience, recordAudienceViews } from "@/lib/server/audience-service";
+import { AUDIENCE_IDENTITY_RULE, AUDIENCE_REQUEST_RULE, AUDIENCE_VIEW_RULE } from "@/lib/server/api-guard";
+import { maintainAudience, openAudienceViews, recordAudienceViews } from "@/lib/server/audience-service";
 import { checkRateLimit, resetRateLimit } from "@/lib/server/rate-limit";
 
 /** Réception des pages vues (`docs/features/AUDIENCE_MEASUREMENT.md`, registre T19). */
@@ -32,6 +32,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
   jest.mocked(recordAudienceViews).mockResolvedValue(1);
+  // Aucun jour clos dans ces envois : le filtre réel rend tout (testé dans audience-std5).
+  jest.mocked(openAudienceViews).mockImplementation((views) => [...views]);
 });
 
 afterEach(() => {
@@ -77,6 +79,17 @@ describe("POST /api/audience", () => {
 
     expect(await res.json()).toEqual({ recorded: 0 });
     expect(checkRateLimit(AUDIENCE_IDENTITY_RULE, "203.0.113.7").remaining).toBe(AUDIENCE_IDENTITY_RULE.limit);
+  });
+
+  it("POST_onlyClosedDayEntries_recordsNothingAndKeepsNetworkQuotas", async () => {
+    jest.mocked(openAudienceViews).mockReturnValue([]);
+
+    const res = await POST(audienceReq(BATCH));
+
+    expect(await res.json()).toEqual({ recorded: 0 });
+    expect(recordAudienceViews).not.toHaveBeenCalled();
+    expect(checkRateLimit(AUDIENCE_IDENTITY_RULE, "203.0.113.7").remaining).toBe(AUDIENCE_IDENTITY_RULE.limit);
+    expect(checkRateLimit(AUDIENCE_VIEW_RULE, "203.0.113.7").remaining).toBe(AUDIENCE_VIEW_RULE.limit);
   });
 
   it("POST_overLimit_returns429AfterLimitSends", async () => {

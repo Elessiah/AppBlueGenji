@@ -75,7 +75,19 @@ function requireEnv(name: string): string {
  * temps, ce dont MySQL faisait un interblocage.
  */
 async function ensureMigrations(db: Pool): Promise<void> {
-  await databaseState().migrationGate.run(() => withMigrationLock(db, () => runMigrations(db)));
+  const migrationGate = currentMigrationGate();
+  await migrationGate.run(() => withMigrationLock(db, () => runMigrations(db)));
+}
+
+/**
+ * Porte des migrations : celle du processus en production, celle de cette
+ * copie du module ailleurs. Sous `next dev`, un rechargement à chaud apporte
+ * un schéma modifié qui doit être rejoué sans redémarrer ; la porte partagée
+ * l'aurait tenu pour déjà joué. Les migrations restent idempotentes et sous
+ * verrou nommé : une copie de plus les rejoue sans dommage.
+ */
+function currentMigrationGate(): OnceGate {
+  return process.env.NODE_ENV === "production" ? databaseState().migrationGate : moduleDatabase.migrationGate;
 }
 
 /**
@@ -135,8 +147,13 @@ export async function getDatabase(): Promise<Pool> {
 /** Silence, en ms, avant la première sonde TCP d'une connexion du pool. */
 export const DB_KEEPALIVE_INITIAL_DELAY_MS = 30_000;
 
-/** Pools déjà réglés (un double de test peut être rendu deux fois). */
-const englishMessagesPools = new WeakSet<Pool>();
+/**
+ * Pools déjà réglés (un double de test peut être rendu deux fois). Partagé sur
+ * `globalThis` comme le pool lui-même : une autre copie du module
+ * (`instrumentation.ts`) qui reçoit le pool commun n'y ajoute pas un second
+ * écouteur `connection`.
+ */
+const englishMessagesPools: WeakSet<Pool> = ((globalThis as typeof globalThis & { __bgEnglishMessagesPools?: WeakSet<Pool> }).__bgEnglishMessagesPools ??= new WeakSet<Pool>());
 
 /**
  * Messages d'erreur du serveur **en anglais** (et attente de verrou de

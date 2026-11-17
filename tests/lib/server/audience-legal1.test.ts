@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/named-lock", () =>
+  jest.requireActual<typeof import("../../helpers/named-lock-passthrough")>("../../helpers/named-lock-passthrough").namedLockPassThrough(),
+);
 jest.mock("@/lib/server/tournaments/transaction");
 
 import { dailySalt, resetAudienceState, runMaintenance } from "@/lib/server/audience-service";

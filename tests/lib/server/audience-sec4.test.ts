@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/named-lock", () =>
+  jest.requireActual<typeof import("../../helpers/named-lock-passthrough")>("../../helpers/named-lock-passthrough").namedLockPassThrough(),
+);
 jest.mock("@/lib/server/tournaments/transaction");
 
 import {
   AUDIENCE_FAIR_VIEWS,
   AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE,
+  AUDIENCE_GLOBAL_IDENTITY_RULE,
   AUDIENCE_GLOBAL_FAIR_VIEW_RULE,
   AUDIENCE_GLOBAL_VIEW_RULE,
   AUDIENCE_IDENTITY_RULE,
@@ -127,14 +131,32 @@ describe("admitAudienceViews — cycle 4", () => {
     expect(admitAudienceViews("forged-other", `${BROWSER} late`, [view()])).toEqual([]);
   });
 
-  it("admitAudienceViews_fairViewReserveExhausted_fairShareViewRefused", () => {
+  // Cycle standard 5 : une réserve épuisée (réseaux forgés) renvoie la part
+  // d'un foyer au plafond commun, qui a encore de la place.
+  it("admitAudienceViews_fairViewReserveExhausted_fallsBackToSiteCap", () => {
     for (let i = 0; i < AUDIENCE_GLOBAL_FAIR_VIEW_RULE.limit; i += 1) chargeRateLimit(AUDIENCE_GLOBAL_FAIR_VIEW_RULE, "site");
+
+    expect(admitAudienceViews("198.51.100.4", BROWSER, [view()])).toEqual([view()]);
+    expect(checkRateLimit(AUDIENCE_GLOBAL_VIEW_RULE, "site").remaining).toBe(AUDIENCE_GLOBAL_VIEW_RULE.limit - 1);
+  });
+
+  it("admitAudienceViews_fairIdentityReserveExhausted_fallsBackToSiteCap", () => {
+    for (let i = 0; i < AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE.limit; i += 1) chargeRateLimit(AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE, "site");
+
+    expect(admitAudienceViews("198.51.100.4", BROWSER, [view()])).toEqual([view()]);
+    expect(checkRateLimit(AUDIENCE_GLOBAL_IDENTITY_RULE, "site").remaining).toBe(AUDIENCE_GLOBAL_IDENTITY_RULE.limit - 1);
+  });
+
+  it("admitAudienceViews_fairReserveAndSiteCapExhausted_viewRefused", () => {
+    for (let i = 0; i < AUDIENCE_GLOBAL_FAIR_VIEW_RULE.limit; i += 1) chargeRateLimit(AUDIENCE_GLOBAL_FAIR_VIEW_RULE, "site");
+    for (let i = 0; i < AUDIENCE_GLOBAL_VIEW_RULE.limit; i += 1) chargeRateLimit(AUDIENCE_GLOBAL_VIEW_RULE, "site");
 
     expect(admitAudienceViews("198.51.100.4", BROWSER, [view()])).toEqual([]);
   });
 
-  it("admitAudienceViews_fairIdentityReserveExhausted_newBrowserRefused", () => {
+  it("admitAudienceViews_fairIdentityReserveAndSiteCapExhausted_newBrowserRefused", () => {
     for (let i = 0; i < AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE.limit; i += 1) chargeRateLimit(AUDIENCE_GLOBAL_FAIR_IDENTITY_RULE, "site");
+    for (let i = 0; i < AUDIENCE_GLOBAL_IDENTITY_RULE.limit; i += 1) chargeRateLimit(AUDIENCE_GLOBAL_IDENTITY_RULE, "site");
 
     expect(admitAudienceViews("198.51.100.4", BROWSER, [view()])).toEqual([]);
   });

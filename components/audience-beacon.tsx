@@ -51,13 +51,22 @@ function send(entries: AudienceBeaconEntry[]): void {
 export function AudienceBeacon() {
   const pathname = usePathname();
   const tracker = useRef<AudienceTracker | null>(null);
+  /** Installation immédiate, tant que le repos n'est pas venu (sinon `null`). */
+  const installNow = useRef<(() => void) | null>(null);
+  /** Page d'arrivée, lue au montage : comptée même si le visiteur la quitte avant le repos. */
+  const landing = useRef<string | null>(null);
 
   useEffect(() => {
     if (browserAudienceOptOut()) return;
     let teardown: (() => void) | null = null;
+    landing.current = window.location.pathname;
     // Installé au repos du navigateur (comme `visit-tracker`) : le premier rendu
     // et l'hydratation ne se disputent pas le fil avec la mesure.
     const install = () => {
+      if (tracker.current) return;
+      installNow.current = null;
+      window.removeEventListener("pagehide", onEarlyPageHide);
+      cancelIdle();
       const instance = new AudienceTracker({
         // Horloge murale : le tracker y lit le jour de Paris (reprise un autre jour)
         // et une veille de la machine (performance.now() s'y arrête parfois).
@@ -68,6 +77,9 @@ export function AudienceBeacon() {
         send,
       });
       tracker.current = instance;
+      // La page d'arrivée d'abord (avec son référent extérieur), puis celle
+      // affichée maintenant si le visiteur a déjà navigué.
+      instance.navigate(landing.current ?? window.location.pathname);
       instance.navigate(window.location.pathname);
 
       const onVisibility = () => {
@@ -107,15 +119,34 @@ export function AudienceBeacon() {
     // `setTimeout` laisse passer le premier rendu. Le délai borne l'attente.
     const supportsIdle = typeof window.requestIdleCallback === "function";
     const handle = supportsIdle ? window.requestIdleCallback(install, { timeout: 1000 }) : window.setTimeout(install, 300);
-
-    return () => {
+    function cancelIdle() {
       if (supportsIdle) window.cancelIdleCallback(handle);
       else window.clearTimeout(handle);
+    }
+    // Départ avant le repos : la page d'arrivée part quand même (rebond rapide).
+    function onEarlyPageHide() {
+      install();
+      tracker.current?.leave();
+    }
+    window.addEventListener("pagehide", onEarlyPageHide);
+    // Navigation avant le repos : installé sur-le-champ (voir l'effet suivant).
+    installNow.current = install;
+
+    return () => {
+      installNow.current = null;
+      window.removeEventListener("pagehide", onEarlyPageHide);
+      cancelIdle();
       teardown?.();
     };
   }, []);
 
   useEffect(() => {
+    // Première navigation interne avant le repos : la page d'arrivée n'est pas
+    // perdue ni confondue avec celle-ci (`install` les compte dans l'ordre).
+    if (!tracker.current && installNow.current && window.location.pathname !== landing.current) {
+      installNow.current();
+      return;
+    }
     tracker.current?.navigate(window.location.pathname);
   }, [pathname]);
 

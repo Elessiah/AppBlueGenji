@@ -28,10 +28,11 @@
  *   l'horloge du serveur ({@link startAudienceMaintenanceClock}).
  */
 import { createHmac, randomBytes } from "node:crypto";
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { clientNetworkKey } from "@/lib/server/api-guard";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { audienceNetworkKey } from "@/lib/server/api-guard";
 import { failureDiagnostic, failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
+import { NamedLockUnavailableError, withNamedLock } from "./named-lock";
 import { readSiteCounts } from "./site-counts";
 import { inTransaction } from "./tournaments/transaction";
 import { PLAYED_STATES } from "@/lib/shared/stats";
@@ -284,14 +285,16 @@ function startSaltSweep(): void {
 /**
  * Empreinte d'un visiteur pour la journée : HMAC-SHA-256 du réseau et du
  * navigateur sous le sel du jour. Le réseau est l'adresse IPv4, ou le `/64`
- * d'une adresse IPv6 (`clientNetworkKey`, port et écritures variantes ôtés) :
+ * d'une adresse IPv6 (`audienceNetworkKey`, port et écritures variantes ôtés ;
+ * toute autre valeur, illisible, devient le réseau inconnu commun — celui des
+ * plafonds : une adresse forgée à chaque envoi ne fait pas un visiteur de plus) :
  * tirer une adresse neuve dans son `/64` ne fait pas un visiteur de plus, et
  * les appareils d'un même navigateur derrière un `/64` comptent pour un, comme
  * derrière une adresse IPv4 partagée.
  */
 export async function audienceVisitorKey(day: string, ip: string | null, userAgent: string | null, now: Date = new Date()): Promise<string> {
   const salt = await dailySalt(day, now);
-  return createHmac("sha256", salt).update(visitorIdentitySource({ ip: clientNetworkKey(ip) ?? ip, userAgent })).digest("hex");
+  return createHmac("sha256", salt).update(visitorIdentitySource({ ip: audienceNetworkKey(ip), userAgent })).digest("hex");
 }
 
 /** Efface les sels des jours repliés (`day <= until`), en base puis en mémoire. */
@@ -304,6 +307,17 @@ export async function forgetSalts(until: string): Promise<void> {
 /** `AAAA-MM-JJ HH:MM:SS` en temps universel, pour une colonne `DATETIME`. */
 function utcDateTime(date: Date): string {
   return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+/**
+ * Entrées d'un envoi encore comptables : celles dont la page s'est ouverte un
+ * jour pas encore repliable. Appliqué avant les plafonds (`admitAudienceViews`) :
+ * une entrée que {@link recordAudienceViews} écarterait ne consomme ni la part
+ * de son réseau ni les réserves du site.
+ */
+export function openAudienceViews<T extends Pick<AudienceView, "openedAgeMs">>(views: readonly T[], now: Date = new Date()): T[] {
+  const closed = lastRollableDay(now);
+  return views.filter((view) => parisClock(new Date(now.getTime() - view.openedAgeMs)).day > closed);
 }
 
 /**
@@ -618,6 +632,21 @@ interface DayRow extends RowDataPacket {
  */
 export async function rollUpAudienceDays(now: Date = new Date(), onRolled?: (day: string) => void): Promise<number> {
   const db = await getDatabase();
+  // Un repli à la fois sur la base : deux processus qui replieraient le même
+  // jour s'interbloqueraient sur l'effacement puis la réécriture de ses
+  // compteurs. Celui qui ne l'obtient pas passe son tour : l'autre replie.
+  try {
+    return await withNamedLock(db, AUDIENCE_ROLLUP_LOCK_NAME, 0, () => rollUpUnlocked(db, now, onRolled));
+  } catch (error) {
+    if (error instanceof NamedLockUnavailableError) return 0;
+    throw error;
+  }
+}
+
+/** Verrou nommé du repli ({@link rollUpAudienceDays}). */
+export const AUDIENCE_ROLLUP_LOCK_NAME = "bg_audience_rollup";
+
+async function rollUpUnlocked(db: Pool, now: Date, onRolled?: (day: string) => void): Promise<number> {
   const until = lastRollableDay(now);
   const [days] = await db.execute<DayRow[]>(
     `SELECT DATE_FORMAT(day, '%Y-%m-%d') AS day

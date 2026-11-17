@@ -7,6 +7,9 @@
  * du détail : `docs/features/AUDIENCE_MEASUREMENT.md`). Chaque étape échoue
  * seule : aucune n'empêche le site de démarrer, ni l'autre de se lancer.
  */
+/** Phase de `next build` (`PHASE_PRODUCTION_BUILD` de `next/constants`), où rien ne touche la base. */
+const AUDIENCE_BUILD_PHASE = "phase-production-build";
+
 export async function register(): Promise<void> {
   // Condition écrite en `=== "nodejs"` autour des imports : le paquet edge les
   // élimine (la base, `dotenv`, n'y ont pas cours).
@@ -18,11 +21,16 @@ export async function register(): Promise<void> {
       await logStartupFailure("[bot-logs] Envoi des lots à l'arrêt non branché.", error);
     }
     // Mesure d'agrément : un échec à son chargement ne doit pas empêcher le site de démarrer.
-    try {
-      const { startAudienceMaintenanceClock } = await import("@/lib/server/audience-service");
-      startAudienceMaintenanceClock();
-    } catch (error) {
-      await logStartupFailure("[audience] Horloge d'entretien non lancée.", error);
+    // Jamais pendant `next build` : un processus de rendu statique qui dure
+    // replierait, effacerait et purgerait la base (migrations du nouveau code
+    // comprises) avant tout déploiement.
+    if (process.env.NEXT_PHASE !== AUDIENCE_BUILD_PHASE) {
+      try {
+        const { startAudienceMaintenanceClock } = await import("@/lib/server/audience-service");
+        startAudienceMaintenanceClock();
+      } catch (error) {
+        await logStartupFailure("[audience] Horloge d'entretien non lancée.", error);
+      }
     }
   }
 }

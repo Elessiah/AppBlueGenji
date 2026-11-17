@@ -76,7 +76,14 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   `AUDIENCE_GLOBAL_FAIR_VIEW_RULE` 6 000 par minute), le reste dans les
   plafonds du site : des réseaux qui épuisent ces derniers n'effacent pas un
   foyer des chiffres, et la part, tous réseaux confondus, reste bornée (le
-  site ne reçoit jamais plus de 12 000 pages vues par minute). Registre des
+  site ne reçoit jamais plus de 12 000 pages vues par minute). Réserve
+  épuisée (réseaux forgés qui la remplissent), la part se reporte sur le
+  plafond commun tant qu'il a de la place (`consumeWithSiteCap`). Les entrées
+  d'un jour déjà clos sont écartées **avant** ces plafonds
+  (`openAudienceViews`) : elles n'usent pas la part du réseau. L'empreinte
+  prend le même réseau que les plafonds (`audienceNetworkKey`) : une adresse
+  illisible, forgée à chaque envoi, retombe dans le réseau inconnu commun et
+  ne fait pas un visiteur de plus. Registre des
   navigateurs vus plein (`AUDIENCE_MAX_KEYS`, peut-être saturé exprès) : un
   navigateur absent n'est pas écarté, chacun de ses envois compte comme un
   navigateur nouveau sous les mêmes plafonds (journal, une fois par 10 min).
@@ -202,6 +209,12 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - **Visiteurs par semaine / mois / an = somme des visiteurs uniques de chaque
   jour** : l'empreinte change chaque jour, aucun dédoublonnage entre jours
   n'est possible — c'est le prix de la dispense. La page le dit.
+- **Un seul repli à la fois sur la base** : `rollUpAudienceDays` tient le
+  verrou nommé `bg_audience_rollup` (sans attente) ; un second processus qui
+  ne l'obtient pas passe son tour. L'horloge d'entretien ne démarre jamais
+  pendant `next build` (`NEXT_PHASE`). Sous `next dev`, la porte des
+  migrations est celle de chaque copie du module (un schéma modifié se rejoue
+  au rechargement) ; en production, celle du processus.
 - **Un seul processus** pour la file et l'entretien (pm2 en lance un) ; le
   sel, lui, est en base : un redémarrage ne compte pas deux fois un visiteur.
   L'entretien attend les signalements en cours de son processus (15 s au
@@ -223,7 +236,9 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 ## Coût (performance, cycle 1)
 
 - **Navigateur** : `<AudienceBeacon />` s'installe au repos (`requestIdleCallback`,
-  repli `setTimeout`) ; son battement d'une minute suit `powerPolicy(...).clocks`
+  repli `setTimeout`) — sur-le-champ si le visiteur navigue ou quitte la page
+  avant : la page d'arrivée (lue au montage, avec son référent) est comptée
+  d'abord ; son battement d'une minute suit `powerPolicy(...).clocks`
   par abonnement sans rendu (éteint onglet masqué ou en économie, rallumé au
   retour). Chart.js n'est chargé que sur `/frequentation`.
 - **Écriture** : `INSERT` par tranches de `INSERT_CHUNK` (1 000) lignes ; une file
