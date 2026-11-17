@@ -1818,6 +1818,15 @@ html {
   mask-composite: intersect;
 }
 
+/* Régime économe (`data-motion="off"` : page sans focus, machine à la peine,
+   match, mouvement réduit) : un voile décoratif statique ne vaut pas une
+   surface masquée à repeindre — le halo reste, ses bords ne sont plus fondus
+   par masque (`docs/features/CLIENT_POWER_MODES.md`). */
+html[data-motion="off"] .fabric-fade {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 /* Filet bas d'un en-tête : il s'éteint à ses deux bouts au lieu de tirer un
    trait net d'un bord à l'autre (porteur en `position: relative`). */
 .hairline-fade::after {

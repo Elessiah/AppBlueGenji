@@ -46,10 +46,11 @@ jest.mock("react", () => ({
   },
 }));
 
-import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
+import { useScheduledBuckets, useScheduledBucketsPair } from "@/lib/shared/hooks/useScheduledBuckets";
 
 /** Appelé hors composant, par le banc. */
 const runHook = useScheduledBuckets;
+const runPairHook = useScheduledBucketsPair;
 import type { TournamentBuckets } from "@/lib/shared/types";
 import { tournamentCard } from "../../helpers/tournament-card";
 
@@ -149,6 +150,56 @@ describe("useScheduledBuckets", () => {
     render(upcomingBuckets());
     expect(jest.getTimerCount()).toBe(1);
     unmount();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe("useScheduledBucketsPair", () => {
+  function renderPair(first: TournamentBuckets, second: TournamentBuckets) {
+    bench.index = { state: 0, effect: 0, memo: 0 };
+    return runPairHook(first, second);
+  }
+
+  it("pair_twoSets_shareOneClockAndOneTimer", () => {
+    const first = upcomingBuckets(1);
+    const second = upcomingBuckets(2);
+    const [a, b] = renderPair(first, second);
+
+    expect(a.upcoming.map((card) => card.id)).toEqual([1]);
+    expect(b.upcoming.map((card) => card.id)).toEqual([2]);
+    // Un seul effet de minuteur pour les deux jeux de paniers.
+    expect(bench.effects).toHaveLength(1);
+    expect(jest.getTimerCount()).toBe(1);
+  });
+
+  it("pair_sharedBoundary_oneTimerFlipsBothSetsInOneRender", () => {
+    const first = upcomingBuckets(1);
+    const second = upcomingBuckets(2);
+    renderPair(first, second);
+    const rendersBefore = bench.rerenders;
+
+    jest.advanceTimersByTime(60_000);
+
+    expect(bench.rerenders).toBe(rendersBefore + 1);
+    const [a, b] = renderPair(first, second);
+    expect(a.registration.map((card) => card.id)).toEqual([1]);
+    expect(b.registration.map((card) => card.id)).toEqual([2]);
+  });
+
+  it("pair_onlySecondHasBoundary_timerStillArmed", () => {
+    const empty: TournamentBuckets = { upcoming: [], registration: [], running: [], finished: [] };
+    const second = upcomingBuckets(2);
+    renderPair(empty, second);
+
+    expect(jest.getTimerCount()).toBe(1);
+    jest.advanceTimersByTime(60_000);
+    expect(renderPair(empty, second)[1].registration.map((card) => card.id)).toEqual([2]);
+  });
+
+  it("pair_nothingToSchedule_armsNoTimer", () => {
+    const empty: TournamentBuckets = { upcoming: [], registration: [], running: [], finished: [] };
+    renderPair(empty, empty);
+
     expect(jest.getTimerCount()).toBe(0);
   });
 });

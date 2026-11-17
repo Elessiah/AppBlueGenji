@@ -262,14 +262,15 @@ describe("ListEmptyState", () => {
 
 describe("TournamentsList — câblage de l'état vide", () => {
   it("page_hiddenUpcoming_usesScheduledStateForStaffOnly", () => {
-    expect(page).toContain("const scheduledHidden = useScheduledBuckets(hiddenAsBuckets);");
-    expect(page).toMatch(/const hiddenUpcoming = showHidden\s*\?\s*filteredHidden\.filter\(/);
+    expect(page).toContain("const [scheduledBuckets, scheduledHidden] = useScheduledBucketsPair(viewBuckets, hiddenAsBuckets);");
+    expect(page).not.toContain("useScheduledBuckets(");
+    expect(page).toMatch(/const hiddenUpcoming = useMemo\(\s*\(\) =>\s*showHidden\s*\?\s*filteredHidden\.filter\(/);
     expect(page).toContain("const state = scheduledHiddenState.get(card.id) ?? card.state;");
   });
 
   it("page_clearFilters_focusesSearchOnlyWithQuery", () => {
-    expect(page).toContain('const hadQuery = query.trim() !== "";');
-    expect(page).toContain("(hadQuery ? searchInputRef.current : allGamesChipRef.current)?.focus();");
+    expect(page).toContain('const queryHasText = query.trim() !== "";');
+    expect(page).toContain("(queryHasText ? searchInputRef.current : allGamesChipRef.current)?.focus();");
     expect(page).toContain('ref={key === "all" ? allGamesChipRef : undefined}');
   });
 
@@ -304,12 +305,45 @@ describe("TournamentsList — câblage de l'état vide", () => {
     expect(page).toContain("const finishedArchivePending = wantFinishedArchive && listTruncated && !archiveFailed;");
   });
 
+  it("page_archiveFailure_silentRefreshWithArchiveInHandStaysQuiet", () => {
+    expect(page).toContain("const archiveHeldRef = useRef(false);");
+    expect(page).toContain("archiveHeldRef.current = true;");
+    expect(page).toContain("if (!archiveStillWanted || archiveHeld) return false;");
+    // Le besoin retombé : série d'échecs et archive en main oubliées.
+    const reset = page.slice(page.indexOf("if (wantFinishedArchive) return;"));
+    expect(reset.slice(0, 160)).toContain("archiveFailedToastedRef.current = false;");
+    expect(reset.slice(0, 160)).toContain("archiveHeldRef.current = false;");
+  });
+
+  it("page_archiveFailure_retriesQuietlyWhileStillWanted", () => {
+    expect(page).toContain("const ARCHIVE_RETRY_MS = 15_000;");
+    expect(page).toContain("if (!archiveFailed || !wantFinishedArchive) return;");
+    expect(page).toContain("window.setInterval(() => void load(true, controller.signal), ARCHIVE_RETRY_MS)");
+    expect(page).toContain("window.clearInterval(timer);");
+  });
+
+  it("page_archiveRequest_debouncedOnKeystrokesNotOnClicks", () => {
+    expect(page).toContain("const ARCHIVE_DEBOUNCE_MS = 400;");
+    expect(page).toContain("window.setTimeout(() => setArchiveQuery(deferredQuery), ARCHIVE_DEBOUNCE_MS)");
+    expect(page).toContain("needsFinishedArchive(archiveQuery, gameFilter, finishedExpanded)");
+    // L'attente se dit dès la frappe, avant le repos (pas de « Aucun résultat » qui clignote).
+    expect(page).toContain("const archiveIntent = listFetched && needsFinishedArchive(deferredQuery, gameFilter, finishedExpanded);");
+    expect(page).toContain("archiveWanted: archiveIntent,");
+  });
+
+  it("page_emptyStatePanel_memoisedWithStableCallbacks", () => {
+    expect(page).toContain("const ListEmptyState = memo(ListEmptyStatePanel);");
+    expect(page).toContain("onShowFinished={showFinishedSection}");
+    expect(page).not.toContain("onShowFinished={() =>");
+  });
+
   it("page_nothingUpcoming_passesClearGameOnlyUnderGameFilter", () => {
     expect(page).toContain('onClearGame={gameFilter === "all" ? undefined : clearGame}');
   });
 
   it("page_clearGame_keepsQueryAndFocusesAllChip", () => {
-    const clearGame = page.slice(page.indexOf("const clearGame = () => {"), page.indexOf("};", page.indexOf("const clearGame = () => {")));
+    const start = page.indexOf("const clearGame = useCallback(() => {");
+    const clearGame = page.slice(start, page.indexOf("}, []);", start));
 
     expect(clearGame).toContain('setGameFilter("all");');
     expect(clearGame).toContain("allGamesChipRef.current?.focus();");
@@ -343,19 +377,29 @@ describe("voiles sans arête dure", () => {
   it("fabric_tournois_setsFadeVarsAndBoundedHeight", () => {
     const fabric = block(tournoisCss, ".fabric");
 
-    expect(fabric).toContain("max-height: 1400px;");
+    expect(fabric).toContain("height: 700px;");
+    expect(fabric).not.toContain("max-height");
+    expect(fabric).toContain("at 70% -60px");
     expect(fabric).toContain("--fade-x: min(18%, 220px);");
     expect(fabric).not.toContain("mask-image");
-    expect(fabric).not.toContain("110%");
+    expect(fabric).not.toMatch(/at \d+% -?\d+%/);
   });
 
   it("fabricBottom_tournois_anchoredToPageBottomAndBounded", () => {
     const bottom = block(tournoisCss, ".fabricBottom");
 
     expect(bottom).toContain("bottom: 0;");
-    expect(bottom).toContain("height: min(100%, 560px);");
-    expect(bottom).toContain("at 10% 110%");
+    expect(bottom).toContain("height: 560px;");
+    expect(bottom).toContain("at 10% 616px");
+    expect(bottom).not.toContain("110%");
     expect(page).toContain("<div className={`${s.fabricBottom} fabric-fade`} />");
+  });
+
+  it("fabricFade_lowPowerRegime_dropsMaskSurfaces", () => {
+    const eco = block(globalsCss, 'html[data-motion="off"] .fabric-fade');
+
+    expect(eco).toContain("-webkit-mask-image: none;");
+    expect(eco).toContain("mask-image: none;");
   });
 
   it("hairlineFade_global_usedByThreeHeaders", () => {

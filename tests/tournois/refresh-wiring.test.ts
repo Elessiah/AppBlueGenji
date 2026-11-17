@@ -162,7 +162,7 @@ describe("liste des tournois — sans flux SSE", () => {
     // en « INSCRIPTIONS ».
     // Une seule horloge, un seul minuteur : les deux jeux se recouvrent presque
     // entièrement.
-    expect(listPage).toContain("useScheduledBuckets(viewBuckets)");
+    expect(listPage).toContain("useScheduledBucketsPair(viewBuckets, hiddenAsBuckets)");
     // Tableau mémoïsé : sans cela, le `memo` du bandeau ne servait jamais et
     // chaque frappe reformatait et redessinait les deux copies de la piste.
     expect(listPage).toContain("() => (listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS),");

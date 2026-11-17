@@ -15,15 +15,21 @@
 
 .fabric {
   position: absolute;
-  inset: 0;
-  background: radial-gradient(1200px 600px at 70% -10%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%);
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Boîte de taille fixe (le halo n'en peint que les premiers 400 px) : une
+     page longue n'alloue pas un masque de 1400 px de haut, presque tout
+     transparent, et le centre du halo (en px) ne bouge plus quand la liste
+     grandit. La page rogne ce qui dépasse sur une page plus courte. */
+  height: 700px;
+  background: radial-gradient(1200px 600px at 70% -60px, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%);
   pointer-events: none;
   /* Bords éteints par `.fabric-fade` (globals.css), réglé ici. Hauteur
      bornée : la page porte toute la liste, et un voile masqué de plusieurs
      milliers de pixels se recomposerait à chaque carte ajoutée ou retirée
      (« Voir plus », flux en direct, archive). Le halo du bas vit donc à part
      (`.fabricBottom`), collé au vrai bas de la page. */
-  max-height: 1400px;
   --fade-x: min(18%, 220px);
   --fade-top: 64px;
   --fade-bottom: min(30%, 260px);
@@ -36,8 +42,10 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: min(100%, 560px);
-  background: radial-gradient(800px 500px at 10% 110%, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
+  /* Taille fixe, centre en px : la boîte ne fait que glisser quand la page
+     change de hauteur, sans que le masque ni le dégradé soient recalculés. */
+  height: 560px;
+  background: radial-gradient(800px 500px at 10% 616px, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
   pointer-events: none;
   --fade-x: min(18%, 220px);
   --fade-top: 0px;

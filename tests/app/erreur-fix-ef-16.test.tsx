@@ -125,7 +125,7 @@ describe("relecture de la liste", () => {
 
   it("n'arme l'archive qu'après la première liste et tant qu'il en faut", () => {
     expect(list).toContain(
-      "const wantFinishedArchive = listFetched && needsFinishedArchive(deferredQuery, gameFilter, finishedExpanded);",
+      "const wantFinishedArchive = listFetched && needsFinishedArchive(archiveQuery, gameFilter, finishedExpanded);",
     );
     expect(list).not.toContain("setWantFinishedArchive");
   });

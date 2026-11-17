@@ -19,12 +19,30 @@ toute largeur (375 px → grand écran). C'est un **opt-in** : les autres pages 
 posent `.fabric` (connexion, pages légales, règles, accueil, classement, carte du
 bot…) gardent leur voile d'origine, dont les halos ancrés au-delà des bords.
 
-Sur `/tournois`, le voile règle ses propres variables et sa hauteur est bornée
-(`max-height: 1400px`) : la page porte toute la liste, et un calque masqué de
-plusieurs milliers de pixels se recomposerait à chaque carte ajoutée ou retirée.
-Le halo du bas vit donc dans une seconde boîte, `.fabricBottom` (aussi en
-`.fabric-fade`, `height: min(100 %, 560 px)`), ancrée au **vrai** bas de la page :
-borné à 1400 px, le voile du haut l'aurait sinon posé au milieu d'une longue liste.
+Sur `/tournois`, le voile règle ses propres variables et sa boîte est de **taille
+fixe** (700 px, centre du halo en px) : la page porte toute la liste, et un calque
+masqué dont la hauteur ou le centre suivrait la liste se recomposerait à chaque
+carte ajoutée ou retirée. Le halo du bas vit dans une seconde boîte,
+`.fabricBottom` (aussi en `.fabric-fade`, `height: 560px`, centre à 616 px),
+ancrée au **vrai** bas de la page : elle ne fait que glisser quand la page change de
+hauteur. Sous `html[data-motion="off"]` (page sans focus, machine à la peine,
+match, mouvement réduit), `.fabric-fade` abandonne ses masques (`mask-image:
+none`) : le halo reste, sans surface masquée à repeindre.
+
+## Coût : archive, minuteurs, rendus
+
+- L'archive des terminés n'est réclamée qu'après **400 ms de repos** de la frappe
+  (`ARCHIVE_DEBOUNCE_MS`) : une lettre tapée puis effacée ne coûte aucune requête.
+  L'attente se dit pourtant dès la frappe (`archiveIntent`), sans repos.
+- Archive en échec et encore attendue : relecture discrète toutes les 15 s
+  (`ARCHIVE_RETRY_MS`), sans notification, jusqu'à la réussite ou la fin du besoin.
+- Un échec de relecture de fond ne notifie pas quand l'archive est déjà en main ;
+  série d'échecs et archive en main sont oubliées quand le besoin retombe.
+- Les invisibles du staff partagent l'horloge et le minuteur des paniers publics
+  (`useScheduledBucketsPair`) : une frontière commune = un seul rendu.
+- Le panneau d'état vide est mémoïsé, ses rappels stables ; le décompte des
+  invisibles à venir est sous `useMemo`. Le panneau n'est pas chargé en différé :
+  un chargement paresseux ferait naître l'état vide un instant après la page.
 
 Le filet bas de la page (`/tournois`) et de l'en-tête des annuaires n'est plus
 un `border-bottom` tiré d'un bord à l'autre : la classe globale

@@ -61,7 +61,7 @@ describe("page tournois — barre de recherche et filtres", () => {
     // squelette, même quand la liste arrive avant « Mes tournois ».
     expect(page).toContain("const viewBuckets = listLoaded ? buckets : emptyBuckets;");
     expect(page).toContain("const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;");
-    expect(page).toContain("useScheduledBuckets(viewBuckets)");
+    expect(page).toContain("useScheduledBucketsPair(viewBuckets, hiddenAsBuckets)");
     expect(page).toContain("finishedBeyondList(viewBuckets, key)");
     expect(page).toContain("isAdmin && viewHidden.length > 0");
     expect(page.match(/\bhiddenTournaments\b/g)).toHaveLength(2);
