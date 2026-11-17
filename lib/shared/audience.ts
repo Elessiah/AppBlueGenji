@@ -33,6 +33,8 @@ export const AUDIENCE_RAW_RETENTION_MONTHS = 13;
  * s'additionnent : ce plafond n'est pas un plafond par page.
  */
 export const AUDIENCE_MAX_ENGAGED_MS = 30 * 60 * 1000;
+/** {@link AUDIENCE_MAX_ENGAGED_MS} en minutes, tel que l'annoncent les textes et la page. */
+export const AUDIENCE_MAX_ENGAGED_MINUTES = AUDIENCE_MAX_ENGAGED_MS / 60_000;
 
 /** Écart entre deux pages vues d'un même visiteur au-delà duquel commence une nouvelle visite. */
 export const AUDIENCE_VISIT_GAP_MINUTES = 30;
@@ -150,6 +152,12 @@ export function splitLocalePath(path: string): { locale: AudienceLocale; path: s
  * images, la page de fréquentation elle-même).
  */
 export function audiencePageKey(rawPath: unknown): { key: string; locale: AudienceLocale } | null {
+  const page = classifyPage(rawPath);
+  return page ? { key: page.key, locale: page.locale } : null;
+}
+
+/** Gabarit, langue et adresse type de `rawPath` (un seul parcours de {@link PAGE_PATTERNS}). */
+function classifyPage(rawPath: unknown): { key: string; locale: AudienceLocale; sample: string } | null {
   if (typeof rawPath !== "string") return null;
   let path = rawPath.trim().split("?")[0].split("#")[0];
   if (!path.startsWith("/") || path.length > 512) return null;
@@ -160,7 +168,7 @@ export function audiencePageKey(rawPath: unknown): { key: string; locale: Audien
   if (bare === AUDIENCE_PAGE_PATH || bare.startsWith(`${AUDIENCE_PAGE_PATH}/`)) return null;
   if (/^\/(api|og|_next)(\/|$)/.test(bare) || UNMEASURED_PAGES.test(bare)) return null;
   const match = PAGE_PATTERNS.find(([, pattern]) => pattern.test(bare));
-  return { key: match ? match[0] : "other", locale: split.locale };
+  return match ? { key: match[0], locale: split.locale, sample: match[2] } : { key: "other", locale: split.locale, sample: OTHER_PAGE_SAMPLE };
 }
 
 /**
@@ -170,9 +178,9 @@ export function audiencePageKey(rawPath: unknown): { key: string; locale: Audien
  * la réduit au même gabarit : rien de plus précis ne quitte le navigateur.
  */
 export function audienceBeaconPath(path: unknown): string | null {
-  const page = audiencePageKey(path);
+  const page = classifyPage(path);
   if (!page) return null;
-  const sample = PAGE_PATTERNS.find(([key]) => key === page.key)?.[2] ?? OTHER_PAGE_SAMPLE;
+  const { sample } = page;
   if (page.locale === "fr") return sample;
   return sample === "/" ? "/en" : `/en${sample}`;
 }

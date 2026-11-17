@@ -12,7 +12,7 @@ import {
   startAudienceMaintenanceClock,
 } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
-import { AUDIENCE_MAX_ENGAGED_MS, fillTemplate, type AudienceView } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MINUTES, fillTemplate, type AudienceView } from "@/lib/shared/audience";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register";
@@ -31,7 +31,7 @@ import { fakePool, type SqlMock, type SqlQuery } from "../../helpers/sql-double"
 
 const SALT = Buffer.alloc(32, 7);
 const ENTRY_ID = "2026-11-statistiques-frequentation-detaillees";
-const MINUTES = AUDIENCE_MAX_ENGAGED_MS / 60_000;
+const MINUTES = AUDIENCE_MAX_ENGAGED_MINUTES;
 
 function view(overrides: Partial<AudienceView> = {}): AudienceView {
   const ageMs = overrides.ageMs ?? 0;
@@ -68,10 +68,12 @@ afterEach(() => {
 });
 
 describe("AudienceBeacon — envoi", () => {
-  it("send_entries_fetchWithoutReferrer", () => {
+  it("send_entries_fetchWithOriginOnlyReferrer", () => {
     const source = readSource("components/audience-beacon.tsx");
 
-    expect(source).toMatch(/fetch\("\/api\/audience", \{[\s\S]*?referrerPolicy: "no-referrer",\s*\}\)/);
+    expect(source).toMatch(/fetch\("\/api\/audience", \{[\s\S]*?referrerPolicy: "strict-origin",\s*\}\)/);
+    // `no-referrer` ferait partir `Origin: null`, refusé par la garde de provenance.
+    expect(source).not.toContain('referrerPolicy: "no-referrer"');
   });
 });
 

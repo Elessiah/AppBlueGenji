@@ -31,7 +31,7 @@
  * (`docs/features/LEGAL_DATA_FILES.md`).
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
@@ -429,9 +429,6 @@ type ActivityText = { [K in Exclude<keyof ProcessingActivity, "ref">]: Localizab
 function registerActivities(activities: Record<string, ActivityText>): Localizable<ProcessingActivity>[] {
   return Object.entries(activities).map(([ref, activity]) => ({ ref, ...activity }));
 }
-
-/** Plafond du temps compté par page (T19), en minutes. */
-const AUDIENCE_MAX_ENGAGED_MINUTES = AUDIENCE_MAX_ENGAGED_MS / 60_000;
 
 const ACTIVITIES = registerActivities({
   T01: {

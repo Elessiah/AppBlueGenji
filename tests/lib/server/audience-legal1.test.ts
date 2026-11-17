@@ -7,7 +7,7 @@ import { dailySalt, resetAudienceState, runMaintenance } from "@/lib/server/audi
 import { getDatabase } from "@/lib/server/database";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
-  AUDIENCE_MAX_ENGAGED_MS,
+  AUDIENCE_MAX_ENGAGED_MINUTES,
   AUDIENCE_RAW_RETENTION_MONTHS,
   audienceBeaconPath,
   audiencePageKey,
@@ -218,7 +218,7 @@ describe("historique — l'entrée suit les constantes", () => {
   it("statsEntry_fr_interpolatesCurrentConstants", () => {
     const details = PRIVACY_CHANGES.find((change) => change.id === ENTRY_ID)?.details.join(" ") ?? "";
 
-    expect(details).toContain(`chacune plafonnée à ${AUDIENCE_MAX_ENGAGED_MS / 60_000} minutes`);
+    expect(details).toContain(`chacune plafonnée à ${AUDIENCE_MAX_ENGAGED_MINUTES} minutes`);
     expect(details).toContain(`${BACKUP_RETENTION_DAYS} jours au plus`);
     expect(details).toContain(`au bout de ${AUDIENCE_RAW_RETENTION_MONTHS} mois`);
     expect(details).not.toContain("par page");
@@ -227,7 +227,7 @@ describe("historique — l'entrée suit les constantes", () => {
   it("statsEntry_en_interpolatesCurrentConstants", () => {
     const details = PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join(" ") ?? "";
 
-    expect(details).toContain(`each capped at ${AUDIENCE_MAX_ENGAGED_MS / 60_000} minutes`);
+    expect(details).toContain(`each capped at ${AUDIENCE_MAX_ENGAGED_MINUTES} minutes`);
     expect(details).toContain(`${BACKUP_RETENTION_DAYS} days at most`);
     expect(details).toContain(`after ${AUDIENCE_RAW_RETENTION_MONTHS} months`);
     expect(details).not.toContain("per page");

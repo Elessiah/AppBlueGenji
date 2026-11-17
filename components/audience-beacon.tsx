@@ -27,9 +27,11 @@ function send(entries: AudienceBeaconEntry[]): void {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ v: entries }),
     keepalive: true,
-    // Sans en-tête `Referer` : il porterait l'adresse affichée (pseudo, numéro),
-    // que la mesure n'envoie jamais. `Origin` et `Sec-Fetch-*` suffisent au serveur.
-    referrerPolicy: "no-referrer",
+    // `Referer` réduit à l'origine du site : l'adresse affichée (pseudo, numéro),
+    // que la mesure n'envoie jamais, n'y part pas. Pas `no-referrer` : il ferait
+    // partir `Origin: null`, refusé par la garde de provenance pour les
+    // navigateurs sans `Sec-Fetch-Site` (Safari < 16.4, Firefox < 90).
+    referrerPolicy: "strict-origin",
   }).catch(() => {
     // Mesure d'agrément : jamais de bruit dans la console du visiteur.
   });

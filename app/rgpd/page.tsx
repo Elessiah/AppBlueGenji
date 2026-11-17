@@ -93,7 +93,7 @@ import {
 } from "@/lib/shared/site-visits";
 import { headers } from "next/headers";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
-import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
@@ -900,7 +900,7 @@ function RgpdFr({
             <strong>Ce qui est transmis.</strong> À chaque page affichée, votre navigateur note le
             type de la page (accueil, fiche d&apos;un tournoi…), jamais son adresse précise, un numéro
             ni un nom, le temps passé onglet visible (envoyé par tranches, chacune plafonnée à{" "}
-            {AUDIENCE_MAX_ENGAGED_MS / 60_000} minutes), la classe de votre
+            {AUDIENCE_MAX_ENGAGED_MINUTES} minutes), la classe de votre
             appareil (mobile, tablette, ordinateur, d&apos;après la largeur de la fenêtre) et, pour la
             première page d&apos;une visite, le nom du site d&apos;où vous venez. Ces notes partent
             par lots vers le serveur. Aucun cookie n&apos;est déposé, rien n&apos;est gardé dans le

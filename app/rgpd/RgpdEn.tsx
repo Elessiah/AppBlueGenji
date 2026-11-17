@@ -5,7 +5,7 @@ import { TranslationNotice } from "@/components/legal/TranslationNotice";
 import { EnglishLegalLink } from "@/components/legal/EnglishLegalLink";
 import { EnglishLegalText } from "@/components/legal/EnglishLegalText";
 import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
-import { AUDIENCE_MAX_ENGAGED_MS, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
+import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_PAGE_PATH, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
@@ -726,7 +726,7 @@ export function RgpdEn({
             <strong>What is sent.</strong> For each page shown, your browser notes the type of page
             (home, a tournament&apos;s page…), never its exact address, a number or a name, the time
             spent with the tab visible (sent in slices, each capped at{" "}
-            {AUDIENCE_MAX_ENGAGED_MS / 60_000} minutes), your device class (mobile, tablet,
+            {AUDIENCE_MAX_ENGAGED_MINUTES} minutes), your device class (mobile, tablet,
             computer, from the window&apos;s width) and, for the first page of a visit, the name of
             the site you came from. These notes are sent to the server in batches. No cookie is set,
             nothing is kept in the browser, and your session is not read: the measurement does not

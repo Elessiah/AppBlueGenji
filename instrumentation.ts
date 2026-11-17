@@ -12,7 +12,12 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { installBotLogShutdownFlush } = await import("@/lib/server/bot-log-shutdown");
     installBotLogShutdownFlush();
-    const { startAudienceMaintenanceClock } = await import("@/lib/server/audience-service");
-    startAudienceMaintenanceClock();
+    // Mesure d'agrément : un échec à son chargement ne doit pas empêcher le site de démarrer.
+    try {
+      const { startAudienceMaintenanceClock } = await import("@/lib/server/audience-service");
+      startAudienceMaintenanceClock();
+    } catch (error) {
+      console.error("[audience] Horloge d'entretien non lancée.", error instanceof Error ? error.name : typeof error);
+    }
   }
 }

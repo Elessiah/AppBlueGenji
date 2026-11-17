@@ -10,7 +10,7 @@
  *   de **son** jour (une page ouverte à 23 h 58 et reçue à 0 h 02 garde celui
  *   de la veille), et la suite d'une lecture celui du jour où sa page s'est
  *   ouverte. Le jour replié, son sel est effacé (base et mémoire de chaque
- *   processus, au plus {@link MAINTENANCE_INTERVAL_MS} ms plus tard) et ses
+ *   processus, une dizaine de minutes plus tard au plus) et ses
  *   entrées tardives sont écartées : une empreinte d'un jour passé ne se
  *   recalcule plus, même par l'association. L'entretien attend les
  *   signalements en cours avant de replier : aucun n'écrit dans un jour clos.
@@ -24,7 +24,8 @@
  * - **Repli** des jours révolus (une fois la marge {@link ROLLUP_GRACE_MINUTES}
  *   passée après minuit), effacement de leur sel, puis **purge** du détail
  *   au-delà de `AUDIENCE_RAW_RETENTION_MONTHS` mois ; entraînés par le trafic
- *   (au plus toutes les {@link MAINTENANCE_INTERVAL_MS} ms), sans ordonnanceur.
+ *   (au plus toutes les {@link MAINTENANCE_INTERVAL_MS} ms), la page et
+ *   l'horloge du serveur ({@link startAudienceMaintenanceClock}).
  */
 import { createHmac, randomBytes } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
@@ -98,27 +99,67 @@ interface PendingRow {
   view: AudienceView;
 }
 
-/** Sels lus ou tirés, par jour : la veille tant qu'elle n'est pas repliée, et le jour. */
-const salts = new Map<string, Promise<Buffer>>();
-/** Balayage des sels en mémoire, actif tant qu'il en reste : un processus sans trafic les oublie aussi. */
-let saltSweep: ReturnType<typeof setInterval> | null = null;
-/** Signalements en cours : l'entretien les attend avant de replier. */
-const recording = new Set<Promise<number>>();
-let pending: PendingRow[] = [];
-let flushTimer: ReturnType<typeof setTimeout> | null = null;
-let flushing: Promise<void> | null = null;
-let lastMaintenanceAt = 0;
 /**
- * Dernier jour que l'entretien de ce processus a commencé à replier : un
- * signalement qui finit après (attente de l'entretien dépassée) écarte ses
- * lignes de ces jours plutôt que de les écrire après leur repli.
+ * État de la mesure dans ce processus. Il vit sur `globalThis`, pas dans ce
+ * module : Next charge le module en deux copies (routes, `instrumentation.ts`),
+ * et l'horloge d'entretien doit voir la même file, les mêmes signalements en
+ * cours, le même jour replié et le même cache que les routes — sans quoi elle
+ * replierait un jour sans attendre ni vider leurs pages vues.
  */
-let rolledThrough: string | null = null;
-let maintaining: Promise<void> | null = null;
-let statsCache: { at: number; value: AudienceStats } | null = null;
-let statsLoad: Promise<AudienceStats> | null = null;
-/** Avancée à chaque repli : une lecture commencée avant n'est pas mise en cache. */
-let statsGeneration = 0;
+interface AudienceState {
+  /** Sels lus ou tirés, par jour : la veille tant qu'elle n'est pas repliée, et le jour. */
+  salts: Map<string, Promise<Buffer>>;
+  /** Balayage des sels en mémoire, actif tant qu'il en reste : un processus sans trafic les oublie aussi. */
+  saltSweep: ReturnType<typeof setInterval> | null;
+  /** Signalements en cours : l'entretien les attend avant de replier. */
+  recording: Set<Promise<number>>;
+  pending: PendingRow[];
+  flushTimer: ReturnType<typeof setTimeout> | null;
+  flushing: Promise<void> | null;
+  lastMaintenanceAt: number;
+  /**
+   * Dernier jour que l'entretien de ce processus a commencé à replier : un
+   * signalement qui finit après (attente de l'entretien dépassée) écarte ses
+   * lignes de ces jours plutôt que de les écrire après leur repli.
+   */
+  rolledThrough: string | null;
+  maintaining: Promise<void> | null;
+  /** Horloge d'entretien ({@link startAudienceMaintenanceClock}), une par processus. */
+  maintenanceClock: ReturnType<typeof setInterval> | null;
+  /** Étapes de l'entretien en échec : une panne se journalise une fois, pas à chaque passage. */
+  failing: Set<MaintenanceStep>;
+  statsCache: { at: number; value: AudienceStats } | null;
+  statsLoad: Promise<AudienceStats> | null;
+  /** Avancée à chaque repli : une lecture commencée avant n'est pas mise en cache. */
+  statsGeneration: number;
+}
+
+type MaintenanceStep = "rollup" | "salts" | "purge";
+
+const audienceGlobal = globalThis as typeof globalThis & { __bgAudienceState?: AudienceState };
+
+function freshState(): AudienceState {
+  return {
+    salts: new Map(),
+    saltSweep: null,
+    recording: new Set(),
+    pending: [],
+    flushTimer: null,
+    flushing: null,
+    lastMaintenanceAt: 0,
+    rolledThrough: null,
+    maintaining: null,
+    maintenanceClock: null,
+    failing: new Set(),
+    statsCache: null,
+    statsLoad: null,
+    statsGeneration: 0,
+  };
+}
+
+audienceGlobal.__bgAudienceState ??= freshState();
+/** État partagé par toutes les copies du module (voir {@link AudienceState}). */
+const S: AudienceState = audienceGlobal.__bgAudienceState;
 
 interface SaltRow extends RowDataPacket {
   salt: Buffer;
@@ -151,7 +192,7 @@ async function loadSalt(day: string, clock: () => Date): Promise<Buffer> {
  * avance avec le temps écoulé depuis l'appel.
  */
 export function dailySalt(day: string, now: Date = new Date()): Promise<Buffer> {
-  const known = salts.get(day);
+  const known = S.salts.get(day);
   if (known) return known;
   const started = Date.now();
   const clock = () => new Date(now.getTime() + Math.max(0, Date.now() - started));
@@ -163,14 +204,14 @@ export function dailySalt(day: string, now: Date = new Date()): Promise<Buffer> 
     () => undefined,
   );
   const value = withTimeout(load, SALT_READ_TIMEOUT_MS, "audience salt read timed out");
-  salts.set(day, value);
+  S.salts.set(day, value);
   startSaltSweep();
   // Une lecture ratée reste en échec SALT_RETRY_MS ms (une ligne au journal,
   // pas une requête par signalement), puis le signalement suivant réessaie.
   value.catch((error: unknown) => {
     console.error(`[audience] Sel du ${day} illisible : pages vues de ce jour écartées.`, failureReason(error));
     const retry = setTimeout(() => {
-      if (salts.get(day) === value) salts.delete(day);
+      if (S.salts.get(day) === value) S.salts.delete(day);
     }, SALT_RETRY_MS);
     retry.unref?.();
   });
@@ -205,17 +246,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 /** Oublie en mémoire les sels des jours clos (`day <= until`). */
 function dropClosedSalts(until: string): void {
   // Supprimer pendant le parcours d'une `Map` est permis : pas de copie des clés.
-  for (const day of salts.keys()) if (day <= until) salts.delete(day);
-  if (salts.size === 0 && saltSweep) {
-    clearInterval(saltSweep);
-    saltSweep = null;
+  for (const day of S.salts.keys()) if (day <= until) S.salts.delete(day);
+  if (S.salts.size === 0 && S.saltSweep) {
+    clearInterval(S.saltSweep);
+    S.saltSweep = null;
   }
 }
 
 function startSaltSweep(): void {
-  if (saltSweep) return;
-  saltSweep = setInterval(() => dropClosedSalts(lastRollableDay(new Date())), MAINTENANCE_INTERVAL_MS);
-  saltSweep.unref?.();
+  if (S.saltSweep) return;
+  S.saltSweep = setInterval(() => dropClosedSalts(lastRollableDay(new Date())), MAINTENANCE_INTERVAL_MS);
+  S.saltSweep.unref?.();
 }
 
 /**
@@ -256,9 +297,9 @@ function utcDateTime(date: Date): string {
  */
 export function recordAudienceViews(input: AudienceRecordInput): Promise<number> {
   const job = recordViews(input);
-  recording.add(job);
+  S.recording.add(job);
   const done = () => {
-    recording.delete(job);
+    S.recording.delete(job);
   };
   job.then(done, done);
   return job;
@@ -296,51 +337,51 @@ async function recordViews(input: AudienceRecordInput): Promise<number> {
   // File à moitié pleine (base lente, rafale d'un client) : chaque envoi n'y
   // ajoute plus qu'une ligne, pour qu'un seul client ne prenne pas toute la
   // place restante aux autres visiteurs.
-  const room = pending.length >= MAX_PENDING / 2 ? 1 : rows.length;
+  const room = S.pending.length >= MAX_PENDING / 2 ? 1 : rows.length;
   let kept = 0;
   for (const row of rows) {
     const visitorKey = keys.get(row.day);
-    if (!visitorKey || (rolledThrough !== null && row.day <= rolledThrough)) continue;
-    if (pending.length >= MAX_PENDING || kept >= room) break;
-    pending.push({ ...row, visitorKey });
+    if (!visitorKey || (S.rolledThrough !== null && row.day <= S.rolledThrough)) continue;
+    if (S.pending.length >= MAX_PENDING || kept >= room) break;
+    S.pending.push({ ...row, visitorKey });
     kept += 1;
   }
-  if (pending.length >= FLUSH_SIZE) void flushAudienceViews();
-  else if (pending.length > 0) scheduleFlush();
+  if (S.pending.length >= FLUSH_SIZE) void flushAudienceViews();
+  else if (S.pending.length > 0) scheduleFlush();
   return kept;
 }
 
 function scheduleFlush(): void {
-  if (flushTimer) return;
-  flushTimer = setTimeout(() => {
-    flushTimer = null;
+  if (S.flushTimer) return;
+  S.flushTimer = setTimeout(() => {
+    S.flushTimer = null;
     void flushAudienceViews();
   }, FLUSH_DELAY_MS);
-  flushTimer.unref?.();
+  S.flushTimer.unref?.();
 }
 
 /** Écrit la file par `INSERT` groupés. Un échec perd ce lot (mesure d'agrément), jamais plus. */
 export function flushAudienceViews(now: Date = new Date()): Promise<void> {
-  if (flushing) return flushing;
-  if (flushTimer) {
-    clearTimeout(flushTimer);
-    flushTimer = null;
+  if (S.flushing) return S.flushing;
+  if (S.flushTimer) {
+    clearTimeout(S.flushTimer);
+    S.flushTimer = null;
   }
-  const batch = pending;
-  pending = [];
+  const batch = S.pending;
+  S.pending = [];
   if (batch.length === 0) return Promise.resolve();
-  flushing = writeBatch(batch, now)
+  S.flushing = writeBatch(batch, now)
     .catch((error: unknown) => {
       console.error(`[audience] ${batch.length} page(s) vue(s) non enregistrée(s).`, failureReason(error));
     })
     .finally(() => {
-      flushing = null;
+      S.flushing = null;
       // Une file déjà au seuil pendant l'écriture repart tout de suite : sans
       // cela, une rafale attendrait le minuteur et gonflerait vers `MAX_PENDING`.
-      if (pending.length >= FLUSH_SIZE) void flushAudienceViews();
-      else if (pending.length > 0) scheduleFlush();
+      if (S.pending.length >= FLUSH_SIZE) void flushAudienceViews();
+      else if (S.pending.length > 0) scheduleFlush();
     });
-  return flushing;
+  return S.flushing;
 }
 
 interface LastDayRow extends RowDataPacket {
@@ -405,60 +446,91 @@ export function rawRetentionStart(now: Date): string {
  * détail trop ancien. Entraîné par le trafic mesuré, la page de fréquentation
  * et l'horloge du serveur ({@link startAudienceMaintenanceClock}). Au plus une
  * fois par {@link MAINTENANCE_INTERVAL_MS} ; jamais attendu par l'appelant,
- * jamais levé.
+ * jamais levé (chaque étape journalise elle-même son échec, voir
+ * {@link runMaintenance}).
  */
 export function maintainAudience(now: Date = new Date()): void {
-  if (now.getTime() - lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || maintaining) return;
-  lastMaintenanceAt = now.getTime();
-  maintaining = runMaintenance(now)
-    .catch((error: unknown) => {
-      console.error("[audience] Entretien (repli, purge) impossible.", failureReason(error));
-    })
+  if (now.getTime() - S.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || S.maintaining) return;
+  S.lastMaintenanceAt = now.getTime();
+  S.maintaining = runMaintenance(now)
+    .catch(() => undefined)
     .finally(() => {
-      maintaining = null;
+      S.maintaining = null;
     });
 }
 
-let maintenanceClock: ReturnType<typeof setInterval> | null = null;
+/**
+ * Période de l'horloge d'entretien : plus courte que
+ * {@link MAINTENANCE_INTERVAL_MS}, pour qu'un passage tombé à peine trop tôt
+ * (minuteur en avance d'une milliseconde, entretien entraîné par le trafic
+ * juste avant) ne repousse pas le suivant d'un intervalle entier.
+ * `maintainAudience` garde la cadence de {@link MAINTENANCE_INTERVAL_MS}.
+ */
+export const MAINTENANCE_CLOCK_TICK_MS = 60_000;
 
 /**
- * Lance l'entretien à intervalle régulier ({@link MAINTENANCE_INTERVAL_MS}),
- * une fois par processus (`instrumentation.ts`) : sans aucune visite mesurée
+ * Lance l'entretien à intervalle régulier ({@link MAINTENANCE_INTERVAL_MS}, au
+ * plus une minute de retard), une fois par processus (`instrumentation.ts` ;
+ * l'horloge est sur `globalThis`, une seconde copie du module ne la double pas) : sans aucune visite mesurée
  * (nuit calme, oppositions, robots), le sel d'un jour clos est tout de même
  * effacé le lendemain et le détail purgé à son terme, comme l'annoncent les
  * textes. Sans effet si l'horloge tourne déjà ; ne retient pas le processus.
  */
 export function startAudienceMaintenanceClock(): void {
-  if (maintenanceClock) return;
-  maintenanceClock = setInterval(() => maintainAudience(), MAINTENANCE_INTERVAL_MS);
-  maintenanceClock.unref?.();
+  if (S.maintenanceClock) return;
+  S.maintenanceClock = setInterval(() => maintainAudience(), MAINTENANCE_CLOCK_TICK_MS);
+  S.maintenanceClock.unref?.();
 }
 
-/** Repli, effacement des sels des jours repliés, puis purge (attendus : tests, et `maintainAudience`). */
+/**
+ * Journalise l'échec d'une étape de l'entretien (`error` non nul) au premier
+ * passage qui échoue, puis plus jusqu'à ce qu'elle réussisse de nouveau : une
+ * base en panne (ou absente, comme en intégration continue) ne remplit pas le
+ * journal toutes les dix minutes. Un succès réarme l'alerte.
+ */
+function reportStep(step: MaintenanceStep, error: unknown, until?: string): void {
+  if (error === null) {
+    S.failing.delete(step);
+    return;
+  }
+  if (S.failing.has(step)) return;
+  S.failing.add(step);
+  if (step === "rollup") console.error("[audience] Repli des jours clos impossible.", failureReason(error));
+  else if (step === "salts") console.error(`[audience] Sels jusqu'au ${until} non effacés.`, failureReason(error));
+  else console.error("[audience] Purge du détail impossible.", failureReason(error));
+}
+
+/**
+ * Repli, effacement des sels des jours repliés, puis purge (attendus : tests, et
+ * `maintainAudience`). Chaque étape ratée est journalisée ici ({@link reportStep}),
+ * puis la première erreur est levée.
+ */
 export async function runMaintenance(now: Date = new Date()): Promise<void> {
   // Les signalements commencés avant l'entretien finissent, puis toute la file
   // part : rien d'un jour replié n'arrive après son repli. Ceux qui commencent
   // ensuite voient ce jour clos et l'écartent. L'attente est bornée : un
   // signalement qui la dépasse écarte ensuite ses lignes des jours repliés.
-  await withTimeout(Promise.allSettled([...recording]), RECORDING_WAIT_MS, "audience recording wait timed out").catch(() => undefined);
+  await withTimeout(Promise.allSettled([...S.recording]), RECORDING_WAIT_MS, "audience recording wait timed out").catch(() => undefined);
   // Dès la fin de l'attente : un signalement attardé qui finit pendant le
   // vidage écarte ses lignes des jours à replier au lieu de les mettre en file.
   const until = lastRollableDay(now);
-  const previous = rolledThrough;
-  if (rolledThrough === null || until > rolledThrough) rolledThrough = until;
+  const previous = S.rolledThrough;
+  if (S.rolledThrough === null || until > S.rolledThrough) S.rolledThrough = until;
   let rolled = 0;
   let failure: unknown = null;
   try {
-    for (let pass = 0; pass < 3 && (flushing || pending.length > 0); pass += 1) {
+    for (let pass = 0; pass < 3 && (S.flushing || S.pending.length > 0); pass += 1) {
       await flushAudienceViews(now);
     }
     rolled = await rollUpAudienceDays(now);
+    reportStep("rollup", null);
   } catch (error) {
+    reportStep("rollup", error);
     // Repli raté : ces jours se replieront plus tard (le repli lit l'empreinte
     // gardée, jamais le sel). Un signalement attardé qui tient déjà leur sel
     // y ajoute encore ses lignes ; sans lui, plus aucun sel neuf n'est tiré
     // pour un jour clos (`loadSalt`) : ses lignes sont écartées.
-    rolledThrough = previous;
+    S.rolledThrough = previous;
     failure = error;
   }
   // Un jour clos n'a plus besoin de son sel, même si son repli a échoué : ses
@@ -466,13 +538,13 @@ export async function runMaintenance(now: Date = new Date()): Promise<void> {
   // du repli : ni le sel ni le détail ne restent au-delà des durées annoncées.
   const [salted, purged] = await Promise.allSettled([forgetSalts(until), purgeAudienceViews(now)]);
   if (rolled > 0) {
-    statsCache = null;
-    statsGeneration += 1;
+    S.statsCache = null;
+    S.statsGeneration += 1;
   }
   // Chaque échec du nettoyage se journalise, même quand le repli a échoué aussi :
   // un sel resté en base contredit ce que disent les textes, il doit se voir.
-  if (salted.status === "rejected") console.error(`[audience] Sels jusqu'au ${until} non effacés.`, failureReason(salted.reason));
-  if (purged.status === "rejected") console.error("[audience] Purge du détail impossible.", failureReason(purged.reason));
+  reportStep("salts", salted.status === "rejected" ? salted.reason : null, until);
+  reportStep("purge", purged.status === "rejected" ? purged.reason : null);
   if (failure !== null) throw failure;
   if (salted.status === "rejected") throw salted.reason;
   if (purged.status === "rejected") throw purged.reason;
@@ -824,43 +896,44 @@ export async function getAudienceStats(now: Date = new Date()): Promise<Audience
   // Jamais d'attente du repli : la page sert le cache, ou lit les compteurs déjà
   // repliés (un jour = une transaction) ; un repli qui finit pendant la lecture
   // la rend périmée sans la mettre en cache (`statsGeneration`).
-  if (statsCache && now.getTime() - statsCache.at < STATS_CACHE_MS) return statsCache.value;
-  if (!statsLoad) {
-    const generation = statsGeneration;
-    statsLoad = loadStats()
+  if (S.statsCache && now.getTime() - S.statsCache.at < STATS_CACHE_MS) return S.statsCache.value;
+  if (!S.statsLoad) {
+    const generation = S.statsGeneration;
+    S.statsLoad = loadStats()
       .then((value) => {
         // Un repli survenu pendant la lecture la rend périmée : servie, pas gardée.
-        if (generation === statsGeneration) statsCache = { at: now.getTime(), value };
+        if (generation === S.statsGeneration) S.statsCache = { at: now.getTime(), value };
         return value;
       })
       .finally(() => {
-        statsLoad = null;
+        S.statsLoad = null;
       });
   }
-  return statsLoad;
+  return S.statsLoad;
 }
 
 /** Remet l'état du module à zéro (tests). */
 export function resetAudienceState(): void {
-  salts.clear();
-  if (maintenanceClock) clearInterval(maintenanceClock);
-  maintenanceClock = null;
-  if (saltSweep) clearInterval(saltSweep);
-  saltSweep = null;
-  recording.clear();
-  pending = [];
-  if (flushTimer) clearTimeout(flushTimer);
-  flushTimer = null;
-  flushing = null;
-  lastMaintenanceAt = 0;
-  rolledThrough = null;
-  maintaining = null;
-  statsCache = null;
-  statsLoad = null;
-  statsGeneration = 0;
+  S.salts.clear();
+  if (S.maintenanceClock) clearInterval(S.maintenanceClock);
+  S.maintenanceClock = null;
+  if (S.saltSweep) clearInterval(S.saltSweep);
+  S.saltSweep = null;
+  S.recording.clear();
+  S.pending = [];
+  if (S.flushTimer) clearTimeout(S.flushTimer);
+  S.flushTimer = null;
+  S.flushing = null;
+  S.lastMaintenanceAt = 0;
+  S.rolledThrough = null;
+  S.maintaining = null;
+  S.statsCache = null;
+  S.statsLoad = null;
+  S.statsGeneration = 0;
+  S.failing.clear();
 }
 
 /** File en attente d'écriture (tests). */
 export function pendingAudienceCount(): number {
-  return pending.length;
+  return S.pending.length;
 }

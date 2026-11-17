@@ -39,9 +39,11 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   par page — une longue lecture en additionne plusieurs). Le navigateur
   n'envoie que **l'adresse type du gabarit** (`audienceBeaconPath` :
   `/joueurs/pseudo` → `/joueurs/0`, rangée avec son gabarit dans
-  `PAGE_PATTERNS`), jamais l'adresse affichée — et l'envoi part sans en-tête
-  `Referer` (`referrerPolicy: "no-referrer"`), qui la porterait jusqu'aux
-  journaux du serveur web.
+  `PAGE_PATTERNS`), jamais l'adresse affichée — et l'en-tête `Referer` de
+  l'envoi est réduit à l'origine du site (`referrerPolicy: "strict-origin"`) :
+  l'adresse affichée n'atteint pas les journaux du serveur web. Pas
+  `no-referrer` : il ferait partir `Origin: null`, que la garde de provenance
+  refuse pour les navigateurs sans `Sec-Fetch-Site` (Safari < 16.4).
 - **Agrégé seulement** à la lecture : la page ne lit que les tables
   `bg_audience_day*`, jamais `bg_audience_views`.
 - **13 mois** pour les lignes détaillées (`AUDIENCE_RAW_RETENTION_MONTHS`),
@@ -232,10 +234,18 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 - **Lecture** : `getAudienceStats` n'attend jamais l'entretien (cache, sinon lecture
   directe des jours déjà repliés) ; l'entretien est entraîné par un envoi
   mesuré (ni opposition, ni robot, ni plafond), par la page et par une horloge
-  de 10 min lancée au démarrage (`startAudienceMaintenanceClock`,
-  `instrumentation.ts`) : sans trafic, le sel d'un jour clos est tout de même
-  effacé et le détail purgé. Un échec d'effacement ou de purge se journalise
-  chacun, même quand le repli échoue aussi.
+  lancée au démarrage (`startAudienceMaintenanceClock`, `instrumentation.ts`,
+  sous `try` : la mesure n'empêche jamais le site de démarrer) : sans trafic,
+  le sel d'un jour clos est tout de même effacé et le détail purgé. L'horloge
+  bat chaque minute (`MAINTENANCE_CLOCK_TICK_MS`), l'entretien garde sa
+  cadence de 10 min : un passage tombé à peine trop tôt ne le repousse pas
+  d'un intervalle entier. **L'état de la mesure vit sur `globalThis`**
+  (`__bgAudienceState`) : Next charge le module en deux copies (routes,
+  instrumentation), et l'horloge doit attendre et vider la file des routes
+  avant de replier — une horloge, une file, un cache par processus. Chaque
+  étape ratée (repli, sels, purge) se journalise une fois, même quand une
+  autre échoue aussi, puis plus jusqu'à ce qu'elle réussisse (`reportStep`) :
+  une base absente ne remplit pas le journal.
 - Les points quotidiens de la page (≈ 100 octets par jour, ≈ 36 Ko par an) ne sont
   pas bornés : la période « tout » les exige, la charge utile reste négligeable.
 
