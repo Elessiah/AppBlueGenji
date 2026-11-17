@@ -10,7 +10,7 @@
  *   de **son** jour (une page ouverte à 23 h 58 et reçue à 0 h 02 garde celui
  *   de la veille), et la suite d'une lecture celui du jour où sa page s'est
  *   ouverte. Le jour replié, son sel est effacé (base et mémoire de chaque
- *   processus, une dizaine de minutes plus tard au plus) et ses
+ *   processus, onze minutes plus tard au plus) et ses
  *   entrées tardives sont écartées : une empreinte d'un jour passé ne se
  *   recalcule plus, même par l'association. L'entretien attend les
  *   signalements en cours avant de replier : aucun n'écrit dans un jour clos.
@@ -30,7 +30,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { clientNetworkKey } from "@/lib/server/api-guard";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureDiagnostic, failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { readSiteCounts } from "./site-counts";
 import { inTransaction } from "./tournaments/transaction";
@@ -126,8 +126,12 @@ interface AudienceState {
   maintaining: Promise<void> | null;
   /** Horloge d'entretien ({@link startAudienceMaintenanceClock}), une par processus. */
   maintenanceClock: ReturnType<typeof setInterval> | null;
-  /** Étapes de l'entretien en échec : une panne se journalise une fois, pas à chaque passage. */
-  failing: Set<MaintenanceStep>;
+  /**
+   * Étapes de l'entretien en échec, avec le jour visé (sels) : une panne se
+   * journalise une fois, pas à chaque passage — puis de nouveau chaque fois
+   * qu'elle laisse un jour de plus derrière elle.
+   */
+  failing: Map<MaintenanceStep, string>;
   statsCache: { at: number; value: AudienceStats } | null;
   statsLoad: Promise<AudienceStats> | null;
   /** Avancée à chaque repli : une lecture commencée avant n'est pas mise en cache. */
@@ -150,16 +154,34 @@ function freshState(): AudienceState {
     rolledThrough: null,
     maintaining: null,
     maintenanceClock: null,
-    failing: new Set(),
+    failing: new Map(),
     statsCache: null,
     statsLoad: null,
     statsGeneration: 0,
   };
 }
 
-audienceGlobal.__bgAudienceState ??= freshState();
+/**
+ * L'état du processus, complété sur place des champs qui lui manquent : un
+ * état posé par une version antérieure du module (rechargement à chaud en
+ * développement) garde son identité, partagée par les autres copies, et reçoit
+ * les champs ajoutés depuis — jamais un champ absent lu comme `undefined`.
+ */
+export function sharedAudienceState(): AudienceState {
+  const fresh = freshState();
+  const existing = audienceGlobal.__bgAudienceState as Partial<AudienceState> | undefined;
+  if (!existing) {
+    audienceGlobal.__bgAudienceState = fresh;
+    return fresh;
+  }
+  for (const key of Object.keys(fresh) as (keyof AudienceState)[]) {
+    if (existing[key] === undefined) Object.assign(existing, { [key]: fresh[key] });
+  }
+  return existing as AudienceState;
+}
+
 /** État partagé par toutes les copies du module (voir {@link AudienceState}). */
-const S: AudienceState = audienceGlobal.__bgAudienceState;
+const S: AudienceState = sharedAudienceState();
 
 interface SaltRow extends RowDataPacket {
   salt: Buffer;
@@ -452,8 +474,16 @@ export function rawRetentionStart(now: Date): string {
 export function maintainAudience(now: Date = new Date()): void {
   if (now.getTime() - S.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || S.maintaining) return;
   S.lastMaintenanceAt = now.getTime();
-  S.maintaining = runMaintenance(now)
-    .catch(() => undefined)
+  // Les échecs des étapes sont déjà journalisés (`reportStep`) ; ce qui
+  // échappe aux étapes est imprévu (erreur de programmation) : journalisé ici,
+  // jamais avalé en silence.
+  S.maintaining = runMaintenanceSteps(now)
+    .then(
+      () => undefined,
+      (error: unknown) => {
+        console.error("[audience] Entretien interrompu.", failureDiagnostic(error));
+      },
+    )
     .finally(() => {
       S.maintaining = null;
     });
@@ -482,30 +512,45 @@ export function startAudienceMaintenanceClock(): void {
   S.maintenanceClock.unref?.();
 }
 
+/** Issue d'une étape de l'entretien : réussie, ou ratée avec son erreur (même `null` levé). */
+type StepOutcome = { ok: true } | { ok: false; error: unknown };
+
 /**
- * Journalise l'échec d'une étape de l'entretien (`error` non nul) au premier
- * passage qui échoue, puis plus jusqu'à ce qu'elle réussisse de nouveau : une
- * base en panne (ou absente, comme en intégration continue) ne remplit pas le
- * journal toutes les dix minutes. Un succès réarme l'alerte.
+ * Journalise l'échec d'une étape de l'entretien au premier passage qui échoue,
+ * puis plus jusqu'à ce qu'elle réussisse de nouveau : une base en panne (ou
+ * absente, comme en intégration continue) ne remplit pas le journal toutes les
+ * dix minutes. Un succès réarme l'alerte. L'effacement des sels se
+ * journalise de nouveau chaque fois que la panne atteint un jour de plus
+ * (`until`) : le journal nomme toujours le dernier jour dont le sel reste en
+ * base, ce que contredisent les textes.
  */
-function reportStep(step: MaintenanceStep, error: unknown, until?: string): void {
-  if (error === null) {
+function reportStep(step: MaintenanceStep, outcome: StepOutcome, until = ""): void {
+  if (outcome.ok) {
     S.failing.delete(step);
     return;
   }
-  if (S.failing.has(step)) return;
-  S.failing.add(step);
-  if (step === "rollup") console.error("[audience] Repli des jours clos impossible.", failureReason(error));
-  else if (step === "salts") console.error(`[audience] Sels jusqu'au ${until} non effacés.`, failureReason(error));
-  else console.error("[audience] Purge du détail impossible.", failureReason(error));
+  if (S.failing.get(step) === until) return;
+  S.failing.set(step, until);
+  if (step === "rollup") console.error("[audience] Repli des jours clos impossible.", failureReason(outcome.error));
+  else if (step === "salts") console.error(`[audience] Sels jusqu'au ${until} non effacés.`, failureReason(outcome.error));
+  else console.error("[audience] Purge du détail impossible.", failureReason(outcome.error));
 }
 
 /**
  * Repli, effacement des sels des jours repliés, puis purge (attendus : tests, et
- * `maintainAudience`). Chaque étape ratée est journalisée ici ({@link reportStep}),
+ * `maintainAudience`). Chaque étape ratée est journalisée ({@link reportStep}),
  * puis la première erreur est levée.
  */
 export async function runMaintenance(now: Date = new Date()): Promise<void> {
+  const failure = await runMaintenanceSteps(now);
+  if (failure) throw failure.error;
+}
+
+/**
+ * Corps de {@link runMaintenance} : rend le premier échec d'étape (déjà
+ * journalisé), ou `null`. Ne lève que l'imprévu.
+ */
+async function runMaintenanceSteps(now: Date): Promise<{ error: unknown } | null> {
   // Les signalements commencés avant l'entretien finissent, puis toute la file
   // part : rien d'un jour replié n'arrive après son repli. Ceux qui commencent
   // ensuite voient ce jour clos et l'écartent. L'attente est bornée : un
@@ -516,38 +561,47 @@ export async function runMaintenance(now: Date = new Date()): Promise<void> {
   const until = lastRollableDay(now);
   const previous = S.rolledThrough;
   if (S.rolledThrough === null || until > S.rolledThrough) S.rolledThrough = until;
-  let rolled = 0;
-  let failure: unknown = null;
+  // Dernier jour effectivement replié pendant ce passage, même si un jour
+  // suivant échoue : chaque jour est validé dans sa propre transaction.
+  let lastRolled = null as string | null;
+  let failure: { error: unknown } | null = null;
   try {
     for (let pass = 0; pass < 3 && (S.flushing || S.pending.length > 0); pass += 1) {
       await flushAudienceViews(now);
     }
-    rolled = await rollUpAudienceDays(now);
-    reportStep("rollup", null);
+    await rollUpAudienceDays(now, (day) => {
+      lastRolled = day;
+    });
+    reportStep("rollup", { ok: true });
   } catch (error) {
-    reportStep("rollup", error);
+    reportStep("rollup", { ok: false, error });
     // Repli raté : ces jours se replieront plus tard (le repli lit l'empreinte
     // gardée, jamais le sel). Un signalement attardé qui tient déjà leur sel
     // y ajoute encore ses lignes ; sans lui, plus aucun sel neuf n'est tiré
-    // pour un jour clos (`loadSalt`) : ses lignes sont écartées.
-    S.rolledThrough = previous;
-    failure = error;
+    // pour un jour clos (`loadSalt`) : ses lignes sont écartées. Les jours déjà
+    // validés avant l'échec restent clos.
+    const kept: string | null = lastRolled;
+    S.rolledThrough = previous !== null && (kept === null || previous >= kept) ? previous : kept;
+    failure = { error };
   }
   // Un jour clos n'a plus besoin de son sel, même si son repli a échoué : ses
   // entrées tardives sont écartées. La purge du détail ne dépend pas non plus
   // du repli : ni le sel ni le détail ne restent au-delà des durées annoncées.
   const [salted, purged] = await Promise.allSettled([forgetSalts(until), purgeAudienceViews(now)]);
-  if (rolled > 0) {
+  // Un jour replié, même suivi d'un échec, change les chiffres : le cache tombe.
+  if (lastRolled !== null) {
     S.statsCache = null;
     S.statsGeneration += 1;
   }
-  // Chaque échec du nettoyage se journalise, même quand le repli a échoué aussi :
-  // un sel resté en base contredit ce que disent les textes, il doit se voir.
-  reportStep("salts", salted.status === "rejected" ? salted.reason : null, until);
-  reportStep("purge", purged.status === "rejected" ? purged.reason : null);
-  if (failure !== null) throw failure;
-  if (salted.status === "rejected") throw salted.reason;
-  if (purged.status === "rejected") throw purged.reason;
+  // Chaque échec du nettoyage se journalise (une fois, puis à chaque jour de
+  // plus), même quand le repli a échoué aussi : un sel resté en base contredit
+  // ce que disent les textes, il doit se voir.
+  reportStep("salts", salted.status === "rejected" ? { ok: false, error: salted.reason } : { ok: true }, until);
+  reportStep("purge", purged.status === "rejected" ? { ok: false, error: purged.reason } : { ok: true });
+  if (failure) return failure;
+  if (salted.status === "rejected") return { error: salted.reason };
+  if (purged.status === "rejected") return { error: purged.reason };
+  return null;
 }
 
 interface DayRow extends RowDataPacket {
@@ -562,7 +616,7 @@ interface DayRow extends RowDataPacket {
  *
  * @returns Le nombre de jours repliés.
  */
-export async function rollUpAudienceDays(now: Date = new Date()): Promise<number> {
+export async function rollUpAudienceDays(now: Date = new Date(), onRolled?: (day: string) => void): Promise<number> {
   const db = await getDatabase();
   const until = lastRollableDay(now);
   const [days] = await db.execute<DayRow[]>(
@@ -577,6 +631,7 @@ export async function rollUpAudienceDays(now: Date = new Date()): Promise<number
   );
   for (const { day } of days) {
     await inTransaction((connection) => rollUpDay(connection, day));
+    onRolled?.(day);
   }
   return days.length;
 }

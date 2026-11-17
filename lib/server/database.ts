@@ -1,7 +1,7 @@
 ﻿import "dotenv/config";
 import { failureReason } from "@/lib/server/failure-reason";
 import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql2/promise";
-import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
+import { createOnceGate, type OnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { runMigrations } from "@/lib/server/database/run-migrations";
 import { releaseWithServerLockWait } from "@/lib/server/tournaments/lock-wait";
@@ -29,8 +29,34 @@ import { releaseWithServerLockWait } from "@/lib/server/tournaments/lock-wait";
 export type SqlParam = ExecuteValues;
 export type SqlParams = SqlParam[];
 
-let pool: Pool | null = null;
-const migrationGate = createOnceGate();
+/** Pool du processus et porte de ses migrations. */
+interface DatabaseState {
+  pool: Pool | null;
+  migrationGate: OnceGate;
+}
+
+/** État de cette copie du module : seul servi hors du serveur du site (scripts, tests). */
+const moduleDatabase: DatabaseState = { pool: null, migrationGate: createOnceGate() };
+const databaseGlobal = globalThis as typeof globalThis & { __bgDatabase?: DatabaseState };
+
+/**
+ * Dans le serveur du site (`NEXT_RUNTIME`), l'état vit sur `globalThis` : Next
+ * charge ce module en plusieurs copies (routes, `instrumentation.ts`), et
+ * chacune ouvrirait sinon son propre pool de 25 places et rejouerait les
+ * migrations — l'horloge d'entretien de la mesure d'audience, lancée au
+ * démarrage, en ouvrait un second. Un script (`npm run seed`) ou un test garde
+ * l'état de sa copie, qu'il ferme ou recharge à son gré.
+ */
+function databaseState(): DatabaseState {
+  if (process.env.NEXT_RUNTIME !== "nodejs") return moduleDatabase;
+  databaseGlobal.__bgDatabase ??= moduleDatabase;
+  return databaseGlobal.__bgDatabase;
+}
+
+/** Le pool déjà ouvert de ce processus, sans l'ouvrir. */
+function openPool(): Pool | null {
+  return databaseState().pool;
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -49,7 +75,7 @@ function requireEnv(name: string): string {
  * temps, ce dont MySQL faisait un interblocage.
  */
 async function ensureMigrations(db: Pool): Promise<void> {
-  await migrationGate.run(() => withMigrationLock(db, () => runMigrations(db)));
+  await databaseState().migrationGate.run(() => withMigrationLock(db, () => runMigrations(db)));
 }
 
 /**
@@ -75,7 +101,8 @@ export async function withConnection<T>(
 }
 
 export async function getDatabase(): Promise<Pool> {
-  pool ??= mysql.createPool({
+  const state = databaseState();
+  state.pool ??= mysql.createPool({
     host: requireEnv("DB_HOST"),
     user: requireEnv("DB_USER"),
     password: requireEnv("DB_PASSWORD"),
@@ -93,6 +120,7 @@ export async function getDatabase(): Promise<Pool> {
     charset: "utf8mb4",
     dateStrings: true,
   });
+  const pool = state.pool;
   if (!englishMessagesPools.has(pool)) {
     englishMessagesPools.add(pool);
     forceEnglishServerMessages(pool);
@@ -186,6 +214,7 @@ export const DUE_DELETIONS_LOCK_NAME = "bg_due_account_deletions";
  * les suppressions définitives.
  */
 export async function runDueAccountDeletionsExclusively(): Promise<void> {
+  const pool = openPool();
   if (!pool) return;
   try {
     await withNamedLock(pool, DUE_DELETIONS_LOCK_NAME, 0, async () => {
@@ -243,6 +272,7 @@ export async function runDueAccountDeletionsExclusively(): Promise<void> {
 async function reconcileDeletedAccountsExclusively(
   reconcile: () => Promise<{ erased: number; renamed: number; failed: number }>,
 ): Promise<{ erased: number; renamed: number; failed: number }> {
+  const pool = openPool();
   if (!pool) return { erased: 0, renamed: 0, failed: 0 };
   try {
     return await withNamedLock(pool, DUE_DELETIONS_LOCK_NAME, 0, () => reconcile());

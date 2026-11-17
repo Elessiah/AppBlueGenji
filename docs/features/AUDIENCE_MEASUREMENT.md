@@ -43,7 +43,7 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   l'envoi est réduit à l'origine du site (`referrerPolicy: "strict-origin"`) :
   l'adresse affichée n'atteint pas les journaux du serveur web. Pas
   `no-referrer` : il ferait partir `Origin: null`, que la garde de provenance
-  refuse pour les navigateurs sans `Sec-Fetch-Site` (Safari < 16.4).
+  refuse pour les navigateurs sans `Sec-Fetch-Site` (Safari < 16.4, Firefox < 90).
 - **Agrégé seulement** à la lecture : la page ne lit que les tables
   `bg_audience_day*`, jamais `bg_audience_views`.
 - **13 mois** pour les lignes détaillées (`AUDIENCE_RAW_RETENTION_MONTHS`),
@@ -242,10 +242,18 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   d'un intervalle entier. **L'état de la mesure vit sur `globalThis`**
   (`__bgAudienceState`) : Next charge le module en deux copies (routes,
   instrumentation), et l'horloge doit attendre et vider la file des routes
-  avant de replier — une horloge, une file, un cache par processus. Chaque
+  avant de replier — une horloge, une file, un cache par processus. Un état
+  posé par une version antérieure du module (rechargement à chaud) est complété
+  sur place des champs qui lui manquent. Le pool de la base vit aussi sur
+  `globalThis` dans le serveur (`__bgDatabase`, `database.ts`) : l'horloge
+  n'ouvre pas un second pool ni ne rejoue les migrations. Chaque
   étape ratée (repli, sels, purge) se journalise une fois, même quand une
   autre échoue aussi, puis plus jusqu'à ce qu'elle réussisse (`reportStep`) :
-  une base absente ne remplit pas le journal.
+  une base absente ne remplit pas le journal. L'effacement des sels se
+  journalise de nouveau à chaque jour de plus laissé en base. Ce qui échappe
+  aux étapes (erreur imprévue) se journalise toujours (`Entretien
+  interrompu`). Un repli qui échoue après avoir validé des jours vide tout de
+  même le cache de la page. `register` isole chacune de ses deux étapes.
 - Les points quotidiens de la page (≈ 100 octets par jour, ≈ 36 Ko par an) ne sont
   pas bornés : la période « tout » les exige, la charge utile reste négligeable.
 

@@ -112,11 +112,15 @@ describe("startAudienceMaintenanceClock — cadence", () => {
     const execute = database();
     mockDb(execute);
     startAudienceMaintenanceClock();
-    jest.setSystemTime(new Date("2026-11-17T00:20:00.001Z"));
+    // Entretien entraîné par le trafic une milliseconde après le départ de
+    // l'horloge (le minuteur, lui, ne bouge pas) : le passage tombé à
+    // l'intervalle exact arrive une milliseconde trop tôt et passe son tour.
+    await jest.advanceTimersByTimeAsync(1);
     maintainAudience();
     await settle();
 
-    await jest.advanceTimersByTimeAsync(MAINTENANCE_INTERVAL_MS + MAINTENANCE_CLOCK_TICK_MS);
+    // Une horloge de dix minutes ne repasserait qu'à 20 min ; celle d'une minute repasse à 11 min.
+    await jest.advanceTimersByTimeAsync(MAINTENANCE_INTERVAL_MS + MAINTENANCE_CLOCK_TICK_MS - 1);
     await settle();
 
     expect(calls(execute, "DELETE FROM bg_audience_salts")).toHaveLength(2);
