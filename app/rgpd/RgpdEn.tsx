@@ -902,14 +902,14 @@ export function RgpdEn({
               player&apos;s page, by
               the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
               a hiding without a challenge —, whether the
-              account is active or pending deletion, the hash (SHA-256) of the image — and, since November 19, 2026, its perceptual
-              hash, a 64-bit summary of what it looks like that cannot be used to rebuild it but also recognises, except for an image that is too simple (nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour), the image slightly cropped,
-              re-encoded or in another format — is kept without time limit in
+              account is active or pending deletion, the hash (SHA-256) of the image — and its perceptual
+              hash, a 64-bit summary of what it looks like that cannot be used to rebuild it but also recognises the image slightly cropped, resized, darkened or lightened, re-encoded or in another format, compared with the 2,000 most recent blocked perceptual hashes; an image that is too simple (nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour) or that the site cannot read has none, and an avatar deleted before this hash was added, in November 2026, only gets one if the same image is deleted again while its file is still on the site
+              — is kept without time limit in
               the list of blocked images, which designates no account and only dates a block to the day, to refuse
               it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
-              erased if nothing else on the site points to it. As long as the deletion decision taken on a report or after a hiding is kept, the hash is also kept on it, with the
+              erased if nothing else on the site points to it. As long as the deletion decision taken on a report or after a hiding is kept, these hashes are also kept on it, with the
               outcome of its challenge: upheld, the block stays; accepted, it is lifted, unless another deletion of
-              the same image still justifies it. Those decisions are erased with the report that prompted them, at the end of its retention period (point 1), or earlier when the account is erased (anonymized, it keeps them until then); the block then becomes permanent: only the hash remains, with no link to any account. An automatic deletion
+              the same image still justifies it. Those decisions are erased with the report that prompted them, at the end of its retention period (point 1), or earlier when the account is erased (anonymized, it keeps them until then); the block then becomes permanent: only the hashes remain, with no link to any account. An automatic deletion
               made while its challenge was still awaiting its outcome only blocks the image once upheld, or on the erasure of
               the account if that comes first, then permanently. Hashes set on the erasure of an account before
               November 11, 2026 — then also those of an avatar that was only hidden — stay blocked, dated to the

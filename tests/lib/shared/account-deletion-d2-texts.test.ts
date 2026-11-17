@@ -175,8 +175,8 @@ describe("revue juridique cycle 4", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
 
-    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par ses empreintes (SHA-256, et empreinte perceptuelle, qui reconnaît aussi, sauf pour une image trop simple, l'image légèrement recadrée, réencodée ou dans un autre format) gardées dès cette suppression");
-    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hashes (SHA-256, and a perceptual hash, which also recognises, except for an image that is too simple, the image slightly cropped, re-encoded or in another format) kept from that deletion");
+    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par ses empreintes (SHA-256, et empreinte perceptuelle, qui reconnaît aussi, sauf pour une image trop simple ou illisible, l'image légèrement recadrée, redimensionnée, assombrie ou éclaircie, réencodée ou dans un autre format, parmi les 2 000 empreintes perceptuelles bloquées les plus récentes) gardées dès cette suppression");
+    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hashes (SHA-256, and a perceptual hash, which also recognises, except for an image that is too simple or unreadable, the image slightly cropped, resized, darkened or lightened, re-encoded or in another format, among the 2,000 most recent blocked perceptual hashes) kept from that deletion");
   });
 
   // Revue EF-72 cycles 1 et 2 : une image trop simple (presque unie, dégradé,
@@ -187,15 +187,15 @@ describe("revue juridique cycle 4", () => {
     const fr = PRIVACY_CHANGES.find((change) => change.id === id);
     const en = PRIVACY_CHANGES_EN[id];
 
-    expect(fr?.summary).toContain("la même image légèrement recadrée, réencodée ou dans un autre format");
-    expect(fr?.details.join(" ")).toContain("Une image trop simple — presque unie, dégradé, motif symétrique, ou faite surtout d'un fond uni, comme un pseudo ou un emblème sur un aplat — n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.");
-    expect(en?.summary).toContain("the same image being uploaded again slightly cropped, re-encoded or in another format");
-    expect(en?.details.join(" ")).toContain("An image that is too simple — nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour — has no perceptual hash: it is blocked by its SHA-256 hash only.");
+    expect(fr?.summary).toContain("la même image légèrement recadrée, redimensionnée, assombrie ou éclaircie, réencodée ou dans un autre format");
+    expect(fr?.details.join(" ")).toContain("Une image trop simple — presque unie, dégradé, motif symétrique, ou faite surtout d'un fond uni, comme un pseudo ou un emblème sur un aplat — ou que le site ne parvient pas à lire n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.");
+    expect(en?.summary).toContain("the same image being uploaded again slightly cropped, resized, darkened or lightened, re-encoded or in another format");
+    expect(en?.details.join(" ")).toContain("An image that is too simple — nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour — or that the site cannot read has no perceptual hash: it is blocked by its SHA-256 hash only.");
   });
 
   it("rgpdReports_perceptualHash_exceptTooSimpleImageFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("reconnaît aussi, sauf pour une image trop simple (presque unie, dégradé, motif symétrique, ou faite surtout d&apos;un fond uni, comme un pseudo ou un emblème sur un aplat), l&apos;image légèrement recadrée, réencodée");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("also recognises, except for an image that is too simple (nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour), the image slightly cropped,");
+    expect(readSource("app/rgpd/page.tsx")).toContain("une image trop simple (presque unie, dégradé, motif symétrique, ou faite surtout d&apos;un fond uni, comme un pseudo ou un emblème sur un aplat) ou que le site ne parvient pas à lire n&apos;en a pas");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("an image that is too simple (nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour) or that the site cannot read has none");
   });
 
   it("processingRegisterT01_avatarHash_dataCategoryNamesAvatarsFrAndEn", () => {
@@ -203,16 +203,79 @@ describe("revue juridique cycle 4", () => {
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
 
     // D31 : sans lien dans la liste des images bloquées, lié au compte sur la décision tant qu'elle est gardée (D87).
-    expect(fr).toContain("Empreintes (SHA-256 et, depuis le 19 novembre 2026, empreinte perceptuelle — un résumé de 64 bits de l'allure de l'image, qui ne permet pas de la reconstituer) des avatars supprimés par la modération : dans la liste des images bloquées, sans lien avec aucun compte, datée au jour près ; sur la décision de modération (registre T11), liée au compte tant que cette décision est gardée, avec l'issue de sa contestation (maintenue ou acceptée)");
-    expect(en).toContain("Hashes (SHA-256 and, since November 19, 2026, a perceptual hash — a 64-bit summary of what the image looks like, which cannot be used to rebuild it) of avatars deleted by moderation: in the list of blocked images, with no link to any account, dated to the day; on the moderation decision (record T11), linked to the account as long as that decision is kept, with the outcome of its challenge (upheld or accepted)");
+    expect(fr).toContain("Empreintes (SHA-256 et, sauf pour une image trop simple ou illisible, empreinte perceptuelle — un résumé de 64 bits de l'allure de l'image, qui ne permet pas de la reconstituer) des avatars supprimés par la modération : dans la liste des images bloquées, sans lien avec aucun compte, datée au jour près ; sur la décision de modération (registre T11), liée au compte tant que cette décision est gardée, avec l'issue de sa contestation (maintenue ou acceptée)");
+    expect(en).toContain("Hashes (SHA-256 and, except for an image that is too simple or unreadable, a perceptual hash — a 64-bit summary of what the image looks like, which cannot be used to rebuild it) of avatars deleted by moderation: in the list of blocked images, with no link to any account, dated to the day; on the moderation decision (record T11), linked to the account as long as that decision is kept, with the outcome of its challenge (upheld or accepted)");
+  });
+
+  // Revue juridique EF-72 : la mise en ligne tombe la nuit du 18 novembre,
+  // aucun texte ne date l'empreinte perceptuelle au jour près.
+  it("perceptualHashTexts_noDayPreciseDate_frAndEn", () => {
+    const texts = [
+      PROCESSING_ACTIVITIES.map((a) => [...a.subPurposes, ...a.dataCategories, ...a.retention, a.legalBasis].join(" ")).join(" "),
+      PROCESSING_ACTIVITIES_EN.map((a) => [...a.subPurposes, ...a.dataCategories, ...a.retention, a.legalBasis].join(" ")).join(" "),
+      readSource("app/rgpd/page.tsx"),
+      readSource("app/rgpd/RgpdEn.tsx"),
+    ].join(" ");
+
+    expect(texts).not.toContain("19 novembre 2026");
+    expect(texts).not.toContain("November 19, 2026");
+  });
+
+  it("perceptualHashTexts_unreadableImage_hasNoneFrAndEn", () => {
+    const t01Fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
+    const t01En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
+
+    expect(t01Fr).toContain("SHA-256 et, sauf pour une image trop simple ou illisible, empreinte perceptuelle");
+    expect(t01En).toContain("SHA-256 and, except for an image that is too simple or unreadable, a perceptual hash");
+  });
+
+  it("perceptualHashTexts_oldAvatar_onlyIfDeletedAgainWithFileFrAndEn", () => {
+    const id = "2026-11-empreinte-perceptuelle-avatar";
+    const fr = PRIVACY_CHANGES.find((change) => change.id === id)?.details.join(" ") ?? "";
+    const en = PRIVACY_CHANGES_EN[id]?.details.join(" ") ?? "";
+
+    expect(fr).not.toContain("rien n'est recalculé");
+    expect(fr).toContain("Un avatar supprimé avant ce changement reste bloqué par sa seule empreinte SHA-256 ; une empreinte perceptuelle ne s'y ajoute que si la même image est de nouveau supprimée alors que son fichier est encore sur le site.");
+    expect(en).not.toContain("nothing is recomputed");
+    expect(en).toContain("An avatar deleted before this change stays blocked by its SHA-256 hash only; a perceptual hash is only added if the same image is deleted again while its file is still on the site.");
+    expect(t01Retention()).toContain("ni pour un avatar supprimé avant l'ajout de cette empreinte en novembre 2026, sauf si la même image est de nouveau supprimée alors que son fichier est encore sur le site");
+    expect(t01RetentionEn()).toContain("nor for an avatar deleted before this hash was added in November 2026, unless the same image is deleted again while its file is still on the site");
+    expect(readSource("app/rgpd/page.tsx")).toContain("un avatar supprimé avant l&apos;ajout de cette empreinte, en novembre 2026, n&apos;en reçoit une que si la même image est de nouveau supprimée alors que son fichier est encore sur le site");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("an avatar deleted before this hash was added, in November 2026, only gets one if the same image is deleted again while its file is still on the site");
+  });
+
+  it("perceptualHashTexts_scopeIncludesResizedDarkenedLightenedFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("reconnaît aussi l&apos;image légèrement recadrée, redimensionnée, assombrie ou éclaircie, réencodée ou dans un autre format");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("also recognises the image slightly cropped, resized, darkened or lightened, re-encoded or in another format");
+  });
+
+  // Les textes disent « 2 000 » : ce nombre est la borne de comparaison du code.
+  it("perceptualHashTexts_comparisonCap_matchesMaxComparedPhashes", () => {
+    const id = "2026-11-empreinte-perceptuelle-avatar";
+
+    expect(readSource("lib/server/blocked-images.ts")).toContain("export const MAX_COMPARED_PHASHES = 2_000;");
+    expect(PRIVACY_CHANGES.find((change) => change.id === id)?.details[0]).toContain("très proche de l'une des 2 000 empreintes perceptuelles bloquées les plus récentes");
+    expect(PRIVACY_CHANGES_EN[id]?.details[0]).toContain("very close to one of the 2,000 most recent blocked perceptual hashes");
+    expect(readSource("app/rgpd/page.tsx")).toContain("comparée aux 2 000 empreintes perceptuelles bloquées les plus récentes");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("compared with the 2,000 most recent blocked perceptual hashes");
+  });
+
+  it("registerT11_retention_namesBothHashesFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T11")?.retention.join(" ") ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T11")?.retention.join(" ") ?? "";
+
+    expect(fr).toContain("membre de la modération qui l'a prise, empreintes d'un avatar supprimé, issue de la contestation");
+    expect(fr).toContain("les empreintes d'un avatar dont la suppression a bloqué l'image ne restent alors que dans la liste des images bloquées");
+    expect(en).toContain("moderation member who took it, hashes of a deleted avatar, outcome of the challenge");
+    expect(en).toContain("the hashes of an avatar whose deletion blocked the image then only stay in the list of blocked images");
   });
 
   it("processingRegisterT01_avatarHash_legitimateInterestBasisFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.legalBasis ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.legalBasis ?? "";
 
-    expect(fr).toContain("intérêt légitime (modération : refuser la remise en ligne d'une image déjà retirée) pour l'empreinte d'un avatar supprimé par la modération");
-    expect(en).toContain("legitimate interest (moderation: refusing the re-upload of an image already removed) for the hash of an avatar deleted by moderation");
+    expect(fr).toContain("intérêt légitime (modération : refuser la remise en ligne d'une image déjà retirée) pour les empreintes (SHA-256 et perceptuelle) d'un avatar supprimé par la modération");
+    expect(en).toContain("legitimate interest (moderation: refusing the re-upload of an image already removed) for the hashes (SHA-256 and perceptual) of an avatar deleted by moderation");
   });
 });
 
@@ -282,8 +345,8 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     const fr = PROCESSING_ACTIVITIES.flatMap((a) => a.dataCategories).join(" ");
     const en = PROCESSING_ACTIVITIES_EN.flatMap((a) => a.dataCategories).join(" ");
 
-    expect(fr).toContain("sur la décision de suppression d'un avatar, ses empreintes (SHA-256 et, depuis le 19 novembre 2026, perceptuelle) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant que la décision est gardée ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
-    expect(en).toContain("on the decision deleting an avatar, its hashes (SHA-256 and, since November 19, 2026, perceptual) and the outcome of the challenge (upheld or accepted), linked to the account as long as the decision is kept; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
+    expect(fr).toContain("sur la décision de suppression d'un avatar, ses empreintes (SHA-256 et, quand l'image en a une, perceptuelle) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant que la décision est gardée ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; ces empreintes restent en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
+    expect(en).toContain("on the decision deleting an avatar, its hashes (SHA-256 and, when the image has one, perceptual) and the outcome of the challenge (upheld or accepted), linked to the account as long as the decision is kept; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); these hashes also stay, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
   });
 
   it("deletionNotice_heldAvatar_reactivationMayNotReturnModeratedAvatarFrAndEn", () => {
@@ -383,14 +446,14 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
     const fr = readFileSync(join(process.cwd(), "app/rgpd/page.tsx"), "utf8").replace(/\s+/g, " ");
     const en = readFileSync(join(process.cwd(), "app/rgpd/RgpdEn.tsx"), "utf8").replace(/\s+/g, " ");
 
-    expect(fr).toContain("Tant que la décision de suppression prise sur un signalement ou après un masquage est gardée, l&apos;empreinte l&apos;est aussi sur elle");
+    expect(fr).toContain("Tant que la décision de suppression prise sur un signalement ou après un masquage est gardée, ces empreintes le sont aussi sur elle");
     expect(fr).toContain("Ces décisions sont effacées avec le signalement qui les a motivées");
-    expect(fr).toContain("seule l&apos;empreinte reste, sans lien avec aucun compte");
+    expect(fr).toContain("seules les empreintes restent, sans lien avec aucun compte");
     expect(fr).toContain("un avatar que la modération n&apos;a jamais supprimé part sans laisser d&apos;empreinte");
     expect(fr).not.toContain("est gardée, sans limite de durée et sans lien avec aucun compte");
-    expect(en).toContain("As long as the deletion decision taken on a report or after a hiding is kept, the hash is also kept on it");
+    expect(en).toContain("As long as the deletion decision taken on a report or after a hiding is kept, these hashes are also kept on it");
     expect(en).toContain("Those decisions are erased with the report that prompted them");
-    expect(en).toContain("only the hash remains, with no link to any account");
+    expect(en).toContain("only the hashes remain, with no link to any account");
     expect(en).toContain("avatar moderation never deleted goes without leaving any hash");
     expect(en).not.toContain("when the staff after a hiding");
   });

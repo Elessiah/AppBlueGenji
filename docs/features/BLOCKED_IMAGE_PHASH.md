@@ -88,7 +88,15 @@ ES2017).
   fichier étant parti. Relu en texte (`CAST(… AS CHAR)`) : un `BIGINT` rendu en
   nombre JavaScript perdrait ses derniers chiffres.
 - **Aucun remplissage** : les lignes bloquées avant EF-72 n'ont que leur
-  SHA-256 — le fichier est parti, rien ne se recalcule.
+  SHA-256 — le fichier est parti, rien ne se recalcule d'office. Seule
+  exception : la même image supprimée **de nouveau** alors que son fichier est
+  encore sur le site (URL partagée par un autre compte, effacement d'un compte)
+  — `COALESCE(phash, VALUES(phash))` pose alors l'empreinte perceptuelle sur la
+  ligne ancienne. Les textes légaux le disent (/rgpd, registre T01, entrée
+  `2026-11-empreinte-perceptuelle-avatar`) et ne datent l'empreinte qu'au mois
+  (« novembre 2026 ») : la mise en ligne tombe la nuit du 18.
+- Textes légaux et borne : « 2 000 empreintes perceptuelles bloquées les plus
+  récentes » = `MAX_COMPARED_PHASHES` (test `account-deletion-d2-texts`).
 - La levée d'un blocage (contestation acceptée, `unblockImageHashOn`) retire la
   ligne entière, `phash` compris. Une **autre** image bloquée d'allure voisine
   continue de refuser l'image rétablie : elle a elle-même été supprimée par la
