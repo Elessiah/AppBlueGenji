@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import styles from "../reports.module.css";
 
 /** Délai pendant lequel le second clic confirme. */
@@ -10,8 +11,13 @@ interface ArmedButtonProps {
   label: string;
   confirmLabel: string;
   onConfirm: () => void;
-  disabled?: boolean;
+  /** Ce geste attend sa réponse : refusé **et** annoncé occupé (`BusyButton`). */
+  busy: boolean;
+  /** Un autre geste attend : refusé sans annonce d'attente. */
+  blocked?: boolean;
   className?: string;
+  /** Nom du geste, pour rendre le focus après la relecture du dossier (`report-gestures.ts`). */
+  "data-gesture"?: string;
 }
 
 /**
@@ -21,9 +27,18 @@ interface ArmedButtonProps {
  * traitement ; un clic unique rendrait l'erreur irréparable.
  *
  * Le changement de libellé est annoncé (`aria-live`) : un lecteur d'écran doit
- * savoir que le bouton attend une confirmation.
+ * savoir que le bouton attend une confirmation. Pendant un envoi, il reste
+ * focalisable (`BusyButton`, `BUSY_BUTTONS.md`) et ne s'arme pas.
  */
-export function ArmedButton({ label, confirmLabel, onConfirm, disabled, className }: Readonly<ArmedButtonProps>) {
+export function ArmedButton({
+  label,
+  confirmLabel,
+  onConfirm,
+  busy,
+  blocked = false,
+  className,
+  "data-gesture": gesture,
+}: Readonly<ArmedButtonProps>) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -33,10 +48,11 @@ export function ArmedButton({ label, confirmLabel, onConfirm, disabled, classNam
   }, [armed]);
 
   return (
-    <button
-      type="button"
+    <BusyButton
+      busy={busy}
+      blocked={blocked}
+      data-gesture={gesture}
       className={`${styles.actionButton} ${className ?? ""}`}
-      disabled={disabled}
       aria-live="polite"
       onClick={() => {
         if (!armed) {
@@ -48,6 +64,6 @@ export function ArmedButton({ label, confirmLabel, onConfirm, disabled, classNam
       }}
     >
       {armed ? confirmLabel : label}
-    </button>
+    </BusyButton>
   );
 }

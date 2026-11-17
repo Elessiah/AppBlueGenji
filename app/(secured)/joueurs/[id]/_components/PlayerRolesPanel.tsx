@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -14,6 +15,7 @@ import {
   type PlatformRoleChange,
 } from "@/lib/shared/permissions";
 import { useStaffLang } from "@/components/i18n/staff-lang";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { rolesErrorMessage } from "../_lib/roles-errors";
 
 /**
@@ -43,7 +45,9 @@ export function PlayerRolesPanel({
   const { showError, showInfo, showSuccess } = useToast();
   const staffLang = useStaffLang();
   const toastLang = staffLang ? { lang: staffLang } : undefined;
-  const [rolesBusy, setRolesBusy] = useState(false);
+  // Un enregistrement à la fois ; pendant l'envoi, les cases gardent le focus
+  // (`aria-readonly`, choix ignoré) et le bouton s'annonce occupé (`BUSY_BUTTONS.md`).
+  const { busy: rolesBusy, isBusy, run } = useBusyGuard();
   const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>([]);
   const [pendingChange, setPendingChange] = useState<PlatformRoleChange | null>(null);
 
@@ -53,13 +57,16 @@ export function PlayerRolesPanel({
   }, [roles]);
 
   const toggleRole = (role: PlatformRole) => {
+    // Ce qui est coché est ce qui part : une case changée pendant l'envoi est ignorée.
+    if (isBusy()) return;
     setSelectedRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
   };
 
-  const saveRoles = async (): Promise<boolean> => {
-    setRolesBusy(true);
+  const saveRoles = async (): Promise<boolean> => (await run(sendRoles)) ?? false;
+
+  const sendRoles = async (): Promise<boolean> => {
     try {
       const res = await fetch(`/api/admin/users/${userId}/roles`, {
         method: "POST",
@@ -87,12 +94,11 @@ export function PlayerRolesPanel({
         return true;
       }
       return false;
-    } finally {
-      setRolesBusy(false);
     }
   };
 
   const requestSave = () => {
+    if (isBusy()) return;
     // Sans les rôles enregistrés, rien ne permet de détecter un réglage concurrent.
     if (!roles) return;
     const change = diffPlatformRoles(roles ?? [], selectedRoles);
@@ -120,7 +126,7 @@ export function PlayerRolesPanel({
               <input
                 type="checkbox"
                 checked={checked}
-                disabled={rolesBusy}
+                aria-readonly={rolesBusy || undefined}
                 onChange={() => toggleRole(role)}
                 style={{ marginTop: 3 }}
               />
@@ -133,17 +139,17 @@ export function PlayerRolesPanel({
         })}
       </fieldset>
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-        <button
-          type="button"
+        <BusyButton
+          busy={rolesBusy}
+          blocked={!roles}
           className="btn"
           style={{ padding: "9px 18px", fontSize: 13 }}
-          disabled={rolesBusy || !roles}
-          aria-busy={rolesBusy}
           aria-label={`Enregistrer les rôles de ${pseudo}`}
           onClick={requestSave}
         >
-          {rolesBusy ? "Enregistrement…" : "Enregistrer les rôles"}
-        </button>
+          {/* Libellé constant : le nom accessible contient le texte visible ; l'attente se dit par `aria-busy`. */}
+          Enregistrer les rôles
+        </BusyButton>
       </div>
       {pendingChange ? (
         <ConfirmActionDialog

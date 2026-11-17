@@ -237,7 +237,7 @@ describe("Rôles — cas limites de l'écran (cycle UI)", () => {
   it("requestSave_rolesUndefined_returnsWithoutSaving", () => {
     const panel = read("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
     expect(panel).toContain("if (!roles) return;");
-    expect(panel).toContain("disabled={rolesBusy || !roles}");
+    expect(panel).toMatch(/busy=\{rolesBusy\}\s+blocked=\{!roles\}/);
     expect(panel).toContain("expectedRoles: roles");
     expect(panel).not.toContain("void saveRoles()");
   });

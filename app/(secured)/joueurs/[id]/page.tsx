@@ -82,7 +82,7 @@ export default function PlayerDetailPage() {
   const text = usePlayersText();
   const { t, locale } = text;
   const statsI18n = useStatsPanelI18n();
-  const { status, data, error, refresh } = useResourceLoader<FullProfileResponse>(
+  const { status, data, error, refresh, revalidate } = useResourceLoader<FullProfileResponse>(
     `/api/players/${params.id}`,
     {
       onNotFoundRedirect: () => {
@@ -345,9 +345,12 @@ export default function PlayerDetailPage() {
         </div>
       )}
 
-      {/* Aucun rôle ne s'attribue à un compte supprimé : la route le refuse. */}
+      {/* Aucun rôle ne s'attribue à un compte supprimé : la route le refuse.
+          Relecture en arrière-plan (`revalidate`) : `refresh` repassait la page
+          en « Chargement… », démontait le panneau et sa confirmation, et le
+          focus tombait sur la page au lieu de revenir à « Enregistrer les rôles ». */}
       {data.viewerIsAdmin && !data.isSelf && !deleted && (
-        <PlayerRolesPanel userId={params.id} pseudo={data.profile.pseudo} roles={data.roles} onSaved={refresh} />
+        <PlayerRolesPanel userId={params.id} pseudo={data.profile.pseudo} roles={data.roles} onSaved={revalidate} />
       )}
 
       <div className="ds-block" style={{ marginBottom: 20 }}>

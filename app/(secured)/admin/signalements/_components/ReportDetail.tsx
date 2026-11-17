@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   REPORT_RESOLUTION_NOTE_MAX_LENGTH,
@@ -16,6 +16,15 @@ import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categor
 import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
+import {
+  ACTIONS_SCOPE,
+  focusAfterGesture,
+  gestureState,
+  pressedGestureOf,
+  reportGesture,
+  type PressedGesture,
+} from "../_lib/report-gestures";
+import { BusyButton } from "@/components/ui/busy-button";
 import { ModerationPlayerLink } from "./ModerationPlayerLink";
 import { ReportTargetCard } from "./ReportTargetCard";
 import { StatusPill } from "./StatusPill";
@@ -23,7 +32,8 @@ import styles from "../reports.module.css";
 
 interface ReportDetailProps {
   report: ReportView;
-  busy: boolean;
+  /** Geste en attente (`report-gestures.ts`), `null` hors envoi. */
+  pending: string | null;
   onAction: (action: ReportAction, note?: string) => void;
   onHideLogo: (target: ReportTargetRef) => void;
   onDeleteLogo: (target: ReportTargetRef) => void;
@@ -44,7 +54,7 @@ function formatDateTime(iso: string): string {
  */
 export function ReportDetail({
   report,
-  busy,
+  pending,
   onAction,
   onHideLogo,
   onDeleteLogo,
@@ -62,6 +72,16 @@ export function ReportDetail({
   const heldForNotifier = report.heldForNotifier;
   const [resolving, setResolving] = useState(false);
   const [note, setNote] = useState("");
+  const busy = pending !== null;
+  const articleRef = useRef<HTMLElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const resolveRef = useRef<HTMLButtonElement>(null);
+  // Le bouton pressé disparaît souvent au retour du geste (« Prendre en
+  // charge » devient « Remettre en attente ») : le focus tomberait sur la page.
+  const pressed = useRef<PressedGesture | null>(null);
+  // Ouvrir ou refermer la note d'archivage retire le bouton pressé : le focus
+  // va au champ, puis revient à « Résoudre et archiver… ».
+  const focusAfterToggle = useRef<"note" | "resolve" | null>(null);
 
   // Un autre dossier, un autre brouillon : la note ne suit pas la sélection.
   useEffect(() => {
@@ -79,8 +99,43 @@ export function ReportDetail({
     setNote("");
   }, [archived]);
 
+  // Avant la peinture : aucune image où le focus est perdu.
+  useLayoutEffect(() => {
+    const target = focusAfterToggle.current;
+    focusAfterToggle.current = null;
+    if (target === "note") noteRef.current?.focus();
+    else if (target === "resolve") resolveRef.current?.focus();
+  }, [resolving]);
+
+  useLayoutEffect(() => {
+    const last = pressed.current;
+    if (!last) return;
+    const root = articleRef.current;
+    const active = document.activeElement;
+    // Un focus parti ailleurs entre-temps (la liste, un lien) n'est pas repris.
+    if (root && (active === null || active === document.body)) focusAfterGesture(root, last)?.focus();
+    if (pending === null) pressed.current = null;
+  }, [report, pending]);
+
+  const openResolve = () => {
+    focusAfterToggle.current = "note";
+    setResolving(true);
+  };
+  const cancelResolve = () => {
+    focusAfterToggle.current = "resolve";
+    setResolving(false);
+  };
+
   return (
-    <article className={styles.detail} aria-labelledby={titleId}>
+    <article
+      ref={articleRef}
+      className={styles.detail}
+      aria-labelledby={titleId}
+      onClickCapture={(event) => {
+        const gesture = pressedGestureOf(event.target);
+        if (gesture) pressed.current = gesture;
+      }}
+    >
       <header className={styles.detailHead}>
         <div>
           <span className="eyebrow">
@@ -93,39 +148,56 @@ export function ReportDetail({
         <StatusPill status={report.status} contested={report.contests.length > 0} />
       </header>
 
-      <fieldset className={`native-group ${styles.actions}`} aria-label="Traitement du signalement">
+      <fieldset
+        className={`native-group ${styles.actions}`}
+        aria-label="Traitement du signalement"
+        data-focus-scope={ACTIONS_SCOPE}
+      >
         {report.status === "OPEN" && (
-          <button
-            type="button"
+          <BusyButton
+            {...gestureState(pending, reportGesture.action("TAKE"))}
+            data-gesture={reportGesture.action("TAKE")}
             className={`${styles.actionButton} ${styles.actionPrimary}`}
-            disabled={busy}
             onClick={() => onAction("TAKE")}
           >
             Prendre en charge
-          </button>
+          </BusyButton>
         )}
         {report.status === "IN_PROGRESS" && (
-          <button type="button" className={styles.actionButton} disabled={busy} onClick={() => onAction("RELEASE")}>
+          <BusyButton
+            {...gestureState(pending, reportGesture.action("RELEASE"))}
+            data-gesture={reportGesture.action("RELEASE")}
+            className={styles.actionButton}
+            onClick={() => onAction("RELEASE")}
+          >
             Remettre en attente
-          </button>
+          </BusyButton>
         )}
         {report.status !== "RESOLVED" && !resolving && (
-          <button type="button" className={styles.actionButton} disabled={busy} onClick={() => setResolving(true)}>
+          <BusyButton ref={resolveRef} busy={false} blocked={busy} className={styles.actionButton} onClick={openResolve}>
             Résoudre et archiver…
-          </button>
+          </BusyButton>
         )}
         {report.status === "RESOLVED" && (
-          <button type="button" className={styles.actionButton} disabled={busy} onClick={() => onAction("REOPEN")}>
+          <BusyButton
+            {...gestureState(pending, reportGesture.action("REOPEN"))}
+            data-gesture={reportGesture.action("REOPEN")}
+            className={styles.actionButton}
+            onClick={() => onAction("REOPEN")}
+          >
             Rouvrir
-          </button>
+          </BusyButton>
         )}
         {resolving && !archived && (
           <div className={styles.resolveBox}>
             <div className="field">
               <label htmlFor={noteId}>Décision prise (facultatif, visible des seuls administrateurs)</label>
               <textarea
+                ref={noteRef}
                 id={noteId}
                 rows={3}
+                // Ce qui est affiché est ce qui part (`BUSY_BUTTONS.md`).
+                readOnly={busy}
                 value={note}
                 maxLength={REPORT_RESOLUTION_NOTE_MAX_LENGTH}
                 onChange={(event) => setNote(event.target.value)}
@@ -133,17 +205,17 @@ export function ReportDetail({
               />
             </div>
             <div className={styles.targetActions}>
-              <button
-                type="button"
+              <BusyButton
+                {...gestureState(pending, reportGesture.action("RESOLVE"))}
+                data-gesture={reportGesture.action("RESOLVE")}
                 className={`${styles.actionButton} ${styles.actionPrimary}`}
-                disabled={busy}
                 onClick={() => onAction("RESOLVE", note)}
               >
                 Archiver
-              </button>
-              <button type="button" className={styles.actionButton} disabled={busy} onClick={() => setResolving(false)}>
+              </BusyButton>
+              <BusyButton busy={false} blocked={busy} className={styles.actionButton} onClick={cancelResolve}>
                 Annuler
-              </button>
+              </BusyButton>
             </div>
             <p className={styles.muted}>
               {/* La durée que tient la purge (`reportRetainedUntil`) : une notification de
@@ -219,7 +291,7 @@ export function ReportDetail({
                 quarantines={report.quarantines.filter(
                   (quarantine) => quarantine.targetType === target.type && quarantine.targetId === target.id,
                 )}
-                busy={busy}
+                pending={pending}
                 onHideLogo={onHideLogo}
                 onDeleteLogo={onDeleteLogo}
                 onRestore={onRestore}

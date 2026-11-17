@@ -15,6 +15,8 @@ import {
   type ContestOutcome,
   type LogoQuarantineView,
 } from "@/lib/shared/logo-quarantine";
+import { BusyButton } from "@/components/ui/busy-button";
+import { gestureState, reportGesture } from "../_lib/report-gestures";
 import { ArmedButton } from "./ArmedButton";
 import styles from "../reports.module.css";
 
@@ -23,7 +25,8 @@ interface ReportTargetCardProps {
   category: ReportCategory;
   /** Images masquées au titre du signalement, pour cette cible. */
   quarantines: LogoQuarantineView[];
-  busy: boolean;
+  /** Geste en attente (`report-gestures.ts`), `null` hors envoi. */
+  pending: string | null;
   onHideLogo: (target: ReportTargetRef) => void;
   onDeleteLogo: (target: ReportTargetRef) => void;
   onRestore: (quarantineId: number) => void;
@@ -60,7 +63,7 @@ export function ReportTargetCard({
   target,
   category,
   quarantines,
-  busy,
+  pending,
   onHideLogo,
   onDeleteLogo,
   onRestore,
@@ -74,9 +77,14 @@ export function ReportTargetCard({
   const image = IMAGE_NOUN[target.type];
   const { nounCap, withArticle } = image ?? DEFAULT_IMAGE_NOUN;
   const canActOnLogo = image !== undefined && target.exists && category !== "BUG";
+  const targetRef = { type: target.type, id: target.id };
+  /** Props d'un bouton de geste : état (`busy`/`blocked`) et nom (`data-gesture`). */
+  const gesture = (name: string) => ({ ...gestureState(pending, name), "data-gesture": name });
 
   return (
-    <li className={styles.target}>
+    // Zone du focus : un geste qui retire son bouton (masquer, rétablir) rend
+    // le focus au premier bouton de la cible (`focusAfterGesture`).
+    <li className={styles.target} data-focus-scope={`target:${target.type}-${target.id}`}>
       <div className={styles.targetHead}>
         {target.imageUrl ? (
           <Image src={target.imageUrl} alt="" width={44} height={44} className={styles.targetImage} />
@@ -125,30 +133,28 @@ export function ReportTargetCard({
             </span>
           </div>
           <div className={styles.targetActions}>
-            <button
-              type="button"
+            <BusyButton
+              {...gesture(reportGesture.restore(hidden.id))}
               className={`${styles.actionButton} ${styles.actionPrimary}`}
-              disabled={busy}
               onClick={() => onRestore(hidden.id)}
             >
               Rétablir {withArticle}
-            </button>
+            </BusyButton>
             <ArmedButton
               label="Supprimer maintenant"
               confirmLabel="Confirmer la suppression ?"
               className={styles.actionDanger}
-              disabled={busy}
+              {...gesture(reportGesture.purge(hidden.id))}
               onConfirm={() => onPurge(hidden.id)}
             />
             {isAvatar && hidden.contestOutcome === null && (
-              <button
-                type="button"
+              <BusyButton
+                {...gesture(reportGesture.outcome(hidden.id, "UPHELD"))}
                 className={styles.actionButton}
-                disabled={busy}
                 onClick={() => onContestOutcome(hidden.id, "UPHELD")}
               >
                 Contestation rejetée
-              </button>
+              </BusyButton>
             )}
           </div>
         </div>
@@ -180,19 +186,18 @@ export function ReportTargetCard({
                   label="Contestation acceptée"
                   confirmLabel="Débloquer l'image ?"
                   className={styles.actionPrimary}
-                  disabled={busy}
+                  {...gesture(reportGesture.outcome(quarantine.id, "OVERTURNED"))}
                   onConfirm={() => onContestOutcome(quarantine.id, "OVERTURNED")}
                 />
               )}
               {quarantine.contestOutcome === null && (
-                <button
-                  type="button"
+                <BusyButton
+                  {...gesture(reportGesture.outcome(quarantine.id, "UPHELD"))}
                   className={styles.actionButton}
-                  disabled={busy}
                   onClick={() => onContestOutcome(quarantine.id, "UPHELD")}
                 >
                   Contestation rejetée
-                </button>
+                </BusyButton>
               )}
             </div>
           )}
@@ -201,20 +206,19 @@ export function ReportTargetCard({
 
       {canActOnLogo && !hidden && target.imageUrl && (
         <div className={styles.targetActions}>
-          <button
-            type="button"
+          <BusyButton
+            {...gesture(reportGesture.hide(targetRef))}
             className={`${styles.actionButton} ${styles.actionWarn}`}
-            disabled={busy}
-            onClick={() => onHideLogo({ type: target.type, id: target.id })}
+            onClick={() => onHideLogo(targetRef)}
           >
             Masquer {withArticle}
-          </button>
+          </BusyButton>
           <ArmedButton
             label={`Supprimer ${withArticle}`}
             confirmLabel="Supprimer sans délai ?"
             className={styles.actionDanger}
-            disabled={busy}
-            onConfirm={() => onDeleteLogo({ type: target.type, id: target.id })}
+            {...gesture(reportGesture.remove(targetRef))}
+            onConfirm={() => onDeleteLogo(targetRef)}
           />
         </div>
       )}

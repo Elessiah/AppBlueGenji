@@ -194,4 +194,24 @@ annoncer de l'attente.
   « Envoi… ».
   Apparence désarmée/en attente de ces boutons : une seule règle, `app/busy-look.module.css` (`composes: busyLook`).
   Le champ « URL de la photo » est nommé par son libellé visible (`<label htmlFor>`).
+- Signalements du staff (EF-70) : panneau `/admin/signalements` (`page.tsx`,
+  « Actualiser » compris), `ReportDetail`, `ReportTargetCard`, `ArmedButton`
+  (props `busy` / `blocked`, ne s'arme pas pendant un envoi) et
+  `PlayerRolesPanel` (cases en `aria-readonly`, choix ignoré par `isBusy()`) —
+  `tests/app/reports-busy-buttons.test.ts`. Une garde pour le panneau : chaque
+  geste porte un nom (`_lib/report-gestures.ts`, `data-gesture`) ; seul le geste
+  en attente s'annonce occupé (`gestureState`), les autres sont refusés, et un
+  geste refusé parce qu'un autre attend le dit (`BUSY_REFUSED_MESSAGE`).
+  « Actualiser » passe par la même garde (un geste lancé pendant la relecture
+  agirait sur un dossier remplacé). Le bouton pressé disparaît souvent au retour
+  (« Prendre en charge » devient « Remettre en attente », « Masquer le logo »
+  laisse « Rétablir ») : `focusAfterGesture` rend le focus au même geste, sinon
+  au premier bouton de sa cible (`data-focus-scope`), sinon au premier geste de
+  traitement — avant la peinture, et jamais s'il est parti ailleurs. Ouvrir la
+  note d'archivage met le focus dans le champ, « Annuler » le rend à
+  « Résoudre et archiver… ». Note en `readOnly` pendant l'envoi. Aucun texte
+  nouveau ; le panneau reste en français sous `/en` (D4). Les rôles enregistrés,
+  la fiche du joueur se relit **en arrière-plan** (`revalidate`) : `refresh`
+  la repassait en « Chargement… », démontait panneau et confirmation, et le
+  focus tombait sur la page.
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

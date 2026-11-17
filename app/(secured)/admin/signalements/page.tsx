@@ -3,6 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import {
   reportStatTone,
   type ReportAction,
@@ -25,6 +28,7 @@ import {
 import { adminFetch, adminReportErrorMessage, jsonBody } from "./_lib/admin-errors";
 import { contestOutcomeMessage, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { ReportDetail } from "./_components/ReportDetail";
+import { REFRESH_GESTURE, reportGesture } from "./_lib/report-gestures";
 import { StatusPill } from "./_components/StatusPill";
 import styles from "./reports.module.css";
 
@@ -64,10 +68,13 @@ function ReportsPanel() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { showError, showSuccess } = useToast();
+  const { showError, showInfo, showSuccess } = useToast();
   const [reports, setReports] = useState<ReportView[] | null>(null);
   const [filters, setFilters] = useState<ReportFilters>(DEFAULT_FILTERS);
-  const [busy, setBusy] = useState(false);
+  // Un geste à la fois (`BUSY_BUTTONS.md`) : `pending` nomme celui qui attend
+  // (seul son bouton s'annonce occupé), les autres sont refusés sans attente.
+  const { busy, run: runGuarded } = useBusyGuard();
+  const [pending, setPending] = useState<string | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const selectedId = Number(searchParams.get("id")) || null;
 
@@ -127,25 +134,46 @@ function ReportsPanel() {
     }
   };
 
-  const run = async <T,>(task: () => Promise<T>, success: string | ((result: T) => string)) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const result = await task();
-      showSuccess(typeof success === "function" ? success(result) : success);
-      // Le badge « Signalements » de la barre compte les dossiers ouverts.
-      router.refresh();
-    } catch (error) {
-      showError(adminReportErrorMessage((error as Error).message));
-    } finally {
-      await load();
-      setBusy(false);
-    }
+  // La garde synchrone écarte le second envoi parti avant le rendu de `busy`
+  // (double clic) ; un geste refusé parce qu'un autre attend le dit.
+  const run = async <T,>(gesture: string, task: () => Promise<T>, success: string | ((result: T) => string)) => {
+    const done = await runGuarded(async () => {
+      setPending(gesture);
+      try {
+        const result = await task();
+        showSuccess(typeof success === "function" ? success(result) : success);
+        // Le badge « Signalements » de la barre compte les dossiers ouverts.
+        router.refresh();
+      } catch (error) {
+        showError(adminReportErrorMessage((error as Error).message));
+      } finally {
+        await load();
+        setPending(null);
+      }
+      return true;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+  };
+
+  // « Actualiser » passe par la même garde : un geste lancé pendant la relecture
+  // agirait sur un dossier que la relecture va remplacer.
+  const refresh = async () => {
+    const done = await runGuarded(async () => {
+      setPending(REFRESH_GESTURE);
+      try {
+        await load();
+      } finally {
+        setPending(null);
+      }
+      return true;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
   };
 
   const onAction = (action: ReportAction, note?: string) => {
     if (!selected) return;
     void run(
+      reportGesture.action(action),
       () => adminFetch(`/api/admin/reports/${selected.id}`, jsonBody("PATCH", { action, note }), "REPORT_ACTION_FAILED"),
       ACTION_SUCCESS[action],
     );
@@ -159,6 +187,7 @@ function ReportsPanel() {
   const onHideLogo = (target: ReportTargetRef) => {
     if (!selected) return;
     void run(
+      reportGesture.hide(target),
       () =>
         adminFetch(
           `/api/admin/reports/${selected.id}/logo-quarantine`,
@@ -174,6 +203,7 @@ function ReportsPanel() {
   const onDeleteLogo = (target: ReportTargetRef) => {
     if (!selected) return;
     void run(
+      reportGesture.remove(target),
       () =>
         adminFetch(
           `/api/admin/reports/${selected.id}/logo-removal`,
@@ -193,6 +223,7 @@ function ReportsPanel() {
   const onRestore = (quarantineId: number) => {
     const type = quarantineTargetType(quarantineId);
     void run(
+      reportGesture.restore(quarantineId),
       () =>
         adminFetch(`/api/admin/logo-quarantines/${quarantineId}/restore`, { method: "POST" }, "LOGO_RESTORE_FAILED"),
       `${imageNoun(type)} rétabli. ${concernedNoun(type)}.`,
@@ -202,6 +233,7 @@ function ReportsPanel() {
   const onPurge = (quarantineId: number) => {
     const type = quarantineTargetType(quarantineId);
     void run(
+      reportGesture.purge(quarantineId),
       () => adminFetch(`/api/admin/logo-quarantines/${quarantineId}`, { method: "DELETE" }, "LOGO_PURGE_FAILED"),
       `${imageNoun(type)} supprimé définitivement. ${concernedNoun(type)}.`,
     );
@@ -211,6 +243,7 @@ function ReportsPanel() {
   // ce que devient le blocage de son image (D18).
   const onContestOutcome = (quarantineId: number, outcome: ContestOutcome) => {
     void run(
+      reportGesture.outcome(quarantineId, outcome),
       () =>
         adminFetch<{ blocked?: boolean | null; hashUnknown?: boolean }>(
           `/api/admin/logo-quarantines/${quarantineId}/contest-outcome`,
@@ -323,9 +356,14 @@ function ReportsPanel() {
           >
             <span aria-hidden="true">⚖</span> Contestés seulement
           </button>
-          <button type="button" className={styles.segment} onClick={() => void load()} disabled={busy}>
+          <BusyButton
+            busy={pending === REFRESH_GESTURE}
+            blocked={busy}
+            className={`${styles.segment} ${styles.refresh}`}
+            onClick={() => void refresh()}
+          >
             Actualiser
-          </button>
+          </BusyButton>
         </fieldset>
       </div>
 
@@ -344,7 +382,7 @@ function ReportsPanel() {
           {selected ? (
             <ReportDetail
               report={selected}
-              busy={busy}
+              pending={pending}
               onAction={onAction}
               onHideLogo={onHideLogo}
               onDeleteLogo={onDeleteLogo}
