@@ -171,7 +171,7 @@ describe("journal de l'entretien", () => {
 
     await expect(runMaintenance(NOON)).rejects.toThrow("db down");
 
-    expect(errorSpy).toHaveBeenCalledWith("[audience] Repli des jours clos impossible.", expect.anything());
+    expect(errorSpy).toHaveBeenCalledWith("[audience] Repli des jours clos impossible (jusqu'au 2026-11-15).", expect.anything());
   });
 });
 

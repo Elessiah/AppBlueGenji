@@ -43,6 +43,8 @@ const globals = globalThis as unknown as { window?: unknown; document?: unknown;
 
 let idle: (() => void) | null = null;
 let pageHideListeners: (() => void)[] = [];
+let pageShowListeners: ((event: { persisted: boolean }) => void)[] = [];
+let visibilityListeners: (() => void)[] = [];
 let sent: AudienceBeaconEntry[][] = [];
 
 /** Navigateur minimal : chemin affiché, repos différé, écouteurs `pagehide` notés. */
@@ -61,6 +63,7 @@ function stubBrowser(pathname: string) {
     },
     addEventListener: (type: string, listener: () => void) => {
       if (type === "pagehide") pageHideListeners.push(listener);
+      if (type === "pageshow") pageShowListeners.push(listener);
     },
     removeEventListener: (type: string, listener: () => void) => {
       if (type === "pagehide") pageHideListeners = pageHideListeners.filter((entry) => entry !== listener);
@@ -72,8 +75,12 @@ function stubBrowser(pathname: string) {
     visibilityState: "visible",
     referrer: "https://partenaire.example/article",
     cookie: "",
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
+    addEventListener: (type: string, listener: () => void) => {
+      if (type === "visibilitychange") visibilityListeners.push(listener);
+    },
+    removeEventListener: (type: string, listener: () => void) => {
+      if (type === "visibilitychange") visibilityListeners = visibilityListeners.filter((entry) => entry !== listener);
+    },
   };
   globals.fetch = jest.fn(async (_url: string, init: { body: string }) => {
     sent.push((JSON.parse(init.body) as { v: AudienceBeaconEntry[] }).v);
@@ -95,17 +102,29 @@ function firePageHide() {
   for (const listener of [...pageHideListeners]) listener();
 }
 
+/** Change la visibilité de l'onglet et prévient les écouteurs. */
+function setVisibility(state: "visible" | "hidden") {
+  (globals.document as { visibilityState: string }).visibilityState = state;
+  for (const listener of [...visibilityListeners]) listener();
+}
+
+/** Suites (temps de lecture) envoyées. */
+const continuations = () => sent.flat().filter((entry) => entry.c === 1);
+
 /** Pages vues envoyées (les suites, temps de lecture seul, écartées). */
 const entries = () => sent.flat().filter((entry) => entry.c !== 1);
 
 beforeEach(() => {
   idle = null;
   pageHideListeners = [];
+  pageShowListeners = [];
+  visibilityListeners = [];
   sent = [];
   mockHooks.refs = [];
 });
 
 afterEach(() => {
+  jest.restoreAllMocks();
   delete globals.window;
   delete globals.document;
   delete globals.fetch;
@@ -165,5 +184,71 @@ describe("AudienceBeacon — avant le repos", () => {
 
     expect(entries()).toEqual([]);
     expect(idle).toBeNull();
+  });
+
+  it("AudienceBeacon_pagehideBeforeIdleTabHidden_landingStillSent", () => {
+    stubBrowser("/tournois");
+    const [mount, onPath] = render("/tournois");
+    mount();
+    onPath();
+    // Au départ, le navigateur masque la page avant `pagehide`.
+    (globals.document as { visibilityState: string }).visibilityState = "hidden";
+
+    firePageHide();
+
+    expect(entries().map((entry) => entry.p)).toEqual(["/tournois"]);
+  });
+
+  it("AudienceBeacon_navigateBeforeIdle_landingTimeFromMount", () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const location = stubBrowser("/tournois");
+    const [mount, onPath] = render("/tournois");
+    mount();
+    onPath();
+    now.mockReturnValue(1_000_500);
+    location.pathname = "/equipes";
+    const [, onNavigate] = render("/equipes");
+
+    onNavigate();
+    firePageHide();
+
+    expect(continuations().map((entry) => [entry.p, entry.t])).toEqual([["/tournois", 500]]);
+  });
+
+  it("AudienceBeacon_earlyPagehideThenBfcacheRestore_pageResumed", () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    stubBrowser("/tournois");
+    const [mount, onPath] = render("/tournois");
+    mount();
+    onPath();
+    (globals.document as { visibilityState: string }).visibilityState = "hidden";
+    firePageHide();
+    sent = [];
+
+    now.mockReturnValue(1_010_000);
+    setVisibility("visible");
+    now.mockReturnValue(1_014_000);
+    setVisibility("hidden");
+
+    expect(entries()).toEqual([]);
+    expect(continuations().map((entry) => [entry.p, entry.t])).toEqual([["/tournois", 4_000]]);
+  });
+
+  it("AudienceBeacon_installedPagehideThenPageshowPersisted_resumes", () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    stubBrowser("/tournois");
+    const [mount, onPath] = render("/tournois");
+    mount();
+    onPath();
+    idle?.();
+    firePageHide();
+    sent = [];
+
+    now.mockReturnValue(1_010_000);
+    for (const listener of [...pageShowListeners]) listener({ persisted: true });
+    now.mockReturnValue(1_013_000);
+    firePageHide();
+
+    expect(continuations().map((entry) => [entry.p, entry.t])).toEqual([["/tournois", 3_000]]);
   });
 });

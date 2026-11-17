@@ -53,13 +53,21 @@ export function AudienceBeacon() {
   const tracker = useRef<AudienceTracker | null>(null);
   /** Installation immédiate, tant que le repos n'est pas venu (sinon `null`). */
   const installNow = useRef<(() => void) | null>(null);
-  /** Page d'arrivée, lue au montage : comptée même si le visiteur la quitte avant le repos. */
-  const landing = useRef<string | null>(null);
+  /**
+   * Page d'arrivée, lue au montage avec son instant et sa visibilité : comptée
+   * (et son temps mesuré depuis l'affichage) même si le visiteur la quitte
+   * avant le repos.
+   */
+  const landing = useRef<{ path: string; at: number; visible: boolean } | null>(null);
 
   useEffect(() => {
     if (browserAudienceOptOut()) return;
     let teardown: (() => void) | null = null;
-    landing.current = window.location.pathname;
+    landing.current = {
+      path: window.location.pathname,
+      at: Date.now(),
+      visible: document.visibilityState === "visible",
+    };
     // Installé au repos du navigateur (comme `visit-tracker`) : le premier rendu
     // et l'hydratation ne se disputent pas le fil avec la mesure.
     const install = () => {
@@ -77,18 +85,29 @@ export function AudienceBeacon() {
         send,
       });
       tracker.current = instance;
-      // La page d'arrivée d'abord (avec son référent extérieur), puis celle
-      // affichée maintenant si le visiteur a déjà navigué.
-      instance.navigate(landing.current ?? window.location.pathname);
+      // La page d'arrivée d'abord (avec son référent extérieur, datée de son
+      // affichage), puis celle affichée maintenant si le visiteur a déjà navigué.
+      const arrival = landing.current;
+      if (arrival) instance.arrive(arrival.path, arrival.at, arrival.visible);
       instance.navigate(window.location.pathname);
+      // Onglet déjà masqué (départ en cours, ou masqué avant le repos) : la
+      // lecture se clôt, et la page reprend au retour (cache avant/arrière).
+      if (document.visibilityState !== "visible") instance.hidden();
 
       const onVisibility = () => {
         if (document.visibilityState === "hidden") instance.hidden();
         else instance.visible();
       };
-      const onPageHide = () => instance.leave();
+      // Départ : tout part, mais la page reste notée comme masquée — restaurée
+      // par le cache avant/arrière, elle reprend (`pageshow`, ou le retour au
+      // premier plan) au lieu de rester muette.
+      const onPageHide = () => instance.hidden();
+      const onPageShow = (event: PageTransitionEvent) => {
+        if (event.persisted && document.visibilityState === "visible") instance.visible();
+      };
       document.addEventListener("visibilitychange", onVisibility);
       window.addEventListener("pagehide", onPageHide);
+      window.addEventListener("pageshow", onPageShow);
 
       // Le battement d'une minute suit le régime de charge (`CLIENT_POWER_MODES.md`) :
       // éteint onglet masqué (la lecture est close alors) et en économie, il se
@@ -109,6 +128,7 @@ export function AudienceBeacon() {
       teardown = () => {
         document.removeEventListener("visibilitychange", onVisibility);
         window.removeEventListener("pagehide", onPageHide);
+        window.removeEventListener("pageshow", onPageShow);
         unsubscribe();
         if (timer !== null) window.clearInterval(timer);
         instance.leave();
@@ -123,10 +143,11 @@ export function AudienceBeacon() {
       if (supportsIdle) window.cancelIdleCallback(handle);
       else window.clearTimeout(handle);
     }
-    // Départ avant le repos : la page d'arrivée part quand même (rebond rapide).
+    // Départ avant le repos : la page d'arrivée part quand même (rebond rapide),
+    // notée masquée pour reprendre si le cache avant/arrière la restaure.
     function onEarlyPageHide() {
       install();
-      tracker.current?.leave();
+      tracker.current?.hidden();
     }
     window.addEventListener("pagehide", onEarlyPageHide);
     // Navigation avant le repos : installé sur-le-champ (voir l'effet suivant).
@@ -143,7 +164,7 @@ export function AudienceBeacon() {
   useEffect(() => {
     // Première navigation interne avant le repos : la page d'arrivée n'est pas
     // perdue ni confondue avec celle-ci (`install` les compte dans l'ordre).
-    if (!tracker.current && installNow.current && window.location.pathname !== landing.current) {
+    if (!tracker.current && installNow.current && window.location.pathname !== landing.current?.path) {
       installNow.current();
       return;
     }

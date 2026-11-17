@@ -87,6 +87,12 @@ export const SALT_READ_TIMEOUT_MS = 10_000;
  * une marge, pour qu'un signalement en cours finisse avant le repli.
  */
 export const RECORDING_WAIT_MS = SALT_READ_TIMEOUT_MS + 5_000;
+/**
+ * Durée maximale d'un passage d'entretien : une étape qui ne répond plus (base
+ * figée, connexion à moitié ouverte) ne bloque pas les passages suivants, qui
+ * effacent tout de même les sels des jours clos et purgent le détail.
+ */
+export const MAINTENANCE_TIMEOUT_MS = 5 * 60 * 1000;
 /** Lignes effacées par passe de purge. */
 const PURGE_BATCH = 10_000;
 /** Jours repliés au plus par entretien (rattrapage progressif). */
@@ -134,6 +140,11 @@ interface AudienceState {
    */
   failing: Map<MaintenanceStep, string>;
   statsCache: { at: number; value: AudienceStats } | null;
+  /**
+   * Dernier jour replié vu en base par l'entretien de ce processus : quand il
+   * change (repli fait par un autre processus), le cache de la page tombe.
+   */
+  knownRolledDay: string | null;
   statsLoad: Promise<AudienceStats> | null;
   /** Avancée à chaque repli : une lecture commencée avant n'est pas mise en cache. */
   statsGeneration: number;
@@ -157,6 +168,7 @@ function freshState(): AudienceState {
     maintenanceClock: null,
     failing: new Map(),
     statsCache: null,
+    knownRolledDay: null,
     statsLoad: null,
     statsGeneration: 0,
   };
@@ -434,11 +446,15 @@ async function writeBatch(all: readonly PendingRow[], now: Date): Promise<void> 
   // postérieurs au dernier replié). Le dernier jour replié ne se relit que si
   // une ligne est d'un jour repliable : un autre processus a pu le replier ;
   // sinon aucun repli n'a pu l'atteindre, et la requête est épargnée.
+  // Avec plusieurs processus, les lignes encore en file chez l'un quand un
+  // autre replie le jour sont donc perdues (quelques secondes de suites,
+  // une heure et quart après minuit) : c'est voulu. Replier de nouveau un jour
+  // déjà publié changerait ses chiffres, et la différence entre les deux
+  // versions isolerait ces quelques visiteurs, sous le seuil d'anonymat.
   let batch = all;
   const rollable = lastRollableDay(now);
   if (all.some((row) => row.day <= rollable)) {
-    const [last] = await db.execute<LastDayRow[]>(`SELECT DATE_FORMAT(MAX(day), '%Y-%m-%d') AS day FROM bg_audience_days`);
-    const lastRolled = last[0]?.day ?? null;
+    const lastRolled = await readLastRolledDay(db);
     if (lastRolled) batch = all.filter((row) => row.day > lastRolled);
   }
   for (let from = 0; from < batch.length; from += INSERT_CHUNK) {
@@ -491,7 +507,8 @@ export function maintainAudience(now: Date = new Date()): void {
   // Les échecs des étapes sont déjà journalisés (`reportStep`) ; ce qui
   // échappe aux étapes est imprévu (erreur de programmation) : journalisé ici,
   // jamais avalé en silence.
-  S.maintaining = runMaintenanceSteps(now)
+  // Borné : un passage figé est abandonné (journalisé), le suivant repart.
+  S.maintaining = withTimeout(runMaintenanceSteps(now), MAINTENANCE_TIMEOUT_MS, "audience maintenance timed out")
     .then(
       () => undefined,
       (error: unknown) => {
@@ -533,10 +550,11 @@ type StepOutcome = { ok: true } | { ok: false; error: unknown };
  * Journalise l'échec d'une étape de l'entretien au premier passage qui échoue,
  * puis plus jusqu'à ce qu'elle réussisse de nouveau : une base en panne (ou
  * absente, comme en intégration continue) ne remplit pas le journal toutes les
- * dix minutes. Un succès réarme l'alerte. L'effacement des sels se
- * journalise de nouveau chaque fois que la panne atteint un jour de plus
- * (`until`) : le journal nomme toujours le dernier jour dont le sel reste en
- * base, ce que contredisent les textes.
+ * dix minutes. Un succès réarme l'alerte. Le repli et l'effacement des sels se
+ * journalisent de nouveau chaque fois que la panne atteint un jour de plus
+ * (`until`) : le journal nomme toujours le dernier jour concerné — un sel
+ * resté en base contredit les textes, et un jour jamais replié finit purgé au
+ * bout de la conservation du détail (la purge ne l'attend pas), il doit se voir.
  */
 function reportStep(step: MaintenanceStep, outcome: StepOutcome, until = ""): void {
   if (outcome.ok) {
@@ -545,7 +563,7 @@ function reportStep(step: MaintenanceStep, outcome: StepOutcome, until = ""): vo
   }
   if (S.failing.get(step) === until) return;
   S.failing.set(step, until);
-  if (step === "rollup") console.error("[audience] Repli des jours clos impossible.", failureReason(outcome.error));
+  if (step === "rollup") console.error(`[audience] Repli des jours clos impossible (jusqu'au ${until}).`, failureReason(outcome.error));
   else if (step === "salts") console.error(`[audience] Sels jusqu'au ${until} non effacés.`, failureReason(outcome.error));
   else console.error("[audience] Purge du détail impossible.", failureReason(outcome.error));
 }
@@ -588,7 +606,7 @@ async function runMaintenanceSteps(now: Date): Promise<{ error: unknown } | null
     });
     reportStep("rollup", { ok: true });
   } catch (error) {
-    reportStep("rollup", { ok: false, error });
+    reportStep("rollup", { ok: false, error }, until);
     // Repli raté : ces jours se replieront plus tard (le repli lit l'empreinte
     // gardée, jamais le sel). Un signalement attardé qui tient déjà leur sel
     // y ajoute encore ses lignes ; sans lui, plus aucun sel neuf n'est tiré
@@ -603,7 +621,10 @@ async function runMaintenanceSteps(now: Date): Promise<{ error: unknown } | null
   // du repli : ni le sel ni le détail ne restent au-delà des durées annoncées.
   const [salted, purged] = await Promise.allSettled([forgetSalts(until), purgeAudienceViews(now)]);
   // Un jour replié, même suivi d'un échec, change les chiffres : le cache tombe.
-  if (lastRolled !== null) {
+  // De même quand un autre processus a replié (verrou tenu ailleurs) : le
+  // dernier jour replié en base a changé depuis le passage précédent.
+  const rolledElsewhere = await lastRolledDayChanged();
+  if (lastRolled !== null || rolledElsewhere) {
     S.statsCache = null;
     S.statsGeneration += 1;
   }
@@ -616,6 +637,27 @@ async function runMaintenanceSteps(now: Date): Promise<{ error: unknown } | null
   if (salted.status === "rejected") return { error: salted.reason };
   if (purged.status === "rejected") return { error: purged.reason };
   return null;
+}
+
+/**
+ * Relit le dernier jour replié en base et dit s'il a changé depuis la
+ * dernière lecture de ce processus. Une lecture ratée ne change rien.
+ */
+async function lastRolledDayChanged(): Promise<boolean> {
+  try {
+    const latest = await readLastRolledDay(await getDatabase());
+    if (latest === S.knownRolledDay) return false;
+    S.knownRolledDay = latest;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Dernier jour replié en base (`YYYY-MM-DD`), ou `null`. */
+async function readLastRolledDay(db: Pool): Promise<string | null> {
+  const [last] = await db.execute<LastDayRow[]>(`SELECT DATE_FORMAT(MAX(day), '%Y-%m-%d') AS day FROM bg_audience_days`);
+  return last[0]?.day ?? null;
 }
 
 interface DayRow extends RowDataPacket {
@@ -1012,6 +1054,7 @@ export function resetAudienceState(): void {
   S.rolledThrough = null;
   S.maintaining = null;
   S.statsCache = null;
+  S.knownRolledDay = null;
   S.statsLoad = null;
   S.statsGeneration = 0;
   S.failing.clear();

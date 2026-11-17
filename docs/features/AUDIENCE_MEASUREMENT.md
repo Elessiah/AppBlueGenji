@@ -211,7 +211,11 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   n'est possible — c'est le prix de la dispense. La page le dit.
 - **Un seul repli à la fois sur la base** : `rollUpAudienceDays` tient le
   verrou nommé `bg_audience_rollup` (sans attente) ; un second processus qui
-  ne l'obtient pas passe son tour. L'horloge d'entretien ne démarre jamais
+  ne l'obtient pas passe son tour ; son cache de la page tombe dès que son
+  entretien voit changer le dernier jour replié en base. Les lignes encore en
+  file chez lui quand l'autre replie le jour sont écartées, jamais un jour
+  publié n'est replié de nouveau : la différence entre ses deux versions
+  isolerait ces quelques visiteurs, sous le seuil d'anonymat. L'horloge d'entretien ne démarre jamais
   pendant `next build` (`NEXT_PHASE`). Sous `next dev`, la porte des
   migrations est celle de chaque copie du module (un schéma modifié se rejoue
   au rechargement) ; en production, celle du processus.
@@ -226,7 +230,10 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   une ligne est d'un jour repliable à cet instant), et le sel d'un
   jour replié n'est jamais recréé (lecture lente finie après l'entretien). Une lecture de sel sans réponse échoue au bout de 10 s
   (`SALT_READ_TIMEOUT_MS`) : rien n'attend une base figée sans fin. Chaque processus oublie en mémoire les sels des jours clos
-  au plus 10 min après la clôture, même sans trafic.
+  au plus 10 min après la clôture, même sans trafic. Un passage d'entretien
+  est borné à 5 min (`MAINTENANCE_TIMEOUT_MS`) : figé, il est abandonné et
+  journalisé (`Entretien interrompu`), et le suivant efface les sels et purge
+  quand même.
 - Un sel illisible (base en panne) écarte les seules entrées de son jour, et
   n'est relu qu'au bout de 30 s (une ligne de journal par essai).
 - **Adresse partagée** : deux visiteurs derrière la même IP avec le même
@@ -237,8 +244,12 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
 
 - **Navigateur** : `<AudienceBeacon />` s'installe au repos (`requestIdleCallback`,
   repli `setTimeout`) — sur-le-champ si le visiteur navigue ou quitte la page
-  avant : la page d'arrivée (lue au montage, avec son référent) est comptée
-  d'abord ; son battement d'une minute suit `powerPolicy(...).clocks`
+  avant : la page d'arrivée (lue au montage avec son instant, sa visibilité
+  et son référent ; `AudienceTracker.arrive`) est comptée d'abord, datée de
+  son affichage et son temps mesuré depuis, même si l'onglet est déjà masqué
+  au départ. Au `pagehide`, la page est close comme masquée (`hidden()`, pas
+  `leave()`) : restaurée par le cache avant/arrière, elle reprend (retour au
+  premier plan ou `pageshow` persisté) au lieu de rester muette ; son battement d'une minute suit `powerPolicy(...).clocks`
   par abonnement sans rendu (éteint onglet masqué ou en économie, rallumé au
   retour). Chart.js n'est chargé que sur `/frequentation`.
 - **Écriture** : `INSERT` par tranches de `INSERT_CHUNK` (1 000) lignes ; une file
@@ -264,8 +275,10 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   n'ouvre pas un second pool ni ne rejoue les migrations. Chaque
   étape ratée (repli, sels, purge) se journalise une fois, même quand une
   autre échoue aussi, puis plus jusqu'à ce qu'elle réussisse (`reportStep`) :
-  une base absente ne remplit pas le journal. L'effacement des sels se
-  journalise de nouveau à chaque jour de plus laissé en base. Ce qui échappe
+  une base absente ne remplit pas le journal. Le repli et l'effacement des
+  sels se journalisent de nouveau à chaque jour de plus en panne : la purge
+  n'attend pas le repli (durée annoncée), un jour jamais replié finirait purgé
+  sans agrégats, ce que le journal doit montrer. Ce qui échappe
   aux étapes (erreur imprévue) se journalise toujours (`Entretien
   interrompu`). Un repli qui échoue après avoir validé des jours vide tout de
   même le cache de la page. `register` isole chacune de ses deux étapes.

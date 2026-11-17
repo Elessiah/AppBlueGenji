@@ -83,6 +83,26 @@ export class AudienceTracker {
     this.start(path, false);
   }
 
+  /**
+   * Page d'arrivée, affichée avant l'installation du suivi (au repos du
+   * navigateur, ou plus tôt si le visiteur navigue ou part) : datée de son
+   * affichage réel (`at`) et comptée si elle était visible alors, même si
+   * l'onglet est masqué à l'installation (au départ, le navigateur masque la
+   * page avant `pagehide`). Son temps court de `at` à sa clôture.
+   */
+  arrive(path: string, at: number, wasVisible: boolean): void {
+    if (this.current || this.arrived) {
+      this.navigate(path);
+      return;
+    }
+    if (!wasVisible) {
+      this.hiddenPath = path;
+      return;
+    }
+    this.hiddenPath = null;
+    this.start(path, false, Math.min(at, this.deps.now()));
+  }
+
   /** L'onglet passe en arrière-plan : la page en cours est close et la file part. */
   hidden(): void {
     const path = this.current?.path ?? this.hiddenPath;
@@ -148,12 +168,14 @@ export class AudienceTracker {
     this.current = { path: segment.path, visibleSince: now, aliveAt: now, openedAt: segment.openedAt };
   }
 
-  private start(path: string, continuation: boolean): void {
-    const now = this.deps.now();
+  /** Ouvre la lecture de `path`, commencée à `since` (l'instant présent par défaut). */
+  private start(path: string, continuation: boolean, since?: number): void {
+    const now = since ?? this.deps.now();
     const first = !continuation && !this.arrived;
     if (!continuation) this.arrived = true;
     const openedAt = continuation && this.counted ? this.counted.openedAt : now;
-    this.current = { path, visibleSince: now, aliveAt: now, openedAt };
+    // `aliveAt` à l'instant présent : l'attente de l'installation n'est pas une veille.
+    this.current = { path, visibleSince: now, aliveAt: this.deps.now(), openedAt };
     if (continuation) return;
     // Seule l'adresse type du gabarit part : jamais un numéro, un pseudo ni un nom.
     const beacon = audienceBeaconPath(path);
