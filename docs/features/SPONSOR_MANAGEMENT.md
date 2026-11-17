@@ -105,3 +105,7 @@ plus est laissé (partenaire créé sans cette image, `keptStoredUpload` de
 ajout **rejoué** après la suppression du partenaire (même clé de requête) le
 recréait sur l'image que cette suppression avait effacée, et plus rien ne
 l'aurait effacée (EF-70).
+Seule l'absence avérée du fichier (`ENOENT`) retire l'image : une autre erreur du
+disque la garde (la validation de l'adresse décide), une requête ou une ancre
+(`?v=2`) est ignorée pour le contrôle, une adresse qui sort du dossier (`..`)
+n'est jamais lue sur disque.

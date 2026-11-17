@@ -57,4 +57,31 @@ describe("keptStoredUpload", () => {
 
     expect(storedUploadExists).toHaveBeenCalledWith(LOGO, "sponsors");
   });
+
+  it("keptStoredUpload_paddedStoredUrl_returnsTrimmedUrl", async () => {
+    jest.mocked(storedUploadExists).mockResolvedValue(true);
+
+    expect(await keptStoredUpload(`  ${LOGO}  `, "sponsors")).toBe(LOGO);
+  });
+
+  it("keptStoredUpload_queryString_checksPathOnlyAndKeepsUrl", async () => {
+    jest.mocked(storedUploadExists).mockResolvedValue(true);
+
+    const kept = await keptStoredUpload(`${LOGO}?v=2#top`, "sponsors");
+
+    expect(storedUploadExists).toHaveBeenCalledWith(LOGO, "sponsors");
+    expect(kept).toBe(`${LOGO}?v=2#top`);
+  });
+
+  it.each([
+    "/api/uploads/sponsors/../../../etc/passwd",
+    "/api/uploads/sponsors/..\..\.env",
+    "/uploads/sponsors/../avatars/1-a.webp",
+  ])("keptStoredUpload_traversal_%s_neverReachesDisk", async (url) => {
+    const kept = await keptStoredUpload(url, "sponsors");
+
+    expect(storedUploadExists).not.toHaveBeenCalled();
+    // Gardée telle quelle : la validation de la ligne la refuse ensuite.
+    expect(kept).toBe(url);
+  });
 });

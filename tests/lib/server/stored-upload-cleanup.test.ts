@@ -3,11 +3,17 @@ import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/image-upload");
+// Le vrai disque, sauf quand un cas impose une erreur précise de `access`.
+jest.mock("node:fs/promises", () => {
+  const actual = jest.requireActual<typeof import("node:fs/promises")>("node:fs/promises");
+  return { ...actual, access: jest.fn(actual.access) };
+});
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import path from "node:path";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { access } from "node:fs/promises";
 import {
   deleteUnreferencedUpload,
   isUploadReferenced,
@@ -187,5 +193,19 @@ describe("storedUploadExists", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(file, "x");
     await expect(storedUploadExists(`/api/uploads/benevoles/${name}`, "benevoles")).resolves.toBe(true);
+  });
+
+  it.each(["EACCES", "EMFILE", "EIO", "ENAMETOOLONG"])("storedUploadExists_%s_trueSoImageIsNotDropped", async (code) => {
+    // Un échec du disque ne dit rien du fichier : l'image est gardée, la validation décide.
+    jest.mocked(access).mockRejectedValueOnce(Object.assign(new Error(code), { code }));
+
+    await expect(storedUploadExists(`/api/uploads/benevoles/${name}`, "benevoles")).resolves.toBe(true);
+  });
+
+  it("storedUploadExists_parentIsFile_false", async () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, "x");
+    // `ENOTDIR` : un fichier pris pour un dossier, le fichier visé n'existe pas.
+    await expect(storedUploadExists(`/api/uploads/benevoles/${name}/x.webp`, "benevoles")).resolves.toBe(false);
   });
 });

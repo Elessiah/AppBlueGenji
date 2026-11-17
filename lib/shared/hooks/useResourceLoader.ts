@@ -14,6 +14,16 @@ export type ResourceState<T> =
  */
 export type NotFoundPayload = { error?: string } & Record<string, unknown>;
 
+/**
+ * Une relecture en arrière-plan qui échoue garde l'écran — sauf session expirée
+ * ou droit retiré (401, 403) : ce que le lecteur ne peut plus lire (outils du
+ * staff, données réservées) ne reste pas à l'écran, elle passe en erreur comme
+ * une lecture.
+ */
+function keepsDataOnFailure(silent: boolean, status: number): boolean {
+  return silent && status !== 401 && status !== 403;
+}
+
 export function useResourceLoader<T>(
   url: string,
   options?: { onNotFoundRedirect?: (payload: NotFoundPayload) => void },
@@ -47,7 +57,8 @@ export function useResourceLoader<T>(
    * relecture en arrière-plan qui échoue laisse l'écran sur l'ancien état sans
    * rien dire : l'appelant le signale. `true` sinon (lue, ou dépassée par une
    * lecture plus récente : l'écran suit alors celle-là, un échec de la
-   * première n'a rien à dire).
+   * première n'a rien à dire). Un refus d'accès (401, 403) retire les
+   * données même en arrière-plan.
    */
   const load = useCallback(
     async (silent: boolean): Promise<boolean> => {
@@ -65,7 +76,7 @@ export function useResourceLoader<T>(
         }
         if (!res.ok) {
           if (!isLatest()) return true;
-          if (silent) return false;
+          if (keepsDataOnFailure(silent, res.status)) return false;
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           setState({ status: "error", data: null, error: body.error ?? `HTTP_${res.status}` });
           return false;

@@ -110,4 +110,16 @@ describe("POST /api/landing/sponsors — image effacée", () => {
     expect(sentInput()?.logoUrl).toBeNull();
     expect(sentInput()?.bannerUrl).toBeNull();
   });
+
+  it("POST_replayAfterShowcaseRevoked_returns403WithoutCachedSponsor", async () => {
+    jest.mocked(storedUploadExists).mockResolvedValue(true);
+    await post({ name: "Test_Partenaire", requestKey: KEY });
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 1, isAdmin: false }));
+
+    const replay = await post({ name: "Test_Partenaire", requestKey: KEY });
+
+    expect(replay.status).toBe(403);
+    expect(await replay.json()).not.toHaveProperty("sponsor");
+    expect(service.createSponsor).toHaveBeenCalledTimes(1);
+  });
 });

@@ -119,6 +119,9 @@ export async function deleteUnreferencedUpload(
  * (`lib/server/idempotency.ts`, option `fresh`) recrée la ligne depuis le corps
  * d'origine, alors que la suppression a pu effacer ce fichier : la ligne
  * recréée désignerait une image absente, que plus rien n'effacerait.
+ *
+ * Faux seulement quand le fichier manque vraiment (ou que l'adresse n'est pas
+ * du dossier) : toute autre erreur du disque le dit présent.
  */
 export async function storedUploadExists(url: string, folder: UploadFolder): Promise<boolean> {
   const absolute = storedUploadAbsolutePath(url, folder);
@@ -126,7 +129,17 @@ export async function storedUploadExists(url: string, folder: UploadFolder): Pro
   try {
     await access(absolute);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // Seule l'absence avérée vaut « effacé ». Un échec passager (`EMFILE`,
+    // `EACCES`, `EIO`) ou une adresse que le disque refuse (`ENAMETOOLONG`)
+    // ne dit rien du fichier : le compter absent retirait pour de bon l'image
+    // d'un ajout, et faisait taire la validation de l'adresse.
+    return !isMissingFileError(error);
   }
+}
+
+/** `ENOENT` / `ENOTDIR` : le fichier n'est pas là, rien d'autre. */
+function isMissingFileError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === "ENOENT" || code === "ENOTDIR";
 }

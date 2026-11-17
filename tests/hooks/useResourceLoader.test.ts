@@ -59,6 +59,13 @@ describe("useResourceLoader", () => {
       expect(catchBranch.indexOf("if (!isLatest()) return true;")).toBeLessThan(catchBranch.indexOf("return false"));
     });
 
+    it("une relecture en arrière-plan refusée (401, 403) retire les données", () => {
+      const notOk = source.slice(source.indexOf("if (!res.ok)"), source.indexOf("const data = (await res.json())"));
+      expect(notOk).toContain("if (keepsDataOnFailure(silent, res.status)) return false;");
+      expect(source).toContain("return silent && status !== 401 && status !== 403;");
+      expect(notOk.indexOf("return false;")).toBeLessThan(notOk.indexOf('setState({ status: "error"'));
+    });
+
     it("passe le corps au rappel, dans sa signature", () => {
       expect(source).toContain("onNotFoundRedirect?: (payload: NotFoundPayload) => void");
     });
