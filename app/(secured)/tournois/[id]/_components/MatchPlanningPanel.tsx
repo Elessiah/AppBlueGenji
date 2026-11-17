@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { matchesToPlan } from "@/lib/shared/match-planning";
@@ -41,6 +41,8 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const a = actionText.t;
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic basculerait deux fois avant le rendu.
+  const busyRef = useRef(false);
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
   const canManage = detail.isAdmin && !frozen;
@@ -66,6 +68,8 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const moving = toPlan.filter((match) => match.team1Score === null && match.team2Score === null);
 
   const toggle = async (next: boolean): Promise<boolean> => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/tournaments/${detail.card.id}/referee-scheduling`, {
@@ -86,6 +90,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
       showError(refereeSchedulingErrorText(actionText, (error as Error).message));
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -153,8 +158,11 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
             <button
               type="button"
               className={`btn ghost tap-target ${styles.toggle}`}
-              onClick={onToggle}
-              disabled={busy}
+              onClick={() => {
+                if (!busyRef.current) onToggle();
+              }}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
             >
               {busy ? "…" : toggleLabel}
             </button>

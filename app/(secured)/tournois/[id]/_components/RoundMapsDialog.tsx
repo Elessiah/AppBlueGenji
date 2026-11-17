@@ -361,6 +361,7 @@ function SlotEditor({
             className="btn ghost"
             aria-label={t("dialog.removeSlot", { number })}
             aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
             onClick={() => {
               if (!busy) onRemoveSlot();
             }}
@@ -551,6 +552,7 @@ function TiebreakForm({
             type="button"
             className="btn ghost"
             aria-disabled={busy || saved === null || undefined}
+            aria-busy={busy || undefined}
             onClick={() => {
               if (busy || saved === null) return;
               // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
@@ -559,7 +561,7 @@ function TiebreakForm({
           >
             {t("dialog.tiebreakRemove")}
           </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || !allowed || undefined}>
+          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || !allowed || undefined} aria-busy={busy || undefined}>
             {t("dialog.tiebreakSave")}
           </button>
         </div>
@@ -818,6 +820,7 @@ function RoundPointsForm({
             type="button"
             className="btn ghost"
             aria-disabled={busy || locked || !hasOwn || undefined}
+            aria-busy={busy || undefined}
             onClick={() => {
               if (busy || locked || !hasOwn) return;
               void send(null, [], t("dialog.pointsRemoved"));
@@ -825,7 +828,7 @@ function RoundPointsForm({
           >
             {t("dialog.pointsRemove")}
           </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || locked || !dirty || undefined}>
+          <button type="submit" className="btn ghost" aria-disabled={busy || locked || !dirty || undefined} aria-busy={busy || undefined}>
             {t("dialog.pointsSave")}
           </button>
         </div>
@@ -910,6 +913,7 @@ function StaleTiebreaks({
                 className="btn ghost"
                 aria-label={t("dialog.staleTiebreakRemoveLabel", { round: label })}
                 aria-disabled={busy || undefined}
+                aria-busy={busy || undefined}
                 onClick={() => {
                   if (busy) return;
                   void run(async () => {
@@ -998,6 +1002,9 @@ export function RoundMapsDialog({
   const [copyTarget, setCopyTarget] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
+  // Garde synchrone : Entrée répétée ou double clic relancerait un envoi avant
+  // que `busy` soit rendu (les boutons restent focalisables, `aria-disabled`).
+  const busyRef = useRef(false);
   // Saisie non enregistrée du champ de la map de départage (remontée par son formulaire).
   const [tiebreakDirty, setTiebreakDirty] = useState(false);
   // Saisie non enregistrée des points du tour (format Duel / Arcade).
@@ -1076,7 +1083,8 @@ export function RoundMapsDialog({
   const clearedText = t(tiebreakKept ? "dialog.roundClearedTiebreakKept" : "dialog.roundCleared");
 
   const run: RunTask = async (task, onRefused) => {
-    if (busy) return false;
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     try {
       await task();
@@ -1089,6 +1097,7 @@ export function RoundMapsDialog({
       onRefused?.(code, text);
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -1345,7 +1354,7 @@ export function RoundMapsDialog({
             </div>
             <div className={styles.actions}>
               <UnsavedNote dirty={rulesDirty} text={t("dialog.unsaved")} />
-              <button type="submit" className="btn ghost" aria-disabled={busy || !rulesDirty || undefined}>
+              <button type="submit" className="btn ghost" aria-disabled={busy || !rulesDirty || undefined} aria-busy={busy || undefined}>
                 {t("dialog.saveRules")}
               </button>
             </div>
@@ -1419,6 +1428,7 @@ export function RoundMapsDialog({
                     type="button"
                     className="btn ghost"
                     aria-disabled={busy || undefined}
+                    aria-busy={busy || undefined}
                     onClick={() => {
                       if (busy) return;
                       setSlots((current) => [...current, []]);
@@ -1439,13 +1449,14 @@ export function RoundMapsDialog({
                   type="button"
                   className="btn ghost"
                   aria-disabled={busy || !saved || undefined}
+                  aria-busy={busy || undefined}
                   onClick={() => {
                     if (!busy && saved) setPending({ kind: "reset" });
                   }}
                 >
                   {t("dialog.clearRound")}
                 </button>
-                <button type="submit" className="btn" aria-disabled={busy || !roundDirty || undefined}>
+                <button type="submit" className="btn" aria-disabled={busy || !roundDirty || undefined} aria-busy={busy || undefined}>
                   {t("dialog.saveRound")}
                 </button>
               </div>
@@ -1474,6 +1485,7 @@ export function RoundMapsDialog({
                     type="button"
                     className="btn ghost"
                     aria-disabled={busy || copyTarget === "" || toSave.length === 0 || undefined}
+                    aria-busy={busy || undefined}
                     onClick={copy}
                   >
                     {t("dialog.copy")}
@@ -1484,6 +1496,7 @@ export function RoundMapsDialog({
                     id={`${ids}-apply-all`}
                     {...fieldErrors.aria("applyAll")}
                     aria-disabled={busy || toSave.length === 0 || undefined}
+                    aria-busy={busy || undefined}
                     onClick={applyAll}
                   >
                     {t("dialog.applyAll")}
@@ -1545,6 +1558,7 @@ export function RoundMapsDialog({
               if (!busy) requestClose();
             }}
             aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
           >
             {t("dialog.close")}
           </button>

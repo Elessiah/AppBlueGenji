@@ -271,6 +271,11 @@ export function MatchScheduleDialog({
   // l'aperçu juste — le cas courant — n'a pas à les montrer.
   const [yearFixOpen, setYearFixOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Garde synchrone : un second envoi (double clic, Entrée) part avant que
+  // `busy` soit rendu. Les boutons restent focalisables pendant l'envoi
+  // (`aria-disabled` + `aria-busy`) ; les listes gardent `disabled` (le focus
+  // est sur le bouton qui envoie, une liste n'envoie pas le formulaire).
+  const busyRef = useRef(false);
   // Le dernier envoi a été retenu (date devenue passée) : le clic suivant, s'il
   // prolonge un double-clic, ne le confirme pas (`isUnreadConfirmationClick`).
   const justHeld = useRef(false);
@@ -345,6 +350,7 @@ export function MatchScheduleDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (busyRef.current) return;
     if (entry.kind === "incomplete" || entry.kind === "invalid") {
       const message = entryRefusal(text, entry) ?? t("schedule.refusal.unknown");
       fieldErrors.flag(entry.field, message);
@@ -371,6 +377,7 @@ export function MatchScheduleDialog({
     }
 
     justHeld.current = false;
+    busyRef.current = true;
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
@@ -393,9 +400,11 @@ export function MatchScheduleDialog({
       fieldErrors.report(errorCode(error), message);
       showError(message);
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
+  const busyProps = { "aria-disabled": busy || undefined, "aria-busy": busy || undefined };
 
   const fieldStyle = { flex: "1 1 96px", margin: 0, minWidth: 0 } as const;
 
@@ -549,8 +558,10 @@ export function MatchScheduleDialog({
             <button
               type="button"
               className="btn ghost"
-              disabled={busy}
-              onClick={() => setYearFixOpen((open) => !open)}
+              {...busyProps}
+              onClick={() => {
+                if (!busyRef.current) setYearFixOpen((open) => !open);
+              }}
               aria-expanded={yearFixOpen}
               aria-controls={YEAR_FIX_ID}
               style={{ padding: "4px 10px", fontSize: 12, marginTop: 6 }}
@@ -569,8 +580,10 @@ export function MatchScheduleDialog({
                 <button
                   type="button"
                   className="btn ghost"
-                  disabled={busy}
-                  onClick={() => setYearShift(previousYear.shift)}
+                  {...busyProps}
+                  onClick={() => {
+                    if (!busyRef.current) setYearShift(previousYear.shift);
+                  }}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
@@ -581,8 +594,10 @@ export function MatchScheduleDialog({
                 <button
                   type="button"
                   className="btn ghost"
-                  disabled={busy}
-                  onClick={() => setYearShift(nextYear.shift)}
+                  {...busyProps}
+                  onClick={() => {
+                    if (!busyRef.current) setYearShift(nextYear.shift);
+                  }}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
@@ -634,9 +649,9 @@ export function MatchScheduleDialog({
                 type="button"
                 className="btn ghost"
                 onClick={(event) => {
-                  if (event.detail <= 1) clearAll();
+                  if (event.detail <= 1 && !busyRef.current) clearAll();
                 }}
-                disabled={busy}
+                {...busyProps}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
                 {t("schedule.clear")}
@@ -646,9 +661,9 @@ export function MatchScheduleDialog({
               type="button"
               className="btn ghost"
               onClick={(event) => {
-                if (event.detail <= 1) onClose();
+                if (event.detail <= 1 && !busyRef.current) onClose();
               }}
-              disabled={busy}
+              {...busyProps}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
@@ -671,7 +686,7 @@ export function MatchScheduleDialog({
                 if (event.repeat && event.key === "Enter") event.preventDefault();
               }}
               className="btn"
-              disabled={busy}
+              {...busyProps}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
               {submitLabel(text, busy, planning)}

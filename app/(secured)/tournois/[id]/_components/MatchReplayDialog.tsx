@@ -1,7 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -39,7 +39,14 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   // Rien à enregistrer : un champ vide sur un match sans lien.
   const noop = !touched && match.replayUrl === null;
 
+  // Garde synchrone (Entrée dans le champ, double clic) : un second envoi
+  // partirait avant que `busy` soit rendu. Les boutons restent focalisables
+  // pendant l'envoi (`aria-disabled` + `aria-busy`), le champ passe en lecture
+  // seule (`readOnly`) : désactivé, il perdrait le focus qu'Entrée y laisse.
+  const busyRef = useRef(false);
   const save = async (value: string | null) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/replay`, {
@@ -55,6 +62,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
     } catch (error) {
       showError(mapError((error as Error).message));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -131,7 +139,8 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
               placeholder="https://www.youtube.com/watch?v=…"
               value={replayUrl}
               onChange={(e) => setReplayUrl(e.target.value)}
-              disabled={busy || !replayable}
+              disabled={!replayable}
+              readOnly={busy}
               aria-invalid={invalid}
               aria-describedby="match-replay-url-hint"
             />
@@ -161,7 +170,8 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 type="button"
                 className="btn ghost"
                 onClick={() => void save(null)}
-                disabled={busy}
+                aria-disabled={busy || undefined}
+                aria-busy={busy || undefined}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
                 {t("replay.remove")}
@@ -170,8 +180,11 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
             <button
               type="button"
               className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
+              onClick={() => {
+                if (!busyRef.current) onClose();
+              }}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
@@ -180,7 +193,8 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
               <button
                 type="submit"
                 className="btn"
-                disabled={busy || invalid || noop}
+                aria-disabled={busy || invalid || noop || undefined}
+                aria-busy={busy || undefined}
                 style={{ padding: "8px 20px", fontSize: 13 }}
               >
                 {busy ? t("schedule.saving") : t("schedule.save")}

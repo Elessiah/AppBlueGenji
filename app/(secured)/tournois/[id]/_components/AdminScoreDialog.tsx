@@ -263,7 +263,8 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
         <button
           type="button"
           className={styles.conflictAction}
-          aria-disabled={submitting}
+          aria-disabled={submitting || undefined}
+          aria-busy={submitting || undefined}
           onClick={() => {
             if (!submitting) onAdopt();
           }}
@@ -301,8 +302,11 @@ function ScoreConflictNotice({
       <button
         type="button"
         className={styles.conflictAction}
-        onClick={form.adoptStoredResult}
-        disabled={form.submitting}
+        onClick={() => {
+          if (!form.submitting) form.adoptStoredResult();
+        }}
+        aria-disabled={form.submitting || undefined}
+        aria-busy={form.submitting || undefined}
       >
         {text.t("score.admin.adoptStored")}
       </button>
@@ -483,7 +487,7 @@ export function AdminScoreDialog({
   };
 
   const toggleForfeit = (teamId: number | null) => {
-    if (teamId === null) return;
+    if (teamId === null || form.submitting) return;
     form.setForfeitTeamId(forfeitTeamId === teamId ? undefined : teamId);
   };
 
@@ -649,12 +653,14 @@ export function AdminScoreDialog({
               type="button"
               className={styles.link}
               onClick={() => {
+                if (form.submitting) return;
                 if (showForfeit) closeForfeit();
                 setForfeitOpen(!showForfeit);
               }}
               aria-expanded={showForfeit}
               aria-controls="admin-score-forfeit"
-              disabled={form.submitting}
+              aria-disabled={form.submitting || undefined}
+              aria-busy={form.submitting || undefined}
             >
               {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
                   désignée : panneau ouvert et vide, il n'y a que le panneau à
@@ -693,7 +699,8 @@ export function AdminScoreDialog({
                     aria-pressed={forfeitTeamId === match.team1Id}
                     aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team1Id)}
-                    disabled={form.submitting || match.team1Id === null}
+                    aria-disabled={form.submitting || match.team1Id === null || undefined}
+                    aria-busy={form.submitting || undefined}
                   >
                     {team1}
                   </button>
@@ -703,7 +710,8 @@ export function AdminScoreDialog({
                     aria-pressed={forfeitTeamId === match.team2Id}
                     aria-describedby="admin-score-forfeit-hint"
                     onClick={() => toggleForfeit(match.team2Id)}
-                    disabled={form.submitting || match.team2Id === null}
+                    aria-disabled={form.submitting || match.team2Id === null || undefined}
+                    aria-busy={form.submitting || undefined}
                   >
                     {team2}
                   </button>
@@ -712,8 +720,11 @@ export function AdminScoreDialog({
                     className={`${styles.forfeit} ${styles.forfeitBoth}`}
                     aria-pressed={doubleForfeit}
                     aria-describedby="admin-score-forfeit-hint"
-                    onClick={() => form.setDoubleForfeit(!doubleForfeit)}
-                    disabled={form.submitting || match.team1Id === null || match.team2Id === null}
+                    onClick={() => {
+                      if (!form.submitting && match.team1Id !== null && match.team2Id !== null) form.setDoubleForfeit(!doubleForfeit);
+                    }}
+                    aria-disabled={form.submitting || match.team1Id === null || match.team2Id === null || undefined}
+                    aria-busy={form.submitting || undefined}
                   >
                     {t("score.admin.forfeit.both")}
                   </button>

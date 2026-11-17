@@ -717,7 +717,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expectNoFrench(admin("en"));
     // Le bouton garde le focus pendant un envoi (aria-disabled), et reprend les maps de la proposition.
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx"), "utf8");
-    expect(source).toMatch(/aria-disabled=\{submitting\}[\s\S]{0,120}if \(!submitting\) onAdopt\(\);/);
+    expect(source).toMatch(/aria-disabled=\{submitting \|\| undefined\}[\s\S]{0,160}if \(!submitting\) onAdopt\(\);/);
     const hook = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
     expect(hook).toMatch(/const adoptReport = \(report: MatchScoreReport\) => \{[\s\S]{0,400}forfeitTeamId: undefined, doubleForfeit: undefined, \.\.\.scoresFromMaps\(rows\)/);
     // Les champs portent déjà la proposition (enregistrée telle quelle) : rien à reprendre.

@@ -412,7 +412,14 @@ export function PlayerScoreDialog({
   // saisissable (à planifier, en attente de départ, en lancement).
   const { refereeScheduling, launchPhase: launchPhaseEnabled } = useLiveControls();
   const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase: launchPhaseEnabled });
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmittingState] = useState(false);
+  // Garde synchrone : un double clic ou Entrée répétée relancerait un envoi
+  // avant que `submitting` soit rendu.
+  const submittingRef = useRef(false);
+  const setSubmitting = (next: boolean) => {
+    submittingRef.current = next;
+    setSubmittingState(next);
+  };
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: submitting });
   const backdrop = useBackdropDismiss(onClose, submitting);
   const [forfeitOpen, setForfeitOpen] = useState(false);
@@ -603,7 +610,7 @@ export function PlayerScoreDialog({
     confirmTheirs: boolean;
     seenAt: string | null;
   }): Promise<boolean> => {
-    if (submitting) return false;
+    if (submittingRef.current) return false;
     const sendCheck = checkMapList(matchFormat, game, send.maps, { decisive: true, ...pointRules });
     if (sendCheck.error) {
       if (!send.confirmTheirs) flagRefusal(sendCheck.error);
@@ -681,7 +688,7 @@ export function PlayerScoreDialog({
   };
 
   const submitForfeit = async () => {
-    if (submitting) return;
+    if (submittingRef.current) return;
     setSubmitting(true);
     onOwnSettle?.(true);
     // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans

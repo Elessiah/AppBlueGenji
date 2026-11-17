@@ -462,6 +462,8 @@ export function MatchCardActions({
   const castIdentityNotice = castBlock && castBlock !== "NOT_CASTER" ? launchError(castBlock) : undefined;
   const actionName = (label: string) => matchCardActionName(label, matchLabel, actionText);
   const [busy, setBusy] = useState(false);
+  // Garde synchrone : un double clic relancerait un geste avant que `busy` soit rendu.
+  const busyRef = useRef(false);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -630,6 +632,8 @@ export function MatchCardActions({
   };
 
   const run = async (action: () => Promise<unknown>, success: string, refresh = true): Promise<boolean> => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     try {
       await action();
@@ -640,6 +644,7 @@ export function MatchCardActions({
       showError(refresh ? launchError((error as Error).message) : mapError((error as Error).message));
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -685,7 +690,9 @@ export function MatchCardActions({
     report: onReport,
   };
 
-  // Gestes qui écrivent eux-mêmes (sans modale) : désactivés pendant un envoi.
+  // Gestes qui écrivent eux-mêmes (sans modale) : en attente pendant un envoi —
+  // `aria-disabled` + `aria-busy`, jamais `disabled` natif (le focus resterait
+  // sinon sans bouton), le clic ignoré.
   const writes = (id: MatchCardActionId) =>
     id === "hostSwap" || id === "claimCast" || id === "releaseCast" || id === "force";
 
@@ -707,18 +714,20 @@ export function MatchCardActions({
       );
     }
     const blocked = id === "claimCast" && castBlock !== null;
+    const waiting = busy && writes(id);
     return (
       <button
         key={id}
         type="button"
         className={className}
-        disabled={busy && writes(id)}
-        aria-disabled={id === "claimCast" ? blocked : undefined}
+        aria-disabled={waiting || blocked || undefined}
+        aria-busy={waiting || undefined}
         title={blocked ? castIdentityNotice : undefined}
         aria-label={actionName(action.label)}
         data-action={id}
         onKeyDown={inMenu ? onPanelKeyDown : undefined}
         onClick={() => {
+          if (waiting) return;
           if (inMenu) {
             setOpen(false);
             toggleRef.current?.focus();

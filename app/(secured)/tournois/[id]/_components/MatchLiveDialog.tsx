@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
@@ -450,7 +450,15 @@ export function MatchLiveDialog({
   const casterStreams = offersCasterLinks(match, referee) ? casterStreamsOf(match, casterList) : [];
   // Seules les saisies de l'arbitre ; un champ intouché montre le lien actuel.
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  // Garde synchrone : Entrée dans un champ ou un double clic relancerait un
+  // envoi avant que `busy` soit rendu. Pendant l'envoi les boutons restent
+  // focalisables (`aria-disabled` + `aria-busy`), jamais `disabled` natif.
+  const busyRef = useRef(false);
+  const setBusy = (next: boolean) => {
+    busyRef.current = next;
+    setBusyState(next);
+  };
   // Un refus du serveur rattaché à son champ (`ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`).
   const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID, streamed: STREAMED_INPUT_ID };
   for (const stream of casterStreams) fieldIds[`caster-${stream.id}`] = casterLinkInputId(stream.id);
@@ -506,7 +514,8 @@ export function MatchLiveDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (urlInvalid || triggerNeedsDate || invalidCasterLink) return;
+    // Le bouton n'est jamais `disabled` natif : toutes ses raisons se gardent ici.
+    if (busyRef.current || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null) return;
 
     // Mode verrouillé : renvoyé tel quel, le serveur n'y voit aucun changement.
     const chosenTrigger = streamed ? trigger : null;
@@ -691,8 +700,11 @@ export function MatchLiveDialog({
             <button
               type="button"
               className={`${onAir ? "btn ghost" : "btn"} ${styles.sectionButton}`}
-              disabled={busy}
-              onClick={() => void toggleAir()}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
+              onClick={() => {
+                if (!busyRef.current) void toggleAir();
+              }}
             >
               {onAir ? actions.t("cardActions.stopLive") : actions.t("cardActions.startLive")}
             </button>
@@ -703,8 +715,10 @@ export function MatchLiveDialog({
             <button
               type="button"
               className={`btn ghost ${styles.sectionButton}`}
-              disabled={busy}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
               onClick={() => {
+                if (busyRef.current) return;
                 // Une autre modale : celle-ci se ferme d'abord, les deux ne se
                 // disputent pas le piège de focus.
                 onClose();
@@ -720,13 +734,22 @@ export function MatchLiveDialog({
 
         <SaveBlockedHint reason={saveReason} />
         <div className={styles.footer}>
-          <button type="button" className={`btn ghost ${styles.sectionButton}`} onClick={onClose} disabled={busy}>
+          <button
+            type="button"
+            className={`btn ghost ${styles.sectionButton}`}
+            onClick={() => {
+              if (!busyRef.current) onClose();
+            }}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+          >
             {t("score.cancel")}
           </button>
           <button
             type="submit"
             className={`btn ${styles.submitButton}`}
-            disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null}
+            aria-disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null || undefined}
+            aria-busy={busy || undefined}
             aria-describedby={saveHintId(saveReason)}
           >
             {busy ? t("schedule.saving") : t("schedule.save")}

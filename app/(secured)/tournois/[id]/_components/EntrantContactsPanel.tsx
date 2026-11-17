@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { DiscordTag } from "@/components/discord-tag";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { useToast } from "@/components/ui/toast";
@@ -58,9 +58,16 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
   // devant un bloc vide, sans savoir qu'il devait replier pour relancer.
   const [failure, setFailure] = useState<string | null>(null);
 
-  const load = async () => {
+  // Garde synchrone : un double clic sur « Réessayer » lancerait deux lectures.
+  const loadingRef = useRef(false);
+  // `retry` : l'échec reste affiché pendant la relance (`contactsPanelView`),
+  // et avec lui « Réessayer », qui garde le focus (`aria-busy`) au lieu de
+  // disparaître sous le doigt.
+  const load = async (retry = false) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
-    setFailure(null);
+    if (!retry) setFailure(null);
     try {
       const res = await fetch(`/api/admin/tournaments/${tournamentId}/contacts`, {
         cache: "no-store",
@@ -68,11 +75,13 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
       const payload = (await res.json()) as { entrants?: EntrantContactGroup[]; error?: string };
       if (!res.ok) throw new Error(payload.error || "CONTACTS_LOAD_FAILED");
       setEntrants(payload.entrants ?? []);
+      setFailure(null);
     } catch (e) {
       const message = mapError((e as Error).message);
       setFailure(message);
       showError(message);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
@@ -112,8 +121,11 @@ export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: 
           <button
             type="button"
             className="btn"
-            onClick={() => void load()}
-            disabled={loading}
+            onClick={() => {
+              if (!loading) void load(true);
+            }}
+            aria-disabled={loading || undefined}
+            aria-busy={loading || undefined}
             style={{ padding: "6px 14px", fontSize: 12 }}
           >
             {t("contacts.retry")}

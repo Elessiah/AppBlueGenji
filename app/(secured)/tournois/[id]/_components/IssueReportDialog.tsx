@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   ISSUE_REPORT_MAX_LENGTH,
@@ -38,14 +38,18 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
   const team2 = useShownEntrantName(match?.team2Id ?? null, match?.team2Name ?? null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // Garde synchrone (double clic, Entrée) : un second signalement partirait
+  // avant que `busy` soit rendu. Boutons focalisables pendant l'envoi.
+  const busyRef = useRef(false);
 
   const valid = normalizeIssueReportMessage(message) !== null;
   const touched = message.trim().length > 0;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!valid) return;
+    if (busyRef.current || !valid) return;
 
+    busyRef.current = true;
     setBusy(true);
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/report-issue`, {
@@ -64,6 +68,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
     } catch (error) {
       showError(mapError((error as Error).message));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -117,8 +122,11 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
           <button
             type="button"
             className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
+            onClick={() => {
+              if (!busyRef.current) onClose();
+            }}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
             style={{ padding: "8px 18px", fontSize: 13 }}
           >
             {t("score.cancel")}
@@ -126,7 +134,8 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
           <button
             type="submit"
             className="btn"
-            disabled={busy || !valid}
+            aria-disabled={busy || !valid || undefined}
+            aria-busy={busy || undefined}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
             {busy ? t("issue.pending") : t("issue.send")}

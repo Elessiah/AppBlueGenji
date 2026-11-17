@@ -112,7 +112,15 @@ export function CastSettingsDialog({
   const { current: liveTrigger, refresh: refreshTrigger } = useCurrentTrigger(match.liveTrigger);
   const trigger: MatchLiveTrigger = pickedTrigger ?? liveTrigger ?? "AUTO";
   const { seenTrigger, pickTrigger } = useSeenTrigger(liveTrigger, pickedTrigger, setTrigger);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  // Garde synchrone : Entrée dans un champ ou un double clic relancerait un
+  // envoi avant que `busy` soit rendu. Pendant l'envoi les boutons restent
+  // focalisables (`aria-disabled` + `aria-busy`), jamais `disabled` natif.
+  const busyRef = useRef(false);
+  const setBusy = (next: boolean) => {
+    busyRef.current = next;
+    setBusyState(next);
+  };
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId, trigger: triggerId });
   const fail = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
 
@@ -183,7 +191,7 @@ export function CastSettingsDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (blocked || cast === null) return;
+    if (busyRef.current || blocked || cast === null) return;
     setBusy(true);
     try {
       // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
@@ -226,6 +234,7 @@ export function CastSettingsDialog({
   // geste sans retour, il passe par une confirmation (`ConfirmActionDialog`).
   // Rend `true` s'il a abouti : la confirmation et la fenêtre se ferment.
   const release = async (): Promise<boolean> => {
+    if (busyRef.current) return false;
     setBusy(true);
     onReleasing?.(true);
     try {
@@ -343,19 +352,35 @@ export function CastSettingsDialog({
             <button
               type="button"
               className={`btn ghost ${styles.button}`}
-              disabled={busy}
-              onClick={() => setConfirmRelease(true)}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
+              onClick={() => {
+                if (!busyRef.current) setConfirmRelease(true);
+              }}
             >
               {t("cardActions.stopCasting")}
             </button>
           )}
           <div className={styles.actions}>
-            <button type="button" className={`btn ghost ${styles.button}`} onClick={onClose} disabled={busy}>
+            <button
+              type="button"
+              className={`btn ghost ${styles.button}`}
+              onClick={() => {
+                if (!busyRef.current) onClose();
+              }}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
+            >
               {played || !settable ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
             </button>
             {/* Un match joué ne prend plus ni lien, ni mode, ni BattleTag : rien à enregistrer. */}
             {!played && settable && (
-              <button type="submit" className={`btn ${styles.button}`} disabled={busy || blocked || cast === null}>
+              <button
+                type="submit"
+                className={`btn ${styles.button}`}
+                aria-disabled={busy || blocked || cast === null || undefined}
+                aria-busy={busy || undefined}
+              >
                 {busy ? t("cardActions.castSettings.saving") : t("cardActions.castSettings.save")}
               </button>
             )}
@@ -472,8 +497,11 @@ function CastAirAndReplay({
           <button
             type="button"
             className={onAir ? "btn ghost" : "btn"}
-            disabled={busy}
-            onClick={() => void toggleAir()}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+            onClick={() => {
+              if (!busy) void toggleAir();
+            }}
           >
             {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
           </button>
@@ -491,8 +519,11 @@ function CastAirAndReplay({
           <button
             type="button"
             className="btn ghost"
-            disabled={busy}
-            onClick={onReplay}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
+            onClick={() => {
+              if (!busy) onReplay();
+            }}
           >
             {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
           </button>

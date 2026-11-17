@@ -747,9 +747,14 @@ textarea,
   box-shadow: 0 4px 12px rgba(89, 212, 255, 0.15);
 }
 
-/* Désarmé, il ne promet pas non plus le clic. */
+/* Désarmé, il ne promet pas non plus le clic. En attente (`aria-busy`, le
+   bouton garde le focus pendant l'envoi), il dit l'attente. */
 .btn:where(:disabled, [aria-disabled="true"]) {
   cursor: not-allowed;
+}
+
+.btn:where([aria-disabled="true"][aria-busy="true"]) {
+  cursor: progress;
 }
 
 /* Zone où `aria-disabled` remplace `disabled` (le bouton garde le focus) : le

@@ -46,6 +46,7 @@ import { DeleteTournamentDialog } from "@/app/(secured)/tournois/[id]/_component
 import { EndurancePenaltyDialog } from "@/app/(secured)/tournois/[id]/_components/EndurancePenaltyDialog";
 import { IssueReportDialog } from "@/app/(secured)/tournois/[id]/_components/IssueReportDialog";
 import { MatchLiveDialog } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { MatchReplayDialog } from "@/app/(secured)/tournois/[id]/_components/MatchReplayDialog";
 import { RollbackRoundDialog } from "@/app/(secured)/tournois/[id]/_components/RollbackRoundDialog";
 import { bracketMatch } from "../helpers/bracket-match";
 import { tournamentCard } from "../helpers/tournament-card";
@@ -209,5 +210,30 @@ describe("RemoveEntrantDialog — rendu inchangé", () => {
         />,
       ),
     ).toMatchSnapshot();
+  });
+});
+
+/**
+ * Boutons pendant une requête (EF-66) : refusés par `aria-disabled`, jamais
+ * par `disabled` natif — le bouton garde le focus. Seul un état durable du
+ * champ (match sans rediff possible) garde `disabled`.
+ */
+describe("MatchReplayDialog — boutons et champ désarmés", () => {
+  const played = { id: 11, status: "COMPLETED" as const, team1Id: 1, team2Id: 2, team1Name: "Frost Alliance", team2Name: "Nova" };
+
+  it("MatchReplayDialog_noopReplay_rendersAriaDisabledSubmit", () => {
+    const html = render(<MatchReplayDialog match={bracketMatch(played)} onClose={noop} onSaved={noop} />);
+
+    expect(html).toMatch(/<button type="submit" class="btn" aria-disabled="true"/);
+    expect(html).not.toMatch(/<button[^>]*\sdisabled=""/);
+    expect(html).not.toContain("readOnly");
+  });
+
+  it("MatchReplayDialog_notReplayableMatch_inputKeepsNativeDisabled", () => {
+    const html = render(
+      <MatchReplayDialog match={bracketMatch({ ...played, status: "READY" })} onClose={noop} onSaved={noop} />,
+    );
+
+    expect(html).toMatch(/<input id="match-replay-url"[^>]*disabled=""/);
   });
 });

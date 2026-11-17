@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useToast } from "@/components/ui/toast";
 import { useActionsText } from "./actions-text";
 import { useMapError } from "./error-map";
@@ -13,6 +14,7 @@ import { requestJson } from "./request-json";
  * `LIVE_TRIGGER_NOT_MANUAL`, `MATCH_NOT_LIVE_READY`, `LIVE_TRIGGER_NOT_OWNED`…).
  *
  * `setBusy` verrouille la fenêtre pendant l'envoi ; `onDone` relit le match.
+ * Un second appel pendant l'envoi (double clic avant le rendu) est ignoré.
  */
 export function useOnAirToggle(
   matchId: number,
@@ -22,7 +24,10 @@ export function useOnAirToggle(
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useActionsText();
+  const inFlight = useRef(false);
   return async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     try {
       await requestJson(
@@ -35,6 +40,7 @@ export function useOnAirToggle(
     } catch (error) {
       showError(mapError((error as Error).message));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };

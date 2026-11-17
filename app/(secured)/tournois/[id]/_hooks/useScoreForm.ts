@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { BracketMatch, MatchScoreReport, TournamentGame } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
@@ -106,6 +106,9 @@ export function useScoreForm(
   const [maps, setMaps] = useState<MatchMapInput[]>(openingRows);
   const sentMaps = trimTrailingBlankMaps(maps);
   const [submitting, setSubmitting] = useState(false);
+  // Garde synchrone : un double clic ou Entrée répétée relance `submit` avant
+  // que `submitting` soit rendu — le second envoi partirait.
+  const submittingRef = useRef(false);
 
   // Le dialogue reste monté entre deux ouvertures : sans resynchronisation, il
   // rouvrirait sur le score du match précédemment édité. On se réaligne sur
@@ -240,7 +243,7 @@ export function useScoreForm(
     state.doubleForfeit !== true;
 
   const submit = async (action: "save" | "resolve") => {
-    if (!match) return false;
+    if (!match || submittingRef.current) return false;
 
     // Les maps se jugent par la règle du report d'équipe : un résultat validé
     // doit décrire un match terminé, un enregistrement seulement rester dans
@@ -256,6 +259,7 @@ export function useScoreForm(
       return false;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const endpoint =
@@ -294,6 +298,7 @@ export function useScoreForm(
       showError(mapError(code));
       return false;
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };

@@ -270,7 +270,7 @@ describe("MatchCardActions — rendu du pied", () => {
   it("« Caster » bloqué faute d'identité : aria-disabled et motif", () => {
     const blocked = renderFooter({ launch: { ...NO_LAUNCH, showClaim: true } }, "CASTER_IDENTITY_REQUIRED");
     expect(blocked).toMatch(/aria-disabled="true"[^>]*Battle\.net|Battle\.net[^>]*aria-disabled="true"/);
-    expect(renderFooter({ launch: { ...NO_LAUNCH, showClaim: true } }, null)).toContain('aria-disabled="false"');
+    expect(renderFooter({ launch: { ...NO_LAUNCH, showClaim: true } }, null)).not.toContain('aria-disabled=');
   });
 });
 
