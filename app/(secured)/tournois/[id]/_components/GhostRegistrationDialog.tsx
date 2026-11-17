@@ -108,6 +108,10 @@ export function GhostRegistrationDialog({
   // avant que `busy` soit rendu — l'équipe fantôme serait créée deux fois.
   // Les boutons restent focalisables pendant l'envoi (`BusyButton`).
   const { busy, isBusy, run } = useBusyGuard();
+  // Équipe fantôme déjà créée par un essai dont l'inscription a échoué (lot
+  // plein, réseau) : un nouvel essai sous le même nom la réutilise au lieu
+  // d'en créer une seconde et de laisser la première orpheline dans `bg_teams`.
+  const createdGhost = useRef<{ name: string; teamId: number } | null>(null);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
   // Le champ du mode affiché prend le focus quand le mode change, pas à
@@ -238,14 +242,21 @@ export function GhostRegistrationDialog({
         let teamIds = selected;
 
         if (mode === "new") {
-          const res = await fetch("/api/teams", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: newName.trim(), ghost: true }),
-          });
-          const payload = (await res.json()) as { teamId?: number; error?: string };
-          if (!res.ok || !payload.teamId) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
-          teamIds = [payload.teamId];
+          const name = newName.trim();
+          const reused = createdGhost.current?.name === name ? createdGhost.current.teamId : null;
+          if (reused === null) {
+            const res = await fetch("/api/teams", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ name, ghost: true }),
+            });
+            const payload = (await res.json()) as { teamId?: number; error?: string };
+            if (!res.ok || !payload.teamId) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
+            createdGhost.current = { name, teamId: payload.teamId };
+            teamIds = [payload.teamId];
+          } else {
+            teamIds = [reused];
+          }
         }
 
         if (teamIds.length === 0) throw new Error("EMPTY_TEAM_SELECTION");

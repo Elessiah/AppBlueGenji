@@ -177,6 +177,11 @@ export function shortenScheduleForLaunch(
  */
 export type AdvanceTarget = Extract<TournamentStageKey, "REGISTRATION" | "LOCKED" | "RUNNING">;
 
+/** Valeur reçue du réseau : est-ce une étape que l'avancée sait viser ? */
+export function isAdvanceTarget(value: unknown): value is AdvanceTarget {
+  return value === "REGISTRATION" || value === "LOCKED" || value === "RUNNING";
+}
+
 const ADVANCE_TARGETS: Partial<Record<TournamentStageKey, AdvanceTarget>> = {
   HIDDEN: "REGISTRATION",
   ANNOUNCED: "REGISTRATION",

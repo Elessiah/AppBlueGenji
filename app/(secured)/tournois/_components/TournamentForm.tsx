@@ -173,12 +173,20 @@ export function TournamentForm({
   const clearFieldError = fieldErrors.clear;
   const set = useCallback(
     <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
-      // Une saisie ignorée pendant l'envoi ne lève pas non plus l'erreur du champ.
+      // Une saisie ignorée pendant l'envoi ne lève pas non plus l'erreur du champ :
+      // la garde est ici, une seule fois, pour la valeur **et** l'erreur.
       if (isBusy()) return;
-      setValues((prev) => ({ ...prev, [key]: value }));
+      setValuesState((prev) => ({ ...prev, [key]: value }));
       if (key in FIELD_IDS) clearFieldError(key as TournamentFormField);
     },
-    [isBusy, setValues, clearFieldError],
+    [isBusy, clearFieldError],
+  );
+  /** Lève l'erreur d'un champ hors envoi : même règle que `set`, pour les rappels de saisie. */
+  const clearIdle = useCallback(
+    (field: TournamentFormField) => {
+      if (!isBusy()) clearFieldError(field);
+    },
+    [isBusy, clearFieldError],
   );
 
   const locked = (field: TournamentField) => !editableFields.has(field);
@@ -369,6 +377,7 @@ export function TournamentForm({
             <div className="field">
               <label htmlFor="tournament-game">{t("form.game")}</label>
               <select
+                aria-readonly={loading || undefined}
                 id="tournament-game"
                 disabled={locked("game")}
                 value={values.game}
@@ -420,6 +429,7 @@ export function TournamentForm({
                 )}
               </InfoHintRow>
               <select
+                aria-readonly={loading || undefined}
                 id="tournament-format"
                 aria-describedby={describedBy(
                   formatExplain !== null && FORMAT_EXPLAIN_ID,
@@ -445,6 +455,7 @@ export function TournamentForm({
             <div className="field">
               <label htmlFor="participant-type">{t("form.participantType")}</label>
               <select
+                aria-readonly={loading || undefined}
                 id="participant-type"
                 aria-describedby={describedBy("participant-type-hint", locked("participantType") && explanationId)}
                 disabled={locked("participantType")}
@@ -468,7 +479,7 @@ export function TournamentForm({
                 readOnly={loading}
                 value={maxTeams}
                 onValueChange={setMaxTeams}
-                onEdit={() => !isBusy() && fieldErrors.clear("maxTeams")}
+                onEdit={() => clearIdle("maxTeams")}
                 {...fieldAttrs("maxTeams")}
               />
               <FieldErrorText fieldId={FIELD_IDS.maxTeams} message={fieldErrors.message("maxTeams")} />
@@ -477,6 +488,7 @@ export function TournamentForm({
             <div className="field">
               <label htmlFor="match-format-type">{t("form.matchFormat")}</label>
               <select
+                aria-readonly={loading || undefined}
                 id="match-format-type"
                 disabled={locked("matchFormat")}
                 value={matchFormatType}
@@ -524,7 +536,7 @@ export function TournamentForm({
                     setLastMatchFormatValue(value);
                     patchMatchFormat({ value });
                   }}
-                  onEdit={() => !isBusy() && fieldErrors.clear("matchFormatValue")}
+                  onEdit={() => clearIdle("matchFormatValue")}
                   {...fieldErrors.aria(
                     "matchFormatValue",
                     locked("matchFormat") && explanationId,
@@ -587,12 +599,11 @@ export function TournamentForm({
               aria={fieldAttrs("mapPointTarget", MAP_POINT_TARGET_HINT_ID)}
               error={fieldErrors.message("mapPointTarget")}
               onCheckedChange={(checked) => {
-                if (isBusy()) return;
                 set("duelArcade", checked);
-                fieldErrors.clear("mapPointTarget");
+                clearIdle("mapPointTarget");
               }}
               onTargetChange={(target) => set("mapPointTarget", target)}
-              onTargetEdit={() => !isBusy() && fieldErrors.clear("mapPointTarget")}
+              onTargetEdit={() => clearIdle("mapPointTarget")}
             />
 
             <FormatSettings
@@ -642,6 +653,7 @@ export function TournamentForm({
                 </InfoHint>
               </InfoHintRow>
               <select
+                aria-readonly={loading || undefined}
                 id="registration-discord"
                 disabled={locked("registrationDiscordRequirement")}
                 value={values.registrationDiscordRequirement}
@@ -669,6 +681,7 @@ export function TournamentForm({
                 </InfoHint>
               </InfoHintRow>
               <select
+                aria-readonly={loading || undefined}
                 id="registration-blizzard"
                 disabled={locked("registrationBlizzardRequirement")}
                 value={values.registrationBlizzardRequirement}

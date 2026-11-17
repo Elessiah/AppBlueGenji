@@ -76,7 +76,8 @@ describe("formulaires — erreurs rattachées aux champs", () => {
         // `fieldAttrs` : le formulaire de tournoi y joint l'explication du verrou.
         expect(src).toMatch(new RegExp(`fieldErrors\\.aria\\(\\s*"${field}"|fieldAttrs\\("${field}"`));
         expect(src).toContain(`fieldErrors.message("${field}")`);
-        expect(src).toMatch(new RegExp(`fieldErrors\\.clear\\("${field}"\\)|set\\("${field}"`));
+        // `clearIdle` : le formulaire de tournoi ne lève l'erreur que hors envoi.
+        expect(src).toMatch(new RegExp(`fieldErrors\\.clear\\("${field}"\\)|set\\("${field}"|clearIdle\\("${field}"`));
       }
     },
   );

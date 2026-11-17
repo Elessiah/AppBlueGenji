@@ -1,5 +1,6 @@
 "use client";
 
+import { useContext } from "react";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
 import { DEFAULT_MATCH_FORMAT, MATCH_FORMAT_BOUNDS } from "@/lib/shared/match-format";
 import { toParticipantType } from "@/lib/shared/participants";
@@ -8,7 +9,7 @@ import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { PhaseBuilder } from "../creer/PhaseBuilder";
 import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
-import { NumberInput } from "@/components/ui/number-input";
+import { NumberInput, NumberInputReadOnlyContext } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { describedBy } from "@/lib/shared/field-errors";
@@ -91,6 +92,9 @@ export function FormatSettings({
   earlyExitError,
 }: Readonly<FormatSettingsProps>) {
   const { format, maxTeams, phases } = values;
+  // Formulaire en cours d'envoi (même contexte que les `NumberInput`) : la liste
+  // s'annonce en lecture seule, le choix y étant ignoré.
+  const frozen = useContext(NumberInputReadOnlyContext);
   const text = useFormText();
   const { t } = text;
   const entrantType = toParticipantType(values.participantType);
@@ -278,6 +282,7 @@ export function FormatSettings({
             </InfoHintRow>
             <select
               id="endurance-playoff-format-type"
+              aria-readonly={frozen || undefined}
               disabled={locked("endurancePlayoffFormat")}
               value={values.endurancePlayoffFormat?.type ?? "MEME"}
               onChange={(e) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, type ReactNode } from "react";
+import { FormEvent, useRef, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ui/toast";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
@@ -52,18 +52,26 @@ export function DeleteTournamentDialog({
   // Suppression faite, navigation en cours : `hold()` garde la garde synchrone
   // et l'attente affichée levées jusqu'au démontage.
   const { busy, isBusy, run, hold } = useBusyGuard();
+  // Le tournoi n'existe plus : si la navigation tarde au-delà de la fin de
+  // `hold()` (`HOLD_RELEASE_MS`), le dialogue se rend pour être fermé, mais
+  // son bouton ne se réarme pas — il n'y a plus rien à supprimer, et un second
+  // envoi n'apporterait qu'un refus « introuvable » après le succès.
+  const [deleted, setDeleted] = useState(false);
+  const deletedRef = useRef(false);
 
   const armed = isDeletionConfirmed(tournamentName, confirmation);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!armed || isBusy()) return;
+    if (!armed || isBusy() || deletedRef.current) return;
 
     await run(async () => {
       try {
         const res = await fetch(`/api/admin/tournaments/${tournamentId}`, { method: "DELETE" });
         const payload = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(payload.error || "TOURNAMENT_DELETE_FAILED");
+        deletedRef.current = true;
+        setDeleted(true);
         hold();
         onDeleted(tournamentName);
       } catch (e) {
@@ -134,14 +142,14 @@ export function DeleteTournamentDialog({
           </BusyButton>
           <BusyButton
             busy={busy}
-            blocked={!armed}
+            blocked={!armed || deleted}
             type="submit"
             className="btn"
             style={{
               padding: "8px 20px",
               fontSize: 13,
               borderColor: "var(--red-live, #ff4d4d)",
-              color: armed && !busy ? "var(--red-live, #ff4d4d)" : undefined,
+              color: armed && !busy && !deleted ? "var(--red-live, #ff4d4d)" : undefined,
             }}
           >
             <BusyLabel busy={busy} idle={t("delete.confirm")} pending={t("delete.pending")} />

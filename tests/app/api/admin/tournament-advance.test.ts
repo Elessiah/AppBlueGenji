@@ -16,6 +16,17 @@ const player = authUser({ id: 4, pseudo: "Joueur", isAdmin: false, roles: [] });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
+function launchWith(id: string, body: unknown) {
+  return POST(
+    new Request(`http://localhost/api/admin/tournaments/${id}/advance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    params(id),
+  );
+}
+
 function launch(id: string) {
   return POST(
     new Request(`http://localhost/api/admin/tournaments/${id}/advance`, { method: "POST" }),
@@ -133,5 +144,34 @@ describe("POST /api/admin/tournaments/[id]/advance", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "TOURNAMENT_ADVANCE_FAILED" });
     expect(logged).toHaveBeenCalled();
+  });
+
+  it("POST_expectedTarget_forwardsItToTheService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await launchWith("7", { expectedTarget: "LOCKED" });
+
+    expect(res.status).toBe(200);
+    expect(advanceTournamentNow).toHaveBeenCalledWith(7, "LOCKED");
+  });
+
+  it("POST_invalidExpectedTarget_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await launchWith("7", { expectedTarget: "HIDDEN" });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_ADVANCE_BODY" });
+    expect(advanceTournamentNow).not.toHaveBeenCalled();
+  });
+
+  it("POST_stageChanged_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(advanceTournamentNow).mockRejectedValue(new Error("TOURNAMENT_STAGE_CHANGED"));
+
+    const res = await launchWith("7", { expectedTarget: "REGISTRATION" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "TOURNAMENT_STAGE_CHANGED" });
   });
 });

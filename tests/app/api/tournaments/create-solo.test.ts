@@ -7,6 +7,7 @@ import { POST } from "@/app/api/tournaments/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 
 const referee = authUser({ id: 1, isAdmin: true });
 
@@ -80,5 +81,37 @@ describe("POST /api/tournaments — tournoi individuel", () => {
         expect.objectContaining({ format, participantType: "SOLO" }),
       );
     }
+  });
+
+  it("POST_sameRequestKeyTwice_createsOneTournament", async () => {
+    resetIdempotencyForTests();
+    const body = { ...base, requestKey: "create-key-00000000001" };
+
+    const first = await POST(jsonReq(body));
+    const second = await POST(jsonReq(body));
+
+    expect(first.status).toBe(201);
+    expect(await second.json()).toEqual({ id: 42 });
+    expect(service.createTournament).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_sameRequestKeyOtherUser_createsAgain", async () => {
+    resetIdempotencyForTests();
+    const body = { ...base, requestKey: "create-key-00000000002" };
+
+    await POST(jsonReq(body));
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 2, isAdmin: true }));
+    await POST(jsonReq(body));
+
+    expect(service.createTournament).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_noRequestKey_createsEachTime", async () => {
+    resetIdempotencyForTests();
+
+    await POST(jsonReq(base));
+    await POST(jsonReq(base));
+
+    expect(service.createTournament).toHaveBeenCalledTimes(2);
   });
 });

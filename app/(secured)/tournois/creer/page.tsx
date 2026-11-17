@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import { ALL_TOURNAMENT_FIELDS } from "@/lib/shared/tournament-edit";
@@ -16,6 +16,7 @@ import { mapError, useErrorsText } from "../[id]/_lib/error-map";
 import { useFormText } from "../_lib/form-text";
 import { imageErrorText, useImageText } from "../_lib/image-text";
 import { CodedError } from "@/lib/shared/field-errors";
+import { newRequestKey } from "@/lib/shared/request-key";
 
 /**
  * Création d'un tournoi.
@@ -31,6 +32,11 @@ export default function CreateTournamentPage() {
   const { t } = text;
   const errorsText = useErrorsText();
   const imageText = useImageText();
+  // Clé du geste (`lib/server/idempotency.ts`) : tirée une fois pour la page,
+  // renvoyée par chaque nouvel essai. Une réponse perdue après la création, ou
+  // le formulaire rendu par `hold()` faute de navigation, ne crée donc jamais
+  // un second tournoi : le serveur rend le premier.
+  const requestKey = useRef<string | null>(null);
   const hl = (children: ReadonlyArray<ReactNode>) => <span className="text-gradient">{richNodes(children)}</span>;
 
   useEffect(() => {
@@ -79,10 +85,11 @@ export default function CreateTournamentPage() {
         editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
         submitLabel={t("create.submit")}
         onSubmit={async (values, image) => {
+          requestKey.current ??= newRequestKey();
           const response = await fetch("/api/tournaments", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(toApiPayload(values)),
+            body: JSON.stringify({ ...toApiPayload(values), requestKey: requestKey.current }),
           });
           const payload = (await response.json()) as { error?: string; id?: number };
           if (!response.ok || !payload.id) {

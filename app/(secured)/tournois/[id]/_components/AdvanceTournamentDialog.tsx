@@ -90,7 +90,14 @@ export function AdvanceTournamentDialog({
     event.preventDefault();
     await run(async () => {
       try {
-        const res = await fetch(`/api/admin/tournaments/${card.id}/advance`, { method: "POST" });
+        // L'étape annoncée part avec la demande : si un autre membre du staff
+        // a déjà avancé le tournoi, le serveur refuse (409) au lieu de lui
+        // faire franchir une étape de plus que celle confirmée ici.
+        const res = await fetch(`/api/admin/tournaments/${card.id}/advance`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(plan.target ? { expectedTarget: plan.target } : {}),
+        });
         const payload = (await res.json()) as { error?: string; advanced?: AdvanceResult };
         if (!res.ok || !payload.advanced) {
           throw new Error(payload.error || "TOURNAMENT_ADVANCE_FAILED");

@@ -137,7 +137,7 @@ describe("dialogues sans retour", () => {
     // La fiche part par `router.replace` : un second clic ne relance pas la suppression.
     const code = source(DIR + "DeleteTournamentDialog.tsx");
     expect(code).toMatch(/hold\(\);\s+onDeleted\(tournamentName\);/);
-    expect(code).toContain("if (!armed || isBusy()) return;");
+    expect(code).toContain("if (!armed || isBusy() || deletedRef.current) return;");
     expect(code).toContain("const { busy, isBusy, run, hold } = useBusyGuard();");
     expect(code).toMatch(/autoComplete="off"\s+\/\/[^\n]*\n\s+\/\/[^\n]*\n\s+readOnly=\{busy\}/);
   });
@@ -292,9 +292,10 @@ describe("cases et radios figées pendant l'envoi", () => {
   it("TournamentForm_busy_formFrozenAndSetterGuarded", () => {
     const form = source(FORM_DIR + "TournamentForm.tsx");
     expect(form).toContain("data-frozen={loading || undefined}");
-    expect(form).toMatch(/const set = useCallback\(\s+<K[^\n]*\n\s*\/\/[^\n]*\n\s+if \(isBusy\(\)\) return;/);
-    expect(form).toContain('onEdit={() => !isBusy() && fieldErrors.clear("maxTeams")}');
-    expect(form).toMatch(/onCheckedChange=\{\(checked\) => \{\s+if \(isBusy\(\)\) return;/);
+    expect(form).toMatch(/const set = useCallback\(\s+<K[^\n]*(\n\s*\/\/[^\n]*)+\n\s+if \(isBusy\(\)\) return;/);
+    expect(form).toContain('onEdit={() => clearIdle("maxTeams")}');
+    expect(form).toMatch(/const clearIdle = useCallback\(\s+\(field: TournamentFormField\) => \{\s+if \(!isBusy\(\)\) clearFieldError\(field\);/);
+    expect(form).toMatch(/onCheckedChange=\{\(checked\) => \{\s+set\("duelArcade", checked\);\s+clearIdle\("mapPointTarget"\);/);
   });
 
   it("globals_frozenForm_infoHintTriggersKeepTheirLook", () => {
@@ -336,5 +337,41 @@ describe("cases et radios figées pendant l'envoi", () => {
   it("GhostCss_busyLinkButton_keepsReadableColour", () => {
     const css = source(DIR + "GhostRegistrationDialog.module.css");
     expect(css).toMatch(/\[aria-busy="true"\] \{[^}]*color: var\(--blue-300/);
+  });
+
+  it("securityReview_createPage_sendsOneRequestKeyPerPage", () => {
+    const page = source("app/(secured)/tournois/creer/page.tsx");
+    expect(page).toContain("useRef<string | null>(null)");
+    expect(page).toContain("requestKey.current ??= newRequestKey();");
+    expect(page).toContain("requestKey: requestKey.current }");
+  });
+
+  it("securityReview_penaltyDialog_sendsRequestKeyDrawnAtOpening", () => {
+    const dialog = source(DIR + "EndurancePenaltyDialog.tsx");
+    expect(dialog).toContain("useState(newRequestKey)");
+    expect(dialog).toContain("reason, requestKey })");
+  });
+
+  it("securityReview_advanceDialog_sendsAnnouncedTarget", () => {
+    expect(source(DIR + "AdvanceTournamentDialog.tsx")).toContain("{ expectedTarget: plan.target }");
+  });
+
+  it("securityReview_deleteDialog_neverRearmsAfterSuccess", () => {
+    const dialog = source(DIR + "DeleteTournamentDialog.tsx");
+    expect(dialog).toContain("if (!armed || isBusy() || deletedRef.current) return;");
+    expect(dialog).toContain("blocked={!armed || deleted}");
+  });
+
+  it("securityReview_ghostDialog_reusesCreatedGhostOnRetry", () => {
+    const dialog = source(DIR + "GhostRegistrationDialog.tsx");
+    expect(dialog).toContain("createdGhost.current?.name === name ? createdGhost.current.teamId : null");
+    expect(dialog).toContain("createdGhost.current = { name, teamId: payload.teamId };");
+  });
+
+  it("securityReview_tournamentForm_singleGuardAndReadonlySelects", () => {
+    const form = source(FORM_DIR + "TournamentForm.tsx");
+    expect(form).not.toContain("!isBusy() && fieldErrors.clear");
+    expect(form.match(/<select\s+aria-readonly=\{loading \|\| undefined\}/g)).toHaveLength(6);
+    expect(source(FORM_DIR + "FormatSettings.tsx")).toContain("aria-readonly={frozen || undefined}");
   });
 });

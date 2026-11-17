@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { newRequestKey } from "@/lib/shared/request-key";
 import {
   MAX_ENDURANCE_PENALTY_POINTS,
   MAX_ENDURANCE_PENALTY_REASON,
@@ -56,6 +57,9 @@ export function EndurancePenaltyDialog({
   // seule (ce qui est affiché est ce qui part), garde synchrone : une Entrée
   // répétée dans les points infligeait la sanction deux fois.
   const { busy, isBusy, run } = useBusyGuard();
+  // Clé du geste (`lib/server/idempotency.ts`), tirée à l'ouverture : renvoyer
+  // la sanction après une réponse perdue ne l'inflige pas une seconde fois.
+  const [requestKey] = useState(newRequestKey);
 
   const parsedPoints = Number(points);
   const violation = checkEndurancePenalty(parsedPoints, reason);
@@ -90,7 +94,7 @@ export function EndurancePenaltyDialog({
         const response = await fetch(`/api/tournaments/${tournamentId}/penalties`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ teamId, points: Math.floor(parsedPoints), reason }),
+          body: JSON.stringify({ teamId, points: Math.floor(parsedPoints), reason, requestKey }),
         });
         const payload = (await response.json()) as { error?: string };
         if (!response.ok) throw new Error(payload.error || "PENALTY_FAILED");

@@ -8,6 +8,7 @@ import { DELETE } from "@/app/api/tournaments/[id]/penalties/[penaltyId]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 
 const member = { id: 2, isAdmin: false, roles: [] } as unknown as Awaited<
   ReturnType<typeof getCurrentUser>
@@ -142,6 +143,29 @@ describe("POST /api/tournaments/[id]/penalties", () => {
     );
     const res = await POST(req(), params);
     expect(res.status).toBe(500);
+  });
+
+  it("POST_sameRequestKeyTwice_appliesPenaltyOnce", async () => {
+    resetIdempotencyForTests();
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    const body = { ...VALID, requestKey: "penalty-key-0000000001" };
+
+    const first = await POST(req(body), params);
+    const second = await POST(req(body), params);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(service.applyEndurancePenalty).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_noRequestKey_appliesEachTime", async () => {
+    resetIdempotencyForTests();
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+
+    await POST(req(), params);
+    await POST(req(), params);
+
+    expect(service.applyEndurancePenalty).toHaveBeenCalledTimes(2);
   });
 });
 

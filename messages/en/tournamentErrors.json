@@ -170,6 +170,8 @@
     "INVALID_TOURNAMENT_ID": "Invalid tournament ID.",
     "TOURNAMENT_ALREADY_STARTED": "This tournament has already started: there's no step left to advance.",
     "TOURNAMENT_ALREADY_FINISHED": "This tournament is finished.",
+    "TOURNAMENT_STAGE_CHANGED": "This tournament has already moved on in the meantime: reload the page to see its current step.",
+    "INVALID_ADVANCE_BODY": "Invalid advance request.",
     "TOURNAMENT_ADVANCE_FAILED": "Error while advancing the tournament.",
     "INVALID_ISSUE_MESSAGE": "Describe the problem in 10 to 1000 characters so the referee can act.",
     "NOT_REGISTERED": "Only the tournament's entrants can report a problem.",
