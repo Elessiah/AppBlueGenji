@@ -192,4 +192,6 @@ annoncer de l'attente.
   partenaires) : un corps trop lourd reste 413, un corps non JSON 415. Libellés d'attente,
   restés en français (D4) : « Enregistrement… », « Ajout… », « Publication… »,
   « Envoi… ».
+  Apparence désarmée/en attente de ces boutons : une seule règle, `app/busy-look.module.css` (`composes: busyLook`).
+  Le champ « URL de la photo » est nommé par son libellé visible (`<label htmlFor>`).
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

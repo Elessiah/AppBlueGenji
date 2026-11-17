@@ -119,6 +119,7 @@
 }
 
 .categoryMove {
+  composes: busyLook from "../busy-look.module.css";
   width: 26px;
   height: 26px;
   display: inline-flex;
@@ -138,25 +139,6 @@
   color: var(--blue-300);
   border-color: var(--blue-500);
   background: rgba(90, 200, 255, 0.05);
-}
-
-/* Désarmé par `aria-disabled` (`BusyButton` : le bouton garde le focus) : dit en
-   couleurs, jamais en `opacity`, et sans réaction au survol. En attente
-   (`aria-busy`), le libellé reste lisible : curseur d'attente, liseré en tirets. */
-.categoryMove[aria-disabled="true"],
-.categoryMove[aria-disabled="true"]:hover {
-  color: var(--ink-dim);
-  border-color: var(--line-soft);
-  background: transparent;
-  cursor: not-allowed;
-}
-
-.categoryMove[aria-disabled="true"][aria-busy="true"],
-.categoryMove[aria-disabled="true"][aria-busy="true"]:hover {
-  color: var(--ink-mute);
-  border-style: dashed;
-  border-color: var(--blue-500);
-  cursor: progress;
 }
 
 .categoryMove:focus-visible,
@@ -250,6 +232,7 @@
 }
 
 .action {
+  composes: busyLook from "../busy-look.module.css";
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
@@ -268,22 +251,6 @@
   color: var(--blue-300);
   border-color: var(--blue-500);
   background: rgba(90, 200, 255, 0.05);
-}
-
-.action[aria-disabled="true"],
-.action[aria-disabled="true"]:hover {
-  color: var(--ink-dim);
-  border-color: var(--line-soft);
-  background: transparent;
-  cursor: not-allowed;
-}
-
-.action[aria-disabled="true"][aria-busy="true"],
-.action[aria-disabled="true"][aria-busy="true"]:hover {
-  color: var(--ink-mute);
-  border-style: dashed;
-  border-color: var(--blue-500);
-  cursor: progress;
 }
 
 .actionDanger:hover {
@@ -395,6 +362,7 @@
 }
 
 .photoUploadBtn {
+  composes: busyLook from "../busy-look.module.css";
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.12em;
@@ -412,22 +380,6 @@
   color: var(--blue-300);
   border-color: var(--blue-500);
   background: rgba(90, 200, 255, 0.1);
-}
-
-.photoUploadBtn[aria-disabled="true"],
-.photoUploadBtn[aria-disabled="true"]:hover {
-  color: var(--ink-dim);
-  border-color: var(--line-soft);
-  background: transparent;
-  cursor: not-allowed;
-}
-
-.photoUploadBtn[aria-disabled="true"][aria-busy="true"],
-.photoUploadBtn[aria-disabled="true"][aria-busy="true"]:hover {
-  color: var(--ink-mute);
-  border-style: dashed;
-  border-color: var(--blue-500);
-  cursor: progress;
 }
 
 .photoUploadBtnDanger {

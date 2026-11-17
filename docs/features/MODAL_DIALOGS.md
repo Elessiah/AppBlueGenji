@@ -70,8 +70,10 @@ fermeture rend le focus au premier focalisable de la ligne **suivante**, sinon
 de la précédente, sinon de la liste, en remontant jusqu'au bouton « Ajouter »
 d'une liste vidée (`restoreFocusTarget`, `lib/shared/dialog-focus.ts`). Une
 ligne retirée **après** la fermeture (liste rechargée) est guettée trois
-secondes (`MutationObserver`) : si le focus est tombé sur `<body>`, il suit la
-même règle.
+secondes (`MutationObserver`, limité à la région `<main>`, un seul guet à la fois) : si le focus est tombé sur `<body>`, il suit la
+même règle — sauf si la page a changé (aucun ancêtre du déclencheur ne survit dans `<main>`). Le rang du chaînon est relevé aussi : une liste
+rafraîchie pendant l'ouverture a remplacé les voisins relevés, la ligne **d'aujourd'hui** au même rang les remplace. Un contrôle `aria-disabled`
+(flèche « monter » d'une première ligne) n'est choisi qu'à défaut d'un contrôle actif.
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà

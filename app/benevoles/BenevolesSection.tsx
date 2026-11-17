@@ -641,7 +641,9 @@ export function BenevolesSection({
           </label>
 
           <div className={styles.modalField}>
-            <span className={styles.modalLabel}>Photo (optionnel)</span>
+            <label htmlFor="benevole-photo-url" className={styles.modalLabel}>
+              Photo (optionnel)
+            </label>
             <div className={styles.photoUploadActions}>
               <input
                 ref={photoFileRef}
@@ -678,7 +680,7 @@ export function BenevolesSection({
               value={form.photoUrl}
               maxLength={500}
               placeholder="… ou colle une URL https://example.com/avatar.jpg"
-              aria-label="URL de la photo"
+              id="benevole-photo-url"
               readOnly={busy}
               onChange={(e) => set("photoUrl", e.target.value)}
             />

@@ -76,12 +76,19 @@ const FOCUSABLE_SELECTOR =
 const LATE_REMOVAL_WATCH_MS = 3_000;
 
 const isShown = (el: Element) =>
-  (el as HTMLElement).offsetParent !== null && getComputedStyle(el).visibility !== "hidden";
+  (el as HTMLElement).getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
 
-/** Premier élément focalisable et visible de `root`, `root` compris. */
+/** Un contrôle désarmé (`aria-disabled`, bouton occupé ou bord d'une flèche) ne fait rien : mauvaise cible de focus. */
+const isArmed = (el: Element) => el.getAttribute("aria-disabled") !== "true";
+
+/**
+ * Premier élément focalisable et visible de `root`, `root` compris — un
+ * contrôle actif de préférence (la flèche « monter » grisée d'une première
+ * ligne ne mène nulle part), à défaut un désarmé plutôt que rien.
+ */
 function firstFocusableIn(root: Element): Element | null {
-  if (root.matches(FOCUSABLE_SELECTOR) && isShown(root)) return root;
-  return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR)).find(isShown) ?? null;
+  const shown = [root, ...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => el.matches(FOCUSABLE_SELECTOR) && isShown(el));
+  return shown.find(isArmed) ?? shown[0] ?? null;
 }
 
 function focusRestoreTarget(entry: RestoreEntry): Element | null {
@@ -90,16 +97,25 @@ function focusRestoreTarget(entry: RestoreEntry): Element | null {
   return next;
 }
 
+/** Arrêt du guet en cours : un seul à la fois, une nouvelle fermeture remplace le précédent. */
+let stopLateRemovalWatch: (() => void) | null = null;
+
 /**
  * Le déclencheur a repris le focus mais sa ligne peut encore disparaître
  * (rechargement après fermeture) : à son retrait, si le focus est tombé sur
- * `<body>`, il passe à la ligne voisine. Guet borné, levé au premier retrait.
+ * `<body>`, il passe à la ligne voisine. Guet borné, levé au premier retrait,
+ * limité à la région principale ; il n'agit que si un ancêtre du déclencheur
+ * **de cette région** est toujours là (une ligne retirée d'une liste, pas un
+ * changement de page, où le focus sur `<body>` est l'usage).
  */
 function watchLateRemoval(entry: RestoreEntry) {
+  stopLateRemovalWatch?.();
   if (entry.element === document.body || entry.element === document.documentElement) return;
+  const region: Element = entry.element.closest("main, [role='main']") ?? document.body;
   const observer = new MutationObserver(() => {
     if (entry.element.isConnected) return;
     stop();
+    if (!entry.trail.some((step) => step.parent !== region && step.parent.isConnected && region.contains(step.parent))) return;
     const active = document.activeElement;
     if (active === null || active === document.body) focusRestoreTarget(entry);
   });
@@ -107,8 +123,10 @@ function watchLateRemoval(entry: RestoreEntry) {
   function stop() {
     observer.disconnect();
     clearTimeout(timer);
+    if (stopLateRemovalWatch === stop) stopLateRemovalWatch = null;
   }
-  observer.observe(document.body, { childList: true, subtree: true });
+  stopLateRemovalWatch = stop;
+  observer.observe(region, { childList: true, subtree: true });
 }
 
 /**

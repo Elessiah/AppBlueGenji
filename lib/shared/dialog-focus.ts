@@ -233,6 +233,8 @@ export interface TrailNode<T> {
   readonly parentElement: T | null;
   readonly nextElementSibling: T | null;
   readonly previousElementSibling: T | null;
+  /** Enfants d'alors : une liste rafraîchie les a peut-être remplacés. */
+  readonly children: ArrayLike<T>;
 }
 
 /** Un cran de la remontée du déclencheur : son parent et ses voisins d'alors. */
@@ -240,18 +242,26 @@ export interface FocusTrailStep<T> {
   parent: T;
   next: T | null;
   previous: T | null;
+  /** Rang du chaînon parmi les enfants de `parent` à l'ouverture. */
+  index: number;
 }
 
 /**
  * Relevé, **à l'ouverture**, du voisinage du déclencheur : chacun de ses
- * ancêtres avec les voisins du chaînon qu'il contient. Une fois la ligne
+ * ancêtres avec les voisins du chaînon qu'il contient et le rang de celui-ci. Une fois la ligne
  * retirée (suppression confirmée), l'élément détaché ne sait plus où il était.
  */
 export function focusTrail<T extends TrailNode<T>>(target: T | null): FocusTrailStep<T>[] {
   const steps: FocusTrailStep<T>[] = [];
   let node = target;
   while (node?.parentElement) {
-    steps.push({ parent: node.parentElement, next: node.nextElementSibling, previous: node.previousElementSibling });
+    const parent: T = node.parentElement;
+    steps.push({
+      parent,
+      next: node.nextElementSibling,
+      previous: node.previousElementSibling,
+      index: Array.prototype.indexOf.call(parent.children, node),
+    });
     node = node.parentElement;
   }
   return steps;
@@ -265,7 +275,7 @@ export function focusTrail<T extends TrailNode<T>>(target: T | null): FocusTrail
  * liste, et ainsi de suite en remontant (le bouton « Ajouter » d'une liste
  * vidée). `null` si rien ne convient.
  */
-export function restoreFocusTarget<T>(
+export function restoreFocusTarget<T extends TrailNode<T>>(
   target: T | null,
   trail: readonly FocusTrailStep<T>[],
   isConnected: (node: T) => boolean,
@@ -274,7 +284,11 @@ export function restoreFocusTarget<T>(
   if (target === null || isConnected(target)) return target;
   for (const step of trail) {
     if (!isConnected(step.parent)) continue;
-    for (const sibling of [step.next, step.previous]) {
+    // Voisins relevés à l'ouverture, puis ceux **d'aujourd'hui** au même rang :
+    // une liste rafraîchie pendant que la modale était ouverte a remplacé les
+    // nœuds relevés, le rang, lui, tient encore.
+    const now = (at: number): T | null => (at >= 0 && at < step.parent.children.length ? step.parent.children[at] : null);
+    for (const sibling of [step.next, step.previous, now(step.index), now(step.index - 1)]) {
       if (sibling === null || !isConnected(sibling)) continue;
       const found = firstFocusable(sibling);
       if (found !== null) return found;

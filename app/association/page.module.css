@@ -138,6 +138,7 @@
 }
 
 .bureauAction {
+  composes: busyLook from "../busy-look.module.css";
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
@@ -161,25 +162,6 @@
   color: var(--red-live, #ff6e82);
   border-color: rgba(255, 110, 130, 0.6);
   background: rgba(255, 110, 130, 0.06);
-}
-
-/* Désarmé par `aria-disabled` (`BusyButton` : le bouton garde le focus) : dit en
-   couleurs, jamais en `opacity`, et sans réaction au survol. En attente
-   (`aria-busy`), le libellé reste lisible : curseur d'attente, liseré en tirets. */
-.bureauAction[aria-disabled="true"],
-.bureauAction[aria-disabled="true"]:hover {
-  color: var(--ink-dim);
-  border-color: var(--line-soft);
-  background: transparent;
-  cursor: not-allowed;
-}
-
-.bureauAction[aria-disabled="true"][aria-busy="true"],
-.bureauAction[aria-disabled="true"][aria-busy="true"]:hover {
-  color: var(--ink-mute);
-  border-style: dashed;
-  border-color: var(--blue-500);
-  cursor: progress;
 }
 
 .bureauAction:focus-visible {

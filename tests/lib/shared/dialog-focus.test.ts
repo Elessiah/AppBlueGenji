@@ -256,12 +256,24 @@ interface FakeNode {
   nextElementSibling: FakeNode | null;
   previousElementSibling: FakeNode | null;
   connected: boolean;
+  /** Enfants d'aujourd'hui (une liste rafraîchie les remplace). */
+  children: FakeNode[];
   /** Premier focalisable de ce nœud, lui compris. */
   focusable: FakeNode | null;
 }
 
 function fakeNode(name: string, parent: FakeNode | null = null): FakeNode {
-  return { name, parentElement: parent, nextElementSibling: null, previousElementSibling: null, connected: true, focusable: null };
+  const node: FakeNode = {
+    name,
+    parentElement: parent,
+    nextElementSibling: null,
+    previousElementSibling: null,
+    connected: true,
+    children: [],
+    focusable: null,
+  };
+  parent?.children.push(node);
+  return node;
 }
 
 /** `root > section > [header > add] + ul > [li1 > b1, li2 > b2, li3 > b3]`. */
@@ -308,10 +320,10 @@ describe("focusTrail", () => {
     const trail = focusTrail(rows[1].button);
 
     expect(trail).toEqual([
-      { parent: rows[1].li, next: null, previous: null },
-      { parent: ul, next: rows[2].li, previous: rows[0].li },
-      { parent: section, next: null, previous: header },
-      { parent: root, next: null, previous: null },
+      { parent: rows[1].li, next: null, previous: null, index: 0 },
+      { parent: ul, next: rows[2].li, previous: rows[0].li, index: 1 },
+      { parent: section, next: null, previous: header, index: 1 },
+      { parent: root, next: null, previous: null, index: 0 },
     ]);
   });
 });
@@ -363,6 +375,35 @@ describe("restoreFocusTarget — déclencheur retiré (suppression confirmée)",
     ul.focusable = replacement;
 
     expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(replacement);
+  });
+
+  it("restoreFocusTarget_listRefreshedWhileOpen_usesTodaysRowAtTheSameRank", () => {
+    const { ul, rows } = listPage();
+    const trail = focusTrail(rows[1].button);
+    // La liste est rendue de nouveau : les trois lignes relevées sont remplacées, la deuxième a disparu.
+    for (const row of rows) removeRow(row);
+    ul.children = [];
+    const fresh = [1, 3].map((n) => {
+      const li = fakeNode(`new-li${n}`, ul);
+      li.focusable = fakeNode(`new-b${n}`, li);
+      return li;
+    });
+
+    expect(restoreFocusTarget(rows[1].button, trail, isConnected, firstFocusable)).toBe(fresh[1].focusable);
+  });
+
+  it("restoreFocusTarget_refreshedLastRow_usesPreviousRowAtRankMinusOne", () => {
+    const { ul, rows } = listPage();
+    const trail = focusTrail(rows[2].button);
+    for (const row of rows) removeRow(row);
+    ul.children = [];
+    const fresh = [1, 2].map((n) => {
+      const li = fakeNode(`new-li${n}`, ul);
+      li.focusable = fakeNode(`new-b${n}`, li);
+      return li;
+    });
+
+    expect(restoreFocusTarget(rows[2].button, trail, isConnected, firstFocusable)).toBe(fresh[1].focusable);
   });
 
   it("restoreFocusTarget_emptiedList_climbsToAddButton", () => {

@@ -167,8 +167,25 @@ describe("association, bénévoles, recrutement — apparence désarmée", () =>
     ["app/recrutement/page.module.css", "action"],
   ])("%s_%s_disarmedInColoursAndBusyDashed", (file, cls) => {
     const code = css(file);
-    expect(code).toContain(`.${cls}[aria-disabled="true"],`);
-    expect(code).toContain(`.${cls}[aria-disabled="true"][aria-busy="true"],`);
+    expect(code).toMatch(new RegExp(String.raw`\.${cls} \{
+  composes: busyLook from "\.\./busy-look\.module\.css";`));
+    expect(code).not.toContain(`.${cls}[aria-disabled="true"]`);
+  });
+
+  it("busyLook_sharedRule_disarmedInColoursAndBusyDashed", () => {
+    const code = css("app/busy-look.module.css");
+    expect(code).toContain('.busyLook[aria-disabled="true"],');
+    expect(code).toContain('.busyLook[aria-disabled="true"][aria-busy="true"],');
+    expect(code).toContain("border-style: dashed;");
+    expect(code).toContain("cursor: progress;");
+    expect(code).not.toContain("opacity");
+  });
+
+  it("benevoles_photoUrlInput_namedByItsVisibleLabel", () => {
+    const code = source("app/benevoles/BenevolesSection.tsx");
+    expect(code).toMatch(/<label htmlFor="benevole-photo-url"[^>]*>\s*Photo \(optionnel\)\s*<\/label>/);
+    expect(code).toContain('id="benevole-photo-url"');
+    expect(code).not.toContain('aria-label="URL de la photo"');
   });
 
   it.each([["app/association/page.module.css"], ["app/benevoles/page.module.css"], ["app/recrutement/page.module.css"]])(
