@@ -95,29 +95,32 @@ export const AUDIENCE_LOCALES: readonly AudienceLocale[] = ["fr", "en"];
 /**
  * Gabarits des pages mesurées, dans l'ordre de reconnaissance. Une page ne
  * se range que sous son gabarit : jamais un identifiant, un pseudo ou un nom
- * d'équipe n'est conservé.
+ * d'équipe n'est conservé. Le troisième terme est l'adresse type du gabarit,
+ * seule envoyée par le navigateur ({@link audienceBeaconPath}) : jamais
+ * l'adresse affichée (numéro, pseudo, nom d'équipe). Chacune se range sous son
+ * propre gabarit (vérifié par les tests).
  */
-const PAGE_PATTERNS: readonly (readonly [string, RegExp])[] = [
-  ["home", /^\/$/],
-  ["rules", /^\/regles$/],
-  ["rulesMode", /^\/regles\/[^/]+$/],
-  ["ranking", /^\/classement$/],
-  ["tournaments", /^\/tournois$/],
-  ["tournament", /^\/tournois\/\d+$/],
-  ["match", /^\/tournois\/\d+\/matchs\/\d+$/],
-  ["tournamentOther", /^\/tournois\/.+$/],
-  ["follow", /^\/suivre(\/.*)?$/],
-  ["teams", /^\/equipes$/],
-  ["team", /^\/equipes\/.+$/],
-  ["players", /^\/joueurs$/],
-  ["player", /^\/joueurs\/.+$/],
-  ["profile", /^\/profil(\/.*)?$/],
-  ["login", /^\/connexion(\/.*)?$/],
-  ["bot", /^\/bot(\/.*)?$/],
-  ["association", /^\/association$/],
-  ["volunteers", /^\/benevoles$/],
-  ["recruitment", /^\/recrutement$/],
-  ["legal", /^\/(rgpd|mentions-legales|conditions-utilisation|accessibilite|privacy-policy-bot|terms-of-service-bot)(\/.*)?$/],
+const PAGE_PATTERNS: readonly (readonly [key: string, pattern: RegExp, sample: string])[] = [
+  ["home", /^\/$/, "/"],
+  ["rules", /^\/regles$/, "/regles"],
+  ["rulesMode", /^\/regles\/[^/]+$/, "/regles/mode"],
+  ["ranking", /^\/classement$/, "/classement"],
+  ["tournaments", /^\/tournois$/, "/tournois"],
+  ["tournament", /^\/tournois\/\d+$/, "/tournois/0"],
+  ["match", /^\/tournois\/\d+\/matchs\/\d+$/, "/tournois/0/matchs/0"],
+  ["tournamentOther", /^\/tournois\/.+$/, "/tournois/0/autre"],
+  ["follow", /^\/suivre(\/.*)?$/, "/suivre"],
+  ["teams", /^\/equipes$/, "/equipes"],
+  ["team", /^\/equipes\/.+$/, "/equipes/0"],
+  ["players", /^\/joueurs$/, "/joueurs"],
+  ["player", /^\/joueurs\/.+$/, "/joueurs/0"],
+  ["profile", /^\/profil(\/.*)?$/, "/profil"],
+  ["login", /^\/connexion(\/.*)?$/, "/connexion"],
+  ["bot", /^\/bot(\/.*)?$/, "/bot"],
+  ["association", /^\/association$/, "/association"],
+  ["volunteers", /^\/benevoles$/, "/benevoles"],
+  ["recruitment", /^\/recrutement$/, "/recrutement"],
+  ["legal", /^\/(rgpd|mentions-legales|conditions-utilisation|accessibilite|privacy-policy-bot|terms-of-service-bot)(\/.*)?$/, "/rgpd"],
 ];
 
 /**
@@ -128,34 +131,8 @@ const PAGE_PATTERNS: readonly (readonly [string, RegExp])[] = [
  */
 const UNMEASURED_PAGES = /^\/(admin|signalements)(\/|$)|^\/tournois\/(creer|[^/]+\/modifier)(\/|$)/;
 
-/**
- * Adresse type de chaque gabarit : le navigateur n'envoie qu'elle, jamais
- * l'adresse affichée (numéro, pseudo, nom d'équipe). Chacune se range sous
- * son propre gabarit (vérifié par les tests).
- */
-const PAGE_SAMPLES: Readonly<Record<string, string>> = {
-  home: "/",
-  rules: "/regles",
-  rulesMode: "/regles/mode",
-  ranking: "/classement",
-  tournaments: "/tournois",
-  tournament: "/tournois/0",
-  match: "/tournois/0/matchs/0",
-  tournamentOther: "/tournois/0/autre",
-  follow: "/suivre",
-  teams: "/equipes",
-  team: "/equipes/0",
-  players: "/joueurs",
-  player: "/joueurs/0",
-  profile: "/profil",
-  login: "/connexion",
-  bot: "/bot",
-  association: "/association",
-  volunteers: "/benevoles",
-  recruitment: "/recrutement",
-  legal: "/rgpd",
-  other: "/autre",
-};
+/** Adresse type des pages hors gabarit. */
+const OTHER_PAGE_SAMPLE = "/autre";
 
 /** Toutes les clés de page possibles, `other` compris (pour les libellés). */
 export const AUDIENCE_PAGE_KEYS: readonly string[] = [...PAGE_PATTERNS.map(([key]) => key), "other"];
@@ -195,7 +172,7 @@ export function audiencePageKey(rawPath: unknown): { key: string; locale: Audien
 export function audienceBeaconPath(path: unknown): string | null {
   const page = audiencePageKey(path);
   if (!page) return null;
-  const sample = PAGE_SAMPLES[page.key] ?? PAGE_SAMPLES.other;
+  const sample = PAGE_PATTERNS.find(([key]) => key === page.key)?.[2] ?? OTHER_PAGE_SAMPLE;
   if (page.locale === "fr") return sample;
   return sample === "/" ? "/en" : `/en${sample}`;
 }

@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
+  AUDIENCE_MAX_ENGAGED_MS,
   AUDIENCE_MIN_VISITORS,
   AUDIENCE_RANGES,
   AUDIENCE_SMALL_KEY,
@@ -302,7 +303,7 @@ export function AudienceDashboard({ stats, unavailable = false, messages: m, loc
         </h2>
         <ul className={styles.methodList}>
           {m.method.items.map((item) => (
-            <li key={item}>{fillTemplate(item, { min: AUDIENCE_MIN_VISITORS })}</li>
+            <li key={item}>{fillTemplate(item, { min: AUDIENCE_MIN_VISITORS, minutes: AUDIENCE_MAX_ENGAGED_MS / 60_000 })}</li>
           ))}
         </ul>
       </section>

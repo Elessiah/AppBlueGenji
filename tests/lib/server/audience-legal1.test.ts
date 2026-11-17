@@ -185,20 +185,29 @@ describe("runMaintenance — sel et purge sans dépendre du repli", () => {
 
 describe("dailySalt — lecture finie après la clôture du jour", () => {
   it("dailySalt_readFinishesAfterDayClosed_deletesThatSalt", async () => {
-    const execute = database();
+    // Lecture commencée à 23 h à Paris le 1er janvier (jour ouvert), finie trois
+    // heures plus tard (le 1er est clos) : le sel tout juste écrit est effacé.
+    jest.useFakeTimers({ now: new Date("2026-01-01T22:00:00Z"), doNotFake: ["setImmediate"] });
+    const base = database();
+    const execute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+      if (sql.startsWith("INSERT IGNORE")) jest.setSystemTime(new Date("2026-01-02T01:00:00Z"));
+      return base(sql, params);
+    });
     mockDb(execute);
 
-    await dailySalt("2026-01-01");
+    await dailySalt("2026-01-01", new Date("2026-01-01T22:00:00Z"));
     await flushPromises();
 
-    expect(calls(execute, "DELETE FROM bg_audience_salts WHERE day = ?").map(([, params]) => params)).toEqual([["2026-01-01"]]);
+    expect(calls(execute, "INSERT IGNORE INTO bg_audience_salts")).toHaveLength(1);
+    expect(calls(execute, "DELETE FROM bg_audience_salts WHERE day <= ?").map(([, params]) => params)).toEqual([["2026-01-01"]]);
+    jest.useRealTimers();
   });
 
   it("dailySalt_openDay_neverDeletesSalt", async () => {
     const execute = database();
     mockDb(execute);
 
-    await dailySalt("2099-01-01");
+    await dailySalt("2026-11-16", NOW);
     await flushPromises();
 
     expect(calls(execute, "DELETE FROM bg_audience_salts")).toHaveLength(0);

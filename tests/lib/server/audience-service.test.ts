@@ -93,7 +93,7 @@ describe("dailySalt", () => {
     const execute = emptyDatabase();
     mockDb(execute);
 
-    await dailySalt("2026-11-16");
+    await dailySalt("2026-11-16", NOW);
 
     const [day, salt] = saltWrites(execute)[0][1] as [string, Buffer];
     expect(day).toBe("2026-11-16");
@@ -107,14 +107,14 @@ describe("dailySalt", () => {
     execute.mockRejectedValueOnce(new Error("down"));
     mockDb(execute);
 
-    await expect(dailySalt("2026-11-16")).rejects.toThrow("down");
+    await expect(dailySalt("2026-11-16", NOW)).rejects.toThrow("down");
     // Pendant le délai, l'échec est resservi sans relire la base.
-    await expect(dailySalt("2026-11-16")).rejects.toThrow("down");
+    await expect(dailySalt("2026-11-16", NOW)).rejects.toThrow("down");
     expect(saltWrites(execute)).toHaveLength(1);
     expect(errorSpy).toHaveBeenCalledTimes(1);
 
     jest.advanceTimersByTime(SALT_RETRY_MS);
-    await expect(dailySalt("2026-11-16")).resolves.toEqual(SALT);
+    await expect(dailySalt("2026-11-16", NOW)).resolves.toEqual(SALT);
     jest.useRealTimers();
   });
 
@@ -158,13 +158,14 @@ describe("forgetSalts", () => {
   it("forgetSalts_until_deletesUpToThatDayAndForgetsMemory", async () => {
     const execute = emptyDatabase();
     mockDb(execute);
-    await dailySalt("2026-11-15");
+    await dailySalt("2026-11-16", NOW);
 
-    await forgetSalts("2026-11-15");
-    await dailySalt("2026-11-15");
+    await forgetSalts("2026-11-16");
+    await dailySalt("2026-11-16", NOW);
 
-    expect(execute.mock.calls.find(([sql]) => sql.startsWith("DELETE FROM bg_audience_salts"))?.[1]).toEqual(["2026-11-15"]);
-    expect(saltWrites(execute)).toHaveLength(2);
+    expect(execute.mock.calls.find(([sql]) => sql.startsWith("DELETE FROM bg_audience_salts"))?.[1]).toEqual(["2026-11-16"]);
+    // Oublié en mémoire : relu en base au signalement suivant.
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("SELECT salt"))).toHaveLength(2);
   });
 });
 
@@ -467,15 +468,18 @@ describe("runMaintenance — signalements en cours", () => {
 
 describe("dailySalt — balayage en mémoire", () => {
   it("dailySalt_idleProcess_sweepForgetsClosedSalt", async () => {
-    jest.useFakeTimers();
+    // 1 h 10 à Paris le 17 : le 16 est encore ouvert ; dix minutes plus tard, il est clos.
+    jest.useFakeTimers({ now: new Date("2026-11-17T00:10:00Z") });
     const execute = emptyDatabase();
     mockDb(execute);
-    await dailySalt("2020-01-01");
+    await dailySalt("2026-11-16");
 
     jest.advanceTimersByTime(MAINTENANCE_INTERVAL_MS);
-    await dailySalt("2020-01-01");
+    await dailySalt("2026-11-16");
 
-    expect(saltWrites(execute)).toHaveLength(2);
+    // Oublié en mémoire, le sel est relu en base (sans en tirer un neuf : jour clos).
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("SELECT salt"))).toHaveLength(2);
+    expect(saltWrites(execute)).toHaveLength(1);
     jest.useRealTimers();
   });
 });
@@ -610,7 +614,7 @@ describe("cycle 4 — jours repliés, quel que soit le processus", () => {
     const execute = emptyDatabase();
     mockDb(execute);
 
-    await dailySalt("2026-11-16");
+    await dailySalt("2026-11-16", NOW);
 
     const [sql, params] = saltWrites(execute)[0];
     expect(sql).toContain("NOT EXISTS (SELECT 1 FROM bg_audience_days WHERE day >= ?)");

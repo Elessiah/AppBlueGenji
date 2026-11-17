@@ -124,13 +124,14 @@ interface SaltRow extends RowDataPacket {
   salt: Buffer;
 }
 
-async function loadSalt(day: string): Promise<Buffer> {
+async function loadSalt(day: string, clock: () => Date): Promise<Buffer> {
   const db = await getDatabase();
   // Le premier signalement du jour tire le sel ; un signalement concurrent, ou
   // le site redémarré, relit celui qui est en base. Jamais pour un jour déjà
   // replié (une lecture lente qui finit après l'entretien, ou un autre
-  // processus) : son sel est effacé et doit le rester.
-  await db.execute(
+  // processus) ni pour un jour clos (repli raté) : son sel est effacé et doit
+  // le rester — un sel neuf ferait de ses visiteurs tardifs des visiteurs de plus.
+  if (day > lastRollableDay(clock())) await db.execute(
     `INSERT IGNORE INTO bg_audience_salts (day, salt)
        SELECT ?, ? FROM DUAL
         WHERE NOT EXISTS (SELECT 1 FROM bg_audience_days WHERE day >= ?)`,
@@ -145,15 +146,20 @@ async function loadSalt(day: string): Promise<Buffer> {
 /**
  * Sel du jour `day` : tiré au hasard la première fois, gardé en base jusqu'au
  * repli du jour, puis effacé (voir {@link forgetSalts}).
+ *
+ * @param now Instant du signalement ; l'horloge de la lecture en part et
+ * avance avec le temps écoulé depuis l'appel.
  */
-export function dailySalt(day: string): Promise<Buffer> {
+export function dailySalt(day: string, now: Date = new Date()): Promise<Buffer> {
   const known = salts.get(day);
   if (known) return known;
-  const load = loadSalt(day);
+  const started = Date.now();
+  const clock = () => new Date(now.getTime() + Math.max(0, Date.now() - started));
+  const load = loadSalt(day, clock);
   // Une lecture abandonnée (délai dépassé) peut encore écrire le sel après
   // l'entretien qui l'a effacé : celui d'un jour clos à sa fin est effacé aussitôt.
   load.then(
-    () => forgetSaltIfClosed(day),
+    () => forgetSaltIfClosed(day, clock()),
     () => undefined,
   );
   const value = withTimeout(load, SALT_READ_TIMEOUT_MS, "audience salt read timed out");
@@ -172,16 +178,15 @@ export function dailySalt(day: string): Promise<Buffer> {
 }
 
 /**
- * Efface le sel de `day` si ce jour est clos à cet instant
- * ({@link lastRollableDay}) : rattrape une écriture de sel finie après
- * l'entretien. Jamais levé (une erreur est journalisée).
+ * Efface les sels des jours clos à `at` ({@link forgetSalts}) si `day` en
+ * est : rattrape une écriture de sel finie après l'entretien. Jamais levé
+ * (une erreur est journalisée).
  */
-async function forgetSaltIfClosed(day: string): Promise<void> {
-  if (day > lastRollableDay(new Date())) return;
+async function forgetSaltIfClosed(day: string, at: Date): Promise<void> {
+  const closed = lastRollableDay(at);
+  if (day > closed) return;
   try {
-    const db = await getDatabase();
-    await db.execute(`DELETE FROM bg_audience_salts WHERE day = ?`, [day]);
-    if (salts.has(day)) salts.delete(day);
+    await forgetSalts(closed);
   } catch (error) {
     console.error(`[audience] Sel du ${day} (jour clos) non effacé.`, failureReason(error));
   }
@@ -221,8 +226,8 @@ function startSaltSweep(): void {
  * les appareils d'un même navigateur derrière un `/64` comptent pour un, comme
  * derrière une adresse IPv4 partagée.
  */
-export async function audienceVisitorKey(day: string, ip: string | null, userAgent: string | null): Promise<string> {
-  const salt = await dailySalt(day);
+export async function audienceVisitorKey(day: string, ip: string | null, userAgent: string | null, now: Date = new Date()): Promise<string> {
+  const salt = await dailySalt(day, now);
   return createHmac("sha256", salt).update(visitorIdentitySource({ ip: clientNetworkKey(ip) ?? ip, userAgent })).digest("hex");
 }
 
@@ -280,7 +285,7 @@ async function recordViews(input: AudienceRecordInput): Promise<number> {
   }
   // Le sel est celui du jour de la page vue, pas celui du jour de réception.
   const days = [...new Set(rows.map((row) => row.day))];
-  const settled = await Promise.allSettled(days.map((day) => audienceVisitorKey(day, input.ip, input.userAgent)));
+  const settled = await Promise.allSettled(days.map((day) => audienceVisitorKey(day, input.ip, input.userAgent, now)));
   const keys = new Map<string, string>();
   settled.forEach((result, index) => {
     if (result.status === "fulfilled") keys.set(days[index], result.value);
@@ -396,9 +401,11 @@ export function rawRetentionStart(now: Date): string {
 }
 
 /**
- * Entretien entraîné par le trafic : repli des jours révolus, effacement de
- * leur sel, puis purge du détail trop ancien. Au plus une fois par
- * {@link MAINTENANCE_INTERVAL_MS} ; jamais attendu par l'appelant, jamais levé.
+ * Entretien : repli des jours révolus, effacement de leur sel, puis purge du
+ * détail trop ancien. Entraîné par le trafic mesuré, la page de fréquentation
+ * et l'horloge du serveur ({@link startAudienceMaintenanceClock}). Au plus une
+ * fois par {@link MAINTENANCE_INTERVAL_MS} ; jamais attendu par l'appelant,
+ * jamais levé.
  */
 export function maintainAudience(now: Date = new Date()): void {
   if (now.getTime() - lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || maintaining) return;
@@ -410,6 +417,21 @@ export function maintainAudience(now: Date = new Date()): void {
     .finally(() => {
       maintaining = null;
     });
+}
+
+let maintenanceClock: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Lance l'entretien à intervalle régulier ({@link MAINTENANCE_INTERVAL_MS}),
+ * une fois par processus (`instrumentation.ts`) : sans aucune visite mesurée
+ * (nuit calme, oppositions, robots), le sel d'un jour clos est tout de même
+ * effacé le lendemain et le détail purgé à son terme, comme l'annoncent les
+ * textes. Sans effet si l'horloge tourne déjà ; ne retient pas le processus.
+ */
+export function startAudienceMaintenanceClock(): void {
+  if (maintenanceClock) return;
+  maintenanceClock = setInterval(() => maintainAudience(), MAINTENANCE_INTERVAL_MS);
+  maintenanceClock.unref?.();
 }
 
 /** Repli, effacement des sels des jours repliés, puis purge (attendus : tests, et `maintainAudience`). */
@@ -433,22 +455,27 @@ export async function runMaintenance(now: Date = new Date()): Promise<void> {
     rolled = await rollUpAudienceDays(now);
   } catch (error) {
     // Repli raté : ces jours se replieront plus tard (le repli lit l'empreinte
-    // gardée, jamais le sel), mais les signalements qui finissent maintenant
-    // en écartent encore les entrées (jours clos, comme `recordViews`).
+    // gardée, jamais le sel). Un signalement attardé qui tient déjà leur sel
+    // y ajoute encore ses lignes ; sans lui, plus aucun sel neuf n'est tiré
+    // pour un jour clos (`loadSalt`) : ses lignes sont écartées.
     rolledThrough = previous;
     failure = error;
   }
   // Un jour clos n'a plus besoin de son sel, même si son repli a échoué : ses
   // entrées tardives sont écartées. La purge du détail ne dépend pas non plus
   // du repli : ni le sel ni le détail ne restent au-delà des durées annoncées.
-  const cleanup = await Promise.allSettled([forgetSalts(until), purgeAudienceViews(now)]);
+  const [salted, purged] = await Promise.allSettled([forgetSalts(until), purgeAudienceViews(now)]);
   if (rolled > 0) {
     statsCache = null;
     statsGeneration += 1;
   }
+  // Chaque échec du nettoyage se journalise, même quand le repli a échoué aussi :
+  // un sel resté en base contredit ce que disent les textes, il doit se voir.
+  if (salted.status === "rejected") console.error(`[audience] Sels jusqu'au ${until} non effacés.`, failureReason(salted.reason));
+  if (purged.status === "rejected") console.error("[audience] Purge du détail impossible.", failureReason(purged.reason));
   if (failure !== null) throw failure;
-  const failed = cleanup.find((result): result is PromiseRejectedResult => result.status === "rejected");
-  if (failed) throw failed.reason;
+  if (salted.status === "rejected") throw salted.reason;
+  if (purged.status === "rejected") throw purged.reason;
 }
 
 interface DayRow extends RowDataPacket {
@@ -816,6 +843,8 @@ export async function getAudienceStats(now: Date = new Date()): Promise<Audience
 /** Remet l'état du module à zéro (tests). */
 export function resetAudienceState(): void {
   salts.clear();
+  if (maintenanceClock) clearInterval(maintenanceClock);
+  maintenanceClock = null;
   if (saltSweep) clearInterval(saltSweep);
   saltSweep = null;
   recording.clear();

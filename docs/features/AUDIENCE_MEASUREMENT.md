@@ -24,7 +24,9 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   mémoire) — **même si le repli échoue** (le repli lit l'empreinte gardée,
   jamais le sel), et la purge des 13 mois tourne aussi — ; une lecture de
   sel abandonnée (délai dépassé) qui écrit après l'entretien voit son sel
-  effacé dès qu'elle finit (`forgetSaltIfClosed`) ; et `recordAudienceViews`
+  effacé dès qu'elle finit (`forgetSaltIfClosed`) ; aucun sel neuf n'est tiré
+  pour un jour clos (`loadSalt`, horloge du signalement) — un sel neuf ferait
+  de ses visiteurs tardifs des visiteurs de plus ; et `recordAudienceViews`
   écarte les entrées tardives de ce jour :
   plus personne ne peut recalculer une empreinte, hors une copie de
   sauvegarde chiffrée faite entre-temps (T09, 30 jours) — les textes légaux
@@ -36,7 +38,10 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   plafonnée à 30 min (`AUDIENCE_MAX_ENGAGED_MS` : un plafond par suite, pas
   par page — une longue lecture en additionne plusieurs). Le navigateur
   n'envoie que **l'adresse type du gabarit** (`audienceBeaconPath` :
-  `/joueurs/pseudo` → `/joueurs/0`), jamais l'adresse affichée.
+  `/joueurs/pseudo` → `/joueurs/0`, rangée avec son gabarit dans
+  `PAGE_PATTERNS`), jamais l'adresse affichée — et l'envoi part sans en-tête
+  `Referer` (`referrerPolicy: "no-referrer"`), qui la porterait jusqu'aux
+  journaux du serveur web.
 - **Agrégé seulement** à la lecture : la page ne lit que les tables
   `bg_audience_day*`, jamais `bg_audience_views`.
 - **13 mois** pour les lignes détaillées (`AUDIENCE_RAW_RETENTION_MONTHS`),
@@ -225,8 +230,12 @@ bg_audience_days / _day_pages / _day_hours / _day_dims (agrégats, sans limite)
   tranches de visiteurs (`MOD(CRC32(visitor_key), n)`), chaque tranche repliée
   puis sommée (`mergeAudienceAggregates`) : mémoire bornée.
 - **Lecture** : `getAudienceStats` n'attend jamais l'entretien (cache, sinon lecture
-  directe des jours déjà repliés) ; l'entretien n'est entraîné que par un envoi
-  mesuré (ni opposition, ni robot, ni plafond) ou par la page.
+  directe des jours déjà repliés) ; l'entretien est entraîné par un envoi
+  mesuré (ni opposition, ni robot, ni plafond), par la page et par une horloge
+  de 10 min lancée au démarrage (`startAudienceMaintenanceClock`,
+  `instrumentation.ts`) : sans trafic, le sel d'un jour clos est tout de même
+  effacé et le détail purgé. Un échec d'effacement ou de purge se journalise
+  chacun, même quand le repli échoue aussi.
 - Les points quotidiens de la page (≈ 100 octets par jour, ≈ 36 Ko par an) ne sont
   pas bornés : la période « tout » les exige, la charge utile reste négligeable.
 

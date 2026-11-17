@@ -919,8 +919,8 @@ function RgpdFr({
             passé et une famille de provenance (accès direct, moteur de recherche, Discord, réseau
             social, plateforme vidéo, autre site) ; jamais l&apos;adresse précise de la page, ni le
             site d&apos;origine, ni votre adresse IP ou votre navigateur tels quels. Les robots connus
-            ne sont pas comptés, et les pages d&apos;administration et de signalements ne sont pas
-            mesurées.
+            ne sont pas comptés, et les pages d&apos;administration (dont la création et la
+            modification d&apos;un tournoi) et de signalements ne sont pas mesurées.
           </p>
           <p>
             <strong>Base légale et dispense de consentement.</strong> L&apos;intérêt légitime de

@@ -744,7 +744,8 @@ export function RgpdEn({
             time spent and a referral family (direct access, search engine, Discord, social network,
             video platform, other website); never the page&apos;s exact address, nor the referring
             site, nor your IP address or browser as such. Known bots are not counted, and the
-            administration and report pages are not measured.
+            administration pages (including creating and editing a tournament) and the report pages
+            are not measured.
           </p>
           <p>
             <strong>Legal basis and consent exemption.</strong> The association&apos;s legitimate

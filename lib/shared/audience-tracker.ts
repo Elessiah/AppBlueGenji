@@ -29,7 +29,6 @@ import {
   AUDIENCE_SUSPEND_GAP_MS,
   AUDIENCE_VISIT_GAP_MINUTES,
   audienceBeaconPath,
-  audiencePageKey,
   parisClock,
   type AudienceBeaconEntry,
   type AudienceDevice,
@@ -142,7 +141,7 @@ export class AudienceTracker {
   /** Tranche d'une lecture qui dure : son temps part en suite, la lecture continue. */
   private checkpoint(): void {
     const segment = this.current;
-    if (!segment || !audiencePageKey(segment.path)) return;
+    if (!segment || !audienceBeaconPath(segment.path)) return;
     const now = this.deps.now();
     if (now - segment.visibleSince < AUDIENCE_CHECKPOINT_MS) return;
     this.finish();
@@ -155,11 +154,13 @@ export class AudienceTracker {
     if (!continuation) this.arrived = true;
     const openedAt = continuation && this.counted ? this.counted.openedAt : now;
     this.current = { path, visibleSince: now, aliveAt: now, openedAt };
-    if (continuation || !audiencePageKey(path)) return;
+    if (continuation) return;
+    // Seule l'adresse type du gabarit part : jamais un numéro, un pseudo ni un nom.
+    const beacon = audienceBeaconPath(path);
+    if (!beacon) return;
     // La page vue part dès son affichage, datée de son début.
     this.counted = { path, openedAt };
-    // Seule l'adresse type du gabarit part : jamais un numéro, un pseudo ni un nom.
-    const entry: AudienceBeaconEntry = { p: audienceBeaconPath(path) ?? "/autre", t: 0, a: 0, d: this.deps.device() };
+    const entry: AudienceBeaconEntry = { p: beacon, t: 0, a: 0, d: this.deps.device() };
     if (first) {
       entry.f = 1;
       entry.r = this.deps.referrerHost();
@@ -179,9 +180,10 @@ export class AudienceTracker {
     if (!segment) return null;
     const now = this.deps.now();
     const end = now - segment.aliveAt > AUDIENCE_SUSPEND_GAP_MS ? segment.aliveAt : now;
-    if (!audiencePageKey(segment.path)) return end;
+    const beacon = audienceBeaconPath(segment.path);
+    if (!beacon) return end;
     const time = Math.max(0, Math.min(AUDIENCE_MAX_ENGAGED_MS, Math.round(end - segment.visibleSince)));
-    if (time > 0) this.enqueue({ p: audienceBeaconPath(segment.path) ?? "/autre", t: time, a: 0, d: this.deps.device(), c: 1 }, end, segment.openedAt);
+    if (time > 0) this.enqueue({ p: beacon, t: time, a: 0, d: this.deps.device(), c: 1 }, end, segment.openedAt);
     return end;
   }
 

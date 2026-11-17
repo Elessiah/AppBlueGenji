@@ -27,6 +27,9 @@ function send(entries: AudienceBeaconEntry[]): void {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ v: entries }),
     keepalive: true,
+    // Sans en-tête `Referer` : il porterait l'adresse affichée (pseudo, numéro),
+    // que la mesure n'envoie jamais. `Origin` et `Sec-Fetch-*` suffisent au serveur.
+    referrerPolicy: "no-referrer",
   }).catch(() => {
     // Mesure d'agrément : jamais de bruit dans la console du visiteur.
   });
