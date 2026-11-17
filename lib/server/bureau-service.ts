@@ -62,6 +62,20 @@ export async function listBureauMembers(): Promise<BureauMember[]> {
   }
 }
 
+/**
+ * Un membre du bureau relu en base (`null` s'il a disparu) : un ajout rejoué
+ * (`runOnceForBody`, option `fresh`) rend sa version actuelle, jamais une
+ * fiche supprimée entre-temps.
+ */
+export async function findBureauMember(id: number): Promise<BureauMember | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<BureauRow[]>(
+    `SELECT id, name, role, role_en, initials, color FROM bg_bureau_members WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  return rows.length > 0 ? fromRow(rows[0]) : null;
+}
+
 /** Crée un membre du bureau et le renvoie. Place le nouveau membre en fin de liste. */
 export async function createBureauMember(input: BureauMemberInput): Promise<BureauMember> {
   const validation = validateBureauInput(input);

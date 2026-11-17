@@ -3,6 +3,8 @@
 import { CyberButton } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
 import { BilingualField } from "@/components/ui/bilingual-field";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
@@ -29,7 +31,8 @@ import styles from "./page.module.css";
 /**
  * Modale de création ou de modification d'une annonce (`RecruitmentSection`).
  * Elle ne tient aucun état : la section garde le formulaire, l'envoi et la
- * fermeture.
+ * fermeture — et ignore toute saisie pendant un envoi (`onChange` gardé par
+ * la section) ; ici, les champs le disent (`readOnly`, `aria-readonly`).
  */
 export function RecruitmentAdEditor({
   editing,
@@ -47,6 +50,7 @@ export function RecruitmentAdEditor({
   editing: RecruitmentAd | null;
   form: RecruitmentFormState;
   onChange: <K extends keyof RecruitmentFormState>(field: K, value: RecruitmentFormState[K]) => void;
+  /** Envoi en cours : champs figés, boutons focalisables (`BUSY_BUTTONS.md`). */
   busy: boolean;
   /** Le Discord a été prérempli depuis le profil du recruteur. */
   prefilledDiscord: boolean;
@@ -68,10 +72,14 @@ export function RecruitmentAdEditor({
       onChange: (lang: "fr" | "en", value: string) => onChange(lang === "fr" ? field : `${field}En`, value),
       // L'aide du rattrapage ne vise qu'un champ qui a un français à traduire.
       enMissing: enMissing && form[field].trim().length > 0,
+      readOnly: busy,
       inputClassName: styles.modalInput,
       labelClassName: styles.modalLabel,
     }) as const;
   const submitLabel = editing ? "Enregistrer" : "Publier";
+  const pendingLabel = editing ? "Enregistrement…" : "Publication…";
+  // Liste ou case pendant l'envoi : le choix est ignoré, et le lecteur d'écran l'annonce.
+  const frozen = busy || undefined;
   return (
     <LandingDialog
       onClose={onClose}
@@ -104,6 +112,7 @@ export function RecruitmentAdEditor({
             value={form.teamName}
             maxLength={120}
             placeholder="Pôle arbitrage · Marie"
+            readOnly={busy}
             onChange={(e) => onChange("teamName", e.target.value)}
           />
         </label>
@@ -112,6 +121,7 @@ export function RecruitmentAdEditor({
           <select
             className={styles.modalInput}
             value={form.domain}
+            aria-readonly={frozen}
             onChange={(e) => onChange("domain", e.target.value as RecruitmentDomain)}
           >
             {RECRUITMENT_DOMAINS.map((d) => (
@@ -171,6 +181,7 @@ export function RecruitmentAdEditor({
           value={form.contactUrl}
           maxLength={2048}
           placeholder="https://…/ticket (SpiceWorks, formulaire…)"
+          readOnly={busy}
           {...errors.aria("contactUrl", "recruitment-contact-url-hint")}
           onChange={(e) => onChange("contactUrl", e.target.value)}
         />
@@ -191,6 +202,7 @@ export function RecruitmentAdEditor({
           value={form.contactDiscord}
           maxLength={RECRUITMENT_DISCORD_MAX}
           placeholder="pseudo#0000 ou lien d'invitation"
+          readOnly={busy}
           {...errors.aria("contactDiscord", "recruitment-contact-discord-hint")}
           onChange={(e) => onChange("contactDiscord", e.target.value)}
         />
@@ -210,6 +222,7 @@ export function RecruitmentAdEditor({
         <select
           className={styles.modalInput}
           value={form.contactPreferred}
+          aria-readonly={frozen}
           onChange={(e) => onChange("contactPreferred", e.target.value as RecruitmentContactChannel)}
         >
           {RECRUITMENT_CONTACT_CHANNELS.map((c) => (
@@ -226,6 +239,7 @@ export function RecruitmentAdEditor({
         <select
           className={styles.modalInput}
           value={form.priority}
+          aria-readonly={frozen}
           onChange={(e) => onChange("priority", e.target.value as RecruitmentPriority)}
         >
           {RECRUITMENT_PRIORITIES.map((p) => (
@@ -246,17 +260,22 @@ export function RecruitmentAdEditor({
         <input
           type="checkbox"
           checked={form.active}
+          aria-readonly={frozen}
           onChange={(e) => onChange("active", e.target.checked)}
         />
         <span>Annonce active (visible publiquement)</span>
       </label>
 
       <div className={styles.modalActions}>
-        <CyberButton variant="ghost" onClick={onClose} disabled={busy}>
-          Annuler
+        <CyberButton variant="ghost" asChild>
+          <BusyButton busy={false} blocked={busy} onClick={onClose}>
+            Annuler
+          </BusyButton>
         </CyberButton>
-        <CyberButton variant="primary" onClick={onSubmit} disabled={busy}>
-          {busy ? "…" : submitLabel}
+        <CyberButton variant="primary" asChild>
+          <BusyButton busy={busy} onClick={onSubmit}>
+            <BusyLabel busy={busy} idle={submitLabel} pending={pendingLabel} />
+          </BusyButton>
         </CyberButton>
       </div>
     </LandingDialog>

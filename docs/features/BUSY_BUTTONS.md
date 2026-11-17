@@ -172,4 +172,21 @@ annoncer de l'attente.
   en `aria-readonly`, qui n'ouvre plus au toucher) se dit en couleurs et en
   tirets. Une suppression refusée parce qu'un autre envoi tient la section le dit
   par une notification neutre (`BUSY_REFUSED_MESSAGE`).
+- Association, bénévoles, recrutement (EF-69) : `BureauSection`,
+  `BenevolesSection`, `RecruitmentSection` et `RecruitmentAdEditor` (qui reçoit
+  `busy` et dont la section garde `onChange`) — `tests/app/association-busy-buttons.test.ts`.
+  Une garde par section : enregistrer, déplacer, supprimer **et importer la
+  photo** d'un bénévole partagent un `run` (« Ajouter » pressé pendant l'envoi
+  de la photo partait sans elle). Le succès ferme la fenêtre par `closeDialog()`
+  — `close()` interroge la garde, encore tenue. Champs en `readOnly`, listes et
+  case « Annonce active » en `aria-readonly` (choix ignoré), « Couleur
+  aléatoire » du bureau refusée pendant l'envoi. Flèches d'ordre par
+  `useArrowRefocus` (listes `bureau`, `recruitment`, `benevole-category` — une
+  catégorie y est désignée par l'id de son premier bénévole, son nom libre
+  n'entre pas dans un sélecteur). Ajouts sans doublon : `POST /api/benevoles`,
+  `/api/association/bureau` et `/api/recruitment` passent par `runOnceForBody`
+  (option `fresh` : `findBenevole`, `findBureauMember`, `findRecruitmentAd`), et
+  refusent un corps qui n'est pas un objet (`INVALID_BODY`). Libellés d'attente,
+  restés en français (D4) : « Enregistrement… », « Ajout… », « Publication… »,
+  « Envoi… ».
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

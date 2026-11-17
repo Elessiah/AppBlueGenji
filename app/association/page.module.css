@@ -157,21 +157,34 @@
   background: rgba(90, 200, 255, 0.05);
 }
 
-.bureauAction:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.bureauAction:disabled:hover {
-  color: var(--ink-mute);
-  border-color: var(--line-soft);
-  background: transparent;
-}
-
 .bureauActionDanger:hover {
   color: var(--red-live, #ff6e82);
   border-color: rgba(255, 110, 130, 0.6);
   background: rgba(255, 110, 130, 0.06);
+}
+
+/* Désarmé par `aria-disabled` (`BusyButton` : le bouton garde le focus) : dit en
+   couleurs, jamais en `opacity`, et sans réaction au survol. En attente
+   (`aria-busy`), le libellé reste lisible : curseur d'attente, liseré en tirets. */
+.bureauAction[aria-disabled="true"],
+.bureauAction[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border-color: var(--line-soft);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.bureauAction[aria-disabled="true"][aria-busy="true"],
+.bureauAction[aria-disabled="true"][aria-busy="true"]:hover {
+  color: var(--ink-mute);
+  border-style: dashed;
+  border-color: var(--blue-500);
+  cursor: progress;
+}
+
+.bureauAction:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
 }
 
 /* Flèches de réordonnancement : carré compact, glyphe centré. */
@@ -242,6 +255,14 @@
 .modalInput:focus {
   border-color: var(--blue-500);
   box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.28);
+}
+
+/* Envoi en cours : le champ ne reçoit plus de saisie (`readOnly`) ; il le dit
+   en couleurs et en tirets, texte toujours lisible (≥ 4,5:1), jamais en `opacity`. */
+.modalInput[readonly] {
+  border-style: dashed;
+  color: var(--ink-mute);
+  cursor: progress;
 }
 
 .modalActions {

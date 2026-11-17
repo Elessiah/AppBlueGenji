@@ -8,6 +8,7 @@ import { GET, POST } from "@/app/api/benevoles/route";
 import { PUT, DELETE } from "@/app/api/benevoles/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/benevoles-service";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -227,5 +228,110 @@ describe("DELETE /api/benevoles/[id] — photo", () => {
     const res = await DELETE(jsonReq("DELETE", {}), params("1"));
     expect(res.status).toBe(200);
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith("/api/uploads/avatars/12-abc.webp", "benevoles");
+  });
+});
+
+describe("POST /api/benevoles — renvoi du même ajout", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const OTHER = authUser({ id: 3, isAdmin: true });
+  const created = { ...sampleBenevole, id: 7 };
+  const input = { firstName: "Marie", lastName: "Dupont", category: "Développeur", categoryEn: "Developer", joinedAt: "2024-03-15" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+    jest.mocked(service.findBenevole).mockImplementation(async () => created);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("POST_sameRequestKeyTwice_createsOnceAndReturnsSameResource", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+
+    const first = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const second = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(service.createBenevole).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe(201);
+    expect(await second.json()).toEqual(await first.json());
+  });
+
+  it("POST_sameRequestKeyOtherUser_createsAgain", async () => {
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(OTHER);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(service.createBenevole).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_noRequestKey_createsEachTime", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", input));
+    await POST(jsonReq("POST", input));
+
+    expect(service.createBenevole).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_firstAttemptFails_retryWithSameKeyCreates", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockRejectedValueOnce(new Error("FIRST_NAME_REQUIRED")).mockResolvedValueOnce(created);
+
+    const failed = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const retried = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(failed.status).toBe(400);
+    expect(retried.status).toBe(201);
+    expect(service.createBenevole).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+    jest.mocked(service.findBenevole).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createBenevole).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(created);
+    const current = { ...created, lastName: "Martin" };
+    jest.mocked(service.findBenevole).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ benevole: current });
+    expect(service.createBenevole).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createBenevole).not.toHaveBeenCalled();
+  });
+
+  it("POST_arrayBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", [input]));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createBenevole).not.toHaveBeenCalled();
   });
 });

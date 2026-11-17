@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -17,11 +19,16 @@ import {
   validateBureauInput,
 } from "@/lib/shared/bureau";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { arrowKey } from "@/lib/shared/arrow-refocus";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { scopedText } from "@/lib/shared/scoped-text";
 import { hasEnglish } from "@/lib/shared/staff-translation";
 import type frAssociation from "@/messages/fr/association.json";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
+import { BUSY_REFUSED_MESSAGE } from "@/components/cyber/landing/showcase-messages";
 import styles from "./page.module.css";
 
 interface BureauSectionProps {
@@ -59,6 +66,7 @@ export function BureauSection({
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const fieldErrors = useFieldErrors(BUREAU_FIELD_ERRORS, ROLE_FIELD_IDS);
   const [members, setMembers] = useState<BureauMember[]>(initialMembers);
   // Le bureau dans la langue de la page : sous `/en`, un membre dont le rôle
@@ -67,12 +75,23 @@ export function BureauSection({
   const [editing, setEditing] = useState<BureauMember | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Un envoi à la fois pour la section (enregistrer, déplacer, supprimer) :
+  // garde synchrone, boutons focalisables pendant l'attente (`BUSY_BUTTONS.md`).
+  // Un double clic sur une flèche partait deux fois, chaque envoi calculé sur
+  // l'ordre d'avant l'autre.
+  const { busy, isBusy, run } = useBusyGuard();
+  const refocusArrow = useArrowRefocus("bureau");
+  // Clé de l'ajout, oubliée à chaque ouverture : un renvoi du même formulaire
+  // (réponse perdue) rend le membre déjà créé au lieu d'en ajouter un second ;
+  // un formulaire corrigé entre-temps tire une clé neuve (`keyForBody`).
+  const createKey = useRef<KeyedBody | null>(null);
 
   // Les membres de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (m: BureauMember) => isAdmin && m.id > 0;
 
   function openCreate() {
+    if (isBusy()) return;
+    createKey.current = null;
     fieldErrors.clear();
     setEditing(null);
     setForm({ name: "", role: "", roleEn: "", initials: "", color: randomBureauColor() });
@@ -80,6 +99,7 @@ export function BureauSection({
   }
 
   function openEdit(member: BureauMember) {
+    if (isBusy()) return;
     fieldErrors.clear();
     setEditing(member);
     setForm({
@@ -92,12 +112,21 @@ export function BureauSection({
     setOpen(true);
   }
 
-  function close() {
-    if (busy) return;
+  function closeDialog() {
     setOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
   }
+
+  function close() {
+    if (!isBusy()) closeDialog();
+  }
+
+  // Champ modifié pendant un envoi : ignoré, même avant que « readOnly » soit
+  // rendu (ce qui est affiché est ce qui part).
+  const edit = (change: (f: FormState) => FormState) => {
+    if (!isBusy()) setForm(change);
+  };
 
   // Un refus désigne son champ quand il le peut (rôle, anglais du rôle) :
   // rattaché à lui, focus ramené, et la même phrase en notification.
@@ -111,6 +140,7 @@ export function BureauSection({
   const previewInitials = (form.initials.trim() || computeInitials(form.name) || "·").toUpperCase();
 
   async function submit() {
+    if (isBusy()) return;
     if (!form.name.trim()) {
       showError("Le nom est requis.");
       return;
@@ -130,35 +160,34 @@ export function BureauSection({
       return;
     }
 
-    setBusy(true);
+    await run(async () => {
+      try {
+        const url = editing ? `/api/association/bureau/${editing.id}` : "/api/association/bureau";
+        const res = await fetch(url, {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
+        });
+        const data = (await res.json()) as { member?: BureauMember; error?: string };
+        if (!res.ok || !data.member) {
+          refuse(data.error, "Échec de l'enregistrement.");
+          return;
+        }
 
-    try {
-      const url = editing ? `/api/association/bureau/${editing.id}` : "/api/association/bureau";
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { member?: BureauMember; error?: string };
-      if (!res.ok || !data.member) {
-        refuse(data.error, "Échec de l'enregistrement.");
-        return;
+        const saved = data.member;
+        if (editing) {
+          setMembers((prev) => prev.map((m) => (m.id === saved.id ? saved : m)));
+          showSuccess("Membre du bureau mis à jour.");
+        } else {
+          // Si on partait du bureau de secours, on bascule sur la liste réelle.
+          setMembers((prev) => [...prev.filter((m) => m.id > 0), saved]);
+          showSuccess("Membre du bureau ajouté.");
+        }
+        closeDialog();
+      } catch {
+        showError("Erreur réseau, réessaye.");
       }
-
-      if (editing) {
-        setMembers((prev) => prev.map((m) => (m.id === data.member!.id ? data.member! : m)));
-        showSuccess("Membre du bureau mis à jour.");
-      } else {
-        // Si on partait du bureau de secours, on bascule sur la liste réelle.
-        setMembers((prev) => [...prev.filter((m) => m.id > 0), data.member!]);
-        showSuccess("Membre du bureau ajouté.");
-      }
-      close();
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // Déplace un membre d'un cran (direction -1 = vers le haut, +1 = vers le bas)
@@ -167,61 +196,66 @@ export function BureauSection({
     const target = index + direction;
     if (target < 0 || target >= members.length) return;
 
-    const previous = members;
-    const reordered = [...members];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setMembers(reordered);
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/association/bureau/reorder", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((m) => m.id) }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+    await run(async () => {
+      const previous = members;
+      const reordered = [...members];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      const id = members[index].id;
+      const arrow = direction < 0 ? "up" : "down";
+      setMembers(reordered);
+      refocusArrow(id, arrow);
+      try {
+        const res = await fetch("/api/association/bureau/reorder", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: reordered.map((m) => m.id) }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+          setMembers(previous);
+          refocusArrow(id, arrow);
+          return;
+        }
+        showSuccess("Ordre du bureau mis à jour.");
+      } catch {
+        showError("Erreur réseau, réessaye.");
         setMembers(previous);
-        return;
+        refocusArrow(id, arrow);
       }
-      showSuccess("Ordre du bureau mis à jour.");
-    } catch {
-      showError("Erreur réseau, réessaye.");
-      setMembers(previous);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const [pendingRemoval, setPendingRemoval] = useState<BureauMember | null>(null);
 
   async function remove(member: BureauMember): Promise<boolean> {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/association/bureau/${member.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+    const done = await run(async () => {
+      try {
+        const res = await fetch(`/api/association/bureau/${member.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+          return false;
+        }
+        // Si plus aucun membre réel, réafficher le bureau de secours — c'est ce
+        // que renverrait un rechargement (table vide → FALLBACK_BUREAU).
+        setMembers((prev) => {
+          const next = prev.filter((m) => m.id !== member.id);
+          return next.length === 0 ? FALLBACK_BUREAU : next;
+        });
+        showSuccess("Membre du bureau supprimé.");
+        return true;
+      } catch {
+        showError("Erreur réseau, réessaye.");
         return false;
       }
-      // Si plus aucun membre réel, réafficher le bureau de secours — c'est ce
-      // que renverrait un rechargement (table vide → FALLBACK_BUREAU).
-      setMembers((prev) => {
-        const next = prev.filter((m) => m.id !== member.id);
-        return next.length === 0 ? FALLBACK_BUREAU : next;
-      });
-      showSuccess("Membre du bureau supprimé.");
-      return true;
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
-    return false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  const pendingLabel = editing ? "Enregistrement…" : "Ajout…";
   // Sous `/en`, un bureau dont aucun rôle n'est encore traduit : le dire,
   // plutôt qu'une grille vide sous « 0 MEMBERS ».
   const pendingTranslation = shown.length === 0 && members.length > 0;
@@ -236,8 +270,12 @@ export function BureauSection({
         <div className={styles.bureauHeadActions}>
           {!pendingTranslation && <span className={styles.meta}>{t("meta", { count: shown.length })}</span>}
           {isAdmin && (
-            <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
-              + Ajouter
+            <CyberButton variant="primary" asChild>
+              {/* Bloqué pendant un déplacement ou une suppression : il le dit
+                  (`aria-busy`) et garde son focus. */}
+              <BusyButton busy={busy} onClick={openCreate} lang={staffLang}>
+                + Ajouter
+              </BusyButton>
             </CyberButton>
           )}
         </div>
@@ -260,47 +298,51 @@ export function BureauSection({
                 {/* Ordre réglé en français seulement : sous /en, des voisins sans anglais sont masqués. */}
                 {locale === DEFAULT_LOCALE && (
                   <>
-                    <button
-                      type="button"
+                    <BusyButton
+                      busy={busy}
+                      blocked={index === 0}
                       className={`${styles.bureauAction} ${styles.moveAction}`}
-                      onClick={() => move(index, -1)}
-                      disabled={busy || index === 0}
+                      onClick={() => void move(index, -1)}
+                      data-arrow={arrowKey("bureau", b.id, "up")}
+                      data-edge={index === 0 || undefined}
                       aria-label={`Déplacer ${b.name} vers le haut`}
                       title="Monter"
                     >
                       ↑
-                    </button>
-                    <button
-                      type="button"
+                    </BusyButton>
+                    <BusyButton
+                      busy={busy}
+                      blocked={index === members.length - 1}
                       className={`${styles.bureauAction} ${styles.moveAction}`}
-                      onClick={() => move(index, 1)}
-                      disabled={busy || index === members.length - 1}
+                      onClick={() => void move(index, 1)}
+                      data-arrow={arrowKey("bureau", b.id, "down")}
+                      data-edge={index === members.length - 1 || undefined}
                       aria-label={`Déplacer ${b.name} vers le bas`}
                       title="Descendre"
                     >
                       ↓
-                    </button>
+                    </BusyButton>
                   </>
                 )}
-                <button
-                  type="button"
+                <BusyButton
+                  busy={busy}
                   className={styles.bureauAction}
                   onClick={() => openEdit(b)}
-                  disabled={busy}
                   aria-label={withEnglishMissing(`Modifier ${b.name}`, !hasEnglish(b.roleEn))}
                 >
                   Modifier
                   {!hasEnglish(b.roleEn) && <EnglishMissingMark />}
-                </button>
-                <button
-                  type="button"
+                </BusyButton>
+                <BusyButton
+                  busy={busy}
                   className={`${styles.bureauAction} ${styles.bureauActionDanger}`}
-                  onClick={() => setPendingRemoval(b)}
-                  disabled={busy}
+                  onClick={() => {
+                    if (!isBusy()) setPendingRemoval(b);
+                  }}
                   aria-label={`Supprimer ${b.name}`}
                 >
                   Supprimer
-                </button>
+                </BusyButton>
               </div>
             )}
           </CyberCard>
@@ -321,13 +363,15 @@ export function BureauSection({
 
           <div className={styles.modalPreview}>
             <TeamSigil label={previewInitials} color={form.color || "var(--blue-500)"} size={40} />
-            <button
-              type="button"
+            {/* Refusée pendant l'envoi : la couleur affichée est celle qui part. */}
+            <BusyButton
+              busy={false}
+              blocked={busy}
               className={styles.bureauAction}
-              onClick={() => setForm((f) => ({ ...f, color: randomBureauColor() }))}
+              onClick={() => edit((f) => ({ ...f, color: randomBureauColor() }))}
             >
               Couleur aléatoire
-            </button>
+            </BusyButton>
           </div>
 
           <label className={styles.modalField}>
@@ -338,7 +382,8 @@ export function BureauSection({
               value={form.name}
               maxLength={120}
               placeholder="Léo Perreaut"
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => edit((f) => ({ ...f, name: e.target.value }))}
             />
           </label>
 
@@ -349,8 +394,9 @@ export function BureauSection({
               fields={{ fr: "role", en: "roleEn" }}
               errors={fieldErrors}
               values={{ fr: form.role, en: form.roleEn }}
-              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, role: value } : { ...f, roleEn: value }))}
+              onChange={(lang, value) => edit((f) => (lang === "fr" ? { ...f, role: value } : { ...f, roleEn: value }))}
               maxLength={BUREAU_ROLE_MAX}
+              readOnly={busy}
               placeholders={{ fr: "Président", en: "President" }}
               enMissing={editing !== null && !hasEnglish(editing.roleEn)}
               inputClassName={styles.modalInput}
@@ -365,16 +411,21 @@ export function BureauSection({
               value={form.initials}
               maxLength={4}
               placeholder={computeInitials(form.name) || "LP"}
-              onChange={(e) => setForm((f) => ({ ...f, initials: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => edit((f) => ({ ...f, initials: e.target.value }))}
             />
           </label>
 
           <div className={styles.modalActions}>
-            <CyberButton variant="ghost" onClick={close} disabled={busy}>
-              Annuler
+            <CyberButton variant="ghost" asChild>
+              <BusyButton busy={false} blocked={busy} onClick={close}>
+                Annuler
+              </BusyButton>
             </CyberButton>
-            <CyberButton variant="primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : submitLabel}
+            <CyberButton variant="primary" asChild>
+              <BusyButton busy={busy} onClick={() => void submit()}>
+                <BusyLabel busy={busy} idle={submitLabel} pending={pendingLabel} />
+              </BusyButton>
             </CyberButton>
           </div>
         </LandingDialog>

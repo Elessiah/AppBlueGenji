@@ -104,6 +104,21 @@ export async function getBenevolePhotoUrl(id: number): Promise<string | null> {
   return rows.length > 0 ? rows[0].photo_url || null : null;
 }
 
+/**
+ * Un bénévole relu en base (`null` s'il a disparu) : un ajout rejoué
+ * (`runOnceForBody`, option `fresh`) rend sa version actuelle, jamais une
+ * fiche supprimée entre-temps.
+ */
+export async function findBenevole(id: number): Promise<Benevole | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<BenevoleRow[]>(
+    `SELECT id, first_name, pseudo, last_name, category, category_en, photo_url, joined_at
+     FROM bg_benevoles WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  return rows.length > 0 ? fromRow(rows[0]) : null;
+}
+
 /** Crée un bénévole et le renvoie. */
 export async function createBenevole(input: BenevoleInput): Promise<Benevole> {
   const validation = validateBenevoleInput(input);

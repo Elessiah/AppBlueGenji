@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import {
   createRecruitmentAd,
   deleteRecruitmentAd,
+  findRecruitmentAd,
   getRecruitmentSpotlight,
   listRecruitmentAds,
   reorderRecruitmentAds,
@@ -522,5 +523,44 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
     await getRecruitmentSpotlight();
 
     expect(execute.mock.calls.some(([sql]) => String(sql).trim().startsWith("SELECT"))).toBe(true);
+  });
+});
+
+describe("findRecruitmentAd", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("findRecruitmentAd_existingInactiveId_returnsMappedAd", async () => {
+    const row = { ...HIGHLIGHT_ROW, title_en: "URGENT EN", roles_en: null, body_en: null, active: 0 };
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
+    await mockDb(execute);
+
+    const found = await findRecruitmentAd(5);
+
+    expect(found).toEqual({
+      id: 5,
+      title: "URGENT",
+      titleEn: "URGENT EN",
+      rolesEn: null,
+      bodyEn: null,
+      teamName: null,
+      domain: "AUTRE",
+      roles: null,
+      body: null,
+      contactUrl: null,
+      contactDiscord: null,
+      contactDiscordId: null,
+      contactPreferred: "AUTO",
+      priority: "IMPORTANT",
+      active: false,
+    });
+    expect(execute.mock.calls[0][1]).toEqual([5]);
+  });
+
+  it("findRecruitmentAd_unknownId_returnsNull", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+
+    expect(await findRecruitmentAd(999)).toBeNull();
   });
 });

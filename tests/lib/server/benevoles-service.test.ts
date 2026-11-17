@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import {
   createBenevole,
   deleteBenevole,
+  findBenevole,
   listBenevoles,
   updateBenevole,
 } from "@/lib/server/benevoles-service";
@@ -136,5 +137,36 @@ describe("benevoles-service — mutualisation de la lecture", () => {
       String(sql).trim().startsWith("SELECT id, first_name"),
     );
     expect(reread).toBe(true);
+  });
+});
+
+describe("findBenevole", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("findBenevole_existingId_returnsMappedBenevole", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ROW, id: 3, category_en: "Refereeing" }]]);
+    await mockDb(execute);
+
+    const found = await findBenevole(3);
+
+    expect(found).toEqual({
+      id: 3,
+      firstName: "Léa",
+      pseudo: "lea",
+      lastName: "Martin",
+      category: "Arbitrage",
+      categoryEn: "Refereeing",
+      photoUrl: null,
+      joinedAt: "2025-01-05",
+    });
+    expect(execute.mock.calls[0][1]).toEqual([3]);
+  });
+
+  it("findBenevole_unknownId_returnsNull", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+
+    expect(await findBenevole(999)).toBeNull();
   });
 });

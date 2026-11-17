@@ -80,3 +80,7 @@ initiale et le flag `isAdmin`. Pour les admins :
 ## Langues (lot 5b de l'i18n)
 
 Le rôle a son anglais (`role_en`, `roleEn`), obligatoire à la saisie (`ROLE_EN_REQUIRED` / `ROLE_EN_TOO_LONG`, rattachés au champ anglais). Sous `/en/association`, un membre sans rôle anglais n'est pas rendu ; son bouton « Modifier » porte la marque **EN**. Le nom ne se traduit pas. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.
+
+## Envois
+
+Boutons occupés, focus des flèches d'ordre et ajout sans doublon par clé de requête : `BUSY_BUTTONS.md` (EF-69).

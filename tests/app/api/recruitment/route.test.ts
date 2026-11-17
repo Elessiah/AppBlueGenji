@@ -9,6 +9,7 @@ import { PUT as REORDER } from "@/app/api/recruitment/reorder/route";
 import { GET as HIGHLIGHT } from "@/app/api/recruitment/highlight/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/recruitment-service";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 import type { RecruitmentAd } from "@/lib/shared/recruitment";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -304,5 +305,110 @@ describe("GET /api/recruitment/highlight", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(await res.json()).toEqual({ modal: [], banner: [] });
     spy.mockRestore();
+  });
+});
+
+describe("POST /api/recruitment — renvoi du même ajout", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const OTHER = authUser({ id: 3, isAdmin: true });
+  const created = { ...sampleAd, id: 7 };
+  const input = { title: "Recherche arbitre", titleEn: "Looking for referees", domain: "AUTRE" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+    jest.mocked(service.findRecruitmentAd).mockImplementation(async () => created);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("POST_sameRequestKeyTwice_createsOnceAndReturnsSameResource", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(created);
+
+    const first = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const second = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe(201);
+    expect(await second.json()).toEqual(await first.json());
+  });
+
+  it("POST_sameRequestKeyOtherUser_createsAgain", async () => {
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(created);
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(OTHER);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_noRequestKey_createsEachTime", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", input));
+    await POST(jsonReq("POST", input));
+
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_firstAttemptFails_retryWithSameKeyCreates", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockRejectedValueOnce(new Error("TITLE_REQUIRED")).mockResolvedValueOnce(created);
+
+    const failed = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const retried = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(failed.status).toBe(400);
+    expect(retried.status).toBe(201);
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(created);
+    jest.mocked(service.findRecruitmentAd).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(created);
+    const current = { ...created, title: "Recherche caster" };
+    jest.mocked(service.findRecruitmentAd).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...input, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ ad: current });
+    expect(service.createRecruitmentAd).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createRecruitmentAd).not.toHaveBeenCalled();
+  });
+
+  it("POST_arrayBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", [input]));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createRecruitmentAd).not.toHaveBeenCalled();
   });
 });
