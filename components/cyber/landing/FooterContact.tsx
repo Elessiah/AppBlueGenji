@@ -7,6 +7,9 @@ import { ProtectedContact } from "@/components/ui/protected-contact";
 import { useToast } from "@/components/ui/toast";
 import { useShellText } from "@/components/i18n/shell-text";
 import { CyberButton } from "@/components/cyber";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./FooterContact.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
@@ -39,7 +42,9 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
   const [contact, setContact] = useState<PublicContactInfo>(initialContact);
   const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (`docs/features/BUSY_BUTTONS.md`) : un double clic sur
+  // « Enregistrer » partait deux fois ; les boutons restent focalisables.
+  const { busy, isBusy, run } = useBusyGuard();
 
   function openEdit() {
     setForm(editableContact(contact));
@@ -47,38 +52,44 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
   }
 
   function close() {
-    if (busy) return;
+    if (isBusy()) return;
     setOpen(false);
     setForm(editableContact(contact));
   }
 
+  // Champ modifié pendant l'envoi : ignoré, même avant que « readOnly » soit
+  // rendu (ce qui est affiché est ce qui part).
+  const editField = (field: keyof ContactInfo, value: string) => {
+    if (!isBusy()) setForm((f) => ({ ...f, [field]: value }));
+  };
+
   async function submit() {
+    if (isBusy()) return;
     const validation = validateContactInfo(form);
     if (!validation.ok) {
       showError(ERROR_MESSAGES[validation.error] ?? "Coordonnées invalides.", { lang: frenchPart });
       return;
     }
 
-    setBusy(true);
-    try {
-      const res = await fetch("/api/association/contact", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(validation.value),
-      });
-      const data = (await res.json()) as { contact?: ContactInfo; error?: string };
-      if (!res.ok || !data.contact) {
-        showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.", { lang: frenchPart });
-        return;
+    await run(async () => {
+      try {
+        const res = await fetch("/api/association/contact", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(validation.value),
+        });
+        const data = (await res.json()) as { contact?: ContactInfo; error?: string };
+        if (!res.ok || !data.contact) {
+          showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.", { lang: frenchPart });
+          return;
+        }
+        setContact(toPublicContact(data.contact));
+        setOpen(false);
+        showSuccess("Coordonnées de contact mises à jour.", { lang: frenchPart });
+      } catch {
+        showError("Erreur réseau, réessaye.", { lang: frenchPart });
       }
-      setContact(toPublicContact(data.contact));
-      setOpen(false);
-      showSuccess("Coordonnées de contact mises à jour.", { lang: frenchPart });
-    } catch {
-      showError("Erreur réseau, réessaye.", { lang: frenchPart });
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const hasAny = contact.emailEncoded || contact.discordTag || contact.discordUrl;
@@ -146,7 +157,8 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               value={form.email}
               maxLength={254}
               placeholder="Adresse de l'association"
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => editField("email", e.target.value)}
             />
           </label>
 
@@ -157,7 +169,8 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               value={form.discordTag}
               maxLength={64}
               placeholder="bluegenji"
-              onChange={(e) => setForm((f) => ({ ...f, discordTag: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => editField("discordTag", e.target.value)}
             />
           </label>
 
@@ -168,16 +181,21 @@ export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContac
               value={form.discordUrl}
               maxLength={200}
               placeholder={DISCORD_INVITE_URL}
-              onChange={(e) => setForm((f) => ({ ...f, discordUrl: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => editField("discordUrl", e.target.value)}
             />
           </label>
 
           <div className={styles.actions}>
-            <CyberButton variant="ghost" onClick={close} disabled={busy}>
-              Annuler
+            <CyberButton variant="ghost" asChild>
+              <BusyButton busy={false} blocked={busy} onClick={close}>
+                Annuler
+              </BusyButton>
             </CyberButton>
-            <CyberButton variant="primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : "Enregistrer"}
+            <CyberButton variant="primary" asChild>
+              <BusyButton busy={busy} onClick={submit}>
+                <BusyLabel busy={busy} idle="Enregistrer" pending="Enregistrement…" />
+              </BusyButton>
             </CyberButton>
           </div>
         </LandingDialog>

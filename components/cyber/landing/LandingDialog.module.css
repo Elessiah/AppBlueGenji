@@ -46,7 +46,7 @@
   transition: border-color 0.2s ease, color 0.2s ease;
 }
 
-.close:hover:not(:disabled) {
+.close:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: var(--blue-500, #5ac8ff);
   color: var(--blue-100, #e6f6ff);
 }
@@ -62,9 +62,16 @@
   box-shadow: 0 0 0 2px var(--blue-500, #5ac8ff);
 }
 
-.close:disabled {
+.close:disabled,
+.close[aria-disabled="true"] {
   color: var(--ink-dim);
   cursor: not-allowed;
+}
+
+/* Fermeture refusée le temps d'un envoi (`BusyButton`) : curseur d'attente. */
+.close[aria-disabled="true"][aria-busy="true"] {
+  cursor: progress;
+  border-style: dashed;
 }
 
 /* Listes déroulantes des formulaires de la vitrine : la flèche native, propre

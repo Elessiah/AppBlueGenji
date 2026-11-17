@@ -316,7 +316,7 @@ describe("cases et radios figées pendant l'envoi", () => {
     expect(panel).toMatch(/const onRemove = useCallback\(\s+\(teamId: number, teamName: string\) => \{[\s\S]*?\[isBusy\],/);
     // Les flèches se retrouvent par data-arrow : aucune ref recréée à chaque rendu.
     expect(panel).not.toMatch(/ref=\{\(node\)/);
-    expect(panel).toContain("[data-arrow=");
+    expect(panel).toContain('data-arrow={arrowKey("seeding", reg.teamId, "up")}');
   });
 
   it("globals_frozenForm_checkboxesSelectsAndButtonsDimmedByColour", () => {

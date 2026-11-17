@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { BilingualField, EnglishMissingHint } from "@/components/ui/bilingual-field";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
@@ -14,7 +16,9 @@ import {
   aboutStatValueNeedsEnglish,
   validateAboutStatInput,
 } from "@/lib/shared/about-stats";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { hasEnglish } from "@/lib/shared/staff-translation";
 import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutStats.module.css";
@@ -77,10 +81,16 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
       ? { value: editing.value, valueEn: editing.valueEn ?? "", label: editing.label, labelEn: editing.labelEn ?? "" }
       : { value: "", valueEn: "", label: "", labelEn: "" },
   );
-  const [busy, setBusy] = useState(false);
+  // Garde synchrone (`BUSY_BUTTONS.md`) : Entrée dans le dernier champ et un
+  // clic sur « Ajouter » partis dans la même image n'envoient qu'une fois.
+  const { busy, isBusy, run } = useBusyGuard();
+  // Clé de l'ajout (la fenêtre est montée à chaque ouverture) : un renvoi du
+  // même formulaire (réponse perdue) rend la carte déjà créée ; un formulaire
+  // corrigé entre-temps tire une clé neuve (`keyForBody`, `lib/server/idempotency.ts`).
+  const createKey = useRef<KeyedBody | null>(null);
 
   function close() {
-    if (busy) return;
+    if (isBusy()) return;
     onClose();
   }
 
@@ -93,7 +103,7 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
   }
 
   async function submit() {
-    if (busy) return;
+    if (isBusy()) return;
     const payload = {
       value: form.value.trim(),
       valueEn: form.valueEn.trim(),
@@ -108,28 +118,28 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
       return;
     }
 
-    setBusy(true);
-    try {
-      const url = editing ? `/api/association/about-stats/${editing.id}` : "/api/association/about-stats";
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { stat?: AboutStat; error?: string };
-      if (!res.ok || !data.stat) {
-        refuse(data.error, "Échec de l'enregistrement.");
-        return;
+    await run(async () => {
+      try {
+        const url = editing ? `/api/association/about-stats/${editing.id}` : "/api/association/about-stats";
+        const res = await fetch(url, {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
+        });
+        const data = (await res.json()) as { stat?: AboutStat; error?: string };
+        if (!res.ok || !data.stat) {
+          refuse(data.error, "Échec de l'enregistrement.");
+          return;
+        }
+        onSaved(data.stat, editing === null);
+      } catch {
+        showError("Erreur réseau, réessaye.");
       }
-      onSaved(data.stat, editing === null);
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  const pendingLabel = editing ? "Enregistrement…" : "Ajout…";
   // Calculés ici seulement : la vitrine, modale fermée, n'en paie rien.
   // La valeur saisie se lirait telle quelle sur la page anglaise : le champ anglais le dit.
   const valueEnMissing = aboutStatValueNeedsEnglish(form);
@@ -163,8 +173,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           readOnly={busy}
           {...fieldErrors.aria("value")}
           onChange={(e) => {
+            if (isBusy()) return;
             fieldErrors.clear("value");
-            setForm((f) => ({ ...f, value: e.target.value }));
+            const value = e.target.value;
+            setForm((f) => ({ ...f, value }));
           }}
           onKeyDown={focusNextOnEnter(STAT_FIELD_IDS.valueEn)}
         />
@@ -196,8 +208,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           readOnly={busy}
           {...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID, valueEnNote !== null && VALUE_EN_MISSING_ID)}
           onChange={(e) => {
+            if (isBusy()) return;
             fieldErrors.clear("valueEn");
-            setForm((f) => ({ ...f, valueEn: e.target.value }));
+            const valueEn = e.target.value;
+            setForm((f) => ({ ...f, valueEn }));
           }}
           onKeyDown={focusNextOnEnter(STAT_FIELD_IDS.label)}
         />
@@ -215,7 +229,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           fields={{ fr: "label", en: "labelEn" }}
           errors={fieldErrors}
           values={{ fr: form.label, en: form.labelEn }}
-          onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }))}
+          onChange={(lang, value) => {
+            // Saisie arrivée avant que « readOnly » soit rendu : ignorée.
+            if (!isBusy()) setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }));
+          }}
           maxLength={ABOUT_STAT_LABEL_MAX}
           placeholders={{ fr: "Bénévole", en: "Volunteer-run" }}
           onEnter={() => void submit()}
@@ -227,22 +244,14 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
       </div>
 
       <div className={styles.modalActions}>
-        {/* `aria-disabled` + garde (`close`, `submit`) plutôt que `disabled` :
-            le bouton cliqué garde le focus pendant l'envoi. Le nom reste
-            « Enregistrer » / « Ajouter » (`aria-label`) : seul le visuel passe à « … ». */}
-        <button type="button" className={styles.action} onClick={close} aria-disabled={busy}>
+        {/* `BusyButton` plutôt que `disabled` : le bouton cliqué garde le focus
+            pendant l'envoi, et son libellé dit l'attente (« Ajout… »). */}
+        <BusyButton busy={false} blocked={busy} className={styles.action} onClick={close}>
           Annuler
-        </button>
-        <button
-          type="button"
-          className={styles.actionPrimary}
-          onClick={submit}
-          aria-disabled={busy}
-          aria-busy={busy}
-          aria-label={submitLabel}
-        >
-          {busy ? "…" : submitLabel}
-        </button>
+        </BusyButton>
+        <BusyButton busy={busy} className={styles.actionPrimary} onClick={() => void submit()}>
+          <BusyLabel busy={busy} idle={submitLabel} pending={pendingLabel} />
+        </BusyButton>
       </div>
     </LandingDialog>
   );

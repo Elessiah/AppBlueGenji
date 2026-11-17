@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { BusyButton } from "@/components/ui/busy-button";
 import styles from "./LandingDialog.module.css";
 
 interface LandingDialogProps {
@@ -78,18 +79,19 @@ export function LandingDialog({
       >
         {/* Fermeture d'en-tête, collée en haut du panneau : sur téléphone, le
             bouton « Annuler » d'un long formulaire est à plus de mille pixels,
-            et le voile ne laisse qu'une vingtaine de pixels à viser. */}
-        <button
-          type="button"
+            et le voile ne laisse qu'une vingtaine de pixels à viser.
+            Pendant un envoi, il reste focalisable (`BusyButton`) : désactivé,
+            il rendait le focus au `<body>`, derrière la modale. */}
+        <BusyButton
+          busy={busy}
           className={`${styles.close} tap-target`}
           onClick={onClose}
-          disabled={busy}
           aria-label="Fermer"
           title="Fermer"
           data-dialog-close
         >
           <span aria-hidden="true">×</span>
-        </button>
+        </BusyButton>
         <AmbientLang lang={lang}>{children}</AmbientLang>
       </div>
     </div>,

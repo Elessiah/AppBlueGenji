@@ -98,3 +98,11 @@
   gap: 10px;
   margin-top: 4px;
 }
+
+/* Envoi en cours (`readOnly`) : la saisie est ignorée, le champ le dit en
+   couleurs et en tirets, texte lisible (≥ 4,5:1), jamais en `opacity`. */
+.input[readonly] {
+  border-style: dashed;
+  color: var(--ink-mute);
+  cursor: progress;
+}

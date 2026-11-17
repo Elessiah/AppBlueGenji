@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -21,6 +23,10 @@ import {
   validateSponsorInput,
 } from "@/lib/shared/sponsors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import { arrowKey } from "@/lib/shared/arrow-refocus";
+import { withRequestKey, type KeyedBody } from "@/lib/shared/request-key";
 import { englishErrorMessage } from "@/lib/shared/staff-translation";
 import {
   sponsorCardMedia,
@@ -33,6 +39,7 @@ import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { EditableCopy } from "./EditableCopy";
 import { useLandingText } from "@/components/i18n/landing-text";
 import { LandingDialog } from "./LandingDialog";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./SponsorsGrid.module.css";
 
 type SponsorsGridProps = {
@@ -114,6 +121,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const fieldErrors = useFieldErrors(SPONSOR_FIELD_ERRORS, DESCRIPTION_FIELD_IDS);
   // Modale portée dans body : sous `/en`, elle dit elle-même sa langue (D4).
   const { cropImage, cropDialog } = useImageCropper({ lang: staffLang });
@@ -121,12 +129,22 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const [editing, setEditing] = useState<Sponsor | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [logoBusy, setLogoBusy] = useState(false);
-  const [bannerBusy, setBannerBusy] = useState(false);
+  // Un envoi à la fois pour la section — enregistrer, déplacer, supprimer,
+  // importer une image : garde synchrone, boutons focalisables pendant
+  // l'attente (`BUSY_BUTTONS.md`). L'import partage la garde : « Enregistrer »
+  // pressé pendant l'envoi d'un logo partait sans lui, puis le logo importé
+  // arrivait dans un formulaire déjà fermé, perdu.
+  const { busy, isBusy, run } = useBusyGuard();
+  // Image en cours d'envoi : son bouton dit « Envoi… ».
+  const [uploadKind, setUploadKind] = useState<"logo" | "banner" | null>(null);
+  const refocusArrow = useArrowRefocus("sponsor");
+  // Clé de l'ajout, oubliée à chaque ouverture : un renvoi du même formulaire
+  // (réponse perdue) rend le partenaire déjà créé au lieu d'en ajouter un
+  // second ; un formulaire corrigé entre-temps tire une clé neuve
+  // (`keyForBody`, `lib/server/idempotency.ts`).
+  const createKey = useRef<KeyedBody | null>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
-  const uploading = logoBusy || bannerBusy;
 
   // Les sponsors de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (s: Sponsor) => isAdmin && s.id > 0;
@@ -134,6 +152,8 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   const displaySponsors = isAdmin ? items : items.slice(0, 6);
 
   function openCreate() {
+    if (isBusy()) return;
+    createKey.current = null;
     fieldErrors.clear();
     setEditing(null);
     setForm(EMPTY_FORM);
@@ -141,6 +161,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   }
 
   function openEdit(sponsor: Sponsor) {
+    if (isBusy()) return;
     fieldErrors.clear();
     setEditing(sponsor);
     setForm({
@@ -155,12 +176,20 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     setOpen(true);
   }
 
-  function close() {
-    if (busy) return;
+  function closeDialog() {
     setOpen(false);
     setEditing(null);
     setForm(EMPTY_FORM);
   }
+
+  function close() {
+    if (!isBusy()) closeDialog();
+  }
+
+  // Champ modifié pendant un envoi : ignoré (ce qui est affiché est ce qui part).
+  const edit = (change: (f: FormState) => FormState) => {
+    if (!isBusy()) setForm(change);
+  };
 
   // Un refus désigne son champ quand il le peut (description, son anglais) :
   // rattaché à lui, focus ramené, et la même phrase en notification.
@@ -171,6 +200,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
   }
 
   async function submit() {
+    if (isBusy()) return;
     if (!form.name.trim()) {
       showError("Le nom est requis.");
       return;
@@ -193,35 +223,33 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
       return;
     }
 
-    setBusy(true);
+    await run(async () => {
+      try {
+        const url = editing ? `/api/landing/sponsors/${editing.id}` : "/api/landing/sponsors";
+        const res = await fetch(url, {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editing ? payload : withRequestKey(createKey, payload)),
+        });
+        const data = (await res.json()) as { sponsor?: Sponsor; error?: string };
+        if (!res.ok || !data.sponsor) {
+          refuse(data.error, "Échec de l'enregistrement.");
+          return;
+        }
 
-    try {
-      const url = editing ? `/api/landing/sponsors/${editing.id}` : "/api/landing/sponsors";
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { sponsor?: Sponsor; error?: string };
-      if (!res.ok || !data.sponsor) {
-        refuse(data.error, "Échec de l'enregistrement.");
-        return;
+        if (editing) {
+          setItems((prev) => sortByTier(prev.map((s) => (s.id === data.sponsor!.id ? data.sponsor! : s))));
+          showSuccess("Partenaire mis à jour.");
+        } else {
+          // Si on partait des sponsors de secours, on bascule sur la liste réelle.
+          setItems((prev) => sortByTier([...prev.filter((s) => s.id > 0), data.sponsor!]));
+          showSuccess("Partenaire ajouté.");
+        }
+        closeDialog();
+      } catch {
+        showError("Erreur réseau, réessaye.");
       }
-
-      if (editing) {
-        setItems((prev) => sortByTier(prev.map((s) => (s.id === data.sponsor!.id ? data.sponsor! : s))));
-        showSuccess("Partenaire mis à jour.");
-      } else {
-        // Si on partait des sponsors de secours, on bascule sur la liste réelle.
-        setItems((prev) => sortByTier([...prev.filter((s) => s.id > 0), data.sponsor!]));
-        showSuccess("Partenaire ajouté.");
-      }
-      close();
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // Le tri d'affichage regroupe d'abord par palier : un déplacement n'a de sens
@@ -238,58 +266,62 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     if (target < 0 || target >= items.length) return;
     if (items[target].tier !== items[index].tier) return;
 
-    const previous = items;
-    const reordered = [...items];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setItems(reordered);
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/landing/sponsors/reorder", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+    await run(async () => {
+      const previous = items;
+      const reordered = [...items];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      const id = items[index].id;
+      const arrow = direction < 0 ? "up" : "down";
+      setItems(reordered);
+      refocusArrow(id, arrow);
+      try {
+        const res = await fetch("/api/landing/sponsors/reorder", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+          setItems(previous);
+          refocusArrow(id, arrow);
+          return;
+        }
+        showSuccess("Ordre des partenaires mis à jour.");
+      } catch {
+        showError("Erreur réseau, réessaye.");
         setItems(previous);
-        return;
+        refocusArrow(id, arrow);
       }
-      showSuccess("Ordre des partenaires mis à jour.");
-    } catch {
-      showError("Erreur réseau, réessaye.");
-      setItems(previous);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const [pendingRemoval, setPendingRemoval] = useState<Sponsor | null>(null);
 
   async function remove(sponsor: Sponsor): Promise<boolean> {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/landing/sponsors/${sponsor.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+    const done = await run(async () => {
+      try {
+        const res = await fetch(`/api/landing/sponsors/${sponsor.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+          return false;
+        }
+        // Si plus aucun sponsor réel, réafficher la vitrine de secours — c'est ce
+        // que renverrait un rechargement (table vide → FALLBACK_SPONSORS).
+        setItems((prev) => {
+          const next = prev.filter((s) => s.id !== sponsor.id);
+          return next.length === 0 ? FALLBACK_SPONSORS : next;
+        });
+        showSuccess("Partenaire supprimé.");
+        return true;
+      } catch {
+        showError("Erreur réseau, réessaye.");
         return false;
       }
-      // Si plus aucun sponsor réel, réafficher la vitrine de secours — c'est ce
-      // que renverrait un rechargement (table vide → FALLBACK_SPONSORS).
-      setItems((prev) => {
-        const next = prev.filter((s) => s.id !== sponsor.id);
-        return next.length === 0 ? FALLBACK_SPONSORS : next;
-      });
-      showSuccess("Partenaire supprimé.");
-      return true;
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
-    return false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
 
   // Logo et bandeau suivent le même chemin : contrôle local (le serveur refait
@@ -302,7 +334,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     const file = event.target.files?.[0];
     // Réinitialise pour permettre de re-sélectionner le même fichier ensuite.
     event.target.value = "";
-    if (!file) return;
+    if (!file || isBusy()) return;
     if (!ACCEPTED_LOGO_TYPES.has(file.type)) {
       showError("Format invalide : PNG, JPEG ou WebP uniquement.");
       return;
@@ -319,29 +351,35 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     );
     if (!image) return;
 
-    const setUploading = kind === "logo" ? setLogoBusy : setBannerBusy;
     const label = kind === "logo" ? "du logo" : "du bandeau";
-    setUploading(true);
-    try {
-      const data = new FormData();
-      appendCroppedImage(data, image);
-      const res = await fetch(`/api/landing/sponsors/${kind}`, { method: "POST", body: data });
-      const payload = (await res.json()) as { logoUrl?: string; bannerUrl?: string; error?: string };
-      const url = kind === "logo" ? payload.logoUrl : payload.bannerUrl;
-      if (!res.ok || !url) {
-        showError(payload.error ? `Échec : ${payload.error}` : `Échec de l'envoi ${label}.`);
-        return;
+    const started = await run(async () => {
+      setUploadKind(kind);
+      try {
+        const data = new FormData();
+        appendCroppedImage(data, image);
+        const res = await fetch(`/api/landing/sponsors/${kind}`, { method: "POST", body: data });
+        const payload = (await res.json()) as { logoUrl?: string; bannerUrl?: string; error?: string };
+        const url = kind === "logo" ? payload.logoUrl : payload.bannerUrl;
+        if (!res.ok || !url) {
+          showError(payload.error ? `Échec : ${payload.error}` : `Échec de l'envoi ${label}.`);
+          return true;
+        }
+        setForm((f) => (kind === "logo" ? { ...f, logoUrl: url } : { ...f, bannerUrl: url }));
+        showSuccess(kind === "logo" ? "Logo importé." : "Bandeau importé.");
+      } catch {
+        showError("Erreur réseau, réessaye.");
+      } finally {
+        setUploadKind(null);
       }
-      setForm((f) => (kind === "logo" ? { ...f, logoUrl: url } : { ...f, bannerUrl: url }));
-      showSuccess(kind === "logo" ? "Logo importé." : "Bandeau importé.");
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setUploading(false);
-    }
+      return true;
+    });
+    // Un autre envoi a pris la section pendant le recadrage : l'image n'est pas
+    // partie, on le dit plutôt que de laisser croire qu'elle est importée.
+    if (!started) showInfo("Image non importée : un autre envoi était en cours, réessaye.");
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  const pendingLabel = editing ? "Enregistrement…" : "Ajout…";
   const bannerFileLabel = form.bannerUrl ? "Changer le fichier" : "Importer un fichier";
   const logoFileLabel = form.logoUrl ? "Changer le fichier" : "Importer un fichier";
 
@@ -358,8 +396,12 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
         <div className={styles.headActions}>
           <span className={styles.meta}>{t("sponsors.count", { count: displaySponsors.length })}</span>
           {isAdmin && (
-            <CyberButton variant="primary" onClick={openCreate} lang={staffLang}>
-              + Ajouter
+            <CyberButton variant="primary" asChild>
+              {/* Bloqué pendant un déplacement ou une suppression : il le dit
+                  (`aria-disabled`, `aria-busy`) au lieu d'ignorer le clic. */}
+              <BusyButton busy={busy} onClick={openCreate} lang={staffLang}>
+                + Ajouter
+              </BusyButton>
             </CyberButton>
           )}
         </div>
@@ -453,45 +495,49 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
               </article>
               {canManage(sponsor) && (
                 <div className={styles.slotActions} data-tap-zone lang={staffLang}>
-                  <button
-                    type="button"
+                  <BusyButton
+                    busy={busy}
+                    blocked={!canMoveUp(index)}
                     className={`${styles.slotAction} ${styles.moveAction}`}
-                    onClick={() => move(index, -1)}
-                    disabled={busy || !canMoveUp(index)}
+                    onClick={() => void move(index, -1)}
+                    data-arrow={arrowKey("sponsor", sponsor.id, "up")}
+                    data-edge={!canMoveUp(index) || undefined}
                     aria-label={`Déplacer ${sponsor.name} vers le haut`}
                     title="Monter"
                   >
                     ↑
-                  </button>
-                  <button
-                    type="button"
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy}
+                    blocked={!canMoveDown(index)}
                     className={`${styles.slotAction} ${styles.moveAction}`}
-                    onClick={() => move(index, 1)}
-                    disabled={busy || !canMoveDown(index)}
+                    onClick={() => void move(index, 1)}
+                    data-arrow={arrowKey("sponsor", sponsor.id, "down")}
+                    data-edge={!canMoveDown(index) || undefined}
                     aria-label={`Déplacer ${sponsor.name} vers le bas`}
                     title="Descendre"
                   >
                     ↓
-                  </button>
-                  <button
-                    type="button"
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy}
                     className={styles.slotAction}
                     onClick={() => openEdit(sponsor)}
-                    disabled={busy}
                     aria-label={withEnglishMissing(`Modifier ${sponsor.name}`, enMissing)}
                   >
                     Modifier
                     {enMissing && <EnglishMissingMark />}
-                  </button>
-                  <button
-                    type="button"
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy}
                     className={`${styles.slotAction} ${styles.slotActionDanger}`}
-                    onClick={() => setPendingRemoval(sponsor)}
-                    disabled={busy}
+                    onClick={() => {
+                      if (!isBusy()) setPendingRemoval(sponsor);
+                    }}
                     aria-label={`Supprimer ${sponsor.name}`}
                   >
                     Supprimer
-                  </button>
+                  </BusyButton>
                 </div>
               )}
             </li>
@@ -516,7 +562,8 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
               value={form.name}
               maxLength={120}
               placeholder="LOGITECH G"
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => edit((f) => ({ ...f, name: e.target.value }))}
             />
           </label>
 
@@ -528,8 +575,9 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
               errors={fieldErrors}
               values={{ fr: form.description, en: form.descriptionEn }}
               onChange={(lang, value) =>
-                setForm((f) => (lang === "fr" ? { ...f, description: value } : { ...f, descriptionEn: value }))
+                edit((f) => (lang === "fr" ? { ...f, description: value } : { ...f, descriptionEn: value }))
               }
+              readOnly={busy}
               maxLength={SPONSOR_DESCRIPTION_MAX}
               required={false}
               multiline
@@ -551,10 +599,15 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
 
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>Palier</span>
+            {/* Liste : `aria-readonly` pendant un envoi, le choix y est ignoré (`edit`). */}
             <select
               className={styles.modalInput}
               value={form.tier}
-              onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as SponsorTier }))}
+              aria-readonly={busy || undefined}
+              onChange={(e) => {
+                const tier = e.target.value as SponsorTier;
+                edit((f) => ({ ...f, tier }));
+              }}
             >
               {SPONSOR_TIERS.map((tier) => (
                 <option key={tier} value={tier}>
@@ -575,10 +628,12 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
               value={form.websiteUrl}
               maxLength={2048}
               placeholder="https://exemple.com"
+              readOnly={busy}
               {...fieldErrors.aria("websiteUrl")}
               onChange={(e) => {
-                fieldErrors.clear("websiteUrl");
-                setForm((f) => ({ ...f, websiteUrl: e.target.value }));
+                const websiteUrl = e.target.value;
+                edit((f) => ({ ...f, websiteUrl }));
+                if (!isBusy()) fieldErrors.clear("websiteUrl");
               }}
             />
             <FieldErrorText fieldId={DESCRIPTION_FIELD_IDS.websiteUrl} message={fieldErrors.message("websiteUrl")} />
@@ -604,23 +659,23 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                   className={styles.logoFileInput}
                   onChange={(e) => uploadImage(e, "banner")}
                 />
-                <button
-                  type="button"
+                <BusyButton
+                  busy={uploadKind === "banner"}
+                  blocked={busy}
                   className={styles.logoUploadBtn}
                   onClick={() => bannerFileRef.current?.click()}
-                  disabled={uploading || busy}
                 >
-                  {bannerBusy ? "Envoi…" : bannerFileLabel}
-                </button>
+                  <BusyLabel busy={uploadKind === "banner"} idle={bannerFileLabel} pending="Envoi…" />
+                </BusyButton>
                 {form.bannerUrl && (
-                  <button
-                    type="button"
+                  <BusyButton
+                    busy={false}
+                    blocked={busy}
                     className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
-                    onClick={() => setForm((f) => ({ ...f, bannerUrl: "" }))}
-                    disabled={uploading || busy}
+                    onClick={() => edit((f) => ({ ...f, bannerUrl: "" }))}
                   >
                     Retirer
-                  </button>
+                  </BusyButton>
                 )}
               </div>
             </div>
@@ -649,23 +704,23 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                   className={styles.logoFileInput}
                   onChange={(e) => uploadImage(e, "logo")}
                 />
-                <button
-                  type="button"
+                <BusyButton
+                  busy={uploadKind === "logo"}
+                  blocked={busy}
                   className={styles.logoUploadBtn}
                   onClick={() => logoFileRef.current?.click()}
-                  disabled={uploading || busy}
                 >
-                  {logoBusy ? "Envoi…" : logoFileLabel}
-                </button>
+                  <BusyLabel busy={uploadKind === "logo"} idle={logoFileLabel} pending="Envoi…" />
+                </BusyButton>
                 {form.logoUrl && (
-                  <button
-                    type="button"
+                  <BusyButton
+                    busy={false}
+                    blocked={busy}
                     className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
-                    onClick={() => setForm((f) => ({ ...f, logoUrl: "" }))}
-                    disabled={uploading || busy}
+                    onClick={() => edit((f) => ({ ...f, logoUrl: "" }))}
                   >
                     Retirer
-                  </button>
+                  </BusyButton>
                 )}
               </div>
             </div>
@@ -679,16 +734,23 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
               maxLength={2048}
               placeholder="… ou colle une URL https://exemple.com/logo.png"
               aria-label="URL du logo"
-              onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
+              readOnly={busy}
+              onChange={(e) => edit((f) => ({ ...f, logoUrl: e.target.value }))}
             />
           </div>
 
           <div className={styles.modalActions}>
-            <CyberButton variant="ghost" onClick={close} disabled={busy}>
-              Annuler
+            <CyberButton variant="ghost" asChild>
+              <BusyButton busy={false} blocked={busy} onClick={close}>
+                Annuler
+              </BusyButton>
             </CyberButton>
-            <CyberButton variant="primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : submitLabel}
+            <CyberButton variant="primary" asChild>
+              {/* Pendant l'import d'une image, l'attente est celle de l'image :
+                  le libellé d'envoi n'est pas celui de l'enregistrement. */}
+              <BusyButton busy={busy && uploadKind === null} blocked={busy} onClick={() => void submit()}>
+                <BusyLabel busy={busy && uploadKind === null} idle={submitLabel} pending={pendingLabel} />
+              </BusyButton>
             </CyberButton>
           </div>
         </LandingDialog>

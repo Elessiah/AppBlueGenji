@@ -265,15 +265,23 @@
   background: rgba(255, 110, 130, 0.1);
 }
 
-.slotAction:disabled {
-  opacity: 0.45;
+/* Désarmé par `aria-disabled` (`BusyButton` : le bouton garde le focus) : dit en
+   couleurs, jamais en `opacity`, et sans réaction au survol. En attente
+   (`aria-busy`), le libellé reste lisible : curseur d'attente, liseré en tirets. */
+.slotAction[aria-disabled="true"],
+.slotAction[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border-color: var(--line-soft);
+  background: rgba(5, 8, 12, 0.85);
   cursor: not-allowed;
 }
 
-.slotAction:disabled:hover {
+.slotAction[aria-disabled="true"][aria-busy="true"],
+.slotAction[aria-disabled="true"][aria-busy="true"]:hover {
   color: var(--ink-mute);
-  border-color: var(--line-soft);
-  background: rgba(5, 8, 12, 0.85);
+  border-style: dashed;
+  border-color: var(--blue-500);
+  cursor: progress;
 }
 
 /* Flèches de réordonnancement : carré compact, glyphe centré. */
@@ -401,21 +409,32 @@
   transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
-.logoUploadBtn:hover:not(:disabled) {
+.logoUploadBtn:hover:not([aria-disabled="true"]) {
   color: var(--blue-300);
   border-color: var(--blue-500);
   background: rgba(90, 200, 255, 0.08);
 }
 
-.logoUploadBtnDanger:hover:not(:disabled) {
+.logoUploadBtnDanger:hover:not([aria-disabled="true"]) {
   color: var(--red-live, #ff6e82);
   border-color: rgba(255, 110, 130, 0.6);
   background: rgba(255, 110, 130, 0.1);
 }
 
-.logoUploadBtn:disabled {
-  opacity: 0.5;
+.logoUploadBtn[aria-disabled="true"],
+.logoUploadBtn[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border-color: var(--line-soft);
+  background: var(--cyber-bg, #06080b);
   cursor: not-allowed;
+}
+
+.logoUploadBtn[aria-disabled="true"][aria-busy="true"],
+.logoUploadBtn[aria-disabled="true"][aria-busy="true"]:hover {
+  color: var(--ink-mute);
+  border-style: dashed;
+  border-color: var(--blue-500);
+  cursor: progress;
 }
 
 .logoHint {
@@ -507,4 +526,18 @@
     outline: 2px solid CanvasText;
     outline-offset: 2px;
   }
+}
+
+/* Envoi en cours : le champ ne reçoit plus de saisie (`readOnly`, ou
+   `aria-readonly` pour une liste) ; il le dit en couleurs et en tirets, texte
+   toujours lisible (≥ 4,5:1), jamais en `opacity`. */
+.modalInput[readonly],
+.modalInput[aria-readonly="true"] {
+  border-style: dashed;
+  color: var(--ink-mute);
+  cursor: progress;
+}
+
+select.modalInput[aria-readonly="true"] {
+  pointer-events: none;
 }

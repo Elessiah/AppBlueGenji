@@ -16,6 +16,7 @@ import { fakePool, type SqlQuery } from "../../../helpers/sql-double";
 import * as service from "@/lib/server/sponsors-service";
 import type { Sponsor } from "@/lib/shared/sponsors";
 import { authUser } from "../../../helpers/auth-user";
+import { resetIdempotencyForTests } from "@/lib/server/idempotency";
 
 const admin = authUser({ id: 1, isAdmin: true });
 const normalUser = authUser({ id: 2, isAdmin: false });
@@ -319,5 +320,100 @@ describe("DELETE /api/landing/sponsors/[id]", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.deleteSponsor).mockRejectedValue(new Error("SPONSOR_NOT_FOUND"));
     expect((await DELETE(jsonReq("DELETE", {}), params("99"))).status).toBe(404);
+  });
+});
+
+describe("POST /api/landing/sponsors — renvoi du même ajout", () => {
+  const KEY = "0f9e8d7c-6b5a-4c3d-9e2f-1a0b9c8d7e6f";
+  const OTHER = authUser({ id: 3, isAdmin: true });
+  const created = { id: 7, name: "Boutique", slug: "boutique", tier: "PARTNER" as const, logoUrl: null, bannerUrl: null, websiteUrl: null, description: null, descriptionEn: null };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetIdempotencyForTests();
+    jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: null, bannerUrl: null });
+    jest.mocked(service.findSponsor).mockImplementation(async () => created);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("POST_sameRequestKeyTwice_createsOnceAndReturnsSameResource", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+
+    const first = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    const second = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(service.createSponsor).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe(201);
+    expect(await second.json()).toEqual(await first.json());
+  });
+
+  it("POST_sameRequestKeyOtherUser_createsAgain", async () => {
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(admin).mockResolvedValueOnce(OTHER);
+
+    await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(service.createSponsor).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_noRequestKey_createsEachTime", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+
+    await POST(jsonReq("POST", { name: "Boutique" }));
+    await POST(jsonReq("POST", { name: "Boutique" }));
+
+    expect(service.createSponsor).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_firstAttemptFails_retryWithSameKeyCreates", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockRejectedValueOnce(new Error("NAME_REQUIRED")).mockResolvedValueOnce(created);
+
+    const failed = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    const retried = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(failed.status).toBe(400);
+    expect(retried.status).toBe(201);
+    expect(service.createSponsor).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterDelete_createsAgain", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+    jest.mocked(service.findSponsor).mockResolvedValueOnce(null);
+
+    await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(replay.status).toBe(201);
+    expect(service.createSponsor).toHaveBeenCalledTimes(2);
+  });
+
+  it("POST_replayAfterEdit_returnsCurrentVersion", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createSponsor).mockResolvedValue(created);
+    const current = { ...created, name: "Boutique renommée" };
+    jest.mocked(service.findSponsor).mockResolvedValueOnce(current);
+
+    await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+    const replay = await POST(jsonReq("POST", { ...{ name: "Boutique" }, requestKey: KEY }));
+
+    expect(await replay.json()).toEqual({ sponsor: current });
+    expect(service.createSponsor).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST_nullBody_returns400InvalidBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq("POST", null));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    expect(service.createSponsor).not.toHaveBeenCalled();
   });
 });

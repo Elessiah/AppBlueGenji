@@ -85,6 +85,17 @@
 .root[aria-disabled="true"][aria-busy="true"] {
   opacity: 1;
   cursor: progress;
+  /* Sans curseur (tactile), le tiret dit l'attente : couleurs et mise en page
+     ne changent pas, le libellé reste lisible. */
+  border-style: dashed;
+}
+
+.ghost[aria-disabled="true"][aria-busy="true"] {
+  border-color: var(--blue-500);
+}
+
+.primary[aria-disabled="true"][aria-busy="true"] {
+  border-color: var(--blue-100);
 }
 
 /* Mouvement réduit (préférence système ou menu d'accessibilité) : le bouton

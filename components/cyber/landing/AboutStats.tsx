@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import { BusyButton } from "@/components/ui/busy-button";
 import { EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -12,8 +13,12 @@ import {
   FALLBACK_ABOUT_STATS,
   localizedAboutStats,
 } from "@/lib/shared/about-stats";
+import { arrowKey } from "@/lib/shared/arrow-refocus";
+import { useArrowRefocus } from "@/lib/shared/hooks/useArrowRefocus";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { orReload } from "@/lib/shared/lazy-component";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./AboutStats.module.css";
 
 // Chargée au premier clic sur « Ajouter » / « Modifier » : seul le staff
@@ -47,12 +52,17 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   const staffToast = staffLang ? { lang: staffLang } : undefined;
   const showError = (message: string) => toast.showError(message, staffToast);
   const showSuccess = (message: string) => toast.showSuccess(message, staffToast);
+  const showInfo = (message: string) => toast.showInfo(message, staffToast);
   const [stats, setStats] = useState<AboutStat[]>(initialStats);
   // Sous `/en`, un chiffre sans titre anglais n'est pas rendu.
   const shown = useMemo(() => localizedAboutStats(stats, locale), [stats, locale]);
   // `undefined` : modale fermée ; `null` : création ; une carte : modification.
   const [editing, setEditing] = useState<AboutStat | null | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
+  // Un envoi à la fois (déplacer, supprimer) : garde synchrone, boutons
+  // focalisables pendant l'attente (`BUSY_BUTTONS.md`). Un double clic sur une
+  // flèche partait deux fois, chaque envoi calculé sur l'ordre d'avant l'autre.
+  const { busy, isBusy, run } = useBusyGuard();
+  const refocusArrow = useArrowRefocus("stat");
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (s: AboutStat) => isAdmin && s.id > 0;
@@ -75,59 +85,69 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
     const target = index + direction;
     if (target < 0 || target >= stats.length) return;
 
-    const previous = stats;
-    const reordered = [...stats];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setStats(reordered);
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/association/about-stats/reorder", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+    await run(async () => {
+      const previous = stats;
+      const reordered = [...stats];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      const id = stats[index].id;
+      const arrow = direction < 0 ? "up" : "down";
+      setStats(reordered);
+      refocusArrow(id, arrow);
+      try {
+        const res = await fetch("/api/association/about-stats/reorder", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+          setStats(previous);
+          refocusArrow(id, arrow);
+          return;
+        }
+        showSuccess("Ordre des cartes mis à jour.");
+      } catch {
+        showError("Erreur réseau, réessaye.");
         setStats(previous);
-        return;
+        refocusArrow(id, arrow);
       }
-      showSuccess("Ordre des cartes mis à jour.");
-    } catch {
-      showError("Erreur réseau, réessaye.");
-      setStats(previous);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const [pendingRemoval, setPendingRemoval] = useState<AboutStat | null>(null);
 
   async function remove(stat: AboutStat): Promise<boolean> {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/association/about-stats/${stat.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+    const done = await run(async () => {
+      try {
+        const res = await fetch(`/api/association/about-stats/${stat.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
+          return false;
+        }
+        // Si plus aucune carte réelle, réafficher les cartes de secours — c'est ce
+        // que renverrait un rechargement (table vide → FALLBACK_ABOUT_STATS).
+        setStats((prev) => {
+          const next = prev.filter((s) => s.id !== stat.id);
+          return next.length === 0 ? FALLBACK_ABOUT_STATS : next;
+        });
+        showSuccess("Carte supprimée.");
+        return true;
+      } catch {
+        showError("Erreur réseau, réessaye.");
         return false;
       }
-      // Si plus aucune carte réelle, réafficher les cartes de secours — c'est ce
-      // que renverrait un rechargement (table vide → FALLBACK_ABOUT_STATS).
-      setStats((prev) => {
-        const next = prev.filter((s) => s.id !== stat.id);
-        return next.length === 0 ? FALLBACK_ABOUT_STATS : next;
-      });
-      showSuccess("Carte supprimée.");
-      return true;
-    } catch {
-      showError("Erreur réseau, réessaye.");
-    } finally {
-      setBusy(false);
-    }
-    return false;
+    });
+    if (done === undefined) showInfo(BUSY_REFUSED_MESSAGE);
+    return done ?? false;
   }
+
+  // Ouvrir la fenêtre ou la confirmation pendant un envoi changerait l'écran
+  // sous la requête : le geste parti dans la même image est ignoré.
+  const openEditor = (stat: AboutStat | null) => {
+    if (!isBusy()) setEditing(stat);
+  };
 
   return (
     <>
@@ -147,47 +167,51 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
                   {/* Ordre réglé en français seulement : sous /en, des voisins sans anglais sont masqués. */}
                   {locale === DEFAULT_LOCALE && (
                     <>
-                      <button
-                        type="button"
+                      <BusyButton
+                        busy={busy}
+                        blocked={index === 0}
                         className={`${styles.action} ${styles.moveAction}`}
-                        onClick={() => move(index, -1)}
-                        disabled={busy || index === 0}
+                        onClick={() => void move(index, -1)}
+                        data-arrow={arrowKey("stat", s.id, "up")}
+                        data-edge={index === 0 || undefined}
                         aria-label={`Déplacer la carte ${s.label} vers la gauche`}
                         title="Déplacer avant"
                       >
                         ↑
-                      </button>
-                      <button
-                        type="button"
+                      </BusyButton>
+                      <BusyButton
+                        busy={busy}
+                        blocked={index === stats.length - 1}
                         className={`${styles.action} ${styles.moveAction}`}
-                        onClick={() => move(index, 1)}
-                        disabled={busy || index === stats.length - 1}
+                        onClick={() => void move(index, 1)}
+                        data-arrow={arrowKey("stat", s.id, "down")}
+                        data-edge={index === stats.length - 1 || undefined}
                         aria-label={`Déplacer la carte ${s.label} vers la droite`}
                         title="Déplacer après"
                       >
                         ↓
-                      </button>
+                      </BusyButton>
                     </>
                   )}
-                  <button
-                    type="button"
+                  <BusyButton
+                    busy={busy}
                     className={styles.action}
-                    onClick={() => setEditing(s)}
-                    disabled={busy}
+                    onClick={() => openEditor(s)}
                     aria-label={withEnglishMissing(`Modifier la carte ${s.label}`, needsEnglish)}
                   >
                     Modifier
                     {needsEnglish && <EnglishMissingMark />}
-                  </button>
-                  <button
-                    type="button"
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy}
                     className={`${styles.action} ${styles.actionDanger}`}
-                    onClick={() => setPendingRemoval(s)}
-                    disabled={busy}
+                    onClick={() => {
+                      if (!isBusy()) setPendingRemoval(s);
+                    }}
                     aria-label={`Supprimer la carte ${s.label}`}
                   >
                     Supprimer
-                  </button>
+                  </BusyButton>
                 </div>
               )}
             </div>
@@ -196,9 +220,9 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
       </div>
 
       {isAdmin && (
-        <button type="button" className={styles.addBtn} onClick={() => setEditing(null)} disabled={busy} lang={staffLang}>
+        <BusyButton busy={busy} className={styles.addBtn} onClick={() => openEditor(null)} lang={staffLang}>
           + Ajouter une carte
-        </button>
+        </BusyButton>
       )}
 
       {editing !== undefined && (

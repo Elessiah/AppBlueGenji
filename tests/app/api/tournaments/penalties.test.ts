@@ -158,6 +158,16 @@ describe("POST /api/tournaments/[id]/penalties", () => {
     expect(service.applyEndurancePenalty).toHaveBeenCalledTimes(1);
   });
 
+  it("POST_sameRequestKeyOtherTeam_appliesBoth", async () => {
+    resetIdempotencyForTests();
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+
+    await POST(req({ ...VALID, requestKey: "penalty-key-0000000002" }), params);
+    await POST(req({ ...VALID, teamId: 43, requestKey: "penalty-key-0000000002" }), params);
+
+    expect(service.applyEndurancePenalty).toHaveBeenCalledTimes(2);
+  });
+
   it("POST_noRequestKey_appliesEachTime", async () => {
     resetIdempotencyForTests();
     jest.mocked(getCurrentUser).mockResolvedValue(referee);

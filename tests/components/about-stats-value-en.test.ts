@@ -68,9 +68,9 @@ describe("AboutStats — valeur anglaise", () => {
     expect(source.match(/readOnly=\{busy\}/g)).toHaveLength(3);
   });
 
-  it("le bouton principal garde son nom pendant l'envoi : seul le visuel passe à « … »", () => {
-    expect(source).toContain("aria-label={submitLabel}");
-    expect(source).toContain('{busy ? "…" : submitLabel}');
+  it("le bouton principal garde un libellé pendant l'envoi (« Ajout… »), sans changer de largeur", () => {
+    expect(source).toContain("<BusyLabel busy={busy} idle={submitLabel} pending={pendingLabel} />");
+    expect(source).not.toContain('{busy ? "…" : submitLabel}');
   });
 
   it("la modale n'est chargée qu'au clic du staff, pas dans le morceau public", () => {
@@ -109,10 +109,10 @@ describe("AboutStats — valeur anglaise", () => {
   it("pendant l'envoi, les boutons gardent le focus : aria-disabled + garde, jamais disabled", () => {
     const actions = /<div className=\{styles\.modalActions\}>([\s\S]*?)<\/div>/.exec(source)?.[1] ?? "";
     expect(actions).not.toMatch(/\sdisabled=\{busy\}/);
-    expect(actions.match(/aria-disabled=\{busy\}/g)).toHaveLength(2);
-    expect(actions).toContain("aria-busy={busy}");
-    expect(source).toMatch(/async function submit\(\) \{\r?\n\s+if \(busy\) return;/);
-    expect(source).toMatch(/function close\(\) \{\r?\n\s+if \(busy\) return;/);
+    expect(actions.match(/<BusyButton busy=\{busy\}/g)).toHaveLength(1);
+    expect(actions).toContain("<BusyButton busy={false} blocked={busy}");
+    expect(source).toMatch(/async function submit\(\) \{\r?\n\s+if \(isBusy\(\)\) return;/);
+    expect(source).toMatch(/function close\(\) \{\r?\n\s+if \(isBusy\(\)\) return;/);
     const css = readSource("components/cyber/landing/AboutStats.module.css");
     expect(css).toContain('.action[aria-disabled="true"]');
     expect(css).toContain('.actionPrimary[aria-disabled="true"]');

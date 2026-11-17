@@ -6,6 +6,9 @@ import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { BusyButton } from "@/components/ui/busy-button";
+import { BusyLabel } from "@/components/ui/busy-label";
+import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
@@ -17,6 +20,7 @@ import {
   type SiteCopyEditorEntry,
   type SiteCopyKey,
 } from "@/lib/shared/site-copy";
+import { BUSY_REFUSED_MESSAGE } from "./showcase-messages";
 import styles from "./EditableCopy.module.css";
 
 /**
@@ -96,16 +100,29 @@ export async function submitSiteCopy(
  * L'administration reste en français (D4) : sous `/en`, l'éditeur porte
  * `lang="fr"`.
  */
-export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<EditableCopyProps>) {
+export function EditableCopy({ canEdit, children, ...rest }: Readonly<EditableCopyProps>) {
+  // Le visiteur ne paie rien de l'édition : aucun crochet (garde d'envoi,
+  // routeur, notifications, formulaire) n'est monté pour lui.
+  if (!canEdit) return <>{children}</>;
+  return (
+    <EditableCopyEditor canEdit {...rest}>
+      {children}
+    </EditableCopyEditor>
+  );
+}
+
+function EditableCopyEditor({ copyKey, value, children }: Readonly<EditableCopyProps>) {
   const router = useRouter();
   const locale = useAppLocale();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const entries = useContext(SiteCopyEditorContext);
   const entry: SiteCopyEditorEntry = entries?.[copyKey] ?? { fr: value, en: "", enMissing: false };
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.fr);
   const [draftEn, setDraftEn] = useState(entry.en);
-  const [busy, setBusy] = useState(false);
+  // Un envoi à la fois (enregistrer, rétablir) : garde synchrone partagée, les
+  // boutons restent focalisables pendant l'attente (`BUSY_BUTTONS.md`).
+  const { busy, isBusy, run } = useBusyGuard();
   // La remise à l'origine efface le français **et** l'anglais : elle se confirme.
   const [confirmReset, setConfirmReset] = useState(false);
   const ids: Record<CopyLang, string> = { fr: `copy-${copyKey}`, en: `copy-${copyKey}-en` };
@@ -125,17 +142,17 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
   const label = field?.label ?? copyKey;
   const staffLang = locale === "fr" ? undefined : "fr";
 
-  if (!canEdit) return <>{children}</>;
-
   const refuse = (code: string, fallback: string) => {
     const message = siteCopyErrorMessage(code, fallback);
     fieldErrors.report(code, message);
     showError(message, staffLang ? { lang: staffLang } : undefined);
   };
 
+  // Geste refusé parce qu'un autre envoi tient la section : dit, pas ignoré.
+  const refusedBusy = () => showInfo(BUSY_REFUSED_MESSAGE, staffLang ? { lang: staffLang } : undefined);
+
   const save = async () => {
-    setBusy(true);
-    try {
+    const done = await run(async () => {
       const outcome = await submitSiteCopy(fetch, copyKey, draft, draftEn);
       if (!outcome.ok) {
         refuse(outcome.code, outcome.fallback);
@@ -144,32 +161,32 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
       showSuccess("Texte mis à jour.", staffLang ? { lang: staffLang } : undefined);
       closeEditor();
       router.refresh();
-    } finally {
-      setBusy(false);
-    }
+    });
+    if (done === undefined) refusedBusy();
   };
 
   const reset = async (): Promise<boolean> => {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/site-copy?key=${encodeURIComponent(copyKey)}`, {
-        method: "DELETE",
-      });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        refuse(payload.error ?? "", "Échec de la remise à l'origine.");
+    const done = await run(async () => {
+      try {
+        const res = await fetch(`/api/site-copy?key=${encodeURIComponent(copyKey)}`, {
+          method: "DELETE",
+        });
+        const payload = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          refuse(payload.error ?? "", "Échec de la remise à l'origine.");
+          return false;
+        }
+        showSuccess("Texte d'origine rétabli.", staffLang ? { lang: staffLang } : undefined);
+        closeEditor();
+        router.refresh();
+        return true;
+      } catch {
+        refuse("", "Erreur réseau, réessaye.");
         return false;
       }
-      showSuccess("Texte d'origine rétabli.", staffLang ? { lang: staffLang } : undefined);
-      closeEditor();
-      router.refresh();
-      return true;
-    } catch {
-      refuse("", "Erreur réseau, réessaye.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    });
+    if (done === undefined) refusedBusy();
+    return done ?? false;
   };
 
   if (editing) {
@@ -177,6 +194,8 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
     const control = (lang: CopyLang) => {
       const text = lang === "fr" ? draft : draftEn;
       const onChange = (next: string) => {
+        // Saisie arrivée avant que « readOnly » soit rendu : ignorée.
+        if (isBusy()) return;
         fieldErrors.clear(lang);
         if (lang === "fr") setDraft(next);
         else setDraftEn(next);
@@ -188,6 +207,8 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
         lang,
         maxLength: field?.maxLength,
         required: true,
+        // Ce qui est affiché est ce qui part : la saisie se fige le temps de l'envoi.
+        readOnly: busy,
         ...fieldErrors.aria(
           lang,
           lang === "en" && entry.enMissing && `${ids.en}-hint`,
@@ -232,26 +253,34 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             <FieldErrorText fieldId={ids.en} message={fieldErrors.message("en")} />
           </div>
         </div>
-        <div className={styles.actions}>
-          <button type="button" className="btn ghost" onClick={() => setConfirmReset(true)} disabled={busy}>
-            Rétablir l&apos;original
-          </button>
-          <span className={styles.spacer} />
-          <button
-            type="button"
+        <div className={`${styles.actions} dim-disabled`}>
+          <BusyButton
+            busy={false}
+            blocked={busy}
             className="btn ghost"
             onClick={() => {
+              if (!isBusy()) setConfirmReset(true);
+            }}
+          >
+            Rétablir l&apos;original
+          </BusyButton>
+          <span className={styles.spacer} />
+          <BusyButton
+            busy={false}
+            blocked={busy}
+            className="btn ghost"
+            onClick={() => {
+              if (isBusy()) return;
               setDraft(entry.fr);
               setDraftEn(entry.en);
               closeEditor();
             }}
-            disabled={busy}
           >
             Annuler
-          </button>
-          <button type="button" className="btn" onClick={save} disabled={busy}>
-            {busy ? "Enregistrement…" : "Enregistrer"}
-          </button>
+          </BusyButton>
+          <BusyButton busy={busy} className="btn" onClick={() => void save()}>
+            <BusyLabel busy={busy} idle="Enregistrer" pending="Enregistrement…" />
+          </BusyButton>
         </div>
         {confirmReset ? (
           <ConfirmActionDialog

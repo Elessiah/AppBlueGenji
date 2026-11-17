@@ -104,6 +104,21 @@ export async function getSponsorLogoUrl(id: number): Promise<string | null> {
   return rows.length > 0 ? rows[0].logoUrl : null;
 }
 
+/**
+ * Relit un partenaire par son id (publié ou non), ou `null` s'il n'existe
+ * plus — avant de rejouer un ajout (`runOnce`, option `fresh`).
+ */
+export async function findSponsor(id: number): Promise<Sponsor | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<SponsorRow[]>(
+    `SELECT id, name, slug, tier, logo_url as logoUrl, banner_url as bannerUrl, website_url as websiteUrl, description,
+            description_en as descriptionEn
+     FROM bg_sponsors WHERE id = ? LIMIT 1`,
+    [id]
+  );
+  return rows.length > 0 ? fromRow(rows[0]) : null;
+}
+
 export type SponsorImageUrls = { logoUrl: string | null; bannerUrl: string | null };
 
 /**

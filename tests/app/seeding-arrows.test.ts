@@ -51,7 +51,7 @@ describe("Ordre de départ — flèches seules", () => {
     // De vrais `<button>` (`BusyButton`) : focusables, actionnés à Entrée et à
     // l'espace, et qui gardent le focus pendant l'envoi.
     expect(
-      panel.match(/<BusyButton\s+busy=\{busy\}\s+blocked=\{[^}]+\}\s+data-arrow=\{.\$\{reg\.teamId\}:(?:up|down).\}\s+className=\{styles\.arrow\}/g),
+      panel.match(/<BusyButton\s+busy=\{busy\}\s+blocked=\{[^}]+\}\s+data-arrow=\{arrowKey\("seeding", reg\.teamId, "(?:up|down)"\)\}\s+data-edge=\{(?:index === 0|isLast) \|\| undefined\}\s+className=\{styles\.arrow\}/g),
     ).toHaveLength(2);
   });
 
@@ -61,7 +61,9 @@ describe("Ordre de départ — flèches seules", () => {
     expect(panel).not.toMatch(/disabled=\{busy/);
     // Arrivée en bout de liste, la flèche actionnée est désarmée : le focus
     // passe à celle qui ramène la ligne.
-    expect(panel).toMatch(/preferred\.getAttribute\("aria-disabled"\) !== "true" \? preferred : arrow\(opposite\)/);
+    // Même règle que la vitrine : `useArrowRefocus` lit `data-edge` (`pickArrowTarget`).
+    expect(panel).toContain('const refocusArrow = useArrowRefocus("seeding");');
+    expect(panel).toContain("if (done || optimistic) refocusArrow(teamId, direction);");
   });
 
   it("ne réagit qu'au clic, jamais au défilement", () => {

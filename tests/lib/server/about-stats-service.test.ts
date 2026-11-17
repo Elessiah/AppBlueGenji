@@ -3,6 +3,7 @@ import {
   FALLBACK_ABOUT_STATS,
   createAboutStat,
   deleteAboutStat,
+  findAboutStat,
   listAboutStats,
   updateAboutStat,
 } from "@/lib/server/about-stats-service";
@@ -226,6 +227,20 @@ describe("about-stats-service", () => {
     it("throws NOT_FOUND when nothing is deleted", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(deleteAboutStat(999)).rejects.toThrow("ABOUT_STAT_NOT_FOUND");
+    });
+  });
+
+  describe("findAboutStat", () => {
+    it("findAboutStat_existingId_returnsStat", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 2, value: "10", value_en: null, label: "L", label_en: "E" }]]);
+      await mockDb(execute);
+      expect(await findAboutStat(2)).toEqual({ id: 2, value: "10", valueEn: null, label: "L", labelEn: "E" });
+      expect(execute.mock.calls[0][1]).toEqual([2]);
+    });
+
+    it("findAboutStat_unknownId_returnsNull", async () => {
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+      expect(await findAboutStat(999)).toBeNull();
     });
   });
 });

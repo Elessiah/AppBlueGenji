@@ -100,10 +100,10 @@ annoncer de l'attente.
   pouvait être renvoyé. Les gestes qui **ajoutent** portent une clé de
   requête tirée une fois par geste (`newRequestKey`, `lib/shared/request-key.ts`) :
   `runOnce` (`lib/server/idempotency.ts`, mémoire du processus, 10 min, 2 000
-  entrées, portée = route + utilisateur + cible) exécute la tâche une fois par
+  entrées, portée = route + utilisateur, la cible s'ajoutant à l'identifiant) exécute la tâche une fois par
   clé et rend aux répétitions le même résultat — création d'un tournoi
   (`POST /api/tournaments`, clé de la page) et pénalité d'endurance (clé du
-  dialogue). Un échec n'est pas retenu. « Avancer le tournoi » envoie l'étape
+  dialogue). Un échec n'est pas retenu. Le droit est vérifié par la route avant `runOnce` : un droit retiré ne reçoit jamais un succès rejoué. Une entrée en cours n'est jamais évincée par les plafonds, seulement par l'échéance (10 min) ; chaque portée en garde au plus 100, toutes cibles confondues (un compte qui inonde de clés n'use que sa part), et le plafond global évince d'abord dans la portée la plus fournie. L'empreinte du corps (`bodyFingerprint` : SHA-256 du corps aux clés triées, sans `requestKey`, jamais le corps lui-même) fait partie de l'identifiant : une clé reprise avec un **autre corps** est un autre geste, exécuté et retenu à son tour. Les ajouts de la vitrine (partenaire, pilier, chiffre) relisent l'objet avant de le rejouer (option `fresh`) : modifié entre-temps, sa version actuelle est rendue ; supprimé, l'ajout s'exécute de nouveau au lieu de rendre un objet disparu. « Avancer le tournoi » envoie l'étape
   annoncée (`expectedTarget`) : si le tournoi a déjà avancé, 409
   `TOURNAMENT_STAGE_CHANGED` au lieu d'une étape de plus. L'équipe fantôme
   créée par un essai dont l'inscription échoue est réutilisée au nouvel essai
@@ -130,4 +130,46 @@ annoncer de l'attente.
   éteintes par `globals.css` (mêmes couleurs que `:disabled`, sans survol).
 - Centre de lancement : en échec, le focus revient au bouton pressé
   (« Confirmer prêt », `confirmReadyRef`), resté focalisable.
+- Pages vitrine éditables (EF-68) : `SponsorsGrid`, `AboutPillars`, `AboutStats`
+  (+ `AboutStatEditor`, qui écrivait `aria-disabled` à la main), `EditableCopy`,
+  `FooterContact` et le « × » de `LandingDialog` — `tests/app/showcase-busy-buttons.test.ts`.
+  Une garde par section : enregistrer, déplacer, supprimer **et importer une
+  image** (partenaires) partagent un `run` — « Enregistrer » pressé pendant
+  l'envoi d'un logo partait sans lui, et le logo arrivait dans un formulaire
+  déjà fermé. Champs en `readOnly`, palier en `aria-readonly` (choix ignoré),
+  `CyberButton` habille un `BusyButton` par `asChild`. Libellés d'attente de
+  ces outils de gestion, restés en français (D4) : « Enregistrement… »,
+  « Ajout… », « Envoi… ».
+- **Flèches d'ordre de la vitrine** : la carte déplacée change de place dans le
+  DOM et le bouton pressé perdait le focus. `useArrowRefocus(liste)`
+  (`lib/shared/hooks/useArrowRefocus.ts`, choix pur `pickArrowTarget` dans
+  `lib/shared/arrow-refocus.ts`) le rend à la flèche retrouvée par `data-arrow`
+  — après l'aperçu optimiste et après un retour à l'ordre d'avant —, ou à la
+  flèche opposée quand la carte arrive en bout (`data-edge`). Un focus parti
+  ailleurs entre-temps n'est pas repris. La cible vit dans une `ref` lue avant
+  la peinture (`useLayoutEffect`) : aucune image peinte focus perdu, aucun rendu
+  de plus. L'ordre des engagés d'un tournoi (`RegistrationsPanel`, liste
+  `seeding`) suit le même crochet.
+- Ajouts de la vitrine sans doublon : `POST /api/landing/sponsors`,
+  `/api/association/about-pillars` et `/api/association/about-stats` passent par
+  `runOnce` (portée route + utilisateur) ; la clé est oubliée à chaque ouverture
+  de la fenêtre d'ajout et liée au corps envoyé (`withRequestKey` /
+  `keyForBody`, `lib/shared/request-key.ts`) : le même formulaire renvoyé garde
+  sa clé, un formulaire corrigé après un échec en tire une neuve — sous
+  l'ancienne, le serveur rendrait l'ajout précédent et la correction serait
+  perdue. Jamais envoyée pour une modification (le `PUT` réécrit la même
+  ligne). Les champs ignorent une saisie arrivée pendant l'envoi (`isBusy()`),
+  avant même que `readOnly` soit rendu ; « + Ajouter » des partenaires est un
+  `BusyButton`, et une image recadrée pendant qu'un autre envoi tient la
+  section le dit (notification neutre) au lieu de se perdre.
+- Attente lisible sur la vitrine : seul le contrôle **réellement en attente**
+  porte `aria-busy` (le bouton d'import pendant l'import d'une image,
+  « Enregistrer » pendant un enregistrement) ; « Annuler », « Retirer » et les
+  autres boutons de la fenêtre sont `blocked` (refusés, sans annonce d'attente).
+  Le liseré d'attente est un vrai accent (`--blue-500`, `--blue-100` sur fond
+  bleu), pas le filet `--line-strong-cy` (14 % d'opacité, invisible) ;
+  `CyberButton` pose lui aussi le tiret en attente. Un champ `readOnly` (ou liste
+  en `aria-readonly`, qui n'ouvre plus au toucher) se dit en couleurs et en
+  tirets. Une suppression refusée parce qu'un autre envoi tient la section le dit
+  par une notification neutre (`BUSY_REFUSED_MESSAGE`).
 - Reste à convertir : voir l'entrée « boutons grisés restants » d'`ERREUR.txt`.

@@ -58,6 +58,16 @@ async function loadListAboutPillars(): Promise<AboutPillar[]> {
   return rows.map(fromRow);
 }
 
+/** Relit un pilier par son id, ou `null` s'il n'existe plus — avant de rejouer un ajout (`runOnce`, option `fresh`). */
+export async function findAboutPillar(id: number): Promise<AboutPillar | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<AboutPillarRow[]>(
+    `SELECT id, title, text, title_en, text_en FROM bg_about_pillars WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  return rows.length > 0 ? fromRow(rows[0]) : null;
+}
+
 /** Crée un pilier et le renvoie. Place le nouveau pilier en fin de liste. */
 export async function createAboutPillar(input: AboutPillarInput): Promise<AboutPillar> {
   const validation = validateAboutPillarInput(input);

@@ -64,6 +64,16 @@ async function loadListAboutStats(): Promise<AboutStat[]> {
   return rows.map(fromRow);
 }
 
+/** Relit une carte par son id, ou `null` si elle n'existe plus — avant de rejouer un ajout (`runOnce`, option `fresh`). */
+export async function findAboutStat(id: number): Promise<AboutStat | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<AboutStatRow[]>(
+    `SELECT id, value, value_en, label, label_en FROM bg_about_stats WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  return rows.length > 0 ? fromRow(rows[0]) : null;
+}
+
 /** Crée une carte et la renvoie. Place la nouvelle carte en fin de liste. */
 export async function createAboutStat(input: AboutStatRequestInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
