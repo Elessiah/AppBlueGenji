@@ -1058,7 +1058,8 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 - **Gardé tel quel** : un avatar seulement masqué que l'effacement emporte
   n'est pas bloqué (D19, D6) ; l'avatar par défaut d'un fournisseur n'a pas
   d'exclusion — la modération ne le supprime pas (D20). L'empreinte
-  perceptuelle (D17) viendra dans un lot à part (`ERREUR.txt`).
+  perceptuelle (D17) est gardée à côté du SHA-256 depuis EF-72
+  (`BLOCKED_IMAGE_PHASH.md`).
 
 ## Solde ERREUR.txt (ACCOUNT-DELETION-2, 2026-11-10)
 

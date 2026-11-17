@@ -282,6 +282,16 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
+  // EF-72 / D17 : empreinte perceptuelle aux deux endroits, sans remplissage
+  // (le fichier d'un avatar déjà bloqué est parti).
+  it("recentSchemaChanges_blockedImagePhash_declaredInCreateTableAndMigration", () => {
+    expect(table("bg_blocked_image_hashes")).toMatch(/phash BIGINT UNSIGNED NULL/);
+    expect(table("bg_logo_quarantines")).toMatch(/image_phash BIGINT UNSIGNED NULL/);
+    expect(migrations).toContain("ALTER TABLE bg_blocked_image_hashes ADD COLUMN phash BIGINT UNSIGNED NULL AFTER sha256");
+    expect(migrations).toContain("ALTER TABLE bg_logo_quarantines ADD COLUMN image_phash BIGINT UNSIGNED NULL AFTER image_sha256");
+    expect(migrations).not.toMatch(/UPDATE bg_blocked_image_hashes SET phash/);
+  });
+
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {
     // Un triplet ne sait dire qu'`ADD COLUMN` : la règle des deux endroits ne
     // s'appliquait alors ni à un `ENUM` élargi, ni à un index posé, ni à une clé

@@ -1126,6 +1126,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing new is linked to your account, and what its deletion removes stays the same (these measurements, which are not linked to it, do not depend on it).",
     ],
   },
+  "2026-11-empreinte-perceptuelle-avatar": {
+    linkLabels: [READ_REPORTS],
+    title: "Avatar deleted by moderation: a perceptual hash is added",
+    summary:
+      "When moderation deletes an avatar, the site now keeps, next to its SHA-256 hash, a perceptual hash of the image: it also refuses the same image being uploaded again slightly cropped, resized, darkened or lightened, re-encoded or in another format.",
+    details: [
+      "What it is: a 64-bit summary of what the image looks like (its large light and dark areas), computed on the site, with no third-party service. It cannot be used to rebuild the image and designates no account. An image uploaded as an avatar or as a team logo is refused if its hash is very close to one of the perceptual hashes of the 2,000 most recently blocked images (by block date); older ones stay stored but are no longer compared.",
+      "Where and for how long: exactly where the SHA-256 hash is kept, and for as long — in the list of blocked images, without time limit and with no link to any account, and on the deletion decision as long as that decision is kept. An accepted challenge that lifts the block removes both hashes together from the list of blocked images.",
+      "An avatar deleted before this change stays blocked by its SHA-256 hash only; a perceptual hash is only added if the same image is blocked again while the site still keeps its file (a new deletion, an account erasure, the purge of a hidden avatar), the row keeping the date of its first block. An image that is too simple — nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour — or that the site cannot decode has no perceptual hash: it is blocked by its SHA-256 hash only.",
+      "What does not change: an avatar that is only hidden, or that moderation never deleted, leaves no hash; what deleting an account removes stays the same.",
+    ],
+  },
 };
 
 /**

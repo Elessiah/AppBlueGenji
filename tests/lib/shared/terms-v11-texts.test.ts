@@ -238,9 +238,9 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
 
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
     // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595), des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
-    // Puis l'avis d'exclusion du bot (même jour), le rectificatif de la marque de session (EF-63, plus tard) puis les trois entrées d'EF-65 (2026-11-18), puis la mesure détaillée (STATS-PAGE).
-    expect(PRIVACY_CHANGES.at(-11)?.id).toBe(V11_ID);
-    expect(PRIVACY_CHANGES.at(-7)?.publishedAt).toBe(TERMS_UPDATED_AT);
+    // Puis l'avis d'exclusion du bot (même jour), le rectificatif de la marque de session (EF-63, plus tard) puis les trois entrées d'EF-65 (2026-11-18), puis la mesure détaillée (STATS-PAGE) et l'empreinte perceptuelle (EF-72).
+    expect(PRIVACY_CHANGES.at(-12)?.id).toBe(V11_ID);
+    expect(PRIVACY_CHANGES.at(-8)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();
   });

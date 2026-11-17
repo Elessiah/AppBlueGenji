@@ -2,19 +2,23 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import sharp from "sharp";
 import { getDatabase } from "@/lib/server/database";
+import * as imagePhash from "@/lib/server/image-phash";
+import { imagePerceptualHash, PHASH_MATCH_DISTANCE } from "@/lib/server/image-phash";
 import {
   blockImageHashOn,
   blockImageHashesSafely,
   blockRemovedImageFiles,
   imageSha256,
   isBlockedImage,
+  MAX_COMPARED_PHASHES,
   pinAccountBlockedHashesOn,
   pinClosedQuarantineHashesOn,
-  readImageSha256,
+  readImageFingerprint,
   retireAccountQuarantinesOn,
   unblockImageHashOn,
 } from "@/lib/server/blocked-images";
@@ -25,44 +29,125 @@ import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-doubl
  * la remise en ligne de la même image (`IMAGE_BLOCKED`).
  */
 
+// Octets qui ne sont pas une image : pas d'empreinte perceptuelle, SHA-256 seul.
 const IMAGE = Buffer.from("image webp traitée");
+
+/**
+ * Une vraie image, avec du dessin sur un fond en dégradé (un fond uni la
+ * rendrait trop simple) : elle a une empreinte perceptuelle.
+ */
+async function drawnImage(): Promise<Buffer> {
+  return sharp(
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#123456"/><stop offset="1" stop-color="#80c0a0"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/><circle cx="90" cy="100" r="60" fill="#f0c040"/><rect x="140" y="150" width="90" height="80" fill="#e04080"/><circle cx="200" cy="60" r="35" fill="#202020"/></svg>`,
+    ),
+  )
+    .webp({ quality: 80 })
+    .toBuffer();
+}
 const missingTable = Object.assign(new Error("Table doesn't exist"), { code: "ER_NO_SUCH_TABLE" });
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
+/** Cette empreinte, ses `count` bits les plus bas inversés. */
+function flipLowBits(hash: string, count: number): string {
+  return BigInt.asUintN(64, BigInt(hash) ^ (BigInt(2) ** BigInt(count) - BigInt(1))).toString();
+}
+
+/** L'empreinte perceptuelle d'une image qui doit en avoir une. */
+async function phashOf(image: Buffer): Promise<string> {
+  const hash = await imagePerceptualHash(image);
+  if (hash === null) throw new Error("image sans empreinte");
+  return hash;
+}
+
+/**
+ * Le double SQL d'`isBlockedImage` : `exact` = la clé primaire connaît l'une des
+ * empreintes SHA-256 ; `phashes` = la liste des empreintes perceptuelles posées.
+ */
+function blockedList(exact: boolean, phashes: (string | null)[] = []) {
+  return jest.fn<SqlQuery>(async (sql) =>
+    /^SELECT 1 FROM bg_blocked_image_hashes/.test(sql.trim())
+      ? [exact ? [{ 1: 1 }] : [], []]
+      : [phashes.filter((phash) => phash !== null).map((phash) => ({ phash })), []],
+  );
+}
+
 describe("isBlockedImage", () => {
-  it("isBlockedImage_hashPresent_true", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ 1: 1 }], []]);
+  it("isBlockedImage_exactShaMatch_trueWithOneQueryAndNoPhashScan", async () => {
+    const execute = blockedList(true, ["1"]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHash");
 
     expect(await isBlockedImage(IMAGE)).toBe(true);
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
+
+    // Revue EF-72 perf. 1 : la clé primaire d'abord, ni balayage ni décodage sur une copie exacte.
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(decode).not.toHaveBeenCalled();
   });
 
-  it("isBlockedImage_twoContents_queriesBothHashesInOneStatement", async () => {
+  it("isBlockedImage_twoContents_exactLookupByPrimaryKeyOnBothHashes", async () => {
     const raw = Buffer.from("fichier tel que téléversé");
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    const execute = blockedList(false);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     await isBlockedImage(IMAGE, raw);
 
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0][0]).toContain("sha256 IN (?, ?)");
+    expect(execute.mock.calls[0][0]).toContain("SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (?, ?) LIMIT 1");
+    expect(execute.mock.calls[0][0]).not.toContain(" OR ");
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(raw)]);
   });
 
-  it("isBlockedImage_noContent_falseWithoutQuery", async () => {
-    const execute = jest.fn<SqlQuery>();
+  it("isBlockedImage_exactMiss_readsBoundedPhashListNewestFirst", async () => {
+    const execute = blockedList(false);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    expect(await isBlockedImage()).toBe(false);
-    expect(execute).not.toHaveBeenCalled();
+    await isBlockedImage(IMAGE);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1][0]).toContain("SELECT CAST(phash AS CHAR) AS phash FROM bg_blocked_image_hashes");
+    expect(execute.mock.calls[1][0]).toContain("WHERE phash IS NOT NULL ORDER BY created_at DESC, sha256 LIMIT 2000");
+    expect(MAX_COMPARED_PHASHES).toBe(2_000);
   });
 
-  it("isBlockedImage_hashAbsent_false", async () => {
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[], []]) }));
+  it("isBlockedImage_noRows_falseWithoutDecoding", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false) }));
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHashResult");
+
+    expect(await isBlockedImage(await drawnImage())).toBe(false);
+    expect(decode).not.toHaveBeenCalled();  decode.mockRestore();
+  });
+
+  // EF-72 / D17 : l'allure de l'image traitée, au seuil commun (borne comprise).
+  it("isBlockedImage_phashAtThreshold_true", async () => {
+    const image = await drawnImage();
+    const near = flipLowBits(await phashOf(image), PHASH_MATCH_DISTANCE);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, [near]) }));
+
+    expect(await isBlockedImage(image)).toBe(true);
+  });
+
+  it("isBlockedImage_phashBeyondThreshold_false", async () => {
+    const image = await drawnImage();
+    const far = flipLowBits(await phashOf(image), PHASH_MATCH_DISTANCE + 1);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, [far]) }));
+
+    expect(await isBlockedImage(image)).toBe(false);
+  });
+
+  it("isBlockedImage_matchAmongManyRows_true", async () => {
+    const image = await drawnImage();
+    const near = flipLowBits(await phashOf(image), 3);
+    const others = Array.from({ length: 2000 }, (_, i) => String(BigInt(i) * BigInt("9007199254740993") + BigInt(12345)));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, [...others, near]) }));
+
+    expect(await isBlockedImage(image)).toBe(true);
+  });
+
+  it("isBlockedImage_imageWithoutPhashAgainstPhashRows_false", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, ["0", "18446744073709551615"]) }));
 
     expect(await isBlockedImage(IMAGE)).toBe(false);
   });
@@ -80,6 +165,15 @@ describe("isBlockedImage", () => {
   });
 });
 
+// MySQL 8, requête préparée : `CAST(? AS UNSIGNED)` d'une chaîne plafonne à 2^63 − 1.
+it("blockedImagesSql_phashParameters_castThroughDecimalNeverDirectlyToUnsigned", () => {
+  const source = readFileSync(join(process.cwd(), "lib", "server", "blocked-images.ts"), "utf8");
+  const quarantine = readFileSync(join(process.cwd(), "lib", "server", "logo-quarantine.ts"), "utf8");
+
+  expect(source).not.toContain("CAST(? AS UNSIGNED)");
+  expect(quarantine).not.toContain("CAST(? AS UNSIGNED)");
+});
+
 describe("blockRemovedImageFiles", () => {
   it("blockRemovedImageFiles_readableFile_insertsSha256OnPool", async () => {
     const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
@@ -90,9 +184,11 @@ describe("blockRemovedImageFiles", () => {
     await blockRemovedImageFiles([file]);
 
     // Geste sans ligne qui le justifie : blocage non levable (revue sécurité #571, D18).
-    expect(execute.mock.calls[0][0]).toContain("INSERT INTO bg_blocked_image_hashes (sha256, created_at) VALUES (?, CURRENT_DATE)");
-    expect(execute.mock.calls[0][0]).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
+    expect(execute.mock.calls[0][0]).toContain(
+      "INSERT INTO bg_blocked_image_hashes (sha256, phash, created_at) VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), CURRENT_DATE)",
+    );
+    expect(execute.mock.calls[0][0]).toContain("ON DUPLICATE KEY UPDATE liftable = 0, phash = COALESCE(phash, VALUES(phash))");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), null]);
   });
 
   it("blockRemovedImageFiles_noFile_noDatabase", async () => {
@@ -157,9 +253,9 @@ describe("blockRemovedImageFiles — jour donné (revue juridique #571, D31)", (
 
     await blockRemovedImageFiles([file], { day: "2026-10-03" });
 
-    expect(execute.mock.calls[0][0]).toContain("VALUES (?, ?)");
+    expect(execute.mock.calls[0][0]).toContain("VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), ?)");
     expect(execute.mock.calls[0][0]).not.toContain("CURRENT_DATE");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), "2026-10-03"]);
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), null, "2026-10-03"]);
   });
 
   it("blockRemovedImageFiles_dayGivenLiftable_datesNewHashWithThatDay", async () => {
@@ -167,8 +263,12 @@ describe("blockRemovedImageFiles — jour donné (revue juridique #571, D31)", (
 
     await blockRemovedImageFiles([file], { liftable: true, day: "2026-10-03" });
 
-    expect(execute.mock.calls[0][0]).toContain("INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, ?)");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), "2026-10-03"]);
+    expect(execute.mock.calls[0][0]).toContain(
+      "INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at) VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), 1, ?)",
+    );
+    expect(execute.mock.calls[0][0]).toContain("ON DUPLICATE KEY UPDATE phash = COALESCE(phash, VALUES(phash))");
+    expect(execute.mock.calls[0][0]).not.toContain("liftable = 0");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), null, "2026-10-03"]);
   });
 
   it("blockRemovedImageFiles_malformedDay_fallsBackToCurrentDate", async () => {
@@ -176,8 +276,8 @@ describe("blockRemovedImageFiles — jour donné (revue juridique #571, D31)", (
 
     await blockRemovedImageFiles([file], { day: "2026-10-03 21:14:00" });
 
-    expect(execute.mock.calls[0][0]).toContain("VALUES (?, CURRENT_DATE)");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
+    expect(execute.mock.calls[0][0]).toContain("VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), CURRENT_DATE)");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), null]);
   });
 });
 
@@ -196,8 +296,10 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
     await blockRemovedImageFiles([writeImage(IMAGE), writeImage(IMAGE), writeImage(other)]);
 
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(String(execute.mock.calls[0][0])).toContain("VALUES (?, CURRENT_DATE), (?, CURRENT_DATE)");
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(other)]);
+    expect(String(execute.mock.calls[0][0])).toContain(
+      "VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), CURRENT_DATE), (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), CURRENT_DATE)",
+    );
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), null, imageSha256(other), null]);
   });
 
   it("blockRemovedImageFiles_missingTable_doesNotThrow", async () => {
@@ -243,7 +345,7 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
 
     await blockRemovedImageFiles([join(tmpdir(), "bg-absent-avatar.webp"), writeImage(IMAGE)]);
 
-    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), null]);
     expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s))");
     error.mockRestore();
   });
@@ -285,13 +387,16 @@ describe("blockImageHashOn (D22)", () => {
   it("blockImageHashOn_newHash_insertsLiftableKeepingExistingState", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
 
-    await blockImageHashOn(fakeConnection({ execute }), "abc");
+    await blockImageHashOn(fakeConnection({ execute }), { sha256: "abc", phash: "123" });
 
-    // D31 : datée du jour seulement.
-    expect(execute).toHaveBeenCalledWith(
-      "INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, CURRENT_DATE)",
-      ["abc"],
+    // D31 : datée du jour seulement ; D17 : l'empreinte perceptuelle suit.
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain(
+      "INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at) VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), 1, CURRENT_DATE)",
     );
+    expect(sql).toContain("ON DUPLICATE KEY UPDATE phash = COALESCE(phash, VALUES(phash))");
+    expect(sql).not.toContain("liftable = 0");
+    expect(params).toEqual(["abc", "123"]);
   });
 });
 
@@ -304,10 +409,12 @@ describe("blockRemovedImageFiles — blocage levable (revue sécurité #571, cyc
 
     await blockRemovedImageFiles([file], { liftable: true });
 
-    expect(execute).toHaveBeenCalledWith(
-      "INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, CURRENT_DATE)",
-      [imageSha256(IMAGE)],
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain(
+      "INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at) VALUES (?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), 1, CURRENT_DATE)",
     );
+    expect(sql).not.toContain("liftable = 0");
+    expect(params).toEqual([imageSha256(IMAGE), null]);
   });
 });
 
@@ -318,7 +425,7 @@ describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
     await pinAccountBlockedHashesOn(fakeConnection({ execute }), 7);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)");
+    expect(sql).toContain("INSERT INTO bg_blocked_image_hashes (sha256, phash, liftable, created_at)");
     expect(sql).toContain("WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL");
     // Cycle 3 : une suppression dont la contestation attendait son issue est comprise.
     expect(sql).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
@@ -334,7 +441,9 @@ describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
 
     const [sql] = execute.mock.calls[0];
     // Revue juridique #571 : jour de la purge, à défaut du masquage.
-    expect(sql).toContain("SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines");
+    expect(sql).toContain(
+      "SELECT image_sha256, MAX(image_phash), 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines",
+    );
     expect(sql).toContain("GROUP BY image_sha256");
     expect(sql).not.toContain("NOW()");
   });
@@ -346,17 +455,98 @@ describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
   });
 });
 
-describe("readImageSha256", () => {
-  it("readImageSha256_existingFile_returnsHash", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "bg-sha-"));
-    const file = join(dir, "a.webp");
-    writeFileSync(file, IMAGE);
+describe("readImageFingerprint", () => {
+  it("readImageFingerprint_drawnImage_returnsBothHashes", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
 
-    expect(await readImageSha256(file)).toBe(imageSha256(IMAGE));
+    expect(await readImageFingerprint(file)).toEqual({
+      sha256: imageSha256(image),
+      phash: await imagePerceptualHash(image),
+    });
   });
 
-  it("readImageSha256_missingFile_returnsNull", async () => {
-    expect(await readImageSha256(join(tmpdir(), "absent-bg-sha.webp"))).toBeNull();
+  it("readImageFingerprint_notAnImage_returnsSha256WithoutPhash", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, IMAGE);
+
+    expect(await readImageFingerprint(file)).toEqual({ sha256: imageSha256(IMAGE), phash: null });
+  });
+
+  it("readImageFingerprint_missingFile_returnsNull", async () => {
+    expect(await readImageFingerprint(join(tmpdir(), "absent-bg-sha.webp"))).toBeNull();
+  });
+
+  // Revue EF-72 cycle 1 : l'empreinte perceptuelle se relève hors verrou ; sous
+  // le verrou, seuls la lecture et le SHA-256 sont refaits.
+  it("readImageFingerprint_preparedSameBytes_reusesPreparedPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
+
+    const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(image), phash: "42" });
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: "42" });
+  });
+
+  it("readImageFingerprint_preparedOtherBytes_recomputesPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
+
+    const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(IMAGE), phash: "42" });
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: await phashOf(image) });
+  });
+
+  // Revue EF-72 cycle 2 : une préparation sans empreinte perceptuelle peut
+  // venir d'un décodage en échec passager — le fichier, effacé ensuite, ne
+  // permettrait plus de la calculer.
+  it("readImageFingerprint_preparedSameBytesWithoutPhash_recomputesPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, image);
+
+    const fingerprint = await readImageFingerprint(file, { sha256: imageSha256(image), phash: null });
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(image), phash: await phashOf(image) });
+  });
+
+  // Revue EF-72 cycle 3 : une image trop simple, bien décodée hors verrou,
+  // n'est pas décodée une seconde fois sous le verrou.
+  it("readImageFingerprint_preparedTooSimpleImage_reusesWithoutDecoding", async () => {
+    const plain = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 40, g: 90, b: 200 } } })
+      .webp()
+      .toBuffer();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sha-")), "a.webp");
+    writeFileSync(file, plain);
+    const prepared = await readImageFingerprint(file);
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHashResult");
+
+    const fingerprint = await readImageFingerprint(file, prepared);
+
+    expect(fingerprint).toEqual({ sha256: imageSha256(plain), phash: null });
+    expect(decode).not.toHaveBeenCalled();
+    decode.mockRestore();
+  });
+
+  it("readImageFingerprint_preparedButFileGone_returnsNull", async () => {
+    expect(await readImageFingerprint(join(tmpdir(), "absent-bg-sha.webp"), { sha256: "abc", phash: "42" })).toBeNull();
+  });
+});
+
+describe("blockRemovedImageFiles — empreinte perceptuelle (D17)", () => {
+  it("blockRemovedImageFiles_drawnImage_insertsSha256AndPhash", async () => {
+    const image = await drawnImage();
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, image);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockRemovedImageFiles([file]);
+
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(image), await imagePerceptualHash(image)]);
   });
 });
 
@@ -366,11 +556,33 @@ describe("blockImageHashesSafely", () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(blockImageHashesSafely(["abc"])).resolves.toBeUndefined();
+    await expect(blockImageHashesSafely([{ sha256: "abc", phash: null }])).resolves.toBeUndefined();
 
     expect(execute).toHaveBeenCalledTimes(2);
     expect(logged).toHaveBeenCalledWith(expect.stringContaining("abc"), "Error");
     logged.mockRestore();
+  });
+
+  it("blockImageHashesSafely_failsTwice_logsPhashForManualBlock", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockRejectedValue(new Error("pool saturé")) }));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await blockImageHashesSafely([{ sha256: "abc", phash: "123" }]);
+
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("abc (phash 123)"), "Error");
+    logged.mockRestore();
+  });
+
+  it("blockImageHashesSafely_sameShaWithAndWithoutPhash_insertsOnceWithPhash", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockImageHashesSafely([
+      { sha256: "abc", phash: null },
+      { sha256: "abc", phash: "123" },
+    ]);
+
+    expect(execute.mock.calls[0][1]).toEqual(["abc", "123"]);
   });
 
   it("blockImageHashesSafely_empty_noQuery", async () => {
@@ -423,8 +635,8 @@ describe("pinClosedQuarantineHashesOn (D87)", () => {
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("WHERE id IN (?, ?)");
     expect(sql).toContain("AND status = 'PURGED' AND hash_blocked = 1 AND image_sha256 IS NOT NULL");
-    expect(sql).toContain("SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at)))");
-    expect(sql).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
+    expect(sql).toContain("SELECT image_sha256, MAX(image_phash), 0, DATE(MIN(COALESCE(closed_at, hidden_at)))");
+    expect(sql).toContain("ON DUPLICATE KEY UPDATE liftable = 0, phash = COALESCE(phash, VALUES(phash))");
     expect(params).toEqual([4, 9]);
   });
 
@@ -440,5 +652,130 @@ describe("pinClosedQuarantineHashesOn (D87)", () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
 
     await expect(pinClosedQuarantineHashesOn(fakeConnection({ execute }), [4])).resolves.toBeUndefined();
+  });
+});
+
+// Revue EF-72 sécurité 1.
+describe("isBlockedImage — borne et décodage en échec (sécurité 1)", () => {
+  /** `count` empreintes sans rapport avec l'image testée. */
+  function unrelatedPhashes(count: number): string[] {
+    return Array.from({ length: count }, (_, i) => String(BigInt(i) * BigInt("9007199254740993") + BigInt(12345)));
+  }
+
+  it("isBlockedImage_capReached_warnsWithoutHash", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const rows = unrelatedPhashes(MAX_COMPARED_PHASHES);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, rows) }));
+
+    await isBlockedImage(await drawnImage());
+
+    expect(warn).toHaveBeenCalledWith("[images] 2000 empreintes perceptuelles comparées : les plus anciennes ne le sont plus");
+  });
+
+  it("isBlockedImage_belowCap_noWarn", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, unrelatedPhashes(MAX_COMPARED_PHASHES - 1)) }));
+
+    await isBlockedImage(await drawnImage());
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("isBlockedImage_undecodableProcessed_falseAndWarns", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, ["123"]) }));
+
+    expect(await isBlockedImage(IMAGE)).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      "[images] empreinte perceptuelle non calculée au téléversement : comparée par ses octets seulement",
+    );
+  });
+
+  it("isBlockedImage_tooSimpleProcessed_falseWithoutWarn", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const plain = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#2850c8" } }).webp().toBuffer();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: blockedList(false, ["123"]) }));
+
+    expect(await isBlockedImage(plain)).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("blockRemovedImageFiles — décodages et journal (sécurité 1)", () => {
+  function writeTemp(name: string, content: Buffer): string {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-sec1-")), name);
+    writeFileSync(file, content);
+    return file;
+  }
+
+  it("blockRemovedImageFiles_twoFiles_decodedOneAtATime", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 2 }, []]) }));
+    const original = imagePhash.imagePerceptualHashResult;
+    let running = 0;
+    let mostAtOnce = 0;
+    const decode = jest.spyOn(imagePhash, "imagePerceptualHashResult").mockImplementation(async (content) => {
+      running += 1;
+      mostAtOnce = Math.max(mostAtOnce, running);
+      const result = await original(content);
+      running -= 1;
+      return result;
+    });
+    const image = await drawnImage();
+
+    await blockRemovedImageFiles([writeTemp("a.webp", image), writeTemp("b.webp", Buffer.concat([image, Buffer.from("x")]))]);
+
+    expect(mostAtOnce).toBe(1);
+    decode.mockRestore();
+  });
+
+  it("blockRemovedImageFiles_tooSimpleImage_logsBytesOnlyWithoutHashOrPath", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]) }));
+    const plain = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#2850c8" } }).webp().toBuffer();
+
+    await blockRemovedImageFiles([writeTemp("user-7-8-plainhash.webp", plain)]);
+
+    expect(warn).toHaveBeenCalledWith("[moderation] 1 image(s) trop simple(s) : bloquée(s) par leurs octets seulement");
+  });
+
+  it("blockRemovedImageFiles_undecodableFile_logsNotDecoded", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]) }));
+
+    await blockRemovedImageFiles([writeTemp("a.webp", IMAGE)]);
+
+    expect(warn).toHaveBeenCalledWith(
+      "[moderation] 1 image(s) non décodée(s) : empreinte perceptuelle non calculée, bloquée(s) par leurs octets seulement",
+    );
+  });
+});
+
+describe("blockImageHashOn / blockImageHashesSafely — empreinte inattendue (sécurité 1)", () => {
+  it("blockImageHashOn_rowFingerprintWithoutPhash_noLog", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await blockImageHashOn(fakeConnection({ execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]) }), {
+      sha256: "abc",
+      phash: null,
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("blockImageHashOn_invalidPhash_insertsNullPhash", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await blockImageHashOn(fakeConnection({ execute }), { sha256: "abc", phash: "abc" });
+
+    expect(execute.mock.calls[0][1]).toEqual(["abc", null]);
+  });
+
+  it("blockImageHashesSafely_outOfRangePhash_insertsNullPhash", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockImageHashesSafely([{ sha256: "abc", phash: "18446744073709551616" }]);
+
+    expect(execute.mock.calls[0][1]).toEqual(["abc", null]);
   });
 });

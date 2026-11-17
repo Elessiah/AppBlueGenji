@@ -36,10 +36,12 @@ import {
   anonymousFileName,
   blockImageHashOn,
   blockImageHashesSafely,
+  type ImageFingerprint,
   pinClosedQuarantineHashesOn,
-  readImageSha256,
+  readImageFingerprint,
   unblockImageHashOn,
 } from "@/lib/server/blocked-images";
+import { storablePhash } from "@/lib/server/image-phash";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 // Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`, le
@@ -162,9 +164,9 @@ export async function removeModeratedAvatarFile(
   if (!absolute) return;
   // Déjà bloquée dans la transaction de la décision (`deleteUserAvatarForReport`).
   if (!options.alreadyBlocked) {
-    const sha256 = await readImageSha256(absolute);
-    if (sha256 === null) logMissingRemovedFile(absolute);
-    else await blockImageHashesSafely([sha256]);
+    const fingerprint = await readImageFingerprint(absolute);
+    if (fingerprint === null) logMissingRemovedFile(absolute);
+    else await blockImageHashesSafely([fingerprint]);
   }
   // Le fichier ne part que si plus aucune ligne ne le désigne : un autre compte
   // (adresse recopiée), un partenaire ou un bénévole (adresse collée), un
@@ -476,7 +478,10 @@ export async function deleteUserAvatarForReport(
   let pseudo: string;
   let avatarUrl: string;
   let quarantineId: number;
-  let sha256: string | null;
+  let fingerprint: ImageFingerprint | null;
+  // Empreintes relevées hors verrou (décodage de l'image), reprises sous le
+  // verrou si le fichier n'a pas changé (`readImageFingerprint`).
+  const prepared = await prepareAvatarFingerprint(db, userId);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -489,18 +494,29 @@ export async function deleteUserAvatarForReport(
     // L'empreinte est relevée sous le verrou et gardée avec la décision : une
     // contestation acceptée plus tard lève le blocage (D18), le fichier parti.
     const absolute = storedUploadAbsolutePath(avatarUrl, "avatars");
-    sha256 = absolute ? await readImageSha256(absolute) : null;
-    if (absolute && sha256 === null) logMissingRemovedFile(absolute);
+    fingerprint = absolute ? await readImageFingerprint(absolute, prepared) : null;
+    if (absolute && fingerprint === null) logMissingRemovedFile(absolute);
     // Bloquée dans la même transaction que la décision : une issue écrite
     // juste après (D18) trouve l'empreinte déjà posée, jamais l'inverse.
-    if (sha256 !== null) await blockImageHashOn(connection, sha256);
+    if (fingerprint !== null) await blockImageHashOn(connection, fingerprint);
     await clearModeratedAvatar(connection, userId, avatar.pending);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines
          (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after, status, closed_at, image_sha256,
-          hash_blocked)
-       VALUES (?, ?, ?, ?, ?, ?, 'PURGED', ?, ?, ?)`,
-      [userId, reportId, avatarUrl, actor.userId, removedAt, contestUntil, removedAt, sha256, sha256 === null ? 0 : 1],
+          image_phash, hash_blocked)
+       VALUES (?, ?, ?, ?, ?, ?, 'PURGED', ?, ?, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED), ?)`,
+      [
+        userId,
+        reportId,
+        avatarUrl,
+        actor.userId,
+        removedAt,
+        contestUntil,
+        removedAt,
+        fingerprint?.sha256 ?? null,
+        storablePhash(fingerprint?.phash),
+        fingerprint === null ? 0 : 1,
+      ],
     );
     quarantineId = Number(inserted.insertId);
     await connection.commit();
@@ -766,6 +782,8 @@ type QuarantineRow = RowDataPacket & {
   closed_at: Date | string | null;
   contest_outcome: ContestOutcome | null;
   image_sha256: string | null;
+  /** Empreinte perceptuelle (D17), en décimal : relue en texte, un `BIGINT` perdrait ses derniers chiffres. */
+  image_phash: string | null;
 };
 
 // `COALESCE` porte le générique : une ligne d'équipe n'a pas de `u.pseudo` à
@@ -776,7 +794,7 @@ const QUARANTINE_SELECT = `SELECT q.id,
        COALESCE(q.team_id, q.user_id) AS target_id,
        COALESCE(t.name, u.pseudo) AS target_name,
        q.report_id, q.logo_url, q.status, q.hidden_at, q.purge_after, q.closed_at,
-       q.contest_outcome, q.image_sha256
+       q.contest_outcome, q.image_sha256, CAST(q.image_phash AS CHAR) AS image_phash
 FROM bg_logo_quarantines q
 LEFT JOIN bg_teams t ON t.id = q.team_id
 LEFT JOIN bg_users u ON u.id = q.user_id`;
@@ -815,7 +833,7 @@ export async function listQuarantinesForReports(reportIds: readonly number[]): P
  * validation automatique, sans figer d'instantané —, pour
  * `lockQuarantineUserFirst`.
  */
-async function quarantineUserId(connection: PoolConnection, quarantineId: number): Promise<number | null> {
+async function quarantineUserId(connection: Pick<PoolConnection, "execute">, quarantineId: number): Promise<number | null> {
   const [rows] = await connection.execute<(RowDataPacket & { user_id: number | null })[]>(
     `SELECT user_id FROM bg_logo_quarantines WHERE id = ? LIMIT 1`,
     [quarantineId],
@@ -1033,12 +1051,13 @@ async function applyOutcomeToHash(
   if (row.status !== "PURGED" || row.target_type !== "USER") return { blocked: null, hashUnknown: false };
   const sha256 = row.image_sha256;
   if (!sha256) return { blocked: null, hashUnknown: true };
+  const fingerprint: ImageFingerprint = { sha256, phash: storablePhash(row.image_phash) };
   await connection.execute(`UPDATE bg_logo_quarantines SET hash_blocked = ? WHERE id = ?`, [
     outcome === "UPHELD" ? 1 : 0,
     Number(row.id),
   ]);
   if (outcome === "UPHELD") {
-    await blockImageHashOn(connection, sha256);
+    await blockImageHashOn(connection, fingerprint);
     return { blocked: true, hashUnknown: false };
   }
   const lifted = await unblockImageHashOn(connection, sha256, Number(row.id));
@@ -1208,12 +1227,18 @@ export async function purgeQuarantinedLogo(
   options: { now?: Date } = {},
 ): Promise<boolean> {
   const db = await getDatabase();
+  const userId = await quarantineUserId(db, quarantineId);
+  // Empreintes relevées hors verrou (décodage de l'image), reprises sous le
+  // verrou si le fichier n'a pas changé (`readImageFingerprint`) — sur le pool,
+  // avant d'emprunter une connexion : le décodage ne la garde pas inactive.
+  // D'office, rien n'est préparé avant l'échéance (la purge n'aurait pas lieu).
+  const dueBy = actor === null ? (options.now ?? new Date()) : null;
+  const prepared = userId === null ? null : await prepareQuarantinedAvatarFingerprint(db, quarantineId, dueBy);
   const connection = await db.getConnection();
   let row: QuarantineRow;
-  let sha256: string | null = null;
+  let fingerprint: ImageFingerprint | null = null;
   let blockHash = false;
   try {
-    const userId = await quarantineUserId(connection, quarantineId);
     await connection.beginTransaction();
     await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
@@ -1232,12 +1257,21 @@ export async function purgeQuarantinedLogo(
       outcome: row.contest_outcome ?? null,
       contested: check.contested,
     });
-    if (row.target_type === "USER") sha256 = await blockPurgedAvatarOn(connection, row, blockHash);
+    if (row.target_type === "USER") fingerprint = await blockPurgedAvatarOn(connection, row, blockHash, prepared);
+    // Les deux empreintes vont ensemble : relevées, elles remplacent celles de
+    // la ligne ; fichier absent, la ligne garde les siennes.
     await connection.execute(
       `UPDATE bg_logo_quarantines
-          SET status = 'PURGED', closed_at = NOW(), image_sha256 = COALESCE(?, image_sha256), hash_blocked = ?
+          SET status = 'PURGED', closed_at = NOW(), image_sha256 = COALESCE(?, image_sha256),
+              image_phash = IF(? IS NULL, image_phash, CAST(CAST(? AS DECIMAL(20,0)) AS UNSIGNED)), hash_blocked = ?
         WHERE id = ?`,
-      [sha256, sha256 !== null && blockHash ? 1 : 0, quarantineId],
+      [
+        fingerprint?.sha256 ?? null,
+        fingerprint?.sha256 ?? null,
+        storablePhash(fingerprint?.phash),
+        fingerprint !== null && blockHash ? 1 : 0,
+        quarantineId,
+      ],
     );
     await connection.commit();
   } catch (error) {
@@ -1256,22 +1290,71 @@ export async function purgeQuarantinedLogo(
  * veut (`blockHash`) — dans la transaction qui écrit la suppression, sous le
  * verrou de la ligne : une issue écrite ensuite (D18) la trouve posée. Un
  * échec annule la purge, rejouée au passage suivant (ou refusée au staff).
- * Rend l'empreinte, gardée sur la ligne, ou `null` (fichier absent).
+ * Rend les empreintes, gardées sur la ligne, ou `null` (fichier absent).
  */
 async function blockPurgedAvatarOn(
   connection: PoolConnection,
   row: QuarantineRow,
   blockHash: boolean,
-): Promise<string | null> {
+  prepared: ImageFingerprint | null,
+): Promise<ImageFingerprint | null> {
   const files = avatarFileLocations(row.logo_url, Number(row.target_id));
   if (!files) return null;
-  const sha256 = await readImageSha256(files.quarantined);
-  if (sha256 === null) {
+  const fingerprint = await readImageFingerprint(files.quarantined, prepared);
+  if (fingerprint === null) {
     if (blockHash) logMissingRemovedFile(files.quarantined);
     return null;
   }
-  if (blockHash) await blockImageHashOn(connection, sha256);
-  return sha256;
+  if (blockHash) await blockImageHashOn(connection, fingerprint);
+  return fingerprint;
+}
+
+/**
+ * Les empreintes de l'avatar actuel d'un compte, relevées **avant** la
+ * transaction de sa suppression (`deleteUserAvatarForReport`) : le décodage
+ * de l'image ne tient pas les verrous. Simple préparation — tout échec rend
+ * `null`, et l'empreinte se calcule alors sous le verrou, comme avant.
+ */
+async function prepareAvatarFingerprint(
+  runner: Pick<PoolConnection, "execute">,
+  userId: number,
+): Promise<ImageFingerprint | null> {
+  try {
+    const avatar = await readModeratableAvatar(runner, userId, false);
+    const absolute = avatar?.avatarUrl ? storedUploadAbsolutePath(avatar.avatarUrl, "avatars") : null;
+    return absolute ? await readImageFingerprint(absolute) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Les empreintes du fichier d'un avatar en quarantaine, relevées **avant** la
+ * transaction de sa purge (`purgeQuarantinedLogo`) : le décodage de l'image ne
+ * tient pas les verrous. Simple préparation — tout échec (ou un logo d'équipe)
+ * rend `null`, et l'empreinte se calcule alors sous le verrou, comme avant.
+ * Rien n'est lu pour une ligne déjà close, ni, d'office (`dueBy`), pour une
+ * échéance pas encore passée : la purge n'aurait pas lieu, le décodage serait
+ * perdu.
+ */
+async function prepareQuarantinedAvatarFingerprint(
+  connection: Pick<PoolConnection, "execute">,
+  quarantineId: number,
+  dueBy: Date | null,
+): Promise<ImageFingerprint | null> {
+  try {
+    const [rows] = await connection.execute<(RowDataPacket & { user_id: number; logo_url: string })[]>(
+      `SELECT user_id, logo_url FROM bg_logo_quarantines
+        WHERE id = ? AND team_id IS NULL AND user_id IS NOT NULL AND status = 'HIDDEN'${dueBy === null ? "" : " AND purge_after <= ?"}
+        LIMIT 1`,
+      dueBy === null ? [quarantineId] : [quarantineId, dueBy],
+    );
+    const row = rows[0];
+    const files = row ? avatarFileLocations(row.logo_url, Number(row.user_id)) : null;
+    return files ? await readImageFingerprint(files.quarantined) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Après le commit d'une purge : le fichier part, la décision est annoncée. */

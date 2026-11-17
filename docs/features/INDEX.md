@@ -130,6 +130,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `AUDIENCE_MEASUREMENT.md` — Statistiques de fréquentation détaillées (T19) : mesure sans cookie, empreinte du jour, agrégats, 13 mois.
 - `CONTENT_REPORTS.md` — Signalements, contestations, panneau de modération.
 - `LOGO_QUARANTINE.md` — Quarantaine des images signalées.
+- `BLOCKED_IMAGE_PHASH.md` — Empreinte perceptuelle (pHash) des avatars bloqués, à côté du SHA-256 (D17).
 - `TERMS_OF_USE.md` — Conditions d'utilisation et leur acceptation.
 - `LEGAL_PAGE.md` — Mentions légales, coordonnées protégées (`ProtectedContact`).
 - `BOT_LEGAL_PAGES.md` — Pages légales bilingues du bot.

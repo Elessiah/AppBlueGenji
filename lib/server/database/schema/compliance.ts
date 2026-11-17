@@ -280,6 +280,10 @@ const COMPLIANCE_TABLES: readonly string[] = [
       -- coup le blocage quand l'issue arrive une fois le fichier parti.
       -- Part avec la ligne, retirée à l'effacement du compte (D31).
       image_sha256 CHAR(64) NULL,
+      -- Empreinte perceptuelle (pHash 64 bits, décision D17) du même fichier,
+      -- relevée avec le SHA-256 et gardée comme lui : reportée sur la liste
+      -- des images bloquées quand le blocage est posé après coup.
+      image_phash BIGINT UNSIGNED NULL,
       -- Cette décision a-t-elle bloqué l'empreinte ? Seule une suppression qui
       -- l'a fait justifie encore le blocage quand une autre est annulée (D18).
       hash_blocked TINYINT(1) NOT NULL DEFAULT 0,
@@ -330,11 +334,18 @@ const COMPLIANCE_TABLES: readonly string[] = [
 
   // Empreintes d'images refusées au téléversement (`ACCOUNT_DELETION.md`, E6) :
   // l'avatar en quarantaine d'un compte effacé part avec lui, son empreinte
-  // SHA-256 (de l'image traitée, telle que stockée) reste ici. Aucune colonne
+  // SHA-256 (de l'image traitée, telle que stockée) et son empreinte
+  // perceptuelle (D17) restent ici. Aucune colonne
   // ne désigne un compte : l'empreinte d'une image n'identifie personne.
   `
       CREATE TABLE IF NOT EXISTS bg_blocked_image_hashes (
       sha256 CHAR(64) PRIMARY KEY,
+      -- Empreinte perceptuelle (pHash 64 bits, décision D17,
+      -- docs/features/BLOCKED_IMAGE_PHASH.md) : refuse aussi une image
+      -- d'allure voisine (cadre décalé, autre format, réencodage). Nulle pour
+      -- une image trop simple (image-phash.ts) et pour les lignes d'avant D17
+      -- (fichier parti, rien à recalculer).
+      phash BIGINT UNSIGNED NULL,
       -- 1 : posée par une décision gardée sur sa ligne de quarantaine, qu'une
       -- contestation acceptée peut lever (D18). 0 : posée par un geste sans
       -- trace qui la justifie (fiche du joueur, effacement d'un compte,

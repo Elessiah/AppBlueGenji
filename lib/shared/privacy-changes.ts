@@ -2131,6 +2131,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est rattaché à ton compte, et ce que sa suppression emporte reste le même (ces mesures, qui ne s'y rattachent pas, n'en dépendent pas).",
     ],
   },
+  {
+    // EF-72 / D17 — empreinte perceptuelle des avatars supprimés par la
+    // modération, gardée à côté du SHA-256 (docs/features/BLOCKED_IMAGE_PHASH.md).
+    // /rgpd § « Signalements » (FR et EN), registre T01 et T11. Pour tous les
+    // comptes. Mise en ligne prévue la nuit du 2026-11-18 ; datée du lendemain
+    // (2026-11-19), comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle
+    // glisse. Aucun texte ne date l'empreinte au jour près (« novembre 2026 »).
+    id: "2026-11-empreinte-perceptuelle-avatar",
+    publishedAt: "2026-11-19",
+    title: "Avatar supprimé par la modération : une empreinte perceptuelle s'ajoute",
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+    summary:
+      "Quand la modération supprime un avatar, le site garde désormais, à côté de son empreinte SHA-256, une empreinte perceptuelle de l'image : elle refuse aussi la remise en ligne de la même image légèrement recadrée, redimensionnée, assombrie ou éclaircie, réencodée ou dans un autre format.",
+    details: [
+      "Ce que c'est : un résumé de 64 bits de l'allure de l'image (ses grandes zones claires et sombres), calculé sur le site, sans service tiers. Il ne permet pas de reconstituer l'image et ne désigne aucun compte. Une image téléversée comme avatar ou comme logo d'équipe est refusée si son empreinte est très proche de l'une des empreintes perceptuelles des 2 000 images bloquées le plus récemment (date du blocage) ; les plus anciennes restent gardées mais ne sont plus comparées.",
+      "Où et combien de temps : exactement là où l'empreinte SHA-256 est gardée, et aussi longtemps qu'elle — dans la liste des images bloquées, sans limite de durée et sans lien avec aucun compte, et sur la décision de suppression tant que celle-ci est gardée. Une contestation acceptée qui lève le blocage retire les deux empreintes ensemble de la liste des images bloquées.",
+      "Un avatar supprimé avant ce changement reste bloqué par sa seule empreinte SHA-256 ; une empreinte perceptuelle ne s'y ajoute que si la même image est de nouveau bloquée alors que le site en garde encore le fichier (nouvelle suppression, effacement d'un compte, purge d'un avatar masqué), la ligne gardant la date de son premier blocage. Une image trop simple — presque unie, dégradé, motif symétrique, ou faite surtout d'un fond uni, comme un pseudo ou un emblème sur un aplat — ou que le site ne parvient pas à décoder n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.",
+      "Ce qui ne change pas : un avatar seulement masqué, ou que la modération n'a jamais supprimé, ne laisse aucune empreinte ; ce que la suppression d'un compte emporte reste le même.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
