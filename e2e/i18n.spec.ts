@@ -150,13 +150,20 @@ test.describe("Langues — adresses /en", () => {
   // Lot 8a-1 : la liste des tournois. Sans session, la carte « Connexion
   // requise » (200) dans la langue de l'adresse, métadonnées de la page comprises.
   test("/en/tournois : lang=en, carte de connexion anglaise, hreflang réciproques, noindex", async ({ page }) => {
-    test.skip(Boolean(process.env.E2E_AUTH_USER), "Parcours sans session : la session de test (E2E_AUTH_USER) remplace la carte de connexion.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    // Avec la session de test (E2E_AUTH_USER), la liste remplace la carte de
+    // connexion : seules les métadonnées (langue, hreflang, noindex) restent à
+    // vérifier, et elles le sont dans les deux modes.
+    const signedIn = Boolean(process.env.E2E_AUTH_USER);
     const response = await page.goto("/en/tournois");
     expect(response?.status()).toBe(200);
     expect(new URL(page.url()).pathname).toBe("/en/tournois");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
-    await expect(page.locator('a[href^="/en/connexion?redirect=%2Fen%2Ftournois"]')).toHaveCount(1);
+    if (signedIn) {
+      await expect(page.getByRole("heading", { level: 1 })).not.toHaveText("Login required");
+    } else {
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
+      await expect(page.locator('a[href^="/en/connexion?redirect=%2Fen%2Ftournois"]')).toHaveCount(1);
+    }
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/en\/tournois$/);
     await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", /[^n]\/tournois$/);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
@@ -164,13 +171,15 @@ test.describe("Langues — adresses /en", () => {
 
   // Lot 8b-2 : création et édition ouvertes sous `/en` (carte de connexion sans session).
   test("/en/tournois/creer et /en/tournois/<id>/modifier : lang=en, hreflang, noindex", async ({ page }) => {
-    test.skip(Boolean(process.env.E2E_AUTH_USER), "Parcours sans session : la session de test (E2E_AUTH_USER) remplace la carte de connexion.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    // Avec la session de test (E2E_AUTH_USER), le formulaire remplace la carte
+    // de connexion : langue, hreflang et noindex se vérifient dans les deux modes.
+    const signedIn = Boolean(process.env.E2E_AUTH_USER);
     for (const path of ["/en/tournois/creer", "/en/tournois/1/modifier"]) {
       const response = await page.goto(path);
       expect(response?.status()).toBe(200);
       expect(new URL(page.url()).pathname).toBe(path);
       await expect(page.locator("html")).toHaveAttribute("lang", "en");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
+      if (!signedIn) await expect(page.getByRole("heading", { level: 1 })).toHaveText("Login required");
       await expect(page.locator('link[rel="alternate"][hreflang="fr"]')).toHaveAttribute("href", new RegExp(`[^n]${path.slice(3)}$`));
       await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     }

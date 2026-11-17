@@ -35,7 +35,7 @@ import {
   type GameFilter,
 } from "./_lib/buckets";
 import { isListGateOpen } from "./_lib/list-gate";
-import { listEmptyKind } from "./_lib/empty-state";
+import { listEmptyKind, searchAwaitsArchive } from "./_lib/empty-state";
 import { ListEmptyState } from "./ListEmptyState";
 import { buildTickerItems } from "./_lib/ticker";
 import {
@@ -225,6 +225,11 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // l'archive arrivée entre-temps.
   const wantFinishedArchiveRef = useRef(wantFinishedArchive);
   wantFinishedArchiveRef.current = wantFinishedArchive;
+  // Dernière lecture de l'archive en échec : la page cesse de l'attendre
+  // (« Chargement… » resterait sinon affiché jusqu'à la relecture suivante).
+  // Le besoin retombé, l'échec est oublié — état ajusté pendant le rendu.
+  const [archiveFailed, setArchiveFailed] = useState(false);
+  if (archiveFailed && !wantFinishedArchive) setArchiveFailed(false);
 
   // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
   // notifications pour un incident réseau passager. Seul le premier chargement,
@@ -242,6 +247,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
         setListFetched(true);
+        if (wantFinishedArchive) setArchiveFailed(false);
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
@@ -252,6 +258,8 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           router.refresh();
           return;
         }
+        // Silencieuse ou non, une archive manquée n'est plus attendue.
+        if (wantFinishedArchive && wantFinishedArchiveRef.current) setArchiveFailed(true);
         if (silent) return;
         // Une phrase traduite, jamais le code ni le message brut du navigateur
         // (« Failed to fetch » sur une page en français) : le lecteur n'en
@@ -399,6 +407,18 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   const viewBuckets = listLoaded ? buckets : emptyBuckets;
   const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;
   const scheduledBuckets = useScheduledBuckets(viewBuckets);
+  // Les invisibles suivent la même horloge pour l'état vide : un invisible dont
+  // les inscriptions ferment page ouverte ne compte plus comme « à venir ».
+  // Leur section garde l'ordre et les cartes servis (seul l'état est relu).
+  const hiddenAsBuckets = useMemo<TournamentBuckets>(
+    () => ({ upcoming: viewHidden, registration: NO_TOURNAMENTS, running: NO_TOURNAMENTS, finished: NO_TOURNAMENTS }),
+    [viewHidden],
+  );
+  const scheduledHidden = useScheduledBuckets(hiddenAsBuckets);
+  const scheduledHiddenState = useMemo(
+    () => new Map(flattenBuckets(scheduledHidden).map((card) => [card.id, card.state] as const)),
+    [scheduledHidden],
+  );
 
   // La recherche (le passage coûteux : nom, description, format sur chaque
   // tournoi) n'est faite qu'une fois par valeur de recherche différée et par
@@ -463,11 +483,20 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
   const finishedBeyond = (key: GameFilter) => (deferredQuery.trim() ? 0 : finishedBeyondList(viewBuckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
-  // Archive demandée mais pas encore reçue : la liste en main est encore la
-  // liste tronquée (une recherche peut viser un terminé qu'elle ne porte pas).
-  const finishedArchivePending = wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
+  // Archive demandée mais pas encore reçue (ni en échec) : la liste en main est
+  // encore la liste tronquée.
+  const listTruncated = viewBuckets.finishedTotals !== undefined;
+  const finishedArchivePending = wantFinishedArchive && listTruncated && !archiveFailed;
   // Section dépliée : l'attente se dit sous ses cartes.
   const finishedArchiveLoading = finishedExpanded && finishedArchivePending;
+  // Une recherche peut viser un terminé que la liste courte ne porte pas : son
+  // résultat (compte annoncé, « Aucun résultat ») attend l'archive.
+  const searchPending = searchAwaitsArchive({
+    archiveWanted: wantFinishedArchive,
+    listTruncated,
+    archiveFailed,
+    query: deferredQuery,
+  });
 
   const showHidden = isAdmin && viewHidden.length > 0;
   const gestureMadeRef = useRef(false);
@@ -482,9 +511,10 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     } else {
       gestureMadeRef.current = true;
     }
+    // Compte encore partiel (l'archive peut en apporter) : seul le compte final
+    // s'annonce, ni un « 0 » ni un « 2 » qui deviendra « 7 ».
+    if (searchPending) return t("list.finishedLoading");
     const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
-    // Rien encore, mais l'archive peut en apporter : pas de « 0 » annoncé à tort.
-    if (shown === 0 && finishedArchivePending) return t("list.finishedLoading");
     return t("list.resultsCount", { count: String(shown) });
   })();
 
@@ -522,7 +552,10 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // inscriptions et annonces comptent « Mes tournois » compris (avant découpage)
   // et, pour le staff, les invisibles à venir de la section qui les montre.
   const hiddenUpcoming = showHidden
-    ? filteredHidden.filter((card) => card.state === "UPCOMING" || card.state === "REGISTRATION").length
+    ? filteredHidden.filter((card) => {
+        const state = scheduledHiddenState.get(card.id) ?? card.state;
+        return state === "UPCOMING" || state === "REGISTRATION";
+      }).length
     : 0;
   const emptyKind = listEmptyKind({
     loaded: listLoaded,
@@ -530,7 +563,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     upcomingCount: gameFilteredBuckets.registration.length + gameFilteredBuckets.upcoming.length + hiddenUpcoming,
     query: deferredQuery,
     gameFilter,
-    archivePending: finishedArchivePending,
+    archivePending: searchPending,
   });
   // Le panneau disparaît avec le filtre : le focus va au contrôle effacé — le
   // champ de recherche s'il portait un texte (sinon, sur un téléphone, le
@@ -540,6 +573,12 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     setQuery("");
     setGameFilter("all");
     (hadQuery ? searchInputRef.current : allGamesChipRef.current)?.focus();
+  };
+  // « Afficher tous les jeux » ne touche qu'au jeu : un texte en cours de
+  // frappe reste, le focus va à la pastille « Tous ».
+  const clearGame = () => {
+    setGameFilter("all");
+    allGamesChipRef.current?.focus();
   };
 
   // Une ancre du sommaire reste dans l'URL : au rechargement (ou sur un lien
@@ -593,6 +632,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
       <RulesHelpFab />
       <BgCanvas mode="network" />
       <div className={`${s.fabric} fabric-fade`} />
+      <div className={`${s.fabricBottom} fabric-fade`} />
       <div className={s.pageInner}>
         <div className="container">
           <header className={s.pageHead}>
@@ -739,7 +779,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
             {/* Recherche sans résultat dans la liste courte : l'archive des
                 terminés peut encore en apporter — on attend avant de dire
                 « Aucun résultat ». */}
-            {listLoaded && shownSections.length === 0 && emptyKind === null && (
+            {emptyKind === "pending" && (
               <div className={s.showMoreRow}>{t("list.finishedLoading")}</div>
             )}
 
@@ -860,7 +900,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                 canManage={isAdmin}
                 finishedCount={totalFinished}
                 onShowFinished={() => setSectionOpen("finished", true)}
-                onClearGame={gameFilter === "all" ? undefined : clearFilters}
+                onClearGame={gameFilter === "all" ? undefined : clearGame}
               />
             )}
 

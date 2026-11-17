@@ -16,18 +16,32 @@
 .fabric {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(1200px 600px at 70% -10%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%),
-    radial-gradient(800px 500px at 10% 110%, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
+  background: radial-gradient(1200px 600px at 70% -10%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%);
   pointer-events: none;
   /* Bords éteints par `.fabric-fade` (globals.css), réglé ici. Hauteur
      bornée : la page porte toute la liste, et un voile masqué de plusieurs
      milliers de pixels se recomposerait à chaque carte ajoutée ou retirée
-     (« Voir plus », flux en direct, archive). */
+     (« Voir plus », flux en direct, archive). Le halo du bas vit donc à part
+     (`.fabricBottom`), collé au vrai bas de la page. */
   max-height: 1400px;
   --fade-x: min(18%, 220px);
   --fade-top: 64px;
   --fade-bottom: min(30%, 260px);
+}
+
+/* Halo du bas : une boîte bornée elle aussi, ancrée au bas de la page quelle
+   que soit la longueur de la liste. Sans fondu haut (le halo s'éteint avant). */
+.fabricBottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(100%, 560px);
+  background: radial-gradient(800px 500px at 10% 110%, rgba(90, 200, 255, calc(0.06 * var(--glow, 1))), transparent 60%);
+  pointer-events: none;
+  --fade-x: min(18%, 220px);
+  --fade-top: 0px;
+  --fade-bottom: min(30%, 160px);
 }
 
 .pageHead {

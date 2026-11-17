@@ -16,7 +16,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { listEmptyKind } from "@/app/(secured)/tournois/_lib/empty-state";
+import { listEmptyKind, searchAwaitsArchive } from "@/app/(secured)/tournois/_lib/empty-state";
 import { ListEmptyState } from "@/app/(secured)/tournois/ListEmptyState";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
@@ -99,10 +99,26 @@ describe("listEmptyKind", () => {
     expect(listEmptyKind({ loaded: true, shownSections: 2, upcomingCount: 1, query: "", gameFilter: "all" })).toBeNull();
   });
 
-  it("listEmptyKind_noSectionsFilteredArchivePending_returnsNull", () => {
+  it("listEmptyKind_noSectionsFilteredArchivePending_returnsPending", () => {
     expect(
       listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "strike", gameFilter: "all", archivePending: true }),
-    ).toBeNull();
+    ).toBe("pending");
+  });
+
+  it("listEmptyKind_noSectionsSearchArchiveFailed_returnsFiltered", () => {
+    const archivePending = searchAwaitsArchive({ archiveWanted: true, listTruncated: true, archiveFailed: true, query: "strike" });
+
+    expect(
+      listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "strike", gameFilter: "all", archivePending }),
+    ).toBe("filtered");
+  });
+
+  it("listEmptyKind_noSectionsGameFilterOnlyArchiveWanted_returnsFilteredAtOnce", () => {
+    const archivePending = searchAwaitsArchive({ archiveWanted: true, listTruncated: true, archiveFailed: false, query: "" });
+
+    expect(
+      listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "", gameFilter: "mr", archivePending }),
+    ).toBe("filtered");
   });
 
   it("listEmptyKind_noSectionsUnfilteredArchivePending_returnsEmpty", () => {
@@ -119,6 +135,32 @@ describe("listEmptyKind", () => {
 
   it("listEmptyKind_whitespaceQuery_treatedAsNoFilter", () => {
     expect(listEmptyKind({ loaded: true, shownSections: 0, upcomingCount: 0, query: "   ", gameFilter: "all" })).toBe("empty");
+  });
+});
+
+describe("searchAwaitsArchive", () => {
+  it("searchAwaitsArchive_queryWithTruncatedListWanted_returnsTrue", () => {
+    expect(searchAwaitsArchive({ archiveWanted: true, listTruncated: true, archiveFailed: false, query: "strike" })).toBe(true);
+  });
+
+  it("searchAwaitsArchive_noQuery_returnsFalse", () => {
+    expect(searchAwaitsArchive({ archiveWanted: true, listTruncated: true, archiveFailed: false, query: "" })).toBe(false);
+  });
+
+  it("searchAwaitsArchive_whitespaceQuery_returnsFalse", () => {
+    expect(searchAwaitsArchive({ archiveWanted: true, listTruncated: true, archiveFailed: false, query: "   " })).toBe(false);
+  });
+
+  it("searchAwaitsArchive_archiveFailed_returnsFalse", () => {
+    expect(searchAwaitsArchive({ archiveWanted: true, listTruncated: true, archiveFailed: true, query: "strike" })).toBe(false);
+  });
+
+  it("searchAwaitsArchive_archiveReceived_returnsFalse", () => {
+    expect(searchAwaitsArchive({ archiveWanted: true, listTruncated: false, archiveFailed: false, query: "strike" })).toBe(false);
+  });
+
+  it("searchAwaitsArchive_archiveNotWanted_returnsFalse", () => {
+    expect(searchAwaitsArchive({ archiveWanted: false, listTruncated: true, archiveFailed: false, query: "strike" })).toBe(false);
   });
 });
 
@@ -219,10 +261,10 @@ describe("ListEmptyState", () => {
 });
 
 describe("TournamentsList — câblage de l'état vide", () => {
-  it("page_upcomingCount_includesHiddenUpcomingForStaff", () => {
-    expect(page).toMatch(
-      /const hiddenUpcoming = showHidden\s*\?\s*filteredHidden\.filter\(\(card\) => card\.state === "UPCOMING" \|\| card\.state === "REGISTRATION"\)\.length\s*:\s*0;/,
-    );
+  it("page_hiddenUpcoming_usesScheduledStateForStaffOnly", () => {
+    expect(page).toContain("const scheduledHidden = useScheduledBuckets(hiddenAsBuckets);");
+    expect(page).toMatch(/const hiddenUpcoming = showHidden\s*\?\s*filteredHidden\.filter\(/);
+    expect(page).toContain("const state = scheduledHiddenState.get(card.id) ?? card.state;");
   });
 
   it("page_clearFilters_focusesSearchOnlyWithQuery", () => {
@@ -231,16 +273,34 @@ describe("TournamentsList — câblage de l'état vide", () => {
     expect(page).toContain('ref={key === "all" ? allGamesChipRef : undefined}');
   });
 
-  it("page_pendingArchive_showsLoadingRowAndAnnouncesIt", () => {
-    expect(page).toContain("archivePending: finishedArchivePending,");
-    expect(page).toContain('if (shown === 0 && finishedArchivePending) return t("list.finishedLoading");');
-    expect(page).toMatch(
-      /\{listLoaded && shownSections\.length === 0 && emptyKind === null && \(\s*<div className=\{s\.showMoreRow\}>\{t\("list\.finishedLoading"\)\}<\/div>/,
-    );
+  it("page_pendingArchive_showsLoadingRowOnPendingOutcome", () => {
+    expect(page).toContain("archivePending: searchPending,");
+    expect(page).toMatch(/\{emptyKind === "pending" && \(\s*<div className=\{s\.showMoreRow\}>\{t\("list\.finishedLoading"\)\}<\/div>/);
+  });
+
+  it("page_liveRegion_announcesLoadingWhileSearchPending", () => {
+    const pendingLine = page.indexOf('if (searchPending) return t("list.finishedLoading");');
+
+    expect(pendingLine).toBeGreaterThan(0);
+    expect(pendingLine).toBeLessThan(page.indexOf('return t("list.resultsCount"'));
+  });
+
+  it("page_archiveFailure_stopsWaitingAndResetsWhenNoLongerWanted", () => {
+    expect(page).toContain("if (archiveFailed && !wantFinishedArchive) setArchiveFailed(false);");
+    expect(page).toContain("if (wantFinishedArchive && wantFinishedArchiveRef.current) setArchiveFailed(true);");
+    expect(page).toContain("const finishedArchivePending = wantFinishedArchive && listTruncated && !archiveFailed;");
   });
 
   it("page_nothingUpcoming_passesClearGameOnlyUnderGameFilter", () => {
-    expect(page).toContain('onClearGame={gameFilter === "all" ? undefined : clearFilters}');
+    expect(page).toContain('onClearGame={gameFilter === "all" ? undefined : clearGame}');
+  });
+
+  it("page_clearGame_keepsQueryAndFocusesAllChip", () => {
+    const clearGame = page.slice(page.indexOf("const clearGame = () => {"), page.indexOf("};", page.indexOf("const clearGame = () => {")));
+
+    expect(clearGame).toContain('setGameFilter("all");');
+    expect(clearGame).toContain("allGamesChipRef.current?.focus();");
+    expect(clearGame).not.toContain("setQuery");
   });
 });
 
@@ -273,6 +333,16 @@ describe("voiles sans arête dure", () => {
     expect(fabric).toContain("max-height: 1400px;");
     expect(fabric).toContain("--fade-x: min(18%, 220px);");
     expect(fabric).not.toContain("mask-image");
+    expect(fabric).not.toContain("110%");
+  });
+
+  it("fabricBottom_tournois_anchoredToPageBottomAndBounded", () => {
+    const bottom = block(tournoisCss, ".fabricBottom");
+
+    expect(bottom).toContain("bottom: 0;");
+    expect(bottom).toContain("height: min(100%, 560px);");
+    expect(bottom).toContain("at 10% 110%");
+    expect(page).toContain("<div className={`${s.fabricBottom} fabric-fade`} />");
   });
 
   it("hairlineFade_global_usedByThreeHeaders", () => {
