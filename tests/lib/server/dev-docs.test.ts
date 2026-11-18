@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   MAX_DOC_BYTES,
+  TITLE_SCAN_BYTES,
   buildDevDocIndex,
   devDocTitle,
   findDevDoc,
@@ -146,5 +147,54 @@ describe("renderDevDoc", () => {
   it("renderDevDoc_summaryNotInIndex_returnsNullHtml", async () => {
     const doc = await renderDevDoc(index, { repo: "site", slug: "OTHER", path: "OTHER.md", title: "x" });
     expect(doc.html).toBeNull();
+  });
+});
+
+describe("revue cycle 1 — titres, collisions, langue des liens", () => {
+  let base2: string;
+  let index2: DevDocIndex;
+
+  beforeAll(async () => {
+    base2 = await fs.mkdtemp(path.join(os.tmpdir(), "devdoc2-"));
+    const root = path.join(base2, "site");
+    await write(path.join(root, "README.md"), "# Racine\n");
+    await write(path.join(root, "docs/README.md"), "# Docs\n");
+    await write(path.join(root, "docs/LATE.md"), `${"x".repeat(TITLE_SCAN_BYTES)}\n# Trop loin\n`);
+    await write(path.join(root, "docs/LINKS.md"), "# Liens\n\n[r](/regles) [e](https://example.org/regles)\n");
+    index2 = await buildDevDocIndex({
+      site: { root, dirs: ["docs"], files: ["README.md"] },
+      bot: { root: path.join(base2, "absent"), dirs: [], files: [] },
+    });
+  });
+
+  afterAll(async () => {
+    await fs.rm(base2, { recursive: true, force: true });
+  });
+
+  it("devDocTitle_hashCommentInFenceBeforeHeading_skipsFence", () => {
+    expect(devDocTitle("```bash\n# install deps\n```\n# Vrai titre\n", "F")).toBe("Vrai titre");
+  });
+
+  it("devDocTitle_onlyHeadingInsideFence_returnsFallback", () => {
+    expect(devDocTitle("```\n# commentaire\n```\n", "F")).toBe("F");
+  });
+
+  it("buildDevDocIndex_docsFileSameNameAsRootFile_rootKeepsShortSlugAndDocsGetsFullPath", () => {
+    expect(findDevDoc(index2, "site", "README")?.path).toBe("README.md");
+    expect(findDevDoc(index2, "site", "docs/README")?.path).toBe("docs/README.md");
+  });
+
+  it("buildDevDocIndex_headingBeyondScanWindow_usesFileName", () => {
+    expect(findDevDoc(index2, "site", "LATE")?.title).toBe("LATE");
+  });
+
+  it("renderDevDoc_siteInternalPath_localized", async () => {
+    const doc = await renderDevDoc(index2, findDevDoc(index2, "site", "LINKS")!, (href) => `/en${href}`);
+    expect(doc.html).toContain('<a href="/en/regles" rel="noreferrer">r</a>');
+  });
+
+  it("renderDevDoc_externalLink_notLocalized", async () => {
+    const doc = await renderDevDoc(index2, findDevDoc(index2, "site", "LINKS")!, (href) => `/en${href}`);
+    expect(doc.html).toContain('<a href="https://example.org/regles" rel="noreferrer">e</a>');
   });
 });

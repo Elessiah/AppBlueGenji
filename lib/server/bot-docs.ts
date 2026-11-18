@@ -130,16 +130,28 @@ function linkTarget(href: string, options: MarkdownRenderOptions): string | null
 /** Repère d'un code inline mis de côté pendant le formatage (`\uE000<n>\uE000`). */
 const CODE_SLOT = /\uE000(\d+)\uE000/g;
 
+/** Repère d'un lien déjà construit (`\uE001<n>\uE001`) : gras et italique n'entrent jamais dans sa balise. */
+const LINK_SLOT = /\uE001(\d+)\uE001/g;
+
+function renderStrongEm(html: string): string {
+  return html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
 function renderEmphasis(text: string, options: MarkdownRenderOptions, codes: string[]): string {
   // Dans le libellé d'un lien, un code reste du code seul : jamais un lien dans un lien.
   const plainCodes = (label: string) => label.replace(CODE_SLOT, (_m, n: string) => `<code>${escapeHtml(codes[Number(n)])}</code>`);
-  return escapeHtml(text)
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, href: string) => { // NOSONAR typescript:S8786 — Markdown des dépôts du site et du bot, source de confiance
-      const target = linkTarget(unescapeHtml(href), options);
-      return target === null ? plainCodes(label) : `<a href="${escapeHtml(target)}" rel="noreferrer">${plainCodes(label)}</a>`;
-    })
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  const links: string[] = [];
+  // Une cible qui contient un code inline n'est pas un lien (le code prime, comme
+  // en CommonMark) : sinon le code rendu atterrirait dans l'attribut `href`.
+  const withLinks = escapeHtml(text).replace(/\[([^\]]+)\]\(([^)\s\uE000]+)\)/g, (_m, label: string, href: string) => { // NOSONAR typescript:S8786 — Markdown des dépôts du site et du bot, source de confiance
+    const target = linkTarget(unescapeHtml(href), options);
+    const inner = plainCodes(renderStrongEm(label));
+    if (target === null) return inner;
+    // Le lien construit est mis de côté : l'emphase du texte autour ne touche pas son `href`.
+    const anchor = `<a href="${escapeHtml(target)}" rel="noreferrer">${inner}</a>`;
+    return `\uE001${links.push(anchor) - 1}\uE001`;
+  });
+  return renderStrongEm(withLinks).replace(LINK_SLOT, (_m, n: string) => links[Number(n)]);
 }
 
 function renderCode(code: string, options: MarkdownRenderOptions): string {
@@ -158,7 +170,7 @@ function renderCode(code: string, options: MarkdownRenderOptions): string {
  */
 export function renderInline(text: string, options: MarkdownRenderOptions = {}): string {
   const codes: string[] = [];
-  const parts = text.replace(/\uE000/g, "").split(/`([^`]+)`/);
+  const parts = text.replace(/[\uE000\uE001]/g, "").split(/`([^`]+)`/);
   const withSlots = parts.map((part, i) => (i % 2 === 1 ? `\uE000${codes.push(part) - 1}\uE000` : part)).join("");
   return renderEmphasis(withSlots, options, codes).replace(CODE_SLOT, (_m, n: string) => renderCode(codes[Number(n)], options));
 }
@@ -220,7 +232,7 @@ interface OpenFence {
 const HEADING_LINE = /^(#{1,6})\s+(.*)$/; // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
 const RULE_LINE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
 const BULLET_LINE = /^([ \t]*)[-*]\s+(.*)$/; // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
-const NUMBERED_LINE = /^([ \t]*)\d{1,9}[.)]\s+(.*)$/; // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
+const NUMBERED_LINE = /^([ \t]*)(\d{1,9})[.)]\s+(.*)$/; // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
 const QUOTE_LINE = /^\s{0,3}>\s?(.*)$/; // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
 
 const isFence = (line: string) => line.trim().startsWith("```");
@@ -253,8 +265,9 @@ class MarkdownWriter {
     }
   }
 
-  private openLevel(indent: number, tag: ListTag): void {
-    this.out.push(`<${tag}>`);
+  private openLevel(indent: number, tag: ListTag, start = 1): void {
+    // Une liste numérotée coupée (ligne vide, bloc de code) reprend à son numéro.
+    this.out.push(tag === "ol" && start !== 1 ? `<ol start="${start}">` : `<${tag}>`);
     this.listStack.push({ indent, tag });
     this.liOpen = false;
   }
@@ -319,12 +332,12 @@ class MarkdownWriter {
     this.out.push("<hr>");
   }
 
-  listItem(rawIndent: string, text: string, tag: ListTag): void {
+  listItem(rawIndent: string, text: string, tag: ListTag, start = 1): void {
     this.closeParagraph();
     this.closeQuote();
     const indent = rawIndent.replace(/\t/g, "  ").length;
     if (opensListLevel(indent, this.listStack.at(-1)?.indent)) {
-      this.openLevel(indent, tag);
+      this.openLevel(indent, tag, start);
     } else {
       while (this.listStack.length > 1 && indent < this.listStack.at(-1)!.indent) this.closeLevel();
       if (this.listStack.at(-1)!.tag === tag) {
@@ -332,7 +345,7 @@ class MarkdownWriter {
       } else {
         // Même niveau, autre sorte de liste : la liste courante se ferme.
         this.closeLevel();
-        this.openLevel(indent, tag);
+        this.openLevel(indent, tag, start);
       }
     }
     this.out.push(`<li>${this.inline(text.trim())}`);
@@ -375,7 +388,7 @@ class MarkdownWriter {
     const bullet = BULLET_LINE.exec(line);
     if (bullet) return this.listItem(bullet[1], bullet[2], "ul");
     const numbered = NUMBERED_LINE.exec(line);
-    if (numbered) return this.listItem(numbered[1], numbered[2], "ol");
+    if (numbered) return this.listItem(numbered[1], numbered[3], "ol", Number(numbered[2]));
     const quoted = QUOTE_LINE.exec(line);
     if (quoted) return this.quoteLine(quoted[1]);
     this.text(line);
@@ -401,7 +414,7 @@ function tableRowsAt(lines: string[], start: number): string[] | null {
  * contenu de confiance des dépôts du site et du bot.
  */
 export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
-  const lines = markdown.replace(/^﻿/, "").replace(/\r\n/g, "\n").split("\n");
+  const lines = markdown.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").split("\n");
   const writer = new MarkdownWriter(options);
   let fence: OpenFence | null = null;
 

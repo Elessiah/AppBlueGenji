@@ -164,7 +164,7 @@ describe("renderMarkdown", () => {
   });
 
   it("ignore le BOM en tête de fichier", () => {
-    expect(renderMarkdown("﻿# Titre")).toBe("<h2>Titre</h2>");
+    expect(renderMarkdown("\uFEFF# Titre")).toBe("<h2>Titre</h2>");
   });
 
   it("gère les fins de ligne Windows", () => {
@@ -338,5 +338,43 @@ describe("renderInline — code dans le formatage", () => {
 describe("headingAnchor", () => {
   it("headingAnchor_punctuationAndAccents_githubLikeSlug", () => {
     expect(headingAnchor("Été & co — `x`")).toBe("été--co--x");
+  });
+});
+
+describe("renderInline — cible de lien et emphase (revue cycle 1)", () => {
+  it("renderInline_linkTargetContainsInlineCode_isNotALink", () => {
+    const html = renderInline("[x](https://a/`B.md`)", { linkCode: () => "/devdoc/site/B" });
+    expect(html).not.toContain('href="https://a/');
+    expect(html).toBe('[x](https://a/<a href="/devdoc/site/B"><code>B.md</code></a>)');
+  });
+
+  it("renderInline_asteriskInLinkTarget_emphasisNeverEntersHref", () => {
+    expect(renderInline("[a](https://x/*) and *b*")).toBe('<a href="https://x/*" rel="noreferrer">a</a> and <em>b</em>');
+  });
+
+  it("renderInline_boldAroundLink_wrapsAnchor", () => {
+    expect(renderInline("**[a](https://x)**")).toBe('<strong><a href="https://x" rel="noreferrer">a</a></strong>');
+  });
+
+  it("renderInline_emphasisInLinkLabel_rendered", () => {
+    expect(renderInline("[**a**](https://x)")).toBe('<a href="https://x" rel="noreferrer"><strong>a</strong></a>');
+  });
+
+  it("renderInline_linkSlotMarkerInSource_isDropped", () => {
+    expect(renderInline("a\uE0010\uE001 b")).toBe("a0 b");
+  });
+});
+
+describe("renderMarkdown — numérotation des listes coupées (revue cycle 1)", () => {
+  it("renderMarkdown_numberedListSplitByBlankLine_continuesNumbering", () => {
+    expect(renderMarkdown("1. un\n\n2. deux")).toBe("<ol>\n<li>un</li>\n</ol>\n<ol start=\"2\">\n<li>deux</li>\n</ol>");
+  });
+
+  it("renderMarkdown_numberedListAfterCodeBlock_keepsNumber", () => {
+    expect(renderMarkdown("```sh\nx\n```\n3. trois")).toContain('<ol start="3">\n<li>trois</li>');
+  });
+
+  it("renderMarkdown_numberedListStartingAtOne_noStartAttribute", () => {
+    expect(renderMarkdown("1. a\n2. b")).toBe("<ol>\n<li>a</li>\n<li>b</li>\n</ol>");
   });
 });

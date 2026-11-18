@@ -12,6 +12,7 @@ import {
   type DevDocRepo,
   type DevDocSummary,
 } from "@/lib/shared/dev-docs";
+import { isInternalPath } from "@/lib/shared/locales";
 
 /**
  * Documentation développeur `/devdoc` (`docs/features/DEVDOC.md`) : lecture
@@ -86,26 +87,76 @@ function isInside(parent: string, child: string): boolean {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-/** Titre d'un document : son premier titre `#`, à défaut le nom du fichier. */
+/**
+ * Titre d'un document : son premier titre `#` hors bloc de code (un
+ * commentaire `# …` d'un exemple shell n'en est pas un), à défaut le nom du
+ * fichier.
+ */
 export function devDocTitle(markdown: string, fallback: string): string {
-  const heading = /^#\s+(.+)$/m.exec(markdown.replace(/^﻿/, ""));
-  const title = heading?.[1].replace(/[`*]/g, "").replace(/\s+#*\s*$/, "").trim();
-  return title || fallback;
+  let inFence = false;
+  for (const line of markdown.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    if (line.trim().startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const heading = /^#\s+(.+)$/.exec(line);
+    const title = heading?.[1].replace(/[`*]/g, "").replace(/\s+#*\s*$/, "").trim();
+    if (title) return title;
+  }
+  return fallback;
+}
+
+/**
+ * Octets lus pour trouver le titre d'un document à l'indexation : le premier
+ * titre est en tête de fichier, inutile de lire tout le document.
+ */
+export const TITLE_SCAN_BYTES = 8 * 1024;
+/** Fichiers examinés en parallèle pendant l'indexation. */
+const INDEX_CONCURRENCY = 16;
+
+async function readHead(file: string): Promise<string | null> {
+  const handle = await fs.open(file, "r").catch(() => null);
+  if (!handle) return null;
+  try {
+    const buffer = Buffer.alloc(TITLE_SCAN_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, TITLE_SCAN_BYTES, 0);
+    // Un caractère coupé en fin de tampon devient « � » : sans effet sur le titre.
+    return buffer.subarray(0, bytesRead).toString("utf8");
+  } catch {
+    return null;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
 }
 
 /**
  * Fichier candidat : un `.md` ordinaire (jamais un lien symbolique), dont le
- * chemin réel reste sous `allowedReal`, de taille raisonnable. Rend son titre,
- * ou `null`.
+ * chemin réel reste sous `allowedReal`, de taille raisonnable. Rend son titre
+ * (lu sur le début du fichier), ou `null`.
  */
 async function readCandidate(file: string, allowedReal: string): Promise<{ real: string; title: string } | null> {
   const stat = await fs.lstat(file).catch(() => null);
   if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_DOC_BYTES) return null;
   const real = await fs.realpath(file).catch(() => null);
   if (!real || !isInside(allowedReal, real)) return null;
-  const raw = await fs.readFile(real, "utf8").catch(() => null);
-  if (raw === null) return null;
-  return { real, title: devDocTitle(raw, path.basename(file, ".md")) };
+  const head = await readHead(real);
+  if (head === null) return null;
+  return { real, title: devDocTitle(head, path.basename(file, ".md")) };
+}
+
+/** `fn` sur chaque élément, `limit` à la fois au plus ; résultats dans l'ordre d'entrée. */
+async function mapLimited<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 async function walk(dir: string, depth: number, found: string[]): Promise<void> {
@@ -123,27 +174,35 @@ async function walk(dir: string, depth: number, found: string[]): Promise<void> 
 async function indexRepo(repo: DevDocRepo, source: DevDocSource): Promise<IndexedDoc[]> {
   const rootReal = await fs.realpath(source.root).catch(() => null);
   if (!rootReal) return [];
-  const docs: IndexedDoc[] = [];
-  const seenSlugs = new Set<string>();
-  const add = async (file: string, allowedReal: string) => {
-    const candidate = await readCandidate(file, allowedReal);
-    if (!candidate) return;
-    const relative = path.relative(rootReal, candidate.real).split(path.sep).join("/");
-    const slug = devDocSlug(repo, relative);
-    if (!slug || seenSlugs.has(slug) || docs.length >= MAX_DOCS_PER_REPO) return;
-    seenSlugs.add(slug);
-    docs.push({ summary: { repo, slug, path: relative, title: candidate.title }, file: candidate.real });
-  };
-
+  // Les fichiers de la racine d'abord : ils gardent leur adresse courte même si
+  // un document de `docs/` porte le même nom (`docs/README.md`).
+  const candidates: { file: string; allowedReal: string }[] = source.files.map((name) => ({
+    file: path.join(rootReal, name),
+    allowedReal: rootReal,
+  }));
   for (const dir of source.dirs) {
     const dirReal = await fs.realpath(path.join(rootReal, dir)).catch(() => null);
     // Un dossier autorisé qui serait lui-même un lien hors du dépôt : ignoré.
     if (!dirReal || !isInside(rootReal, dirReal)) continue;
     const files: string[] = [];
     await walk(dirReal, 0, files);
-    for (const file of files) await add(file, dirReal);
+    for (const file of files) candidates.push({ file, allowedReal: dirReal });
   }
-  for (const name of source.files) await add(path.join(rootReal, name), rootReal);
+
+  const read = await mapLimited(candidates, INDEX_CONCURRENCY, (c) => readCandidate(c.file, c.allowedReal));
+  const docs: IndexedDoc[] = [];
+  const seenSlugs = new Set<string>();
+  for (const candidate of read) {
+    if (!candidate || docs.length >= MAX_DOCS_PER_REPO) continue;
+    const relative = path.relative(rootReal, candidate.real).split(path.sep).join("/");
+    const short = devDocSlug(repo, relative);
+    if (!short) continue;
+    // Adresse courte déjà prise : le document garde son chemin complet, sans effacer l'autre.
+    const slug = seenSlugs.has(short) ? relative.slice(0, -".md".length) : short;
+    if (seenSlugs.has(slug)) continue;
+    seenSlugs.add(slug);
+    docs.push({ summary: { repo, slug, path: relative, title: candidate.title }, file: candidate.real });
+  }
   return docs;
 }
 
@@ -193,7 +252,8 @@ export async function renderDevDoc(
   if (!entry) return { summary, html: null, updatedAt: null, language: "fr" };
   const lookup: DevDocLookup = (repo, relative) => index.byPath.get(key(repo, relative))?.summary ?? null;
   const origin = { repo: summary.repo, path: summary.path };
-  const internal = (href: string | null) => (href?.startsWith("/devdoc/") ? localize(href) : href);
+  // Tout chemin du site (`/devdoc/…`, `/regles`…) prend la langue de la page.
+  const internal = (href: string | null) => (href !== null && isInternalPath(href) ? localize(href) : href);
   try {
     const [raw, stat] = await Promise.all([fs.readFile(entry.file, "utf8"), fs.stat(entry.file)]);
     const html = renderMarkdown(raw, {

@@ -20,7 +20,8 @@ la porte ne protège que la page elle-même (rien n'y est masqué ni caviardé).
   Aucune route d'API : la liste des documents est servie par la page, la
   recherche filtre côté navigateur.
 - Lien « Documentation dev » dans le menu du compte (`AccountMenu`, prop
-  `devDocs`, posée par `SiteShell` selon `can(user, "dev")`).
+  `devDocs`, posée par `SiteShell` et l'en-tête des pages publiques
+  `PublicHeader` selon `can(user, "dev")`).
 
 ## Documents lus (liste blanche)
 
@@ -44,7 +45,8 @@ Les conditions du bot (`LegalTerms/`) restent sur leurs propres pages.
 3. le fichier lu est celui de l'index, jamais un chemin bâti depuis l'adresse.
 
 L'index est refait au plus une fois par minute (`loadDevDocIndex`, cache
-commun) ; un document est relu et rendu à chaque vue (peu de lecteurs, et ~200
+commun), en lisant seulement les 8 premiers Ko de chaque fichier pour son
+titre (premier `#` hors bloc de code), 16 fichiers à la fois ; un document est relu et rendu à chaque vue (peu de lecteurs, et ~200
 rendus par langue chasseraient du cache des entrées plus utiles).
 
 ## Adresses
@@ -52,7 +54,9 @@ rendus par langue chasseraient du cache des entrées plus utiles).
 - `/devdoc` : l'index des fonctionnalités du site (`docs/features/INDEX.md`).
 - `/devdoc/site/<chemin sous docs/ sans .md>` — `/devdoc/site/features/BUSY_BUTTONS`,
   `/devdoc/site/DATABASE_SCHEMA` ; un fichier de la racine du dépôt garde son
-  seul nom (`/devdoc/site/CLAUDE`).
+  seul nom (`/devdoc/site/CLAUDE`). Les fichiers de la racine sont indexés
+  d'abord : si un document de `docs/` porte le même nom (`docs/README.md`), il
+  garde son chemin complet (`/devdoc/site/docs/README`) au lieu d'effacer l'autre.
 - `/devdoc/bot/<chemin depuis la racine du bot sans .md>` — `/devdoc/bot/doc/main`,
   `/devdoc/bot/helpfr`.
 - Sous `/en` aussi (`MIGRATED_ROUTES` : `/devdoc`, `/devdoc/[...path]`, motif
@@ -70,15 +74,20 @@ contient du code, ligne repliée sous une puce qui prolonge son élément) et r�
 `MarkdownRenderOptions` :
 
 - **liens** (`resolveDevDocLink`) : ancre, `https://`, `mailto:` et chemin du
-  site tels quels ; chemin relatif vers un document listé → sa page `/devdoc`
+  site tels quels (un chemin du site prend la langue de la page : `/regles`
+  devient `/en/regles` sous `/en`) ; chemin relatif vers un document listé → sa page `/devdoc`
   (préfixe de langue compris), ancre gardée ; vers un autre fichier du dépôt
   (code, dossier) → ce fichier sur GitHub (`DEV_DOC_SOURCE_URLS`) ; chemin qui
-  sort du dépôt, `//hôte` ou autre schéma → texte seul ;
+  sort du dépôt, `//hôte` ou autre schéma → texte seul ; une cible qui contient
+  un code inline n'est pas un lien (le code prime), et gras/italique n'entrent
+  jamais dans l'attribut d'un lien ;
 - **code inline qui nomme un document** (`resolveDevDocCodeRef`) :
   `` `BUSY_BUTTONS.md` `` de l'index ou de `CLAUDE.md` devient un lien — cherché
   relatif au document, depuis la racine, puis dans `docs/features`, `docs`
   (site) ou `doc`, `dev-notes` (bot) ;
-- **ancres** sur les titres, à la manière de GitHub (`headingAnchor`).
+- **ancres** sur les titres, à la manière de GitHub (`headingAnchor`) ;
+- **listes numérotées coupées** (ligne vide, bloc de code, sous-liste) : la
+  suite reprend à son numéro (`<ol start="N">`).
 
 Le titre de l'onglet n'est posé que pour un lecteur autorisé : la 404 servie
 aux autres comptes n'annonce pas la page.
