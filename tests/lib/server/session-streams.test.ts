@@ -8,6 +8,7 @@ import {
   registerSessionStream,
   registeredStreamCount,
   resetSessionStreams,
+  RECONNECT_MEMORY_MAX,
   REVOCATION_MEMORY_MS,
   revocationMark,
   revokedSince,
@@ -304,6 +305,35 @@ describe("reconnectRequestedSince (ADMIN_PLAYER_VIEW.md)", () => {
     const mark = revocationMark();
 
     closeUserStreams(1);
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
+  });
+});
+
+describe("mémoire des changements de contexte (perf)", () => {
+  it("reconnectRequestedSince_moreThanCapMarks_oldestForgottenNewestKept", () => {
+    const mark = revocationMark();
+    reconnectSessionStreams(1, "premiere");
+    for (let i = 0; i < RECONNECT_MEMORY_MAX; i += 1) reconnectSessionStreams(2, `s${i}`);
+
+    expect(reconnectRequestedSince(1, "premiere", mark)).toBe(false);
+    expect(reconnectRequestedSince(2, `s${RECONNECT_MEMORY_MAX - 1}`, mark)).toBe(true);
+  });
+
+  it("revokedSince_manyReconnectMarks_realRevocationStillFound", () => {
+    const mark = revocationMark();
+    closeSessionStreams("revoquee");
+    for (let i = 0; i < RECONNECT_MEMORY_MAX * 2; i += 1) reconnectSessionStreams(2, `s${i}`);
+
+    expect(revokedSince(1, "revoquee", mark)).toBe(true);
+  });
+
+  it("reconnectRequestedSince_afterMemoryDelay_isFalse", () => {
+    jest.useFakeTimers();
+    const mark = revocationMark();
+    reconnectSessionStreams(1, "ici");
+
+    jest.advanceTimersByTime(REVOCATION_MEMORY_MS + 1);
 
     expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
   });

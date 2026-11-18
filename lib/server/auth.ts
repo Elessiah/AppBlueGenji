@@ -479,8 +479,8 @@ export function devBypassSessionKey(userId: number): string {
 }
 
 
-const DEV_BYPASS_PLAYER_VIEW_SQL = `(SELECT COUNT(*) FROM bg_user_sessions dv
-       WHERE dv.user_id = bg_users.id AND dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
+const DEV_BYPASS_PLAYER_VIEW_SQL = `EXISTS(SELECT 1 FROM bg_user_sessions dv
+       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
          AND dv.player_view_until > NOW()) AS player_view`;
 
 /**

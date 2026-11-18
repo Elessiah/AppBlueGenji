@@ -7,7 +7,8 @@ jest.mock("next/navigation", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { AccountMenuPanel } from "@/components/account-menu";
-import { PlayerViewBanner, requestPlayerView, takePlayerViewFocus } from "@/components/player-view";
+import { PlayerViewBanner } from "@/components/player-view";
+import { requestPlayerView, takePlayerViewFocus } from "@/components/player-view-toggle";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { ToastProvider } from "@/components/ui/toast";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -152,6 +153,13 @@ describe("textes FR = EN", () => {
 describe("câblage", () => {
   it("la mise en page racine pose la bannière en vue joueur seulement", () => {
     expect(readSource("app/layout.tsx")).toContain("{user?.playerView && <PlayerViewBanner />}");
+  });
+
+  it("bannerBundle_layoutLoadsItDynamically_accountMenuImportsOnlyTheToggle", () => {
+    expect(readSource("app/layout.tsx")).toContain('dynamic(() => import("@/components/player-view")');
+    expect(readSource("app/layout.tsx")).not.toMatch(/^import .* from "@\/components\/player-view";/m);
+    expect(readSource("components/account-menu.tsx")).toContain('from "./player-view-toggle"');
+    expect(readSource("components/account-menu.tsx")).not.toMatch(/from "\.\/player-view"/);
   });
 
 });

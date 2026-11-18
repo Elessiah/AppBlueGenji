@@ -88,7 +88,7 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   fermée par « déconnecter mes autres appareils ».
 - **Journal** : une ligne pm2 seulement (`auditStaffAction`, auteur nommé) —
   rien sur Discord, où la bascule ne dirait rien d'utile au staff.
-- Côté client : `usePlayerViewToggle` (`components/player-view.tsx`) — un
+- Côté client : `usePlayerViewToggle` (`components/player-view-toggle.ts`, séparé de la bannière `components/player-view.tsx` chargée à la demande par la mise en page) — un
   second clic n'envoie rien, un échec en notification (`showError`), une
   réussite par `router.refresh()` (la barre et les menus changent).
 
@@ -126,3 +126,9 @@ deux endroits), `tests/app/player-view-toggle.test.tsx` (le geste : toast,
 relecture après réussite seulement, un seul envoi par double clic), et des cas « vue joueur » dans `session-streams`, `match-launch`,
 `match-launch-routes`, `match-referee-routes`, `users-roles`, `detail-preview`
 et `stream` (aucun droit staff par le flux comme par la lecture REST).
+
+## Performance
+
+- Le drapeau est lu dans la requête de session existante (`s.player_view_until > NOW()`), sans requête de plus ni index nouveau ; l'échéance est une simple comparaison.
+- La bannière est chargée par `next/dynamic` (rendue côté serveur, code absent du morceau des pages publiques) ; le hook et le focus vivent dans `player-view-toggle.ts`, que le menu du compte importe sans la bannière.
+- Les changements de contexte (reconnexion) sont gardés à part des révocations (`RECONNECT_MEMORY_MAX` = 64, une minute) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).

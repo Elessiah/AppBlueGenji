@@ -36,7 +36,7 @@ jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({ useLocaleRouter: () => ({ refresh }) }));
 jest.mock("@/components/i18n/shell-text", () => ({ useShellText: () => ({ t: (key: string) => key }) }));
 
-import { takePlayerViewFocus, usePlayerViewToggle } from "@/components/player-view";
+import { takePlayerViewFocus, usePlayerViewToggle } from "@/components/player-view-toggle";
 
 const fetchMock = jest.fn<typeof fetch>();
 const originalFetch = global.fetch;

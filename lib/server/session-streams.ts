@@ -56,7 +56,7 @@ type Revocation = {
 
 type GlobalWithRegistry = typeof globalThis & {
   __bgSessionStreams?: Set<Entry>;
-  __bgStreamRevocations?: { mark: number; recent: Revocation[] };
+  __bgStreamRevocations?: { mark: number; recent: Revocation[]; reconnects: Revocation[] };
 };
 
 /**
@@ -66,15 +66,25 @@ type GlobalWithRegistry = typeof globalThis & {
  */
 export const REVOCATION_MEMORY_MS = 60_000;
 
-function revocations(): { mark: number; recent: Revocation[] } {
+/**
+ * Plafond des changements de contexte retenus : une bascule répétée ne grossit
+ * pas la liste que chaque ouverture de flux parcourt (les plus anciens
+ * tombent ; au-delà d'une minute ils tombent de toute façon).
+ */
+export const RECONNECT_MEMORY_MAX = 64;
+
+function revocations(): { mark: number; recent: Revocation[]; reconnects: Revocation[] } {
   const globalRef = globalThis as GlobalWithRegistry;
-  globalRef.__bgStreamRevocations ??= { mark: 0, recent: [] };
+  globalRef.__bgStreamRevocations ??= { mark: 0, recent: [], reconnects: [] };
   return globalRef.__bgStreamRevocations;
 }
 
 function prune(now: number): void {
   const state = revocations();
   state.recent = state.recent.filter((entry) => now - entry.at < REVOCATION_MEMORY_MS);
+  if (state.reconnects.length > 0) {
+    state.reconnects = state.reconnects.filter((entry) => now - entry.at < REVOCATION_MEMORY_MS);
+  }
 }
 
 function noteRevocation(revocation: Omit<Revocation, "mark" | "at">): void {
@@ -82,7 +92,14 @@ function noteRevocation(revocation: Omit<Revocation, "mark" | "at">): void {
   prune(now);
   const state = revocations();
   state.mark += 1;
-  state.recent.push({ ...revocation, mark: state.mark, at: now });
+  const entry = { ...revocation, mark: state.mark, at: now };
+  if (revocation.reconnect) {
+    // À part : les révocations réelles restent courtes à parcourir.
+    state.reconnects.push(entry);
+    if (state.reconnects.length > RECONNECT_MEMORY_MAX) state.reconnects.shift();
+    return;
+  }
+  state.recent.push(entry);
 }
 
 /**
@@ -98,7 +115,7 @@ export function revocationMark(): number {
 export function revokedSince(userId: number, tokenHash: string, mark: number): boolean {
   prune(Date.now());
   return revocations().recent.some((entry) => {
-    if (entry.mark <= mark || entry.reconnect) return false;
+    if (entry.mark <= mark) return false;
     if (entry.tokenHash !== undefined) return entry.tokenHash === tokenHash;
     return (
       entry.userId === userId &&
@@ -227,10 +244,9 @@ export function reconnectSessionStreams(userId: number, tokenHash: string | null
  */
 export function reconnectRequestedSince(userId: number, tokenHash: string, mark: number): boolean {
   prune(Date.now());
-  return revocations().recent.some(
+  return revocations().reconnects.some(
     (entry) =>
       entry.mark > mark &&
-      entry.reconnect === true &&
       entry.userId === userId &&
       (entry.tokenHash === undefined || entry.tokenHash === tokenHash),
   );
@@ -240,6 +256,7 @@ export function reconnectRequestedSince(userId: number, tokenHash: string, mark:
 export function resetSessionStreams(): void {
   registry().clear();
   revocations().recent = [];
+  revocations().reconnects = [];
 }
 
 /** Pour les tests : nombre de flux inscrits. */

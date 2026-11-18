@@ -1,5 +1,6 @@
 ﻿import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
+import dynamic from "next/dynamic";
 import "./globals.css";
 import { FONT_VARIABLES } from "./site-fonts";
 import { ToastProvider } from "@/components/ui/toast";
@@ -17,7 +18,6 @@ import { FloatingScrollWatcher } from "@/components/floating-scroll-watcher";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
-import { PlayerViewBanner } from "@/components/player-view";
 import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
 import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
@@ -38,6 +38,13 @@ import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { localizedPrivacyChanges, privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
+
+/**
+ * La bannière de la vue joueur : son code n'arrive que dans le morceau des
+ * sessions qui la montrent (quelques comptes du staff), jamais dans celui des
+ * pages publiques. Rendue côté serveur : pas de saut de mise en page.
+ */
+const PlayerViewBanner = dynamic(() => import("@/components/player-view").then((module) => module.PlayerViewBanner));
 import {
   recruitmentModalSilenced,
   termsModalDueOnLoad,

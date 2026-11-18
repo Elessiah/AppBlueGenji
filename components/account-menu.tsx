@@ -9,7 +9,7 @@ import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
 import { useLogout } from "./use-logout";
-import { takePlayerViewFocus, usePlayerViewToggle } from "./player-view";
+import { takePlayerViewFocus, usePlayerViewToggle } from "./player-view-toggle";
 import type { PlayerViewMenuMode } from "@/lib/shared/player-view";
 import s from "./account-menu.module.css";
 

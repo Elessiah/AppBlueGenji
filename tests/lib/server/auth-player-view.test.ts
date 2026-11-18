@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { readSource } from "../../helpers/read-source";
 import {
   countOtherSessions,
   devBypassSessionKey,
@@ -243,5 +244,12 @@ describe("autres appareils — ligne du contournement écartée", () => {
       expect.stringContaining("token_hash NOT LIKE 'dev-auth-bypass:%'"),
       expect.stringContaining("token_hash NOT LIKE 'dev-auth-bypass:%'"),
     ]);
+  });
+});
+
+describe("requête du contournement de développement", () => {
+  it("devBypassSql_usesExistsNotACount", () => {
+    expect(readSource("lib/server/auth.ts")).toContain("EXISTS(SELECT 1 FROM bg_user_sessions dv");
+    expect(readSource("lib/server/auth.ts")).not.toContain("(SELECT COUNT(*) FROM bg_user_sessions dv");
   });
 });
