@@ -13,8 +13,9 @@ import { can } from "@/lib/shared/permissions";
 import { planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
-import { withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
+import { MATCH_REFEREE_REFUSAL_CODES, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
 import { loadPlanningData, loadPlanningMembers, type Executor, type LoadedEntry, type PlanningData } from "./load";
+import { readMatchReferee, restoreMatchReferee, type MatchRefereeSnapshot } from "./match-restore";
 import { entryAssignments } from "./model";
 import { loadEntryPlayers, playersDuring } from "./players";
 import { writeSoloCaster } from "./profiles";
@@ -27,20 +28,13 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_ROLE_CONFLICT: 409,
   PLANNING_IS_PLAYER: 409,
   PLANNING_OVERLAP: 409,
+  PLANNING_OVERLAP_MANAGED: 409,
   PLANNING_CAST_MANAGED: 409,
   PLANNING_NOT_ASSIGNED: 409,
   PLANNING_BUSY: 409,
   NOT_CASTER: 409,
-  // Refus de la désignation d'un arbitre de match (`assignMatchReferee`).
-  MATCH_NOT_FOUND: 404,
-  MATCH_ALREADY_COMPLETED: 409,
-  MATCH_NOT_LAUNCHABLE: 409,
-  NOT_REFEREE: 409,
-  REFEREE_IDENTITY_REQUIRED: 409,
-  REFEREE_DISCORD_REQUIRED: 409,
-  REFEREE_OBJECTION: 409,
-  REFEREE_IS_PLAYER: 409,
-  REFEREE_CHANGED: 409,
+  // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
+  ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
 };
 
 async function findEntry(executor: Executor, user: AuthUser, entryKey: string, now: number) {
@@ -103,8 +97,10 @@ function heldRolesOn(entry: LoadedEntry, data: PlanningData, userId: number): Pl
  *
  * Les lignes du planning s'écrivent d'un bloc (une transaction) ; la
  * désignation du match, qui a la sienne, s'y fait **avant** toute ligne qui
- * nomme le match. Si le bloc échoue après elle, l'arbitre d'avant est remis
- * sur le match : planning et match ne se contredisent pas.
+ * nomme le match (la clé étrangère d'une ligne y prend un verrou partagé sur
+ * le match, que la désignation attendrait). Si le bloc échoue après elle,
+ * l'arbitrage d'avant — arbitre, autogestion, « prêt » — est remis sur le
+ * match (`match-restore.ts`) : planning et match ne se contredisent pas.
  */
 type ManualInput = { entryKey: string; role: PlanningRole; userId: number; assigned: boolean };
 type ManualContext = {
@@ -120,9 +116,11 @@ type ManualContext = {
 /**
  * Un membre ne couvre pas une entrée pendant laquelle il joue (ce match, ce
  * tournoi entier, ou une entrée qui la chevauche), ni deux entrées qui se
- * chevauchent : une attribution tenue ailleurs (confirmée, choix du staff,
- * caster inscrit, arbitre du match) refuse le geste ; une simple proposition
- * provisoire ailleurs cède la place au choix du staff (rendue).
+ * chevauchent : une attribution tenue ailleurs refuse le geste — confirmée ou
+ * choix du staff (`PLANNING_OVERLAP`, à retirer d'abord dans le planning),
+ * caster inscrit ou arbitre désigné sur le match (`PLANNING_OVERLAP_MANAGED`,
+ * à retirer depuis le match) ; une simple proposition provisoire ailleurs
+ * cède la place au choix du staff (rendue).
  */
 async function overlappingProposals(
   connection: Executor,
@@ -138,6 +136,7 @@ async function overlappingProposals(
   for (const other of around) {
     if (other.key === entry.key) continue;
     for (const row of entryAssignments(other, data).filter((candidate) => candidate.userId === userId)) {
+      if (row.source === "CAST" || row.source === "MATCH") throw new Error("PLANNING_OVERLAP_MANAGED");
       if (!row.provisional) throw new Error("PLANNING_OVERLAP");
       proposals.push({ entry: other, role: row.role });
     }
@@ -153,7 +152,7 @@ async function assignManually({ connection, actor, data, entry, input, current, 
   }
   if (current?.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
   const released = await overlappingProposals(connection, data, entry, input.userId);
-  let refereeMoved = false;
+  const before = matchId === null ? null : await readMatchReferee(connection, matchId);
   try {
     await transact(connection, async () => {
       for (const proposal of released) {
@@ -168,16 +167,23 @@ async function assignManually({ connection, actor, data, entry, input, current, 
           [entry.key, input.userId],
         );
         await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId);
-        refereeMoved = true;
       }
       await writeAssignment(connection, entry, { userId: input.userId, role: input.role, source: "MANUAL", reason: "MANUAL" }, actor.id);
     });
   } catch (error) {
-    if (refereeMoved && matchId !== null) {
-      await assignMatchReferee(matchId, actor.id, entry.matchRefereeId, input.userId).catch(() => undefined);
-    }
+    await undoMatchChange(before, input.userId);
     throw error;
   }
+}
+
+/**
+ * Le bloc du planning a échoué : l'arbitrage du match est remis tel qu'il
+ * était (`restoreMatchReferee`) — que la désignation ait été validée avant
+ * l'échec, ou validée puis suivie d'une exception. Sans effet si elle n'avait
+ * rien validé.
+ */
+async function undoMatchChange(before: MatchRefereeSnapshot | null, written: number | null): Promise<void> {
+  if (before) await restoreMatchReferee(before, written);
 }
 
 async function unassignManually({ connection, actor, entry, input, current, matchId }: ManualContext): Promise<void> {
@@ -186,7 +192,7 @@ async function unassignManually({ connection, actor, entry, input, current, matc
   if (current.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
   // Une proposition provisoire n'est pas encore posée sur le match.
   const onMatch = matchId !== null && !current.provisional;
-  let refereeReleased = false;
+  const before = onMatch && matchId !== null ? await readMatchReferee(connection, matchId) : null;
   try {
     await transact(connection, async () => {
       await connection.execute("DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ?", [
@@ -196,14 +202,11 @@ async function unassignManually({ connection, actor, entry, input, current, matc
       ]);
       if (onMatch && matchId !== null) {
         await assignMatchReferee(matchId, actor.id, null, input.userId);
-        refereeReleased = true;
       }
       await writeEvent(connection, entry, input.userId, input.role, "REMOVED", "MANUAL", actor.id);
     });
   } catch (error) {
-    if (refereeReleased && matchId !== null) {
-      await assignMatchReferee(matchId, actor.id, input.userId, null).catch(() => undefined);
-    }
+    await undoMatchChange(before, null);
     throw error;
   }
 }

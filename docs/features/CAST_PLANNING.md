@@ -56,7 +56,8 @@ compte les **rôles**, pas les personnes.
   préfère l'entrée de l'autre — sort des impasses de deux entrées qui se
   chevauchent). Chaque essai se juge sur la seule partie du planning qu'il
   touche (état indexé) : un lot de 31 jours se calcule en une fraction de
-  seconde. Le calcul se fait d'abord, puis l'effacement et les nouvelles
+  seconde ; le coût se mesure en essais (`PlannerStats`), borné par les tests
+  jusque dans le pire cas des échanges (tous préfèrent les mêmes entrées). Le calcul se fait d'abord, puis l'effacement et les nouvelles
   propositions s'écrivent dans **une transaction** (jamais un lot à moitié
   effacé).
 - **Semaines** : lundi 00:00 **heure de Paris** (`planningWeekStart`,
@@ -68,14 +69,16 @@ compte les **rôles**, pas les personnes.
   (`MATCH`) ; respecte l'autogestion décidée par le staff et les retraits
   manuels (jamais reproposé), écarte qui **joue** pendant l'entrée — joueurs
   du match, engagés du tournoi pour l'entrée d'un tournoi entier, joueurs de
-  toute entrée qui la chevauche (`players.ts`, deux lectures pour tout le
-  lot) — et les arbitres qui ne remplissent pas les conditions de
+  toute entrée qui la chevauche (`players.ts`, deux lectures pour les seules
+  entrées du lot et celles qui les chevauchent, règle de `match-players.ts`) — et les arbitres qui ne remplissent pas les conditions de
   `MATCH_REFEREE.md`.
 - Ordre : préférence (« je veux ce créneau »), puis charge la plus faible
   (semaine de l'entrée, puis `PLANNING_HISTORY_WEEKS` = 8 semaines d'historique
   **avant la semaine du lot** — un lot calculé à l'avance compte aussi le
   travail déjà tenu des semaines intermédiaires —, confirmées ou manuelles
-  seulement), puis id. Arbitres d'abord sur les entrées diffusées.
+  seulement ; pour une entrée d'une semaine plus tardive d'un lot de plusieurs
+  semaines, le travail verrouillé des semaines du lot qui la précèdent s'y
+  ajoute, `historyWeek`), puis id. Arbitres d'abord sur les entrées diffusées.
 - **Plusieurs casquettes** : une personne répond rôle par rôle ; le calcul
   préfère des personnes distinctes, et ne cumule arbitre + caster ou
   arbitre + prod qu'en dernier recours — jamais caster + prod.
@@ -94,17 +97,29 @@ compte les **rôles**, pas les personnes.
   avant un délai (heures). Une proposition d'arbitre confirmée est posée sur le
   match par `assignMatchReferee` ; seul un **refus métier** (conditions
   changées, arbitre posé entre-temps) retire la ligne et la compte — une panne
-  (base, interblocage) fait échouer le geste sans rien retirer, et le relancer
-  confirme l'arbitre déjà posé. Les désignations passent d'abord, les lignes
-  du planning s'écrivent ensuite en une transaction. Les lignes confirmées
+  (base, interblocage) fait échouer le geste sans rien retirer ; les
+  désignations déjà validées avant elle s'écrivent quand même au planning,
+  puis la panne remonte. Les désignations passent d'abord, les lignes du
+  planning s'écrivent ensuite en une transaction. Une proposition d'arbitre
+  restée provisoire alors que le match a déjà cet arbitre est confirmée au
+  début de chaque calcul et de chaque confirmation (`confirmPendingReferees`),
+  entrée commencée comprise : un calcul relancé ne l'efface jamais. Les lignes confirmées
   deviennent des contraintes fixes pour les calculs suivants.
 - Un choix du staff (`source = MANUAL`) naît confirmé et verrouillé ; un retrait
   manuel est mémorisé pour que le calcul ne repropose pas la personne. Le
   choix est refusé si la personne joue pendant l'entrée (`PLANNING_IS_PLAYER`)
-  ou tient déjà une attribution confirmée sur une entrée qui la chevauche
-  (`PLANNING_OVERLAP`) ; une simple proposition provisoire qui chevauche lui
-  cède la place. Lignes du planning en une transaction ; si elle échoue après
-  la désignation sur le match, l'arbitre d'avant y est remis.
+  ou tient déjà une attribution sur une entrée qui la chevauche — confirmée
+  ou manuelle (`PLANNING_OVERLAP`, à retirer dans le planning), caster inscrit
+  ou arbitre désigné sur le match (`PLANNING_OVERLAP_MANAGED`, à retirer depuis
+  le match) ; une simple proposition provisoire qui chevauche lui cède la
+  place. Lignes du planning en une transaction ; si elle échoue après la
+  désignation sur le match (ou si la désignation lève après sa validation),
+  l'arbitrage d'avant — arbitre, autogestion, « prêt » — est remis d'une
+  instruction, seulement si le match n'a pas bougé entre-temps ; sinon c'est
+  consigné dans pm2 (`match-restore.ts`).
+- Les refus du match (`MATCH_REFEREE_REFUSAL_CODES`) sont une seule liste,
+  vérifiée par le type contre les motifs d'inéligibilité ; les statuts HTTP de
+  la route en dérivent.
 - Un geste à la fois : verrou nommé `bg_planning` (10 s) → `PLANNING_BUSY`.
 
 ## Données (`lib/server/database/schema/planning.ts`)

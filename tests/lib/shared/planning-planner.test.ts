@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import type { PlanningRole } from "@/lib/shared/planning";
-import { planAssignments, rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
+import { planAssignments, PLANNER_MAX_PASSES, rolesConflict, slotsOverlap, type PlannerStats } from "@/lib/shared/planning-planner";
 import { available, HOUR_MS, MONDAY, plannerEntry, plannerInput } from "../../helpers/planning";
 
 /**
@@ -384,7 +384,7 @@ describe("planAssignments — amélioration globale", () => {
     ]);
   });
 
-  it("planAssignments_monthBatch120Entries_completesQuickly", () => {
+  it("planAssignments_monthBatch120Entries_trialsBounded", () => {
     const entries = Array.from({ length: 120 }, (_, i) =>
       plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
         endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
@@ -399,14 +399,74 @@ describe("planAssignments — amélioration globale", () => {
           : held.map((role) => available(entry.key, userId, role, { preferred: (i * 7 + userId) % 11 === 0 })),
       ),
     );
-    const input = plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) });
+    const stats: PlannerStats = { passes: 0, trials: 0 };
 
-    const started = performance.now();
-    const result = planAssignments(input);
-    const elapsed = performance.now() - started;
+    const result = planAssignments(plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) }), stats);
 
-    expect(elapsed).toBeLessThan(1500);
     expect(result.length).toBeGreaterThan(120);
+    expect(stats.passes).toBeLessThanOrEqual(PLANNER_MAX_PASSES);
+    expect(stats.trials).toBeLessThan(20_000);
+  });
+
+  it("planAssignments_everyonePrefersTheSameFewEntries_trialsBounded", () => {
+    // Pire cas des échanges : chacun préfère les 20 mêmes entrées, que peu tiennent.
+    const entries = Array.from({ length: 120 }, (_, i) =>
+      plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
+        endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
+      }),
+    );
+    const roles: PlanningRole[][] = [REFEREE, CASTER, PROD, ["REFEREE", "CASTER"], ["CASTER", "PROD"]];
+    const members = new Map<number, PlanningRole[]>(Array.from({ length: 25 }, (_, u) => [u + 1, roles[u % roles.length]]));
+    const availability = entries.flatMap((entry, i) =>
+      [...members].flatMap(([userId, held]) => held.map((role) => available(entry.key, userId, role, { preferred: i >= 100 }))),
+    );
+    const stats: PlannerStats = { passes: 0, trials: 0 };
+
+    planAssignments(plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) }), stats);
+
+    expect(stats.passes).toBeLessThanOrEqual(PLANNER_MAX_PASSES);
+    expect(stats.trials).toBeLessThan(60_000);
+  });
+
+  it("planAssignments_historyWeek_lockedWorkOfEarlierBatchWeekTipsFairness", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:w1", 20), plannerEntry("m:w1b", 22), plannerEntry("m:w2", 7 * 24 + 20)],
+      availability: [available("m:w2", 1, "REFEREE"), available("m:w2", 2, "REFEREE")],
+      members: new Map([
+        [1, REFEREE],
+        [2, REFEREE],
+      ]),
+      locked: [
+        { entryKey: "m:w1", userId: 1, role: "REFEREE", reason: "MANUAL" },
+        { entryKey: "m:w1b", userId: 1, role: "REFEREE", reason: "MANUAL" },
+      ],
+      history: new Map([[2, 1]]),
+      historyWeek: MONDAY,
+    });
+
+    const result = planAssignments(input);
+
+    expect(result).toEqual([expect.objectContaining({ entryKey: "m:w2", userId: 2, historyLoad: 1 })]);
+  });
+
+  it("planAssignments_noHistoryWeek_earlierWeeksIgnored", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:w1", 20), plannerEntry("m:w1b", 22), plannerEntry("m:w2", 7 * 24 + 20)],
+      availability: [available("m:w2", 1, "REFEREE"), available("m:w2", 2, "REFEREE")],
+      members: new Map([
+        [1, REFEREE],
+        [2, REFEREE],
+      ]),
+      locked: [
+        { entryKey: "m:w1", userId: 1, role: "REFEREE", reason: "MANUAL" },
+        { entryKey: "m:w1b", userId: 1, role: "REFEREE", reason: "MANUAL" },
+      ],
+      history: new Map([[2, 1]]),
+    });
+
+    const result = planAssignments(input);
+
+    expect(result).toEqual([expect.objectContaining({ entryKey: "m:w2", userId: 1, historyLoad: 0 })]);
   });
 
   it("planAssignments_mondayEarlyParisTime_sameWeekAsMondayEvening", () => {

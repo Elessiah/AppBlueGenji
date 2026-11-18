@@ -110,6 +110,7 @@
     "PLANNING_ROLE_CONFLICT": "Une même personne ne peut pas être caster et prod sur un même créneau.",
     "PLANNING_IS_PLAYER": "Cette personne joue pendant ce créneau : elle ne peut pas le couvrir.",
     "PLANNING_OVERLAP": "Cette personne tient déjà un créneau qui chevauche celui-ci : retire-la d'abord de l'autre.",
+    "PLANNING_OVERLAP_MANAGED": "Cette personne tient déjà, sur le match lui-même, un créneau qui chevauche celui-ci (caster inscrit ou arbitre désigné) : retire-la d'abord depuis ce match.",
     "PLANNING_CAST_MANAGED": "Ce caster est inscrit sur le match : retire-le depuis le match.",
     "PLANNING_NOT_ASSIGNED": "Cette personne n'est déjà plus attribuée.",
     "PLANNING_BUSY": "Un autre geste du planning est en cours, réessaie.",

@@ -11,10 +11,12 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
-import { PLANNING_EVENT_REFEREES, PLANNING_ROLES, type PlanningRole } from "@/lib/shared/planning";
+import type { RefereeIneligibility } from "@/lib/shared/match-referee";
+import { PLANNING_EVENT_REFEREES, PLANNING_ROLES, planningWeekStart, type PlanningRole } from "@/lib/shared/planning";
 import {
   exclusionKey,
   planAssignments,
+  slotsOverlap,
   type LockedAssignment,
   type PlannerInput,
 } from "@/lib/shared/planning-planner";
@@ -65,9 +67,11 @@ async function excludePlayers(
   entries: readonly LoadedEntry[],
   excluded: Set<string>,
 ): Promise<void> {
-  const players = await loadEntryPlayers(executor, data.entries);
+  // Seules comptent les entrées du lot et celles qui en chevauchent une.
+  const around = data.entries.filter((other) => entries.some((entry) => other.key === entry.key || slotsOverlap(other, entry)));
+  const players = await loadEntryPlayers(executor, around);
   for (const entry of entries) {
-    for (const userId of playersDuring(entry, data.entries, players)) {
+    for (const userId of playersDuring(entry, around, players)) {
       for (const role of PLANNING_ROLES) excluded.add(exclusionKey(entry.key, userId, role));
     }
   }
@@ -106,6 +110,7 @@ export function preparePlanner(
   batch: readonly LoadedEntry[],
   history: ReadonlyMap<number, number>,
   excluded: ReadonlySet<string>,
+  historyWeek?: number,
 ): PlannerInput {
   const inBatch = new Set(batch.map((entry) => entry.key));
   const locked: LockedAssignment[] = [];
@@ -129,6 +134,7 @@ export function preparePlanner(
     locked,
     refereeDecided: new Set(data.entries.filter((entry) => entry.selfManaged).map((entry) => entry.key)),
     history,
+    historyWeek,
     excluded,
   };
 }
@@ -191,12 +197,14 @@ export async function runAutoAssign(
     const data = await loadPlanningData(connection, { now, includeHidden: true });
     const batch = batchEntries(data, window);
     if (batch.length === 0) return { entries: 0, proposed: 0, replaced: 0 };
-    const history = await loadPlanningHistory(connection, Math.max(now, window.from));
+    const anchor = Math.max(now, window.from);
+    const history = await loadPlanningHistory(connection, anchor);
     const excluded = await loadExclusions(connection, data, batch);
-    const planned = planAssignments(preparePlanner(data, batch, history, excluded));
+    const planned = planAssignments(preparePlanner(data, batch, history, excluded, planningWeekStart(anchor)));
     const keys = batch.map((entry) => entry.key);
     const byKey = new Map(batch.map((entry) => [entry.key, entry]));
     return transact(connection, async () => {
+      await confirmPendingReferees(connection, data, actorId);
       const [cleared] = await connection.execute(
         `DELETE FROM bg_planning_assignments
           WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
@@ -230,44 +238,99 @@ export function entriesToConfirm(data: Pick<PlanningData, "entries">, scope: Con
  * retirée. Toute autre erreur (base, interblocage) est une panne : le geste
  * échoue et se relance, sans rien retirer.
  */
-export const MATCH_REFEREE_REFUSALS: ReadonlySet<string> = new Set([
-  "MATCH_NOT_FOUND",
-  "MATCH_ALREADY_COMPLETED",
-  "MATCH_NOT_LAUNCHABLE",
-  "NOT_REFEREE",
-  "REFEREE_IDENTITY_REQUIRED",
-  "REFEREE_DISCORD_REQUIRED",
-  "REFEREE_OBJECTION",
-  "REFEREE_IS_PLAYER",
-  "REFEREE_CHANGED",
-]);
+type MatchRefereeRefusal =
+  | Exclude<RefereeIneligibility, "ACCOUNT_GONE">
+  | "MATCH_NOT_FOUND"
+  | "MATCH_ALREADY_COMPLETED"
+  | "MATCH_NOT_LAUNCHABLE"
+  | "REFEREE_CHANGED";
+
+// La liste unique, que la route des gestes reprend (`PLANNING_STATUSES`). Un
+// motif d'inéligibilité ajouté (`RefereeIneligibility`) sans entrée ici ne
+// compile pas (`satisfies`) : il ne passerait pas pour une panne.
+const MATCH_REFEREE_REFUSAL_SET = {
+  MATCH_NOT_FOUND: true,
+  MATCH_ALREADY_COMPLETED: true,
+  MATCH_NOT_LAUNCHABLE: true,
+  NOT_REFEREE: true,
+  REFEREE_IDENTITY_REQUIRED: true,
+  REFEREE_DISCORD_REQUIRED: true,
+  REFEREE_OBJECTION: true,
+  REFEREE_IS_PLAYER: true,
+  REFEREE_CHANGED: true,
+} satisfies Record<MatchRefereeRefusal, true>;
+
+export const MATCH_REFEREE_REFUSAL_CODES = Object.keys(MATCH_REFEREE_REFUSAL_SET) as readonly MatchRefereeRefusal[];
+
+export const MATCH_REFEREE_REFUSALS: ReadonlySet<string> = new Set(MATCH_REFEREE_REFUSAL_CODES);
 
 export function isMatchRefereeRefusal(error: unknown): boolean {
   return error instanceof Error && MATCH_REFEREE_REFUSALS.has(error.message);
 }
 
-/** Une proposition à confirmer, et ce qu'il en advient. */
-type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; refused: boolean };
-
 /**
- * Les propositions provisoires des entrées retenues. S'y ajoute, pour un
- * match, la proposition d'arbitre restée provisoire alors que le match a déjà
- * cet arbitre (confirmation interrompue par une panne) : elle se confirme
- * sans rien redemander au match.
+ * Une proposition à confirmer, et ce qu'il en advient : `refused` (le match
+ * l'a refusée), `settled` (arbitre de match dont le match a décidé : posé ou
+ * refusé).
  */
+type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; refused: boolean; settled: boolean };
+
 function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
   const steps: ConfirmStep[] = [];
   for (const entry of entriesToConfirm(data, scope)) {
     for (const row of entryAssignments(entry, data).filter((candidate) => candidate.provisional)) {
-      steps.push({ entry, userId: row.userId, role: row.role, refused: false });
+      steps.push({ entry, userId: row.userId, role: row.role, refused: false, settled: false });
     }
-    const pending = data.assignments.find(
-      (row) =>
-        row.entryKey === entry.key && row.role === "REFEREE" && !row.confirmed && row.userId === entry.matchRefereeId,
-    );
-    if (entry.kind === "MATCH" && pending) steps.push({ entry, userId: pending.userId, role: "REFEREE", refused: false });
   }
   return steps;
+}
+
+/**
+ * Propositions d'arbitre restées provisoires alors que le match a déjà cet
+ * arbitre — une confirmation interrompue par une panne après la désignation
+ * du match : elles se confirment sans rien redemander au match, que l'entrée
+ * soit encore ouverte ou déjà commencée. Jouée au début de chaque calcul et
+ * de chaque confirmation (dans leur transaction) : un calcul relancé ne les
+ * efface donc jamais comme de simples propositions.
+ */
+export async function confirmPendingReferees(executor: Executor, data: PlanningData, actorId: number): Promise<number> {
+  let confirmed = 0;
+  for (const entry of data.entries) {
+    if (entry.kind !== "MATCH" || entry.matchRefereeId === null) continue;
+    const pending = data.assignments.some(
+      (row) => row.entryKey === entry.key && row.role === "REFEREE" && !row.confirmed && row.userId === entry.matchRefereeId,
+    );
+    if (!pending) continue;
+    await executor.execute(
+      "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
+      [entry.key, entry.matchRefereeId],
+    );
+    await writeEvent(executor, entry, entry.matchRefereeId, "REFEREE", "CONFIRMED", "AUTO", actorId);
+    confirmed += 1;
+  }
+  return confirmed;
+}
+
+/**
+ * Pose sur le match chaque arbitre de match à confirmer, l'un après l'autre.
+ * Rend la panne qui a interrompu la série (`undefined` sinon) : les
+ * désignations déjà décidées restent marquées `settled`, pour que le planning
+ * les écrive quand même — jamais un match qui a son arbitre et un planning qui
+ * le montre encore en proposition.
+ */
+async function designateReferees(steps: ConfirmStep[], actorId: number): Promise<unknown> {
+  for (const step of steps) {
+    const { entry } = step;
+    if (entry.kind !== "MATCH" || step.role !== "REFEREE" || entry.matchId === null) continue;
+    try {
+      await assignMatchReferee(entry.matchId, actorId, step.userId, null);
+    } catch (error) {
+      if (!isMatchRefereeRefusal(error)) return error;
+      step.refused = true;
+    }
+    step.settled = true;
+  }
+  return undefined;
 }
 
 /**
@@ -288,19 +351,13 @@ export async function confirmAssignments(
 ): Promise<ConfirmReport> {
   return withPlanningLock(async (connection) => {
     const data = await loadPlanningData(connection, { now, includeHidden: true });
-    const steps = confirmSteps(data, scope);
-    for (const step of steps) {
-      const { entry } = step;
-      if (entry.kind !== "MATCH" || step.role !== "REFEREE" || entry.matchId === null) continue;
-      if (entry.matchRefereeId === step.userId) continue;
-      try {
-        await assignMatchReferee(entry.matchId, actorId, step.userId, null);
-      } catch (error) {
-        if (!isMatchRefereeRefusal(error)) throw error;
-        step.refused = true;
-      }
-    }
-    return transact(connection, async () => {
+    const all = confirmSteps(data, scope);
+    const failure = await designateReferees(all, actorId);
+    // Une panne en route : seules s'écrivent les désignations que le match a
+    // déjà décidées, puis la panne remonte (le geste se relance).
+    const steps = failure === undefined ? all : all.filter((step) => step.settled);
+    const report = await transact(connection, async () => {
+      const healed = await confirmPendingReferees(connection, data, actorId);
       for (const step of steps) {
         if (step.refused) {
           await connection.execute(
@@ -317,7 +374,9 @@ export async function confirmAssignments(
         await writeEvent(connection, step.entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
       }
       const refused = steps.filter((step) => step.refused).length;
-      return { confirmed: steps.length - refused, refused };
+      return { confirmed: steps.length - refused + healed, refused };
     });
+    if (failure !== undefined) throw failure;
+    return report;
   });
 }

@@ -35,13 +35,34 @@ export async function loadMatchPlayerIds(
   match: { team1_id: number | null; team2_id: number | null },
 ): Promise<Set<number>> {
   const teamIds = [match.team1_id, match.team2_id].filter((id): id is number => id !== null).map(Number);
-  if (teamIds.length === 0) return new Set();
-  const placeholders = sqlPlaceholders(teamIds.length);
-  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT user_id FROM bg_team_members tm WHERE ${activeMemberSql("tm")} AND team_id IN (${placeholders})
+  const byTeam = await loadTeamPlayers(connection, teamIds);
+  return new Set([...byTeam.values()].flatMap((ids) => [...ids]));
+}
+
+/**
+ * Comptes qui jouent pour chaque engagée (`teamId` → comptes) : membres
+ * actifs, ou titulaire de l'entrée solo. La même règle, en une lecture pour
+ * autant d'engagées qu'il faut (le planning, `planning/players.ts`).
+ */
+export async function loadTeamPlayers(
+  connection: Pick<PoolConnection, "execute">,
+  teamIds: readonly number[],
+): Promise<Map<number, Set<number>>> {
+  const ids = [...new Set(teamIds)];
+  const out = new Map<number, Set<number>>();
+  if (ids.length === 0) return out;
+  const placeholders = sqlPlaceholders(ids.length);
+  const [rows] = await connection.execute<(RowDataPacket & { team_id: number; user_id: number })[]>(
+    `SELECT tm.team_id, tm.user_id FROM bg_team_members tm WHERE ${activeMemberSql("tm")} AND tm.team_id IN (${placeholders})
      UNION
-     SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IS NOT NULL AND id IN (${placeholders})`,
-    [...teamIds, ...teamIds],
+     SELECT id AS team_id, solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IS NOT NULL AND id IN (${placeholders})`,
+    [...ids, ...ids],
   );
-  return new Set(rows.map((row) => Number(row.user_id)));
+  for (const row of rows) {
+    const teamId = Number(row.team_id);
+    const players = out.get(teamId) ?? new Set<number>();
+    players.add(Number(row.user_id));
+    out.set(teamId, players);
+  }
+  return out;
 }

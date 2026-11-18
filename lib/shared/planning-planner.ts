@@ -68,6 +68,14 @@ export type PlannerInput = {
   refereeDecided: ReadonlySet<string>;
   /** Attributions des semaines précédentes, par membre (équité). */
   history: ReadonlyMap<number, number>;
+  /**
+   * Début (`planningWeekStart`) de la semaine où `history` s'arrête. Pour une
+   * entrée d'une semaine plus tardive du lot, le travail **tenu** (verrouillé)
+   * des semaines entre les deux s'ajoute à son historique : un lot de
+   * plusieurs semaines reste équitable d'une semaine à l'autre. Absent : rien
+   * ne s'ajoute.
+   */
+  historyWeek?: number;
   /** `entryKey|userId|role` refusés (joueur du match, condition d'arbitrage, retrait par le staff). */
   excluded: ReadonlySet<string>;
 };
@@ -85,6 +93,9 @@ export type PlannedAssignment = {
 
 /** Plafond des tours d'amélioration (chacun améliore strictement : le calcul s'arrête toujours bien avant). */
 export const PLANNER_MAX_PASSES = 20;
+
+/** Mesure du coût d'un calcul : tours d'amélioration joués, essais jugés. */
+export type PlannerStats = { passes: number; trials: number };
 
 export function exclusionKey(entryKey: string, userId: number, role: PlanningRole): string {
   return `${entryKey}|${userId}|${role}`;
@@ -139,6 +150,11 @@ class PlannerState {
   private readonly byEntry = new Map<string, Placement[]>();
   private readonly byUser = new Map<number, Placement[]>();
   private readonly loads = new Map<string, number>();
+  /** Membre → semaine → places verrouillées (figé par {@link PlannerState.freezeHistory}). */
+  private readonly lockedWeeks = new Map<number, Map<number, number>>();
+  private readonly historyCache = new Map<string, number>();
+  /** Essais jugés (chaque {@link PlannerState.localScore}) : la mesure du coût du calcul. */
+  trials = 0;
 
   constructor(readonly input: PlannerInput) {
     this.entries = new Map(input.entries.map((entry) => [entry.key, entry]));
@@ -224,6 +240,34 @@ class PlannerState {
     return (this.offered.get(`${entry.key}|${role}`) ?? []).filter((userId) => this.eligible(entry, userId, role));
   }
 
+  /** Une fois les places verrouillées posées : leur charge par semaine, pour l'historique. */
+  freezeHistory(): void {
+    for (const p of this.placements) {
+      if (!p.locked) continue;
+      const weeks = this.lockedWeeks.get(p.userId) ?? new Map<number, number>();
+      const week = this.weekOf(p.entryKey);
+      weeks.set(week, (weeks.get(week) ?? 0) + 1);
+      this.lockedWeeks.set(p.userId, weeks);
+    }
+  }
+
+  /** Historique d'un membre pour une entrée : `history`, plus le travail tenu des semaines du lot qui la précèdent. */
+  historyOf(userId: number, entryKey: string): number {
+    const base = this.input.history.get(userId) ?? 0;
+    const from = this.input.historyWeek;
+    if (from === undefined) return base;
+    const week = this.weekOf(entryKey);
+    const key = `${week}|${userId}`;
+    const cached = this.historyCache.get(key);
+    if (cached !== undefined) return cached;
+    let total = base;
+    for (const [lockedWeek, count] of this.lockedWeeks.get(userId) ?? []) {
+      if (lockedWeek >= from && lockedWeek < week) total += count;
+    }
+    this.historyCache.set(key, total);
+    return total;
+  }
+
   weekLoad(userId: number, entryKey: string): number {
     return this.loads.get(`${this.weekOf(entryKey)}|${userId}`) ?? 0;
   }
@@ -243,6 +287,7 @@ class PlannerState {
    * qui ne touche qu'elles se juge sur la différence avant / après.
    */
   localScore(entryKeys: readonly string[], userIds: readonly number[]): Score {
+    this.trials += 1;
     const score: Score = [0, 0, 0, 0];
     const users = [...new Set(userIds)];
     for (const entryKey of new Set(entryKeys)) {
@@ -263,7 +308,7 @@ class PlannerState {
     for (const p of group.filter((placement) => !placement.locked)) {
       if (group.length > 1) score[0] += 1;
       if (!this.preferred(p.entryKey, p.userId, p.role)) score[1] += 1;
-      score[3] += this.input.history.get(p.userId) ?? 0;
+      score[3] += this.historyOf(p.userId, p.entryKey);
     }
   }
 }
@@ -319,7 +364,7 @@ function bestCandidate(state: PlannerState, entry: PlannerEntry, role: PlanningR
     alreadyOn: state.rolesOn(entry.key, userId).length > 0 ? 1 : 0,
     preferred: state.preferred(entry.key, userId, role) ? 0 : 1,
     week: state.weekLoad(userId, entry.key),
-    history: state.input.history.get(userId) ?? 0,
+    history: state.historyOf(userId, entry.key),
   }));
   ranked.sort(
     (a, b) =>
@@ -497,7 +542,7 @@ function swapPreferences(state: PlannerState): boolean {
  * Le calcul. Rend les propositions nouvelles (jamais les verrouillées), dans
  * l'ordre du calendrier puis de la clé et du rôle.
  */
-export function planAssignments(input: PlannerInput): PlannedAssignment[] {
+export function planAssignments(input: PlannerInput, stats?: PlannerStats): PlannedAssignment[] {
   const state = new PlannerState(input);
   const lockedRows = [...input.locked].sort(
     (a, b) => a.entryKey.localeCompare(b.entryKey) || a.role.localeCompare(b.role) || a.userId - b.userId,
@@ -507,13 +552,20 @@ export function planAssignments(input: PlannerInput): PlannedAssignment[] {
       state.place(row.entryKey, row.userId, row.role, true);
     }
   }
+  state.freezeHistory();
   const open = input.entries.filter((entry) => entry.open);
   fillAll(state, open);
-  for (let pass = 0; pass < PLANNER_MAX_PASSES; pass += 1) {
+  let passes = 0;
+  while (passes < PLANNER_MAX_PASSES) {
+    passes += 1;
     const moved = improve(state);
     const swapped = swapPreferences(state);
     const filled = fillAll(state, open);
     if (!moved && !swapped && !filled) break;
+  }
+  if (stats) {
+    stats.passes = passes;
+    stats.trials = state.trials;
   }
   const order = new Map(PLANNING_ROLES.map((role, index) => [role, index]));
   return [...state.placements]
@@ -526,7 +578,7 @@ export function planAssignments(input: PlannerInput): PlannedAssignment[] {
         role: p.role,
         reason: state.preferred(p.entryKey, p.userId, p.role) ? ("PREFERENCE" as const) : ("LOAD" as const),
         weekLoad: state.weekLoad(p.userId, p.entryKey),
-        historyLoad: input.history.get(p.userId) ?? 0,
+        historyLoad: state.historyOf(p.userId, p.entryKey),
         startAt: entry.startAt,
       };
     })

@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { activeMemberSql, loadMatchPlayerIds, playsMatchSql } from "@/lib/server/tournaments/match-players";
+import { activeMemberSql, loadMatchPlayerIds, loadTeamPlayers, playsMatchSql } from "@/lib/server/tournaments/match-players";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 /** Règle « qui joue ce match » partagée par le verrou, l'instantané et la fenêtre « Arbitrage » (EF-31). */
@@ -39,6 +39,31 @@ describe("match-players", () => {
     const execute = jest.fn<SqlQuery>();
 
     await expect(loadMatchPlayerIds(fakeConnection({ execute }), { team1_id: null, team2_id: null })).resolves.toEqual(new Set());
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("loadTeamPlayers_rowsOfSeveralTeams_groupedByTeamDeduped", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { team_id: 10, user_id: 3 },
+        { team_id: 10, user_id: 3 },
+        { team_id: 20, user_id: 5 },
+      ],
+      [],
+    ]);
+
+    const players = await loadTeamPlayers(fakeConnection({ execute }), [10, 20, 10]);
+
+    expect(players).toEqual(new Map([[10, new Set([3])], [20, new Set([5])]]));
+    expect(execute.mock.calls[0][1]).toEqual([10, 20, 10, 20]);
+    expect(execute.mock.calls[0][0]).toContain("solo_user_id IS NOT NULL");
+  });
+
+  it("loadTeamPlayers_noTeam_readsNothing", async () => {
+    const execute = jest.fn<SqlQuery>();
+
+    await expect(loadTeamPlayers(fakeConnection({ execute }), [])).resolves.toEqual(new Map());
 
     expect(execute).not.toHaveBeenCalled();
   });

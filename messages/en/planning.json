@@ -110,6 +110,7 @@
     "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and producer on one slot.",
     "PLANNING_IS_PLAYER": "This person plays during this slot: they cannot cover it.",
     "PLANNING_OVERLAP": "This person already holds a slot that overlaps this one: remove them from the other one first.",
+    "PLANNING_OVERLAP_MANAGED": "This person already holds an overlapping slot on the match itself (signed-up caster or appointed referee): remove them from that match first.",
     "PLANNING_CAST_MANAGED": "This caster signed up on the match: remove them from the match.",
     "PLANNING_NOT_ASSIGNED": "This person is no longer assigned.",
     "PLANNING_BUSY": "Another schedule action is in progress, try again.",

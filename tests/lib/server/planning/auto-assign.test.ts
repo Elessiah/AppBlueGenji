@@ -150,6 +150,10 @@ describe("preparePlanner", () => {
 
     expect([...preparePlanner(data, [inside], new Map(), new Set()).soloCasterIds]).toEqual([4]);
   });
+
+  it("preparePlanner_historyWeek_passedToPlanner", () => {
+    expect(preparePlanner(planningData({ entries: [inside] }), [inside], new Map(), new Set(), MONDAY).historyWeek).toBe(MONDAY);
+  });
 });
 
 describe("withPlanningLock", () => {
@@ -190,6 +194,32 @@ describe("runAutoAssign", () => {
     ]);
     expect(execute.mock.calls[0][0]).toContain("source = 'AUTO' AND confirmed = 0");
     expect(execute.mock.calls[1][1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "AUTO", "LOAD", 0, 9]);
+  });
+
+  it("runAutoAssign_pendingRefereeOnMatch_confirmedBeforeDelete", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry({ matchRefereeId: 3 })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
+      }),
+    );
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(statements().slice(0, 3)).toEqual([
+      "UPDATE bg_planning_assignments SET confi",
+      "INSERT INTO bg_planning_events (entry_ke",
+      "DELETE FROM bg_planning_assignments WHER",
+    ]);
+  });
+
+  it("runAutoAssign_entryOutsideBatchNotOverlapping_playersNotLoaded", async () => {
+    const far = loadedEntry({ key: "m:2", matchId: 2, startAt: MONDAY + 50 * HOUR_MS, endAt: MONDAY + 51 * HOUR_MS });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry(), far] }));
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(jest.mocked(loadEntryPlayers).mock.calls[0][1].map((entry) => entry.key)).toEqual(["m:1"]);
   });
 
   it("runAutoAssign_matchPlayer_excluded", async () => {
@@ -374,7 +404,7 @@ describe("confirmAssignments", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("confirmAssignments_pendingRefereeAlreadyOnMatch_confirmedWithoutMatchCall", async () => {
+  it("confirmAssignments_pendingRefereeAlreadyOnMatch_healedWithoutMatchCall", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       planningData({
         entries: [loadedEntry({ matchRefereeId: 3 })],
@@ -386,7 +416,44 @@ describe("confirmAssignments", () => {
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(execute.mock.calls[0][1]).toEqual(["m:1", 3, "REFEREE"]);
+    expect(execute.mock.calls[0][1]).toEqual(["m:1", 3]);
+    expect(execute.mock.calls[1][1]).toContain("CONFIRMED");
+  });
+
+  it("confirmAssignments_pendingRefereeOnStartedMatch_healed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry({ matchRefereeId: 3, open: false, editable: false })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
+      }),
+    );
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 1, refused: 0 });
+    expect(statements()[0]).toBe("UPDATE bg_planning_assignments SET confi");
+  });
+
+  it("confirmAssignments_transientFailureAfterFirstReferee_firstConfirmedThenThrows", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [first, second],
+        assignments: [
+          loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" }),
+          loadedAssignment({ entryKey: "m:2", userId: 5, role: "REFEREE" }),
+          loadedAssignment({ entryKey: "m:2", userId: 4, role: "CASTER" }),
+        ],
+      }),
+    );
+    jest.mocked(assignMatchReferee).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1", "m:2"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+
+    expect(execute.mock.calls.map(([, params]) => params)).toEqual([
+      ["m:1", 3, "REFEREE"],
+      ["m:1", 3, "REFEREE", 10, 1, "CONFIRMED", "AUTO", 9],
+    ]);
+    expect(connection.commit).toHaveBeenCalled();
   });
 
   it("confirmAssignments_tournamentReferee_noMatchCall", async () => {
