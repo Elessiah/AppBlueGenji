@@ -34,9 +34,9 @@ describe("registre T19", () => {
 describe("historique des changements", () => {
   it("privacyChanges_statsEntry_followedByPhashEntryAndDated", () => {
     // Suivie de l'empreinte perceptuelle des avatars bloqués (EF-72).
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
-    expect(PRIVACY_CHANGES.at(-2)?.publishedAt).toBe("2026-11-18");
-    expect(PRIVACY_CHANGES.at(-2)?.links?.map((link) => link.href)).toEqual(["/rgpd#audience-detaillee", "/rgpd#audience"]);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(ENTRY_ID);
+    expect(PRIVACY_CHANGES.at(-3)?.publishedAt).toBe("2026-11-18");
+    expect(PRIVACY_CHANGES.at(-3)?.links?.map((link) => link.href)).toEqual(["/rgpd#audience-detaillee", "/rgpd#audience"]);
   });
 
   it("privacyChanges_statsEntry_hasEnglish", () => {

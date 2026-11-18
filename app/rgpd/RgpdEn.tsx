@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { CyberButton } from "@/components/cyber";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
@@ -1071,6 +1072,17 @@ export function RgpdEn({
             by unticking “Discord direct messages about my matches and teams” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — push notifications keep
             their own settings (<LocaleLink href="/rgpd/registre#t03">register, T03</LocaleLink>).
+          </p>
+          <p id="test-messages-prives">
+            <strong>“Test my DMs”.</strong> From <EnglishLegalLink href="/profil#comptes">My profile</EnglishLegalLink>,
+            this button asks the bot to send you a short test direct message, in your account&apos;s language, to
+            check that it can reach you — only to your own linked Discord account, and only if your tag is verified;
+            the message carries neither a link nor anyone&apos;s name. The result (message delivered, direct messages
+            closed, not on the BlueGenji server, bot unreachable) is shown to you only and is not recorded; a try that
+            does not succeed is counted in the staff log on Discord without naming anyone. At most{" "}
+            {DM_TEST_HOURLY_LIMIT} tries per hour: your account number is kept in memory only, sixty-one minutes at
+            most, for that cap. Basis: <strong>performance of the service</strong> you request (
+            <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,

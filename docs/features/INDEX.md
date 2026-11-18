@@ -85,6 +85,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BATTLETAG_ORIGIN.md` — Origine du BattleTag (`overwatch_battletag_typed`) : un BattleTag tapé gardé sous un Battle.net muet, jamais vérifié, champ ouvert.
 - `DISCORD_VERIFICATION.md` — Certification du tag Discord, visibilité du tag.
 - `DISCORD_CERTIFY_PROMPT.md` — Fenêtre qui propose la certification après une connexion Discord ou Blizzard, « Ne plus voir ».
+- `DISCORD_DM_TEST.md` — « Tester mes MP » (`/profil`) : un message privé de test du bot vers son Discord rattaché, issue en notification (remis, MP fermés, hors du serveur, bot injoignable), modale « Certifier mon tag » sans tag certifié, 3 essais par heure.
 - `SESSION_REVOCATION.md` — Fermer ses autres sessions.
 - `SAFE_LOGIN_REDIRECT.md` — Destination d'après connexion : chemin du site seulement.
 - `SECURITY_HEADERS_CSP.md` — En-têtes de sécurité et CSP en application (page cassée : lire `/api/csp-report`).

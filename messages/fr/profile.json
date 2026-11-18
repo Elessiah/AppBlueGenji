@@ -141,6 +141,23 @@
     "hint": "Tes notifications push et les messages privés Discord du site arrivent dans cette langue, sauf les alertes adressées au staff, en français puis en anglais. Elle reprend celle de la page à chaque connexion.",
     "saved": "Langue des notifications enregistrée."
   },
+  "dmTest": {
+    "button": "Tester mes MP",
+    "buttonLabel": "Tester mes MP (messages privés Discord)",
+    "hint": "Le bot t'envoie un court message privé de test sur ton compte Discord lié, pour vérifier qu'il peut te joindre (3 essais par heure).",
+    "sent": "Message de test envoyé : regarde tes messages privés Discord.",
+    "dmsClosed": "Le bot ne peut pas t'écrire : tes messages privés sont fermés aux membres du serveur BlueGenji (ou tu as bloqué le bot). Ouvre-les dans les paramètres de confidentialité du serveur sur Discord.",
+    "notInServer": "Le bot ne te trouve pas sur le serveur Discord BlueGenji : il n'écrit qu'à ses membres. Rejoins le serveur, puis réessaie.",
+    "notLinked": "Aucun compte Discord n'est lié à ton compte : lie-le dans « Applications connectées », puis réessaie.",
+    "botUnreachable": "Le bot Discord ne répond pas pour l'instant : réessaie plus tard.",
+    "tooMany": "Trop de tests en peu de temps : réessaie dans une heure.",
+    "failed": "Le test n'a pas pu être lancé. Réessaie plus tard.",
+    "certifyTitle": "Certifier ton tag Discord d'abord ?",
+    "certifyWarning": "Ton tag Discord n'est pas certifié : le bot ne t'envoie aucun message privé de match (horaires, rappels, check-in), même si le test réussissait.",
+    "certifyWhy": "La certification prouve que ce compte Discord est bien le tien : l'organisation peut alors te joindre pendant un tournoi, et le bot t'écrire pour tes matchs. Certifie ton tag, puis lance le test.",
+    "certifyConfirm": "Certifier mon tag",
+    "certifyPending": "Ouverture…"
+  },
   "matchDms": {
     "label": "Messages privés Discord de mes matchs et de mes équipes",
     "notCertified": "Sans tag Discord certifié, les messages de tes matchs ne te parviennent pas, ni ceux de tes équipes sans Discord lié (contre le spam).",

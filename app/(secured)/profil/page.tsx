@@ -47,6 +47,7 @@ import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { ProfileSection } from "./_components/ProfileSection";
 import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { MatchDmField } from "./_components/MatchDmField";
+import { DiscordDmTestButton } from "./_components/DiscordDmTestButton";
 import { RecruitmentModalField } from "./_components/RecruitmentModalField";
 import { SelfRolesSection } from "./_components/SelfRolesField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
@@ -1010,7 +1011,7 @@ export default function ProfilePage() {
               discordState,
               blizzardLinked,
               data?.profile.battletagFromBlizzard,
-              () => setVerifyOpen(true),
+              openVerifyDialog,
               {
                 failed: discordReadFailed,
                 reading: discordStateBusy,
@@ -1139,6 +1140,14 @@ export default function ProfilePage() {
                   </button>
                 </div>
               )}
+              {/* « Tester mes MP » : sous un tag non certifié, la fenêtre qu'il ouvre
+                  propose « Certifier mon tag » — le même `openVerifyDialog` que la
+                  ligne Discord des comptes liés. Absent tant que l'état n'est pas lu. */}
+              <DiscordDmTestButton
+                linked={discordState.linked}
+                verified={discordState.verified}
+                onCertify={openVerifyDialog}
+              />
               {/* **Deux cas seulement, et non trois.** Un tag certifié appartient
                   forcément à un compte rattaché — `writeVerifiedTag` écrit
                   `discord_id`, et détacher Discord décertifie —, donc `verified`

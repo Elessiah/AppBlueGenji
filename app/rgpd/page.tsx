@@ -72,6 +72,7 @@ import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { RgpdEn } from "./RgpdEn";
+import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
   NOTIFIER_FOLLOW_UP,
@@ -1271,6 +1272,17 @@ function RgpdFr({
             vous y opposer à tout moment en décochant « Messages privés Discord de mes matchs et de mes équipes »
             dans <Link href="/profil#notifications">Mon profil</Link> — la notification push garde ses propres
             réglages (<Link href="/rgpd/registre#t03">registre, T03</Link>).
+          </p>
+          <p id="test-messages-prives">
+            <strong>« Tester mes MP ».</strong> Depuis <Link href="/profil#comptes">Mon profil</Link>, ce bouton
+            demande au bot de vous envoyer un court message privé de test, dans la langue de votre compte, pour
+            vérifier qu&apos;il peut vous joindre — seulement à votre propre compte Discord rattaché, et seulement si
+            votre tag est certifié ; le message ne porte ni lien ni nom de personne. Le résultat (message remis,
+            messages privés fermés, absent du serveur BlueGenji, bot injoignable) ne s&apos;affiche qu&apos;à vous et
+            n&apos;est pas enregistré ; un essai qui n&apos;aboutit pas est compté au journal du staff sur Discord sans
+            nommer personne. Au plus {DM_TEST_HOURLY_LIMIT} essais par heure : le numéro de votre compte est gardé en
+            mémoire seulement, soixante et une minutes au plus, pour ce plafond. Base : l&apos;
+            <strong>exécution du service</strong> que vous demandez (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
