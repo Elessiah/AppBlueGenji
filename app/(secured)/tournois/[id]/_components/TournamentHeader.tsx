@@ -35,7 +35,7 @@ import {
   type HeaderTone,
 } from "../_lib/header-meta";
 import { LiveIndicator, useLiveIndicatorText, type LiveIndicatorProps } from "./LiveIndicator";
-import { SyncModeBadgeView, SyncModeExplanation, SyncModeHintView, useSyncMode, type SyncModeState } from "./SyncModeBadge";
+import { SyncModeBadge, SyncModeExplanation, SyncModeHint, useSyncMode } from "./SyncModeBadge";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
@@ -44,11 +44,10 @@ import s from "./TournamentHeader.module.css";
  * témoin (`useLiveIndicatorText`) n'est calculée que pour la page sans compte,
  * et non à chaque rendu poussé par le flux d'un membre.
  */
-const SpectatorHint = memo(function SpectatorHint({
-  sync,
-  ...props
-}: Readonly<LiveIndicatorProps & { sync: SyncModeState | null }>) {
+const SpectatorHint = memo(function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
   const { t } = useTournamentPageText();
+  // Abonné ici, pas dans l'en-tête : un alt-tab ne redessine que cette aide.
+  const sync = useSyncMode(props);
   // Le sens de « Hors ligne » : le `title` du témoin ne s'atteint ni au toucher
   // ni au clavier. Lecture réussie, l'explication du mode dit déjà la cadence.
   const liveText = useLiveIndicatorText(props);
@@ -148,8 +147,6 @@ export function TournamentHeader({
   const text = useTournamentPageText();
   const labels = useTournamentsText();
   const { t } = text;
-  // Résolu une fois, pour la pastille et pour l'aide : une seule lecture du régime de charge.
-  const sync = useSyncMode({ isLive, tier, fatal, viewerMatch });
   // Inscription, signalement et gestes du staff : lot 8b / D4, restés français.
   // Gestes (lot 8b) : inscription, signalement, outils du staff de l'en-tête.
   const actionText = useActionsText();
@@ -200,7 +197,7 @@ export function TournamentHeader({
             <LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
             {/* Comment la page se tient à jour (prioritaire, match, éco…) : à côté
                 du témoin, qui dit seulement si la connexion tient. */}
-            <SyncModeBadgeView state={sync} />
+            <SyncModeBadge isLive={isLive} tier={tier} fatal={fatal} viewerMatch={viewerMatch} />
             {detail.isAdmin && !frozen && (
               <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
             )}
@@ -214,9 +211,9 @@ export function TournamentHeader({
               ligne sur toute la barre, au lieu d'élargir le groupe — qui, en
               s'élargissant, déplaçait le bouton qu'on vient de cliquer. */}
           {spectator ? (
-            <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} sync={sync} />
+            <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
           ) : (
-            <SyncModeHintView state={sync} cadenceMs={cadenceMs} />
+            <SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />
           )}
         </div>
 

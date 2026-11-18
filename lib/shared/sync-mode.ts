@@ -20,7 +20,10 @@
  *
  * La page sans compte (`POLL`) n'a pas de flux : elle relit le tournoi à
  * cadence fixe, et un échec passager n'y change pas de mode (le témoin dit
- * « Hors ligne »). Elle ne connaît ni `PRIORITY` ni `POLLING`.
+ * « Hors ligne »). Elle ne connaît ni `PRIORITY` ni `POLLING`, ni `MATCH` : ce
+ * régime n'y viendrait que du bail d'un onglet connecté, et la page sans compte
+ * (projetée, diffusée) ne doit rien dire du compte ouvert à côté — elle s'y
+ * dit `ECO`, ce qu'elle fait alors (animations figées).
  *
  * `ECO` et `MATCH` ne changent pas le palier reçu, seulement ce que la page
  * peint : le texte du mode le dit (`syncModeTierNote`).
@@ -35,10 +38,7 @@ export type SyncMode = "PRIORITY" | "STANDARD" | "MATCH" | "ECO" | "SLEEP" | "PO
 /** Tous les modes, dans l'ordre où l'aide les énumère. */
 export const SYNC_MODES: readonly SyncMode[] = ["PRIORITY", "STANDARD", "MATCH", "ECO", "SLEEP", "POLLING"];
 
-/**
- * Modes que l'aide de la page sans compte énumère. `MATCH` n'y vient que d'un
- * autre onglet (bail partagé) : il se dit quand il est là, sans s'annoncer.
- */
+/** Modes que la page sans compte peut afficher, et que son aide énumère. */
 export const POLL_SYNC_MODES: readonly SyncMode[] = ["STANDARD", "ECO", "SLEEP"];
 
 /**
@@ -70,7 +70,8 @@ export function resolveSyncMode(input: SyncModeInput): SyncMode | null {
   if (input.fatal) return null;
   if (input.source === "STREAM" && !input.isLive) return "POLLING";
   if (input.power === "SLEEP") return "SLEEP";
-  if (input.power === "MATCH") return "MATCH";
+  // Sans compte, le bail `MATCH` d'un autre onglet ne se trahit pas (voir plus haut).
+  if (input.power === "MATCH") return input.source === "POLL" ? "ECO" : "MATCH";
   if (input.power === "ECO") return "ECO";
   return input.source === "STREAM" && input.tier === "PRIORITY" ? "PRIORITY" : "STANDARD";
 }

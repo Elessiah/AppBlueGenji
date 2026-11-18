@@ -27,6 +27,7 @@ import {
   SyncModeHintView,
   SyncModeBadge,
   SyncModeExplanation,
+  SyncModeHint,
   syncModeNowTextKey,
   syncModeOtherTextKey,
   type SyncModeState,
@@ -81,6 +82,15 @@ describe("SyncModeBadge", () => {
 
   it("page sans compte : jamais prioritaire", () => {
     expect(spectator(<SyncModeBadge isLive tier="PRIORITY" />)).toContain(fr.modes.STANDARD.label);
+  });
+
+  it("SyncModeBadge_spectatorMatchLease_showsEcoWithoutMatchText", () => {
+    mockMode = "MATCH";
+
+    const html = spectator(<SyncModeBadge isLive tier="STANDARD" />);
+
+    expect(html).toContain(fr.modes.ECO.label);
+    expect(html).not.toContain(fr.modes.MATCH.label);
   });
 
   it("variantes : ni bleu (témoin voisin) ni gris, l'ambre seulement pour le mode secours", () => {
@@ -212,16 +222,21 @@ describe("câblage de l'en-tête et de la source", () => {
   const live = readSource("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 
   it("membre : pastille et « i » du mode reçoivent le match du lecteur ; sans compte : la pastille Spectateur", () => {
-    expect(header).toContain("useSyncMode({ isLive, tier, fatal, viewerMatch })");
-    expect(header).toContain("<SyncModeHintView state={sync}");
-    expect(header).toContain("<SyncModeBadgeView state={sync} />");
+    expect(header).toContain("<SyncModeBadge isLive={isLive} tier={tier} fatal={fatal} viewerMatch={viewerMatch} />");
+    expect(header).toContain("<SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />");
     expect(header).toMatch(/spectator \? \(\s*<SpectatorHint/);
   });
 
-  it("le mode est résolu une seule fois par l'en-tête, pas par la pastille et l'aide", () => {
+  it("header_doesNotSubscribe_badgeAndHintSubscribeThemselves", () => {
+    // Seule la pastille Spectateur s'abonne dans ce fichier : l'en-tête, lui, ne
+    // se redessine pas à un alt-tab.
     expect(header.split("useSyncMode(")).toHaveLength(2);
-    expect(header).not.toContain("<SyncModeBadge ");
-    expect(header).not.toContain("<SyncModeHint ");
+    expect(header).toContain("const sync = useSyncMode(props);");
+    expect(header).not.toContain("SyncModeBadgeView");
+    expect(header).not.toContain("SyncModeHintView");
+    for (const wrapper of [SyncModeBadge, SyncModeHint]) {
+      expect(String((wrapper as unknown as { $$typeof: symbol }).$$typeof)).toBe("Symbol(react.memo)");
+    }
   });
   it("pastille Spectateur : la phrase du témoin seulement hors lecture réussie (pas deux fois la cadence)", () => {
     expect(header).toContain("{(sync === null || !props.isLive) && <p>{liveText.title}</p>}");

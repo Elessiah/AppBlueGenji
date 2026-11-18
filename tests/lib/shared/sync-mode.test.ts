@@ -49,6 +49,14 @@ describe("resolveSyncMode", () => {
     expect(resolveSyncMode(input({ power: "SLEEP", tier: "PRIORITY" }))).toBe("SLEEP");
   });
 
+  it("resolveSyncMode_pollWithMatchLease_returnsEco", () => {
+    expect(resolveSyncMode(input({ source: "POLL", power: "MATCH", viewerMatch: false }))).toBe("ECO");
+  });
+
+  it("resolveSyncMode_streamWithMatchLease_returnsMatch", () => {
+    expect(resolveSyncMode(input({ source: "STREAM", power: "MATCH", viewerMatch: false }))).toBe("MATCH");
+  });
+
   it("rencontre en cours : match, même prioritaire", () => {
     expect(resolveSyncMode(input({ power: "MATCH", tier: "PRIORITY", viewerMatch: true }))).toBe("MATCH");
   });

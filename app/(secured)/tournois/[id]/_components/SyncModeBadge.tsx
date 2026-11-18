@@ -110,9 +110,9 @@ export type SyncModeState = { mode: SyncMode; input: SyncModeInput };
 
 /**
  * Mode de synchronisation du lecteur, lu à la source : palier du flux, régime
- * de charge (`useClientPower`), état du flux, page avec ou sans compte. Seul le
- * composant qui l'appelle (l'en-tête, une fois pour la pastille et l'aide) se
- * redessine à un alt-tab, jamais la fiche entière. Le résultat garde son
+ * de charge (`useClientPower`), état du flux, page avec ou sans compte. Appelé
+ * par la pastille et par l'aide elles-mêmes, jamais par l'en-tête : un alt-tab
+ * ne redessine qu'elles, ni l'en-tête ni la fiche entière. Le résultat garde son
  * identité tant que ses entrées ne changent pas : les vues mémoïsées en
  * dessous ne se redessinent pas à chaque message du flux.
  */
@@ -135,11 +135,11 @@ export function useSyncMode({ isLive, tier, fatal = null, viewerMatch = false }:
  * de `aria-live` : le mode bascule à chaque alt-tab, ce serait du bruit. Le
  * texte porte le sens, la couleur ne fait que l'accompagner.
  */
-export function SyncModeBadge(props: Readonly<SyncModeProps>) {
+export const SyncModeBadge = memo(function SyncModeBadge(props: Readonly<SyncModeProps>) {
   return <SyncModeBadgeView state={useSyncMode(props)} />;
-}
+});
 
-/** La pastille d'un mode déjà résolu (l'en-tête le résout une fois pour elle et l'aide). */
+/** La pastille d'un mode déjà résolu. */
 export const SyncModeBadgeView = memo(function SyncModeBadgeView({ state }: Readonly<{ state: SyncModeState | null }>) {
   const { t } = useTournamentPageText();
   if (state === null) return null;
@@ -195,9 +195,9 @@ export const SyncModeExplanation = memo(function SyncModeExplanation({
 });
 
 /** Le « i » de la pastille, pour la page avec compte (la page sans compte a le sien, `SpectatorHint`). */
-export function SyncModeHint(props: Readonly<SyncModeProps>) {
+export const SyncModeHint = memo(function SyncModeHint(props: Readonly<SyncModeProps>) {
   return <SyncModeHintView state={useSyncMode(props)} cadenceMs={props.cadenceMs} />;
-}
+});
 
 /**
  * Le « i » d'un mode déjà résolu. Fermée, l'aide reste montée (`InfoHint`) :
