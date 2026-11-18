@@ -61,7 +61,7 @@ export function DiscordDmTestButton({
   const { showError, showSuccess } = useToast();
   const { busy, run, whenIdle } = useBusyGuard();
   const [warnOpen, setWarnOpen] = useState(false);
-  // Quitter la page abandonne la requête en vol (le serveur ne tient plus l'appel au bot).
+  // Quitter la page abandonne la requête en vol (le serveur cesse de l'attendre).
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
 
@@ -79,6 +79,9 @@ export function DiscordDmTestButton({
       try {
         const res = await fetch("/api/profile/discord/dm-test", {
           method: "POST",
+          // Corps JSON exigé par la route (provenance : ferme le formulaire forgé).
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
           signal: ctl.signal,
         });
         const payload = (await res

@@ -153,6 +153,7 @@
     "notInServer": "Le bot ne te trouve pas sur le serveur Discord BlueGenji : il n'écrit qu'à ses membres. Rejoins-le avec le lien de l'aide « i » à côté du bouton, puis réessaie (déjà membre ? réessaie plus tard).",
     "notLinked": "Aucun compte Discord n'est lié à ton compte : lie-le dans « Applications connectées », puis réessaie.",
     "botUnreachable": "Le bot Discord ne répond pas pour l'instant : réessaie dans quelques minutes.",
+    "busy": "Trop de tests en cours sur le site pour l'instant : réessaie dans quelques minutes.",
     "tooMany": "Trop de tests : {max} par heure au maximum. Réessaie dans une heure.",
     "failed": "Le résultat du test est inconnu : regarde tes messages privés Discord, puis réessaie plus tard si rien n'est arrivé.",
     "certifyTitle": "Tag Discord non certifié",

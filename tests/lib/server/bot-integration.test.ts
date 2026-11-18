@@ -425,25 +425,18 @@ describe("bot-integration", () => {
       expect(fetchMock).toHaveBeenCalled();
     });
 
-    it("pushDiscordDirectMessages_callerLeaves_abortsWithoutTrippingCircuit", async () => {
-      const controller = new AbortController();
-      const fetchMock = jest.spyOn(global, "fetch").mockImplementation(
-        (_url, init) =>
-          new Promise((_resolve, reject) => {
-            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
-          }),
-      );
+    it("pushDiscordDirectMessages_bypassSuccess_doesNotCloseCircuit", async () => {
+      await tripCircuit();
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      await pushDiscordDirectMessages("Test", recipients, "dm-test", { honourCircuit: false });
+      fetchMock.mockClear();
 
-      const pending = pushDiscordDirectMessages("Test", recipients, "dm-test", {
-        honourCircuit: false,
-        signal: controller.signal,
-      });
-      controller.abort();
+      const report = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
 
-      expect(await pending).toBeNull();
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      fetchMock.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
-      expect(await pushDiscordDirectMessages("Test", recipients, "dm-test")).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(report).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("tente quand même l'alerte arbitres : un signalement est une action de joueur", async () => {

@@ -25,7 +25,8 @@ désigne. Absent tant que l'état Discord n'est pas lu.
 - **Tag certifié** : `POST /api/profile/discord/dm-test`, puis une notification :
   remis (`SENT`, succès), messages privés fermés (`DMS_CLOSED`), absent du serveur
   BlueGenji (`NOT_IN_SERVER`), aucun Discord lié (`DISCORD_NOT_LINKED`), bot
-  injoignable (`BOT_INTERNAL_UNREACHABLE`, 503), trop d'essais (`TOO_MANY_REQUESTS`,
+  injoignable (`BOT_INTERNAL_UNREACHABLE`, 503), trop de tests en cours sur le site
+  (`DISCORD_DM_TEST_BUSY`, 503, toast `busy`), trop d'essais (`TOO_MANY_REQUESTS`,
   429, plafond annoncé et « réessaie dans une heure »), autre échec ou réponse illisible
   côté navigateur (`failed` : le résultat est inconnu, le message a pu partir — le texte
   invite à regarder ses messages privés avant de relancer) (`DISCORD_DM_TEST_FAILED`). Sans Discord lié (`linked` faux), le bouton
@@ -62,14 +63,33 @@ désigne. Absent tant que l'état Discord n'est pas lu.
   colonne `locale` manque) — `DM_TEST_MESSAGE`, `renderDm` (`BOT_DM_LANGUAGE.md`).
   Ce n'est pas une notification (`notifyUsers`) : aucun push, le joueur attend
   l'issue précise.
-- Requêtes en vol : l'appel au bot (15 s au plus) est abandonné quand le joueur quitte la page (`req.signal` → `AbortSignal.any`, sans compter une panne du bot) ; au plus `DM_TEST_MAX_IN_FLIGHT` (8) tests attendent le bot à la fois, tous comptes confondus — au-delà `DISCORD_DM_TEST_BUSY` (503, place rendue, toast « bot injoignable »). Le bouton abandonne sa requête au démontage.
-- Plafond : `DISCORD_DM_TEST_RULE`, **3 essais par heure et par compte**, en mémoire,
-  réservé en une instruction (`reserveRateLimit`) avant tout `await`. Rendu sur un refus
-  où rien n'est parti (non lié, non certifié, compte absent) ; gardé quand le bot est
-  injoignable (on ne martèle pas un bot tombé).
+- Requêtes en vol : quand le joueur quitte la page, la route cesse d'attendre
+  (`REQUEST_ABORTED`) mais l'appel au bot (15 s au plus) **n'est pas** interrompu — le
+  bot, qui a reçu la demande, travaille encore ; la place en vol reste prise jusqu'à sa
+  réponse ou son délai. Au plus `DM_TEST_MAX_IN_FLIGHT` (8) tests en cours côté bot,
+  tous comptes confondus — au-delà `DISCORD_DM_TEST_BUSY` (503, places rendues, toast
+  « trop de tests en cours sur le site »). Joueur parti avant l'appel : rien n'est
+  demandé au bot. Le bouton abandonne sa requête au démontage.
+- Coupe-circuit : le test l'ignore (`honourCircuit: false`) et, réussi, **ne le referme
+  pas** (seuls ses échecs comptent) — un clic ne rouvre pas les flux d'arrière-plan
+  vers un bot en panne partielle. Vaut aussi pour les alertes arbitres et dirigeants.
+- Plafonds, en mémoire, réservés en une instruction (`reserveRateLimit`) avant tout
+  `await` :
+  - `DISCORD_DM_TEST_RULE`, **3 essais par heure et par compte**, fenêtre **glissante**
+    (`slide` : chaque essai repousse la fin d'une heure ; aucune heure glissante n'en
+    porte plus de 3, pas de double rafale à la remise à zéro), seau plein : `refuse` ;
+  - `DISCORD_DM_TEST_GLOBAL_RULE`, 120 par heure tous comptes confondus (chaque test
+    non remis écrit une ligne au journal du staff) — au-delà `DISCORD_DM_TEST_BUSY` ;
+  - `DISCORD_DM_TEST_ATTEMPT_RULE`, 30 appels par heure et par compte, refus compris,
+    jamais rendu : borne la boucle de refus rendus.
+  Une erreur `DmTestError` dit si rien n'est parti (`nothingSent`) : non lié, non
+  certifié, compte absent, lecture du compte en échec, occupé, joueur parti avant
+  l'appel → places rendues ; bot injoignable, bilan illisible, joueur parti pendant
+  l'appel → gardées (on ne martèle pas un bot tombé).
 - Provenance vérifiée par la route elle-même en première instruction
-  (`rejectCrossSiteRequest`, en plus du middleware : 403 `CROSS_SITE_REQUEST`) ; refus =
-  code seul.
+  (`rejectCrossSiteRequest` avec `requireJson`, en plus du middleware : 403
+  `CROSS_SITE_REQUEST`, 415 sans corps JSON — ferme le formulaire forgé d'un navigateur
+  qui n'envoie ni `Sec-Fetch-Site` ni `Origin`) ; refus = code seul.
 - La case « Messages privés Discord de mes matchs » ne s'applique pas : le test est
   demandé par le joueur lui-même.
 

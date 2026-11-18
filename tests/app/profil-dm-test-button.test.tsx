@@ -152,6 +152,27 @@ describe("DiscordDmTestButton", () => {
     expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("button_verified_postsJsonBodyForTheProvenanceCheck", async () => {
+    fetchMock.mockResolvedValue(response(true, { outcome: "SENT" }));
+
+    button(render({ verified: true, onCertify: jest.fn() })).onClick();
+    await flush();
+
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+  });
+
+  it("button_busy_showsBusyToast", async () => {
+    fetchMock.mockResolvedValue(response(false, { error: "DISCORD_DM_TEST_BUSY" }));
+
+    button(render({ verified: true, onCertify: jest.fn() })).onClick();
+    await flush();
+
+    expect(showError).toHaveBeenCalledWith("dmTest.busy");
+  });
+
   it("button_verifiedDoubleClick_postsOnce", async () => {
     fetchMock.mockResolvedValue(response(true, { outcome: "SENT" }));
     const tree = render({ verified: true, onCertify: jest.fn() });
@@ -323,6 +344,11 @@ describe("textes « Tester mes MP »", () => {
   it("texts_botUnreachable_doesNotContradictTheError", () => {
     expect(frProfile.dmTest.botUnreachable).not.toContain("arrive quand même");
     expect(enProfile.dmTest.botUnreachable).not.toContain("arrives anyway");
+  });
+
+  it("texts_busy_blamesTheSiteNotTheBot", () => {
+    expect(frProfile.dmTest.busy).toContain("sur le site");
+    expect(enProfile.dmTest.busy).toContain("on the site");
   });
 
   it("texts_failed_saysTheResultIsUnknown", () => {

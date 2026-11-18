@@ -70,8 +70,8 @@ describe("dmTestOutcomeToast", () => {
 });
 
 describe("dmTestErrorToast busy", () => {
-  it("dmTestErrorToast_busy_saysBotUnreachable", () => {
-    expect(dmTestErrorToast("DISCORD_DM_TEST_BUSY")).toEqual({ tone: "error", key: "botUnreachable" });
+  it("dmTestErrorToast_busy_returnsBusyKey", () => {
+    expect(dmTestErrorToast("DISCORD_DM_TEST_BUSY")).toEqual({ tone: "error", key: "busy" });
   });
 });
 

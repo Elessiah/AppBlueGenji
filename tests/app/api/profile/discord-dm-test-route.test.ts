@@ -8,14 +8,19 @@ jest.mock("@/lib/server/discord-dm-test", () => ({
 
 import { POST } from "@/app/api/profile/discord/dm-test/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { sendDiscordDmTest } from "@/lib/server/discord-dm-test";
+import { DmTestError, sendDiscordDmTest } from "@/lib/server/discord-dm-test";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../helpers/auth-user";
 
 /** `POST /api/profile/discord/dm-test` : test des messages privés, plafonné par compte. */
 
 const URL_DM_TEST = "http://localhost:3000/api/profile/discord/dm-test";
-const sameSite = () => new Request(URL_DM_TEST, { method: "POST", headers: { "sec-fetch-site": "same-origin" } });
+const sameSite = () =>
+  new Request(URL_DM_TEST, {
+    method: "POST",
+    headers: { "sec-fetch-site": "same-origin", "content-type": "application/json" },
+    body: "{}",
+  });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -56,7 +61,7 @@ describe("POST /api/profile/discord/dm-test", () => {
   });
 
   it("post_busy_returns503AndRefundsQuota", async () => {
-    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("DISCORD_DM_TEST_BUSY"));
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_DM_TEST_BUSY", true));
     for (let i = 0; i < 5; i += 1) {
       const response = await POST(sameSite());
       expect(response.status).toBe(503);
@@ -65,7 +70,7 @@ describe("POST /api/profile/discord/dm-test", () => {
   });
 
   it("post_notCertified_returns409AndRefundsQuota", async () => {
-    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("DISCORD_NOT_CERTIFIED"));
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_NOT_CERTIFIED", true));
     await POST(sameSite());
     await POST(sameSite());
     await POST(sameSite());
@@ -77,7 +82,7 @@ describe("POST /api/profile/discord/dm-test", () => {
   });
 
   it("post_notLinked_returns409", async () => {
-    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("DISCORD_NOT_LINKED"));
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_NOT_LINKED", true));
 
     const response = await POST(sameSite());
 
@@ -86,7 +91,7 @@ describe("POST /api/profile/discord/dm-test", () => {
   });
 
   it("post_profileNotFound_returns404", async () => {
-    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("PROFILE_NOT_FOUND"));
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("PROFILE_NOT_FOUND", true));
 
     const response = await POST(sameSite());
 
@@ -95,7 +100,7 @@ describe("POST /api/profile/discord/dm-test", () => {
   });
 
   it("post_botUnreachable_returns503AndKeepsQuota", async () => {
-    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("BOT_INTERNAL_UNREACHABLE"));
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("BOT_INTERNAL_UNREACHABLE", false));
     const first = await POST(sameSite());
     await POST(sameSite());
     await POST(sameSite());
@@ -129,5 +134,117 @@ describe("POST /api/profile/discord/dm-test", () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: "DISCORD_DM_TEST_FAILED" });
+  });
+  it("post_noJsonContentType_returns415BeforeAuth", async () => {
+    const form = new Request(URL_DM_TEST, { method: "POST", headers: { "sec-fetch-site": "same-origin" } });
+
+    const response = await POST(form);
+
+    expect(response.status).toBe(415);
+    expect(getCurrentUser).not.toHaveBeenCalled();
+    expect(sendDiscordDmTest).not.toHaveBeenCalled();
+  });
+
+  it("post_slidingWindow_refusesFourthJustAfterTheFirstHour", async () => {
+    jest.useFakeTimers({ now: new Date("2026-11-18T10:00:00Z") });
+    try {
+      await POST(sameSite());
+      jest.setSystemTime(new Date("2026-11-18T10:30:00Z"));
+      await POST(sameSite());
+      jest.setSystemTime(new Date("2026-11-18T10:59:00Z"));
+      await POST(sameSite());
+      jest.setSystemTime(new Date("2026-11-18T11:01:00Z"));
+
+      const response = await POST(sameSite());
+
+      expect(response.status).toBe(429);
+      expect(sendDiscordDmTest).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("post_attemptCap_returns429AfterThirtyRefusedCalls", async () => {
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_NOT_CERTIFIED", true));
+    for (let i = 0; i < 30; i += 1) await POST(sameSite());
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: "TOO_MANY_REQUESTS" });
+    expect(sendDiscordDmTest).toHaveBeenCalledTimes(30);
+  });
+
+  it("post_globalCapReached_returns503BusyAndRefundsAccountSlot", async () => {
+    for (let id = 1000; id < 1040; id += 1) {
+      jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id }));
+      await POST(sameSite());
+      await POST(sameSite());
+      await POST(sameSite());
+    }
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+
+    const refused = await POST(sameSite());
+
+    expect(refused.status).toBe(503);
+    expect(await refused.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
+    expect(sendDiscordDmTest).toHaveBeenCalledTimes(120);
+    resetRateLimit("discord-dm-test-global");
+    const statuses = [];
+    for (let i = 0; i < 3; i += 1) statuses.push((await POST(sameSite())).status);
+    expect(statuses).toEqual([200, 200, 200]);
+  });
+
+  it("post_nothingSentError_refundsGlobalSlot", async () => {
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_NOT_LINKED", true));
+    for (let id = 1000; id < 1121; id += 1) {
+      jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id }));
+      await POST(sameSite());
+    }
+    jest.mocked(sendDiscordDmTest).mockResolvedValue("SENT");
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(200);
+  });
+
+  it("post_abortedAfterBotCall_returns400AndKeepsQuota", async () => {
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("REQUEST_ABORTED", false));
+    const first = await POST(sameSite());
+    await POST(sameSite());
+    await POST(sameSite());
+
+    const fourth = await POST(sameSite());
+
+    expect(first.status).toBe(400);
+    expect(await first.json()).toEqual({ error: "REQUEST_ABORTED" });
+    expect(fourth.status).toBe(429);
+  });
+
+  it("post_accountReadFailed_returns500AndRefundsQuota", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(sendDiscordDmTest)
+      .mockRejectedValue(new DmTestError("DISCORD_DM_TEST_FAILED", true, { cause: new Error("ECONNRESET") }));
+    for (let i = 0; i < 4; i += 1) await POST(sameSite());
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "DISCORD_DM_TEST_FAILED" });
+    expect(sendDiscordDmTest).toHaveBeenCalledTimes(5);
+    expect(log).toHaveBeenCalled();
+  });
+
+  it("post_unexpectedError_keepsQuota", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("boom"));
+    await POST(sameSite());
+    await POST(sameSite());
+    await POST(sameSite());
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(429);
   });
 });

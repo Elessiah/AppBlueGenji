@@ -27,6 +27,8 @@ export const DM_TEST_BOT_UNREACHABLE = "BOT_INTERNAL_UNREACHABLE";
 export const DM_TEST_FAILED = "DISCORD_DM_TEST_FAILED";
 /** Trop de tests en vol vers le bot : rien n'est parti, on réessaiera plus tard. */
 export const DM_TEST_BUSY = "DISCORD_DM_TEST_BUSY";
+/** Le joueur a quitté la page : la route cesse d'attendre (réponse jamais lue). */
+export const DM_TEST_ABORTED = "REQUEST_ABORTED";
 
 /** Plafond par compte : quelques essais par heure, jamais une rafale de messages. */
 export const DM_TEST_HOURLY_LIMIT = 3;
@@ -65,6 +67,7 @@ export type DmTestToastKey =
   | "notInServer"
   | "notLinked"
   | "botUnreachable"
+  | "busy"
   | "tooMany"
   | "failed";
 
@@ -96,8 +99,9 @@ export function dmTestErrorToast(code: unknown): DmTestToast | null {
     case DM_TEST_NOT_LINKED:
       return { tone: "error", key: "notLinked" };
     case DM_TEST_BOT_UNREACHABLE:
-    case DM_TEST_BUSY:
       return { tone: "error", key: "botUnreachable" };
+    case DM_TEST_BUSY:
+      return { tone: "error", key: "busy" };
     case "TOO_MANY_REQUESTS":
       return { tone: "error", key: "tooMany" };
     default:

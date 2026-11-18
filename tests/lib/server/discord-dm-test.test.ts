@@ -5,7 +5,7 @@ jest.mock("@/lib/server/bot-integration", () => ({ pushDiscordDirectMessages: je
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
-import { sendDiscordDmTest } from "@/lib/server/discord-dm-test";
+import { DmTestError, sendDiscordDmTest } from "@/lib/server/discord-dm-test";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 /** « Tester mes MP » : un seul message, au Discord rattaché et certifié du compte. */
@@ -113,5 +113,67 @@ describe("sendDiscordDmTest", () => {
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 0, unresolved: [], failed: [] });
 
     await expect(sendDiscordDmTest(7)).rejects.toThrow("DISCORD_DM_TEST_FAILED");
+  });
+  it("sendDiscordDmTest_accountReadFails_throwsFailedNothingSent", async () => {
+    execute.mockRejectedValue(new Error("ECONNRESET"));
+
+    const error = await sendDiscordDmTest(7).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(DmTestError);
+    expect(error).toMatchObject({ message: "DISCORD_DM_TEST_FAILED", nothingSent: true });
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("sendDiscordDmTest_abortedBeforeBotCall_throwsAbortedNothingSentWithoutBotCall", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    const controller = new AbortController();
+    controller.abort();
+
+    const error = await sendDiscordDmTest(7, controller.signal).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ message: "REQUEST_ABORTED", nothingSent: true });
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("sendDiscordDmTest_notCertified_errorSaysNothingSent", async () => {
+    execute.mockResolvedValue([[certifiedRow({ discord_verified_at: null })]]);
+
+    const error = await sendDiscordDmTest(7).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ message: "DISCORD_NOT_CERTIFIED", nothingSent: true });
+  });
+
+  it("sendDiscordDmTest_botUnreachable_errorSaysMaybeSent", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
+
+    const error = await sendDiscordDmTest(7).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ message: "BOT_INTERNAL_UNREACHABLE", nothingSent: false });
+  });
+});
+
+describe("sendDiscordDmTest abort during the bot call", () => {
+  it("sendDiscordDmTest_abortedDuringBotCall_rejectsAbortedAndKeepsInFlightSlotUntilBotSettles", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    const gate: { release?: (report: { sent: number; unresolved: never[]; failed: never[] }) => void } = {};
+    jest.mocked(pushDiscordDirectMessages).mockReturnValue(
+      new Promise((resolve) => {
+        gate.release = resolve;
+      }),
+    );
+    const controllers = Array.from({ length: 8 }, () => new AbortController());
+    const pending = controllers.map((controller) => sendDiscordDmTest(7, controller.signal).catch((caught: unknown) => caught));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    controllers.forEach((controller) => controller.abort());
+    const errors = await Promise.all(pending);
+
+    expect(errors[0]).toMatchObject({ message: "REQUEST_ABORTED", nothingSent: false });
+    await expect(sendDiscordDmTest(7)).rejects.toThrow("DISCORD_DM_TEST_BUSY");
+    gate.release?.({ sent: 1, unresolved: [], failed: [] });
+    await new Promise((resolve) => setImmediate(resolve));
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    await expect(sendDiscordDmTest(7)).resolves.toBe("SENT");
   });
 });

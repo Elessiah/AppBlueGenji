@@ -153,6 +153,7 @@
     "notInServer": "The bot cannot find you on the BlueGenji Discord server: it only writes to its members. Join it with the link in the “i” help next to the button, then try again (already a member? try again later).",
     "notLinked": "No Discord account is linked to your account: link it in “Connected apps”, then try again.",
     "botUnreachable": "The Discord bot is not responding right now: try again in a few minutes.",
+    "busy": "Too many tests are running on the site right now: try again in a few minutes.",
     "tooMany": "Too many tests: {max} per hour at most. Try again in an hour.",
     "failed": "The test result is unknown: check your Discord direct messages, then try again later if nothing arrived.",
     "certifyTitle": "Discord tag not verified",
