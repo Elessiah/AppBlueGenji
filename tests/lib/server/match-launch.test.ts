@@ -55,6 +55,8 @@ const TEAM2 = 20;
 /** L'appariement de `matchState()`, lu sous verrou et porté par l'annonce d'un changement de caster. */
 const PAIRING = { team1Id: TEAM1, team2Id: TEAM2 };
 const CASTER = 900;
+/** Session hors vue joueur : casts et arbitrages comptent (`PartySession`). */
+const ACCOUNT_SESSION = { playerView: false };
 
 type MatchState = {
   id: number;
@@ -505,7 +507,7 @@ beforeEach(() => {
 
 describe("setMatchReady", () => {
   it("pose le « Prêt » du capitaine et ouvre le délai de lancement", async () => {
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
     expect(state.match?.team1_ready_at).toBe(STAMP);
     expect(state.match?.lobby_opened_at).toBe(STAMP);
     expect(state.match?.launched_at).toBeNull();
@@ -514,15 +516,15 @@ describe("setMatchReady", () => {
 
   it("lance le match au dernier « Prêt » attendu", async () => {
     state.match = matchState({ team2_ready_at: STAMP });
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: true });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
     expect(state.match?.launched_at).toBe(STAMP);
   });
 
   it("attend le caster inscrit avant de lancer", async () => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.users[CASTER] = ELIGIBLE_CASTER;
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
-    await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: true });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, CASTER, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
     expect(casterReadyOf(state)).toBe(STAMP);
   });
 
@@ -531,9 +533,9 @@ describe("setMatchReady", () => {
     state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: null });
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.users[901] = ELIGIBLE_CASTER;
-    await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, CASTER, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, null]);
-    await expect(setMatchReady(42, 901, true)).resolves.toEqual({ launched: true });
+    await expect(setMatchReady(42, 901, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, STAMP]);
   });
 
@@ -541,7 +543,7 @@ describe("setMatchReady", () => {
     state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
     state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: STAMP });
     state.users[901] = ELIGIBLE_CASTER;
-    await setMatchReady(42, 901, false);
+    await setMatchReady(42, 901, false, ACCOUNT_SESSION);
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, null]);
   });
 
@@ -552,46 +554,46 @@ describe("setMatchReady", () => {
   ])("refuse le « Prêt » d'un caster inscrit %s, avec le motif du blocage", async (_label, overrides, code) => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.users[CASTER] = { ...ELIGIBLE_CASTER, ...overrides };
-    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow(code);
+    await expect(setMatchReady(42, CASTER, true, ACCOUNT_SESSION)).rejects.toThrow(code);
     expect(casterReadyOf(state)).toBeNull();
   });
 
   it("compte une fantôme prête d'office : l'équipe réelle suffit", async () => {
     state.match = matchState({ team2_is_ghost: 1 });
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: true });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
   });
 
   it("retire un « Prêt » sans rien lancer", async () => {
     state.match = matchState({ team1_ready_at: STAMP });
-    await expect(setMatchReady(42, 1, false)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, 1, false, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
     expect(state.match?.team1_ready_at).toBeNull();
   });
 
   it("écrit dans la colonne de l'équipe 2 pour son propriétaire", async () => {
-    await setMatchReady(42, 3, true);
+    await setMatchReady(42, 3, true, ACCOUNT_SESSION);
     expect(state.match?.team2_ready_at).toBe(STAMP);
     expect(state.match?.team1_ready_at).toBeNull();
   });
 
   it("accepte le joueur d'une entrée solo", async () => {
     state.soloEntries = [{ userId: 50, teamId: TEAM2 }];
-    await setMatchReady(42, 50, true);
+    await setMatchReady(42, 50, true, ACCOUNT_SESSION);
     expect(state.match?.team2_ready_at).toBe(STAMP);
   });
 
   it("refuse un joueur du roster sans rôle d'engagement", async () => {
-    await expect(setMatchReady(42, 2, true)).rejects.toThrow("NOT_TEAM_READY_ROLE");
+    await expect(setMatchReady(42, 2, true, ACCOUNT_SESSION)).rejects.toThrow("NOT_TEAM_READY_ROLE");
     expect(state.writes).toEqual([]);
   });
 
   it("refuse qui n'est ni joueur ni caster du match", async () => {
-    await expect(setMatchReady(42, 777, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    await expect(setMatchReady(42, 777, true, ACCOUNT_SESSION)).rejects.toThrow("NOT_MATCH_PARTY");
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("refuse un match introuvable", async () => {
     state.match = null;
-    await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_NOT_FOUND");
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 
   it("tient pour introuvable un match dont le tournoi a disparu", async () => {
@@ -611,22 +613,22 @@ describe("setMatchReady", () => {
         }),
       ),
     );
-    await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_NOT_FOUND");
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 
   it("refuse hors d'un tournoi en cours", async () => {
     state.match = matchState({ tournament_state: "FINISHED" });
-    await expect(setMatchReady(42, 1, true)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).rejects.toThrow("TOURNAMENT_NOT_RUNNING");
   });
 
   it("refuse avant l'heure de début", async () => {
     state.match = matchState({ start_at: new Date(Date.now() + 3_600_000).toISOString() });
-    await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_NOT_IN_LOBBY");
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).rejects.toThrow("MATCH_NOT_IN_LOBBY");
   });
 
   it("refuse de retirer un « Prêt » une fois le match lancé", async () => {
     state.match = matchState({ launched_at: STAMP, team1_ready_at: STAMP });
-    await expect(setMatchReady(42, 1, false)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
+    await expect(setMatchReady(42, 1, false, ACCOUNT_SESSION)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
     expect(state.match?.team1_ready_at).toBe(STAMP);
   });
 });
@@ -636,7 +638,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     // Le créneau 2 portait l'équipe 30, prête ; une correction y a mis l'équipe
     // 20. Son « Prêt » ne vaut rien pour la nouvelle.
     state.match = matchState({ launch_pairing: `${TEAM1}:30`, team2_ready_at: STAMP });
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
     expect(state.match?.launch_pairing).toBe(`${TEAM1}:${TEAM2}`);
     expect(state.match?.team2_ready_at).toBeNull();
     expect(state.match?.team1_ready_at).toBe(STAMP);
@@ -644,7 +646,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
 
   it("ne tient pas pour lancé un match lancé sous un autre appariement", async () => {
     state.match = matchState({ launch_pairing: `${TEAM1}:30`, launched_at: STAMP });
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
     expect(state.match?.launched_at).toBeNull();
   });
 
@@ -654,7 +656,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     // réservés : un réappariement ne les renvoie pas.
     state.match = matchState({ launch_pairing: `${TEAM1}:30` });
 
-    await setMatchReady(42, 1, true);
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
 
     expect(state.writes).toContain(
       `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY\\_BRIEF%' [42]`,
@@ -665,7 +667,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     // Empreinte vide : aucune réservation possible, pas de verrou d'intervalle inutile.
     state.match = matchState({ launch_pairing: null });
 
-    await setMatchReady(42, 1, true);
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
 
     expect(state.writes.some((write) => write.includes("SET launch_pairing = ?"))).toBe(true);
     expect(state.writes.some((write) => write.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
@@ -674,7 +676,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
   it("adoptCurrentPairing_samePairing_startNoticeClaimsKept", async () => {
     state.match = matchState({ launch_pairing: `${TEAM1}:${TEAM2}` });
 
-    await setMatchReady(42, 1, true);
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
 
     expect(state.writes.some((write) => write.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
   });
@@ -762,7 +764,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
   it("annonce après le commit le caster désinscrit par un « Prêt »", async () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
-    await setMatchReady(42, 1, true);
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
     expect(casterOf(state)).toBeNull();
     expect(queueCastChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reason: "JOINED_TEAM" }));
     expect(flushCastChanges).toHaveBeenCalledTimes(1);
@@ -773,7 +775,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     // Un lecteur étranger au match : refusé après la désinscription, tout est annulé.
-    await expect(setMatchReady(42, 999, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    await expect(setMatchReady(42, 999, true, ACCOUNT_SESSION)).rejects.toThrow("NOT_MATCH_PARTY");
     expect(queueCastChange).toHaveBeenCalledTimes(1);
     expect(discardCastChanges).toHaveBeenCalledTimes(1);
     expect(flushCastChanges).not.toHaveBeenCalled();
@@ -781,7 +783,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
 
   it("fait agir en joueur celui qui est à la fois inscrit comme caster et joueur", async () => {
     state.match = matchState({ caster_user_id: 1 });
-    await setMatchReady(42, 1, true);
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
     expect(state.match?.team1_ready_at).toBe(STAMP);
     expect(casterReadyOf(state)).toBeNull();
   });
@@ -1642,7 +1644,7 @@ describe("phase de lancement éteinte (`match_launch_phase = 0`)", () => {
 
   it("refuse le « Prêt » : la règle tient déjà le match pour lancé", async () => {
     state.match = matchState({ match_launch_phase: 0 });
-    await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
     expect(state.match?.team1_ready_at).toBeNull();
   });
 
@@ -1777,7 +1779,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
 
   it("l'arbitre est une 4e partie : le match attend son « Prêt », qui vaut aussi s'il caste", async () => {
     state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
-    await setMatchReady(42, REFEREE, true);
+    await setMatchReady(42, REFEREE, true, ACCOUNT_SESSION);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(state.match?.launched_at).toBe(STAMP);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
@@ -1785,14 +1787,14 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
 
   it("setMatchReady_refereeReadyInOpenLobbyWithoutLaunch_publishesNothing", async () => {
     state.match = matchState({ referee_user_id: REFEREE, lobby_opened_at: STAMP, team1_ready_at: null });
-    await setMatchReady(42, REFEREE, true);
+    await setMatchReady(42, REFEREE, true, ACCOUNT_SESSION);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("setMatchReady_refereeReadyOpensLobby_publishes", async () => {
     state.match = matchState({ referee_user_id: REFEREE, lobby_opened_at: null, team1_ready_at: null });
-    await setMatchReady(42, REFEREE, true);
+    await setMatchReady(42, REFEREE, true, ACCOUNT_SESSION);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
@@ -1824,7 +1826,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
 
   it("setMatchReady_refereeCaster_setsBothReadiesInOneClick", async () => {
     state.match = matchState({ referee_user_id: REFEREE, caster_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
-    await setMatchReady(42, REFEREE, true);
+    await setMatchReady(42, REFEREE, true, ACCOUNT_SESSION);
     expect(casterReadyOf(state)).toBe(STAMP);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(state.match?.launched_at).toBe(STAMP);
@@ -1846,7 +1848,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
       caster_user_id: REFEREE,
       caster_ready_at: STAMP,
     });
-    await setMatchReady(42, REFEREE, false);
+    await setMatchReady(42, REFEREE, false, ACCOUNT_SESSION);
     expect(casterReadyOf(state)).toBeNull();
     expect(state.match?.referee_ready_at).toBeNull();
     expect(state.match?.referee_user_id).toBe(REFEREE);
@@ -1874,7 +1876,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
   it("un arbitre qui rejoint une équipe du match sans changer l'appariement n'est plus attendu", async () => {
     state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP });
     state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });
-    await setMatchReady(42, 3, true);
+    await setMatchReady(42, 3, true, ACCOUNT_SESSION);
     expect(state.match?.launched_at).toBe(STAMP);
   });
 
@@ -1888,7 +1890,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
 
   it("sans arbitre, les deux équipes suffisent", async () => {
     state.match = matchState({ team1_ready_at: STAMP });
-    await setMatchReady(42, 3, true);
+    await setMatchReady(42, 3, true, ACCOUNT_SESSION);
     expect(state.match?.launched_at).toBe(STAMP);
   });
 
@@ -2493,7 +2495,7 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
     state.users[CASTER] = INELIGIBLE;
     state.match = matchState({ caster_user_id: CASTER });
 
-    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_CASTER");
+    await expect(setMatchReady(42, CASTER, true, ACCOUNT_SESSION)).rejects.toThrow("NOT_CASTER");
 
     expect(casterReadyOf(state)).toBeNull();
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
@@ -2502,7 +2504,7 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
   it("setMatchReady_strangerNotCaster_throwsNotMatchParty", async () => {
     state.match = matchState({ caster_user_id: CASTER });
 
-    await expect(setMatchReady(42, 999, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    await expect(setMatchReady(42, 999, true, ACCOUNT_SESSION)).rejects.toThrow("NOT_MATCH_PARTY");
   });
 
   it("setMatchReady_ineligibleCoCaster_doesNotBlockTheLaunch", async () => {
@@ -2511,8 +2513,8 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: null });
 
-    await setMatchReady(42, 1, true);
-    await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: true });
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
+    await expect(setMatchReady(42, CASTER, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
 
     expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([CASTER]);
   });
@@ -2861,7 +2863,7 @@ describe("salons vocaux d'équipe : le départ n'en dépend pas (`MATCH_VOICE.md
 
   it("setMatchReady_lastReady_launchesWithoutReadingVoiceChannels", async () => {
     state.match = matchState({ team2_ready_at: STAMP, start_at: past(), lobby_opened_at: STAMP });
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: true });
+    await expect(setMatchReady(42, 1, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
     expect(voiceRead()).toBe(false);
   });
 });
@@ -3028,7 +3030,7 @@ describe("règles serveur de l'arbitrage (EF-31)", () => {
     state.match = matchState({ referee_user_id: REFEREE });
     state.issued = [];
 
-    await setMatchReady(42, 1, true);
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
 
     expect(state.issued.filter((sql) => sql.includes("FROM bg_users WHERE id = ?"))).toHaveLength(1);
   });
@@ -3254,19 +3256,19 @@ describe("jeu du tournoi lu sous le verrou du match (revue sécurité #545)", ()
   it("setMatchReady_overwatchRefereeLostBattlenet_launchDoesNotWaitForReferee", async () => {
     state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP });
     state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
-    await expect(setMatchReady(42, 3, true)).resolves.toEqual({ launched: true });
+    await expect(setMatchReady(42, 3, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: true });
   });
 
   it("setMatchReady_marvelRivalsRefereeDiscordOnly_launchWaitsForReferee", async () => {
     state.match = matchState({ tournament_game: "MR", game: "MR", referee_user_id: REFEREE, team1_ready_at: STAMP });
     state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
-    await expect(setMatchReady(42, 3, true)).resolves.toEqual({ launched: false });
+    await expect(setMatchReady(42, 3, true, ACCOUNT_SESSION)).resolves.toEqual({ launched: false });
   });
 
   it("setMatchReady_marvelRivalsCasterDiscordOnly_readyAccepted", async () => {
     state.match = matchState({ tournament_game: "MR", game: "MR", caster_user_id: CASTER });
     state.users[CASTER] = { ...ELIGIBLE_CASTER, ...withoutBattlenet };
-    await setMatchReady(42, CASTER, true);
+    await setMatchReady(42, CASTER, true, ACCOUNT_SESSION);
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP]);
   });
 });

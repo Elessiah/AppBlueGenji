@@ -51,8 +51,9 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   est refusé (`NOT_MATCH_PARTY`), et les routes de cast et le retrait
   d'arbitrage répondent `403 FORBIDDEN`. La résolution de la partie du match
   (`resolveMatchParty`, qui lit l'éligibilité en base) prend **obligatoirement**
-  l'état de la session (`PartySession`) : un nouvel appelant qui l'oublie ne
-  compile pas, et en vue joueur seul le rôle d'équipe en sort. Revenir en vue admin les lui
+  l'état de la session (`PartySession`, requis aussi par `setMatchReady` ; et
+  `LaunchViewer.playerView` côté lancement et contacts) : un nouvel appelant
+  qui l'oublie ne compile pas, et en vue joueur seul le rôle d'équipe en sort. Revenir en vue admin les lui
   rend tels quels.
 - Les notifications push staff suivent le **compte** (abonnement de
   l'appareil), pas la session : elles continuent d'arriver.
@@ -63,7 +64,8 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   première instruction (`403 CROSS_SITE_REQUEST`, `415` hors JSON).
 - `401 UNAUTHORIZED` sans session ; `403 FORBIDDEN` pour un compte sans droit
   réel ; `400 INVALID_PLAYER_VIEW` pour un corps sans booléen ;
-  `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until }`.
+  `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until }`,
+  toutes deux tirées de l'état **relu** (`playerView` = `until !== null`).
 - `setPlayerView` (`lib/server/player-view.ts`) écrit l'échéance (ou `NULL`)
   sur la ligne de **cette** session, **seulement si l'état change** (écriture
   conditionnée en une instruction) : redemander la vue joueur ne repousse pas
@@ -74,11 +76,15 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   (`reconnectSessionStreams`, motif `RECONNECT` : la route relit le contexte
   du lecteur, sans refus). Il laisse aussi une trace datée par le repère des
   révocations : un flux qui lisait la session pendant la bascule la retrouve
-  (`reconnectRequestedSince`) et se reconnecte sitôt ouvert, au lieu de garder
-  le contexte staff.
+  (`reconnectRequestedSince`) et répond un 200 vide, **sans trame
+  d'ouverture** (aucun contexte staff servi) ; le client le rouvre sur un
+  contexte relu. Flux et ligne pm2 partent sitôt l'écriture faite, avant la
+  relecture : une relecture en échec (500) ne les perd pas.
 - Contournement de développement : la ligne `dev-auth-bypass:<id>` est
   reconnue sur l'objet même rendu par `getCurrentUser` (aucune relecture), ses
-  bascules reconnectent tous les flux du compte, et elle n'est ni comptée ni
+  bascules reconnectent tous les flux du compte (le contournement passe toute
+  requête du compte, cookie compris), seul un doublon de clé à l'insertion est
+  toléré (bascule concurrente), et elle n'est ni comptée ni
   fermée par « déconnecter mes autres appareils ».
 - **Journal** : une ligne pm2 seulement (`auditStaffAction`, auteur nommé) —
   rien sur Discord, où la bascule ne dirait rien d'utile au staff.

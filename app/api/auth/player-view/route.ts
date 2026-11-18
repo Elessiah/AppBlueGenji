@@ -30,7 +30,9 @@ export async function POST(req: Request) {
 
   try {
     const { until } = await setPlayerView(user, active);
-    return ok({ playerView: active, until });
+    // L'état relu en base, pas celui demandé : deux bascules croisées ne
+    // peuvent rendre « vue joueur » sans échéance.
+    return ok({ playerView: until !== null, until });
   } catch (error) {
     if (error instanceof Error && error.message === PLAYER_VIEW_NO_SESSION) return fail("UNAUTHORIZED", 401);
     console.error("[player-view] bascule impossible :", failureReason(error));

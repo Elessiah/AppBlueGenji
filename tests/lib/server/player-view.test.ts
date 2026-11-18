@@ -134,6 +134,20 @@ describe("setPlayerView — session à cookie", () => {
   });
 });
 
+describe("setPlayerView — relecture en échec", () => {
+  it("setPlayerView_readBackFails_stillReconnectsAndAudits", async () => {
+    execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      if (String(sql).trimStart().startsWith("SELECT")) throw new Error("pool lost");
+      return [header(1), []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(setPlayerView(admin, true)).rejects.toThrow("pool lost");
+    expect(reconnectSessionStreams).toHaveBeenCalledWith(7, HASH);
+    expect(auditStaffAction).toHaveBeenCalledWith(PLAYER_VIEW_ON_AUDIT, { id: 7, pseudo: "Chef" });
+  });
+});
+
 describe("setPlayerView — contournement de développement", () => {
   beforeEach(() => {
     jest.mocked(playerViewSessionKey).mockResolvedValue({ tokenHash: "dev-auth-bypass:7", devBypass: true });
@@ -145,7 +159,7 @@ describe("setPlayerView — contournement de développement", () => {
     const [stale, insert] = sqlCalls();
     expect(stale).toContain("DELETE FROM bg_user_sessions");
     expect(stale).toContain("(player_view_until IS NULL OR player_view_until <= NOW())");
-    expect(insert).toContain("INSERT IGNORE INTO bg_user_sessions");
+    expect(insert).toContain("INSERT INTO bg_user_sessions");
     expect(execute.mock.calls[1][1]).toEqual(["dev-auth-bypass:7", 7, 12, 12]);
   });
 
@@ -167,6 +181,34 @@ describe("setPlayerView — contournement de développement", () => {
     expect(sql).toContain("DELETE FROM bg_user_sessions WHERE token_hash = ? AND user_id = ? AND player_view_until > NOW()");
     expect(params).toEqual(["dev-auth-bypass:7", 7]);
     expect(result.until).toBeNull();
+  });
+
+  it("setPlayerView_devBypassDuplicateInsert_reportsNoChange", async () => {
+    execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      const text = String(sql).trimStart();
+      if (text.startsWith("INSERT")) throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+      return text.startsWith("SELECT") ? [[{ player_view_until: DEADLINE, active: 1 }], []] : [header(0), []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const result = await setPlayerView(admin, true);
+
+    expect(result.until).toBe("2026-11-18T22:00:00.000Z");
+    expect(auditStaffAction).not.toHaveBeenCalled();
+    expect(reconnectSessionStreams).not.toHaveBeenCalled();
+  });
+
+  it("setPlayerView_devBypassOtherInsertError_rethrows", async () => {
+    execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      if (String(sql).trimStart().startsWith("INSERT")) {
+        throw Object.assign(new Error("Field doesn't have a default value"), { code: "ER_NO_DEFAULT_FOR_FIELD" });
+      }
+      return [header(0), []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(setPlayerView(admin, true)).rejects.toThrow("Field doesn't have a default value");
+    expect(auditStaffAction).not.toHaveBeenCalled();
   });
 
   it("setPlayerView_devBypass_reconnectsEveryStreamOfTheAccount", async () => {

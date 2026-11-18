@@ -49,6 +49,17 @@ export async function setPlayerView(user: AuthUser, active: boolean): Promise<{ 
     ? await writeDevBypassView(db, key.tokenHash, user.id, active)
     : await writeSessionView(db, key.tokenHash, user.id, active);
 
+  if (changed) {
+    // Sitôt l'écriture faite, avant toute relecture qui pourrait échouer : un
+    // changement commité doit fermer les flux et laisser sa ligne pm2, même si
+    // la réponse finit en 500 (une nouvelle demande, sans effet, ne les
+    // rattraperait pas). `null` : tous les flux du compte — sous le
+    // contournement, toute requête du compte le passe (cookie compris), si
+    // bien que ses flux sont tous ceux de cette « session ».
+    reconnectSessionStreams(user.id, key.devBypass ? null : key.tokenHash);
+    auditStaffAction(active ? PLAYER_VIEW_ON_AUDIT : PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
+  }
+
   const [rows] = await db.execute<SessionViewRow[]>(
     `SELECT player_view_until, player_view_until > NOW() AS active FROM bg_user_sessions
      WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() LIMIT 1`,
@@ -58,13 +69,6 @@ export async function setPlayerView(user: AuthUser, active: boolean): Promise<{ 
   // Une session à cookie disparue entre-temps (déconnexion croisée) : refus.
   // La ligne du contournement, elle, n'existe qu'en vue joueur.
   if (!row && !key.devBypass) throw new Error(PLAYER_VIEW_NO_SESSION);
-
-  if (changed) {
-    // `null` : tous les flux du compte — ceux du contournement portent
-    // l'empreinte d'un éventuel cookie resté posé, ou aucune.
-    reconnectSessionStreams(user.id, key.devBypass ? null : key.tokenHash);
-    auditStaffAction(active ? PLAYER_VIEW_ON_AUDIT : PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
-  }
   return { until: row && Number(row.active ?? 0) === 1 ? toIso(row.player_view_until) : null };
 }
 
@@ -85,7 +89,8 @@ async function writeSessionView(db: Pool, tokenHash: string, userId: number, act
 /**
  * Contournement de développement : la ligne dédiée n'existe qu'en vue joueur.
  * Une ligne échue est retirée avant d'en poser une neuve ; une ligne encore
- * valide n'est pas repoussée (`INSERT IGNORE`). `true` si l'état a changé.
+ * valide n'est pas repoussée (doublon de clé écarté — et lui seul : toute
+ * autre erreur d'insertion remonte). `true` si l'état a changé.
  */
 async function writeDevBypassView(db: Pool, tokenHash: string, userId: number, active: boolean): Promise<boolean> {
   if (!active) {
@@ -99,10 +104,16 @@ async function writeDevBypassView(db: Pool, tokenHash: string, userId: number, a
     `DELETE FROM bg_user_sessions WHERE token_hash = ? AND user_id = ? AND (player_view_until IS NULL OR player_view_until <= NOW())`,
     [tokenHash, userId],
   );
-  const [inserted] = await db.execute<ResultSetHeader>(
-    `INSERT IGNORE INTO bg_user_sessions (token_hash, user_id, expires_at, player_view_until)
-     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR), DATE_ADD(NOW(), INTERVAL ? HOUR))`,
-    [tokenHash, userId, PLAYER_VIEW_MAX_HOURS, PLAYER_VIEW_MAX_HOURS],
-  );
-  return Number(inserted.affectedRows ?? 0) > 0;
+  try {
+    const [inserted] = await db.execute<ResultSetHeader>(
+      `INSERT INTO bg_user_sessions (token_hash, user_id, expires_at, player_view_until)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR), DATE_ADD(NOW(), INTERVAL ? HOUR))`,
+      [tokenHash, userId, PLAYER_VIEW_MAX_HOURS, PLAYER_VIEW_MAX_HOURS],
+    );
+    return Number(inserted.affectedRows ?? 0) > 0;
+  } catch (error) {
+    // Ligne encore valide (bascule concurrente) : rien ne change.
+    if ((error as { code?: unknown } | null)?.code === "ER_DUP_ENTRY") return false;
+    throw error;
+  }
 }

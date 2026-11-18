@@ -86,8 +86,12 @@ export type LaunchViewer = {
   id: number;
   isAdmin?: boolean;
   roles?: readonly PlatformRole[];
-  /** Vue joueur de la session (`ADMIN_PLAYER_VIEW.md`) : ni cast ni arbitrage désigné. */
-  playerView?: boolean;
+  /**
+   * Vue joueur de la session (`ADMIN_PLAYER_VIEW.md`) : ni cast ni arbitrage
+   * désigné. Requise, comme `PartySession` : un lecteur bâti à la main sans
+   * elle ne compile pas.
+   */
+  playerView: boolean;
 };
 
 type CandidateBaseRow = LaunchMatchBaseRow & {
@@ -338,7 +342,7 @@ function viewerRole(
   teams: ViewerTeams,
   casters: readonly MatchCasterLink[],
   referee: boolean,
-  playerView = false,
+  playerView: boolean,
 ): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
   // Ordre de `resolveMatchParty` : joueur, caster, arbitre désigné.
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
@@ -1088,7 +1092,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, early, exposes } of visible) {
       const casters = kept.get(Number(row.id)) ?? [];
-      const party = viewerRole(row, viewer.id, teams, casters, referee, viewer.playerView === true);
+      const party = viewerRole(row, viewer.id, teams, casters, referee, viewer.playerView);
       if (!party) continue;
       // À un arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
       result.push(

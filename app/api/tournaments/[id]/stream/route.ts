@@ -79,6 +79,23 @@ function wantsQuietStream(req: Request): boolean {
   }
 }
 
+/**
+ * Session périmée avant la première trame : révoquée → `401` ; contexte du
+ * lecteur changé (équipe quittée, rôle changé, vue joueur basculée —
+ * `ADMIN_PLAYER_VIEW.md`) → un `200` vide, sans la trame d'ouverture et son
+ * contexte périmé (les droits de staff d'une session passée en vue joueur) :
+ * le client le referme et le rouvre (`live-connection.ts`) sur un contexte
+ * relu. `null` : rien de périmé.
+ */
+function staleOpeningResponse(revoked: boolean, reconnect: boolean): Response | null {
+  if (revoked) return fail("UNAUTHORIZED", 401);
+  if (!reconnect) return null;
+  return new Response(null, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform" },
+  });
+}
+
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   // Repère pris **avant** la lecture de la session : une révocation commitée
   // pendant celle-ci ne trouverait pas encore le flux à fermer.
@@ -111,8 +128,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const tokenHash = await currentTokenHash();
   let revoked = false;
   // Contexte du lecteur changé (équipe quittée, rôle changé…) pendant
-  // l'ouverture : pas un refus — le flux se ferme sitôt ouvert, et le client se
-  // reconnecte sur un contexte relu, sans passer par le REST de secours.
+  // l'ouverture : pas un refus — un 200 vide (`staleOpeningResponse`), sans trame
+  // d'ouverture, et le client se reconnecte sur un contexte relu.
   let reconnectRequested = false;
   // Le tournoi suivi, pour qu'un geste de roster ne reconnecte que les flux
   // des tournois concernés (`reconnectUserStreams`) ; validé plus bas.
@@ -138,13 +155,15 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     unregister();
     return response;
   };
-  if (revokedSince(user.id, tokenHash, mark)) {
-    return refuse(fail("UNAUTHORIZED", 401));
-  }
-  // Vue joueur basculée pendant la lecture de la session : le contexte lu est
-  // périmé, le flux se reconnecte sitôt ouvert (`reconnectSessionStreams`).
-  // Rien n'a pu le demander depuis l'inscription (aucune attente depuis).
-  reconnectRequested = reconnectRequestedSince(user.id, tokenHash, mark);
+  // Révocation, ou vue joueur basculée, pendant la lecture de la session :
+  // seule la trace datée par le repère les rattrape. Le drapeau n'est pas
+  // réécrit ici : un rappel tombé depuis l'inscription garde sa demande, que
+  // le contrôle d'après les lectures relit.
+  const staleSession = staleOpeningResponse(
+    revokedSince(user.id, tokenHash, mark),
+    reconnectRequestedSince(user.id, tokenHash, mark),
+  );
+  if (staleSession) return refuse(staleSession);
 
   // Toute sortie imprévue (base indisponible pendant les lectures) désinscrit
   // le flux : le registre est global, et une reconnexion en boucle pendant une
@@ -245,10 +264,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       ? "STANDARD"
       : resolveRefreshTier({ isStaff: narratesLive, isParticipant });
 
-    // Session révoquée pendant les lectures : la porte ordinaire répondrait 401.
-    if (revoked) {
-      return refuse(fail("UNAUTHORIZED", 401));
-    }
+    // Session révoquée pendant les lectures (la porte ordinaire répondrait
+    // 401), ou contexte changé : ni instantané ni droits périmés servis.
+    const staleRead = staleOpeningResponse(revoked, reconnectRequested);
+    if (staleRead) return refuse(staleRead);
 
     // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
     // 238 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
@@ -406,7 +425,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           // Course résiduelle : le contrôle plus haut a pu passer juste avant que
           // le client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son
           // écouteur.
-          // Reconnexion demandée pendant l'ouverture : le registre a déjà
+          // Reconnexion demandée pendant l'ouverture (filet : aucune attente
+          // ne sépare le contrôle plus haut de cette ligne) : le registre a déjà
           // retiré ce flux — ouvert, plus rien ne le fermerait à une révocation.
           if (req.signal.aborted || reconnectRequested) {
             cleanup();

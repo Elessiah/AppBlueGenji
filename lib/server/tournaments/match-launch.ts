@@ -750,7 +750,7 @@ export async function setMatchReady(
   matchId: number,
   userId: number,
   ready: boolean,
-  options: { playerView?: boolean } = {},
+  session: PartySession,
 ): Promise<{ launched: boolean }> {
   const { tournamentId, launched, quiet } = await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
@@ -763,7 +763,7 @@ export async function setMatchReady(
     await adoptCurrentPairing(connection, row);
     // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
     const lobbyWasOpen = row.lobby_opened_at !== null;
-    const party = await resolvePartyOrRefusal(connection, row, userId, { playerView: options.playerView === true });
+    const party = await resolvePartyOrRefusal(connection, row, userId, session);
     if (typeof party === "string") throw new Error(party);
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 

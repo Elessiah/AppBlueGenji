@@ -78,6 +78,17 @@ describe("POST /api/auth/player-view", () => {
     await expect(res.json()).resolves.toMatchObject({ playerView: true, until: "2026-11-20T12:00:00.000Z" });
   });
 
+  it("POST_enterPlayerViewButNothingActiveInDb_returnsPlayerViewFalse", async () => {
+    // L'état relu, pas celui demandé : jamais « vue joueur » sans échéance.
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: null });
+
+    const res = await toggle({ active: true });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ playerView: false, until: null });
+  });
+
   it("POST_bodyWithoutBoolean_returns400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
