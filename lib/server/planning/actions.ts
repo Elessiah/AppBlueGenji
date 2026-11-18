@@ -16,7 +16,7 @@ import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
 import { MATCH_REFEREE_REFUSAL_CODES, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
 import { loadPlanningData, loadPlanningMembers, type Executor, type LoadedEntry, type PlanningData } from "./load";
 import { entryAssignments } from "./model";
-import { readPlanningRows, settleFailedDesignation } from "./planning-undo";
+import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "./planning-undo";
 import { loadEntryPlayers, playersDuring } from "./players";
 import { writeSoloCaster } from "./profiles";
 
@@ -32,6 +32,7 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_CAST_MANAGED: 409,
   PLANNING_NOT_ASSIGNED: 409,
   PLANNING_BUSY: 409,
+  PLANNING_CONFIRM_PARTIAL: 409,
   NOT_CASTER: 409,
   // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
@@ -152,7 +153,22 @@ async function assignManually({ connection, actor, data, entry, input, current, 
   }
   if (current?.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
   const released = await overlappingProposals(connection, data, entry, input.userId);
-  const before = await readPlanningRows(connection, [entry.key, ...released.map((proposal) => proposal.entry.key)]);
+  // L'instantané ne sert qu'à l'arbitre d'un match (seul geste qui passe par le match) : les lignes que le geste retire.
+  const releasedKeys = new Set(released.map((proposal) => `${proposal.entry.key}|${proposal.role}`));
+  const undo =
+    matchId === null
+      ? undefined
+      : await snapshotGesture(
+          connection,
+          [entry.key, ...released.map((proposal) => proposal.entry.key)],
+          { entryKey: entry.key, userId: input.userId, role: input.role },
+          (row) =>
+            (row.entry_key === entry.key && row.role === "REFEREE" && Number(row.user_id) !== input.userId) ||
+            (Number(row.user_id) === input.userId &&
+              row.source === "AUTO" &&
+              !Number(row.confirmed) &&
+              releasedKeys.has(`${row.entry_key}|${row.role}`)),
+        );
   const eventIds = await transact(connection, async () => {
     for (const proposal of released) {
       await connection.execute(
@@ -168,11 +184,13 @@ async function assignManually({ connection, actor, data, entry, input, current, 
     }
     return [await writeAssignment(connection, entry, { userId: input.userId, role: input.role, source: "MANUAL", reason: "MANUAL" }, actor.id)];
   });
-  if (matchId === null) return;
+  if (matchId === null || undo === undefined) return;
+  // Le match porte déjà ce membre : rien à lui demander (et une panne n'aurait rien à trancher).
+  if ((await readMatchReferee(matchId)) === input.userId) return;
   try {
     await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId);
   } catch (error) {
-    await settleFailedDesignation(error, matchId, input.userId, before, eventIds);
+    await settleFailedDesignation(error, matchId, input.userId, undo, eventIds);
     throw error;
   }
 }
@@ -183,7 +201,7 @@ async function unassignManually({ connection, actor, entry, input, current, matc
   if (current.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
   // Une proposition provisoire n'est pas encore posée sur le match.
   const onMatch = matchId !== null && !current.provisional;
-  const before = await readPlanningRows(connection, [entry.key]);
+  const undo = onMatch ? await snapshotGesture(connection, [entry.key], { entryKey: entry.key, userId: input.userId, role: input.role }) : undefined;
   const eventIds = await transact(connection, async () => {
     await connection.execute("DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ?", [
       entry.key,
@@ -192,11 +210,13 @@ async function unassignManually({ connection, actor, entry, input, current, matc
     ]);
     return [await writeEvent(connection, entry, input.userId, input.role, "REMOVED", "MANUAL", actor.id)];
   });
-  if (!onMatch || matchId === null) return;
+  if (matchId === null || undo === undefined) return;
+  // Le match n'a déjà plus d'arbitre : rien à lui demander.
+  if ((await readMatchReferee(matchId)) === null) return;
   try {
     await assignMatchReferee(matchId, actor.id, null, input.userId);
   } catch (error) {
-    await settleFailedDesignation(error, matchId, null, before, eventIds);
+    await settleFailedDesignation(error, matchId, null, undo, eventIds);
     throw error;
   }
 }

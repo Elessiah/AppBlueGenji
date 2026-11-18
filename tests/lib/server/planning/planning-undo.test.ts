@@ -8,8 +8,10 @@ import {
   designationTookEffect,
   readPlanningRows,
   settleFailedDesignation,
+  snapshotGesture,
   undoPlanningBlock,
   type PlanningAssignmentRow,
+  type PlanningUndo,
 } from "@/lib/server/planning/planning-undo";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 
@@ -17,7 +19,30 @@ import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 
 const connection = connectionMock();
 const { execute } = connection;
-const EMPTY = { entryKeys: [], rows: [] };
+const CREATED_AT = new Date("2026-11-16T19:00:00Z");
+
+function row(overrides: Partial<PlanningAssignmentRow> = {}): PlanningAssignmentRow {
+  return {
+    entry_key: "m:1",
+    user_id: 7,
+    role: "REFEREE",
+    tournament_id: 10,
+    match_id: 1,
+    source: "AUTO",
+    reason: "LOAD",
+    confirmed: 0,
+    assigned_by_user_id: 9,
+    created_at: CREATED_AT,
+    ...overrides,
+  };
+}
+
+const UNDO: PlanningUndo = { keys: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }], rows: [] };
+
+/** Les requêtes jouées qui contiennent `fragment`. */
+function callsWith(fragment: string) {
+  return execute.mock.calls.filter(([sql]) => sql.includes(fragment));
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -30,20 +55,51 @@ beforeEach(() => {
 });
 
 describe("readPlanningRows", () => {
-  it("readPlanningRows_noKeys_noQuery", async () => {
+  it("readPlanningRows_noKeys_emptyNoQuery", async () => {
     const actual = await readPlanningRows(fakeConnection(connection), []);
 
-    expect(actual).toEqual(EMPTY);
+    expect(actual).toEqual([]);
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("readPlanningRows_duplicateKeys_oneDedupedSelect", async () => {
-    execute.mockResolvedValueOnce([[{ entry_key: "m:1" }], []]);
+    execute.mockResolvedValueOnce([[row()], []]);
 
-    const actual = await readPlanningRows(fakeConnection(connection), ["m:1", "m:2", "m:1"]);
+    await readPlanningRows(fakeConnection(connection), ["m:1", "m:2", "m:1"]);
 
-    expect(actual.entryKeys).toEqual(["m:1", "m:2"]);
     expect(execute.mock.calls[0][1]).toEqual(["m:1", "m:2"]);
+  });
+});
+
+describe("snapshotGesture", () => {
+  it("snapshotGesture_onlyWrittenAndRemovedRows_keysDeduped", async () => {
+    const written = row({ user_id: 3, source: "MANUAL" });
+    const removed = row({ user_id: 7 });
+    const untouched = row({ user_id: 8, role: "CASTER" });
+    execute.mockResolvedValueOnce([[written, removed, untouched], []]);
+
+    const actual = await snapshotGesture(
+      fakeConnection(connection),
+      ["m:1"],
+      { entryKey: "m:1", userId: 3, role: "REFEREE" },
+      (candidate) => candidate.role === "REFEREE" && candidate.user_id !== 3,
+    );
+
+    expect(actual).toEqual({
+      keys: [
+        { entryKey: "m:1", userId: 3, role: "REFEREE" },
+        { entryKey: "m:1", userId: 7, role: "REFEREE" },
+      ],
+      rows: [written, removed],
+    });
+  });
+
+  it("snapshotGesture_writtenKeyAbsent_stillUndoneByKey", async () => {
+    execute.mockResolvedValueOnce([[row({ user_id: 8, role: "CASTER" })], []]);
+
+    const actual = await snapshotGesture(fakeConnection(connection), ["m:1"], { entryKey: "m:1", userId: 3, role: "REFEREE" });
+
+    expect(actual).toEqual({ keys: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }], rows: [] });
   });
 });
 
@@ -80,25 +136,40 @@ describe("designationTookEffect", () => {
 });
 
 describe("undoPlanningBlock", () => {
-  it("undoPlanningBlock_rowsAndEvents_restoredInOneTransaction", async () => {
-    const createdAt = new Date("2026-11-16T19:00:00Z");
-    const row: PlanningAssignmentRow = {
-      entry_key: "m:1", user_id: 7, role: "REFEREE", tournament_id: 10, match_id: 1,
-      source: "AUTO", reason: "LOAD", confirmed: 0, assigned_by_user_id: 9, created_at: createdAt,
+  it("undoPlanningBlock_keyedDeleteOnly_noEntryWideDelete", async () => {
+    const undo: PlanningUndo = {
+      keys: [
+        { entryKey: "m:1", userId: 3, role: "REFEREE" },
+        { entryKey: "m:2", userId: 3, role: "CASTER" },
+      ],
+      rows: [],
     };
 
-    const actual = await undoPlanningBlock({ entryKeys: ["m:1"], rows: [row] }, [77]);
+    await undoPlanningBlock(undo, []);
+
+    expect(callsWith("DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ?").map(([, params]) => params)).toEqual([
+      ["m:1", 3, "REFEREE"],
+      ["m:2", 3, "CASTER"],
+    ]);
+    expect(callsWith("entry_key IN")).toEqual([]);
+  });
+
+  it("undoPlanningBlock_restoreSkipsErasedAccounts", async () => {
+    const actual = await undoPlanningBlock({ keys: [{ entryKey: "m:1", userId: 7, role: "REFEREE" }], rows: [row()] }, [77]);
 
     expect(actual).toBe(true);
+    const [restore] = callsWith("INSERT IGNORE INTO bg_planning_assignments");
+    expect(restore[0]).toContain("u.is_deleted = 0");
+    expect(restore[0]).toContain("b.is_deleted = 0");
+    expect(restore[1]).toEqual(["m:1", "REFEREE", 10, 1, "AUTO", "LOAD", 0, 9, CREATED_AT, 7]);
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([77]);
     expect(connection.commit).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 7, "REFEREE", 10, 1, "AUTO", "LOAD", 0, 9, createdAt]);
-    expect(execute.mock.calls[2][1]).toEqual([77]);
   });
 
   it("undoPlanningBlock_writeFails_loggedReturnsFalse", async () => {
     execute.mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
 
-    const actual = await undoPlanningBlock({ entryKeys: ["m:1"], rows: [] }, [77]);
+    const actual = await undoPlanningBlock(UNDO, [77]);
 
     expect(actual).toBe(false);
     expect(connection.rollback).toHaveBeenCalled();
@@ -110,7 +181,7 @@ describe("settleFailedDesignation", () => {
   it("settleFailedDesignation_designationTook_nothingUndone", async () => {
     execute.mockResolvedValueOnce([[{ referee_user_id: 3 }], []]);
 
-    await settleFailedDesignation(new Error("PUBLISH_FAILED"), 1, 3, { entryKeys: ["m:1"], rows: [] }, [77]);
+    await settleFailedDesignation(new Error("PUBLISH_FAILED"), 1, 3, UNDO, [77]);
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(connection.beginTransaction).not.toHaveBeenCalled();
@@ -119,16 +190,16 @@ describe("settleFailedDesignation", () => {
   it("settleFailedDesignation_uncertain_loggedNothingUndone", async () => {
     execute.mockRejectedValueOnce(new Error("ECONNRESET"));
 
-    await settleFailedDesignation(new Error("ER_LOCK_DEADLOCK"), 1, 3, { entryKeys: ["m:1"], rows: [] }, [77]);
+    await settleFailedDesignation(new Error("ER_LOCK_DEADLOCK"), 1, 3, UNDO, [77]);
 
     expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalled();
   });
 
   it("settleFailedDesignation_refused_undone", async () => {
-    await settleFailedDesignation(new Error("REFEREE_CHANGED"), 1, 3, { entryKeys: ["m:1"], rows: [] }, [77]);
+    await settleFailedDesignation(new Error("REFEREE_CHANGED"), 1, 3, UNDO, [77]);
 
     expect(connection.commit).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[1][1]).toEqual([77]);
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([77]);
   });
 });

@@ -50,6 +50,17 @@ describe("entryAssignments", () => {
     ]);
   });
 
+  it("entryAssignments_castSignupOverProvisionalCaster_becomesCast", () => {
+    const data = planningData({
+      assignments: [loadedAssignment({ userId: 5, role: "CASTER", confirmed: false })],
+      matchCasters: new Map([["m:1", [5]]]),
+    });
+
+    expect(entryAssignments(loadedEntry(), data)).toEqual([
+      { userId: 5, role: "CASTER", source: "CAST", reason: "CAST", provisional: false },
+    ]);
+  });
+
   it("entryAssignments_tournamentRefereeRows_kept", () => {
     const entry = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
     const data = planningData({

@@ -69,7 +69,9 @@ compte les **rôles**, pas les personnes.
   (`[lundi, lundi suivant[`, 7 j ± 1 h au changement d'heure) et regroupement
   de la page.
 - Garde tel quel ce qui est **verrouillé** : choix manuels, propositions
-  confirmées, caster inscrit sur le match (`CAST`), arbitre désigné du match
+  confirmées, caster inscrit sur le match (`CAST` — son inscription l'emporte sur
+  une simple proposition provisoire du même caster, et compte dans l'équité),
+  arbitre désigné du match
   (`MATCH`) ; respecte l'autogestion décidée par le staff et les retraits
   manuels (jamais reproposé), écarte qui **joue** pendant l'entrée — joueurs
   du match, engagés du tournoi pour l'entrée d'un tournoi entier, joueurs de
@@ -104,16 +106,21 @@ compte les **rôles**, pas les personnes.
   changées, arbitre posé entre-temps) retire la ligne et la compte — une panne
   (base, interblocage) fait échouer le geste sans rien retirer ; les
   désignations déjà validées avant elle, et les casters et prods (qui ne
-  dépendent d'aucun match), s'écrivent quand même au planning, puis la panne
-  d'origine remonte (même si cette écriture échoue à son tour, consignée).
+  dépendent d'aucun match), s'écrivent quand même au planning ; si une partie
+  a ainsi été écrite, le geste répond `PLANNING_CONFIRM_PARTIAL` (« relance la
+  confirmation », la panne d'origine va dans pm2), sinon la panne d'origine
+  remonte (même si cette écriture échoue à son tour, consignée).
   Les désignations passent d'abord, les lignes du planning s'écrivent ensuite
   en une transaction ; un arbitre de match ne s'y confirme que si le match l'a
   encore, et un évènement ne s'écrit que pour une ligne vraiment changée
   (relancer le geste n'écrit rien deux fois). Une proposition d'arbitre
   restée provisoire alors que le match a déjà cet arbitre est confirmée au
   début de chaque calcul (fenêtre vide comprise) et de chaque confirmation
-  (`confirmPendingReferees`), lue en base — entrée commencée ou hors de la
-  vue comprise : un calcul relancé ne l'efface jamais. Les lignes confirmées
+  (`confirmPendingReferees`, trois instructions ensemblistes lues en base —
+  entrée commencée ou hors de la vue comprise : un calcul relancé ne l'efface
+  jamais) ; au même moment, une ligne d'arbitre **confirmée** que son match ne
+  porte pas (désignation restée incertaine, arbitre changé depuis le match)
+  est retirée : le match fait foi. Les lignes confirmées
   deviennent des contraintes fixes pour les calculs suivants.
 - Un choix du staff (`source = MANUAL`) naît confirmé et verrouillé ; un retrait
   manuel est mémorisé pour que le calcul ne repropose pas la personne. Le
@@ -123,10 +130,13 @@ compte les **rôles**, pas les personnes.
   ou arbitre désigné sur le match (`PLANNING_OVERLAP_MANAGED`, à retirer depuis
   le match) ; une simple proposition provisoire qui chevauche lui cède la
   place. Les lignes du planning s'écrivent d'abord, en une transaction
-  validée ; la désignation sur le match (`assignMatchReferee`) passe ensuite.
-  Si elle est refusée, ou tombe en panne sans avoir pris (le match relu le
-  dit), les lignes des entrées touchées sont remises et les évènements du
-  geste effacés (`planning-undo.ts`) ; une panne qui a pris garde le planning,
+  validée ; la désignation sur le match (`assignMatchReferee`) passe ensuite,
+  sauf si le match, relu juste avant, porte déjà ce qui est voulu. Si elle est
+  refusée, ou tombe en panne sans avoir pris (le match relu le dit), les seules
+  lignes que le geste a écrites ou retirées sont remises (jamais celles d'un
+  compte supprimé entre-temps, ni le nom d'un staff supprimé) et les
+  évènements du geste effacés (`planning-undo.ts`, instantané pris pour le
+  seul arbitre d'un match) ; une panne qui a pris garde le planning,
   un doute est consigné dans pm2. Le match n'est **jamais** réécrit à la main :
   il ne change que par sa désignation, avec ses contrôles (opposition, joueur
   du match) et ses avis à l'arbitre.

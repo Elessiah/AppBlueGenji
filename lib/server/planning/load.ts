@@ -416,7 +416,8 @@ export async function loadPlanningHistory(executor: Executor, weekOf: number): P
        SELECT c.user_id FROM bg_match_casters c JOIN bg_matches m ON m.id = c.match_id
         WHERE m.start_at >= ? AND m.start_at < ?
           AND NOT EXISTS (SELECT 1 FROM bg_planning_assignments pa
-                           WHERE pa.match_id = c.match_id AND pa.user_id = c.user_id AND pa.role = 'CASTER')
+                           WHERE pa.match_id = c.match_id AND pa.user_id = c.user_id AND pa.role = 'CASTER'
+                             AND (pa.source = 'MANUAL' OR pa.confirmed = 1))
      ) jobs GROUP BY user_id`,
     [from, to, from, to, from, to],
   );

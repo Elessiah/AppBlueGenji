@@ -5,7 +5,7 @@
  * et confirme celles que le staff retient. Sous le verrou nommé du planning :
  * un geste à la fois.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
@@ -164,7 +164,10 @@ export async function writeEvent(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [entry.key, userId, role, entry.tournamentId, entry.matchId, kind, source, actorId],
   );
-  return Number((result as { insertId?: number } | undefined)?.insertId ?? 0);
+  const id = Number((result as { insertId?: number } | undefined)?.insertId ?? 0);
+  // Sans identifiant, une annulation ne saurait plus effacer cet évènement : panne franche.
+  if (!Number.isInteger(id) || id <= 0) throw new Error("PLANNING_EVENT_ID_MISSING");
+  return id;
 }
 
 /** Pose une ligne d'attribution (un choix du staff naît confirmé) et l'évènement qui la retrace (son identifiant rendu). */
@@ -300,43 +303,42 @@ function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
   return steps;
 }
 
-type PendingRefereeRow = RowDataPacket & { entry_key: string; user_id: number; tournament_id: number; match_id: number };
-
 /** Confirme une proposition d'arbitre de match **seulement** si le match a (encore) cet arbitre. */
 const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
   WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
     AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
 
+/** Une proposition d'arbitre provisoire que le match porte déjà. */
+const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
+  WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`;
+
 /**
- * Propositions d'arbitre restées provisoires alors que le match a déjà cet
- * arbitre — une confirmation interrompue par une panne après la désignation
- * du match : elles se confirment sans rien redemander au match, que l'entrée
- * soit encore ouverte, déjà commencée ou hors de ce que montre le planning.
- * Lues en base (jamais d'après un état chargé avant les désignations), chacune
- * confirmée à condition que le match ait encore cet arbitre ; l'évènement ne
- * s'écrit que pour une ligne vraiment confirmée. Jouée au début de chaque
- * calcul (même sur une fenêtre vide) et de chaque confirmation, dans leur
- * transaction : un calcul relancé ne les efface donc jamais comme de simples
- * propositions.
+ * Réconcilie les arbitres de match du planning avec les matchs, en un nombre
+ * fixe d'instructions. Une ligne d'arbitre **confirmée** que son match ne
+ * porte pas (désignation restée incertaine après une panne, arbitre changé
+ * depuis le match) est retirée : le match fait foi. Une proposition restée
+ * provisoire alors que le match a déjà cet arbitre (confirmation interrompue
+ * par une panne après la désignation) se confirme sans rien redemander au
+ * match, que l'entrée soit ouverte, commencée ou hors de ce que montre le
+ * planning ; ses évènements s'écrivent d'abord, d'après la même lecture
+ * verrouillante (`INSERT … SELECT`), puis les lignes se confirment. Jouée au
+ * début de chaque calcul (même sur une fenêtre vide) et de chaque
+ * confirmation, dans leur transaction : un calcul relancé ne les efface donc
+ * jamais comme de simples propositions.
  */
 export async function confirmPendingReferees(executor: Executor, actorId: number): Promise<number> {
-  const [rows] = await executor.execute<PendingRefereeRow[]>(
-    `SELECT a.entry_key, a.user_id, a.tournament_id, a.match_id
-       FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
-      WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id
-      ORDER BY a.entry_key, a.user_id`,
+  await executor.execute(
+    `DELETE a FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
+      WHERE a.role = 'REFEREE' AND a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)`,
   );
-  let confirmed = 0;
-  for (const row of rows) {
-    const userId = Number(row.user_id);
-    const matchId = Number(row.match_id);
-    const [result] = await executor.execute(CONFIRM_MATCH_REFEREE_SQL, [row.entry_key, userId, matchId, userId]);
-    if (affected(result) === 0) continue;
-    const entry = { key: row.entry_key, tournamentId: Number(row.tournament_id), matchId };
-    await writeEvent(executor, entry, userId, "REFEREE", "CONFIRMED", "AUTO", actorId);
-    confirmed += 1;
-  }
-  return confirmed;
+  await executor.execute(
+    `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
+     SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'CONFIRMED', 'AUTO', ? ${PENDING_ON_MATCH_SQL}`,
+    [actorId],
+  );
+  const [result] = await executor.execute(`UPDATE bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
+     SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`);
+  return affected(result);
 }
 
 /**
@@ -431,7 +433,13 @@ export async function confirmAssignments(
       console.error("[planning] confirmation : écriture du planning en échec après une panne de désignation", failureDiagnostic(error));
       throw failure;
     }
-    if (failure !== undefined) throw failure;
-    return report;
+    if (failure === undefined) return report;
+    // Une partie est écrite : le staff doit le savoir (et relancer), la panne d'origine va au journal.
+    if (report.confirmed + report.refused === 0) throw failure;
+    console.error(
+      `[planning] confirmation partielle (${report.confirmed} confirmée(s), ${report.refused} retirée(s)) après une panne de désignation`,
+      failureDiagnostic(failure),
+    );
+    throw new Error("PLANNING_CONFIRM_PARTIAL");
   });
 }

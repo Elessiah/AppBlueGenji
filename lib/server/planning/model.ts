@@ -13,7 +13,8 @@ import type { LoadedEntry, PlanningData } from "./load";
  * elle nomme le même compte ; un arbitre désigné ailleurs (fenêtre
  * « Arbitrage ») vaut `MATCH`. Une proposition **provisoire** d'arbitre de
  * match ne compte que tant que le match n'a pas d'arbitre. Un caster inscrit
- * sur le match sans ligne du planning vaut `CAST`.
+ * sur le match sans ligne du planning tenue (confirmée ou choix du staff) vaut
+ * `CAST` : son inscription l'emporte sur une simple proposition provisoire.
  */
 function matchRefereeRows(entry: LoadedEntry, rows: PlanningData["assignments"]): PlanningAssignmentView[] {
   if (entry.matchRefereeId === null) {
@@ -41,8 +42,10 @@ export function entryAssignments(
   }
   if (entry.kind === "MATCH") out.push(...matchRefereeRows(entry, rows));
   for (const userId of data.matchCasters.get(entry.key) ?? []) {
-    if (out.some((row) => row.role === "CASTER" && row.userId === userId)) continue;
-    out.push({ userId, role: "CASTER", source: "CAST", reason: "CAST", provisional: false });
+    const index = out.findIndex((row) => row.role === "CASTER" && row.userId === userId);
+    const signup: PlanningAssignmentView = { userId, role: "CASTER", source: "CAST", reason: "CAST", provisional: false };
+    if (index === -1) out.push(signup);
+    else if (out[index].provisional) out[index] = signup;
   }
   const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
   return out.sort((a, b) => order[a.role] - order[b.role] || a.userId - b.userId);
