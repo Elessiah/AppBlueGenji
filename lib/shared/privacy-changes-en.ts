@@ -13,6 +13,7 @@
  * this module.
  */
 
+import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
@@ -1136,6 +1137,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Where and for how long: exactly where the SHA-256 hash is kept, and for as long — in the list of blocked images, without time limit and with no link to any account, and on the deletion decision as long as that decision is kept. An accepted challenge that lifts the block removes both hashes together from the list of blocked images.",
       "An avatar deleted before this change stays blocked by its SHA-256 hash only; a perceptual hash is only added if the same image is blocked again while the site still keeps its file (a new deletion, an account erasure, the purge of a hidden avatar), the row keeping the date of its first block. An image that is too simple — nearly plain, a gradient, a symmetric pattern, or mostly a plain background, such as a name or an emblem on a flat colour — or that the site cannot decode has no perceptual hash: it is blocked by its SHA-256 hash only.",
       "What does not change: an avatar that is only hidden, or that moderation never deleted, leaves no hash; what deleting an account removes stays the same.",
+    ],
+  },
+  "2026-11-test-messages-prives": {
+    linkLabels: ["Read the “Test my DMs” paragraph"],
+    title: "“Test my DMs”: a test direct message, at your request",
+    summary:
+      "From “My profile”, the “Test my DMs” button asks the BlueGenji bot to send a short test direct message to your linked Discord account, to check that it can reach you. Nothing is sent without your click.",
+    details: [
+      `The message only goes to your own linked Discord account, and only if your tag is certified; it contains neither a link nor anyone's name. The “Discord direct messages about my matches and teams” box does not apply to this test, which you request yourself, and a delivered test does not tick it again. The site tells you the result (message delivered, direct messages closed, not on any BlueGenji server, bot unreachable) and does not record it. Normally at most ${DM_TEST_HOURLY_LIMIT} tries per hour: this cap lives in memory and starts again from zero when the site restarts. Your account number and the time of each of your tries are kept there, sixty-one minutes at most after your last click on the button, for the caps on tries.`,
+      "A message not delivered (direct messages closed or not on any of the servers) leaves a line giving its outcome as counts (delivered, not found, unreachable) in the staff log on Discord, and a sending the bot cannot carry out, a line giving the error — without naming anyone. Basis: performance of the service you request.",
+      "What does not change: nothing new about you is written to the database, and what deleting the account removes stays the same.",
     ],
   },
 };

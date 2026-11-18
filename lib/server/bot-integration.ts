@@ -69,6 +69,17 @@ function recordSuccess(): void {
   circuitOpenUntil = 0;
 }
 
+/**
+ * Succès d'un appel qui passe outre le coupe-circuit (geste d'un joueur,
+ * alerte arbitres ou dirigeants) : il remet la série d'échecs à zéro comme
+ * tout succès — ouvert ou fermé, des échecs suivis d'un succès ne sont plus
+ * « d'affilée » ; ouvert, il ne le referme pas — un clic répété ne rouvrirait
+ * sinon les flux d'arrière-plan vers un bot en panne partielle.
+ */
+function recordBypassSuccess(): void {
+  consecutiveFailures = 0;
+}
+
 function getInternalHeaders(): HeadersInit {
   const token = process.env.BOT_INTERNAL_TOKEN;
   return token ? { "x-internal-token": token } : {};
@@ -535,7 +546,8 @@ async function postDiscordNotification(
       return null;
     }
 
-    recordSuccess();
+    if (options.honourCircuit) recordSuccess();
+    else recordBypassSuccess();
     return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
   } catch {
     recordFailure();
@@ -550,18 +562,23 @@ async function postDiscordNotification(
  * injoignable ne doit pas faire échouer la lecture d'une page de tournoi, qui
  * est ce qui déclenche le balayage des rappels.
  *
+ * @param options `honourCircuit` : respecter le coupe-circuit (défaut `true`,
+ *   flux d'arrière-plan) ; `false` pour une action explicite d'un joueur qui
+ *   attend la réponse (« Tester mes MP ») — elle mérite sa tentative, sans
+ *   refermer le coupe-circuit si elle réussit.
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(
   message: string,
   recipients: DiscordRecipient[],
   context: string,
+  options: { honourCircuit?: boolean } = {},
 ): Promise<DiscordDeliveryReport | null> {
   if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification(
     "/internal/notify/dm",
     { message, recipients, context },
-    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: true },
+    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
   );
 }
 

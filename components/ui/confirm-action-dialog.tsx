@@ -140,6 +140,10 @@ export function ConfirmActionDialog({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    // Portée dans <body>, la fenêtre reste enfant React de son appelant : sans cet
+    // arrêt, la soumission remonterait jusqu'au `onSubmit` d'un formulaire englobant
+    // (le profil l'enregistrerait).
+    event.stopPropagation();
     if (busy || !armed) return;
     void runConfirmation({ onConfirm, onClose, setBusy, closeOnSuccess });
   };

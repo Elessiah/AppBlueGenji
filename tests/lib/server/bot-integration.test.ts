@@ -25,6 +25,7 @@ describe("bot-integration", () => {
   afterEach(() => {
     process.env = { ...originalEnv };
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it("uses localhost fallback URL when BOT_INTERNAL_URL is missing", async () => {
@@ -411,6 +412,75 @@ describe("bot-integration", () => {
 
       expect(await pushDiscordDirectMessages("Rappel", recipients, "match-reminder")).toBeNull();
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("pushDiscordDirectMessages_circuitOpenHonourFalse_stillCallsBot", async () => {
+      await tripCircuit();
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+
+      const report = await pushDiscordDirectMessages("Test", recipients, "dm-test", { honourCircuit: false });
+
+      expect(report).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(fetchMock).toHaveBeenCalled();
+    });
+
+    it("pushDiscordDirectMessages_bypassSuccess_doesNotCloseCircuit", async () => {
+      await tripCircuit();
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      await pushDiscordDirectMessages("Test", recipients, "dm-test", { honourCircuit: false });
+      fetchMock.mockClear();
+
+      const report = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+      expect(report).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("pushDiscordDirectMessages_bypassSuccessWhileClosed_resetsFailureStreak", async () => {
+      // Au-delà du délai d'un coupe-circuit ouvert par un test précédent : fermé.
+      jest.useFakeTimers({ now: Date.now() + 120_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+      const failing = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
+      await pushSiteVisitStats({} as SiteVisitStats);
+      await pushSiteVisitStats({} as SiteVisitStats);
+      failing.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      await pushRefereeAlert("Signalement", "issue-report");
+      failing.mockResolvedValue(new Response(null, { status: 500 }));
+      await pushSiteVisitStats({} as SiteVisitStats);
+      failing.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      failing.mockClear();
+
+      const report = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+      expect(report).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(failing).toHaveBeenCalled();
+    });
+
+    it("pushDiscordDirectMessages_bypassSuccessWhileOpen_resetsFailureStreakWithoutClosing", async () => {
+      // Au-delà du délai de tout coupe-circuit ouvert par un test précédent.
+      jest.useFakeTimers({ now: Date.now() + 240_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+      await tripCircuit();
+      const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
+      await pushDiscordDirectMessages("Test", recipients, "dm-test", { honourCircuit: false });
+      await pushRefereeAlert("Signalement", "issue-report");
+      fetchMock.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      await pushDiscordDirectMessages("Test", recipients, "dm-test", { honourCircuit: false });
+      fetchMock.mockClear();
+      expect(await pushDiscordDirectMessages("Rappel", recipients, "match-reminder")).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+      jest.setSystemTime(Date.now() + 31_000);
+      fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
+      await pushSiteVisitStats({} as SiteVisitStats);
+      fetchMock.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      fetchMock.mockClear();
+
+      const report = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+      expect(report).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(fetchMock).toHaveBeenCalled();
     });
 
     it("tente quand même l'alerte arbitres : un signalement est une action de joueur", async () => {

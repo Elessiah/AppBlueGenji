@@ -44,6 +44,7 @@
  * Voir `docs/features/PRIVACY_CHANGES_CONSENT.md`.
  */
 
+import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
@@ -2149,6 +2150,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Où et combien de temps : exactement là où l'empreinte SHA-256 est gardée, et aussi longtemps qu'elle — dans la liste des images bloquées, sans limite de durée et sans lien avec aucun compte, et sur la décision de suppression tant que celle-ci est gardée. Une contestation acceptée qui lève le blocage retire les deux empreintes ensemble de la liste des images bloquées.",
       "Un avatar supprimé avant ce changement reste bloqué par sa seule empreinte SHA-256 ; une empreinte perceptuelle ne s'y ajoute que si la même image est de nouveau bloquée alors que le site en garde encore le fichier (nouvelle suppression, effacement d'un compte, purge d'un avatar masqué), la ligne gardant la date de son premier blocage. Une image trop simple — presque unie, dégradé, motif symétrique, ou faite surtout d'un fond uni, comme un pseudo ou un emblème sur un aplat — ou que le site ne parvient pas à décoder n'a pas d'empreinte perceptuelle : elle n'est bloquée que par son empreinte SHA-256.",
       "Ce qui ne change pas : un avatar seulement masqué, ou que la modération n'a jamais supprimé, ne laisse aucune empreinte ; ce que la suppression d'un compte emporte reste le même.",
+    ],
+  },
+  {
+    // DM-TEST-BUTTON — « Tester mes MP » dans « Mon profil » : un message privé de
+    // test, à la demande, vers le Discord rattaché du joueur
+    // (docs/features/DISCORD_DM_TEST.md). /rgpd § « Messages privés Discord de
+    // match » (paragraphe #test-messages-prives, FR et EN), registre T04. Pour
+    // tous les comptes. Datée du lendemain de la mise en ligne prévue, comme
+    // `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-test-messages-prives",
+    publishedAt: "2026-11-20",
+    title: "« Tester mes MP » : un message privé de test, à ta demande",
+    links: [{ href: "/rgpd#test-messages-prives", label: "Lire le paragraphe « Tester mes MP »" }],
+    summary:
+      "Depuis « Mon profil », le bouton « Tester mes MP » demande au bot BlueGenji de t'envoyer un court message privé de test sur ton compte Discord lié, pour vérifier qu'il peut te joindre. Rien ne part sans ton clic.",
+    details: [
+      `Le message part seulement à ton propre compte Discord rattaché, et seulement si ton tag est certifié ; il ne contient ni lien ni nom de personne. La case « Messages privés Discord de mes matchs et de mes équipes » ne s'applique pas à ce test, que tu demandes toi-même, et un test remis ne la recoche pas. Le site te dit le résultat (message remis, messages privés fermés, absent des serveurs BlueGenji, bot injoignable) et ne l'enregistre pas. Normalement au plus ${DM_TEST_HOURLY_LIMIT} essais par heure : ce plafond vit en mémoire et repart de zéro quand le site redémarre. Ton numéro de compte et l'heure de chacun de tes essais y sont gardés, soixante et une minutes au plus après ton dernier clic sur le bouton, pour les plafonds d'essais.`,
+      "Un message non remis (messages privés fermés ou absent des serveurs) laisse au journal du staff sur Discord une ligne qui en donne l'issue en nombres (remis, introuvables, injoignables), et un envoi que le bot ne parvient pas à faire, une ligne qui donne l'erreur — sans nommer personne. Base : l'exécution du service que tu demandes.",
+      "Ce qui ne change pas : rien de nouveau n'est écrit sur toi en base, et ce que la suppression du compte emporte reste le même.",
     ],
   },
 ];

@@ -141,6 +141,25 @@
     "hint": "Your push notifications and the site's Discord direct messages arrive in this language, except alerts sent to staff, in French then English. It takes the page's language again each time you log in.",
     "saved": "Notification language saved."
   },
+  "dmTest": {
+    "button": "Test my DMs",
+    "sending": "Sending…",
+    "buttonLabel": "Test my DMs (Discord direct messages)",
+    "hint": "The bot sends a short test direct message to your linked Discord account, to check that it can reach you ({max} tries per hour).",
+    "hintInvite": "Not on any BlueGenji server? The bot only writes to their members:",
+    "hintInviteLink": "join the server",
+    "sent": "Test message sent: check your Discord direct messages.",
+    "dmsClosed": "The bot cannot write to you: your direct messages are closed (or you blocked the bot). On Discord: right-click the BlueGenji server, open “Privacy Settings”, then turn on “Direct Messages”.",
+    "notInServer": "The bot cannot find you on any BlueGenji Discord server: it only writes to their members. Join the server with the link in the “i” help next to the button, then try again (already a member? try again later).",
+    "notLinked": "No Discord account is linked to your account: link it in “Connected apps”, then try again.",
+    "botUnreachable": "The Discord bot is not responding right now: try again in a few minutes.",
+    "busy": "Too many tests are running on the site right now: try again in a few minutes.",
+    "tooMany": "Too many tests: {max} per hour at most. Try again in an hour.",
+    "failed": "The test result is unknown: check your Discord direct messages, then try again later if nothing arrived.",
+    "certifyTitle": "Discord tag not verified",
+    "certifyWarning": "Your Discord tag is not verified: the bot sends you no match direct messages, and the test only runs once your tag is verified. Verification proves this account is yours.",
+    "certifyConfirm": "Verify my tag"
+  },
   "matchDms": {
     "label": "Discord direct messages about my matches and teams",
     "notCertified": "Without a verified Discord tag, match messages can't reach you, nor team messages without a linked Discord account (anti-spam).",

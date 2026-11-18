@@ -41,6 +41,9 @@ describe("un seul point d'entrée pour les notifications", () => {
       ({ path, code }) =>
         path !== "lib/server/notify.ts" &&
         path !== "lib/server/bot-integration.ts" &&
+        // « Tester mes MP » n'est pas une notification : il éprouve le canal
+        // Discord lui-même et lit le bilan du bot, destinataire par destinataire.
+        path !== "lib/server/discord-dm-test.ts" &&
         callSites(code, "pushDiscordDirectMessages").length > 0,
     ).map(({ path }) => path);
     expect(offenders).toEqual([]);

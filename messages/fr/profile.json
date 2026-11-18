@@ -141,6 +141,25 @@
     "hint": "Tes notifications push et les messages privés Discord du site arrivent dans cette langue, sauf les alertes adressées au staff, en français puis en anglais. Elle reprend celle de la page à chaque connexion.",
     "saved": "Langue des notifications enregistrée."
   },
+  "dmTest": {
+    "button": "Tester mes MP",
+    "sending": "Envoi…",
+    "buttonLabel": "Tester mes MP (messages privés Discord)",
+    "hint": "Le bot t'envoie un court message privé de test sur ton compte Discord lié, pour vérifier qu'il peut te joindre ({max} essais par heure).",
+    "hintInvite": "Sur aucun serveur BlueGenji ? Le bot n'écrit qu'à leurs membres :",
+    "hintInviteLink": "rejoindre le serveur",
+    "sent": "Message de test envoyé : regarde tes messages privés Discord.",
+    "dmsClosed": "Le bot ne peut pas t'écrire : tes messages privés sont fermés (ou tu as bloqué le bot). Sur Discord : clic droit sur le serveur BlueGenji, « Paramètres de confidentialité », puis active « Messages privés ».",
+    "notInServer": "Le bot ne te trouve sur aucun serveur Discord BlueGenji : il n'écrit qu'à leurs membres. Rejoins le serveur avec le lien de l'aide « i » à côté du bouton, puis réessaie (déjà membre ? réessaie plus tard).",
+    "notLinked": "Aucun compte Discord n'est lié à ton compte : lie-le dans « Applications connectées », puis réessaie.",
+    "botUnreachable": "Le bot Discord ne répond pas pour l'instant : réessaie dans quelques minutes.",
+    "busy": "Trop de tests en cours sur le site pour l'instant : réessaie dans quelques minutes.",
+    "tooMany": "Trop de tests : {max} par heure au maximum. Réessaie dans une heure.",
+    "failed": "Le résultat du test est inconnu : regarde tes messages privés Discord, puis réessaie plus tard si rien n'est arrivé.",
+    "certifyTitle": "Tag Discord non certifié",
+    "certifyWarning": "Ton tag Discord n'est pas certifié : le bot ne t'envoie aucun message privé de match, et le test ne part qu'une fois le tag certifié. La certification prouve que ce compte est bien le tien.",
+    "certifyConfirm": "Certifier mon tag"
+  },
   "matchDms": {
     "label": "Messages privés Discord de mes matchs et de mes équipes",
     "notCertified": "Sans tag Discord certifié, les messages de tes matchs ne te parviennent pas, ni ceux de tes équipes sans Discord lié (contre le spam).",

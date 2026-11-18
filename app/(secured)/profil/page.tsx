@@ -2,7 +2,7 @@
 
 import { UserAvatar } from "@/components/user-avatar";
 import { focusMainContent } from "@/components/accessibility/SkipLink";
-import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { Coche } from "@/components/Coche";
@@ -47,6 +47,7 @@ import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { ProfileSection } from "./_components/ProfileSection";
 import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { MatchDmField } from "./_components/MatchDmField";
+import { DiscordDmTestButton } from "./_components/DiscordDmTestButton";
 import { RecruitmentModalField } from "./_components/RecruitmentModalField";
 import { SelfRolesSection } from "./_components/SelfRolesField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
@@ -842,8 +843,18 @@ export default function ProfilePage() {
   const sections = visibleProfileSections({ invitations: invitations.length, adminRoles: Number(data.isAdmin) });
   const sectionById = PROFILE_SECTION_BY_ID;
 
+  const dmTestButton = (
+    <DiscordDmTestButton
+      linked={discordState.linked}
+      verified={discordState.verified}
+      onCertify={openVerifyDialog}
+      onNotCertified={() => void loadDiscordState()}
+    />
+  );
+
   const discordLockedActions = (
     <DiscordLockedActions
+      dmTestButton={dmTestButton}
       discordState={discordState}
       discordStateBusy={discordStateBusy}
       loadDiscordState={loadDiscordState}
@@ -1010,7 +1021,7 @@ export default function ProfilePage() {
               discordState,
               blizzardLinked,
               data?.profile.battletagFromBlizzard,
-              () => setVerifyOpen(true),
+              openVerifyDialog,
               {
                 failed: discordReadFailed,
                 reading: discordStateBusy,
@@ -1117,6 +1128,12 @@ export default function ProfilePage() {
                 aria-readonly={discordLocked || undefined}
               />
               <FieldErrorText fieldId={PROFILE_FIELD_IDS.discord} message={fieldErrors.message("discord")} />
+              {/* « Tester mes MP » vit dans la même rangée que les gestes Discord
+                  (Retirer / Certifier) : un seul bloc d'actions sous le champ. Sous un
+                  tag non certifié, la fenêtre qu'il ouvre propose « Certifier mon tag »
+                  — le même `openVerifyDialog` que la ligne Discord des comptes liés et
+                  le bouton « Certifier » du champ. Absent tant que l'état n'est pas lu,
+                  et sans Discord lié. */}
               {discordLocked ? (
                 discordLockedActions
               ) : (
@@ -1124,7 +1141,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     className="btn"
-                    onClick={() => setVerifyOpen(true)}
+                    onClick={openVerifyDialog}
                     /* « Recertifier » seul ne dit pas quoi : le libellé
                        accessible commence par le texte visible (WCAG 2.5.3) et
                        ajoute l'objet. */
@@ -1137,6 +1154,7 @@ export default function ProfilePage() {
                   >
                     {discordState.verified ? t("discord.recertify") : t("discord.certify")}
                   </button>
+                  {dmTestButton}
                 </div>
               )}
               {/* **Deux cas seulement, et non trois.** Un tag certifié appartient
@@ -1350,6 +1368,8 @@ interface DiscordLockedActionsProps {
   loadDiscordState: () => Promise<void>;
   discordTagBusy: boolean;
   onDiscordTagRemove: () => void;
+  /** « Tester mes MP » : dans la même rangée que « Retirer mon tag ». */
+  dmTestButton: ReactNode;
 }
 
 /**
@@ -1371,6 +1391,7 @@ function DiscordLockedActions({
   loadDiscordState,
   discordTagBusy,
   onDiscordTagRemove,
+  dmTestButton,
 }: Readonly<DiscordLockedActionsProps>) {
   const { t } = useProfileText();
   return discordState.linked !== true ? (
@@ -1391,6 +1412,7 @@ function DiscordLockedActions({
       discordState={discordState}
       discordTagBusy={discordTagBusy}
       onDiscordTagRemove={onDiscordTagRemove}
+      dmTestButton={dmTestButton}
     />
   );
 }
@@ -1400,6 +1422,7 @@ function DiscordLinkedActions({
   discordState,
   discordTagBusy,
   onDiscordTagRemove,
+  dmTestButton,
 }: Readonly<Omit<DiscordLockedActionsProps, "discordStateBusy" | "loadDiscordState">>) {
   const { t } = useProfileText();
   /* Le geste « Certifier » (ou « Enregistrer mon tag » sans tag) vit sur la ligne
@@ -1419,6 +1442,7 @@ function DiscordLinkedActions({
           {discordTagBusy ? t("discord.removing") : t("discord.remove")}
         </button>
       ) : null}
+      {dmTestButton}
     </div>
   );
 }

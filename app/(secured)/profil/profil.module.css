@@ -315,6 +315,12 @@
   margin-top: 8px;
 }
 
+/* Largeur réservée : « Envoi… » remplace « Tester mes MP » sans décaler le « i » voisin. */
+.dmTestButton {
+  min-width: 128px;
+  justify-content: center;
+}
+
 .avatarActions {
   display: flex;
   gap: 8px;
