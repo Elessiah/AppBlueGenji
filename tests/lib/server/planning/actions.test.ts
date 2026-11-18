@@ -72,10 +72,16 @@ function routeSql(
     displaced?: number[];
     released?: number;
     readFails?: boolean;
+    /** Les lectures du match (hors transaction) échouent après ce nombre de lectures réussies. */
+    readFailsAfter?: number;
+    /** L'arbitre du match lu dans la transaction du geste ; par défaut, la première lecture. */
+    inTransaction?: number | null;
   } = {},
 ) {
   const reads = Array.isArray(options.matchReferee) ? [...options.matchReferee] : [options.matchReferee ?? null];
+  const inTransaction = options.inTransaction === undefined ? (reads[0] ?? null) : options.inTransaction;
   let nextEventId = EVENT_ID;
+  let matchReads = 0;
   execute.mockImplementation(async (sql: string) => {
     if (sql.startsWith("SELECT entry_key")) return [options.rows ?? [], []];
     if (sql.startsWith("SELECT user_id FROM bg_planning_assignments")) {
@@ -84,8 +90,12 @@ function routeSql(
     if (sql.includes("source = 'AUTO' AND confirmed = 0") && options.released !== undefined) {
       return [{ affectedRows: options.released }];
     }
+    if (sql.startsWith("SELECT m.referee_user_id FROM bg_matches")) return [[{ referee_user_id: inTransaction }], []];
     if (sql.includes("SELECT referee_user_id FROM bg_matches")) {
-      if (options.readFails) throw new Error("ER_CON_COUNT_ERROR");
+      matchReads += 1;
+      if (options.readFails || (options.readFailsAfter !== undefined && matchReads > options.readFailsAfter)) {
+        throw new Error("ER_CON_COUNT_ERROR");
+      }
       const referee = reads.length > 1 ? reads.shift() : reads[0];
       return [[{ referee_user_id: referee ?? null }], []];
     }
@@ -437,6 +447,37 @@ describe("setManualAssignment — pose", () => {
       "REFEREE_CHANGED",
     );
     expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID, EVENT_ID + 1]);
+  });
+
+  it("setManualAssignment_carriedReadInTransaction_removedEventForFreshReferee", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: null })], members }));
+    routeSql({ matchReferee: null, inTransaction: 7 });
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(callsWith("INSERT INTO bg_planning_events")[0][1]).toEqual(["m:1", 7, "REFEREE", 10, 1, "REMOVED", "AUTO", 9]);
+  });
+
+  it("setManualAssignment_matchGotWantedMemberMeanwhile_carriedEventErased", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ matchReferee: 3, inTransaction: 7 });
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID]);
+  });
+
+  it("setManualAssignment_uncertainOutcome_carriedEventErasedOthersKept", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ matchReferee: 7, readFailsAfter: 1 });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("PUBLISH_FAILED"));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
+      "PUBLISH_FAILED",
+    );
+    expect(callsWith("INSERT IGNORE")).toEqual([]);
+    expect(callsWith("DELETE FROM bg_planning_events").map(([, params]) => params)).toEqual([[EVENT_ID]]);
   });
 
   it("setManualAssignment_matchWithoutReferee_noRemovedEvent", async () => {

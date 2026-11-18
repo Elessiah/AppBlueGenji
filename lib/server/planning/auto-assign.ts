@@ -478,6 +478,11 @@ type ConfirmStep = {
   settled: boolean;
   /** Refus venu de la lecture sans verrou (rôle, tournoi caché) : rejugé sous le verrou (`refuseLostRoles`). */
   byHolding?: boolean;
+  /**
+   * Le match portait déjà cet arbitre avant ce geste (posé depuis le match, ou par une confirmation
+   * interrompue) : ce geste ne l'a pas désigné, la réconciliation le confirme sans auteur.
+   */
+  onMatchBefore?: boolean;
 };
 
 /**
@@ -523,6 +528,11 @@ const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed 
   WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
     AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
 
+/** Retire une proposition d'arbitre de match refusée, **sauf** si le match porte cet arbitre (il fait foi). */
+const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
+  WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
+    AND NOT EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
+
 /** Une ligne d'arbitre confirmée que son match ne porte plus (arbitre changé ou retiré depuis le match). */
 const STALE_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
   WHERE a.role = 'REFEREE' AND a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)`;
@@ -544,7 +554,8 @@ const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m O
  * planning — confirmation sans auteur elle aussi : le site aligne le planning
  * sur le match, ce n'est pas qui lance ce calcul qui l'a désigné (une
  * confirmation joue cette réconciliation **après** ses propres lignes : ce
- * qu'elle vient de désigner s'inscrit à son compte) ; ses évènements s'écrivent d'abord, d'après la même lecture
+ * qu'elle vient de désigner s'inscrit à son compte, ce que le match portait
+ * avant elle se confirme ici, sans auteur) ; ses évènements s'écrivent d'abord, d'après la même lecture
  * verrouillante (`INSERT … SELECT`), puis les lignes se confirment. Jouée au
  * début de chaque calcul (même sur une fenêtre vide) et de chaque
  * confirmation, dans leur transaction : un calcul relancé ne les efface donc
@@ -584,15 +595,48 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
       await withPlanningLock(async (connection) => {
         const [rows] = await connection.execute<RowDataPacket[]>(PROPOSAL_STILL_PENDING_SQL, [step.entry.key, step.userId]);
         if (rows.length === 0) return;
+        // Le match a déjà cet arbitre : ce geste ne le désigne pas (ni compte, ni appel au match).
+        const [held] = await connection.execute<RowDataPacket[]>(MATCH_HAS_REFEREE_SQL, [matchId, step.userId]);
+        if (held.length > 0) {
+          step.onMatchBefore = true;
+          return;
+        }
         await assignMatchReferee(matchId, actorId, step.userId, null);
       });
     } catch (error) {
-      if (!isMatchRefereeRefusal(error)) return error;
+      if (!isMatchRefereeRefusal(error)) {
+        // Une panne après la validation : le match relu dit si ce geste l'a posé (alors écrit à son compte).
+        if (await matchHasReferee(matchId, step.userId)) step.settled = true;
+        return error;
+      }
       step.refused = true;
     }
     step.settled = true;
   }
   return undefined;
+}
+
+/**
+ * Un arbitre de match que ce geste n'a pas désigné (le match le portait déjà, ou refus de la lecture
+ * sans verrou levé sous le verrou) : la réconciliation le confirme si le match le porte, sans auteur.
+ */
+function leftToReconcile(step: ConfirmStep): boolean {
+  return isMatchReferee(step) && !step.refused && (step.onMatchBefore === true || step.byHolding === true);
+}
+
+/** Le match porte-t-il déjà cet arbitre ? */
+const MATCH_HAS_REFEREE_SQL = "SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ? LIMIT 1";
+
+/** Relit le match après une panne ; illisible : `false` (la réconciliation tranchera, sans auteur). */
+async function matchHasReferee(matchId: number, refereeId: number): Promise<boolean> {
+  try {
+    return await withConnection(async (connection) => {
+      const [rows] = await connection.execute<RowDataPacket[]>(MATCH_HAS_REFEREE_SQL, [matchId, refereeId]);
+      return rows.length > 0;
+    });
+  } catch {
+    return false;
+  }
 }
 
 /** La proposition d'arbitre de match lue au calcul existe-t-elle encore (ni retirée, ni confirmée) ? */
@@ -655,11 +699,16 @@ async function writeConfirmSteps(connection: PoolConnection, steps: readonly Con
   let refused = 0;
   for (const step of steps) {
     const { entry } = step;
+    if (leftToReconcile(step)) continue;
     if (step.refused) {
-      const [removed] = await connection.execute(
-        "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
-        [entry.key, step.userId, step.role],
-      );
+      // Un arbitre de match que le match porte (encore) ne se retire pas : le match fait foi, la
+      // réconciliation le confirme ; seul ce que le match ne porte pas est retiré au compte du geste.
+      const [removed] = isMatchReferee(step)
+        ? await connection.execute(REFUSE_MATCH_REFEREE_SQL, [entry.key, step.userId, entry.matchId, step.userId])
+        : await connection.execute(
+            "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
+            [entry.key, step.userId, step.role],
+          );
       if (affected(removed) === 0) continue;
       await writeEvent(connection, entry, step.userId, step.role, "REMOVED", "AUTO", actorId);
       refused += 1;

@@ -24,7 +24,7 @@ import {
   type PlanningData,
 } from "./load";
 import { entryAssignments } from "./model";
-import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "./planning-undo";
+import { readMatchReferee, settleFailedDesignation, snapshotGesture, undoPlanningBlock } from "./planning-undo";
 import { loadEntryPlayers, playersDuring } from "./players";
 import { writeSoloCaster } from "./profiles";
 
@@ -194,6 +194,8 @@ async function assignManually({ connection, actor, data, entry, input, current, 
               !Number(row.confirmed) &&
               releasedKeys.has(`${row.entry_key}|${row.role}`)),
         );
+  // L'évènement du retrait de l'arbitre que le match portait seul : effacé si ce n'est finalement pas ce geste qui l'a retiré.
+  let carriedEvent: number | undefined;
   const eventIds = await transact(connection, async () => {
     // Relu verrouillé, dans la transaction qui écrit : un rôle retiré ou un tournoi recaché entre-temps refuse le geste.
     const holds = await lockedHolding(connection, [{ userId: input.userId, entry }]);
@@ -222,24 +224,43 @@ async function assignManually({ connection, actor, data, entry, input, current, 
       ]);
       for (const row of displaced) ids.push(await writeEvent(connection, entry, Number(row.user_id), "REFEREE", "REMOVED", "AUTO", actor.id));
       // L'arbitre posé depuis le match seul (sans ligne au planning) que ce choix remplace : son retrait
-      // passe par le planning, il s'inscrit aussi (effacé avec le geste si le match le refuse).
-      const carried = entry.matchRefereeId;
+      // passe par le planning, il s'inscrit aussi (effacé avec le geste si le match le refuse). Le match
+      // est relu ici, pas d'après la lecture d'avant la transaction : un arbitre changé entre-temps depuis
+      // le match n'est pas mis au compte du staff (la désignation, qui attend l'ancien, est alors refusée).
+      const carried = await readMatchRefereeIn(connection, matchId);
       if (carried !== null && carried !== input.userId && !displaced.some((row) => Number(row.user_id) === carried)) {
-        ids.push(await writeEvent(connection, entry, carried, "REFEREE", "REMOVED", "AUTO", actor.id));
+        carriedEvent = await writeEvent(connection, entry, carried, "REFEREE", "REMOVED", "AUTO", actor.id);
+        ids.push(carriedEvent);
       }
     }
     ids.push(await writeAssignment(connection, entry, { userId: input.userId, role: input.role, source: "MANUAL", reason: "MANUAL" }, actor.id));
     return ids;
   });
   if (matchId === null || undo === undefined) return;
-  // Le match porte déjà ce membre : rien à lui demander (et une panne n'aurait rien à trancher).
-  if ((await readMatchReferee(matchId)) === input.userId) return;
+  // Le match porte déjà ce membre : rien à lui demander (et une panne n'aurait rien à trancher) ; s'il
+  // l'a reçu depuis le match après la transaction, ce geste n'a retiré personne du match.
+  if ((await readMatchReferee(matchId)) === input.userId) {
+    if (carriedEvent !== undefined) await undoPlanningBlock({ keys: [], rows: [] }, [carriedEvent]);
+    return;
+  }
   try {
     await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId);
   } catch (error) {
-    await settleFailedDesignation(error, matchId, input.userId, undo, eventIds);
+    const took = await settleFailedDesignation(error, matchId, input.userId, undo, eventIds);
+    // Issue incertaine : le match a pu garder son arbitre, l'historique ne dit pas qu'il l'a perdu.
+    if (took === undefined && carriedEvent !== undefined) await undoPlanningBlock({ keys: [], rows: [] }, [carriedEvent]);
     throw error;
   }
+}
+
+/** L'arbitre du match, lu dans la transaction du geste (lecture simple : aucun verrou de match sous celui du planning). */
+async function readMatchRefereeIn(connection: Executor, matchId: number): Promise<number | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { referee_user_id: number | null })[]>(
+    "SELECT m.referee_user_id FROM bg_matches m WHERE m.id = ?",
+    [matchId],
+  );
+  const value = rows[0]?.referee_user_id;
+  return value === null || value === undefined ? null : Number(value);
 }
 
 async function unassignManually({ connection, actor, entry, input, current, matchId }: ManualContext): Promise<void> {

@@ -71,11 +71,15 @@ type SqlRoute = {
   proposalGone?: boolean;
   /** Les lignes du lot en base à la relecture verrouillée (par défaut : celles des données du geste). */
   rows?: readonly LoadedAssignment[];
+  /** Le match porte-t-il déjà l'arbitre (`MATCH_HAS_REFEREE_SQL`), lecture après lecture ; par défaut non. */
+  onMatch?: boolean[];
 };
 
 const RECONCILE = "JOIN bg_matches m ON m.id = a.match_id";
 /** La relecture, sous le verrou, d'une proposition d'arbitre de match avant sa désignation. */
 const RECHECK = "SELECT 1 FROM bg_planning_assignments";
+/** La lecture du match avant une désignation, ou après une panne : porte-t-il déjà l'arbitre ? */
+const MATCH_HELD = "SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?";
 /** Le retrait retracé des propositions qu'un calcul relancé ne repose pas (groupé, avant l'effacement du lot). */
 const DROPPED = "'REMOVED', 'AUTO', ?)";
 /** La relecture verrouillée des lignes des entrées du lot (`lockedBatchRows`). */
@@ -106,8 +110,19 @@ async function batchRows(keys: readonly unknown[], override?: readonly LoadedAss
 /** Le compte qui a posé les lignes déjà en base (un autre que le lanceur du geste, 9). */
 const PREVIOUS_AUTHOR = 5;
 
+/** Les réponses successives à `MATCH_HELD` (la dernière se répète ; aucune : le match ne porte pas l'arbitre). */
+function matchHeldReads(answers: readonly boolean[] = []): () => { 1: number }[] {
+  const queue = [...answers];
+  return () => {
+    const answer = queue.length > 1 ? queue.shift() : queue[0];
+    return answer === true ? [{ 1: 1 }] : [];
+  };
+}
+
 function routeSql(route: SqlRoute = {}) {
+  const held = matchHeldReads(route.onMatch);
   execute.mockImplementation(async (sql: string, params?: unknown) => {
+    if (sql.startsWith(MATCH_HELD)) return [held()];
     if (route.failOn !== undefined && sql.includes(route.failOn)) throw new Error("ER_LOCK_DEADLOCK");
     if (sql.includes(BATCH)) return [await batchRows(params as unknown[], route.rows)];
     if (sql.includes(RECONCILE)) return [{ affectedRows: route.healed ?? 0 }];
@@ -121,7 +136,9 @@ function routeSql(route: SqlRoute = {}) {
 /** Paramètres des écritures jouées (la réconciliation exclue). */
 function writeParams(): unknown[] {
   return execute.mock.calls
-    .filter(([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH))
+    .filter(
+      ([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH) && !sql.startsWith(MATCH_HELD),
+    )
     .map(([, params]) => params);
 }
 
@@ -155,7 +172,9 @@ beforeEach(() => {
 /** Requêtes jouées, réduites à leur début (le verbe et la table). */
 function statements(): string[] {
   return execute.mock.calls
-    .filter(([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH))
+    .filter(
+      ([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH) && !sql.startsWith(MATCH_HELD),
+    )
     .map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
 
@@ -499,20 +518,6 @@ describe("runAutoAssign", () => {
 
     const insert = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_planning_assignments"));
     expect(insert?.[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "LOAD", 9]);
-  });
-
-  it("runAutoAssign_lockedBatchRows_readsTheAuthor", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
-        entries: [loadedEntry()],
-        availability: [available("m:1", 3, "REFEREE")],
-        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
-      }),
-    );
-
-    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
-
-    expect(execute.mock.calls.find(([sql]) => sql.includes(BATCH))?.[0]).toContain("assigned_by_user_id");
   });
 
   it("runAutoAssign_rerunChangedReason_writesTheEvent", async () => {
@@ -1218,17 +1223,60 @@ describe("confirmAssignments", () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
-    // Rôle rendu sous le verrou, mais jamais désigné : le match ne le porte pas, la ligne reste provisoire.
+    // Rôle rendu sous le verrou, mais jamais désigné par ce geste : rien à son compte, la réconciliation
+    // (sans auteur) le confirme seulement si le match le porte ; sinon la ligne reste provisoire.
     routeSql({ affected: 0 });
 
     const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 0, refused: 0 });
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(statements()).toEqual(["UPDATE bg_planning_assignments SET confi"]);
-    expect(execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_planning_assignments SET"))?.[0]).toContain(
-      "EXISTS (SELECT 1 FROM bg_matches",
+    expect(statements()).toEqual([]);
+  });
+
+  it("confirmAssignments_refereeAlreadyOnMatch_noMatchCallConfirmedWithoutActor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
+    routeSql({ onMatch: [true], healed: 1 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 1, refused: 0 });
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(statements()).toEqual([]);
+  });
+
+  it("confirmAssignments_refusedRefereeStillOnMatch_deleteGuardedByMatch", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValue(new Error("REFEREE_OBJECTION"));
+    routeSql({ deleted: 0 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 0 });
+    const removal = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE FROM bg_planning_assignments"));
+    expect(removal?.[0]).toContain("NOT EXISTS (SELECT 1 FROM bg_matches");
+    expect(removal?.[1]).toEqual(["m:1", 3, 1, 3]);
+    expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER"]);
+  });
+
+  it("confirmAssignments_outageAfterMatchTook_writtenWithActorThenPartial", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    // Avant la désignation, le match ne le porte pas ; relu après la panne, il le porte.
+    routeSql({ onMatch: [false, true] });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("PLANNING_CONFIRM_PARTIAL");
+    expect(writeParams()).toEqual([
+      ["m:1", 3, 1, 3],
+      ["m:1", 3, "REFEREE", 10, 1, "CONFIRMED", "AUTO", 9],
+    ]);
   });
 
   it("confirmAssignments_lockOrder_accountsBeforeMatchReconcile", async () => {

@@ -163,7 +163,8 @@ export async function undoPlanningBlock(undo: PlanningUndo, eventIds: readonly n
  * pas pris ; la garde si elle a pris (le planning dit vrai) ; consigne le
  * doute. Une ligne d'arbitre confirmée que le match ne porte pas, laissée par
  * ce doute, est retirée au prochain calcul ou à la prochaine confirmation
- * (`confirmPendingReferees`).
+ * (`confirmPendingReferees`). Rend ce qu'on sait de la désignation
+ * (`designationTookEffect`), pour que l'appelant ajuste ce qui en dépend.
  */
 export async function settleFailedDesignation(
   error: unknown,
@@ -171,12 +172,12 @@ export async function settleFailedDesignation(
   wanted: number | null,
   undo: PlanningUndo,
   eventIds: readonly number[],
-): Promise<void> {
+): Promise<boolean | undefined> {
   const took = await designationTookEffect(error, matchId, wanted);
-  if (took === true) return;
   if (took === undefined) {
     console.error(`[planning] désignation du match ${matchId} incertaine après une panne : planning gardé tel quel.`);
-    return;
+  } else if (!took) {
+    await undoPlanningBlock(undo, eventIds);
   }
-  await undoPlanningBlock(undo, eventIds);
+  return took;
 }
