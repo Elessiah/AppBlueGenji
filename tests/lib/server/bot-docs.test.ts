@@ -267,32 +267,18 @@ describe("renderMarkdown — blocs de /devdoc", () => {
   });
 
 
-  it("renderMarkdown_barsWithoutSeparator_staysParagraph", () => {
-    expect(renderMarkdown("| a |\nsuite")).toBe("<p>| a | suite</p>");
-  });
+  const blockCases: [name: string, source: string, html: string][] = [
+    ["renderMarkdown_barsWithoutSeparator_staysParagraph", "| a |\nsuite", "<p>| a | suite</p>"],
+    ["renderMarkdown_orderedList_rendersOl", "1. un\n2. deux", "<ol>\n<li>un</li>\n<li>deux</li>\n</ol>"],
+    ["renderMarkdown_orderedThenBullet_switchesList", "1. un\n- deux", "<ol>\n<li>un</li>\n</ol>\n<ul>\n<li>deux</li>\n</ul>"],
+    ["renderMarkdown_wrappedBulletLine_continuesItem", "- un\n  suite\n- deux", "<ul>\n<li>un suite</li>\n<li>deux</li>\n</ul>"],
+    ["renderMarkdown_textAfterBlankLine_closesList", "- un\n\nsuite", "<ul>\n<li>un</li>\n</ul>\n<p>suite</p>"],
+    ["renderMarkdown_blockquote_joinsLines", "> cité\n> suite", "<blockquote><p>cité suite</p></blockquote>"],
+    ["renderMarkdown_rule_rendersHr", "---", "<hr>"],
+  ];
 
-  it("renderMarkdown_orderedList_rendersOl", () => {
-    expect(renderMarkdown("1. un\n2. deux")).toBe("<ol>\n<li>un</li>\n<li>deux</li>\n</ol>");
-  });
-
-  it("renderMarkdown_orderedThenBullet_switchesList", () => {
-    expect(renderMarkdown("1. un\n- deux")).toBe("<ol>\n<li>un</li>\n</ol>\n<ul>\n<li>deux</li>\n</ul>");
-  });
-
-  it("renderMarkdown_wrappedBulletLine_continuesItem", () => {
-    expect(renderMarkdown("- un\n  suite\n- deux")).toBe("<ul>\n<li>un suite</li>\n<li>deux</li>\n</ul>");
-  });
-
-  it("renderMarkdown_textAfterBlankLine_closesList", () => {
-    expect(renderMarkdown("- un\n\nsuite")).toBe("<ul>\n<li>un</li>\n</ul>\n<p>suite</p>");
-  });
-
-  it("renderMarkdown_blockquote_joinsLines", () => {
-    expect(renderMarkdown("> cité\n> suite")).toBe("<blockquote><p>cité suite</p></blockquote>");
-  });
-
-  it("renderMarkdown_rule_rendersHr", () => {
-    expect(renderMarkdown("---")).toBe("<hr>");
+  it.each(blockCases)("%s", (_name, source, html) => {
+    expect(renderMarkdown(source)).toBe(html);
   });
 
   it("renderMarkdown_fenceWithLanguage_tagsBlock", () => {

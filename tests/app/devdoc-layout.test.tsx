@@ -1,7 +1,4 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 
 /**
  * Mise en page de `/devdoc` (`docs/features/DEVDOC.md`) : l'arborescence y vit,
@@ -15,39 +12,30 @@ jest.mock("@/lib/server/dev-docs", () => {
   const actual = jest.requireActual<typeof import("@/lib/server/dev-docs")>("@/lib/server/dev-docs");
   return { ...actual, loadDevDocIndex: jest.fn() };
 });
-jest.mock("next/navigation", () => ({
-  usePathname: () => mockPathname,
-  useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined, prefetch: () => undefined }),
-  notFound: () => {
-    throw new Error("NEXT_NOT_FOUND");
-  },
-}));
+jest.mock("next/navigation", () =>
+  jest.requireActual<typeof import("../helpers/devdoc-fixture")>("../helpers/devdoc-fixture").devDocNavigationMock(() => mockPathname),
+);
 
 import { renderToStaticMarkup } from "react-dom/server";
 import DevDocLayout from "@/app/(secured)/devdoc/layout";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { getCurrentUser } from "@/lib/server/auth";
-import { buildDevDocIndex, loadDevDocIndex, type DevDocIndex } from "@/lib/server/dev-docs";
+import { loadDevDocIndex, type DevDocIndex } from "@/lib/server/dev-docs";
+import { makeDevDocFixture, type DevDocFixture } from "../helpers/devdoc-fixture";
 import { authUser } from "../helpers/auth-user";
 
-let base: string;
+let fixture: DevDocFixture;
 let index: DevDocIndex;
 
 beforeAll(async () => {
-  base = await fs.mkdtemp(path.join(os.tmpdir(), "devdoc-layout-"));
-  const site = path.join(base, "site");
-  await fs.mkdir(path.join(site, "docs/features"), { recursive: true });
-  await fs.writeFile(path.join(site, "docs/features/INDEX.md"), "# Index des fonctionnalités\n");
-  await fs.writeFile(path.join(site, "docs/features/BUSY_BUTTONS.md"), "# Boutons occupés\n");
-  index = await buildDevDocIndex({
-    site: { root: site, dirs: ["docs"], files: [] },
-    bot: { root: path.join(base, "absent"), dirs: ["doc"], files: [] },
+  fixture = await makeDevDocFixture("devdoc-layout-", {
+    "docs/features/INDEX.md": "# Index des fonctionnalités\n",
+    "docs/features/BUSY_BUTTONS.md": "# Boutons occupés\n",
   });
+  index = fixture.index;
 });
 
-afterAll(async () => {
-  await fs.rm(base, { recursive: true, force: true });
-});
+afterAll(() => fixture.cleanup());
 
 beforeEach(() => {
   mockLocale = "fr";

@@ -75,40 +75,20 @@ describe("parseDevDocParams", () => {
     expect(parseDevDocParams(["bot", "doc", "a%20b"])).toEqual({ repo: "bot", slug: "doc/a b" });
   });
 
-  it("parseDevDocParams_unknownRepo_returnsNull", () => {
-    expect(parseDevDocParams(["secret", "x"])).toBeNull();
-  });
+  const refused: [name: string, segments: string[]][] = [
+    ["parseDevDocParams_unknownRepo_returnsNull", ["secret", "x"]],
+    ["parseDevDocParams_repoOnly_returnsNull", ["site"]],
+    ["parseDevDocParams_parentSegment_returnsNull", ["site", "..", "..", ".env"]],
+    ["parseDevDocParams_dotSegment_returnsNull", ["site", ".", "INDEX"]],
+    ["parseDevDocParams_encodedSlash_returnsNull", ["site", "..%2F..%2F.env"]],
+    ["parseDevDocParams_backslash_returnsNull", ["site", "..\\..\\.env"]],
+    ["parseDevDocParams_nulCharacter_returnsNull", ["site", "INDEX%00"]],
+    ["parseDevDocParams_badEncoding_returnsNull", ["site", "%E0%A4%A"]],
+    ["parseDevDocParams_emptySegment_returnsNull", ["site", ""]],
+  ];
 
-  it("parseDevDocParams_repoOnly_returnsNull", () => {
-    expect(parseDevDocParams(["site"])).toBeNull();
-  });
-
-  it("parseDevDocParams_parentSegment_returnsNull", () => {
-    expect(parseDevDocParams(["site", "..", "..", ".env"])).toBeNull();
-  });
-
-  it("parseDevDocParams_dotSegment_returnsNull", () => {
-    expect(parseDevDocParams(["site", ".", "INDEX"])).toBeNull();
-  });
-
-  it("parseDevDocParams_encodedSlash_returnsNull", () => {
-    expect(parseDevDocParams(["site", "..%2F..%2F.env"])).toBeNull();
-  });
-
-  it("parseDevDocParams_backslash_returnsNull", () => {
-    expect(parseDevDocParams(["site", "..\\..\\.env"])).toBeNull();
-  });
-
-  it("parseDevDocParams_nulCharacter_returnsNull", () => {
-    expect(parseDevDocParams(["site", "INDEX%00"])).toBeNull();
-  });
-
-  it("parseDevDocParams_badEncoding_returnsNull", () => {
-    expect(parseDevDocParams(["site", "%E0%A4%A"])).toBeNull();
-  });
-
-  it("parseDevDocParams_emptySegment_returnsNull", () => {
-    expect(parseDevDocParams(["site", ""])).toBeNull();
+  it.each(refused)("%s", (_name, segments) => {
+    expect(parseDevDocParams(segments)).toBeNull();
   });
 });
 

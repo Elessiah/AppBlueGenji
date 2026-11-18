@@ -38,35 +38,19 @@ describe("splitLocalePrefix — langue lue dans le chemin", () => {
   });
 });
 
-describe("isMigratedRoute — liste blanche", () => {
-  it("accepte les routes listées, segments dynamiques compris, barre finale tolérée", () => {
-    expect(isMigratedRoute("/")).toBe(true);
-    expect(isMigratedRoute("/regles")).toBe(true);
-    expect(isMigratedRoute("/regles/")).toBe(true);
-    expect(isMigratedRoute("/regles/swiss")).toBe(true);
-    expect(isMigratedRoute("/equipes/12")).toBe(true);
+describe("isMigratedRoute — liste blanche et segment attrape-tout [...x]", () => {
+  // Routes listées, segments dynamiques compris, barre finale tolérée ; la
+  // racine et une ou plusieurs parties sous /devdoc.
+  const accepted: string[] = ["/", "/regles", "/regles/", "/regles/swiss", "/equipes/12", "/devdoc", "/devdoc/", "/devdoc/site/INDEX", "/devdoc/site/features/BUSY_BUTTONS"];
+  // Le reste, un segment dynamique vide ou en trop, une tête différente, une partie vide.
+  const refused: string[] = ["/classement", "/regles/swiss/x", "/equipes/", "/equipes", "/devdocs", "/devdoc//x", "/x/devdoc/site"];
+
+  it.each(accepted)("accepte %s", (route) => {
+    expect(isMigratedRoute(route)).toBe(true);
   });
 
-  it("refuse le reste, et un segment dynamique vide ou en trop", () => {
-    expect(isMigratedRoute("/classement")).toBe(false);
-    expect(isMigratedRoute("/regles/swiss/x")).toBe(false);
-    expect(isMigratedRoute("/equipes/")).toBe(false);
-    expect(isMigratedRoute("/equipes")).toBe(false);
-  });
-});
-
-describe("isMigratedRoute — segment attrape-tout [...x]", () => {
-  it("accepte la racine et une ou plusieurs parties sous /devdoc", () => {
-    expect(isMigratedRoute("/devdoc")).toBe(true);
-    expect(isMigratedRoute("/devdoc/")).toBe(true);
-    expect(isMigratedRoute("/devdoc/site/INDEX")).toBe(true);
-    expect(isMigratedRoute("/devdoc/site/features/BUSY_BUTTONS")).toBe(true);
-  });
-
-  it("refuse une tête différente et une partie vide", () => {
-    expect(isMigratedRoute("/devdocs")).toBe(false);
-    expect(isMigratedRoute("/devdoc//x")).toBe(false);
-    expect(isMigratedRoute("/x/devdoc/site")).toBe(false);
+  it.each(refused)("refuse %s", (route) => {
+    expect(isMigratedRoute(route)).toBe(false);
   });
 });
 
