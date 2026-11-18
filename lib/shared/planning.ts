@@ -132,15 +132,58 @@ export function planningCoverage(input: CoverageInput): Coverage {
   };
 }
 
-/** Début de la semaine (lundi 00:00 UTC) qui contient `at` : la clé de charge hebdomadaire. */
+/** Fuseau des semaines du planning : celui de l'organisation et de la page. */
+export const PLANNING_TIME_ZONE = "Europe/Paris";
+
+const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+
+const PARIS_CLOCK = new Intl.DateTimeFormat("en-GB", {
+  timeZone: PLANNING_TIME_ZONE,
+  hourCycle: "h23",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+});
+
+/** L'heure de Paris d'un instant, écrite comme si c'était de l'UTC (ms, à la seconde). */
+function parisWallClock(at: number): number {
+  const parts: Record<string, number> = {};
+  for (const part of PARIS_CLOCK.formatToParts(new Date(at))) {
+    if (part.type !== "literal") parts[part.type] = Number(part.value);
+  }
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+/** Instant de minuit, à Paris, du jour calendaire `wallDate` (son minuit UTC). */
+function parisMidnight(wallDate: number): number {
+  // Minuit n'est jamais dans une heure avalée ou doublée en France (2 h / 3 h) :
+  // le décalage de midi du même jour est le bon.
+  const noon = wallDate + HALF_DAY_MS;
+  return wallDate - (parisWallClock(noon) - noon);
+}
+
+/**
+ * Début de la semaine (lundi 00:00, **heure de Paris**) qui contient `at` :
+ * la clé de charge hebdomadaire, du lot « semaine » et du regroupement de la
+ * page. Une semaine dure 7 j ± 1 h autour d'un changement d'heure.
+ */
 export function planningWeekStart(at: number): number {
-  const day = new Date(at);
-  const midnight = Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate());
-  const weekday = (day.getUTCDay() + 6) % 7; // lundi = 0
-  return midnight - weekday * DAY_MS;
+  const wall = parisWallClock(at);
+  const date = wall - (((wall % DAY_MS) + DAY_MS) % DAY_MS);
+  const weekday = (new Date(date).getUTCDay() + 6) % 7; // lundi = 0
+  return parisMidnight(date - weekday * DAY_MS);
+}
+
+/** Début de la semaine qui suit celle qui commence à `weekStart` (lundi suivant, 00:00 à Paris). */
+export function planningNextWeekStart(weekStart: number): number {
+  return planningWeekStart(weekStart + WEEK_MS + HALF_DAY_MS);
 }
 
 /** Début de la période d'équité : les {@link PLANNING_HISTORY_WEEKS} semaines qui précèdent celle de `now`. */
 export function planningHistoryStart(now: number): number {
-  return planningWeekStart(now) - PLANNING_HISTORY_WEEKS * WEEK_MS;
+  // Relu en semaine depuis un lundi midi : insensible aux changements d'heure.
+  return planningWeekStart(planningWeekStart(now) - PLANNING_HISTORY_WEEKS * WEEK_MS + HALF_DAY_MS);
 }

@@ -10,7 +10,7 @@ import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
-import { loadMatchPlayerIds } from "@/lib/server/tournaments/match-players";
+import { transact } from "@/lib/server/tournaments/transaction";
 import { PLANNING_EVENT_REFEREES, PLANNING_ROLES, type PlanningRole } from "@/lib/shared/planning";
 import {
   exclusionKey,
@@ -21,6 +21,7 @@ import {
 import type { AutoAssignReport, ConfirmReport } from "@/lib/shared/planning-view";
 import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type PlanningData } from "./load";
 import { entryAssignments } from "./model";
+import { loadEntryPlayers, playersDuring } from "./players";
 
 /** Verrou nommé de tous les gestes d'écriture du planning (calcul, confirmation, désignation). */
 export const PLANNING_LOCK = "bg_planning";
@@ -40,9 +41,11 @@ export async function withPlanningLock<T>(run: (connection: PoolConnection) => P
 export type PlanningWindow = { from: number; to: number };
 
 /**
- * Les refus du calcul : un joueur du match ne le couvre dans aucun rôle ; un
- * arbitre qui ne remplit pas la condition d'arbitrage du jeu n'arbitre pas ;
- * un membre retiré **à la main** d'un rôle d'une entrée n'y est pas replacé.
+ * Les refus du calcul : qui joue pendant une entrée — dans ce match, dans le
+ * tournoi entier d'une entrée « tournoi », ou dans une entrée qui la
+ * chevauche — ne la couvre dans aucun rôle ; un arbitre qui ne remplit pas la
+ * condition d'arbitrage du jeu n'arbitre pas ; un membre retiré **à la main**
+ * d'un rôle d'une entrée n'y est pas replacé.
  */
 export async function loadExclusions(
   executor: Executor,
@@ -50,20 +53,21 @@ export async function loadExclusions(
   entries: readonly LoadedEntry[],
 ): Promise<Set<string>> {
   const excluded = new Set<string>();
-  await excludeMatchPlayers(executor, entries, excluded);
+  await excludePlayers(executor, data, entries, excluded);
   await excludeIneligibleReferees(executor, data, entries, excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
   return excluded;
 }
 
-async function excludeMatchPlayers(executor: Executor, entries: readonly LoadedEntry[], excluded: Set<string>): Promise<void> {
+async function excludePlayers(
+  executor: Executor,
+  data: PlanningData,
+  entries: readonly LoadedEntry[],
+  excluded: Set<string>,
+): Promise<void> {
+  const players = await loadEntryPlayers(executor, data.entries);
   for (const entry of entries) {
-    if (entry.matchId === null) continue;
-    const players = await loadMatchPlayerIds(executor, {
-      team1_id: entry.team1?.teamId ?? null,
-      team2_id: entry.team2?.teamId ?? null,
-    });
-    for (const userId of players) {
+    for (const userId of playersDuring(entry, data.entries, players)) {
       for (const role of PLANNING_ROLES) excluded.add(exclusionKey(entry.key, userId, role));
     }
   }
@@ -172,7 +176,11 @@ function affected(result: unknown): number {
  * Lance un lot : les propositions provisoires des entrées ouvertes de la
  * fenêtre sont effacées, puis recalculées ensemble autour de tout ce qui est
  * verrouillé. Relancer le même lot sur les mêmes données rend le même
- * planning (calcul déterministe).
+ * planning (calcul déterministe). L'équité se lit jusqu'à la semaine **du
+ * lot** (`loadPlanningHistory`), pas jusqu'à celle d'aujourd'hui. Le calcul
+ * se fait d'abord ; l'effacement et les nouvelles propositions s'écrivent
+ * ensuite d'un bloc (une transaction) : un échec en route ne laisse pas un
+ * lot à moitié effacé.
  */
 export async function runAutoAssign(
   actorId: number,
@@ -183,24 +191,26 @@ export async function runAutoAssign(
     const data = await loadPlanningData(connection, { now, includeHidden: true });
     const batch = batchEntries(data, window);
     if (batch.length === 0) return { entries: 0, proposed: 0, replaced: 0 };
-    const history = await loadPlanningHistory(connection, now);
+    const history = await loadPlanningHistory(connection, Math.max(now, window.from));
     const excluded = await loadExclusions(connection, data, batch);
-    const input = preparePlanner(data, batch, history, excluded);
+    const planned = planAssignments(preparePlanner(data, batch, history, excluded));
     const keys = batch.map((entry) => entry.key);
-    const [cleared] = await connection.execute(
-      `DELETE FROM bg_planning_assignments
-        WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
-      keys,
-    );
     const byKey = new Map(batch.map((entry) => [entry.key, entry]));
-    let proposed = 0;
-    for (const planned of planAssignments(input)) {
-      const entry = byKey.get(planned.entryKey);
-      if (!entry) continue;
-      await writeAssignment(connection, entry, { userId: planned.userId, role: planned.role, reason: planned.reason, source: "AUTO" }, actorId);
-      proposed += 1;
-    }
-    return { entries: batch.length, proposed, replaced: affected(cleared) };
+    return transact(connection, async () => {
+      const [cleared] = await connection.execute(
+        `DELETE FROM bg_planning_assignments
+          WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
+        keys,
+      );
+      let proposed = 0;
+      for (const row of planned) {
+        const entry = byKey.get(row.entryKey);
+        if (!entry) continue;
+        await writeAssignment(connection, entry, { userId: row.userId, role: row.role, reason: row.reason, source: "AUTO" }, actorId);
+        proposed += 1;
+      }
+      return { entries: batch.length, proposed, replaced: affected(cleared) };
+    });
   });
 }
 
@@ -215,11 +225,61 @@ export function entriesToConfirm(data: Pick<PlanningData, "entries">, scope: Con
 }
 
 /**
+ * Refus **métier** de la désignation d'un arbitre de match
+ * (`assignMatchReferee`) : la proposition ne peut pas tenir, elle est
+ * retirée. Toute autre erreur (base, interblocage) est une panne : le geste
+ * échoue et se relance, sans rien retirer.
+ */
+export const MATCH_REFEREE_REFUSALS: ReadonlySet<string> = new Set([
+  "MATCH_NOT_FOUND",
+  "MATCH_ALREADY_COMPLETED",
+  "MATCH_NOT_LAUNCHABLE",
+  "NOT_REFEREE",
+  "REFEREE_IDENTITY_REQUIRED",
+  "REFEREE_DISCORD_REQUIRED",
+  "REFEREE_OBJECTION",
+  "REFEREE_IS_PLAYER",
+  "REFEREE_CHANGED",
+]);
+
+export function isMatchRefereeRefusal(error: unknown): boolean {
+  return error instanceof Error && MATCH_REFEREE_REFUSALS.has(error.message);
+}
+
+/** Une proposition à confirmer, et ce qu'il en advient. */
+type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; refused: boolean };
+
+/**
+ * Les propositions provisoires des entrées retenues. S'y ajoute, pour un
+ * match, la proposition d'arbitre restée provisoire alors que le match a déjà
+ * cet arbitre (confirmation interrompue par une panne) : elle se confirme
+ * sans rien redemander au match.
+ */
+function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
+  const steps: ConfirmStep[] = [];
+  for (const entry of entriesToConfirm(data, scope)) {
+    for (const row of entryAssignments(entry, data).filter((candidate) => candidate.provisional)) {
+      steps.push({ entry, userId: row.userId, role: row.role, refused: false });
+    }
+    const pending = data.assignments.find(
+      (row) =>
+        row.entryKey === entry.key && row.role === "REFEREE" && !row.confirmed && row.userId === entry.matchRefereeId,
+    );
+    if (entry.kind === "MATCH" && pending) steps.push({ entry, userId: pending.userId, role: "REFEREE", refused: false });
+  }
+  return steps;
+}
+
+/**
  * Confirme des propositions provisoires. Les autres restent provisoires, et
  * les lots suivants se calculent **autour** des confirmées. Un arbitre de
- * match est alors posé sur le match (`assignMatchReferee`, sans rien
+ * match est d'abord posé sur le match (`assignMatchReferee`, sans rien
  * remplacer) ; un refus du match (arbitre posé entre-temps, condition
- * d'arbitrage, joueur du match) retire la proposition.
+ * d'arbitrage, joueur du match) retire la proposition, une panne fait
+ * échouer le geste sans rien retirer. Les lignes du planning s'écrivent
+ * ensuite d'un bloc (une transaction, ouverte **après** les désignations :
+ * elle ne retient aucun match qu'une désignation attendrait) ; relancer le
+ * geste retrouve les arbitres déjà posés.
  */
 export async function confirmAssignments(
   actorId: number,
@@ -228,31 +288,36 @@ export async function confirmAssignments(
 ): Promise<ConfirmReport> {
   return withPlanningLock(async (connection) => {
     const data = await loadPlanningData(connection, { now, includeHidden: true });
-    let confirmed = 0;
-    let refused = 0;
-    for (const entry of entriesToConfirm(data, scope)) {
-      for (const row of entryAssignments(entry, data).filter((candidate) => candidate.provisional)) {
-        if (entry.kind === "MATCH" && row.role === "REFEREE" && entry.matchId !== null) {
-          try {
-            await assignMatchReferee(entry.matchId, actorId, row.userId, null);
-          } catch {
-            await connection.execute(
-              "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
-              [entry.key, row.userId],
-            );
-            await writeEvent(connection, entry, row.userId, row.role, "REMOVED", "AUTO", actorId);
-            refused += 1;
-            continue;
-          }
+    const steps = confirmSteps(data, scope);
+    for (const step of steps) {
+      const { entry } = step;
+      if (entry.kind !== "MATCH" || step.role !== "REFEREE" || entry.matchId === null) continue;
+      if (entry.matchRefereeId === step.userId) continue;
+      try {
+        await assignMatchReferee(entry.matchId, actorId, step.userId, null);
+      } catch (error) {
+        if (!isMatchRefereeRefusal(error)) throw error;
+        step.refused = true;
+      }
+    }
+    return transact(connection, async () => {
+      for (const step of steps) {
+        if (step.refused) {
+          await connection.execute(
+            "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
+            [step.entry.key, step.userId],
+          );
+          await writeEvent(connection, step.entry, step.userId, step.role, "REMOVED", "AUTO", actorId);
+          continue;
         }
         await connection.execute(
           "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ?",
-          [entry.key, row.userId, row.role],
+          [step.entry.key, step.userId, step.role],
         );
-        await writeEvent(connection, entry, row.userId, row.role, "CONFIRMED", "AUTO", actorId);
-        confirmed += 1;
+        await writeEvent(connection, step.entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
       }
-    }
-    return { confirmed, refused };
+      const refused = steps.filter((step) => step.refused).length;
+      return { confirmed: steps.length - refused, refused };
+    });
   });
 }

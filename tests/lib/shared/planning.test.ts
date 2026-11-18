@@ -4,6 +4,7 @@ import {
   planningCoverage,
   planningEntryKey,
   planningHistoryStart,
+  planningNextWeekStart,
   planningRolesOf,
   planningWeekStart,
 } from "@/lib/shared/planning";
@@ -133,6 +134,28 @@ describe("planningWeekStart / planningHistoryStart", () => {
   });
 
   it("planningHistoryStart_returnsEightWeeksBeforeWeekStart", () => {
-    expect(planningHistoryStart(MONDAY + DAY_MS)).toBe(MONDAY - 8 * 7 * DAY_MS);
+    // Huit lundis plus tôt : le 28 septembre 2026, minuit à Paris (heure d'été, 22:00 UTC la veille).
+    expect(planningHistoryStart(MONDAY + DAY_MS)).toBe(Date.UTC(2026, 8, 27, 22));
+  });
+
+  it("planningWeekStart_mondayEarlyParisTime_sameWeekNotPrevious", () => {
+    // Lundi 00:30 à Paris = dimanche 23:30 UTC : déjà la semaine du lundi.
+    expect(planningWeekStart(MONDAY + 30 * 60 * 1000)).toBe(MONDAY);
+  });
+
+  it("planningWeekStart_sundayLateParisTime_previousWeek", () => {
+    expect(planningWeekStart(MONDAY - 30 * 60 * 1000)).toBe(planningWeekStart(MONDAY - 3 * DAY_MS));
+    expect(planningWeekStart(MONDAY - 30 * 60 * 1000)).toBe(MONDAY - 7 * DAY_MS);
+  });
+
+  it("planningWeekStart_summerTime_mondayMidnightParis", () => {
+    // Mercredi 1er juillet 2026 12:00 UTC → lundi 29 juin, minuit à Paris (22:00 UTC le 28).
+    expect(planningWeekStart(Date.UTC(2026, 6, 1, 12))).toBe(Date.UTC(2026, 5, 28, 22));
+  });
+
+  it("planningNextWeekStart_acrossDstChange_nextParisMonday", () => {
+    const summerMonday = Date.UTC(2026, 9, 18, 22);
+    expect(planningNextWeekStart(summerMonday)).toBe(Date.UTC(2026, 9, 25, 23));
+    expect(planningNextWeekStart(MONDAY)).toBe(MONDAY + 7 * DAY_MS);
   });
 });

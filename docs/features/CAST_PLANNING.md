@@ -51,16 +51,31 @@ compte les **rôles**, pas les personnes.
 - **Par lot** sur une fenêtre (une semaine depuis la page, `PLANNING_BATCH_MAX_DAYS`
   = 31 au plus), relançable : il efface les seules propositions provisoires
   du lot et recalcule l'ensemble (construction la plus contrainte d'abord, puis
-  amélioration globale jusqu'à stabilité).
+  amélioration globale jusqu'à stabilité : remplacement d'une proposition par
+  un autre candidat, et **échange** de deux membres d'un même rôle quand l'un
+  préfère l'entrée de l'autre — sort des impasses de deux entrées qui se
+  chevauchent). Chaque essai se juge sur la seule partie du planning qu'il
+  touche (état indexé) : un lot de 31 jours se calcule en une fraction de
+  seconde. Le calcul se fait d'abord, puis l'effacement et les nouvelles
+  propositions s'écrivent dans **une transaction** (jamais un lot à moitié
+  effacé).
+- **Semaines** : lundi 00:00 **heure de Paris** (`planningWeekStart`,
+  `PLANNING_TIME_ZONE`) — charge hebdomadaire, bouton « calculer la semaine »
+  (`[lundi, lundi suivant[`, 7 j ± 1 h au changement d'heure) et regroupement
+  de la page.
 - Garde tel quel ce qui est **verrouillé** : choix manuels, propositions
   confirmées, caster inscrit sur le match (`CAST`), arbitre désigné du match
   (`MATCH`) ; respecte l'autogestion décidée par le staff et les retraits
-  manuels (jamais reproposé), écarte les joueurs du match et les arbitres qui
-  ne remplissent pas les conditions de `MATCH_REFEREE.md`.
+  manuels (jamais reproposé), écarte qui **joue** pendant l'entrée — joueurs
+  du match, engagés du tournoi pour l'entrée d'un tournoi entier, joueurs de
+  toute entrée qui la chevauche (`players.ts`, deux lectures pour tout le
+  lot) — et les arbitres qui ne remplissent pas les conditions de
+  `MATCH_REFEREE.md`.
 - Ordre : préférence (« je veux ce créneau »), puis charge la plus faible
-  (semaine de l'entrée, puis `PLANNING_HISTORY_WEEKS` = 8 semaines d'historique,
-  confirmées ou manuelles seulement), puis id. Arbitres d'abord sur les entrées
-  diffusées.
+  (semaine de l'entrée, puis `PLANNING_HISTORY_WEEKS` = 8 semaines d'historique
+  **avant la semaine du lot** — un lot calculé à l'avance compte aussi le
+  travail déjà tenu des semaines intermédiaires —, confirmées ou manuelles
+  seulement), puis id. Arbitres d'abord sur les entrées diffusées.
 - **Plusieurs casquettes** : une personne répond rôle par rôle ; le calcul
   préfère des personnes distinctes, et ne cumule arbitre + caster ou
   arbitre + prod qu'en dernier recours — jamais caster + prod.
@@ -77,11 +92,19 @@ compte les **rôles**, pas les personnes.
   comme tel, rien n'est encore posé sur le match.
 - **Confirmer** un sous-ensemble : des entrées nommées, ou tout ce qui commence
   avant un délai (heures). Une proposition d'arbitre confirmée est posée sur le
-  match par `assignMatchReferee` ; refusée (conditions changées), la ligne est
-  retirée et comptée. Les lignes confirmées deviennent des contraintes fixes
-  pour les calculs suivants.
+  match par `assignMatchReferee` ; seul un **refus métier** (conditions
+  changées, arbitre posé entre-temps) retire la ligne et la compte — une panne
+  (base, interblocage) fait échouer le geste sans rien retirer, et le relancer
+  confirme l'arbitre déjà posé. Les désignations passent d'abord, les lignes
+  du planning s'écrivent ensuite en une transaction. Les lignes confirmées
+  deviennent des contraintes fixes pour les calculs suivants.
 - Un choix du staff (`source = MANUAL`) naît confirmé et verrouillé ; un retrait
-  manuel est mémorisé pour que le calcul ne repropose pas la personne.
+  manuel est mémorisé pour que le calcul ne repropose pas la personne. Le
+  choix est refusé si la personne joue pendant l'entrée (`PLANNING_IS_PLAYER`)
+  ou tient déjà une attribution confirmée sur une entrée qui la chevauche
+  (`PLANNING_OVERLAP`) ; une simple proposition provisoire qui chevauche lui
+  cède la place. Lignes du planning en une transaction ; si elle échoue après
+  la désignation sur le match, l'arbitre d'avant y est remis.
 - Un geste à la fois : verrou nommé `bg_planning` (10 s) → `PLANNING_BUSY`.
 
 ## Données (`lib/server/database/schema/planning.ts`)

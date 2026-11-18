@@ -328,6 +328,104 @@ describe("planAssignments — tournoi entier et chevauchement", () => {
   });
 });
 
+describe("planAssignments — amélioration globale", () => {
+  it("planAssignments_overlappingEntriesCrossedPreferences_swapServesBoth", () => {
+    // 1 veut A et B, 2 ne veut que A : la construction donne A à 1 (identifiant le
+    // plus bas), B à 2 ; aucun remplacement seul ne passe (chevauchement), l'échange oui.
+    const input = plannerInput({
+      entries: [plannerEntry("m:a", 20, { endAt: MONDAY + 22 * HOUR_MS }), plannerEntry("m:b", 21)],
+      availability: [
+        available("m:a", 1, "REFEREE", { preferred: true }),
+        available("m:b", 1, "REFEREE", { preferred: true }),
+        available("m:a", 2, "REFEREE", { preferred: true }),
+        available("m:b", 2, "REFEREE"),
+      ],
+      members: new Map([
+        [1, REFEREE],
+        [2, REFEREE],
+      ]),
+    });
+
+    const result = planAssignments(input);
+
+    expect(result.map(({ entryKey, userId, reason }) => ({ entryKey, userId, reason }))).toEqual([
+      { entryKey: "m:a", userId: 2, reason: "PREFERENCE" },
+      { entryKey: "m:b", userId: 1, reason: "PREFERENCE" },
+    ]);
+  });
+
+  it("planAssignments_swapWouldDropStream_notSwapped", () => {
+    // B d'abord (20 h) : seul 1 (autonome) le diffuse ; A (21 h, chevauche B) va à 2,
+    // pas autonome, avec le prod 3. 2 préfère B, mais l'échange laisserait B sans
+    // diffusion (2 sans prod) : refusé.
+    const input = plannerInput({
+      entries: [plannerEntry("m:b", 20, { endAt: MONDAY + 22 * HOUR_MS }), plannerEntry("m:a", 21)],
+      availability: [
+        available("m:a", 1, "CASTER"),
+        available("m:b", 1, "CASTER"),
+        available("m:a", 2, "CASTER"),
+        available("m:b", 2, "CASTER", { preferred: true }),
+        available("m:a", 3, "PROD"),
+      ],
+      members: new Map<number, PlanningRole[]>([
+        [1, CASTER],
+        [2, CASTER],
+        [3, PROD],
+      ]),
+      soloCasterIds: new Set([1]),
+    });
+
+    const result = picks(planAssignments(input));
+
+    expect(result).toEqual([
+      { entryKey: "m:b", userId: 1, role: "CASTER" },
+      { entryKey: "m:a", userId: 2, role: "CASTER" },
+      { entryKey: "m:a", userId: 3, role: "PROD" },
+    ]);
+  });
+
+  it("planAssignments_monthBatch120Entries_completesQuickly", () => {
+    const entries = Array.from({ length: 120 }, (_, i) =>
+      plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
+        endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
+      }),
+    );
+    const roles: PlanningRole[][] = [REFEREE, CASTER, PROD, ["REFEREE", "CASTER"], ["CASTER", "PROD"]];
+    const members = new Map<number, PlanningRole[]>(Array.from({ length: 25 }, (_, u) => [u + 1, roles[u % roles.length]]));
+    const availability = entries.flatMap((entry, i) =>
+      [...members].flatMap(([userId, held]) =>
+        (i + userId) % 3 === 0
+          ? []
+          : held.map((role) => available(entry.key, userId, role, { preferred: (i * 7 + userId) % 11 === 0 })),
+      ),
+    );
+    const input = plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) });
+
+    const started = performance.now();
+    const result = planAssignments(input);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(1500);
+    expect(result.length).toBeGreaterThan(120);
+  });
+
+  it("planAssignments_mondayEarlyParisTime_sameWeekAsMondayEvening", () => {
+    // Lundi 00:30 et lundi 20:00 à Paris : même semaine, la charge les cumule.
+    const input = plannerInput({
+      entries: [
+        { key: "m:early", startAt: MONDAY + HOUR_MS / 2, endAt: MONDAY + HOUR_MS, open: true },
+        plannerEntry("m:late", 20),
+      ],
+      availability: [available("m:early", 1, "REFEREE"), available("m:late", 1, "REFEREE")],
+      members: new Map([[1, REFEREE]]),
+    });
+
+    const result = planAssignments(input);
+
+    expect(result.map((row) => row.weekLoad)).toEqual([2, 2]);
+  });
+});
+
 describe("planAssignments — déterminisme", () => {
   const entries = [plannerEntry("m:1", 20), plannerEntry("m:2", 20), plannerEntry("m:3", 22)];
   const availability = [

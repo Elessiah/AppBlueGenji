@@ -390,14 +390,17 @@ export async function loadPlanningData(
 type HistoryRow = RowDataPacket & { user_id: number; jobs: number };
 
 /**
- * Charge des semaines précédentes (équité) : attributions du planning,
- * arbitres désignés et casters inscrits sur les entrées commencées entre
- * {@link planningHistoryStart} et le début de la semaine de `now` : seul le
- * travail tenu pèse (une attribution retirée, ou restée provisoire, n'y compte pas).
+ * Charge des semaines qui précèdent celle du lot (équité) : attributions du
+ * planning, arbitres désignés et casters inscrits sur les entrées commencées
+ * entre {@link planningHistoryStart} et le début de la semaine de `weekOf`
+ * (un instant de la semaine du lot). Un lot calculé à l'avance compte donc
+ * aussi le travail déjà tenu des semaines qui le séparent d'aujourd'hui. Seul
+ * le travail tenu pèse (une attribution retirée, ou restée provisoire, n'y
+ * compte pas).
  */
-export async function loadPlanningHistory(executor: Executor, now: number): Promise<Map<number, number>> {
-  const from = new Date(planningHistoryStart(now));
-  const to = new Date(planningWeekStart(now));
+export async function loadPlanningHistory(executor: Executor, weekOf: number): Promise<Map<number, number>> {
+  const from = new Date(planningHistoryStart(weekOf));
+  const to = new Date(planningWeekStart(weekOf));
   const [rows] = await executor.execute<HistoryRow[]>(
     `SELECT user_id, COUNT(*) AS jobs FROM (
        SELECT a.user_id FROM bg_planning_assignments a

@@ -11,7 +11,10 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningHistory: jest.fn(),
 }));
 jest.mock("@/lib/server/tournaments/match-launch");
-jest.mock("@/lib/server/tournaments/match-players");
+jest.mock("@/lib/server/planning/players", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
+  loadEntryPlayers: jest.fn(),
+}));
 jest.mock("@/lib/server/tournaments/cast-eligibility");
 
 import type { PoolConnection } from "mysql2/promise";
@@ -26,28 +29,33 @@ import {
   withPlanningLock,
 } from "@/lib/server/planning/auto-assign";
 import { loadPlanningData, loadPlanningHistory } from "@/lib/server/planning/load";
+import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
-import { loadMatchPlayerIds } from "@/lib/server/tournaments/match-players";
+
 import { available, HOUR_MS, loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
-import { fakeConnection, fakePool, type SqlQuery } from "../../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool } from "../../../helpers/sql-double";
 
 /**
  * Calcul par lot et confirmation (`CAST_PLANNING.md` § Calcul, § Provisoire,
  * confirmé, manuel) : base simulée, verrou toujours obtenu.
  */
 
-const execute = jest.fn<SqlQuery>();
+const connection = connectionMock();
+const { execute } = connection;
 
 beforeEach(() => {
   jest.clearAllMocks();
   execute.mockResolvedValue([{ affectedRows: 0 }]);
+  connection.beginTransaction.mockResolvedValue(undefined);
+  connection.commit.mockResolvedValue(undefined);
+  connection.rollback.mockResolvedValue(undefined);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({}));
   jest.mocked(withNamedLock).mockImplementation(<T>(_pool: unknown, _name: string, _seconds: number, run: (c: PoolConnection) => Promise<T>) =>
-    run(fakeConnection({ execute })),
+    run(fakeConnection(connection)),
   );
   jest.mocked(loadPlanningHistory).mockResolvedValue(new Map());
-  jest.mocked(loadMatchPlayerIds).mockResolvedValue(new Set());
+  jest.mocked(loadEntryPlayers).mockResolvedValue(new Map());
   jest.mocked(loadEligibleRefereeIds).mockImplementation(async (_executor, ids) => new Set(ids));
   jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
 });
@@ -192,11 +200,85 @@ describe("runAutoAssign", () => {
         members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
       }),
     );
-    jest.mocked(loadMatchPlayerIds).mockResolvedValue(new Set([3]));
+    jest.mocked(loadEntryPlayers).mockResolvedValue(new Map([["m:1", new Set([3])]]));
 
     const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
 
     expect(report.proposed).toBe(0);
+  });
+
+  it("runAutoAssign_tournamentEntryPlayer_excluded", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null, team1: null, team2: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [event],
+        availability: [available("t:10", 3, "CASTER")],
+        members: [loadedMember({ userId: 3, roles: ["CASTER"], soloCaster: true })],
+      }),
+    );
+    jest.mocked(loadEntryPlayers).mockResolvedValue(new Map([["t:10", new Set([3])]]));
+
+    const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(report.proposed).toBe(0);
+  });
+
+  it("runAutoAssign_playerOfOverlappingMatch_excluded", async () => {
+    const other = loadedEntry({ key: "m:2", matchId: 2, startAt: MONDAY + HOUR_MS / 2, endAt: MONDAY + 2 * HOUR_MS });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry(), other],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+      }),
+    );
+    jest.mocked(loadEntryPlayers).mockResolvedValue(new Map([["m:2", new Set([3])]]));
+
+    const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + HOUR_MS / 4 }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ entries: 1, proposed: 0, replaced: 0 });
+  });
+
+  it("runAutoAssign_writes_insideOneTransaction", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+      }),
+    );
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[0]);
+    expect(connection.commit.mock.invocationCallOrder[0]).toBeGreaterThan(execute.mock.invocationCallOrder[2]);
+  });
+
+  it("runAutoAssign_insertFails_rollbackAndThrows", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+      }),
+    );
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }]).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+
+    await expect(runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS)).rejects.toThrow(
+      "ER_LOCK_DEADLOCK",
+    );
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("runAutoAssign_futureWindow_historyAnchoredOnWindow", async () => {
+    const later = loadedEntry({ startAt: MONDAY + 14 * 24 * HOUR_MS, endAt: MONDAY + 14 * 24 * HOUR_MS + HOUR_MS });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [later] }));
+    const from = MONDAY + 14 * 24 * HOUR_MS;
+
+    await runAutoAssign(9, { from, to: from + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(jest.mocked(loadPlanningHistory).mock.calls[0][1]).toBe(from);
   });
 
   it("runAutoAssign_ineligibleReferee_excluded", async () => {
@@ -279,6 +361,32 @@ describe("confirmAssignments", () => {
       "INSERT INTO bg_planning_events (entry_ke",
     ]);
     expect(execute.mock.calls[1][1]).toContain("REMOVED");
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_transientRefereeError_propagatesNothingRemoved", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_pendingRefereeAlreadyOnMatch_confirmedWithoutMatchCall", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry({ matchRefereeId: 3 })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
+      }),
+    );
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 1, refused: 0 });
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(execute.mock.calls[0][1]).toEqual(["m:1", 3, "REFEREE"]);
   });
 
   it("confirmAssignments_tournamentReferee_noMatchCall", async () => {

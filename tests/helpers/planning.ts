@@ -9,8 +9,8 @@ import type { PlanningEntryView } from "@/lib/shared/planning-view";
  * surcharge que ce qui compte pour son cas.
  */
 
-/** Lundi 2026-11-23, 00:00 UTC : début d'une semaine de planning. */
-export const MONDAY = Date.UTC(2026, 10, 23);
+/** Lundi 2026-11-23, 00:00 à Paris (23:00 UTC la veille) : début d'une semaine de planning. */
+export const MONDAY = Date.UTC(2026, 10, 22, 23);
 export const HOUR_MS = 60 * 60 * 1000;
 
 export function plannerEntry(key: string, startHour: number, overrides: Partial<PlannerEntry> = {}): PlannerEntry {

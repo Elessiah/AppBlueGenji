@@ -42,7 +42,7 @@ function formatters(locale: Locale) {
   return {
     slot: new Intl.DateTimeFormat(tag, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE }),
     time: new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE }),
-    day: new Intl.DateTimeFormat(tag, { day: "numeric", month: "long", timeZone: "UTC" }),
+    day: new Intl.DateTimeFormat(tag, { day: "numeric", month: "long", timeZone: TIME_ZONE }),
   };
 }
 

@@ -4,16 +4,13 @@
  * texte d'un refus. Se teste sans navigateur.
  */
 import type { PillVariant } from "@/components/cyber/Pill";
-import { planningWeekStart, type CoverageLevel, type PlanningRole } from "@/lib/shared/planning";
+import { planningNextWeekStart, planningWeekStart, type CoverageLevel, type PlanningRole } from "@/lib/shared/planning";
 import { rolesConflict } from "@/lib/shared/planning-planner";
 import type { PlanningEntryView, PlanningMember } from "@/lib/shared/planning-view";
 
 export type PlanningWeek = { weekStart: number; entries: PlanningEntryView[] };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-export const WEEK_MS = 7 * DAY_MS;
-
-/** Les entrées par semaine (lundi UTC), dans l'ordre chronologique. */
+/** Les entrées par semaine (lundi, minuit à Paris), dans l'ordre chronologique. */
 export function groupByWeek(entries: readonly PlanningEntryView[]): PlanningWeek[] {
   const weeks = new Map<number, PlanningEntryView[]>();
   const sorted = [...entries].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || a.key.localeCompare(b.key));
@@ -71,9 +68,9 @@ export function errorKey(code: string | null | undefined, known: object): string
   return code && Object.hasOwn(known, code) ? code : "generic";
 }
 
-/** Fenêtre d'un calcul de semaine : `[lundi, lundi + 7 j[` en ISO. */
+/** Fenêtre d'un calcul de semaine : `[lundi, lundi suivant[` (minuit à Paris) en ISO. */
 export function weekWindow(weekStart: number): { from: string; to: string } {
-  return { from: new Date(weekStart).toISOString(), to: new Date(weekStart + WEEK_MS).toISOString() };
+  return { from: new Date(weekStart).toISOString(), to: new Date(planningNextWeekStart(weekStart)).toISOString() };
 }
 
 /** Échéance d'une confirmation par délai de prévenance (`now` + `hours`). */

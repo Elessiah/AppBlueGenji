@@ -15,7 +15,11 @@
  * 2. **Amélioration globale** : chaque proposition est remise en jeu — un
  *    autre candidat la prend si le planning entier s'en trouve meilleur
  *    ({@link planningScore}), à couverture égale de l'entrée ; une place
- *    restée vide est retentée. Jusqu'à ce que plus rien ne s'améliore.
+ *    restée vide est retentée ; deux membres d'un même rôle **échangent**
+ *    leurs entrées quand l'un préfère celle de l'autre (deux entrées qui se
+ *    chevauchent, chacun posé sur celle que l'autre voulait). Jusqu'à ce que
+ *    plus rien ne s'améliore. Chaque essai se juge sur la seule partie du
+ *    planning qu'il touche : un lot d'un mois se calcule en un instant.
  *
  * Une personne ne tient pas deux entrées qui se **chevauchent** (durées
  * estimées, `planning-durations.ts`) mais enchaîne des entrées consécutives.
@@ -102,38 +106,101 @@ export function slotsOverlap(a: { startAt: number; endAt: number }, b: { startAt
 
 type Placement = { entryKey: string; userId: number; role: PlanningRole; locked: boolean };
 
+/** Valeur d'un planning, ou d'une partie : `[cumuls, préférences non servies, Σ charges², historique]` (plus petit = meilleur). */
+type Score = [number, number, number, number];
+
+function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+}
+
+function dropFrom<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const list = map.get(key);
+  if (!list) return;
+  const index = list.indexOf(value);
+  if (index >= 0) list.splice(index, 1);
+}
+
+/**
+ * État du calcul, indexé (par entrée, par membre, charge par semaine) : chaque
+ * question du calcul se pose sans parcourir tout le planning, et un essai se
+ * juge sur la seule partie du planning qu'il touche ({@link PlannerState.localScore}).
+ */
 class PlannerState {
-  readonly placements: Placement[] = [];
+  readonly placements = new Set<Placement>();
   private readonly entries: Map<string, PlannerEntry>;
+  private readonly weeks = new Map<string, number>();
   private readonly availability = new Map<string, PlannerAvailability>();
+  /** `entryKey|role` → membres qui ont donné une disponibilité (triés). */
+  private readonly offered = new Map<string, number[]>();
+  /** `userId|role` → entrées préférées (triées). */
+  private readonly preferences = new Map<string, string[]>();
+  private readonly byEntry = new Map<string, Placement[]>();
+  private readonly byUser = new Map<number, Placement[]>();
+  private readonly loads = new Map<string, number>();
 
   constructor(readonly input: PlannerInput) {
     this.entries = new Map(input.entries.map((entry) => [entry.key, entry]));
+    for (const entry of input.entries) this.weeks.set(entry.key, planningWeekStart(entry.startAt));
     for (const row of input.availability) {
       this.availability.set(exclusionKey(row.entryKey, row.userId, row.role), row);
+      pushTo(this.offered, `${row.entryKey}|${row.role}`, row.userId);
+      if (row.preferred) pushTo(this.preferences, `${row.userId}|${row.role}`, row.entryKey);
     }
+    for (const [key, ids] of this.offered) this.offered.set(key, [...new Set(ids)].sort((x, y) => x - y));
+    for (const list of this.preferences.values()) list.sort((x, y) => x.localeCompare(y));
   }
 
   entry(key: string): PlannerEntry | undefined {
     return this.entries.get(key);
   }
 
+  weekOf(key: string): number {
+    return this.weeks.get(key) ?? 0;
+  }
+
+  on(entryKey: string): readonly Placement[] {
+    return this.byEntry.get(entryKey) ?? [];
+  }
+
   held(entryKey: string, role: PlanningRole): number[] {
-    return this.placements.filter((p) => p.entryKey === entryKey && p.role === role).map((p) => p.userId);
+    return this.on(entryKey)
+      .filter((p) => p.role === role)
+      .map((p) => p.userId);
   }
 
   rolesOn(entryKey: string, userId: number): PlanningRole[] {
-    return this.placements.filter((p) => p.entryKey === entryKey && p.userId === userId).map((p) => p.role);
+    return this.on(entryKey)
+      .filter((p) => p.userId === userId)
+      .map((p) => p.role);
+  }
+
+  preferredEntries(userId: number, role: PlanningRole): readonly string[] {
+    return this.preferences.get(`${userId}|${role}`) ?? [];
   }
 
   place(entryKey: string, userId: number, role: PlanningRole, locked: boolean): Placement {
     const placement = { entryKey, userId, role, locked };
-    this.placements.push(placement);
+    this.restore(placement);
     return placement;
   }
 
+  /** Pose (ou remet) cette place, le même objet. */
+  restore(placement: Placement): void {
+    this.placements.add(placement);
+    pushTo(this.byEntry, placement.entryKey, placement);
+    pushTo(this.byUser, placement.userId, placement);
+    const load = `${this.weekOf(placement.entryKey)}|${placement.userId}`;
+    this.loads.set(load, (this.loads.get(load) ?? 0) + 1);
+  }
+
   remove(placement: Placement): void {
-    this.placements.splice(this.placements.indexOf(placement), 1);
+    if (!this.placements.delete(placement)) return;
+    dropFrom(this.byEntry, placement.entryKey, placement);
+    dropFrom(this.byUser, placement.userId, placement);
+    const load = `${this.weekOf(placement.entryKey)}|${placement.userId}`;
+    this.loads.set(load, (this.loads.get(load) ?? 1) - 1);
   }
 
   preferred(entryKey: string, userId: number, role: PlanningRole): boolean {
@@ -146,27 +213,19 @@ class PlannerState {
     if (!(this.input.members.get(userId) ?? []).includes(role)) return false;
     if (this.input.excluded.has(exclusionKey(entry.key, userId, role))) return false;
     if (this.rolesOn(entry.key, userId).some((held) => held === role || rolesConflict(held, role))) return false;
-    return !this.placements.some((p) => {
-      if (p.userId !== userId || p.entryKey === entry.key) return false;
+    return !(this.byUser.get(userId) ?? []).some((p) => {
+      if (p.entryKey === entry.key) return false;
       const other = this.entry(p.entryKey);
       return other !== undefined && slotsOverlap(entry, other);
     });
   }
 
   candidates(entry: PlannerEntry, role: PlanningRole): number[] {
-    const ids = new Set<number>();
-    for (const row of this.input.availability) {
-      if (row.entryKey === entry.key && row.role === role && this.eligible(entry, row.userId, role)) ids.add(row.userId);
-    }
-    return [...ids].sort((a, b) => a - b);
+    return (this.offered.get(`${entry.key}|${role}`) ?? []).filter((userId) => this.eligible(entry, userId, role));
   }
 
-  weekLoad(userId: number, at: number): number {
-    const week = planningWeekStart(at);
-    return this.placements.filter((p) => {
-      const entry = this.entry(p.entryKey);
-      return p.userId === userId && entry !== undefined && planningWeekStart(entry.startAt) === week;
-    }).length;
+  weekLoad(userId: number, entryKey: string): number {
+    return this.loads.get(`${this.weekOf(entryKey)}|${userId}`) ?? 0;
   }
 
   coverage(entryKey: string) {
@@ -176,6 +235,36 @@ class PlannerState {
       prodIds: this.held(entryKey, "PROD"),
       soloCasterIds: this.input.soloCasterIds,
     });
+  }
+
+  /**
+   * La part de {@link planningScore} que portent ces membres sur ces entrées
+   * (leurs places, et leurs charges des semaines de ces entrées) : un essai
+   * qui ne touche qu'elles se juge sur la différence avant / après.
+   */
+  localScore(entryKeys: readonly string[], userIds: readonly number[]): Score {
+    const score: Score = [0, 0, 0, 0];
+    const users = [...new Set(userIds)];
+    for (const entryKey of new Set(entryKeys)) {
+      for (const userId of users) this.addGroupScore(score, entryKey, userId);
+    }
+    for (const week of new Set(entryKeys.map((key) => this.weekOf(key)))) {
+      for (const userId of users) {
+        const load = this.loads.get(`${week}|${userId}`) ?? 0;
+        score[2] += load * load;
+      }
+    }
+    return score;
+  }
+
+  /** Cumuls, préférences non servies et historique des places (non verrouillées) d'un membre sur une entrée. */
+  private addGroupScore(score: Score, entryKey: string, userId: number): void {
+    const group = this.on(entryKey).filter((p) => p.userId === userId);
+    for (const p of group.filter((placement) => !placement.locked)) {
+      if (group.length > 1) score[0] += 1;
+      if (!this.preferred(p.entryKey, p.userId, p.role)) score[1] += 1;
+      score[3] += this.input.history.get(p.userId) ?? 0;
+    }
   }
 }
 
@@ -187,34 +276,33 @@ class PlannerState {
  * 3. somme des carrés des charges hebdomadaires (répartition : deux membres à
  *    une entrée valent mieux qu'un à deux) ;
  * 4. charge des semaines précédentes des membres choisis (équité dans le temps).
+ *
+ * Le calcul ne l'évalue jamais en entier : chaque essai se juge sur sa
+ * différence locale ({@link PlannerState.localScore}), qui donne le même ordre.
  */
-export function planningScore(state: { placements: readonly Placement[] }, input: PlannerInput, weekOf: (key: string) => number): number[] {
-  let multiHat = 0;
-  let notPreferred = 0;
-  let historyLoad = 0;
-  const loads = new Map<string, number>();
-  const prefs = new Set(
-    input.availability.filter((row) => row.preferred).map((row) => exclusionKey(row.entryKey, row.userId, row.role)),
+export function planningScore(placements: readonly Placement[], input: PlannerInput): Score {
+  const state = new PlannerState(input);
+  for (const p of placements) state.restore({ ...p });
+  return state.localScore(
+    placements.map((p) => p.entryKey),
+    placements.map((p) => p.userId),
   );
-  for (const p of state.placements) {
-    const load = `${weekOf(p.entryKey)}|${p.userId}`;
-    loads.set(load, (loads.get(load) ?? 0) + 1);
-    if (p.locked) continue;
-    if (state.placements.some((o) => o !== p && o.entryKey === p.entryKey && o.userId === p.userId)) multiHat += 1;
-    if (!prefs.has(exclusionKey(p.entryKey, p.userId, p.role))) notPreferred += 1;
-    historyLoad += input.history.get(p.userId) ?? 0;
-  }
-  let squares = 0;
-  for (const value of loads.values()) squares += value * value;
-  return [multiHat, notPreferred, squares, historyLoad];
 }
 
+/** `after` − `before`, terme à terme. */
+function delta(after: Score, before: Score): Score {
+  return [after[0] - before[0], after[1] - before[1], after[2] - before[2], after[3] - before[3]];
+}
+
+/** Vrai si `a` est strictement meilleur que `b` (ordre lexicographique). */
 function better(a: readonly number[], b: readonly number[]): boolean {
   for (let i = 0; i < a.length; i += 1) {
     if (a[i] !== b[i]) return a[i] < b[i];
   }
   return false;
 }
+
+const NO_CHANGE: Score = [0, 0, 0, 0];
 
 function sameCoverage(a: ReturnType<PlannerState["coverage"]>, b: ReturnType<PlannerState["coverage"]>): boolean {
   return a.level === b.level && a.refereePriority === b.refereePriority;
@@ -230,7 +318,7 @@ function bestCandidate(state: PlannerState, entry: PlannerEntry, role: PlanningR
     userId,
     alreadyOn: state.rolesOn(entry.key, userId).length > 0 ? 1 : 0,
     preferred: state.preferred(entry.key, userId, role) ? 0 : 1,
-    week: state.weekLoad(userId, entry.startAt),
+    week: state.weekLoad(userId, entry.key),
     history: state.input.history.get(userId) ?? 0,
   }));
   ranked.sort(
@@ -304,38 +392,102 @@ function fillAll(state: PlannerState, open: readonly PlannerEntry[]): boolean {
   return changed;
 }
 
-/** Remet en jeu chaque proposition : un autre candidat la prend si le planning entier y gagne. */
-function improve(state: PlannerState, weekOf: (key: string) => number): boolean {
-  let changed = false;
-  const movable = state.placements
+/** Propositions remises en jeu, dans l'ordre du calendrier puis de la clé, du rôle et du membre. */
+function movablePlacements(state: PlannerState): Placement[] {
+  return [...state.placements]
     .filter((p) => !p.locked)
     .sort((a, b) => {
       const ea = state.entry(a.entryKey);
       const eb = state.entry(b.entryKey);
-      return (ea?.startAt ?? 0) - (eb?.startAt ?? 0) || a.entryKey.localeCompare(b.entryKey) || a.role.localeCompare(b.role);
+      return (
+        (ea?.startAt ?? 0) - (eb?.startAt ?? 0) ||
+        a.entryKey.localeCompare(b.entryKey) ||
+        a.role.localeCompare(b.role) ||
+        a.userId - b.userId
+      );
     });
-  for (const placement of movable) {
+}
+
+/** Remet en jeu chaque proposition : un autre candidat la prend si le planning entier y gagne. */
+function improve(state: PlannerState): boolean {
+  let changed = false;
+  for (const placement of movablePlacements(state)) {
     const entry = state.entry(placement.entryKey);
-    if (!entry || !state.placements.includes(placement)) continue;
+    if (!entry || !state.placements.has(placement)) continue;
     const coverage = state.coverage(entry.key);
-    let score = planningScore(state, state.input, weekOf);
     state.remove(placement);
+    const others = state.candidates(entry, placement.role).filter((userId) => userId !== placement.userId);
+    state.restore(placement);
     let best: number | null = null;
-    for (const userId of state.candidates(entry, placement.role)) {
-      if (userId === placement.userId) continue;
+    let bestGain = NO_CHANGE;
+    for (const userId of others) {
+      const scope = [placement.userId, userId];
+      const before = state.localScore([entry.key], scope);
+      state.remove(placement);
       const trial = state.place(entry.key, userId, placement.role, false);
-      const trialScore = planningScore(state, state.input, weekOf);
-      if (sameCoverage(state.coverage(entry.key), coverage) && better(trialScore, score)) {
+      const gain = delta(state.localScore([entry.key], scope), before);
+      if (sameCoverage(state.coverage(entry.key), coverage) && better(gain, bestGain)) {
         best = userId;
-        score = trialScore;
+        bestGain = gain;
       }
       state.remove(trial);
+      state.restore(placement);
     }
-    if (best === null) {
-      state.placements.push(placement);
-    } else {
+    if (best !== null) {
+      state.remove(placement);
       state.place(entry.key, best, placement.role, false);
       changed = true;
+    }
+  }
+  return changed;
+}
+
+/**
+ * Échange deux propositions d'un même rôle entre deux membres si le planning
+ * y gagne, à couverture égale des deux entrées. Sort le calcul des impasses
+ * qu'un remplacement seul ne lève pas : deux entrées qui se chevauchent,
+ * chacun posé sur celle que l'autre voulait.
+ */
+function trySwap(state: PlannerState, first: Placement, second: Placement): boolean {
+  const a = state.entry(first.entryKey);
+  const b = state.entry(second.entryKey);
+  if (!a || !b) return false;
+  const keys = [a.key, b.key];
+  const users = [first.userId, second.userId];
+  const coverageA = state.coverage(a.key);
+  const coverageB = state.coverage(b.key);
+  const before = state.localScore(keys, users);
+  state.remove(first);
+  state.remove(second);
+  const placed: Placement[] = [];
+  if (state.eligible(b, first.userId, first.role)) placed.push(state.place(b.key, first.userId, first.role, false));
+  if (placed.length === 1 && state.eligible(a, second.userId, second.role)) {
+    placed.push(state.place(a.key, second.userId, second.role, false));
+  }
+  const kept =
+    placed.length === 2 &&
+    sameCoverage(state.coverage(a.key), coverageA) &&
+    sameCoverage(state.coverage(b.key), coverageB) &&
+    better(delta(state.localScore(keys, users), before), NO_CHANGE);
+  if (kept) return true;
+  for (const p of placed) state.remove(p);
+  state.restore(first);
+  state.restore(second);
+  return false;
+}
+
+/** Les échanges tentés : un membre posé ailleurs que sur une entrée qu'il préfère, contre qui la tient. */
+function swapPreferences(state: PlannerState): boolean {
+  let changed = false;
+  for (const first of movablePlacements(state)) {
+    for (const wanted of state.preferredEntries(first.userId, first.role)) {
+      if (!state.placements.has(first) || state.preferred(first.entryKey, first.userId, first.role)) break;
+      if (wanted === first.entryKey) continue;
+      const holders = state
+        .on(wanted)
+        .filter((p) => !p.locked && p.role === first.role && p.userId !== first.userId)
+        .sort((x, y) => x.userId - y.userId);
+      if (holders.some((second) => trySwap(state, first, second))) changed = true;
     }
   }
   return changed;
@@ -355,16 +507,16 @@ export function planAssignments(input: PlannerInput): PlannedAssignment[] {
       state.place(row.entryKey, row.userId, row.role, true);
     }
   }
-  const weekOf = (key: string) => planningWeekStart(state.entry(key)?.startAt ?? 0);
   const open = input.entries.filter((entry) => entry.open);
   fillAll(state, open);
   for (let pass = 0; pass < PLANNER_MAX_PASSES; pass += 1) {
-    const moved = improve(state, weekOf);
+    const moved = improve(state);
+    const swapped = swapPreferences(state);
     const filled = fillAll(state, open);
-    if (!moved && !filled) break;
+    if (!moved && !swapped && !filled) break;
   }
   const order = new Map(PLANNING_ROLES.map((role, index) => [role, index]));
-  return state.placements
+  return [...state.placements]
     .filter((p) => !p.locked)
     .map((p) => {
       const entry = state.entry(p.entryKey) as PlannerEntry;
@@ -373,7 +525,7 @@ export function planAssignments(input: PlannerInput): PlannedAssignment[] {
         userId: p.userId,
         role: p.role,
         reason: state.preferred(p.entryKey, p.userId, p.role) ? ("PREFERENCE" as const) : ("LOAD" as const),
-        weekLoad: state.weekLoad(p.userId, entry.startAt),
+        weekLoad: state.weekLoad(p.userId, p.entryKey),
         historyLoad: input.history.get(p.userId) ?? 0,
         startAt: entry.startAt,
       };

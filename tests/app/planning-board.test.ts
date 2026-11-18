@@ -104,11 +104,17 @@ describe("errorKey / weekWindow / leadUntil / COVERAGE_PILL", () => {
   });
 
   it("weekWindow_returnsMondayToNextMonday", () => {
-    expect(weekWindow(MONDAY)).toEqual({ from: "2026-11-23T00:00:00.000Z", to: "2026-11-30T00:00:00.000Z" });
+    expect(weekWindow(MONDAY)).toEqual({ from: "2026-11-22T23:00:00.000Z", to: "2026-11-29T23:00:00.000Z" });
+  });
+
+  it("weekWindow_acrossDstChange_endsAtNextParisMonday", () => {
+    // Semaine du 26 octobre 2026 (passage à l'heure d'hiver le 25) : la précédente dure 7 j + 1 h.
+    const summerMonday = Date.UTC(2026, 9, 18, 22);
+    expect(weekWindow(summerMonday)).toEqual({ from: "2026-10-18T22:00:00.000Z", to: "2026-10-25T23:00:00.000Z" });
   });
 
   it("leadUntil_addsHours", () => {
-    expect(leadUntil(MONDAY, 48)).toBe("2026-11-25T00:00:00.000Z");
+    expect(leadUntil(MONDAY, 48)).toBe("2026-11-24T23:00:00.000Z");
   });
 
   it("COVERAGE_PILL_neverWarning", () => {
