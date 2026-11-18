@@ -4,6 +4,10 @@ import type { ClientPowerState } from "@/lib/shared/hooks/useClientPower";
 import { UNKNOWN_PROBE } from "@/lib/shared/client-power";
 import { readSource } from "../helpers/read-source";
 import { ClientPowerBadge } from "@/components/client-power-badge";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import frShell from "@/messages/fr/shell.json";
+import enShell from "@/messages/en/shell.json";
 
 /**
  * Le témoin du régime de charge. Les effets ne tournent pas au rendu serveur :
@@ -118,5 +122,31 @@ describe("ClientPowerBadge", () => {
     expect(reset).toBeGreaterThan(0);
     expect(early).toBeGreaterThan(reset);
   });
-});
 
+  it("parle anglais sous /en, sans un mot de français", () => {
+    state = {
+      ...base({ matchFocus: true }),
+      probe: { cores: 1, memoryGb: 2, frameIntervalMs: 33 },
+      limits: ["LOW_CORES"],
+      ignorePerformance: true,
+    };
+    const html = renderToStaticMarkup(
+      <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+        <ClientPowerBadge />
+      </ShellTextProvider>,
+    );
+    expect(html).toContain(enShell.clientPower.modes.MATCH.label);
+    expect(html).toContain('title="Lighter page during your match');
+    expect(html).toContain("every 5 s");
+    expect(html).not.toContain("Mode match");
+    expect(html).not.toContain(frShell.clientPower.modes.MATCH.description.slice(0, 20));
+  });
+
+  it("textes du témoin : mêmes clés en français et en anglais", () => {
+    const keys = (value: object): string[] =>
+      Object.entries(value).flatMap(([key, child]) =>
+        typeof child === "object" && child !== null ? keys(child).map((sub) => `${key}.${sub}`) : [key],
+      );
+    expect(keys(enShell.clientPower).sort()).toEqual(keys(frShell.clientPower).sort());
+  });
+});

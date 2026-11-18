@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { shellText } from "@/lib/shared/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import {
   activeMatchFocusUntil,
   isSlowFrameInterval,
@@ -411,6 +413,16 @@ describe("témoin", () => {
       expect(powerModeLabel(mode)).not.toBe("");
       expect(powerModeDescription(mode)).not.toBe("");
     }
-    expect(powerModeLabel("ECO")).toBe("Éco");
+    expect(powerModeLabel("ECO")).toBe("Mode éco");
+  });
+
+  it("se traduit : le nombre de cœurs s'accorde aussi en anglais", () => {
+    const { t } = shellText("en", messagesFor("en").shell);
+    const probe = { cores: 1, memoryGb: 2, frameIntervalMs: 33.3 };
+    expect(powerReasonLabel("LOW_CORES", probe, t)).toBe("Modest processor (1 core)");
+    expect(powerReasonLabel("LOW_CORES", { ...probe, cores: 4 }, t)).toBe("Modest processor (4 cores)");
+    expect(powerProbeSummary(probe, t)).toBe("30 fps · 1 core · 2 GB");
+    expect(powerModeLabel("ECO", t)).toBe("Eco mode");
+    expect(powerReasonLabel("MATCH", UNKNOWN_PROBE, t)).toBe("You have a match in progress or about to start");
   });
 });

@@ -212,5 +212,46 @@
   "imageCropLoad": {
     "failed": "The crop window couldn't open. Try again in a moment.",
     "reloading": "The site has just been updated: reload the page to crop your image."
+  },
+  "clientPower": {
+    "panelLabel": "Display mode",
+    "modes": {
+      "FULL": {
+        "label": "Full mode",
+        "description": "All animations run."
+      },
+      "ECO": {
+        "label": "Eco mode",
+        "description": "Decorative animations and the animated background are paused; data stays live."
+      },
+      "MATCH": {
+        "label": "Match mode",
+        "description": "Lighter page during your match: animations paused, background memory released, other matches' bracket refreshed every {seconds} s while you look at your game. Your own match shows at once."
+      },
+      "SLEEP": {
+        "label": "Sleep mode",
+        "description": "Hidden tab: nothing is drawn; the tab title and a sound alert will tell you."
+      }
+    },
+    "reasons": {
+      "HIDDEN": "Tab hidden or window minimised",
+      "MATCH": "You have a match in progress or about to start",
+      "BACKGROUND": "The page is not focused (game, other window or second screen)",
+      "REDUCED_MOTION": "Your system asks for reduced motion",
+      "MOTION_SETTING": "You chose to reduce motion (accessibility menu)",
+      "LOW_CORES": "Modest processor ({cores})",
+      "LOW_MEMORY": "Modest memory ({memory} GB)",
+      "SLOW_FRAMES": "Slow display (≈ {fps} frames/s measured — battery saver, throttled browser or busy machine)",
+      "SLOW_FRAMES_UNMEASURED": "Slow display"
+    },
+    "probe": {
+      "fps": "{fps} fps",
+      "fpsUnmeasured": "fps not measured",
+      "cores": "{count, plural, one {# core} other {# cores}}",
+      "coresUnknown": "? cores",
+      "memory": "{memory} GB"
+    },
+    "ignored": "Detection ignored at your request. Seen: {limits}.",
+    "ignoreToggle": "Ignore performance detection"
   }
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
-import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
+import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import { mapError, useErrorsText } from "../_lib/error-map";
 import { clearAttention } from "../_lib/attention";
 import {
@@ -128,6 +128,13 @@ export function useTournamentLive(tournamentId: number) {
   );
   /** Palier spectateur du flux. */
   const [quietStream] = useState(() => createQuietStream(() => reconnectRef.current?.()));
+  /**
+   * Palier **accordé** au lecteur : celui du dernier instantané reçu sur un flux
+   * plein. Un flux calmé (`?quiet=1`, onglet caché) reçoit le palier spectateur,
+   * que l'état rendu porte un instant au retour sur l'onglet — la pastille du
+   * mode ne doit pas dire « spectateur » à un prioritaire pour autant.
+   */
+  const [grantedTier, setGrantedTier] = useState<RefreshTier>(INITIAL_LIVE_STATE.tier);
 
   /** Le lecteur a une rencontre en cours — lu sur l'état reçu, pas sur le rendu. */
   const [matchFocus, setMatchFocus] = useState(false);
@@ -301,6 +308,7 @@ export function useTournamentLive(tournamentId: number) {
     setState(INITIAL_LIVE_STATE);
     setIsLive(false);
     setFatal(null);
+    setGrantedTier(INITIAL_LIVE_STATE.tier);
   }, [tournamentId, renderGate, quietStream]);
 
   /**
@@ -436,7 +444,9 @@ export function useTournamentLive(tournamentId: number) {
         previous !== null &&
         shouldRefreshViewerContext(previous, message.snapshot);
 
-      commit(applyLiveMessage(stateRef.current, message));
+      const next = applyLiveMessage(stateRef.current, message);
+      commit(next);
+      if (!quietStream.isQuiet()) setGrantedTier(next.tier);
       // `force` : on vient de commiter cette version, la déduplication par
       // version rejetterait la relecture avant d'en avoir pris l'aperçu.
       // Les pseudos viennent avec la relecture ; si elle échoue (429, réseau),
@@ -444,7 +454,7 @@ export function useTournamentLive(tournamentId: number) {
       if (stalePreview) void load(true, true).then(() => refreshRefereeNames());
       else if (message.type === "snapshot") refreshRefereeNames();
     },
-    [commit, load, refreshRefereeNames],
+    [commit, load, refreshRefereeNames, quietStream],
   );
 
   useEffect(() => {
@@ -482,8 +492,13 @@ export function useTournamentLive(tournamentId: number) {
      * reconnecter, `TOURNAMENT_NOT_FOUND` dit que le tournoi n'existe plus.
      */
     fatal,
-    /** Palier de fraîcheur accordé par le serveur (`lib/shared/refresh-tiers`). */
-    tier: state.tier,
+    /**
+     * Palier de fraîcheur accordé par le serveur (`lib/shared/refresh-tiers`),
+     * hors flux calmé : celui du lecteur, pas celui de l'onglet caché.
+     */
+    tier: grantedTier,
+    /** Rencontre du lecteur en cours ou imminente (`viewerMatchFocus`), sur l'état reçu. */
+    viewerMatch: matchFocus,
     /**
      * Recharge à la demande, après une action de l'utilisateur : le flux couvre
      * le cas nominal, mais celui qui vient d'agir mérite un retour immédiat quel

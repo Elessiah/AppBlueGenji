@@ -35,7 +35,7 @@ import {
   type HeaderTone,
 } from "../_lib/header-meta";
 import { LiveIndicator, useLiveIndicatorText, type LiveIndicatorProps } from "./LiveIndicator";
-import { SyncModeBadge, SyncModeExplanation, SyncModeHint } from "./SyncModeBadge";
+import { SyncModeBadge, SyncModeExplanation, SyncModeHint, useSyncMode } from "./SyncModeBadge";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
@@ -46,14 +46,15 @@ import s from "./TournamentHeader.module.css";
  */
 function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
   const { t } = useTournamentPageText();
-  // La cadence accordée et le sens de « Hors ligne » : le `title` du témoin ne
-  // s'atteint ni au toucher ni au clavier.
+  // Le sens de « Hors ligne » : le `title` du témoin ne s'atteint ni au toucher
+  // ni au clavier. Lecture réussie, l'explication du mode dit déjà la cadence.
   const liveText = useLiveIndicatorText(props);
+  const sync = useSyncMode(props);
   return (
     <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
       <p>{t("header.spectatorTitle")}</p>
-      <p>{liveText.title}</p>
-      <SyncModeExplanation {...props} />
+      {(sync === null || !props.isLive) && <p>{liveText.title}</p>}
+      {sync !== null && <SyncModeExplanation state={sync} cadenceMs={props.cadenceMs} />}
     </InfoHint>
   );
 }
@@ -84,6 +85,8 @@ interface TournamentHeaderProps {
   /** Cadence de relecture de la page sans compte (`TournamentSheetSource.cadenceMs`). */
   cadenceMs?: number | null;
   fatal: LiveFailure | null;
+  /** Rencontre du lecteur en cours ou imminente (`TournamentSheetSource.viewerMatch`). */
+  viewerMatch?: boolean;
   /** Suivi arrêté : les actions sont retirées plutôt que laissées à échouer. */
   frozen: boolean;
   onRegister: () => void;
@@ -127,6 +130,7 @@ export function TournamentHeader({
   tier,
   cadenceMs,
   fatal,
+  viewerMatch,
   frozen,
   onRegister,
   onReportIssue,
@@ -192,7 +196,7 @@ export function TournamentHeader({
             <LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
             {/* Comment la page se tient à jour (prioritaire, match, éco…) : à côté
                 du témoin, qui dit seulement si la connexion tient. */}
-            <SyncModeBadge isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+            <SyncModeBadge isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />
             {detail.isAdmin && !frozen && (
               <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
             )}
@@ -208,7 +212,7 @@ export function TournamentHeader({
           {spectator ? (
             <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
           ) : (
-            <SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+            <SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />
           )}
         </div>
 

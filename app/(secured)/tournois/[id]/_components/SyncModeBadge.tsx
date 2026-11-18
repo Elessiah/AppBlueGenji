@@ -2,10 +2,21 @@
 
 import { Pill, type PillVariant } from "@/components/cyber/Pill";
 import { InfoHint } from "@/components/ui/info-hint";
+import { useSpectatorView } from "@/components/spectator-view";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
+import { MATCH_BACKGROUND_RENDER_DELAY_MS, QUIET_STREAM_AFTER_MS } from "@/lib/shared/client-power";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
-import { otherSyncModes, resolveSyncMode, type SyncMode } from "@/lib/shared/sync-mode";
+import {
+  otherSyncModes,
+  resolveSyncMode,
+  syncModeOtherKey,
+  syncModeTextKey,
+  syncModeTierNote,
+  type SyncMode,
+  type SyncModeInput,
+} from "@/lib/shared/sync-mode";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import type { TournamentPageKey } from "@/lib/shared/tournament-page-text";
 import { cadenceLabel, type LiveIndicatorProps } from "./LiveIndicator";
 
 /**
@@ -21,14 +32,36 @@ const SYNC_MODE_VARIANT: Record<SyncMode, PillVariant> = {
   POLLING: "warning",
 };
 
+export type SyncModeProps = LiveIndicatorProps & {
+  /**
+   * Le lecteur a une rencontre en cours ou imminente dans ce tournoi
+   * (`useTournamentLive`). Absent : page sans compte, jamais.
+   */
+  viewerMatch?: boolean;
+};
+
+/** Ce que le mode courant a besoin de savoir, lu à la source. */
+export type SyncModeState = { mode: SyncMode; input: SyncModeInput };
+
 /**
  * Mode de synchronisation du lecteur, lu à la source : palier du flux, régime
- * de charge (`useClientPower`), état du flux. Seuls les composants qui
- * l'appellent se redessinent à un alt-tab, jamais la fiche entière.
+ * de charge (`useClientPower`), état du flux, page avec ou sans compte. Seuls
+ * les composants qui l'appellent se redessinent à un alt-tab, jamais la fiche
+ * entière.
  */
-export function useSyncMode({ isLive, tier, fatal = null }: Readonly<LiveIndicatorProps>): SyncMode | null {
+export function useSyncMode({ isLive, tier, fatal = null, viewerMatch = false }: Readonly<SyncModeProps>): SyncModeState | null {
   const power = useClientPower().mode;
-  return resolveSyncMode({ tier, power, isLive, fatal: fatal !== null });
+  const spectator = useSpectatorView();
+  const input: SyncModeInput = {
+    tier,
+    power,
+    isLive,
+    fatal: fatal !== null,
+    source: spectator ? "POLL" : "STREAM",
+    viewerMatch,
+  };
+  const mode = resolveSyncMode(input);
+  return mode === null ? null : { mode, input };
 }
 
 /**
@@ -38,10 +71,11 @@ export function useSyncMode({ isLive, tier, fatal = null }: Readonly<LiveIndicat
  * de `aria-live` : le mode bascule à chaque alt-tab, ce serait du bruit. Le
  * texte porte le sens, la couleur ne fait que l'accompagner.
  */
-export function SyncModeBadge(props: Readonly<LiveIndicatorProps>) {
-  const mode = useSyncMode(props);
+export function SyncModeBadge(props: Readonly<SyncModeProps>) {
+  const state = useSyncMode(props);
   const { t } = useTournamentPageText();
-  if (mode === null) return null;
+  if (state === null) return null;
+  const { mode } = state;
   return (
     <Pill variant={SYNC_MODE_VARIANT[mode]} data-sync-mode={mode.toLowerCase()}>
       {t(`live.sync.modes.${mode}.label`)}
@@ -49,23 +83,38 @@ export function SyncModeBadge(props: Readonly<LiveIndicatorProps>) {
   );
 }
 
-/** Explication du mode courant puis, en liste, des autres. Rien après un échec définitif. */
-export function SyncModeExplanation(props: Readonly<LiveIndicatorProps>) {
-  const mode = useSyncMode(props);
+/**
+ * Explication du mode courant (avec sa cadence, et le palier conservé sous un
+ * régime de peinture) puis, en liste, des autres modes que ce lecteur peut
+ * rencontrer sur cette page. Les durées viennent des constantes qui les
+ * décident, jamais écrites dans le texte.
+ */
+export function SyncModeExplanation({ state, cadenceMs }: Readonly<{ state: SyncModeState; cadenceMs?: number | null }>) {
   const text = useTournamentPageText();
-  if (mode === null) return null;
   const { t } = text;
-  const { tier, cadenceMs } = props;
-  const base = mode === "POLLING" ? REFRESH_CADENCE[tier].detailFallbackMs : REFRESH_CADENCE[tier].pushCoalesceMs;
-  const cadence = cadenceLabel(text, cadenceMs ?? base);
+  const { mode, input } = state;
+  const base = mode === "POLLING" ? REFRESH_CADENCE[input.tier].detailFallbackMs : REFRESH_CADENCE[input.tier].pushCoalesceMs;
+  const values = {
+    cadence: cadenceLabel(text, cadenceMs ?? base),
+    delay: cadenceLabel(text, MATCH_BACKGROUND_RENDER_DELAY_MS),
+    minutes: Math.round(QUIET_STREAM_AFTER_MS / 60_000),
+  };
+  const kept = syncModeTierNote(mode, input);
+  const now = t(`live.sync.modes.${mode}.${syncModeTextKey(mode, input)}` as TournamentPageKey, values);
+  const otherValues = { ...values, cadence: cadenceLabel(text, REFRESH_CADENCE.PRIORITY.pushCoalesceMs) };
   return (
     <>
-      <p>{t(`live.sync.modes.${mode}.now`, { cadence })}</p>
+      <p>
+        {now}
+        {kept !== null && " "}
+        {kept !== null && t(`live.sync.tierKept.${kept}`)}
+      </p>
       <p>{t("live.sync.others")}</p>
       <ul>
-        {otherSyncModes(mode).map((other) => (
+        {otherSyncModes(mode, input).map((other) => (
           <li key={other}>
-            <strong>{t(`live.sync.modes.${other}.label`)}</strong> — {t(`live.sync.modes.${other}.other`)}
+            <strong>{t(`live.sync.modes.${other}.label`)}</strong> —{" "}
+            {t(`live.sync.modes.${other}.${syncModeOtherKey(other, input.source)}` as TournamentPageKey, otherValues)}
           </li>
         ))}
       </ul>
@@ -74,13 +123,13 @@ export function SyncModeExplanation(props: Readonly<LiveIndicatorProps>) {
 }
 
 /** Le « i » de la pastille, pour la page avec compte (la page sans compte a le sien, `SpectatorHint`). */
-export function SyncModeHint(props: Readonly<LiveIndicatorProps>) {
-  const mode = useSyncMode(props);
+export function SyncModeHint(props: Readonly<SyncModeProps>) {
+  const state = useSyncMode(props);
   const { t } = useTournamentPageText();
-  if (mode === null) return null;
+  if (state === null) return null;
   return (
     <InfoHint id="tournament-sync-hint" subject={t("live.sync.title")}>
-      <SyncModeExplanation {...props} />
+      <SyncModeExplanation state={state} cadenceMs={props.cadenceMs} />
     </InfoHint>
   );
 }

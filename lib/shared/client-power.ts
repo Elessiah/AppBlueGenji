@@ -34,6 +34,8 @@
  * Module pur : aucune dépendance au navigateur, testable tel quel.
  */
 
+import { shellText, type ShellTranslate } from "./shell-text";
+
 /** Ce que l'utilisateur fait de la page, lu sur le document. */
 export type PageAttention =
   /** Visible, et la fenêtre a le focus. */
@@ -308,37 +310,29 @@ export function powerReasons(input: ClientPowerInput, limits: readonly Performan
   return reasons;
 }
 
-export function powerModeLabel(mode: ClientPowerMode): string {
-  switch (mode) {
-    case "FULL":
-      return "Complet";
-    case "ECO":
-      return "Éco";
-    case "MATCH":
-      return "Match";
-    case "SLEEP":
-      return "Veille";
-  }
+/** Le français, hors fournisseur de textes (tests). */
+const FRENCH: ShellTranslate = shellText("fr").t;
+
+/** « Mode éco », « Eco mode »… (`shell.clientPower.modes`). */
+export function powerModeLabel(mode: ClientPowerMode, t: ShellTranslate = FRENCH): string {
+  return t(`clientPower.modes.${mode}.label`);
 }
 
 /** Ce que le régime retire, en une phrase lisible par un joueur. */
-export function powerModeDescription(mode: ClientPowerMode): string {
-  switch (mode) {
-    case "FULL":
-      return "Toutes les animations tournent.";
-    case "ECO":
-      return "Animations décoratives et fond animé suspendus ; les données restent à jour en direct.";
-    case "MATCH":
-      return "Page allégée pendant ton match : animations suspendues, mémoire du fond rendue, plateau des autres matchs rafraîchi toutes les 5 s quand tu regardes ton jeu. Ton match, lui, s'affiche tout de suite.";
-    case "SLEEP":
-      return "Onglet caché : rien n'est dessiné, tu seras prévenu par le titre de l'onglet et un signal sonore.";
-  }
+export function powerModeDescription(mode: ClientPowerMode, t: ShellTranslate = FRENCH): string {
+  return t(`clientPower.modes.${mode}.description`, {
+    seconds: String(Math.round(MATCH_BACKGROUND_RENDER_DELAY_MS / 1000)),
+  });
 }
 
 /** « 2 cœurs » / « 1 cœur » — accordé, comme partout où le nombre s'affiche. */
-function coresLabel(cores: number | null): string {
-  if (cores === null) return "? cœurs";
-  return `${cores} cœur${cores > 1 ? "s" : ""}`;
+function coresLabel(cores: number | null, t: ShellTranslate): string {
+  return cores === null ? t("clientPower.probe.coresUnknown") : t("clientPower.probe.cores", { count: cores });
+}
+
+/** Images par seconde d'un intervalle mesuré. */
+function framesPerSecond(intervalMs: number): string {
+  return String(Math.round(1000 / intervalMs));
 }
 
 /**
@@ -346,36 +340,30 @@ function coresLabel(cores: number | null): string {
  * que le navigateur ne dit pas n'est pas affiché (la cadence, seule mesurée,
  * dit qu'elle ne l'est pas encore).
  */
-export function powerProbeSummary(probe: PerformanceProbe): string {
+export function powerProbeSummary(probe: PerformanceProbe, t: ShellTranslate = FRENCH): string {
   return [
-    probe.frameIntervalMs ? `${Math.round(1000 / probe.frameIntervalMs)} i/s` : "i/s non mesuré",
-    probe.cores ? coresLabel(probe.cores) : null,
-    probe.memoryGb ? `${probe.memoryGb} Go` : null,
+    probe.frameIntervalMs
+      ? t("clientPower.probe.fps", { fps: framesPerSecond(probe.frameIntervalMs) })
+      : t("clientPower.probe.fpsUnmeasured"),
+    probe.cores ? coresLabel(probe.cores, t) : null,
+    probe.memoryGb ? t("clientPower.probe.memory", { memory: String(probe.memoryGb) }) : null,
   ]
     .filter((part): part is string => part !== null)
     .join(" · ");
 }
 
-export function powerReasonLabel(reason: PowerReason, probe: PerformanceProbe): string {
+export function powerReasonLabel(reason: PowerReason, probe: PerformanceProbe, t: ShellTranslate = FRENCH): string {
   switch (reason) {
-    case "HIDDEN":
-      return "Onglet caché ou fenêtre réduite";
-    case "MATCH":
-      return "Tu as un match en cours";
-    case "BACKGROUND":
-      return "La page n'a pas le focus (jeu, autre fenêtre ou second écran)";
-    case "REDUCED_MOTION":
-      return "Ton système demande de réduire les animations";
-    case "MOTION_SETTING":
-      return "Tu as choisi de réduire les animations (menu d'accessibilité)";
     case "LOW_CORES":
-      return `Processeur modeste (${coresLabel(probe.cores)})`;
+      return t("clientPower.reasons.LOW_CORES", { cores: coresLabel(probe.cores, t) });
     case "LOW_MEMORY":
-      return `Mémoire modeste (${probe.memoryGb ?? "?"} Go)`;
+      return t("clientPower.reasons.LOW_MEMORY", { memory: probe.memoryGb === null ? "?" : String(probe.memoryGb) });
     case "SLOW_FRAMES":
       return probe.frameIntervalMs
-        ? `Affichage ralenti (≈ ${Math.round(1000 / probe.frameIntervalMs)} images/s mesurées — économiseur de batterie, navigateur bridé ou machine chargée)`
-        : "Affichage ralenti";
+        ? t("clientPower.reasons.SLOW_FRAMES", { fps: framesPerSecond(probe.frameIntervalMs) })
+        : t("clientPower.reasons.SLOW_FRAMES_UNMEASURED");
+    default:
+      return t(`clientPower.reasons.${reason}`);
   }
 }
 

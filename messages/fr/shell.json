@@ -212,5 +212,46 @@
   "imageCropLoad": {
     "failed": "La fenêtre de recadrage n'a pas pu s'ouvrir. Réessaie dans un instant.",
     "reloading": "Le site vient d'être mis à jour : recharge la page pour recadrer ton image."
+  },
+  "clientPower": {
+    "panelLabel": "Mode d'affichage",
+    "modes": {
+      "FULL": {
+        "label": "Mode complet",
+        "description": "Toutes les animations tournent."
+      },
+      "ECO": {
+        "label": "Mode éco",
+        "description": "Animations décoratives et fond animé suspendus ; les données restent à jour en direct."
+      },
+      "MATCH": {
+        "label": "Mode match",
+        "description": "Page allégée pendant ton match : animations suspendues, mémoire du fond rendue, plateau des autres matchs rafraîchi toutes les {seconds} s quand tu regardes ton jeu. Ton match, lui, s'affiche tout de suite."
+      },
+      "SLEEP": {
+        "label": "Mode veille",
+        "description": "Onglet caché : rien n'est dessiné, tu seras prévenu par le titre de l'onglet et un signal sonore."
+      }
+    },
+    "reasons": {
+      "HIDDEN": "Onglet caché ou fenêtre réduite",
+      "MATCH": "Tu as un match en cours ou imminent",
+      "BACKGROUND": "La page n'a pas le focus (jeu, autre fenêtre ou second écran)",
+      "REDUCED_MOTION": "Ton système demande de réduire les animations",
+      "MOTION_SETTING": "Tu as choisi de réduire les animations (menu d'accessibilité)",
+      "LOW_CORES": "Processeur modeste ({cores})",
+      "LOW_MEMORY": "Mémoire modeste ({memory} Go)",
+      "SLOW_FRAMES": "Affichage ralenti (≈ {fps} images/s mesurées — économiseur de batterie, navigateur bridé ou machine chargée)",
+      "SLOW_FRAMES_UNMEASURED": "Affichage ralenti"
+    },
+    "probe": {
+      "fps": "{fps} i/s",
+      "fpsUnmeasured": "i/s non mesuré",
+      "cores": "{count, plural, one {# cœur} other {# cœurs}}",
+      "coresUnknown": "? cœurs",
+      "memory": "{memory} Go"
+    },
+    "ignored": "Détection ignorée à ta demande. Constaté : {limits}.",
+    "ignoreToggle": "Ignorer la détection de performances"
   }
 }
