@@ -94,7 +94,8 @@ export function planningNoticeUrl(siteBase: string, locale: Locale): string {
 function boundedLines(lines: readonly string[], locale: Locale): string[] {
   if (lines.length <= PLANNING_DM_MAX_LINES) return [...lines];
   const hidden = lines.length - PLANNING_DM_MAX_LINES;
-  const more = locale === "en" ? `… and ${hidden} more` : `… et ${hidden} ${hidden > 1 ? "autres" : "autre"}`;
+  const others = hidden > 1 ? "autres" : "autre";
+  const more = locale === "en" ? `… and ${hidden} more` : `… et ${hidden} ${others}`;
   return [...lines.slice(0, PLANNING_DM_MAX_LINES), more];
 }
 

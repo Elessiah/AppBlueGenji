@@ -43,7 +43,7 @@ import {
 import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type PlanningData } from "./load";
 import { entryAssignments } from "./model";
 import { announceWithdrawal } from "./notices";
-import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "./planning-undo";
+import { readMatchReferee, settleFailedDesignation, snapshotGesture, type PlanningUndo } from "./planning-undo";
 
 /** Un désistement à moins de ce délai avant le début est tardif. */
 export const LATE_WITHDRAWAL_MS = 24 * 60 * 60 * 1000;
@@ -172,6 +172,29 @@ async function placeReplacement(
   });
 }
 
+/** L'attribution que `user` quitte, ou le refus par code. */
+function withdrawnAssignment(user: AuthUser, input: WithdrawalInput, data: PlanningData, now: number) {
+  const entry = data.entries.find((candidate) => candidate.key === input.entryKey);
+  if (!entry) throw new Error("PLANNING_ENTRY_NOT_FOUND");
+  if (!entry.editable || entry.startAt <= now) throw new Error("PLANNING_WITHDRAWAL_CLOSED");
+  const current = entryAssignments(entry, data).find((row) => row.userId === user.id && row.role === input.role);
+  if (!current) throw new Error("PLANNING_NOT_ASSIGNED");
+  if (current.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
+  return { entry, current };
+}
+
+/** Retire l'arbitre désigné du match s'il s'agit encore de `userId` ; un refus défait le geste. */
+async function releaseMatchReferee(matchId: number, userId: number, undo: PlanningUndo, eventIds: readonly number[]): Promise<void> {
+  const carried = await readMatchReferee(matchId);
+  if (carried !== undefined && carried !== userId) return;
+  try {
+    await assignMatchReferee(matchId, userId, null, userId);
+  } catch (error) {
+    await settleFailedDesignation(error, matchId, null, undo, eventIds);
+    throw error;
+  }
+}
+
 type Outcome = WithdrawalResult & {
   confirmed: boolean;
   entry: LoadedEntry;
@@ -188,12 +211,7 @@ type Outcome = WithdrawalResult & {
 export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, now: number = Date.now()): Promise<WithdrawalResult> {
   const outcome = await withPlanningLock(async (connection): Promise<Outcome> => {
     const data = await loadPlanningData(connection, { now, includeHidden: can(user, "tournaments") });
-    const entry = data.entries.find((candidate) => candidate.key === input.entryKey);
-    if (!entry) throw new Error("PLANNING_ENTRY_NOT_FOUND");
-    if (!entry.editable || entry.startAt <= now) throw new Error("PLANNING_WITHDRAWAL_CLOSED");
-    const current = entryAssignments(entry, data).find((row) => row.userId === user.id && row.role === input.role);
-    if (!current) throw new Error("PLANNING_NOT_ASSIGNED");
-    if (current.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
+    const { entry, current } = withdrawnAssignment(user, input, data, now);
     const confirmed = !current.provisional;
     const late = isLateWithdrawal(entry.startAt, now);
     // L'arbitre d'un match passe par le match ; une proposition provisoire n'y est pas encore.
@@ -208,17 +226,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       ]);
       return [await writeWithdrawalEvent(connection, entry, user.id, input, confirmed, late)];
     });
-    if (matchId !== null && undo !== undefined) {
-      const carried = await readMatchReferee(matchId);
-      if (carried === undefined || carried === user.id) {
-        try {
-          await assignMatchReferee(matchId, user.id, null, user.id);
-        } catch (error) {
-          await settleFailedDesignation(error, matchId, null, undo, eventIds);
-          throw error;
-        }
-      }
-    }
+    if (matchId !== null && undo !== undefined) await releaseMatchReferee(matchId, user.id, undo, eventIds);
     const found = await findReplacement(connection, entry.key, input.role, now);
     const fresh = found.entry ?? entry;
     const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, user.id));
