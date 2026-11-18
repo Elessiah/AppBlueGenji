@@ -9,12 +9,12 @@ L'en-tête de `/tournois/[id]` (et de `/suivre/tournois/[id]`) porte, à côté 
 | Ordre | Mode | Quand | Variante |
 |---|---|---|---|
 | 1 | aucun | échec définitif (`fatal`) — le témoin dit « Hors ligne » | — |
-| 2 | `POLLING` « Mode relecture » | page avec compte, flux non établi : sondage de secours (`detailFallbackMs`) | `warning` (ambre : dégradé) |
-| 3 | `SLEEP` « Mode veille » | onglet caché | `neutral` |
+| 2 | `POLLING` « Mode secours » | page avec compte, flux non établi : sondage de secours (`detailFallbackMs`) | `warning` (ambre : dégradé) |
+| 3 | `SLEEP` « Mode veille » | onglet caché | `accent` |
 | 4 | `MATCH` « Mode match » | rencontre du lecteur en cours ou imminente (10 min avant l'horaire), dans cet onglet ou un autre (bail partagé) | `accent` |
-| 5 | `ECO` « Mode éco » | page sans focus, machine à la peine ou mouvement réduit | `success` |
-| 6 | `PRIORITY` « Mode prioritaire » | palier `PRIORITY` : staff `tournaments`, cast, engagés **hors match** | `blue` |
-| 6 | `STANDARD` « Mode standard » | palier `STANDARD` : spectateurs, et toujours la page sans compte | `info` |
+| 5 | `ECO` « Mode éco » | page sans focus, machine à la peine ou mouvement réduit | `accent` |
+| 6 | `PRIORITY` « Mode prioritaire » | palier `PRIORITY` : staff `tournaments`, cast, engagés **hors match** | `highlight` |
+| 6 | `STANDARD` « Mode standard » | palier `STANDARD` : spectateurs, et toujours la page sans compte | `success` |
 
 Écart avec la demande : « prioritaire » n'est pas un régime mais un **palier serveur** ; un joueur en match est lui aussi au palier prioritaire, mais la pastille affiche alors « match » (le régime l'emporte). Sous `MATCH` et `ECO`, qui ne touchent que la peinture, le texte rappelle le palier conservé (`syncModeTierNote`) et la liste des autres modes l'omet.
 
@@ -36,3 +36,5 @@ L'en-tête de `/tournois/[id]` (et de `/suivre/tournois/[id]`) porte, à côté 
 - Le témoin global en bas à droite (`ClientPowerBadge`) reste : il porte la case « Ignorer la détection de performances ». Ses textes sont dans `messages/{fr,en}/shell.json`, `clientPower.*`.
 
 Tests : `tests/lib/shared/sync-mode.test.ts`, `tests/tournois/sync-mode-badge.test.tsx`, `tests/app/client-power-badge.test.tsx`.
+
+Pastille : `white-space: nowrap` (`SyncModeBadge.module.css`), jamais coupée en deux lignes à 375 px. Ni bleu (le témoin de flux voisin l'est) ni gris : deux pastilles identiques côte à côte se liraient comme un seul état.

@@ -21,17 +21,21 @@ import {
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import type { TournamentPageKey } from "@/lib/shared/tournament-page-text";
 import { cadenceLabel, type LiveIndicatorProps } from "./LiveIndicator";
+import styles from "./SyncModeBadge.module.css";
 
 /**
  * Variante sémantique par mode. Jamais le rouge (`pill-live`, réservé à ce qui
- * est à l'antenne) ; l'ambre seulement pour le mode dégradé (flux coupé).
+ * est à l'antenne) ; l'ambre seulement pour le mode dégradé (flux coupé) ; ni
+ * le bleu ni le gris : le témoin de flux voisin est bleu, et deux pastilles
+ * identiques côte à côte se lisent comme un seul état. Les régimes de peinture
+ * (match, éco, veille) partagent le violet, un seul mode s'affichant à la fois.
  */
-const SYNC_MODE_VARIANT: Record<SyncMode, PillVariant> = {
-  PRIORITY: "blue",
-  STANDARD: "info",
+export const SYNC_MODE_VARIANT: Record<SyncMode, PillVariant> = {
+  PRIORITY: "highlight",
+  STANDARD: "success",
   MATCH: "accent",
-  ECO: "success",
-  SLEEP: "neutral",
+  ECO: "accent",
+  SLEEP: "accent",
   POLLING: "warning",
 };
 
@@ -121,7 +125,7 @@ export function SyncModeBadge(props: Readonly<SyncModeProps>) {
   if (state === null) return null;
   const { mode } = state;
   return (
-    <Pill variant={SYNC_MODE_VARIANT[mode]} data-sync-mode={mode.toLowerCase()}>
+    <Pill variant={SYNC_MODE_VARIANT[mode]} className={styles.badge} data-sync-mode={mode.toLowerCase()}>
       {t(`live.sync.modes.${mode}.label`)}
     </Pill>
   );

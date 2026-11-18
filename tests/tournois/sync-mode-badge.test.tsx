@@ -20,6 +20,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { FR_TOURNAMENT_PAGE_TEXT, tournamentPageMessages } from "@/lib/shared/tournament-page-text";
 import { readSource } from "../helpers/read-source";
 import {
+  SYNC_MODE_VARIANT,
   SyncModeBadge,
   SyncModeExplanation,
   syncModeNowTextKey,
@@ -76,6 +77,20 @@ describe("SyncModeBadge", () => {
 
   it("page sans compte : jamais prioritaire", () => {
     expect(spectator(<SyncModeBadge isLive tier="PRIORITY" />)).toContain(fr.modes.STANDARD.label);
+  });
+
+  it("variantes : ni bleu (témoin voisin) ni gris, l'ambre seulement pour le mode secours", () => {
+    for (const mode of SYNC_MODES) {
+      const variant = SYNC_MODE_VARIANT[mode];
+      expect(["blue", "neutral", "live", "default"]).not.toContain(variant);
+      expect(variant === "warning").toBe(mode === "POLLING");
+    }
+  });
+
+  it("le libellé ne passe jamais à la ligne dans la pastille", () => {
+    const html = renderToStaticMarkup(<SyncModeBadge isLive tier="PRIORITY" />);
+    expect(html).toContain("badge");
+    expect(readSource("app/(secured)/tournois/[id]/_components/SyncModeBadge.module.css")).toMatch(/white-space: nowrap/);
   });
 
   it("jamais de rouge ni de zone live, relecture comprise", () => {
