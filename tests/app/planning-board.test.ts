@@ -102,6 +102,11 @@ describe("candidatesFor", () => {
 });
 
 describe("errorKey / weekWindow / leadUntil / COVERAGE_PILL", () => {
+  it("errorKey_rateLimited_ownTextInBothLanguages", () => {
+    expect(errorKey("TOO_MANY_REQUESTS", frPlanning.errors)).toBe("TOO_MANY_REQUESTS");
+    expect(errorKey("TOO_MANY_REQUESTS", enPlanning.errors)).toBe("TOO_MANY_REQUESTS");
+  });
+
   it("errorKey_known_returnsCode", () => {
     expect(errorKey("PLANNING_BUSY", { PLANNING_BUSY: "x" })).toBe("PLANNING_BUSY");
   });

@@ -83,6 +83,14 @@ describe("loadPlanningView — comptes", () => {
     expect(view.members[0].soloCaster).toBe(true);
   });
 
+  it("loadPlanningView_members_serverOnlyFieldsLeftOut", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false })]);
+
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.members).toEqual([{ userId: 4, pseudo: "Membre", roles: ["CASTER"], soloCaster: false }]);
+  });
+
   it("loadPlanningView_passesCachedUsersToTheLoad", async () => {
     await loadPlanningView(caster, MONDAY);
 
@@ -169,6 +177,18 @@ describe("visibleAssignment", () => {
 
   it("visibleAssignment_otherMemberLoad_becomesAuto", () => {
     expect(visibleAssignment({ ...preference, reason: "LOAD" }, 4, false).reason).toBe("AUTO");
+  });
+
+  it("visibleAssignment_unknownReasonForOther_maskedAsAuto", () => {
+    // Un motif encore inconnu de la liste blanche (ajouté plus tard au type).
+    const future = { ...preference, reason: String("AVAILABLE_ONLY") as PlanningAssignmentView["reason"] };
+
+    expect(visibleAssignment(future, 4, false).reason).toBe("AUTO");
+  });
+
+  it("visibleAssignment_otherMemberCastOrMatch_unchanged", () => {
+    expect(visibleAssignment({ ...preference, reason: "CAST" }, 4, false).reason).toBe("CAST");
+    expect(visibleAssignment({ ...preference, reason: "MATCH" }, 4, false).reason).toBe("MATCH");
   });
 
   it("visibleAssignment_otherMemberManual_unchanged", () => {

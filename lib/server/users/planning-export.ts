@@ -7,7 +7,8 @@ import type { PersonalDataExport } from "@/lib/shared/types";
 /**
  * Ce que le planning des casts et arbitres garde du titulaire, pour l'export
  * (art. 15 et 20, `docs/features/CAST_PLANNING.md`) : ses disponibilités et
- * préférences, les attributions qui le nomment, leur historique (attribué,
+ * préférences, les attributions qui le nomment (avec leur motif : préférence,
+ * charge, choix du staff…), leur historique (attribué,
  * confirmé, retiré — sans dire quel membre du staff a fait le geste) et son
  * réglage « caster autonome ». Tables tolérées : une base qui en manque n'a rien à exporter.
  */
@@ -27,8 +28,8 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       `SELECT entry_key, tournament_id, match_id, role, status, preferred, updated_at
          FROM bg_planning_availability WHERE user_id = ? ORDER BY updated_at, entry_key, role`,
     ),
-    tolerant<RowDataPacket & { entry_key: string; tournament_id: number; match_id: number | null; role: string; source: string; confirmed: number; created_at: Date | null }>(
-      `SELECT entry_key, tournament_id, match_id, role, source, confirmed, created_at
+    tolerant<RowDataPacket & { entry_key: string; tournament_id: number; match_id: number | null; role: string; source: string; reason: string; confirmed: number; created_at: Date | null }>(
+      `SELECT entry_key, tournament_id, match_id, role, source, reason, confirmed, created_at
          FROM bg_planning_assignments WHERE user_id = ? ORDER BY created_at, entry_key, role`,
     ),
     tolerant<RowDataPacket & { tournament_id: number; match_id: number | null; role: string; kind: string; source: string; created_at: Date | null }>(
@@ -51,6 +52,7 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       matchId: row.match_id === null ? null : Number(row.match_id),
       role: row.role,
       source: row.source,
+      reason: row.reason,
       confirmed: Boolean(row.confirmed),
       createdAt: toIso(row.created_at),
     })),

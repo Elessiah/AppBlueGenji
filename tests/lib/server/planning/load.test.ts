@@ -192,8 +192,17 @@ describe("loadPlanningMembersByIds", () => {
     ]);
 
     expect(await loadPlanningMembersByIds(executor, [4, 9])).toEqual([
-      { userId: 4, pseudo: "Caster", roles: ["CASTER"], soloCaster: true },
+      { userId: 4, pseudo: "Caster", roles: ["CASTER"], soloCaster: true, seesHidden: false },
     ]);
+  });
+
+  it("loadPlanningMembersByIds_admin_seesHidden", async () => {
+    jest.mocked(resolveRoles).mockReturnValue([]);
+    connection.execute.mockResolvedValue([[{ id: 1, pseudo: "Admin", is_admin: 1, platform_roles_json: null, solo_caster: null }], []]);
+
+    const [admin] = await loadPlanningMembersByIds(executor, [1]);
+
+    expect(admin.seesHidden).toBe(true);
   });
 });
 

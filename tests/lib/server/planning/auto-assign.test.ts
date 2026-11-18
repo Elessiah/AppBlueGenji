@@ -9,6 +9,7 @@ jest.mock("@/lib/server/planning/load", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
   loadPlanningData: jest.fn(),
   loadPlanningHistory: jest.fn(),
+  loadPlanningMembersByIds: jest.fn(),
 }));
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/planning/players", () => ({
@@ -30,7 +31,7 @@ import {
   withPlanningLock,
   writeEvent,
 } from "@/lib/server/planning/auto-assign";
-import { loadPlanningData, loadPlanningHistory } from "@/lib/server/planning/load";
+import { loadPlanningData, loadPlanningHistory, loadPlanningMembersByIds } from "@/lib/server/planning/load";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -238,6 +239,14 @@ describe("excludeFromHidden", () => {
     excludeFromHidden({ members: [loadedMember({ userId: 3, roles: ["REFEREE", "CASTER"] })] }, [hidden], excluded);
 
     expect(excluded.size).toBe(0);
+  });
+
+  it("excludeFromHidden_refereeRoleWithoutSeesHidden_excluded", () => {
+    const excluded = new Set<string>();
+
+    excludeFromHidden({ members: [loadedMember({ userId: 3, roles: ["REFEREE"], seesHidden: false })] }, [hidden], excluded);
+
+    expect([...excluded]).toEqual(["t:10|3|REFEREE"]);
   });
 
   it("excludeFromHidden_visibleEntry_nothingExcluded", () => {
@@ -521,6 +530,58 @@ describe("confirmAssignments", () => {
   ];
   /** Les données relues au geste, membres (rôles du moment) compris. */
   const confirmData = (overrides: Parameters<typeof planningData>[0] = {}) => planningData({ members, ...overrides });
+
+  beforeEach(() => {
+    // Relecture sous le verrou final : par défaut, les mêmes comptes qu'au début du geste.
+    jest.mocked(loadPlanningMembersByIds).mockImplementation(async (_executor, ids) => members.filter((member) => ids.includes(member.userId)));
+  });
+
+  it("confirmAssignments_roleLostDuringDesignations_removedNotConfirmed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([]);
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(jest.mocked(loadPlanningMembersByIds).mock.calls[0][1]).toEqual([4]);
+    expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_events (entry_ke"]);
+    expect(writeParams()[1]).toContain("REMOVED");
+  });
+
+  it("confirmAssignments_hiddenEntryCasterWithoutTournaments_refused", async () => {
+    const hidden = loadedEntry({ key: "m:1", matchId: 1, hidden: true });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [hidden], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(writeParams()[1]).toContain("REMOVED");
+  });
+
+  it("confirmAssignments_hiddenEntryMemberSeeingHidden_confirmed", async () => {
+    const hidden = loadedEntry({ key: "m:1", matchId: 1, hidden: true });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [hidden], assignments: [loadedAssignment({ entryKey: "m:1", userId: 5, role: "CASTER" })] }),
+    );
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 1, refused: 0 });
+  });
+
+  it("confirmAssignments_matchRefereeOnly_notReReadByIds", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
+  });
 
   it("confirmAssignments_subset_confirmsOnlyNamedProvisional", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(

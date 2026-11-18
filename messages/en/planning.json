@@ -111,6 +111,7 @@
     "solo": "Setting saved."
   },
   "errors": {
+    "TOO_MANY_REQUESTS": "Too many actions in a row. Wait a few minutes before trying again.",
     "UNAUTHORIZED": "Your session has expired: sign in again.",
     "FORBIDDEN": "This action is reserved for tournament staff.",
     "NETWORK_ERROR": "Cannot connect. Check your network and try again.",

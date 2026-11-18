@@ -8,7 +8,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { resolveRoles } from "@/lib/server/auth";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
-import { rolesGranting } from "@/lib/shared/permissions";
+import { can, rolesGranting } from "@/lib/shared/permissions";
 import {
   PLANNING_HORIZON_DAYS,
   PLANNING_PAST_DAYS,
@@ -87,7 +87,11 @@ export type LoadedAssignment = {
 /** Retrait manuel par le staff (`bg_planning_events`) : le calcul ne replace plus ce membre sur ce rôle de cette entrée. */
 export type LoadedRemoval = { entryKey: string; userId: number; role: PlanningRole };
 
-export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole[]; soloCaster: boolean };
+/**
+ * Un compte du planning. `seesHidden` : il voit les tournois encore cachés
+ * (permission `tournaments`, la même que `includeHidden` des lectures).
+ */
+export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole[]; soloCaster: boolean; seesHidden: boolean };
 
 export type PlanningData = {
   entries: LoadedEntry[];
@@ -323,15 +327,19 @@ export async function loadPlanningMembers(executor: Executor): Promise<LoadedMem
 
 function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
   return rows
-    .map((row) => ({
-      userId: Number(row.id),
-      pseudo: visibleText(row.pseudo),
-      roles: planningRolesOf({
+    .map((row) => {
+      const account = {
         isAdmin: Number(row.is_admin) === 1,
         roles: resolveRoles(Number(row.is_admin) === 1, row.platform_roles_json),
-      }),
-      soloCaster: Number(row.solo_caster ?? 0) === 1,
-    }))
+      };
+      return {
+        userId: Number(row.id),
+        pseudo: visibleText(row.pseudo),
+        roles: planningRolesOf(account),
+        soloCaster: Number(row.solo_caster ?? 0) === 1,
+        seesHidden: can(account, "tournaments"),
+      };
+    })
     .filter((member) => member.roles.length > 0);
 }
 

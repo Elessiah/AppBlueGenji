@@ -16,9 +16,10 @@ beforeEach(() => {
   jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
 });
 
-function routeSql(tables: { events?: unknown[]; missing?: boolean } = {}) {
+function routeSql(tables: { events?: unknown[]; assignments?: unknown[]; missing?: boolean } = {}) {
   execute.mockImplementation(async (sql: string) => {
     if (tables.missing) throw Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" });
+    if (sql.includes("FROM bg_planning_assignments")) return [tables.assignments ?? [], []];
     if (sql.includes("FROM bg_planning_events")) return [tables.events ?? [], []];
     return [[], []];
   });
@@ -48,6 +49,20 @@ describe("exportOwnPlanning", () => {
     expect(sql).toContain("WHERE user_id = ?");
     expect(sql).not.toContain("actor_user_id");
     expect(params).toEqual([4]);
+  });
+
+  it("exportOwnPlanning_assignments_includeReason", async () => {
+    routeSql({
+      assignments: [
+        { entry_key: "m:1", tournament_id: 10, match_id: 1, role: "CASTER", source: "AUTO", reason: "PREFERENCE", confirmed: 0, created_at: new Date("2026-11-20T18:00:00.000Z") },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.assignments).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", source: "AUTO", reason: "PREFERENCE", confirmed: false, createdAt: "2026-11-20T18:00:00.000Z" },
+    ]);
   });
 
   it("exportOwnPlanning_tablesMissing_emptyLists", async () => {

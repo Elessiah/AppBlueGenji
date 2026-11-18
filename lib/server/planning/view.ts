@@ -53,8 +53,12 @@ async function pageMembers(connection: Executor, now: number): Promise<LoadedMem
  */
 export function visibleAssignment(row: PlanningAssignmentView, readerId: number, canManage: boolean): PlanningAssignmentShown {
   if (canManage || row.userId === readerId) return row;
-  return row.reason === "PREFERENCE" || row.reason === "LOAD" ? { ...row, reason: "AUTO" } : row;
+  // Liste blanche : un motif ajouté plus tard reste masqué tant qu'il n'y est pas.
+  return SHARED_REASONS.has(row.reason) ? row : { ...row, reason: "AUTO" };
 }
+
+/** Motifs qui ne disent rien de ce que la personne a déclaré : lisibles de tous. */
+const SHARED_REASONS: ReadonlySet<PlanningAssignmentView["reason"]> = new Set<PlanningAssignmentView["reason"]>(["MANUAL", "CAST", "MATCH"]);
 
 /** Les disponibilités regroupées par entrée, en un seul passage. */
 function groupAvailability(rows: readonly LoadedAvailability[]): Map<string, LoadedAvailability[]> {
@@ -115,7 +119,8 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     myRoles: planningRolesOf(user),
     canManage,
     entries,
-    members: data.members.map((member) => ({ ...member })),
+    // Champs nommés : ce que la page montre, rien de plus (`seesHidden` reste au serveur).
+    members: data.members.map(({ userId, pseudo, roles, soloCaster }) => ({ userId, pseudo, roles, soloCaster })),
     durations: data.durations,
   };
 }

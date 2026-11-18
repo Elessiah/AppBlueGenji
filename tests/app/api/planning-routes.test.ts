@@ -398,6 +398,11 @@ describe("plafonds des routes du planning", () => {
     expect(runAutoAssign).toHaveBeenCalledTimes(PLANNING_BATCH_RULE.limit);
   });
 
+  it("planningReadRule_budget_coversEveryAllowedGestureReload", () => {
+    expect(PLANNING_READ_RULE.windowMs).toBe(PLANNING_WRITE_RULE.windowMs);
+    expect(PLANNING_READ_RULE.limit).toBeGreaterThan(PLANNING_WRITE_RULE.limit + PLANNING_BATCH_RULE.limit);
+  });
+
   it("planningGet_plainPlayer_403NotCounted", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     for (let call = 0; call < PLANNING_READ_RULE.limit + 1; call += 1) await planningGet();

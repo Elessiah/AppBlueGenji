@@ -68,8 +68,10 @@ export function loadedAssignment(overrides: Partial<LoadedAssignment> = {}): Loa
   return { entryKey: "m:1", userId: 1, role: "REFEREE", source: "AUTO", reason: "LOAD", confirmed: false, ...overrides };
 }
 
+/** `seesHidden` suit par défaut le rôle d'arbitre (tous deux viennent de `tournaments`). */
 export function loadedMember(overrides: Partial<LoadedMember> = {}): LoadedMember {
-  return { userId: 1, pseudo: "Membre", roles: ["REFEREE"], soloCaster: false, ...overrides };
+  const roles = overrides.roles ?? ["REFEREE"];
+  return { userId: 1, pseudo: "Membre", roles, soloCaster: false, seesHidden: roles.includes("REFEREE"), ...overrides };
 }
 
 export function planningData(overrides: Partial<PlanningData> = {}): PlanningData {

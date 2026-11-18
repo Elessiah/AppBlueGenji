@@ -486,13 +486,16 @@ export const TEAM_OWN_ROLES_WRITE_RULE: RateLimitRule = {
 
 /**
  * Lectures du planning des casts et arbitres (`GET /api/planning`), par
- * compte : une page en lit une à l'ouverture et après chaque geste de lot ;
- * sans plafond, un membre en boucle occupait le pool (sept lectures chacune).
+ * compte : une page en lit une à l'ouverture et après chaque geste qui ne se
+ * reporte pas sur place ; sans plafond, un membre en boucle occupait le pool
+ * (sept lectures chacune). Au-dessus de la somme des gestes permis
+ * (`PLANNING_WRITE_RULE` + `PLANNING_BATCH_RULE`, même fenêtre) : une rafale
+ * de gestes acceptés ne se voit jamais refuser sa relecture.
  */
 export const PLANNING_READ_RULE: RateLimitRule = {
   name: "planning-read",
-  limit: 60,
-  windowMs: 60_000,
+  limit: 400,
+  windowMs: 5 * 60_000,
 };
 
 /**

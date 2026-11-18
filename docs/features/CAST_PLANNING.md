@@ -27,15 +27,19 @@ compte suit `can(user, "planning")`. Les disponibilités des autres ne sont
 lues que par `tournaments` : sans elle, la lecture ne rend de la base que les
 siennes (`availabilityOf`). La raison « Préférence » / « Charge » d'une
 proposition faite à un autre devient « Calcul » (`AUTO`, `visibleAssignment`)
-pour qui n'a pas `tournaments` : elle dirait ce que l'autre a demandé. Un
+pour qui n'a pas `tournaments` : elle dirait ce que l'autre a demandé. Le
+masque est une liste blanche (`MANUAL`, `CAST`, `MATCH` restent lisibles) : un
+motif ajouté plus tard est masqué d'office. Un
 tournoi encore caché n'est proposé par le calcul qu'aux membres qui le voient
 (`excludeFromHidden`). Rien n'est publié sur Discord.
 
 Plafonds par compte (`api-guard.ts`), posés après le contrôle de permission :
-`PLANNING_READ_RULE` (60 lectures / min), `PLANNING_WRITE_RULE` (180 gestes
-unitaires / 5 min, disponibilité, autonome, désignation, réglages),
-`PLANNING_BATCH_RULE` (20 calculs ou confirmations / 5 min, chacun tenant le
-verrou `bg_planning`).
+`PLANNING_READ_RULE` (400 lectures / 5 min, plus que la somme des gestes
+permis : la relecture d'un geste accepté n'est jamais refusée),
+`PLANNING_WRITE_RULE` (180 gestes unitaires / 5 min, disponibilité, autonome,
+désignation, réglages), `PLANNING_BATCH_RULE` (20 calculs ou confirmations /
+5 min, chacun tenant le verrou `bg_planning`). Le refus `429`
+(`TOO_MANY_REQUESTS`) a son texte dans `planning.errors`.
 
 ## Entrées
 
@@ -179,8 +183,12 @@ compte les **rôles**, pas les personnes.
   passage du verrou `bg_planning` qui relit d'abord la proposition
   (`PROPOSAL_STILL_PENDING_SQL`) : un retrait du staff fait entre-temps n'est
   jamais défait sur le match. Les écritures du planning suivent sous le verrou.
-  Une proposition dont le membre ne tient plus le rôle est retirée, jamais
-  confirmée (`confirmSteps`, rôles relus au geste).
+  Une proposition dont le membre ne tient plus le rôle, ou qui porte sur un
+  tournoi encore caché qu'il ne voit pas, est retirée, jamais confirmée
+  (`canStillHold`) : rôles relus au geste (`confirmSteps`) puis encore sous le
+  verrou final, par leur clé (`refuseLostRoles`), les désignations pouvant
+  durer. Un `PLANNING_BUSY` en pleine série est une panne : ce qui est décidé
+  s'écrit, le geste se relance.
 - `bg_planning_events` : index `(entry_key, kind, source)` pour les retraits
   manuels ; les lectures par entrée passent par les clés primaires.
 - Écran : une relecture garde l'identité des entrées inchangées (`mergeView`),
@@ -207,7 +215,7 @@ lancée par `instrumentation.ts`) : tout ce qui concerne une entrée
 autonome dès que le compte ne tient plus de rôle du planning. Suppression du
 compte : ses lignes partent, ses gestes de staff restent sans le désigner
 (`account-erasure.ts`). Export des données : `planning` (`planning-export.ts`) — disponibilités,
-attributions, historique (`history` : attribuée, confirmée, retirée, sans
+attributions (avec leur motif), historique (`history` : attribuée, confirmée, retirée, sans
 l'auteur du geste) et réglage autonome.
 
 ## Interface

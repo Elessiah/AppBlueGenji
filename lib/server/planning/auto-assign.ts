@@ -22,7 +22,15 @@ import {
   type PlannerInput,
 } from "@/lib/shared/planning-planner";
 import type { AutoAssignReport, ConfirmReport } from "@/lib/shared/planning-view";
-import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type PlanningData } from "./load";
+import {
+  loadPlanningData,
+  loadPlanningHistory,
+  loadPlanningMembersByIds,
+  type Executor,
+  type LoadedEntry,
+  type LoadedMember,
+  type PlanningData,
+} from "./load";
 import { entryAssignments } from "./model";
 import { loadEntryPlayers, playersDuring } from "./players";
 
@@ -74,7 +82,7 @@ export function excludeFromHidden(data: Pick<PlanningData, "members">, entries: 
   const hidden = entries.filter((entry) => entry.hidden);
   if (hidden.length === 0) return;
   for (const member of data.members) {
-    if (member.roles.includes("REFEREE")) continue;
+    if (member.seesHidden) continue;
     for (const entry of hidden) {
       for (const role of member.roles) excluded.add(exclusionKey(entry.key, member.userId, role));
     }
@@ -361,17 +369,27 @@ export function isMatchRefereeRefusal(error: unknown): boolean {
 type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; refused: boolean; settled: boolean };
 
 /**
- * Les propositions à confirmer. Une proposition dont le membre ne tient plus
- * le rôle (rôle retiré, compte supprimé depuis le calcul : `data.members` est
- * relu à chaque geste) est retirée, jamais confirmée.
+ * Le membre peut-il encore tenir cette proposition : il a toujours le rôle
+ * (ni rôle retiré, ni compte supprimé) et voit l'entrée (un tournoi encore
+ * caché ne va qu'à qui voit les tournois cachés, `excludeFromHidden`).
+ */
+export function canStillHold(member: LoadedMember | undefined, entry: LoadedEntry, role: PlanningRole): boolean {
+  return member !== undefined && member.roles.includes(role) && (!entry.hidden || member.seesHidden);
+}
+
+/**
+ * Les propositions à confirmer. Une proposition que le membre ne peut plus
+ * tenir (`canStillHold` : `data.members` est relu à chaque geste) est retirée,
+ * jamais confirmée ; les rôles se relisent encore sous le verrou, juste avant
+ * l'écriture (`writeConfirmSteps`).
  */
 export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
-  const held = new Map(data.members.map((member) => [member.userId, member.roles]));
+  const members = new Map(data.members.map((member) => [member.userId, member]));
   const steps: ConfirmStep[] = [];
   for (const entry of entriesToConfirm(data, scope)) {
     for (const row of entryAssignments(entry, data).filter((candidate) => candidate.provisional)) {
-      const stillHeld = held.get(row.userId)?.includes(row.role) ?? false;
-      steps.push({ entry, userId: row.userId, role: row.role, refused: !stillHeld, settled: !stillHeld });
+      const held = canStillHold(members.get(row.userId), entry, row.role);
+      steps.push({ entry, userId: row.userId, role: row.role, refused: !held, settled: !held });
     }
   }
   return steps;
@@ -452,14 +470,33 @@ function isMatchReferee(step: ConfirmStep): boolean {
 }
 
 /**
+ * Relit sous le verrou, par leur clé, les comptes des propositions à
+ * confirmer qui ne dépendent d'aucun match (casters, prods, arbitre d'une
+ * entrée « tournoi ») : un rôle retiré pendant les désignations, qui peuvent
+ * durer, retire la proposition au lieu de la confirmer. Un arbitre de match,
+ * lui, suit le match (`assignMatchReferee` a jugé son rôle, `CONFIRM_MATCH_REFEREE_SQL`).
+ */
+async function refuseLostRoles(connection: PoolConnection, steps: readonly ConfirmStep[]): Promise<void> {
+  const pending = steps.filter((step) => !step.refused && !isMatchReferee(step));
+  if (pending.length === 0) return;
+  const members = await loadPlanningMembersByIds(connection, [...new Set(pending.map((step) => step.userId))]);
+  const byId = new Map(members.map((member) => [member.userId, member]));
+  for (const step of pending) {
+    if (!canStillHold(byId.get(step.userId), step.entry, step.role)) step.refused = true;
+  }
+}
+
+/**
  * Les lignes d'une confirmation, d'un bloc : les propositions refusées par le
- * match retirées, les autres confirmées — un arbitre de match seulement si le
- * match l'a encore. Un évènement par ligne vraiment changée : relancer le
+ * match, ou que le membre ne peut plus tenir (rôles relus ici, sous le
+ * verrou), retirées ; les autres confirmées — un arbitre de match seulement si
+ * le match l'a encore. Un évènement par ligne vraiment changée : relancer le
  * geste n'écrit rien deux fois.
  */
 async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
   let confirmed = await confirmPendingReferees(connection, actorId);
   let refused = 0;
+  await refuseLostRoles(connection, steps);
   for (const step of steps) {
     const { entry } = step;
     if (step.refused) {
@@ -502,10 +539,13 @@ export async function confirmAssignments(
   now: number = Date.now(),
 ): Promise<ConfirmReport> {
   // Les désignations d'arbitres de match (chacune sa transaction, son
-  // évènement) se font **avant** le verrou : le tenir pendant des dizaines
-  // d'entre elles ferait échouer en `PLANNING_BUSY` tout autre geste du staff.
-  // Elles sont idempotentes ; les écritures du planning, elles, sont sous le
-  // verrou et gardées (une proposition effacée entre-temps n'est pas confirmée).
+  // évènement) prennent le verrou **une à une**, brièvement, et non d'un bloc :
+  // le tenir pendant des dizaines d'entre elles ferait échouer en
+  // `PLANNING_BUSY` tout autre geste du staff. Chacune relit d'abord sa
+  // proposition (un retrait du staff fait entre-temps n'est pas défait) ; un
+  // verrou trop longtemps tenu ailleurs (`PLANNING_BUSY`) est une panne : la
+  // série s'arrête, ce qui est décidé s'écrit, le geste se relance. Les
+  // écritures du planning suivent sous le verrou, rôles relus (`refuseLostRoles`).
   const data = await withConnection((connection) => loadPlanningData(connection, { now, includeHidden: true }));
   const all = confirmSteps(data, scope);
   const failure = await designateReferees(all, actorId);

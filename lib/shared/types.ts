@@ -1305,7 +1305,8 @@ export type PersonalDataExport = {
    */
   planning: {
     availability: { tournamentId: number; matchId: number | null; role: string; status: string; preferred: boolean; updatedAt: string | null }[];
-    assignments: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
+    /** `reason` : motif de l'attribution (`PREFERENCE`, `LOAD`, `MANUAL`), tel que sa page le lui montre. */
+    assignments: { tournamentId: number; matchId: number | null; role: string; source: string; reason: string; confirmed: boolean; createdAt: string | null }[];
     /** Historique des attributions (attribuée, confirmée, retirée), sans l'auteur du geste. */
     history: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
     soloCaster: boolean | null;
