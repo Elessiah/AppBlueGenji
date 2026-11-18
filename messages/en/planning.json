@@ -8,6 +8,18 @@
   "loading": "Loading the schedule…",
   "empty": "No upcoming slot.",
   "refresh": "Refresh",
+  "filters": {
+    "label": "Filter the agenda",
+    "mine": "My slots",
+    "uncovered": "Needs cover",
+    "tournament": "Tournament",
+    "allTournaments": "All tournaments",
+    "reset": "Reset filters",
+    "count": "{shown, plural, one {# slot shown} other {# slots shown}} of {total}",
+    "empty": "No slot matches these filters.",
+    "hint": "“My slots”: the ones you are assigned to, provisional proposals included. “Needs cover”: a caster, producer or referee is missing (deliberate self-management excluded)."
+  },
+  "mineBadge": "My slot",
   "week": "Week of {date}",
   "hidden": "Unpublished",
   "event": "Whole tournament",
@@ -15,7 +27,6 @@
   "versus": "vs",
   "tbd": "To be decided",
   "until": "until {time}",
-  "channel": "Channel",
   "roles": {
     "REFEREE": "Referee",
     "CASTER": "Caster",
@@ -57,7 +68,6 @@
     "nobody": "Nobody",
     "remove": "Remove {name} ({role})",
     "add": "Add — {role}",
-    "choose": "Choose…",
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
     "unknown": "No answer"
@@ -72,14 +82,13 @@
     "hint": "The calculation proposes, for a whole week, who covers each slot. Its proposals stay provisional until confirmed; staff choices are never replaced.",
     "runWeek": "Calculate the week",
     "runTitle": "Calculate the week of {date}?",
-    "runBody": "This week's provisional proposals are recalculated. Staff choices and confirmed assignments do not move.",
+    "runBody": "The provisional proposals of the whole week, all tournaments included, are recalculated. Staff choices and confirmed assignments do not move.",
     "runConfirm": "Calculate",
     "running": "Calculating…",
     "runDone": "{proposed, plural, one {# proposal} other {# proposals}} across {entries, plural, one {# slot} other {# slots}}.",
     "confirmEntry": "Confirm",
     "confirmEntryLabel": "Confirm the proposals: {slot}",
     "leadLabel": "Confirm what starts within the next hours",
-    "leadHours": "Hours",
     "confirmLead": "Confirm",
     "confirmDone": "{confirmed} confirmed, {refused, plural, =0 {none refused} other {# refused by the match}}."
   },
@@ -130,5 +139,13 @@
     "INVALID_CONFIRM_SCOPE": "Nothing to confirm in this selection.",
     "INVALID_DURATIONS": "A duration is outside the allowed range.",
     "generic": "The operation failed. Try again in a moment."
+  },
+  "staffConfirm": {
+    "entryTitle": "Confirm this slot?",
+    "entryBody": "The provisional proposals on this slot become assignments: the referee is set on the match.",
+    "leadTitle": "Confirm everything starting within {hours, plural, one {# hour} other {# hours}}?",
+    "leadBody": "Every provisional proposal on slots starting by then becomes an assignment: referees are set on their matches.",
+    "confirm": "Confirm",
+    "pending": "Confirming…"
   }
 }

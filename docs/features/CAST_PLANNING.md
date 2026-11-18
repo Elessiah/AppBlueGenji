@@ -166,10 +166,15 @@ compte : ses lignes partent, ses gestes de staff restent sans le désigner
 
 ## Interface
 
-`app/(secured)/planning/` : semaines, cartes d'entrée (couverture en pastilles,
+`app/(secured)/planning/` : agenda par semaine puis par jour (Paris), filtres
+(« Mes créneaux » = attribué·e, proposition provisoire comprise ; « À couvrir » =
+il manque un caster, un prod ou un arbitre, hors autogestion voulue ; un
+tournoi) avec compteur, aides « i » (filtres, couverture, raisons) pour tous les
+membres, créneau du lecteur surligné (« Mon créneau »), cartes d'entrée (couverture en pastilles,
 `warning` réservé à « à arbitrer en priorité »), sa réponse par rôle (contrôle
 segmenté + étoile de préférence), panneau du staff (calcul de la semaine par
-`ConfirmActionDialog`, confirmation par délai ou par entrée, casters autonomes,
+`ConfirmActionDialog`, confirmation par délai ou par entrée, elle aussi derrière
+`ConfirmActionDialog` (elle pose l'arbitre sur le match), casters autonomes,
 durées). Textes : espace de noms `planning` (FR, EN).
 
 ## Tests

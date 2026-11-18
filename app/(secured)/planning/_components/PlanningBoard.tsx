@@ -23,12 +23,18 @@ import type {
 import { scopedText } from "@/lib/shared/scoped-text";
 import {
   COVERAGE_PILL,
+  NO_FILTERS,
   candidatesFor,
   errorKey,
+  filterEntries,
+  filtersActive,
   groupByWeek,
   hasProvisional,
+  heldBy,
   leadUntil,
+  tournamentChoices,
   weekWindow,
+  type PlanningFilters,
 } from "../_lib/planning-board";
 import styles from "../planning.module.css";
 
@@ -43,6 +49,7 @@ function formatters(locale: Locale) {
     slot: new Intl.DateTimeFormat(tag, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE }),
     time: new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE }),
     day: new Intl.DateTimeFormat(tag, { day: "numeric", month: "long", timeZone: TIME_ZONE }),
+    dayLong: new Intl.DateTimeFormat(tag, { weekday: "long", day: "numeric", month: "long", timeZone: TIME_ZONE }),
   };
 }
 
@@ -76,6 +83,8 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   const [view, setView] = useState<PlanningView | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [runWeek, setRunWeek] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState<ConfirmTarget | null>(null);
+  const [filters, setFilters] = useState<PlanningFilters>(NO_FILTERS);
 
   const fail = useCallback(
     (error: unknown) => showError(t(`errors.${errorKey((error as Error).message, messages.errors)}` as never)),
@@ -123,7 +132,11 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   };
 
   const names = useMemo(() => new Map((view?.members ?? []).map((member) => [member.userId, member.pseudo])), [view]);
-  const weeks = useMemo(() => groupByWeek(view?.entries ?? []), [view]);
+  const shown = useMemo(() => filterEntries(view?.entries ?? [], filters, view?.me ?? 0), [view, filters]);
+  const weeks = useMemo(() => groupByWeek(shown), [shown]);
+  const tournaments = useMemo(() => tournamentChoices(view?.entries ?? []), [view]);
+  // Un tournoi choisi qui n'a plus de créneau (relecture) : le filtre retombe sur « tous ».
+  const tournamentId = tournaments.some((choice) => choice.id === filters.tournamentId) ? filters.tournamentId : null;
 
   if (!view) {
     return (
@@ -136,6 +149,8 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   const isCaster = view.myRoles.includes("CASTER");
   const meSolo = view.members.find((member) => member.userId === view.me)?.soloCaster ?? false;
 
+  const active = filtersActive({ ...filters, tournamentId });
+  const patch = (change: Partial<PlanningFilters>) => setFilters({ ...filters, tournamentId, ...change });
   return (
     <div className={styles.board}>
       <div className={styles.toolbar}>
@@ -162,10 +177,72 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
         </BusyButton>
       </div>
 
-      {view.canManage && <StaffPanel text={text} view={view} pending={pending} act={act} />}
+      <section className={styles.filters} aria-label={t("filters.label")}>
+        <div className={styles.filterRow} data-tap-zone>
+          <button type="button" className={styles.chip} aria-pressed={filters.mine} onClick={() => patch({ mine: !filters.mine })}>
+            {t("filters.mine")}
+          </button>
+          <button
+            type="button"
+            className={styles.chip}
+            aria-pressed={filters.uncovered}
+            onClick={() => patch({ uncovered: !filters.uncovered })}
+          >
+            {t("filters.uncovered")}
+          </button>
+          <label className={styles.tournamentFilter}>
+            <span className="sr-only">{t("filters.tournament")}</span>
+            <select
+              className={styles.select}
+              value={tournamentId ?? ""}
+              onChange={(event) => {
+                const id = Number.parseInt(event.target.value, 10);
+                patch({ tournamentId: Number.isSafeInteger(id) && id > 0 ? id : null });
+              }}
+            >
+              <option value="">{t("filters.allTournaments")}</option>
+              {tournaments.map((choice) => (
+                <option key={choice.id} value={choice.id}>
+                  {choice.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {active && (
+            <button type="button" className={styles.linkButton} onClick={() => setFilters(NO_FILTERS)}>
+              {t("filters.reset")}
+            </button>
+          )}
+        </div>
+        <div className={styles.hints}>
+          <InfoHintRow>
+            <span className={styles.muted}>{t("filters.label")}</span>
+            <InfoHint id="planning-filters-hint" subject={t("filters.label")}>
+              {t("filters.hint")}
+            </InfoHint>
+          </InfoHintRow>
+          <InfoHintRow>
+            <span className={styles.muted}>{t("coverage.label")}</span>
+            <InfoHint id="planning-coverage-hint" subject={t("coverage.label")}>
+              {t("coverage.hint")}
+            </InfoHint>
+          </InfoHintRow>
+          <InfoHintRow>
+            <span className={styles.muted}>{t("assignment.reasonSubject")}</span>
+            <InfoHint id="planning-reason-hint" subject={t("assignment.reasonSubject")}>
+              {t("assignment.reasonHint")}
+            </InfoHint>
+          </InfoHintRow>
+        </div>
+        <output className={styles.count}>{t("filters.count", { shown: shown.length, total: view.entries.length })}</output>
+      </section>
+
+      {view.canManage && (
+        <StaffPanel text={text} view={view} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
+      )}
 
       {weeks.length === 0 ? (
-        <p className={styles.empty}>{t("empty")}</p>
+        <p className={styles.empty}>{t(view.entries.length === 0 ? "empty" : "filters.empty")}</p>
       ) : (
         weeks.map((week) => (
           <section key={week.weekStart} className={styles.week} aria-labelledby={`planning-week-${week.weekStart}`}>
@@ -184,23 +261,53 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
                 </BusyButton>
               )}
             </header>
-            <ul className={styles.entries}>
-              {week.entries.map((entry) => (
-                <EntryCard
-                  key={entry.key}
-                  entry={entry}
-                  view={view}
-                  text={text}
-                  names={names}
-                  slot={format.slot.format(Date.parse(entry.startAt))}
-                  until={format.time.format(Date.parse(entry.endAt))}
-                  pending={pending}
-                  act={act}
-                />
-              ))}
-            </ul>
+            {week.days.map((day) => (
+              <div key={day.dayStart} className={styles.day}>
+                <h3 className={styles.dayTitle}>{format.dayLong.format(day.dayStart)}</h3>
+                <ul className={styles.entries}>
+                  {day.entries.map((entry) => {
+                    const slot = format.slot.format(Date.parse(entry.startAt));
+                    return (
+                      <EntryCard
+                        key={entry.key}
+                        entry={entry}
+                        view={view}
+                        text={text}
+                        names={names}
+                        slot={slot}
+                        until={format.time.format(Date.parse(entry.endAt))}
+                        pending={pending}
+                        act={act}
+                        onConfirm={() => setConfirming({ kind: "entry", key: entry.key, slot: `${entry.tournamentName} · ${slot}` })}
+                      />
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </section>
         ))
+      )}
+
+      {confirming !== null && (
+        <ConfirmActionDialog
+          title={confirming.kind === "entry" ? t("staffConfirm.entryTitle") : t("staffConfirm.leadTitle", { hours: confirming.hours })}
+          confirmLabel={t("staffConfirm.confirm")}
+          pendingLabel={t("staffConfirm.pending")}
+          tone="primary"
+          onClose={() => setConfirming(null)}
+          onConfirm={() => {
+            const body = confirming.kind === "entry" ? { entryKeys: [confirming.key] } : { until: leadUntil(Date.now(), confirming.hours) };
+            return act(
+              confirming.kind === "entry" ? `confirm:${confirming.key}` : "confirm:lead",
+              () => call<{ report: ConfirmReport }>("/api/admin/planning/confirm", json("POST", body)),
+              ({ report }) => t("staff.confirmDone", { confirmed: report.confirmed, refused: report.refused }),
+            );
+          }}
+        >
+          {confirming.kind === "entry" && <p>{confirming.slot}</p>}
+          <p>{t(confirming.kind === "entry" ? "staffConfirm.entryBody" : "staffConfirm.leadBody")}</p>
+        </ConfirmActionDialog>
       )}
 
       {runWeek !== null && (
@@ -225,6 +332,9 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   );
 }
 
+/** Le geste de confirmation en attente de l'accord du staff : une entrée, ou ce qui commence dans `hours` heures. */
+type ConfirmTarget = { kind: "entry"; key: string; slot: string } | { kind: "lead"; hours: number };
+
 type Act = <T>(gesture: string, task: () => Promise<T>, success: (result: T) => string) => Promise<boolean>;
 
 function Entrant({ entrant, text }: Readonly<{ entrant: PlanningEntrant | null; text: Text }>) {
@@ -245,6 +355,7 @@ function EntryCard({
   until,
   pending,
   act,
+  onConfirm,
 }: Readonly<{
   entry: PlanningEntryView;
   view: PlanningView;
@@ -254,6 +365,7 @@ function EntryCard({
   until: string;
   pending: string | null;
   act: Act;
+  onConfirm: () => void;
 }>) {
   const { t } = text;
   const coverage = entry.coverage;
@@ -261,14 +373,16 @@ function EntryCard({
   if (entry.kind === "TOURNAMENT") title = t("event");
   else if (entry.roundNumber !== null) title = t("round", { round: entry.roundNumber });
   const label = `${entry.tournamentName} · ${slot}`;
+  const mine = heldBy(entry, view.me);
   return (
-    <li className={styles.entry} data-tap-zone>
+    <li className={styles.entry} data-tap-zone data-mine={mine || undefined}>
       <div className={styles.entryHead}>
         <div className={styles.entryWhen}>
           <span className={styles.slot}>{slot}</span>
           <span className={styles.muted}>{t("until", { time: until })}</span>
         </div>
         <div className={styles.pills}>
+          {mine && <Pill variant="highlight">{t("mineBadge")}</Pill>}
           <Pill variant={COVERAGE_PILL[coverage.level]}>{t(`coverage.${coverage.level}`)}</Pill>
           {coverage.refereePriority && <Pill variant="warning">{t("coverage.priority")}</Pill>}
           {coverage.casterNeedsProd && <Pill variant="neutral">{t("coverage.needsProd")}</Pill>}
@@ -302,13 +416,7 @@ function EntryCard({
           blocked={pending !== null}
           className={styles.button}
           aria-label={t("staff.confirmEntryLabel", { slot: label })}
-          onClick={() =>
-            void act(
-              `confirm:${entry.key}`,
-              () => call<{ report: ConfirmReport }>("/api/admin/planning/confirm", json("POST", { entryKeys: [entry.key] })),
-              ({ report }) => t("staff.confirmDone", { confirmed: report.confirmed, refused: report.refused }),
-            )
-          }
+          onClick={onConfirm}
         >
           {t("staff.confirmEntry")}
         </BusyButton>
@@ -464,7 +572,8 @@ function StaffPanel({
   view,
   pending,
   act,
-}: Readonly<{ text: Text; view: PlanningView; pending: string | null; act: Act }>) {
+  onConfirmLead,
+}: Readonly<{ text: Text; view: PlanningView; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
   const { t } = text;
   const [hours, setHours] = useState(48);
   const [durations, setDurations] = useState<PlanningDurationSettings>(view.durations);
@@ -477,7 +586,7 @@ function StaffPanel({
     [min, max]: readonly [number, number],
     change: (value: number) => PlanningDurationSettings,
   ) => (
-    <label className={styles.field} htmlFor={id}>
+    <label className={`field ${styles.field}`} htmlFor={id}>
       <span>{label}</span>
       <NumberInput id={id} className={styles.number} min={min} max={max} step={1} value={value} onValueChange={(next) => setDurations(change(next))} />
     </label>
@@ -491,16 +600,10 @@ function StaffPanel({
         <InfoHint id="planning-staff-hint" subject={t("staff.title")}>
           {t("staff.hint")}
         </InfoHint>
-        <InfoHint id="planning-reason-hint" subject={t("assignment.reasonSubject")}>
-          {t("assignment.reasonHint")}
-        </InfoHint>
-        <InfoHint id="planning-coverage-hint" subject={t("coverage.label")}>
-          {t("coverage.hint")}
-        </InfoHint>
       </InfoHintRow>
 
       <div className={styles.staffRow}>
-        <label className={styles.field} htmlFor="planning-lead-hours">
+        <label className={`field ${styles.field}`} htmlFor="planning-lead-hours">
           <span>{t("staff.leadLabel")}</span>
           <NumberInput id="planning-lead-hours" className={styles.number} min={1} max={744} step={1} value={hours} onValueChange={setHours} />
         </label>
@@ -508,13 +611,7 @@ function StaffPanel({
           busy={pending === "confirm:lead"}
           blocked={pending !== null || hours < 1 || hours > 744}
           className={styles.button}
-          onClick={() =>
-            void act(
-              "confirm:lead",
-              () => call<{ report: ConfirmReport }>("/api/admin/planning/confirm", json("POST", { until: leadUntil(Date.now(), hours) })),
-              ({ report }) => t("staff.confirmDone", { confirmed: report.confirmed, refused: report.refused }),
-            )
-          }
+          onClick={() => onConfirmLead(hours)}
         >
           {t("staff.confirmLead")}
         </BusyButton>
@@ -547,7 +644,6 @@ function StaffPanel({
       <details className={styles.settings}>
         <summary>{t("settings.title")}</summary>
         <InfoHintRow>
-          <span className={styles.muted}>{t("settings.title")}</span>
           <InfoHint id="planning-durations-hint" subject={t("settings.title")}>
             {t("settings.hint")}
           </InfoHint>

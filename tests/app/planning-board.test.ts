@@ -3,15 +3,23 @@ import {
   candidatesFor,
   COVERAGE_PILL,
   errorKey,
+  filterEntries,
+  filtersActive,
+  groupByDay,
   groupByWeek,
   hasProvisional,
+  heldBy,
   leadUntil,
+  needsCover,
+  NO_FILTERS,
+  tournamentChoices,
   weekWindow,
 } from "@/app/(secured)/planning/_lib/planning-board";
 import { PLANNING_STATUSES } from "@/lib/server/planning/actions";
 import enPlanning from "@/messages/en/planning.json";
 import frPlanning from "@/messages/fr/planning.json";
 import type { PlanningMember } from "@/lib/shared/planning-view";
+import { planningCoverage } from "@/lib/shared/planning";
 import { entryView, HOUR_MS, MONDAY } from "../helpers/planning";
 
 /** Logique pure de l'écran « Planning » et ses textes de refus (`CAST_PLANNING.md` § Interface). */
@@ -136,5 +144,168 @@ describe("textes de refus du planning", () => {
 
   it("planningErrors_everyRouteCode_hasEnglishText", () => {
     expect(ROUTE_CODES.filter((code) => !Object.hasOwn(enPlanning.errors, code))).toEqual([]);
+  });
+});
+
+function covered(input: { hasReferee?: boolean; casterIds?: number[]; prodIds?: number[]; soloCasterIds?: number[] }) {
+  return planningCoverage({
+    hasReferee: input.hasReferee ?? false,
+    casterIds: input.casterIds ?? [],
+    prodIds: input.prodIds ?? [],
+    soloCasterIds: new Set(input.soloCasterIds ?? []),
+  });
+}
+
+function assigned(userId: number, provisional = false) {
+  return { userId, role: "REFEREE" as const, source: "AUTO" as const, reason: "LOAD" as const, provisional };
+}
+
+describe("groupByDay", () => {
+  it("groupByDay_sameDayEntries_oneGroup", () => {
+    const first = entryView({ key: "m:1", startAt: iso(MONDAY + HOUR_MS) });
+    const second = entryView({ key: "m:2", startAt: iso(MONDAY + 22 * HOUR_MS) });
+
+    const days = groupByDay([first, second]);
+
+    expect(days.map((day) => [day.dayStart, day.entries.map((entry) => entry.key)])).toEqual([[MONDAY, ["m:1", "m:2"]]]);
+  });
+
+  it("groupByDay_lateEveningAndNextMorning_splitAtParisMidnight", () => {
+    const evening = entryView({ key: "m:1", startAt: iso(MONDAY + 23.5 * HOUR_MS) });
+    const morning = entryView({ key: "m:2", startAt: iso(MONDAY + 24.5 * HOUR_MS) });
+
+    const days = groupByDay([evening, morning]);
+
+    expect(days.map((day) => day.dayStart)).toEqual([MONDAY, MONDAY + 24 * HOUR_MS]);
+  });
+
+  it("groupByWeek_entries_carryTheirDays", () => {
+    const monday = entryView({ key: "m:1", startAt: iso(MONDAY + HOUR_MS) });
+    const tuesday = entryView({ key: "m:2", startAt: iso(MONDAY + 30 * HOUR_MS) });
+
+    const [week] = groupByWeek([tuesday, monday]);
+
+    expect(week.days.map((day) => day.entries.map((entry) => entry.key))).toEqual([["m:1"], ["m:2"]]);
+  });
+});
+
+describe("heldBy", () => {
+  it("heldBy_confirmedAssignment_true", () => {
+    expect(heldBy(entryView({ assignments: [assigned(7)] }), 7)).toBe(true);
+  });
+
+  it("heldBy_provisionalAssignment_true", () => {
+    expect(heldBy(entryView({ assignments: [assigned(7, true)] }), 7)).toBe(true);
+  });
+
+  it("heldBy_someoneElse_false", () => {
+    expect(heldBy(entryView({ assignments: [assigned(8)] }), 7)).toBe(false);
+  });
+});
+
+describe("needsCover", () => {
+  it("needsCover_nobodyOnOpenEntry_true", () => {
+    expect(needsCover(entryView())).toBe(true);
+  });
+
+  it("needsCover_refereeOnly_true", () => {
+    expect(needsCover(entryView({ coverage: covered({ hasReferee: true }) }))).toBe(true);
+  });
+
+  it("needsCover_casterWithoutProd_true", () => {
+    expect(needsCover(entryView({ coverage: covered({ hasReferee: true, casterIds: [1] }) }))).toBe(true);
+  });
+
+  it("needsCover_streamedWithoutReferee_true", () => {
+    expect(needsCover(entryView({ coverage: covered({ casterIds: [1], prodIds: [2] }) }))).toBe(true);
+  });
+
+  it("needsCover_complete_false", () => {
+    expect(needsCover(entryView({ coverage: covered({ hasReferee: true, casterIds: [1], prodIds: [2] }) }))).toBe(false);
+  });
+
+  it("needsCover_soloCasterWithReferee_false", () => {
+    expect(needsCover(entryView({ coverage: covered({ hasReferee: true, casterIds: [1], soloCasterIds: [1] }) }))).toBe(false);
+  });
+
+  it("needsCover_closedEntry_false", () => {
+    expect(needsCover(entryView({ open: false }))).toBe(false);
+  });
+
+  it("needsCover_deliberateSelfManagement_false", () => {
+    expect(needsCover(entryView({ selfManaged: true }))).toBe(false);
+  });
+});
+
+describe("filterEntries", () => {
+  const mineOpen = entryView({ key: "m:1", tournamentId: 10, assignments: [assigned(7)] });
+  const otherCovered = entryView({
+    key: "m:2",
+    tournamentId: 20,
+    coverage: covered({ hasReferee: true, casterIds: [1], prodIds: [2] }),
+  });
+  const otherOpen = entryView({ key: "m:3", tournamentId: 20 });
+  const all = [mineOpen, otherCovered, otherOpen];
+  const keys = (entries: readonly { key: string }[]) => entries.map((entry) => entry.key);
+
+  it("filterEntries_noFilter_everyEntry", () => {
+    expect(keys(filterEntries(all, NO_FILTERS, 7))).toEqual(["m:1", "m:2", "m:3"]);
+  });
+
+  it("filterEntries_mine_onlyHeldSlots", () => {
+    expect(keys(filterEntries(all, { ...NO_FILTERS, mine: true }, 7))).toEqual(["m:1"]);
+  });
+
+  it("filterEntries_uncovered_onlySlotsMissingSomeone", () => {
+    expect(keys(filterEntries(all, { ...NO_FILTERS, uncovered: true }, 7))).toEqual(["m:1", "m:3"]);
+  });
+
+  it("filterEntries_tournament_onlyThatTournament", () => {
+    expect(keys(filterEntries(all, { ...NO_FILTERS, tournamentId: 20 }, 7))).toEqual(["m:2", "m:3"]);
+  });
+
+  it("filterEntries_allFiltersCombined_intersection", () => {
+    expect(keys(filterEntries(all, { mine: false, uncovered: true, tournamentId: 20 }, 7))).toEqual(["m:3"]);
+  });
+
+  it("filterEntries_noMatch_empty", () => {
+    expect(filterEntries(all, { ...NO_FILTERS, mine: true }, 99)).toEqual([]);
+  });
+});
+
+describe("tournamentChoices", () => {
+  it("tournamentChoices_repeatedTournaments_uniqueSortedByName", () => {
+    const entries = [
+      entryView({ key: "m:1", tournamentId: 2, tournamentName: "Zeta" }),
+      entryView({ key: "m:2", tournamentId: 1, tournamentName: "Alpha" }),
+      entryView({ key: "m:3", tournamentId: 2, tournamentName: "Zeta" }),
+    ];
+
+    expect(tournamentChoices(entries)).toEqual([
+      { id: 1, name: "Alpha" },
+      { id: 2, name: "Zeta" },
+    ]);
+  });
+
+  it("tournamentChoices_noEntries_empty", () => {
+    expect(tournamentChoices([])).toEqual([]);
+  });
+});
+
+describe("filtersActive", () => {
+  it("filtersActive_defaults_false", () => {
+    expect(filtersActive(NO_FILTERS)).toBe(false);
+  });
+
+  it("filtersActive_mine_true", () => {
+    expect(filtersActive({ ...NO_FILTERS, mine: true })).toBe(true);
+  });
+
+  it("filtersActive_uncovered_true", () => {
+    expect(filtersActive({ ...NO_FILTERS, uncovered: true })).toBe(true);
+  });
+
+  it("filtersActive_tournament_true", () => {
+    expect(filtersActive({ ...NO_FILTERS, tournamentId: 3 })).toBe(true);
   });
 });

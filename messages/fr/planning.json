@@ -8,6 +8,18 @@
   "loading": "Chargement du planning…",
   "empty": "Aucun créneau à venir.",
   "refresh": "Actualiser",
+  "filters": {
+    "label": "Filtrer l'agenda",
+    "mine": "Mes créneaux",
+    "uncovered": "À couvrir",
+    "tournament": "Tournoi",
+    "allTournaments": "Tous les tournois",
+    "reset": "Réinitialiser les filtres",
+    "count": "{shown, plural, one {# créneau affiché} other {# créneaux affichés}} sur {total}",
+    "empty": "Aucun créneau ne correspond à ces filtres.",
+    "hint": "« Mes créneaux » : ceux où tu es attribué·e, proposition provisoire comprise. « À couvrir » : il manque un caster, un prod ou un arbitre (hors autogestion voulue)."
+  },
+  "mineBadge": "Mon créneau",
   "week": "Semaine du {date}",
   "hidden": "Non publié",
   "event": "Tournoi entier",
@@ -15,7 +27,6 @@
   "versus": "contre",
   "tbd": "À déterminer",
   "until": "jusqu'à {time}",
-  "channel": "Chaîne",
   "roles": {
     "REFEREE": "Arbitre",
     "CASTER": "Caster",
@@ -57,7 +68,6 @@
     "nobody": "Personne",
     "remove": "Retirer {name} ({role})",
     "add": "Ajouter — {role}",
-    "choose": "Choisir…",
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
     "unknown": "Pas répondu"
@@ -72,14 +82,13 @@
     "hint": "Le calcul propose, pour toute une semaine, qui couvre chaque créneau. Ses propositions restent provisoires jusqu'à confirmation ; les choix du staff ne sont jamais remplacés.",
     "runWeek": "Calculer la semaine",
     "runTitle": "Calculer la semaine du {date} ?",
-    "runBody": "Les propositions provisoires de cette semaine sont recalculées. Les choix du staff et ce qui est confirmé ne bougent pas.",
+    "runBody": "Les propositions provisoires de toute la semaine, tous tournois confondus, sont recalculées. Les choix du staff et ce qui est confirmé ne bougent pas.",
     "runConfirm": "Calculer",
     "running": "Calcul…",
     "runDone": "{proposed, plural, one {# proposition} other {# propositions}} sur {entries, plural, one {# créneau} other {# créneaux}}.",
     "confirmEntry": "Confirmer",
     "confirmEntryLabel": "Confirmer les propositions : {slot}",
     "leadLabel": "Confirmer ce qui commence dans les prochaines heures",
-    "leadHours": "Heures",
     "confirmLead": "Confirmer",
     "confirmDone": "{confirmed, plural, one {# confirmée} other {# confirmées}}, {refused, plural, =0 {aucune refusée} one {# refusée par le match} other {# refusées par le match}}."
   },
@@ -130,5 +139,13 @@
     "INVALID_CONFIRM_SCOPE": "Rien à confirmer dans cette sélection.",
     "INVALID_DURATIONS": "Une durée est hors des bornes permises.",
     "generic": "L'opération a échoué. Réessaie dans un instant."
+  },
+  "staffConfirm": {
+    "entryTitle": "Confirmer ce créneau ?",
+    "entryBody": "Les propositions provisoires de ce créneau deviennent des désignations : l'arbitre est posé sur le match.",
+    "leadTitle": "Confirmer ce qui commence dans {hours, plural, one {# heure} other {# heures}} ?",
+    "leadBody": "Toutes les propositions provisoires des créneaux qui commencent d'ici là deviennent des désignations : les arbitres sont posés sur leurs matchs.",
+    "confirm": "Confirmer",
+    "pending": "Confirmation…"
   }
 }

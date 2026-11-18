@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   parsePlanningEntryKey,
   planningCoverage,
+  planningDayStart,
   planningEntryKey,
   planningHistoryStart,
   planningNextWeekStart,
@@ -157,5 +158,32 @@ describe("planningWeekStart / planningHistoryStart", () => {
     const summerMonday = Date.UTC(2026, 9, 18, 22);
     expect(planningNextWeekStart(summerMonday)).toBe(Date.UTC(2026, 9, 25, 23));
     expect(planningNextWeekStart(MONDAY)).toBe(MONDAY + 7 * DAY_MS);
+  });
+});
+
+describe("planningDayStart", () => {
+  const MIDNIGHT = Date.UTC(2026, 10, 22, 23); // 2026-11-23 00:00 à Paris
+
+  it("planningDayStart_midday_parisMidnight", () => {
+    expect(planningDayStart(MIDNIGHT + 12 * 3_600_000)).toBe(MIDNIGHT);
+  });
+
+  it("planningDayStart_justAfterMidnight_sameDay", () => {
+    expect(planningDayStart(MIDNIGHT + 30 * 60_000)).toBe(MIDNIGHT);
+  });
+
+  it("planningDayStart_lateEvening_sameDay", () => {
+    expect(planningDayStart(MIDNIGHT + 23.5 * 3_600_000)).toBe(MIDNIGHT);
+  });
+
+  it("planningDayStart_dayOfWinterTimeChange_keepsParisMidnight", () => {
+    // 2026-10-25 : le jour de l'heure d'hiver commence à 22:00 UTC la veille, le suivant à 23:00 UTC.
+    expect(planningDayStart(Date.UTC(2026, 9, 25, 12))).toBe(Date.UTC(2026, 9, 24, 22));
+    expect(planningDayStart(Date.UTC(2026, 9, 26, 12))).toBe(Date.UTC(2026, 9, 25, 23));
+  });
+  it("planningDayStart_dayOfSummerTimeChange_keepsParisMidnight", () => {
+    // 2026-03-29 : minuit est encore à l'heure d'hiver (23:00 UTC la veille), le soir déjà à l'heure d'été.
+    expect(planningDayStart(Date.UTC(2026, 2, 29, 12))).toBe(Date.UTC(2026, 2, 28, 23));
+    expect(planningDayStart(Date.UTC(2026, 2, 29, 21))).toBe(Date.UTC(2026, 2, 28, 23));
   });
 });

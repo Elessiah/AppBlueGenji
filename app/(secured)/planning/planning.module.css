@@ -207,6 +207,8 @@
 }
 
 .select {
+  flex: 1 1 150px;
+  min-width: 0;
   max-width: 100%;
   min-height: 30px;
   padding: 2px 8px;
@@ -294,12 +296,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: min(100%, 170px);
   font-size: 12px;
   color: var(--ink-soft);
 }
 
 .number {
-  width: 96px;
+  min-height: 34px;
+  padding: 4px 8px;
 }
 
 .fields {
@@ -331,4 +335,101 @@
   cursor: pointer;
   color: var(--blue-300);
   font-size: 13px;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 32px;
+  padding: 2px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip:hover {
+  color: var(--ink);
+  border-color: var(--line-strong-cy);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: rgba(var(--blue-500-rgb), 0.6);
+  background: rgba(var(--blue-500-rgb), 0.14);
+  color: var(--blue-100);
+}
+
+.tournamentFilter {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tournamentFilter .select {
+  flex: 0 1 auto;
+  min-height: 32px;
+  max-width: min(100%, 260px);
+  font-size: 13px;
+}
+
+.linkButton {
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--blue-300);
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.count {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dayTitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-quiet);
+}
+
+/* Le mois reste en minuscules (« Jeudi 19 novembre ») : seule la première lettre monte. */
+.dayTitle::first-letter {
+  text-transform: uppercase;
+}
+
+.entry[data-mine] {
+  border-color: rgba(var(--pink-400-rgb), 0.55);
+  box-shadow: inset 3px 0 0 rgba(var(--pink-400-rgb), 0.7);
+}
+
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
 }

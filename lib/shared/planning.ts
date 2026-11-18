@@ -177,6 +177,15 @@ export function planningWeekStart(at: number): number {
   return parisMidnight(date - weekday * DAY_MS);
 }
 
+/** Début du jour (00:00, **heure de Paris**) qui contient `at` : le regroupement par jour de la page. */
+export function planningDayStart(at: number): number {
+  const wall = parisWallClock(at);
+  const wallDate = wall - (((wall % DAY_MS) + DAY_MS) % DAY_MS);
+  // Le décalage se relit à l'instant trouvé : le jour d'un changement d'heure, minuit n'a pas celui de midi.
+  const guess = wallDate - (wall - at);
+  return wallDate - (parisWallClock(guess) - guess);
+}
+
 /** Début de la semaine qui suit celle qui commence à `weekStart` (lundi suivant, 00:00 à Paris). */
 export function planningNextWeekStart(weekStart: number): number {
   return planningWeekStart(weekStart + WEEK_MS + HALF_DAY_MS);
