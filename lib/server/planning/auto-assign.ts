@@ -265,6 +265,30 @@ async function writeProposals(
   return rows.length;
 }
 
+/**
+ * Retrace le retrait de chaque proposition provisoire du lot que le nouveau
+ * calcul ne repose pas (`REMOVED`, `AUTO`, au compte qui lance le calcul, comme
+ * ses poses) : d'une instruction (`INSERT … SELECT`), d'après la même lecture
+ * que l'effacement qui suit, dans la même transaction. Une proposition reposée
+ * (même membre, même rôle) n'est pas retirée : seul son motif peut changer.
+ */
+async function writeDroppedProposals(
+  executor: Executor,
+  keys: readonly string[],
+  kept: readonly PlannedRow[],
+  actorId: number,
+): Promise<void> {
+  const keptClause =
+    kept.length === 0 ? "" : ` AND (entry_key, user_id, role) NOT IN (${kept.map(() => "(?, ?, ?)").join(", ")})`;
+  await executor.execute(
+    `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
+     SELECT entry_key, user_id, role, tournament_id, match_id, 'REMOVED', 'AUTO', ?
+       FROM bg_planning_assignments
+      WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})${keptClause}`,
+    [actorId, ...keys, ...kept.flatMap((row) => [row.entryKey, row.userId, row.role])],
+  );
+}
+
 function affected(result: unknown): number {
   return Number((result as { affectedRows?: number }).affectedRows ?? 0);
 }
@@ -288,7 +312,7 @@ export async function runAutoAssign(
     const data = await loadPlanningData(connection, { now, includeHidden: true });
     const batch = batchEntries(data, window);
     if (batch.length === 0) {
-      await transact(connection, () => confirmPendingReferees(connection, actorId));
+      await transact(connection, () => confirmPendingReferees(connection));
       return { entries: 0, proposed: 0, replaced: 0 };
     }
     const anchor = Math.max(now, window.from);
@@ -304,7 +328,7 @@ export async function runAutoAssign(
         .map((row) => [planKey(row.entryKey, row.userId, row.role), row.reason]),
     );
     return transact(connection, async () => {
-      await confirmPendingReferees(connection, actorId);
+      await confirmPendingReferees(connection);
       // Rôles et tournois cachés relus ici, verrouillés : un retrait concurrent ne laisse aucune proposition.
       const holds = await lockedHolding(
         connection,
@@ -317,6 +341,7 @@ export async function runAutoAssign(
         const entry = byKey.get(row.entryKey);
         return entry !== undefined && holds(row.userId, entry, row.role) === null;
       });
+      await writeDroppedProposals(connection, keys, kept, actorId);
       const [cleared] = await connection.execute(
         `DELETE FROM bg_planning_assignments
           WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
@@ -435,21 +460,23 @@ const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m O
 /**
  * Réconcilie les arbitres de match du planning avec les matchs, en un nombre
  * fixe d'instructions. Une ligne d'arbitre **confirmée** que son match ne
- * porte pas (désignation restée incertaine après une panne, arbitre changé
- * depuis le match) est retirée — retrait inscrit à son historique, sans
- * auteur — : le match fait foi. Une proposition restée
+ * porte pas (désignation restée incertaine après une panne, arbitre changé ou
+ * retiré depuis le match) est retirée — retrait inscrit à son historique, sans
+ * auteur : personne ne l'a retirée par le planning, c'est le match, qui fait
+ * foi, qui ne la porte pas. Une proposition restée
  * provisoire alors que le match a déjà cet arbitre (confirmation interrompue
  * par une panne après la désignation) se confirme sans rien redemander au
  * match, que l'entrée soit ouverte, commencée ou hors de ce que montre le
- * planning ; ses évènements s'écrivent d'abord, d'après la même lecture
+ * planning — confirmation sans auteur elle aussi : la désignation s'est faite
+ * sur le match, pas par qui lance ce calcul ; ses évènements s'écrivent d'abord, d'après la même lecture
  * verrouillante (`INSERT … SELECT`), puis les lignes se confirment. Jouée au
  * début de chaque calcul (même sur une fenêtre vide) et de chaque
  * confirmation, dans leur transaction : un calcul relancé ne les efface donc
  * jamais comme de simples propositions.
  */
-export async function confirmPendingReferees(executor: Executor, actorId: number): Promise<number> {
-  // Le retrait s'inscrit à l'historique avant l'effacement, d'après la même lecture : sans auteur,
-  // le geste ayant été fait depuis le match, pas par qui lance ce calcul ou cette confirmation.
+export async function confirmPendingReferees(executor: Executor): Promise<number> {
+  // Retrait et confirmation s'inscrivent à l'historique avant d'être écrits, d'après la même lecture,
+  // sans auteur : ce n'est pas qui lance ce calcul ou cette confirmation qui les a faits.
   await executor.execute(
     `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
      SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'REMOVED', 'AUTO', NULL ${STALE_ON_MATCH_SQL}`,
@@ -457,8 +484,7 @@ export async function confirmPendingReferees(executor: Executor, actorId: number
   await executor.execute(`DELETE a ${STALE_ON_MATCH_SQL}`);
   await executor.execute(
     `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
-     SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'CONFIRMED', 'AUTO', ? ${PENDING_ON_MATCH_SQL}`,
-    [actorId],
+     SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'CONFIRMED', 'AUTO', NULL ${PENDING_ON_MATCH_SQL}`,
   );
   const [result] = await executor.execute(`UPDATE bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
      SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`);
@@ -546,7 +572,7 @@ export async function lockedHolding(
  * geste n'écrit rien deux fois.
  */
 async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
-  let confirmed = await confirmPendingReferees(connection, actorId);
+  let confirmed = await confirmPendingReferees(connection);
   let refused = 0;
   await refuseLostRoles(connection, steps);
   for (const step of steps) {

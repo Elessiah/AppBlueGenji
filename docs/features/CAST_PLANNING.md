@@ -140,15 +140,20 @@ compte les **rôles**, pas les personnes.
   Les désignations passent d'abord, les lignes du planning s'écrivent ensuite
   en une transaction ; un arbitre de match ne s'y confirme que si le match l'a
   encore, et un évènement ne s'écrit que pour une ligne vraiment changée
-  (relancer le geste n'écrit rien deux fois). Une proposition d'arbitre
+  (relancer le geste n'écrit rien deux fois). Un calcul relancé inscrit le
+  retrait (`REMOVED`, `AUTO`, à son lanceur) de chaque proposition provisoire
+  du lot qu'il ne repose pas, d'une instruction lue avant l'effacement. Une proposition d'arbitre
   restée provisoire alors que le match a déjà cet arbitre est confirmée au
   début de chaque calcul (fenêtre vide comprise) et de chaque confirmation
   (`confirmPendingReferees`, quatre instructions ensemblistes lues en base —
   entrée commencée ou hors de la vue comprise : un calcul relancé ne l'efface
-  jamais) ; au même moment, une ligne d'arbitre **confirmée** que son match ne
-  porte pas (désignation restée incertaine, arbitre changé depuis le match)
+  jamais ; la confirmation s'inscrit sans auteur, la désignation s'étant faite
+  sur le match) ; au même moment, une ligne d'arbitre **confirmée** que son match ne
+  porte pas (désignation restée incertaine, arbitre changé ou retiré depuis le match)
   est retirée, son retrait inscrit à l'historique (`REMOVED`, `AUTO`, sans
-  auteur : le geste a été fait depuis le match) : le match fait foi. Les lignes confirmées
+  auteur : personne ne l'a retirée par le planning, c'est le match, qui fait
+  foi, qui ne la porte pas ; ce retrait n'écarte personne des calculs
+  suivants). Index `(role, confirmed, match_id)` pour ces balayages. Les lignes confirmées
   deviennent des contraintes fixes pour les calculs suivants.
 - Un choix du staff (`source = MANUAL`) naît confirmé et verrouillé ; un retrait
   manuel est mémorisé pour que le calcul ne repropose pas la personne. Le
@@ -157,7 +162,12 @@ compte les **rôles**, pas les personnes.
   ou manuelle (`PLANNING_OVERLAP`, à retirer dans le planning), caster inscrit
   ou arbitre désigné sur le match (`PLANNING_OVERLAP_MANAGED`, à retirer depuis
   le match) ; une simple proposition provisoire qui chevauche lui cède la
-  place. Les lignes du planning s'écrivent d'abord, en une transaction
+  place. Chaque ligne que le choix retire — proposition rendue, arbitre du
+  match remplacé (lu verrouillé) — s'inscrit à l'historique (`REMOVED`,
+  `AUTO` : retrait par conséquence, qui n'écarte personne des calculs
+  suivants, au compte du staff) ; ces évènements s'effacent avec le geste s'il
+  est annulé. Retirer une ligne d'arbitre que le match ne porte pas (plus
+  d'arbitre, ou un autre posé depuis le match) n'appelle pas le match. Les lignes du planning s'écrivent d'abord, en une transaction
   validée ; la désignation sur le match (`assignMatchReferee`) passe ensuite,
   sauf si le match, relu juste avant, porte déjà ce qui est voulu. Si elle est
   refusée, ou tombe en panne sans avoir pris (le match relu le dit), les seules

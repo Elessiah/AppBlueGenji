@@ -144,8 +144,17 @@ describe("planning — registre T20", () => {
   });
 
   it("t20_dataCategories_historyIncludesRemovalSeenOnMatch", () => {
-    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("arbitre changé depuis le match compris");
-    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("a referee changed from the match included");
+    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("arbitre changé ou retiré depuis le match compris");
+    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("a referee changed or removed from the match included");
+  });
+
+  it("legalTexts_history_noAccountForWhatComesFromMatch", () => {
+    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("sans compte pour ce qui vient du match");
+    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("none for what comes from the match");
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("sans compte pour ce qui vient du match");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none for what comes from the match");
+    expect(frEntry()).toContain("sans compte pour ce qui vient du match");
+    expect(enEntry()).toContain("none for what comes from the match");
   });
 
   it("legalTexts_enPlanning_neverSayProducers", () => {

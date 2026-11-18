@@ -1307,7 +1307,7 @@ export function RgpdEn({
             week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until the
             tournament staff confirms them, who can also assign or remove someone by hand. The site keeps,
             with each assignment, who set it and its history (set, confirmed, removed, with the account that
-            acted). Assignments and the “solo caster” setting are read by logged-in referees, casters,
+            acted through the schedule, none for what comes from the match). Assignments and the “solo caster” setting are read by logged-in referees, casters,
             prods and administrators, the reason for a calculated proposal (preference, load) only
             appearing there as “Calculation”, except to the tournament staff and the person concerned;
             everyone&apos;s availability and preferences by the tournament staff only (referees and

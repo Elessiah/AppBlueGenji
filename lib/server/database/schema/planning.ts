@@ -69,6 +69,8 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       INDEX idx_bg_planning_assignments_tournament (tournament_id),
       INDEX idx_bg_planning_assignments_match (match_id),
       INDEX idx_bg_planning_assignments_by (assigned_by_user_id),
+      -- Réconciliation des arbitres de match avec les matchs (confirmPendingReferees), à chaque calcul et confirmation.
+      INDEX idx_bg_planning_assignments_reconcile (role, confirmed, match_id),
       CONSTRAINT fk_bg_planning_assignments_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_planning_assignments_tournament FOREIGN KEY (tournament_id)

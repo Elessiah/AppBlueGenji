@@ -4,7 +4,7 @@
  * Chaque geste relit l'entrée en base ; une erreur se lève par son **code**,
  * que la route traduit (`PLANNING_STATUSES`).
  */
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -46,6 +46,10 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
 };
+
+function affectedRows(result: unknown): number {
+  return Number((result as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
 
 /** Une seule entrée, lue par sa clé : sans toute la fenêtre, ni les comptes, ni les disponibilités des autres. */
 async function loadOneEntry(executor: Executor, user: AuthUser, entryKey: string, now: number): Promise<LoadedEntry> {
@@ -195,19 +199,31 @@ async function assignManually({ connection, actor, data, entry, input, current, 
     const holds = await lockedHolding(connection, [{ userId: input.userId, entry }]);
     const fresh = holds(input.userId, entry, input.role);
     if (fresh !== null) throw new Error(fresh);
+    // Chaque ligne que le geste retire s'inscrit à l'historique (`REMOVED`, `AUTO` : un retrait par
+    // conséquence, qui n'écarte personne des calculs suivants), au compte du staff qui agit ;
+    // ces évènements s'effacent avec le reste si la désignation du match est refusée.
+    const ids: number[] = [];
     for (const proposal of released) {
-      await connection.execute(
+      const [removed] = await connection.execute(
         "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ? AND source = 'AUTO' AND confirmed = 0",
         [proposal.entry.key, input.userId, proposal.role],
       );
+      if (affectedRows(removed) > 0) ids.push(await writeEvent(connection, proposal.entry, input.userId, proposal.role, "REMOVED", "AUTO", actor.id));
     }
     if (matchId !== null) {
+      // L'arbitre que le choix du staff remplace sur ce match (proposé ou confirmé), lu verrouillé avant d'être retiré.
+      const [displaced] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+        "SELECT user_id FROM bg_planning_assignments WHERE entry_key = ? AND role = 'REFEREE' AND user_id <> ? FOR UPDATE",
+        [entry.key, input.userId],
+      );
       await connection.execute("DELETE FROM bg_planning_assignments WHERE entry_key = ? AND role = 'REFEREE' AND user_id <> ?", [
         entry.key,
         input.userId,
       ]);
+      for (const row of displaced) ids.push(await writeEvent(connection, entry, Number(row.user_id), "REFEREE", "REMOVED", "AUTO", actor.id));
     }
-    return [await writeAssignment(connection, entry, { userId: input.userId, role: input.role, source: "MANUAL", reason: "MANUAL" }, actor.id)];
+    ids.push(await writeAssignment(connection, entry, { userId: input.userId, role: input.role, source: "MANUAL", reason: "MANUAL" }, actor.id));
+    return ids;
   });
   if (matchId === null || undo === undefined) return;
   // Le match porte déjà ce membre : rien à lui demander (et une panne n'aurait rien à trancher).
@@ -236,8 +252,10 @@ async function unassignManually({ connection, actor, entry, input, current, matc
     return [await writeEvent(connection, entry, input.userId, input.role, "REMOVED", "MANUAL", actor.id)];
   });
   if (matchId === null || undo === undefined) return;
-  // Le match n'a déjà plus d'arbitre : rien à lui demander.
-  if ((await readMatchReferee(matchId)) === null) return;
+  // Le match ne porte pas (ou plus) ce membre — plus d'arbitre, ou un autre posé depuis le match :
+  // rien à lui demander, la ligne du planning n'était qu'un reste (la réconciliation l'aurait retirée).
+  const carried = await readMatchReferee(matchId);
+  if (carried !== undefined && carried !== input.userId) return;
   try {
     await assignMatchReferee(matchId, actor.id, null, input.userId);
   } catch (error) {

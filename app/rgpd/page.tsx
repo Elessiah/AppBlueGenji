@@ -1532,7 +1532,7 @@ function RgpdFr({
             la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
             propositions restent provisoires jusqu&apos;à leur confirmation par le staff des tournois, qui peut
             aussi désigner ou retirer quelqu&apos;un à la main. Le site garde, avec chaque attribution, qui l&apos;a
-            posée et son historique (pose, confirmation, retrait, avec le compte qui a agi). Les attributions et
+            posée et son historique (pose, confirmation, retrait, avec le compte qui a agi par le planning, sans compte pour ce qui vient du match). Les attributions et
             le réglage « caster autonome » se lisent par les arbitres, casters, prods et administrateurs
             connectés, le motif d&apos;une proposition du calcul (préférence, charge) n&apos;y paraissant, hors le
             staff des tournois et la personne concernée, que comme « Calcul » ; les disponibilités et
