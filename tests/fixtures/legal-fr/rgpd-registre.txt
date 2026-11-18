@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 20/11/2026
+ActeursMIS À JOUR LE 21/11/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -14,9 +14,9 @@ Personne à contacter pour les demandes relatives aux données
 Keryan Houssin, hébergeur technique du site, chargé par l'association de recevoir les demandes relatives aux données (coordonnées données avec celles du responsable du traitement). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement
 Hébergeur
 Keryan Houssin (particulier, bénévole de l'association), 13 rue du Chemin Fourchue, 14000 Caen, France — aucun prestataire d'hébergement : le responsable technique de l'association fait tourner le site et le bot sur sa propre machine, pour le compte de l'association — pas de sous-traitant au sens de l'article 28 du RGPD, donc pas de contrat de sous-traitance, données hébergées en France (site et bot Discord sur un Raspberry Pi, à Caen)
-19 TRAITEMENTS
+20 TRAITEMENTS
 Activités de traitement
-T01 Comptes joueurs et profilsT02 AuthentificationT03 Tournois, équipes et palmarèsT04 Contact des joueurs pendant un tournoiT05 Journal d'activité du staff sur DiscordT06 Mesure d'audience du siteT07 Présentation de l'association et recrutement de bénévolesT08 Bot Discord BlueGenjiT09 SauvegardesT10 Information des joueurs sur les changements de politiqueT11 Signalements, contestations et modération des contenus et des comptesT12 Notifications pushT13 Acceptation des conditions d'utilisationT14 Journal des données de connexionT15 Portail de support (Spiceworks)T16 Retransmission des matchsT17 Journaux d'accès du serveur webT18 Salons vocaux d'équipe des matchsT19 Statistiques de fréquentation détaillées
+T01 Comptes joueurs et profilsT02 AuthentificationT03 Tournois, équipes et palmarèsT04 Contact des joueurs pendant un tournoiT05 Journal d'activité du staff sur DiscordT06 Mesure d'audience du siteT07 Présentation de l'association et recrutement de bénévolesT08 Bot Discord BlueGenjiT09 SauvegardesT10 Information des joueurs sur les changements de politiqueT11 Signalements, contestations et modération des contenus et des comptesT12 Notifications pushT13 Acceptation des conditions d'utilisationT14 Journal des données de connexionT15 Portail de support (Spiceworks)T16 Retransmission des matchsT17 Journaux d'accès du serveur webT18 Salons vocaux d'équipe des matchsT19 Statistiques de fréquentation détailléesT20 Planning des casts et arbitres
 T01 Comptes joueurs et profils
 Finalité principale
 Permettre aux joueurs de disposer d'un compte sur la plateforme de tournois
@@ -59,7 +59,7 @@ Destinataires
 Public du site (seules les données que le joueur rend visibles)
 Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement, pour le BattleTag de tout contact présenté (joueur, caster, arbitre désigné) ; sur la page du match aussi, pour le BattleTag de l'arbitre désigné et des casters et, aux seules parties du match (jamais à un arbitre sans rôle sur ce match), celui des contacts des deux équipes — (BattleTag même masqué, pour s'ajouter en jeu, dans les seuls tournois Overwatch ; durées du traitement T04)
 Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag
-Joueurs connectés du site : titre de rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) sur la fiche du joueur, quels que soient ses réglages de visibilité — jamais le rôle développeur, qui n'y paraît pas
+Joueurs connectés du site : titre de rôle de plateforme (administrateur, arbitre, caster, prod, community manager, recruteur) sur la fiche du joueur, quels que soient ses réglages de visibilité — jamais le rôle développeur, qui n'y paraît pas
 Staff de l'association selon son rôle (administration, arbitrage)
 Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé
 Transferts hors UE
@@ -242,7 +242,7 @@ Message de test « Tester mes MP » non remis (messages privés fermés ou joueu
 Casts des matchs : l'inscription d'un caster sur un match et son retrait (par lui-même, par le staff ou d'office, avec le motif), sans nommer le caster ni le staff — et sans trace dans les journaux du serveur
 Arbitrage des matchs : arbitre désigné qui prend un match, à qui le staff le confie ou qui en est retiré (par lui-même, par le staff ou d'office, avec le motif), autogestion d'un match ou d'une manche entière (une ligne par manche), première carte posée ou retirée, carte choisie dans le pool de la manche (par le staff ou, en autogestion, par une équipe du match) ou choix retiré — sans nommer l'arbitre ni le staff ; l'opposition d'un arbitre retenue ou levée par le staff : une seule ligne, sans nommer personne ni les matchs dont il est retiré (aucune ligne par match)
 Autres gestes du staff sur les matchs et tournois : résultat validé ou score enregistré par l'arbitrage, lancement forcé, hôte du salon désigné ou retiré, réglage de la diffusion d'un match, mise à l'antenne ou retrait, lien de rediffusion, modification d'un tournoi, cartes de manche (pool et cartes imposées) ou règles de ban modifiées, options « Salons vocaux d'équipe » et « Check-in des matchs » allumées ou éteintes, salon vocal d'une équipe vidé (son auteur, s'il n'est pas l'arbitre désigné du match, est en outre nommé dans les journaux du serveur, voir T18), ordre des têtes de série, étape suivante avancée, équipes fantômes inscrites (leur nombre), image et lien de diffusion d'un tournoi — le geste, le tournoi et le match (le tournoi seul pour un score qui suspend la validation automatique et pour un geste sur le tournoi : modification, cartes de manche, règles de ban, options « Salons vocaux d'équipe » et « Check-in des matchs », têtes de série, étape avancée, équipes fantômes, image et lien de diffusion), sans nommer son auteur (« le staff », ou « un caster » pour un geste de diffusion de qui n'a que cette permission) ni le lien posé ; cette ligne n'ajoute rien aux journaux du serveur (un litige tranché ou un résultat corrigé y garde la trace courte nominative décrite à la première ligne (traçabilité des gestes d'arbitrage), comme une validation automatique suspendue), sauf, quand elle n'a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur
-Rôles de plateforme : attribution ou retrait d'un rôle (administrateur, arbitre, caster, community manager, recruteur, développeur) par un administrateur, y compris sur son propre compte, où il ne peut pas se retirer l'administration — une ligne sans nommer personne ; dans les journaux du serveur, son auteur, l'identifiant du compte visé et les rôles enregistrés
+Rôles de plateforme : attribution ou retrait d'un rôle (administrateur, arbitre, caster, prod, community manager, recruteur, développeur) par un administrateur, y compris sur son propre compte, où il ne peut pas se retirer l'administration — une ligne sans nommer personne ; dans les journaux du serveur, son auteur, l'identifiant du compte visé et les rôles enregistrés
 Vue joueur : un compte qui porte un rôle de plateforme (membre du staff ou développeur) suspend ses droits sur une de ses sessions pour voir le site comme un joueur, 12 heures au plus, puis les reprend — aucune ligne sur Discord ; dans les journaux du serveur, une ligne à chaque bascule (activée ou quittée) qui nomme son auteur ; l'échéance de la vue est portée par la session (T01) et y reste, même passée, jusqu'à l'effacement de la session ; en mémoire seulement, jamais écrits, le numéro du compte et l'heure de chaque bascule, pour leur plafond (une minute et demie au plus), et le numéro du compte avec l'empreinte de la session, pour en rouvrir les flux en direct (ignorés au bout d'une minute, oubliés au passage suivant du serveur)
 Base légale
 Intérêt légitime (administration et contrôle de l'arbitrage et des tournois, diffusion comprise) à l'égard des joueurs et équipes cités, des casters des matchs (jamais nommés) et du membre du staff auteur d'un geste, nommé dans les journaux du serveur, comme de l'arbitre dont le staff retient ou lève l'opposition, désigné dans ces seuls journaux par l'identifiant de son compte, et du compte dont un administrateur attribue ou retire un rôle de plateforme, désigné de même, comme du titulaire d'un rôle de plateforme qui passe en vue joueur ou en revient, nommé dans ces journaux (trace des droits suspendus et repris) ; l'envoi du programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service (T04), comme la ligne d'un message de test « Tester mes MP » non remis ou dont l'envoi échoue (exécution du service demandé par le joueur, T04)
@@ -799,3 +799,35 @@ Chiffrement des échanges (HTTPS)
 Droits d'administration par rôle, limités à ce que chaque mission exige
 Aucun cookie ni stockage du navigateur pour la mesure ; la session n'est jamais lue : la mesure ignore si le visiteur est connecté
 Opposition relue côté serveur (en-têtes Sec-GPC et DNT, cookie d'opposition) : une page vue refusée n'est ni hachée, ni décomptée du plafond d'envois, ni écrite ; robots connus écartés de la même façon
+T20 Planning des casts et arbitres
+Finalité principale
+Organiser qui arbitre, caste et produit (prod) les matchs et les tournois à venir
+Sous-finalités
+Recueillir, créneau par créneau (match planifié, ou tournoi entier), la disponibilité de chaque arbitre, caster et prod pour chaque rôle qu'il tient, et sa préférence
+Proposer les attributions par un calcul qui suit les disponibilités et les préférences et répartit la charge (semaine en cours et 8 semaines précédentes) ; propositions provisoires jusqu'à leur confirmation par le staff des tournois, qui peut aussi désigner ou retirer quelqu'un à la main
+Retenir si un caster diffuse seul (caster autonome), réglage posé par le caster ou par le staff des tournois
+Base légale
+Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise
+Personnes concernées
+Arbitres, casters et prods du site (rôles de plateforme), administrateurs compris
+Données
+Pour chaque créneau et chaque rôle : disponibilité (disponible, absent, à voir), préférence, date de la dernière réponse
+Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), raison (préférence, charge), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait, avec la date et le compte qui a agi)
+Réglage « caster autonome »
+Données sensibles
+Aucune
+Conservation
+Disponibilités, préférences, attributions et leur historique : 90 jours après le début du créneau, puis effacés par une purge quotidienne, hors les copies de sauvegarde chiffrées (T09, 30 jours au plus)
+Réglage « caster autonome » : tant que le compte tient un rôle du planning ; effacé à la purge quotidienne qui suit le retrait de son dernier rôle
+Suppression du compte : tout ce qui le concerne dans le planning part avec lui ; les gestes qu'il a faits comme staff restent, sans le désigner
+Destinataires
+Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités
+Staff des tournois (permission d'arbitrage) : les disponibilités et préférences de tous, pour attribuer
+Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)
+Transferts hors UE
+Aucun
+Sécurité
+Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
+Chiffrement des échanges (HTTPS)
+Droits d'administration par rôle, limités à ce que chaque mission exige
+Page et routes réservées aux comptes qui tiennent un rôle du planning ; la vue joueur n'y donne aucun accès

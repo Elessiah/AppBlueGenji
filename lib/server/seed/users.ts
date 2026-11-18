@@ -135,6 +135,46 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     blizzardSub: "seed-blizzard-cocaster",
   },
   {
+    pseudo: "CasterAutonome",
+    purpose:
+      "rôle CASTER, caster autonome (diffuse seul, sans prod) dans le planning des casts ; identité vérifiée",
+    platformRoles: ["CASTER"],
+    isAdult: 1,
+    discordId: "900000000000000039",
+    discordTag: "test_caster_autonome",
+    discordVerified: true,
+    blizzardSub: "seed-blizzard-caster-autonome",
+  },
+  {
+    pseudo: "Prod",
+    purpose: "rôle PROD seul : planning des casts (production d'un direct, jamais compté sans caster)",
+    platformRoles: ["PROD"],
+    isAdult: 1,
+  },
+  {
+    pseudo: "Prod2",
+    purpose: "second rôle PROD : la répartition de la charge entre prods du planning",
+    platformRoles: ["PROD"],
+    isAdult: 1,
+  },
+  {
+    pseudo: "Arbitre2",
+    purpose:
+      "second arbitre, identité vérifiée : le pool d'arbitres d'un tournoi sans planification et la répartition de la charge",
+    platformRoles: ["ARBITRE"],
+    isAdult: 1,
+    discordId: "900000000000000049",
+    discordTag: "test_arbitre2",
+    discordVerified: true,
+    blizzardSub: "seed-blizzard-arbitre2",
+  },
+  {
+    pseudo: "CasterProd",
+    purpose: "rôles CASTER + PROD cumulés : plusieurs casquettes dans le planning (une seule par créneau)",
+    platformRoles: ["CASTER", "PROD"],
+    isAdult: 1,
+  },
+  {
     pseudo: "BattletagTape",
     purpose:
       "Battle.net rattaché qui n'a donné aucun BattleTag : le BattleTag tapé est gardé, sans pastille « vérifié », et reste modifiable ; rôles CASTER + ARBITRE et Discord certifié, pour vérifier à la main que le BattleTag tapé seul refuse cast et arbitrage",

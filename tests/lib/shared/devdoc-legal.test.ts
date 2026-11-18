@@ -55,11 +55,11 @@ describe("historique des changements", () => {
 describe("registre T01", () => {
   it("register_t01_listsPublicRoleTitleWithoutDeveloperInBothLanguages", () => {
     expect(t01Recipients(PROCESSING_ACTIVITIES)).toContain(
-      "titre de rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) sur la fiche du joueur",
+      "titre de rôle de plateforme (administrateur, arbitre, caster, prod, community manager, recruteur) sur la fiche du joueur",
     );
     expect(t01Recipients(PROCESSING_ACTIVITIES)).toContain("jamais le rôle développeur");
     expect(t01Recipients(PROCESSING_ACTIVITIES_EN)).toContain(
-      "platform role title (administrator, referee, caster, community manager, recruiter) on the player page",
+      "platform role title (administrator, referee, caster, producer, community manager, recruiter) on the player page",
     );
     expect(t01Recipients(PROCESSING_ACTIVITIES_EN)).toContain("never the developer role");
   });

@@ -1,0 +1,130 @@
+{
+  "meta": {
+    "title": "Schedule"
+  },
+  "eyebrow": "CASTS · REFEREEING",
+  "title": "Schedule",
+  "lead": "Who referees, casts and produces each upcoming match.",
+  "loading": "Loading the schedule…",
+  "empty": "No upcoming slot.",
+  "refresh": "Refresh",
+  "week": "Week of {date}",
+  "hidden": "Unpublished",
+  "event": "Whole tournament",
+  "round": "Round {round}",
+  "versus": "vs",
+  "tbd": "To be decided",
+  "until": "until {time}",
+  "channel": "Channel",
+  "roles": {
+    "REFEREE": "Referee",
+    "CASTER": "Caster",
+    "PROD": "Producer"
+  },
+  "coverage": {
+    "COMPLETE": "Complete",
+    "STREAMED": "Streamed",
+    "REFEREED": "Refereed only",
+    "SELF_MANAGED": "Self-managed",
+    "priority": "Referee needed first",
+    "needsProd": "Caster without producer",
+    "idleProds": "Producer without caster",
+    "label": "Coverage",
+    "hint": "Complete: referee, caster and producer. Streamed: a solo caster, or a caster and a producer. Self-managed: nobody, teams manage themselves."
+  },
+  "status": {
+    "AVAILABLE": "Available",
+    "UNAVAILABLE": "Away",
+    "PENDING": "Maybe"
+  },
+  "mine": {
+    "legend": "My availability — {role}",
+    "preferOn": "Remove preference ({role})",
+    "preferOff": "I prefer this slot ({role})",
+    "closed": "Availability closed"
+  },
+  "assignment": {
+    "provisional": "Provisional",
+    "reason": {
+      "PREFERENCE": "Preference",
+      "LOAD": "Load",
+      "MANUAL": "Staff choice",
+      "CAST": "Signed up to cast",
+      "MATCH": "Set on the match"
+    },
+    "reasonHint": "Preference: the person marked this slot. Load: they served the least in recent weeks. Provisional: proposed by the calculation, not confirmed yet.",
+    "reasonSubject": "Assignment reasons",
+    "nobody": "Nobody",
+    "remove": "Remove {name} ({role})",
+    "add": "Add — {role}",
+    "choose": "Choose…",
+    "option": "{name} · {status}",
+    "optionPreferred": "{name} · {status} ★",
+    "unknown": "No answer"
+  },
+  "solo": {
+    "label": "I stream alone (solo caster)",
+    "hint": "A solo caster streams without a producer; other casters need a producer for a match to be streamed.",
+    "staffTitle": "Solo casters"
+  },
+  "staff": {
+    "title": "Calculation and confirmation",
+    "hint": "The calculation proposes, for a whole week, who covers each slot. Its proposals stay provisional until confirmed; staff choices are never replaced.",
+    "runWeek": "Calculate the week",
+    "runTitle": "Calculate the week of {date}?",
+    "runBody": "This week's provisional proposals are recalculated. Staff choices and confirmed assignments do not move.",
+    "runConfirm": "Calculate",
+    "running": "Calculating…",
+    "runDone": "{proposed, plural, one {# proposal} other {# proposals}} across {entries, plural, one {# slot} other {# slots}}.",
+    "confirmEntry": "Confirm",
+    "confirmEntryLabel": "Confirm the proposals: {slot}",
+    "leadLabel": "Confirm what starts within the next hours",
+    "leadHours": "Hours",
+    "confirmLead": "Confirm",
+    "confirmDone": "{confirmed} confirmed, {refused, plural, =0 {none refused} other {# refused by the match}}."
+  },
+  "settings": {
+    "title": "Estimated durations",
+    "hint": "Nobody holds two overlapping slots. A match lasts its maximum number of maps times the map duration, plus the buffer.",
+    "mapOW": "Minutes per map (Overwatch)",
+    "mapMR": "Minutes per map (Marvel Rivals)",
+    "buffer": "Buffer per match (minutes)",
+    "defaultMaps": "Maps without a known format",
+    "eventHours": "Whole tournament duration (hours)",
+    "save": "Save durations",
+    "saved": "Durations saved."
+  },
+  "saved": {
+    "availability": "Availability saved.",
+    "assigned": "Assignment saved.",
+    "removed": "Removal saved.",
+    "solo": "Setting saved."
+  },
+  "errors": {
+    "UNAUTHORIZED": "Your session has expired: sign in again.",
+    "FORBIDDEN": "This action is reserved for tournament staff.",
+    "NETWORK_ERROR": "Cannot connect. Check your network and try again.",
+    "PLANNING_ENTRY_NOT_FOUND": "This slot no longer exists. The page is reloaded.",
+    "PLANNING_ENTRY_CLOSED": "This slot is closed: it has started or has been played.",
+    "PLANNING_ROLE_NOT_HELD": "This account does not hold this role.",
+    "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and producer on one slot.",
+    "PLANNING_CAST_MANAGED": "This caster signed up on the match: remove them from the match.",
+    "PLANNING_NOT_ASSIGNED": "This person is no longer assigned.",
+    "PLANNING_BUSY": "Another schedule action is in progress, try again.",
+    "NOT_CASTER": "This account does not have the caster role.",
+    "MATCH_NOT_FOUND": "This match no longer exists.",
+    "MATCH_ALREADY_COMPLETED": "This match has already been played.",
+    "MATCH_NOT_LAUNCHABLE": "This match can no longer receive a referee.",
+    "NOT_REFEREE": "This account cannot referee.",
+    "REFEREE_IDENTITY_REQUIRED": "This referee must first certify their game identity.",
+    "REFEREE_DISCORD_REQUIRED": "This referee must first link their Discord account.",
+    "REFEREE_OBJECTION": "A team in the match objects to this referee.",
+    "REFEREE_IS_PLAYER": "This referee plays in this match.",
+    "REFEREE_CHANGED": "The match referee just changed. The page is reloaded.",
+    "CONCURRENT_UPDATE_RETRY": "The schedule just changed, try again.",
+    "INVALID_WINDOW": "Invalid period (31 days at most).",
+    "INVALID_CONFIRM_SCOPE": "Nothing to confirm in this selection.",
+    "INVALID_DURATIONS": "A duration is outside the allowed range.",
+    "generic": "The operation failed. Try again in a moment."
+  }
+}

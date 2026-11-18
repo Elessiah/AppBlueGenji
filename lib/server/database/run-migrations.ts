@@ -18,6 +18,7 @@ import { createAccountTables } from "./schema/accounts";
 import { createComplianceTables } from "./schema/compliance";
 import { createSentNotificationTables } from "./schema/notifications";
 import { createPhaseTables } from "./schema/phases";
+import { createPlanningTables } from "./schema/planning";
 import { createShowcaseTables } from "./schema/showcase";
 import { createReplayStandingTables } from "./schema/standings";
 import { createTeamTables } from "./schema/teams";
@@ -78,6 +79,7 @@ export async function runMigrations(db: Pool): Promise<void> {
   await createTournamentTables(db);
   await createReplayStandingTables(db);
   await createPhaseTables(db);
+  await createPlanningTables(db);
   await createSentNotificationTables(db);
   await createShowcaseTables(db);
   await createComplianceTables(db);

@@ -13,6 +13,7 @@
  * this module.
  */
 
+import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
@@ -1169,6 +1170,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Nothing is said about it on Discord. In the server logs, each switch (on or off) leaves a line with the username and identifier of its author, according to their automatic rotation; basis: legitimate interest (administration of the platform), to which the person concerned may object.",
       "The player-view deadline is noted on the login session and is erased with it (logout, end of the session or deletion of the account). For the time of the switch, the server keeps in memory only, never written, the account number, the time of the switches and the hash of the session.",
       "What does not change: for a player without a platform role, nothing new is collected, and what deleting the account removes stays the same.",
+    ],
+  },
+  "2026-11-planning-casts-arbitres": {
+    linkLabels: ["Read record T20 of the register"],
+    title: "Cast and referee schedule",
+    summary: `Referees, casters and producers (a new platform role) get a \u201cSchedule\u201d page: they give their availability and preferences there, slot by slot, and the tournament staff assigns who covers each match. These data are kept ${PLANNING_RETENTION_DAYS} days after the start of the slot.`,
+    details: [
+      "What is kept: for each slot and each role held, the availability given and the preference; the assignments (who holds which role, proposed by the calculation or chosen by the staff, provisional or confirmed) and their history; the \u201csolo caster\u201d setting. Basis: the association's legitimate interest (organising its volunteers), with a right to object.",
+      "Who reads it: referees, casters, producers and administrators see each slot's assignments; only the tournament staff sees everyone's availability and preferences. Nothing about it is published on Discord.",
+      "Deleting the account removes everything about it in the schedule; the export of your data contains it.",
+      "What does not change: for a player without a platform role, nothing new is collected.",
     ],
   },
 };

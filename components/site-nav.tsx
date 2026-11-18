@@ -29,6 +29,8 @@ type SiteNavProps = {
   languageSwitcherLabel?: string;
   /** Lien « Documentation dev » du menu du compte (permission `dev`). */
   devDocs?: boolean;
+  /** Lien « Planning » du menu du compte (permission `planning`). */
+  planning?: boolean;
   /** Entrée de la vue joueur du menu du compte (`ADMIN_PLAYER_VIEW.md`). */
   playerViewEntry?: PlayerViewMenuMode | null;
 };
@@ -57,6 +59,7 @@ export function SiteNav({
   openReports = null,
   languageSwitcherLabel,
   devDocs = false,
+  planning = false,
   playerViewEntry = null,
 }: Readonly<SiteNavProps>) {
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
@@ -116,7 +119,7 @@ export function SiteNav({
             </div>
           )}
           {/* Profil, équipe et déconnexion, à portée de main sur toutes les largeurs. */}
-          <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} devDocs={devDocs} playerViewEntry={playerViewEntry} />
+          <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} devDocs={devDocs} planning={planning} playerViewEntry={playerViewEntry} />
         </div>
         {copies.narrow && <NavLinks className={s.navLeftMobile} pathname={pathname} />}
       </div>

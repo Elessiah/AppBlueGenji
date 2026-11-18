@@ -52,8 +52,9 @@ import type frRoundMaps from "@/messages/fr/roundMaps.json";
 import type frMatchPage from "@/messages/fr/matchPage.json";
 import type frAudience from "@/messages/fr/audience.json";
 import type frDevdoc from "@/messages/fr/devdoc.json";
+import type frPlanning from "@/messages/fr/planning.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage", "audience", "devdoc"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage", "audience", "devdoc", "planning"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -178,6 +179,8 @@ export type Messages = {
   audience: typeof frAudience;
   /** Documentation développeur réservée `/devdoc` (`docs/features/DEVDOC.md`). */
   devdoc: typeof frDevdoc;
+  /** Planning des casts et arbitres `/planning` (`docs/features/CAST_PLANNING.md`). */
+  planning: typeof frPlanning;
 };
 
 /**

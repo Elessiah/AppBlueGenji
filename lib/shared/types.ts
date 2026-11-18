@@ -1299,6 +1299,16 @@ export type PersonalDataExport = {
   /** Matchs dont il a posé le mode d'antenne (`bg_matches.live_trigger_user_id`, T16). */
   liveTriggers: { matchId: number; tournamentId: number; liveTrigger: string | null }[];
   /**
+   * Planning des casts et arbitres (`docs/features/CAST_PLANNING.md`) : ses
+   * disponibilités et préférences, les attributions qui le nomment, et son
+   * réglage « caster autonome » (`null` : jamais posé).
+   */
+  planning: {
+    availability: { tournamentId: number; matchId: number | null; role: string; status: string; preferred: boolean; updatedAt: string | null }[];
+    assignments: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
+    soloCaster: boolean | null;
+  };
+  /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.
    */

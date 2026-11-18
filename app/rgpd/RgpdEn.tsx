@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { CyberButton } from "@/components/cyber";
@@ -1050,7 +1051,7 @@ export function RgpdEn({
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
-            When an administrator grants or removes a platform role (administrator, referee, caster, community
+            When an administrator grants or removes a platform role (administrator, referee, caster, producer, community
             manager, recruiter, developer), including on their own account, where they cannot remove their own administration, the
             staff log on Discord notes it without naming anyone; the server logs keep its author, the identifier of the
             account concerned and the roles saved, on the basis of legitimate interest (administration of the
@@ -1295,6 +1296,24 @@ export function RgpdEn({
             otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can
             ask for these announcements to be deleted
             through the “Report a problem” button, GDPR category.
+          </p>
+          <p id="planning">
+            <strong>Cast and referee schedule.</strong> Referees, casters and producers (a platform role
+            that organises the production of a live stream) have a “Schedule” page: for each slot (a
+            scheduled match, or a whole tournament when its matches are not scheduled) and each role they
+            hold, they give their availability (available, away, maybe) and their preference there; a caster
+            also says whether they stream alone (“solo caster”), which the tournament staff can set for
+            them. A calculation proposes the assignments from these answers and everyone&apos;s load (current
+            week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until the
+            tournament staff confirms them, who can also assign or remove someone by hand. The site keeps,
+            with each assignment, who set it and its history (set, confirmed, removed). Assignments and the
+            “solo caster” setting are read by logged-in referees, casters, producers and administrators;
+            everyone&apos;s availability and preferences by the tournament staff only; nothing about it is
+            published on Discord. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds a
+            schedule role; deleting the account removes everything about it, and the export of your data
+            contains it. Basis: the association&apos;s legitimate interest (organising its volunteers), with a
+            right to object (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>
         </div>

@@ -31,6 +31,12 @@ export async function register(): Promise<void> {
       } catch (error) {
         await logStartupFailure("[audience] Horloge d'entretien non lancée.", error);
       }
+      try {
+        const { startPlanningRetentionClock } = await import("@/lib/server/planning/retention");
+        startPlanningRetentionClock();
+      } catch (error) {
+        await logStartupFailure("[planning] Purge de conservation non lancée.", error);
+      }
     }
   }
 }

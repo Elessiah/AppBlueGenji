@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/shared/account-deletion";
@@ -1250,7 +1251,7 @@ function RgpdFr({
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
-            Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, community
+            Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, prod, community
             manager, recruteur, développeur), y compris sur son propre compte, où il ne peut pas se retirer l&apos;administration, le
             journal du staff sur Discord le note sans nommer personne ; les journaux du serveur gardent son auteur,
             l&apos;identifiant du compte visé et les rôles enregistrés, au titre de l&apos;intérêt légitime
@@ -1520,6 +1521,25 @@ function RgpdFr({
             finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut demander la
             suppression de ces annonces par le bouton « Signaler
             un problème », catégorie RGPD.
+          </p>
+          <p id="planning">
+            <strong>Planning des casts et arbitres.</strong> Les arbitres, casters et prods (rôle de
+            plateforme qui organise la production d&apos;un direct) ont une page « Planning » : pour chaque
+            créneau (un match planifié, ou un tournoi entier quand ses matchs ne sont pas planifiés) et
+            chaque rôle qu&apos;ils tiennent, ils y donnent leur disponibilité (disponible, absent, à voir) et
+            leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce que le
+            staff des tournois peut régler pour lui. Un calcul propose les attributions selon ces réponses et
+            la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
+            propositions restent provisoires jusqu&apos;à leur confirmation par le staff des tournois, qui peut
+            aussi désigner ou retirer quelqu&apos;un à la main. Le site garde, avec chaque attribution, qui l&apos;a
+            posée et son historique (pose, confirmation, retrait). Les attributions et le réglage « caster
+            autonome » se lisent par les arbitres, casters, prods et administrateurs connectés ; les
+            disponibilités et préférences de tous, par le seul staff des tournois ; rien n&apos;en est publié
+            sur Discord. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
+            de rôle du planning ; la suppression du compte emporte tout ce qui le concerne, l&apos;export de vos
+            données le contient. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
+            avec droit d&apos;opposition (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
         </div>

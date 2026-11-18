@@ -38,6 +38,7 @@ export async function SiteShell({
         openReports={openReports}
         languageSwitcherLabel={await languageSwitcherLabel()}
         devDocs={can(user, "dev")}
+        planning={can(user, "planning")}
         playerViewEntry={playerViewMenuMode(user)}
       />
       <main className={mainClassName} style={mainStyle}>{children}</main>

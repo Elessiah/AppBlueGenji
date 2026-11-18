@@ -198,6 +198,7 @@
       "ADMIN": "Administrator",
       "ARBITRE": "Referee",
       "CASTER": "Caster",
+      "PROD": "Prod",
       "COMMUNITY_MANAGER": "Community Manager",
       "RECRUTEUR": "Recruiter",
       "DEV": "Developer"
@@ -206,6 +207,7 @@
       "ADMIN": "Every right, including assigning roles.",
       "ARBITRE": "Create and manage tournaments.",
       "CASTER": "Prepare and broadcast matches live (bracket preview, on-air).",
+      "PROD": "Run the production of broadcasts (cast planning).",
       "COMMUNITY_MANAGER": "Manage the showcase site and the association.",
       "RECRUTEUR": "Manage the recruitment page.",
       "DEV": "Read the technical documentation of the site and the bot."

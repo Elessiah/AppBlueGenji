@@ -58,6 +58,18 @@ describe("AccountMenuPanel", () => {
     expect(html).toMatch(/<button type="button"[^>]*><svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="itemText">Déconnexion<\/span><\/button>/);
   });
 
+  it("accountMenuPanel_planningRight_showsPlanningLink", () => {
+    const html = renderToStaticMarkup(
+      <AccountMenuPanel id="compte" activeTeam={null} planning leaving={false} onNavigate={() => undefined} onLogout={() => undefined} />,
+    );
+    expect(html).toContain('href="/planning"');
+    expect(html).toContain(">Planning</span>");
+  });
+
+  it("accountMenuPanel_noPlanningRight_hidesPlanningLink", () => {
+    expect(panel(null)).not.toContain('href="/planning"');
+  });
+
   it("garde ses pictogrammes hors du nom accessible", () => {
     const html = panel({ teamId: 7, teamName: "Les Ours" });
     expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(3);

@@ -35,6 +35,7 @@
   "account": {
     "menuLabel": "{pseudo}, account menu",
     "profile": "My profile",
+    "planning": "Schedule",
     "devDocs": "Developer docs",
     "logout": "Log out",
     "loggingOut": "Logging out…",

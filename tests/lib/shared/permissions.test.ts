@@ -65,10 +65,13 @@ describe("permissions", () => {
         "tournaments",
         "casting",
         "live",
+        "planning",
       ]);
       // Le caster prépare (aperçu) et diffuse (antenne) — mais ne touche ni aux
       // scores ni aux tournois.
-      expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting", "live"]);
+      expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting", "live", "planning"]);
+      // Le prod ne voit que le planning des casts et arbitres.
+      expect([...permissionsForRoles(["PROD"])]).toEqual(["planning"]);
       expect([...permissionsForRoles(["COMMUNITY_MANAGER"])]).toEqual(["showcase"]);
       expect([...permissionsForRoles(["RECRUTEUR"])]).toEqual(["recruitment"]);
       // Le développeur lit la documentation technique, rien d'autre.
@@ -78,13 +81,13 @@ describe("permissions", () => {
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
       expect(perms).toEqual(
-        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev"]),
+        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev", "planning"]),
       );
     });
 
     it("cumulates permissions across roles", () => {
       const perms = permissionsForRoles(["ARBITRE", "RECRUTEUR"]);
-      expect(perms).toEqual(new Set(["tournaments", "casting", "live", "recruitment"]));
+      expect(perms).toEqual(new Set(["tournaments", "casting", "live", "planning", "recruitment"]));
     });
 
     it("returns an empty set for no roles", () => {

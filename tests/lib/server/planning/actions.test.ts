@@ -1,0 +1,201 @@
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/named-lock", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/named-lock")>("@/lib/server/named-lock"),
+  withNamedLock: jest.fn(),
+}));
+jest.mock("@/lib/server/planning/load", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
+  loadPlanningData: jest.fn(),
+  loadPlanningMembers: jest.fn(),
+}));
+jest.mock("@/lib/server/planning/profiles");
+jest.mock("@/lib/server/tournaments/match-launch");
+
+import type { PoolConnection } from "mysql2/promise";
+import { getDatabase, withConnection } from "@/lib/server/database";
+import { withNamedLock } from "@/lib/server/named-lock";
+import { setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
+import { loadPlanningData, loadPlanningMembers } from "@/lib/server/planning/load";
+import { writeSoloCaster } from "@/lib/server/planning/profiles";
+import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
+import { authUser } from "../../../helpers/auth-user";
+import { loadedAssignment, loadedEntry, loadedMember, planningData } from "../../../helpers/planning";
+import { fakeConnection, fakePool, type SqlQuery } from "../../../helpers/sql-double";
+
+/** Gestes du planning : sa disponibilité, le caster autonome, la désignation à la main (`CAST_PLANNING.md`). */
+
+const execute = jest.fn<SqlQuery>();
+const staff = authUser({ id: 9, roles: ["ARBITRE"] });
+const prod = authUser({ id: 6, roles: ["PROD"] });
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  execute.mockResolvedValue([{ affectedRows: 1 }]);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({}));
+  jest.mocked(withConnection).mockImplementation(<T>(run: (c: PoolConnection) => Promise<T>) => run(fakeConnection({ execute })));
+  jest.mocked(withNamedLock).mockImplementation(<T>(_pool: unknown, _name: string, _seconds: number, run: (c: PoolConnection) => Promise<T>) =>
+    run(fakeConnection({ execute })),
+  );
+  jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
+  jest.mocked(writeSoloCaster).mockResolvedValue(undefined);
+});
+
+describe("setAvailability", () => {
+  it("setAvailability_roleNotHeld_throwsRoleNotHeld", async () => {
+    await expect(setAvailability(prod, { entryKey: "m:1", role: "CASTER", status: "AVAILABLE", preferred: false })).rejects.toThrow(
+      "PLANNING_ROLE_NOT_HELD",
+    );
+    expect(loadPlanningData).not.toHaveBeenCalled();
+  });
+
+  it("setAvailability_unknownEntry_throwsNotFound", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData());
+
+    await expect(setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false })).rejects.toThrow(
+      "PLANNING_ENTRY_NOT_FOUND",
+    );
+  });
+
+  it("setAvailability_closedEntry_throwsClosed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ open: false })] }));
+
+    await expect(setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false })).rejects.toThrow(
+      "PLANNING_ENTRY_CLOSED",
+    );
+  });
+
+  it("setAvailability_valid_upserts", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
+
+    await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "PENDING", preferred: true });
+
+    expect(execute.mock.calls[0][1]).toEqual(["m:1", 6, "PROD", 10, 1, "PENDING", 1]);
+  });
+
+  it("setAvailability_nonStaff_hiddenTournamentsNotLoaded", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
+
+    await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false });
+
+    expect(jest.mocked(loadPlanningData).mock.calls[0][1]).toMatchObject({ includeHidden: false });
+  });
+});
+
+describe("setSoloCaster", () => {
+  it("setSoloCaster_notCaster_throwsNotCaster", async () => {
+    jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 6, roles: ["PROD"] })]);
+
+    await expect(setSoloCaster(6, true)).rejects.toThrow("NOT_CASTER");
+    expect(writeSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("setSoloCaster_caster_writes", async () => {
+    jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
+
+    await setSoloCaster(4, true);
+
+    expect(writeSoloCaster).toHaveBeenCalledWith(expect.anything(), 4, true);
+  });
+});
+
+describe("setManualAssignment — pose", () => {
+  const members = [
+    loadedMember({ userId: 3, roles: ["REFEREE"] }),
+    loadedMember({ userId: 4, roles: ["CASTER", "PROD"] }),
+    loadedMember({ userId: 6, roles: ["PROD"] }),
+  ];
+
+  it("setManualAssignment_notEditable_throwsClosed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ editable: false })], members }));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_ENTRY_CLOSED",
+    );
+  });
+
+  it("setManualAssignment_roleNotHeld_throws", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], members }));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_NOT_HELD",
+    );
+  });
+
+  it("setManualAssignment_casterOnEntryWhereProd_throwsConflict", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [loadedEntry()], members, assignments: [loadedAssignment({ userId: 4, role: "PROD" })] }),
+    );
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_CONFLICT",
+    );
+  });
+
+  it("setManualAssignment_castSource_throwsCastManaged", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [loadedEntry()], members, matchCasters: new Map([["m:1", [4]]]) }),
+    );
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true })).rejects.toThrow(
+      "PLANNING_CAST_MANAGED",
+    );
+  });
+
+  it("setManualAssignment_matchReferee_callsAssignMatchReferee", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, 7);
+    expect(execute.mock.calls[0][0]).toContain("DELETE FROM bg_planning_assignments");
+  });
+
+  it("setManualAssignment_tournamentCaster_writesManualConfirmed", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members }));
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "CASTER", userId: 4, assigned: true });
+
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(execute.mock.calls[0][1]).toEqual(["t:10", 4, "CASTER", 10, null, "MANUAL", "MANUAL", 1, 9]);
+  });
+});
+
+describe("setManualAssignment — retrait", () => {
+  it("unassign_notAssigned_throws", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: false })).rejects.toThrow(
+      "PLANNING_NOT_ASSIGNED",
+    );
+  });
+
+  it("unassign_castSource_throwsCastManaged", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], matchCasters: new Map([["m:1", [4]]]) }));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: false })).rejects.toThrow(
+      "PLANNING_CAST_MANAGED",
+    );
+  });
+
+  it("unassign_provisionalReferee_doesNotTouchMatch_writesRemovedManual", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: 3, role: "REFEREE" })] }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: false });
+
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(execute.mock.calls[1][1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "REMOVED", "MANUAL", 9]);
+  });
+
+  it("unassign_confirmedMatchReferee_releasesOnMatch", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 3 })] }));
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: false });
+
+    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, null, 3);
+  });
+});

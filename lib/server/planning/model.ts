@@ -1,0 +1,62 @@
+/**
+ * Ce que tient chaque entrée du planning, toutes sources réunies : lignes du
+ * planning, arbitre désigné du match (`bg_matches.referee_user_id`) et casters
+ * inscrits (`bg_match_casters`). Pur : se teste sans base.
+ */
+import { planningCoverage, type Coverage } from "@/lib/shared/planning";
+import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
+import type { LoadedEntry, PlanningData } from "./load";
+
+/**
+ * Les attributions d'une entrée. L'arbitre d'un **match** est celui du match :
+ * une ligne REFEREE confirmée du planning n'en est que la provenance quand
+ * elle nomme le même compte ; un arbitre désigné ailleurs (fenêtre
+ * « Arbitrage ») vaut `MATCH`. Une proposition **provisoire** d'arbitre de
+ * match ne compte que tant que le match n'a pas d'arbitre. Un caster inscrit
+ * sur le match sans ligne du planning vaut `CAST`.
+ */
+function matchRefereeRows(entry: LoadedEntry, rows: PlanningData["assignments"]): PlanningAssignmentView[] {
+  if (entry.matchRefereeId === null) {
+    return rows
+      .filter((row) => row.role === "REFEREE" && !row.confirmed)
+      .map((row) => ({ userId: row.userId, role: "REFEREE", source: row.source, reason: row.reason, provisional: true }));
+  }
+  const provenance = rows.find((row) => row.role === "REFEREE" && row.confirmed && row.userId === entry.matchRefereeId);
+  return [
+    provenance
+      ? { userId: provenance.userId, role: "REFEREE", source: provenance.source, reason: provenance.reason, provisional: false }
+      : { userId: entry.matchRefereeId, role: "REFEREE", source: "MATCH", reason: "MATCH", provisional: false },
+  ];
+}
+
+export function entryAssignments(
+  entry: LoadedEntry,
+  data: Pick<PlanningData, "assignments" | "matchCasters">,
+): PlanningAssignmentView[] {
+  const rows = data.assignments.filter((row) => row.entryKey === entry.key);
+  const out: PlanningAssignmentView[] = [];
+  for (const row of rows) {
+    if (entry.kind === "MATCH" && row.role === "REFEREE") continue;
+    out.push({ userId: row.userId, role: row.role, source: row.source, reason: row.reason, provisional: !row.confirmed });
+  }
+  if (entry.kind === "MATCH") out.push(...matchRefereeRows(entry, rows));
+  for (const userId of data.matchCasters.get(entry.key) ?? []) {
+    if (out.some((row) => row.role === "CASTER" && row.userId === userId)) continue;
+    out.push({ userId, role: "CASTER", source: "CAST", reason: "CAST", provisional: false });
+  }
+  const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
+  return out.sort((a, b) => order[a.role] - order[b.role] || a.userId - b.userId);
+}
+
+/** Couverture d'une entrée : les rôles tenus comptent (propositions provisoires comprises), pas les personnes. */
+export function entryCoverage(
+  assignments: readonly PlanningAssignmentView[],
+  soloCasterIds: ReadonlySet<number>,
+): Coverage {
+  return planningCoverage({
+    hasReferee: assignments.some((row) => row.role === "REFEREE"),
+    casterIds: assignments.filter((row) => row.role === "CASTER").map((row) => row.userId),
+    prodIds: assignments.filter((row) => row.role === "PROD").map((row) => row.userId),
+    soloCasterIds,
+  });
+}

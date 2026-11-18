@@ -34,9 +34,9 @@ describe("registre T19", () => {
 describe("historique des changements", () => {
   it("privacyChanges_statsEntry_followedByPhashEntryAndDated", () => {
     // Suivie de l'empreinte perceptuelle des avatars bloqués (EF-72), de « Tester mes MP », des rôles de plateforme et de la vue joueur.
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(ENTRY_ID);
-    expect(PRIVACY_CHANGES.at(-5)?.publishedAt).toBe("2026-11-18");
-    expect(PRIVACY_CHANGES.at(-5)?.links?.map((link) => link.href)).toEqual(["/rgpd#audience-detaillee", "/rgpd#audience"]);
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(ENTRY_ID);
+    expect(PRIVACY_CHANGES.at(-6)?.publishedAt).toBe("2026-11-18");
+    expect(PRIVACY_CHANGES.at(-6)?.links?.map((link) => link.href)).toEqual(["/rgpd#audience-detaillee", "/rgpd#audience"]);
   });
 
   it("privacyChanges_statsEntry_hasEnglish", () => {
