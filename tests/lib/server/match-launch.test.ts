@@ -448,7 +448,7 @@ function executeFor(state: World) {
       return [{ affectedRows: 1 }, []];
     }
     if (sql.includes("FROM bg_account_suspensions")) {
-      return [(state.suspendedUsers ?? []).includes(Number(params[0])) ? [{ id: 1 }] : [], []];
+      return [(state.suspendedUsers ?? []).includes(Number(params[0])) ? [{ user_id: Number(params[0]) }] : [], []];
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
@@ -1792,7 +1792,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(state.match?.referee_user_id).toBe(REFEREE);
     const suspensionRead = state.issued.findIndex((sql) => sql.includes("FROM bg_account_suspensions"));
     const accountRead = state.issued.findIndex((sql) => sql.includes("FROM bg_users") && sql.endsWith("LOCK IN SHARE MODE"));
-    expect(state.issued[suspensionRead]).toMatch(/WHERE s\.user_id = \? AND .* LIMIT 1 LOCK IN SHARE MODE$/);
+    expect(state.issued[suspensionRead]).toMatch(/WHERE s\.user_id IN \(\?\) AND .* LOCK IN SHARE MODE$/);
     expect(accountRead).toBeLessThan(suspensionRead);
   });
 

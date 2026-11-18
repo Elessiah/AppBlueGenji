@@ -1,3 +1,5 @@
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+
 /**
  * Une suspension qui court, écrite une fois pour toutes les lectures —
  * pendant SQL de `isSuspensionActive`. `alias` est celui de
@@ -18,4 +20,25 @@ export function activeSuspensionSql(alias: string): string {
  */
 export function userSuspendedSql(userColumn: string): string {
   return `EXISTS (SELECT 1 FROM bg_account_suspensions sus WHERE sus.user_id = ${userColumn} AND ${activeSuspensionSql("sus")})`;
+}
+
+/** Ce dont `lockedSuspendedUserIds` a besoin de la connexion (import de type seul). */
+export type SuspensionReader = Pick<PoolConnection, "execute">;
+
+/**
+ * Les comptes de `ids` qu'une suspension tient, en lecture **courante et
+ * verrouillée** (`LOCK IN SHARE MODE`, compris de MariaDB) : à jouer dans la
+ * transaction du geste, **après** les lignes des comptes (l'ordre de
+ * `suspendAccount`, qui tient le compte en exclusif jusqu'à sa validation) —
+ * une suspension posée pendant le geste est attendue puis lue. Seule écriture
+ * de cette lecture (planning, désignation d'un arbitre, dernier administrateur).
+ */
+export async function lockedSuspendedUserIds(executor: SuspensionReader, ids: readonly number[]): Promise<Set<number>> {
+  if (ids.length === 0) return new Set();
+  const [rows] = await executor.execute<(RowDataPacket & { user_id: number | string })[]>(
+    `SELECT DISTINCT s.user_id FROM bg_account_suspensions s
+      WHERE s.user_id IN (${ids.map(() => "?").join(", ")}) AND ${activeSuspensionSql("s")} LOCK IN SHARE MODE`,
+    [...ids],
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
 }

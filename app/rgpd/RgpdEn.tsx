@@ -933,10 +933,12 @@ export function RgpdEn({
             or indefinite period: all its sessions are closed and no login is possible while the suspension runs;
             if it referees, casts or produces, it is no longer proposed, confirmed, assigned or taken as a replacement
             by the schedule, nor sent its notices (new slots, assignments, withdrawals, open slots); its confirmed
-            assignments stay until the tournament staff removes them, and its still-provisional proposals drop at the
-            next calculation or confirmation; the tournament staff can only infer that the schedule no longer retains
-            it (it is no longer proposed there, and a slot it streamed alone no longer counts as covered there),
-            without seeing the suspension or its reasons (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
+            assignments stay until the tournament staff removes them, and its still-provisional proposals are no
+            longer confirmed by the schedule; the tournament staff and, through what the calculation proposes there,
+            the other schedule members can only infer that the schedule no longer retains it (it is no longer
+            proposed or confirmed there, an assignment by hand is refused, and a slot it streamed alone no longer
+            counts as covered for the calculation, which proposes other casters there, nor in the tournament
+            staff&apos;s view), without seeing the suspension or its reasons (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
           <ul>
             <li>

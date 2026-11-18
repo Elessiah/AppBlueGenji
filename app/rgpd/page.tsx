@@ -1124,10 +1124,12 @@ function RgpdFr({
             s&apos;il arbitre, caste ou produit, il n&apos;est plus ni proposé, ni confirmé, ni désigné, ni
             pris en remplaçant par le planning, ni prévenu par ses avis (nouveaux créneaux, affectations,
             désistements, places à pourvoir) ; ses affectations confirmées restent jusqu&apos;à ce que le staff
-            des tournois les retire, ses propositions encore provisoires tombent au calcul ou à la confirmation
-            qui suivent ; le staff des tournois peut seulement en déduire que le planning ne le retient plus (il
-            n&apos;y est plus proposé, et un créneau qu&apos;il diffusait seul n&apos;y est plus compté couvert),
-            sans voir la suspension ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
+            des tournois les retire, ses propositions encore provisoires ne sont plus confirmées par le
+            planning ; le staff des tournois et, par ce que le calcul y propose, les autres membres du planning
+            peuvent seulement en déduire que le planning ne le retient plus (il n&apos;y est plus proposé ni
+            confirmé, une désignation à la main est refusée, et un créneau qu&apos;il diffusait seul n&apos;est
+            plus compté couvert par le calcul, qui y propose d&apos;autres casters, ni dans la vue du staff des
+            tournois), sans voir la suspension ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <ul>
             <li>

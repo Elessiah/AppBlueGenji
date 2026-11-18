@@ -399,20 +399,36 @@ fenêtre « Arbitrage » du match ne passe pas l'option. La réconciliation
 (`confirmPendingReferees`) ne confirme pas la proposition d'un compte suspendu
 que le match porte d'ailleurs ; `CONFIRM_MATCH_REFEREE_SQL`, lui, suit la
 désignation que le geste vient de faire (déjà jugée : une suspension validée
-après elle trouve une affectation posée). Ses affectations confirmées restent
+après elle trouve une affectation posée), sauf désignation incertaine (panne
+d'`assignMatchReferee`, match relu qui porte l'arbitre, peut-être posé par la
+fenêtre « Arbitrage » du match qui ne juge pas la suspension) :
+`CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL` rejuge la suspension. Ses affectations confirmées restent
 jusqu'à ce que le staff les retire (retirer un arbitre de match le prévient par
 `REFEREE_RELEASED`, avis du match et non du planning, dont le push écarte déjà
-un compte suspendu) ; ses propositions encore provisoires tombent au calcul ou à
-la confirmation suivants. Un caster autonome suspendu ne couvre plus seul son
+un compte suspendu) ; ses propositions encore provisoires ne sont plus
+confirmées (elles restent provisoires jusqu'à leur retrait : calcul de leur lot,
+refus à la confirmation, ou staff — une proposition d'arbitre que le match
+porte n'est jamais retirée par le planning). Un caster autonome suspendu ne couvre plus seul son
 créneau (`coveringSoloCasterIds`) pour le calcul (`preparePlanner`) et pour le
-staff des tournois ; les autres lecteurs gardent la couverture d'avant. Le
-staff des tournois peut donc **déduire** qu'un compte n'est plus retenu (déclaré :
-registre T11 et T20, `/rgpd` §5), sans voir la suspension ni ses motifs.
+staff des tournois ; les autres lecteurs gardent la couverture d'avant, mais
+voient ce que le calcul propose à sa place. Le staff des tournois — et, par ces
+propositions, les autres membres — peuvent donc **déduire** qu'un compte n'est
+plus retenu (plus proposé ni confirmé, désignation à la main refusée par le
+texte neutre `PLANNING_ROLE_NOT_HELD`, créneau autonome plus couvert ; déclaré :
+registre T11 et T20, `/rgpd` §5, `PRIVACY_CHANGES`), sans voir la suspension ni
+ses motifs.
 Coût des verrous : la lecture verrouillante des suspensions de `lockedHolding`
 pose des verrous de clé suivante sur `(user_id, lifted_at)` le temps de la
 transaction du planning (courte, sérialisée par le verrou nommé) : une
 suspension d'un compte voisin attend au plus cette transaction, sans
-interblocage (même ordre que `suspendAccount`).
+interblocage (même ordre que `suspendAccount`). La même lecture
+(`lockedSuspendedUserIds`, `suspension-sql.ts`, seule écriture, aussi lue par
+le contrôle du dernier administrateur) joue dans `assignMatchReferee`
+(`refuseSuspended`) pour **un** compte, dans la transaction du match (ligne du
+match `FOR UPDATE`, compte en partage, puis suspensions) : une suspension
+posée sur un compte voisin de l'index attend aussi cette transaction, courte
+(une désignation) ; même ordre comptes → suspensions que `suspendAccount`,
+qui ne touche jamais les matchs avant sa validation, donc sans interblocage.
 Le drapeau `suspended` n'est jamais rendu à la page. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du

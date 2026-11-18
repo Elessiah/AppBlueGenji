@@ -173,9 +173,9 @@ function lockedAccountReads(q: string, params: unknown[], options: Options): obj
     const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
     return other?.locked ? [other.locked] : [];
   }
-  if (q.startsWith("SELECT s.id FROM bg_account_suspensions s")) {
+  if (q.startsWith("SELECT DISTINCT s.user_id FROM bg_account_suspensions s")) {
     const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
-    return other?.suspendedUnderLock ? [{ id: 1 }] : [];
+    return other?.suspendedUnderLock ? [{ user_id: other.id }] : [];
   }
   return null;
 }
@@ -577,7 +577,7 @@ describe("requestAccountDeletion — dernier administrateur", () => {
 
     await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
 
-    const reread = queries.find(({ sql }) => sql.startsWith("SELECT s.id FROM bg_account_suspensions s"));
+    const reread = queries.find(({ sql }) => sql.startsWith("SELECT DISTINCT s.user_id FROM bg_account_suspensions s"));
     expect(reread?.sql).toContain("LOCK IN SHARE MODE");
     expect(reread?.params).toEqual([9]);
   });

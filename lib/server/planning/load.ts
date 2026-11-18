@@ -9,7 +9,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
 import { toIso } from "@/lib/server/serialization";
-import { activeSuspensionSql, userSuspendedSql } from "@/lib/server/suspension-sql";
+import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
 import { can, rolesGranting } from "@/lib/shared/permissions";
 import {
   PLANNING_HORIZON_DAYS,
@@ -425,12 +425,7 @@ export async function loadPlanningMembersByIds(
   );
   if (!options.lock || rows.length === 0) return toMembers(rows);
   // Les comptes tenus, la suspension se relit verrouillée (comptes puis suspensions, l'ordre de `suspendAccount`).
-  const [suspended] = await executor.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT s.user_id FROM bg_account_suspensions s
-      WHERE s.user_id IN (${inList(rows.length)}) AND ${activeSuspensionSql("s")} LOCK IN SHARE MODE`,
-    rows.map((row) => Number(row.id)),
-  );
-  const held = new Set(suspended.map((row) => Number(row.user_id)));
+  const held = await lockedSuspendedUserIds(executor, rows.map((row) => Number(row.id)));
   return toMembers(rows.map((row) => ({ ...row, suspended: held.has(Number(row.id)) ? 1 : 0 })));
 }
 

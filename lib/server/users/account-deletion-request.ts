@@ -35,7 +35,7 @@ import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs"
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
-import { activeSuspensionSql, userSuspendedSql } from "@/lib/server/suspension-sql";
+import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
 import { cancelPendingTeamInvitations, lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
@@ -537,12 +537,7 @@ async function assertAnotherAdminRemains(connection: PoolConnection, userId: num
     // Relue en lecture verrouillante (donc courante, pas l'instantané) : une
     // suspension posée depuis le premier relevé ne laisse pas passer la
     // demande, et aucune ne se pose sur ce compte avant le commit.
-    const [suspended] = await connection.execute<(RowDataPacket & { id: number })[]>(
-      `SELECT s.id FROM bg_account_suspensions s
-        WHERE s.user_id = ? AND ${activeSuspensionSql("s")} LIMIT 1 LOCK IN SHARE MODE`,
-      [Number(other.id)],
-    );
-    if (suspended.length === 0) return;
+    if ((await lockedSuspendedUserIds(connection, [Number(other.id)])).size === 0) return;
   }
   throw new Error("LAST_ADMIN_ACCOUNT");
 }

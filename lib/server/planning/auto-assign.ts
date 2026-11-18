@@ -501,6 +501,13 @@ type ConfirmStep = {
    * interrompue) : ce geste ne l'a pas désigné, la réconciliation le confirme sans auteur.
    */
   onMatchBefore?: boolean;
+  /**
+   * Désignation incertaine : une panne a interrompu `assignMatchReferee` et le
+   * match relu porte l'arbitre, posé par ce geste **ou** par un autre (fenêtre
+   * « Arbitrage » du match, qui ne juge pas la suspension) — sa confirmation
+   * rejuge donc la suspension (`CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL`).
+   */
+  uncertain?: boolean;
 };
 
 /**
@@ -541,23 +548,31 @@ export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmSt
   return steps;
 }
 
-/** Confirme une proposition d'arbitre de match **seulement** si le match a (encore) cet arbitre. */
 /**
  * Le compte de la ligne `a` n'est pas suspendu : la réconciliation laisse
  * provisoire la proposition d'un compte suspendu que le match porte d'ailleurs.
  */
 const NOT_SUSPENDED_SQL = (alias: string) => "NOT " + userSuspendedSql(alias + ".user_id");
 
-/*
- * Sans contrôle de suspension : ce geste vient de désigner cet arbitre, et la
- * désignation l'a jugée dans la transaction du match (`refuseSuspended`). Une
- * suspension validée après elle trouve une affectation déjà posée — elle
- * reste, la ligne suit le match qui fait foi (jamais un match qui porte
- * l'arbitre et un planning qui le montre en simple proposition).
+/**
+ * Confirme une proposition d'arbitre de match **seulement** si le match a
+ * (encore) cet arbitre. Sans contrôle de suspension : ce geste vient de
+ * désigner cet arbitre, et la désignation l'a jugée dans la transaction du
+ * match (`refuseSuspended`). Une suspension validée après elle trouve une
+ * affectation déjà posée — elle reste, la ligne suit le match qui fait foi
+ * (jamais un match qui porte l'arbitre et un planning qui le montre en simple
+ * proposition).
  */
 const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
   WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
     AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
+
+/**
+ * La même, pour une désignation incertaine (`ConfirmStep.uncertain`) : rien ne
+ * dit que ce geste l'a jugée, la suspension se rejuge — un compte suspendu
+ * reste en proposition, comme dans la réconciliation.
+ */
+export const CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL = `${CONFIRM_MATCH_REFEREE_SQL} AND ${NOT_SUSPENDED_SQL("bg_planning_assignments")}`;
 
 /** Retire une proposition d'arbitre de match refusée, **sauf** si le match porte cet arbitre (il fait foi). */
 const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
@@ -638,7 +653,10 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
     } catch (error) {
       if (!isMatchRefereeRefusal(error)) {
         // Une panne après la validation : le match relu dit si ce geste l'a posé (alors écrit à son compte).
-        if (await matchHasReferee(matchId, step.userId)) step.settled = true;
+        if (await matchHasReferee(matchId, step.userId)) {
+          step.settled = true;
+          step.uncertain = true;
+        }
         return error;
       }
       step.refused = true;
@@ -717,6 +735,19 @@ export async function lockedHolding(
   return (userId, entry, role) => holdingRefusal(byId.get(userId), { hidden: hidden.has(entry.tournamentId) }, role);
 }
 
+/** L'écriture qui confirme une proposition : un arbitre de match seulement si le match l'a encore. */
+function confirmStatement(step: ConfirmStep): [string, (string | number | null)[]] {
+  const { entry } = step;
+  if (!isMatchReferee(step)) {
+    return [
+      "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
+      [entry.key, step.userId, step.role],
+    ];
+  }
+  const sql = step.uncertain === true ? CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL : CONFIRM_MATCH_REFEREE_SQL;
+  return [sql, [entry.key, step.userId, entry.matchId, step.userId]];
+}
+
 /**
  * Les lignes d'une confirmation, d'un bloc : les propositions refusées par le
  * match, ou que le membre ne peut plus tenir (rôles relus ici, sous le
@@ -751,12 +782,7 @@ async function writeConfirmSteps(
       refused += 1;
       continue;
     }
-    const [result] = isMatchReferee(step)
-      ? await connection.execute(CONFIRM_MATCH_REFEREE_SQL, [entry.key, step.userId, entry.matchId, step.userId])
-      : await connection.execute(
-          "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
-          [entry.key, step.userId, step.role],
-        );
+    const [result] = await connection.execute(...confirmStatement(step));
     if (affected(result) === 0) continue;
     await writeEvent(connection, entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
     // Confirmée par ce geste : la personne sera prévenue (`announceAssignments`), une fois l'écriture validée.

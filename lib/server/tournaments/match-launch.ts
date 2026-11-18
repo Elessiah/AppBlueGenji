@@ -79,7 +79,7 @@ import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction, transact } from "./transaction";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { lockedSuspendedUserIds } from "@/lib/server/suspension-sql";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -1666,11 +1666,7 @@ async function writeReferee(
  * contournée entre un contrôle et l'écriture.
  */
 async function refereeSuspended(connection: PoolConnection, refereeId: number): Promise<boolean> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT s.id FROM bg_account_suspensions s WHERE s.user_id = ? AND ${activeSuspensionSql("s")} LIMIT 1 LOCK IN SHARE MODE`,
-    [refereeId],
-  );
-  return rows.length > 0;
+  return (await lockedSuspendedUserIds(connection, [refereeId])).has(refereeId);
 }
 
 /**

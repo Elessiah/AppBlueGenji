@@ -28,6 +28,7 @@ import {
   confirmAssignments,
   confirmPendingReferees,
   entriesToConfirm,
+  CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL,
   excludeFromHidden,
   excludeSuspended,
   holdingRefusal,
@@ -1400,6 +1401,36 @@ describe("confirmAssignments", () => {
       ["m:1", 3, 1, 3],
       ["m:1", 3, "REFEREE", 10, 1, "CONFIRMED", "AUTO", 9],
     ]);
+  });
+
+  it("confirmAssignments_outageAfterMatchTook_confirmRejudgesSuspension", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    routeSql({ onMatch: [false, true] });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("PLANNING_CONFIRM_PARTIAL");
+
+    const confirmSql = execute.mock.calls
+      .map(([sql]) => sql)
+      .find((sql) => sql.startsWith("UPDATE bg_planning_assignments SET confirmed = 1") && sql.includes("FROM bg_matches"));
+    expect(confirmSql).toBe(CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL);
+    expect(confirmSql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus WHERE sus.user_id = bg_planning_assignments.user_id");
+  });
+
+  it("confirmAssignments_outageMatchUncertainSuspended_staysProvisionalNoAnnounce", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    // Le compte suspendu : la confirmation rejugée ne touche aucune ligne.
+    routeSql({ onMatch: [false, true], affected: 0 });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    expect(writeParams().some((params) => (params as unknown[]).includes("CONFIRMED"))).toBe(false);
   });
 
   it("confirmAssignments_lockOrder_accountsBeforeMatchReconcile", async () => {
