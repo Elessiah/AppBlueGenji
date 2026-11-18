@@ -111,7 +111,9 @@ export function devDocTitle(markdown: string, fallback: string): string {
     }
     if (inFence) continue;
     const heading = /^#\s+(.+)$/.exec(line);
-    const title = heading?.[1].replace(/[`*]/g, "").replace(/\s+#*\s*$/, "").trim();
+    // Les `#` de fermeture (`# Titre ##`) partent ; sans expression à blancs
+    // répétés, qui se reparcourait en temps cubique sur une longue file d'espaces.
+    const title = heading?.[1].replace(/[`*]/g, "").trimEnd().replace(/\s#+$/, "").trim();
     if (title) return title;
   }
   return fallback;
@@ -141,13 +143,22 @@ async function readHead(file: string): Promise<string | null> {
 }
 
 /**
- * Fichier candidat : un `.md` ordinaire (jamais un lien symbolique), dont le
- * chemin réel reste sous `allowedReal`, de taille raisonnable. Rend son titre
- * (lu sur le début du fichier), ou `null`.
+ * Un fichier servable : ordinaire, jamais un lien symbolique ni un lien dur
+ * (un second nom qui pourrait désigner un fichier hors des dossiers
+ * autorisés), de taille raisonnable.
+ */
+function isServableFile(stat: { isFile(): boolean; isSymbolicLink(): boolean; nlink: number; size: number }): boolean {
+  return stat.isFile() && !stat.isSymbolicLink() && stat.nlink <= 1 && stat.size <= MAX_DOC_BYTES;
+}
+
+/**
+ * Fichier candidat : un `.md` servable ({@link isServableFile}), dont le
+ * chemin réel reste sous `allowedReal`. Rend son titre (lu sur le début du
+ * fichier), ou `null`.
  */
 async function readCandidate(file: string, allowedReal: string): Promise<{ real: string; title: string } | null> {
   const stat = await fs.lstat(file).catch(() => null);
-  if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_DOC_BYTES) return null;
+  if (!stat || !isServableFile(stat)) return null;
   const real = await fs.realpath(file).catch(() => null);
   if (!real || !isInside(allowedReal, real)) return null;
   const head = await readHead(real);
@@ -260,6 +271,28 @@ export interface LoadedDevDoc {
   outline: DevDocOutlineItem[];
 }
 
+/**
+ * Lit le fichier vérifié par `checked` (son `lstat`) : ouvert sans suivre de
+ * lien symbolique là où le système le permet, puis comparé au fichier vérifié
+ * (même périphérique, même inode) — un remplacement entre la vérification et
+ * la lecture rend `null` au lieu d'un autre contenu.
+ */
+async function readVerified(file: string, checked: { dev: number; ino: number }): Promise<string | null> {
+  const handle = await fs.open(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0)).catch(() => null);
+  if (!handle) return null;
+  try {
+    const opened = await handle.stat();
+    // Un descripteur ouvert n'est jamais un lien symbolique : seuls type, liens durs et taille se revérifient.
+    const same = opened.dev === checked.dev && opened.ino === checked.ino;
+    if (!same || !opened.isFile() || opened.nlink > 1 || opened.size > MAX_DOC_BYTES) return null;
+    return await handle.readFile("utf8");
+  } catch {
+    return null;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
 /** Rendus récents, par index : un nouvel index (liens à jour) repart d'une table vide. */
 const renderedDocs = new WeakMap<DevDocIndex, Map<string, LoadedDevDoc>>();
 
@@ -291,14 +324,19 @@ export async function renderDevDoc(
   // Tout chemin du site (`/devdoc/…`, `/regles`…) prend la langue de la page.
   const internal = (href: string | null) => (href !== null && isInternalPath(href) ? localize(href) : href);
   try {
-    // Un fichier a pu grossir depuis l'indexation (jusqu'à une minute plus tôt) : le plafond se revérifie.
-    const stat = await fs.stat(entry.file);
-    if (stat.size > MAX_DOC_BYTES) return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+    // Le fichier a pu changer depuis l'indexation (l'index échu reste servi
+    // jusqu'à dix minutes) : grossi, remplacé par un lien symbolique ou dur, ou
+    // atteint désormais par un dossier devenu lien. Tout se revérifie avant lecture.
+    const stat = await fs.lstat(entry.file);
+    if (!isServableFile(stat) || (await fs.realpath(entry.file)) !== entry.file) {
+      return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+    }
     // Même fichier, même état, même langue de liens : le rendu précédent resservi.
     const cacheKey = [entry.file, stat.mtimeMs, stat.size, localize("/devdoc"), tableLabel ?? ""].join("|");
     const remembered = renderedDocs.get(index)?.get(cacheKey);
     if (remembered) return remembered;
-    const raw = await fs.readFile(entry.file, "utf8");
+    const raw = await readVerified(entry.file, stat);
+    if (raw === null) return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
     const html = renderMarkdown(raw, {
       headingIds: true,
       tableLabel,

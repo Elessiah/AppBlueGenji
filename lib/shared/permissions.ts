@@ -167,17 +167,23 @@ export function canAny(
 }
 
 /**
- * Vrai si l'utilisateur porte au moins un rôle de permission de plateforme
- * (`ADMIN` compris). Sert à distinguer le staff — qui gère un domaine ou un
- * autre, peu importe lequel — d'un simple visiteur ou joueur : pas un domaine
- * précis, juste « a un rôle sur le site ».
+ * Rôles qui ne font pas du staff : `DEV` ne donne que la lecture de `/devdoc`,
+ * jamais les pages ou sections réservées au staff (`/bot`, `/bot/docs`).
+ */
+export const NON_STAFF_ROLES: readonly PlatformRole[] = ["DEV"];
+
+/**
+ * Vrai si l'utilisateur porte au moins un rôle de staff de plateforme
+ * (`ADMIN` compris, {@link NON_STAFF_ROLES} exclus). Sert à distinguer le
+ * staff — qui gère un domaine ou un autre, peu importe lequel — d'un simple
+ * visiteur ou joueur : pas un domaine précis, juste « a un rôle sur le site ».
  */
 export function isStaffMember(
   user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
 ): boolean {
   if (!user) return false;
   if (user.isAdmin) return true;
-  return (user.roles?.length ?? 0) > 0;
+  return (user.roles ?? []).some((role) => !NON_STAFF_ROLES.includes(role));
 }
 
 /** Rôles accordés et retirés par un enregistrement, dans l'ordre d'affichage. */

@@ -198,3 +198,66 @@ describe("revue cycle 1 — titres, collisions, langue des liens", () => {
     expect(doc.html).toContain('<a href="https://example.org/regles" rel="noreferrer">e</a>');
   });
 });
+
+/** Revue de sécurité, cycle 1 : titres en temps linéaire, liens durs, fichier changé après l'indexation. */
+describe("revue sécurité cycle 1 — fichiers servis", () => {
+  let root: string;
+  let outside: string;
+
+  beforeAll(async () => {
+    root = await fs.mkdtemp(path.join(os.tmpdir(), "devdoc-sec-"));
+    outside = path.join(root, "outside.md");
+    await write(outside, "# Secret hors liste\n");
+    await write(path.join(root, "repo/docs/LINKED.md"), "# Lié\n");
+    await fs.link(outside, path.join(root, "repo/docs/HARD.md"));
+    await write(path.join(root, "repo/docs/SWAP.md"), "# Avant\n");
+    await write(path.join(root, "repo/docs/LATE.md"), "# Tard\n");
+  });
+
+  afterAll(async () => {
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  const build = () =>
+    buildDevDocIndex({
+      site: { root: path.join(root, "repo"), dirs: ["docs"], files: [] },
+      bot: { root: path.join(root, "absent"), dirs: ["doc"], files: [] },
+    });
+
+  it("devDocTitle_closingHashes_stripped", () => {
+    expect(devDocTitle("# Titre ##", "f")).toBe("Titre");
+    expect(devDocTitle("# Langage C#", "f")).toBe("Langage C#");
+  });
+
+  it("devDocTitle_longTrailingSpaces_answersInLinearTime", () => {
+    const start = performance.now();
+    expect(devDocTitle(`# Foo${" ".repeat(8000)}bar`, "f")).toMatch(/^Foo\s+bar$/);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
+  it("buildDevDocIndex_hardLinkedFile_isSkipped", async () => {
+    const sec = await build();
+    expect(findDevDoc(sec, "site", "HARD")).toBeNull();
+    expect(findDevDoc(sec, "site", "LINKED")?.title).toBe("Lié");
+  });
+
+  it("renderDevDoc_fileHardLinkedAfterIndex_returnsNullHtml", async () => {
+    const sec = await build();
+    const summary = findDevDoc(sec, "site", "LATE")!;
+    await fs.link(path.join(root, "repo/docs/LATE.md"), path.join(root, "second-name.md"));
+    const doc = await renderDevDoc(sec, summary);
+    expect(doc.html).toBeNull();
+  });
+
+  it("renderDevDoc_fileReplacedAfterIndex_returnsNullHtml", async () => {
+    const sec = await build();
+    const summary = findDevDoc(sec, "site", "SWAP")!;
+    const file = path.join(root, "repo/docs/SWAP.md");
+    await fs.rm(file);
+    // Un lien symbolique vers un fichier hors liste ; sans droit de le créer
+    // (Windows), le fichier a disparu : le refus est le même.
+    await fs.symlink(outside, file, "file").catch(() => undefined);
+    const doc = await renderDevDoc(sec, summary);
+    expect(doc.html).toBeNull();
+  });
+});

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import "@/app/bot/docs/docs.css";
+import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { getCurrentUser } from "@/lib/server/auth";
 import { findDevDoc, loadDevDocIndex, renderDevDoc } from "@/lib/server/dev-docs";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -79,13 +80,15 @@ export default async function DevDocPage({ params }: Readonly<PageProps>) {
         {doc.outline.length > 0 ? (
           <details className={styles.outline}>
             <summary className={styles.outlineTitle} lang={foreign ? locale : undefined}>{t("doc.outline")}</summary>
-            <ul className={styles.outlineList}>
-              {doc.outline.map((item) => (
-                <li key={item.id} className={item.level === 3 ? styles.outlineSub : undefined}>
-                  <a href={`#${encodeURIComponent(item.id)}`}>{item.text}</a>
-                </li>
-              ))}
-            </ul>
+            <ScrollArea orientation="y" ariaLabel={t("doc.outline")} className={styles.outlineScroll}>
+              <ul className={styles.outlineList}>
+                {doc.outline.map((item) => (
+                  <li key={item.id} className={item.level === 3 ? styles.outlineSub : undefined}>
+                    <a href={`#${encodeURIComponent(item.id)}`}>{item.text}</a>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
           </details>
         ) : null}
         {doc.html === null ? (

@@ -85,7 +85,7 @@ export default async function BotDocsPage({ params }: Readonly<PageProps>) {
   const section = findBotDocSection(slug?.[0], isStaff);
   if (!section) notFound();
 
-  const doc = await loadBotDocCached(section, locale);
+  const doc = await loadBotDocCached(section, locale, t("docs.table"));
   const file = botDocFile(section, locale);
   // Langue réelle du document : sous `/en`, une page sans version anglaise
   // reste française (staff seulement), et le dit.

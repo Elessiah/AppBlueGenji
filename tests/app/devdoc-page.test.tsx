@@ -107,6 +107,8 @@ describe("DevDocPage — garde", () => {
     const html = await renderPage(["site", "features", "LONG"]);
     expect(html).toContain("Sur cette page");
     expect(html).toContain('<a href="#trois">Trois</a>');
+    // Le sommaire défile dans une `<ScrollArea>`, jamais un `overflow` posé à la main.
+    expect(html).toMatch(/<div class="scroll-area[^"]*"[^>]*><ul class="[^"]*outlineList/);
     expect(html).toContain('role="region" tabindex="0" aria-label="Tableau, défilable"');
     expect(html).toContain('target="_blank"');
     expect(html).toContain("(nouvel onglet)");

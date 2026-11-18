@@ -39,10 +39,19 @@ Les conditions du bot (`LegalTerms/`) restent sur leurs propres pages.
 1. `parseDevDocParams` refuse tout segment vide, `.`, `..`, contenant `/`, `\`
    ou un caractère nul, ou mal encodé, et tout dépôt inconnu ;
 2. le document est cherché **dans l'index** (`buildDevDocIndex`), qui ne retient
-   que des fichiers `.md` ordinaires — ni lien symbolique, ni dossier caché,
-   1 Mo au plus, 1 000 par dépôt, 6 niveaux de dossiers — dont le **chemin réel**
+   que des fichiers `.md` ordinaires — ni lien symbolique, ni lien dur
+   (`nlink` > 1), ni dossier caché, 1 Mo au plus, 1 000 par dépôt, 6 niveaux de dossiers — dont le **chemin réel**
    reste sous le dossier autorisé ;
-3. le fichier lu est celui de l'index, jamais un chemin bâti depuis l'adresse.
+3. le fichier lu est celui de l'index, jamais un chemin bâti depuis l'adresse ;
+4. à chaque lecture, tout se revérifie (l'index échu reste servi jusqu'à
+   10 minutes) : `lstat` (fichier ordinaire, ni lien symbolique ni dur, taille),
+   chemin réel inchangé, puis ouverture sans suivre de lien (`O_NOFOLLOW` là où
+   le système l'offre) et même périphérique + inode que le fichier vérifié.
+
+**Copie de travail, pas Git.** L'index lit le disque, pas `git ls-files` : un
+`.md` non suivi ou ignoré posé dans ces dossiers sur le serveur (note locale,
+journal) serait lisible par tout compte `dev`. Ne jamais y déposer de note
+privée ni de secret ; les secrets vivent dans `.env*`, hors liste blanche.
 
 L'index est refait au plus une fois par minute (`loadDevDocIndex`), en lisant
 seulement les 8 premiers Ko de chaque fichier pour son titre (premier `#` hors
@@ -61,9 +70,12 @@ plus gros document (131 Ko) ~19 ms, un document courant < 5 ms. L'arborescence
 (~35 Ko dans le flux RSC + ~45 Ko de HTML pour 200 documents, ~10 Ko compressés)
 vit dans la mise en page : elle n'est envoyée qu'une fois par visite. Les liens
 de la navigation ne se préchargent pas (`prefetch={false}`) : chaque lien visible
-aurait lancé un rendu serveur en production. Les motifs de lien du rendu sont
-bornés (libellé 500 caractères, cible 2 000) : sans cela, une ligne de milliers
-de `[` se rendait en temps quadratique.
+aurait lancé un rendu serveur en production. Les motifs du rendu sont en temps
+linéaire : liens bornés (libellé 500 caractères, cible 2 000) et sans crochet
+dans le libellé ni parenthèse ou crochet dans la cible (une ligne de milliers de
+`[` se rendait en temps quadratique, même bornée), ligne de séparation de
+tableau découpée cellule par cellule, `#` de fermeture d'un titre retirés sans
+expression à blancs répétés.
 
 ## Adresses
 

@@ -37,7 +37,11 @@ export interface LoadedBotDoc {
  * Lit et rend un document du bot depuis le disque, à chaque appel — la page
  * passe par {@link loadBotDocCached}.
  */
-export async function loadBotDoc(section: BotDocSection, locale: Locale = DEFAULT_LOCALE): Promise<LoadedBotDoc> {
+export async function loadBotDoc(
+  section: BotDocSection,
+  locale: Locale = DEFAULT_LOCALE,
+  tableLabel?: string,
+): Promise<LoadedBotDoc> {
   const file = botDocFile(section, locale);
   const filePath = path.join(BOT_PROJECT_DIR, file);
   try {
@@ -48,7 +52,8 @@ export async function loadBotDoc(section: BotDocSection, locale: Locale = DEFAUL
     return {
       section,
       file,
-      html: renderMarkdown(raw),
+      // Un tableau large défile dans une région nommée et focalisable (`tableLabel`).
+      html: renderMarkdown(raw, { tableLabel }),
       updatedAt: stat.mtime.toISOString(),
     };
   } catch {
@@ -70,9 +75,16 @@ export const BOT_DOC_TTL_MS = 60_000;
  * registre (`BOT_DOC_SECTIONS`), jamais une saisie : l'espace des clés est
  * borné par construction.
  */
-export function loadBotDocCached(section: BotDocSection, locale: Locale = DEFAULT_LOCALE): Promise<LoadedBotDoc> {
-  // Clé : le fichier lu, pas la section — le guide a deux fichiers, un par langue.
-  return cached(`bot-doc:${botDocFile(section, locale)}`, BOT_DOC_TTL_MS, () => loadBotDoc(section, locale));
+export function loadBotDocCached(
+  section: BotDocSection,
+  locale: Locale = DEFAULT_LOCALE,
+  tableLabel?: string,
+): Promise<LoadedBotDoc> {
+  // Clé : le fichier lu et la langue de la page — le guide a deux fichiers, un
+  // par langue, et un même fichier porte le nom de ses tableaux dans la langue lue.
+  return cached(`bot-doc:${botDocFile(section, locale)}:${locale}`, BOT_DOC_TTL_MS, () =>
+    loadBotDoc(section, locale, tableLabel),
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -122,8 +134,13 @@ function unescapeHtml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function isSafeHref(href: string): boolean {
-  return /^(https?:\/\/|\/|#|mailto:)/i.test(href);
+/**
+ * Schémas sûrs d'une cible de lien. Un chemin du site commence par une seule
+ * barre : `//hôte` et `/\hôte` sont lus par le navigateur comme l'adresse
+ * d'un autre site (sans schéma) et sont refusés.
+ */
+export function isSafeHref(href: string): boolean {
+  return /^(https?:\/\/|\/(?![/\\])|#|mailto:)/i.test(href);
 }
 
 /** Adresse finale d'un lien : celle du résolveur, toujours repassée au filtre des schémas sûrs. */
@@ -143,17 +160,25 @@ function renderStrongEm(html: string): string {
 }
 
 /*
- * Bornes des motifs de lien : sans elles, une ligne de milliers de `[` sans
- * `](` se parcourait en entier à chaque `[` (temps quadratique, ~20 s pour
- * 200 000 crochets) : un rendu qui bloque le processus.
+ * Motif d'un lien `[libellé](cible)`, en temps linéaire : le libellé s'arrête
+ * au premier crochet (ouvrant ou fermant), la cible à la première parenthèse
+ * ou au premier crochet. Sans ces exclusions, une ligne de milliers de `[` (ou
+ * de `[a](` sans fin) se reparcourait à chaque crochet — quadratique même
+ * borné (~1,3 s pour un million de `[`) : un rendu qui bloque le processus.
+ * Un libellé à crochets imbriqués n'est donc pas un lien (seul le lien
+ * intérieur l'est, comme en CommonMark).
  */
+const LINK_PATTERN = /\[([^[\]]{1,500})\]\(([^()[\]\s\uE000]{1,2000})\)/g; // NOSONAR typescript:S8786 — classes exclusives, temps linéaire
+/** Même motif, pour le texte brut d'un titre. */
+const PLAIN_LINK_PATTERN = /\[([^[\]]{1,500})\]\([^()[\]]{0,2000}\)/g; // NOSONAR typescript:S8786 — classes exclusives, temps linéaire
+
 function renderEmphasis(text: string, options: MarkdownRenderOptions, codes: string[]): string {
   // Dans le libellé d'un lien, un code reste du code seul : jamais un lien dans un lien.
   const plainCodes = (label: string) => label.replace(CODE_SLOT, (_m, n: string) => `<code>${escapeHtml(codes[Number(n)])}</code>`);
   const links: string[] = [];
   // Une cible qui contient un code inline n'est pas un lien (le code prime, comme
   // en CommonMark) : sinon le code rendu atterrirait dans l'attribut `href`.
-  const withLinks = escapeHtml(text).replace(/\[([^\]]{1,500})\]\(([^)\s\uE000]{1,2000})\)/g, (_m, label: string, href: string) => { // NOSONAR typescript:S8786 — Markdown des dépôts du site et du bot, source de confiance
+  const withLinks = escapeHtml(text).replace(LINK_PATTERN, (_m, label: string, href: string) => {
     const target = linkTarget(unescapeHtml(href), options);
     const inner = plainCodes(renderStrongEm(label));
     if (target === null) return inner;
@@ -199,7 +224,7 @@ export function headingAnchor(text: string): string {
 
 /** Texte brut d'un titre (sans balisage Markdown), pour son ancre. */
 function plainHeadingText(text: string): string {
-  return text.replace(/\[([^\]]{1,500})\]\([^)]{0,2000}\)/g, "$1").replace(/[`*]/g, ""); // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
+  return text.replace(PLAIN_LINK_PATTERN, "$1").replace(/[`*]/g, "");
 }
 
 type ListTag = "ul" | "ol";
@@ -223,8 +248,17 @@ export function tableCells(line: string): string[] {
   return trimmed.split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, "|"));
 }
 
-function isTableSeparator(line: string): boolean {
-  return /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(line);
+/**
+ * Ligne de séparation d'un tableau (`| --- | :-: |`) : chaque cellule n'est
+ * faite que de tirets, encadrés au plus d'un `:`. Découpée cellule par cellule
+ * plutôt que lue d'une seule expression, dont les blancs répétés se
+ * reparcouraient en temps quadratique sur une longue ligne d'espaces.
+ */
+export function isTableSeparator(line: string): boolean {
+  let body = line.trim();
+  if (body.startsWith("|")) body = body.slice(1);
+  if (body.endsWith("|")) body = body.slice(0, -1);
+  return body.split("|").every((cell) => /^:?-+:?$/.test(cell.trim()));
 }
 
 /** Langue d'une barrière de code (` ```ts `), réduite à un identifiant sûr. */

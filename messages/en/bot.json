@@ -207,6 +207,7 @@
     "synced": "DOCS SYNCED FROM THE BOT REPOSITORY",
     "updated": "UPDATED · {date}",
     "frenchOnly": "Staff-only page, written in French.",
+    "table": "Table, scrollable",
     "sections": {
       "guide": {
         "title": "User guide",

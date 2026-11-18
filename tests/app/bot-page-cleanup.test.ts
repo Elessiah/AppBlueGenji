@@ -285,7 +285,7 @@ describe("/bot — aucune lecture pour rien, aucun cache promis en vain", () => 
     expect(page).not.toContain("@/lib/server/bot-integration");
     expect(page).toContain("@/lib/server/bot-showcase-cache");
     expect(page).toContain("cachedBotActivity()");
-    expect(docsPage).toContain("loadBotDocCached(section, locale)");
+    expect(docsPage).toContain('loadBotDocCached(section, locale, t("docs.table"))');
     expect(docsPage).not.toMatch(/\bloadBotDoc\(/);
   });
 

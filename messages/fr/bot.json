@@ -207,6 +207,7 @@
     "synced": "DOC SYNCHRONISÉE DEPUIS LE DÉPÔT DU BOT",
     "updated": "MAJ · {date}",
     "frenchOnly": "Page réservée au staff, rédigée en français.",
+    "table": "Tableau, défilable",
     "sections": {
       "guide": {
         "title": "Guide utilisateur",

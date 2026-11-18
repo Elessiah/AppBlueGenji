@@ -158,7 +158,10 @@
 .docs-content ol > li { padding-left: 4px; }
 .docs-content ol > li::before { content: none; }
 .docs-content ol > li::marker { color: var(--cyan-400); font-family: var(--font-mono); font-size: 12px; }
-/* Un tableau large défile dans son enveloppe (`.docs-table`) au lieu de s'écraser. */
+/* Un tableau large défile dans son enveloppe (`.docs-table`) au lieu de s'écraser.
+   HTML rendu en chaîne (`renderMarkdown`), hors de portée de `<ScrollArea>` : la
+   région nommée et focalisable est posée par le rendu (`tableLabel`), sur les
+   deux pages. */
 .docs-content .docs-table {
   margin: 0 0 18px;
   max-width: 100%;

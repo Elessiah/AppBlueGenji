@@ -37,7 +37,9 @@ s'additionnent.
 - `dev` — page `/devdoc` (documentation du site et du bot, `DEVDOC.md`) et
   lien « Documentation dev » du menu du compte. **Lecture seule**, sans aucune
   donnée de membre : les dépôts et leur doc sont publics, la page ne fait que
-  les rassembler. Rôle `DEV` (et `ADMIN`).
+  les rassembler. Rôle `DEV` (et `ADMIN`). `DEV` ne fait **pas** du staff :
+  `isStaffMember` l'écarte (`NON_STAFF_ROLES`), si bien qu'il n'ouvre ni les
+  commandes ni les sections staff de `/bot` et `/bot/docs`.
 - `moderation` — panneau `/admin/signalements`, `/api/admin/reports/*`,
   `/api/admin/logo-quarantines/*`, `DELETE /api/admin/teams/[id]/logo`,
   `DELETE /api/admin/users/[id]/avatar` (réservé `ADMIN` : retirer le contenu

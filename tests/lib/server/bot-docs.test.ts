@@ -7,6 +7,8 @@ import {
   BOT_DOC_SECTIONS,
   findBotDocSection,
   headingAnchor,
+  isSafeHref,
+  isTableSeparator,
   renderInline,
   renderMarkdown,
 } from "@/lib/server/bot-docs";
@@ -387,5 +389,72 @@ describe("renderMarkdown — numérotation des listes coupées (revue cycle 1)",
 
   it("renderMarkdown_numberedListStartingAtOne_noStartAttribute", () => {
     expect(renderMarkdown("1. a\n2. b")).toBe("<ol>\n<li>a</li>\n<li>b</li>\n</ol>");
+  });
+});
+
+/** Revue de sécurité, cycle 1 : cibles hors site, motifs en temps linéaire, tableaux nommés. */
+describe("revue sécurité cycle 1 — rendu Markdown", () => {
+  it("isSafeHref_protocolRelative_rejected", () => {
+    expect(isSafeHref("//evil.example/phish")).toBe(false);
+    expect(renderInline("[Guide](//evil.example/phish)")).toBe("Guide");
+  });
+
+  it("isSafeHref_backslashHost_rejected", () => {
+    expect(isSafeHref("/\\evil.example")).toBe(false);
+  });
+
+  it("isSafeHref_singleSlashPath_accepted", () => {
+    expect(isSafeHref("/regles")).toBe(true);
+    expect(renderInline("[r](/regles)")).toBe('<a href="/regles" rel="noreferrer">r</a>');
+  });
+
+  it("renderInline_manyOpenBrackets_rendersInLinearTime", () => {
+    const line = "[".repeat(200_000);
+    const start = performance.now();
+    renderInline(line);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("renderInline_repeatedUnclosedLinkTargets_rendersInLinearTime", () => {
+    const line = "[a](".repeat(100_000);
+    const start = performance.now();
+    renderInline(line);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("renderInline_nestedBracketLabel_onlyInnerLinkRendered", () => {
+    expect(renderInline("[a [b](/x)")).toBe('[a <a href="/x" rel="noreferrer">b</a>');
+  });
+
+  it("isTableSeparator_alignedCells_true", () => {
+    expect(isTableSeparator("| :-- | :-: | --: |")).toBe(true);
+    expect(isTableSeparator("---|---")).toBe(true);
+  });
+
+  it("isTableSeparator_emptyOrTextCell_false", () => {
+    expect(isTableSeparator("| --- |  |")).toBe(false);
+    expect(isTableSeparator("| --- | a |")).toBe(false);
+    expect(isTableSeparator("|")).toBe(false);
+  });
+
+  it("isTableSeparator_longSpaceLine_answersInLinearTime", () => {
+    const line = `|${" ".repeat(200_000)}x`;
+    const start = performance.now();
+    expect(isTableSeparator(line)).toBe(false);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+
+  it("renderMarkdown_tableAfterLongSpaceLine_rendersQuickly", () => {
+    const start = performance.now();
+    renderMarkdown(`| a |\n${" ".repeat(100_000)}x`);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("renderMarkdown_tableLabel_namesScrollRegion", () => {
+    const table = "| a | b |\n|---|---|\n| 1 | 2 |";
+    expect(renderMarkdown(table, { tableLabel: "Table, scrollable" })).toContain(
+      '<div class="docs-table" role="region" tabindex="0" aria-label="Table, scrollable">',
+    );
+    expect(renderMarkdown(table)).toContain('<div class="docs-table">');
   });
 });

@@ -296,14 +296,17 @@
   cursor: pointer;
 }
 
+/* Le défilement vient de `<ScrollArea>` (région nommée, focalisable quand elle déborde). */
+.outlineScroll {
+  max-height: 40vh;
+}
+
 .outlineList {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin: 0;
   padding: 4px 12px 12px 28px;
-  max-height: 40vh;
-  overflow-y: auto;
   font-size: 13px;
 }
 
