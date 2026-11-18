@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "title": "Documentation développeur"
+  },
+  "eyebrow": "DÉVELOPPEMENT · DOCUMENTATION",
+  "title": "Documentation développeur",
+  "lead": "Toute la documentation du site et du bot, relue depuis les dépôts.",
+  "repos": {
+    "site": "Site",
+    "bot": "Bot Discord"
+  },
+  "rootFolder": "Racine",
+  "nav": {
+    "label": "Documents",
+    "count": "{count, plural, one {# document} other {# documents}}",
+    "tree": "Arborescence des documents"
+  },
+  "search": {
+    "label": "Rechercher un document",
+    "placeholder": "Titre ou fichier…",
+    "empty": "Aucun document ne correspond.",
+    "results": "{count, plural, =0 {Aucun résultat} one {# résultat} other {# résultats}}"
+  },
+  "doc": {
+    "source": "Source : {file}",
+    "github": "Voir sur GitHub",
+    "updated": "Modifié le {date}",
+    "frenchOnly": "Ce document est rédigé en français.",
+    "missing": "Ce document n'a pas pu être lu.",
+    "repoEmpty": "Aucun document trouvé dans ce dépôt."
+  }
+}

@@ -199,14 +199,16 @@
       "ARBITRE": "Arbitre",
       "CASTER": "Caster",
       "COMMUNITY_MANAGER": "Community Manager",
-      "RECRUTEUR": "Recruteur"
+      "RECRUTEUR": "Recruteur",
+      "DEV": "Développeur"
     },
     "descriptions": {
       "ADMIN": "Tous les droits, dont l'attribution des rôles.",
       "ARBITRE": "Créer et gérer les tournois.",
       "CASTER": "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
       "COMMUNITY_MANAGER": "Gérer le site vitrine et l'association.",
-      "RECRUTEUR": "Gérer la page recrutement."
+      "RECRUTEUR": "Gérer la page recrutement.",
+      "DEV": "Lire la documentation technique du site et du bot."
     },
     "save": "Enregistrer mes rôles",
     "saving": "Enregistrement…",

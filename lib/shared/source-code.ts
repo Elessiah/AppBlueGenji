@@ -13,6 +13,9 @@
 /** Dépôt public du site. */
 export const SOURCE_CODE_URL = "https://github.com/Elessiah/AppBlueGenji";
 
+/** Dépôt public du bot (`blueGenjiBot`), sous licence AGPL-3.0-only (fichiers `LICENSE` et `NOTICE`). */
+export const BOT_SOURCE_URL = "https://github.com/Elessiah/blueGenjiBot";
+
 /** Identifiant SPDX, celui de `package.json`. */
 export const CODE_LICENSE_SPDX = "AGPL-3.0-only";
 

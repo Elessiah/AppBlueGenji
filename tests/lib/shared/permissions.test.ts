@@ -70,12 +70,14 @@ describe("permissions", () => {
       expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting", "live"]);
       expect([...permissionsForRoles(["COMMUNITY_MANAGER"])]).toEqual(["showcase"]);
       expect([...permissionsForRoles(["RECRUTEUR"])]).toEqual(["recruitment"]);
+      // Le développeur lit la documentation technique, rien d'autre.
+      expect([...permissionsForRoles(["DEV"])]).toEqual(["dev"]);
     });
 
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
       expect(perms).toEqual(
-        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation"]),
+        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev"]),
       );
     });
 
@@ -111,6 +113,12 @@ describe("permissions", () => {
     it("is safe on null/undefined", () => {
       expect(hasPermission(null, "tournaments")).toBe(false);
       expect(hasPermission(undefined, "tournaments")).toBe(false);
+    });
+    it("keeps a DEV user out of every other scope", () => {
+      expect(hasPermission(["DEV"], "dev")).toBe(true);
+      expect(hasPermission(["DEV"], "tournaments")).toBe(false);
+      expect(hasPermission(["DEV"], "moderation")).toBe(false);
+      expect(hasPermission(["DEV"], "roles")).toBe(false);
     });
   });
 

@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   BOT_DOC_SECTIONS,
   findBotDocSection,
+  headingAnchor,
   renderInline,
   renderMarkdown,
 } from "@/lib/server/bot-docs";
@@ -243,5 +244,99 @@ describe("loadBotDoc", () => {
     expect(help.html).toContain("Aide");
     expect(other.html).toContain("Autre");
     clearCache();
+  });
+});
+
+describe("renderMarkdown — blocs de /devdoc", () => {
+  it("renderMarkdown_tableWithSeparator_rendersHeadAndBody", () => {
+    expect(renderMarkdown("| a | b |\n|---|:-:|\n| 1 | `x` |")).toBe(
+      "<table>\n<thead><tr><th>a</th><th>b</th></tr></thead>\n<tbody>\n<tr><td>1</td><td><code>x</code></td></tr>\n</tbody>\n</table>",
+    );
+  });
+
+  it("renderMarkdown_barsWithoutSeparator_staysParagraph", () => {
+    expect(renderMarkdown("| a |\nsuite")).toBe("<p>| a | suite</p>");
+  });
+
+  it("renderMarkdown_orderedList_rendersOl", () => {
+    expect(renderMarkdown("1. un\n2. deux")).toBe("<ol>\n<li>un</li>\n<li>deux</li>\n</ol>");
+  });
+
+  it("renderMarkdown_orderedThenBullet_switchesList", () => {
+    expect(renderMarkdown("1. un\n- deux")).toBe("<ol>\n<li>un</li>\n</ol>\n<ul>\n<li>deux</li>\n</ul>");
+  });
+
+  it("renderMarkdown_wrappedBulletLine_continuesItem", () => {
+    expect(renderMarkdown("- un\n  suite\n- deux")).toBe("<ul>\n<li>un suite</li>\n<li>deux</li>\n</ul>");
+  });
+
+  it("renderMarkdown_textAfterBlankLine_closesList", () => {
+    expect(renderMarkdown("- un\n\nsuite")).toBe("<ul>\n<li>un</li>\n</ul>\n<p>suite</p>");
+  });
+
+  it("renderMarkdown_blockquote_joinsLines", () => {
+    expect(renderMarkdown("> cité\n> suite")).toBe("<blockquote><p>cité suite</p></blockquote>");
+  });
+
+  it("renderMarkdown_rule_rendersHr", () => {
+    expect(renderMarkdown("---")).toBe("<hr>");
+  });
+
+  it("renderMarkdown_fenceWithLanguage_tagsBlock", () => {
+    expect(renderMarkdown("```ts\nconst a = 1;\n```")).toBe(
+      '<pre data-lang="ts"><code class="language-ts">const a = 1;</code></pre>',
+    );
+  });
+
+  it("renderMarkdown_headingIds_dedupesAnchors", () => {
+    expect(renderMarkdown("# Titre\n## Titre", { headingIds: true })).toBe(
+      '<h2 id="titre">Titre</h2>\n<h3 id="titre-1">Titre</h3>',
+    );
+  });
+
+  it("renderMarkdown_noOptions_noHeadingIds", () => {
+    expect(renderMarkdown("## Titre")).toBe("<h3>Titre</h3>");
+  });
+});
+
+describe("renderInline — options de liens", () => {
+  it("renderInline_resolverRefuses_keepsLabelOnly", () => {
+    expect(renderInline("[x](a.md)", { resolveLink: () => null })).toBe("x");
+  });
+
+  it("renderInline_resolverReturnsUnsafeScheme_dropsLink", () => {
+    expect(renderInline("[x](a.md)", { resolveLink: () => "javascript:alert(1)" })).toBe("x");
+  });
+
+  it("renderInline_linkCodeResolves_wrapsCodeInLink", () => {
+    expect(renderInline("`A.md`", { linkCode: () => "/devdoc/site/A" })).toBe(
+      '<a href="/devdoc/site/A"><code>A.md</code></a>',
+    );
+  });
+
+  it("renderInline_linkCodeRefuses_keepsPlainCode", () => {
+    expect(renderInline("`A.md`", { linkCode: () => null })).toBe("<code>A.md</code>");
+  });
+});
+
+describe("renderInline — code dans le formatage", () => {
+  it("renderInline_boldAroundCode_keepsBoldAndCode", () => {
+    expect(renderInline("**ne pas `disabled` natif**")).toBe("<strong>ne pas <code>disabled</code> natif</strong>");
+  });
+
+  it("renderInline_codeLabelInLink_neverNestsLinks", () => {
+    expect(renderInline("[`X.md`](https://example.org)", { linkCode: () => "/devdoc/x" })).toBe(
+      '<a href="https://example.org" rel="noreferrer"><code>X.md</code></a>',
+    );
+  });
+
+  it("renderInline_slotMarkerInSource_isDropped", () => {
+    expect(renderInline("a\uE0000\uE000 b")).toBe("a0 b");
+  });
+});
+
+describe("headingAnchor", () => {
+  it("headingAnchor_punctuationAndAccents_githubLikeSlug", () => {
+    expect(headingAnchor("Été & co — `x`")).toBe("été--co--x");
   });
 });

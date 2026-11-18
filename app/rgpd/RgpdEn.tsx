@@ -1050,7 +1050,7 @@ export function RgpdEn({
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
             When an administrator grants or removes a platform role (administrator, referee, caster, community
-            manager, recruiter), including on their own account, where they cannot remove their own administration, the
+            manager, recruiter, developer), including on their own account, where they cannot remove their own administration, the
             staff log on Discord notes it without naming anyone; the server logs keep its author, the identifier of the
             account concerned and the roles saved, on the basis of legitimate interest (administration of the
             platform), to which the person concerned may object (section{" "}

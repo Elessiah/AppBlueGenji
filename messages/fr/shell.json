@@ -35,6 +35,7 @@
   "account": {
     "menuLabel": "{pseudo}, menu du compte",
     "profile": "Mon profil",
+    "devDocs": "Documentation dev",
     "logout": "Déconnexion",
     "loggingOut": "Déconnexion…",
     "logoutFailed": "La déconnexion a échoué. Réessaie dans un instant."

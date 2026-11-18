@@ -48,6 +48,7 @@ import {
   DPF_ADEQUACY_DECISION_EN,
 } from "@/lib/shared/processing-register";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { BOT_SOURCE_URL } from "@/lib/shared/source-code";
 import {
   VOICE_BOT_ABANDONED_MAX_HOURS,
   VOICE_BOT_RECREATE_MAX,
@@ -85,8 +86,8 @@ const TERMS_HREF = "/terms-of-service-bot";
 const LEGAL_NOTICE_HREF = "/mentions-legales";
 const SITE_PRIVACY_HREF = "/rgpd";
 const CNIL_COMPLAINT_URL = "https://www.cnil.fr/fr/plaintes";
-/** Dépôt public du bot (`blueGenjiBot`), sous licence AGPL-3.0-only (fichiers `LICENSE` et `NOTICE`). */
-export const BOT_SOURCE_URL = "https://github.com/Elessiah/blueGenjiBot";
+/** Dépôt public du bot — défini dans `source-code.ts`, avec celui du site. */
+export { BOT_SOURCE_URL };
 /** Titulaire des droits d'auteur sur le code du bot, tel que le nomme son fichier `NOTICE`. */
 export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // Aucune adresse électronique ici : le courriel de l'association ne s'écrit

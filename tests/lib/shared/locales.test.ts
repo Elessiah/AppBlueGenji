@@ -3,7 +3,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 // Liste blanche simulée : au lot 0 elle est vide, et ces règles ne se
 // vérifient que sur des routes traduites.
 jest.mock("@/lib/shared/i18n-routes", () => ({
-  MIGRATED_ROUTES: ["/", "/regles", "/regles/[slug]", "/equipes/[id]"],
+  MIGRATED_ROUTES: ["/", "/regles", "/regles/[slug]", "/equipes/[id]", "/devdoc", "/devdoc/[...path]"],
 }));
 
 import {
@@ -52,6 +52,21 @@ describe("isMigratedRoute — liste blanche", () => {
     expect(isMigratedRoute("/regles/swiss/x")).toBe(false);
     expect(isMigratedRoute("/equipes/")).toBe(false);
     expect(isMigratedRoute("/equipes")).toBe(false);
+  });
+});
+
+describe("isMigratedRoute — segment attrape-tout [...x]", () => {
+  it("accepte la racine et une ou plusieurs parties sous /devdoc", () => {
+    expect(isMigratedRoute("/devdoc")).toBe(true);
+    expect(isMigratedRoute("/devdoc/")).toBe(true);
+    expect(isMigratedRoute("/devdoc/site/INDEX")).toBe(true);
+    expect(isMigratedRoute("/devdoc/site/features/BUSY_BUTTONS")).toBe(true);
+  });
+
+  it("refuse une tête différente et une partie vide", () => {
+    expect(isMigratedRoute("/devdocs")).toBe(false);
+    expect(isMigratedRoute("/devdoc//x")).toBe(false);
+    expect(isMigratedRoute("/x/devdoc/site")).toBe(false);
   });
 });
 

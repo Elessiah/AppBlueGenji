@@ -11,7 +11,7 @@
  */
 
 /** Rôles attribuables à un utilisateur. Cumulables. */
-export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" | "RECRUTEUR";
+export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" | "RECRUTEUR" | "DEV";
 
 /**
  * Domaines d'action protégés :
@@ -29,6 +29,9 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  *   par un membre (logo d'équipe, avatar de joueur). Réservé ADMIN : retirer
  *   le contenu d'un tiers engage la responsabilité de l'association, ce n'est
  *   pas un geste d'arbitrage ni de vitrine.
+ * - `dev` — lecture de la documentation technique du site et du bot
+ *   (`/devdoc`, `docs/features/DEVDOC.md`). Lecture seule : aucune écriture,
+ *   aucune donnée de membre.
  */
 export type Permission =
   | "tournaments"
@@ -37,7 +40,8 @@ export type Permission =
   | "showcase"
   | "recruitment"
   | "roles"
-  | "moderation";
+  | "moderation"
+  | "dev";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
@@ -46,6 +50,7 @@ export const PLATFORM_ROLES: readonly PlatformRole[] = [
   "CASTER",
   "COMMUNITY_MANAGER",
   "RECRUTEUR",
+  "DEV",
 ];
 
 /** Libellés FR pour l'UI. */
@@ -55,6 +60,7 @@ export const ROLE_LABELS: Record<PlatformRole, string> = {
   CASTER: "Caster",
   COMMUNITY_MANAGER: "Community Manager",
   RECRUTEUR: "Recruteur",
+  DEV: "Développeur",
 };
 
 /** Description courte du périmètre de chaque rôle (UI). */
@@ -64,10 +70,11 @@ export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   CASTER: "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
+  DEV: "Lire la documentation technique du site et du bot.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev"],
   // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
   // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
   // un match casté.
@@ -77,6 +84,9 @@ const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
   CASTER: ["casting", "live"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
+  // Lecture de `/devdoc` seulement : les dépôts et leur doc sont publics, la
+  // page ne fait que les rassembler pour qui travaille sur le code.
+  DEV: ["dev"],
 };
 
 /** Vrai si `value` est un `PlatformRole` connu. */

@@ -165,6 +165,10 @@
     "RECRUTEUR": {
       "label": "Recruteur",
       "description": "Gérer la page recrutement."
+    },
+    "DEV": {
+      "label": "Développeur",
+      "description": "Lire la documentation technique du site et du bot."
     }
   },
   "audience": {

@@ -159,6 +159,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     isAdult: 1,
   },
   {
+    pseudo: "Developpeur",
+    purpose: "permission dev seule (documentation /devdoc)",
+    platformRoles: ["DEV"],
+    isAdult: 1,
+  },
+  {
     pseudo: "MultiRole",
     purpose: "rôles cumulés arbitre + recruteur",
     platformRoles: ["ARBITRE", "RECRUTEUR"],

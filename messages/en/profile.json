@@ -199,14 +199,16 @@
       "ARBITRE": "Referee",
       "CASTER": "Caster",
       "COMMUNITY_MANAGER": "Community Manager",
-      "RECRUTEUR": "Recruiter"
+      "RECRUTEUR": "Recruiter",
+      "DEV": "Developer"
     },
     "descriptions": {
       "ADMIN": "Every right, including assigning roles.",
       "ARBITRE": "Create and manage tournaments.",
       "CASTER": "Prepare and broadcast matches live (bracket preview, on-air).",
       "COMMUNITY_MANAGER": "Manage the showcase site and the association.",
-      "RECRUTEUR": "Manage the recruitment page."
+      "RECRUTEUR": "Manage the recruitment page.",
+      "DEV": "Read the technical documentation of the site and the bot."
     },
     "save": "Save my roles",
     "saving": "Saving…",
