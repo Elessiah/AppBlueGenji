@@ -550,18 +550,22 @@ async function postDiscordNotification(
  * injoignable ne doit pas faire échouer la lecture d'une page de tournoi, qui
  * est ce qui déclenche le balayage des rappels.
  *
+ * @param options `honourCircuit` : respecter le coupe-circuit (défaut `true`,
+ *   flux d'arrière-plan) ; `false` pour une action explicite d'un joueur qui
+ *   attend la réponse (« Tester mes MP ») — elle mérite sa tentative.
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(
   message: string,
   recipients: DiscordRecipient[],
   context: string,
+  options: { honourCircuit?: boolean } = {},
 ): Promise<DiscordDeliveryReport | null> {
   if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification(
     "/internal/notify/dm",
     { message, recipients, context },
-    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: true },
+    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
   );
 }
 

@@ -22,8 +22,20 @@ describe("dmTestOutcome", () => {
     expect(dmTestOutcome({ sent: 0, unresolved: ["dm-test"], failed: [] })).toBe("NOT_IN_SERVER");
   });
 
-  it("dmTestOutcome_emptyReport_returnsNotInServer", () => {
-    expect(dmTestOutcome({ sent: 0, unresolved: [], failed: [] })).toBe("NOT_IN_SERVER");
+  it("dmTestOutcome_emptyReport_returnsNull", () => {
+    expect(dmTestOutcome({ sent: 0, unresolved: [], failed: [] })).toBeNull();
+  });
+
+  it("dmTestOutcome_failedNotArray_returnsNull", () => {
+    expect(dmTestOutcome({ sent: 0, failed: null })).toBeNull();
+  });
+
+  it("dmTestOutcome_sentNotNumber_readsArrays", () => {
+    expect(dmTestOutcome({ sent: "1", unresolved: ["dm-test"] })).toBe("NOT_IN_SERVER");
+  });
+
+  it("dmTestOutcome_failedAndUnresolved_returnsDmsClosed", () => {
+    expect(dmTestOutcome({ sent: 0, unresolved: ["dm-test"], failed: ["dm-test"] })).toBe("DMS_CLOSED");
   });
 });
 

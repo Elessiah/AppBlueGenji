@@ -11,6 +11,7 @@ import {
   dmTestErrorToast,
   dmTestOutcomeToast,
   DM_TEST_FAILED,
+  DM_TEST_HOURLY_LIMIT,
   type DmTestToast,
 } from "@/lib/shared/discord-dm-test";
 import s from "../profil.module.css";
@@ -39,7 +40,8 @@ export function dmTestResponseAction(
  * **le même geste** que le bouton « Certifier » de la ligne Discord
  * (`openVerifyDialog` de la page), aucune logique de certification ici.
  *
- * Rien n'est rendu tant que l'état Discord n'est pas lu (`linked` nul).
+ * Rien n'est rendu tant que l'état Discord n'est pas lu (`linked` nul), ni sans
+ * compte Discord lié (`linked` faux) : il n'y a alors personne à qui écrire.
  */
 export function DiscordDmTestButton({
   linked,
@@ -80,7 +82,7 @@ export function DiscordDmTestButton({
     else setWarnOpen(true);
   });
 
-  if (linked === null) return null;
+  if (linked !== true) return null;
 
   return (
     <div className={s.actionsRow}>
@@ -94,7 +96,7 @@ export function DiscordDmTestButton({
         {t("dmTest.button")}
       </BusyButton>
       <InfoHint id="profile-dm-test-more" subject={t("dmTest.button")}>
-        <p>{t("dmTest.hint")}</p>
+        <p>{t("dmTest.hint", { max: String(DM_TEST_HOURLY_LIMIT) })}</p>
       </InfoHint>
       {warnOpen ? (
         // Le bouton vit dans le formulaire du profil : la soumission de la

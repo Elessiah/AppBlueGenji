@@ -29,19 +29,25 @@ export const DM_TEST_FAILED = "DISCORD_DM_TEST_FAILED";
 /** Plafond par compte : quelques essais par heure, jamais une rafale de messages. */
 export const DM_TEST_HOURLY_LIMIT = 3;
 
-/** Le bilan du bot, tel que `pushDiscordDirectMessages` le rend. */
-export type DmTestReport = { sent: number; unresolved: readonly string[]; failed: readonly string[] };
+/**
+ * Le bilan du bot, tel que `pushDiscordDirectMessages` le rend — lu comme du
+ * JSON étranger : un champ peut manquer ou n'être pas du type attendu.
+ */
+export type DmTestReport = { sent?: unknown; unresolved?: unknown; failed?: unknown };
+
+const hasEntries = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
 
 /**
  * L'issue d'un bilan à un seul destinataire. Un message remis l'emporte ; un
- * refus de Discord (`failed`) dit un membre joint mais fermé ; sinon, le bot ne
- * l'a pas trouvé sur le serveur (`unresolved`, ou bilan vide d'un bot qui
- * n'aurait rien tenté).
+ * refus de Discord (`failed`) dit un membre joint mais fermé ; un membre
+ * introuvable (`unresolved`) dit un joueur absent du serveur. Un bilan vide ou
+ * illisible ne dit rien : `null` (la route le rend en échec générique).
  */
-export function dmTestOutcome(report: DmTestReport): DmTestOutcome {
-  if (report.sent > 0) return "SENT";
-  if (report.failed.length > 0) return "DMS_CLOSED";
-  return "NOT_IN_SERVER";
+export function dmTestOutcome(report: DmTestReport): DmTestOutcome | null {
+  if (typeof report.sent === "number" && report.sent > 0) return "SENT";
+  if (hasEntries(report.failed)) return "DMS_CLOSED";
+  if (hasEntries(report.unresolved)) return "NOT_IN_SERVER";
+  return null;
 }
 
 /** Le message de test : court, neutre, sans lien ni nom de personne. */

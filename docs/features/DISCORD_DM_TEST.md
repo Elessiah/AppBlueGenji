@@ -21,13 +21,15 @@ Absent tant que l'état Discord n'est pas lu.
   remis (`SENT`, succès), messages privés fermés (`DMS_CLOSED`), absent du serveur
   BlueGenji (`NOT_IN_SERVER`), aucun Discord lié (`DISCORD_NOT_LINKED`), bot
   injoignable (`BOT_INTERNAL_UNREACHABLE`, 503), trop d'essais (`TOO_MANY_REQUESTS`,
-  429), autre échec (`DISCORD_DM_TEST_FAILED`).
+  429, « réessaie plus tard » : la fenêtre fixe ne rouvre pas forcément dans l'heure),
+  autre échec (`DISCORD_DM_TEST_FAILED`). Sans Discord lié (`linked` faux), le bouton
+  n'est pas rendu ; l'astuce lit le plafond dans `DM_TEST_HOURLY_LIMIT`.
 - **Tag non certifié** (ou `DISCORD_NOT_CERTIFIED` rendu par la route, état changé
   sous l'écran) : rien ne part ; une modale (`ConfirmActionDialog`, ton `primary`)
   dit que sans certification le bot n'envoie aucun message de match, et pourquoi
   certifier, avec **« Certifier mon tag »** et « Annuler ». « Certifier mon tag »
   appelle **le même geste** que le bouton « Certifier » de la ligne Discord des comptes
-  liés : `openVerifyDialog` de la page (`DiscordVerificationDialog`), aucune logique de
+  liés et le bouton « Certifier » du champ : `openVerifyDialog` de la page (`DiscordVerificationDialog`), aucune logique de
   certification nouvelle. La modale est enveloppée d'un `onSubmit` arrêté : portée
   dans `<body>`, sa soumission remonterait sinon par l'arbre React jusqu'au
   formulaire du profil.
@@ -39,10 +41,16 @@ Absent tant que l'état Discord n'est pas lu.
   supprimé (`PROFILE_NOT_FOUND` sinon).
 - Canal : `pushDiscordDirectMessages` → `POST /internal/notify/dm` du bot, **existant** —
   aucune route ni changement côté bot. Le bot ne cherche le membre que sur le serveur
-  BlueGenji : `unresolved` = absent du serveur, `failed` = Discord refuse (messages
-  privés fermés), `sent` = remis (`dmTestOutcome`). Contexte `dm-test` : un essai qui
+  BlueGenji : `unresolved` = absent du serveur (le bot range aussi là un membre
+  qu'une erreur passagère de Discord l'a empêché de lire : le texte invite alors à
+  réessayer), `failed` = Discord refuse (messages privés fermés), `sent` = remis
+  (`dmTestOutcome`) ; un bilan vide ou illisible (champ absent ou non tableau) rend
+  `DISCORD_DM_TEST_FAILED` (500). Contexte `dm-test` : un essai qui
   n'aboutit pas est compté au journal du staff (« 0 envoyé(s), 1 introuvable(s)… »),
-  sans identifiant. Le coupe-circuit du bot s'applique (bot tombé : réponse immédiate).
+  sans identifiant. Le coupe-circuit des flux d'arrière-plan **ne s'applique pas**
+  (`honourCircuit: false`, comme `pushRefereeAlert`) : geste explicite, il mérite sa
+  tentative même juste après une panne. Délai 15 s : un bot trop lent rend 503, le
+  message pouvant arriver après coup (le texte le dit).
 - Texte : court, neutre, sans lien ni nom, dans la langue du compte (bilingue si la
   colonne `locale` manque) — `DM_TEST_MESSAGE`, `renderDm` (`BOT_DM_LANGUAGE.md`).
   Ce n'est pas une notification (`notifyUsers`) : aucun push, le joueur attend
@@ -51,7 +59,9 @@ Absent tant que l'état Discord n'est pas lu.
   réservé en une instruction (`reserveRateLimit`) avant tout `await`. Rendu sur un refus
   où rien n'est parti (non lié, non certifié, compte absent) ; gardé quand le bot est
   injoignable (on ne martèle pas un bot tombé).
-- Provenance vérifiée par le middleware (403 `CROSS_SITE_REQUEST`) ; refus = code seul.
+- Provenance vérifiée par la route elle-même en première instruction
+  (`rejectCrossSiteRequest`, en plus du middleware : 403 `CROSS_SITE_REQUEST`) ; refus =
+  code seul.
 - La case « Messages privés Discord de mes matchs » ne s'applique pas : le test est
   demandé par le joueur lui-même.
 

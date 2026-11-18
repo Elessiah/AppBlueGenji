@@ -17,6 +17,7 @@ import { accountLocaleFromRow, readWithLocaleColumn } from "@/lib/server/users/a
 import { renderDm } from "@/lib/shared/dm-language";
 import {
   DM_TEST_BOT_UNREACHABLE,
+  DM_TEST_FAILED,
   DM_TEST_HOURLY_LIMIT,
   DM_TEST_MESSAGE,
   DM_TEST_NOT_CERTIFIED,
@@ -51,7 +52,8 @@ type DmTestRow = RowDataPacket & {
  * @returns L'issue rendue par le bot.
  * @throws `PROFILE_NOT_FOUND` (compte absent ou supprimé), `DISCORD_NOT_LINKED`,
  *   `DISCORD_NOT_CERTIFIED` — rien n'est parti ; `BOT_INTERNAL_UNREACHABLE` —
- *   bot injoignable ou en panne, rien ne dit que le message soit parti.
+ *   bot injoignable ou en panne, rien ne dit que le message soit parti ;
+ *   `DISCORD_DM_TEST_FAILED` — bilan du bot illisible ou vide.
  */
 export async function sendDiscordDmTest(userId: number): Promise<DmTestOutcome> {
   const db = await getDatabase();
@@ -75,7 +77,12 @@ export async function sendDiscordDmTest(userId: number): Promise<DmTestOutcome> 
     renderDm(DM_TEST_MESSAGE, locale),
     [{ discordId: row.discord_id, handle: null, label: DM_TEST_CONTEXT }],
     DM_TEST_CONTEXT,
+    // Geste explicite d'un joueur qui attend la réponse : il ignore le
+    // coupe-circuit des flux d'arrière-plan, comme `pushRefereeAlert`.
+    { honourCircuit: false },
   );
   if (report === null) throw new Error(DM_TEST_BOT_UNREACHABLE);
-  return dmTestOutcome(report);
+  const outcome = dmTestOutcome(report);
+  if (outcome === null) throw new Error(DM_TEST_FAILED);
+  return outcome;
 }

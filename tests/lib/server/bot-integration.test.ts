@@ -413,6 +413,18 @@ describe("bot-integration", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("pushDiscordDirectMessages_circuitOpenHonourFalse_stillCallsBot", async () => {
+      await tripCircuit();
+      const fetchMock = jest
+        .spyOn(global, "fetch")
+        .mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+
+      const report = await pushDiscordDirectMessages("Test", recipients, "dm-test", { honourCircuit: false });
+
+      expect(report).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(fetchMock).toHaveBeenCalled();
+    });
+
     it("tente quand même l'alerte arbitres : un signalement est une action de joueur", async () => {
       await tripCircuit();
       const fetchMock = jest

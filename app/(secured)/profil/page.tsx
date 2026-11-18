@@ -1125,7 +1125,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     className="btn"
-                    onClick={() => setVerifyOpen(true)}
+                    onClick={openVerifyDialog}
                     /* « Recertifier » seul ne dit pas quoi : le libellé
                        accessible commence par le texte visible (WCAG 2.5.3) et
                        ajoute l'objet. */
@@ -1142,7 +1142,8 @@ export default function ProfilePage() {
               )}
               {/* « Tester mes MP » : sous un tag non certifié, la fenêtre qu'il ouvre
                   propose « Certifier mon tag » — le même `openVerifyDialog` que la
-                  ligne Discord des comptes liés. Absent tant que l'état n'est pas lu. */}
+                  ligne Discord des comptes liés et le bouton « Certifier » du champ.
+                  Absent tant que l'état n'est pas lu, et sans Discord lié. */}
               <DiscordDmTestButton
                 linked={discordState.linked}
                 verified={discordState.verified}

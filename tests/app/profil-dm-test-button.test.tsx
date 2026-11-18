@@ -33,11 +33,12 @@ jest.mock("react", () => {
   };
 });
 
+const translate = jest.fn((key: string, _values?: Record<string, string>) => key);
 const showError = jest.fn<(message: string) => void>();
 const showSuccess = jest.fn<(message: string) => void>();
 jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess, showInfo: jest.fn() }) }));
 jest.mock("@/components/i18n/profile-text", () => ({
-  useProfileText: () => ({ t: (key: string) => key }),
+  useProfileText: () => ({ t: translate }),
 }));
 
 import { DiscordDmTestButton, dmTestResponseAction } from "@/app/(secured)/profil/_components/DiscordDmTestButton";
@@ -112,6 +113,16 @@ describe("dmTestResponseAction", () => {
 describe("DiscordDmTestButton", () => {
   it("button_stateNotRead_rendersNothing", () => {
     expect(render({ linked: null, verified: false, onCertify: jest.fn() })).toBeNull();
+  });
+
+  it("button_notLinked_rendersNothing", () => {
+    expect(render({ linked: false, verified: false, onCertify: jest.fn() })).toBeNull();
+  });
+
+  it("button_hint_interpolatesHourlyLimit", () => {
+    render({ verified: true, onCertify: jest.fn() });
+
+    expect(translate).toHaveBeenCalledWith("dmTest.hint", { max: "3" });
   });
 
   it("button_verified_postsAndShowsSuccessToast", async () => {
@@ -203,6 +214,16 @@ describe("textes « Tester mes MP »", () => {
     expect(Object.keys(enProfile.dmTest).sort()).toEqual(Object.keys(frProfile.dmTest).sort());
     expect(frProfile.dmTest.button).toBe("Tester mes MP");
     expect(enProfile.dmTest.button).toBe("Test my DMs");
+  });
+
+  it("texts_hint_hasLimitPlaceholder", () => {
+    expect(frProfile.dmTest.hint).toContain("{max} essais par heure");
+    expect(enProfile.dmTest.hint).toContain("{max} tries per hour");
+  });
+
+  it("texts_tooMany_saysLater", () => {
+    expect(frProfile.dmTest.tooMany).toBe("Trop de tests en peu de temps : réessaie plus tard.");
+    expect(enProfile.dmTest.tooMany).toBe("Too many tests in a short time: try again later.");
   });
 
   it("texts_accessibleName_containsVisibleLabel", () => {

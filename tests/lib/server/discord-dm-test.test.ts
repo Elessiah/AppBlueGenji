@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 
 describe("sendDiscordDmTest", () => {
-  it("sendDiscordDmTest_certifiedLinked_sendsToDiscordIdInAccountLocale", async () => {
+  it("sendDiscordDmTest_certifiedLinked_sendsToDiscordIdInAccountLocaleIgnoringCircuit", async () => {
     execute.mockResolvedValue([[certifiedRow({ locale: "en" })]]);
 
     const outcome = await sendDiscordDmTest(7);
@@ -35,6 +35,7 @@ describe("sendDiscordDmTest", () => {
       "BlueGenji test message: the bot can reach you by direct message. Nothing to do.",
       [{ discordId: "100000000000000001", handle: null, label: "dm-test" }],
       "dm-test",
+      { honourCircuit: false },
     );
     expect(execute.mock.calls[0][1]).toEqual([7]);
   });
@@ -82,5 +83,12 @@ describe("sendDiscordDmTest", () => {
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 0, unresolved: [], failed: ["dm-test"] });
 
     await expect(sendDiscordDmTest(7)).resolves.toBe("DMS_CLOSED");
+  });
+
+  it("sendDiscordDmTest_emptyReport_throwsFailed", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 0, unresolved: [], failed: [] });
+
+    await expect(sendDiscordDmTest(7)).rejects.toThrow("DISCORD_DM_TEST_FAILED");
   });
 });
