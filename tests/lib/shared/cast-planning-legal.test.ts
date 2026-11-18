@@ -40,15 +40,23 @@ function planningParagraph(path: string): string {
 
 describe("planning — historique des changements", () => {
   it("planningEntry_refereeDesignation_declaresAnonymousDiscordLineInBothLanguages", () => {
-    expect(frEntry()).toContain("le journal du staff sur Discord le note sans nommer personne");
+    expect(frEntry()).toContain("le journal du staff sur Discord note chaque changement d'arbitre du match sans nommer personne");
     expect(frEntry()).toContain("Rien d'autre du planning n'est publié sur Discord.");
-    expect(enEntry()).toContain("the staff log on Discord notes it without naming anyone");
+    expect(enEntry()).toContain("the staff log on Discord notes each change of the match's referee without naming anyone");
     expect(enEntry()).toContain("Nothing else from the schedule is published on Discord.");
   });
 
   it("planningEntry_refereeRemoval_declaredWithDiscordLineInBothLanguages", () => {
-    expect(frEntry()).toContain("Confirmer, désigner ou retirer un arbitre de match par le planning agit sur le match lui-même");
-    expect(enEntry()).toContain("Confirming, assigning or removing a match referee through the schedule acts on the match itself");
+    expect(frEntry()).toContain("confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même");
+    expect(enEntry()).toContain("confirming or assigning a match's referee, or removing its assigned referee, acts on the match itself");
+  });
+
+  it("planningEntry_discordLine_onlyForAChangeOfTheMatchReferee", () => {
+    // Retirer une simple proposition, ou poser l'arbitre que le match a déjà, ne change rien au match : aucune ligne.
+    expect(frEntry()).toContain("note chaque changement d'arbitre du match sans nommer personne");
+    expect(enEntry()).toContain("notes each change of the match's referee without naming anyone");
+    expect(frEntry()).not.toContain("retirer un arbitre de match par le planning");
+    expect(enEntry()).not.toContain("removing a match referee through the schedule");
   });
 
   it("planningEntry_push_onlyForRefereeRemovedBySomeoneElse", () => {
@@ -117,19 +125,27 @@ describe("planning — registre T20", () => {
   it("t20_recipients_removalAndPushRestriction_inBothLanguages", () => {
     const fr = t20(PROCESSING_ACTIVITIES).recipients.join(" ");
     const en = t20(PROCESSING_ACTIVITIES_EN).recipients.join(" ");
-    expect(fr).toContain("Confirmer, désigner ou retirer un arbitre de match par le planning");
+    expect(fr).toContain("ou retirer son arbitre désigné, agit sur le match lui-même");
+    expect(fr).toContain("à chaque changement d'arbitre du match");
     expect(fr).toContain("une notification push à l'arbitre retiré par un autre que lui");
-    expect(en).toContain("Confirming, assigning or removing a match referee through the schedule");
+    expect(en).toContain("or removing its assigned referee, acts on the match itself");
+    expect(en).toContain("for each change of the match's referee");
     expect(en).toContain("a push notification to a referee removed by someone else");
   });
 
-  it("t20_dataCategories_reasonListsEveryStoredValue", () => {
+  it("t20_dataCategories_storedReasonsOnly_derivedOnesReadFromMatch", () => {
+    // Gardés : PREFERENCE, LOAD, MANUAL ; CAST et MATCH se déduisent à la lecture (`load.ts`).
     expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain(
-      "motif (préférence, charge, choix du staff, inscription de cast, arbitre désigné du match)",
+      "motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici)",
     );
     expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain(
-      "reason (preference, load, staff choice, cast signup, match's assigned referee)",
+      "reason (preference, load, staff choice; the cast signup or the match's assigned referee, shown as a reason, are read from the signup and from the match, T04, without being kept here)",
     );
+  });
+
+  it("t20_dataCategories_historyIncludesRemovalSeenOnMatch", () => {
+    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("arbitre changé depuis le match compris");
+    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("a referee changed from the match included");
   });
 
   it("legalTexts_enPlanning_neverSayProducers", () => {
@@ -148,24 +164,26 @@ describe("planning — registre T20", () => {
 describe("planning — /rgpd", () => {
   it("rgpdPlanning_frParagraph_matchesTheCode", () => {
     const fr = planningParagraph("app/rgpd/page.tsx");
-    expect(fr).toContain("le journal du staff sur Discord le note sans nommer personne");
+    expect(fr).toContain("le journal du staff sur Discord note chaque");
     expect(fr).toContain("par le seul staff des tournois (arbitres et administrateurs)");
     expect(fr).toContain("que comme « Calcul »");
     expect(fr).toContain("quand le compte ne tient plus le rôle caster");
     expect(fr).toContain("gestes faits comme staff compris");
-    expect(fr).toContain("retirer un arbitre de match par le planning");
+    expect(fr).toContain("ou retirer son arbitre désigné, agit sur le match lui-même");
+    expect(fr).toContain("note chaque changement d&apos;arbitre du match");
     expect(fr).toContain("retiré par un autre que lui en est prévenu");
     expect(fr).not.toContain("rien n&apos;en est publié sur Discord");
   });
 
   it("rgpdPlanning_enParagraph_matchesTheCode", () => {
     const en = planningParagraph("app/rgpd/RgpdEn.tsx");
-    expect(en).toContain("the staff log on Discord notes it without naming anyone");
+    expect(en).toContain("the staff log on Discord notes each change");
     expect(en).toContain("by the tournament staff only (referees and administrators)");
     expect(en).toContain("as “Calculation”");
     expect(en).toContain("when the account no longer holds the caster role");
     expect(en).toContain("actions taken as staff included");
-    expect(en).toContain("removing a match referee through the schedule");
+    expect(en).toContain("or removing its assigned referee, acts on the match itself");
+    expect(en).toContain("notes each change of the match&apos;s referee");
     expect(en).toContain("a referee removed by someone else is notified by push");
     expect(en).not.toContain("nothing about it is published on Discord");
   });

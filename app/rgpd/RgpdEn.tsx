@@ -1311,9 +1311,9 @@ export function RgpdEn({
             prods and administrators, the reason for a calculated proposal (preference, load) only
             appearing there as “Calculation”, except to the tournament staff and the person concerned;
             everyone&apos;s availability and preferences by the tournament staff only (referees and
-            administrators). Confirming, assigning or removing a match referee through the schedule acts on
-            the match itself, like the staff does: the staff log on Discord notes it without naming anyone
-            and a referee removed by someone else is notified by push (<LocaleLink href="/rgpd/registre#t04">register,
+            administrators). Through the schedule, confirming or assigning a match&apos;s referee, or removing
+            its assigned referee, acts on the match itself, like the staff does: the staff log on Discord
+            notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push (<LocaleLink href="/rgpd/registre#t04">register,
             T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>); nothing else from the
             schedule is published on Discord. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the

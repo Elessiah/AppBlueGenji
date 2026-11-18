@@ -424,6 +424,10 @@ const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed 
   WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
     AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
 
+/** Une ligne d'arbitre confirmée que son match ne porte plus (arbitre changé ou retiré depuis le match). */
+const STALE_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
+  WHERE a.role = 'REFEREE' AND a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)`;
+
 /** Une proposition d'arbitre provisoire que le match porte déjà. */
 const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
   WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`;
@@ -432,7 +436,8 @@ const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m O
  * Réconcilie les arbitres de match du planning avec les matchs, en un nombre
  * fixe d'instructions. Une ligne d'arbitre **confirmée** que son match ne
  * porte pas (désignation restée incertaine après une panne, arbitre changé
- * depuis le match) est retirée : le match fait foi. Une proposition restée
+ * depuis le match) est retirée — retrait inscrit à son historique, sans
+ * auteur — : le match fait foi. Une proposition restée
  * provisoire alors que le match a déjà cet arbitre (confirmation interrompue
  * par une panne après la désignation) se confirme sans rien redemander au
  * match, que l'entrée soit ouverte, commencée ou hors de ce que montre le
@@ -443,10 +448,13 @@ const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m O
  * jamais comme de simples propositions.
  */
 export async function confirmPendingReferees(executor: Executor, actorId: number): Promise<number> {
+  // Le retrait s'inscrit à l'historique avant l'effacement, d'après la même lecture : sans auteur,
+  // le geste ayant été fait depuis le match, pas par qui lance ce calcul ou cette confirmation.
   await executor.execute(
-    `DELETE a FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
-      WHERE a.role = 'REFEREE' AND a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)`,
+    `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
+     SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'REMOVED', 'AUTO', NULL ${STALE_ON_MATCH_SQL}`,
   );
+  await executor.execute(`DELETE a ${STALE_ON_MATCH_SQL}`);
   await executor.execute(
     `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
      SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'CONFIRMED', 'AUTO', ? ${PENDING_ON_MATCH_SQL}`,

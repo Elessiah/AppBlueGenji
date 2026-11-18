@@ -143,11 +143,12 @@ compte les **rôles**, pas les personnes.
   (relancer le geste n'écrit rien deux fois). Une proposition d'arbitre
   restée provisoire alors que le match a déjà cet arbitre est confirmée au
   début de chaque calcul (fenêtre vide comprise) et de chaque confirmation
-  (`confirmPendingReferees`, trois instructions ensemblistes lues en base —
+  (`confirmPendingReferees`, quatre instructions ensemblistes lues en base —
   entrée commencée ou hors de la vue comprise : un calcul relancé ne l'efface
   jamais) ; au même moment, une ligne d'arbitre **confirmée** que son match ne
   porte pas (désignation restée incertaine, arbitre changé depuis le match)
-  est retirée : le match fait foi. Les lignes confirmées
+  est retirée, son retrait inscrit à l'historique (`REMOVED`, `AUTO`, sans
+  auteur : le geste a été fait depuis le match) : le match fait foi. Les lignes confirmées
   deviennent des contraintes fixes pour les calculs suivants.
 - Un choix du staff (`source = MANUAL`) naît confirmé et verrouillé ; un retrait
   manuel est mémorisé pour que le calcul ne repropose pas la personne. Le
@@ -233,10 +234,14 @@ ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
 personne visée, art. 15.4 ; le match et le rôle restent, et l'arbitre désigné
 d'un match est de toute façon public, T04) et réglage autonome.
 
-Ce que disent les textes, et qui doit rester vrai : confirmer, désigner ou retirer
-un arbitre de **match** par le planning passe par `assignMatchReferee` — ligne
-anonyme au journal du staff sur Discord, push `REFEREE_RELEASED` à l'arbitre
-retiré par un autre que lui (`refereeReleaseNotice`, T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
+Ce que disent les textes, et qui doit rester vrai : confirmer ou désigner
+l'arbitre d'un **match** par le planning, ou retirer son arbitre désigné, passe par
+`assignMatchReferee` — ligne anonyme au journal du staff sur Discord à chaque
+changement d'arbitre du match (retirer une proposition provisoire, ou poser
+l'arbitre que le match a déjà, n'en écrit aucune), push `REFEREE_RELEASED` à
+l'arbitre retiré par un autre que lui : retrait (`STAFF`) ou remplacement par un
+autre arbitre (`REPLACED`, désignation avec `replacedRefereeId`), jugés par
+`refereeReleaseNotice` (T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :

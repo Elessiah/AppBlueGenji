@@ -17,7 +17,7 @@
     "reset": "Reset filters",
     "count": "{shown, plural, one {# slot shown} other {# slots shown}} of {total}",
     "empty": "No slot matches these filters.",
-    "hint": "“My slots”: the ones you are assigned to, provisional proposals included. “Needs cover”: a caster, producer or referee is missing (deliberate self-management excluded)."
+    "hint": "“My slots”: the ones you are assigned to, provisional proposals included. “Needs cover”: a caster, prod or referee is missing (deliberate self-management excluded)."
   },
   "mineBadge": "My slot",
   "week": "Week of {date}",
@@ -30,7 +30,7 @@
   "roles": {
     "REFEREE": "Referee",
     "CASTER": "Caster",
-    "PROD": "Producer"
+    "PROD": "Prod"
   },
   "coverage": {
     "COMPLETE": "Complete",
@@ -38,10 +38,10 @@
     "REFEREED": "Refereed only",
     "SELF_MANAGED": "Self-managed",
     "priority": "Referee needed first",
-    "needsProd": "Caster without producer",
-    "idleProds": "Producer without caster",
+    "needsProd": "Caster without prod",
+    "idleProds": "Prod without caster",
     "label": "Coverage",
-    "hint": "Complete: referee, caster and producer. Streamed: a solo caster, or a caster and a producer. Self-managed: nobody, teams manage themselves."
+    "hint": "Complete: referee, caster and prod. Streamed: a solo caster, or a caster and a prod. Self-managed: nobody, teams manage themselves."
   },
   "status": {
     "AVAILABLE": "Available",
@@ -75,7 +75,7 @@
   },
   "solo": {
     "label": "I stream alone (solo caster)",
-    "hint": "A solo caster streams without a producer; other casters need a producer for a match to be streamed.",
+    "hint": "A solo caster streams without a prod; other casters need a prod for a match to be streamed.",
     "staffTitle": "Solo casters"
   },
   "staff": {
@@ -119,7 +119,7 @@
     "PLANNING_ENTRY_CLOSED": "This slot is closed: it has started or has been played.",
     "PLANNING_ROLE_NOT_HELD": "This account does not hold this role.",
     "PLANNING_HIDDEN_FOR_MEMBER": "This tournament is still hidden: this account cannot see it.",
-    "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and producer on one slot.",
+    "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and prod on one slot.",
     "PLANNING_IS_PLAYER": "This person plays during this slot: they cannot cover it.",
     "PLANNING_OVERLAP": "This person already holds a slot that overlaps this one: remove them from the other one first.",
     "PLANNING_OVERLAP_MANAGED": "This person already holds an overlapping slot on the match itself (signed-up caster or appointed referee): remove them from that match first.",

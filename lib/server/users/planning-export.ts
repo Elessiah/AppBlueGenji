@@ -76,10 +76,7 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       preferred: Boolean(row.preferred),
       updatedAt: toIso(row.updated_at),
     })),
-    assignments: assignments.map((row) => {
-      const { confirmed, createdAt, ...rest } = mapAssignment(row);
-      return { ...rest, reason: row.reason, confirmed, createdAt };
-    }),
+    assignments: assignments.map((row) => ({ ...mapAssignment(row), reason: row.reason })),
     history: events.map(mapEvent),
     staffActions: acted.map(mapEvent),
     assignmentsSet: set.map(mapAssignment),

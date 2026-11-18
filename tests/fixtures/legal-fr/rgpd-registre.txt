@@ -812,7 +812,7 @@ Personnes concernées
 Arbitres, casters et prods du site (rôles de plateforme), administrateurs compris
 Données
 Pour chaque créneau et chaque rôle : disponibilité (disponible, absent, à voir), préférence, date de la dernière réponse
-Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff, inscription de cast, arbitre désigné du match), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait, avec la date et le compte qui a agi)
+Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait — arbitre changé depuis le match compris —, avec la date et le compte qui a agi par le planning)
 Réglage « caster autonome »
 Données sensibles
 Aucune
@@ -823,7 +823,7 @@ Suppression du compte : tout ce qui le concerne dans le planning part avec lui ;
 Destinataires
 Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau — le motif d'une proposition du calcul (préférence, charge) n'y paraît que comme « Calcul », hors le staff des tournois et la personne concernée — et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités et préférences
 Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, et le motif de chaque attribution, pour attribuer
-Confirmer, désigner ou retirer un arbitre de match par le planning agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord, une notification push à l'arbitre retiré par un autre que lui ; rien d'autre du planning n'est publié sur Discord
+Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui ; rien d'autre du planning n'est publié sur Discord
 Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)
 Transferts hors UE
 Aucun

@@ -1536,9 +1536,10 @@ function RgpdFr({
             le réglage « caster autonome » se lisent par les arbitres, casters, prods et administrateurs
             connectés, le motif d&apos;une proposition du calcul (préférence, charge) n&apos;y paraissant, hors le
             staff des tournois et la personne concernée, que comme « Calcul » ; les disponibilités et
-            préférences de tous, par le seul staff des tournois (arbitres et administrateurs). Confirmer,
-            désigner ou retirer un arbitre de match par le planning agit sur le match lui-même, comme un
-            geste du staff : le journal du staff sur Discord le note sans nommer personne et l&apos;arbitre
+            préférences de tous, par le seul staff des tournois (arbitres et administrateurs). Par le
+            planning, confirmer ou désigner l&apos;arbitre d&apos;un match, ou retirer son arbitre désigné, agit
+            sur le match lui-même, comme un geste du staff : le journal du staff sur Discord note chaque
+            changement d&apos;arbitre du match sans nommer personne et l&apos;arbitre
             retiré par un autre que lui en est prévenu par notification (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
             <Link href="/rgpd/registre#t05">T05</Link>) ; rien d&apos;autre du planning n&apos;est publié sur
             Discord. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du

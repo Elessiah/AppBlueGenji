@@ -341,6 +341,7 @@ describe("runAutoAssign", () => {
     await runAutoAssign(9, { from: MONDAY + 100 * HOUR_MS, to: MONDAY + 120 * HOUR_MS }, MONDAY - HOUR_MS);
 
     expect(reconcileStatements()).toEqual([
+      "INSERT INTO bg_planning_events (entry_ke",
       "DELETE a FROM bg_planning_assignments a ",
       "INSERT INTO bg_planning_events (entry_ke",
       "UPDATE bg_planning_assignments a JOIN bg",
@@ -467,7 +468,7 @@ describe("runAutoAssign", () => {
     await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
 
     const order = execute.mock.calls.map(([sql]) => (sql.includes(RECONCILE) ? "reconcile" : sql.trim().slice(0, 6)));
-    expect(order.slice(0, 4)).toEqual(["reconcile", "reconcile", "reconcile", "DELETE"]);
+    expect(order.slice(0, 5)).toEqual(["reconcile", "reconcile", "reconcile", "reconcile", "DELETE"]);
   });
 
   it("runAutoAssign_reconcile_sweepsConfirmedRefereeMatchNoLongerHolds", async () => {
@@ -478,6 +479,20 @@ describe("runAutoAssign", () => {
     const sweep = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE a FROM"))?.[0];
     expect(sweep).toContain("a.confirmed = 1");
     expect(sweep).toContain("m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id");
+  });
+
+  it("runAutoAssign_reconcile_staleConfirmedRefereeLoggedRemovedBeforeSweep", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [] }));
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    const calls = execute.mock.calls.map(([sql, params]) => ({ sql: sql.replace(/\s+/g, " "), params }));
+    const removedAt = calls.findIndex(({ sql }) => sql.includes("'REMOVED', 'AUTO', NULL"));
+    const sweepAt = calls.findIndex(({ sql }) => sql.startsWith("DELETE a FROM"));
+    expect(removedAt).toBeGreaterThanOrEqual(0);
+    expect(removedAt).toBeLessThan(sweepAt);
+    expect(calls[removedAt].sql).toContain("a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)");
+    expect(calls[removedAt].params).toBeUndefined();
   });
 
   it("runAutoAssign_entryOutsideBatchNotOverlapping_playersNotLoaded", async () => {
@@ -784,7 +799,7 @@ describe("confirmAssignments", () => {
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(execute.mock.calls.find(([sql]) => sql.includes(RECONCILE) && sql.includes("INSERT INTO bg_planning_events"))?.[1]).toEqual([9]);
+    expect(execute.mock.calls.find(([sql]) => sql.includes(RECONCILE) && sql.includes("'CONFIRMED'"))?.[1]).toEqual([9]);
   });
 
   it("confirmAssignments_nothingPendingOnMatch_noneCounted", async () => {
@@ -803,7 +818,7 @@ describe("confirmAssignments", () => {
     const report = await confirmAssignments(9, { entryKeys: [] }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 5, refused: 0 });
-    expect(reconcileStatements()).toHaveLength(3);
+    expect(reconcileStatements()).toHaveLength(4);
   });
 
   it("confirmAssignments_pendingRefereeOnStartedMatch_healed", async () => {
@@ -818,7 +833,7 @@ describe("confirmAssignments", () => {
     const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
-    expect(reconcileStatements()).toHaveLength(3);
+    expect(reconcileStatements()).toHaveLength(4);
   });
 
   it("confirmAssignments_transientFailureAfterFirstReferee_partialWrittenThrowsConfirmPartial", async () => {
