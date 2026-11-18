@@ -830,6 +830,7 @@ describe("tournament — équivalence avec next-intl, message par message", () =
       prefix: "Alpha · round 1", capital: "x", penalty: "1", every: "every round", list: "a, b", draw: "1", bye: "3", value: "50",
       title: "Round 1", progress: "done", registered: "3", max: "8", day: "May 12, 2026", hour: "20:00",
       seed: "6", rank: "2", losses: "1", draws: "0", id: "7", map: "Ilios", url: "https://example.org/suivre/tournois/1",
+      delay: "every 5 seconds",
     };
     for (const { key, source } of messages) {
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });

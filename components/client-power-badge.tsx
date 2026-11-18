@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { powerReasons, resolvePowerMode, showsPowerBadge } from "@/lib/shared/client-power";
 import {
+  powerLimitsList,
   powerModeDescription,
   powerModeLabel,
   powerProbeSummary,
   powerReasonLabel,
-  powerReasons,
-  resolvePowerMode,
-  showsPowerBadge,
-} from "@/lib/shared/client-power";
+} from "@/lib/shared/client-power-text";
 import { setIgnorePerformance, useClientPowerState } from "@/lib/shared/hooks/useClientPower";
+import { useShellText } from "@/components/i18n/shell-text";
 import styles from "./client-power-badge.module.css";
 
 /**
@@ -30,10 +30,17 @@ import styles from "./client-power-badge.module.css";
  */
 export function ClientPowerBadge() {
   const { input, probe, limits, ignorePerformance } = useClientPowerState();
+  // Monté par la mise en page racine, sous `ShellTextProvider` : la langue de la page.
+  const { t } = useShellText();
   const mode = resolvePowerMode(input);
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Formatés une fois par régime et langue, pas à chaque rendu du témoin
+  // (monté sur toutes les pages) ; le détail, lui, ne se compose que ouvert.
+  const label = useMemo(() => powerModeLabel(mode, t), [mode, t]);
+  const description = useMemo(() => powerModeDescription(mode, t), [mode, t]);
 
   const reasons = powerReasons(input, limits);
   const ignoredLimits = ignorePerformance && limits.length > 0;
@@ -64,25 +71,22 @@ export function ClientPowerBadge() {
 
   if (!visible) return null;
 
-  const label = `Mode ${powerModeLabel(mode).toLowerCase()}`;
-
   return (
     <div ref={rootRef} className={styles.root} data-mode={mode.toLowerCase()}>
       {open && (
-        <section id={panelId} className={styles.panel} aria-label="Mode d'affichage">
+        <section id={panelId} className={styles.panel} aria-label={t("clientPower.panelLabel")}>
           <p className={styles.title}>{label}</p>
-          <p className={styles.text}>{powerModeDescription(mode)}</p>
+          <p className={styles.text}>{description}</p>
           {reasons.length > 0 && (
             <ul className={styles.reasons}>
               {reasons.map((reason) => (
-                <li key={reason}>{powerReasonLabel(reason, probe)}</li>
+                <li key={reason}>{powerReasonLabel(reason, probe, t)}</li>
               ))}
             </ul>
           )}
           {ignoredLimits && (
             <p className={styles.text}>
-              Détection ignorée à ta demande. Constaté :{" "}
-              {limits.map((limit) => powerReasonLabel(limit, probe)).join(" ; ")}.
+              {t("clientPower.ignored", { limits: powerLimitsList(limits, probe, t) })}
             </p>
           )}
           {(limits.length > 0 || ignorePerformance) && (
@@ -93,10 +97,10 @@ export function ClientPowerBadge() {
                 onChange={(event) => setIgnorePerformance(event.target.checked)}
               />
               {/* NOSONAR S6772 — label en flex avec `gap` */}
-              Ignorer la détection de performances
+              {t("clientPower.ignoreToggle")}
             </label>
           )}
-          <p className={styles.mono}>{powerProbeSummary(probe)}</p>
+          <p className={styles.mono}>{powerProbeSummary(probe, t)}</p>
         </section>
       )}
       <button
@@ -104,7 +108,7 @@ export function ClientPowerBadge() {
         className={styles.pill}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        title={powerModeDescription(mode)}
+        title={description}
         onClick={() => setOpen((value) => !value)}
       >
         <span className={styles.dot} aria-hidden />

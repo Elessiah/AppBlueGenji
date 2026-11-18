@@ -12,6 +12,7 @@ import {
   RECONNECT_MAX_MS,
   RECONNECT_MIN_MS,
   applyLiveMessage,
+  applyStreamMessage,
   fatalFailure,
   parseLiveMessage,
   shouldCommitFetched,
@@ -875,5 +876,57 @@ describe("reconnexion pendant la lecture de l'invitation (certificationPromptPen
     const message = parseLiveMessage(raw);
     expect(message).toEqual({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: null });
     expect(applyLiveMessage(reconnect(withPrompt(), true), message!).detail?.certificationPrompt).toBeNull();
+  });
+});
+
+describe("applyStreamMessage — palier sous un flux calmé", () => {
+  const reconnect = (tier: "PRIORITY" | "STANDARD") => ({
+    type: "connected" as const,
+    tournamentId: 7,
+    tier,
+    viewer: viewer(),
+    snapshot: snapshot({ version: "v2" }),
+  });
+
+  it("applyStreamMessage_quietConnectedWithLowerTier_keepsPreviousTier", () => {
+    const state = connected();
+
+    const next = applyStreamMessage(state, reconnect("STANDARD"), true);
+
+    expect(next.tier).toBe("PRIORITY");
+    expect(next.detail?.version).toBe("v2");
+  });
+
+  it("applyStreamMessage_fullConnected_takesServerTier", () => {
+    const state = connected();
+
+    const next = applyStreamMessage(state, reconnect("STANDARD"), false);
+
+    expect(next.tier).toBe("STANDARD");
+  });
+
+  it("applyStreamMessage_quietSameVersionSnapshot_returnsSameReference", () => {
+    const state = connected();
+
+    const next = applyStreamMessage(state, { type: "snapshot", tournamentId: 7, version: "v1", snapshot: snapshot() }, true);
+
+    expect(next).toBe(state);
+  });
+
+  it("applyStreamMessage_quietSnapshotSameTier_returnsApplyLiveMessageResult", () => {
+    const state = connected();
+    const message = { type: "snapshot" as const, tournamentId: 7, version: "v2", snapshot: snapshot({ version: "v2" }) };
+
+    const next = applyStreamMessage(state, message, true);
+
+    expect(next).toEqual(applyLiveMessage(state, message));
+    expect(next.tier).toBe("PRIORITY");
+  });
+
+  it("applyStreamMessage_quietFirstConnect_keepsInitialStandard", () => {
+    const next = applyStreamMessage(INITIAL_LIVE_STATE, reconnect("PRIORITY"), true);
+
+    expect(next.tier).toBe("STANDARD");
+    expect(next.detail?.card.id).toBe(7);
   });
 });

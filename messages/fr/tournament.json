@@ -117,6 +117,52 @@
       "MATCH_READY": "Ton match est prêt",
       "TOURNAMENT_STARTED": "Le tournoi commence",
       "ROUND_STARTED": "Nouvelle manche"
+    },
+    "sync": {
+      "title": "Mode de synchronisation",
+      "others": "Les autres modes :",
+      "matchBatched": "Sans focus, la page regroupe les changements {delay}, sauf ceux de ton match.",
+      "tierKept": {
+        "PRIORITY": "Tu restes parmi ceux que le serveur sert en premier.",
+        "STANDARD": "Tu restes au rythme des spectateurs."
+      },
+      "modes": {
+        "PRIORITY": {
+          "label": "Mode prioritaire",
+          "now": "Tu fais partie de ceux que le serveur sert en premier (organisation, cast, équipes engagées) : les changements t'arrivent {cadence}.",
+          "other": "Organisation, cast et équipes engagées reçoivent les changements {cadence}."
+        },
+        "STANDARD": {
+          "label": "Mode standard",
+          "now": "Tu suis ce tournoi en spectateur : les changements t'arrivent {cadence}, sans recharger la page.",
+          "nowPoll": "Sans compte, la page relit le tournoi d'elle-même {cadence}, sans que tu aies à la recharger.",
+          "other": "Les spectateurs reçoivent les changements par fenêtres plus larges, sans recharger la page.",
+          "otherPoll": "La page relit le tournoi d'elle-même, sans que tu aies à la recharger."
+        },
+        "MATCH": {
+          "label": "Mode match",
+          "now": "Tu as un match en cours ou imminent : les changements t'arrivent {cadence}, et les animations sont figées pour ménager ta machine.",
+          "nowElsewhere": "Ton match d'un autre onglet est en cours ou imminent : les animations sont figées ici aussi, et les changements arrivent {cadence}.",
+          "other": "Match en cours ou imminent : animations figées ; sans focus, l'affichage des autres matchs est regroupé {delay}."
+        },
+        "ECO": {
+          "label": "Mode éco",
+          "now": "La page est sans animation (elle n'a pas le focus, ta machine est à la peine, ou le mouvement réduit est demandé) : les changements arrivent {cadence} et s'affichent aussitôt.",
+          "other": "Page sans focus, machine à la peine ou mouvement réduit : animations figées, données toujours affichées aussitôt."
+        },
+        "SLEEP": {
+          "label": "Mode veille",
+          "now": "L'onglet est caché : les changements sont reçus mais affichés à ton retour. Au bout de {minutes, plural, one {# minute} other {# minutes}}, hors match, la page passe au rythme des spectateurs pour soulager le serveur.",
+          "nowPoll": "L'onglet est caché : la page cesse de relire le tournoi et reprend dès ton retour.",
+          "other": "Onglet caché : l'affichage attend ton retour, et au bout de {minutes, plural, one {# minute} other {# minutes}} (hors match) le flux passe au rythme des spectateurs.",
+          "otherPoll": "Onglet caché : la page cesse de relire le tournoi et reprend à ton retour."
+        },
+        "POLLING": {
+          "label": "Mode secours",
+          "now": "Le flux temps réel n'est pas établi : la page relit le tournoi d'elle-même {cadence}, en attendant le retour de la connexion.",
+          "other": "Flux temps réel coupé : la page relit le tournoi d'elle-même, plus lentement."
+        }
+      }
     }
   },
   "loading": "Chargement du tournoi…",

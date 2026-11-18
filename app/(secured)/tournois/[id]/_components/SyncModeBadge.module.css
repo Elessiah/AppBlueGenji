@@ -1,0 +1,5 @@
+/* Le libellé tient sur une ligne : c'est la pastille entière qui passe à la
+   ligne dans `.viewer`, jamais son texte en deux. */
+.badge {
+  white-space: nowrap;
+}

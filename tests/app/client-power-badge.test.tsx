@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ClientPowerState } from "@/lib/shared/hooks/useClientPower";
-import { UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { MATCH_BACKGROUND_RENDER_DELAY_MS, UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { powerLimitsList } from "@/lib/shared/client-power-text";
+import { shellText } from "@/lib/shared/shell-text";
 import { readSource } from "../helpers/read-source";
 import { ClientPowerBadge } from "@/components/client-power-badge";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import frShell from "@/messages/fr/shell.json";
+import enShell from "@/messages/en/shell.json";
 
 /**
  * Le témoin du régime de charge. Les effets ne tournent pas au rendu serveur :
@@ -118,5 +124,57 @@ describe("ClientPowerBadge", () => {
     expect(reset).toBeGreaterThan(0);
     expect(early).toBeGreaterThan(reset);
   });
+
+  it("parle anglais sous /en, sans un mot de français", () => {
+    state = {
+      ...base({ matchFocus: true }),
+      probe: { cores: 1, memoryGb: 2, frameIntervalMs: 33 },
+      limits: ["LOW_CORES"],
+      ignorePerformance: true,
+    };
+    const html = renderToStaticMarkup(
+      <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+        <ClientPowerBadge />
+      </ShellTextProvider>,
+    );
+    expect(html).toContain(enShell.clientPower.modes.MATCH.label);
+    expect(html).toContain('title="Lighter page during your match');
+    expect(html).toContain(`every ${Math.round(MATCH_BACKGROUND_RENDER_DELAY_MS / 1000)} s`);
+    expect(html).not.toContain("Mode match");
+    expect(html).not.toContain(frShell.clientPower.modes.MATCH.description.slice(0, 20));
+  });
+
+  it("powerLimitsList_english_usesEnglishSeparator", () => {
+    const list = powerLimitsList(["LOW_CORES", "SLOW_FRAMES"], { cores: 1, memoryGb: 2, frameIntervalMs: 33 }, shellText("en", messagesFor("en").shell).t);
+
+    expect(list).toContain("; ");
+    expect(list).not.toContain(" ; ");
+  });
+
+  it("powerLimitsList_french_usesFrenchSeparator", () => {
+    const list = powerLimitsList(["LOW_CORES", "SLOW_FRAMES"], { cores: 1, memoryGb: 2, frameIntervalMs: 33 });
+
+    expect(list).toContain(" ; ");
+  });
+
+  it("le panneau passe la liste par powerLimitsList (séparateur de la langue)", () => {
+    expect(readSource("components/client-power-badge.tsx")).toContain("powerLimitsList(limits, probe, t)");
+  });
+
+  it("textes du témoin : mêmes clés en français et en anglais", () => {
+    const keys = (value: object): string[] =>
+      Object.entries(value).flatMap(([key, child]) =>
+        typeof child === "object" && child !== null ? keys(child).map((sub) => `${key}.${sub}`) : [key],
+      );
+    expect(keys(enShell.clientPower).sort()).toEqual(keys(frShell.clientPower).sort());
+  });
 });
 
+describe("coût de rendu du témoin", () => {
+  it("le libellé et la description du régime sont mémoïsés par régime et langue", () => {
+    const source = readSource("components/client-power-badge.tsx");
+    expect(source).toContain("useMemo(() => powerModeLabel(mode, t), [mode, t])");
+    expect(source).toContain("useMemo(() => powerModeDescription(mode, t), [mode, t])");
+    expect(source).toContain('from "@/lib/shared/client-power-text"');
+  });
+});

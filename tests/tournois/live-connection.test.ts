@@ -53,7 +53,7 @@ const SNAPSHOT = JSON.stringify({
 type Harness = {
   options: LiveConnectionOptions;
   load: jest.Mock<(silent: boolean) => Promise<LiveFailure | null>>;
-  onMessage: jest.Mock<(message: LiveMessage) => void>;
+  onMessage: jest.Mock<(message: LiveMessage, quiet: boolean) => void>;
   onLiveChange: jest.Mock<(live: boolean) => void>;
   onFatal: jest.Mock<(failure: LiveFailure) => void>;
   state: { detail: boolean; quiet: boolean; lastUpdateAt: number; lastFetchAt: number };
@@ -62,7 +62,7 @@ type Harness = {
 function open(loadResult: LiveFailure | null = null): Harness {
   const state = { detail: false, quiet: false, lastUpdateAt: 0, lastFetchAt: 0 };
   const load = jest.fn<(silent: boolean) => Promise<LiveFailure | null>>(async () => loadResult);
-  const onMessage = jest.fn<(message: LiveMessage) => void>();
+  const onMessage = jest.fn<(message: LiveMessage, quiet: boolean) => void>();
   const onLiveChange = jest.fn<(live: boolean) => void>();
   const onFatal = jest.fn<(failure: LiveFailure) => void>();
   const options: LiveConnectionOptions = {
@@ -128,6 +128,19 @@ describe("ouverture du flux", () => {
     expect(onMessage).toHaveBeenCalledTimes(1);
     expect(onMessage.mock.calls[0][0]).toMatchObject({ type: "snapshot", version: "v2" });
     expect(onLiveChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("marque chaque message du flux ouvert plein ou calmé, lu à l'ouverture", () => {
+    const { onMessage, state } = open();
+    const full = latest();
+    state.quiet = true;
+    full.onmessage!({ data: SNAPSHOT });
+    expect(onMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "snapshot" }), false);
+
+    connection!.reconnect();
+    state.quiet = false;
+    latest().onmessage!({ data: SNAPSHOT });
+    expect(onMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "snapshot" }), true);
   });
 });
 

@@ -88,6 +88,10 @@ cette case est cochée sur une limite constatée, la page repasse en régime
 complet mais le témoin **reste** (« Mode complet », avec ce qui a été constaté) :
 c'est lui qui porte la case qui défait ce choix.
 
+Ses textes suivent la langue de la page : `messages/{fr,en}/shell.json`,
+`clientPower.*`, lus par `useShellText()` ; les libellés de `client-power-text.ts`
+(`powerModeLabel`, `powerReasonLabel`…) prennent ce `t` (français par défaut). Ils vivent à part de `client-power.ts`, pur, que la mise en page, le fond et le flux importent sans embarquer le JSON de la coque ; le témoin les mémoïse par régime et langue.
+
 Pour un diagnostic à distance, `<html data-power="full|eco|match|sleep">` et
 `data-motion="on|off"` se lisent dans l'inspecteur.
 

@@ -29,8 +29,13 @@ export type LiveConnectionOptions = {
    * échec **définitif** est rendu plutôt que levé.
    */
   load: (silent: boolean) => Promise<LiveFailure | null>;
-  /** Message exploitable du flux, déjà analysé. */
-  onMessage: (message: LiveMessage) => void;
+  /**
+   * Message exploitable du flux, déjà analysé. `quiet` : le flux qui l'a porté
+   * était ouvert calmé (`?quiet=1`) — lu à son ouverture, jamais à l'arrivée du
+   * message, sinon la dernière trame d'un flux calmé en cours de remplacement
+   * serait lue comme celle d'un flux plein.
+   */
+  onMessage: (message: LiveMessage, quiet: boolean) => void;
   /** Témoin « À jour » / « Reconnexion… ». */
   onLiveChange: (live: boolean) => void;
   /** Échec dont on ne se relèvera pas : la connexion a cessé de réessayer. */
@@ -151,12 +156,14 @@ export function openLiveConnection(options: LiveConnectionOptions): LiveConnecti
     }, reconnectDelayMs(attempts));
   };
 
+  let openedQuiet = false;
+
   const connect = () => {
     if (cancelled || stopped) return;
 
     try {
-      const quiet = options.quiet() ? "?quiet=1" : "";
-      source = new EventSource(`/api/tournaments/${tournamentId}/stream${quiet}`);
+      openedQuiet = options.quiet();
+      source = new EventSource(`/api/tournaments/${tournamentId}/stream${openedQuiet ? "?quiet=1" : ""}`);
     } catch {
       startFallback();
       scheduleReconnect();
@@ -171,6 +178,7 @@ export function openLiveConnection(options: LiveConnectionOptions): LiveConnecti
       watchFirstSnapshot();
     };
 
+    const streamQuiet = openedQuiet;
     source.onmessage = (event) => {
       if (cancelled) return;
       const message = parseLiveMessage(event.data);
@@ -180,7 +188,7 @@ export function openLiveConnection(options: LiveConnectionOptions): LiveConnecti
       options.onLiveChange(true);
       stopFirstSnapshotWatch();
       stopFallback();
-      options.onMessage(message);
+      options.onMessage(message, streamQuiet);
     };
 
     source.onerror = () => {

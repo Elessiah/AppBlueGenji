@@ -474,6 +474,12 @@ export type TournamentSheetSource = {
   cadenceMs?: number | null;
   /** La première lecture a échoué ; une autre suivra (page sans compte). */
   retrying?: boolean;
+  /**
+   * Le lecteur a une rencontre en cours ou imminente dans ce tournoi
+   * (`viewerMatchFocus`, flux de l'espace connecté) : la pastille du mode de
+   * synchronisation distingue ce match d'un match tenu dans un autre onglet.
+   */
+  viewerMatch?: boolean;
 };
 
 /**
@@ -538,7 +544,7 @@ function TournamentSheetView({
   const mapParticipantError = useMapParticipantError();
   const { showError, showSuccess } = useToast();
 
-  const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
+  const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying, viewerMatch } = source;
   const published = useTournamentPublished(detail?.card ?? null);
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
@@ -1290,6 +1296,7 @@ function TournamentSheetView({
           tier={tier}
           cadenceMs={cadenceMs}
           fatal={fatal}
+          viewerMatch={viewerMatch}
           frozen={frozen}
           onRegister={registerTeam}
           onReportIssue={() => openIssueReport(null)}

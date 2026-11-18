@@ -2,7 +2,7 @@
 
 import { ShareLinkButton } from "@/components/share/ShareLinkButton";
 import { spectatorTournamentPath } from "@/lib/shared/spectator-view";
-import { useState, type MouseEvent } from "react";
+import { memo, useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
@@ -35,6 +35,7 @@ import {
   type HeaderTone,
 } from "../_lib/header-meta";
 import { LiveIndicator, useLiveIndicatorText, type LiveIndicatorProps } from "./LiveIndicator";
+import { SyncModeBadge, SyncModeExplanation, SyncModeHint, useSyncMode } from "./SyncModeBadge";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
@@ -43,18 +44,21 @@ import s from "./TournamentHeader.module.css";
  * témoin (`useLiveIndicatorText`) n'est calculée que pour la page sans compte,
  * et non à chaque rendu poussé par le flux d'un membre.
  */
-function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
+const SpectatorHint = memo(function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
   const { t } = useTournamentPageText();
-  // La cadence accordée et le sens de « Hors ligne » : le `title` du témoin ne
-  // s'atteint ni au toucher ni au clavier.
+  // Abonné ici, pas dans l'en-tête : un alt-tab ne redessine que cette aide.
+  const sync = useSyncMode(props);
+  // Le sens de « Hors ligne » : le `title` du témoin ne s'atteint ni au toucher
+  // ni au clavier. Lecture réussie, l'explication du mode dit déjà la cadence.
   const liveText = useLiveIndicatorText(props);
   return (
     <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
       <p>{t("header.spectatorTitle")}</p>
-      <p>{liveText.title}</p>
+      {(sync === null || !props.isLive) && <p>{liveText.title}</p>}
+      {sync !== null && <SyncModeExplanation state={sync} cadenceMs={props.cadenceMs} />}
     </InfoHint>
   );
-}
+});
 
 /** Ce que `canReturnInSite` a besoin de lire du navigateur, à l'instant. */
 function readSiteBackInput() {
@@ -82,6 +86,8 @@ interface TournamentHeaderProps {
   /** Cadence de relecture de la page sans compte (`TournamentSheetSource.cadenceMs`). */
   cadenceMs?: number | null;
   fatal: LiveFailure | null;
+  /** Rencontre du lecteur en cours ou imminente (`TournamentSheetSource.viewerMatch`). */
+  viewerMatch?: boolean;
   /** Suivi arrêté : les actions sont retirées plutôt que laissées à échouer. */
   frozen: boolean;
   onRegister: () => void;
@@ -125,6 +131,7 @@ export function TournamentHeader({
   tier,
   cadenceMs,
   fatal,
+  viewerMatch,
   frozen,
   onRegister,
   onReportIssue,
@@ -188,6 +195,9 @@ export function TournamentHeader({
             {/* Dit que la page se tient à jour seule : sans ce repère, on
                 recharge par précaution même quand tout arrive tout seul. */}
             <LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+            {/* Comment la page se tient à jour (prioritaire, match, éco…) : à côté
+                du témoin, qui dit seulement si la connexion tient. */}
+            <SyncModeBadge isLive={isLive} tier={tier} fatal={fatal} viewerMatch={viewerMatch} />
             {detail.isAdmin && !frozen && (
               <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
             )}
@@ -200,7 +210,11 @@ export function TournamentHeader({
               même, hors du groupe `.viewer` : ouverte, l'explication passe à la
               ligne sur toute la barre, au lieu d'élargir le groupe — qui, en
               s'élargissant, déplaçait le bouton qu'on vient de cliquer. */}
-          {spectator && <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />}
+          {spectator ? (
+            <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+          ) : (
+            <SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />
+          )}
         </div>
 
         {/* Illustration : un bandeau entre les outils du lecteur et l'identité,

@@ -117,6 +117,52 @@
       "MATCH_READY": "Your match is ready",
       "TOURNAMENT_STARTED": "Tournament starting",
       "ROUND_STARTED": "New round"
+    },
+    "sync": {
+      "title": "Sync mode",
+      "others": "The other modes:",
+      "matchBatched": "Unfocused, the page batches changes {delay}, except your match's.",
+      "tierKept": {
+        "PRIORITY": "You remain among those the server serves first.",
+        "STANDARD": "You stay at the spectator pace."
+      },
+      "modes": {
+        "PRIORITY": {
+          "label": "Priority mode",
+          "now": "You are among those the server serves first (organisers, casters, registered teams): changes reach you {cadence}.",
+          "other": "Organisers, casters and registered teams receive changes {cadence}."
+        },
+        "STANDARD": {
+          "label": "Standard mode",
+          "now": "You follow this tournament as a spectator: changes reach you {cadence}, with no need to reload the page.",
+          "nowPoll": "Without an account, the page re-reads the tournament by itself {cadence}, with no need to reload it.",
+          "other": "Spectators receive changes in wider windows, with no need to reload the page.",
+          "otherPoll": "The page re-reads the tournament by itself, with no need to reload it."
+        },
+        "MATCH": {
+          "label": "Match mode",
+          "now": "You have a match in progress or about to start: changes reach you {cadence}, and animations are frozen to spare your machine.",
+          "nowElsewhere": "Your match in another tab is in progress or about to start: animations are frozen here too, and changes arrive {cadence}.",
+          "other": "Match in progress or about to start: animations frozen; without focus, the display of other matches is batched {delay}."
+        },
+        "ECO": {
+          "label": "Eco mode",
+          "now": "The page runs without animations (it is not focused, your machine is struggling, or reduced motion is requested): changes arrive {cadence} and show at once.",
+          "other": "Unfocused page, struggling machine or reduced motion: animations frozen, data still shown at once."
+        },
+        "SLEEP": {
+          "label": "Sleep mode",
+          "now": "The tab is hidden: changes are received but shown when you come back. After {minutes, plural, one {# minute} other {# minutes}}, outside a match, the page drops to the spectator pace to relieve the server.",
+          "nowPoll": "The tab is hidden: the page stops re-reading the tournament and resumes as soon as you come back.",
+          "other": "Hidden tab: the display waits for your return, and after {minutes, plural, one {# minute} other {# minutes}} (outside a match) the stream drops to the spectator pace.",
+          "otherPoll": "Hidden tab: the page stops re-reading the tournament and resumes when you come back."
+        },
+        "POLLING": {
+          "label": "Fallback mode",
+          "now": "The live stream is not established: the page re-reads the tournament by itself {cadence}, until the connection returns.",
+          "other": "Live stream cut: the page re-reads the tournament by itself, more slowly."
+        }
+      }
     }
   },
   "loading": "Loading the tournament…",

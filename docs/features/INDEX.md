@@ -155,6 +155,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `IMAGE_CROP.md` — Recadrage manuel de toute image importée.
 - `LOCAL_UPLOAD_URLS.md` — Une image servie vient du site (`localUploadUrl`).
 - `CLIENT_POWER_MODES.md` — Régime de charge du navigateur, `--deco-anim-state`.
+- `SYNC_MODE_BADGE.md` — Pastille « Mode prioritaire / standard / match / éco / veille / relecture » de la fiche tournoi.
 - `ACCESSIBILITY_MENU.md` — Menu d'accessibilité et pauses.
 - `ACCESSIBILITY_QUICK_WINS.md` — Lien d'évitement, titres, langue, page courante.
 - `ACCESSIBILITY_LANDMARKS_FOCUS.md` — Repères des pages vitrine, focus des champs.
