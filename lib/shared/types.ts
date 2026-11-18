@@ -1306,6 +1306,8 @@ export type PersonalDataExport = {
   planning: {
     availability: { tournamentId: number; matchId: number | null; role: string; status: string; preferred: boolean; updatedAt: string | null }[];
     assignments: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
+    /** Historique des attributions (attribuée, confirmée, retirée), sans l'auteur du geste. */
+    history: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
     soloCaster: boolean | null;
   };
   /**

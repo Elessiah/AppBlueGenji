@@ -27,12 +27,14 @@ import { PUT as settingsPut } from "@/app/api/admin/planning/settings/route";
 import { PUT as availabilityPut } from "@/app/api/planning/availability/route";
 import { GET as planningGet } from "@/app/api/planning/route";
 import { PUT as soloPut } from "@/app/api/planning/solo-caster/route";
+import { PLANNING_BATCH_RULE, PLANNING_READ_RULE, PLANNING_WRITE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { writeDurationSettings } from "@/lib/server/planning/load";
 import { loadPlanningView } from "@/lib/server/planning/view";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import type { PlanningView } from "@/lib/shared/planning-view";
 import { authUser } from "../../helpers/auth-user";
@@ -94,6 +96,7 @@ const STAFF_ROUTES = [
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetRateLimit();
   jest.mocked(loadPlanningView).mockResolvedValue(VIEW);
   jest.mocked(setAvailability).mockResolvedValue(undefined);
   jest.mocked(setSoloCaster).mockResolvedValue(undefined);
@@ -361,5 +364,44 @@ describe("PUT /api/admin/planning/settings", () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
     expect(await errorOf(await settingsPut(request("PUT", DEFAULT_PLANNING_DURATIONS)))).toBe("PLANNING_SETTINGS_FAILED");
     log.mockRestore();
+  });
+});
+
+describe("plafonds des routes du planning", () => {
+  it("planningGet_overReadLimit_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    for (let call = 0; call < PLANNING_READ_RULE.limit; call += 1) await planningGet();
+
+    expect((await planningGet()).status).toBe(429);
+    expect(loadPlanningView).toHaveBeenCalledTimes(PLANNING_READ_RULE.limit);
+  });
+
+  it("availabilityPut_overWriteLimit_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(prod);
+    for (let call = 0; call < PLANNING_WRITE_RULE.limit; call += 1) await availabilityPut(request("PUT", AVAILABILITY));
+
+    expect((await availabilityPut(request("PUT", AVAILABILITY))).status).toBe(429);
+  });
+
+  it("soloPut_sharesWriteLimitWithAvailability_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    for (let call = 0; call < PLANNING_WRITE_RULE.limit; call += 1) await soloPut(request("PUT", { solo: true }));
+
+    expect((await availabilityPut(request("PUT", AVAILABILITY))).status).toBe(429);
+  });
+
+  it("autoAssignPost_overBatchLimit_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (let call = 0; call < PLANNING_BATCH_RULE.limit; call += 1) await autoAssignPost(request("POST", WINDOW));
+
+    expect((await confirmPost(request("POST", CONFIRM))).status).toBe(429);
+    expect(runAutoAssign).toHaveBeenCalledTimes(PLANNING_BATCH_RULE.limit);
+  });
+
+  it("planningGet_plainPlayer_403NotCounted", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    for (let call = 0; call < PLANNING_READ_RULE.limit + 1; call += 1) await planningGet();
+
+    expect((await planningGet()).status).toBe(403);
   });
 });

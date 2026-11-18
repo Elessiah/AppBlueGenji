@@ -318,6 +318,10 @@ export async function loadPlanningMembers(executor: Executor): Promise<LoadedMem
       WHERE u.is_deleted = 0 AND ${PLANNING_MEMBER_SQL}
       ORDER BY u.id`,
   );
+  return toMembers(rows);
+}
+
+function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
   return rows
     .map((row) => ({
       userId: Number(row.id),
@@ -331,12 +335,23 @@ export async function loadPlanningMembers(executor: Executor): Promise<LoadedMem
     .filter((member) => member.roles.length > 0);
 }
 
-/** Les comptes réglés « caster autonome » (petite table : une ligne par compte qui l'a réglé). */
-export async function loadSoloCasterIds(executor: Executor): Promise<Set<number>> {
-  const [rows] = await executor.execute<(RowDataPacket & { user_id: number })[]>(
-    "SELECT user_id FROM bg_planning_profiles WHERE solo_caster = 1",
+/**
+ * Les comptes nommés, relus par leur clé (sans parcourir la table) : seuls
+ * ceux qui sont encore vivants **et** tiennent encore un rôle du planning
+ * sont rendus, avec leurs rôles, leur pseudo et leur réglage « caster
+ * autonome » du moment.
+ */
+export async function loadPlanningMembersByIds(executor: Executor, ids: readonly number[]): Promise<LoadedMember[]> {
+  if (ids.length === 0) return [];
+  const [rows] = await executor.execute<MemberRow[]>(
+    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
+       FROM bg_users u
+       LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
+      WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
+      ORDER BY u.id`,
+    [...ids],
   );
-  return new Set(rows.map((row) => Number(row.user_id)));
+  return toMembers(rows);
 }
 
 type AvailabilityRow = RowDataPacket & {
@@ -360,8 +375,13 @@ type RemovalRow = RowDataPacket & { entry_key: string; user_id: number; role: Pl
 
 type CasterRow = RowDataPacket & { match_id: number; user_id: number };
 
-/** Les comptes déjà lus par l'appelant (page : copie brève, voir `view.ts`) : la lecture des membres n'est pas rejouée. */
-type DataOptions = { now: number; includeHidden: boolean; members?: LoadedMember[] };
+/**
+ * Les comptes déjà lus par l'appelant (page : copie brève, voir `view.ts`) : la
+ * lecture des membres n'est pas rejouée. `availabilityOf` : seules les
+ * disponibilités de ce compte sont lues (un lecteur sans la permission
+ * `tournaments` ne voit que les siennes — celles des autres ne quittent pas la base).
+ */
+type DataOptions = { now: number; includeHidden: boolean; members?: LoadedMember[]; availabilityOf?: number };
 
 /** Les matchs de la fenêtre et leurs casters inscrits (`entryKey` → comptes), en une lecture. */
 async function loadMatchCasters(executor: Executor, matchIds: readonly number[]): Promise<Map<string, number[]>> {
@@ -399,8 +419,8 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
     membersRead,
     executor.execute<AvailabilityRow[]>(
       `SELECT entry_key, user_id, role, status, preferred FROM bg_planning_availability
-        WHERE entry_key IN (${inList(keys.length)})`,
-      keys,
+        WHERE entry_key IN (${inList(keys.length)})${options.availabilityOf === undefined ? "" : " AND user_id = ?"}`,
+      options.availabilityOf === undefined ? keys : [...keys, options.availabilityOf],
     ),
     executor.execute<AssignmentRow[]>(
       `SELECT entry_key, user_id, role, source, reason, confirmed FROM bg_planning_assignments

@@ -5,7 +5,7 @@
  * et confirme celles que le staff retient. Sous le verrou nommé du planning :
  * un geste à la fois.
  */
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
@@ -48,7 +48,8 @@ export type PlanningWindow = { from: number; to: number };
  * tournoi entier d'une entrée « tournoi », ou dans une entrée qui la
  * chevauche — ne la couvre dans aucun rôle ; un arbitre qui ne remplit pas la
  * condition d'arbitrage du jeu n'arbitre pas ; un membre retiré **à la main**
- * d'un rôle d'une entrée n'y est pas replacé.
+ * d'un rôle d'une entrée n'y est pas replacé ; un tournoi encore caché n'est
+ * proposé qu'à qui le voit (le staff des tournois, qui tient l'arbitrage).
  */
 export async function loadExclusions(
   executor: Executor,
@@ -59,7 +60,25 @@ export async function loadExclusions(
   await excludePlayers(executor, data, entries, excluded);
   await excludeIneligibleReferees(executor, data, entries, excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
+  excludeFromHidden(data, entries, excluded);
   return excluded;
+}
+
+/**
+ * Une entrée d'un tournoi encore caché n'est proposée qu'aux membres qui
+ * voient les tournois cachés (permission `tournaments`, celle qui donne le rôle
+ * d'arbitre) : un caster ou un prod sans elle n'y reçoit rien — ni sur sa page,
+ * ni dans l'export de ses données.
+ */
+export function excludeFromHidden(data: Pick<PlanningData, "members">, entries: readonly LoadedEntry[], excluded: Set<string>): void {
+  const hidden = entries.filter((entry) => entry.hidden);
+  if (hidden.length === 0) return;
+  for (const member of data.members) {
+    if (member.roles.includes("REFEREE")) continue;
+    for (const entry of hidden) {
+      for (const role of member.roles) excluded.add(exclusionKey(entry.key, member.userId, role));
+    }
+  }
 }
 
 async function excludePlayers(
@@ -341,11 +360,18 @@ export function isMatchRefereeRefusal(error: unknown): boolean {
  */
 type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; refused: boolean; settled: boolean };
 
-function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
+/**
+ * Les propositions à confirmer. Une proposition dont le membre ne tient plus
+ * le rôle (rôle retiré, compte supprimé depuis le calcul : `data.members` est
+ * relu à chaque geste) est retirée, jamais confirmée.
+ */
+export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
+  const held = new Map(data.members.map((member) => [member.userId, member.roles]));
   const steps: ConfirmStep[] = [];
   for (const entry of entriesToConfirm(data, scope)) {
     for (const row of entryAssignments(entry, data).filter((candidate) => candidate.provisional)) {
-      steps.push({ entry, userId: row.userId, role: row.role, refused: false, settled: false });
+      const stillHeld = held.get(row.userId)?.includes(row.role) ?? false;
+      steps.push({ entry, userId: row.userId, role: row.role, refused: !stillHeld, settled: !stillHeld });
     }
   }
   return steps;
@@ -399,9 +425,15 @@ export async function confirmPendingReferees(executor: Executor, actorId: number
 async function designateReferees(steps: ConfirmStep[], actorId: number): Promise<unknown> {
   for (const step of steps) {
     const { matchId } = step.entry;
-    if (!isMatchReferee(step) || matchId === null) continue;
+    if (!isMatchReferee(step) || matchId === null || step.settled) continue;
     try {
-      await assignMatchReferee(matchId, actorId, step.userId, null);
+      // Sous le verrou, une désignation à la fois : un retrait du staff fait
+      // depuis la lecture (proposition effacée) n'est pas défait sur le match.
+      await withPlanningLock(async (connection) => {
+        const [rows] = await connection.execute<RowDataPacket[]>(PROPOSAL_STILL_PENDING_SQL, [step.entry.key, step.userId]);
+        if (rows.length === 0) return;
+        await assignMatchReferee(matchId, actorId, step.userId, null);
+      });
     } catch (error) {
       if (!isMatchRefereeRefusal(error)) return error;
       step.refused = true;
@@ -410,6 +442,10 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
   }
   return undefined;
 }
+
+/** La proposition d'arbitre de match lue au calcul existe-t-elle encore (ni retirée, ni confirmée) ? */
+export const PROPOSAL_STILL_PENDING_SQL = `SELECT 1 FROM bg_planning_assignments
+  WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0 LIMIT 1`;
 
 function isMatchReferee(step: ConfirmStep): boolean {
   return step.entry.kind === "MATCH" && step.role === "REFEREE" && step.entry.matchId !== null;
@@ -428,8 +464,8 @@ async function writeConfirmSteps(connection: PoolConnection, steps: readonly Con
     const { entry } = step;
     if (step.refused) {
       const [removed] = await connection.execute(
-        "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
-        [entry.key, step.userId],
+        "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
+        [entry.key, step.userId, step.role],
       );
       if (affected(removed) === 0) continue;
       await writeEvent(connection, entry, step.userId, step.role, "REMOVED", "AUTO", actorId);

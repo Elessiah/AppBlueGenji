@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 
+import { resolveRoles } from "@/lib/server/auth";
 import {
   loadPlanningData,
   loadPlanningEntries,
-  loadSoloCasterIds,
+  loadPlanningMembersByIds,
   parseEntryKey,
   type LoadedMember,
 } from "@/lib/server/planning/load";
@@ -164,11 +165,35 @@ describe("loadPlanningEntries — une seule entrée", () => {
   });
 });
 
-describe("loadSoloCasterIds", () => {
-  it("loadSoloCasterIds_rows_setOfIds", async () => {
-    connection.execute.mockResolvedValue([[{ user_id: 4 }, { user_id: "9" }], []]);
+describe("loadPlanningMembersByIds", () => {
+  it("loadPlanningMembersByIds_noIds_noQuery", async () => {
+    expect(await loadPlanningMembersByIds(executor, [])).toEqual([]);
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
 
-    expect(await loadSoloCasterIds(executor)).toEqual(new Set([4, 9]));
+  it("loadPlanningMembersByIds_ids_readByKeyAliveOnly", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadPlanningMembersByIds(executor, [4, 9]);
+
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(sql).toContain("u.id IN (?, ?) AND u.is_deleted = 0");
+    expect(params).toEqual([4, 9]);
+  });
+
+  it("loadPlanningMembersByIds_rows_rolesResolvedRolelessDropped", async () => {
+    jest.mocked(resolveRoles).mockImplementation((_isAdmin, raw) => (raw === '["CASTER"]' ? ["CASTER"] : []));
+    connection.execute.mockResolvedValue([
+      [
+        { id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 1 },
+        { id: 9, pseudo: "Ancien", is_admin: 0, platform_roles_json: "[]", solo_caster: null },
+      ],
+      [],
+    ]);
+
+    expect(await loadPlanningMembersByIds(executor, [4, 9])).toEqual([
+      { userId: 4, pseudo: "Caster", roles: ["CASTER"], soloCaster: true },
+    ]);
   });
 });
 
@@ -198,6 +223,25 @@ describe("loadPlanningData", () => {
     await loadPlanningData(executor, { now: MONDAY, includeHidden: true });
 
     expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FROM bg_users u"))).toBe(true);
+  });
+
+  it("loadPlanningData_availabilityOf_onlyThatAccountRead", async () => {
+    routeSql({ tournaments: [tournamentRow()] });
+
+    await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [], availabilityOf: 4 });
+
+    const [sql, params] = connection.execute.mock.calls.find(([text]) => text.includes("FROM bg_planning_availability")) ?? [];
+    expect(sql).toContain("AND user_id = ?");
+    expect(params).toEqual(["t:10", 4]);
+  });
+
+  it("loadPlanningData_noAvailabilityOf_everyoneRead", async () => {
+    routeSql({ tournaments: [tournamentRow()] });
+
+    await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [] });
+
+    const [sql] = connection.execute.mock.calls.find(([text]) => text.includes("FROM bg_planning_availability")) ?? [];
+    expect(sql).not.toContain("user_id = ?");
   });
 
   it("loadPlanningData_noEntries_availabilityNotRead", async () => {

@@ -61,9 +61,10 @@
       "LOAD": "Load",
       "MANUAL": "Staff choice",
       "CAST": "Signed up to cast",
-      "MATCH": "Set on the match"
+      "MATCH": "Set on the match",
+      "AUTO": "Calculation"
     },
-    "reasonHint": "Preference: the person marked this slot. Load: they served the least in recent weeks. Provisional: proposed by the calculation, not confirmed yet.",
+    "reasonHint": "Preference: the person marked this slot. Load: they served the least in recent weeks. Calculation: proposed by the calculation, its reason is visible only to staff and the person. Provisional: proposed by the calculation, not confirmed yet.",
     "reasonSubject": "Assignment reasons",
     "nobody": "Nobody",
     "remove": "Remove {name} ({role})",

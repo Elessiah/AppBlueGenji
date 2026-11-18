@@ -61,9 +61,10 @@
       "LOAD": "Charge",
       "MANUAL": "Choix du staff",
       "CAST": "Inscrit au cast",
-      "MATCH": "Désigné sur le match"
+      "MATCH": "Désigné sur le match",
+      "AUTO": "Calcul"
     },
-    "reasonHint": "Préférence : la personne a marqué ce créneau. Charge : elle a le moins servi ces dernières semaines. Provisoire : proposé par le calcul, pas encore confirmé.",
+    "reasonHint": "Préférence : la personne a marqué ce créneau. Charge : elle a le moins servi ces dernières semaines. Calcul : proposé par le calcul, sa raison n'est visible que du staff et de la personne. Provisoire : proposé par le calcul, pas encore confirmé.",
     "reasonSubject": "Raisons d'attribution",
     "nobody": "Personne",
     "remove": "Retirer {name} ({role})",

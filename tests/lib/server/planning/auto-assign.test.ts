@@ -24,6 +24,7 @@ import {
   batchEntries,
   confirmAssignments,
   entriesToConfirm,
+  excludeFromHidden,
   preparePlanner,
   runAutoAssign,
   withPlanningLock,
@@ -50,14 +51,17 @@ const { execute } = connection;
  * ses instructions joignent `bg_matches m ON m.id = a.match_id` ; `healed` =
  * propositions confirmées), lignes touchées, requête en panne, évènement sans identifiant.
  */
-type SqlRoute = { healed?: number; affected?: number; deleted?: number; failOn?: string; noInsertId?: boolean };
+type SqlRoute = { healed?: number; affected?: number; deleted?: number; failOn?: string; noInsertId?: boolean; proposalGone?: boolean };
 
 const RECONCILE = "JOIN bg_matches m ON m.id = a.match_id";
+/** La relecture, sous le verrou, d'une proposition d'arbitre de match avant sa désignation. */
+const RECHECK = "SELECT 1 FROM bg_planning_assignments";
 
 function routeSql(route: SqlRoute = {}) {
   execute.mockImplementation(async (sql: string) => {
     if (route.failOn !== undefined && sql.includes(route.failOn)) throw new Error("ER_LOCK_DEADLOCK");
     if (sql.includes(RECONCILE)) return [{ affectedRows: route.healed ?? 0 }];
+    if (sql.includes(RECHECK)) return [route.proposalGone ? [] : [{ 1: 1 }]];
     if (sql.includes("INSERT INTO bg_planning_events")) return [route.noInsertId ? { affectedRows: 1 } : { affectedRows: 1, insertId: 1 }];
     if (sql.startsWith("DELETE") && route.deleted !== undefined) return [{ affectedRows: route.deleted }];
     return [{ affectedRows: route.affected ?? 1 }];
@@ -66,7 +70,7 @@ function routeSql(route: SqlRoute = {}) {
 
 /** Paramètres des écritures jouées (la réconciliation exclue). */
 function writeParams(): unknown[] {
-  return execute.mock.calls.filter(([sql]) => !sql.includes(RECONCILE)).map(([, params]) => params);
+  return execute.mock.calls.filter(([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK)).map(([, params]) => params);
 }
 
 /** Les instructions de la réconciliation, réduites à leur début. */
@@ -93,7 +97,9 @@ beforeEach(() => {
 
 /** Requêtes jouées, réduites à leur début (le verbe et la table). */
 function statements(): string[] {
-  return execute.mock.calls.filter(([sql]) => !sql.includes(RECONCILE)).map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
+  return execute.mock.calls
+    .filter(([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK))
+    .map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
 
 describe("writeEvent", () => {
@@ -212,6 +218,34 @@ describe("preparePlanner", () => {
 
   it("preparePlanner_historyWeek_passedToPlanner", () => {
     expect(preparePlanner(planningData({ entries: [inside] }), [inside], new Map(), new Set(), MONDAY).historyWeek).toBe(MONDAY);
+  });
+});
+
+describe("excludeFromHidden", () => {
+  const hidden = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null, hidden: true });
+
+  it("excludeFromHidden_casterAndProdOnHiddenEntry_excludedInEveryRole", () => {
+    const excluded = new Set<string>();
+
+    excludeFromHidden({ members: [loadedMember({ userId: 4, roles: ["CASTER", "PROD"] })] }, [hidden], excluded);
+
+    expect([...excluded]).toEqual(["t:10|4|CASTER", "t:10|4|PROD"]);
+  });
+
+  it("excludeFromHidden_tournamentStaff_notExcluded", () => {
+    const excluded = new Set<string>();
+
+    excludeFromHidden({ members: [loadedMember({ userId: 3, roles: ["REFEREE", "CASTER"] })] }, [hidden], excluded);
+
+    expect(excluded.size).toBe(0);
+  });
+
+  it("excludeFromHidden_visibleEntry_nothingExcluded", () => {
+    const excluded = new Set<string>();
+
+    excludeFromHidden({ members: [loadedMember({ userId: 4, roles: ["CASTER"] })] }, [loadedEntry()], excluded);
+
+    expect(excluded.size).toBe(0);
   });
 });
 
@@ -479,10 +513,18 @@ describe("runAutoAssign", () => {
 describe("confirmAssignments", () => {
   const first = loadedEntry({ key: "m:1", matchId: 1 });
   const second = loadedEntry({ key: "m:2", matchId: 2, startAt: MONDAY + 5 * HOUR_MS, endAt: MONDAY + 6 * HOUR_MS });
+  const members = [
+    loadedMember({ userId: 3, roles: ["REFEREE"] }),
+    loadedMember({ userId: 4, roles: ["CASTER"] }),
+    loadedMember({ userId: 5, roles: ["REFEREE", "CASTER"] }),
+    loadedMember({ userId: 6, roles: ["PROD"] }),
+  ];
+  /** Les données relues au geste, membres (rôles du moment) compris. */
+  const confirmData = (overrides: Parameters<typeof planningData>[0] = {}) => planningData({ members, ...overrides });
 
   it("confirmAssignments_subset_confirmsOnlyNamedProvisional", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
+      confirmData({
         entries: [first, second],
         assignments: [
           loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" }),
@@ -504,7 +546,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_alreadyConfirmedByEarlierRun_noEventNotCounted", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
     );
     routeSql({ affected: 0 });
 
@@ -516,7 +558,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_matchReferee_appliedViaAssignMatchReferee", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
 
     const report = await confirmAssignments(9, { until: MONDAY + HOUR_MS }, MONDAY - HOUR_MS);
@@ -527,7 +569,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_matchReferee_confirmedOnlyIfMatchStillHasHim", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
     routeSql({ affected: 0 });
 
@@ -540,7 +582,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_refereeRefused_rowDeletedRemovedEventCounted", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
     jest.mocked(assignMatchReferee).mockRejectedValue(new Error("REFEREE_IS_PLAYER"));
 
@@ -557,7 +599,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_transientRefereeError_propagatesNothingRemoved", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
     jest.mocked(assignMatchReferee).mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
 
@@ -567,7 +609,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_pendingRefereeAlreadyOnMatch_healedWithoutMatchCall", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
+      confirmData({
         entries: [loadedEntry({ matchRefereeId: 3 })],
         assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
       }),
@@ -582,7 +624,7 @@ describe("confirmAssignments", () => {
   });
 
   it("confirmAssignments_nothingPendingOnMatch_noneCounted", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [first] }));
+    jest.mocked(loadPlanningData).mockResolvedValue(confirmData({ entries: [first] }));
 
     const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
@@ -591,7 +633,7 @@ describe("confirmAssignments", () => {
   });
 
   it("confirmAssignments_unloadedEntries_stillReconciledInConstantStatements", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [] }));
+    jest.mocked(loadPlanningData).mockResolvedValue(confirmData({ entries: [] }));
     routeSql({ healed: 5 });
 
     const report = await confirmAssignments(9, { entryKeys: [] }, MONDAY - HOUR_MS);
@@ -602,7 +644,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_pendingRefereeOnStartedMatch_healed", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
+      confirmData({
         entries: [loadedEntry({ matchRefereeId: 3, open: false, editable: false })],
         assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
       }),
@@ -617,7 +659,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_transientFailureAfterFirstReferee_partialWrittenThrowsConfirmPartial", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
+      confirmData({
         entries: [first, second],
         assignments: [
           loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" }),
@@ -643,7 +685,7 @@ describe("confirmAssignments", () => {
 
   it("confirmAssignments_writeFailsAfterDesignationPanne_originalPanneThrown", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
+      confirmData({
         entries: [first],
         assignments: [
           loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" }),
@@ -663,12 +705,79 @@ describe("confirmAssignments", () => {
   it("confirmAssignments_tournamentReferee_noMatchCall", async () => {
     const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
     jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({ entries: [event], assignments: [loadedAssignment({ entryKey: "t:10", userId: 3, role: "REFEREE" })] }),
+      confirmData({ entries: [event], assignments: [loadedAssignment({ entryKey: "t:10", userId: 3, role: "REFEREE" })] }),
     );
 
     const report = await confirmAssignments(9, { entryKeys: ["t:10"] }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_casterLostRole_rowRemovedNotConfirmed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [first],
+        members: [loadedMember({ userId: 4, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })],
+      }),
+    );
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(writeParams()).toEqual([
+      ["m:1", 4, "CASTER"],
+      ["m:1", 4, "CASTER", 10, 1, "REMOVED", "AUTO", 9],
+    ]);
+    expect(statements()[0]).toBe("DELETE FROM bg_planning_assignments WHER");
+  });
+
+  it("confirmAssignments_matchRefereeLostRole_notDesignatedRowRemoved", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_matchRefereeProposalRemovedMeanwhile_matchNotTouched", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    routeSql({ proposalGone: true, affected: 0 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 0 });
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_matchReferee_designatedUnderPlanningLockAfterRecheck", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(withNamedLock).toHaveBeenCalledTimes(2);
+    const recheck = execute.mock.calls.find(([sql]) => sql.includes(RECHECK));
+    expect(recheck?.[1]).toEqual(["m:1", 3]);
+    expect(execute.mock.invocationCallOrder[execute.mock.calls.indexOf(recheck!)]).toBeLessThan(
+      jest.mocked(assignMatchReferee).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("confirmAssignments_designationLockBusy_failureNothingDesignated", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(withNamedLock).mockRejectedValueOnce(new NamedLockUnavailableError("bg_planning", 10));
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("PLANNING_BUSY");
     expect(assignMatchReferee).not.toHaveBeenCalled();
   });
 });

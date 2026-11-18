@@ -24,7 +24,18 @@ tenus (`planningRolesOf`) : arbitre = `tournaments`, caster = `CASTER`, prod =
 `PROD`. Vue joueur : aucun rôle, page 404, routes 403. Sans session : carte
 « Connexion requise » (page), 401 (routes). Le lien « Planning » du menu du
 compte suit `can(user, "planning")`. Les disponibilités des autres ne sont
-lues que par `tournaments` ; rien n'est publié sur Discord.
+lues que par `tournaments` : sans elle, la lecture ne rend de la base que les
+siennes (`availabilityOf`). La raison « Préférence » / « Charge » d'une
+proposition faite à un autre devient « Calcul » (`AUTO`, `visibleAssignment`)
+pour qui n'a pas `tournaments` : elle dirait ce que l'autre a demandé. Un
+tournoi encore caché n'est proposé par le calcul qu'aux membres qui le voient
+(`excludeFromHidden`). Rien n'est publié sur Discord.
+
+Plafonds par compte (`api-guard.ts`), posés après le contrôle de permission :
+`PLANNING_READ_RULE` (60 lectures / min), `PLANNING_WRITE_RULE` (180 gestes
+unitaires / 5 min, disponibilité, autonome, désignation, réglages),
+`PLANNING_BATCH_RULE` (20 calculs ou confirmations / 5 min, chacun tenant le
+verrou `bg_planning`).
 
 ## Entrées
 
@@ -153,15 +164,23 @@ compte les **rôles**, pas les personnes.
   `PlanningData`), puis disponibilités, attributions, retraits et casters
   lancés ensemble ; regroupements par entrée en un passage (pas de filtre par
   entrée).
-- Les comptes du planning (balayage de `bg_users` par `JSON_CONTAINS`) sont
-  copiés `PLANNING_MEMBERS_TTL_MS` (30 s) pour la **page** seule ; les gestes et
-  le calcul les relisent. Le réglage « caster autonome » se relit à chaque page.
+- La **liste** des comptes du planning (balayage de `bg_users` par
+  `JSON_CONTAINS`) est gardée `PLANNING_MEMBERS_TTL_MS` (30 s) pour la **page**
+  seule, en identifiants : chaque page relit ces comptes par leur clé
+  (`loadPlanningMembersByIds` : pseudo, rôles, « caster autonome »), si bien
+  qu'un compte supprimé ou qui perd son rôle disparaît dès la page suivante ;
+  un rôle accordé apparaît au plus tard en 30 s. Les gestes et le calcul
+  relisent tout ; « caster autonome » ne relit que le compte visé.
 - Sa disponibilité (`setAvailability`) ne lit que **son** entrée (`only`,
   `parseEntryKey`), ni la fenêtre, ni les comptes.
 - Le calcul écrit ses propositions par instructions groupées (200 lignes) et
   ne retrace (`ASSIGNED`) que ce qui change d'un lot à l'autre. La
-  confirmation désigne les arbitres de match **avant** de prendre le verrou
-  `bg_planning` (idempotent, écritures du planning gardées sous le verrou).
+  confirmation désigne les arbitres de match un à un, chacun sous un bref
+  passage du verrou `bg_planning` qui relit d'abord la proposition
+  (`PROPOSAL_STILL_PENDING_SQL`) : un retrait du staff fait entre-temps n'est
+  jamais défait sur le match. Les écritures du planning suivent sous le verrou.
+  Une proposition dont le membre ne tient plus le rôle est retirée, jamais
+  confirmée (`confirmSteps`, rôles relus au geste).
 - `bg_planning_events` : index `(entry_key, kind, source)` pour les retraits
   manuels ; les lectures par entrée passent par les clés primaires.
 - Écran : une relecture garde l'identité des entrées inchangées (`mergeView`),
@@ -187,7 +206,9 @@ lancée par `instrumentation.ts`) : tout ce qui concerne une entrée
 `PLANNING_RETENTION_DAYS` (90) jours après son début ; le réglage caster
 autonome dès que le compte ne tient plus de rôle du planning. Suppression du
 compte : ses lignes partent, ses gestes de staff restent sans le désigner
-(`account-erasure.ts`). Export des données : `planning` (`planning-export.ts`).
+(`account-erasure.ts`). Export des données : `planning` (`planning-export.ts`) — disponibilités,
+attributions, historique (`history` : attribuée, confirmée, retirée, sans
+l'auteur du geste) et réglage autonome.
 
 ## Interface
 

@@ -17,7 +17,7 @@ import { MATCH_REFEREE_REFUSAL_CODES, withPlanningLock, writeAssignment, writeEv
 import {
   loadPlanningData,
   loadPlanningEntries,
-  loadPlanningMembers,
+  loadPlanningMembersByIds,
   parseEntryKey,
   type Executor,
   type LoadedEntry,
@@ -91,8 +91,9 @@ export async function setAvailability(
  */
 export async function setSoloCaster(targetUserId: number, solo: boolean): Promise<void> {
   await withConnection(async (connection) => {
-    const members = await loadPlanningMembers(connection);
-    if (!members.some((member) => member.userId === targetUserId && member.roles.includes("CASTER"))) {
+    // Le seul compte visé, relu par sa clé : ses rôles du moment.
+    const [member] = await loadPlanningMembersByIds(connection, [targetUserId]);
+    if (!member?.roles.includes("CASTER")) {
       throw new Error("NOT_CASTER");
     }
     await writeSoloCaster(connection, targetUserId, solo);

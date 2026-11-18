@@ -5,13 +5,14 @@ jest.mock("@/lib/server/planning/load", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
   loadPlanningData: jest.fn(),
   loadPlanningMembers: jest.fn(),
-  loadSoloCasterIds: jest.fn(),
+  loadPlanningMembersByIds: jest.fn(),
 }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
-import { loadPlanningData, loadPlanningMembers, loadSoloCasterIds, type LoadedAvailability } from "@/lib/server/planning/load";
-import { loadPlanningView, PLANNING_MEMBERS_TTL_MS, resetPlanningMembersCache } from "@/lib/server/planning/view";
+import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability } from "@/lib/server/planning/load";
+import { loadPlanningView, PLANNING_MEMBERS_TTL_MS, resetPlanningMembersCache, visibleAssignment } from "@/lib/server/planning/view";
+import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { authUser } from "../../../helpers/auth-user";
 import { loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
@@ -27,7 +28,7 @@ beforeEach(() => {
   resetPlanningMembersCache();
   jest.mocked(withConnection).mockImplementation(<T>(run: (c: PoolConnection) => Promise<T>) => run(fakeConnection(connection)));
   jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
-  jest.mocked(loadSoloCasterIds).mockResolvedValue(new Set());
+  jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
   jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
     planningData({ entries: [loadedEntry()], members: options.members ?? [] }),
   );
@@ -55,24 +56,31 @@ describe("loadPlanningView — comptes", () => {
     expect(loadPlanningMembers).toHaveBeenCalledTimes(2);
   });
 
-  it("loadPlanningView_soloSetting_readEveryTimeEvenWhenUsersCached", async () => {
+  it("loadPlanningView_withinTtl_cachedIdsReadAgainByKey", async () => {
     await loadPlanningView(caster, MONDAY);
-    jest.mocked(loadSoloCasterIds).mockResolvedValue(new Set([4]));
 
-    const view = await loadPlanningView(caster, MONDAY + 1000);
+    await loadPlanningView(caster, MONDAY + 1000);
 
-    expect(view.members.find((member) => member.userId === 4)?.soloCaster).toBe(true);
-    expect(loadPlanningMembers).toHaveBeenCalledTimes(1);
+    expect(loadPlanningMembersByIds).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(loadPlanningMembersByIds).mock.calls[0][1]).toEqual([4]);
   });
 
-  it("loadPlanningView_cachedUsers_notMutatedBySoloMerge", async () => {
-    jest.mocked(loadSoloCasterIds).mockResolvedValue(new Set([4]));
+  it("loadPlanningView_memberLostRoleWithinTtl_droppedOnNextLoad", async () => {
     await loadPlanningView(caster, MONDAY);
-    jest.mocked(loadSoloCasterIds).mockResolvedValue(new Set());
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([]);
 
     const view = await loadPlanningView(caster, MONDAY + 1000);
 
-    expect(view.members[0].soloCaster).toBe(false);
+    expect(view.members).toEqual([]);
+  });
+
+  it("loadPlanningView_soloSettingWithinTtl_freshValue", async () => {
+    await loadPlanningView(caster, MONDAY);
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true })]);
+
+    const view = await loadPlanningView(caster, MONDAY + 1000);
+
+    expect(view.members[0].soloCaster).toBe(true);
   });
 
   it("loadPlanningView_passesCachedUsersToTheLoad", async () => {
@@ -113,6 +121,18 @@ describe("loadPlanningView — disponibilités", () => {
     expect(view.entries.map((entry) => entry.mine.map((row) => row.status))).toEqual([["AVAILABLE"], ["UNAVAILABLE"]]);
   });
 
+  it("loadPlanningView_nonStaff_readsOnlyOwnAvailabilityFromDatabase", async () => {
+    await loadPlanningView(caster, MONDAY);
+
+    expect(jest.mocked(loadPlanningData).mock.calls[0][1].availabilityOf).toBe(4);
+  });
+
+  it("loadPlanningView_staff_readsEveryoneAvailability", async () => {
+    await loadPlanningView(staff, MONDAY);
+
+    expect(jest.mocked(loadPlanningData).mock.calls[0][1].availabilityOf).toBeUndefined();
+  });
+
   it("loadPlanningView_entryWithoutRows_emptyLists", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
 
@@ -129,5 +149,44 @@ describe("loadPlanningView — disponibilités", () => {
     const view = await loadPlanningView(staff, MONDAY);
 
     expect(view.durations).toBe(data.durations);
+  });
+});
+
+describe("visibleAssignment", () => {
+  const preference: PlanningAssignmentView = { userId: 5, role: "CASTER", source: "AUTO", reason: "PREFERENCE", provisional: true };
+
+  it("visibleAssignment_staff_keepsPreference", () => {
+    expect(visibleAssignment(preference, 9, true).reason).toBe("PREFERENCE");
+  });
+
+  it("visibleAssignment_ownRow_keepsPreference", () => {
+    expect(visibleAssignment(preference, 5, false).reason).toBe("PREFERENCE");
+  });
+
+  it("visibleAssignment_otherMemberPreference_becomesAuto", () => {
+    expect(visibleAssignment(preference, 4, false).reason).toBe("AUTO");
+  });
+
+  it("visibleAssignment_otherMemberLoad_becomesAuto", () => {
+    expect(visibleAssignment({ ...preference, reason: "LOAD" }, 4, false).reason).toBe("AUTO");
+  });
+
+  it("visibleAssignment_otherMemberManual_unchanged", () => {
+    expect(visibleAssignment({ ...preference, source: "MANUAL", reason: "MANUAL" }, 4, false).reason).toBe("MANUAL");
+  });
+});
+
+describe("loadPlanningView — raisons", () => {
+  it("loadPlanningView_casterReadsOtherPreference_shownAsAuto", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry({ key: "m:1", matchId: 1 })],
+        assignments: [{ entryKey: "m:1", userId: 6, role: "PROD", source: "AUTO", reason: "PREFERENCE", confirmed: false }],
+      }),
+    );
+
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.entries[0].assignments.map((row) => row.reason)).toEqual(["AUTO"]);
   });
 });

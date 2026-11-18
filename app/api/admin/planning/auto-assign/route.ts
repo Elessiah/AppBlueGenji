@@ -1,3 +1,4 @@
+import { PLANNING_BATCH_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { runAutoAssign } from "@/lib/server/planning/auto-assign";
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  const throttled = enforceRateLimit(PLANNING_BATCH_RULE, user.id);
+  if (throttled) return throttled;
 
   const read = await readJsonObject(req, "INVALID_BODY", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);

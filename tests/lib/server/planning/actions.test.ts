@@ -9,7 +9,7 @@ jest.mock("@/lib/server/planning/load", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
   loadPlanningData: jest.fn(),
   loadPlanningEntries: jest.fn(),
-  loadPlanningMembers: jest.fn(),
+  loadPlanningMembersByIds: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/profiles");
 jest.mock("@/lib/server/planning/players", () => ({
@@ -24,7 +24,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
-import { loadPlanningData, loadPlanningEntries, loadPlanningMembers } from "@/lib/server/planning/load";
+import { loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -145,7 +145,7 @@ describe("setAvailability", () => {
     await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false });
 
     expect(loadPlanningData).not.toHaveBeenCalled();
-    expect(loadPlanningMembers).not.toHaveBeenCalled();
+    expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
     expect(jest.mocked(loadPlanningEntries).mock.calls[0][1]).toMatchObject({ only: { kind: "MATCH", id: 1 } });
   });
 
@@ -168,17 +168,25 @@ describe("setAvailability", () => {
 
 describe("setSoloCaster", () => {
   it("setSoloCaster_notCaster_throwsNotCaster", async () => {
-    jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 6, roles: ["PROD"] })]);
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 6, roles: ["PROD"] })]);
 
     await expect(setSoloCaster(6, true)).rejects.toThrow("NOT_CASTER");
     expect(writeSoloCaster).not.toHaveBeenCalled();
   });
 
-  it("setSoloCaster_caster_writes", async () => {
-    jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
+  it("setSoloCaster_accountGoneOrRoleless_throwsNotCaster", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([]);
+
+    await expect(setSoloCaster(7, true)).rejects.toThrow("NOT_CASTER");
+    expect(writeSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("setSoloCaster_caster_readsOnlyTargetAndWrites", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
 
     await setSoloCaster(4, true);
 
+    expect(jest.mocked(loadPlanningMembersByIds).mock.calls[0][1]).toEqual([4]);
     expect(writeSoloCaster).toHaveBeenCalledWith(expect.anything(), 4, true);
   });
 });

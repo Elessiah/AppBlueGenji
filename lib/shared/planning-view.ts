@@ -30,6 +30,14 @@ export type PlanningAssignmentView = {
   provisional: boolean;
 };
 
+/**
+ * Une attribution telle qu'un lecteur la reçoit : pour un lecteur sans la
+ * permission `tournaments`, la raison d'une proposition du calcul faite à un
+ * autre (« Préférence », « Charge ») devient `AUTO` — elle dirait ce que
+ * l'autre a demandé.
+ */
+export type PlanningAssignmentShown = Omit<PlanningAssignmentView, "reason"> & { reason: AssignmentReason | "AUTO" };
+
 export type PlanningAvailabilityView = {
   userId: number;
   role: PlanningRole;
@@ -60,7 +68,7 @@ export type PlanningEntryView = {
   channelUrl: string | null;
   /** Autogestion posée par le staff sur le match. */
   selfManaged: boolean;
-  assignments: PlanningAssignmentView[];
+  assignments: PlanningAssignmentShown[];
   coverage: Coverage;
   /** Disponibilités du lecteur sur cette entrée, par rôle tenu. */
   mine: PlanningAvailabilityView[];

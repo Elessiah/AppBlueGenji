@@ -7,11 +7,11 @@ import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { can } from "@/lib/shared/permissions";
 import { planningRolesOf } from "@/lib/shared/planning";
-import type { PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
+import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
 import {
   loadPlanningData,
   loadPlanningMembers,
-  loadSoloCasterIds,
+  loadPlanningMembersByIds,
   type Executor,
   type LoadedAvailability,
   type LoadedMember,
@@ -19,32 +19,41 @@ import {
 import { entryAssignments, entryCoverage } from "./model";
 
 /**
- * Durée de la copie des comptes qui tiennent un rôle du planning (pseudo,
- * rôles) : la page les affiche, elle ne décide rien d'après eux — les gestes et
- * le calcul les relisent. Chaque chargement de page ne repasse donc pas sur
- * toute la table des comptes. Le réglage « caster autonome », lui, se relit à
- * chaque fois (une lecture de la petite table des profils) : un geste y est
- * visible aussitôt.
+ * Durée de la copie de la **liste** des comptes qui tiennent un rôle du
+ * planning : elle évite de repasser, à chaque chargement de page, sur toute la
+ * table des comptes (les rôles se cherchent dans du JSON). Seuls les
+ * identifiants en sont gardés : à chaque page, ces comptes se relisent par
+ * leur clé (pseudo, rôles, réglage « caster autonome »), et un compte supprimé
+ * ou qui a perdu son rôle n'est plus rendu, dès le chargement suivant. Un
+ * rôle **accordé** apparaît, lui, au plus tard au bout de ce délai.
  */
 export const PLANNING_MEMBERS_TTL_MS = 30 * 1000;
 
-let membersCache: { at: number; members: LoadedMember[] } | null = null;
+let membersCache: { at: number; ids: number[] } | null = null;
 
-/** Oublie la copie des comptes (tests, et tout geste qui en change la liste). */
+/** Oublie la copie de la liste des comptes (tests). */
 export function resetPlanningMembersCache(): void {
   membersCache = null;
 }
 
 async function pageMembers(connection: Executor, now: number): Promise<LoadedMember[]> {
-  let base: LoadedMember[];
   if (membersCache && now >= membersCache.at && now - membersCache.at < PLANNING_MEMBERS_TTL_MS) {
-    base = membersCache.members;
-  } else {
-    base = await loadPlanningMembers(connection);
-    membersCache = { at: now, members: base };
+    return loadPlanningMembersByIds(connection, membersCache.ids);
   }
-  const solo = await loadSoloCasterIds(connection);
-  return base.map((member) => ({ ...member, soloCaster: solo.has(member.userId) }));
+  const members = await loadPlanningMembers(connection);
+  membersCache = { at: now, ids: members.map((member) => member.userId) };
+  return members;
+}
+
+/**
+ * Ce qu'une attribution dit de sa raison. « Préférence » et « Charge » disent
+ * ce que la personne a demandé (ou non) : seuls le staff des tournois et la
+ * personne elle-même le lisent ; pour les autres, une proposition du calcul
+ * est « Calcul », sans plus.
+ */
+export function visibleAssignment(row: PlanningAssignmentView, readerId: number, canManage: boolean): PlanningAssignmentShown {
+  if (canManage || row.userId === readerId) return row;
+  return row.reason === "PREFERENCE" || row.reason === "LOAD" ? { ...row, reason: "AUTO" } : row;
 }
 
 /** Les disponibilités regroupées par entrée, en un seul passage. */
@@ -61,7 +70,12 @@ function groupAvailability(rows: readonly LoadedAvailability[]): Map<string, Loa
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
   const data = await withConnection(async (connection) =>
-    loadPlanningData(connection, { now, includeHidden: canManage, members: await pageMembers(connection, now) }),
+    loadPlanningData(connection, {
+      now,
+      includeHidden: canManage,
+      members: await pageMembers(connection, now),
+      ...(canManage ? {} : { availabilityOf: user.id }),
+    }),
   );
   const solo = new Set(data.members.filter((member) => member.soloCaster).map((member) => member.userId));
   const availabilityByEntry = groupAvailability(data.availability);
@@ -85,11 +99,12 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       hidden: entry.hidden,
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
-      assignments,
+      assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       coverage: entryCoverage(assignments, solo),
       mine: availability
         .filter((row) => row.userId === user.id)
         .map(({ userId, role, status, preferred }) => ({ userId, role, status, preferred })),
+      // Défense en profondeur : sans `tournaments`, la lecture ne rend déjà que les siennes.
       availability: canManage
         ? availability.map(({ userId, role, status, preferred }) => ({ userId, role, status, preferred }))
         : [],
