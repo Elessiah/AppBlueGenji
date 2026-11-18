@@ -416,6 +416,40 @@ describe("setManualAssignment — pose", () => {
     ]);
   });
 
+  it("setManualAssignment_refereeCarriedByMatchOnly_writesRemovedAutoEvent", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ matchReferee: 7 });
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(callsWith("INSERT INTO bg_planning_events").map(([, params]) => params)).toEqual([
+      ["m:1", 7, "REFEREE", 10, 1, "REMOVED", "AUTO", 9],
+      ["m:1", 3, "REFEREE", 10, 1, "ASSIGNED", "MANUAL", 9],
+    ]);
+  });
+
+  it("setManualAssignment_refereeCarriedByMatchOnlyRefused_removalEventErased", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ matchReferee: 7 });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("REFEREE_CHANGED"));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
+      "REFEREE_CHANGED",
+    );
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID, EVENT_ID + 1]);
+  });
+
+  it("setManualAssignment_matchWithoutReferee_noRemovedEvent", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: null })], members }));
+    routeSql();
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(callsWith("INSERT INTO bg_planning_events").map(([, params]) => params)).toEqual([
+      ["m:1", 3, "REFEREE", 10, 1, "ASSIGNED", "MANUAL", 9],
+    ]);
+  });
+
   it("setManualAssignment_designationRefused_displacedRemovalEventErasedToo", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
     routeSql({ rows: [assignmentRow()], matchReferee: 7, displaced: [7] });
@@ -442,7 +476,8 @@ describe("setManualAssignment — pose", () => {
     expect(callsWith("INSERT IGNORE INTO bg_planning_assignments")[0][1]).toEqual([
       "m:1", "REFEREE", 10, 1, "MANUAL", "MANUAL", 1, 9, CREATED_AT, 7,
     ]);
-    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID]);
+    // L'évènement de retrait de l'arbitre que portait le match, puis celui de la pose.
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID, EVENT_ID + 1]);
     expect(callsWith("UPDATE bg_matches")).toEqual([]);
   });
 
@@ -518,7 +553,7 @@ describe("setManualAssignment — pose", () => {
     execute.mockImplementation(async (sql: string) => {
       if (sql.startsWith("SELECT")) return [[], []];
       if (sql.includes("INSERT INTO bg_planning_assignments")) throw new Error("ER_LOCK_DEADLOCK");
-      return [{ affectedRows: 1 }];
+      return [{ affectedRows: 1, insertId: EVENT_ID }];
     });
 
     await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(

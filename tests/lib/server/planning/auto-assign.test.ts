@@ -99,8 +99,12 @@ async function batchRows(keys: readonly unknown[], override?: readonly LoadedAss
       source: row.source,
       reason: row.reason,
       confirmed: row.confirmed ? 1 : 0,
+      assigned_by_user_id: PREVIOUS_AUTHOR,
     }));
 }
+
+/** Le compte qui a posé les lignes déjà en base (un autre que le lanceur du geste, 9). */
+const PREVIOUS_AUTHOR = 5;
 
 function routeSql(route: SqlRoute = {}) {
   execute.mockImplementation(async (sql: string, params?: unknown) => {
@@ -463,6 +467,52 @@ describe("runAutoAssign", () => {
 
     expect(report.proposed).toBe(1);
     expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_assignments (ent"]);
+  });
+
+  it("runAutoAssign_rerunUnchangedProposal_keepsPreviousAuthor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE", reason: "LOAD" })],
+      }),
+    );
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    const insert = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_planning_assignments"));
+    expect(insert?.[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "LOAD", PREVIOUS_AUTHOR]);
+  });
+
+  it("runAutoAssign_rerunChangedReason_newLauncherIsAuthor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE", reason: "PREFERENCE" })],
+      }),
+    );
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    const insert = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_planning_assignments"));
+    expect(insert?.[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "LOAD", 9]);
+  });
+
+  it("runAutoAssign_lockedBatchRows_readsTheAuthor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+      }),
+    );
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(execute.mock.calls.find(([sql]) => sql.includes(BATCH))?.[0]).toContain("assigned_by_user_id");
   });
 
   it("runAutoAssign_rerunChangedReason_writesTheEvent", async () => {
@@ -929,6 +979,31 @@ describe("confirmAssignments", () => {
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
     expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, null);
+  });
+
+  it("confirmAssignments_matchRefereeDesignatedByGesture_confirmedWithActorBeforeReconcile", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    const sqls = execute.mock.calls.map(([sql]) => sql);
+    const ownEvent = execute.mock.calls.findIndex(([sql]) => sql.startsWith("INSERT INTO bg_planning_events") && !sql.includes(RECONCILE));
+    const heal = sqls.findIndex((sql) => sql.includes(RECONCILE) && sql.includes("'CONFIRMED', 'AUTO', NULL"));
+    expect(execute.mock.calls[ownEvent][1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "CONFIRMED", "AUTO", 9]);
+    expect(ownEvent).toBeLessThan(heal);
+  });
+
+  it("confirmAssignments_leftoverHeals_countAddedToGestureConfirmations", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    routeSql({ healed: 1 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 2, refused: 0 });
   });
 
   it("confirmAssignments_matchReferee_confirmedOnlyIfMatchStillHasHim", async () => {

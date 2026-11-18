@@ -42,7 +42,7 @@ tournoi recaché pendant le geste attend sa validation. Ces lectures passent
 lignes du planning : même ordre qu'un compte rendu de match (tournoi, puis
 match), sans interblocage. L'export des données
 rend toutes les attributions du titulaire, même sur un tournoi caché (art. 15 :
-ce sont ses données). Rien n'est publié sur Discord.
+ce sont ses données). Seul un changement d'arbitre de match passe par le journal du staff sur Discord (voir « Données personnelles »).
 
 Plafonds par compte (`api-guard.ts`), posés après le contrôle de permission :
 `PLANNING_READ_RULE` (400 lectures / 5 min, plus que la somme des gestes
@@ -152,8 +152,10 @@ compte les **rôles**, pas les personnes.
   début de chaque calcul (fenêtre vide comprise) et de chaque confirmation
   (`confirmPendingReferees`, quatre instructions ensemblistes lues en base —
   entrée commencée ou hors de la vue comprise : un calcul relancé ne l'efface
-  jamais ; la confirmation s'inscrit sans auteur, la désignation s'étant faite
-  sur le match) ; au même moment, une ligne d'arbitre **confirmée** que son match ne
+  jamais ; la confirmation s'inscrit sans auteur : le site aligne le planning
+  sur le match, sans savoir qui l'a désigné — une confirmation joue cette
+  réconciliation **après** ses propres lignes, si bien qu'un arbitre qu'elle
+  vient de désigner s'inscrit au compte du staff qui confirme) ; au même moment, une ligne d'arbitre **confirmée** que son match ne
   porte pas (désignation restée incertaine, arbitre changé ou retiré depuis le match)
   est retirée, son retrait inscrit à l'historique (`REMOVED`, `AUTO`, sans
   auteur : personne ne l'a retirée par le planning, c'est le match, qui fait
@@ -171,7 +173,8 @@ compte les **rôles**, pas les personnes.
   match remplacé (lu verrouillé) — s'inscrit à l'historique (`REMOVED`,
   `AUTO` : retrait par conséquence, qui n'écarte personne des calculs
   suivants, au compte du staff) ; ces évènements s'effacent avec le geste s'il
-  est annulé. Retirer une ligne d'arbitre que le match ne porte pas (plus
+  est annulé ; l'arbitre que le match portait sans ligne au planning, remplacé
+  par ce choix, s'y inscrit aussi. Retirer une ligne d'arbitre que le match ne porte pas (plus
   d'arbitre, ou un autre posé depuis le match) n'appelle pas le match. Les lignes du planning s'écrivent d'abord, en une transaction
   validée ; la désignation sur le match (`assignMatchReferee`) passe ensuite,
   sauf si le match, relu juste avant, porte déjà ce qui est voulu. Si elle est
@@ -204,7 +207,8 @@ compte les **rôles**, pas les personnes.
 - Sa disponibilité (`setAvailability`) ne lit que **son** entrée (`only`,
   `parseEntryKey`), ni la fenêtre, ni les comptes.
 - Le calcul écrit ses propositions par instructions groupées (200 lignes) et
-  ne retrace (`ASSIGNED`) que ce qui change d'un lot à l'autre, d'après les
+  ne retrace (`ASSIGNED`) que ce qui change d'un lot à l'autre (une
+  proposition reposée à l'identique garde le compte qui l'a posée), d'après les
   lignes du lot relues verrouillées dans sa transaction (`lockedBatchRows`,
   `FOR UPDATE`, par paquets de 200) : les retraits (`REMOVED`) s'écrivent par
   paquets, jamais en liste `NOT IN` ; une ligne tenue (confirmée, y compris

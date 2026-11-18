@@ -231,7 +231,8 @@ const planKey = (entryKey: string, userId: number, role: PlanningRole) => `${ent
  * deux allers-retours par ligne, sous le verrou) : les lignes, puis un
  * évènement `ASSIGNED` seulement pour celles qui diffèrent de la proposition
  * précédente (même membre, même rôle, même motif : rien de nouveau à
- * retracer). Relancer un lot inchangé n'ajoute donc aucun évènement. Les
+ * retracer). Relancer un lot inchangé n'ajoute donc aucun évènement, et une
+ * ligne reposée à l'identique garde le compte qui l'a posée. Les
  * lignes tenues (confirmées, choix du staff) sont déjà écartées
  * (`lockedBatchRows`) ; une clé en double ne réécrit de toute façon jamais
  * une ligne existante.
@@ -240,12 +241,17 @@ async function writeProposals(
   executor: Executor,
   planned: readonly PlannedRow[],
   byKey: ReadonlyMap<string, LoadedEntry>,
-  previous: ReadonlyMap<string, string>,
+  previous: ReadonlyMap<string, PreviousProposal>,
   actorId: number,
 ): Promise<number> {
   const rows = planned.flatMap((row) => {
     const entry = byKey.get(row.entryKey);
-    return entry ? [{ row, entry }] : [];
+    if (!entry) return [];
+    const before = previous.get(planKey(row.entryKey, row.userId, row.role));
+    // Une proposition reposée à l'identique garde le compte qui l'a posée : sans évènement nouveau,
+    // la ligne et son historique nomment le même auteur.
+    const unchanged = before !== undefined && before.reason === row.reason;
+    return [{ row, entry, changed: !unchanged, author: unchanged ? before.assignedBy : actorId }];
   });
   for (let start = 0; start < rows.length; start += WRITE_CHUNK) {
     const chunk = rows.slice(start, start + WRITE_CHUNK);
@@ -254,10 +260,10 @@ async function writeProposals(
          (entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id)
        VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, 'AUTO', ?, 0, ?)").join(", ")}
        ON DUPLICATE KEY UPDATE entry_key = entry_key`,
-      chunk.flatMap(({ row, entry }) => [entry.key, row.userId, row.role, entry.tournamentId, entry.matchId, row.reason, actorId]),
+      chunk.flatMap(({ row, entry, author }) => [entry.key, row.userId, row.role, entry.tournamentId, entry.matchId, row.reason, author]),
     );
   }
-  const changed = rows.filter(({ row }) => previous.get(planKey(row.entryKey, row.userId, row.role)) !== row.reason);
+  const changed = rows.filter((row) => row.changed);
   for (let start = 0; start < changed.length; start += WRITE_CHUNK) {
     const chunk = changed.slice(start, start + WRITE_CHUNK);
     await executor.execute(
@@ -269,6 +275,9 @@ async function writeProposals(
   return rows.length;
 }
 
+/** Une proposition provisoire que le lot remplace : son motif et le compte qui l'a posée. */
+type PreviousProposal = { reason: string; assignedBy: number | null };
+
 /** Une ligne d'attribution d'une entrée du lot, relue verrouillée dans la transaction d'écriture. */
 type BatchRow = RowDataPacket & {
   entry_key: string;
@@ -279,6 +288,7 @@ type BatchRow = RowDataPacket & {
   source: string;
   reason: string | null;
   confirmed: number;
+  assigned_by_user_id: number | null;
 };
 
 /**
@@ -294,7 +304,7 @@ async function lockedBatchRows(connection: Executor, keys: readonly string[]): P
   for (let start = 0; start < keys.length; start += WRITE_CHUNK) {
     const chunk = keys.slice(start, start + WRITE_CHUNK);
     const [rows] = await connection.execute<BatchRow[]>(
-      `SELECT entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed
+      `SELECT entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id
          FROM bg_planning_assignments
         WHERE entry_key IN (${chunk.map(() => "?").join(", ")})
         ORDER BY entry_key, user_id, role FOR UPDATE`,
@@ -391,7 +401,12 @@ export async function runAutoAssign(
         );
       });
       // Les propositions provisoires que le lot remplace : de quoi ne retracer que ce qui change.
-      const previous = new Map(provisional.map((row) => [planKey(row.entry_key, Number(row.user_id), row.role), row.reason ?? ""]));
+      const previous = new Map(
+        provisional.map((row) => [
+          planKey(row.entry_key, Number(row.user_id), row.role),
+          { reason: row.reason ?? "", assignedBy: row.assigned_by_user_id === null ? null : Number(row.assigned_by_user_id) },
+        ]),
+      );
       await writeDroppedProposals(connection, provisional, kept, actorId);
       const [cleared] = await connection.execute(
         `DELETE FROM bg_planning_assignments
@@ -526,8 +541,10 @@ const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m O
  * provisoire alors que le match a déjà cet arbitre (confirmation interrompue
  * par une panne après la désignation) se confirme sans rien redemander au
  * match, que l'entrée soit ouverte, commencée ou hors de ce que montre le
- * planning — confirmation sans auteur elle aussi : la désignation s'est faite
- * sur le match, pas par qui lance ce calcul ; ses évènements s'écrivent d'abord, d'après la même lecture
+ * planning — confirmation sans auteur elle aussi : le site aligne le planning
+ * sur le match, ce n'est pas qui lance ce calcul qui l'a désigné (une
+ * confirmation joue cette réconciliation **après** ses propres lignes : ce
+ * qu'elle vient de désigner s'inscrit à son compte) ; ses évènements s'écrivent d'abord, d'après la même lecture
  * verrouillante (`INSERT … SELECT`), puis les lignes se confirment. Jouée au
  * début de chaque calcul (même sur une fenêtre vide) et de chaque
  * confirmation, dans leur transaction : un calcul relancé ne les efface donc
@@ -634,7 +651,7 @@ export async function lockedHolding(
 async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
   // Comptes et tournois verrouillés d'abord, avant les matchs (même ordre que `runAutoAssign`, sans interblocage).
   await refuseLostRoles(connection, steps);
-  let confirmed = await confirmPendingReferees(connection);
+  let confirmed = 0;
   let refused = 0;
   for (const step of steps) {
     const { entry } = step;
@@ -658,6 +675,9 @@ async function writeConfirmSteps(connection: PoolConnection, steps: readonly Con
     await writeEvent(connection, entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
     confirmed += 1;
   }
+  // La réconciliation **après** les lignes du geste : un arbitre que ce geste vient de poser sur le
+  // match se confirme à son compte (ci-dessus), seuls les restes d'autres gestes s'y confirment sans auteur.
+  confirmed += await confirmPendingReferees(connection);
   return { confirmed, refused };
 }
 

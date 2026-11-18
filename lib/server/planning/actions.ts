@@ -221,6 +221,12 @@ async function assignManually({ connection, actor, data, entry, input, current, 
         input.userId,
       ]);
       for (const row of displaced) ids.push(await writeEvent(connection, entry, Number(row.user_id), "REFEREE", "REMOVED", "AUTO", actor.id));
+      // L'arbitre posé depuis le match seul (sans ligne au planning) que ce choix remplace : son retrait
+      // passe par le planning, il s'inscrit aussi (effacé avec le geste si le match le refuse).
+      const carried = entry.matchRefereeId;
+      if (carried !== null && carried !== input.userId && !displaced.some((row) => Number(row.user_id) === carried)) {
+        ids.push(await writeEvent(connection, entry, carried, "REFEREE", "REMOVED", "AUTO", actor.id));
+      }
     }
     ids.push(await writeAssignment(connection, entry, { userId: input.userId, role: input.role, source: "MANUAL", reason: "MANUAL" }, actor.id));
     return ids;

@@ -812,7 +812,7 @@ Personnes concernées
 Arbitres, casters et prods du site (rôles de plateforme), administrateurs compris
 Données
 Pour chaque créneau et chaque rôle : disponibilité (disponible, absent, à voir), préférence, date de la dernière réponse
-Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait — arbitre changé ou retiré depuis le match compris —, avec la date et le compte qui a agi par le planning, sans compte pour ce qui vient du match)
+Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait — arbitre changé ou retiré depuis le match compris —, avec la date et le compte qui a agi par le planning, sans compte quand le site aligne le planning sur le match)
 Réglage « caster autonome »
 Données sensibles
 Aucune

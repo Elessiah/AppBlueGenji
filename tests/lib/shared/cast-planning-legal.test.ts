@@ -149,12 +149,12 @@ describe("planning — registre T20", () => {
   });
 
   it("legalTexts_history_noAccountForWhatComesFromMatch", () => {
-    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("sans compte pour ce qui vient du match");
-    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("none for what comes from the match");
-    expect(planningParagraph("app/rgpd/page.tsx")).toContain("sans compte pour ce qui vient du match");
-    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none for what comes from the match");
-    expect(frEntry()).toContain("sans compte pour ce qui vient du match");
-    expect(enEntry()).toContain("none for what comes from the match");
+    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("sans compte quand le site aligne le planning sur le match");
+    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("none when the site aligns the schedule with the match");
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("sans compte quand le site aligne le planning sur le match");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none when the site aligns the schedule with the match");
+    expect(frEntry()).toContain("sans compte quand le site aligne le planning sur le match");
+    expect(enEntry()).toContain("none when the site aligns the schedule with the match");
   });
 
   it("legalTexts_enPlanning_neverSayProducers", () => {
