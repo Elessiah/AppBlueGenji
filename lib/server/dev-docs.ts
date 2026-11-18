@@ -1,14 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { BOT_PROJECT_DIR, renderMarkdown } from "@/lib/server/bot-docs";
-import { cached } from "@/lib/server/cache";
+import { cached, cachedStale } from "@/lib/server/cache";
 import {
   DEV_DOC_REPOS,
   devDocSlug,
+  docOutline,
   guessDocLanguage,
   resolveDevDocCodeRef,
   resolveDevDocLink,
   type DevDocLookup,
+  type DevDocOutlineItem,
   type DevDocRepo,
   type DevDocSummary,
 } from "@/lib/shared/dev-docs";
@@ -58,12 +60,20 @@ export const MAX_DOCS_PER_REPO = 1000;
 /** Taille maximale d'un document lu (1 Mo) : au-delà, il est ignoré. */
 export const MAX_DOC_BYTES = 1024 * 1024;
 /**
- * Durée pendant laquelle l'index est resservi tel quel. Un document, lui, est
- * relu et rendu à chaque vue : la page n'a qu'une poignée de lecteurs, et
- * garder ~200 rendus par langue dans le cache commun en chasserait des
- * entrées plus utiles.
+ * Durée pendant laquelle l'index est resservi tel quel. Passé ce délai, le
+ * lecteur suivant reçoit l'ancien index pendant que le nouveau se refait en
+ * arrière-plan (jusqu'à {@link DEV_DOC_STALE_MS}) : personne n'attend les
+ * ~2 000 lectures de fichiers d'une réindexation.
  */
 export const DEV_DOC_TTL_MS = 60_000;
+/** Durée pendant laquelle un index échu reste servi en attendant son remplaçant. */
+export const DEV_DOC_STALE_MS = 10 * DEV_DOC_TTL_MS;
+/**
+ * Rendus gardés par index (donc au plus une minute, puis ils repartent avec
+ * lui) : les quelques documents qu'un lecteur parcourt, pas les ~200. Hors du
+ * cache commun, dont ils chasseraient des entrées plus utiles.
+ */
+export const RENDERED_DOCS_PER_INDEX = 24;
 
 interface IndexedDoc {
   summary: DevDocSummary;
@@ -119,7 +129,7 @@ async function readHead(file: string): Promise<string | null> {
   const handle = await fs.open(file, "r").catch(() => null);
   if (!handle) return null;
   try {
-    const buffer = Buffer.alloc(TITLE_SCAN_BYTES);
+    const buffer = Buffer.allocUnsafe(TITLE_SCAN_BYTES);
     const { bytesRead } = await handle.read(buffer, 0, TITLE_SCAN_BYTES, 0);
     // Un caractère coupé en fin de tampon devient « � » : sans effet sur le titre.
     return buffer.subarray(0, bytesRead).toString("utf8");
@@ -217,9 +227,20 @@ export async function buildDevDocIndex(sources: Record<DevDocRepo, DevDocSource>
   };
 }
 
-/** {@link buildDevDocIndex}, refait au plus une fois par minute. */
+const INDEX_KEY = "devdoc:index";
+
+/**
+ * {@link buildDevDocIndex}, refait au plus une fois par minute. Un index échu
+ * est resservi tel quel pendant que le nouveau se construit (un seul calcul à
+ * la fois) ; seul le tout premier appel du processus attend.
+ */
 export function loadDevDocIndex(): Promise<DevDocIndex> {
-  return cached("devdoc:index", DEV_DOC_TTL_MS, () => buildDevDocIndex());
+  const stale = cachedStale<DevDocIndex>(INDEX_KEY);
+  const fresh = cached(INDEX_KEY, DEV_DOC_TTL_MS, () => buildDevDocIndex(), { retainMs: DEV_DOC_STALE_MS });
+  if (stale === undefined) return fresh;
+  // Un échec du rafraîchissement ne touche pas ce lecteur : le suivant retente.
+  fresh.catch(() => undefined);
+  return Promise.resolve(stale);
 }
 
 /** Le document d'une adresse, cherché dans l'index seulement. */
@@ -235,6 +256,20 @@ export interface LoadedDevDoc {
   updatedAt: string | null;
   /** Langue du document (`guessDocLanguage`), pour son attribut `lang`. */
   language: "fr" | "en";
+  /** Sommaire des titres (`docOutline`), vide pour un document court ou illisible. */
+  outline: DevDocOutlineItem[];
+}
+
+/** Rendus récents, par index : un nouvel index (liens à jour) repart d'une table vide. */
+const renderedDocs = new WeakMap<DevDocIndex, Map<string, LoadedDevDoc>>();
+
+function rememberRender(index: DevDocIndex, cacheKey: string, doc: LoadedDevDoc): void {
+  const renders = renderedDocs.get(index) ?? new Map<string, LoadedDevDoc>();
+  renderedDocs.set(index, renders);
+  // Le plus ancien part le premier ; une clé relue repasse en fin d'ordre.
+  renders.delete(cacheKey);
+  if (renders.size >= RENDERED_DOCS_PER_INDEX) renders.delete(renders.keys().next().value as string);
+  renders.set(cacheKey, doc);
 }
 
 /**
@@ -250,21 +285,36 @@ export async function renderDevDoc(
   tableLabel?: string,
 ): Promise<LoadedDevDoc> {
   const entry = index.bySlug.get(key(summary.repo, summary.slug));
-  if (!entry) return { summary, html: null, updatedAt: null, language: "fr" };
+  if (!entry) return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
   const lookup: DevDocLookup = (repo, relative) => index.byPath.get(key(repo, relative))?.summary ?? null;
   const origin = { repo: summary.repo, path: summary.path };
   // Tout chemin du site (`/devdoc/…`, `/regles`…) prend la langue de la page.
   const internal = (href: string | null) => (href !== null && isInternalPath(href) ? localize(href) : href);
   try {
-    const [raw, stat] = await Promise.all([fs.readFile(entry.file, "utf8"), fs.stat(entry.file)]);
+    // Un fichier a pu grossir depuis l'indexation (jusqu'à une minute plus tôt) : le plafond se revérifie.
+    const stat = await fs.stat(entry.file);
+    if (stat.size > MAX_DOC_BYTES) return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+    // Même fichier, même état, même langue de liens : le rendu précédent resservi.
+    const cacheKey = [entry.file, stat.mtimeMs, stat.size, localize("/devdoc"), tableLabel ?? ""].join("|");
+    const remembered = renderedDocs.get(index)?.get(cacheKey);
+    if (remembered) return remembered;
+    const raw = await fs.readFile(entry.file, "utf8");
     const html = renderMarkdown(raw, {
       headingIds: true,
       tableLabel,
       resolveLink: (href) => internal(resolveDevDocLink(href, origin, lookup)),
       linkCode: (code) => internal(resolveDevDocCodeRef(code, origin, lookup)),
     });
-    return { summary, html, updatedAt: stat.mtime.toISOString(), language: guessDocLanguage(raw) };
+    const doc: LoadedDevDoc = {
+      summary,
+      html,
+      updatedAt: stat.mtime.toISOString(),
+      language: guessDocLanguage(raw),
+      outline: docOutline(html),
+    };
+    rememberRender(index, cacheKey, doc);
+    return doc;
   } catch {
-    return { summary, html: null, updatedAt: null, language: "fr" };
+    return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
   }
 }

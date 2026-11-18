@@ -1,34 +1,49 @@
 "use client";
 
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { AnnuaireSearchField } from "@/app/(secured)/_shared/AnnuaireSearchField";
 import {
+  DEVDOC_PATH,
   devDocHref,
-  filterDevDocs,
+  devDocSearchIndex,
+  parseDevDocParams,
+  searchDevDocs,
   type DevDocRepoGroup,
   type DevDocSummary,
 } from "@/lib/shared/dev-docs";
-import type { Locale } from "@/lib/shared/locales";
+import { splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import { scopedText } from "@/lib/shared/scoped-text";
 import styles from "../devdoc.module.css";
 
 type DevDocNavProps = {
   groups: DevDocRepoGroup[];
-  current: { repo: string; slug: string };
   locale: Locale;
   messages: Messages["devdoc"];
 };
 
 /**
+ * Le document ouvert, lu dans l'adresse (la navigation vit dans la mise en page,
+ * qui ne reçoit pas le document) : `null` hors d'un document (adresse inconnue).
+ */
+function currentDoc(pathname: string): { repo: string; slug: string } | null {
+  const { path } = splitLocalePrefix(pathname);
+  if (path !== DEVDOC_PATH && !path.startsWith(`${DEVDOC_PATH}/`)) return null;
+  const segments = path.slice(DEVDOC_PATH.length).split("/").filter(Boolean);
+  return parseDevDocParams(segments.length > 0 ? segments : undefined);
+}
+
+/**
  * Navigation de `/devdoc` : recherche par titre ou fichier, puis arborescence
  * par dépôt et par dossier (le dossier du document ouvert déplié). La liste
- * est servie par la page, filtrée ici sans requête.
+ * est servie par la mise en page, une fois par visite, filtrée ici sans requête.
  */
-export function DevDocNav({ groups, current, locale, messages }: Readonly<DevDocNavProps>) {
+export function DevDocNav({ groups, locale, messages }: Readonly<DevDocNavProps>) {
+  const current = currentDoc(usePathname() ?? "") ?? { repo: "", slug: "" };
   const { t } = useMemo(() => scopedText(locale, messages), [locale, messages]);
   const [query, setQuery] = useState("");
   const deferred = useDeferredValue(query);
@@ -37,7 +52,9 @@ export function DevDocNav({ groups, current, locale, messages }: Readonly<DevDoc
   const [expanded, setExpanded] = useState(false);
 
   const all = useMemo(() => groups.flatMap((group) => group.folders.flatMap((folder) => folder.docs)), [groups]);
-  const results = useMemo(() => (deferred.trim() ? filterDevDocs(all, deferred) : null), [all, deferred]);
+  // Les textes de recherche sont normalisés une fois : une frappe ne normalise que la requête.
+  const searchIndex = useMemo(() => devDocSearchIndex(all), [all]);
+  const results = useMemo(() => (deferred.trim() ? searchDevDocs(searchIndex, deferred) : null), [searchIndex, deferred]);
   const bodyId = useId();
   const currentTitle = all.find((doc) => doc.repo === current.repo && doc.slug === current.slug)?.title ?? "";
   const isCurrent = (doc: DevDocSummary) => doc.repo === current.repo && doc.slug === current.slug;
@@ -64,6 +81,7 @@ export function DevDocNav({ groups, current, locale, messages }: Readonly<DevDoc
     <LocaleLink
       href={devDocHref(doc.repo, doc.slug)}
       className={styles.navLink}
+      prefetch={false}
       aria-current={isCurrent(doc) ? "page" : undefined}
       onClick={() => setQuery("")}
     >
@@ -86,7 +104,8 @@ export function DevDocNav({ groups, current, locale, messages }: Readonly<DevDoc
       </ul>
     );
 
-  const tree = groups.map((group) => (
+  // Le plan n'est construit que s'il s'affiche : pas pendant la recherche, à chaque frappe.
+  const tree = results !== null ? null : groups.map((group) => (
     <section key={group.repo} className={styles.navRepo} aria-labelledby={`devdoc-repo-${group.repo}`}>
       <h2 id={`devdoc-repo-${group.repo}`} className={styles.navRepoTitle}>
         {t(`repos.${group.repo}`)}

@@ -92,7 +92,6 @@ describe("DevDocPage — garde", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
     const html = await renderPage(["site", "features", "BUSY_BUTTONS"]);
     expect(html).toContain("<h2 id=\"boutons-occupés\">Boutons occupés</h2>");
-    expect(html).toContain('aria-current="page"');
   });
 
   it("DevDocPage_englishLocale_prefixesInternalLinks", async () => {
@@ -116,13 +115,6 @@ describe("DevDocPage — garde", () => {
   it("DevDocPage_shortDoc_hasNoOutline", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
     expect(await renderPage(["site", "features", "BUSY_BUTTONS"])).not.toContain("Sur cette page");
-  });
-
-  it("DevDocPage_navigation_startsCollapsedWithToggle", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
-    const html = await renderPage(["site", "features", "BUSY_BUTTONS"]);
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain("Parcourir les documents");
   });
 
   it("DevDocPage_unknownDoc_notFound", async () => {

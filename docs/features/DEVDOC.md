@@ -44,10 +44,26 @@ Les conditions du bot (`LegalTerms/`) restent sur leurs propres pages.
    reste sous le dossier autorisé ;
 3. le fichier lu est celui de l'index, jamais un chemin bâti depuis l'adresse.
 
-L'index est refait au plus une fois par minute (`loadDevDocIndex`, cache
-commun), en lisant seulement les 8 premiers Ko de chaque fichier pour son
-titre (premier `#` hors bloc de code), 16 fichiers à la fois ; un document est relu et rendu à chaque vue (peu de lecteurs, et ~200
-rendus par langue chasseraient du cache des entrées plus utiles).
+L'index est refait au plus une fois par minute (`loadDevDocIndex`), en lisant
+seulement les 8 premiers Ko de chaque fichier pour son titre (premier `#` hors
+bloc de code), 16 fichiers à la fois. Passé la minute, le lecteur suivant reçoit
+l'ancien index (gardé 10 minutes) pendant que le nouveau se refait en
+arrière-plan : seul le tout premier appel du processus attend la réindexation.
+
+Un document est relu à chaque vue (taille revérifiée : un fichier a pu grossir
+depuis l'indexation), mais son rendu (HTML, langue, sommaire) est gardé
+24 par index — donc au plus une minute — sous la clé fichier + date + taille +
+langue des liens ; hors du cache commun, dont ~200 rendus par langue auraient
+chassé des entrées plus utiles.
+
+**Coûts mesurés** (202 documents, machine de dev) : index à froid ~35 ms ; rendu du
+plus gros document (131 Ko) ~19 ms, un document courant < 5 ms. L'arborescence
+(~35 Ko dans le flux RSC + ~45 Ko de HTML pour 200 documents, ~10 Ko compressés)
+vit dans la mise en page : elle n'est envoyée qu'une fois par visite. Les liens
+de la navigation ne se préchargent pas (`prefetch={false}`) : chaque lien visible
+aurait lancé un rendu serveur en production. Les motifs de lien du rendu sont
+bornés (libellé 500 caractères, cible 2 000) : sans cela, une ligne de milliers
+de `[` se rendait en temps quadratique.
 
 ## Adresses
 
@@ -94,9 +110,12 @@ aux autres comptes n'annonce pas la page.
 
 ## Écran
 
-`app/(secured)/devdoc/[[...path]]/page.tsx` + `_components/DevDocNav.tsx` :
+`app/(secured)/devdoc/layout.tsx` (en-tête et navigation, une fois par visite) +
+`_components/DevDocNav.tsx` (le document ouvert se lit dans l'adresse) +
+`[[...path]]/page.tsx` (le document) :
 navigation (recherche par titre ou fichier — `filterDevDocs`, insensible à la
-casse, aux accents et aux `_`, nombre de résultats annoncé —, puis arborescence
+casse, aux accents et aux `_`, nombre de résultats annoncé, textes normalisés une
+fois —, puis arborescence
 par dépôt et par dossier, `INDEX` en tête, dossier du document ouvert déplié
 et amené dans la zone)
 dans une `ScrollArea` verticale nommée ; le document à côté (une colonne sous
@@ -116,4 +135,7 @@ regroupement, recherche, langue), `tests/lib/server/dev-docs.test.ts` (index
 sur un faux dépôt : liste blanche, liens symboliques et sorties refusés, rendu
 avec liens réécrits), `tests/app/devdoc-page.test.tsx` (porte : sans session,
 sans permission, `DEV`, administrateur ; document inconnu),
+`tests/app/devdoc-layout.test.tsx` (navigation, document ouvert lu dans l'adresse),
+`tests/app/devdoc-nav-prefetch.test.tsx` (pas de préchargement),
+`tests/lib/server/dev-docs-perf.test.ts` (rendus gardés, index échu, motifs bornés),
 `tests/lib/server/bot-docs.test.ts` (nouveaux blocs du rendu).

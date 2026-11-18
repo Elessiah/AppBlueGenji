@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   DEFAULT_DEV_DOC,
   devDocHref,
+  devDocSearchIndex,
   devDocSlug,
   docOutline,
   filterDevDocs,
@@ -11,6 +12,7 @@ import {
   parseDevDocParams,
   resolveDevDocCodeRef,
   resolveDevDocLink,
+  searchDevDocs,
   type DevDocLookup,
   type DevDocRepo,
   type DevDocSummary,
@@ -279,5 +281,31 @@ describe("docOutline", () => {
   it("docOutline_deeperLevelsAndNoIds_ignored", () => {
     const html = [heading(5, "x", "X"), heading(2, "t", "T"), "<h3>sans id</h3>", heading(3, "a", "A"), heading(3, "b", "B"), heading(3, "c", "C")].join("\n");
     expect(docOutline(html)).toEqual([]);
+  });
+});
+
+describe("devDocSearchIndex / searchDevDocs", () => {
+  const sample: DevDocSummary[] = [
+    { repo: "site", slug: "features/I18N", path: "docs/features/I18N.md", title: "Langues et traductions" },
+    { repo: "site", slug: "features/INDEX", path: "docs/features/INDEX.md", title: "Index des fonctionnalités" },
+    { repo: "bot", slug: "help", path: "help.md", title: "Aide" },
+  ];
+
+  it("searchDevDocs_emptyQuery_returnsAllInOrder", () => {
+    expect(searchDevDocs(devDocSearchIndex(sample), "  ")).toEqual(sample);
+  });
+
+  it("searchDevDocs_accentsCaseAndUnderscore_matchLikeFilterDevDocs", () => {
+    const entries = devDocSearchIndex(sample);
+    for (const query of ["fonctionnalites", "LANGUES", "docs features", "i18n", "zzz", "aide help"]) {
+      expect(searchDevDocs(entries, query)).toEqual(filterDevDocs(sample, query));
+    }
+    expect(searchDevDocs(entries, "fonctionnalites")).toEqual([sample[1]]);
+  });
+
+  it("devDocSearchIndex_normalizesOncePerDocument", () => {
+    const entries = devDocSearchIndex(sample);
+    expect(entries.map((entry) => entry.doc)).toEqual(sample);
+    expect(entries[1].haystack).toBe("index des fonctionnalites docs/features/index.md");
   });
 });

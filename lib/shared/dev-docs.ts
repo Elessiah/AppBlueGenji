@@ -157,12 +157,28 @@ export function normalizeSearch(value: string): string {
  * tous les documents.
  */
 export function filterDevDocs(docs: readonly DevDocSummary[], query: string): DevDocSummary[] {
+  return searchDevDocs(devDocSearchIndex(docs), query);
+}
+
+/** Un document et son texte de recherche, normalisé une fois pour toutes. */
+export interface DevDocSearchEntry {
+  doc: DevDocSummary;
+  haystack: string;
+}
+
+/**
+ * Textes de recherche des documents, à garder d'une frappe à l'autre : seule la
+ * recherche se normalise ensuite (`searchDevDocs`), pas les ~200 titres.
+ */
+export function devDocSearchIndex(docs: readonly DevDocSummary[]): DevDocSearchEntry[] {
+  return docs.map((doc) => ({ doc, haystack: normalizeSearch(`${doc.title} ${doc.path}`) }));
+}
+
+/** {@link filterDevDocs} sur un index déjà normalisé. */
+export function searchDevDocs(entries: readonly DevDocSearchEntry[], query: string): DevDocSummary[] {
   const terms = normalizeSearch(query).split(" ").filter(Boolean);
-  if (terms.length === 0) return [...docs];
-  return docs.filter((doc) => {
-    const haystack = normalizeSearch(`${doc.title} ${doc.path}`);
-    return terms.every((term) => haystack.includes(term));
-  });
+  if (terms.length === 0) return entries.map((entry) => entry.doc);
+  return entries.filter((entry) => terms.every((term) => entry.haystack.includes(term))).map((entry) => entry.doc);
 }
 
 /**

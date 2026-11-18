@@ -142,13 +142,18 @@ function renderStrongEm(html: string): string {
   return html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\*([^*]+)\*/g, "<em>$1</em>");
 }
 
+/*
+ * Bornes des motifs de lien : sans elles, une ligne de milliers de `[` sans
+ * `](` se parcourait en entier à chaque `[` (temps quadratique, ~20 s pour
+ * 200 000 crochets) : un rendu qui bloque le processus.
+ */
 function renderEmphasis(text: string, options: MarkdownRenderOptions, codes: string[]): string {
   // Dans le libellé d'un lien, un code reste du code seul : jamais un lien dans un lien.
   const plainCodes = (label: string) => label.replace(CODE_SLOT, (_m, n: string) => `<code>${escapeHtml(codes[Number(n)])}</code>`);
   const links: string[] = [];
   // Une cible qui contient un code inline n'est pas un lien (le code prime, comme
   // en CommonMark) : sinon le code rendu atterrirait dans l'attribut `href`.
-  const withLinks = escapeHtml(text).replace(/\[([^\]]+)\]\(([^)\s\uE000]+)\)/g, (_m, label: string, href: string) => { // NOSONAR typescript:S8786 — Markdown des dépôts du site et du bot, source de confiance
+  const withLinks = escapeHtml(text).replace(/\[([^\]]{1,500})\]\(([^)\s\uE000]{1,2000})\)/g, (_m, label: string, href: string) => { // NOSONAR typescript:S8786 — Markdown des dépôts du site et du bot, source de confiance
     const target = linkTarget(unescapeHtml(href), options);
     const inner = plainCodes(renderStrongEm(label));
     if (target === null) return inner;
@@ -194,7 +199,7 @@ export function headingAnchor(text: string): string {
 
 /** Texte brut d'un titre (sans balisage Markdown), pour son ancre. */
 function plainHeadingText(text: string): string {
-  return text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[`*]/g, ""); // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
+  return text.replace(/\[([^\]]{1,500})\]\([^)]{0,2000}\)/g, "$1").replace(/[`*]/g, ""); // NOSONAR typescript:S8786 — Markdown des dépôts, source de confiance
 }
 
 type ListTag = "ul" | "ol";
