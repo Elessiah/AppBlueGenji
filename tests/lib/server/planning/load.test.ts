@@ -9,6 +9,7 @@ import {
   loadPlanningEntries,
   loadHiddenTournamentIds,
   loadPlanningMembersByIds,
+  loadSuspendedUserIds,
   parseEntryKey,
   type LoadedMember,
 } from "@/lib/server/planning/load";
@@ -239,6 +240,30 @@ describe("loadHiddenTournamentIds", () => {
     const [sql, params] = connection.execute.mock.calls[0];
     expect(sql).toContain("LOCK IN SHARE MODE");
     expect(params).toEqual([10, 11]);
+  });
+});
+
+describe("loadSuspendedUserIds", () => {
+  it("loadSuspendedUserIds_noIds_noQuery", async () => {
+    expect(await loadSuspendedUserIds(executor, [])).toEqual(new Set());
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
+  it("loadSuspendedUserIds_duplicateIds_queriesEachOnceWithActiveSuspensionFilter", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadSuspendedUserIds(executor, [4, 4, 5]);
+
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(sql).toContain("FROM bg_account_suspensions s");
+    expect(sql).toContain("s.lifted_at IS NULL");
+    expect(params).toEqual([4, 5]);
+  });
+
+  it("loadSuspendedUserIds_rows_returnsNumericIds", async () => {
+    connection.execute.mockResolvedValue([[{ user_id: "4" }], []]);
+
+    expect(await loadSuspendedUserIds(executor, [4, 5])).toEqual(new Set([4]));
   });
 });
 

@@ -976,7 +976,7 @@ export function RgpdEn({
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, in a tournament that has check-in, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
-            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
+            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission; a referee, caster or prod, of the schedule (new slots where they can hold a role, their assignments, withdrawals on their confirmed slots) and, tournament staff, of open slots.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics. A
             topic added since you subscribed (such as “New match”) is on by default on your devices already
@@ -1316,9 +1316,10 @@ export function RgpdEn({
             notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push (<LocaleLink href="/rgpd/registre#t04">register,
             T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
-            can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of a
-            withdrawal on a slot they are assigned to; the tournament staff, of a slot left open (a line
-            naming no one in the staff log on Discord). None of these messages names a player or a staff
+            can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
+            withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; the
+            tournament staff, of a slot left open (a line naming no one in the staff log on Discord; the slot
+            also appears “open” on the schedule, without the reason). None of these messages names a player or a staff
             member; each of these topics can be turned off in the notification settings of “My profile”,
             which also turns off its direct message. Everyone can withdraw from an assignment until the slot
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal

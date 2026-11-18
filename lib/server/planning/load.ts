@@ -9,6 +9,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
 import { toIso } from "@/lib/server/serialization";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { can, rolesGranting } from "@/lib/shared/permissions";
 import {
   PLANNING_HORIZON_DAYS,
@@ -413,6 +414,23 @@ export async function loadHiddenTournamentIds(executor: Executor, tournamentIds:
     [...tournamentIds],
   );
   return new Set(rows.filter((row) => Number(row.hidden) === 1).map((row) => Number(row.id)));
+}
+
+/**
+ * Parmi ces comptes, ceux qu'une suspension tient **à cet instant** : un
+ * compte suspendu n'a plus de droit effectif, le calcul ne le propose à aucun
+ * rôle (ni lot, ni remplacement d'un désistement).
+ */
+export async function loadSuspendedUserIds(executor: Executor, userIds: readonly number[]): Promise<Set<number>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Set();
+  const [rows] = await executor.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT DISTINCT s.user_id
+       FROM bg_account_suspensions s
+      WHERE s.user_id IN (${inList(ids.length)}) AND ${activeSuspensionSql("s")}`,
+    ids,
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
 }
 
 type AvailabilityRow = RowDataPacket & {

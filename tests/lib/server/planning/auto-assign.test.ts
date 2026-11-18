@@ -11,6 +11,7 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningHistory: jest.fn(),
   loadPlanningMembersByIds: jest.fn(),
   loadHiddenTournamentIds: jest.fn(),
+  loadSuspendedUserIds: jest.fn(),
 }));
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/planning/players", () => ({
@@ -37,6 +38,7 @@ import {
 } from "@/lib/server/planning/auto-assign";
 import {
   loadHiddenTournamentIds,
+  loadSuspendedUserIds,
   loadPlanningData,
   loadPlanningHistory,
   loadPlanningMembersByIds,
@@ -169,6 +171,7 @@ beforeEach(() => {
     ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
   );
   jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set());
+  jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set());
 });
 
 /** Requêtes jouées, réduites à leur début (le verbe et la table). */
@@ -439,6 +442,22 @@ describe("runAutoAssign", () => {
     ]);
     expect(writeParams()[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "LOAD", 9]);
     expect(writeParams()[2]).toEqual(["m:1", 3, "REFEREE", 10, 1, 9]);
+  });
+
+  it("runAutoAssign_suspendedAvailableMember_notProposed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+      }),
+    );
+    jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set([3]));
+
+    const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(report.proposed).toBe(0);
+    expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER"]);
   });
 
   it("runAutoAssign_roleLostUnderLock_proposalNotWritten", async () => {

@@ -29,6 +29,7 @@ import {
   loadHiddenTournamentIds,
   loadPlanningHistory,
   loadPlanningMembersByIds,
+  loadSuspendedUserIds,
   type Executor,
   type LoadedEntry,
   type LoadedMember,
@@ -61,7 +62,8 @@ export type PlanningWindow = { from: number; to: number };
  * chevauche — ne la couvre dans aucun rôle ; un arbitre qui ne remplit pas la
  * condition d'arbitrage du jeu n'arbitre pas ; un membre retiré **à la main**
  * d'un rôle d'une entrée n'y est pas replacé ; un tournoi encore caché n'est
- * proposé qu'à qui le voit (le staff des tournois, qui tient l'arbitrage).
+ * proposé qu'à qui le voit (le staff des tournois, qui tient l'arbitrage) ;
+ * un compte suspendu n'est proposé à rien.
  */
 export async function loadExclusions(
   executor: Executor,
@@ -73,7 +75,25 @@ export async function loadExclusions(
   await excludeIneligibleReferees(executor, data, entries, excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
   excludeFromHidden(data, entries, excluded);
+  await excludeSuspended(executor, data, entries, excluded);
   return excluded;
+}
+
+/** Un compte suspendu n'a plus de droit effectif : aucun rôle d'aucune entrée du lot. */
+async function excludeSuspended(
+  executor: Executor,
+  data: Pick<PlanningData, "members">,
+  entries: readonly LoadedEntry[],
+  excluded: Set<string>,
+): Promise<void> {
+  if (entries.length === 0) return;
+  const suspended = await loadSuspendedUserIds(executor, data.members.map((member) => member.userId));
+  for (const member of data.members) {
+    if (!suspended.has(member.userId)) continue;
+    for (const entry of entries) {
+      for (const role of member.roles) excluded.add(exclusionKey(entry.key, member.userId, role));
+    }
+  }
 }
 
 /**

@@ -210,7 +210,7 @@ Quatre sujets de `PUSH_TOPICS`, chacun push **et** message privé Discord
 (`planning*Push`) et `lib/shared/planning-notices.ts` (messages privés, heure
 de Paris, lien vers `/planning` dans la langue du destinataire).
 
-- `PLANNING_NEW_ENTRIES` (« Nouveaux matchs au planning ») : **un
+- `PLANNING_NEW_ENTRIES` (« Nouveaux créneaux au planning ») : **un
   récapitulatif par vague**. Un balayage (chaque minute,
   `bg_planning_entry_notices`, verrou nommé `bg_planning_notices`) note
   chaque entrée ouverte qu'il découvre ; la vague part quand elle est calme
@@ -238,7 +238,8 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   à l'auteur du geste ; aussi au remplaçant d'un désistement. Date et heure
   (Paris), rôle, affiche, lien.
 - `PLANNING_WITHDRAWAL` (« Désistements du planning ») : aux autres affectés
-  de l'entrée quand une attribution **confirmée** est quittée — « un caster
+  **confirmés** de l'entrée quand une attribution **confirmée** est quittée
+  (une proposition provisoire, quittée ou co-affectée, n'en reçoit aucun) — « un caster
   s'est désisté », remplaçant affecté ou place à pourvoir.
 - `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
   aucun remplaçant trouvé — push **et** message privé au staff des tournois
@@ -348,8 +349,10 @@ compte, tournoi, match.
 
 ## Conservation et RGPD
 
-Registre **T20** ; `/rgpd` (FR, EN) ; entrée `2026-11-planning-casts-arbitres`
-de `PRIVACY_CHANGES`. Purge quotidienne (`lib/server/planning/retention.ts`,
+Registre **T20** (et **T12** pour les quatre sujets) ; `/rgpd` (FR, EN : §
+planning et § notifications push) ; entrées `2026-11-planning-casts-arbitres`
+et `2026-11-planning-notifications-desistements` de `PRIVACY_CHANGES` — dates
+et `REGISTER_UPDATED_AT` avancent ensemble. Purge quotidienne (`lib/server/planning/retention.ts`,
 lancée par `instrumentation.ts`) : tout ce qui concerne une entrée
 `PLANNING_RETENTION_DAYS` (90) jours après son début ; le réglage caster
 autonome dès que le compte ne tient plus le rôle `CASTER` (seul à pouvoir le
@@ -374,7 +377,10 @@ autre arbitre (`REPLACED`, désignation avec `replacedRefereeId`), jugés par
 `refereeReleaseNotice` (T04, T05). Les notifications du planning (§ Notifications)
 partent en message privé Discord sans nommer de joueur ni de membre du
 staff ; la ligne « place à pourvoir » va au canal de logs, anonyme (T12, T20).
-Le motif d'un désistement n'est lu que du staff des tournois. Le staff des
+Le motif d'un désistement n'est lu que du staff des tournois ; la pastille
+« à pourvoir » (`unfilled`) est montrée à tous les membres, sans motif.
+Un compte **suspendu** n'est proposé par le calcul à aucun rôle, ni en lot ni
+en remplacement d'un désistement (`loadExclusions` → `loadSuspendedUserIds`). Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :

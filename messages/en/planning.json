@@ -157,7 +157,7 @@
     "action": "Withdraw",
     "actionLabel": "Withdraw: {role}, {slot}",
     "title": "Withdraw from this slot?",
-    "body": "An available replacement is looked for right away. If there is none, the slot is open and the tournament staff is told.",
+    "body": "An available replacement is looked for right away. If there is none and your assignment was confirmed, the slot is open and the tournament staff is told.",
     "late": "Late withdrawal: the slot starts in less than 24 hours.",
     "reasonLabel": "Reason (optional, read by the tournament staff only)",
     "confirm": "Withdraw",

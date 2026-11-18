@@ -11,6 +11,7 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningHistory: jest.fn(),
   loadPlanningMembersByIds: jest.fn(),
   loadHiddenTournamentIds: jest.fn(),
+  loadSuspendedUserIds: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/players", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
@@ -31,6 +32,7 @@ import { getDatabase } from "@/lib/server/database";
 import { withNamedLock } from "@/lib/server/named-lock";
 import {
   loadHiddenTournamentIds,
+  loadSuspendedUserIds,
   loadPlanningData,
   loadPlanningHistory,
   loadPlanningMembersByIds,
@@ -74,6 +76,7 @@ beforeEach(() => {
     ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
   );
   jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set());
+  jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set());
   jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
   jest.mocked(snapshotGesture).mockResolvedValue({ keys: [], rows: [] });
   jest.mocked(readMatchReferee).mockResolvedValue(3);
@@ -214,6 +217,26 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: true });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true, withdrawnUserId: 4 });
+  });
+
+  it("withdrawFromEntry_onlyCandidateSuspended_slotUnfilled", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+    jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set([6]));
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true });
+  });
+
+  it("withdrawFromEntry_suspendedAndActiveCandidates_activeReplacementPicked", async () => {
+    casterData({ confirmed: true, candidates: [6, 7] });
+    jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set([6]));
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 7 });
   });
 
   it("withdrawFromEntry_lessThan24hBefore_flaggedLate", async () => {

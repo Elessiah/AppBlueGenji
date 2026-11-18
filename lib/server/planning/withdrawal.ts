@@ -17,7 +17,7 @@
  *   contredisent jamais ; un refus du match défait le désistement.
  * - **Remplacement** : le calcul du lot 1 (`planAssignments`) rouvre la seule
  *   entrée, tout le reste verrouillé, et prend son premier choix pour le rôle
- *   (disponible, sans chevauchement, ni joueur, ni retiré, préférences
+ *   (disponible, sans chevauchement, ni joueur, ni retiré, ni suspendu, préférences
  *   d'abord, puis la charge). Attribution quittée **confirmée** : le
  *   remplaçant naît confirmé (posé sur le match pour un arbitre) et il est
  *   prévenu ; **provisoire** : il reste une proposition, sans message. Personne :
