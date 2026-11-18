@@ -6,6 +6,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import {
   loadPlanningData,
   loadPlanningEntries,
+  loadHiddenTournamentIds,
   loadPlanningMembersByIds,
   parseEntryKey,
   type LoadedMember,
@@ -196,6 +197,16 @@ describe("loadPlanningMembersByIds", () => {
     ]);
   });
 
+  it("loadPlanningMembersByIds_lock_shareLockOnAccountsOnly", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadPlanningMembersByIds(executor, [4], { lock: true });
+
+    const [sql] = connection.execute.mock.calls[0];
+    expect(sql).toContain("LOCK IN SHARE MODE");
+    expect(sql).not.toContain("JOIN");
+  });
+
   it("loadPlanningMembersByIds_admin_seesHidden", async () => {
     jest.mocked(resolveRoles).mockReturnValue([]);
     connection.execute.mockResolvedValue([[{ id: 1, pseudo: "Admin", is_admin: 1, platform_roles_json: null, solo_caster: null }], []]);
@@ -203,6 +214,30 @@ describe("loadPlanningMembersByIds", () => {
     const [admin] = await loadPlanningMembersByIds(executor, [1]);
 
     expect(admin.seesHidden).toBe(true);
+  });
+});
+
+describe("loadHiddenTournamentIds", () => {
+  it("loadHiddenTournamentIds_noIds_noQuery", async () => {
+    expect(await loadHiddenTournamentIds(executor, [])).toEqual(new Set());
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
+  it("loadHiddenTournamentIds_rows_onlyHiddenReturnedUnderShareLock", async () => {
+    connection.execute.mockResolvedValue([
+      [
+        { id: 10, hidden: 1 },
+        { id: 11, hidden: 0 },
+      ],
+      [],
+    ]);
+
+    const hidden = await loadHiddenTournamentIds(executor, [10, 11]);
+
+    expect(hidden).toEqual(new Set([10]));
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(sql).toContain("LOCK IN SHARE MODE");
+    expect(params).toEqual([10, 11]);
   });
 });
 

@@ -10,6 +10,7 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningData: jest.fn(),
   loadPlanningEntries: jest.fn(),
   loadPlanningMembersByIds: jest.fn(),
+  loadHiddenTournamentIds: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/profiles");
 jest.mock("@/lib/server/planning/players", () => ({
@@ -24,7 +25,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
-import { loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
+import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -98,6 +99,11 @@ beforeEach(() => {
   jest.mocked(loadEntryPlayers).mockResolvedValue(new Map());
   jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
   jest.mocked(writeSoloCaster).mockResolvedValue(undefined);
+  // Relecture verrouillée dans la transaction : par défaut, chacun tient tous les rôles et voit tout.
+  jest.mocked(loadPlanningMembersByIds).mockImplementation(async (_executor, ids) =>
+    ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
+  );
+  jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set());
 });
 
 describe("setAvailability", () => {
@@ -211,6 +217,50 @@ describe("setManualAssignment — pose", () => {
 
     await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 6, assigned: true })).rejects.toThrow(
       "PLANNING_ROLE_NOT_HELD",
+    );
+  });
+
+  it("setManualAssignment_hiddenEntryMemberWithoutTournaments_throwsHidden", async () => {
+    const hidden = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null, hidden: true });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [hidden], members }));
+
+    await expect(setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_HIDDEN_FOR_MEMBER",
+    );
+    expect(callsWith("INSERT INTO bg_planning_assignments")).toEqual([]);
+  });
+
+  it("setManualAssignment_hiddenEntryMemberSeesHidden_writes", async () => {
+    const hidden = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null, hidden: true });
+    const seer = loadedMember({ userId: 6, roles: ["PROD"], seesHidden: true });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [hidden], members: [seer] }));
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true });
+
+    expect(callsWith("INSERT INTO bg_planning_assignments")).toHaveLength(1);
+  });
+
+  it("setManualAssignment_roleLostUnderLock_rollsBackWithoutWriting", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members }));
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([]);
+
+    await expect(setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_NOT_HELD",
+    );
+    expect(jest.mocked(loadPlanningMembersByIds).mock.calls[0][2]).toEqual({ lock: true });
+    expect(callsWith("INSERT INTO bg_planning_assignments")).toEqual([]);
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("setManualAssignment_tournamentRehiddenUnderLock_throwsHidden", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members }));
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 6, roles: ["PROD"], seesHidden: false })]);
+    jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set([10]));
+
+    await expect(setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_HIDDEN_FOR_MEMBER",
     );
   });
 

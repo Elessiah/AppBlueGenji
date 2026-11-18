@@ -499,6 +499,19 @@ export const PLANNING_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Rafale des lectures du planning, en plus de `PLANNING_READ_RULE` : sans
+ * elle, les 400 lectures de la fenêtre pouvaient partir en une minute (près
+ * de 2 800 requêtes au pool). 120 par minute couvrent toujours la relecture
+ * des gestes réels : une disponibilité se pose sur place sans relecture
+ * (`applyAvailability`), seuls les gestes du staff relisent.
+ */
+export const PLANNING_READ_BURST_RULE: RateLimitRule = {
+  name: "planning-read-burst",
+  limit: 120,
+  windowMs: 60_000,
+};
+
+/**
  * Gestes unitaires du planning (sa disponibilité, « caster autonome »,
  * désignation et réglages du staff), par compte. Large : on coche des
  * créneaux en rafale, une semaine chargée en compte quelques dizaines.

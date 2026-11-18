@@ -162,7 +162,7 @@ export function hasProvisional(entry: PlanningEntryView): boolean {
 
 /**
  * Les membres que le staff peut ajouter dans un rôle d'une entrée : ceux qui
- * tiennent le rôle et n'y sont pas déjà ; les disponibles d'abord (préférence
+ * tiennent le rôle, n'y sont pas déjà et voient l'entrée si elle est cachée ; les disponibles d'abord (préférence
  * en tête), puis « à voir », sans réponse, absents — chacun par pseudo.
  */
 export function candidatesFor(
@@ -177,7 +177,8 @@ export function candidatesFor(
   const rank = { AVAILABLE: 0, PENDING: 1, UNKNOWN: 2, UNAVAILABLE: 3 } as const;
   const answers = new Map(entry.availability.filter((row) => row.role === role).map((row) => [row.userId, row]));
   return members
-    .filter((member) => member.roles.includes(role) && !taken.has(member.userId))
+    // Un tournoi encore caché ne va qu'à qui le voit (le serveur refuse les autres : `PLANNING_HIDDEN_FOR_MEMBER`).
+    .filter((member) => member.roles.includes(role) && !taken.has(member.userId) && (!entry.hidden || member.seesHidden !== false))
     .map((member) => {
       const row = answers.get(member.userId);
       return { member, status: row?.status ?? null, preferred: row?.preferred ?? false };

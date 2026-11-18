@@ -24,6 +24,7 @@ import {
 import type { AutoAssignReport, ConfirmReport } from "@/lib/shared/planning-view";
 import {
   loadPlanningData,
+  loadHiddenTournamentIds,
   loadPlanningHistory,
   loadPlanningMembersByIds,
   type Executor,
@@ -304,12 +305,24 @@ export async function runAutoAssign(
     );
     return transact(connection, async () => {
       await confirmPendingReferees(connection, actorId);
+      // Rôles et tournois cachés relus ici, verrouillés : un retrait concurrent ne laisse aucune proposition.
+      const holds = await lockedHolding(
+        connection,
+        planned.flatMap((row) => {
+          const entry = byKey.get(row.entryKey);
+          return entry ? [{ userId: row.userId, entry }] : [];
+        }),
+      );
+      const kept = planned.filter((row) => {
+        const entry = byKey.get(row.entryKey);
+        return entry !== undefined && holds(row.userId, entry, row.role) === null;
+      });
       const [cleared] = await connection.execute(
         `DELETE FROM bg_planning_assignments
           WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
         keys,
       );
-      const proposed = await writeProposals(connection, planned, byKey, previous, actorId);
+      const proposed = await writeProposals(connection, kept, byKey, previous, actorId);
       return { entries: batch.length, proposed, replaced: affected(cleared) };
     });
   });
@@ -374,7 +387,18 @@ type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; ref
  * caché ne va qu'à qui voit les tournois cachés, `excludeFromHidden`).
  */
 export function canStillHold(member: LoadedMember | undefined, entry: LoadedEntry, role: PlanningRole): boolean {
-  return member !== undefined && member.roles.includes(role) && (!entry.hidden || member.seesHidden);
+  return holdingRefusal(member, entry, role) === null;
+}
+
+/** Le refus de `canStillHold`, par son code : rôle plus tenu (ou compte parti), ou tournoi caché qu'il ne voit pas. */
+export function holdingRefusal(
+  member: LoadedMember | undefined,
+  entry: Pick<LoadedEntry, "hidden">,
+  role: PlanningRole,
+): "PLANNING_ROLE_NOT_HELD" | "PLANNING_HIDDEN_FOR_MEMBER" | null {
+  if (!member?.roles.includes(role)) return "PLANNING_ROLE_NOT_HELD";
+  if (entry.hidden && !member.seesHidden) return "PLANNING_HIDDEN_FOR_MEMBER";
+  return null;
 }
 
 /**
@@ -479,11 +503,31 @@ function isMatchReferee(step: ConfirmStep): boolean {
 async function refuseLostRoles(connection: PoolConnection, steps: readonly ConfirmStep[]): Promise<void> {
   const pending = steps.filter((step) => !step.refused && !isMatchReferee(step));
   if (pending.length === 0) return;
-  const members = await loadPlanningMembersByIds(connection, [...new Set(pending.map((step) => step.userId))]);
-  const byId = new Map(members.map((member) => [member.userId, member]));
+  const holds = await lockedHolding(connection, pending);
   for (const step of pending) {
-    if (!canStillHold(byId.get(step.userId), step.entry, step.role)) step.refused = true;
+    if (holds(step.userId, step.entry, step.role) !== null) step.refused = true;
   }
+}
+
+/** Qui peut tenir quoi, relu dans la transaction d'écriture (`lockedHolding`) : `null` s'il le peut, sinon le refus. */
+export type HoldingCheck = (userId: number, entry: LoadedEntry, role: PlanningRole) => ReturnType<typeof holdingRefusal>;
+
+/**
+ * Relit, **dans la transaction qui écrit** et verrouillés en partage, les
+ * comptes visés (rôles, permission `tournaments`) et l'état caché de leurs
+ * tournois : un rôle retiré ou un tournoi recaché pendant le geste attend sa
+ * validation au lieu de passer entre la lecture et l'écriture. Rend le
+ * contrôle `holdingRefusal` sur ces données fraîches.
+ */
+export async function lockedHolding(
+  connection: Executor,
+  rows: readonly { userId: number; entry: LoadedEntry }[],
+): Promise<HoldingCheck> {
+  if (rows.length === 0) return () => "PLANNING_ROLE_NOT_HELD";
+  const members = await loadPlanningMembersByIds(connection, [...new Set(rows.map((row) => row.userId))], { lock: true });
+  const hidden = await loadHiddenTournamentIds(connection, [...new Set(rows.map((row) => row.entry.tournamentId))]);
+  const byId = new Map(members.map((member) => [member.userId, member]));
+  return (userId, entry, role) => holdingRefusal(byId.get(userId), { hidden: hidden.has(entry.tournamentId) }, role);
 }
 
 /**

@@ -91,6 +91,15 @@ describe("loadPlanningView — comptes", () => {
     expect(view.members).toEqual([{ userId: 4, pseudo: "Membre", roles: ["CASTER"], soloCaster: false }]);
   });
 
+  it("loadPlanningView_staff_membersCarrySeesHidden", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false })]);
+
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.canManage).toBe(true);
+    expect(view.members).toEqual([{ userId: 4, pseudo: "Membre", roles: ["CASTER"], soloCaster: false, seesHidden: false }]);
+  });
+
   it("loadPlanningView_passesCachedUsersToTheLoad", async () => {
     await loadPlanningView(caster, MONDAY);
 

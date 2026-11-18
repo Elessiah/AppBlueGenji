@@ -81,6 +81,8 @@ export type PlanningMember = {
   pseudo: string;
   roles: PlanningRole[];
   soloCaster: boolean;
+  /** Voit les tournois encore cachés (permission `tournaments`) : rendu au staff des tournois seul, pour ses choix. */
+  seesHidden?: boolean;
 };
 
 export type PlanningView = {

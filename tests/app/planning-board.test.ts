@@ -92,6 +92,20 @@ describe("candidatesFor", () => {
       [1, "UNAVAILABLE", false],
     ]);
   });
+  it("candidatesFor_hiddenEntry_excludesMembersNotSeeingHidden", () => {
+    const members = [member({ userId: 1, seesHidden: false }), member({ userId: 2, seesHidden: true })];
+
+    const result = candidatesFor(entryView({ hidden: true }), "CASTER", members);
+
+    expect(result.map((row) => row.member.userId)).toEqual([2]);
+  });
+
+  it("candidatesFor_visibleEntry_keepsMembersNotSeeingHidden", () => {
+    const result = candidatesFor(entryView({ hidden: false }), "CASTER", [member({ userId: 1, seesHidden: false })]);
+
+    expect(result.map((row) => row.member.userId)).toEqual([1]);
+  });
+
   it("candidatesFor_memberProdOnEntry_excludedFromCasterButKeptForReferee", () => {
     const entry = entryView({ assignments: [{ userId: 4, role: "PROD", source: "MANUAL", reason: "MANUAL", provisional: false }] });
     const members = [member({ userId: 4, pseudo: "Double", roles: ["CASTER", "PROD", "REFEREE"] })];

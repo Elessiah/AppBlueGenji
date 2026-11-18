@@ -119,8 +119,10 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     myRoles: planningRolesOf(user),
     canManage,
     entries,
-    // Champs nommés : ce que la page montre, rien de plus (`seesHidden` reste au serveur).
-    members: data.members.map(({ userId, pseudo, roles, soloCaster }) => ({ userId, pseudo, roles, soloCaster })),
+    // Champs nommés : ce que la page montre, rien de plus (`seesHidden` au staff seul, qui choisit les candidats).
+    members: data.members.map(({ userId, pseudo, roles, soloCaster, seesHidden }) =>
+      canManage ? { userId, pseudo, roles, soloCaster, seesHidden } : { userId, pseudo, roles, soloCaster },
+    ),
     durations: data.durations,
   };
 }

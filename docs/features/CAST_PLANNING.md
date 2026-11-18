@@ -30,12 +30,22 @@ proposition faite à un autre devient « Calcul » (`AUTO`, `visibleAssignment`)
 pour qui n'a pas `tournaments` : elle dirait ce que l'autre a demandé. Le
 masque est une liste blanche (`MANUAL`, `CAST`, `MATCH` restent lisibles) : un
 motif ajouté plus tard est masqué d'office. Un
-tournoi encore caché n'est proposé par le calcul qu'aux membres qui le voient
-(`excludeFromHidden`). Rien n'est publié sur Discord.
+tournoi encore caché ne va qu'aux membres qui le voient (`seesHidden`,
+permission `tournaments`) : le calcul ne le propose qu'à eux
+(`excludeFromHidden`), le choix du staff refuse les autres
+(`PLANNING_HIDDEN_FOR_MEMBER`, liste des candidats filtrée), la confirmation
+les retire. Rôles et état caché se relisent **dans la transaction qui écrit**,
+verrouillés en partage (`lockedHolding` : `LOCK IN SHARE MODE` sur le compte
+et le tournoi) — calcul, confirmation et choix du staff : un rôle retiré ou un
+tournoi recaché pendant le geste attend sa validation. L'export des données
+rend toutes les attributions du titulaire, même sur un tournoi caché (art. 15 :
+ce sont ses données). Rien n'est publié sur Discord.
 
 Plafonds par compte (`api-guard.ts`), posés après le contrôle de permission :
 `PLANNING_READ_RULE` (400 lectures / 5 min, plus que la somme des gestes
-permis : la relecture d'un geste accepté n'est jamais refusée),
+permis) doublé de `PLANNING_READ_BURST_RULE` (120 / min, contre une rafale de
+400 en une minute ; une disponibilité se pose sans relecture, seuls les gestes
+du staff relisent),
 `PLANNING_WRITE_RULE` (180 gestes unitaires / 5 min, disponibilité, autonome,
 désignation, réglages), `PLANNING_BATCH_RULE` (20 calculs ou confirmations /
 5 min, chacun tenant le verrou `bg_planning`). Le refus `429`
@@ -186,7 +196,8 @@ compte les **rôles**, pas les personnes.
   Une proposition dont le membre ne tient plus le rôle, ou qui porte sur un
   tournoi encore caché qu'il ne voit pas, est retirée, jamais confirmée
   (`canStillHold`) : rôles relus au geste (`confirmSteps`) puis encore sous le
-  verrou final, par leur clé (`refuseLostRoles`), les désignations pouvant
+  verrou final, par leur clé et verrouillés en partage avec l'état caché du
+  tournoi (`refuseLostRoles` → `lockedHolding`), les désignations pouvant
   durer. Un `PLANNING_BUSY` en pleine série est une panne : ce qui est décidé
   s'écrit, le geste se relance.
 - `bg_planning_events` : index `(entry_key, kind, source)` pour les retraits

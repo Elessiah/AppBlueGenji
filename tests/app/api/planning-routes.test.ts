@@ -27,7 +27,7 @@ import { PUT as settingsPut } from "@/app/api/admin/planning/settings/route";
 import { PUT as availabilityPut } from "@/app/api/planning/availability/route";
 import { GET as planningGet } from "@/app/api/planning/route";
 import { PUT as soloPut } from "@/app/api/planning/solo-caster/route";
-import { PLANNING_BATCH_RULE, PLANNING_READ_RULE, PLANNING_WRITE_RULE } from "@/lib/server/api-guard";
+import { PLANNING_BATCH_RULE, PLANNING_READ_BURST_RULE, PLANNING_READ_RULE, PLANNING_WRITE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
@@ -370,10 +370,28 @@ describe("PUT /api/admin/planning/settings", () => {
 describe("plafonds des routes du planning", () => {
   it("planningGet_overReadLimit_returns429", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    for (let call = 0; call < PLANNING_READ_RULE.limit; call += 1) await planningGet();
+    // Une lecture toutes les 0,6 s : 100 par minute (sous la rafale), les 400 en quatre minutes.
+    let clock = 1_000_000;
+    const now = jest.spyOn(Date, "now").mockImplementation(() => clock);
+    try {
+      for (let call = 0; call < PLANNING_READ_RULE.limit; call += 1) {
+        await planningGet();
+        clock += 600;
+      }
+
+      expect((await planningGet()).status).toBe(429);
+      expect(loadPlanningView).toHaveBeenCalledTimes(PLANNING_READ_RULE.limit);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("planningGet_overReadBurst_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    for (let call = 0; call < PLANNING_READ_BURST_RULE.limit; call += 1) await planningGet();
 
     expect((await planningGet()).status).toBe(429);
-    expect(loadPlanningView).toHaveBeenCalledTimes(PLANNING_READ_RULE.limit);
+    expect(loadPlanningView).toHaveBeenCalledTimes(PLANNING_READ_BURST_RULE.limit);
   });
 
   it("availabilityPut_overWriteLimit_returns429", async () => {

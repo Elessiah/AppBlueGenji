@@ -13,7 +13,7 @@ import { can } from "@/lib/shared/permissions";
 import { planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
-import { MATCH_REFEREE_REFUSAL_CODES, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
+import { MATCH_REFEREE_REFUSAL_CODES, holdingRefusal, lockedHolding, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
 import {
   loadPlanningData,
   loadPlanningEntries,
@@ -33,6 +33,7 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_ENTRY_NOT_FOUND: 404,
   PLANNING_ENTRY_CLOSED: 409,
   PLANNING_ROLE_NOT_HELD: 409,
+  PLANNING_HIDDEN_FOR_MEMBER: 409,
   PLANNING_ROLE_CONFLICT: 409,
   PLANNING_IS_PLAYER: 409,
   PLANNING_OVERLAP: 409,
@@ -165,7 +166,9 @@ async function overlappingProposals(
 
 async function assignManually({ connection, actor, data, entry, input, current, matchId }: ManualContext): Promise<void> {
   const member = data.members.find((candidate) => candidate.userId === input.userId);
-  if (!member?.roles.includes(input.role)) throw new Error("PLANNING_ROLE_NOT_HELD");
+  // Rôle tenu, et tournoi encore caché seulement pour qui le voit, comme pour le calcul (`excludeFromHidden`).
+  const refusal = holdingRefusal(member, entry, input.role);
+  if (refusal !== null) throw new Error(refusal);
   if (heldRolesOn(entry, data, input.userId).some((role) => rolesConflict(role, input.role))) {
     throw new Error("PLANNING_ROLE_CONFLICT");
   }
@@ -188,6 +191,10 @@ async function assignManually({ connection, actor, data, entry, input, current, 
               releasedKeys.has(`${row.entry_key}|${row.role}`)),
         );
   const eventIds = await transact(connection, async () => {
+    // Relu verrouillé, dans la transaction qui écrit : un rôle retiré ou un tournoi recaché entre-temps refuse le geste.
+    const holds = await lockedHolding(connection, [{ userId: input.userId, entry }]);
+    const fresh = holds(input.userId, entry, input.role);
+    if (fresh !== null) throw new Error(fresh);
     for (const proposal of released) {
       await connection.execute(
         "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ? AND source = 'AUTO' AND confirmed = 0",

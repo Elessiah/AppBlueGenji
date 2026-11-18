@@ -347,19 +347,48 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
  * Les comptes nommés, relus par leur clé (sans parcourir la table) : seuls
  * ceux qui sont encore vivants **et** tiennent encore un rôle du planning
  * sont rendus, avec leurs rôles, leur pseudo et leur réglage « caster
- * autonome » du moment.
+ * autonome » du moment. `lock` (dans une transaction) : lecture verrouillée
+ * en partage (`LOCK IN SHARE MODE`, compris de MariaDB) — un retrait de rôle
+ * concurrent attend que l'écriture qui s'appuie sur cette lecture soit validée.
  */
-export async function loadPlanningMembersByIds(executor: Executor, ids: readonly number[]): Promise<LoadedMember[]> {
+export async function loadPlanningMembersByIds(
+  executor: Executor,
+  ids: readonly number[],
+  options: { lock?: boolean } = {},
+): Promise<LoadedMember[]> {
   if (ids.length === 0) return [];
+  // Le compte seul est verrouillé (requête sans jointure) ; le réglage autonome se lit à part.
   const [rows] = await executor.execute<MemberRow[]>(
-    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
-       FROM bg_users u
-       LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
-      WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
-      ORDER BY u.id`,
+    options.lock
+      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster
+           FROM bg_users u
+          WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
+          ORDER BY u.id LOCK IN SHARE MODE`
+      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
+           FROM bg_users u
+           LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
+          WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
+          ORDER BY u.id`,
     [...ids],
   );
   return toMembers(rows);
+}
+
+/**
+ * Parmi ces tournois, ceux encore cachés **à cet instant** (`start_visibility_at`
+ * dans le futur), lus verrouillés en partage : un tournoi recaché pendant un
+ * geste long attend la fin de l'écriture qui le croyait visible.
+ */
+export async function loadHiddenTournamentIds(executor: Executor, tournamentIds: readonly number[]): Promise<Set<number>> {
+  if (tournamentIds.length === 0) return new Set();
+  const [rows] = await executor.execute<(RowDataPacket & { id: number; hidden: number })[]>(
+    `SELECT t.id, (t.start_visibility_at > NOW()) AS hidden
+       FROM bg_tournaments t
+      WHERE t.id IN (${inList(tournamentIds.length)})
+      ORDER BY t.id LOCK IN SHARE MODE`,
+    [...tournamentIds],
+  );
+  return new Set(rows.filter((row) => Number(row.hidden) === 1).map((row) => Number(row.id)));
 }
 
 type AvailabilityRow = RowDataPacket & {
