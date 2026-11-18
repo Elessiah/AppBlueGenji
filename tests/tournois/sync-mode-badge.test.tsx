@@ -3,19 +3,30 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ClientPowerMode } from "@/lib/shared/client-power";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
-import { SYNC_MODES, type SyncMode, type SyncModeInput } from "@/lib/shared/sync-mode";
+import { MATCH_BACKGROUND_RENDER_DELAY_MS, QUIET_STREAM_AFTER_MS } from "@/lib/shared/client-power";
+import {
+  SYNC_MODES,
+  syncModeOtherKey,
+  syncModeTextKey,
+  type SyncMode,
+  type SyncModeInput,
+} from "@/lib/shared/sync-mode";
+import { messageAt } from "@/lib/shared/scoped-text";
 import frTournament from "@/messages/fr/tournament.json";
 import enTournament from "@/messages/en/tournament.json";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
+import { FR_TOURNAMENT_PAGE_TEXT, tournamentPageMessages } from "@/lib/shared/tournament-page-text";
 import { readSource } from "../helpers/read-source";
 import {
   SyncModeBadge,
   SyncModeExplanation,
+  syncModeNowTextKey,
+  syncModeOtherTextKey,
   type SyncModeState,
 } from "@/app/(secured)/tournois/[id]/_components/SyncModeBadge";
+import { cadenceLabel } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
 
 let mockMode: ClientPowerMode = "FULL";
 jest.mock("@/lib/shared/hooks/useClientPower", () => ({
@@ -133,13 +144,32 @@ describe("SyncModeExplanation", () => {
 
   it("match tenu dans un autre onglet : le texte le dit", () => {
     const html = renderToStaticMarkup(<SyncModeExplanation state={state("MATCH", { power: "MATCH" })} />);
-    expect(html).toContain("dans un autre onglet");
+    expect(html).toContain("autre onglet");
   });
 
-  it("durées tirées des constantes : regroupement en match et calme de la veille", () => {
-    const html = renderToStaticMarkup(<SyncModeExplanation state={state("PRIORITY", { tier: "PRIORITY" })} />);
-    expect(html).toContain("toutes les 5 secondes au plus");
-    expect(html).toContain("au bout de 1 minute");
+  it("SyncModeExplanation_matchElsewhereStream_mentionsDelayFromConstant", () => {
+    const delay = cadenceLabel(FR_TOURNAMENT_PAGE_TEXT, MATCH_BACKGROUND_RENDER_DELAY_MS);
+
+    const html = renderToStaticMarkup(<SyncModeExplanation state={state("MATCH", { power: "MATCH" })} />);
+
+    expect(html).toContain(`la page regroupe les changements ${delay}, sauf ceux de ton match`);
+  });
+
+  it("SyncModeExplanation_matchElsewherePoll_noBatchingClaim", () => {
+    const html = renderToStaticMarkup(
+      <SyncModeExplanation state={state("MATCH", { power: "MATCH", source: "POLL" })} cadenceMs={60_000} />,
+    );
+
+    expect(html).toContain("autre onglet");
+    expect(html).not.toContain("regroupe");
+  });
+
+  it("SyncModeExplanation_sleep_minutesFromQuietConstant", () => {
+    const minutes = Math.round(QUIET_STREAM_AFTER_MS / 60_000);
+
+    const html = renderToStaticMarkup(<SyncModeExplanation state={state("SLEEP", { power: "SLEEP" })} />);
+
+    expect(html).toContain(`Au bout de ${minutes} minute`);
   });
 
   it("page sans compte en veille : la relecture s'arrête, rien n'est reçu", () => {
@@ -172,9 +202,37 @@ describe("câblage de l'en-tête et de la source", () => {
     expect(header).toContain("{(sync === null || !props.isLive) && <p>{liveText.title}</p>}");
   });
 
-  it("le palier exposé est celui accordé sur un flux plein, pas celui du flux calmé", () => {
-    expect(live).toContain("if (!quietStream.isQuiet()) setGrantedTier(next.tier);");
-    expect(live).toContain("tier: grantedTier,");
+  it("le flux passe par applyStreamMessage (palier gardé sous flux calmé, testé dans live-state.test.ts)", () => {
+    expect(live).toContain("commit(applyStreamMessage(stateRef.current, message, quietStream.isQuiet()));");
     expect(live).toContain("viewerMatch: matchFocus,");
+  });
+});
+
+describe("clés des textes du mode", () => {
+  const combos: Array<[SyncMode, SyncModeInput["source"], boolean]> = [];
+  for (const mode of SYNC_MODES)
+    for (const source of ["STREAM", "POLL"] as const) for (const viewerMatch of [true, false]) combos.push([mode, source, viewerMatch]);
+
+  it.each(combos)("syncModeNowTextKey_%s_%s_viewerMatch=%s_resolvesOwnVariantNoFallback", (mode, source, viewerMatch) => {
+    const variant = syncModeTextKey(mode, { source, viewerMatch });
+
+    const key = syncModeNowTextKey(mode, variant);
+
+    expect(key).toBe(`live.sync.modes.${mode}.${variant}`);
+    expect(messageAt(frTournament, key)).toEqual(expect.any(String));
+    expect(messageAt(enTournament, key)).toEqual(expect.any(String));
+  });
+
+  it.each(combos)("syncModeOtherTextKey_%s_%s_resolvesOwnVariant", (mode, source) => {
+    const variant = syncModeOtherKey(mode, source);
+
+    const key = syncModeOtherTextKey(mode, variant);
+
+    expect(key).toBe(`live.sync.modes.${mode}.${variant}`);
+    expect(messageAt(enTournament, key)).toEqual(expect.any(String));
+  });
+
+  it("syncModeNowTextKey_missingVariant_fallsBackToNow", () => {
+    expect(syncModeNowTextKey("PRIORITY", "nowPoll")).toBe("live.sync.modes.PRIORITY.now");
   });
 });

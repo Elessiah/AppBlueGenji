@@ -121,7 +121,8 @@
     "sync": {
       "title": "Sync mode",
       "others": "The other modes:",
-      "tierKept": {
+      "matchBatched": "Unfocused, the page batches changes {delay}, except your match's.",
+    "tierKept": {
         "PRIORITY": "You remain among those the server serves first.",
         "STANDARD": "You stay at the spectator pace."
       },
@@ -140,8 +141,8 @@
         },
         "MATCH": {
           "label": "Match mode",
-          "now": "You have a match in progress or about to start: changes reach you {cadence}, animations are frozen to spare your machine, and your match shows at once even when the page is not focused.",
-          "nowElsewhere": "One of your matches is in progress or about to start in another tab: animations are frozen here too to spare your machine, and changes arrive {cadence}.",
+          "now": "You have a match in progress or about to start: changes reach you {cadence}, and animations are frozen to spare your machine.",
+          "nowElsewhere": "Your match in another tab is in progress or about to start: animations are frozen here too, and changes arrive {cadence}.",
           "other": "Match in progress or about to start: animations frozen; without focus, the display of other matches is batched {delay}."
         },
         "ECO": {

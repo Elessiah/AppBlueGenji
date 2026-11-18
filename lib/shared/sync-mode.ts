@@ -85,6 +85,15 @@ export function syncModeTextKey(mode: SyncMode, input: Pick<SyncModeInput, "sour
   return "now";
 }
 
+/**
+ * Le régime `MATCH` regroupe, sans focus, l'affichage de ce que le flux apporte
+ * (`MATCH_BACKGROUND_RENDER_DELAY_MS`), sauf le match du lecteur : à dire sur la
+ * page avec compte. La page sans compte n'a pas de flux, rien n'y est regroupé.
+ */
+export function syncModeBatchNote(mode: SyncMode, source: SyncSource): boolean {
+  return mode === "MATCH" && source === "STREAM";
+}
+
 /** Variante du texte d'un autre mode, dans la liste de l'aide. */
 export type SyncModeOtherKey = "other" | "otherPoll";
 

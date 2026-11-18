@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
   powerModeDescription,
+  powerLimitsList,
   powerModeLabel,
   powerProbeSummary,
   powerReasonLabel,
@@ -85,7 +86,7 @@ export function ClientPowerBadge() {
           )}
           {ignoredLimits && (
             <p className={styles.text}>
-              {t("clientPower.ignored", { limits: limits.map((limit) => powerReasonLabel(limit, probe, t)).join(" ; ") })}
+              {t("clientPower.ignored", { limits: powerLimitsList(limits, probe, t) })}
             </p>
           )}
           {(limits.length > 0 || ignorePerformance) && (

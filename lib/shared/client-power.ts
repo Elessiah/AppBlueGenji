@@ -325,6 +325,15 @@ export function powerModeDescription(mode: ClientPowerMode, t: ShellTranslate = 
   });
 }
 
+/** Limites constatées en une liste, au séparateur de la langue (`clientPower.listSeparator`). */
+export function powerLimitsList(
+  limits: readonly PerformanceLimit[],
+  probe: PerformanceProbe,
+  t: ShellTranslate = FRENCH,
+): string {
+  return limits.map((limit) => powerReasonLabel(limit, probe, t)).join(t("clientPower.listSeparator"));
+}
+
 /** « 2 cœurs » / « 1 cœur » — accordé, comme partout où le nombre s'affiche. */
 function coresLabel(cores: number | null, t: ShellTranslate): string {
   return cores === null ? t("clientPower.probe.coresUnknown") : t("clientPower.probe.cores", { count: cores });

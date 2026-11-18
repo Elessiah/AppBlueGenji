@@ -121,7 +121,8 @@
     "sync": {
       "title": "Mode de synchronisation",
       "others": "Les autres modes :",
-      "tierKept": {
+      "matchBatched": "Sans focus, la page regroupe les changements {delay}, sauf ceux de ton match.",
+    "tierKept": {
         "PRIORITY": "Tu restes parmi ceux que le serveur sert en premier.",
         "STANDARD": "Tu restes au rythme des spectateurs."
       },
@@ -140,8 +141,8 @@
         },
         "MATCH": {
           "label": "Mode match",
-          "now": "Tu as un match en cours ou imminent : les changements t'arrivent {cadence}, les animations sont figées pour ménager ta machine, et ton match s'affiche aussitôt même si la page n'a pas le focus.",
-          "nowElsewhere": "Un de tes matchs est en cours ou imminent dans un autre onglet : les animations sont figées ici aussi pour ménager ta machine, et les changements arrivent {cadence}.",
+          "now": "Tu as un match en cours ou imminent : les changements t'arrivent {cadence}, et les animations sont figées pour ménager ta machine.",
+          "nowElsewhere": "Ton match d'un autre onglet est en cours ou imminent : les animations sont figées ici aussi, et les changements arrivent {cadence}.",
           "other": "Match en cours ou imminent : animations figées ; sans focus, l'affichage des autres matchs est regroupé {delay}."
         },
         "ECO": {

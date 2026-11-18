@@ -6,6 +6,7 @@ import {
   POLL_SYNC_MODES,
   resolveSyncMode,
   SYNC_MODES,
+  syncModeBatchNote,
   syncModeOtherKey,
   syncModeTextKey,
   syncModeTierNote,
@@ -82,6 +83,20 @@ describe("syncModeTextKey", () => {
   it("page avec compte : texte nominal", () => {
     expect(syncModeTextKey("SLEEP", { source: "STREAM", viewerMatch: false })).toBe("now");
     expect(syncModeTextKey("STANDARD", { source: "STREAM", viewerMatch: false })).toBe("now");
+  });
+});
+
+describe("syncModeBatchNote", () => {
+  it("syncModeBatchNote_matchOnStream_true", () => {
+    expect(syncModeBatchNote("MATCH", "STREAM")).toBe(true);
+  });
+
+  it("syncModeBatchNote_matchOnPollPage_false", () => {
+    expect(syncModeBatchNote("MATCH", "POLL")).toBe(false);
+  });
+
+  it("syncModeBatchNote_otherModeOnStream_false", () => {
+    expect(syncModeBatchNote("ECO", "STREAM")).toBe(false);
   });
 });
 

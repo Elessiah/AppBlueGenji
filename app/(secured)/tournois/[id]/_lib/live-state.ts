@@ -113,6 +113,21 @@ export function parseLiveMessage(raw: string): LiveMessage | null {
 }
 
 /**
+ * Intègre un message reçu sur le flux, ouvert plein ou calmé.
+ *
+ * Un flux calmé (`?quiet=1`, onglet caché hors match) est servi au palier
+ * spectateur : ce palier est celui de l'onglet, pas celui du lecteur. L'état
+ * garde donc le palier accordé par le dernier flux plein — la pastille du mode,
+ * le témoin de flux et le sondage de secours lisent tous ce même palier, et un
+ * prioritaire revenu sur l'onglet n'est jamais dit ni relu « spectateur ».
+ */
+export function applyStreamMessage(state: LiveState, message: LiveMessage, quiet: boolean): LiveState {
+  const next = applyLiveMessage(state, message);
+  if (!quiet || next === state || next.tier === state.tier) return next;
+  return { tier: state.tier, detail: next.detail };
+}
+
+/**
  * Intègre un message dans l'état courant.
  *
  * Renvoie l'état inchangé — la **même référence** — quand le message n'apporte

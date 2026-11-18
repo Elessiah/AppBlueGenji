@@ -252,6 +252,7 @@
       "memory": "{memory} GB"
     },
     "ignored": "Detection ignored at your request. Seen: {limits}.",
+    "listSeparator": "; ",
     "ignoreToggle": "Ignore performance detection"
   }
 }

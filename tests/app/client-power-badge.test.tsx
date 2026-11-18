@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ClientPowerState } from "@/lib/shared/hooks/useClientPower";
-import { UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { MATCH_BACKGROUND_RENDER_DELAY_MS, powerLimitsList, UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { shellText } from "@/lib/shared/shell-text";
 import { readSource } from "../helpers/read-source";
 import { ClientPowerBadge } from "@/components/client-power-badge";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
@@ -137,9 +138,26 @@ describe("ClientPowerBadge", () => {
     );
     expect(html).toContain(enShell.clientPower.modes.MATCH.label);
     expect(html).toContain('title="Lighter page during your match');
-    expect(html).toContain("every 5 s");
+    expect(html).toContain(`every ${Math.round(MATCH_BACKGROUND_RENDER_DELAY_MS / 1000)} s`);
     expect(html).not.toContain("Mode match");
     expect(html).not.toContain(frShell.clientPower.modes.MATCH.description.slice(0, 20));
+  });
+
+  it("powerLimitsList_english_usesEnglishSeparator", () => {
+    const list = powerLimitsList(["LOW_CORES", "SLOW_FRAMES"], { cores: 1, memoryGb: 2, frameIntervalMs: 33 }, shellText("en", messagesFor("en").shell).t);
+
+    expect(list).toContain("; ");
+    expect(list).not.toContain(" ; ");
+  });
+
+  it("powerLimitsList_french_usesFrenchSeparator", () => {
+    const list = powerLimitsList(["LOW_CORES", "SLOW_FRAMES"], { cores: 1, memoryGb: 2, frameIntervalMs: 33 });
+
+    expect(list).toContain(" ; ");
+  });
+
+  it("le panneau passe la liste par powerLimitsList (séparateur de la langue)", () => {
+    expect(readSource("components/client-power-badge.tsx")).toContain("powerLimitsList(limits, probe, t)");
   });
 
   it("textes du témoin : mêmes clés en français et en anglais", () => {

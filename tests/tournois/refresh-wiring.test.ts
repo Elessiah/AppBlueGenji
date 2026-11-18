@@ -95,7 +95,7 @@ describe("hook temps réel — les garde-fous de dégradation", () => {
     // remise à zéro, l'échec définitif du tournoi précédent condamnerait le
     // suivant, et son plateau s'afficherait un instant sous la mauvaise URL.
     expect(hook).toMatch(
-      /useEffect\(\(\) => \{[\s\S]{0,600}?setFatal\(null\);\s*setGrantedTier\(INITIAL_LIVE_STATE\.tier\);\s*\}, \[tournamentId, renderGate, quietStream\]\);/,
+      /useEffect\(\(\) => \{[\s\S]{0,600}?setFatal\(null\);\s*\}, \[tournamentId, renderGate, quietStream\]\);/,
     );
   });
 

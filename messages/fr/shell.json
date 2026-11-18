@@ -252,6 +252,7 @@
       "memory": "{memory} Go"
     },
     "ignored": "Détection ignorée à ta demande. Constaté : {limits}.",
+    "listSeparator": " ; ",
     "ignoreToggle": "Ignorer la détection de performances"
   }
 }

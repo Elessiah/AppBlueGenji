@@ -20,7 +20,9 @@ L'en-tête de `/tournois/[id]` (et de `/suivre/tournois/[id]`) porte, à côté 
 
 ## Ce qui dit vrai selon la page
 
-- **Palier accordé** : `useTournamentLive` expose le palier du dernier instantané reçu sur un flux **plein**. Un flux calmé (`?quiet=1`, onglet caché depuis une minute) reçoit le palier spectateur : la pastille ne dit pas « spectateur » à un prioritaire au retour sur l'onglet.
+- **Palier accordé** : un flux calmé (`?quiet=1`, onglet caché depuis une minute) reçoit le palier spectateur ; `applyStreamMessage` (`_lib/live-state.ts`) garde alors dans l'état le palier du dernier flux **plein**. Une seule source : pastille, témoin et sondage de secours lisent ce même palier — au retour sur l'onglet, un prioritaire n'est ni dit ni relu « spectateur ».
+- **Regroupement en match** : sur la page avec compte, le texte du mode `MATCH` ajoute `live.sync.matchBatched` (sans focus, affichage regroupé `MATCH_BACKGROUND_RENDER_DELAY_MS`, sauf le match du lecteur — `syncModeBatchNote`) ; la page sans compte n'a pas de flux, rien n'y est regroupé.
+- **Clés écrites en toutes lettres** : `SYNC_MODE_NOW_KEYS` / `SYNC_MODE_OTHER_KEYS` (`SyncModeBadge.tsx`), vérifiées par le compilateur ; aucune clé construite par gabarit puis forcée.
 - **Match d'un autre onglet** : `viewerMatch` (`viewerMatchFocus` de ce tournoi, via `TournamentSheetSource`) distingue le match du lecteur ici d'un régime `MATCH` venu d'un autre onglet (`nowElsewhere`).
 - **Page sans compte** (`useSpectatorView`, source `POLL`) : pas de flux. Ni `PRIORITY` ni `POLLING` ; un échec de lecture ne change pas le mode (le témoin dit « Hors ligne ») ; `STANDARD` et `SLEEP` ont leur texte de relecture (`nowPoll`, `otherPoll` : onglet caché, la relecture s'arrête). L'aide n'énumère que `POLL_SYNC_MODES`.
 - Durées citées (regroupement en match, calme de la veille, cadence prioritaire) : interpolées depuis `MATCH_BACKGROUND_RENDER_DELAY_MS`, `QUIET_STREAM_AFTER_MS`, `REFRESH_CADENCE`, jamais écrites dans le texte.
