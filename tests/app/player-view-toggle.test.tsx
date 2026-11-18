@@ -129,12 +129,13 @@ describe("usePlayerViewToggle", () => {
   });
 
   it("toggle_pending_isTrueWhileTheRequestRuns", async () => {
-    const pendingResponse = Promise.withResolvers<Response>();
-    fetchMock.mockReturnValue(pendingResponse.promise);
+    // Pas de `Promise.withResolvers` : la CI tourne sous Node 20, qui ne l’a pas.
+    let resolveResponse: (response: Response) => void = () => {};
+    fetchMock.mockReturnValue(new Promise<Response>((resolve) => { resolveResponse = resolve; }));
 
     const running = ToggleProbe().toggle(true);
     expect(ToggleProbe().pending).toBe(true);
-    pendingResponse.resolve(new Response("{}", { status: 200 }));
+    resolveResponse(new Response("{}", { status: 200 }));
     await running;
 
     expect(ToggleProbe().pending).toBe(false);
