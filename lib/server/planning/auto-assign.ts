@@ -5,8 +5,9 @@
  * et confirme celles que le staff retient. Sous le verrou nommé du planning :
  * un geste à la fois.
  */
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -117,7 +118,13 @@ export function preparePlanner(
   for (const entry of data.entries) {
     for (const row of entryAssignments(entry, data)) {
       if (row.provisional && inBatch.has(entry.key)) continue;
-      locked.push({ entryKey: entry.key, userId: row.userId, role: row.role, reason: row.reason });
+      locked.push({
+        entryKey: entry.key,
+        userId: row.userId,
+        role: row.role,
+        reason: row.reason,
+        ...(row.provisional ? { provisional: true } : {}),
+      });
     }
   }
   return {
@@ -139,29 +146,34 @@ export function preparePlanner(
   };
 }
 
+/** Ce qu'un évènement retient de son entrée. */
+export type EventEntry = Pick<LoadedEntry, "key" | "tournamentId" | "matchId">;
+
+/** Écrit un évènement du planning ; rend son identifiant (qu'une annulation efface). */
 export async function writeEvent(
   executor: Executor,
-  entry: LoadedEntry,
+  entry: EventEntry,
   userId: number,
   role: PlanningRole,
   kind: "ASSIGNED" | "CONFIRMED" | "REMOVED",
   source: "AUTO" | "MANUAL",
   actorId: number,
-): Promise<void> {
-  await executor.execute(
+): Promise<number> {
+  const [result] = await executor.execute(
     `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [entry.key, userId, role, entry.tournamentId, entry.matchId, kind, source, actorId],
   );
+  return Number((result as { insertId?: number } | undefined)?.insertId ?? 0);
 }
 
-/** Pose une ligne d'attribution (un choix du staff naît confirmé) et l'évènement qui la retrace. */
+/** Pose une ligne d'attribution (un choix du staff naît confirmé) et l'évènement qui la retrace (son identifiant rendu). */
 export async function writeAssignment(
   executor: Executor,
   entry: LoadedEntry,
   row: { userId: number; role: PlanningRole; source: "AUTO" | "MANUAL"; reason: "PREFERENCE" | "LOAD" | "MANUAL" },
   actorId: number,
-): Promise<void> {
+): Promise<number> {
   const confirmed = row.source === "MANUAL" ? 1 : 0;
   await executor.execute(
     `INSERT INTO bg_planning_assignments
@@ -171,7 +183,7 @@ export async function writeAssignment(
                              assigned_by_user_id = VALUES(assigned_by_user_id)`,
     [entry.key, row.userId, row.role, entry.tournamentId, entry.matchId, row.source, row.reason, confirmed, actorId],
   );
-  await writeEvent(executor, entry, row.userId, row.role, "ASSIGNED", row.source, actorId);
+  return writeEvent(executor, entry, row.userId, row.role, "ASSIGNED", row.source, actorId);
 }
 
 function affected(result: unknown): number {
@@ -196,7 +208,10 @@ export async function runAutoAssign(
   return withPlanningLock(async (connection) => {
     const data = await loadPlanningData(connection, { now, includeHidden: true });
     const batch = batchEntries(data, window);
-    if (batch.length === 0) return { entries: 0, proposed: 0, replaced: 0 };
+    if (batch.length === 0) {
+      await transact(connection, () => confirmPendingReferees(connection, actorId));
+      return { entries: 0, proposed: 0, replaced: 0 };
+    }
     const anchor = Math.max(now, window.from);
     const history = await loadPlanningHistory(connection, anchor);
     const excluded = await loadExclusions(connection, data, batch);
@@ -204,7 +219,7 @@ export async function runAutoAssign(
     const keys = batch.map((entry) => entry.key);
     const byKey = new Map(batch.map((entry) => [entry.key, entry]));
     return transact(connection, async () => {
-      await confirmPendingReferees(connection, data, actorId);
+      await confirmPendingReferees(connection, actorId);
       const [cleared] = await connection.execute(
         `DELETE FROM bg_planning_assignments
           WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
@@ -285,27 +300,40 @@ function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmStep[] {
   return steps;
 }
 
+type PendingRefereeRow = RowDataPacket & { entry_key: string; user_id: number; tournament_id: number; match_id: number };
+
+/** Confirme une proposition d'arbitre de match **seulement** si le match a (encore) cet arbitre. */
+const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
+  WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
+    AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
+
 /**
  * Propositions d'arbitre restées provisoires alors que le match a déjà cet
  * arbitre — une confirmation interrompue par une panne après la désignation
  * du match : elles se confirment sans rien redemander au match, que l'entrée
- * soit encore ouverte ou déjà commencée. Jouée au début de chaque calcul et
- * de chaque confirmation (dans leur transaction) : un calcul relancé ne les
- * efface donc jamais comme de simples propositions.
+ * soit encore ouverte, déjà commencée ou hors de ce que montre le planning.
+ * Lues en base (jamais d'après un état chargé avant les désignations), chacune
+ * confirmée à condition que le match ait encore cet arbitre ; l'évènement ne
+ * s'écrit que pour une ligne vraiment confirmée. Jouée au début de chaque
+ * calcul (même sur une fenêtre vide) et de chaque confirmation, dans leur
+ * transaction : un calcul relancé ne les efface donc jamais comme de simples
+ * propositions.
  */
-export async function confirmPendingReferees(executor: Executor, data: PlanningData, actorId: number): Promise<number> {
+export async function confirmPendingReferees(executor: Executor, actorId: number): Promise<number> {
+  const [rows] = await executor.execute<PendingRefereeRow[]>(
+    `SELECT a.entry_key, a.user_id, a.tournament_id, a.match_id
+       FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
+      WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id
+      ORDER BY a.entry_key, a.user_id`,
+  );
   let confirmed = 0;
-  for (const entry of data.entries) {
-    if (entry.kind !== "MATCH" || entry.matchRefereeId === null) continue;
-    const pending = data.assignments.some(
-      (row) => row.entryKey === entry.key && row.role === "REFEREE" && !row.confirmed && row.userId === entry.matchRefereeId,
-    );
-    if (!pending) continue;
-    await executor.execute(
-      "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
-      [entry.key, entry.matchRefereeId],
-    );
-    await writeEvent(executor, entry, entry.matchRefereeId, "REFEREE", "CONFIRMED", "AUTO", actorId);
+  for (const row of rows) {
+    const userId = Number(row.user_id);
+    const matchId = Number(row.match_id);
+    const [result] = await executor.execute(CONFIRM_MATCH_REFEREE_SQL, [row.entry_key, userId, matchId, userId]);
+    if (affected(result) === 0) continue;
+    const entry = { key: row.entry_key, tournamentId: Number(row.tournament_id), matchId };
+    await writeEvent(executor, entry, userId, "REFEREE", "CONFIRMED", "AUTO", actorId);
     confirmed += 1;
   }
   return confirmed;
@@ -320,10 +348,10 @@ export async function confirmPendingReferees(executor: Executor, data: PlanningD
  */
 async function designateReferees(steps: ConfirmStep[], actorId: number): Promise<unknown> {
   for (const step of steps) {
-    const { entry } = step;
-    if (entry.kind !== "MATCH" || step.role !== "REFEREE" || entry.matchId === null) continue;
+    const { matchId } = step.entry;
+    if (!isMatchReferee(step) || matchId === null) continue;
     try {
-      await assignMatchReferee(entry.matchId, actorId, step.userId, null);
+      await assignMatchReferee(matchId, actorId, step.userId, null);
     } catch (error) {
       if (!isMatchRefereeRefusal(error)) return error;
       step.refused = true;
@@ -331,6 +359,44 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
     step.settled = true;
   }
   return undefined;
+}
+
+function isMatchReferee(step: ConfirmStep): boolean {
+  return step.entry.kind === "MATCH" && step.role === "REFEREE" && step.entry.matchId !== null;
+}
+
+/**
+ * Les lignes d'une confirmation, d'un bloc : les propositions refusées par le
+ * match retirées, les autres confirmées — un arbitre de match seulement si le
+ * match l'a encore. Un évènement par ligne vraiment changée : relancer le
+ * geste n'écrit rien deux fois.
+ */
+async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
+  let confirmed = await confirmPendingReferees(connection, actorId);
+  let refused = 0;
+  for (const step of steps) {
+    const { entry } = step;
+    if (step.refused) {
+      const [removed] = await connection.execute(
+        "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
+        [entry.key, step.userId],
+      );
+      if (affected(removed) === 0) continue;
+      await writeEvent(connection, entry, step.userId, step.role, "REMOVED", "AUTO", actorId);
+      refused += 1;
+      continue;
+    }
+    const [result] = isMatchReferee(step)
+      ? await connection.execute(CONFIRM_MATCH_REFEREE_SQL, [entry.key, step.userId, entry.matchId, step.userId])
+      : await connection.execute(
+          "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
+          [entry.key, step.userId, step.role],
+        );
+    if (affected(result) === 0) continue;
+    await writeEvent(connection, entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
+    confirmed += 1;
+  }
+  return { confirmed, refused };
 }
 
 /**
@@ -353,29 +419,18 @@ export async function confirmAssignments(
     const data = await loadPlanningData(connection, { now, includeHidden: true });
     const all = confirmSteps(data, scope);
     const failure = await designateReferees(all, actorId);
-    // Une panne en route : seules s'écrivent les désignations que le match a
-    // déjà décidées, puis la panne remonte (le geste se relance).
-    const steps = failure === undefined ? all : all.filter((step) => step.settled);
-    const report = await transact(connection, async () => {
-      const healed = await confirmPendingReferees(connection, data, actorId);
-      for (const step of steps) {
-        if (step.refused) {
-          await connection.execute(
-            "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0",
-            [step.entry.key, step.userId],
-          );
-          await writeEvent(connection, step.entry, step.userId, step.role, "REMOVED", "AUTO", actorId);
-          continue;
-        }
-        await connection.execute(
-          "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ?",
-          [step.entry.key, step.userId, step.role],
-        );
-        await writeEvent(connection, step.entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
-      }
-      const refused = steps.filter((step) => step.refused).length;
-      return { confirmed: steps.length - refused + healed, refused };
-    });
+    // Une panne en route : les désignations que le match a déjà décidées et
+    // les autres rôles (casters, prods, qui ne dépendent d'aucun match)
+    // s'écrivent quand même, puis la panne d'origine remonte (le geste se relance).
+    const steps = failure === undefined ? all : all.filter((step) => step.settled || !isMatchReferee(step));
+    let report: ConfirmReport;
+    try {
+      report = await transact(connection, () => writeConfirmSteps(connection, steps, actorId));
+    } catch (error) {
+      if (failure === undefined) throw error;
+      console.error("[planning] confirmation : écriture du planning en échec après une panne de désignation", failureDiagnostic(error));
+      throw failure;
+    }
     if (failure !== undefined) throw failure;
     return report;
   });

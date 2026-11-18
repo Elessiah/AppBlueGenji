@@ -54,8 +54,19 @@ export type PlannerAvailability = {
   preferred: boolean;
 };
 
-/** Attribution déjà posée, gardée par le calcul (choix du staff, confirmée, caster inscrit, arbitre du match). */
-export type LockedAssignment = { entryKey: string; userId: number; role: PlanningRole; reason: AssignmentReason };
+/**
+ * Attribution déjà posée, gardée par le calcul (choix du staff, confirmée,
+ * caster inscrit, arbitre du match, proposition provisoire hors du lot).
+ * `provisional` : une simple proposition, qui occupe sa place mais ne compte
+ * pas comme travail tenu dans l'équité (`historyWeek`).
+ */
+export type LockedAssignment = {
+  entryKey: string;
+  userId: number;
+  role: PlanningRole;
+  reason: AssignmentReason;
+  provisional?: boolean;
+};
 
 export type PlannerInput = {
   entries: readonly PlannerEntry[];
@@ -71,7 +82,7 @@ export type PlannerInput = {
   /**
    * Début (`planningWeekStart`) de la semaine où `history` s'arrête. Pour une
    * entrée d'une semaine plus tardive du lot, le travail **tenu** (verrouillé)
-   * des semaines entre les deux s'ajoute à son historique : un lot de
+   * (hors propositions provisoires) des semaines entre les deux s'ajoute à son historique : un lot de
    * plusieurs semaines reste équitable d'une semaine à l'autre. Absent : rien
    * ne s'ajoute.
    */
@@ -94,8 +105,12 @@ export type PlannedAssignment = {
 /** Plafond des tours d'amélioration (chacun améliore strictement : le calcul s'arrête toujours bien avant). */
 export const PLANNER_MAX_PASSES = 20;
 
-/** Mesure du coût d'un calcul : tours d'amélioration joués, essais jugés. */
-export type PlannerStats = { passes: number; trials: number };
+/**
+ * Mesure du coût d'un calcul : tours d'amélioration joués, essais jugés, et
+ * `checks`, le travail des questions d'éligibilité (une par question, plus une
+ * par place du membre parcourue) — ce que coûtent construction et échanges.
+ */
+export type PlannerStats = { passes: number; trials: number; checks: number };
 
 export function exclusionKey(entryKey: string, userId: number, role: PlanningRole): string {
   return `${entryKey}|${userId}|${role}`;
@@ -115,7 +130,7 @@ export function slotsOverlap(a: { startAt: number; endAt: number }, b: { startAt
   return a.startAt < b.endAt && b.startAt < a.endAt;
 }
 
-type Placement = { entryKey: string; userId: number; role: PlanningRole; locked: boolean };
+type Placement = { entryKey: string; userId: number; role: PlanningRole; locked: boolean; provisional?: boolean };
 
 /** Valeur d'un planning, ou d'une partie : `[cumuls, préférences non servies, Σ charges², historique]` (plus petit = meilleur). */
 type Score = [number, number, number, number];
@@ -134,7 +149,7 @@ function dropFrom<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 /**
- * État du calcul, indexé (par entrée, par membre, charge par semaine) : chaque
+ * État du calcul, indexé (par entrée, chevauchements, charge par semaine) : chaque
  * question du calcul se pose sans parcourir tout le planning, et un essai se
  * juge sur la seule partie du planning qu'il touche ({@link PlannerState.localScore}).
  */
@@ -148,17 +163,21 @@ class PlannerState {
   /** `userId|role` → entrées préférées (triées). */
   private readonly preferences = new Map<string, string[]>();
   private readonly byEntry = new Map<string, Placement[]>();
-  private readonly byUser = new Map<number, Placement[]>();
+  /** Entrée → clés des autres entrées dont le créneau chevauche le sien. */
+  private readonly overlapping = new Map<string, string[]>();
   private readonly loads = new Map<string, number>();
   /** Membre → semaine → places verrouillées (figé par {@link PlannerState.freezeHistory}). */
   private readonly lockedWeeks = new Map<number, Map<number, number>>();
   private readonly historyCache = new Map<string, number>();
   /** Essais jugés (chaque {@link PlannerState.localScore}) : la mesure du coût du calcul. */
   trials = 0;
+  /** Travail des questions d'éligibilité ({@link PlannerState.eligible}). */
+  checks = 0;
 
   constructor(readonly input: PlannerInput) {
     this.entries = new Map(input.entries.map((entry) => [entry.key, entry]));
     for (const entry of input.entries) this.weeks.set(entry.key, planningWeekStart(entry.startAt));
+    this.indexOverlaps(input.entries);
     for (const row of input.availability) {
       this.availability.set(exclusionKey(row.entryKey, row.userId, row.role), row);
       pushTo(this.offered, `${row.entryKey}|${row.role}`, row.userId);
@@ -166,6 +185,20 @@ class PlannerState {
     }
     for (const [key, ids] of this.offered) this.offered.set(key, [...new Set(ids)].sort((x, y) => x - y));
     for (const list of this.preferences.values()) list.sort((x, y) => x.localeCompare(y));
+  }
+
+  /** Chevauchements, par un balayage dans l'ordre des débuts (sans comparer toutes les paires). */
+  private indexOverlaps(entries: readonly PlannerEntry[]): void {
+    const sorted = [...entries].sort((a, b) => a.startAt - b.startAt || a.key.localeCompare(b.key));
+    for (let i = 0; i < sorted.length; i += 1) {
+      const a = sorted[i];
+      for (let j = i + 1; j < sorted.length && sorted[j].startAt < a.endAt; j += 1) {
+        const b = sorted[j];
+        if (a.key === b.key || !slotsOverlap(a, b)) continue;
+        pushTo(this.overlapping, a.key, b.key);
+        pushTo(this.overlapping, b.key, a.key);
+      }
+    }
   }
 
   entry(key: string): PlannerEntry | undefined {
@@ -196,8 +229,8 @@ class PlannerState {
     return this.preferences.get(`${userId}|${role}`) ?? [];
   }
 
-  place(entryKey: string, userId: number, role: PlanningRole, locked: boolean): Placement {
-    const placement = { entryKey, userId, role, locked };
+  place(entryKey: string, userId: number, role: PlanningRole, locked: boolean, provisional = false): Placement {
+    const placement: Placement = provisional ? { entryKey, userId, role, locked, provisional } : { entryKey, userId, role, locked };
     this.restore(placement);
     return placement;
   }
@@ -206,7 +239,6 @@ class PlannerState {
   restore(placement: Placement): void {
     this.placements.add(placement);
     pushTo(this.byEntry, placement.entryKey, placement);
-    pushTo(this.byUser, placement.userId, placement);
     const load = `${this.weekOf(placement.entryKey)}|${placement.userId}`;
     this.loads.set(load, (this.loads.get(load) ?? 0) + 1);
   }
@@ -214,7 +246,6 @@ class PlannerState {
   remove(placement: Placement): void {
     if (!this.placements.delete(placement)) return;
     dropFrom(this.byEntry, placement.entryKey, placement);
-    dropFrom(this.byUser, placement.userId, placement);
     const load = `${this.weekOf(placement.entryKey)}|${placement.userId}`;
     this.loads.set(load, (this.loads.get(load) ?? 1) - 1);
   }
@@ -225,14 +256,15 @@ class PlannerState {
 
   /** Le membre peut-il prendre ce rôle de cette entrée, dans l'état courant ? */
   eligible(entry: PlannerEntry, userId: number, role: PlanningRole): boolean {
+    this.checks += 1;
     if (this.availability.get(exclusionKey(entry.key, userId, role))?.status !== "AVAILABLE") return false;
     if (!(this.input.members.get(userId) ?? []).includes(role)) return false;
     if (this.input.excluded.has(exclusionKey(entry.key, userId, role))) return false;
     if (this.rolesOn(entry.key, userId).some((held) => held === role || rolesConflict(held, role))) return false;
-    return !(this.byUser.get(userId) ?? []).some((p) => {
-      if (p.entryKey === entry.key) return false;
-      const other = this.entry(p.entryKey);
-      return other !== undefined && slotsOverlap(entry, other);
+    // Les seules entrées qui la chevauchent (indexées) : le coût ne croît pas avec le lot.
+    return !(this.overlapping.get(entry.key) ?? []).some((other) => {
+      this.checks += 1;
+      return this.on(other).some((p) => p.userId === userId);
     });
   }
 
@@ -240,10 +272,10 @@ class PlannerState {
     return (this.offered.get(`${entry.key}|${role}`) ?? []).filter((userId) => this.eligible(entry, userId, role));
   }
 
-  /** Une fois les places verrouillées posées : leur charge par semaine, pour l'historique. */
+  /** Une fois les places verrouillées posées : leur charge par semaine, pour l'historique (propositions provisoires exclues). */
   freezeHistory(): void {
     for (const p of this.placements) {
-      if (!p.locked) continue;
+      if (!p.locked || p.provisional === true) continue;
       const weeks = this.lockedWeeks.get(p.userId) ?? new Map<number, number>();
       const week = this.weekOf(p.entryKey);
       weeks.set(week, (weeks.get(week) ?? 0) + 1);
@@ -549,7 +581,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
   );
   for (const row of lockedRows) {
     if (state.entry(row.entryKey) && !state.held(row.entryKey, row.role).includes(row.userId)) {
-      state.place(row.entryKey, row.userId, row.role, true);
+      state.place(row.entryKey, row.userId, row.role, true, row.provisional === true);
     }
   }
   state.freezeHistory();
@@ -566,6 +598,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
   if (stats) {
     stats.passes = passes;
     stats.trials = state.trials;
+    stats.checks = state.checks;
   }
   const order = new Map(PLANNING_ROLES.map((role, index) => [role, index]));
   return [...state.placements]

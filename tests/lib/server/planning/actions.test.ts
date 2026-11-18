@@ -37,11 +37,42 @@ const connection = connectionMock();
 const { execute } = connection;
 const staff = authUser({ id: 9, roles: ["ARBITRE"] });
 const prod = authUser({ id: 6, roles: ["PROD"] });
-const READY_AT = new Date("2026-11-16T19:00:00Z");
 
-/** Ligne `bg_matches` que lit l'instantané d'arbitrage (`match-restore.ts`). */
-function matchRow(overrides: Record<string, unknown> = {}) {
-  return { tournament_id: 10, referee_user_id: null, referee_ready_at: null, self_managed: 0, status: "READY", ...overrides };
+const CREATED_AT = new Date("2026-11-16T19:00:00Z");
+const EVENT_ID = 77;
+
+/** Ligne `bg_planning_assignments` telle que la lit l'instantané d'un geste (`planning-undo.ts`). */
+function assignmentRow(overrides: Record<string, unknown> = {}) {
+  return {
+    entry_key: "m:1",
+    user_id: 7,
+    role: "REFEREE",
+    tournament_id: 10,
+    match_id: 1,
+    source: "MANUAL",
+    reason: "MANUAL",
+    confirmed: 1,
+    assigned_by_user_id: 9,
+    created_at: CREATED_AT,
+    ...overrides,
+  };
+}
+
+/** Base simulée : instantané des lignes, arbitre relu du match, identifiant d'évènement. */
+function routeSql(options: { rows?: Record<string, unknown>[]; matchReferee?: number | null } = {}) {
+  execute.mockImplementation(async (sql: string) => {
+    if (sql.startsWith("SELECT entry_key")) return [options.rows ?? [], []];
+    if (sql.includes("SELECT referee_user_id FROM bg_matches")) {
+      return [[{ referee_user_id: options.matchReferee ?? null }], []];
+    }
+    if (sql.includes("INSERT INTO bg_planning_events")) return [{ affectedRows: 1, insertId: EVENT_ID }];
+    return [{ affectedRows: 1 }];
+  });
+}
+
+/** Les requêtes jouées qui contiennent `fragment`. */
+function callsWith(fragment: string) {
+  return execute.mock.calls.filter(([sql]) => sql.includes(fragment));
 }
 
 beforeEach(() => {
@@ -55,6 +86,8 @@ beforeEach(() => {
   jest.mocked(withNamedLock).mockImplementation(<T>(_pool: unknown, _name: string, _seconds: number, run: (c: PoolConnection) => Promise<T>) =>
     run(fakeConnection(connection)),
   );
+  routeSql();
+  jest.spyOn(console, "error").mockImplementation(() => undefined);
   jest.mocked(loadEntryPlayers).mockResolvedValue(new Map());
   jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
   jest.mocked(writeSoloCaster).mockResolvedValue(undefined);
@@ -161,14 +194,17 @@ describe("setManualAssignment — pose", () => {
     );
   });
 
-  it("setManualAssignment_matchReferee_callsAssignMatchReferee", async () => {
+  it("setManualAssignment_matchReferee_planningCommittedBeforeDesignation", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    jest.mocked(assignMatchReferee).mockImplementation(async () => {
+      expect(connection.commit).toHaveBeenCalledTimes(1);
+    });
 
     await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
 
     expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, 7);
-    expect(execute.mock.calls[0][0]).toContain("FROM bg_matches WHERE id = ?");
-    expect(execute.mock.calls[1][0]).toContain("DELETE FROM bg_planning_assignments");
+    expect(callsWith("role = 'REFEREE' AND user_id <> ?")[0][1]).toEqual(["m:1", 3]);
+    expect(callsWith("UPDATE bg_matches")).toEqual([]);
   });
 
   it("setManualAssignment_tournamentCaster_writesManualConfirmed", async () => {
@@ -178,7 +214,7 @@ describe("setManualAssignment — pose", () => {
     await setManualAssignment(staff, { entryKey: "t:10", role: "CASTER", userId: 4, assigned: true });
 
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(execute.mock.calls[0][1]).toEqual(["t:10", 4, "CASTER", 10, null, "MANUAL", "MANUAL", 1, 9]);
+    expect(callsWith("INSERT INTO bg_planning_assignments")[0][1]).toEqual(["t:10", 4, "CASTER", 10, null, "MANUAL", "MANUAL", 1, 9]);
     expect(connection.commit).toHaveBeenCalled();
   });
 
@@ -220,49 +256,62 @@ describe("setManualAssignment — pose", () => {
 
     await setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true });
 
-    expect(execute.mock.calls[0][0]).toContain("source = 'AUTO' AND confirmed = 0");
-    expect(execute.mock.calls[0][1]).toEqual(["m:2", 4, "CASTER"]);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", "MANUAL", 1, 9]);
+    expect(callsWith("source = 'AUTO' AND confirmed = 0")[0][1]).toEqual(["m:2", 4, "CASTER"]);
+    expect(callsWith("INSERT INTO bg_planning_assignments")[0][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", "MANUAL", 1, 9]);
   });
 
-  it("setManualAssignment_writeFailsAfterRefereeMoved_previousStateRestoredBySnapshot", async () => {
+  it("setManualAssignment_designationRefused_planningRowsAndEventUndone", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
-    execute
-      .mockResolvedValueOnce([[matchRow({ referee_user_id: 7, referee_ready_at: READY_AT })], []])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    routeSql({ rows: [assignmentRow()], matchReferee: 7 });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("REFEREE_CHANGED"));
 
     await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
-      "ER_LOCK_DEADLOCK",
+      "REFEREE_CHANGED",
     );
-    expect(connection.rollback).toHaveBeenCalled();
-    expect(assignMatchReferee).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[3][0]).toContain("UPDATE bg_matches SET referee_user_id = ?");
-    expect(execute.mock.calls[3][1]).toEqual([7, READY_AT, 0, 1, 3, "READY"]);
+    expect(callsWith("DELETE FROM bg_planning_assignments WHERE entry_key IN")[0][1]).toEqual(["m:1"]);
+    expect(callsWith("INSERT IGNORE INTO bg_planning_assignments")[0][1]).toEqual([
+      "m:1", 7, "REFEREE", 10, 1, "MANUAL", "MANUAL", 1, 9, CREATED_AT,
+    ]);
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID]);
+    expect(callsWith("UPDATE bg_matches")).toEqual([]);
   });
 
-  it("setManualAssignment_selfManagedMatchWriteFails_selfManagementRestored", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], members }));
-    execute
-      .mockResolvedValueOnce([[matchRow({ self_managed: 1 })], []])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
-
-    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
-      "ER_LOCK_DEADLOCK",
-    );
-    expect(execute.mock.calls[3][1]).toEqual([null, null, 1, 1, 3, "READY"]);
-  });
-
-  it("setManualAssignment_assignMatchRefereeThrows_restoreAttempted", async () => {
+  it("setManualAssignment_panneButMatchHasNewReferee_planningKept", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
-    execute.mockResolvedValueOnce([[matchRow({ referee_user_id: 7 })], []]);
+    routeSql({ rows: [assignmentRow()], matchReferee: 3 });
     jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("PUBLISH_FAILED"));
 
     await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
       "PUBLISH_FAILED",
     );
-    expect(execute.mock.calls[2][0]).toContain("referee_user_id <=> ?");
+    expect(callsWith("INSERT IGNORE")).toEqual([]);
+    expect(callsWith("DELETE FROM bg_planning_events")).toEqual([]);
+  });
+
+  it("setManualAssignment_panneMatchUnchanged_planningUndone", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ rows: [assignmentRow()], matchReferee: 7 });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
+      "ER_LOCK_DEADLOCK",
+    );
+    expect(callsWith("INSERT IGNORE")).toHaveLength(1);
+  });
+
+  it("setManualAssignment_planningBlockFails_matchNeverTouched", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.startsWith("SELECT entry_key")) return [[], []];
+      if (sql.includes("INSERT INTO bg_planning_assignments")) throw new Error("ER_LOCK_DEADLOCK");
+      return [{ affectedRows: 1 }];
+    });
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
+      "ER_LOCK_DEADLOCK",
+    );
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(assignMatchReferee).not.toHaveBeenCalled();
   });
 
   it("setManualAssignment_overlappingCastSignup_throwsOverlapManaged", async () => {
@@ -311,7 +360,7 @@ describe("setManualAssignment — retrait", () => {
     await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: false });
 
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "REMOVED", "MANUAL", 9]);
+    expect(callsWith("INSERT INTO bg_planning_events")[0][1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "REMOVED", "MANUAL", 9]);
   });
 
   it("unassign_confirmedMatchReferee_releasesOnMatch", async () => {
@@ -322,18 +371,27 @@ describe("setManualAssignment — retrait", () => {
     expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, null, 3);
   });
 
-  it("unassign_writeFailsAfterRelease_restoredWithNullCas", async () => {
+  it("unassign_designationRefused_rowRestoredRemovalEventErased", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 3 })] }));
-    execute
-      .mockResolvedValueOnce([[matchRow({ referee_user_id: 3, referee_ready_at: READY_AT })], []])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    routeSql({ rows: [assignmentRow({ user_id: 3 })], matchReferee: 3 });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("REFEREE_CHANGED"));
 
     await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: false })).rejects.toThrow(
-      "ER_LOCK_DEADLOCK",
+      "REFEREE_CHANGED",
     );
-    expect(assignMatchReferee).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[3][1]).toEqual([3, READY_AT, 0, 1, null, "READY"]);
+    expect(callsWith("INSERT IGNORE INTO bg_planning_assignments")[0][1]).toEqual(expect.arrayContaining(["m:1", 3, "REFEREE"]));
+    expect(callsWith("DELETE FROM bg_planning_events")[0][1]).toEqual([EVENT_ID]);
+  });
+
+  it("unassign_panneAfterRelease_matchWithoutReferee_planningKept", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 3 })] }));
+    routeSql({ rows: [assignmentRow({ user_id: 3 })], matchReferee: null });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("PUBLISH_FAILED"));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: false })).rejects.toThrow(
+      "PUBLISH_FAILED",
+    );
+    expect(callsWith("INSERT IGNORE")).toEqual([]);
   });
 });
 

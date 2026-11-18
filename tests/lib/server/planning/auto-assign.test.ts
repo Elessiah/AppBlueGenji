@@ -44,9 +44,30 @@ import { connectionMock, fakeConnection, fakePool } from "../../../helpers/sql-d
 const connection = connectionMock();
 const { execute } = connection;
 
+/** Base simulée : arbitres en attente (`confirmPendingReferees`), lignes touchées, requête en panne. */
+type SqlRoute = { pending?: Record<string, unknown>[]; affected?: number; deleted?: number; failOn?: string };
+
+function routeSql(route: SqlRoute = {}) {
+  execute.mockImplementation(async (sql: string) => {
+    if (route.failOn !== undefined && sql.includes(route.failOn)) throw new Error("ER_LOCK_DEADLOCK");
+    if (sql.includes("SELECT a.entry_key")) return [route.pending ?? [], []];
+    if (sql.includes("INSERT INTO bg_planning_events")) return [{ affectedRows: 1, insertId: 1 }];
+    if (sql.startsWith("DELETE") && route.deleted !== undefined) return [{ affectedRows: route.deleted }];
+    return [{ affectedRows: route.affected ?? 1 }];
+  });
+}
+
+/** Une proposition d'arbitre provisoire que le match porte déjà (lue en base). */
+const PENDING_ON_MATCH = { entry_key: "m:1", user_id: 3, tournament_id: 10, match_id: 1 };
+
+/** Paramètres des écritures jouées (la lecture des arbitres en attente exclue). */
+function writeParams(): unknown[] {
+  return execute.mock.calls.filter(([sql]) => !sql.includes("SELECT a.entry_key")).map(([, params]) => params);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  execute.mockResolvedValue([{ affectedRows: 0 }]);
+  routeSql();
   connection.beginTransaction.mockResolvedValue(undefined);
   connection.commit.mockResolvedValue(undefined);
   connection.rollback.mockResolvedValue(undefined);
@@ -62,7 +83,7 @@ beforeEach(() => {
 
 /** Requêtes jouées, réduites à leur début (le verbe et la table). */
 function statements(): string[] {
-  return execute.mock.calls.map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
+  return execute.mock.calls.filter(([sql]) => !sql.includes("SELECT a.entry_key")).map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
 
 describe("batchEntries / entriesToConfirm", () => {
@@ -105,7 +126,7 @@ describe("preparePlanner", () => {
 
     const input = preparePlanner(data, [inside], new Map(), new Set());
 
-    expect(input.locked).toEqual([{ entryKey: "m:2", userId: 2, role: "CASTER", reason: "LOAD" }]);
+    expect(input.locked).toEqual([{ entryKey: "m:2", userId: 2, role: "CASTER", reason: "LOAD", provisional: true }]);
     expect(input.entries.map((entry) => [entry.key, entry.open])).toEqual([
       ["m:1", true],
       ["m:2", false],
@@ -171,7 +192,17 @@ describe("runAutoAssign", () => {
     const report = await runAutoAssign(9, { from: MONDAY + 100 * HOUR_MS, to: MONDAY + 120 * HOUR_MS }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ entries: 0, proposed: 0, replaced: 0 });
-    expect(execute).not.toHaveBeenCalled();
+    expect(statements()).toEqual([]);
+  });
+
+  it("runAutoAssign_emptyBatchWithPendingReferee_healedInTransaction", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
+    routeSql({ pending: [PENDING_ON_MATCH] });
+
+    await runAutoAssign(9, { from: MONDAY + 100 * HOUR_MS, to: MONDAY + 120 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(statements()).toEqual(["UPDATE bg_planning_assignments SET confi", "INSERT INTO bg_planning_events (entry_ke"]);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
   it("runAutoAssign_deletesProvisionalOfBatchThenInsertsAuto", async () => {
@@ -182,7 +213,7 @@ describe("runAutoAssign", () => {
         members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
       }),
     );
-    execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
+    routeSql({ deleted: 2 });
 
     const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
 
@@ -192,8 +223,7 @@ describe("runAutoAssign", () => {
       "INSERT INTO bg_planning_assignments (ent",
       "INSERT INTO bg_planning_events (entry_ke",
     ]);
-    expect(execute.mock.calls[0][0]).toContain("source = 'AUTO' AND confirmed = 0");
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "AUTO", "LOAD", 0, 9]);
+    expect(writeParams()[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "AUTO", "LOAD", 0, 9]);
   });
 
   it("runAutoAssign_pendingRefereeOnMatch_confirmedBeforeDelete", async () => {
@@ -203,6 +233,7 @@ describe("runAutoAssign", () => {
         assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
       }),
     );
+    routeSql({ pending: [PENDING_ON_MATCH] });
 
     await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
 
@@ -263,6 +294,7 @@ describe("runAutoAssign", () => {
       }),
     );
     jest.mocked(loadEntryPlayers).mockResolvedValue(new Map([["m:2", new Set([3])]]));
+    routeSql({ deleted: 0 });
 
     const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + HOUR_MS / 4 }, MONDAY - HOUR_MS);
 
@@ -292,7 +324,7 @@ describe("runAutoAssign", () => {
         members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
       }),
     );
-    execute.mockResolvedValueOnce([{ affectedRows: 1 }]).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    routeSql({ failOn: "INSERT INTO bg_planning_assignments" });
 
     await expect(runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS)).rejects.toThrow(
       "ER_LOCK_DEADLOCK",
@@ -361,9 +393,23 @@ describe("confirmAssignments", () => {
     const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
-    expect(execute.mock.calls[0][1]).toEqual(["m:1", 4, "CASTER"]);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "CONFIRMED", "AUTO", 9]);
+    expect(writeParams()).toEqual([
+      ["m:1", 4, "CASTER"],
+      ["m:1", 4, "CASTER", 10, 1, "CONFIRMED", "AUTO", 9],
+    ]);
     expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_alreadyConfirmedByEarlierRun_noEventNotCounted", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+    routeSql({ affected: 0 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 0 });
+    expect(statements()).toEqual(["UPDATE bg_planning_assignments SET confi"]);
   });
 
   it("confirmAssignments_matchReferee_appliedViaAssignMatchReferee", async () => {
@@ -375,6 +421,19 @@ describe("confirmAssignments", () => {
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
     expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, null);
+  });
+
+  it("confirmAssignments_matchReferee_confirmedOnlyIfMatchStillHasHim", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    routeSql({ affected: 0 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 0 });
+    expect(execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE"))?.[0]).toContain("EXISTS (SELECT 1 FROM bg_matches");
+    expect(writeParams()).toEqual([["m:1", 3, 1, 3]]);
   });
 
   it("confirmAssignments_refereeRefused_rowDeletedRemovedEventCounted", async () => {
@@ -390,7 +449,7 @@ describe("confirmAssignments", () => {
       "DELETE FROM bg_planning_assignments WHER",
       "INSERT INTO bg_planning_events (entry_ke",
     ]);
-    expect(execute.mock.calls[1][1]).toContain("REMOVED");
+    expect(writeParams()[1]).toContain("REMOVED");
     expect(connection.commit).toHaveBeenCalled();
   });
 
@@ -401,7 +460,7 @@ describe("confirmAssignments", () => {
     jest.mocked(assignMatchReferee).mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
 
     await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
-    expect(execute).not.toHaveBeenCalled();
+    expect(statements()).toEqual([]);
   });
 
   it("confirmAssignments_pendingRefereeAlreadyOnMatch_healedWithoutMatchCall", async () => {
@@ -411,13 +470,33 @@ describe("confirmAssignments", () => {
         assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
       }),
     );
+    routeSql({ pending: [PENDING_ON_MATCH] });
 
     const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(execute.mock.calls[0][1]).toEqual(["m:1", 3]);
-    expect(execute.mock.calls[1][1]).toContain("CONFIRMED");
+    expect(writeParams()[0]).toEqual(["m:1", 3, 1, 3]);
+    expect(writeParams()[1]).toContain("CONFIRMED");
+  });
+
+  it("confirmAssignments_pendingRefereeMovedMeanwhile_noEvent", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [first] }));
+    routeSql({ pending: [PENDING_ON_MATCH], affected: 0 });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 0 });
+    expect(statements()).toEqual(["UPDATE bg_planning_assignments SET confi"]);
+  });
+
+  it("confirmAssignments_pendingRefereeOfUnloadedEntry_healedFromRow", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [] }));
+    routeSql({ pending: [{ entry_key: "m:42", user_id: 3, tournament_id: 11, match_id: 42 }] });
+
+    await confirmAssignments(9, { entryKeys: [] }, MONDAY - HOUR_MS);
+
+    expect(writeParams()[1]).toEqual(["m:42", 3, "REFEREE", 11, 42, "CONFIRMED", "AUTO", 9]);
   });
 
   it("confirmAssignments_pendingRefereeOnStartedMatch_healed", async () => {
@@ -427,6 +506,7 @@ describe("confirmAssignments", () => {
         assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })],
       }),
     );
+    routeSql({ pending: [PENDING_ON_MATCH] });
 
     const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
@@ -449,11 +529,32 @@ describe("confirmAssignments", () => {
 
     await expect(confirmAssignments(9, { entryKeys: ["m:1", "m:2"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([
-      ["m:1", 3, "REFEREE"],
+    expect(writeParams()).toEqual([
+      ["m:1", 3, 1, 3],
       ["m:1", 3, "REFEREE", 10, 1, "CONFIRMED", "AUTO", 9],
+      ["m:2", 4, "CASTER"],
+      ["m:2", 4, "CASTER", 10, 2, "CONFIRMED", "AUTO", 9],
     ]);
     expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_writeFailsAfterDesignationPanne_originalPanneThrown", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [first],
+        assignments: [
+          loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" }),
+          loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" }),
+        ],
+      }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    routeSql({ failOn: "UPDATE bg_planning_assignments" });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalled();
   });
 
   it("confirmAssignments_tournamentReferee_noMatchCall", async () => {

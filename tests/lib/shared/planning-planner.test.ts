@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import type { PlanningRole } from "@/lib/shared/planning";
-import { planAssignments, PLANNER_MAX_PASSES, rolesConflict, slotsOverlap, type PlannerStats } from "@/lib/shared/planning-planner";
+import { planAssignments, rolesConflict, slotsOverlap, type PlannerStats } from "@/lib/shared/planning-planner";
 import { available, HOUR_MS, MONDAY, plannerEntry, plannerInput } from "../../helpers/planning";
 
 /**
@@ -13,6 +13,37 @@ import { available, HOUR_MS, MONDAY, plannerEntry, plannerInput } from "../../he
 const REFEREE: PlanningRole[] = ["REFEREE"];
 const CASTER: PlanningRole[] = ["CASTER"];
 const PROD: PlanningRole[] = ["PROD"];
+
+// Bornes du travail d'un lot de 120 matchs : environ deux fois la valeur mesurée
+// (une régression de quelques fois se voit, une variation du calcul non).
+const TRIALS_BOUND_120 = 18_000;
+const CHECKS_BOUND_120 = 80_000;
+const TRIALS_BOUND_120_CROWDED = 60_000;
+const CHECKS_BOUND_120_CROWDED = 200_000;
+
+/** Lot de `size` matchs, quatre par soir ; `crowded` : chacun préfère les 20 mêmes dernières entrées (pire cas des échanges). */
+function batchInput(size: number, shape: "spread" | "crowded") {
+  const entries = Array.from({ length: size }, (_, i) =>
+    plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
+      endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
+    }),
+  );
+  const roles: PlanningRole[][] = [REFEREE, CASTER, PROD, ["REFEREE", "CASTER"], ["CASTER", "PROD"]];
+  const members = new Map<number, PlanningRole[]>(Array.from({ length: 25 }, (_, u) => [u + 1, roles[u % roles.length]]));
+  const availability = entries.flatMap((entry, i) =>
+    [...members].flatMap(([userId, held]) => {
+      if (shape === "crowded") return held.map((role) => available(entry.key, userId, role, { preferred: i >= size - 20 }));
+      return (i + userId) % 3 === 0
+        ? []
+        : held.map((role) => available(entry.key, userId, role, { preferred: (i * 7 + userId) % 11 === 0 }));
+    }),
+  );
+  return plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) });
+}
+
+function emptyStats(): PlannerStats {
+  return { passes: 0, trials: 0, checks: 0 };
+}
 
 /** Les propositions réduites à « qui, quel rôle, où ». */
 function picks(result: ReturnType<typeof planAssignments>) {
@@ -384,48 +415,37 @@ describe("planAssignments — amélioration globale", () => {
     ]);
   });
 
-  it("planAssignments_monthBatch120Entries_trialsBounded", () => {
-    const entries = Array.from({ length: 120 }, (_, i) =>
-      plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
-        endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
-      }),
-    );
-    const roles: PlanningRole[][] = [REFEREE, CASTER, PROD, ["REFEREE", "CASTER"], ["CASTER", "PROD"]];
-    const members = new Map<number, PlanningRole[]>(Array.from({ length: 25 }, (_, u) => [u + 1, roles[u % roles.length]]));
-    const availability = entries.flatMap((entry, i) =>
-      [...members].flatMap(([userId, held]) =>
-        (i + userId) % 3 === 0
-          ? []
-          : held.map((role) => available(entry.key, userId, role, { preferred: (i * 7 + userId) % 11 === 0 })),
-      ),
-    );
-    const stats: PlannerStats = { passes: 0, trials: 0 };
+  it("planAssignments_monthBatch120Entries_workBounded", () => {
+    const stats = emptyStats();
 
-    const result = planAssignments(plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) }), stats);
+    const result = planAssignments(batchInput(120, "spread"), stats);
 
     expect(result.length).toBeGreaterThan(120);
-    expect(stats.passes).toBeLessThanOrEqual(PLANNER_MAX_PASSES);
-    expect(stats.trials).toBeLessThan(20_000);
+    expect(stats.passes).toBeGreaterThan(0);
+    expect(stats.trials).toBeLessThan(TRIALS_BOUND_120);
+    expect(stats.checks).toBeLessThan(CHECKS_BOUND_120);
   });
 
-  it("planAssignments_everyonePrefersTheSameFewEntries_trialsBounded", () => {
-    // Pire cas des échanges : chacun préfère les 20 mêmes entrées, que peu tiennent.
-    const entries = Array.from({ length: 120 }, (_, i) =>
-      plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
-        endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
-      }),
-    );
-    const roles: PlanningRole[][] = [REFEREE, CASTER, PROD, ["REFEREE", "CASTER"], ["CASTER", "PROD"]];
-    const members = new Map<number, PlanningRole[]>(Array.from({ length: 25 }, (_, u) => [u + 1, roles[u % roles.length]]));
-    const availability = entries.flatMap((entry, i) =>
-      [...members].flatMap(([userId, held]) => held.map((role) => available(entry.key, userId, role, { preferred: i >= 100 }))),
-    );
-    const stats: PlannerStats = { passes: 0, trials: 0 };
+  it("planAssignments_everyonePrefersTheSameFewEntries_workBounded", () => {
+    const stats = emptyStats();
 
-    planAssignments(plannerInput({ entries, availability, members, soloCasterIds: new Set([2, 7]) }), stats);
+    planAssignments(batchInput(120, "crowded"), stats);
 
-    expect(stats.passes).toBeLessThanOrEqual(PLANNER_MAX_PASSES);
-    expect(stats.trials).toBeLessThan(60_000);
+    expect(stats.trials).toBeLessThan(TRIALS_BOUND_120_CROWDED);
+    expect(stats.checks).toBeLessThan(CHECKS_BOUND_120_CROWDED);
+  });
+
+  it("planAssignments_doublingTheBatch_workGrowsAboutLinearly", () => {
+    // Un coût quadratique quadruplerait en doublant le lot : on tolère moins de trois fois.
+    for (const shape of ["spread", "crowded"] as const) {
+      const half = emptyStats();
+      const full = emptyStats();
+
+      planAssignments(batchInput(60, shape), half);
+      planAssignments(batchInput(120, shape), full);
+
+      expect(full.trials + full.checks).toBeLessThan(3 * (half.trials + half.checks));
+    }
   });
 
   it("planAssignments_historyWeek_lockedWorkOfEarlierBatchWeekTipsFairness", () => {
@@ -447,6 +467,27 @@ describe("planAssignments — amélioration globale", () => {
     const result = planAssignments(input);
 
     expect(result).toEqual([expect.objectContaining({ entryKey: "m:w2", userId: 2, historyLoad: 1 })]);
+  });
+
+  it("planAssignments_historyWeek_provisionalProposalsOfEarlierWeekIgnored", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:w1", 20), plannerEntry("m:w1b", 22), plannerEntry("m:w2", 7 * 24 + 20)],
+      availability: [available("m:w2", 1, "REFEREE"), available("m:w2", 2, "REFEREE")],
+      members: new Map([
+        [1, REFEREE],
+        [2, REFEREE],
+      ]),
+      locked: [
+        { entryKey: "m:w1", userId: 1, role: "REFEREE", reason: "LOAD", provisional: true },
+        { entryKey: "m:w1b", userId: 1, role: "REFEREE", reason: "LOAD", provisional: true },
+      ],
+      history: new Map([[2, 1]]),
+      historyWeek: MONDAY,
+    });
+
+    const result = planAssignments(input);
+
+    expect(result).toEqual([expect.objectContaining({ entryKey: "m:w2", userId: 1, historyLoad: 0 })]);
   });
 
   it("planAssignments_noHistoryWeek_earlierWeeksIgnored", () => {
