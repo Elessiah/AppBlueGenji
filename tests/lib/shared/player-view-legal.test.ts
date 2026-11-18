@@ -32,7 +32,7 @@ function paragraphAround(path: string, marker: string): string {
 describe("historique des changements", () => {
   it("privacyChanges_playerViewEntry_followedByPlanningAndDated", () => {
     expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
-    // Suivie du planning des casts et arbitres (CAST-PLANNING, 2026-11-21).
+    // Suivie du planning des casts et arbitres (CAST-PLANNING, 2026-11-20).
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe("2026-11-planning-casts-arbitres");
     expect(frEntry()?.publishedAt).toBe("2026-11-20");
     expect(REGISTER_UPDATED_AT >= "2026-11-20").toBe(true);

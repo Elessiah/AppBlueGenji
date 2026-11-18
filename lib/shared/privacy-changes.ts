@@ -2223,7 +2223,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // peut recevoir un rôle. Datée du lendemain de la mise en ligne prévue,
     // comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
     id: "2026-11-planning-casts-arbitres",
-    publishedAt: "2026-11-21",
+    publishedAt: "2026-11-20",
     title: "Planning des casts et arbitres",
     links: [{ href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" }],
     summary: `Les arbitres, casters et prods (nouveau rôle de plateforme) disposent d'une page « Planning » : ils y donnent leurs disponibilités et leurs préférences, créneau par créneau, et le staff des tournois y attribue qui couvre chaque match. Ces données sont gardées ${PLANNING_RETENTION_DAYS} jours après le début du créneau ; le réglage « caster autonome », tant que le compte tient le rôle caster.`,
