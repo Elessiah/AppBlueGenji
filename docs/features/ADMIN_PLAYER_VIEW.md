@@ -130,11 +130,23 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
 ## RGPD
 
 La colonne ne sert qu'à suspendre des droits, à la demande de la personne
-elle-même, et part avec la session : le registre (T05) cite la ligne pm2 de la
-bascule et l'échéance portée par la session ; `/rgpd` (FR et EN) l'ajoute aux
-traces nommées du staff dans les journaux du serveur. Pas d'entrée
-`PRIVACY_CHANGES` : rien ne change pour un joueur, et le membre du staff fait
-lui-même le geste (décision à confirmer à la revue juridique).
+elle-même, et part avec la session (déconnexion, purge des sessions échues,
+suppression du compte) ; une échéance passée reste sur la ligne, sans effet,
+jusque-là. Tout titulaire d'un rôle de plateforme, développeur compris (qui
+n'est pas du staff), peut basculer : les textes disent « rôle de plateforme »,
+jamais « staff » seul.
+
+- Registre : T01 décrit l'échéance parmi les données de la session ; T05 décrit
+  la bascule (sous-finalité « Vue joueur »), la ligne pm2 (pseudo, identifiant,
+  sens), la mémoire du plafond (`PLAYER_VIEW_TOGGLE_RULE`) et des reconnexions
+  (`session-streams`), la base (intérêt légitime) et les développeurs parmi les
+  personnes concernées.
+- `/rgpd` (FR et EN) : paragraphe des journaux du staff (base, opposition),
+  note sur ce qui survit à la suppression (bascules dans les deux sens),
+  paragraphe du cookie de session (l'échéance portée par la session).
+- `PRIVACY_CHANGES` : entrée `2026-11-vue-joueur-du-staff` (FR et EN, tous les
+  comptes, comme les traces des rôles de plateforme), datée du 2026-11-20 avec
+  `REGISTER_UPDATED_AT`.
 
 ## Tests
 

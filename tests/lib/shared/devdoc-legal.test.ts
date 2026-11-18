@@ -28,8 +28,8 @@ function rolesParagraph(path: string, marker: string): string {
 }
 
 describe("historique des changements", () => {
-  it("privacyChanges_rolesEntry_isLastAndDated", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
+  it("privacyChanges_rolesEntry_isListedAndDated", () => {
+    expect(frEntry()?.id).toBe(ENTRY_ID);
     expect(frEntry()?.publishedAt).toBe("2026-11-20");
     expect(frEntry()?.audience).toBeUndefined();
     expect(frEntry()?.asksTermsAcceptance).toBeUndefined();

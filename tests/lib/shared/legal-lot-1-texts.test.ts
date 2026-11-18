@@ -31,7 +31,7 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
     // les statistiques de fréquentation détaillées (STATS-PAGE, 2026-11-18), l'empreinte
     // perceptuelle des avatars bloqués (EF-72, 2026-11-19), « Tester mes MP » et
     // les rôles de plateforme (DEVDOC-PAGE, 2026-11-20).
-    expect(PRIVACY_CHANGES.at(-15)?.id).toBe(ID);
+    expect(PRIVACY_CHANGES.at(-16)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {

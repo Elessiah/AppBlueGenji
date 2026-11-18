@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
+import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { CyberButton } from "@/components/cyber";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TranslationNotice } from "@/components/legal/TranslationNotice";
@@ -312,7 +313,7 @@ export function RgpdEn({
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
           are deleted on request, and to the moderation alert for such an announcement blocked or flagged by AutoMod, which keeps your username — the staff is told of your request without you being named, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>);
-          for a staff member, their refereeing actions, the platform roles they granted or removed and their switches to player view remain named in the server logs, according to their
+          for a staff member, their refereeing actions and the platform roles they granted or removed, and, for any holder of a platform role (developer included), their switches into and out of player view, remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
@@ -502,7 +503,7 @@ export function RgpdEn({
               <strong>__Host-bg_session</strong> — httpOnly, sameSite=lax session cookie, lasting 30 days, set{" "}
               <strong>at login</strong>. It only contains a random token, which says nothing about you and allows
               you to be recognized on the platform; our servers only keep its hash (SHA-256), never the token
-              itself. It is deleted at logout. It replaces <strong>bg_session</strong>, which the site deletes if it
+              itself, with the session it opens (including, for an account holding a platform role that switches to player view, its deadline). It is deleted at logout. It replaces <strong>bg_session</strong>, which the site deletes if it
               still finds it.
             </li>
             <li>
@@ -1055,6 +1056,12 @@ export function RgpdEn({
             account concerned and the roles saved, on the basis of legitimate interest (administration of the
             platform), to which the person concerned may object (section{" "}
             <a href="#exercer-vos-droits">“Exercising your rights”</a>; <LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+            An account holding a platform role (developer included) can suspend its rights on one of its sessions to
+            see the site as a player (“player view”), for {PLAYER_VIEW_MAX_HOURS} hours at most: nothing is said about it on
+            Discord; the server logs keep its username, its identifier and the direction of the switch (on or off),
+            according to their rotation, on the basis of legitimate interest (administration of the platform), to which
+            its holder may object; the player-view deadline is noted on the session and is erased with it
+            (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A platform role is also shown as a title (administrator, referee…) on your player page, which any logged-in
             member reads, whatever your visibility settings; the developer role, which only opens reading the technical
             documentation of the site and the bot (published on GitHub), does not appear there (<LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>).

@@ -14,6 +14,7 @@
  */
 
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
+import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
@@ -1158,6 +1159,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What was inaccurate: the register only named, as the public of the player page, the data the player makes visible. Yet the title of a platform role always appears there, for any logged-in member. It disappears when the role is removed, and with the anonymization of a deleted account.",
       "The developer role, which is new, only opens reading the technical documentation of the site and the bot (published on GitHub): it gives access to no member data, is not part of the staff and does not appear on the player page. Granting or removing it is logged like the other roles: in the staff log on Discord naming no one, with its author, the account concerned and the roles saved in the server logs.",
       "What does not change: nothing new about you is collected, and what deleting the account removes stays the same.",
+    ],
+  },
+  "2026-11-vue-joueur-du-staff": {
+    linkLabels: ["Read record T05 of the register"],
+    title: "Player view: the staff can see the site as a player",
+    summary: `An account holding a platform role (staff member or developer) can suspend its rights on one of its sessions to see the site as a player, for ${PLAYER_VIEW_MAX_HOURS} hours at most. Each switch is noted, under its name, in the server logs.`,
+    details: [
+      "Nothing is said about it on Discord. In the server logs, each switch (on or off) leaves a line with the username and identifier of its author, according to their automatic rotation; basis: legitimate interest (administration of the platform), to which the person concerned may object.",
+      "The player-view deadline is noted on the login session and is erased with it (logout, end of the session or deletion of the account). For the time of the switch, the server keeps in memory only, never written, the account number, the time of the switches and the hash of the session.",
+      "What does not change: for a player without a platform role, nothing new is collected, and what deleting the account removes stays the same.",
     ],
   },
 };
