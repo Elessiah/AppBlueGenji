@@ -14,6 +14,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import {
   DM_TEST_BOT_UNREACHABLE,
+  DM_TEST_BUSY,
   DM_TEST_FAILED,
   DM_TEST_NOT_CERTIFIED,
   DM_TEST_NOT_LINKED,
@@ -24,6 +25,7 @@ const NOTHING_SENT: Readonly<Record<string, number>> = {
   PROFILE_NOT_FOUND: 404,
   [DM_TEST_NOT_LINKED]: 409,
   [DM_TEST_NOT_CERTIFIED]: 409,
+  [DM_TEST_BUSY]: 503,
 };
 
 export async function POST(req: Request) {
@@ -39,7 +41,7 @@ export async function POST(req: Request) {
   if (reservation.refused) return reservation.refused;
 
   try {
-    return ok({ outcome: await sendDiscordDmTest(user.id) });
+    return ok({ outcome: await sendDiscordDmTest(user.id, req.signal) });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     const status = NOTHING_SENT[code];

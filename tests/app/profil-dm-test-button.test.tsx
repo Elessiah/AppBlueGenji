@@ -139,8 +139,17 @@ describe("DiscordDmTestButton", () => {
     button(render(props)).onClick();
     await flush();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/profile/discord/dm-test", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/profile/discord/dm-test", expect.objectContaining({ method: "POST" }));
     expect(showSuccess).toHaveBeenCalledWith("dmTest.sent");
+  });
+
+  it("button_verified_postsWithAbortSignal", async () => {
+    fetchMock.mockResolvedValue(response(true, { outcome: "SENT" }));
+
+    button(render({ verified: true, onCertify: jest.fn() })).onClick();
+    await flush();
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("button_verifiedDoubleClick_postsOnce", async () => {

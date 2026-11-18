@@ -40,7 +40,7 @@ describe("POST /api/profile/discord/dm-test", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ outcome: "SENT" });
-    expect(sendDiscordDmTest).toHaveBeenCalledWith(7);
+    expect(sendDiscordDmTest).toHaveBeenCalledWith(7, expect.any(AbortSignal));
   });
 
   it("post_overLimit_returns429AfterThreeTries", async () => {
@@ -53,6 +53,15 @@ describe("POST /api/profile/discord/dm-test", () => {
     expect(response.status).toBe(429);
     expect(await response.json()).toEqual({ error: "TOO_MANY_REQUESTS" });
     expect(sendDiscordDmTest).toHaveBeenCalledTimes(3);
+  });
+
+  it("post_busy_returns503AndRefundsQuota", async () => {
+    jest.mocked(sendDiscordDmTest).mockRejectedValue(new Error("DISCORD_DM_TEST_BUSY"));
+    for (let i = 0; i < 5; i += 1) {
+      const response = await POST(sameSite());
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
+    }
   });
 
   it("post_notCertified_returns409AndRefundsQuota", async () => {

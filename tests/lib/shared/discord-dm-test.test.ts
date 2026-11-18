@@ -69,6 +69,12 @@ describe("dmTestOutcomeToast", () => {
   });
 });
 
+describe("dmTestErrorToast busy", () => {
+  it("dmTestErrorToast_busy_saysBotUnreachable", () => {
+    expect(dmTestErrorToast("DISCORD_DM_TEST_BUSY")).toEqual({ tone: "error", key: "botUnreachable" });
+  });
+});
+
 describe("dmTestErrorToast", () => {
   it("dmTestErrorToast_notCertified_returnsNull", () => {
     expect(dmTestErrorToast("DISCORD_NOT_CERTIFIED")).toBeNull();

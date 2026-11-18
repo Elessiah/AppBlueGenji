@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { InfoHint } from "@/components/ui/info-hint";
@@ -61,6 +61,9 @@ export function DiscordDmTestButton({
   const { showError, showSuccess } = useToast();
   const { busy, run, whenIdle } = useBusyGuard();
   const [warnOpen, setWarnOpen] = useState(false);
+  // Quitter la page abandonne la requête en vol (le serveur ne tient plus l'appel au bot).
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
 
   const show = (toast: DmTestToast) => {
     const message = t(`dmTest.${toast.key}`, { max: String(DM_TEST_HOURLY_LIMIT) });
@@ -71,9 +74,12 @@ export function DiscordDmTestButton({
   const test = () =>
     run(async () => {
       let action: DmTestToast | "certify";
+      const ctl = new AbortController();
+      controller.current = ctl;
       try {
         const res = await fetch("/api/profile/discord/dm-test", {
           method: "POST",
+          signal: ctl.signal,
         });
         const payload = (await res
           .json()
@@ -82,6 +88,7 @@ export function DiscordDmTestButton({
       } catch {
         action = { tone: "error", key: "failed" };
       }
+      if (ctl.signal.aborted) return;
       if (action === "certify") {
         setWarnOpen(true);
         onNotCertified?.();

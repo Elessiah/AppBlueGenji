@@ -17,6 +17,7 @@ import { accountLocaleFromRow, readWithLocaleColumn } from "@/lib/server/users/a
 import { renderDm } from "@/lib/shared/dm-language";
 import {
   DM_TEST_BOT_UNREACHABLE,
+  DM_TEST_BUSY,
   DM_TEST_FAILED,
   DM_TEST_HOURLY_LIMIT,
   DM_TEST_MESSAGE,
@@ -37,6 +38,14 @@ export const DISCORD_DM_TEST_RULE: RateLimitRule = {
   windowMs: 60 * 60_000,
 };
 
+/**
+ * Tests en attente de la réponse du bot, tous comptes confondus : bot en panne,
+ * chaque test tient une requête jusqu'à son délai ; au-delà, refus immédiat
+ * (`DISCORD_DM_TEST_BUSY`) plutôt qu'une pile de requêtes pendantes.
+ */
+export const DM_TEST_MAX_IN_FLIGHT = 8;
+let inFlight = 0;
+
 /** Étiquette côté bot : journalisée en compte seulement, jamais un nom. */
 export const DM_TEST_CONTEXT = "dm-test";
 
@@ -53,9 +62,21 @@ type DmTestRow = RowDataPacket & {
  * @throws `PROFILE_NOT_FOUND` (compte absent ou supprimé), `DISCORD_NOT_LINKED`,
  *   `DISCORD_NOT_CERTIFIED` — rien n'est parti ; `BOT_INTERNAL_UNREACHABLE` —
  *   bot injoignable ou en panne, rien ne dit que le message soit parti ;
- *   `DISCORD_DM_TEST_FAILED` — bilan du bot illisible ou vide.
+ *   `DISCORD_DM_TEST_FAILED` — bilan du bot illisible ou vide ;
+ *   `DISCORD_DM_TEST_BUSY` — trop de tests en vol, rien n'est parti.
+ * @param signal Abandon quand le joueur quitte la page.
  */
-export async function sendDiscordDmTest(userId: number): Promise<DmTestOutcome> {
+export async function sendDiscordDmTest(userId: number, signal?: AbortSignal): Promise<DmTestOutcome> {
+  if (inFlight >= DM_TEST_MAX_IN_FLIGHT) throw new Error(DM_TEST_BUSY);
+  inFlight += 1;
+  try {
+    return await sendDiscordDmTestNow(userId, signal);
+  } finally {
+    inFlight -= 1;
+  }
+}
+
+async function sendDiscordDmTestNow(userId: number, signal?: AbortSignal): Promise<DmTestOutcome> {
   const db = await getDatabase();
   const [rows] = await readWithLocaleColumn((withLocale) =>
     db.execute<DmTestRow[]>(
@@ -79,7 +100,7 @@ export async function sendDiscordDmTest(userId: number): Promise<DmTestOutcome> 
     DM_TEST_CONTEXT,
     // Geste explicite d'un joueur qui attend la réponse : il ignore le
     // coupe-circuit des flux d'arrière-plan, comme `pushRefereeAlert`.
-    { honourCircuit: false },
+    { honourCircuit: false, signal },
   );
   if (report === null) throw new Error(DM_TEST_BOT_UNREACHABLE);
   const outcome = dmTestOutcome(report);

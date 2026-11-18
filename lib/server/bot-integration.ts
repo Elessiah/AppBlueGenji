@@ -512,7 +512,7 @@ function emptyDelivery(): DiscordDeliveryReport {
 async function postDiscordNotification(
   path: string,
   body: unknown,
-  options: { timeoutMs: number; honourCircuit: boolean },
+  options: { timeoutMs: number; honourCircuit: boolean; signal?: AbortSignal },
 ): Promise<DiscordDeliveryReport | null> {
   if (outboundMuted() || (options.honourCircuit && isCircuitOpen())) return null;
 
@@ -527,7 +527,9 @@ async function postDiscordNotification(
       },
       body: JSON.stringify(body),
       cache: "no-store",
-      signal: AbortSignal.timeout(options.timeoutMs),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(options.timeoutMs)])
+        : AbortSignal.timeout(options.timeoutMs),
     });
 
     if (!response.ok) {
@@ -538,7 +540,8 @@ async function postDiscordNotification(
     recordSuccess();
     return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
   } catch {
-    recordFailure();
+    // Le demandeur est parti : ce n'est pas une panne du bot.
+    if (!options.signal?.aborted) recordFailure();
     return null;
   }
 }
@@ -553,19 +556,20 @@ async function postDiscordNotification(
  * @param options `honourCircuit` : respecter le coupe-circuit (défaut `true`,
  *   flux d'arrière-plan) ; `false` pour une action explicite d'un joueur qui
  *   attend la réponse (« Tester mes MP ») — elle mérite sa tentative.
+ *   `signal` : abandon quand le demandeur quitte (la requête au bot n'est plus tenue).
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(
   message: string,
   recipients: DiscordRecipient[],
   context: string,
-  options: { honourCircuit?: boolean } = {},
+  options: { honourCircuit?: boolean; signal?: AbortSignal } = {},
 ): Promise<DiscordDeliveryReport | null> {
   if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification(
     "/internal/notify/dm",
     { message, recipients, context },
-    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
+    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true, signal: options.signal },
   );
 }
 

@@ -24,6 +24,29 @@ beforeEach(() => {
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
 });
 
+describe("sendDiscordDmTest in flight", () => {
+  it("sendDiscordDmTest_tooManyPending_throwsBusyWithoutCallingBot", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    const gate: { release?: (report: { sent: number; unresolved: never[]; failed: never[] }) => void } = {};
+    jest.mocked(pushDiscordDirectMessages).mockReturnValue(
+      new Promise((resolve) => {
+        gate.release = resolve;
+      }),
+    );
+    const pending = Array.from({ length: 8 }, () => sendDiscordDmTest(7));
+    await new Promise((resolve) => setImmediate(resolve));
+    jest.mocked(pushDiscordDirectMessages).mockClear();
+
+    await expect(sendDiscordDmTest(7)).rejects.toThrow("DISCORD_DM_TEST_BUSY");
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+
+    gate.release?.({ sent: 1, unresolved: [], failed: [] });
+    await Promise.all(pending);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    await expect(sendDiscordDmTest(7)).resolves.toBe("SENT");
+  });
+});
+
 describe("sendDiscordDmTest", () => {
   it("sendDiscordDmTest_certifiedLinked_sendsToDiscordIdInAccountLocaleIgnoringCircuit", async () => {
     execute.mockResolvedValue([[certifiedRow({ locale: "en" })]]);

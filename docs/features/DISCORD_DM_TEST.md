@@ -62,6 +62,7 @@ désigne. Absent tant que l'état Discord n'est pas lu.
   colonne `locale` manque) — `DM_TEST_MESSAGE`, `renderDm` (`BOT_DM_LANGUAGE.md`).
   Ce n'est pas une notification (`notifyUsers`) : aucun push, le joueur attend
   l'issue précise.
+- Requêtes en vol : l'appel au bot (15 s au plus) est abandonné quand le joueur quitte la page (`req.signal` → `AbortSignal.any`, sans compter une panne du bot) ; au plus `DM_TEST_MAX_IN_FLIGHT` (8) tests attendent le bot à la fois, tous comptes confondus — au-delà `DISCORD_DM_TEST_BUSY` (503, place rendue, toast « bot injoignable »). Le bouton abandonne sa requête au démontage.
 - Plafond : `DISCORD_DM_TEST_RULE`, **3 essais par heure et par compte**, en mémoire,
   réservé en une instruction (`reserveRateLimit`) avant tout `await`. Rendu sur un refus
   où rien n'est parti (non lié, non certifié, compte absent) ; gardé quand le bot est
