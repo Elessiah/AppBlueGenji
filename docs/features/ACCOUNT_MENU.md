@@ -18,7 +18,7 @@ Un bouton (avatar + pseudo + ▾) ouvre un panneau : **Mon profil**, **Mon équi
 - Fermeture : clic en dehors, clic sur un lien, Échap (focus rendu au bouton), tabulation qui sort du menu. Les règles viennent de `PublicNavMenu` (`handleMenuEscape`, `focusLeftMenu`), réutilisées telles quelles.
 - `requestLogout()` rend `false` sur un refus ou une panne : un toast le dit, et le joueur n'est pas ramené à l'accueil en restant connecté.
 - `PublicHeader` ne transmet au client que `{ teamId, teamName }`, pas les rôles.
-- **Passer en vue joueur** (bouton, pictogramme `Eye`) : pour un compte qui porte des droits de plateforme et ne les a pas suspendus (`playerViewEntry`) ; le retour passe par la bannière de la vue joueur (`ADMIN_PLAYER_VIEW.md`).
+- **Passer en vue joueur** (bouton, pictogramme `Eye`) : pour un compte qui porte des droits de plateforme et ne les a pas suspendus (`playerViewEntry`) ; pendant la vue joueur, la même entrée devient « Revenir en vue admin » (`playerViewEntry` = `"enter"` / `"back"`, `ADMIN_PLAYER_VIEW.md`).
 
 Le bouton « Déconnexion » du bas de `/profil` reste en place.
 

@@ -3,6 +3,7 @@ import type { AuthUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { countOpenReports } from "@/lib/server/content-reports";
 import { can } from "@/lib/shared/permissions";
+import { playerViewMenuMode } from "@/lib/shared/player-view";
 import { SiteNav } from "@/components/site-nav";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
@@ -37,7 +38,7 @@ export async function SiteShell({
         openReports={openReports}
         languageSwitcherLabel={await languageSwitcherLabel()}
         devDocs={can(user, "dev")}
-        playerViewEntry={user.playerViewAvailable && !user.playerView}
+        playerViewEntry={playerViewMenuMode(user)}
       />
       <main className={mainClassName} style={mainStyle}>{children}</main>
       <SiteFooterBar authenticated />

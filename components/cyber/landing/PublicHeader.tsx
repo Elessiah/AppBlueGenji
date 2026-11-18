@@ -10,6 +10,7 @@ import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { can } from "@/lib/shared/permissions";
+import { playerViewMenuMode } from "@/lib/shared/player-view";
 import { joinHrefFor } from "@/lib/shared/spectator-view";
 import { PublicNavMenu } from "./PublicNavMenu";
 import { JoinLink } from "./JoinLink";
@@ -98,7 +99,7 @@ export async function PublicHeader() {
                   affiché (WCAG 2.5.3). */}
               <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam}
                 devDocs={can(user, "dev")}
-                playerViewEntry={user.playerViewAvailable && !user.playerView}
+                playerViewEntry={playerViewMenuMode(user)}
               />
             </>
           ) : (

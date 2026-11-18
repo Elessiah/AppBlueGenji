@@ -7,13 +7,13 @@ jest.mock("next/navigation", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { AccountMenuPanel } from "@/components/account-menu";
-import { PlayerViewBanner, requestPlayerView } from "@/components/player-view";
+import { PlayerViewBanner, requestPlayerView, takePlayerViewFocus } from "@/components/player-view";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { ToastProvider } from "@/components/ui/toast";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
-import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
+import { PLAYER_VIEW_MAX_HOURS, playerViewMenuMode, type PlayerViewMenuMode } from "@/lib/shared/player-view";
 import { readSource } from "../helpers/read-source";
 
 /** Vue joueur du staff, côté écran (`docs/features/ADMIN_PLAYER_VIEW.md`). */
@@ -27,7 +27,7 @@ const banner = (locale: "fr" | "en" = "fr") =>
     </ShellTextProvider>,
   );
 
-const panel = (playerView: { pending: boolean; enter: () => void } | null) =>
+const panel = (playerView: { mode: PlayerViewMenuMode; pending: boolean; toggle: () => void } | null) =>
   renderToStaticMarkup(
     <AccountMenuPanel
       id="compte"
@@ -67,11 +67,22 @@ describe("PlayerViewBanner", () => {
 
 describe("AccountMenuPanel — entrée vue joueur", () => {
   it("AccountMenuPanel_entryOffered_showsSwitchButton", () => {
-    expect(panel({ pending: false, enter: () => undefined })).toContain("Passer en vue joueur");
+    expect(panel({ mode: "enter", pending: false, toggle: () => undefined })).toContain("Passer en vue joueur");
+  });
+
+  it("AccountMenuPanel_playerViewActive_offersReturnToAdminView", () => {
+    const html = panel({ mode: "back", pending: false, toggle: () => undefined });
+
+    expect(html).toContain("Revenir en vue admin");
+    expect(html).not.toContain("Passer en vue joueur");
+  });
+
+  it("AccountMenuPanel_returnPending_saysReturning", () => {
+    expect(panel({ mode: "back", pending: true, toggle: () => undefined })).toContain("Retour en vue admin…");
   });
 
   it("AccountMenuPanel_entryPending_saysSwitching", () => {
-    const html = panel({ pending: true, enter: () => undefined });
+    const html = panel({ mode: "enter", pending: true, toggle: () => undefined });
 
     expect(html).toContain('aria-busy="true"');
     expect(html).not.toContain("Passer en vue joueur<");
@@ -79,6 +90,27 @@ describe("AccountMenuPanel — entrée vue joueur", () => {
 
   it("AccountMenuPanel_noEntry_hidesSwitchButton", () => {
     expect(panel(null)).not.toContain("vue joueur");
+  });
+});
+
+describe("playerViewMenuMode", () => {
+  it("playerViewMenuMode_playerViewOn_isBack", () => {
+    expect(playerViewMenuMode({ playerView: true, playerViewAvailable: true })).toBe("back");
+  });
+
+  it("playerViewMenuMode_staffInAdminView_isEnter", () => {
+    expect(playerViewMenuMode({ playerView: false, playerViewAvailable: true })).toBe("enter");
+  });
+
+  it("playerViewMenuMode_plainPlayer_isNull", () => {
+    expect(playerViewMenuMode({ playerView: false, playerViewAvailable: false })).toBeNull();
+  });
+});
+
+describe("takePlayerViewFocus", () => {
+  it("takePlayerViewFocus_nothingPending_isFalse", () => {
+    expect(takePlayerViewFocus("banner")).toBe(false);
+    expect(takePlayerViewFocus("account")).toBe(false);
   });
 });
 

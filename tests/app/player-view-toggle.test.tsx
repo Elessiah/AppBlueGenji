@@ -36,7 +36,7 @@ jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({ useLocaleRouter: () => ({ refresh }) }));
 jest.mock("@/components/i18n/shell-text", () => ({ useShellText: () => ({ t: (key: string) => key }) }));
 
-import { usePlayerViewToggle } from "@/components/player-view";
+import { takePlayerViewFocus, usePlayerViewToggle } from "@/components/player-view";
 
 const fetchMock = jest.fn<typeof fetch>();
 const originalFetch = global.fetch;
@@ -68,6 +68,35 @@ describe("usePlayerViewToggle", () => {
 
     expect(order).toEqual(["done", "refresh"]);
     expect(showError).not.toHaveBeenCalled();
+  });
+
+  it("toggle_enteringSucceeds_handsFocusToTheBannerOnce", async () => {
+    await ToggleProbe().toggle(true);
+
+    expect(takePlayerViewFocus("account")).toBe(false);
+    expect(takePlayerViewFocus("banner")).toBe(true);
+    expect(takePlayerViewFocus("banner")).toBe(false);
+  });
+
+  it("toggle_returningSucceeds_handsFocusToTheAccountButton", async () => {
+    await ToggleProbe().toggle(false);
+
+    expect(takePlayerViewFocus("banner")).toBe(false);
+    expect(takePlayerViewFocus("account")).toBe(true);
+  });
+
+  it("toggle_failure_handsNoFocus", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 500 }));
+
+    await ToggleProbe().toggle(false);
+
+    expect(takePlayerViewFocus("account")).toBe(false);
+  });
+
+  it("toggle_twoInstancesAtOnce_sendOnePost", async () => {
+    await Promise.all([ToggleProbe().toggle(true), ToggleProbe().toggle(false)]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("toggle_failureEntering_showsPlayerViewFailedWithoutRefresh", async () => {

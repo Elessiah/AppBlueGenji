@@ -9,8 +9,14 @@ import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
 import { useLogout } from "./use-logout";
-import { usePlayerViewToggle } from "./player-view";
+import { takePlayerViewFocus, usePlayerViewToggle } from "./player-view";
+import type { PlayerViewMenuMode } from "@/lib/shared/player-view";
 import s from "./account-menu.module.css";
+
+const PLAYER_VIEW_MENU_KEYS = {
+  enter: { idle: "account.playerView", pending: "account.playerViewPending" },
+  back: { idle: "playerView.back", pending: "playerView.backPending" },
+} as const;
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
 
@@ -21,11 +27,13 @@ type AccountMenuProps = {
   /** Lien vers la documentation développeur (permission `dev`, `DEVDOC.md`). */
   devDocs?: boolean;
   /**
-   * Entrée « Passer en vue joueur » (`ADMIN_PLAYER_VIEW.md`) : le compte porte
-   * des droits de plateforme et la session ne les a pas encore suspendus. Le
-   * retour, lui, passe par la bannière de la vue joueur.
+   * Entrée de la vue joueur (`ADMIN_PLAYER_VIEW.md`) : `"enter"` (« Passer en
+   * vue joueur ») quand le compte porte des droits de plateforme que la session
+   * n'a pas suspendus, `"back"` (« Revenir en vue admin ») pendant la vue
+   * joueur — la bannière défile avec la page, le menu reste sous la barre
+   * fixe. Rien pour un compte sans droits.
    */
-  playerViewEntry?: boolean;
+  playerViewEntry?: PlayerViewMenuMode | null;
 };
 
 /**
@@ -46,7 +54,7 @@ export function AccountMenu({
   avatarUrl,
   activeTeam = null,
   devDocs = false,
-  playerViewEntry = false,
+  playerViewEntry = null,
 }: Readonly<AccountMenuProps>) {
   const { t } = useShellText();
   const [open, setOpen] = useState(false);
@@ -73,6 +81,12 @@ export function AccountMenu({
   }, [open]);
 
   const { leaving, logout: onLogout } = useLogout(() => setOpen(false));
+
+  // Après le retour en vue admin, la bannière a disparu : le focus revient au
+  // bouton du compte plutôt que de se perdre sur la page.
+  useEffect(() => {
+    if (playerViewEntry === "enter" && takePlayerViewFocus("account")) buttonRef.current?.focus();
+  }, [playerViewEntry]);
 
   const close = () => setOpen(false);
   const { pending: switching, toggle } = usePlayerViewToggle(close);
@@ -107,7 +121,7 @@ export function AccountMenu({
           id={panelId}
           activeTeam={activeTeam}
           devDocs={devDocs}
-          playerView={playerViewEntry ? { pending: switching, enter: () => toggle(true) } : null}
+          playerView={playerViewEntry ? { mode: playerViewEntry, pending: switching, toggle: () => toggle(playerViewEntry === "enter") } : null}
           leaving={leaving}
           onNavigate={close}
           onLogout={onLogout}
@@ -130,8 +144,8 @@ export function AccountMenuPanel({
   id: string;
   activeTeam: AccountMenuTeam | null;
   devDocs?: boolean;
-  /** « Passer en vue joueur », quand le compte peut suspendre ses droits ({@link AccountMenuProps.playerViewEntry}). */
-  playerView?: { pending: boolean; enter: () => void } | null;
+  /** Entrée de la vue joueur, quand le compte porte des droits à suspendre ({@link AccountMenuProps.playerViewEntry}). */
+  playerView?: { mode: PlayerViewMenuMode; pending: boolean; toggle: () => void } | null;
   leaving: boolean;
   onNavigate: () => void;
   onLogout: () => void;
@@ -174,13 +188,13 @@ export function AccountMenuPanel({
         <button
           type="button"
           className={s.item}
-          onClick={() => !playerView.pending && playerView.enter()}
+          onClick={() => !playerView.pending && playerView.toggle()}
           aria-disabled={playerView.pending || undefined}
           aria-busy={playerView.pending || undefined}
         >
           <Eye className={s.itemIcon} size={16} aria-hidden="true" />
           <span className={s.itemText}>
-            {playerView.pending ? t("account.playerViewPending") : t("account.playerView")}
+            {t(PLAYER_VIEW_MENU_KEYS[playerView.mode][playerView.pending ? "pending" : "idle"])}
           </span>
         </button>
       )}

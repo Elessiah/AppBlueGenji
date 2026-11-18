@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye } from "lucide-react";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
@@ -27,6 +27,24 @@ export async function requestPlayerView(active: boolean, fetchImpl: typeof fetch
 }
 
 /**
+ * Le focus à rendre après la relecture de la page : le geste démonte l'élément
+ * cliqué (entrée du menu, bannière) et le focus tomberait sur `<body>`. Le
+ * geste note où le poser, l'élément qui apparaît le réclame (une seule fois).
+ */
+type FocusTarget = "banner" | "account";
+let pendingFocus: FocusTarget | null = null;
+
+/** Un seul geste à la fois : la bannière et le menu du compte partagent ce verrou. */
+let inFlight = false;
+
+/** `true` une seule fois si le geste attend ce focus. */
+export function takePlayerViewFocus(target: FocusTarget): boolean {
+  if (pendingFocus !== target) return false;
+  pendingFocus = null;
+  return true;
+}
+
+/**
  * Le geste, commun au menu du compte et à la bannière : un second clic
  * n'envoie rien de plus, un échec se dit en notification, une réussite relit
  * la page (`router.refresh()`) — la barre, les menus et les écrans de gestion
@@ -40,18 +58,18 @@ export function usePlayerViewToggle(onDone?: () => void): {
   const { showError } = useToast();
   const { t } = useShellText();
   const [pending, setPending] = useState(false);
-  const inFlight = useRef(false);
   const toggle = async (active: boolean) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+    if (inFlight) return;
+    inFlight = true;
     setPending(true);
     const done = await requestPlayerView(active);
-    inFlight.current = false;
+    inFlight = false;
     setPending(false);
     if (!done) {
       showError(t(active ? "account.playerViewFailed" : "playerView.backFailed"));
       return;
     }
+    pendingFocus = active ? "banner" : "account";
     onDone?.();
     router.refresh();
   };
@@ -65,6 +83,11 @@ export function usePlayerViewToggle(onDone?: () => void): {
 export function PlayerViewBanner() {
   const { t } = useShellText();
   const { pending, toggle } = usePlayerViewToggle();
+  const backRef = useRef<HTMLButtonElement>(null);
+  // Arrivée par le menu du compte : le focus passe au retour, qui dit l'état.
+  useEffect(() => {
+    if (takePlayerViewFocus("banner")) backRef.current?.focus();
+  }, []);
   return (
     <section className={s.banner} aria-label={t("playerView.label")}>
       <div className={s.state}>
@@ -75,6 +98,7 @@ export function PlayerViewBanner() {
         </InfoHint>
       </div>
       <button
+        ref={backRef}
         type="button"
         className={s.back}
         onClick={() => !pending && toggle(false)}

@@ -5,6 +5,7 @@ import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigati
 import { LogoWithGlow } from "./logo-with-glow";
 import { AccountMenu } from "./account-menu";
 import { LanguageSwitcher, useSwitchablePath } from "./i18n/LanguageSwitcher";
+import type { PlayerViewMenuMode } from "@/lib/shared/player-view";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
@@ -28,8 +29,8 @@ type SiteNavProps = {
   languageSwitcherLabel?: string;
   /** Lien « Documentation dev » du menu du compte (permission `dev`). */
   devDocs?: boolean;
-  /** Entrée « Passer en vue joueur » du menu du compte (`ADMIN_PLAYER_VIEW.md`). */
-  playerViewEntry?: boolean;
+  /** Entrée de la vue joueur du menu du compte (`ADMIN_PLAYER_VIEW.md`). */
+  playerViewEntry?: PlayerViewMenuMode | null;
 };
 
 /**
@@ -56,7 +57,7 @@ export function SiteNav({
   openReports = null,
   languageSwitcherLabel,
   devDocs = false,
-  playerViewEntry = false,
+  playerViewEntry = null,
 }: Readonly<SiteNavProps>) {
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();

@@ -36,3 +36,15 @@ export function parsePlayerViewBody(body: unknown): boolean | null {
   const { active } = body as { active?: unknown };
   return typeof active === "boolean" ? active : null;
 }
+
+/** Ce que le menu du compte propose : passer en vue joueur, en revenir, ou rien. */
+export type PlayerViewMenuMode = "enter" | "back";
+
+/**
+ * L'entrée du menu du compte : « Revenir en vue admin » pendant la vue joueur,
+ * « Passer en vue joueur » quand le compte porte des droits à suspendre.
+ */
+export function playerViewMenuMode(user: { playerView: boolean; playerViewAvailable: boolean }): PlayerViewMenuMode | null {
+  if (user.playerView) return "back";
+  return user.playerViewAvailable ? "enter" : null;
+}

@@ -94,8 +94,13 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
 
 ## Interface
 
-- Menu du compte (`AccountMenu`, prop `playerViewEntry`) : « Passer en vue
-  joueur », rendu quand le compte peut basculer et ne l'a pas fait.
+- Menu du compte (`AccountMenu`, prop `playerViewEntry` = `playerViewMenuMode(user)`) :
+  « Passer en vue joueur » quand le compte peut basculer, « Revenir en vue
+  admin » pendant la vue joueur — la bannière défile avec la page, le menu,
+  sous la barre fixe, reste à portée.
+- Focus : le geste démonte l'élément cliqué ; `takePlayerViewFocus` le rend
+  une seule fois — au bouton de retour de la bannière après l'entrée, au
+  bouton du compte après le retour (jamais sur `<body>`).
 - Bannière `PlayerViewBanner`, rendue par la mise en page racine quand
   `user.playerView` : « Vue joueur active », un « i » (`InfoHint`) qui dit
   l'appareil seul, l'échéance (`PLAYER_VIEW_MAX_HOURS`, passé en paramètre du
