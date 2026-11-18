@@ -151,18 +151,16 @@ export function DevDocNav({ groups, locale, messages }: Readonly<DevDocNavProps>
           <span className={styles.navHeadMeta}>{t("nav.count", { count: all.length })}</span>
         </div>
         {/* Échap vide la recherche (le champ garde le focus). */}
-        <div
-          className={styles.navSearch}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && query) {
-              event.stopPropagation();
-              setQuery("");
-            }
-          }}
-        >
+        <div className={styles.navSearch}>
           <AnnuaireSearchField
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && query) {
+                event.stopPropagation();
+                setQuery("");
+              }
+            }}
             placeholder={t("search.placeholder")}
             label={t("search.label")}
           />

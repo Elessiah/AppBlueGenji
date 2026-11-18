@@ -110,7 +110,7 @@ export function devDocTitle(markdown: string, fallback: string): string {
       continue;
     }
     if (inFence) continue;
-    const heading = /^#\s+(.+)$/.exec(line);
+    const heading = /^#\s+(\S.*)$/.exec(line);
     // Les `#` de fermeture (`# Titre ##`) partent ; sans expression à blancs
     // répétés, qui se reparcourait en temps cubique sur une longue file d'espaces.
     const title = heading?.[1].replace(/[`*]/g, "").trimEnd().replace(/\s#+$/, "").trim();

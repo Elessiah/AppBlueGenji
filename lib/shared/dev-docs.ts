@@ -318,7 +318,7 @@ export const DEV_DOC_OUTLINE_MIN = 4;
 
 function plainHtml(html: string): string {
   return html
-    .replace(/<[^>]*>/g, "")
+    .replace(/<[^<>]*>/g, "")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')

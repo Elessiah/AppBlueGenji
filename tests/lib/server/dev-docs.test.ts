@@ -224,6 +224,10 @@ describe("revue sécurité cycle 1 — fichiers servis", () => {
       bot: { root: path.join(root, "absent"), dirs: ["doc"], files: [] },
     });
 
+  it("devDocTitle_hashFollowedBySpacesOnly_returnsFallback", () => {
+    expect(devDocTitle(`#${" ".repeat(50_000)}\n`, "F")).toBe("F");
+  });
+
   it("devDocTitle_closingHashes_stripped", () => {
     expect(devDocTitle("# Titre ##", "f")).toBe("Titre");
     expect(devDocTitle("# Langage C#", "f")).toBe("Langage C#");

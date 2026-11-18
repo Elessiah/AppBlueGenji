@@ -249,6 +249,17 @@ describe("docOutline", () => {
     ]);
   });
 
+  it("docOutline_unclosedTagsInHeading_keptAsTextQuickly", () => {
+    const heading = (n: number, text: string) => `<h3 id="h${n}">${text}</h3>`;
+    const html = [heading(1, "<".repeat(20_000) + "a"), heading(2, "b"), heading(3, "c"), heading(4, "d")].join("\n");
+    const started = Date.now();
+
+    const items = docOutline(html);
+
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(items[0]?.text).toBe("<".repeat(20_000) + "a");
+  });
+
   it("docOutline_fewerThanFourHeadings_returnsEmpty", () => {
     expect(docOutline([heading(3, "a", "A"), heading(3, "b", "B"), heading(3, "c", "C")].join("\n"))).toEqual([]);
   });
