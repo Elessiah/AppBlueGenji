@@ -48,7 +48,7 @@ désigne. Absent tant que l'état Discord n'est pas lu.
   saisi, jamais un autre compte), exigé certifié (`discord_verified_at`), compte non
   supprimé (`PROFILE_NOT_FOUND` sinon).
 - Canal : `pushDiscordDirectMessages` → `POST /internal/notify/dm` du bot, **existant** —
-  aucune route ni changement côté bot. Le bot ne cherche le membre que sur le serveur
+  aucune route ni changement côté bot. Le bot ne cherche le membre que sur les serveurs
   BlueGenji : `unresolved` = absent du serveur (le bot range aussi là un membre
   qu'une erreur passagère de Discord l'a empêché de lire : le texte invite alors à
   réessayer), `failed` = Discord refuse (messages privés fermés), `sent` = remis
@@ -128,10 +128,18 @@ désigne. Absent tant que l'état Discord n'est pas lu.
 
 ## RGPD
 
-Registre **T04** (sous-finalité, conservation, sécurité ; `REGISTER_UPDATED_AT`),
+Registre **T04** (sous-finalité, base légale, personnes, catégories, conservation,
+destinataires, sécurité ; `REGISTER_UPDATED_AT`) et **T05** (ligne du journal du staff),
 `/rgpd#test-messages-prives` (FR et EN), entrée `2026-11-test-messages-prives` de
-`PRIVACY_CHANGES` (FR et EN). Rien n'est écrit en base ; le numéro de compte du
-plafond vit en mémoire, 61 minutes au plus après le dernier essai.
+`PRIVACY_CHANGES` (FR et EN). Rien n'est écrit en base. En mémoire seulement : numéro de
+compte et heure de chaque essai décompté (`accountTries`), compteur d'appels par compte
+(`DISCORD_DM_TEST_ATTEMPT_RULE`) — 61 minutes au plus après le dernier clic, remis à zéro
+au redémarrage ; d'où « **normalement** au plus 3 essais par heure » dans les textes. Un
+message non remis (`DMS_CLOSED`, `NOT_IN_SERVER`) fait écrire au bot une ligne au journal
+du staff (`dm-test: … introuvable(s) / injoignable(s)`) : l'issue, jamais le joueur. Le
+bot cherche le membre sur **tous** les serveurs BlueGenji (`findHomeMember`) : « absent
+des serveurs ». La case des messages privés de match et d'équipe ne s'applique pas, et
+les textes légaux le disent.
 
 ## Tests
 

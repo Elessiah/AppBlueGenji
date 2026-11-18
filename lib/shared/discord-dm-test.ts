@@ -15,7 +15,7 @@ import type { LocalizedDm } from "./dm-language";
  * - `SENT` : message remis ;
  * - `DMS_CLOSED` : membre du serveur BlueGenji, mais Discord refuse le message
  *   (messages privés fermés, bot bloqué) ;
- * - `NOT_IN_SERVER` : absent du serveur BlueGenji — le bot n'écrit qu'à ses membres.
+ * - `NOT_IN_SERVER` : absent de tous les serveurs BlueGenji — le bot n'écrit qu'à ses membres.
  */
 export const DM_TEST_OUTCOMES = ["SENT", "DMS_CLOSED", "NOT_IN_SERVER"] as const;
 export type DmTestOutcome = (typeof DM_TEST_OUTCOMES)[number];

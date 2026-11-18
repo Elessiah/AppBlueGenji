@@ -4,7 +4,7 @@
  * Réutilise le canal existant `POST /internal/notify/dm` du bot
  * (`pushDiscordDirectMessages`) : un seul destinataire, le compte Discord
  * **rattaché** au compte qui demande — jamais un tag saisi, jamais un autre
- * compte. Le bot ne cherche ce membre que sur le serveur BlueGenji et rend un
+ * compte. Le bot ne cherche ce membre que sur les serveurs BlueGenji et rend un
  * bilan dont {@link dmTestOutcome} tire l'issue. Pas de `notifyUsers` : ce
  * n'est pas une notification (aucun push, aucun sujet), mais un geste dont le
  * joueur attend le résultat précis.

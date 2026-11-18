@@ -1076,12 +1076,17 @@ export function RgpdEn({
           <p id="test-messages-prives">
             <strong>“Test my DMs”.</strong> From <EnglishLegalLink href="/profil#comptes">My profile</EnglishLegalLink>,
             this button asks the bot to send you a short test direct message, in your account&apos;s language, to
-            check that it can reach you — only to your own linked Discord account, and only if your tag is verified;
-            the message carries neither a link nor anyone&apos;s name. The result (message delivered, direct messages
-            closed, not on the BlueGenji server, bot unreachable) is shown to you only and is not recorded; a try that
-            does not succeed is counted in the staff log on Discord without naming anyone. At most{" "}
-            {DM_TEST_HOURLY_LIMIT} tries per hour: your account number is kept in memory only, sixty-one minutes at
-            most after your last try, for that cap. Basis: <strong>performance of the service</strong> you request (
+            check that it can reach you — only to your own linked Discord account, and only if your tag is
+            certified; the message carries neither a link nor anyone&apos;s name. The “Discord direct messages about my
+            matches and teams” box does not apply to this test, which you request yourself, and a delivered test does
+            not tick it again. The result (message delivered, direct messages closed, not on any BlueGenji server, bot
+            unreachable) is shown to you only and the site does not record it; a message not delivered (direct
+            messages closed or not on any of the servers) leaves a line giving its outcome in the staff log on
+            Discord, without naming anyone (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+            Normally at most {DM_TEST_HOURLY_LIMIT} tries per hour: this cap lives in memory and starts again from
+            zero when the site restarts. Your account number and the time of each of your tries are kept there
+            only, sixty-one minutes at most after your last click on the button, for the caps on tries. Basis:{" "}
+            <strong>performance of the service</strong> you request (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
           <p id="arbitre-designe">

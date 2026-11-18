@@ -1277,11 +1277,16 @@ function RgpdFr({
             <strong>« Tester mes MP ».</strong> Depuis <Link href="/profil#comptes">Mon profil</Link>, ce bouton
             demande au bot de vous envoyer un court message privé de test, dans la langue de votre compte, pour
             vérifier qu&apos;il peut vous joindre — seulement à votre propre compte Discord rattaché, et seulement si
-            votre tag est certifié ; le message ne porte ni lien ni nom de personne. Le résultat (message remis,
-            messages privés fermés, absent du serveur BlueGenji, bot injoignable) ne s&apos;affiche qu&apos;à vous et
-            n&apos;est pas enregistré ; un essai qui n&apos;aboutit pas est compté au journal du staff sur Discord sans
-            nommer personne. Au plus {DM_TEST_HOURLY_LIMIT} essais par heure : le numéro de votre compte est gardé en
-            mémoire seulement, soixante et une minutes au plus après votre dernier essai, pour ce plafond. Base : l&apos;
+            votre tag est certifié ; le message ne porte ni lien ni nom de personne. La case « Messages privés Discord
+            de mes matchs et de mes équipes » ne s&apos;applique pas à ce test, que vous demandez vous-même, et un
+            test remis ne la recoche pas. Le résultat (message remis, messages privés fermés, absent des serveurs
+            BlueGenji, bot injoignable) ne s&apos;affiche qu&apos;à vous et le site ne l&apos;enregistre pas ; un
+            message non remis (messages privés fermés ou absent des serveurs) laisse au journal du staff sur Discord
+            une ligne qui en donne l&apos;issue, sans nommer personne (
+            <Link href="/rgpd/registre#t05">registre, T05</Link>). Normalement au plus {DM_TEST_HOURLY_LIMIT} essais
+            par heure : ce plafond vit en mémoire et repart de zéro quand le site redémarre. Le numéro de votre compte
+            et l&apos;heure de chacun de vos essais y sont gardés seulement, soixante et une minutes au plus après
+            votre dernier clic sur le bouton, pour les plafonds d&apos;essais. Base : l&apos;
             <strong>exécution du service</strong> que vous demandez (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
           <p id="arbitre-designe">
