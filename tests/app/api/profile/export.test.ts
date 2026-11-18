@@ -59,7 +59,7 @@ function sampleExport(): PersonalDataExport {
     providedStreamLinks: [],
     refereeAssignments: [],
     liveTriggers: [],
-    planning: { availability: [], assignments: [], history: [], soloCaster: null },
+    planning: { availability: [], assignments: [], history: [], staffActions: [], assignmentsSet: [], soloCaster: null },
     suspensions: [],
     termsAcceptances: [],
     reports: [],

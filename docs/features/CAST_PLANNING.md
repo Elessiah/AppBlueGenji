@@ -223,11 +223,23 @@ Registre **T20** ; `/rgpd` (FR, EN) ; entrée `2026-11-planning-casts-arbitres`
 de `PRIVACY_CHANGES`. Purge quotidienne (`lib/server/planning/retention.ts`,
 lancée par `instrumentation.ts`) : tout ce qui concerne une entrée
 `PLANNING_RETENTION_DAYS` (90) jours après son début ; le réglage caster
-autonome dès que le compte ne tient plus de rôle du planning. Suppression du
-compte : ses lignes partent, ses gestes de staff restent sans le désigner
-(`account-erasure.ts`). Export des données : `planning` (`planning-export.ts`) — disponibilités,
-attributions (avec leur motif), historique (`history` : attribuée, confirmée, retirée, sans
-l'auteur du geste) et réglage autonome.
+autonome dès que le compte ne tient plus le rôle `CASTER` (seul à pouvoir le
+porter). Suppression du compte : ses lignes partent, ses gestes de staff restent
+sans le désigner (`account-erasure.ts`). Export des données : `planning`
+(`planning-export.ts`) — disponibilités, attributions (avec leur motif),
+historique (`history` : attribuée, confirmée, retirée, sans l'auteur du geste),
+ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
+`assignmentsSet` : attributions qu'il a posées — sans la personne visée,
+art. 15.4) et réglage autonome.
+
+Ce que disent les textes, et qui doit rester vrai : un arbitre de **match**
+confirmé ou désigné par le planning passe par `assignMatchReferee` — ligne
+anonyme au journal du staff sur Discord, push `REFEREE_RELEASED` à l'arbitre
+retiré (T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
+tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
+préférences et motifs ; les autres membres lisent le motif d'une proposition du
+calcul comme « Calcul » (`visibleAssignment`). Tests :
+`tests/lib/shared/cast-planning-legal.test.ts`.
 
 ## Interface
 

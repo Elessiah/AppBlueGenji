@@ -1300,8 +1300,8 @@ export type PersonalDataExport = {
   liveTriggers: { matchId: number; tournamentId: number; liveTrigger: string | null }[];
   /**
    * Planning des casts et arbitres (`docs/features/CAST_PLANNING.md`) : ses
-   * disponibilités et préférences, les attributions qui le nomment, et son
-   * réglage « caster autonome » (`null` : jamais posé).
+   * disponibilités et préférences, les attributions qui le nomment, ses gestes
+   * comme staff et son réglage « caster autonome » (`null` : jamais posé).
    */
   planning: {
     availability: { tournamentId: number; matchId: number | null; role: string; status: string; preferred: boolean; updatedAt: string | null }[];
@@ -1309,6 +1309,13 @@ export type PersonalDataExport = {
     assignments: { tournamentId: number; matchId: number | null; role: string; source: string; reason: string; confirmed: boolean; createdAt: string | null }[];
     /** Historique des attributions (attribuée, confirmée, retirée), sans l'auteur du geste. */
     history: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    /**
+     * Ses gestes comme staff (attribution posée, confirmée, retirée) : la
+     * trace qui le nomme comme auteur, sans la personne visée (art. 15.4).
+     */
+    staffActions: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    /** Attributions en cours qu'il a posées comme staff, sans la personne visée. */
+    assignmentsSet: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
     soloCaster: boolean | null;
   };
   /**

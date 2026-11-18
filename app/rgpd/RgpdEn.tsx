@@ -1051,7 +1051,7 @@ export function RgpdEn({
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
-            When an administrator grants or removes a platform role (administrator, referee, caster, producer, community
+            When an administrator grants or removes a platform role (administrator, referee, caster, prod, community
             manager, recruiter, developer), including on their own account, where they cannot remove their own administration, the
             staff log on Discord notes it without naming anyone; the server logs keep its author, the identifier of the
             account concerned and the roles saved, on the basis of legitimate interest (administration of the
@@ -1298,7 +1298,7 @@ export function RgpdEn({
             through the “Report a problem” button, GDPR category.
           </p>
           <p id="planning">
-            <strong>Cast and referee schedule.</strong> Referees, casters and producers (a platform role
+            <strong>Cast and referee schedule.</strong> Referees, casters and producers (“prod”, a platform role
             that organises the production of a live stream) have a “Schedule” page: for each slot (a
             scheduled match, or a whole tournament when its matches are not scheduled) and each role they
             hold, they give their availability (available, away, maybe) and their preference there; a caster
@@ -1306,13 +1306,20 @@ export function RgpdEn({
             them. A calculation proposes the assignments from these answers and everyone&apos;s load (current
             week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until the
             tournament staff confirms them, who can also assign or remove someone by hand. The site keeps,
-            with each assignment, who set it and its history (set, confirmed, removed). Assignments and the
-            “solo caster” setting are read by logged-in referees, casters, producers and administrators;
-            everyone&apos;s availability and preferences by the tournament staff only; nothing about it is
-            published on Discord. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
-            of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds a
-            schedule role; deleting the account removes everything about it, and the export of your data
-            contains it. Basis: the association&apos;s legitimate interest (organising its volunteers), with a
+            with each assignment, who set it and its history (set, confirmed, removed, with the account that
+            acted). Assignments and the “solo caster” setting are read by logged-in referees, casters,
+            producers and administrators, the reason for a calculated proposal (preference, load) only
+            appearing there as “Calculation”, except to the tournament staff and the person concerned;
+            everyone&apos;s availability and preferences by the tournament staff only (referees and
+            administrators). A match referee confirmed or assigned through the schedule becomes the
+            match&apos;s assigned referee, like an assignment by the staff: the staff log on Discord notes it
+            without naming anyone and the referee removed is notified by push (<LocaleLink href="/rgpd/registre#t04">register,
+            T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>); nothing else from the
+            schedule is published on Discord. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
+            caster role; deleting the account removes everything about it (the actions it took as staff
+            remain, without naming it), and the export of your data contains it, actions taken as staff
+            included. Basis: the association&apos;s legitimate interest (organising its volunteers), with a
             right to object (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>

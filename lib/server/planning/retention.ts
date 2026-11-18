@@ -3,13 +3,18 @@
  * registre des traitements) : disponibilités, préférences, attributions et
  * leur historique sont effacés {@link PLANNING_RETENTION_DAYS} jours après le
  * début de leur entrée (match, ou tournoi entier) ; le réglage « caster
- * autonome » l'est quand le compte ne tient plus aucun rôle du planning.
+ * autonome » l'est quand le compte ne tient plus le rôle caster (le seul qui
+ * peut le porter, `setSoloCaster`).
  * Une purge par jour, lancée au démarrage (`instrumentation.ts`).
  */
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
-import { PLANNING_MEMBER_SQL, type Executor } from "./load";
+import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
+import type { Executor } from "./load";
+
+/** Le réglage « caster autonome » ne sert qu'à un caster : il part avec ce rôle. */
+const HOLDS_CASTER_SQL = `JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral("CASTER")})`;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PURGE_TICK_MS = DAY_MS;
@@ -34,7 +39,7 @@ export async function purgeExpiredPlanning(executor: Executor, now: number = Dat
   }
   const [profiles] = await executor.execute(
     `DELETE p FROM bg_planning_profiles p JOIN bg_users u ON u.id = p.user_id
-      WHERE u.is_deleted = 1 OR NOT ${PLANNING_MEMBER_SQL}`,
+      WHERE u.is_deleted = 1 OR NOT COALESCE(${HOLDS_CASTER_SQL}, 0)`,
   );
   removed += Number((profiles as { affectedRows?: number }).affectedRows ?? 0);
   return removed;

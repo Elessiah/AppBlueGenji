@@ -33,13 +33,23 @@ describe("purgeExpiredPlanning", () => {
     ]);
   });
 
-  it("purgeExpiredPlanning_profiles_removedWhenNoPlanningRoleOrDeleted", async () => {
+  it("purgeExpiredPlanning_profiles_removedWhenCasterRoleLostOrDeleted", async () => {
     execute.mockResolvedValue([{ affectedRows: 0 }]);
 
     await purgeExpiredPlanning(fakeConnection({ execute }), NOW);
 
     const profiles = execute.mock.calls[3][0];
-    expect(profiles).toContain("u.is_deleted = 1 OR NOT");
-    expect(profiles).toContain("JSON_CONTAINS(u.platform_roles_json");
+    expect(profiles).toContain("u.is_deleted = 1 OR NOT COALESCE(JSON_CONTAINS(u.platform_roles_json, '\"CASTER\"'), 0)");
+  });
+
+  it("purgeExpiredPlanning_profiles_otherPlanningRolesDoNotKeepTheSetting", async () => {
+    execute.mockResolvedValue([{ affectedRows: 0 }]);
+
+    await purgeExpiredPlanning(fakeConnection({ execute }), NOW);
+
+    const profiles = execute.mock.calls[3][0];
+    expect(profiles).not.toContain("ARBITRE");
+    expect(profiles).not.toContain("PROD");
+    expect(profiles).not.toContain("is_admin");
   });
 });

@@ -59,7 +59,7 @@ describe("registre T01", () => {
     );
     expect(t01Recipients(PROCESSING_ACTIVITIES)).toContain("jamais le rôle développeur");
     expect(t01Recipients(PROCESSING_ACTIVITIES_EN)).toContain(
-      "platform role title (administrator, referee, caster, producer, community manager, recruiter) on the player page",
+      "platform role title (administrator, referee, caster, prod, community manager, recruiter) on the player page",
     );
     expect(t01Recipients(PROCESSING_ACTIVITIES_EN)).toContain("never the developer role");
   });

@@ -818,11 +818,12 @@ Données sensibles
 Aucune
 Conservation
 Disponibilités, préférences, attributions et leur historique : 90 jours après le début du créneau, puis effacés par une purge quotidienne, hors les copies de sauvegarde chiffrées (T09, 30 jours au plus)
-Réglage « caster autonome » : tant que le compte tient un rôle du planning ; effacé à la purge quotidienne qui suit le retrait de son dernier rôle
-Suppression du compte : tout ce qui le concerne dans le planning part avec lui ; les gestes qu'il a faits comme staff restent, sans le désigner
+Réglage « caster autonome » : tant que le compte tient le rôle caster ; effacé à la purge quotidienne qui suit son retrait
+Suppression du compte : tout ce qui le concerne dans le planning part avec lui ; les gestes qu'il a faits comme staff restent, sans le désigner. L'export de ses données (art. 15 et 20) contient ses disponibilités, préférences, attributions avec leur motif, leur historique, son réglage « caster autonome » et les gestes qu'il a faits comme staff (sans la personne visée)
 Destinataires
-Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités
-Staff des tournois (permission d'arbitrage) : les disponibilités et préférences de tous, pour attribuer
+Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau — le motif d'une proposition du calcul (préférence, charge) n'y paraît que comme « Calcul », hors le staff des tournois et la personne concernée — et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités et préférences
+Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, et le motif de chaque attribution, pour attribuer
+Un arbitre de match confirmé ou désigné par le planning devient l'arbitre désigné du match, comme une désignation par le staff (T04, T05) : une ligne sans nom au journal du staff sur Discord, une notification push à l'arbitre retiré ; rien d'autre du planning n'est publié sur Discord
 Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)
 Transferts hors UE
 Aucun

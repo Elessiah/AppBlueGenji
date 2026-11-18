@@ -1532,13 +1532,20 @@ function RgpdFr({
             la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
             propositions restent provisoires jusqu&apos;à leur confirmation par le staff des tournois, qui peut
             aussi désigner ou retirer quelqu&apos;un à la main. Le site garde, avec chaque attribution, qui l&apos;a
-            posée et son historique (pose, confirmation, retrait). Les attributions et le réglage « caster
-            autonome » se lisent par les arbitres, casters, prods et administrateurs connectés ; les
-            disponibilités et préférences de tous, par le seul staff des tournois ; rien n&apos;en est publié
-            sur Discord. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            posée et son historique (pose, confirmation, retrait, avec le compte qui a agi). Les attributions et
+            le réglage « caster autonome » se lisent par les arbitres, casters, prods et administrateurs
+            connectés, le motif d&apos;une proposition du calcul (préférence, charge) n&apos;y paraissant, hors le
+            staff des tournois et la personne concernée, que comme « Calcul » ; les disponibilités et
+            préférences de tous, par le seul staff des tournois (arbitres et administrateurs). Un arbitre de
+            match confirmé ou désigné par le planning devient l&apos;arbitre désigné du match, comme une
+            désignation par le staff : le journal du staff sur Discord le note sans nommer personne et
+            l&apos;arbitre retiré est prévenu par notification (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
+            <Link href="/rgpd/registre#t05">T05</Link>) ; rien d&apos;autre du planning n&apos;est publié sur
+            Discord. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
-            de rôle du planning ; la suppression du compte emporte tout ce qui le concerne, l&apos;export de vos
-            données le contient. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
+            le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
+            staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff
+            compris. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
             avec droit d&apos;opposition (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
