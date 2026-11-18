@@ -18,7 +18,7 @@ jest.mock("@/lib/server/planning/players", () => ({
 jest.mock("@/lib/server/tournaments/cast-eligibility");
 
 import type { PoolConnection } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import {
   batchEntries,
@@ -27,6 +27,7 @@ import {
   preparePlanner,
   runAutoAssign,
   withPlanningLock,
+  writeEvent,
 } from "@/lib/server/planning/auto-assign";
 import { loadPlanningData, loadPlanningHistory } from "@/lib/server/planning/load";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
@@ -80,6 +81,7 @@ beforeEach(() => {
   connection.commit.mockResolvedValue(undefined);
   connection.rollback.mockResolvedValue(undefined);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({}));
+  jest.mocked(withConnection).mockImplementation(<T>(run: (c: PoolConnection) => Promise<T>) => run(fakeConnection(connection)));
   jest.mocked(withNamedLock).mockImplementation(<T>(_pool: unknown, _name: string, _seconds: number, run: (c: PoolConnection) => Promise<T>) =>
     run(fakeConnection(connection)),
   );
@@ -93,6 +95,22 @@ beforeEach(() => {
 function statements(): string[] {
   return execute.mock.calls.filter(([sql]) => !sql.includes(RECONCILE)).map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
+
+describe("writeEvent", () => {
+  it("writeEvent_noInsertId_throws", async () => {
+    routeSql({ noInsertId: true });
+
+    await expect(writeEvent(fakeConnection(connection), loadedEntry(), 3, "CASTER", "ASSIGNED", "MANUAL", 9)).rejects.toThrow(
+      "PLANNING_EVENT_ID_MISSING",
+    );
+  });
+
+  it("writeEvent_insertId_returnsIt", async () => {
+    routeSql();
+
+    await expect(writeEvent(fakeConnection(connection), loadedEntry(), 3, "CASTER", "ASSIGNED", "MANUAL", 9)).resolves.toBe(1);
+  });
+});
 
 describe("batchEntries / entriesToConfirm", () => {
   const entries = [
@@ -248,7 +266,59 @@ describe("runAutoAssign", () => {
       "INSERT INTO bg_planning_assignments (ent",
       "INSERT INTO bg_planning_events (entry_ke",
     ]);
-    expect(writeParams()[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "AUTO", "LOAD", 0, 9]);
+    expect(writeParams()[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "LOAD", 9]);
+    expect(writeParams()[2]).toEqual(["m:1", 3, "REFEREE", 10, 1, 9]);
+  });
+
+  it("runAutoAssign_rerunUnchangedProposal_writesNoNewEvent", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE", reason: "LOAD" })],
+      }),
+    );
+
+    const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(report.proposed).toBe(1);
+    expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_assignments (ent"]);
+  });
+
+  it("runAutoAssign_rerunChangedReason_writesTheEvent", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+        assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE", reason: "PREFERENCE" })],
+      }),
+    );
+
+    await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(statements()).toContain("INSERT INTO bg_planning_events (entry_ke");
+  });
+
+  it("runAutoAssign_manyProposals_writtenInGroupedStatements", async () => {
+    const entries = Array.from({ length: 450 }, (_, index) =>
+      loadedEntry({ key: `m:${index + 1}`, matchId: index + 1, startAt: MONDAY + index * 2 * HOUR_MS, endAt: MONDAY + (index * 2 + 1) * HOUR_MS }),
+    );
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries,
+        availability: entries.map((entry) => available(entry.key, 3, "REFEREE")),
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+      }),
+    );
+
+    const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 1000 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(report.proposed).toBe(450);
+    // 450 lignes : trois instructions de lignes et trois d'évènements, et non 900 allers-retours.
+    expect(statements().filter((sql) => sql.startsWith("INSERT INTO bg_planning_assignments"))).toHaveLength(3);
+    expect(statements().filter((sql) => sql.startsWith("INSERT INTO bg_planning_events"))).toHaveLength(3);
   });
 
   it("runAutoAssign_pendingRefereeOnMatch_confirmedBeforeDelete", async () => {
@@ -274,22 +344,6 @@ describe("runAutoAssign", () => {
     const sweep = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE a FROM"))?.[0];
     expect(sweep).toContain("a.confirmed = 1");
     expect(sweep).toContain("m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id");
-  });
-
-  it("runAutoAssign_eventWithoutInsertId_throwsAndRollsBack", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(
-      planningData({
-        entries: [loadedEntry()],
-        availability: [available("m:1", 3, "REFEREE")],
-        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
-      }),
-    );
-    routeSql({ noInsertId: true });
-
-    await expect(runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS)).rejects.toThrow(
-      "PLANNING_EVENT_ID_MISSING",
-    );
-    expect(connection.rollback).toHaveBeenCalled();
   });
 
   it("runAutoAssign_entryOutsideBatchNotOverlapping_playersNotLoaded", async () => {

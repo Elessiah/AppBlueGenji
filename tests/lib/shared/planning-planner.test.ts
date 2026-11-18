@@ -20,11 +20,16 @@ const TRIALS_BOUND_120 = 18_000;
 const CHECKS_BOUND_120 = 80_000;
 const TRIALS_BOUND_120_CROWDED = 60_000;
 const CHECKS_BOUND_120_CROWDED = 200_000;
+const TRIALS_BOUND_CLUSTERED_300 = 2_000;
+const CHECKS_BOUND_CLUSTERED_300 = 1_500_000;
 
 /** Lot de `size` matchs, quatre par soir ; `crowded` : chacun préfère les 20 mêmes dernières entrées (pire cas des échanges). */
-function batchInput(size: number, shape: "spread" | "crowded") {
+function batchInput(size: number, shape: "spread" | "crowded" | "clustered") {
+  // `clustered` : une ronde de tableau lance 32 matchs au même instant (tous se chevauchent).
   const entries = Array.from({ length: size }, (_, i) =>
-    plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
+    shape === "clustered"
+      ? plannerEntry(`m:${i}`, Math.floor(i / 32) * 3 + 18, { endAt: MONDAY + (Math.floor(i / 32) * 3 + 20) * HOUR_MS })
+      : plannerEntry(`m:${i}`, Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5, {
       endAt: MONDAY + (Math.floor(i / 4) * 24 + 18 + (i % 4) * 1.5 + 2) * HOUR_MS,
     }),
   );
@@ -32,6 +37,7 @@ function batchInput(size: number, shape: "spread" | "crowded") {
   const members = new Map<number, PlanningRole[]>(Array.from({ length: 25 }, (_, u) => [u + 1, roles[u % roles.length]]));
   const availability = entries.flatMap((entry, i) =>
     [...members].flatMap(([userId, held]) => {
+      if (shape === "clustered") return held.map((role) => available(entry.key, userId, role, { preferred: (i * 7 + userId) % 11 === 0 }));
       if (shape === "crowded") return held.map((role) => available(entry.key, userId, role, { preferred: i >= size - 20 }));
       return (i + userId) % 3 === 0
         ? []
@@ -435,9 +441,19 @@ describe("planAssignments — amélioration globale", () => {
     expect(stats.checks).toBeLessThan(CHECKS_BOUND_120_CROWDED);
   });
 
+  it("planAssignments_roundsOf32SimultaneousMatches_workBounded", () => {
+    const stats = emptyStats();
+
+    planAssignments(batchInput(300, "clustered"), stats);
+
+    // Mesuré : environ 735 000 vérifications et 850 essais pour 300 entrées par rondes de 32 ; les bornes en gardent environ le double.
+    expect(stats.trials).toBeLessThan(TRIALS_BOUND_CLUSTERED_300);
+    expect(stats.checks).toBeLessThan(CHECKS_BOUND_CLUSTERED_300);
+  });
+
   it("planAssignments_doublingTheBatch_workGrowsAboutLinearly", () => {
     // Un coût quadratique quadruplerait en doublant le lot : on tolère moins de trois fois.
-    for (const shape of ["spread", "crowded"] as const) {
+    for (const shape of ["spread", "crowded", "clustered"] as const) {
       const half = emptyStats();
       const full = emptyStats();
 

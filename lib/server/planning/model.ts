@@ -30,11 +30,28 @@ function matchRefereeRows(entry: LoadedEntry, rows: PlanningData["assignments"])
   ];
 }
 
+const byEntryCache = new WeakMap<PlanningData["assignments"], Map<string, PlanningData["assignments"]>>();
+
+/** Les lignes du planning de chaque entrée, regroupées une fois par chargement (et non refiltrées à chaque entrée). */
+function assignmentsByEntry(rows: PlanningData["assignments"]): Map<string, PlanningData["assignments"]> {
+  let index = byEntryCache.get(rows);
+  if (!index) {
+    index = new Map();
+    for (const row of rows) {
+      const list = index.get(row.entryKey);
+      if (list) list.push(row);
+      else index.set(row.entryKey, [row]);
+    }
+    byEntryCache.set(rows, index);
+  }
+  return index;
+}
+
 export function entryAssignments(
   entry: LoadedEntry,
   data: Pick<PlanningData, "assignments" | "matchCasters">,
 ): PlanningAssignmentView[] {
-  const rows = data.assignments.filter((row) => row.entryKey === entry.key);
+  const rows = assignmentsByEntry(data.assignments).get(entry.key) ?? [];
   const out: PlanningAssignmentView[] = [];
   for (const row of rows) {
     if (entry.kind === "MATCH" && row.role === "REFEREE") continue;

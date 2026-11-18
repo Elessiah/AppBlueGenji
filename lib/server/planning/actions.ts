@@ -14,7 +14,15 @@ import { planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/l
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
 import { MATCH_REFEREE_REFUSAL_CODES, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
-import { loadPlanningData, loadPlanningMembers, type Executor, type LoadedEntry, type PlanningData } from "./load";
+import {
+  loadPlanningData,
+  loadPlanningEntries,
+  loadPlanningMembers,
+  parseEntryKey,
+  type Executor,
+  type LoadedEntry,
+  type PlanningData,
+} from "./load";
 import { entryAssignments } from "./model";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "./planning-undo";
 import { loadEntryPlayers, playersDuring } from "./players";
@@ -38,6 +46,15 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
 };
 
+/** Une seule entrée, lue par sa clé : sans toute la fenêtre, ni les comptes, ni les disponibilités des autres. */
+async function loadOneEntry(executor: Executor, user: AuthUser, entryKey: string, now: number): Promise<LoadedEntry> {
+  const only = parseEntryKey(entryKey);
+  const entries = only ? await loadPlanningEntries(executor, { now, includeHidden: can(user, "tournaments"), only }) : [];
+  const entry = entries.find((candidate) => candidate.key === entryKey);
+  if (!entry) throw new Error("PLANNING_ENTRY_NOT_FOUND");
+  return entry;
+}
+
 async function findEntry(executor: Executor, user: AuthUser, entryKey: string, now: number) {
   const data = await loadPlanningData(executor, { now, includeHidden: can(user, "tournaments") });
   const entry = data.entries.find((candidate) => candidate.key === entryKey);
@@ -57,7 +74,7 @@ export async function setAvailability(
 ): Promise<void> {
   if (!planningRolesOf(user).includes(input.role)) throw new Error("PLANNING_ROLE_NOT_HELD");
   await withConnection(async (connection) => {
-    const { entry } = await findEntry(connection, user, input.entryKey, now);
+    const entry = await loadOneEntry(connection, user, input.entryKey, now);
     if (!entry.open) throw new Error("PLANNING_ENTRY_CLOSED");
     await connection.execute(
       `INSERT INTO bg_planning_availability (entry_key, user_id, role, tournament_id, match_id, status, preferred)

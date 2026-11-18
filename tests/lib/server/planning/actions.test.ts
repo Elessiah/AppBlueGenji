@@ -8,6 +8,7 @@ jest.mock("@/lib/server/named-lock", () => ({
 jest.mock("@/lib/server/planning/load", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
   loadPlanningData: jest.fn(),
+  loadPlanningEntries: jest.fn(),
   loadPlanningMembers: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/profiles");
@@ -23,7 +24,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
-import { loadPlanningData, loadPlanningMembers } from "@/lib/server/planning/load";
+import { loadPlanningData, loadPlanningEntries, loadPlanningMembers } from "@/lib/server/planning/load";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -108,15 +109,22 @@ describe("setAvailability", () => {
   });
 
   it("setAvailability_unknownEntry_throwsNotFound", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData());
+    jest.mocked(loadPlanningEntries).mockResolvedValue([]);
 
     await expect(setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false })).rejects.toThrow(
       "PLANNING_ENTRY_NOT_FOUND",
     );
   });
 
+  it("setAvailability_malformedKey_notFoundWithoutReadingAnything", async () => {
+    await expect(setAvailability(prod, { entryKey: "x:1; DROP", role: "PROD", status: "AVAILABLE", preferred: false })).rejects.toThrow(
+      "PLANNING_ENTRY_NOT_FOUND",
+    );
+    expect(loadPlanningEntries).not.toHaveBeenCalled();
+  });
+
   it("setAvailability_closedEntry_throwsClosed", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ open: false })] }));
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ open: false })]);
 
     await expect(setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false })).rejects.toThrow(
       "PLANNING_ENTRY_CLOSED",
@@ -124,19 +132,37 @@ describe("setAvailability", () => {
   });
 
   it("setAvailability_valid_upserts", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry()]);
 
     await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "PENDING", preferred: true });
 
     expect(execute.mock.calls[0][1]).toEqual(["m:1", 6, "PROD", 10, 1, "PENDING", 1]);
   });
 
-  it("setAvailability_nonStaff_hiddenTournamentsNotLoaded", async () => {
-    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()] }));
+  it("setAvailability_readsOnlyThatEntry_neverTheWholePlanning", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry()]);
 
     await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false });
 
-    expect(jest.mocked(loadPlanningData).mock.calls[0][1]).toMatchObject({ includeHidden: false });
+    expect(loadPlanningData).not.toHaveBeenCalled();
+    expect(loadPlanningMembers).not.toHaveBeenCalled();
+    expect(jest.mocked(loadPlanningEntries).mock.calls[0][1]).toMatchObject({ only: { kind: "MATCH", id: 1 } });
+  });
+
+  it("setAvailability_tournamentKey_readsTheTournamentEntry", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "t:5", kind: "TOURNAMENT", matchId: null })]);
+
+    await setAvailability(prod, { entryKey: "t:5", role: "PROD", status: "AVAILABLE", preferred: false });
+
+    expect(jest.mocked(loadPlanningEntries).mock.calls[0][1]).toMatchObject({ only: { kind: "TOURNAMENT", id: 5 } });
+  });
+
+  it("setAvailability_nonStaff_hiddenTournamentsNotLoaded", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry()]);
+
+    await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false });
+
+    expect(jest.mocked(loadPlanningEntries).mock.calls[0][1]).toMatchObject({ includeHidden: false });
   });
 });
 

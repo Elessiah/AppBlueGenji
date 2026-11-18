@@ -34,8 +34,10 @@ lues que par `tournaments` ; rien n'est publié sur Discord.
   tournoi (`t:<id>`), attribuée par rôle pour toute la soirée, avec un groupe
   de `PLANNING_EVENT_REFEREES` (2) arbitres posés par le calcul (le staff peut
   en ajouter).
-- Montrées : à venir et commencées depuis `PLANNING_PAST_DAYS` (7) jours,
-  tournois masqués compris pour le staff seulement.
+- Montrées : commencées depuis `PLANNING_PAST_DAYS` (7) jours et jusqu'à
+  `PLANNING_HORIZON_DAYS` (90) jours devant (la page, sa réponse et son DOM
+  restent bornés quand toute une saison est planifiée), tournois masqués
+  compris pour le staff seulement.
 
 ## Couverture (du meilleur au pire)
 
@@ -144,6 +146,29 @@ compte les **rôles**, pas les personnes.
   vérifiée par le type contre les motifs d'inéligibilité ; les statuts HTTP de
   la route en dérivent.
 - Un geste à la fois : verrou nommé `bg_planning` (10 s) → `PLANNING_BUSY`.
+
+## Coût (performance)
+
+- Une page = une fenêtre bornée : durées lues une fois (elles voyagent dans
+  `PlanningData`), puis disponibilités, attributions, retraits et casters
+  lancés ensemble ; regroupements par entrée en un passage (pas de filtre par
+  entrée).
+- Les comptes du planning (balayage de `bg_users` par `JSON_CONTAINS`) sont
+  copiés `PLANNING_MEMBERS_TTL_MS` (30 s) pour la **page** seule ; les gestes et
+  le calcul les relisent. Le réglage « caster autonome » se relit à chaque page.
+- Sa disponibilité (`setAvailability`) ne lit que **son** entrée (`only`,
+  `parseEntryKey`), ni la fenêtre, ni les comptes.
+- Le calcul écrit ses propositions par instructions groupées (200 lignes) et
+  ne retrace (`ASSIGNED`) que ce qui change d'un lot à l'autre. La
+  confirmation désigne les arbitres de match **avant** de prendre le verrou
+  `bg_planning` (idempotent, écritures du planning gardées sous le verrou).
+- `bg_planning_events` : index `(entry_key, kind, source)` pour les retraits
+  manuels ; les lectures par entrée passent par les clés primaires.
+- Écran : une relecture garde l'identité des entrées inchangées (`mergeView`),
+  les cartes sont mémoïsées, une disponibilité se pose sur la page sans relecture
+  (`applyAvailability`) ; semaine et jour d'une entrée se calculent une fois.
+- Bornes d'opérations du calcul testées sur trois formes (étalée, concentrée,
+  rondes de 32 matchs simultanés).
 
 ## Données (`lib/server/database/schema/planning.ts`)
 

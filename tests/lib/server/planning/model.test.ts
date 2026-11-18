@@ -91,3 +91,31 @@ describe("entryCoverage", () => {
     expect(coverage.refereePriority).toBe(false);
   });
 });
+
+describe("entryAssignments — regroupement par entrée", () => {
+  it("entryAssignments_manyEntries_eachSeesOnlyItsOwnRows", () => {
+    const entries = Array.from({ length: 300 }, (_, i) => loadedEntry({ key: `m:${i}`, matchId: i }));
+    const data = planningData({
+      entries,
+      assignments: entries.map((entry, i) => loadedAssignment({ entryKey: entry.key, userId: i + 1, role: "CASTER" })),
+    });
+
+    const seen = entries.map((entry) => entryAssignments(entry, data).map((row) => row.userId));
+
+    expect(seen).toEqual(entries.map((_, i) => [i + 1]));
+  });
+
+  it("entryAssignments_entryWithoutRows_empty", () => {
+    const data = planningData({ assignments: [loadedAssignment({ entryKey: "m:2" })] });
+
+    expect(entryAssignments(loadedEntry({ key: "m:1" }), data)).toEqual([]);
+  });
+
+  it("entryAssignments_twoLoads_independentResults", () => {
+    const first = planningData({ assignments: [loadedAssignment({ userId: 3, role: "CASTER" })] });
+    const second = planningData({ assignments: [loadedAssignment({ userId: 4, role: "CASTER" })] });
+
+    expect(entryAssignments(loadedEntry(), first)[0].userId).toBe(3);
+    expect(entryAssignments(loadedEntry(), second)[0].userId).toBe(4);
+  });
+});

@@ -48,6 +48,12 @@ export const PLANNING_HISTORY_WEEKS = 8;
 export const PLANNING_RETENTION_DAYS = 90;
 /** Le planning montre les entrées commencées depuis au plus ce délai. */
 export const PLANNING_PAST_DAYS = 7;
+/**
+ * Le planning montre les entrées qui commencent au plus tard dans ce délai :
+ * la page, sa réponse et son DOM restent bornés même quand toute une saison de
+ * tableaux est déjà planifiée.
+ */
+export const PLANNING_HORIZON_DAYS = 90;
 /** Arbitres posés par le calcul sur un tournoi entier (évènement aux matchs enchaînés) ; le staff peut en ajouter. */
 export const PLANNING_EVENT_REFEREES = 2;
 

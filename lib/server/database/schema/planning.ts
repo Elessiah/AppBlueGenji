@@ -96,7 +96,9 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       source ENUM('AUTO', 'MANUAL') NOT NULL,
       actor_user_id BIGINT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_bg_planning_events_entry (entry_key),
+      -- Le calcul lit les retraits manuels (REMOVED, MANUAL) des entrées du lot :
+      -- l'index les trouve sans filtrer, ligne à ligne, toute l'histoire d'une entrée.
+      INDEX idx_bg_planning_events_entry (entry_key, kind, source),
       INDEX idx_bg_planning_events_user (user_id),
       INDEX idx_bg_planning_events_actor (actor_user_id),
       INDEX idx_bg_planning_events_tournament (tournament_id),

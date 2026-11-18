@@ -10,6 +10,7 @@ import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
 import { rolesGranting } from "@/lib/shared/permissions";
 import {
+  PLANNING_HORIZON_DAYS,
   PLANNING_PAST_DAYS,
   planningEntryKey,
   planningHistoryStart,
@@ -90,6 +91,8 @@ export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole
 
 export type PlanningData = {
   entries: LoadedEntry[];
+  /** Réglages des durées, lus avec les entrées (une seule lecture par chargement). */
+  durations: PlanningDurationSettings;
   availability: LoadedAvailability[];
   assignments: LoadedAssignment[];
   removals: LoadedRemoval[];
@@ -225,38 +228,60 @@ function matchEntry(match: MatchRow, tournament: TournamentRow, durations: Plann
   };
 }
 
+/** Une seule entrée du planning, nommée par sa clé (`m:<id>` / `t:<id>`). */
+export type EntryOnly = { kind: PlanningEntryKind; id: number };
+
+/** Lit une clé d'entrée (`m:<id>` / `t:<id>`) ; `null` si ce n'en est pas une. */
+export function parseEntryKey(key: string): EntryOnly | null {
+  const found = /^([mt]):([1-9]\d{0,15})$/.exec(key);
+  if (!found) return null;
+  return { kind: found[1] === "m" ? "MATCH" : "TOURNAMENT", id: Number(found[2]) };
+}
+
+type EntriesOptions = {
+  now: number;
+  includeHidden: boolean;
+  /** Réduit la lecture à une entrée : un geste qui n'en touche qu'une ne charge pas toute la fenêtre. */
+  only?: EntryOnly;
+  durations?: PlanningDurationSettings;
+};
+
 /**
- * Les entrées du planning depuis {@link PLANNING_PAST_DAYS} jours : un tournoi
- * **sans** planification des matchs donne une seule entrée (le tournoi entier,
- * à son heure de début), un tournoi **avec** donne une entrée par match
- * planifié (hors exempts).
+ * Les entrées du planning, de {@link PLANNING_PAST_DAYS} jours en arrière à
+ * {@link PLANNING_HORIZON_DAYS} jours devant : un tournoi **sans**
+ * planification des matchs donne une seule entrée (le tournoi entier, à son
+ * heure de début), un tournoi **avec** donne une entrée par match planifié
+ * (hors exempts).
  */
-export async function loadPlanningEntries(
-  executor: Executor,
-  options: { now: number; includeHidden: boolean },
-): Promise<LoadedEntry[]> {
-  const durations = await loadDurationSettings(executor);
+export async function loadPlanningEntries(executor: Executor, options: EntriesOptions): Promise<LoadedEntry[]> {
+  const durations = options.durations ?? (await loadDurationSettings(executor));
   const from = new Date(options.now - PLANNING_PAST_DAYS * DAY_MS);
+  const to = new Date(options.now + PLANNING_HORIZON_DAYS * DAY_MS);
   const hiddenClause = options.includeHidden ? "" : " AND t.start_visibility_at <= NOW()";
+  const only = options.only;
+  const onlyTournament = only?.kind === "TOURNAMENT" ? " AND t.id = ?" : "";
+  const onlyMatchTournament =
+    only?.kind === "MATCH" ? " AND EXISTS (SELECT 1 FROM bg_matches om WHERE om.id = ? AND om.tournament_id = t.id)" : "";
   const [tournaments] = await executor.execute<TournamentRow[]>(
     `SELECT t.id, t.name, t.game, t.state, t.start_at, t.live_url, t.referee_scheduling,
             t.match_format_type, t.match_format_value, t.match_format_max_maps,
             (t.start_visibility_at > NOW()) AS hidden
        FROM bg_tournaments t
-      WHERE (t.start_at >= ?
+      WHERE ((t.start_at >= ? AND t.start_at < ?)
              OR (t.referee_scheduling = 1
                  AND EXISTS (SELECT 1 FROM bg_matches pm
-                              WHERE pm.tournament_id = t.id AND pm.start_at >= ? AND pm.is_bye = 0)))${hiddenClause}`,
-    [from, from],
+                              WHERE pm.tournament_id = t.id AND pm.start_at >= ? AND pm.start_at < ? AND pm.is_bye = 0)))${hiddenClause}${onlyTournament}${onlyMatchTournament}`,
+    [from, to, from, to, ...(only ? [only.id] : [])],
   );
   const entries: LoadedEntry[] = tournaments
     // Un tournoi entier n'est qu'une entrée, à son début : passé de
-    // `PLANNING_PAST_DAYS`, il sort du planning comme un match.
-    .filter((row) => Number(row.referee_scheduling) !== 1 && time(row.start_at) >= from.getTime())
+    // `PLANNING_PAST_DAYS`, ou au-delà de l'horizon, il sort du planning comme un match.
+    .filter((row) => Number(row.referee_scheduling) !== 1 && time(row.start_at) >= from.getTime() && time(row.start_at) < to.getTime())
     .map((row) => eventEntry(row, durations, options.now));
   const scheduled = tournaments.filter((row) => Number(row.referee_scheduling) === 1);
   if (scheduled.length > 0) {
     const byId = new Map(scheduled.map((row) => [Number(row.id), row]));
+    const onlyMatch = only?.kind === "MATCH" ? " AND m.id = ?" : "";
     const [matches] = await executor.execute<MatchRow[]>(
       `SELECT m.id, m.tournament_id, m.start_at, m.status, m.round_number, m.team1_id, m.team2_id,
               t1.name AS team1_name, t2.name AS team2_name, t1.solo_user_id AS team1_solo, t2.solo_user_id AS team2_solo,
@@ -265,8 +290,8 @@ export async function loadPlanningEntries(
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
          LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
         WHERE m.tournament_id IN (${inList(scheduled.length)})
-          AND m.is_bye = 0 AND m.start_at IS NOT NULL AND m.start_at >= ?`,
-      [...byId.keys(), from],
+          AND m.is_bye = 0 AND m.start_at IS NOT NULL AND m.start_at >= ? AND m.start_at < ?${onlyMatch}`,
+      [...byId.keys(), from, to, ...(only?.kind === "MATCH" ? [only.id] : [])],
     );
     for (const match of matches) {
       const tournament = byId.get(Number(match.tournament_id));
@@ -306,6 +331,14 @@ export async function loadPlanningMembers(executor: Executor): Promise<LoadedMem
     .filter((member) => member.roles.length > 0);
 }
 
+/** Les comptes réglés « caster autonome » (petite table : une ligne par compte qui l'a réglé). */
+export async function loadSoloCasterIds(executor: Executor): Promise<Set<number>> {
+  const [rows] = await executor.execute<(RowDataPacket & { user_id: number })[]>(
+    "SELECT user_id FROM bg_planning_profiles WHERE solo_caster = 1",
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
+}
+
 type AvailabilityRow = RowDataPacket & {
   entry_key: string;
   user_id: number;
@@ -327,45 +360,63 @@ type RemovalRow = RowDataPacket & { entry_key: string; user_id: number; role: Pl
 
 type CasterRow = RowDataPacket & { match_id: number; user_id: number };
 
-/** Tout le planning des entrées de la fenêtre, en six lectures au plus. */
-export async function loadPlanningData(
-  executor: Executor,
-  options: { now: number; includeHidden: boolean },
-): Promise<PlanningData> {
-  const entries = await loadPlanningEntries(executor, options);
-  const members = await loadPlanningMembers(executor);
-  const empty = { availability: [], assignments: [], removals: [], matchCasters: new Map<string, number[]>() };
-  if (entries.length === 0) return { entries, members, ...empty };
-  const keys = entries.map((entry) => entry.key);
-  const [availability] = await executor.execute<AvailabilityRow[]>(
-    `SELECT entry_key, user_id, role, status, preferred FROM bg_planning_availability
-      WHERE entry_key IN (${inList(keys.length)})`,
-    keys,
-  );
-  const [assignments] = await executor.execute<AssignmentRow[]>(
-    `SELECT entry_key, user_id, role, source, reason, confirmed FROM bg_planning_assignments
-      WHERE entry_key IN (${inList(keys.length)})`,
-    keys,
-  );
-  const [removals] = await executor.execute<RemovalRow[]>(
-    `SELECT DISTINCT entry_key, user_id, role FROM bg_planning_events
-      WHERE kind = 'REMOVED' AND source = 'MANUAL' AND entry_key IN (${inList(keys.length)})`,
-    keys,
-  );
-  const matchIds = entries.flatMap((entry) => (entry.matchId === null ? [] : [entry.matchId]));
+/** Les comptes déjà lus par l'appelant (page : copie brève, voir `view.ts`) : la lecture des membres n'est pas rejouée. */
+type DataOptions = { now: number; includeHidden: boolean; members?: LoadedMember[] };
+
+/** Les matchs de la fenêtre et leurs casters inscrits (`entryKey` → comptes), en une lecture. */
+async function loadMatchCasters(executor: Executor, matchIds: readonly number[]): Promise<Map<string, number[]>> {
   const matchCasters = new Map<string, number[]>();
-  if (matchIds.length > 0) {
-    const [casters] = await executor.execute<CasterRow[]>(
-      `SELECT match_id, user_id FROM bg_match_casters WHERE match_id IN (${inList(matchIds.length)}) ORDER BY user_id`,
-      matchIds,
-    );
-    for (const row of casters) {
-      const key = planningEntryKey("MATCH", Number(row.match_id));
-      matchCasters.set(key, [...(matchCasters.get(key) ?? []), Number(row.user_id)]);
-    }
+  if (matchIds.length === 0) return matchCasters;
+  const [casters] = await executor.execute<CasterRow[]>(
+    `SELECT match_id, user_id FROM bg_match_casters WHERE match_id IN (${inList(matchIds.length)}) ORDER BY user_id`,
+    [...matchIds],
+  );
+  for (const row of casters) {
+    const key = planningEntryKey("MATCH", Number(row.match_id));
+    const list = matchCasters.get(key);
+    if (list) list.push(Number(row.user_id));
+    else matchCasters.set(key, [Number(row.user_id)]);
   }
+  return matchCasters;
+}
+
+/**
+ * Tout le planning des entrées de la fenêtre, en sept lectures au plus (les
+ * durées, lues une seule fois, voyagent avec les entrées). Les lectures qui ne
+ * dépendent que des entrées partent ensemble : sur une connexion de la piscine,
+ * elles ne s'attendent pas l'une l'autre.
+ */
+export async function loadPlanningData(executor: Executor, options: DataOptions): Promise<PlanningData> {
+  const durations = await loadDurationSettings(executor);
+  const entries = await loadPlanningEntries(executor, { ...options, durations });
+  const keys = entries.map((entry) => entry.key);
+  const matchIds = entries.flatMap((entry) => (entry.matchId === null ? [] : [entry.matchId]));
+  const membersRead = options.members ? Promise.resolve(options.members) : loadPlanningMembers(executor);
+  if (entries.length === 0) {
+    return { entries, durations, members: await membersRead, availability: [], assignments: [], removals: [], matchCasters: new Map() };
+  }
+  const [members, [availability], [assignments], [removals], matchCasters] = await Promise.all([
+    membersRead,
+    executor.execute<AvailabilityRow[]>(
+      `SELECT entry_key, user_id, role, status, preferred FROM bg_planning_availability
+        WHERE entry_key IN (${inList(keys.length)})`,
+      keys,
+    ),
+    executor.execute<AssignmentRow[]>(
+      `SELECT entry_key, user_id, role, source, reason, confirmed FROM bg_planning_assignments
+        WHERE entry_key IN (${inList(keys.length)})`,
+      keys,
+    ),
+    executor.execute<RemovalRow[]>(
+      `SELECT DISTINCT entry_key, user_id, role FROM bg_planning_events
+        WHERE kind = 'REMOVED' AND source = 'MANUAL' AND entry_key IN (${inList(keys.length)})`,
+      keys,
+    ),
+    loadMatchCasters(executor, matchIds),
+  ]);
   return {
     entries,
+    durations,
     members,
     availability: availability.map((row) => ({
       entryKey: row.entry_key,

@@ -1,5 +1,6 @@
 import type { LoadedAssignment, LoadedEntry, LoadedMember, PlanningData } from "@/lib/server/planning/load";
 import { planningCoverage, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
+import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import type { PlannerAvailability, PlannerEntry, PlannerInput } from "@/lib/shared/planning-planner";
 import type { PlanningEntryView } from "@/lib/shared/planning-view";
 
@@ -74,6 +75,7 @@ export function loadedMember(overrides: Partial<LoadedMember> = {}): LoadedMembe
 export function planningData(overrides: Partial<PlanningData> = {}): PlanningData {
   return {
     entries: [],
+    durations: DEFAULT_PLANNING_DURATIONS,
     availability: [],
     assignments: [],
     removals: [],

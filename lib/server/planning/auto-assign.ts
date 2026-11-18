@@ -6,7 +6,7 @@
  * un geste à la fois.
  */
 import type { PoolConnection } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
@@ -189,6 +189,54 @@ export async function writeAssignment(
   return writeEvent(executor, entry, row.userId, row.role, "ASSIGNED", row.source, actorId);
 }
 
+/** Lignes par instruction d'écriture groupée. */
+const WRITE_CHUNK = 200;
+
+type PlannedRow = ReturnType<typeof planAssignments>[number];
+
+const planKey = (entryKey: string, userId: number, role: PlanningRole) => `${entryKey}|${userId}|${role}`;
+
+/**
+ * Écrit les propositions d'un lot en quelques instructions groupées (et non
+ * deux allers-retours par ligne, sous le verrou) : les lignes, puis un
+ * évènement `ASSIGNED` seulement pour celles qui diffèrent de la proposition
+ * précédente (même membre, même rôle, même motif : rien de nouveau à
+ * retracer). Relancer un lot inchangé n'ajoute donc aucun évènement.
+ */
+async function writeProposals(
+  executor: Executor,
+  planned: readonly PlannedRow[],
+  byKey: ReadonlyMap<string, LoadedEntry>,
+  previous: ReadonlyMap<string, string>,
+  actorId: number,
+): Promise<number> {
+  const rows = planned.flatMap((row) => {
+    const entry = byKey.get(row.entryKey);
+    return entry ? [{ row, entry }] : [];
+  });
+  for (let start = 0; start < rows.length; start += WRITE_CHUNK) {
+    const chunk = rows.slice(start, start + WRITE_CHUNK);
+    await executor.execute(
+      `INSERT INTO bg_planning_assignments
+         (entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, 'AUTO', ?, 0, ?)").join(", ")}
+       ON DUPLICATE KEY UPDATE source = VALUES(source), reason = VALUES(reason), confirmed = VALUES(confirmed),
+                               assigned_by_user_id = VALUES(assigned_by_user_id)`,
+      chunk.flatMap(({ row, entry }) => [entry.key, row.userId, row.role, entry.tournamentId, entry.matchId, row.reason, actorId]),
+    );
+  }
+  const changed = rows.filter(({ row }) => previous.get(planKey(row.entryKey, row.userId, row.role)) !== row.reason);
+  for (let start = 0; start < changed.length; start += WRITE_CHUNK) {
+    const chunk = changed.slice(start, start + WRITE_CHUNK);
+    await executor.execute(
+      `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, 'ASSIGNED', 'AUTO', ?)").join(", ")}`,
+      chunk.flatMap(({ row, entry }) => [entry.key, row.userId, row.role, entry.tournamentId, entry.matchId, actorId]),
+    );
+  }
+  return rows.length;
+}
+
 function affected(result: unknown): number {
   return Number((result as { affectedRows?: number }).affectedRows ?? 0);
 }
@@ -221,6 +269,12 @@ export async function runAutoAssign(
     const planned = planAssignments(preparePlanner(data, batch, history, excluded, planningWeekStart(anchor)));
     const keys = batch.map((entry) => entry.key);
     const byKey = new Map(batch.map((entry) => [entry.key, entry]));
+    // Les propositions provisoires que le lot remplace : de quoi ne retracer que ce qui change.
+    const previous = new Map(
+      data.assignments
+        .filter((row) => row.source === "AUTO" && !row.confirmed && byKey.has(row.entryKey))
+        .map((row) => [planKey(row.entryKey, row.userId, row.role), row.reason]),
+    );
     return transact(connection, async () => {
       await confirmPendingReferees(connection, actorId);
       const [cleared] = await connection.execute(
@@ -228,13 +282,7 @@ export async function runAutoAssign(
           WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
         keys,
       );
-      let proposed = 0;
-      for (const row of planned) {
-        const entry = byKey.get(row.entryKey);
-        if (!entry) continue;
-        await writeAssignment(connection, entry, { userId: row.userId, role: row.role, reason: row.reason, source: "AUTO" }, actorId);
-        proposed += 1;
-      }
+      const proposed = await writeProposals(connection, planned, byKey, previous, actorId);
       return { entries: batch.length, proposed, replaced: affected(cleared) };
     });
   });
@@ -417,10 +465,15 @@ export async function confirmAssignments(
   scope: ConfirmScope,
   now: number = Date.now(),
 ): Promise<ConfirmReport> {
+  // Les désignations d'arbitres de match (chacune sa transaction, son
+  // évènement) se font **avant** le verrou : le tenir pendant des dizaines
+  // d'entre elles ferait échouer en `PLANNING_BUSY` tout autre geste du staff.
+  // Elles sont idempotentes ; les écritures du planning, elles, sont sous le
+  // verrou et gardées (une proposition effacée entre-temps n'est pas confirmée).
+  const data = await withConnection((connection) => loadPlanningData(connection, { now, includeHidden: true }));
+  const all = confirmSteps(data, scope);
+  const failure = await designateReferees(all, actorId);
   return withPlanningLock(async (connection) => {
-    const data = await loadPlanningData(connection, { now, includeHidden: true });
-    const all = confirmSteps(data, scope);
-    const failure = await designateReferees(all, actorId);
     // Une panne en route : les désignations que le match a déjà décidées et
     // les autres rôles (casters, prods, qui ne dépendent d'aucun match)
     // s'écrivent quand même, puis la panne d'origine remonte (le geste se relance).

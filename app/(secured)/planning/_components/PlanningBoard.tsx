@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Star, X } from "lucide-react";
 import { Pill } from "@/components/cyber/Pill";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
@@ -24,6 +24,7 @@ import { scopedText } from "@/lib/shared/scoped-text";
 import {
   COVERAGE_PILL,
   NO_FILTERS,
+  applyAvailability,
   candidatesFor,
   errorKey,
   filterEntries,
@@ -32,6 +33,7 @@ import {
   hasProvisional,
   heldBy,
   leadUntil,
+  mergeView,
   tournamentChoices,
   weekWindow,
   type PlanningFilters,
@@ -94,7 +96,7 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   const load = useCallback(async () => {
     try {
       const body = await call<{ planning: PlanningView }>("/api/planning");
-      setView(body.planning);
+      setView((previous) => mergeView(previous, body.planning));
     } catch (error) {
       fail(error);
     }
@@ -104,41 +106,73 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
     void load();
   }, [load]);
 
-  /** Un geste à la fois ; la page se relit après chacun, réussi ou non. */
+  // Le geste en cours se lit dans une référence : `act` garde ainsi la même
+  // identité d'un geste à l'autre, et les cartes mémoïsées ne se redessinent pas.
+  const pendingRef = useRef<string | null>(null);
+
+  /**
+   * Un geste à la fois ; la page se relit après chacun, réussi ou non — sauf
+   * si `patch` dit comment le poser à la main sur la page (la disponibilité :
+   * le geste le plus fréquent), le geste réussi ne coûte alors aucune relecture.
+   */
   const act = useCallback(
-    async <T,>(gesture: string, task: () => Promise<T>, success: (result: T) => string): Promise<boolean> => {
-      if (pending !== null) return false;
+    async <T,>(gesture: string, task: () => Promise<T>, success: (result: T) => string, patch?: () => void): Promise<boolean> => {
+      if (pendingRef.current !== null) return false;
+      pendingRef.current = gesture;
       setPending(gesture);
+      let patched = false;
       try {
         const result = await task();
         showSuccess(success(result));
+        if (patch) {
+          patch();
+          patched = true;
+        }
         return true;
       } catch (error) {
         fail(error);
         return false;
       } finally {
-        await load();
+        if (!patched) await load();
+        pendingRef.current = null;
         setPending(null);
       }
     },
-    [pending, showSuccess, fail, load],
+    [showSuccess, fail, load],
   );
 
   const refresh = async () => {
-    if (pending !== null) return;
+    if (pendingRef.current !== null) return;
+    pendingRef.current = "refresh";
     setPending("refresh");
     await load();
+    pendingRef.current = null;
     setPending(null);
   };
 
-  const names = useMemo(() => new Map((view?.members ?? []).map((member) => [member.userId, member.pseudo])), [view]);
+  const confirmEntry = useCallback((key: string, slot: string) => setConfirming({ kind: "entry", key, slot }), []);
+  const saveAvailability = useCallback(
+    (change: Parameters<typeof applyAvailability>[1]) => setView((current) => (current ? applyAvailability(current, change) : current)),
+    [],
+  );
+
+  const members = view?.members;
+  const names = useMemo(() => new Map((members ?? []).map((member) => [member.userId, member.pseudo])), [members]);
+  // Ce que les cartes lisent du lecteur : stable tant que ces quatre valeurs le sont.
+  const me = view?.me;
+  const myRoles = view?.myRoles;
+  const canManage = view?.canManage;
+  const context = useMemo(
+    () => (me === undefined || !myRoles || canManage === undefined || !members ? null : { me, myRoles, canManage, members }),
+    [me, myRoles, canManage, members],
+  );
   const shown = useMemo(() => filterEntries(view?.entries ?? [], filters, view?.me ?? 0), [view, filters]);
   const weeks = useMemo(() => groupByWeek(shown), [shown]);
   const tournaments = useMemo(() => tournamentChoices(view?.entries ?? []), [view]);
   // Un tournoi choisi qui n'a plus de créneau (relecture) : le filtre retombe sur « tous ».
   const tournamentId = tournaments.some((choice) => choice.id === filters.tournamentId) ? filters.tournamentId : null;
 
-  if (!view) {
+  if (!view || !context) {
     return (
       <p className={styles.empty} aria-busy="true">
         {t("loading")}
@@ -271,14 +305,15 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
                       <EntryCard
                         key={entry.key}
                         entry={entry}
-                        view={view}
+                        view={context}
                         text={text}
                         names={names}
                         slot={slot}
                         until={format.time.format(Date.parse(entry.endAt))}
-                        pending={pending}
+                        pending={pendingFor(pending, entry.key)}
                         act={act}
-                        onConfirm={() => setConfirming({ kind: "entry", key: entry.key, slot: `${entry.tournamentName} · ${slot}` })}
+                        onConfirm={confirmEntry}
+                        onAvailability={saveAvailability}
                       />
                     );
                   })}
@@ -335,7 +370,19 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
 /** Le geste de confirmation en attente de l'accord du staff : une entrée, ou ce qui commence dans `hours` heures. */
 type ConfirmTarget = { kind: "entry"; key: string; slot: string } | { kind: "lead"; hours: number };
 
-type Act = <T>(gesture: string, task: () => Promise<T>, success: (result: T) => string) => Promise<boolean>;
+type Act = <T>(gesture: string, task: () => Promise<T>, success: (result: T) => string, patch?: () => void) => Promise<boolean>;
+
+/** Ce que les cartes lisent du lecteur (et non toute la page : une relecture sans effet sur elles ne les redessine pas). */
+type Reader = Pick<PlanningView, "me" | "myRoles" | "canManage" | "members">;
+
+/**
+ * Le geste en cours, vu d'une carte : le sien, ou `"other"` pour celui d'une
+ * autre — la carte ne change de propriétés que si le geste la concerne.
+ */
+function pendingFor(pending: string | null, entryKey: string): string | null {
+  if (pending === null) return null;
+  return pending.endsWith(`:${entryKey}`) || pending.includes(`:${entryKey}:`) ? pending : "other";
+}
 
 function Entrant({ entrant, text }: Readonly<{ entrant: PlanningEntrant | null; text: Text }>) {
   if (!entrant) return <span className={styles.muted}>{text.t("tbd")}</span>;
@@ -346,7 +393,7 @@ function Entrant({ entrant, text }: Readonly<{ entrant: PlanningEntrant | null; 
   );
 }
 
-function EntryCard({
+const EntryCard = memo(function EntryCard({
   entry,
   view,
   text,
@@ -356,16 +403,18 @@ function EntryCard({
   pending,
   act,
   onConfirm,
+  onAvailability,
 }: Readonly<{
   entry: PlanningEntryView;
-  view: PlanningView;
+  view: Reader;
   text: Text;
   names: ReadonlyMap<number, string>;
   slot: string;
   until: string;
   pending: string | null;
   act: Act;
-  onConfirm: () => void;
+  onConfirm: (key: string, slot: string) => void;
+  onAvailability: (change: Parameters<typeof applyAvailability>[1]) => void;
 }>) {
   const { t } = text;
   const coverage = entry.coverage;
@@ -408,7 +457,9 @@ function EntryCard({
         ))}
       </dl>
 
-      {view.myRoles.length > 0 && <MyAvailability entry={entry} view={view} text={text} pending={pending} act={act} />}
+      {view.myRoles.length > 0 && (
+        <MyAvailability entry={entry} view={view} text={text} pending={pending} act={act} onSaved={onAvailability} />
+      )}
 
       {view.canManage && entry.open && hasProvisional(entry) && (
         <BusyButton
@@ -416,14 +467,14 @@ function EntryCard({
           blocked={pending !== null}
           className={styles.button}
           aria-label={t("staff.confirmEntryLabel", { slot: label })}
-          onClick={onConfirm}
+          onClick={() => onConfirm(entry.key, label)}
         >
           {t("staff.confirmEntry")}
         </BusyButton>
       )}
     </li>
   );
-}
+});
 
 function RoleRow({
   role,
@@ -436,7 +487,7 @@ function RoleRow({
 }: Readonly<{
   role: PlanningRole;
   entry: PlanningEntryView;
-  view: PlanningView;
+  view: Reader;
   text: Text;
   names: ReadonlyMap<number, string>;
   pending: string | null;
@@ -520,7 +571,15 @@ function MyAvailability({
   text,
   pending,
   act,
-}: Readonly<{ entry: PlanningEntryView; view: PlanningView; text: Text; pending: string | null; act: Act }>) {
+  onSaved,
+}: Readonly<{
+  entry: PlanningEntryView;
+  view: Reader;
+  text: Text;
+  pending: string | null;
+  act: Act;
+  onSaved: (change: Parameters<typeof applyAvailability>[1]) => void;
+}>) {
   const { t } = text;
   if (!entry.open) return <p className={styles.muted}>{t("mine.closed")}</p>;
   const save = (role: PlanningRole, status: AvailabilityStatus, preferred: boolean) =>
@@ -528,6 +587,7 @@ function MyAvailability({
       `mine:${entry.key}:${role}`,
       () => call("/api/planning/availability", json("PUT", { entryKey: entry.key, role, status, preferred })),
       () => t("saved.availability"),
+      () => onSaved({ entryKey: entry.key, role, status, preferred }),
     );
   return (
     <div className={styles.mine}>

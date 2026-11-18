@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  applyAvailability,
   candidatesFor,
   COVERAGE_PILL,
   errorKey,
@@ -10,6 +11,7 @@ import {
   hasProvisional,
   heldBy,
   leadUntil,
+  mergeView,
   needsCover,
   NO_FILTERS,
   tournamentChoices,
@@ -18,7 +20,8 @@ import {
 import { PLANNING_STATUSES } from "@/lib/server/planning/actions";
 import enPlanning from "@/messages/en/planning.json";
 import frPlanning from "@/messages/fr/planning.json";
-import type { PlanningMember } from "@/lib/shared/planning-view";
+import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
+import type { PlanningMember, PlanningView } from "@/lib/shared/planning-view";
 import { planningCoverage } from "@/lib/shared/planning";
 import { entryView, HOUR_MS, MONDAY } from "../helpers/planning";
 
@@ -307,5 +310,139 @@ describe("filtersActive", () => {
 
   it("filtersActive_tournament_true", () => {
     expect(filtersActive({ ...NO_FILTERS, tournamentId: 3 })).toBe(true);
+  });
+});
+
+function viewOf(overrides: Partial<PlanningView> = {}): PlanningView {
+  return {
+    me: 1,
+    myRoles: ["CASTER"],
+    canManage: false,
+    entries: [entryView({ key: "m:1" }), entryView({ key: "m:2", matchId: 2 })],
+    members: [member()],
+    durations: DEFAULT_PLANNING_DURATIONS,
+    ...overrides,
+  };
+}
+
+describe("applyAvailability", () => {
+  it("applyAvailability_newAnswer_addedToMineOnly_whenNotManager", () => {
+    const view = viewOf();
+
+    const next = applyAvailability(view, { entryKey: "m:1", role: "CASTER", status: "AVAILABLE", preferred: true });
+
+    expect(next.entries[0].mine).toEqual([{ userId: 1, role: "CASTER", status: "AVAILABLE", preferred: true }]);
+    expect(next.entries[0].availability).toEqual([]);
+  });
+
+  it("applyAvailability_existingAnswer_replacedNotDuplicated", () => {
+    const row = { userId: 1, role: "CASTER" as const, status: "PENDING" as const, preferred: false };
+    const view = viewOf({ entries: [entryView({ key: "m:1", mine: [row] })] });
+
+    const next = applyAvailability(view, { entryKey: "m:1", role: "CASTER", status: "UNAVAILABLE", preferred: false });
+
+    expect(next.entries[0].mine).toEqual([{ ...row, status: "UNAVAILABLE" }]);
+  });
+
+  it("applyAvailability_otherRoleAndOtherUser_kept", () => {
+    const others = [
+      { userId: 1, role: "PROD" as const, status: "AVAILABLE" as const, preferred: false },
+      { userId: 2, role: "CASTER" as const, status: "AVAILABLE" as const, preferred: false },
+    ];
+    const view = viewOf({ canManage: true, entries: [entryView({ key: "m:1", availability: others })] });
+
+    const next = applyAvailability(view, { entryKey: "m:1", role: "CASTER", status: "PENDING", preferred: false });
+
+    expect(next.entries[0].availability).toHaveLength(3);
+    expect(next.entries[0].availability).toEqual(expect.arrayContaining(others));
+  });
+
+  it("applyAvailability_otherEntries_sameObjects", () => {
+    const view = viewOf();
+
+    const next = applyAvailability(view, { entryKey: "m:1", role: "CASTER", status: "AVAILABLE", preferred: false });
+
+    expect(next.entries[1]).toBe(view.entries[1]);
+    expect(next.members).toBe(view.members);
+  });
+
+  it("applyAvailability_unknownEntry_nothingChanges", () => {
+    const view = viewOf();
+
+    const next = applyAvailability(view, { entryKey: "m:99", role: "CASTER", status: "AVAILABLE", preferred: false });
+
+    expect(next.entries.every((entry, index) => entry === view.entries[index])).toBe(true);
+  });
+});
+
+describe("mergeView", () => {
+  it("mergeView_noPrevious_returnsNext", () => {
+    const next = viewOf();
+
+    expect(mergeView(null, next)).toBe(next);
+  });
+
+  it("mergeView_identicalReread_keepsEveryObject", () => {
+    const previous = viewOf();
+    const next = structuredClone(previous);
+
+    const merged = mergeView(previous, next);
+
+    expect(merged.entries).toBe(previous.entries);
+    expect(merged.members).toBe(previous.members);
+    expect(merged.myRoles).toBe(previous.myRoles);
+    expect(merged.durations).toBe(previous.durations);
+  });
+
+  it("mergeView_oneEntryChanged_onlyThatOneIsNew", () => {
+    const previous = viewOf();
+    const next = structuredClone(previous);
+    next.entries[1].open = false;
+
+    const merged = mergeView(previous, next);
+
+    expect(merged.entries[0]).toBe(previous.entries[0]);
+    expect(merged.entries[1]).toBe(next.entries[1]);
+    expect(merged.entries[1].open).toBe(false);
+  });
+
+  it("mergeView_entryRemovedOrAdded_listFollowsNext", () => {
+    const previous = viewOf();
+    const next = structuredClone(previous);
+    next.entries.pop();
+    next.entries.push(entryView({ key: "m:3", matchId: 3 }));
+
+    const merged = mergeView(previous, next);
+
+    expect(merged.entries.map((entry) => entry.key)).toEqual(["m:1", "m:3"]);
+    expect(merged.entries[0]).toBe(previous.entries[0]);
+  });
+
+  it("mergeView_membersChanged_newMembers", () => {
+    const previous = viewOf();
+    const next = structuredClone(previous);
+    next.members[0].soloCaster = true;
+
+    expect(mergeView(previous, next).members).toBe(next.members);
+  });
+});
+
+describe("groupByWeek — identité des entrées", () => {
+  it("groupByWeek_largeBatch_everyEntryGroupedOnceInOrder", () => {
+    const entries = Array.from({ length: 600 }, (_, i) => entryView({ key: `m:${i}`, startAt: iso(MONDAY + (599 - i) * HOUR_MS) }));
+
+    const weeks = groupByWeek(entries);
+
+    const flat = weeks.flatMap((week) => week.entries.map((entry) => Date.parse(entry.startAt)));
+    expect(flat).toHaveLength(600);
+    expect(flat).toEqual([...flat].sort((a, b) => a - b));
+    expect(weeks.reduce((sum, week) => sum + week.days.reduce((n, day) => n + day.entries.length, 0), 0)).toBe(600);
+  });
+
+  it("groupByWeek_sameEntriesTwice_sameGrouping", () => {
+    const entries = [entryView({ key: "m:2", startAt: iso(MONDAY + WEEK_MS) }), entryView({ key: "m:1", startAt: iso(MONDAY) })];
+
+    expect(groupByWeek(entries).map((week) => week.weekStart)).toEqual(groupByWeek(entries).map((week) => week.weekStart));
+    expect(groupByWeek(entries)).toHaveLength(2);
   });
 });
