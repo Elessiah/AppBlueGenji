@@ -29,7 +29,7 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles } from "@/lib/server/serialization";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import {
@@ -371,7 +371,7 @@ export async function loadNotificationRecipients(
   // Un compte suspendu n'est plus sollicité pour un rôle qu'il ne peut tenir
   // (avis du planning) ; les avis qui le concernent lui-même le joignent encore.
   const active = options.excludeSuspended
-    ? ` AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus WHERE sus.user_id = bg_users.id AND ${activeSuspensionSql("sus")})`
+    ? ` AND NOT ${userSuspendedSql("bg_users.id")}`
     : "";
   const select = (withMatchDm: boolean, withLocale: boolean) =>
     db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(

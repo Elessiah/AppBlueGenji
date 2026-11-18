@@ -35,7 +35,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 
 export function endpointHash(endpoint: string): string {
   return crypto.createHash("sha256").update(endpoint).digest("hex");
@@ -206,8 +206,7 @@ function reachableSubscriptionsSql(accounts: number, topic: PushTopic): string {
                          WHERE o.user_id = s.user_id AND o.topic = ?)${
                            restricted
                              ? `
-         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                         WHERE sus.user_id = s.user_id AND ${activeSuspensionSql("sus")})`
+         AND NOT ${userSuspendedSql("s.user_id")}`
                              : ""
                          }`;
 }
@@ -373,8 +372,7 @@ export async function loadStaffCandidates(options: { subscribedOnly: boolean }):
        AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)`
            : ""
        }
-       AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                        WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
+       AND NOT ${userSuspendedSql("u.id")}`,
   );
   return rows.map((row) => ({
     userId: Number(row.id),

@@ -35,7 +35,7 @@ import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs"
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { activeSuspensionSql, userSuspendedSql } from "@/lib/server/suspension-sql";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
 import { cancelPendingTeamInvitations, lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
@@ -149,10 +149,7 @@ async function loadSuccessorCandidates(
   const ids = rows.map((row) => Number(row.user_id));
   const [alive] = await connection.execute<(RowDataPacket & { id: number; suspended: number | string })[]>(
     `SELECT u.id,
-            EXISTS (
-              SELECT 1 FROM bg_account_suspensions s
-               WHERE s.user_id = u.id AND ${activeSuspensionSql("s")}
-            ) AS suspended
+            ${userSuspendedSql("u.id")} AS suspended
        FROM bg_users u
       WHERE u.is_deleted = 0 AND u.id IN (${ids.map(() => "?").join(", ")})`,
     ids,
@@ -297,10 +294,7 @@ async function findOrganizerSuccessor(
       WHERE u.is_deleted = 0
         AND u.id <> ?${onlyId === undefined ? "" : " AND u.id = ?"}
         AND (u.is_admin = 1 OR ${roleSql})
-        AND NOT EXISTS (
-          SELECT 1 FROM bg_account_suspensions s
-           WHERE s.user_id = u.id AND ${activeSuspensionSql("s")}
-        )
+        AND NOT ${userSuspendedSql("u.id")}
       ORDER BY (${roleSql}) DESC, u.created_at, u.id
       LIMIT 1`,
     onlyId === undefined ? [userId] : [userId, onlyId],
@@ -530,7 +524,7 @@ async function assertAnotherAdminRemains(connection: PoolConnection, userId: num
     // Un administrateur suspendu ne peut ouvrir de session (`assertNotSuspended`) :
     // il ne compte pas comme un administrateur restant.
     `SELECT id FROM bg_users u WHERE is_admin = 1 AND is_deleted = 0 AND id <> ?
-        AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = u.id AND ${activeSuspensionSql("s")})
+        AND NOT ${userSuspendedSql("u.id")}
       ORDER BY id`,
     [userId],
   );

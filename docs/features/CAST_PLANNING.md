@@ -382,19 +382,38 @@ Le motif d'un désistement n'est lu que du staff des tournois ; la pastille
 que plus personne n'est confirmé dans le rôle quitté (une proposition
 provisoire ne compte pas) ; l'avis au staff part,
 lui, dès qu'une attribution confirmée reste sans remplaçant (`unfilledRoles`).
-Un compte **suspendu** (`LoadedMember.suspended` : sous-requête à la lecture
-simple ; sous `lockedHolding`, lecture verrouillante **à part** de
-`bg_account_suspensions`, après les comptes — une sous-requête d'une lecture
-verrouillante n'est qu'un instantané) n'est plus ni proposé, ni confirmé, ni
-désigné, ni pris en remplaçant par le planning : `excludeSuspended` (tous les
-rôles) et `holdingRefusal` (`PLANNING_ROLE_NOT_HELD`, texte neutre « ne peut pas
-tenir ce rôle pour l'instant », la suspension n'est pas dite au staff des
-tournois), relu verrouillé juste avant chaque désignation d'arbitre de match
-(confirmation, remplaçant, choix à la main) ; la réconciliation
-(`confirmPendingReferees`, `CONFIRM_MATCH_REFEREE_SQL`) ne confirme pas sa
-ligne même si le match le porte. Ses attributions déjà posées restent jusqu'à
-ce que le staff les retire ; seul le staff des tournois voit un caster
-autonome suspendu ne plus couvrir seul son créneau. Jamais rendu à la page. Le staff des
+Un compte **suspendu** (`LoadedMember.suspended` : sous-requête
+`userSuspendedSql` à la lecture simple ; sous `lockedHolding`, lecture
+verrouillante **à part** de `bg_account_suspensions`, après les comptes — une
+sous-requête d'une lecture verrouillante n'est qu'un instantané) n'est plus ni
+proposé, ni confirmé, ni désigné, ni pris en remplaçant par le planning, ni
+prévenu par ses avis : `excludeSuspended` (tous les rôles) et `holdingRefusal`
+(`PLANNING_ROLE_NOT_HELD`, texte neutre « ne peut pas tenir ce rôle pour
+l'instant »). Une désignation d'arbitre de match par le planning (confirmation,
+remplaçant, choix à la main) passe `refuseSuspended` à `assignMatchReferee` :
+la suspension est relue (`refereeSuspended`, un seul compte, verrouillée après
+la ligne du compte, l'ordre de `suspendAccount`) **dans la transaction qui
+écrit le match** — aucune fenêtre entre contrôle et écriture ; refus
+`REFEREE_UNAVAILABLE`, rendu `PLANNING_ROLE_NOT_HELD` au choix à la main. La
+fenêtre « Arbitrage » du match ne passe pas l'option. La réconciliation
+(`confirmPendingReferees`) ne confirme pas la proposition d'un compte suspendu
+que le match porte d'ailleurs ; `CONFIRM_MATCH_REFEREE_SQL`, lui, suit la
+désignation que le geste vient de faire (déjà jugée : une suspension validée
+après elle trouve une affectation posée). Ses affectations confirmées restent
+jusqu'à ce que le staff les retire (retirer un arbitre de match le prévient par
+`REFEREE_RELEASED`, avis du match et non du planning, dont le push écarte déjà
+un compte suspendu) ; ses propositions encore provisoires tombent au calcul ou à
+la confirmation suivants. Un caster autonome suspendu ne couvre plus seul son
+créneau (`coveringSoloCasterIds`) pour le calcul (`preparePlanner`) et pour le
+staff des tournois ; les autres lecteurs gardent la couverture d'avant. Le
+staff des tournois peut donc **déduire** qu'un compte n'est plus retenu (déclaré :
+registre T11 et T20, `/rgpd` §5), sans voir la suspension ni ses motifs.
+Coût des verrous : la lecture verrouillante des suspensions de `lockedHolding`
+pose des verrous de clé suivante sur `(user_id, lifted_at)` le temps de la
+transaction du planning (courte, sérialisée par le verrou nommé) : une
+suspension d'un compte voisin attend au plus cette transaction, sans
+interblocage (même ordre que `suspendAccount`).
+Le drapeau `suspended` n'est jamais rendu à la page. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :

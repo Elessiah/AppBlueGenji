@@ -11,6 +11,7 @@ import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView
 import {
   loadPlanningData,
   loadPlanningMembers,
+  coveringSoloCasterIds,
   loadPlanningMembersByIds,
   type Executor,
   type LoadedEntry,
@@ -97,11 +98,9 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       ...(canManage ? {} : { availabilityOf: user.id }),
     }),
   );
-  // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, qui doit le pourvoir ;
-  // les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
-  const solo = new Set(
-    data.members.filter((member) => member.soloCaster && !(canManage && member.suspended)).map((member) => member.userId),
-  );
+  // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
+  // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
+  const solo = coveringSoloCasterIds(data.members, canManage);
   const availabilityByEntry = groupByEntry(data.availability);
   const withdrawalsByEntry = groupByEntry(data.withdrawals);
   const entries: PlanningEntryView[] = data.entries.map((entry) => {

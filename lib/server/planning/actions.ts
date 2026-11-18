@@ -247,16 +247,15 @@ async function assignManually({ connection, actor, data, entry, input, current, 
     return;
   }
   try {
-    // Relu verrouillé juste avant la désignation (le contrôle de la transaction est déjà validé) : une
-    // suspension ou un retrait de rôle posé entre-temps refuse, et le geste se défait comme sur un refus.
-    const holds = await lockedHolding(connection, [{ userId: input.userId, entry }]);
-    const late = holds(input.userId, entry, input.role);
-    if (late !== null) throw new Error(late);
-    await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId);
+    // Suspension jugée dans la transaction même du match (`refuseSuspended`) : une suspension posée
+    // depuis le contrôle du planning refuse, et le geste se défait comme sur un refus.
+    await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId, { refuseSuspended: true });
   } catch (error) {
     const took = await settleFailedDesignation(error, matchId, input.userId, undo, eventIds);
     // Issue incertaine : le match a pu garder son arbitre, l'historique ne dit pas qu'il l'a perdu.
     if (took === undefined && carriedEvent !== undefined) await undoPlanningBlock({ keys: [], rows: [] }, [carriedEvent]);
+    // Même texte neutre que le contrôle du planning : la suspension n'est pas dite au staff des tournois.
+    if (error instanceof Error && error.message === "REFEREE_UNAVAILABLE") throw new Error("PLANNING_ROLE_NOT_HELD");
     throw error;
   }
 }

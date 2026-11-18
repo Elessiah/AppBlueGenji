@@ -303,11 +303,11 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     expect(result.replaced).toBe(true);
     expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([
       [1, 3, null, 3],
-      [1, 3, 5, null],
+      [1, 3, 5, null, { refuseSuspended: true }],
     ]);
   });
 
-  it("withdrawFromEntry_refereeReplacementSuspendedUnderLock_slotUnfilledMatchUntouched", async () => {
+  it("withdrawFromEntry_refereeReplacementUnavailable_slotUnfilledNoRow", async () => {
     const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 })];
     jest
       .mocked(loadPlanningData)
@@ -322,12 +322,13 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
           removals: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }],
         }),
       );
-    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 5, suspended: true })]);
+    jest.mocked(assignMatchReferee).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("REFEREE_UNAVAILABLE"));
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: true });
-    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, null, 3]]);
+    expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, 3, 5, null, { refuseSuspended: true }]);
+    expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
   });
 
   it("withdrawFromEntry_matchRefereeChangedMeanwhile_noReplacementNorOpenSlot", async () => {
@@ -371,7 +372,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: true, unfilled: false });
-    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, 5, null]]);
+    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, 5, null, { refuseSuspended: true }]]);
   });
 
   it("withdrawFromEntry_matchRefusesRelease_rethrowsAfterUndo", async () => {

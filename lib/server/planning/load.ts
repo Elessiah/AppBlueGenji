@@ -9,7 +9,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
 import { toIso } from "@/lib/server/serialization";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { activeSuspensionSql, userSuspendedSql } from "@/lib/server/suspension-sql";
 import { can, rolesGranting } from "@/lib/shared/permissions";
 import {
   PLANNING_HORIZON_DAYS,
@@ -340,8 +340,21 @@ type MemberRow = RowDataPacket & {
   suspended: number;
 };
 
+/**
+ * Les casters autonomes qui couvrent seuls leur créneau. `skipSuspended` :
+ * un caster autonome suspendu ne compte plus (calcul et staff des tournois,
+ * qui doivent pourvoir sa place) ; les autres lecteurs gardent la couverture
+ * d'avant, rien n'y trahit la suspension.
+ */
+export function coveringSoloCasterIds(
+  members: readonly Pick<LoadedMember, "userId" | "soloCaster" | "suspended">[],
+  skipSuspended: boolean,
+): Set<number> {
+  return new Set(members.filter((member) => member.soloCaster && !(skipSuspended && member.suspended)).map((member) => member.userId));
+}
+
 /** Une suspension qui court tient le compte `u` (sous-requête, lue avec la ligne du compte). */
-const MEMBER_SUSPENDED_SQL = `EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = u.id AND ${activeSuspensionSql("s")}) AS suspended`;
+const MEMBER_SUSPENDED_SQL = `${userSuspendedSql("u.id")} AS suspended`;
 
 /** Comptes qui tiennent un rôle du planning (droits **réels**, la vue joueur n'y change rien). */
 export async function loadPlanningMembers(executor: Executor): Promise<LoadedMember[]> {

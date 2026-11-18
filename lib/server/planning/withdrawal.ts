@@ -145,12 +145,9 @@ async function placeReplacement(
 ): Promise<boolean> {
   const matchReferee = entry.kind === "MATCH" && pick.role === "REFEREE" && entry.matchId !== null;
   if (matchReferee && confirmed) {
-    // Relu verrouillé juste avant la désignation : le choix vient de la lecture du début du geste, un
-    // rôle retiré ou une suspension posée depuis laisse la place à pourvoir (le match n'est pas touché).
-    const holds = await lockedHolding(connection, [{ userId: pick.userId, entry }]);
-    if (holds(pick.userId, entry, pick.role) !== null) return false;
     try {
-      await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null);
+      // Suspension jugée dans la transaction même du match : posée depuis le choix, la place reste à pourvoir.
+      await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null, { refuseSuspended: true });
     } catch (error) {
       if (!isMatchRefereeRefusal(error)) console.error("[planning] remplaçant d'arbitre non posé.", failureReason(error));
       return false;

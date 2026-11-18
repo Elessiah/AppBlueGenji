@@ -932,8 +932,11 @@ export function RgpdEn({
             A member of moderation can <strong>suspend an account</strong> contrary to the terms of use, for a fixed
             or indefinite period: all its sessions are closed and no login is possible while the suspension runs;
             if it referees, casts or produces, it is no longer proposed, confirmed, assigned or taken as a replacement
-            by the schedule, nor notified by it; the assignments it already held stay until the tournament staff
-            removes them (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
+            by the schedule, nor sent its notices (new slots, assignments, withdrawals, open slots); its confirmed
+            assignments stay until the tournament staff removes them, and its still-provisional proposals drop at the
+            next calculation or confirmation; the tournament staff can only infer that the schedule no longer retains
+            it (it is no longer proposed there, and a slot it streamed alone no longer counts as covered there),
+            without seeing the suspension or its reasons (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
           <ul>
             <li>

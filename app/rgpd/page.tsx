@@ -1122,8 +1122,12 @@ function RgpdFr({
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
             sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
             s&apos;il arbitre, caste ou produit, il n&apos;est plus ni proposé, ni confirmé, ni désigné, ni
-            pris en remplaçant par le planning, ni prévenu par lui ; les attributions qu&apos;il tenait déjà
-            restent jusqu&apos;à ce que le staff des tournois les retire (<Link href="/rgpd/registre#t20">registre, T20</Link>).
+            pris en remplaçant par le planning, ni prévenu par ses avis (nouveaux créneaux, affectations,
+            désistements, places à pourvoir) ; ses affectations confirmées restent jusqu&apos;à ce que le staff
+            des tournois les retire, ses propositions encore provisoires tombent au calcul ou à la confirmation
+            qui suivent ; le staff des tournois peut seulement en déduire que le planning ne le retient plus (il
+            n&apos;y est plus proposé, et un créneau qu&apos;il diffusait seul n&apos;y est plus compté couvert),
+            sans voir la suspension ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <ul>
             <li>

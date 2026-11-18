@@ -14,7 +14,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { readWithLocaleColumn, withRowLocale } from "@/lib/server/users/account-locale";
 import { notifyUsers, type NotificationReport } from "@/lib/server/notify";
 import { siteCanonicalBase, siteUrl } from "@/lib/server/site-url";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { withoutOptedOutDiscord } from "@/lib/server/users/match-dm-preference";
 import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import { teamInvitationPush } from "@/lib/shared/push-messages";
@@ -127,8 +127,7 @@ export async function notifyTeamInvite(
   const [accounts] = await readWithLocaleColumn((withLocale) =>
     db.execute<AccountRow[]>(
       `SELECT u.id, u.pseudo, u.is_deleted, u.discord_id, u.discord_pseudo, u.discord_verified_at${withLocale ? ", u.locale" : ""},
-              EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                      WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")}) AS suspended
+              ${userSuspendedSql("u.id")} AS suspended
        FROM bg_users u WHERE u.id = ? LIMIT 1`,
       [userId],
     ),

@@ -345,7 +345,7 @@ describe("setManualAssignment — pose", () => {
 
     await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
 
-    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, 7);
+    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, 7, { refuseSuspended: true });
     expect(callsWith("role = 'REFEREE' AND user_id <> ?")[0][1]).toEqual(["m:1", 3]);
     expect(callsWith("UPDATE bg_matches")).toEqual([]);
   });
@@ -571,19 +571,24 @@ describe("setManualAssignment — pose", () => {
     expect(callsWith("INSERT IGNORE")).toHaveLength(1);
   });
 
-  it("setManualAssignment_matchRefereeSuspendedAfterCommit_refusedAndUndone", async () => {
+  it("setManualAssignment_matchRefereeUnavailable_neutralRefusalAndUndone", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
     routeSql({ rows: [assignmentRow()], matchReferee: 7 });
-    jest
-      .mocked(loadPlanningMembersByIds)
-      .mockResolvedValueOnce([loadedMember({ userId: 3, roles: ["REFEREE"] })])
-      .mockResolvedValueOnce([loadedMember({ userId: 3, roles: ["REFEREE"], suspended: true })]);
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("REFEREE_UNAVAILABLE"));
 
     await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
       "PLANNING_ROLE_NOT_HELD",
     );
-    expect(assignMatchReferee).not.toHaveBeenCalled();
     expect(callsWith("INSERT IGNORE")).toHaveLength(1);
+  });
+
+  it("setManualAssignment_matchReferee_onePlanningReReadOnly", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ matchReferee: 7 });
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(loadPlanningMembersByIds).toHaveBeenCalledTimes(1);
   });
 
   it("setManualAssignment_matchAlreadyHasWanted_noDesignationCall", async () => {

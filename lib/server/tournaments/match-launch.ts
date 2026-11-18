@@ -79,6 +79,7 @@ import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction, transact } from "./transaction";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -1629,7 +1630,12 @@ function assertOpenMatch(row: { status: string; is_bye: number } | undefined): v
  * match déjà prêt : un seul « Prêt » vaut pour les deux (`writeCasterReady`),
  * sa modale le montre prêt, le lancement ne doit pas l'attendre une seconde fois.
  */
-async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, refereeId: number): Promise<void> {
+async function writeReferee(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  refereeId: number,
+  refuseSuspended = false,
+): Promise<void> {
   // Lecture verrouillée : une suppression du compte en cours (verrou exclusif
   // sur sa ligne) est attendue puis lue, sans quoi l'arbitre désigné serait le
   // compte anonymisé, sur un match que son retrait n'avait pas vu. Condition
@@ -1642,12 +1648,29 @@ async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, ref
   // son balayage le voit, ou bien ce geste attend qu'elle le soit et la lit
   // (`referee-objection.ts`).
   if (standing.objection) throw new Error("REFEREE_OBJECTION");
+  if (refuseSuspended && (await refereeSuspended(connection, refereeId))) throw new Error("REFEREE_UNAVAILABLE");
   if (await resolveTeamParty(connection, row, refereeId)) throw new Error("REFEREE_IS_PLAYER");
   const casterReadyAt = row.casters.find((caster) => caster.userId === refereeId)?.readyAt ?? null;
   await connection.execute(
     `UPDATE bg_matches SET referee_user_id = ?, referee_ready_at = ?, self_managed = 0 WHERE id = ?`,
     [refereeId, casterReadyAt, row.id],
   );
+}
+
+/**
+ * Une suspension court-elle sur ce compte ? Lecture courante (verrouillante)
+ * d'**un seul** compte, dans la transaction de la désignation, **après** la
+ * ligne du compte (tenue en partage par `loadRefereeStanding`) — l'ordre de
+ * `suspendAccount`, qui tient le compte en exclusif jusqu'à sa validation :
+ * une suspension posée pendant le geste est attendue puis lue, jamais
+ * contournée entre un contrôle et l'écriture.
+ */
+async function refereeSuspended(connection: PoolConnection, refereeId: number): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT s.id FROM bg_account_suspensions s WHERE s.user_id = ? AND ${activeSuspensionSql("s")} LIMIT 1 LOCK IN SHARE MODE`,
+    [refereeId],
+  );
+  return rows.length > 0;
 }
 
 /**
@@ -1781,13 +1804,17 @@ function assertExpectedReferee(current: number | null, expected: number | null |
  *
  * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
  *   | `NOT_REFEREE` | `REFEREE_IDENTITY_REQUIRED` | `REFEREE_OBJECTION` | `REFEREE_IS_PLAYER`
- *   | `REFEREE_CHANGED`
+ *   | `REFEREE_CHANGED` | `REFEREE_UNAVAILABLE` (`refuseSuspended` : compte suspendu)
+ *
+ * `options.refuseSuspended` (planning) : un compte suspendu n'est pas désigné,
+ * contrôle fait **dans** la transaction qui écrit le match (`refereeSuspended`).
  */
 export async function assignMatchReferee(
   matchId: number,
   staffUserId: number,
   refereeId: number | null,
   expected?: number | null,
+  options: { refuseSuspended?: boolean } = {},
 ): Promise<void> {
   if (refereeId === null) {
     await releaseReferee(matchId, staffUserId, true, expected);
@@ -1803,7 +1830,7 @@ export async function assignMatchReferee(
         return null;
       }
       assertExpectedReferee(current, expected);
-      await writeReferee(connection, row, refereeId);
+      await writeReferee(connection, row, refereeId, options.refuseSuspended === true);
       queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current, actorId: staffUserId });
       return Number(row.tournament_id);
     }),

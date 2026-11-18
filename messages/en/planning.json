@@ -139,6 +139,7 @@
     "REFEREE_OBJECTION": "A team in the match objects to this referee.",
     "REFEREE_IS_PLAYER": "This referee plays in this match.",
     "REFEREE_CHANGED": "The match referee just changed. The page is reloaded.",
+    "REFEREE_UNAVAILABLE": "This account cannot hold this role for now.",
     "CONCURRENT_UPDATE_RETRY": "The schedule just changed, try again.",
     "INVALID_WINDOW": "Invalid period (31 days at most).",
     "INVALID_CONFIRM_SCOPE": "Nothing to confirm in this selection.",

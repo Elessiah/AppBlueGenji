@@ -12,7 +12,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/shared/planning-planner";
 import type { AutoAssignReport, ConfirmReport } from "@/lib/shared/planning-view";
 import {
+  coveringSoloCasterIds,
   loadPlanningData,
   loadHiddenTournamentIds,
   loadPlanningHistory,
@@ -181,7 +182,7 @@ export function preparePlanner(
     })),
     availability: data.availability,
     members: new Map(data.members.map((member) => [member.userId, member.roles])),
-    soloCasterIds: new Set(data.members.filter((member) => member.soloCaster).map((member) => member.userId)),
+    soloCasterIds: coveringSoloCasterIds(data.members, true),
     locked,
     refereeDecided: new Set(data.entries.filter((entry) => entry.selfManaged).map((entry) => entry.key)),
     history,
@@ -455,7 +456,8 @@ type MatchRefereeRefusal =
   | "MATCH_NOT_FOUND"
   | "MATCH_ALREADY_COMPLETED"
   | "MATCH_NOT_LAUNCHABLE"
-  | "REFEREE_CHANGED";
+  | "REFEREE_CHANGED"
+  | "REFEREE_UNAVAILABLE";
 
 // La liste unique, que la route des gestes reprend (`PLANNING_STATUSES`). Un
 // motif d'inéligibilité ajouté (`RefereeIneligibility`) sans entrée ici ne
@@ -470,6 +472,7 @@ const MATCH_REFEREE_REFUSAL_SET = {
   REFEREE_OBJECTION: true,
   REFEREE_IS_PLAYER: true,
   REFEREE_CHANGED: true,
+  REFEREE_UNAVAILABLE: true,
 } satisfies Record<MatchRefereeRefusal, true>;
 
 export const MATCH_REFEREE_REFUSAL_CODES = Object.keys(MATCH_REFEREE_REFUSAL_SET) as readonly MatchRefereeRefusal[];
@@ -540,15 +543,21 @@ export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmSt
 
 /** Confirme une proposition d'arbitre de match **seulement** si le match a (encore) cet arbitre. */
 /**
- * Le compte de la ligne `a` n'est pas suspendu : une suspension laisse le
- * match tel quel (il fait foi), mais le planning n'en confirme pas la ligne.
+ * Le compte de la ligne `a` n'est pas suspendu : la réconciliation laisse
+ * provisoire la proposition d'un compte suspendu que le match porte d'ailleurs.
  */
-const NOT_SUSPENDED_SQL = (alias: string) =>
-  `NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = ${alias}.user_id AND ${activeSuspensionSql("s")})`;
+const NOT_SUSPENDED_SQL = (alias: string) => "NOT " + userSuspendedSql(alias + ".user_id");
 
-const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments a SET a.confirmed = 1
-  WHERE a.entry_key = ? AND a.user_id = ? AND a.role = 'REFEREE' AND a.confirmed = 0
-    AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?) AND ${NOT_SUSPENDED_SQL("a")}`;
+/*
+ * Sans contrôle de suspension : ce geste vient de désigner cet arbitre, et la
+ * désignation l'a jugée dans la transaction du match (`refuseSuspended`). Une
+ * suspension validée après elle trouve une affectation déjà posée — elle
+ * reste, la ligne suit le match qui fait foi (jamais un match qui porte
+ * l'arbitre et un planning qui le montre en simple proposition).
+ */
+const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
+  WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
+    AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
 
 /** Retire une proposition d'arbitre de match refusée, **sauf** si le match porte cet arbitre (il fait foi). */
 const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
@@ -623,13 +632,8 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
           step.onMatchBefore = true;
           return;
         }
-        // Relu juste avant la désignation : un rôle retiré ou une suspension posée depuis la lecture refuse.
-        const holds = await lockedHolding(connection, [{ userId: step.userId, entry: step.entry }]);
-        if (holds(step.userId, step.entry, step.role) !== null) {
-          step.refused = true;
-          return;
-        }
-        await assignMatchReferee(matchId, actorId, step.userId, null);
+        // Suspension jugée dans la transaction même du match : posée depuis la lecture, elle refuse.
+        await assignMatchReferee(matchId, actorId, step.userId, null, { refuseSuspended: true });
       });
     } catch (error) {
       if (!isMatchRefereeRefusal(error)) {

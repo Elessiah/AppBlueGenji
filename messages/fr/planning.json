@@ -139,6 +139,7 @@
     "REFEREE_OBJECTION": "Une équipe du match s'oppose à cet arbitre.",
     "REFEREE_IS_PLAYER": "Cet arbitre joue ce match.",
     "REFEREE_CHANGED": "L'arbitre du match vient de changer. La page est rechargée.",
+    "REFEREE_UNAVAILABLE": "Ce compte ne peut pas tenir ce rôle pour l'instant.",
     "CONCURRENT_UPDATE_RETRY": "Le planning vient de changer, réessaie.",
     "INVALID_WINDOW": "Période invalide (31 jours au plus).",
     "INVALID_CONFIRM_SCOPE": "Rien à confirmer dans cette sélection.",

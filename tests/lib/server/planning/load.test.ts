@@ -4,6 +4,7 @@ jest.mock("@/lib/server/auth");
 
 import { resolveRoles } from "@/lib/server/auth";
 import {
+  coveringSoloCasterIds,
   distinctRemovals,
   loadPlanningData,
   loadPlanningEntries,
@@ -305,7 +306,7 @@ describe("loadPlanningMembers", () => {
     await loadPlanningMembers(executor);
 
     const [sql] = connection.execute.mock.calls[0];
-    expect(sql).toContain("FROM bg_account_suspensions s WHERE s.user_id = u.id");
+    expect(sql).toContain("FROM bg_account_suspensions sus WHERE sus.user_id = u.id");
     expect(sql).toContain("AS suspended");
   });
 
@@ -316,6 +317,22 @@ describe("loadPlanningMembers", () => {
     const [member] = await loadPlanningMembers(executor);
 
     expect(member.suspended).toBe(false);
+  });
+});
+
+describe("coveringSoloCasterIds", () => {
+  const members = [
+    loadedMember({ userId: 3, soloCaster: true }),
+    loadedMember({ userId: 4, soloCaster: true, suspended: true }),
+    loadedMember({ userId: 5, soloCaster: false }),
+  ];
+
+  it("coveringSoloCasterIds_skipSuspended_excludesSuspendedSolo", () => {
+    expect([...coveringSoloCasterIds(members, true)]).toEqual([3]);
+  });
+
+  it("coveringSoloCasterIds_keepSuspended_includesSuspendedSolo", () => {
+    expect([...coveringSoloCasterIds(members, false)]).toEqual([3, 4]);
   });
 });
 
