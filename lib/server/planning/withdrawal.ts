@@ -40,7 +40,7 @@ import {
   withPlanningLock,
   writeEvent,
 } from "./auto-assign";
-import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type PlanningData } from "./load";
+import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type LoadedMember, type PlanningData } from "./load";
 import { entryAssignments } from "./model";
 import { announceWithdrawal } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, type PlanningUndo } from "./planning-undo";
@@ -114,8 +114,10 @@ async function findReplacement(
   entryKey: string,
   role: PlanningRole,
   now: number,
+  members: LoadedMember[],
 ): Promise<{ data: PlanningData; entry: LoadedEntry | undefined; pick: PlannedAssignment | null }> {
-  const data = await loadPlanningData(connection, { now, includeHidden: true });
+  // Relu après le retrait (les affectations ont changé), mais pas les membres : déjà lus sous le même verrou.
+  const data = await loadPlanningData(connection, { now, includeHidden: true, members });
   const entry = data.entries.find((candidate) => candidate.key === entryKey);
   if (!entry?.open || !entry.editable) return { data, entry, pick: null };
   const anchor = Math.max(now, entry.startAt);
@@ -251,7 +253,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
         coAssignedIds: coAssigned(entry, data, user.id, heldBy),
       };
     }
-    const found = await findReplacement(connection, entry.key, input.role, now);
+    const found = await findReplacement(connection, entry.key, input.role, now, data.members);
     const fresh = found.entry ?? entry;
     const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, user.id));
     const replacementId = placed && found.pick ? found.pick.userId : null;

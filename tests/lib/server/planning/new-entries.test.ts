@@ -244,6 +244,24 @@ describe("collectWave", () => {
     expect(statements()).not.toContain("UPDATE bg_planning_entry_notices SET ann");
   });
 
+  it("collectWave_pendingEntryHidden_seenAtRestampedSoItJoinsTheNextWave", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: true })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_MAX_WAIT_MS), announced_at: null }]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    const update = execute.mock.calls.find(([sql]) => sql.includes("SET seen_at = ?"));
+    expect(update?.[1]).toEqual([new Date(NOW), "m:1"]);
+  });
+
+  it("collectWave_noHiddenPending_noRestamp", async () => {
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW), announced_at: null }]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET seen_at = ?"))).toBe(false);
+  });
+
   it("collectWave_rehiddenEntryVisibleAgain_announcedInWave", async () => {
     jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: false })]);
     knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
@@ -276,6 +294,20 @@ describe("announceWave", () => {
     expect(notifyUsers).toHaveBeenCalledTimes(1);
     expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 6], "proven"]);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_NEW_ENTRIES", dmFollowsTopic: true });
+  });
+
+  it("announceWave_differentListsPerMember_recipientsLoadedOnceAndOneSendPerList", async () => {
+    jest.mocked(loadPlanningMembers).mockResolvedValue([
+      loadedMember({ userId: 4, roles: ["CASTER"] }),
+      loadedMember({ userId: 6, roles: ["REFEREE"] }),
+    ]);
+    jest.mocked(loadEligibleRefereeIds).mockImplementation(async (_executor, _ids, game) => (game === "OW" ? new Set([6]) : new Set<number>()));
+
+    await announceWave(fakeConnection(connection), [loadedEntry({ game: "OW" }), loadedEntry({ key: "m:2", matchId: 2, game: "MR" })]);
+
+    expect(loadNotificationRecipients).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(loadEligibleRefereeIds).toHaveBeenCalledTimes(2);
   });
 
   it("announceWave_emptyWave_sendsNothing", async () => {

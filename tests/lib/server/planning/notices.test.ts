@@ -71,6 +71,27 @@ describe("announceAssignments", () => {
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_ASSIGNED", dmFollowsTopic: true });
   });
 
+  it("announceAssignments_sameListForTwoUsers_oneSendForBoth", async () => {
+    const entry = loadedEntry();
+
+    await announceAssignments([
+      { userId: 4, entry, role: "CASTER" },
+      { userId: 6, entry, role: "CASTER" },
+    ]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(notifyUsers).mock.calls[0][0].map((recipient) => recipient.userId)).toEqual([4, 6]);
+  });
+
+  it("announceAssignments_differentLists_oneSendPerList", async () => {
+    await announceAssignments([
+      { userId: 4, entry: loadedEntry(), role: "CASTER" },
+      { userId: 6, entry: loadedEntry(), role: "PROD" },
+    ]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+  });
+
   it("announceAssignments_onlyTheActor_sendsNothing", async () => {
     await announceAssignments([{ userId: 9, entry: loadedEntry(), role: "REFEREE" }], { actorId: 9 });
 

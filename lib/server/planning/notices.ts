@@ -43,6 +43,9 @@ export function noticeEntry(entry: LoadedEntry): PlanningNoticeEntry {
   };
 }
 
+/** Envois d'affectations lancés en même temps. */
+const ASSIGNMENT_SEND_CONCURRENCY = 4;
+
 /** Une affectation à annoncer : à qui, sur quelle entrée, dans quel rôle. */
 export type AssignmentNotice = { userId: number; entry: LoadedEntry; role: PlanningRole };
 
@@ -67,18 +70,33 @@ export async function announceAssignments(
     const recipients = await loadNotificationRecipients([...byUser.keys()], "proven");
     const base = siteCanonicalBase();
     const replacement = options.replacement === true;
+    // Les personnes qui reçoivent la même liste partent en un envoi (une
+    // confirmation de semaine en groupe : quelques envois, non un par membre).
+    const groups = new Map<string, { list: PlanningNoticeAssignment[]; recipients: typeof recipients }>();
     for (const recipient of recipients) {
       const list = (byUser.get(recipient.userId) ?? []).sort((a, b) => a.startAt.localeCompare(b.startAt));
       if (list.length === 0) continue;
-      await notifyUsers([recipient], {
-        topic: "PLANNING_ASSIGNED",
-        push: (locale) => planningAssignedPush(list, locale, replacement),
-        discord: {
-          message: (locale) => formatPlanningAssignedDm(list, base, locale, replacement),
-          context: replacement ? "planning-replacement" : "planning-assigned",
-        },
-        dmFollowsTopic: true,
-      });
+      const signature = list.map((item) => `${item.key}:${item.role}`).join("|");
+      const group = groups.get(signature) ?? { list, recipients: [] };
+      group.recipients.push(recipient);
+      groups.set(signature, group);
+    }
+    const batches = [...groups.values()];
+    // Par paquets : les envois partent ensemble, sans inonder le bot ni la base.
+    for (let index = 0; index < batches.length; index += ASSIGNMENT_SEND_CONCURRENCY) {
+      await Promise.all(
+        batches.slice(index, index + ASSIGNMENT_SEND_CONCURRENCY).map(({ list, recipients: group }) =>
+          notifyUsers(group, {
+            topic: "PLANNING_ASSIGNED",
+            push: (locale) => planningAssignedPush(list, locale, replacement),
+            discord: {
+              message: (locale) => formatPlanningAssignedDm(list, base, locale, replacement),
+              context: replacement ? "planning-replacement" : "planning-assigned",
+            },
+            dmFollowsTopic: true,
+          }),
+        ),
+      );
     }
   } catch (error) {
     console.error("[planning] annonce des affectations impossible.", failureReason(error));

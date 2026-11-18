@@ -432,8 +432,17 @@ type AssignmentRow = RowDataPacket & {
   confirmed: number;
 };
 
-type RemovalRow = RowDataPacket & { entry_key: string; user_id: number; role: PlanningRole };
-type WithdrawalRow = RemovalRow & { reason: string | null; late: number; source: AssignmentSource; created_at: Date | string };
+type EventRow = RowDataPacket & {
+  id: number;
+  entry_key: string;
+  user_id: number;
+  role: PlanningRole;
+  kind: "REMOVED" | "WITHDRAWN";
+  reason: string | null;
+  late: number;
+  source: AssignmentSource;
+  created_at: Date | string;
+};
 
 type CasterRow = RowDataPacket & { match_id: number; user_id: number };
 
@@ -486,7 +495,7 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       matchCasters: new Map(),
     };
   }
-  const [members, [availability], [assignments], [removals], [withdrawals], matchCasters] = await Promise.all([
+  const [members, [availability], [assignments], [events], matchCasters] = await Promise.all([
     membersRead,
     executor.execute<AvailabilityRow[]>(
       `SELECT entry_key, user_id, role, status, preferred FROM bg_planning_availability
@@ -498,21 +507,19 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
         WHERE entry_key IN (${inList(keys.length)})`,
       keys,
     ),
-    executor.execute<RemovalRow[]>(
-      `SELECT DISTINCT entry_key, user_id, role FROM bg_planning_events
-        WHERE kind = 'REMOVED' AND source = 'MANUAL' AND entry_key IN (${inList(keys.length)})`,
-      keys,
-    ),
-    // Désistements : `source` dit si l'attribution quittée était confirmée
+    // Retraits du staff et désistements en **une** lecture (même index). Pour
+    // un désistement, `source` dit si l'attribution quittée était confirmée
     // (`MANUAL`) ou une proposition provisoire (`AUTO`), `withdrawal.ts`.
-    executor.execute<WithdrawalRow[]>(
-      `SELECT entry_key, user_id, role, source, reason, late, created_at FROM bg_planning_events
-        WHERE kind = 'WITHDRAWN' AND entry_key IN (${inList(keys.length)})
-        ORDER BY created_at, id`,
+    executor.execute<EventRow[]>(
+      `SELECT id, entry_key, user_id, role, kind, source, reason, late, created_at FROM bg_planning_events
+        WHERE ((kind = 'REMOVED' AND source = 'MANUAL') OR kind = 'WITHDRAWN') AND entry_key IN (${inList(keys.length)})`,
       keys,
     ),
     loadMatchCasters(executor, matchIds),
   ]);
+  const withdrawals = events
+    .filter((row) => row.kind === "WITHDRAWN")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime() || Number(a.id) - Number(b.id));
   return {
     entries,
     durations,
@@ -532,7 +539,7 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       confirmed: row.source === "MANUAL" || Number(row.confirmed) === 1,
     })),
-    removals: [...removals, ...withdrawals].map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role })),
+    removals: events.map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role })),
     withdrawals: withdrawals.map((row) => ({
       entryKey: row.entry_key,
       userId: Number(row.user_id),

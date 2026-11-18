@@ -490,7 +490,8 @@ function WithdrawButton({
   text: Text;
 }>) {
   const { t } = text;
-  const now = useClock(WITHDRAW_CLOCK_MS);
+  // Plus d'horloge pour une entrée déjà commencée ou close : le bouton n'y reviendra pas.
+  const now = useClock(WITHDRAW_CLOCK_MS, entry.editable && Date.parse(entry.startAt) > Date.now());
   if (now === null || !canWithdraw(entry, now)) return null;
   return (
     <button

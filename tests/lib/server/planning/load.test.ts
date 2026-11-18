@@ -247,17 +247,26 @@ describe("loadPlanningData", () => {
     const plain = connection.execute.getMockImplementation();
     connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
       if (sql.includes("kind = 'WITHDRAWN'")) {
-        return [[{ entry_key: "t:10", user_id: 4, role: "CASTER", source: "MANUAL", reason: "Malade", late: 1, created_at: new Date("2026-11-20T10:00:00Z") }], []];
+        return [
+          [
+            { id: 8, entry_key: "t:10", user_id: 5, role: "CASTER", kind: "WITHDRAWN", source: "AUTO", reason: null, late: 0, created_at: new Date("2026-11-20T10:00:00Z") },
+            { id: 9, entry_key: "t:10", user_id: 6, role: "PROD", kind: "REMOVED", source: "MANUAL", reason: null, late: 0, created_at: new Date("2026-11-19T10:00:00Z") },
+            { id: 7, entry_key: "t:10", user_id: 4, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: "Malade", late: 1, created_at: new Date("2026-11-20T10:00:00Z") },
+          ],
+          [],
+        ];
       }
       return plain ? plain(sql, params) : [[], []];
     });
 
     const data = await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [] });
 
-    expect(data.withdrawals).toEqual([
-      { entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" },
-    ]);
+    // Une seule lecture pour retraits et désistements ; les désistements sortent par date puis identifiant.
+    expect(connection.execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_planning_events"))).toHaveLength(1);
+    expect(data.withdrawals.map((row) => row.userId)).toEqual([4, 5]);
+    expect(data.withdrawals[0]).toEqual({ entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" });
     expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 4, role: "CASTER" });
+    expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 6, role: "PROD" });
   });
 
   it("loadPlanningData_reads_settingsOnce_andCarriesThem", async () => {

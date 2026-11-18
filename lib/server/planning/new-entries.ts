@@ -44,6 +44,8 @@ export const NEW_ENTRIES_QUIET_MS = 5 * 60 * 1000;
 /** Une vague qui ne se calme pas s'annonce tout de même au bout de ce délai. */
 export const NEW_ENTRIES_MAX_WAIT_MS = 30 * 60 * 1000;
 const SWEEP_TICK_MS = 60 * 1000;
+/** Listes de la vague envoyées en même temps. */
+const NEW_ENTRIES_SEND_CONCURRENCY = 4;
 const FIRST_SWEEP_DELAY_MS = 2 * 60 * 1000;
 const NOTICES_LOCK = "bg_planning_notices";
 /** Marqueur (`bg_settings`) du premier passage, posé une fois pour toutes. */
@@ -101,11 +103,10 @@ export function groupByEntries(byMember: ReadonlyMap<number, readonly LoadedEntr
 
 async function eligibleByGame(executor: Executor, members: readonly LoadedMember[], entries: readonly LoadedEntry[]) {
   const referees = members.filter((member) => member.roles.includes("REFEREE")).map((member) => member.userId);
-  const out = new Map<string, Set<number>>();
-  for (const game of new Set(entries.map((entry) => entry.game))) {
-    out.set(game, referees.length === 0 ? new Set() : await loadEligibleRefereeIds(executor, referees, game));
-  }
-  return out;
+  const games = [...new Set(entries.map((entry) => entry.game))];
+  // Une lecture par jeu (la condition d'arbitrage diffère), lancées ensemble.
+  const sets = await Promise.all(games.map((game) => (referees.length === 0 ? new Set<number>() : loadEligibleRefereeIds(executor, referees, game))));
+  return new Map(games.map((game, index) => [game, sets[index]]));
 }
 
 const toMs = (value: Date | string) => new Date(value).getTime();
@@ -148,6 +149,16 @@ export async function collectWave(connection: PoolConnection, now: number): Prom
       fresh.flatMap((entry) => [entry.key, entry.tournamentId, entry.matchId, stamp, bootstrap ? stamp : null]),
     );
   }
+  // Une entrée recachée garde sa place dans la vague : sa mesure repart à chaque
+  // passage tant qu'elle est cachée, et la vague se calme après sa réapparition
+  // (sinon un vieux `seen_at` la ferait annoncer seule, hors de son lot).
+  const resting = known.filter((row) => row.announced_at === null && waiting.has(row.entry_key)).map((row) => row.entry_key);
+  if (resting.length > 0 && !bootstrap) {
+    await connection.execute(
+      `UPDATE bg_planning_entry_notices SET seen_at = ? WHERE announced_at IS NULL AND entry_key IN (${inList(resting.length)})`,
+      [stamp, ...resting],
+    );
+  }
   if (bootstrap) {
     await connection.execute("INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, '1')", [BOOTSTRAP_SETTING]);
     return [];
@@ -179,15 +190,25 @@ export async function announceWave(executor: Executor, wave: readonly LoadedEntr
     const players = await loadEntryPlayers(executor, wave);
     const byMember = digestRecipients(wave, members, eligible, (entry) => playersDuring(entry, wave, players));
     const base = siteCanonicalBase();
-    for (const group of groupByEntries(byMember)) {
+    const groups = groupByEntries(byMember);
+    // Les comptes se lisent **une** fois pour toute la vague, non une fois par liste.
+    const recipientsById = new Map(
+      (await loadNotificationRecipients(groups.flatMap((group) => group.userIds), "proven")).map((recipient) => [recipient.userId, recipient]),
+    );
+    const send = async (group: (typeof groups)[number]) => {
       const list: PlanningNoticeEntry[] = group.entries.map(noticeEntry);
-      const recipients = await loadNotificationRecipients(group.userIds, "proven");
+      const recipients = group.userIds.flatMap((id) => recipientsById.get(id) ?? []);
+      if (recipients.length === 0) return;
       await notifyUsers(recipients, {
         topic: "PLANNING_NEW_ENTRIES",
         push: (locale) => planningNewEntriesPush(list, locale),
         discord: { message: (locale) => formatPlanningNewEntriesDm(list, base, locale), context: "planning-new-entries" },
         dmFollowsTopic: true,
       });
+    };
+    // Par paquets : les listes partent ensemble, sans inonder le bot ni la base.
+    for (let index = 0; index < groups.length; index += NEW_ENTRIES_SEND_CONCURRENCY) {
+      await Promise.all(groups.slice(index, index + NEW_ENTRIES_SEND_CONCURRENCY).map(send));
     }
   } catch (error) {
     console.error("[planning] récapitulatif des nouvelles entrées impossible.", failureReason(error));

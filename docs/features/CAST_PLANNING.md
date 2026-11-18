@@ -220,7 +220,11 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   jamais une entrée où il joue. Une entrée d'un tournoi encore **caché** n'est
   pas notée : elle l'est quand le tournoi devient visible, et part alors à
   tous ceux qu'elle concerne ; notée puis recachée avant sa vague, elle attend
-  de même, sans être notée annoncée. Au tout premier passage (marqueur
+  de même, sans être notée annoncée (son `seen_at` repart à chaque passage
+  tant qu'elle est cachée : à sa réapparition elle rejoint la vague suivante au
+  lieu de partir seule). Les comptes de la vague se lisent une fois, les
+  membres qui reçoivent la même liste partent en un envoi, par paquets de 4 ;
+  même regroupement pour les affectations confirmées en groupe. Au tout premier passage (marqueur
   `planning_entry_notices_bootstrapped` absent de `bg_settings`), tout est noté
   déjà annoncé, sans message ; le marqueur ne dépend pas du contenu de la
   table, que la purge de conservation peut vider ; `npm run seed`, qui
