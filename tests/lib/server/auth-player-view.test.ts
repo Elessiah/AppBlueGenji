@@ -131,6 +131,38 @@ describe("getCurrentUser — vue joueur", () => {
     expect(can(user, "tournaments")).toBe(true);
   });
 
+  it("getCurrentUser_playerViewRow_exposesPlayerViewUntilIso", async () => {
+    await withExecute(
+      jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 1, player_view_until: new Date("2026-11-18T22:00:00.000Z") }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user?.playerViewUntil).toBe("2026-11-18T22:00:00.000Z");
+  });
+
+  it("getCurrentUser_noRightsAccountWithStaleRow_playerViewUntilNull", async () => {
+    await withExecute(
+      jest.fn<SqlQuery>().mockResolvedValue([[{ ...baseRow, player_view: 1, player_view_until: "2026-11-18T22:00:00.000Z" }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user?.playerViewUntil).toBeNull();
+  });
+
+  it("getCurrentUser_playerViewOff_playerViewUntilNull", async () => {
+    await withExecute(
+      jest.fn<SqlQuery>().mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 0, player_view_until: "2026-11-17T22:00:00.000Z" }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user?.playerViewUntil).toBeNull();
+  });
+
   it("getCurrentUser_plainPlayerWithFlag_isNotInPlayerView", async () => {
     await withExecute(jest.fn<SqlQuery>().mockResolvedValue([[{ ...baseRow, player_view: 1 }], []]));
 

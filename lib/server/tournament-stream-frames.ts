@@ -13,6 +13,7 @@
  */
 import type { TournamentSnapshotFrame } from "./tournaments/snapshot";
 import { concatBytes, deflateSegment } from "./sse-gzip";
+import { STREAM_RECONNECT_DATA } from "@/lib/shared/stream-reconnect";
 
 /** Encodage d'une connexion : ce qu'elle a annoncé dans `Content-Encoding`. */
 export type StreamEncoding = "identity" | "gzip";
@@ -98,6 +99,19 @@ export function connectedFrameBytes(
 export function viewerPatchFrameBytes(payload: Record<string, unknown>, encoding: StreamEncoding): Uint8Array {
   const plain = encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
   return encoding === "identity" ? plain : deflateSegment(plain);
+}
+
+const RECONNECT = encoder.encode(`data: ${STREAM_RECONNECT_DATA}\n\n`);
+let deflatedReconnect: Uint8Array | null = null;
+
+/**
+ * Demande de reconnexion (`lib/shared/stream-reconnect.ts`) : contexte du
+ * lecteur changé, le client rouvre le flux sur-le-champ.
+ */
+export function reconnectFrameBytes(encoding: StreamEncoding): Uint8Array {
+  if (encoding === "identity") return RECONNECT;
+  deflatedReconnect ??= deflateSegment(RECONNECT);
+  return deflatedReconnect;
 }
 
 const PING = encoder.encode(": ping\n\n");

@@ -48,3 +48,22 @@ export function playerViewMenuMode(user: { playerView: boolean; playerViewAvaila
   if (user.playerView) return "back";
   return user.playerViewAvailable ? "enter" : null;
 }
+
+/** Marge après l'échéance : la relecture tombe quand la base la voit passée. */
+export const PLAYER_VIEW_EXPIRY_MARGIN_MS = 1_000;
+
+/** Plus long délai qu'un minuteur tient (au-delà, `setTimeout` part sur-le-champ). */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * Délai avant l'échéance de la vue joueur (`until`, ISO), plus une marge :
+ * la bannière relit alors la page et le flux SSE se reconnecte, les droits
+ * étant revenus. `null` : pas d'échéance lisible, rien à programmer. Une
+ * échéance déjà passée (horloges décalées) donne la seule marge.
+ */
+export function playerViewExpiryDelayMs(until: string | null, now: number): number | null {
+  if (!until) return null;
+  const at = Date.parse(until);
+  if (!Number.isFinite(at)) return null;
+  return Math.min(MAX_TIMER_MS, Math.max(0, at - now) + PLAYER_VIEW_EXPIRY_MARGIN_MS);
+}

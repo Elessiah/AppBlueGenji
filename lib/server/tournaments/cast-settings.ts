@@ -82,6 +82,24 @@ export type CastAccess = {
 export const PLAIN_CAST_ACCESS: CastAccess = { oversees: false, manages: false };
 
 /**
+ * L'auteur d'un geste de cast ou d'arbitrage, **avec l'état de sa session** :
+ * l'éligibilité se lit en base (`is_admin`, rôles), que la vue joueur
+ * (`ADMIN_PLAYER_VIEW.md`) ne change pas. Requis : un appelant qui l'oublie ne
+ * compile pas, et aucun chemin ne fait caster ou arbitrer une vue joueur.
+ */
+export type SessionActor = { id: number; playerView: boolean };
+
+/**
+ * L'identifiant de l'auteur, refusé en vue joueur.
+ *
+ * @throws `PLAYER_VIEW_ACTIVE` — la session est en vue joueur.
+ */
+export function actingUserId(actor: SessionActor): number {
+  if (actor.playerView) throw new Error("PLAYER_VIEW_ACTIVE");
+  return actor.id;
+}
+
+/**
  * Le match accepte-t-il encore ce mode d'antenne ? Même verdict que la
  * configuration du staff (`assertConfigurable`) : un match dont le score est
  * saisi ne se démarque que, et un mode posé sur lui remplacerait le lien d'un
@@ -445,7 +463,8 @@ type OwnCastRow = RowDataPacket & {
  *
  * @throws `NOT_MATCH_CASTER` — le lecteur ne caste pas ce match.
  */
-export async function loadOwnCastSettings(matchId: number, userId: number): Promise<OwnCastSettings> {
+export async function loadOwnCastSettings(matchId: number, actor: SessionActor): Promise<OwnCastSettings> {
+  const userId = actingUserId(actor);
   const db = await getDatabase();
   const [rows] = await db.execute<OwnCastRow[]>(
     `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned, m.live_trigger

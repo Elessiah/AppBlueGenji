@@ -43,6 +43,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   CAST_STREAM_LINK_HELD: 409,
   STAFF_STREAM_FORBIDDEN: 403,
   NOT_MATCH_CASTER: 403,
+  PLAYER_VIEW_ACTIVE: 403,
 };
 
 /**
@@ -84,7 +85,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   try {
     // `triggerSkipped` : le mode d'antenne, posé entre-temps par un autre, est
     // resté le sien — l'inscription, elle, est faite.
-    const { triggerSkipped } = await claimMatchCast(matchId, user.id, can(user, "live"), target, settings, castAccess(user));
+    const { triggerSkipped } = await claimMatchCast(matchId, user, can(user, "live"), target, settings, castAccess(user));
     return ok({ casterUserId: user.id, triggerSkipped });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_CLAIM_FAILED");
@@ -107,7 +108,7 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
   try {
-    return ok(await loadOwnCastSettings(matchId, user.id));
+    return ok(await loadOwnCastSettings(matchId, user));
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_SETTINGS_FAILED");
   }
@@ -136,7 +137,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (organisationRefusal) return fail(organisationRefusal.code, organisationRefusal.status);
 
   try {
-    await setCastSettings(matchId, user.id, can(user, "live"), settings, castAccess(user));
+    await setCastSettings(matchId, user, can(user, "live"), settings, castAccess(user));
     return ok({ casterUserId: user.id });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_SETTINGS_FAILED");
@@ -161,7 +162,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ matchId:
   if (!isPositiveId(casterId)) return fail("INVALID_USER_ID", 400);
 
   try {
-    await releaseMatchCast(matchId, user.id, castAccess(user).oversees, casterId);
+    await releaseMatchCast(matchId, user, castAccess(user).oversees, casterId);
     return ok({ casterUserId: null });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_RELEASE_FAILED");

@@ -38,13 +38,6 @@ import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { localizedPrivacyChanges, privacyChangeHeads } from "@/lib/shared/privacy-changes-en";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
-
-/**
- * La bannière de la vue joueur : son code n'arrive que dans le morceau des
- * sessions qui la montrent (quelques comptes du staff), jamais dans celui des
- * pages publiques. Rendue côté serveur : pas de saut de mise en page.
- */
-const PlayerViewBanner = dynamic(() => import("@/components/player-view").then((module) => module.PlayerViewBanner));
 import {
   recruitmentModalSilenced,
   termsModalDueOnLoad,
@@ -71,6 +64,13 @@ import { visiblePodiumTiers } from "@/lib/shared/podium-tiers";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { DEFAULT_LOCALE, LOCALE_HEADER, localeFromHeader } from "@/lib/shared/locales";
+
+/**
+ * La bannière de la vue joueur : son code n'arrive que dans le morceau des
+ * sessions qui la montrent (quelques comptes du staff), jamais dans celui des
+ * pages publiques. Rendue côté serveur : pas de saut de mise en page.
+ */
+const PlayerViewBanner = dynamic(() => import("@/components/player-view").then((module) => module.PlayerViewBanner));
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -342,7 +342,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <SkipLink />
           {/* Vue joueur du staff (`ADMIN_PLAYER_VIEW.md`) : sur toutes les
               pages, tant qu'elle dure, avec le retour en un clic. */}
-          {user?.playerView && <PlayerViewBanner />}
+          {user?.playerView && <PlayerViewBanner until={user.playerViewUntil} />}
           <VisitTracker />
           <AudienceBeacon />
           <ServiceWorkerRegistration />

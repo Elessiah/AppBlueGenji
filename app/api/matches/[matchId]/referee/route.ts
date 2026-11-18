@@ -15,6 +15,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   REFEREE_IS_PLAYER: 409,
   MATCH_ALREADY_REFEREED: 409,
   NOT_MATCH_REFEREE: 403,
+  PLAYER_VIEW_ACTIVE: 403,
 };
 
 /**
@@ -32,7 +33,7 @@ export async function POST(_req: Request, context: { params: Promise<{ matchId: 
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
   try {
-    await takeMatchReferee(matchId, user.id);
+    await takeMatchReferee(matchId, user);
     return ok({ refereeAssigned: true });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_REFEREE_TAKE_FAILED");
@@ -50,7 +51,7 @@ export async function DELETE(_req: Request, context: { params: Promise<{ matchId
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
   try {
-    await releaseMatchReferee(matchId, user.id, false);
+    await releaseMatchReferee(matchId, user, false);
     return ok({ refereeAssigned: false });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_REFEREE_RELEASE_FAILED");

@@ -64,7 +64,8 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   première instruction (`403 CROSS_SITE_REQUEST`, `415` hors JSON).
 - `401 UNAUTHORIZED` sans session ; `403 FORBIDDEN` pour un compte sans droit
   réel ; `400 INVALID_PLAYER_VIEW` pour un corps sans booléen ;
-  `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until }`,
+  `429` au-delà de dix bascules par minute et par compte
+  (`PLAYER_VIEW_TOGGLE_RULE`) ; `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until }`,
   toutes deux tirées de l'état **relu** (`playerView` = `until !== null`).
 - `setPlayerView` (`lib/server/player-view.ts`) écrit l'échéance (ou `NULL`)
   sur la ligne de **cette** session, **seulement si l'état change** (écriture
@@ -76,9 +77,14 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   (`reconnectSessionStreams`, motif `RECONNECT` : la route relit le contexte
   du lecteur, sans refus). Il laisse aussi une trace datée par le repère des
   révocations : un flux qui lisait la session pendant la bascule la retrouve
-  (`reconnectRequestedSince`) et répond un 200 vide, **sans trame
-  d'ouverture** (aucun contexte staff servi) ; le client le rouvre sur un
-  contexte relu. Flux et ligne pm2 partent sitôt l'écriture faite, avant la
+  (`reconnectRequestedSince`) et répond la seule demande de reconnexion
+  (`{"type":"reconnect"}`, `lib/shared/stream-reconnect.ts`), **sans trame
+  d'ouverture** (aucun contexte staff servi). Un flux ouvert reçoit la même
+  trame avant sa fermeture. Le client rouvre sur-le-champ, sans témoin « Hors
+  ligne » ni sondage de secours ; une seconde demande sans ouverture entre
+  les deux passe par l'attente croissante. Les traces sont bornées **par
+  compte** (`RECONNECT_MEMORY_PER_USER` = 20, le double du débit permis) :
+  les bascules d'un compte ne chassent jamais la trace en attente d'un autre. Flux et ligne pm2 partent sitôt l'écriture faite, avant la
   relecture : une relecture en échec (500) ne les perd pas.
 - Contournement de développement : la ligne `dev-auth-bypass:<id>` est
   reconnue sur l'objet même rendu par `getCurrentUser` (aucune relecture), ses
@@ -91,6 +97,19 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
 - Côté client : `usePlayerViewToggle` (`components/player-view-toggle.ts`, séparé de la bannière `components/player-view.tsx` chargée à la demande par la mise en page) — un
   second clic n'envoie rien, un échec en notification (`showError`), une
   réussite par `router.refresh()` (la barre et les menus changent).
+
+- **Échéance** : `getCurrentUser` relit aussi `player_view_until`
+  (`user.playerViewUntil`). À cette heure (plus une seconde,
+  `playerViewExpiryDelayMs`), la bannière relit la page et chaque flux SSE de
+  la session envoie la demande de reconnexion puis se ferme : interface et
+  droits ne divergent pas quand les droits reviennent d'eux-mêmes.
+- **Cast et arbitrage** : `claimMatchCast`, `setCastSettings`,
+  `loadOwnCastSettings`, `releaseMatchCast`, `takeMatchReferee` et
+  `releaseMatchReferee` prennent l'auteur **avec sa session**
+  (`SessionActor = { id, playerView }`) et refusent la vue joueur
+  (`PLAYER_VIEW_ACTIVE`, 403) : l'éligibilité se lit en base, un nouvel
+  appelant ne peut pas l'oublier. Le retrait par le staff (`assignMatchReferee`,
+  route d'administration gardée par `can()`) passe par le retrait interne.
 
 ## Interface
 
@@ -131,4 +150,4 @@ et `stream` (aucun droit staff par le flux comme par la lecture REST).
 
 - Le drapeau est lu dans la requête de session existante (`s.player_view_until > NOW()`), sans requête de plus ni index nouveau ; l'échéance est une simple comparaison.
 - La bannière est chargée par `next/dynamic` (rendue côté serveur, code absent du morceau des pages publiques) ; le hook et le focus vivent dans `player-view-toggle.ts`, que le menu du compte importe sans la bannière.
-- Les changements de contexte (reconnexion) sont gardés à part des révocations (`RECONNECT_MEMORY_MAX` = 64, une minute) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).
+- Les changements de contexte (reconnexion) sont gardés à part des révocations (une minute, `RECONNECT_MEMORY_PER_USER` = 20 par compte, filet global `RECONNECT_MEMORY_MAX` = 1024) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).

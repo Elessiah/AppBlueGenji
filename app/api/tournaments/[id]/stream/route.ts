@@ -44,9 +44,12 @@ import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 import {
   connectedFrameBytes,
   pingFrameBytes,
+  reconnectFrameBytes,
   viewerPatchFrameBytes,
   type StreamEncoding,
 } from "@/lib/server/tournament-stream-frames";
+import { playerViewExpiryDelayMs } from "@/lib/shared/player-view";
+import { STREAM_RECONNECT_DATA } from "@/lib/shared/stream-reconnect";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,15 +85,16 @@ function wantsQuietStream(req: Request): boolean {
 /**
  * Session périmée avant la première trame : révoquée → `401` ; contexte du
  * lecteur changé (équipe quittée, rôle changé, vue joueur basculée —
- * `ADMIN_PLAYER_VIEW.md`) → un `200` vide, sans la trame d'ouverture et son
- * contexte périmé (les droits de staff d'une session passée en vue joueur) :
- * le client le referme et le rouvre (`live-connection.ts`) sur un contexte
- * relu. `null` : rien de périmé.
+ * `ADMIN_PLAYER_VIEW.md`) → un `200` qui ne porte que la demande de
+ * reconnexion (`lib/shared/stream-reconnect.ts`), sans la trame d'ouverture et
+ * son contexte périmé (les droits de staff d'une session passée en vue
+ * joueur) : le client le rouvre sur-le-champ (`live-connection.ts`), sans
+ * témoin « Hors ligne » ni sondage de secours. `null` : rien de périmé.
  */
 function staleOpeningResponse(revoked: boolean, reconnect: boolean): Response | null {
   if (revoked) return fail("UNAUTHORIZED", 401);
   if (!reconnect) return null;
-  return new Response(null, {
+  return new Response(`data: ${STREAM_RECONNECT_DATA}\n\n`, {
     status: 200,
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform" },
   });
@@ -118,6 +122,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
    * sur son propre tournoi.
    */
   let cleanup: () => void = () => undefined;
+  /** Écrit la demande de reconnexion sur le flux ouvert (rien avant son ouverture). */
+  let requestReconnect: () => void = () => undefined;
 
   // La session n'est lue qu'ici : le flux s'inscrit donc **dès maintenant**
   // auprès d'elle (`lib/server/session-streams.ts`), pour qu'une déconnexion,
@@ -128,7 +134,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const tokenHash = await currentTokenHash();
   let revoked = false;
   // Contexte du lecteur changé (équipe quittée, rôle changé…) pendant
-  // l'ouverture : pas un refus — un 200 vide (`staleOpeningResponse`), sans trame
+  // l'ouverture : pas un refus — la seule demande de reconnexion (`staleOpeningResponse`), sans trame
   // d'ouverture, et le client se reconnecte sur un contexte relu.
   let reconnectRequested = false;
   // Le tournoi suivi, pour qu'un geste de roster ne reconnecte que les flux
@@ -139,7 +145,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     tokenHash,
     (reason) => {
       if (reason === "REVOKED") revoked = true;
-      else reconnectRequested = true;
+      else {
+        reconnectRequested = true;
+        // Flux ouvert : la demande part avant la fermeture, et le client
+        // rouvre sur-le-champ au lieu de croire à une panne.
+        requestReconnect();
+      }
       cleanup();
     },
     Number.isInteger(streamedTournamentId) && streamedTournamentId > 0 ? streamedTournamentId : null,
@@ -297,6 +308,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         let closed = false;
         let leaveRoom: (() => void) | null = null;
         let heartbeat: ReturnType<typeof setInterval> | null = null;
+        let playerViewExpiry: ReturnType<typeof setTimeout> | null = null;
 
         // Renseigné **avant** la première écriture : la place de flux ne doit
         // survivre à aucune sortie, pas même celle d'une exception.
@@ -304,6 +316,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           if (closed) return;
           closed = true;
           if (heartbeat !== null) clearInterval(heartbeat);
+          if (playerViewExpiry !== null) clearTimeout(playerViewExpiry);
           leaveRoom?.();
           releaseSlot();
           unregister();
@@ -339,6 +352,15 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           if (decision.action === "SKIP") return false;
           controller.enqueue(frame);
           return true;
+        };
+        requestReconnect = (): void => {
+          if (closed) return;
+          try {
+            // Hors contre-pression : une trame de vingt octets, la dernière.
+            controller.enqueue(reconnectFrameBytes(encoding));
+          } catch {
+            // Flux déjà terminé.
+          }
         };
 
         try {
@@ -422,6 +444,18 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           }, HEARTBEAT_MS);
           heartbeat.unref?.();
 
+          // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : à l'échéance, les droits
+          // reviennent sans aucune écriture — le flux se reconnecte pour relire
+          // le contexte du lecteur (palier, droits de staff).
+          const expiryDelay = playerViewExpiryDelayMs(user.playerViewUntil, Date.now());
+          if (expiryDelay !== null) {
+            playerViewExpiry = setTimeout(() => {
+              requestReconnect();
+              cleanup();
+            }, expiryDelay);
+            playerViewExpiry.unref?.();
+          }
+
           // Course résiduelle : le contrôle plus haut a pu passer juste avant que
           // le client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son
           // écouteur.
@@ -429,6 +463,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           // ne sépare le contrôle plus haut de cette ligne) : le registre a déjà
           // retiré ce flux — ouvert, plus rien ne le fermerait à une révocation.
           if (req.signal.aborted || reconnectRequested) {
+            if (reconnectRequested) requestReconnect();
             cleanup();
             return;
           }

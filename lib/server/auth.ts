@@ -8,7 +8,7 @@ import { SESSION_RETENTION_DAYS } from "@/lib/shared/processing-register";
 import { isProductionCookieEnv, sessionCookieName } from "@/lib/shared/auth-cookies";
 import { localAvatarUrl } from "@/lib/shared/avatar";
 import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
-import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
+import { normalizePseudo, slugifyPseudo, toIso } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { holdsPlatformRights, sessionPlatformRights } from "@/lib/shared/player-view";
 import { recordConnection } from "@/lib/server/connection-logs";
@@ -57,6 +57,12 @@ export type AuthUser = {
    */
   playerView: boolean;
   /**
+   * Échéance de la vue joueur (ISO, relue en base), `null` hors vue joueur :
+   * la bannière relit la page et le flux SSE se reconnecte à cette heure, quand
+   * les droits reviennent d'eux-mêmes.
+   */
+  playerViewUntil: string | null;
+  /**
    * Le compte porte **réellement** des droits de plateforme (colonne
    * `is_admin` ou rôle cumulable), vue joueur ou non : seule condition de la
    * bascule, dans les deux sens — sans quoi le retour serait impossible.
@@ -89,6 +95,7 @@ type UserRow = RowDataPacket & {
   recruitment_modal_off?: number | null;
   certify_prompt_due?: number | null;
   player_view?: number | string | null;
+  player_view_until?: Date | string | null;
 };
 
 /**
@@ -144,6 +151,7 @@ function fromRow(row: UserRow): AuthUser {
     isAdmin: rights.isAdmin,
     roles: rights.roles,
     playerView,
+    playerViewUntil: playerView && row.player_view_until ? toIso(row.player_view_until) : null,
     playerViewAvailable,
     recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
     recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
@@ -481,7 +489,10 @@ export function devBypassSessionKey(userId: number): string {
 
 const DEV_BYPASS_PLAYER_VIEW_SQL = `EXISTS(SELECT 1 FROM bg_user_sessions dv
        WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
-         AND dv.player_view_until > NOW()) AS player_view`;
+         AND dv.player_view_until > NOW()) AS player_view,
+       (SELECT dv.player_view_until FROM bg_user_sessions dv
+       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
+         AND dv.player_view_until > NOW()) AS player_view_until`;
 
 /**
  * Les utilisateurs résolus par le contournement de développement, tels que
@@ -540,7 +551,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView ? ", s.player_view_until > NOW() AS player_view" : ""}
+    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView ? ", s.player_view_until > NOW() AS player_view, s.player_view_until" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

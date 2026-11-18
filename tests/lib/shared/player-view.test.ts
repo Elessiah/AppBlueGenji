@@ -2,7 +2,9 @@ import { describe, expect, it } from "@jest/globals";
 import {
   holdsPlatformRights,
   parsePlayerViewBody,
+  PLAYER_VIEW_EXPIRY_MARGIN_MS,
   PLAYER_VIEW_MAX_HOURS,
+  playerViewExpiryDelayMs,
   sessionPlatformRights,
 } from "@/lib/shared/player-view";
 
@@ -65,5 +67,29 @@ describe("parsePlayerViewBody", () => {
 describe("PLAYER_VIEW_MAX_HOURS", () => {
   it("borne la vue joueur à douze heures", () => {
     expect(PLAYER_VIEW_MAX_HOURS).toBe(12);
+  });
+});
+
+describe("playerViewExpiryDelayMs", () => {
+  const NOW = Date.parse("2026-11-18T10:00:00.000Z");
+
+  it("playerViewExpiryDelayMs_null_returnsNull", () => {
+    expect(playerViewExpiryDelayMs(null, NOW)).toBeNull();
+  });
+
+  it("playerViewExpiryDelayMs_unparsable_returnsNull", () => {
+    expect(playerViewExpiryDelayMs("pas une date", NOW)).toBeNull();
+  });
+
+  it("playerViewExpiryDelayMs_future_returnsRemainingPlusMargin", () => {
+    expect(playerViewExpiryDelayMs("2026-11-18T11:00:00.000Z", NOW)).toBe(3_600_000 + PLAYER_VIEW_EXPIRY_MARGIN_MS);
+  });
+
+  it("playerViewExpiryDelayMs_past_returnsMarginOnly", () => {
+    expect(playerViewExpiryDelayMs("2026-11-18T09:00:00.000Z", NOW)).toBe(PLAYER_VIEW_EXPIRY_MARGIN_MS);
+  });
+
+  it("playerViewExpiryDelayMs_farFuture_cappedToMaxTimer", () => {
+    expect(playerViewExpiryDelayMs("2027-11-18T10:00:00.000Z", NOW)).toBe(2_147_483_647);
   });
 });

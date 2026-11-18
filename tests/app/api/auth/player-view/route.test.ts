@@ -9,6 +9,8 @@ jest.mock("@/lib/server/player-view", () => ({
 import { POST } from "@/app/api/auth/player-view/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { setPlayerView } from "@/lib/server/player-view";
+import { PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../../helpers/auth-user";
 
 /** `POST /api/auth/player-view` (`docs/features/ADMIN_PLAYER_VIEW.md`). */
@@ -28,10 +30,22 @@ function toggle(body: unknown, headers: Record<string, string> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetRateLimit();
   jest.mocked(setPlayerView).mockResolvedValue({ until: null });
 });
 
 describe("POST /api/auth/player-view", () => {
+  it("POST_moreThanRuleLimitPerAccount_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: i % 2 === 0 });
+    jest.mocked(setPlayerView).mockClear();
+
+    const res = await toggle({ active: true });
+
+    expect(res.status).toBe(429);
+    expect(setPlayerView).not.toHaveBeenCalled();
+  });
+
   it("POST_crossSiteRequest_returns403WithoutReadingSession", async () => {
     const res = await toggle({ active: true }, { "sec-fetch-site": "cross-site" });
 

@@ -1,3 +1,4 @@
+import { enforceRateLimit, PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
@@ -13,7 +14,8 @@ import { parsePlayerViewBody } from "@/lib/shared/player-view";
  * Ouverte aux seuls comptes qui portent **réellement** des droits de
  * plateforme (`playerViewAvailable`, lu sur le compte et non sur la session) :
  * c'est ce qui laisse revenir une session en vue joueur, dont `can()` ne voit
- * plus aucun droit. Un joueur sans rôle reçoit `403 FORBIDDEN`.
+ * plus aucun droit. Un joueur sans rôle reçoit `403 FORBIDDEN`. Débit borné
+ * par compte (`PLAYER_VIEW_TOGGLE_RULE`, `429`).
  */
 export async function POST(req: Request) {
   const crossSite = rejectCrossSiteRequest(req, { requireJson: true });
@@ -22,6 +24,8 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!user.playerViewAvailable) return fail("FORBIDDEN", 403);
+  const throttled = enforceRateLimit(PLAYER_VIEW_TOGGLE_RULE, user.id);
+  if (throttled) return throttled;
 
   const read = await readJsonObject(req, "INVALID_PLAYER_VIEW", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);

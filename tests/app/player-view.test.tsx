@@ -23,7 +23,7 @@ const banner = (locale: "fr" | "en" = "fr") =>
   renderToStaticMarkup(
     <ShellTextProvider locale={locale} messages={locale === "en" ? messagesFor("en").shell : undefined}>
       <ToastProvider>
-        <PlayerViewBanner />
+        <PlayerViewBanner until={null} />
       </ToastProvider>
     </ShellTextProvider>,
   );
@@ -152,7 +152,7 @@ describe("textes FR = EN", () => {
 
 describe("câblage", () => {
   it("la mise en page racine pose la bannière en vue joueur seulement", () => {
-    expect(readSource("app/layout.tsx")).toContain("{user?.playerView && <PlayerViewBanner />}");
+    expect(readSource("app/layout.tsx")).toContain("{user?.playerView && <PlayerViewBanner until={user.playerViewUntil} />}");
   });
 
   it("bannerBundle_layoutLoadsItDynamically_accountMenuImportsOnlyTheToggle", () => {

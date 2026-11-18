@@ -56,7 +56,7 @@ import {
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
 import { announceStaffMatchAction } from "./staff-action-logs";
-import { applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
+import { actingUserId, applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type SessionActor, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
 import {
   lockMatchCasters,
   lockMatchStreams,
@@ -1039,12 +1039,13 @@ async function releaseIneligibleCasters(
  */
 export async function claimMatchCast(
   matchId: number,
-  userId: number,
+  actor: SessionActor,
   hasLivePermission: boolean,
   target: CastTarget,
   settings: CastSettings = {},
   access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<{ triggerSkipped: boolean }> {
+  const userId = actingUserId(actor);
   const castTarget: CastTarget = target;
   // Le lien est jugé avant toute lecture : un refus ne coûte rien. Un stream
   // ouvert sans lien n'apparaissait sur aucune vue et n'annonçait rien : le
@@ -1193,11 +1194,12 @@ function claimTrigger(
  */
 export async function setCastSettings(
   matchId: number,
-  userId: number,
+  actor: SessionActor,
   hasLivePermission: boolean,
   settings: CastSettings,
   access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<void> {
+  const userId = actingUserId(actor);
   if (!hasLivePermission) throw new Error("NOT_CASTER");
   // Le lien et le BattleTag sont jugés avant toute lecture : un refus ne coûte rien.
   if (settings.liveUrl !== undefined) parseStreamUrlInput(settings.liveUrl);
@@ -1257,10 +1259,12 @@ function announceCastTrigger(matchId: number, change: CastSettingsOutcome["trigg
  */
 export async function releaseMatchCast(
   matchId: number,
-  userId: number,
+  actor: SessionActor,
   canManage: boolean,
-  casterId: number = userId,
+  target?: number,
 ): Promise<void> {
+  const userId = actingUserId(actor);
+  const casterId = target ?? userId;
   const { tournamentId, releasedCasterId, pairing } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
@@ -1667,7 +1671,8 @@ function takenOverChange(row: LaunchMatchRow, matchId: number, refereeId: number
  *   | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
  *   | `REFEREE_IS_PLAYER` | `MATCH_ALREADY_REFEREED`
  */
-export async function takeMatchReferee(matchId: number, userId: number): Promise<void> {
+export async function takeMatchReferee(matchId: number, actor: SessionActor): Promise<void> {
+  const userId = actingUserId(actor);
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
@@ -1716,10 +1721,27 @@ async function clearMatchReferee(
  * `expected` (staff) : l'arbitre que la fenêtre montrait ; s'il a changé
  * depuis, rien n'est retiré (`REFEREE_CHANGED`).
  *
+ * `actor` porte l'état de la session : en vue joueur, refus
+ * (`PLAYER_VIEW_ACTIVE`), même pour un arbitre désigné.
+ *
  * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
- *   | `NOT_MATCH_REFEREE` | `REFEREE_CHANGED`
+ *   | `NOT_MATCH_REFEREE` | `REFEREE_CHANGED` | `PLAYER_VIEW_ACTIVE`
  */
 export async function releaseMatchReferee(
+  matchId: number,
+  actor: SessionActor,
+  canManage: boolean,
+  expected?: number | null,
+): Promise<void> {
+  await releaseReferee(matchId, actingUserId(actor), canManage, expected);
+}
+
+/**
+ * Le retrait lui-même, commun au départ de l'arbitre ({@link releaseMatchReferee},
+ * vue joueur refusée) et au retrait par le staff ({@link assignMatchReferee},
+ * route d'administration gardée par `can()`, que la vue joueur voit sans droit).
+ */
+async function releaseReferee(
   matchId: number,
   userId: number,
   canManage: boolean,
@@ -1768,7 +1790,7 @@ export async function assignMatchReferee(
   expected?: number | null,
 ): Promise<void> {
   if (refereeId === null) {
-    await releaseMatchReferee(matchId, staffUserId, true, expected);
+    await releaseReferee(matchId, staffUserId, true, expected);
     return;
   }
   const tournamentId = await retryOnDeadlock(() =>

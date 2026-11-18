@@ -41,6 +41,8 @@ import {
   STREAM_STALL_TIMEOUT_MS,
 } from "@/lib/server/stream-backpressure";
 import type { PlatformRole } from "@/lib/shared/permissions";
+import { STREAM_RECONNECT_DATA } from "@/lib/shared/stream-reconnect";
+import { PLAYER_VIEW_EXPIRY_MARGIN_MS } from "@/lib/shared/player-view";
 import { authUser } from "../../../helpers/auth-user";
 import * as snapshotModule from "@/lib/server/tournaments/snapshot";
 import { dispatchLiveAnnouncements } from "@/lib/server/tournaments/live-announcements";
@@ -387,7 +389,7 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
     await response.body!.cancel();
   });
 
-  it("GET_reconnectDuringOpeningReads_answersEmpty200WithoutConnectedFrame (EF-23)", async () => {
+  it("GET_reconnectDuringOpeningReads_answersReconnectOnlyWithoutConnectedFrame (EF-23)", async () => {
     // Rôle changé, équipe quittée pendant l'ouverture : pas un 401 — un 200
     // vide, sans la trame d'ouverture et son contexte périmé ; le client se
     // reconnecte sur un contexte relu.
@@ -400,12 +402,12 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/event-stream");
-    expect(await response.text()).toBe("");
+    expect(await response.text()).toBe(`data: ${STREAM_RECONNECT_DATA}\n\n`);
     expect(registeredStreamCount()).toBe(0);
     expect(tournamentAudience(5)).toBe(0);
   });
 
-  it("GET_playerViewSwitchDuringSessionRead_answersEmpty200WithoutStaffContext (ADMIN_PLAYER_VIEW.md)", async () => {
+  it("GET_playerViewSwitchDuringSessionRead_answersReconnectOnlyWithoutStaffContext (ADMIN_PLAYER_VIEW.md)", async () => {
     // Bascule commitée pendant la lecture de la session : aucun flux encore
     // inscrit — seule la trace de la reconnexion le rattrape, sans 401, et
     // rien n'est lu ni servi avec les droits de staff périmés.
@@ -418,7 +420,7 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
     const response = await GET(new Request("http://t/"), params("5"));
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe("");
+    expect(await response.text()).toBe(`data: ${STREAM_RECONNECT_DATA}\n\n`);
     expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
     expect(getTournamentViewerContext).not.toHaveBeenCalled();
     expect(registeredStreamCount()).toBe(0);
@@ -431,6 +433,62 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
 
     expect(await drainsToEnd(response)).toBe(true);
     expect(registeredStreamCount()).toBe(0);
+  });
+
+  /** Lit tout le flux (sans compression) jusqu'à sa fin. */
+  async function readToEnd(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+  ): Promise<string> {
+    const decoder = new TextDecoder();
+    let text = "";
+    // Une heure de battements (fausses horloges) précède parfois la fin.
+    for (let i = 0; i < 1000; i += 1) {
+      const { done, value } = await reader.read();
+      if (done) return text;
+      text += decoder.decode(value, { stream: true });
+    }
+    throw new Error("flux jamais terminé");
+  }
+
+  it("GET_reconnectOfOpenStream_sendsReconnectFrameBeforeEnd", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    reconnectUserStreams(1, { tournamentIds: new Set([5]) });
+
+    expect((await readToEnd(response.body!.getReader())).endsWith(`data: ${STREAM_RECONNECT_DATA}
+
+`)).toBe(true);
+  });
+
+  it("GET_playerViewUntilReached_sendsReconnectFrameAndEnds (ADMIN_PLAYER_VIEW.md)", async () => {
+    jest.useFakeTimers({ now: Date.parse("2026-11-18T10:00:00.000Z"), doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    jest
+      .mocked(getCurrentUser)
+      .mockResolvedValue(authUser({ id: 1, playerView: true, playerViewAvailable: true, playerViewUntil: "2026-11-18T11:00:00.000Z" }));
+    const response = await GET(new Request("http://t/"), params("5"));
+    const reader = response.body!.getReader();
+    await reader.read();
+
+    jest.advanceTimersByTime(60 * 60_000 + PLAYER_VIEW_EXPIRY_MARGIN_MS);
+    jest.useRealTimers();
+
+    expect(registeredStreamCount()).toBe(0);
+    expect((await readToEnd(reader)).endsWith(`data: ${STREAM_RECONNECT_DATA}
+
+`)).toBe(true);
+  });
+
+  it("GET_noPlayerViewUntil_streamOutlivesTwelveHours", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    const response = await GET(new Request("http://t/"), params("5"));
+    const reader = response.body!.getReader();
+    await reader.read();
+
+    jest.advanceTimersByTime(13 * 60 * 60_000);
+    jest.useRealTimers();
+
+    expect(registeredStreamCount()).toBe(1);
+    await reader.cancel();
   });
 
   it("GET_reconnectOfAnotherTournament_leavesThisStreamOpen (EF-23)", async () => {

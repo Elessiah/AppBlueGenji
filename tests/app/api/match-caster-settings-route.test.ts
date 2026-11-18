@@ -44,7 +44,7 @@ describe("GET /api/matches/[matchId]/caster", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ streamId: 3, battletag: "Voix#2100" });
     // Toujours le lecteur lui-même : aucun identifiant de compte n'est lu dans la requête.
-    expect(loadOwnCastSettings).toHaveBeenCalledWith(42, 4);
+    expect(loadOwnCastSettings).toHaveBeenCalledWith(42, expect.objectContaining({ id: 4, playerView: false }));
   });
 
   it("casterGet_notCaster_returns403", async () => {
@@ -74,7 +74,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     // Le lien, absent du corps, n'est pas touché.
     expect(setCastSettings).toHaveBeenCalledWith(
       42,
-      4,
+      expect.objectContaining({ id: 4, playerView: false }),
       true,
       { trigger: "MANUAL", battletag: null },
       { oversees: false, manages: false },
@@ -86,7 +86,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, roles: ["ARBITRE"] }));
     jest.mocked(setCastSettings).mockResolvedValue();
     await casterPut(jsonRequest("PUT", { trigger: "AUTO" }), params("42"));
-    expect(setCastSettings).toHaveBeenCalledWith(42, 3, true, { trigger: "AUTO" }, { oversees: true, manages: true });
+    expect(setCastSettings).toHaveBeenCalledWith(42, expect.objectContaining({ id: 3, playerView: false }), true, { trigger: "AUTO" }, { oversees: true, manages: true });
   });
 
   it("casterPut_organisationLinkTrue_returns403StaffStreamForbidden", async () => {
@@ -136,7 +136,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     const req = new Request("http://localhost/api/matches/42/caster", { method: "PUT", body, duplex: "half" } as RequestInit);
     const res = await casterPut(req, params("42"));
     expect(res.status).toBe(200);
-    expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, {}, { oversees: false, manages: false });
+    expect(setCastSettings).toHaveBeenCalledWith(42, expect.objectContaining({ id: 4, playerView: false }), true, {}, { oversees: false, manages: false });
   });
 
   it("casterPut_brokenJson_returnsInvalidCastSettings", async () => {

@@ -128,6 +128,21 @@ export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/**
+ * Bascule « vue joueur » d'une session (`POST /api/auth/player-view`), par
+ * compte. Chaque vrai changement écrit la session, laisse une ligne pm2
+ * nommée et fait reconnecter les flux de la session : dix par minute couvrent
+ * tous les allers-retours d'un membre du staff qui vérifie un écran ; au-delà,
+ * c'est une boucle. Le plafond borne aussi les changements de contexte retenus
+ * par compte (`RECONNECT_MEMORY_PER_USER`, son double : une fenêtre fixe laisse
+ * passer deux salves de part et d'autre de sa limite).
+ */
+export const PLAYER_VIEW_TOGGLE_RULE: RateLimitRule = {
+  name: "player-view-toggle",
+  limit: 10,
+  windowMs: 60_000,
+};
+
 /** Bascule de la planification des matchs par l'arbitrage d'un tournoi, par compte (même plafond). */
 export const REFEREE_SCHEDULING_TOGGLE_RULE: RateLimitRule = {
   name: "referee-scheduling-toggle",

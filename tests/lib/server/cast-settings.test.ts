@@ -405,7 +405,7 @@ describe("loadOwnCastSettings — ce que la fenêtre relit à l'ouverture", () =
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[ownRow], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    const cast = await loadOwnCastSettings(42, 900);
+    const cast = await loadOwnCastSettings(42, { id: 900, playerView: false });
 
     expect(cast).toEqual({ streamId: 5, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: null, liveTrigger: null });
     expect(String(execute.mock.calls[0][0])).not.toContain("link_user_id");
@@ -416,7 +416,7 @@ describe("loadOwnCastSettings — ce que la fenêtre relit à l'ouverture", () =
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ownRow, live_trigger: "AUTO" }], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    const cast = await loadOwnCastSettings(42, 900);
+    const cast = await loadOwnCastSettings(42, { id: 900, playerView: false });
 
     expect(cast.liveTrigger).toBe("AUTO");
   });
@@ -425,7 +425,7 @@ describe("loadOwnCastSettings — ce que la fenêtre relit à l'ouverture", () =
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ownRow, live_trigger: "BOGUS" }], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    const cast = await loadOwnCastSettings(42, 900);
+    const cast = await loadOwnCastSettings(42, { id: 900, playerView: false });
 
     expect(cast.liveTrigger).toBeNull();
   });
@@ -434,6 +434,14 @@ describe("loadOwnCastSettings — ce que la fenêtre relit à l'ouverture", () =
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
-    await expect(loadOwnCastSettings(42, 900)).rejects.toThrow("NOT_MATCH_CASTER");
+    await expect(loadOwnCastSettings(42, { id: 900, playerView: false })).rejects.toThrow("NOT_MATCH_CASTER");
+  });
+
+  it("loadOwnCastSettings_playerViewActor_throwsPlayerViewActive", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[ownRow], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(loadOwnCastSettings(42, { id: 900, playerView: true })).rejects.toThrow("PLAYER_VIEW_ACTIVE");
+    expect(execute).not.toHaveBeenCalled();
   });
 });

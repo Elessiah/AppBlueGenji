@@ -1,4 +1,5 @@
 import { FOCUS_REFRESH_MIN_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
+import { isStreamReconnectData } from "@/lib/shared/stream-reconnect";
 import {
   FIRST_SNAPSHOT_TIMEOUT_MS,
   parseLiveMessage,
@@ -157,6 +158,12 @@ export function openLiveConnection(options: LiveConnectionOptions): LiveConnecti
   };
 
   let openedQuiet = false;
+  /**
+   * Demandes de reconnexion reçues depuis la dernière trame d'ouverture : la
+   * première rouvre sur-le-champ, une suivante sans ouverture entre-temps passe
+   * par l'attente croissante (jamais de boucle serrée).
+   */
+  let reconnectRequests = 0;
 
   const connect = () => {
     if (cancelled || stopped) return;
@@ -181,10 +188,22 @@ export function openLiveConnection(options: LiveConnectionOptions): LiveConnecti
     const streamQuiet = openedQuiet;
     source.onmessage = (event) => {
       if (cancelled) return;
+      if (isStreamReconnectData(event.data)) {
+        // Contexte du lecteur changé (vue joueur, équipe…) : le serveur ferme ce
+        // flux. Pas une panne — ni témoin « Hors ligne » ni sondage de secours.
+        stopFirstSnapshotWatch();
+        source?.close();
+        source = null;
+        reconnectRequests += 1;
+        if (reconnectRequests === 1) connect();
+        else scheduleReconnect();
+        return;
+      }
       const message = parseLiveMessage(event.data);
       if (!message) return;
       // Le premier message porte déjà tout : la connexion vaut chargement.
       // Il lève aussi le guet et le sondage qu'un flux muet avait armés.
+      if (message.type === "connected") reconnectRequests = 0;
       options.onLiveChange(true);
       stopFirstSnapshotWatch();
       stopFallback();
