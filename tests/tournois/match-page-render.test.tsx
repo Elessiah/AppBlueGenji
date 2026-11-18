@@ -395,6 +395,32 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(lobby).not.toContain("Cartes du tour");
   });
 
+  it("keyFacts_refereedMatch_hostPlaysLeftAndRefereeCreatesGame", () => {
+    const facts = visible(render(match({ refereeAssigned: true }), "public"));
+    expect(facts).toContain("Hôte B Bravo Joue à gauche");
+    expect(facts).toContain("Arbitre Arbitre désigné Un arbitre suit ce match. Crée la partie");
+    expect(facts).not.toContain("Bravo Crée la partie");
+  });
+
+  it("keyFacts_selfManaged_hostKeepsCreatesGame", () => {
+    const facts = visible(render(match({ selfManaged: true }), "public"));
+    expect(facts).toContain("Hôte B Bravo Crée la partie");
+    expect(facts).not.toContain("Joue à gauche Crée");
+    expect(facts).not.toContain("Arbitre désigné Crée la partie");
+  });
+
+  it("keyFacts_completedRefereed_noRefereeFactNorCreatesGameClaim", () => {
+    const facts = visible(render(match({ status: "COMPLETED", refereeAssigned: true }), "public"));
+    expect(facts).toContain("Hôte B Bravo Joue à gauche");
+    expect(facts).not.toContain("Crée la partie");
+  });
+
+  it("keyFacts_refereedMatchEnglish_playsOnLeftAndCreatesGame", () => {
+    const facts = visible(render(match({ refereeAssigned: true }), "public", false, "en"));
+    expect(facts).toContain("Plays on the left");
+    expect(facts).toContain("Creates the game");
+  });
+
   it("MatchMaps_playedRefereedMatch_hidesBanOrderRow", () => {
     // Match arbitré déjà joué : aucun premier ban affirmé, ni « adversaires à venir ».
     const text = visible(render(match({ status: "COMPLETED", refereeAssigned: true, firstBanTeamId: null }), "public"));

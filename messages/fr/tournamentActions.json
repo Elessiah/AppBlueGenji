@@ -472,7 +472,7 @@
     "byeRound": "ne joue pas cette manche (effectif impair)",
     "versus": "contre",
     "sidesUnknown": "Côtés à confirmer",
-    "sidesHint": "L'affiche est sûre ; les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.",
+    "sidesHint": "L'affiche est sûre ; les matchs restants décideront qui, mieux classé, part à gauche.",
     "footnoteRound": "Sûres quel que soit le score des matchs restants, hors décision d'arbitrage (abandon, pénalité, double forfait). La manche n'est posée qu'une fois la précédente terminée.",
     "footnoteShort": "Rencontres sûres, hors décision d'arbitrage.",
     "footnoteSubject": "Rencontres sûres"

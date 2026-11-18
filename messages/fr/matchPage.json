@@ -14,6 +14,8 @@
     "label": "L'essentiel du match",
     "host": "Hôte",
     "hostDetail": "Crée la partie",
+    "hostRefereedDetail": "Joue à gauche",
+    "refereeCreates": "Crée la partie",
     "firstBan": "Premier ban",
     "referee": "Arbitre",
     "officiating": "Arbitrage",

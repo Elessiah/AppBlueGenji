@@ -63,7 +63,7 @@ import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText, useMapError } from "../_lib/error-map";
 import { useMatchCardModel } from "../_lib/match-card-model";
 import { useMatchFormat } from "../_lib/match-format-context";
-import { useMatchPageText } from "../_lib/match-page-text";
+import { useMatchPageText, type MatchPageText } from "../_lib/match-page-text";
 import { matchPageHeaderScore, matchPageMapFacts, type MatchPageMapFact } from "../_lib/match-page-facts";
 import { matchSideViews } from "../_lib/match-row-sides";
 import {
@@ -380,6 +380,7 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
     return {
       id: "officiating",
       label: page.t("facts.referee"),
+      detail: page.t("facts.refereeCreates"),
       // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
       // désigné » sans compte, ou tant que le pseudo de la désignation manque.
       value: (
@@ -481,6 +482,22 @@ function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFac
 }
 
 /**
+ * Fait « Hôte » : l'équipe qui joue à gauche (règlement §14). Elle crée la
+ * partie, sauf sur un match arbitré où c'est l'arbitre désigné (fait
+ * « Arbitre ») : elle ne fait alors que jouer à gauche.
+ */
+function hostFact(hostSide: PageSide | null, refereed: boolean, pending: ReactNode, page: MatchPageText): KeyFact {
+  let detail: string | undefined;
+  if (hostSide) detail = page.t(refereed ? "facts.hostRefereedDetail" : "facts.hostDetail");
+  return {
+    id: "host",
+    label: page.t("facts.host"),
+    value: hostSide ? <SideName side={hostSide} logoSize={20} /> : pending,
+    detail,
+  };
+}
+
+/**
  * Faits clés du match, au gabarit de l'en-tête des pages de règles
  * (`KeyFacts`) : chacun titré en toutes lettres — hôte, premier ban, arbitre ou
  * autogestion, maps, format, côtés, casters, lancement. Rien de nouveau n'est
@@ -526,12 +543,7 @@ function MatchKeyFacts({
 
   const facts: KeyFact[] = [];
   if (hostSide || opponentsPending) {
-    facts.push({
-      id: "host",
-      label: page.t("facts.host"),
-      value: hostSide ? <SideName side={hostSide} logoSize={20} /> : pending,
-      detail: hostSide ? page.t("facts.hostDetail") : undefined,
-    });
+    facts.push(hostFact(hostSide, match.refereeAssigned, pending, page));
   }
   if (banSide || opponentsPending) {
     facts.push({
@@ -795,6 +807,7 @@ function ConnectionSection({
             key={side.teamId}
             side={side}
             isHost={launch.hostTeamId === side.teamId}
+            refereed={launch.referee !== null}
             phase={launch.phase}
             onCopy={onCopy}
             linkNames

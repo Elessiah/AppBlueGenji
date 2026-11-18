@@ -168,6 +168,7 @@ function ContactRow({
 export function SideCard({
   side,
   isHost,
+  refereed = false,
   phase,
   onCopy,
   linkNames = false,
@@ -176,6 +177,8 @@ export function SideCard({
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
+  /** Un arbitre désigné crée la partie : l'hôte joue seulement à gauche. */
+  refereed?: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
@@ -223,7 +226,7 @@ export function SideCard({
       </div>
       {isHost && (
         <p className={styles.hostBadge}>
-          <span aria-hidden="true">🏠</span> {t("host")}
+          <span aria-hidden="true">🏠</span> {t(refereed ? "hostRefereed" : "host")}
         </p>
       )}
       <SideContacts

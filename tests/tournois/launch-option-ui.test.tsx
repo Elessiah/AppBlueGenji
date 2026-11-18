@@ -234,6 +234,17 @@ describe("fiches de contact — noms cliquables", () => {
   const TEAM_VIEWER = { role: "TEAM1", isCaster: false, earlyContacts: true } as const;
   const LATER = "Contacts non affichés.";
 
+  it("SideCard_hostWithoutReferee_badgeSaysCreatesLobby", () => {
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
+    expect(html).toContain("crée le salon");
+  });
+
+  it("SideCard_hostWithReferee_badgeSaysPlaysOnLeft", () => {
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost refereed phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
+    expect(html).toContain("joue à gauche");
+    expect(html).not.toContain("crée le salon");
+  });
+
   it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
     const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
     expect(html).not.toContain("href=");
