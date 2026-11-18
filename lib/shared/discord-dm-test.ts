@@ -13,7 +13,7 @@ import type { LocalizedDm } from "./dm-language";
 /**
  * Issue d'un test parti jusqu'au bot :
  * - `SENT` : message remis ;
- * - `DMS_CLOSED` : membre du serveur BlueGenji, mais Discord refuse le message
+ * - `DMS_CLOSED` : membre d'un serveur BlueGenji, mais Discord refuse le message
  *   (messages privés fermés, bot bloqué) ;
  * - `NOT_IN_SERVER` : absent de tous les serveurs BlueGenji — le bot n'écrit qu'à ses membres.
  */
@@ -44,7 +44,7 @@ const hasEntries = (value: unknown): boolean => Array.isArray(value) && value.le
 /**
  * L'issue d'un bilan à un seul destinataire. Un message remis l'emporte ; un
  * refus de Discord (`failed`) dit un membre joint mais fermé ; un membre
- * introuvable (`unresolved`) dit un joueur absent du serveur. Un bilan vide ou
+ * introuvable (`unresolved`) dit un joueur absent des serveurs BlueGenji. Un bilan vide ou
  * illisible ne dit rien : `null` (la route le rend en échec générique).
  */
 export function dmTestOutcome(report: DmTestReport): DmTestOutcome | null {

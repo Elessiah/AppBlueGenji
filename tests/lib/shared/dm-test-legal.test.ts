@@ -2,6 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN, REGISTER_UPDATED_AT } from "@/lib/shared/processing-register";
+import frProfile from "@/messages/fr/profile.json";
+import enProfile from "@/messages/en/profile.json";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -181,5 +183,72 @@ describe("la case des messages privés de match ne s'applique pas au test", () =
     expect(rgpdParagraph("app/rgpd/RgpdEn.tsx")).toContain("does not apply to this test");
     expect(frEntry()).toContain("ne s'applique pas à ce test");
     expect(enEntry()).toContain("does not apply to this test");
+  });
+});
+
+describe("T05 : la ligne du test, complète et cohérente", () => {
+  it("register_t05_legalBasisCoversDmTestLine", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T05").legalBasis).toContain("la ligne d'un message de test « Tester mes MP » non remis");
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T05").legalBasis).toContain("the line for a “Test my DMs” test message not delivered");
+  });
+
+  it("register_t05_dataSubjectsIncludeDmTesters", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T05").dataSubjects).toContain(
+      "Titulaires de compte qui demandent le message de test « Tester mes MP » (jamais nommés ni désignés)",
+    );
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T05").dataSubjects).toContain(
+      "Account holders who request the “Test my DMs” test message (never named or designated)",
+    );
+  });
+
+  it("register_t05_dataCategoriesDescribeCountsOrError", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T05").dataCategories.join(" ")).toContain(
+      "l'issue en nombres (remis, introuvables, injoignables) ou l'erreur rendue",
+    );
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T05").dataCategories.join(" ")).toContain(
+      "the outcome as counts (delivered, not found, unreachable) or the error returned",
+    );
+  });
+
+  it("register_t05_subPurpose_saysDatedByDiscordNotTime", () => {
+    const fr = activity(PROCESSING_ACTIVITIES, "T05").subPurposes.join(" ");
+    const en = activity(PROCESSING_ACTIVITIES_EN, "T05").subPurposes.join(" ");
+
+    expect(fr).toContain("datée par Discord");
+    expect(en).toContain("dated by Discord");
+    expect(fr).not.toContain("l'issue et l'heure");
+    expect(en).not.toContain("outcome and time");
+  });
+});
+
+describe("T04 : la finalité couvre la vérification à la demande", () => {
+  it("register_t04_purposeCoversReachabilityCheck", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T04").purpose).toContain("que le bot peut le joindre en message privé");
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T04").purpose).toContain("that the bot can reach them by direct message");
+  });
+});
+
+describe("un envoi que le bot ne parvient pas à faire laisse une ligne d'erreur", () => {
+  it("legalTexts_dmTest_declareErrorLine", () => {
+    expect(rgpdParagraph("app/rgpd/page.tsx")).toContain("une ligne qui donne l&apos;erreur");
+    expect(rgpdParagraph("app/rgpd/RgpdEn.tsx")).toContain("a line giving the error");
+    expect(frEntry()).toContain("une ligne qui donne l'erreur");
+    expect(enEntry()).toContain("a line giving the error");
+    expect(activity(PROCESSING_ACTIVITIES, "T04").retention.join(" ")).toContain("une ligne qui donne l'erreur");
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T04").retention.join(" ")).toContain("a line giving the error");
+  });
+});
+
+describe("les notifications parlent de tous les serveurs BlueGenji", () => {
+  it("profileTexts_notInServer_namePluralServers", () => {
+    expect(frProfile.dmTest.notInServer).toContain("sur aucun serveur Discord BlueGenji");
+    expect(frProfile.dmTest.hintInvite).toContain("Sur aucun serveur BlueGenji");
+    expect(enProfile.dmTest.notInServer).toContain("on any BlueGenji Discord server");
+    expect(enProfile.dmTest.hintInvite).toContain("Not on any BlueGenji server");
+  });
+
+  it("profileTexts_notInServer_singularServerIsGone", () => {
+    expect(frProfile.dmTest.notInServer).not.toContain("sur le serveur Discord BlueGenji");
+    expect(enProfile.dmTest.notInServer).not.toContain("on the BlueGenji Discord server");
   });
 });

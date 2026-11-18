@@ -1081,8 +1081,9 @@ export function RgpdEn({
             matches and teams” box does not apply to this test, which you request yourself, and a delivered test does
             not tick it again. The result (message delivered, direct messages closed, not on any BlueGenji server, bot
             unreachable) is shown to you only and the site does not record it; a message not delivered (direct
-            messages closed or not on any of the servers) leaves a line giving its outcome in the staff log on
-            Discord, without naming anyone (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+            messages closed or not on any of the servers) leaves a line giving its outcome as counts (delivered,
+            not found, unreachable) in the staff log on Discord, and a sending the bot cannot carry out, a line
+            giving the error — without naming anyone (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             Normally at most {DM_TEST_HOURLY_LIMIT} tries per hour: this cap lives in memory and starts again from
             zero when the site restarts. Your account number and the time of each of your tries are kept there
             only, sixty-one minutes at most after your last click on the button, for the caps on tries. Basis:{" "}

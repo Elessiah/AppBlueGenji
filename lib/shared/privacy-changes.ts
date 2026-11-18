@@ -2167,7 +2167,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Depuis « Mon profil », le bouton « Tester mes MP » demande au bot BlueGenji de t'envoyer un court message privé de test sur ton compte Discord lié, pour vérifier qu'il peut te joindre. Rien ne part sans ton clic.",
     details: [
       `Le message part seulement à ton propre compte Discord rattaché, et seulement si ton tag est certifié ; il ne contient ni lien ni nom de personne. La case « Messages privés Discord de mes matchs et de mes équipes » ne s'applique pas à ce test, que tu demandes toi-même, et un test remis ne la recoche pas. Le site te dit le résultat (message remis, messages privés fermés, absent des serveurs BlueGenji, bot injoignable) et ne l'enregistre pas. Normalement au plus ${DM_TEST_HOURLY_LIMIT} essais par heure : ce plafond vit en mémoire et repart de zéro quand le site redémarre. Ton numéro de compte et l'heure de chacun de tes essais y sont gardés, soixante et une minutes au plus après ton dernier clic sur le bouton, pour les plafonds d'essais.`,
-      "Un message non remis (messages privés fermés ou absent des serveurs) laisse au journal du staff sur Discord une ligne qui en donne l'issue, sans nommer personne. Base : l'exécution du service que tu demandes.",
+      "Un message non remis (messages privés fermés ou absent des serveurs) laisse au journal du staff sur Discord une ligne qui en donne l'issue en nombres (remis, introuvables, injoignables), et un envoi que le bot ne parvient pas à faire, une ligne qui donne l'erreur — sans nommer personne. Base : l'exécution du service que tu demandes.",
       "Ce qui ne change pas : rien de nouveau n'est écrit sur toi en base, et ce que la suppression du compte emporte reste le même.",
     ],
   },

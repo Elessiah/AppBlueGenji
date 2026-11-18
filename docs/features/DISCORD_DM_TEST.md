@@ -19,11 +19,11 @@ libellé accessible « Tester mes MP (messages privés Discord) »). Le composan
 fragment : la page pose la rangée. Pendant l'envoi le libellé devient « Envoi… » (largeur
 réservée `.dmTestButton`, le « i » voisin ne bouge pas) et une région `role="status"`
 `sr-only` l'annonce. L'aide derrière le « i » dit le plafond et porte le lien
-d'invitation du serveur (`DiscordInviteLink`), que la notification « absent du serveur »
+d'invitation du serveur (`DiscordInviteLink`), que la notification « absent des serveurs »
 désigne. Absent tant que l'état Discord n'est pas lu.
 
 - **Tag certifié** : `POST /api/profile/discord/dm-test`, puis une notification :
-  remis (`SENT`, succès), messages privés fermés (`DMS_CLOSED`), absent du serveur
+  remis (`SENT`, succès), messages privés fermés (`DMS_CLOSED`), absent des serveurs
   BlueGenji (`NOT_IN_SERVER`), aucun Discord lié (`DISCORD_NOT_LINKED`), bot
   injoignable (`BOT_INTERNAL_UNREACHABLE`, 503), trop de tests en cours sur le site
   (`DISCORD_DM_TEST_BUSY`, 503, toast `busy`), trop d'essais (`TOO_MANY_REQUESTS`,
@@ -49,7 +49,7 @@ désigne. Absent tant que l'état Discord n'est pas lu.
   supprimé (`PROFILE_NOT_FOUND` sinon).
 - Canal : `pushDiscordDirectMessages` → `POST /internal/notify/dm` du bot, **existant** —
   aucune route ni changement côté bot. Le bot ne cherche le membre que sur les serveurs
-  BlueGenji : `unresolved` = absent du serveur (le bot range aussi là un membre
+  BlueGenji : `unresolved` = absent de tous ces serveurs (le bot range aussi là un membre
   qu'une erreur passagère de Discord l'a empêché de lire : le texte invite alors à
   réessayer), `failed` = Discord refuse (messages privés fermés), `sent` = remis
   (`dmTestOutcome`) ; un bilan vide ou illisible (champ absent ou non tableau) rend
@@ -136,7 +136,12 @@ compte et heure de chaque essai décompté (`accountTries`), compteur d'appels p
 (`DISCORD_DM_TEST_ATTEMPT_RULE`) — 61 minutes au plus après le dernier clic, remis à zéro
 au redémarrage ; d'où « **normalement** au plus 3 essais par heure » dans les textes. Un
 message non remis (`DMS_CLOSED`, `NOT_IN_SERVER`) fait écrire au bot une ligne au journal
-du staff (`dm-test: … introuvable(s) / injoignable(s)`) : l'issue, jamais le joueur. Le
+du staff (`[AppBlueGenji] dm-test: N envoye(s), N introuvable(s), N injoignable(s).`,
+datée par Discord) : l'issue en compteurs, jamais le joueur. Un envoi que le bot ne
+parvient pas à faire (exception, aucun serveur joignable ; « bot injoignable » pour le
+joueur) lui fait écrire une ligne d'erreur (`notify/dm error (dm-test): <erreur>` ou
+`notify/dm: aucun serveur BlueGenji joignable…`), sans nom non plus ; les textes la
+déclarent aussi. Base de ces lignes : exécution du service (T04, rappelé en T05). Le
 bot cherche le membre sur **tous** les serveurs BlueGenji (`findHomeMember`) : « absent
 des serveurs ». La case des messages privés de match et d'équipe ne s'applique pas, et
 les textes légaux le disent.

@@ -1282,7 +1282,8 @@ function RgpdFr({
             test remis ne la recoche pas. Le résultat (message remis, messages privés fermés, absent des serveurs
             BlueGenji, bot injoignable) ne s&apos;affiche qu&apos;à vous et le site ne l&apos;enregistre pas ; un
             message non remis (messages privés fermés ou absent des serveurs) laisse au journal du staff sur Discord
-            une ligne qui en donne l&apos;issue, sans nommer personne (
+            une ligne qui en donne l&apos;issue en nombres (remis, introuvables, injoignables), et un envoi que le bot
+            ne parvient pas à faire, une ligne qui donne l&apos;erreur — sans nommer personne (
             <Link href="/rgpd/registre#t05">registre, T05</Link>). Normalement au plus {DM_TEST_HOURLY_LIMIT} essais
             par heure : ce plafond vit en mémoire et repart de zéro quand le site redémarre. Le numéro de votre compte
             et l&apos;heure de chacun de vos essais y sont gardés seulement, soixante et une minutes au plus après
