@@ -9,13 +9,17 @@ jest.mock("@/lib/server/discord-dm-test", () => ({
 import { POST } from "@/app/api/profile/discord/dm-test/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import {
+  DISCORD_DM_TEST_ATTEMPT_RULE,
+  DISCORD_DM_TEST_GLOBAL_RULE,
+  DISCORD_DM_TEST_VOLUME_RULE,
+  DM_TEST_GLOBAL_KEY,
   DM_TEST_MAX_TRACKED_ACCOUNTS,
   DmTestError,
   reserveDmTestTry,
   resetDmTestTries,
   sendDiscordDmTest,
 } from "@/lib/server/discord-dm-test";
-import { resetRateLimit } from "@/lib/server/rate-limit";
+import { chargeRateLimit, resetRateLimit, takeTokenBucket } from "@/lib/server/rate-limit";
 import { authUser } from "../../../helpers/auth-user";
 
 /** `POST /api/profile/discord/dm-test` : test des messages privés, plafonné par compte. */
@@ -52,7 +56,7 @@ describe("POST /api/profile/discord/dm-test", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ outcome: "SENT" });
-    expect(sendDiscordDmTest).toHaveBeenCalledWith(7, expect.any(AbortSignal));
+    expect(sendDiscordDmTest).toHaveBeenCalledWith(7, expect.any(AbortSignal), expect.any(Function));
   });
 
   it("post_overLimit_returns429AfterThreeTries", async () => {
@@ -307,5 +311,64 @@ describe("POST /api/profile/discord/dm-test", () => {
     const response = await POST(sameSite());
 
     expect(response.status).toBe(429);
+  });
+  it("post_attemptBucketFullNewcomer_returns503Busy", async () => {
+    for (let id = 100_000; id < 110_000; id += 1) chargeRateLimit(DISCORD_DM_TEST_ATTEMPT_RULE, String(id));
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
+    expect(sendDiscordDmTest).not.toHaveBeenCalled();
+  });
+
+  it("post_volumeBucketEmpty_returns503BusyAndRefundsLogTokenAndAccountSlot", async () => {
+    for (let i = 0; i < DISCORD_DM_TEST_VOLUME_RULE.capacity; i += 1) {
+      takeTokenBucket(DISCORD_DM_TEST_VOLUME_RULE, DM_TEST_GLOBAL_KEY);
+    }
+
+    const refused = await POST(sameSite());
+
+    expect(refused.status).toBe(503);
+    expect(await refused.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
+    expect(sendDiscordDmTest).not.toHaveBeenCalled();
+    expect(takeTokenBucket(DISCORD_DM_TEST_GLOBAL_RULE, DM_TEST_GLOBAL_KEY).remaining).toBe(
+      DISCORD_DM_TEST_GLOBAL_RULE.capacity - 1,
+    );
+    resetRateLimit("discord-dm-test-volume");
+    const statuses = [];
+    for (let i = 0; i < 3; i += 1) statuses.push((await POST(sameSite())).status);
+    expect(statuses).toEqual([200, 200, 200]);
+  });
+
+  it("post_sentTestsBeyondVolumeCapacity_refusedBusy", async () => {
+    for (let id = 1000; id < 1000 + DISCORD_DM_TEST_VOLUME_RULE.capacity; id += 1) {
+      jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id }));
+      await POST(sameSite());
+    }
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
+    expect(sendDiscordDmTest).toHaveBeenCalledTimes(DISCORD_DM_TEST_VOLUME_RULE.capacity);
+  });
+
+  it("post_lateSentAfterAbort_refundsLogToken", async () => {
+    jest.mocked(sendDiscordDmTest).mockImplementation(async (_userId, _signal, onLateOutcome) => {
+      onLateOutcome?.("SENT");
+      throw new DmTestError("REQUEST_ABORTED", false);
+    });
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(400);
+    expect(takeTokenBucket(DISCORD_DM_TEST_GLOBAL_RULE, DM_TEST_GLOBAL_KEY).remaining).toBe(
+      DISCORD_DM_TEST_GLOBAL_RULE.capacity - 1,
+    );
+    expect(takeTokenBucket(DISCORD_DM_TEST_VOLUME_RULE, DM_TEST_GLOBAL_KEY).remaining).toBe(
+      DISCORD_DM_TEST_VOLUME_RULE.capacity - 2,
+    );
   });
 });

@@ -1176,7 +1176,8 @@ export function refundRateToken(rule: TokenBucketRule, identity: RateIdentity): 
   if (key !== ANONYMOUS_IDENTITY) refundTokenBucket(rule, key);
 }
 
-function tooManyRequests(retryAfterMs: number): NextResponse {
+/** Le refus `429` commun : code seul, `Retry-After` en secondes (au moins 1), jamais mis en cache. */
+export function tooManyRequests(retryAfterMs: number): NextResponse {
   return NextResponse.json(
     { error: "TOO_MANY_REQUESTS" },
     {

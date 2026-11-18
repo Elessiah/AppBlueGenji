@@ -70,10 +70,11 @@ désigne. Absent tant que l'état Discord n'est pas lu.
   tous comptes confondus — au-delà `DISCORD_DM_TEST_BUSY` (503, places rendues, toast
   « trop de tests en cours sur le site »). Joueur parti avant l'appel : rien n'est
   demandé au bot. Le bouton abandonne sa requête au démontage.
-- Coupe-circuit : le test l'ignore (`honourCircuit: false`) et, réussi, **ne le rouvre
+- Coupe-circuit : le test l'ignore (`honourCircuit: false`) et, réussi, **ne le referme
   pas** s'il est ouvert — un clic ne relance pas les flux d'arrière-plan vers un bot en
-  panne partielle ; coupe-circuit fermé, son succès remet la série d'échecs à zéro comme
-  tout autre (`recordBypassSuccess`). Vaut aussi pour les alertes arbitres et dirigeants.
+  panne partielle ; ouvert ou fermé, son succès remet la série d'échecs à zéro comme tout
+  autre (`recordBypassSuccess`) : des échecs suivis d'un succès ne sont plus « d'affilée ».
+  Vaut aussi pour les alertes arbitres et dirigeants.
 - Plafonds, en mémoire du processus, contrôlés et décomptés en une instruction avant tout
   `await` :
   - par compte, **3 essais par heure** (`reserveDmTestTry`), **vraie fenêtre glissante** :
@@ -81,17 +82,38 @@ désigne. Absent tant que l'état Discord n'est pas lu.
     datent de la dernière heure — aucune heure glissante n'en porte plus de 3 ; refus 429
     `TOO_MANY_REQUESTS` avec `Retry-After` (sortie du plus ancien essai). Un essai rendu est
     retiré, une fois au plus, sans rien repousser. Le compte est effacé une heure après son
-    dernier essai décompté (minuteur détaché, sans attendre de requête). Au-delà de
-    `DM_TEST_MAX_TRACKED_ACCOUNTS` comptes suivis : `DISCORD_DM_TEST_BUSY` ;
+    dernier essai décompté : **un** minuteur détaché par compte, réarmé sur le dernier
+    essai (rendu compris), qui efface le compte **sans condition** à l'échéance — une
+    horloge qui recule ne le garde pas. Au-delà de `DM_TEST_MAX_TRACKED_ACCOUNTS` comptes
+    suivis : purge par la tête (table rangée par dernier essai, arrêt au premier actif),
+    puis `DISCORD_DM_TEST_BUSY` ;
   - `DISCORD_DM_TEST_GLOBAL_RULE`, seau à jetons tous comptes confondus (30 d'un coup, puis
     un toutes les 30 s) : chaque test non remis écrit une ligne au journal du staff ; un test
-    remis (`SENT`) rend son jeton — vide : `DISCORD_DM_TEST_BUSY` (place du compte rendue) ;
+    remis (`SENT`) rend son jeton, **même** remis après que la route a cessé d'attendre
+    (`onLateOutcome` de `sendDiscordDmTest`) — vide : `DISCORD_DM_TEST_BUSY` (place du
+    compte rendue) ;
+  - `DISCORD_DM_TEST_VOLUME_RULE`, seau à jetons tous comptes confondus (60 d'un coup, puis
+    un toutes les 10 s, 360 par heure au plus) : **tous** les tests demandés au bot, remis
+    compris — seul un test où rien n'est parti rend son jeton. Borne le volume de messages
+    privés du bot pour ce bouton quel que soit le nombre de comptes — vide :
+    `DISCORD_DM_TEST_BUSY` (place du compte et jeton du journal rendus) ;
   - `DISCORD_DM_TEST_ATTEMPT_RULE`, 30 appels par heure et par compte, refus compris,
-    jamais rendu : borne la boucle de refus rendus (seau plein : remis à zéro).
+    jamais rendu : borne la boucle de refus rendus. Seau plein (`overflow: "refuse"`) : les
+    plafonds en cours sont gardés, un compte sans fenêtre ouverte reçoit
+    `DISCORD_DM_TEST_BUSY` (jamais un 429 faux).
   Une erreur `DmTestError` dit si rien n'est parti (`nothingSent`) : non lié, non
   certifié, compte absent, lecture du compte en échec, occupé, joueur parti avant
   l'appel → places rendues ; bot injoignable, bilan illisible, joueur parti pendant
   l'appel → gardées (on ne martèle pas un bot tombé).
+- **En mémoire, pas en base** (écart assumé à la règle de `CLAUDE.md` « un quota se
+  réserve en une instruction (`UPDATE … WHERE attempts < ?` + `affectedRows`) ») : la
+  règle vise ce qu'elle interdit — lire puis écrire de part et d'autre d'un `await`, qui
+  laisse passer deux requêtes simultanées. Ici le contrôle et le décompte sont **une seule
+  instruction synchrone** (`reserveDmTestTry`, aucun `await`) dans un processus unique
+  (pm2, une instance) : la course est fermée de la même façon. Ce plafond ne protège ni un
+  secret ni une connexion (rien à deviner, le message ne part qu'au compte lui-même) ; le
+  passer en base ajouterait un stockage de données personnelles (numéro de compte, heures
+  des essais) à déclarer et à purger, pour un garde-fou contre la rafale.
 - **Redémarrage** : ces plafonds vivent en mémoire ; un redémarrage du site (déploiement,
   `pm2 restart`) les remet à zéro — un compte peut alors refaire jusqu'à 3 essais. Accepté :
   c'est un garde-fou contre la rafale, pas une promesse faite au joueur, et rien n'est

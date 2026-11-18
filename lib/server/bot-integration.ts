@@ -71,13 +71,13 @@ function recordSuccess(): void {
 
 /**
  * Succès d'un appel qui passe outre le coupe-circuit (geste d'un joueur,
- * alerte arbitres ou dirigeants) : coupe-circuit fermé, il remet la série
- * d'échecs à zéro comme tout succès ; ouvert, il ne le referme pas — un clic
- * répété ne rouvrirait sinon les flux d'arrière-plan vers un bot en panne
- * partielle.
+ * alerte arbitres ou dirigeants) : il remet la série d'échecs à zéro comme
+ * tout succès — ouvert ou fermé, des échecs suivis d'un succès ne sont plus
+ * « d'affilée » ; ouvert, il ne le referme pas — un clic répété ne rouvrirait
+ * sinon les flux d'arrière-plan vers un bot en panne partielle.
  */
 function recordBypassSuccess(): void {
-  if (Date.now() >= circuitOpenUntil) consecutiveFailures = 0;
+  consecutiveFailures = 0;
 }
 
 function getInternalHeaders(): HeadersInit {

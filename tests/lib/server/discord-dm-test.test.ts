@@ -8,6 +8,7 @@ import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import {
   DM_TEST_MAX_TRACKED_ACCOUNTS,
   DmTestError,
+  dmTestExpiryTimerCount,
   reserveDmTestTry,
   resetDmTestTries,
   sendDiscordDmTest,
@@ -185,6 +186,40 @@ describe("sendDiscordDmTest abort during the bot call", () => {
   });
 });
 
+describe("sendDiscordDmTest late outcome", () => {
+  it("sendDiscordDmTest_abortedDuringBotCallThenSent_callsOnLateOutcomeWithSent", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    const gate: { release?: (report: { sent: number; unresolved: never[]; failed: never[] }) => void } = {};
+    jest.mocked(pushDiscordDirectMessages).mockReturnValue(
+      new Promise((resolve) => {
+        gate.release = resolve;
+      }),
+    );
+    const onLateOutcome = jest.fn<(outcome: string) => void>();
+    const controller = new AbortController();
+    const pending = sendDiscordDmTest(7, controller.signal, onLateOutcome).catch((caught: unknown) => caught);
+    await new Promise((resolve) => setImmediate(resolve));
+    controller.abort();
+    expect(await pending).toMatchObject({ message: "REQUEST_ABORTED", nothingSent: false });
+    expect(onLateOutcome).not.toHaveBeenCalled();
+
+    gate.release?.({ sent: 1, unresolved: [], failed: [] });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onLateOutcome).toHaveBeenCalledWith("SENT");
+  });
+
+  it("sendDiscordDmTest_notAborted_neverCallsOnLateOutcome", async () => {
+    execute.mockResolvedValue([[certifiedRow()]]);
+    const onLateOutcome = jest.fn<(outcome: string) => void>();
+
+    const outcome = await sendDiscordDmTest(7, new AbortController().signal, onLateOutcome);
+
+    expect(outcome).toBe("SENT");
+    expect(onLateOutcome).not.toHaveBeenCalled();
+  });
+});
+
 describe("reserveDmTestTry", () => {
   const T0 = Date.parse("2026-11-18T10:00:00Z");
   const MIN = 60_000;
@@ -264,6 +299,61 @@ describe("reserveDmTestTry", () => {
 
     jest.advanceTimersByTime(60 * MIN + 1);
 
+    expect(trackedDmTestAccounts()).toBe(0);
+  });
+
+  it("reserveDmTestTry_expiryTimerFiresWhileClockBehind_dropsAccountUnconditionally", () => {
+    reserveDmTestTry(7);
+    jest.setSystemTime(T0 - 10 * MIN);
+
+    jest.advanceTimersByTime(60 * MIN);
+
+    expect(trackedDmTestAccounts()).toBe(0);
+    expect(dmTestExpiryTimerCount()).toBe(0);
+  });
+
+  it("reserveDmTestTry_manyRefundedTries_keepsOneTimerPerAccount", () => {
+    for (let i = 0; i < 30; i += 1) {
+      for (const id of [7, 8]) {
+        const reservation = reserveDmTestTry(id);
+        if (reservation.refused === null) reservation.refund();
+      }
+    }
+    reserveDmTestTry(7);
+    reserveDmTestTry(8);
+
+    expect(dmTestExpiryTimerCount()).toBe(2);
+  });
+
+  it("reserveDmTestTry_refundOnlyTry_clearsItsTimer", () => {
+    const only = reserveDmTestTry(7);
+    if (only.refused !== null) throw new Error("expected a reservation");
+
+    only.refund();
+
+    expect(dmTestExpiryTimerCount()).toBe(0);
+  });
+
+  it("reserveDmTestTry_refundLastTry_rearmsExpiryOnPreviousTry", () => {
+    reserveDmTestTry(7);
+    jest.advanceTimersByTime(30 * MIN);
+    const second = reserveDmTestTry(7);
+    if (second.refused !== null) throw new Error("expected a reservation");
+    second.refund();
+
+    jest.advanceTimersByTime(30 * MIN);
+
+    expect(trackedDmTestAccounts()).toBe(0);
+  });
+
+  it("reserveDmTestTry_newerTry_keepsAccountUntilAnHourAfterIt", () => {
+    reserveDmTestTry(7);
+    jest.advanceTimersByTime(30 * MIN);
+    reserveDmTestTry(7);
+
+    jest.advanceTimersByTime(30 * MIN + 1);
+    expect(trackedDmTestAccounts()).toBe(1);
+    jest.advanceTimersByTime(30 * MIN);
     expect(trackedDmTestAccounts()).toBe(0);
   });
 

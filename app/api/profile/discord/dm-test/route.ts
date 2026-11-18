@@ -6,13 +6,21 @@
  * (403 `CROSS_SITE_REQUEST`, corps JSON exigé : 415 sinon), sans dépendre du
  * périmètre du middleware. Un refus ne porte qu'un code.
  */
-import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/auth";
-import { enforceRateLimit, refundRateToken, takeRateToken } from "@/lib/server/api-guard";
+import { tooManyRequests } from "@/lib/server/api-guard";
+import {
+  consumeRateLimit,
+  rateLimitIdentity,
+  rateLimitWindowOf,
+  refundTokenBucket,
+  takeTokenBucket,
+  type TokenBucketRule,
+} from "@/lib/server/rate-limit";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import {
   DISCORD_DM_TEST_ATTEMPT_RULE,
   DISCORD_DM_TEST_GLOBAL_RULE,
+  DISCORD_DM_TEST_VOLUME_RULE,
   DM_TEST_GLOBAL_KEY,
   DmTestError,
   reserveDmTestTry,
@@ -47,30 +55,35 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   // Tous les appels, refus compris (ceux-ci rendent leur place au plafond par
-  // compte, pas à celui-ci).
-  const attempts = enforceRateLimit(DISCORD_DM_TEST_ATTEMPT_RULE, user.id);
-  if (attempts) return attempts;
+  // compte, pas à celui-ci). Seau plein, nouveau venu refusé : occupé, pas
+  // « trop d'essais ».
+  const attemptKey = rateLimitIdentity(user.id);
+  const hadAttemptWindow = rateLimitWindowOf(DISCORD_DM_TEST_ATTEMPT_RULE, attemptKey) !== null;
+  const attempts = consumeRateLimit(DISCORD_DM_TEST_ATTEMPT_RULE, attemptKey);
+  if (!attempts.allowed) {
+    return hadAttemptWindow ? tooManyRequests(attempts.retryAfterMs) : fail(DM_TEST_BUSY, 503);
+  }
 
   // Réservée en une instruction, avant tout `await` : deux clics simultanés ne
   // passent pas tous deux sous le plafond.
   const reservation = reserveDmTestTry(user.id);
-  if (reservation.refused === "TOO_MANY") return tooManyTries(reservation.retryAfterMs);
+  if (reservation.refused === "TOO_MANY") return tooManyRequests(reservation.retryAfterMs);
   if (reservation.refused === "BUSY") return fail(DM_TEST_BUSY, 503);
-  if (takeRateToken(DISCORD_DM_TEST_GLOBAL_RULE, DM_TEST_GLOBAL_KEY)) {
+  const refundLog = takeGlobalToken(DISCORD_DM_TEST_GLOBAL_RULE);
+  const refundVolume = refundLog ? takeGlobalToken(DISCORD_DM_TEST_VOLUME_RULE) : null;
+  if (!refundLog || !refundVolume) {
+    refundLog?.();
     reservation.refund();
     return fail(DM_TEST_BUSY, 503);
   }
-  let globalRefunded = false;
-  const refundGlobal = () => {
-    if (globalRefunded) return;
-    globalRefunded = true;
-    refundRateToken(DISCORD_DM_TEST_GLOBAL_RULE, DM_TEST_GLOBAL_KEY);
-  };
 
   try {
-    const outcome = await sendDiscordDmTest(user.id, req.signal);
-    // Remis : aucune ligne au journal du staff, le jeton global est rendu.
-    if (outcome === "SENT") refundGlobal();
+    // Remis, même après que la route a cessé d'attendre : aucune ligne au
+    // journal du staff, le jeton de ce plafond-là est rendu.
+    const outcome = await sendDiscordDmTest(user.id, req.signal, (late) => {
+      if (late === "SENT") refundLog();
+    });
+    if (outcome === "SENT") refundLog();
     return ok({ outcome });
   } catch (error) {
     // Rien n'est parti : places rendues. Sinon (bot injoignable ou trop lent,
@@ -78,21 +91,22 @@ export async function POST(req: Request) {
     // panne ne se martèle pas.
     if (error instanceof DmTestError && error.nothingSent) {
       reservation.refund();
-      refundGlobal();
+      refundLog();
+      refundVolume();
     }
     return dmTestFailure(error);
   }
 }
 
-/** Plafond par compte atteint : 429 et le délai jusqu'à la sortie du plus ancien essai. */
-function tooManyTries(retryAfterMs: number) {
-  return NextResponse.json(
-    { error: "TOO_MANY_REQUESTS" },
-    {
-      status: 429,
-      headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1000))), "Cache-Control": "no-store" },
-    },
-  );
+/** Prend un jeton du seau global `rule` ; rend de quoi le rendre une fois au plus, ou `null` s'il est vide. */
+function takeGlobalToken(rule: TokenBucketRule): (() => void) | null {
+  if (!takeTokenBucket(rule, DM_TEST_GLOBAL_KEY).allowed) return null;
+  let refunded = false;
+  return () => {
+    if (refunded) return;
+    refunded = true;
+    refundTokenBucket(rule, DM_TEST_GLOBAL_KEY);
+  };
 }
 
 /** La réponse d'un test qui n'a pas rendu d'issue : un code seul. */
