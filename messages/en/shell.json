@@ -38,7 +38,18 @@
     "devDocs": "Developer docs",
     "logout": "Log out",
     "loggingOut": "Logging out…",
-    "logoutFailed": "Couldn't log you out. Try again in a moment."
+    "logoutFailed": "Couldn't log you out. Try again in a moment.",
+    "playerView": "Switch to player view",
+    "playerViewPending": "Switching to player view…",
+    "playerViewFailed": "Couldn't switch to player view. Try again in a moment."
+  },
+  "playerView": {
+    "label": "Player view",
+    "active": "Player view on",
+    "back": "Back to admin view",
+    "backPending": "Returning to admin view…",
+    "backFailed": "Couldn't return to admin view. Try again in a moment.",
+    "hint": "On this device only, the site treats you as a player: your staff rights are suspended until you switch back, for {hours} hours at most. Staff push notifications follow the account and keep arriving."
   },
   "footer": {
     "brandName": "BlueGenji",

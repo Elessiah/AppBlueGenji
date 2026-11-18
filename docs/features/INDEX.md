@@ -91,6 +91,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `SECURITY_HEADERS_CSP.md` — En-têtes de sécurité et CSP en application (page cassée : lire `/api/csp-report`).
 - `DEV_AUTH_BYPASS.md` — `DEV_AUTH_USER_ID`, en développement seulement.
 - `PERMISSION_ROLES.md` — Rôles de plateforme cumulables et permissions `can(user, …)` ; un administrateur règle les siens depuis « Mon profil », sans se retirer `ADMIN`.
+- `ADMIN_PLAYER_VIEW.md` — « Vue joueur » du staff : droits de plateforme suspendus pour une session (12 h au plus), bannière de retour sur toutes les pages.
 - `PROFILE_SCREEN.md` — Écran « Mon profil ».
 - `ACCOUNT_MENU.md` — Menu du compte, hauteur des barres de navigation.
 - `ACCOUNT_DELETION.md` — Suppression d'un compte : demande réversible 30 jours (réactivation, départ des équipes, forfaits), puis effacement ou anonymisation.

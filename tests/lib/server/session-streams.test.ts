@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   closeSessionStreams,
   closeUserStreams,
+  reconnectRequestedSince,
+  reconnectSessionStreams,
   reconnectUserStreams,
   registerSessionStream,
   registeredStreamCount,
   resetSessionStreams,
+  RECONNECT_MEMORY_MAX,
+  RECONNECT_MEMORY_PER_USER,
   REVOCATION_MEMORY_MS,
   revocationMark,
   revokedSince,
@@ -231,5 +235,122 @@ describe("reconnectUserStreams (EF-04)", () => {
 
     expect(reconnectUserStreams([])).toBe(0);
     expect(close).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
+  it("reconnectSessionStreams_oneSession_closesOnlyThatSessionStreams", () => {
+    const here = jest.fn();
+    const otherDevice = jest.fn();
+    const otherUser = jest.fn();
+    register(1, "ici", here);
+    register(1, "ailleurs", otherDevice);
+    register(2, "ici", otherUser);
+
+    expect(reconnectSessionStreams(1, "ici")).toBe(1);
+    expect(here).toHaveBeenCalledTimes(1);
+    expect(otherDevice).not.toHaveBeenCalled();
+    expect(otherUser).not.toHaveBeenCalled();
+  });
+
+  it("reconnectSessionStreams_switch_isNotARevocation", () => {
+    register(1, "ici");
+    const mark = revocationMark();
+
+    reconnectSessionStreams(1, "ici");
+
+    expect(revokedSince(1, "ici", mark)).toBe(false);
+  });
+
+  it("reconnectSessionStreams_nullHash_closesEveryStreamOfTheAccount", () => {
+    const cookieless = jest.fn();
+    const staleCookie = jest.fn();
+    const otherUser = jest.fn();
+    register(1, "", cookieless);
+    register(1, "vraie", staleCookie);
+    register(2, "", otherUser);
+
+    expect(reconnectSessionStreams(1, null)).toBe(2);
+    expect(otherUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconnectRequestedSince (ADMIN_PLAYER_VIEW.md)", () => {
+  it("reconnectRequestedSince_switchAfterMark_isTrueForThatSessionOnly", () => {
+    const mark = revocationMark();
+
+    reconnectSessionStreams(1, "ici");
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(true);
+    expect(reconnectRequestedSince(1, "ailleurs", mark)).toBe(false);
+    expect(reconnectRequestedSince(2, "ici", mark)).toBe(false);
+  });
+
+  it("reconnectRequestedSince_switchBeforeMark_isFalse", () => {
+    reconnectSessionStreams(1, "ici");
+    const mark = revocationMark();
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
+  });
+
+  it("reconnectRequestedSince_nullHashSwitch_matchesAnySessionOfTheAccount", () => {
+    const mark = revocationMark();
+
+    reconnectSessionStreams(1, null);
+
+    expect(reconnectRequestedSince(1, "", mark)).toBe(true);
+    expect(reconnectRequestedSince(1, "cookie", mark)).toBe(true);
+  });
+
+  it("reconnectRequestedSince_revocation_isNotAReconnect", () => {
+    const mark = revocationMark();
+
+    closeUserStreams(1);
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
+  });
+});
+
+describe("mémoire des changements de contexte (perf)", () => {
+  it("reconnectRequestedSince_otherAccountFloodsBeyondPerUserCap_pendingEntryOfFirstAccountKept", () => {
+    const mark = revocationMark();
+    reconnectSessionStreams(1, "premiere");
+    for (let i = 0; i < RECONNECT_MEMORY_PER_USER * 2; i += 1) reconnectSessionStreams(2, `s${i}`);
+
+    expect(reconnectRequestedSince(1, "premiere", mark)).toBe(true);
+  });
+
+  it("reconnectRequestedSince_ownEntriesBeyondPerUserCap_oldestOwnForgottenNewestKept", () => {
+    const mark = revocationMark();
+    for (let i = 0; i <= RECONNECT_MEMORY_PER_USER; i += 1) reconnectSessionStreams(2, `s${i}`);
+
+    expect(reconnectRequestedSince(2, "s0", mark)).toBe(false);
+    expect(reconnectRequestedSince(2, `s${RECONNECT_MEMORY_PER_USER}`, mark)).toBe(true);
+  });
+
+  it("reconnectRequestedSince_globalBackstopExceeded_oldestDropped", () => {
+    const mark = revocationMark();
+    for (let user = 1; user <= RECONNECT_MEMORY_MAX + 1; user += 1) reconnectSessionStreams(user, "ici");
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
+    expect(reconnectRequestedSince(RECONNECT_MEMORY_MAX + 1, "ici", mark)).toBe(true);
+  });
+
+  it("revokedSince_manyReconnectMarks_realRevocationStillFound", () => {
+    const mark = revocationMark();
+    closeSessionStreams("revoquee");
+    for (let i = 0; i < RECONNECT_MEMORY_MAX * 2; i += 1) reconnectSessionStreams(2, `s${i}`);
+
+    expect(revokedSince(1, "revoquee", mark)).toBe(true);
+  });
+
+  it("reconnectRequestedSince_afterMemoryDelay_isFalse", () => {
+    jest.useFakeTimers();
+    const mark = revocationMark();
+    reconnectSessionStreams(1, "ici");
+
+    jest.advanceTimersByTime(REVOCATION_MEMORY_MS + 1);
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
   });
 });

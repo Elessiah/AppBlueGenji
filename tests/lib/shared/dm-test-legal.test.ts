@@ -27,9 +27,9 @@ describe("registre T04", () => {
 });
 
 describe("historique des changements", () => {
-  it("privacyChanges_dmTestEntry_isLastAndDated", () => {
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID); // suivie des rôles de plateforme (DEVDOC-PAGE)
-    expect(PRIVACY_CHANGES.at(-2)?.publishedAt).toBe("2026-11-20");
+  it("privacyChanges_dmTestEntry_isListedAndDated", () => {
+    const entry = PRIVACY_CHANGES.find((change) => change.id === ENTRY_ID);
+    expect(entry?.publishedAt).toBe("2026-11-20");
   });
 
   it("privacyChanges_dmTestEntry_hasEnglish", () => {

@@ -319,3 +319,21 @@ describe("POST /api/admin/users/[id]/roles", () => {
     expect(error).toHaveBeenCalledWith("[roles] journal du staff non publié : Error");
   });
 });
+
+describe("POST /api/admin/users/[id]/roles — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("POST_adminInPlayerView_returns403", async () => {
+    // `getCurrentUser` rend la session : en vue joueur, plus aucun droit.
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: [], playerView: true, playerViewAvailable: true }),
+    );
+
+    const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+
+    expect(res.status).toBe(403);
+    expect(service.setUserRoles).not.toHaveBeenCalled();
+  });
+});

@@ -156,10 +156,19 @@ test.describe("Protection des routes sécurisées", () => {
     // Le tournoi n'a pas besoin d'exister : ce qui est vérifié ici, c'est que le
     // visiteur arrive sur une page (avec son `<head>`) — la page sans compte
     // (`docs/features/SPECTATOR_VIEW.md`), où un robot d'aperçu lit l'encart.
-    const response = await page.goto("/tournois/1");
+    // Sous plusieurs workers, `i18n.spec.ts` demande la même page sans compte
+    // (`/en/tournois/<id>`) au même instant : `next dev` compile alors la route
+    // deux fois à la fois, et la première réponse peut être un 500 de
+    // compilation, jamais reproduit seul ni sur un serveur construit. La
+    // navigation est donc rejouée tant que la compilation n'est pas finie ; une
+    // vraie panne de la page reste un échec au bout du délai.
+    test.setTimeout(90_000);
+    await expect(async () => {
+      const response = await page.goto("/tournois/1");
+      expect(response?.status()).toBe(200);
+    }).toPass({ timeout: 60_000 });
 
     await expect(page).toHaveURL(/\/suivre\/tournois\/1$/);
-    expect(response?.status()).toBe(200);
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(1);
     await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
       "content",

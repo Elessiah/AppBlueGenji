@@ -10,6 +10,7 @@ import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { can } from "@/lib/shared/permissions";
+import { playerViewMenuMode } from "@/lib/shared/player-view";
 import { joinHrefFor } from "@/lib/shared/spectator-view";
 import { PublicNavMenu } from "./PublicNavMenu";
 import { JoinLink } from "./JoinLink";
@@ -96,7 +97,10 @@ export async function PublicHeader() {
               {/* Profil, équipe et déconnexion : le même menu que dans
                   l'espace connecté. Son nom accessible commence par le pseudo
                   affiché (WCAG 2.5.3). */}
-              <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam} devDocs={can(user, "dev")} />
+              <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam}
+                devDocs={can(user, "dev")}
+                playerViewEntry={playerViewMenuMode(user)}
+              />
             </>
           ) : (
             <CyberButton variant="primary" asChild>

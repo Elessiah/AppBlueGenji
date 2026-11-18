@@ -642,6 +642,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // seuls octets.
     `ALTER TABLE bg_blocked_image_hashes ADD COLUMN phash BIGINT UNSIGNED NULL AFTER sha256`,
     `ALTER TABLE bg_logo_quarantines ADD COLUMN image_phash BIGINT UNSIGNED NULL AFTER image_sha256`,
+    // « Vue joueur » du staff, par session (`docs/features/ADMIN_PLAYER_VIEW.md`).
+    `ALTER TABLE bg_user_sessions ADD COLUMN player_view_until DATETIME NULL`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

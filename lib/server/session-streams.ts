@@ -43,6 +43,12 @@ type Entry = {
 type Revocation = {
   mark: number;
   at: number;
+  /**
+   * `RECONNECT` : seul le contexte du lecteur a changé (vue joueur) — un flux
+   * qui s'ouvrait répond la seule demande de reconnexion (`reconnectRequestedSince`), sans
+   * refus. Absent : une vraie révocation.
+   */
+  reconnect?: true;
   userId?: number;
   tokenHash?: string;
   keepTokenHash?: string;
@@ -50,7 +56,7 @@ type Revocation = {
 
 type GlobalWithRegistry = typeof globalThis & {
   __bgSessionStreams?: Set<Entry>;
-  __bgStreamRevocations?: { mark: number; recent: Revocation[] };
+  __bgStreamRevocations?: { mark: number; recent: Revocation[]; reconnects: Revocation[] };
 };
 
 /**
@@ -60,15 +66,36 @@ type GlobalWithRegistry = typeof globalThis & {
  */
 export const REVOCATION_MEMORY_MS = 60_000;
 
-function revocations(): { mark: number; recent: Revocation[] } {
+/**
+ * Plafond des changements de contexte retenus **par compte** : une bascule
+ * répétée ne grossit pas la liste que chaque ouverture de flux parcourt (les
+ * plus anciens du compte tombent ; au-delà d'une minute ils tombent de toute
+ * façon). Par compte, et non global : les bascules d'un compte ne chassent
+ * jamais le changement en attente d'un autre, qui servirait alors l'ancien
+ * contexte (droits de staff) au flux qui s'ouvrait pendant sa bascule. Le
+ * double du débit permis (`PLAYER_VIEW_TOGGLE_RULE`) : un compte n'y atteint
+ * pas ses propres changements de la minute.
+ */
+export const RECONNECT_MEMORY_PER_USER = 20;
+
+/**
+ * Filet de mémoire, tous comptes confondus : seuls les comptes du staff
+ * basculent, et à débit borné — n'est jamais atteint en pratique.
+ */
+export const RECONNECT_MEMORY_MAX = 1024;
+
+function revocations(): { mark: number; recent: Revocation[]; reconnects: Revocation[] } {
   const globalRef = globalThis as GlobalWithRegistry;
-  globalRef.__bgStreamRevocations ??= { mark: 0, recent: [] };
+  globalRef.__bgStreamRevocations ??= { mark: 0, recent: [], reconnects: [] };
   return globalRef.__bgStreamRevocations;
 }
 
 function prune(now: number): void {
   const state = revocations();
   state.recent = state.recent.filter((entry) => now - entry.at < REVOCATION_MEMORY_MS);
+  if (state.reconnects.length > 0) {
+    state.reconnects = state.reconnects.filter((entry) => now - entry.at < REVOCATION_MEMORY_MS);
+  }
 }
 
 function noteRevocation(revocation: Omit<Revocation, "mark" | "at">): void {
@@ -76,7 +103,19 @@ function noteRevocation(revocation: Omit<Revocation, "mark" | "at">): void {
   prune(now);
   const state = revocations();
   state.mark += 1;
-  state.recent.push({ ...revocation, mark: state.mark, at: now });
+  const entry = { ...revocation, mark: state.mark, at: now };
+  if (revocation.reconnect) {
+    // À part : les révocations réelles restent courtes à parcourir.
+    state.reconnects.push(entry);
+    const own = state.reconnects.filter((kept) => kept.userId === entry.userId);
+    if (own.length > RECONNECT_MEMORY_PER_USER) {
+      const oldest = own[0];
+      state.reconnects = state.reconnects.filter((kept) => kept !== oldest);
+    }
+    if (state.reconnects.length > RECONNECT_MEMORY_MAX) state.reconnects.shift();
+    return;
+  }
+  state.recent.push(entry);
 }
 
 /**
@@ -158,7 +197,7 @@ export function closeUserStreams(userId: number, options: { keepTokenHash?: stri
 /**
  * Fait reconnecter les flux de ces comptes **sans révoquer** leur session :
  * rien n'est noté pour `revokedSince`, et le rappel reçoit `RECONNECT` — un
- * flux en cours d'ouverture n'est pas refusé (401), il se ferme sitôt ouvert.
+ * flux en cours d'ouverture n'est pas refusé (401) : il répond la seule demande de reconnexion (`lib/shared/stream-reconnect.ts`).
  * Sert quand le contexte du lecteur change (équipe quittée, retirée, dissoute,
  * rôle changé) : le client se reconnecte et la route le relit.
  *
@@ -193,10 +232,47 @@ export function closeSessionStreams(tokenHash: string): number {
   return closeMatching((entry) => entry.tokenHash === tokenHash);
 }
 
+/**
+ * Fait reconnecter les flux d'**une** session, sans la révoquer (`RECONNECT`) :
+ * son contexte de lecteur a changé (vue joueur, `ADMIN_PLAYER_VIEW.md`) et la
+ * route doit le relire. `tokenHash` `null` : tous les flux du compte — le
+ * contournement de développement, dont les flux portent l'empreinte d'un
+ * éventuel cookie resté posé, ou aucune.
+ *
+ * Le changement est noté comme une révocation (même repère), mais lu par
+ * `reconnectRequestedSince` seulement : un flux qui lisait la session pendant
+ * la bascule répond la seule demande de reconnexion, au lieu de servir l'ancien contexte.
+ *
+ * @returns le nombre de flux fermés.
+ */
+export function reconnectSessionStreams(userId: number, tokenHash: string | null): number {
+  noteRevocation(tokenHash === null ? { userId, reconnect: true } : { userId, tokenHash, reconnect: true });
+  return closeMatching(
+    (entry) => entry.userId === userId && (tokenHash === null || entry.tokenHash === tokenHash),
+    "RECONNECT",
+  );
+}
+
+/**
+ * Un changement de contexte postérieur au repère (`reconnectSessionStreams`)
+ * vise-t-il ce flux ? Le flux qui l'a manqué pendant son ouverture doit alors
+ * se reconnecter pour relire la session.
+ */
+export function reconnectRequestedSince(userId: number, tokenHash: string, mark: number): boolean {
+  prune(Date.now());
+  return revocations().reconnects.some(
+    (entry) =>
+      entry.mark > mark &&
+      entry.userId === userId &&
+      (entry.tokenHash === undefined || entry.tokenHash === tokenHash),
+  );
+}
+
 /** Oublie tous les flux inscrits (sans les fermer) et les révocations récentes. Réservé aux tests. */
 export function resetSessionStreams(): void {
   registry().clear();
   revocations().recent = [];
+  revocations().reconnects = [];
 }
 
 /** Pour les tests : nombre de flux inscrits. */

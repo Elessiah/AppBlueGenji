@@ -73,6 +73,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { RgpdEn } from "./RgpdEn";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
+import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
   NOTIFIER_FOLLOW_UP,
@@ -421,7 +422,7 @@ function RgpdFr({
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
           demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo — le staff est averti de votre demande sans que vous soyez nommé, et les modérateurs suppriment à la main les alertes qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
-          d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés restent nommés dans les journaux du serveur, selon leur rotation
+          d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés, et, pour tout titulaire d&apos;un rôle de plateforme (développeur compris), ses bascules vers et depuis la vue joueur, restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
@@ -637,7 +638,8 @@ function RgpdFr({
               durée 30 jours, déposé <strong>à la connexion</strong>. Il contient
               uniquement un jeton aléatoire, qui ne dit rien de vous et permet de vous
               reconnaître sur la plateforme ; nos serveurs n&apos;en gardent que
-              l&apos;empreinte (SHA-256), jamais le jeton lui-même. Il est supprimé à la
+              l&apos;empreinte (SHA-256), jamais le jeton lui-même, avec la session qu&apos;il ouvre (dont,
+              pour un compte qui porte un rôle de plateforme et passe en vue joueur, l&apos;échéance de celle-ci). Il est supprimé à la
               déconnexion. Il remplace <strong>bg_session</strong>, que le site efface
               s&apos;il le trouve encore.
             </li>
@@ -1254,6 +1256,12 @@ function RgpdFr({
             l&apos;identifiant du compte visé et les rôles enregistrés, au titre de l&apos;intérêt légitime
             (administration de la plateforme), auquel la personne concernée peut s&apos;opposer (section{" "}
             <a href="#exercer-vos-droits">« Exercer vos droits »</a> ; <Link href="/rgpd/registre#t05">registre, T05</Link>).
+            Un compte qui porte un rôle de plateforme (développeur compris) peut suspendre ses droits sur une de ses
+            sessions pour voir le site comme un joueur (« vue joueur »), {PLAYER_VIEW_MAX_HOURS} heures au plus : rien n&apos;en est dit
+            sur Discord ; les journaux du serveur gardent son pseudo, son identifiant et le sens de la bascule (activée ou
+            quittée), selon leur rotation, au titre de l&apos;intérêt légitime (administration de la plateforme), auquel il
+            peut s&apos;opposer ; l&apos;échéance de la vue joueur est notée sur la session et s&apos;efface avec elle
+            (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Un rôle de plateforme s&apos;affiche aussi comme un titre (administrateur, arbitre…) sur votre fiche de joueur,
             que lit tout membre connecté, quels que soient vos réglages de visibilité ; le rôle développeur, qui
             n&apos;ouvre que la lecture de la documentation technique du site et du bot (publiée sur GitHub), n&apos;y

@@ -45,6 +45,7 @@
  */
 
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
+import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { AUDIENCE_MAX_ENGAGED_MINUTES, AUDIENCE_MIN_VISITORS, AUDIENCE_RAW_RETENTION_MONTHS } from "@/lib/shared/audience";
 import {
@@ -2189,6 +2190,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui était inexact : le registre ne citait, comme public de la fiche, que les données que le joueur rend visibles. Or le titre d'un rôle de plateforme y paraît toujours, pour tout membre connecté. Il disparaît quand le rôle est retiré, et avec l'anonymisation d'un compte supprimé.",
       "Le rôle développeur, nouveau, n'ouvre que la lecture de la documentation technique du site et du bot (publiée sur GitHub) : il ne donne accès à aucune donnée de membre, ne fait pas partie du staff et ne paraît pas sur la fiche. Son attribution ou son retrait est noté comme celui des autres rôles : au journal du staff sur Discord sans nommer personne, avec son auteur, le compte visé et les rôles enregistrés dans les journaux du serveur.",
       "Ce qui ne change pas : rien de nouveau n'est collecté sur toi, et ce que la suppression du compte emporte reste le même.",
+    ],
+  },
+  {
+    // ADMIN-VIEW-TOGGLE — « vue joueur » : un titulaire de rôle de plateforme
+    // (staff ou développeur) suspend ses droits sur une session, 12 h au plus ;
+    // l'échéance vit sur la session (`bg_user_sessions.player_view_until`),
+    // chaque bascule laisse une ligne nominative dans pm2 (`auditStaffAction`),
+    // rien sur Discord. Une nouvelle trace nommée du staff : déclarée comme
+    // celle des rôles de plateforme, pour tous les comptes (n'importe quel
+    // compte peut recevoir un rôle). Registre T01 et T05, /rgpd (FR et EN).
+    // Datée du lendemain de la mise en ligne prévue, comme
+    // `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-vue-joueur-du-staff",
+    publishedAt: "2026-11-20",
+    title: "Vue joueur : le staff peut voir le site comme un joueur",
+    links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
+    summary: `Un compte qui porte un rôle de plateforme (membre du staff ou développeur) peut suspendre ses droits sur une de ses sessions pour voir le site comme un joueur, ${PLAYER_VIEW_MAX_HOURS} heures au plus. Chaque bascule est notée, à son nom, dans les journaux du serveur.`,
+    details: [
+      "Rien n'en est dit sur Discord. Dans les journaux du serveur, chaque bascule (activée ou quittée) laisse une ligne avec le pseudo et l'identifiant de son auteur, selon leur rotation automatique ; base : l'intérêt légitime (administration de la plateforme), auquel la personne concernée peut s'opposer.",
+      "L'échéance de la vue joueur est notée sur la session de connexion et s'efface avec elle (déconnexion, fin de la session ou suppression du compte). Le temps de la bascule, le serveur garde en mémoire seulement, jamais écrits, le numéro du compte, l'heure des bascules et l'empreinte de la session.",
+      "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté, et ce que la suppression du compte emporte reste le même.",
     ],
   },
 ];

@@ -10,6 +10,7 @@ import {
   type LiveMessage,
 } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 import { FOCUS_REFRESH_MIN_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
+import { STREAM_RECONNECT_DATA } from "@/lib/shared/stream-reconnect";
 
 /**
  * Connexion au flux d'un tournoi (`_lib/live-connection.ts`), jouée sans DOM :
@@ -349,5 +350,46 @@ describe("fermeture", () => {
     connection!.close();
     connection = null;
     expect(source.closed).toBe(true);
+  });
+});
+
+describe("demande de reconnexion du serveur (contexte du lecteur changé)", () => {
+  const CONNECTED = JSON.stringify({ type: "connected", tournamentId: 7, tier: "STANDARD", viewer: {}, snapshot: { id: 7 } });
+
+  it("connect_reconnectFrame_reopensImmediatelyWithoutFallbackOrOffline", async () => {
+    const { onLiveChange, load, onMessage } = open();
+    const first = latest();
+    first.onopen!();
+
+    first.onmessage!({ data: STREAM_RECONNECT_DATA });
+
+    expect(first.closed).toBe(true);
+    expect(FakeEventSource.instances).toHaveLength(2);
+    expect(onLiveChange).not.toHaveBeenCalledWith(false);
+    expect(onMessage).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(60_000);
+    await settle();
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("connect_secondReconnectFrameWithoutConnected_usesBackoff", () => {
+    open();
+    latest().onmessage!({ data: STREAM_RECONNECT_DATA });
+
+    latest().onmessage!({ data: STREAM_RECONNECT_DATA });
+
+    expect(FakeEventSource.instances).toHaveLength(2);
+    jest.advanceTimersByTime(1_000);
+    expect(FakeEventSource.instances).toHaveLength(3);
+  });
+
+  it("connect_connectedBetweenReconnectFrames_immediateAgain", () => {
+    open();
+    latest().onmessage!({ data: STREAM_RECONNECT_DATA });
+    latest().onmessage!({ data: CONNECTED });
+
+    latest().onmessage!({ data: STREAM_RECONNECT_DATA });
+
+    expect(FakeEventSource.instances).toHaveLength(3);
   });
 });

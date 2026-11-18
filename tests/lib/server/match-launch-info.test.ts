@@ -249,7 +249,7 @@ beforeEach(() => {
   jest.mocked(withConnection).mockImplementation((run) => run(connectionFor(state)));
 });
 
-const viewer = { id: VIEWER, roles: [] };
+const viewer = { id: VIEWER, roles: [], playerView: false };
 
 describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
   it("rend un match en lancement avec son tournoi, ses équipes et l'hôte par défaut", async () => {
@@ -379,7 +379,7 @@ describe("listViewerMatchLaunches — coût de l'interrogation", () => {
     state.running = false;
 
     await listViewerMatchLaunches(viewer);
-    await listViewerMatchLaunches({ id: 2, roles: [] });
+    await listViewerMatchLaunches({ id: 2, roles: [], playerView: false });
 
     expect(state.reads.filter((sql) => sql.includes("AS running"))).toHaveLength(1);
   });
@@ -1005,7 +1005,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
 
   it("un arbitre ne lit, par la modale, aucun match dont il n'est pas partie", async () => {
     state.viewerMemberships = [];
-    const referee = { id: VIEWER, roles: ["ARBITRE" as const] };
+    const referee = { id: VIEWER, roles: ["ARBITRE" as const], playerView: false };
     expect(await listViewerMatchLaunches(referee)).toEqual([]);
     expect(state.reads.find((sql) => sql.includes("t.name AS tournament_name"))).not.toContain("1 = 1 OR");
   });
@@ -1038,7 +1038,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
   // Décision du 2026-10-19 : l'arbitre (permission `tournaments`) lit, par la
   // carte, les mêmes contacts que les joueurs du match, aux mêmes moments.
   describe("arbitre", () => {
-    const referee = { id: VIEWER, roles: ["ARBITRE" as const] };
+    const referee = { id: VIEWER, roles: ["ARBITRE" as const], playerView: false };
     const hiddenCaptain = () =>
       member(TEAM2, 5, {
         roles_json: JSON.stringify(["CAPITAINE"]),
@@ -1114,10 +1114,10 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     });
 
     it("vaut pour un administrateur, pas pour un caster sans arbitrage", async () => {
-      await expect(loadViewerMatchContacts({ id: VIEWER, isAdmin: true }, 42)).resolves.toMatchObject({
+      await expect(loadViewerMatchContacts({ id: VIEWER, isAdmin: true, playerView: false }, 42)).resolves.toMatchObject({
         viewer: { role: "REFEREE" },
       });
-      await expect(loadViewerMatchContacts({ id: VIEWER, roles: ["CASTER"] }, 42)).resolves.toBeNull();
+      await expect(loadViewerMatchContacts({ id: VIEWER, roles: ["CASTER"], playerView: false }, 42)).resolves.toBeNull();
     });
 
     it("ne présente rien à l'arbitre dans la modale de lancement", async () => {
@@ -1142,7 +1142,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.writes = [];
       state.viewerMemberships = [];
       state.members = [member(TEAM1, VIEWER)];
-      const seen = await loadViewerMatchContacts({ id: 1234, roles: ["ARBITRE"] }, 42);
+      const seen = await loadViewerMatchContacts({ id: 1234, roles: ["ARBITRE"], playerView: false }, 42);
       expect(seen?.casters).toEqual([]);
     });
 
@@ -1179,7 +1179,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.users = [casterUser(VIEWER)];
       const [asReferee] = await listViewerMatchLaunches(referee);
       expect(asReferee?.viewer).toMatchObject({ role: "CASTER", isReferee: false, isCaster: true, earlyContacts: true });
-      const [asCaster] = await listViewerMatchLaunches({ id: VIEWER });
+      const [asCaster] = await listViewerMatchLaunches({ id: VIEWER, playerView: false });
       expect(asCaster?.viewer).toMatchObject({ role: "CASTER", isReferee: false, isCaster: true, earlyContacts: false });
     });
   });
@@ -1273,7 +1273,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     state.viewerMemberships = [];
     state.candidates = [candidate({ referee_user_id: VIEWER, referee_ready_at: OPENED })];
     state.users = [casterUser(VIEWER, { pseudo: "Moi", platform_roles_json: JSON.stringify(["ARBITRE"]) })];
-    const [info] = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"] });
+    const [info] = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"], playerView: false });
     expect(info.viewer).toMatchObject({ role: "MATCH_REFEREE", canDeclareReady: true, isReferee: true, ready: true });
     expect(info.referee).toMatchObject({ isViewer: true, ready: true });
   });
@@ -1363,7 +1363,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       casterUser(VIEWER, { pseudo: "Moi", platform_roles_json: JSON.stringify(["ARBITRE"]), referee_objection_at: OPENED }),
     ];
 
-    const launches = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"] });
+    const launches = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"], playerView: false });
 
     expect(launches.some((info) => info.viewer.role === "MATCH_REFEREE")).toBe(false);
   });
@@ -1408,7 +1408,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
       state.users = [juge()];
 
-      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"], playerView: false }, 42);
 
       expect(info?.viewer.role).toBe("REFEREE");
       expect(info?.referee).toBeDefined();
@@ -1421,7 +1421,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       state.candidates = [candidate({ referee_user_id: VIEWER, self_managed: 0 })];
       state.users = [casterUser(VIEWER, { discord_pseudo: "moi", platform_roles_json: JSON.stringify(["ARBITRE"]) })];
 
-      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"], playerView: false }, 42);
 
       expect(info?.viewer).toMatchObject({ role: "MATCH_REFEREE", isReferee: true });
       expect(info?.referee).toMatchObject({ isViewer: true, discordTag: null });
@@ -1551,7 +1551,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       ];
       state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
 
-      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"], playerView: false }, 42);
 
       expect(info?.viewer.role).toBe("CASTER");
       expect(info?.phase).toBe("SCHEDULED");
@@ -1572,7 +1572,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
         ];
         state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
 
-        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"], playerView: false }, 42);
 
         expect(info?.referee).toMatchObject({ contactsShown: false, contactsPending: true });
       });
@@ -1619,7 +1619,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
         state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
         state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
 
-        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+        const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"], playerView: false }, 42);
 
         expect(info?.referee).toMatchObject({ contactsShown: true });
         expect(info?.referee).not.toHaveProperty("contactsPending");
@@ -1642,7 +1642,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
       state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
 
-      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"], playerView: false }, 42);
 
       expect(info?.viewer.role).toBe("CASTER");
       expect(info?.referee).toMatchObject({ discordTag: "juge", battletag: "Arbitre#1" });
@@ -1688,7 +1688,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
 // Décision du 2026-11-11 : l'arbitre désigné qui caste aussi le match lit ses
 // co-casters en arbitre désigné, dès que les deux adversaires sont connus.
 describe("loadViewerMatchContacts — arbitre désigné qui caste aussi le match", () => {
-  const staff = { id: VIEWER, roles: ["ARBITRE" as const] };
+  const staff = { id: VIEWER, roles: ["ARBITRE" as const], playerView: false };
   const self = (overrides: Record<string, unknown> = {}) =>
     casterUser(VIEWER, { pseudo: "Moi", platform_roles_json: JSON.stringify(["ARBITRE"]), ...overrides });
   const later = () => new Date(Date.now() + 3 * 3_600_000).toISOString();

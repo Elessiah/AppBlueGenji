@@ -285,6 +285,14 @@ sauter un envoi) et `decideStreamWrite` tranche avant chaque écriture :
   qui laisserait la file attendre un lecteur qui ne lit plus —, sa place de flux
   rendue. Un client vivant se reconnecte seul.
 
+**Contexte du lecteur changé** (équipe quittée, rôle changé, vue joueur —
+`reconnectUserStreams`, `reconnectSessionStreams`) : le flux reçoit la trame
+`{"type":"reconnect"}` (`lib/shared/stream-reconnect.ts`) puis se ferme ; un
+flux qui s'ouvrait pendant le changement ne reçoit qu'elle. Le client
+(`live-connection.ts`) rouvre sur-le-champ, sans témoin « Hors ligne » ni
+sondage de secours ; une seconde demande sans ouverture entre les deux passe
+par l'attente croissante.
+
 > Le **cast** (`CASTER`, permission `casting`) est prioritaire au même titre que
 > le staff : il commente le match pendant qu'il se joue, et le laisser au palier
 > spectateur lui ferait décrire un plateau vieux de vingt secondes. C'est la

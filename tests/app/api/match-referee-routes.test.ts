@@ -83,7 +83,7 @@ describe("POST / DELETE /api/matches/[matchId]/referee", () => {
     jest.mocked(takeMatchReferee).mockResolvedValue();
     const res = await refereePost(jsonRequest("POST"), params("42"));
     expect(res.status).toBe(200);
-    expect(takeMatchReferee).toHaveBeenCalledWith(42, 3);
+    expect(takeMatchReferee).toHaveBeenCalledWith(42, expect.objectContaining({ id: 3, playerView: false }));
   });
 
   it.each<[string, number]>([
@@ -104,7 +104,7 @@ describe("POST / DELETE /api/matches/[matchId]/referee", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(releaseMatchReferee).mockResolvedValue();
     expect((await refereeDelete(jsonRequest("DELETE"), params("42"))).status).toBe(200);
-    expect(releaseMatchReferee).toHaveBeenCalledWith(42, 3, false);
+    expect(releaseMatchReferee).toHaveBeenCalledWith(42, expect.objectContaining({ id: 3, playerView: false }), false);
     jest.mocked(releaseMatchReferee).mockRejectedValue(new Error("NOT_MATCH_REFEREE"));
     expect((await refereeDelete(jsonRequest("DELETE"), params("42"))).status).toBe(403);
   });
@@ -255,5 +255,16 @@ describe("PUT autogestion et première carte", () => {
 
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toEqual({ error: "MATCH_NOT_LAUNCHABLE" });
+  });
+});
+
+describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  it("refereeDelete_playerView_returns403WithoutReleasing", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, roles: [], playerView: true, playerViewAvailable: true }));
+
+    const res = await refereeDelete(jsonRequest("DELETE"), params("42"));
+
+    expect(res.status).toBe(403);
+    expect(releaseMatchReferee).not.toHaveBeenCalled();
   });
 });

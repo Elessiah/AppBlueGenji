@@ -38,7 +38,7 @@ describe("authUser", () => {
 
   it("ne porte que les champs d'`AuthUser`, aucune adresse", () => {
     expect(Object.keys(authUser()).sort()).toEqual(
-      ["avatarUrl", "certifyPromptDue", "discordId", "googleSub", "id", "isAdmin", "isAdult", "pseudo", "recruitmentModalBackOn", "recruitmentModalOff", "roles"],
+      ["avatarUrl", "certifyPromptDue", "discordId", "googleSub", "id", "isAdmin", "isAdult", "playerView", "playerViewAvailable", "playerViewUntil", "pseudo", "recruitmentModalBackOn", "recruitmentModalOff", "roles"],
     );
   });
 });
