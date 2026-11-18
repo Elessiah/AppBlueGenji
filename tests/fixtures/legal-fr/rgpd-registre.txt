@@ -58,6 +58,7 @@ Destinataires
 Public du site (seules les données que le joueur rend visibles)
 Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement, pour le BattleTag de tout contact présenté (joueur, caster, arbitre désigné) ; sur la page du match aussi, pour le BattleTag de l'arbitre désigné et des casters et, aux seules parties du match (jamais à un arbitre sans rôle sur ce match), celui des contacts des deux équipes — (BattleTag même masqué, pour s'ajouter en jeu, dans les seuls tournois Overwatch ; durées du traitement T04)
 Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag
+Joueurs connectés du site : titre de rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) sur la fiche du joueur, quels que soient ses réglages de visibilité — jamais le rôle développeur, qui n'y paraît pas
 Staff de l'association selon son rôle (administration, arbitrage)
 Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé
 Transferts hors UE

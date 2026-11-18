@@ -31,7 +31,8 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  *   pas un geste d'arbitrage ni de vitrine.
  * - `dev` — lecture de la documentation technique du site et du bot
  *   (`/devdoc`, `docs/features/DEVDOC.md`). Lecture seule : aucune écriture,
- *   aucune donnée de membre.
+ *   aucune donnée de membre lue en base (seulement les `.md` de la liste
+ *   blanche, tels que sur le serveur — jamais de note privée dans ces dossiers).
  */
 export type Permission =
   | "tournaments"
@@ -84,8 +85,8 @@ const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
   CASTER: ["casting", "live"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
-  // Lecture de `/devdoc` seulement : les dépôts et leur doc sont publics, la
-  // page ne fait que les rassembler pour qui travaille sur le code.
+  // Lecture de `/devdoc` seulement : la doc des dépôts, publiée sur GitHub,
+  // relue sur le serveur et rassemblée pour qui travaille sur le code.
   DEV: ["dev"],
 };
 
@@ -168,7 +169,9 @@ export function canAny(
 
 /**
  * Rôles qui ne font pas du staff : `DEV` ne donne que la lecture de `/devdoc`,
- * jamais les pages ou sections réservées au staff (`/bot`, `/bot/docs`).
+ * jamais les commandes ni les sections réservées au staff de `/bot` et
+ * `/bot/docs` (leurs fichiers, publics sur GitHub, restent lisibles dans
+ * `/devdoc` avec le reste de `doc/`), ni un titre public sur la fiche du joueur.
  */
 export const NON_STAFF_ROLES: readonly PlatformRole[] = ["DEV"];
 

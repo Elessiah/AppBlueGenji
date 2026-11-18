@@ -2170,6 +2170,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Un message non remis (messages privés fermés ou absent des serveurs) laisse au journal du staff sur Discord une ligne qui en donne l'issue en nombres (remis, introuvables, injoignables), et un envoi que le bot ne parvient pas à faire, une ligne qui donne l'erreur — sans nommer personne. Base : l'exécution du service que tu demandes.",
       "Ce qui ne change pas : rien de nouveau n'est écrit sur toi en base, et ce que la suppression du compte emporte reste le même.",
     ],
+  },  {
+    // DEVDOC-PAGE — rôle de plateforme « développeur » (lecture de /devdoc) et
+    // rectification : les titres de rôle de plateforme sont affichés sur la
+    // fiche du joueur à tout membre connecté, ce que /rgpd et le registre (T01,
+    // destinataires « seules les données que le joueur rend visibles ») ne
+    // disaient pas. /rgpd, paragraphe des rôles de plateforme (FR et EN),
+    // registre T01 et T05. Pour tous les comptes. Datée du lendemain de la mise
+    // en ligne prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si
+    // elle glisse.
+    id: "2026-11-roles-de-plateforme-fiche",
+    publishedAt: "2026-11-20",
+    title: "Rôles de plateforme : un titre sur la fiche, un rôle développeur",
+    links: [{ href: "/rgpd/registre#t01", label: "Lire la fiche T01 du registre" }],
+    summary:
+      "Rectification : un rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) s'affiche comme un titre sur la fiche du joueur, que lit tout membre connecté, quels que soient ses réglages de visibilité — /rgpd ne le disait pas. Un nouveau rôle, développeur, n'y paraît pas.",
+    details: [
+      "Ce qui était inexact : le registre ne citait, comme public de la fiche, que les données que le joueur rend visibles. Or le titre d'un rôle de plateforme y paraît toujours, pour tout membre connecté. Il disparaît quand le rôle est retiré, et avec l'anonymisation d'un compte supprimé.",
+      "Le rôle développeur, nouveau, n'ouvre que la lecture de la documentation technique du site et du bot (publiée sur GitHub) : il ne donne accès à aucune donnée de membre, ne fait pas partie du staff et ne paraît pas sur la fiche. Son attribution ou son retrait est noté comme celui des autres rôles : au journal du staff sur Discord sans nommer personne, avec son auteur, le compte visé et les rôles enregistrés dans les journaux du serveur.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté sur toi, et ce que la suppression du compte emporte reste le même.",
+    ],
   },
 ];
 

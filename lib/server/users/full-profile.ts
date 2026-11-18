@@ -7,7 +7,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { canSeeBattletagVerification } from "@/lib/shared/battletag-visibility";
-import { can, type PlatformRole } from "@/lib/shared/permissions";
+import { can, NON_STAFF_ROLES, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { getActiveSuspension } from "@/lib/server/account-suspensions";
 import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@/lib/shared/types";
@@ -266,8 +266,10 @@ export async function getFullProfile(
     // Ne pas divulguer qui est admin / quels rôles aux non-admins : réservé au viewer admin.
     isAdmin: viewerIsAdmin ? targetIsAdmin : false,
     roles: viewerIsAdmin ? targetRoles : [],
-    // Les rôles staff sont des titres publics affichés à tous les visiteurs.
-    displayRoles: targetRoles,
+    // Les rôles staff sont des titres publics affichés à tous les visiteurs
+    // (`/rgpd`, registre T01). `DEV` n'est pas un titre de staff
+    // (`NON_STAFF_ROLES`) : il ne paraît pas sur la fiche.
+    displayRoles: targetRoles.filter((role) => !NON_STAFF_ROLES.includes(role)),
     isSelf,
     viewerIsAdmin,
     canModerate,

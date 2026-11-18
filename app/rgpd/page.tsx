@@ -1254,6 +1254,10 @@ function RgpdFr({
             l&apos;identifiant du compte visé et les rôles enregistrés, au titre de l&apos;intérêt légitime
             (administration de la plateforme), auquel la personne concernée peut s&apos;opposer (section{" "}
             <a href="#exercer-vos-droits">« Exercer vos droits »</a> ; <Link href="/rgpd/registre#t05">registre, T05</Link>).
+            Un rôle de plateforme s&apos;affiche aussi comme un titre (administrateur, arbitre…) sur votre fiche de joueur,
+            que lit tout membre connecté, quels que soient vos réglages de visibilité ; le rôle développeur, qui
+            n&apos;ouvre que la lecture de la documentation technique du site et du bot (publiée sur GitHub), n&apos;y
+            paraît pas (<Link href="/rgpd/registre#t01">registre, T01</Link>).
           </p>
           <p id="messages-d-equipe">
             <strong>Messages privés Discord d&apos;équipe.</strong> Le bot vous écrit aussi en privé, dans la langue

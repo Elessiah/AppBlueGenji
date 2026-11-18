@@ -29,8 +29,9 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
     // (TEAM-DM-OPTOUT) et l'avis d'exclusion du bot (BOT-LOT), datés du même jour, la suivent,
     // puis le rectificatif de la marque de session (EF-63), les trois entrées d'EF-65 (2026-11-18),
     // les statistiques de fréquentation détaillées (STATS-PAGE, 2026-11-18), l'empreinte
-    // perceptuelle des avatars bloqués (EF-72, 2026-11-19).
-    expect(PRIVACY_CHANGES.at(-14)?.id).toBe(ID);
+    // perceptuelle des avatars bloqués (EF-72, 2026-11-19), « Tester mes MP » et
+    // les rôles de plateforme (DEVDOC-PAGE, 2026-11-20).
+    expect(PRIVACY_CHANGES.at(-15)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {

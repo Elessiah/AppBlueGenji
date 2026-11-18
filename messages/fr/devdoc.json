@@ -4,7 +4,7 @@
   },
   "eyebrow": "DÉVELOPPEMENT · DOCUMENTATION",
   "title": "Documentation développeur",
-  "lead": "Toute la documentation du site et du bot, relue depuis les dépôts.",
+  "lead": "Toute la documentation du site et du bot, telle qu'elle est sur le serveur.",
   "repos": {
     "site": "Site",
     "bot": "Bot Discord"

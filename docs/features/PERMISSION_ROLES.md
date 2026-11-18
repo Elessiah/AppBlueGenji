@@ -35,11 +35,16 @@ s'additionnent.
 - `recruitment` — `/api/recruitment/*`.
 - `roles` — `POST /api/admin/users/[id]/roles` (réservé `ADMIN`).
 - `dev` — page `/devdoc` (documentation du site et du bot, `DEVDOC.md`) et
-  lien « Documentation dev » du menu du compte. **Lecture seule**, sans aucune
-  donnée de membre : les dépôts et leur doc sont publics, la page ne fait que
-  les rassembler. Rôle `DEV` (et `ADMIN`). `DEV` ne fait **pas** du staff :
-  `isStaffMember` l'écarte (`NON_STAFF_ROLES`), si bien qu'il n'ouvre ni les
-  commandes ni les sections staff de `/bot` et `/bot/docs`.
+  lien « Documentation dev » du menu du compte. **Lecture seule**, aucune
+  donnée de membre lue en base : la page sert les `.md` des dossiers de la
+  liste blanche tels qu'ils sont sur le serveur (copie de travail, publiée sur
+  GitHub — d'où la règle : jamais de note privée dans ces dossiers). Rôle `DEV`
+  (et `ADMIN`). `DEV` ne fait **pas** du staff : `isStaffMember` l'écarte
+  (`NON_STAFF_ROLES`), si bien qu'il n'ouvre ni les commandes ni les sections
+  staff de `/bot` et `/bot/docs` — mais `/devdoc` lui montre tout `doc/` du
+  bot, dont les fichiers de ces sections (publics sur GitHub) : la réserve de
+  `/bot/docs` est une présentation, pas un secret. `DEV` n'est pas non plus un
+  titre public : la fiche du joueur ne l'affiche pas (`displayRoles`).
 - `moderation` — panneau `/admin/signalements`, `/api/admin/reports/*`,
   `/api/admin/logo-quarantines/*`, `DELETE /api/admin/teams/[id]/logo`,
   `DELETE /api/admin/users/[id]/avatar` (réservé `ADMIN` : retirer le contenu

@@ -1,8 +1,13 @@
 # Documentation développeur (`/devdoc`)
 
 Page réservée qui rassemble **toute** la documentation Markdown du site et du
-bot, relue à chaud depuis les deux dépôts. Les dépôts et leur doc sont publics :
-la porte ne protège que la page elle-même (rien n'y est masqué ni caviardé).
+bot, relue à chaud sur le serveur, dans la copie de travail des deux dépôts
+(voir « Copie de travail, pas Git »). Ces documents sont publiés sur GitHub :
+la porte ne protège que la page elle-même (rien n'y est masqué ni caviardé), et
+le lecteur `DEV` ne lit aucune donnée de membre en base. Les fichiers des
+sections staff de `/bot/docs` (`doc/internal-api.md`, `doc/main.md`…) y sont
+lisibles comme le reste de `doc/` : leur réserve sur `/bot/docs` n'est qu'une
+présentation, le dépôt du bot étant public.
 
 ## Accès
 
@@ -51,7 +56,21 @@ Les conditions du bot (`LegalTerms/`) restent sur leurs propres pages.
 **Copie de travail, pas Git.** L'index lit le disque, pas `git ls-files` : un
 `.md` non suivi ou ignoré posé dans ces dossiers sur le serveur (note locale,
 journal) serait lisible par tout compte `dev`. Ne jamais y déposer de note
-privée ni de secret ; les secrets vivent dans `.env*`, hors liste blanche.
+privée, de donnée de membre ni de secret ; les secrets vivent dans `.env*`,
+hors liste blanche. C'est cette règle qui fonde « aucune donnée de membre »
+(`PERMISSION_ROLES.md`), et ce que veut dire « lue sur le serveur » dans
+l'en-tête de la page. Un correctif posé à la main sur le serveur y paraît avant
+d'être sur `main`, que vise le lien « Voir sur GitHub ».
+
+**Rôle `DEV` et vie privée.** Le rôle s'attribue et se retire comme les autres
+(journal du staff sur Discord sans nom, auteur dans les journaux du serveur —
+`/rgpd`, registre T05) ; il ne paraît pas sur la fiche du joueur, où seuls les
+titres de staff sont publics (`displayRoles`, `NON_STAFF_ROLES`), et il
+n'ouvre pas la fenêtre « Arbitrage » ni n'y est lu (`REFEREE_ROLE_SQL`).
+Le nouveau rôle et la publicité des titres de staff sur la fiche (rectification :
+le registre T01 ne la disait pas) sont annoncés par l'entrée
+`2026-11-roles-de-plateforme-fiche` de `PRIVACY_CHANGES` (FR et EN), `/rgpd`
+et le registre T01.
 
 L'index est refait au plus une fois par minute (`loadDevDocIndex`), en lisant
 seulement les 8 premiers Ko de chaque fichier pour son titre (premier `#` hors

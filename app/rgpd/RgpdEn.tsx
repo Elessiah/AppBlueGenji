@@ -1055,6 +1055,9 @@ export function RgpdEn({
             account concerned and the roles saved, on the basis of legitimate interest (administration of the
             platform), to which the person concerned may object (section{" "}
             <a href="#exercer-vos-droits">“Exercising your rights”</a>; <LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+            A platform role is also shown as a title (administrator, referee…) on your player page, which any logged-in
+            member reads, whatever your visibility settings; the developer role, which only opens reading the technical
+            documentation of the site and the bot (published on GitHub), does not appear there (<LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>).
           </p>
           <p id="messages-d-equipe">
             <strong>Team Discord direct messages.</strong> The bot also writes to you privately, in your account&apos;s

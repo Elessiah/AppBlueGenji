@@ -1149,6 +1149,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "A message not delivered (direct messages closed or not on any of the servers) leaves a line giving its outcome as counts (delivered, not found, unreachable) in the staff log on Discord, and a sending the bot cannot carry out, a line giving the error — without naming anyone. Basis: performance of the service you request.",
       "What does not change: nothing new about you is written to the database, and what deleting the account removes stays the same.",
     ],
+  },  "2026-11-roles-de-plateforme-fiche": {
+    linkLabels: ["Read record T01 of the register"],
+    title: "Platform roles: a title on the player page, a developer role",
+    summary:
+      "Correction: a platform role (administrator, referee, caster, community manager, recruiter) is shown as a title on the player page, which any logged-in member reads, whatever their visibility settings — /rgpd did not say so. A new role, developer, does not appear there.",
+    details: [
+      "What was inaccurate: the register only named, as the public of the player page, the data the player makes visible. Yet the title of a platform role always appears there, for any logged-in member. It disappears when the role is removed, and with the anonymization of a deleted account.",
+      "The developer role, which is new, only opens reading the technical documentation of the site and the bot (published on GitHub): it gives access to no member data, is not part of the staff and does not appear on the player page. Granting or removing it is logged like the other roles: in the staff log on Discord naming no one, with its author, the account concerned and the roles saved in the server logs.",
+      "What does not change: nothing new about you is collected, and what deleting the account removes stays the same.",
+    ],
   },
 };
 
